@@ -52,8 +52,8 @@ export async function GET(req: NextRequest) {
       }))
     });
   } catch (error: any) {
-    console.error('获取历史生图任务失败:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('获取历史生图任务失败 (使用本地状态兜底):', error);
+    return NextResponse.json({ success: true, tasks: [], warning: error.message });
   }
 }
 
