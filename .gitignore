@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+web-app/node_modules/
+
+# Next.js build output
+.next/
+web-app/.next/
+out/
+web-app/out/
+build/
+web-app/build/
+
+# Local Environment Variables
+.env*.local
+
+# System & IDE files
+.DS_Store
+*/.DS_Store
+*.pem
+*.log
+.vscode/
+.idea/
+
+# Next.js TypeScript
+*.tsbuildinfo
+next-env.d.ts
+web-app/next-env.d.ts
+web-app/src/generated/prisma

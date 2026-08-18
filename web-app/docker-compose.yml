@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  azhuo-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: azhuo-studio
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:/app/prisma/dev.db
+      # AI 绘图与视觉模型接口配置 (服务端全局默认)
+      - AI_DRAWING_BASE_URL=${AI_DRAWING_BASE_URL:-https://ai.comfly.org}
+      - AI_DRAWING_API_KEY=${AI_DRAWING_API_KEY}
+      # 电商接口配置 (可选)
+      - WANBANG_API_KEY=${WANBANG_API_KEY}
+      - WANBANG_API_SECRET=${WANBANG_API_SECRET}
+      - EXTERNAL_SCRAPER_ID=${EXTERNAL_SCRAPER_ID}
+      - EXTERNAL_SCRAPER_SECRET=${EXTERNAL_SCRAPER_SECRET}
+      # 云端对象存储配置 (推荐：配置 R2/OSS/COS 确保多用户图片永久留存)
+      - STORAGE_ENABLED=${STORAGE_ENABLED:-false}
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-r2}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_PUBLIC_DOMAIN=${S3_PUBLIC_DOMAIN}
+    volumes:
+      # 持久化 SQLite 数据库和本地媒体存储
+      - ./data/prisma:/app/prisma
+      - ./data/storage:/app/public/storage
