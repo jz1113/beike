@@ -1,0 +1,28 @@
+[package]
+name = "azhuo-workbench"
+version = "0.1.0"
+description = "贝壳云图桌面壳"
+authors = ["azhuo"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "azhuo_workbench_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+sysinfo = "0.33"
+dirs = "6"
+getrandom = "0.2"
+keyring = "3"

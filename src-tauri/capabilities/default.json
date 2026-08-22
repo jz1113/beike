@@ -1,0 +1,16 @@
+{
+  "identifier": "default",
+  "description": "主窗口默认能力",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-title",
+    "allow-desktop-api",
+    "allow-credentials",
+    "dialog:default",
+    "opener:allow-reveal-item-in-dir",
+    "opener:allow-open-url"
+  ]
+}

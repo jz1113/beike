@@ -1,0 +1,15 @@
+[[permission]]
+identifier = "allow-desktop-api"
+description = "允许桌面 API 与基址命令"
+commands.allow = [
+  "get_api_base",
+  "desktop_api",
+  "save_desktop_env",
+  "get_app_data_dir",
+  "get_default_download_dir",
+  "get_system_memory",
+  "get_app_memory_usage",
+  "get_disk_usage",
+  "register_download_directory",
+  "save_download_file",
+]

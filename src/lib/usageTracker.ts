@@ -1,4 +1,4 @@
-// web-app/src/lib/usageTracker.ts
+// src/lib/usageTracker.ts
 'use client';
 
 /**
@@ -97,6 +97,7 @@ export const COMFY_MODEL_PRICING: Record<string, ModelPricingRule> = {
   'gpt-image-2': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.06 },
   'gpt-image-2-all': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.04 },
   'gpt-image-2-4k': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.08 },
+  'gpt-image-2-2k': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.06 },
   'image2-4k': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.08 },
   'gpt-image-1': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.06 },
   'gpt-image-1.5': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.06 },
@@ -250,6 +251,7 @@ export function estimateModelCost(
     const count = params.mediaCount || 1;
     if (rule?.fixedPerUnit) return count * rule.fixedPerUnit;
     if (m.includes('gpt-image-2-4k') || m.includes('image2-4k')) return count * 0.08;
+    if (m.includes('gpt-image-2-2k')) return count * 0.06;
     if (m.includes('gpt-image-2')) return count * 0.06;
     if (m.includes('seedream-5') || m.includes('seededit')) return count * 0.15;
     if (m.includes('seedream')) return count * 0.14;
@@ -324,6 +326,45 @@ export function getUsageLogs(): UsageLogItem[] {
 }
 
 /**
+ * 安全保存用量日志到 LocalStorage，若超额自动降级梯度缩减历史容量，杜绝 QuotaExceededError 异常抛出
+ */
+function safeSaveUsageLogs(logs: UsageLogItem[]): void {
+  if (typeof window === 'undefined') return;
+
+  // 默认保留最近 250 条，防止挤占 LocalStorage 5MB 配额
+  let targetList = logs.slice(0, 250);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(targetList));
+      return;
+    } catch (e: any) {
+      const isQuota = 
+        e?.name === 'QuotaExceededError' || 
+        e?.code === 22 || 
+        e?.code === 1014 || 
+        e?.number === -2147024882 ||
+        (typeof e?.message === 'string' && e.message.toLowerCase().includes('quota'));
+
+      if (isQuota) {
+        // 容量超标，按梯度裁减：250 -> 100 -> 40 -> 10 -> 0
+        const nextLen = Math.floor(targetList.length * 0.4);
+        if (nextLen < 5) {
+          try {
+            localStorage.removeItem(STORAGE_KEY);
+          } catch {}
+          return;
+        }
+        targetList = targetList.slice(0, nextLen);
+      } else {
+        // 其它非配额异常直接退出
+        return;
+      }
+    }
+  }
+}
+
+/**
  * 记录一次真实模型调用
  */
 export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | 'costUsd' | 'costRmb'> & { 
@@ -373,12 +414,8 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
       };
 
       logs.unshift(newLog);
-      // 保留最近 1000 条调用记录
-      const trimmed = logs.slice(0, 1000);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-    } catch (e) {
-      console.error('记录用量统计失败:', e);
-    }
+      safeSaveUsageLogs(logs);
+    } catch {}
   }
 }
 

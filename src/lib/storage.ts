@@ -14,35 +14,7 @@ export interface StorageConfig {
 }
 
 /**
- * 客户端辅助函数：获取本地配置的对象存储请求头 (用于传给后端非阻塞转存)
- */
-export function getClientStorageHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const enabled = localStorage.getItem('storage_enabled') === 'true';
-    if (!enabled) return {};
-    const config: StorageConfig = {
-      enabled: true,
-      provider: (localStorage.getItem('storage_provider') as any) || 'r2',
-      accountId: localStorage.getItem('storage_account_id') || '',
-      endpoint: localStorage.getItem('storage_endpoint') || '',
-      accessKeyId: localStorage.getItem('storage_access_key_id') || '',
-      secretAccessKey: localStorage.getItem('storage_secret_access_key') || '',
-      bucketName: localStorage.getItem('storage_bucket_name') || '',
-      publicDomain: localStorage.getItem('storage_public_domain') || ''
-    };
-    return {
-      'x-storage-config': typeof btoa !== 'undefined' 
-        ? btoa(unescape(encodeURIComponent(JSON.stringify(config))))
-        : JSON.stringify(config)
-    };
-  } catch {
-    return {};
-  }
-}
-
-/**
- * 从 NextRequest 或请求 Body 中提取前端传递的存储配置
+ * 从 Request 或请求 Body 中提取前端传递的存储配置
  */
 export function extractStorageConfigFromRequest(req: any, body?: any): StorageConfig | undefined {
   if (body?.storageConfig) return body.storageConfig;
@@ -223,10 +195,20 @@ export async function persistMediaUrl(
       return tempUrl;
     }
 
-    const permanentUrl = await uploadRemoteMediaToStorage(tempUrl, {
-      keyPrefix: mediaType === 'video' ? 'videos' : 'images',
-      customConfig: config
-    });
+    let permanentUrl: string | null = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        permanentUrl = await uploadRemoteMediaToStorage(tempUrl, {
+          keyPrefix: mediaType === 'video' ? 'videos' : 'images',
+          customConfig: config
+        });
+        if (permanentUrl) break;
+      } catch (uploadErr) {
+        if (attempt === 1) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      }
+    }
 
     // 自动更新数据库中的记录为永久链接
     if (permanentUrl && taskId) {

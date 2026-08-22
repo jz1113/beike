@@ -1,10 +1,27 @@
+/** 跨批次反雷同签名：场景 + 动作/表情库摘要 */
+export interface PreviousGroupSignature {
+  scene: string;
+  actionDigest: string;
+}
+
 export interface VisionAnalyzeParams {
   productTitle: string;
+  productProps?: Record<string, string>;
   imageUrls?: string[];
   templateStyle?: string;
   shotCount?: number;
   extraRequirements?: string;
   model?: string;
+  /** 模特人设文字（原创种草人像） */
+  modelPersona?: string;
+  /** 是否已上传专属正脸 ID 图 */
+  hasAnchorFace?: boolean;
+  /** 架构模式：默认种草人像 8 段骨架；纯商品静物可走 no_model */
+  architectureMode?: 'seed_portrait' | 'pure_product' | 'auto';
+  /** 本会话近期 master_scene 摘要，用于跨批次反雷同（兼容旧字段） */
+  previousMasterScenes?: string[];
+  /** 本会话近期组签名（场景 + 动作库），优先于 previousMasterScenes */
+  previousGroupSignatures?: PreviousGroupSignature[];
 }
 
 export interface ShotPrompt {
@@ -12,6 +29,10 @@ export interface ShotPrompt {
   title?: string;
   prompt: string;
   scene?: string;
+  expression?: string; // 本镜表情关键词（组内强制差异）
+  action?: string; // 本镜动作/道具互动（组内强制差异）
+  prop?: string; // 本镜道具
+  optics?: string; // 光学短句
   camera_focal_length?: string; // 🌟 摄影焦段 (如: 85mm f/1.8 浅景深, 35mm 人文机位, 100mm 微距特写)
   angle?: string; // 🌟 机位视角 (如: 45° 沉浸俯角, 平视平角, 超低仰角, 越肩抓拍)
   lighting_type?: string; // 🌟 采光属性 (如: 5500K 百叶窗晨光, 柔和漫反射, 侧逆光轮廓)
@@ -19,6 +40,16 @@ export interface ShotPrompt {
   shot_type?: 'model_shot' | 'hand_held_only' | 'pure_product'; // 🌟 分镜类型
   productImageUrl?: string; // 🌟 该分镜绑定的具体商品素材图（正面/背面/侧面实物图）
   selected?: boolean;
+}
+
+export function buildActionDigestFromShots(
+  shots: Array<{ expression?: string; action?: string }>
+): string {
+  return shots
+    .map((s) => [s.expression, s.action].filter(Boolean).join('/'))
+    .filter(Boolean)
+    .slice(0, 6)
+    .join(' | ');
 }
 
 export interface StylePresetItem {
@@ -107,12 +138,20 @@ export const VISION_MODELS: VisionModel[] = [
     description: 'Google 旗舰视觉模型，中文生活化场景推断最强'
   },
   { 
-    id: 'grok-4.6', 
-    name: 'Grok 4.6',
-    shortName: 'Grok 4.6',
-    provider: 'xAI',
-    badge: '反AI纪实',
-    description: 'xAI 自然语言表达与生活感反 AI 拍摄提示词生成'
+    id: 'gpt-5.6-luna', 
+    name: 'gpt-5.6-luna (多模态)',
+    shortName: 'gpt-5.6-luna',
+    provider: 'OpenAI',
+    badge: '多模态',
+    description: 'OpenAI 新一代多模态视觉推理与生活化空间构图'
+  },
+  { 
+    id: 'gemini-3.7-flash', 
+    name: 'gemini-3.7-flash',
+    shortName: 'gemini-3.7-flash',
+    provider: 'Google',
+    badge: '多模态极速',
+    description: 'Google 新一代多模态推理与生活化场景解构'
   },
   { 
     id: 'gpt-5.5-pro', 
@@ -120,102 +159,253 @@ export const VISION_MODELS: VisionModel[] = [
     shortName: 'GPT 5.5 Pro',
     provider: 'OpenAI',
     badge: '多模态旗舰',
-    description: 'OpenAI 顶级综合理解能力'
+    description: 'OpenAI 顶级综合理解能力与物理一致性把控'
+  },
+  { 
+    id: 'grok-4.6', 
+    name: 'Grok 4.6 (反AI纪实)',
+    shortName: 'Grok 4.6',
+    provider: 'xAI',
+    badge: '反AI纪实',
+    description: 'xAI 自然语言表达与生活感反 AI 拍摄提示词生成'
+  },
+  { 
+    id: 'claude-3-7-sonnet-thinking', 
+    name: 'Claude 3.7 Sonnet (思考)',
+    shortName: 'Claude 3.7 Sonnet',
+    provider: 'Anthropic',
+    badge: '深度推理',
+    description: 'Anthropic 旗舰思考模型，超高审美细节与质感策划'
+  },
+  { 
+    id: 'gemini-2.5-flash', 
+    name: 'Gemini 2.5 Flash',
+    shortName: 'Gemini 2.5 Flash',
+    provider: 'Google',
+    badge: '极速秒级',
+    description: '秒级极速响应，适合轻量级快速分镜构思'
   }
 ];
+
+export function pickVisionAnalyzeFallbacks(selectedId: string, availableIds: string[]): string[] {
+  const selected = (selectedId || '').trim();
+  const ids = availableIds.map((id) => String(id || '').trim()).filter(Boolean);
+  const preferred = ['gemini-3.7-flash', 'gemini-2.5-flash'];
+  const isThinking = (id: string) => {
+    const s = id.toLowerCase();
+    return s.includes('thinking') || s.includes('luna') || s.includes('terra') || s.includes('pro-preview');
+  };
+  const picked: string[] = [];
+  for (const id of preferred) {
+    if (id !== selected && ids.includes(id) && !picked.includes(id)) picked.push(id);
+  }
+  for (const id of ids) {
+    if (picked.length >= 2) break;
+    if (id === selected || picked.includes(id) || isThinking(id)) continue;
+    picked.push(id);
+  }
+  return picked.slice(0, 2);
+}
+
+export function normalizeVisionModelId(modelId?: string): string {
+  if (!modelId) return 'gpt-5.6-luna';
+  const clean = modelId.trim().toLowerCase();
+  if (clean === 'gpt-4-vision-preview' || clean === 'gpt-4-turbo-vision') {
+    return 'gpt-4o';
+  }
+  if (clean === 'gemini-1.5-flash' || clean === 'gemini-2.0-flash') {
+    return 'gemini-2.5-flash';
+  }
+  if (clean === 'gemini-1.5-pro' || clean === 'gemini-2.5-pro') {
+    return 'gemini-3.1-pro-preview-thinking-high';
+  }
+  if (clean === 'claude-3-5-sonnet' || clean === 'claude-3-5-sonnet-20241022') {
+    return 'claude-3-7-sonnet-thinking';
+  }
+  return modelId;
+}
 
 export function buildVisionSystemPrompt(params: VisionAnalyzeParams): string {
   const {
     productTitle,
+    productProps,
     templateStyle = '依据商品实物与品类调性，智能构思高审美、生活化、多层次的真实买家秀空间置景与光影',
     shotCount = 4,
-    extraRequirements = ''
+    extraRequirements = '',
+    modelPersona = '',
+    hasAnchorFace = false,
+    architectureMode = 'auto',
+    previousMasterScenes = [],
+    previousGroupSignatures = [],
   } = params;
 
-  return `# Role: 顶级商业视觉总监 & 电商高质感买家秀多模态分镜策划大师
+  const isNoModel =
+    architectureMode === 'pure_product' ||
+    !modelPersona ||
+    modelPersona === 'none' ||
+    modelPersona.includes('无人物') ||
+    modelPersona.includes('无需模特') ||
+    modelPersona.includes('纯商品') ||
+    modelPersona.includes('纯静物');
 
-你精通主流社交媒体（小红书/Instagram/Pinterest/抖音等）百万赞爆款家居与数码生活实拍摄影的核心美学机理。
-你的任务是：根据输入的【目标商品实物图（首图 @图片1）】与已选定的【品类摄影提示词架构】，为该商品量身定制一套 ${shotCount} 组**【在同一个高审美物理房间内连拍】**的视角多变、光影通透、空间高级、极具真实生活呼吸感的生图提示词（Prompt）！
+  const propsSection = productProps && Object.keys(productProps).length > 0
+    ? `\n- 核心规格参数 (Props):\n${Object.entries(productProps).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}`
+    : '';
+
+  const sigList = (previousGroupSignatures || [])
+    .filter((s) => s && (s.scene || s.actionDigest))
+    .slice(0, 3);
+  const legacyScenes = (previousMasterScenes || []).filter(Boolean).slice(0, 2);
+  const antiDupLines: string[] = [];
+  if (sigList.length > 0) {
+    sigList.forEach((s, i) => {
+      antiDupLines.push(
+        `${i + 1}. 场景：${s.scene || '（空）'}｜动作表情库：${s.actionDigest || '（空）'}`
+      );
+    });
+  } else if (legacyScenes.length > 0) {
+    legacyScenes.forEach((s, i) => antiDupLines.push(`${i + 1}. ${s}`));
+  }
+
+  const antiDupSection = antiDupLines.length > 0
+    ? `\n## 🚨 跨批次反雷同（必须换场景类型与动作库）
+本会话近期已用过的组签名（禁止再复用同类空间/同一套动作表情库）：
+${antiDupLines.join('\n')}
+- 必须换一个**明显不同的场景类型**（如：上次咖啡厅 → 本次阳台/书房/街角窗边/酒店大厅/度假外景等）。
+- 必须换一套**表情与动作库**，禁止总是「甜笑托腮 + 同机位」。
+- style_bible 的风格形容词也须与上批拉开（如纪实街拍 ↔ 度假柔光 ↔ 咖啡馆窗边）。
+`
+    : '';
+
+  // 预分配差异轴，写入 system prompt，降低模型雷同
+  const diversityHints = Array.from({ length: shotCount }, (_, i) => {
+    const n = i + 1;
+    const pool = [
+      { e: '浅笑望向镜头外', a: '双手自然垂落，微微前倾', c: '35mm 全景定场', g: '平视' },
+      { e: '微蹙眉专注看手中物', a: '一手轻托商品靠近胸口', c: '50mm 斜侧中景', g: '45° 斜侧' },
+      { e: '半侧脸轻抿唇', a: '侧身靠墙一手插袋', c: '85mm 中近景', g: '微俯' },
+      { e: '开怀短笑', a: '坐姿捧物置于膝上', c: '28mm 广角纵深', g: '低机位仰拍' },
+      { e: '平静直视前方', a: '行走中回眸', c: '70mm 半身', g: '平视半身' },
+      { e: '抬头望向远处光源', a: '俯身整理道具', c: '40mm 生活侧视', g: '过肩侧视' },
+    ][i % 6];
+    return `- 镜 ${n}：表情「${pool.e}」｜动作「${pool.a}」｜机位「${pool.c} / ${pool.g}」`;
+  }).join('\n');
+
+  const identityLock = isNoModel
+    ? `## 【Identity Lock · 身份锁】
+- 本次为**纯商品/静物**组图：全套 \`has_human: false\`，禁止出现模特、人脸、发型、身体。
+- identity_bible 写：纯商品静物，无人物。`
+    : `## 【Identity Lock · 身份锁】
+- 全套 ${shotCount} 镜必须是**同一位年轻东亚模特身份**（默认年轻东亚男性气质，除非架构/人设另行指定），禁止中途换人、换发型主色、换年龄感。
+${hasAnchorFace
+  ? `- 已挂载【专属正脸 ID 图】（多模态中位于商品图之后）：仅作五官骨相与身份特征参考；**严禁**照搬正脸图背景、死板表情或拍摄角度。
+- 生图垫图约定：@图片1=商品，@图片2=正脸 ID 特写板；场景定桩（若有）为 @图片3。提示词中人物五官用「@图片2」指代。`
+  : `- 无人脸垫图时，面容按下列人设定型（写入 identity_bible，并在每镜复用关键特征词）：
+【${modelPersona || '一位清透自然的年轻东亚模特'}】`}
+- 解剖学硬约束：两臂十指、双腿，禁止多余肢体。`;
+
+  const lookLock = isNoModel
+    ? `## 【Look Lock · 穿搭/陈设锁】
+- 纯静物：无需服饰锁；look_bible 写商品陈设主色与材质气质摘要即可；look_parts 可省略。
+- product_role 固定为 \`placed_object\`。`
+    : `## 【Look Lock · 服饰配饰锁 · 商品角色优先】
+- **先判定 product_role**（必填其一）：
+  - \`worn_apparel\`：商品是衣服/外套/裙裤等**穿在身上**的服装 → 模特必须穿着 @图片1；**禁止**在 look_parts.top/bottom 写任何颜色或版型文字；top 只能写「穿着 @图片1 所示服装」。
+  - \`worn_accessory\`：项链/包/鞋/手表等**佩戴类** → accessory（或 shoes）只写「佩戴/使用 @图片1」，禁止描写商品几何。
+  - \`held_object\`：手机/杯/数码等**手持** → 服饰可协调自拟，但**禁止**把商品写成「脖子佩戴」；商品外观只认 @图片1。
+  - \`placed_object\`：纯陈设静物（若误判人物模式勿用）。
+- 全套复用同一 look_bible / look_parts；禁止中途换穿搭主色或核心单品（**商品本身除外：商品只认垫图**）。
+- **严禁文字描写商品颜色/几何/支架/镜头排列**；外观唯一真相是 @图片1。
+- 服务端按 8 段硬模板拼装最终 prompt，字段准确优先：
+  \`[主体];[上装];[下装];[鞋履];[配饰];[道具];[场景];[风格]\` + 表情·动作·光学。`;
+
+  return `# Role: 擅长拍摄「种草级」人像大片的摄影师，专注年轻人配饰美学与画面细节；描述须让画面充满时尚博主精致感，目标是「极度真实、毫无 AI 感」的照片级提示词。
+
+你的任务：根据【目标商品实物图 @图片1】${hasAnchorFace && !isNoModel ? '与【专属正脸 ID 图】' : ''}及【品类/自定义提示词架构】，为商品策划一套 ${shotCount} 镜**同一身份 · 同一穿搭 · 同一主空间**、但**表情/动作/机位强制差异化**的结构化字段（最终中文 Prompt 由系统按 8 段骨架拼装）。
 
 ---
 ## 【目标商品信息】
-- 商品名称/标题：${productTitle}
-- 商品实物素材图：已挂载在多模态首图（生图时以此实物垫图为绝对基准）
+- 商品名称/标题：${productTitle}${propsSection}
+- 商品实物素材图：多模态首图（生图时 @图片1 为外观唯一真相）
+${hasAnchorFace && !isNoModel ? '- 专属正脸图：多模态次图（仅 ID，生图时 @图片2）\n' : ''}
+---
+${identityLock}
 
 ---
-## 🌟 核心铁律一：【同批次全套分镜强物理场景一致性锁定 (Single-Batch Room Lock)】
-🚨 **【全套 ${shotCount} 个分镜必须是同一个物理房间、同一套置景在不同摄影机位与景别下的连拍组图】**：
-1. **【第一步：先为本批次构思唯一的【高审美物理主空间架构 (Master Scene)】】**：
-   - 结合激活的品类架构，构思一个**通透、明亮、开阔且富有生活美感的现代真实空间**（如：米白浅灰微水泥质感墙面、侧边大面积采光落地窗搭配透光白纱帘、温润原木实木工作桌、墙面上方悬空原木置物隔板上摆放低饱和现代艺术画框与几本精装画册、桌角点缀一盆生机盎然的清透绿植、前景通透的木质扶手椅与几何羊毛地毯）；
-   - 🚨 **严禁全套分镜出现黑暗逼仄、死黑阴影、杂乱电竞或破旧角落！**
-2. **【第二步：全套分镜锁定统一的【明亮自然采光时间】】**：
-   - **全套分镜统一在明亮柔和的自然日光漫反射（5500K 清晨/上午通透窗光）下拍摄**！
-   - 🚨 **绝对禁止在同一个批次里白天、中午、傍晚蓝调与黑夜台灯乱跳！** 必须保持整套图色温与光影的一致性。
-3. **【第三步：全套分镜强制共享相同的背景建筑与核心置景特征】**：
-   - 每一个分镜在描写背景时，**必须统一出现该房间的核心特征**（如：同一面米灰微水泥墙、同款墙面悬空置物架与艺术画框、同款侧边落地窗、同款实木桌面与同款生机绿植）；
-   - **通过丰富的摄影机位展现不同视角的同一房间**：
-     - **镜头 1（正面全景定场）**：平视全景，展现主体在房间中的端正摆放，右侧窗光倾泻，背景可见置物架画框与绿植，完整交代空间美感；
-     - **镜头 2（45°斜侧景深机位）**：从左前方 45 度望向主体，侧逆光勾勒主体立体轮廓，桌面纵深延伸，背景柔和虚化置物架画框与绿植；
-     - **镜头 3（斜上方俯瞰视角 / 台面秩序感）**：从斜上方俯视，收纳台面整洁秩序与局部生活道具，自然光漫射在木质纹理与周边质感配件上；
-     - **镜头 4（空间广角纵深视角）**：广角镜头从房间入口望向窗边工作区，前景虚化椅子/地毯，中景为主体，远景为落地窗、置物架画框与阳光绿植，空间开阔透气；
-     - **镜头 5（中近景质感特写）**：大光圈浅景深聚焦主体屏幕通透画质与台面光影微反光，背景自然融化为柔和光斑散景；
-     - **镜头 6（侧方生活互动视角）**：自然松弛的人文视点，带绿植叶片与生活化呼吸感。
+${lookLock}
 
 ---
-## 🌟 核心铁律二：【激活的品类提示词架构 (Prompt Architecture) 与屏幕画中画设定】
-本次策划全套 ${shotCount} 个分镜，已被绑定并激活了以下【品类拍摄置景与提示词生成架构】：
-==================== 激活的品类提示词架构 START ====================
+## 【Scene Lock · 场景锁】
+1. **先写唯一 master_scene**：同一主空间 + 统一光色；背景干净有质感（度假/咖啡厅/酒店大厅等），严禁非现实风格与杂物（梯子、垃圾桶等）。
+2. 每镜 \`scene\` 必须复用 master_scene 的关键词；分镜只换**机位/景别/构图焦点**，禁止换房。
+3. 严禁黑暗逼仄、杂乱电竞废墟、土味霓虹。
+
+---
+## 【Style Lock · 风格锁】
+- 写唯一 style_bible：风格形容词 + 光线类型 + 8K 高清极度真实写实。
+- 全套共用 style_bible；组内差异只体现在表情/动作/机位，不换整体风格流派。
+
+---
+## 【Diversity Axis · 组内差异轴】（最高优先级之一）
+全套 ${shotCount} 镜的 \`expression\` / \`action\` / \`camera_focal_length\`+\`angle\` **必须两两明显不同**。
+建议按下列预分配执行（可微调措辞，但不可两镜撞车）：
+${diversityHints}
+- 每镜 JSON 必须写出独立的 expression、action、prop、optics 字段。
+- prompt 字段可写简短草稿；服务端会用结构化字段重拼，字段准确优先于 prompt 文采。
+- **prompt 字段（及字段内描述）必须使用简体中文**，禁止整段英文 prompt；画面内需显示的外文可放在中文引号内。
+
+---
+## 【激活的品类/自定义提示词架构】
+==================== START ====================
 ${templateStyle}
-==================== 激活的品类提示词架构 END ======================
-
-🚨 【架构执行与屏幕内容规则】：
-1. **【屏幕画中画与表面反光】**：若商品为带屏设备（显示器、电视、笔记本、平板、手机等），屏幕点亮画面遵循上述架构中对屏幕内容与画中画的设定，或呈现高审美现代艺术（如：包豪斯极简几何排版壁纸、3D立体厚涂油画微观浮雕、新海诚清透夏日白云插画）。全套分镜保持画面风格的连贯与通透高级感！
-2. **🚨 【绝对禁令】**：**绝对严禁生成暗黑机甲机器人、暗黑科幻废墟城堡、土味霓虹街机赛车、虚假仪表盘或暗色杂乱UI！绝对严禁显示电商产品详情页或促销广告！**
-3. **【生活道具生态】**：依据上述架构与商品品类，在各分镜中自然点缀高品味生活道具（如清透水杯、设计感绿植、画册、极简文具等），营建真实生活呼吸感。
+==================== END ======================
+- 若架构覆盖场景/光影/风格段：以架构为准写入 master_scene / style_bible，但仍强制 Identity + Look + Diversity。
+- 若架构未指定服饰：按 product_role 补全 look_parts（**worn_apparel 不得自造服装颜色**）。
+- 带屏设备：屏幕内容须高审美艺术壁纸或真实知名游戏实机画面；严禁暗黑机甲/虚假仪表盘/电商详情页 UI。
 
 ---
-## 🌟 核心铁律三：【绝对去商业化与去广告包装 (Anti-Advertising)】
-1. **严禁生成零售外包装纸盒/快递箱**：画面中杜绝任何瓦楞纸箱、塑料包装袋或彩盒；
-2. **严禁生成价格标签与促销小贴纸**：杜绝出现任何文字标价（如“¥999”、“官方正品”、“新品热卖”红底标签）、促销横幅或参数水印；
-3. **严禁屏幕显示电商产品详情页**：若为带屏设备，严禁让屏幕显示淘宝/京东/官网的电商产品图文介绍页；
-4. **生活实拍状态**：画面中的商品必须是真实用户在生活场景中已经**拆箱安装完毕、正在自然使用中的纯净真实状态**！
-
----
-## 🚨 核心铁律四：【严禁在提示词中用文字生硬描写商品硬件外观】
-🚨 **严禁在提示词中描写商品自身的具体几何形状、边框粗细、支架底座结构、镜头排列等细节！**
-- **原因**：下游生图模型在接收到外观文字描写时，文本权重会强行覆盖实物垫图导致变形。
-- **正确做法**：提示词中一律使用【参考图1所示商品】或【@图片1】指代主体；
-- **分工**：**提示词 100% 负责空间环境、自然采光、高审美壁纸、生活道具与摄影光学；商品自身的外观与几何结构 100% 交由附带的实物垫图保证！**
-
----
-## 🎯 镜头光学与去 AI 纪实参数
-1. **纯中文生图指令**，文字聚焦于明亮通透光影、高级空间美感与生活质感；
-2. **严禁包含任何负面指令词**；
-3. **真实摄影光学**：自然光学浅景深（f/1.8~f/2.8），物体接触面具有真实重力微接触阴影 (Contact Shadow)，木质、陶瓷与玻璃微纹理细腻自然，告别廉价 3D 渲染假感与暗室死黑。
+## 【去广告 & 商品外观禁令】
+- 禁止外包装盒、价签、促销贴纸、参数水印、鼠标光标与截屏边框。
+- **严禁文字描写商品几何/支架/镜头排列**；主体一律 @图片1。
+${antiDupSection}
 ${extraRequirements ? `\n【用户定制补充要求】：\n${extraRequirements}\n` : ''}
-
-## 输出格式要求
-必须严格输出合法的 JSON 代码块，严禁包含多余废话或 Markdown 前言：
+## 输出格式（合法 JSON，无 Markdown 前言）
 \`\`\`json
 {
-  "product_fingerprint": "对商品品类的简要提炼（如：专业电竞显示器 / 旗舰智能手机 / 极简桌面音响）",
-  "master_scene": "全套分镜统一锁定的主物理场景与置景描述（米灰微水泥墙面、侧边大落地窗白纱帘、长条原木实木桌、悬空置物隔板陈列艺术画框与书籍、桌角生机绿植、前景木椅与几何地毯）",
-  "has_human": false,
+  "product_fingerprint": "商品品类简要提炼（含是否服饰/配饰/手持）",
+  "product_role": "${isNoModel ? 'placed_object' : 'worn_apparel | worn_accessory | held_object | placed_object'}",
+  "master_scene": "全套统一主空间与光色关键词（须足够具体）",
+  "style_bible": "风格形容词 + 光线类型 + 真实写实质感",
+  "look_bible": "${isNoModel ? '陈设主色与材质气质摘要' : '穿搭摘要（服饰商品勿写颜色，只写 @图片1）'}",
+  "look_parts": {
+    "top": "${isNoModel ? '' : 'worn_apparel 时写：穿着 @图片1 所示服装；其他角色可写协调上装'}",
+    "bottom": "${isNoModel ? '' : '协调下装（勿抢商品）'}",
+    "shoes": "${isNoModel ? '' : '简约鞋履或 worn_accessory 时 @图片1'}",
+    "accessory": "${isNoModel ? '' : 'worn_accessory 时佩戴 @图片1；worn_apparel 勿写脖子佩戴商品'}"
+  },
+  "identity_bible": "${isNoModel ? '纯商品静物，无人物' : (hasAnchorFace ? '已绑定专属正脸 @图片2（仅五官 ID）+ 关键体态特征短句' : '人设五官发型妆容关键特征短句')}",
+  "has_human": ${isNoModel ? 'false' : 'true'},
   "prompts": [
     {
       "shot_no": 1,
-      "title": "正面全景沉浸视点，展现主体空间光影与生活置景",
-      "scene": "主场景正面平视全景（同一物理房间与明亮窗光）",
-      "camera_focal_length": "35mm 人文环境机位",
-      "angle": "平视微俯角",
-      "lighting_type": "清晨自然窗光与柔和漫反射",
-      "has_human": false,
-      "shot_type": "pure_product",
-      "prompt": "一张真实高端居家空间摄影作品，主体为@图片1，安装完成并自然放置在窗边原木工作桌上，成为现代生活空间中的视觉焦点。右侧明亮落地窗透入通透柔和的清晨自然日光，浅灰微水泥墙面上方设有一条原木悬空置物架，整齐陈列着低饱和抽象艺术画框与几本精装画册，桌角摆放着一盆充满生机的青翠绿植。屏幕点亮呈现清透而富有现代艺术美感的包豪斯几何艺术壁纸，米白、深蓝、砖红与柔和黄色色块构成安静高级的视觉中心。35mm人文焦段呈现真实室内透视，f/2.4自然浅景深，所有物体拥有符合重力的接触阴影，材质微纹理细腻，整体舒展、通透、具有高级空间呼吸感与真实买家秀质感。"
+      "title": "分镜短标题（含机位意图）",
+      "scene": "复用 master_scene 关键词 + 本镜机位景别",
+      "expression": "${isNoModel ? '无（静物）' : '本镜独有表情关键词'}",
+      "action": "${isNoModel ? '商品摆放/使用状态' : '本镜独有动作或道具互动'}",
+      "prop": "本镜道具短句",
+      "optics": "本镜光学短句",
+      "camera_focal_length": "如 35mm 人文 / 85mm 特写",
+      "angle": "如 平视 / 45° 斜侧 / 微俯",
+      "lighting_type": "与 master_scene / style_bible 统一的光色描述",
+      "has_human": ${isNoModel ? 'false' : 'true'},
+      "shot_type": "${isNoModel ? 'pure_product' : 'model_shot'}",
+      "prompt": "可选短草稿（系统会按字段重拼）"
     }
   ]
 }
 \`\`\`
+- prompts 数组长度必须恰好为 ${shotCount}，shot_no 从 1 到 ${shotCount}。
+- product_role 必须与商品实物一致（衬衫/外套等=worn_apparel）。
 `;
 }
 
@@ -284,21 +474,36 @@ export const MODEL_PERSONAS: ModelPersonaItem[] = [
 
 export function buildSocialFaceSwapSystemPrompt(params: {
   productTitle: string;
+  productProps?: Record<string, string>;
   referenceImageCount: number;
   modelPersona: string;
   hasAnchorFace?: boolean;
   productFingerprint?: string;
   extraRequirements?: string;
 }): string {
-  const { productTitle, referenceImageCount, modelPersona, hasAnchorFace = false, productFingerprint, extraRequirements } = params;
+  const { productTitle, productProps, referenceImageCount, modelPersona, hasAnchorFace = false, productFingerprint, extraRequirements } = params;
   const isNoModel = !modelPersona || modelPersona === 'none' || modelPersona.includes('无人物') || modelPersona.includes('无需模特') || modelPersona.includes('纯商品') || modelPersona.includes('纯静物');
+
+  const propsSection = productProps && Object.keys(productProps).length > 0
+    ? `\n- 目标商品规格参数 (Props):\n${Object.entries(productProps).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}\n`
+    : '';
 
   return `你是一位顶级社交媒体电商【爆款图文创意复刻与商品置换】视觉总监与摄影提示词专家。
 本次制作任务是：【爆款图文创意复刻工坊（目标商品实物主体置换 + 爆款黄金构图与光影美学汲取 + ${isNoModel ? '纯商品置景与质感升级' : (hasAnchorFace ? '专属真人模特面容克隆' : '模特人脸一致性克隆')}）】。
 
 用户从外部社交平台（小红书/抖音）采集并勾选了 ${referenceImageCount} 张高颜值真实爆款参考图片，并传入了目标商品实物素材图。
+- 目标商品标题: ${productTitle}${propsSection}
 
 你必须逐张深度解构这 ${referenceImageCount} 张爆款参考图的精髓机位、光影体系、空间层次与道具美学，为目标商品打造**既精准传承爆款视觉冲击力、又极具真实高级生活质感的全新实拍摄影组图**！
+
+---
+## 🚨 生图垫图槽位铁律（提示词必须与此一致）
+生图时每镜垫图顺序固定为：
+- **@图片1** = 目标商品实物图（外观唯一真相）
+- **@图片2** = 本镜对应的爆款社媒参考图（构图/场景/肢体动作；仅头朝向与嘴开合程度可参考）
+${hasAnchorFace ? `- **@图片3** = 专属真人模特正脸图（仅五官 ID 定型；严禁照搬其背景、机位、死板表情）
+` : ''}
+人物分镜强制句式骨架：构图/动作/头位 ← @图片2；表情 ← 文字关键词；五官 ID ← ${hasAnchorFace ? '@图片3' : '文字人设'}；商品外观 ← @图片1。
 
 ---
 ## 🚨 最高红线铁律一：【严禁生成商业广告海报、促销文案与参数排版！】
@@ -321,14 +526,21 @@ export function buildSocialFaceSwapSystemPrompt(params: {
 - **商品外观 100% 由输入的实物垫图决定，提示词仅负责复刻并优化场景、机位、手部姿态、自然光影和屏幕内容！**
 
 ---
+## 🚨 最高红线铁律四：【防穿帮 — 忽略参考图旧商品与正脸图场景】
+1. **忽略 @图片2 中的旧商品/品牌/机身几何**：主体外观只认 @图片1；参考图里的旧手机、旧壳、竞品必须被置换掉，禁止抄旧 SKU 外观。
+2. **忽略 @图片2 中旧模特身份五官**：发型/穿搭可服务场景，但五官骨相必须来自 ${hasAnchorFace ? '@图片3' : '指定人设文字'}。
+3. ${hasAnchorFace ? '**严禁复用 @图片3 的背景、机位、表情与拍摄角度**：@图片3 只提供五官 ID，禁止抄正脸板眨眼/嘟嘴/证件照表情。' : '无正脸垫图时，面容按人设文字定型；动作/头位跟 @图片2，表情用自然语言关键词。'}
+4. **product_fingerprint 只能来自目标商品图**，禁止从社媒参考图提取旧商品指纹。
+
+---
 ## 🌟 核心摄影法则：【黄金构图精准复刻 + 真实光影重构升级 (Creative Re-Lighting)】
 🚨 **分镜 1~N 必须与用户传入的 爆款参考图 1~N 严格逐张 1:1 对应复刻构图精髓，并进行真实光影重构与质感升级：**
 1. **机位与景别 1:1 精准继承**：
-   - 严格继承对应参考图的黄金构图点、透视角度（俯拍/平视/45°微俯/局部微距）、相机景深（大光圈背景虚化/超广角纵深）；
+   - 严格继承对应参考图的黄金构图点、透视角度（俯拍/平视/45°微俯/局部微距）、相机景深（大光圈背景虚化/超广角纵深）；构图与透视以 @图片2 像素为准；
 2. **物理重光照与环境融合 (Realistic Re-Lighting)**：
    - 将 @图片1 真实自然地融入对应参考图的环境光影中，根据现场主光源方向生成精准的明暗过渡、侧逆光轮廓微反光与贴合桌面的真实重力接触阴影 (Contact Shadow)，告别生硬抠图贴片假感；
-3. **生活化置景与高级质感升级**：
-   - 保持原参考图的整体空间调性（如极简桌搭/温馨居家/清晨窗光/日系原木），并可对周边生活小道具做 10%~20% 的审美优化（如清透水杯、生机绿植、极简画册、质感键盘），让画面更有呼吸感与真实种草力！
+3. **生活化置景（克制）**：
+   - 保持原参考图的整体空间调性与主要道具布局；**禁止大幅发明新道具或 10%~20%「美学升级」改景**，以免穿帮；仅允许微调光影与质感清晰度。
 
 ---
 
@@ -361,61 +573,51 @@ ${isNoModel ? `
 
 ### 3. 【类型 C：模特真人出镜 / 自拍 / 穿搭街拍（原参考图本身确实有人物出镜）】
 - 🚨 **仅当该张参考图原本就真实包含真人模特/人物时，才执行模特换脸/人脸克隆**：
+- 🚨 **【人脸五官定型 (ID) / 姿势 (Pose) / 表情 (Expression) 三路解耦铁律】**：
+  1. 👑 **参考人脸图（Anchor Face / ${hasAnchorFace ? '@图片3' : '人设文字'}）的唯一职责**：**【人脸五官骨相与身份特征（ID）】**！**严禁照搬人脸定型图上的死板表情、固定角度或背景场景**！
+  2. 📸 **参考分镜图（@图片2）的职责**：**肢体动作、手持姿态、头部朝向、嘴开合程度、场景机位**；**禁止从 @图片2 抄任何眉眼鼻唇五官身份，也禁止整脸抄其微表情（笑意/嘟嘴/眨眼/挑眉）**！
+     - 将 ${hasAnchorFace ? '@图片3' : '人设'} 的五官骨相无痕嵌入 @图片2 的身体姿势中；仅嘴开合/头朝向可跟 @图片2，五官轮廓与眉眼神态绝不能跟 @图片2 原模特！
+  3. ✍️ **表情职责归文字关键词**：每镜必须输出独立的 \`expression\` 字段与 prompt 内「表情关键词：…」；按场景写自然生动神态（如浅笑望向镜头、微蹙眉专注、平静直视），**禁止写「同参考图表情」「表情跟 @图片2/@图片3」**；组内人物镜表情尽量两两不同。
 ${hasAnchorFace ? `
 - 👑 **【专属真人模特正脸克隆（仅应用于原图有人物的分镜）】**：
-  - 在该有人物出镜的分镜 prompt 中，统一声明：【画面中人物面容与发型必须严格 100% 对齐专属真人模特正脸图（完全相同的真实五官轮廓、发型发色与自然真实肤质，保持真人面部一致性克隆）】；
-  - **【解剖学与肢体防幻觉铁律】**：画面中人物**严格仅有两只手臂（左臂与右臂），双手严格共计 10 根手指，严禁生成第3只手、多余手臂或悬空手**！如果是对镜自拍必须写明【低机位对镜自拍镜面反射真实实拍视角】，并明确分工左右手动作；
+  - 槽位声明：【机位/场景/肢体姿势/头位以 @图片2 为准（忽略其五官身份与整脸表情）；人物五官骨相只认 @图片3；表情只认文字关键词；商品外观只认 @图片1】；
+  - 可写头朝向与嘴开合关键词（如「微侧头、嘴自然闭合」），**严禁写「五官/脸型/表情跟参考图」**；
+  - 禁止在 prompt 中描述模糊脸、马赛克遮挡、打码脸；
+  - **【解剖学与肢体防幻觉铁律】**：画面中人物**严格仅有两只手臂，双手严格共计 10 根手指，下肢仅两条腿**；
   - 必须标记：\`"has_human": true\`, \`"shot_type": "model_shot"\`。
 ` : `
-- 将人物面容与设定替换为：【${modelPersona}】；
-- **首张有人物出镜的分镜**：作为【基准定脸镜头 (Anchor Face)】，细致描摹模特的五官轮廓、发型发色与肤质微肌理；
-- **后续有人物出镜的分镜**：显式声明【画面中为与前序人像分镜完全同一位东亚年轻女生（完全相同的五官轮廓、发型发色与清透肤质）】，实现全套换人 100% 同一人；
-- **【解剖学与肢体防幻觉铁律】**：画面中人物**严格仅有两只手臂（左臂与右臂），双手严格共计 10 根手指，严禁生成第3只手、多余手臂或悬空手**！如果是对镜自拍必须写明【低机位对镜自拍镜面反射真实实拍视角】，并明确分工左右手动作；
+- 将人物面容五官定型为：【${modelPersona}】；
+- 动作与姿势严格继承 @图片2；表情用自然语言关键词；禁止发明参考图没有的道具；
+- **【解剖学与肢体防幻觉铁律】**：严格两臂十指、双腿；
   - 必须标记：\`"has_human": true\`, \`"shot_type": "model_shot"\`。
 `}
-
-### 4. 【🎭 人物微表情场景化与多姿多彩法则 (Diverse Natural Micro-Expressions - 仅针对有人物分镜)】
-- 🚨 **最高表情禁令：绝对禁止全部分镜千篇一律照抄参考图的刻板/单一表情！**
-- 在保持同一模特真实五官骨相的前提下，**你必须根据每个分镜的具体场景、动作、光影与生活情境，为每个镜头自主构思自然多变、灵动松弛、高级真实的买家秀微表情**：
-  - **自拍/对镜取景分镜**：眼神清澈明亮看向镜面或镜头，双眼自然睁开，嘴角带着自然大方、自信舒展的清甜微笑；
-  - **专注使用/操作商品分镜**：眼神专注认真地注视商品屏幕，神态安静沉浸，微抿嘴角带着专注与喜爱，真实生活感抓拍；
-  - **户外探店/咖啡厅/街拍分镜**：眉眼舒展，惬意松弛的侧颜浅笑或不经意的回眸浅笑，享受自然阳光与休闲时光；
-  - **室内随性坐姿/休息分镜**：随性慵懒的松弛神态，眼神温和宁静，嘴角自然放松，无刻意摆拍感；
-  - **展示商品/开箱互动分镜**：神采奕奕的明媚开朗笑容，眼神灵动、充满分享欲；
-- 🚨 **每一个有人物分镜的面部神态、眼神焦点与嘴角动态必须各具特色、生动鲜活，彻底告别模板化僵硬表情！**
 `}
 
 ---
 
-## 1:1 精准构图与自包含描述要求
-- 🚨 **严禁偷懒使用模糊代称**：严禁在 prompt 中写“做出与参考图一致的姿态”、“同款姿势”等模糊字眼！
-- 每个分镜必须自包含、详尽写出：视角与景别、服饰穿搭（若有人物）、桌面背景材质与光影环境、光线走向与材质接触阴影。
+## 1:1 精准构图与文字职责
+- 构图、透视、景别、场景空间以 @图片2 为准；文字负责写清**表情关键词**与左右手分工，禁止用模糊代称敷衍（如“同款姿势”）。
+- 有人物时写清本镜独有表情关键词（平静直视/托腮浅笑/专注看向手中物等，**由文字生成，禁止抄 @图片2/@图片3 像素表情**）与手部握持；禁止大段臆造与 @图片2 冲突的新场景或道具。
 
 ${extraRequirements ? `【用户定制补充要求】：\n${extraRequirements}\n` : ''}
 
 ## 输出格式要求
-- 🚨 **分镜数量严格对齐**：你必须严格在 "prompts" 数组中输出恰好 ${referenceImageCount} 组分镜（shot_no 从 1 到 ${referenceImageCount}），1:1 严格对齐用户传入的这 ${referenceImageCount} 张参考图！
+- **prompt 字段必须使用简体中文**书写画面描述，禁止整段英文 prompt；画面内需显示的外文品牌/文案可放在中文引号内。
+- 🚨 **分镜数量绝对严格对齐（不多也不少）**：\`prompts\` 数组长度必须恰好等于 ${referenceImageCount}，\`shot_no\` 从 1 到 ${referenceImageCount}，与参考图 1..${referenceImageCount} 一一对应。下面 JSON 只展示 **1 条对象的字段结构**，实际回复必须输出全部 ${referenceImageCount} 条，严禁只抄示例条数。
 必须严格输出合法的 JSON 代码块，严禁包含 Markdown 前言或多余废话：
 \`\`\`json
 {
   "product_fingerprint": "对目标商品品类的简要提炼",
-  "model_anchor_features": "${hasAnchorFace ? '已绑定专属真人模特正脸图（全套分镜 100% 克隆对齐该真实面容）' : '对新模特人脸、发型、妆容、五官特征的标准化设定（若全套图无人物则写无人物纯静物）'}",
+  "model_anchor_features": "${hasAnchorFace ? '已绑定专属真人模特正脸图 @图片3（仅作五官骨相定型；动作/头位依各分镜 @图片2；表情由各镜文字关键词）' : '对新模特人脸、发型、妆容、五官特征的标准化设定（若全套图无人物则写无人物纯静物）'}",
   "prompts": [
     {
       "shot_no": 1,
-      "title": "📸 分镜 1：暗调电竞桌搭实拍 (复刻参考图1黄金机位并优化光影)",
-      "scene": "汲取参考图1的电竞桌搭与暗调氛围构图，将核心主体精准替换为目标商品实物，重构真实物理光影与边缘反光",
+      "title": "分镜 1：对应参考图1的构图要点（结构示例；须继续写到分镜 ${referenceImageCount}）",
+      "scene": "对应参考图1的场景与光影",
+      "expression": "有人物则写独立表情关键词，静物写无（静物）",
       "has_human": false,
       "shot_type": "pure_product",
-      "prompt": "【爆款构图复刻与商品置换实拍】：以 @图片2 为空间构图与机位视角基准，呈现暗调质感电竞桌面空间。画面正中央主体精准替换为 @图片1 所示商品实物，安装完备且屏幕点亮。画面完整保留 @图片2 的景深焦段、桌面增高架与蓝色氛围拾音灯光影，依据现场漫反射环境对 @图片1 进行精准物理重光照与边缘接触阴影渲染，材质微纹理清晰细腻，无任何鼠标光标、截屏边框、文字排版或广告标签，呈现超高清真实买家秀实拍质感。"
-    },
-    {
-      "shot_no": 2,
-      "title": "📸 分镜 2：人像买家秀对镜自拍 (复刻参考图2黄金构图)",
-      "scene": "复刻参考图2的对镜自拍坐姿与景深构图，${hasAnchorFace ? '严格对齐专属真人模特面容' : '新模特基准定脸出镜'}，手中商品替换为目标实物",
-      "has_human": true,
-      "shot_type": "model_shot",
-      "prompt": "【爆款构图复刻与人物/商品置换】：以 @图片2 为人物动作与空间构图基准，低机位对镜自拍视角；将人物面容无痕替换为${hasAnchorFace ? '所附专属真人模特正脸图（完全相同的五官轮廓与真实肤质）' : '指定新模特人设'}，将手中握持的商品精准置换为 @图片1 所示实物，双臂与双手共10根手指动作自然舒展，面部微表情清甜自信，真实生活抓拍光影，无鼠标指针、无截屏痕迹与AI塑料感。"
+      "prompt": "【爆款构图复刻与商品置换实拍】：以 @图片2 为本镜构图与机位基准，忽略 @图片2 中旧商品外观。主体精准替换为 @图片1 所示商品实物，保留本镜参考图的景深、置景与光影，对 @图片1 做物理重光照与接触阴影，无鼠标光标、截屏边框或广告文字。"
     }
   ]
 }

@@ -46,3 +46,13 @@ export interface ImageTaskRecord {
   createdAt: string | Date;
 }
 
+export type {
+  GenerationTask,
+  ChatSession,
+  MediaAttachment,
+  ProductWidgetData,
+  AssistantMessage,
+  AssistantSession,
+} from './app-store';
+
+

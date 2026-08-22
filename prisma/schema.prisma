@@ -19,6 +19,11 @@ model Product {
   
   // 关联的生图任务
   tasks       ImageTask[]
+
+  @@unique([platform, itemId])
+  @@index([itemId])
+  @@index([platform, itemId])
+  @@index([createdAt])
 }
 
 // 生图任务记录
@@ -27,7 +32,7 @@ model ImageTask {
   
   // 关联商品（可选，也可能直接填提示词生成）
   productId   String?
-  product     Product? @relation(fields: [productId], references: [id])
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   
   // 提示词相关
   prompt      String
@@ -46,6 +51,11 @@ model ImageTask {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([productId])
+  @@index([createdAt])
+  @@index([mediaType])
 }
 
 // 提示词生成历史记录
@@ -58,6 +68,9 @@ model PromptRecord {
   styleName          String?
   promptsJson        String   // 存储生成的分镜 JSON 数组
   createdAt          DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
 }
 
 // 电商多品类自定义爆款风格配方
@@ -74,5 +87,21 @@ model StyleRecipe {
   isFavorite    Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([category])
+  @@index([isFavorite])
+  @@index([createdAt])
+}
+
+// AI 助手对话会话（权威持久化，防崩溃丢失）
+model AssistantThread {
+  id           String   @id
+  title        String   @default("新对话")
+  messagesJson String   @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@index([createdAt])
 }
 
