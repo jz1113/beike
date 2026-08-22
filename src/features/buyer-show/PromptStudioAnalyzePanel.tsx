@@ -1,7 +1,8 @@
 'use client';
-import { RefObject } from 'react';
+import { RefObject, useEffect, useState } from 'react';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { VISION_MODELS } from '@/lib/vision';
+import { isThinkingVisionModel } from '@/lib/visionTimeouts';
 import { normalizeImageUrlToStandardJpg } from '@/lib/drawing';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { getModelProviderName } from '@/features/hub/PromptActionBar';
@@ -75,6 +76,28 @@ export default function PromptStudioAnalyzePanel({
   effectiveShotCount,
   stylePickerSlot,
 }: PromptStudioAnalyzePanelProps) {
+  const [analyzeElapsedSec, setAnalyzeElapsedSec] = useState(0);
+
+  useEffect(() => {
+    if (!isAnalyzing) {
+      setAnalyzeElapsedSec(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setAnalyzeElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isAnalyzing]);
+
+  const activeVisionModelForHint =
+    availableVisionModels.find(m => m.id === selectedVisionModel) ||
+    availableVisionModels[0] ||
+    VISION_MODELS[0];
+  const analyzeWaitHint = isThinkingVisionModel(activeVisionModelForHint?.id || '')
+    ? '深度思考模型通常需 1–2 分钟，请勿关闭页面'
+    : '视觉分析进行中，复杂商品图可能需要 1 分钟左右';
+
   return (
     <>
       <div className="flex-1 overflow-y-auto p-5 space-y-4.5">
@@ -343,7 +366,7 @@ export default function PromptStudioAnalyzePanel({
               {shotCount} 镜
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-2 p-1.5 rounded-2xl bg-slate-100/90 border border-slate-200/80">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-slate-100/90 border border-slate-200/80">
             {[2, 3, 4, 6].map(num => (
               <button
                 key={num}
@@ -402,7 +425,15 @@ export default function PromptStudioAnalyzePanel({
 
       </div>
 {/* Bottom Docked Action Button */}
-<div className="p-4 border-t border-slate-200/80 bg-slate-50/80 flex-shrink-0">
+<div className="p-4 border-t border-slate-200/80 bg-slate-50/80 flex-shrink-0 space-y-2">
+  {isAnalyzing && (
+    <p className="text-[10px] text-slate-500 text-center leading-relaxed px-1">
+      {analyzeWaitHint}
+      {analyzeElapsedSec > 0 && (
+        <span className="font-mono text-indigo-600"> · 已等待 {analyzeElapsedSec}s</span>
+      )}
+    </p>
+  )}
   <button
     onClick={handleGeneratePrompts}
     disabled={isAnalyzing}
@@ -411,7 +442,7 @@ export default function PromptStudioAnalyzePanel({
     {isAnalyzing ? (
       <>
         <Loader2 className="w-4 h-4 animate-spin text-white" />
-        <span>分析中...</span>
+        <span>分析中{analyzeElapsedSec > 0 ? ` (${analyzeElapsedSec}s)` : '...'}</span>
       </>
     ) : (
       <>

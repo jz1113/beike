@@ -7,7 +7,7 @@ import { buildImageRequest } from '@/lib/modelAdapters';
 import { normalizeOpenAiImageRequest } from '@/lib/modelAdapters/image/normalizeOpenAiImageModel';
 import { createImageConvertCache, logLatencyAudit } from '@/lib/latencyAudit';
 import { emphasizeIdentityFacePlate, obfuscateCompositionFaces } from '@/lib/faceObfuscate';
-import { humanizeUpstreamError } from '@/lib/upstreamErrors';
+import { humanizeUpstreamError, formatUserError } from '@/lib/upstreamErrors';
 
 const DEFAULT_BASE_URL = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
 const DEFAULT_API_KEY = process.env.AI_DRAWING_API_KEY || '';
@@ -549,7 +549,7 @@ export async function POST(req: Request) {
     });
     return jsonResponse({
       success: false,
-      error: humanizeUpstreamError(error.message || '生图任务提交失败')
+      error: formatUserError(error, '生图任务提交失败')
     }, 500);
   }
 }
@@ -638,6 +638,36 @@ export async function GET(req: Request) {
 
     if (!res || !res.ok || !resData) {
       console.warn(`[AI生图-轮询] 查询任务 ${taskId} 状态暂未就绪`);
+      try {
+        const taskRecord = await prisma.imageTask.findFirst({
+          where: { taskId },
+          select: { status: true, resultUrl: true, failReason: true },
+        });
+        if (taskRecord?.resultUrl) {
+          return jsonResponse({
+            success: true,
+            taskId,
+            status: 'SUCCESS',
+            progress: '100%',
+            resultUrl: taskRecord.resultUrl,
+            failReason: '',
+          });
+        }
+        if (taskRecord?.status === 'FAILURE') {
+          return jsonResponse({
+            success: true,
+            taskId,
+            status: 'FAILURE',
+            progress: '0%',
+            resultUrl: '',
+            failReason: taskRecord.failReason
+              ? formatUserError(String(taskRecord.failReason), '生图任务失败')
+              : '生图任务失败',
+          });
+        }
+      } catch {
+        /* ignore DB fallback errors */
+      }
       return jsonResponse({
         success: true,
         taskId,
@@ -655,7 +685,7 @@ export async function GET(req: Request) {
         ? (String(resData.progress).endsWith('%') ? String(resData.progress) : `${resData.progress}%`) 
         : (rawStatus === 'SUCCESS' || rawStatus === 'SUCCEEDED' || rawStatus === 'COMPLETED' ? '100%' : '50%'));
     const rawFailReason = taskInfo.fail_reason || resData.fail_reason || resData.message || taskInfo.error?.message || taskInfo.error || '';
-    const failReason = rawFailReason ? humanizeUpstreamError(String(rawFailReason)) : '';
+    const failReason = rawFailReason ? formatUserError(String(rawFailReason), '生图任务失败') : '';
     
     // 提取结果图片 URL (深度解析全格式)
     let resultUrl = '';
@@ -731,7 +761,7 @@ export async function GET(req: Request) {
     console.error('[AI生图-轮询] 异常:', error);
     return jsonResponse({
       success: false,
-      error: error.message || '查询任务状态失败'
+      error: formatUserError(error, '查询任务状态失败')
     }, 500);
   }
 }

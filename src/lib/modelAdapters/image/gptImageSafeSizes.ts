@@ -11,26 +11,26 @@ const DEFAULT_ASPECT_ID = '3:4';
 export const GPT_IMAGE_GATEWAY_SAFE_SIZES: Record<string, Record<GptImageQualityTier, string>> = {
   smart: { low: '1024x1024', medium: '2048x2048', high: '2880x2880' },
   '21:9': { low: '1536x640', medium: '2048x864', high: '3840x1632' },
-  '16:9': { low: '1536x1024', medium: '2048x1152', high: '3840x2160' },
+  '16:9': { low: '1536x864', medium: '2048x1152', high: '3840x2160' },
   '3:2': { low: '1536x1024', medium: '2048x1360', high: '3840x2560' },
   '4:3': { low: '1280x960', medium: '2048x1536', high: '3840x2880' },
   '1:1': { low: '1024x1024', medium: '2048x2048', high: '2880x2880' },
-  '3:4': { low: '1024x1536', medium: '1536x2048', high: '2160x3840' },
-  '2:3': { low: '1024x1536', medium: '1360x2048', high: '2160x3840' },
-  '9:16': { low: '1024x1536', medium: '1152x2048', high: '2160x3840' },
+  '3:4': { low: '960x1280', medium: '1536x2048', high: '2448x3264' },
+  '2:3': { low: '1024x1536', medium: '1360x2048', high: '2160x3240' },
+  '9:16': { low: '864x1536', medium: '1152x2048', high: '2160x3840' },
 };
 
 /** gpt-image-2-2k 专线：1536 系，避免 2048 触发网关重复追加 -2k */
 export const GPT_IMAGE_SUFFIX_2K_SIZES: Record<string, string> = {
   smart: '1536x1536',
   '21:9': '1536x640',
-  '16:9': '1536x1024',
+  '16:9': '1536x864',
   '3:2': '1536x1024',
   '4:3': '1536x1152',
   '1:1': '1536x1536',
   '3:4': '1536x2048',
   '2:3': '1024x1536',
-  '9:16': '1024x1536',
+  '9:16': '1152x2048',
 };
 
 export function isPixelSizeString(size?: string): boolean {

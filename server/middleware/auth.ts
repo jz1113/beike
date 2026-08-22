@@ -47,7 +47,7 @@ export async function apiAuthMiddleware(c: Context, next: Next) {
 
   if (!isAccessTokenConfigured()) {
     return c.json(
-      { success: false, error: 'Server misconfigured: set LOCAL_ACCESS_TOKEN in production' },
+      { success: false, error: '服务端未配置访问令牌，请联系管理员' },
       503,
     );
   }
@@ -62,13 +62,13 @@ export async function apiAuthMiddleware(c: Context, next: Next) {
       return next();
     }
     return c.json(
-      { success: false, error: 'Unauthorized: missing app_token cookie or valid media signature' },
+      { success: false, error: '未授权：缺少有效的访问凭证或媒体签名' },
       401,
     );
   }
 
   if (!ok) {
-    return c.json({ success: false, error: 'Unauthorized: missing or invalid x-app-token' }, 401);
+    return c.json({ success: false, error: '未授权：访问令牌缺失或无效' }, 401);
   }
 
   const isDanger =
@@ -79,12 +79,12 @@ export async function apiAuthMiddleware(c: Context, next: Next) {
   if (isDanger) {
     if (!admin) {
       return c.json(
-        { success: false, error: 'Forbidden: ADMIN_ACCESS_TOKEN not configured' },
+        { success: false, error: '管理员令牌未配置，无法执行此操作' },
         403,
       );
     }
     if (token !== admin) {
-      return c.json({ success: false, error: 'Forbidden: admin token required' }, 403);
+      return c.json({ success: false, error: '需要管理员权限' }, 403);
     }
   }
 

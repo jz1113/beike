@@ -100,8 +100,8 @@ export function buildComprehensiveProductProps(params: {
   if (Array.isArray(rawProps)) {
     rawProps.forEach((p: any) => {
       if (!p) return;
-      let k = (p.name || p.key || p.prop_name || '').toString().trim();
-      let v = (p.value || p.val || p.prop_value || '').toString().trim();
+      const k = (p.name || p.key || p.prop_name || '').toString().trim();
+      const v = (p.value || p.val || p.prop_value || '').toString().trim();
       if (k && v) {
         result[k] = v;
       }

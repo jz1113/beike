@@ -1,6 +1,7 @@
 import { jsonResponse } from '../../../adapters/http';
 import { prisma } from '@/lib/prisma';
 import { resolveStorageConfig, uploadRemoteMediaToStorage, isAlreadyPermanentUrl, StorageConfig } from '@/lib/storage';
+import { formatUserError } from '../../../lib/formatApiError';
 
 /**
  * POST /api/assets/storage/migrate
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
         }
       } catch (err: any) {
         failedCount++;
-        errors.push(`任务 ${task.taskId || task.id} 迁移失败: ${err.message}`);
+        errors.push(`任务 ${task.taskId || task.id} 迁移失败: ${formatUserError(err)}`);
         console.warn(`[对象存储-批量迁移] 任务 ${task.id} 转存失败:`, err.message);
       }
     }
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
     console.error('[对象存储-批量迁移] 异常:', error);
     return jsonResponse({
       success: false,
-      error: error.message || '批量迁移执行失败'
+      error: formatUserError(error, '批量迁移执行失败')
     }, 500);
   }
 }

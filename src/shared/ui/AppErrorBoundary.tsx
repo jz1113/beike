@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { formatUserError } from '@/lib/upstreamErrors';
 
 interface Props {
   children: ReactNode;
@@ -18,7 +19,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, message: '' };
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, message: error?.message || '未知错误' };
+    return { hasError: true, message: formatUserError(error, '未知错误') };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {

@@ -1,6 +1,7 @@
 import { jsonResponse } from '../../adapters/http';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
+import { formatUserError } from '../../lib/formatApiError';
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_CHARS = 80000;
@@ -208,7 +209,7 @@ export async function POST(req: Request) {
     console.error('[extract-document]', error);
     return jsonResponse({
       success: false,
-      error: error instanceof Error ? error.message : '文档解析失败',
+      error: formatUserError(error, '文档解析失败'),
     }, 500);
   }
 }

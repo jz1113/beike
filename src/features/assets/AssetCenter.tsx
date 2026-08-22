@@ -8,6 +8,7 @@ import {
   permanentDeleteGeneration,
 } from '@/lib/permanentDeleteGeneration';
 import { saveToDownloadDir } from '@/lib/desktopDownload';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
@@ -28,6 +29,7 @@ import { groupTasksIntoBatches, type AssetTaskBatch } from './assetBatchUtils';
 import AssetProductLibrary from './AssetProductLibrary';
 import AssetRecipeLibrary from './AssetRecipeLibrary';
 import AssetGenerationHistory from './AssetGenerationHistory';
+import { pageRoot, pageToolbar, pageToolbarEnd, subToolbarScroll } from '@/shared/ui/layoutClasses';
 import AssetFolderOverlay from './AssetFolderOverlay';
 
 export type { AssetTaskBatch } from './assetBatchUtils';
@@ -129,7 +131,7 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
       await apiFetch(`/api/catalog/styles?id=${id}`, { method: 'DELETE' });
       setRecipes(prev => prev.filter(r => r.id !== id));
     } catch (err) {
-      console.error('删除配方失败:', err);
+      showToast(`❌ 删除配方失败: ${formatUserError(err, '请稍后重试')}`);
     }
   };
 
@@ -155,6 +157,8 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
         if (data.success) {
           setRecipes(prev => prev.map(r => r.id === editingRecipe.id ? data.recipe : r));
           setEditingRecipe(null);
+        } else {
+          showToast(`❌ 保存失败: ${data.error || '未知错误'}`);
         }
       } else {
         const res = await apiFetch('/api/catalog/styles', {
@@ -175,7 +179,7 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
         }
       }
     } catch (err) {
-      console.error('保存配方失败:', err);
+      showToast(`❌ 保存配方失败: ${formatUserError(err, '请稍后重试')}`);
     } finally {
       setIsUpdatingRecipe(false);
     }
@@ -650,7 +654,7 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
       showToast(`🎉 成功打包并下载 ${selectedTasks.length} 张高清图片！`);
     } catch (err: any) {
       console.error('批量下载失败:', err);
-      showToast(`❌ 批量下载失败: ${err.message || '请稍后重试'}`);
+      showToast(`❌ 批量下载失败: ${formatUserError(err, '请稍后重试')}`);
     } finally {
       setIsDownloadingZip(false);
     }
@@ -696,7 +700,7 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
       showToast('✨ 剪映素材包已下载！解压后可直接拖入剪映草稿');
     } catch (err: any) {
       console.error('同步剪映导出失败:', err);
-      showToast(`❌ 导出失败: ${err.message || '请稍后重试'}`);
+      showToast(`❌ 导出失败: ${formatUserError(err, '请稍后重试')}`);
     } finally {
       setIsDownloadingZip(false);
     }
@@ -780,7 +784,7 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
       await apiFetch(`/api/catalog/products?id=${id}`, { method: 'DELETE' });
       setProducts(prev => prev.filter(p => p.id !== id));
     } catch (err) {
-      console.error('删除商品失败:', err);
+      showToast(`❌ 删除商品失败: ${formatUserError(err, '请稍后重试')}`);
     }
   };
 
@@ -879,11 +883,11 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
   };
 
   return (
-    <div className="flex-1 h-full overflow-hidden bg-[#FAFAFC] flex flex-col select-none">
+    <div className={`${pageRoot} bg-[#FAFAFC] select-none`}>
       {/* 🌟 1. Top Header Bar (胶囊标签导航 + 搜索/批量/剪映导出) */}
-      <div className="h-14 px-6 lg:px-8 border-b border-slate-200/80 bg-white flex items-center justify-between flex-shrink-0 shadow-2xs">
+      <div className={`min-h-14 py-2 px-6 lg:px-8 border-b border-slate-200/80 bg-white ${pageToolbar} flex-shrink-0 shadow-2xs`}>
         {/* Left: Tab Switcher (胶囊切换: 生成历史 | 主体 | 画布) */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl">
+        <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl shrink-0">
           <button
             onClick={() => setActiveTab('history')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -919,16 +923,16 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
         </div>
 
         {/* Right: Actions Bar */}
-        <div className="flex items-center gap-2.5">
+        <div className={`${pageToolbarEnd} ${subToolbarScroll}`}>
           {/* Search Box */}
-          <div className="relative flex items-center">
+          <div className="relative flex items-center min-w-[120px] max-w-[200px] sm:max-w-[240px] flex-1 sm:flex-none">
             <Search className="w-3.5 h-3.5 absolute left-3 pointer-events-none text-slate-400" />
             <input
               type="text"
               value={searchKeyword}
               onChange={e => setSearchKeyword(e.target.value)}
               placeholder="搜索提示词..."
-              className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-100/80 focus:bg-white border border-transparent focus:border-indigo-400 text-xs text-slate-900 placeholder-slate-400 outline-none w-36 focus:w-56 transition-all shadow-2xs"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-100/80 focus:bg-white border border-transparent focus:border-indigo-400 text-xs text-slate-900 placeholder-slate-400 outline-none transition-all shadow-2xs"
             />
           </div>
 
@@ -947,7 +951,7 @@ export default function AssetCenter({ onEnterBuyerShow, onOpenSettings }: Props)
               )}
 
               {isBatchMode ? (
-                <div className="flex items-center gap-2 animate-fade-in">
+                <div className="flex items-center gap-2 animate-fade-in flex-nowrap">
                   <button
                     onClick={handleToggleSelectAll}
                     className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"

@@ -1,6 +1,6 @@
 'use client';
 
-import { getClientStorageHeaders } from '@/lib/storageClient';
+import { getGatewayClientHeaders } from '@/lib/gatewayClient';
 import { getClientAccessToken, syncAppTokenCookie } from '@/lib/apiToken';
 import { isTauriDesktop, resolveApiUrl } from '@/lib/desktopRuntime';
 import { invokeTauriApi } from '@/lib/tauriApi';
@@ -26,7 +26,7 @@ export function apiHeaders(extra?: HeadersInit): Headers {
   if (!headers.has('x-app-token')) {
     headers.set('x-app-token', getClientAccessToken());
   }
-  const storage = getClientStorageHeaders();
+  const storage = getGatewayClientHeaders();
   Object.entries(storage).forEach(([k, v]) => {
     if (!headers.has(k)) headers.set(k, v);
   });

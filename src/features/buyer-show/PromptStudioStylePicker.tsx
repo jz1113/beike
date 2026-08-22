@@ -1,6 +1,7 @@
 'use client';
 import { apiFetch } from '@/lib/apiClient';
 import { confirmAction } from '@/lib/confirmAction';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { useState } from 'react';
 import {
   Check,
@@ -142,7 +143,7 @@ export default function PromptStudioStylePicker({
                         setSelectedStyleId('auto');
                       }
                     } catch (err) {
-                      console.error('删除配方失败:', err);
+                      showToast(formatUserError(err, '删除配方失败'));
                     }
                   }}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer border border-slate-200/60 hover:border-red-200"
@@ -336,8 +337,7 @@ export default function PromptStudioStylePicker({
                                 ));
                                 showToast('已更新架构名称');
                               } catch (err) {
-                                console.error('保存架构名称失败:', err);
-                                showToast('保存架构名称失败');
+                                showToast(formatUserError(err, '保存架构名称失败'));
                                 return;
                               } finally {
                                 setIsSavingRecipeName(false);

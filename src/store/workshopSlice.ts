@@ -12,6 +12,8 @@ import {
 import {
   buildSocialPromptSourceKey,
   invalidateSocialPromptsIfNeeded,
+  STUDIO_DRAFT_SOCIAL_KEY,
+  STUDIO_DRAFT_ORIGINAL_KEY,
 } from './persist';
 import {
   ORIGINAL_ANCHOR_FACE_LS_KEY,
@@ -21,55 +23,40 @@ import {
   pickEffectiveIsAnchorFaceConfirmed,
   isOriginalWorkshopMode,
 } from './anchorFace';
+import {
+  applyWorkshopModeSession,
+  createDefaultWorkshopSession,
+  extractWorkshopModeSession,
+  persistModePersonaPref,
+  workshopModeSessionKey,
+  type WorkshopMode,
+} from './workshopSession';
 import type { AppState, WorkshopSlice } from './types';
 
-export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> = (set, get) => ({
-  currentStep: 1,
+const defaultSocialSession = createDefaultWorkshopSession('social_face_product_swap');
+const defaultOriginalSession = createDefaultWorkshopSession('storyboard_generate');
 
-  // Step 1
-  product: null,
-  images: [],
-  apiUsed: null,
+export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> = (set, get) => ({
+  socialSessionCache: defaultSocialSession,
+  originalSessionCache: defaultOriginalSession,
+
+  ...applyWorkshopModeSession(defaultSocialSession),
+
+  // 全局偏好（两模式共享）
   isLoading: false,
   error: null,
-
-  // Step 2
+  // Step 2 全局
   selectedVisionModel: typeof window !== 'undefined'
     ? getStoredMultimodalModelId('gemini-3.7-flash')
     : 'gemini-3.7-flash',
-  selectedStyleId: 'computer_office_monitor',
-  shotCount: 4,
-  extraRequirements: '',
   isAnalyzing: false,
-  productFingerprint: '',
-  productRole: null as OriginalProductRole | null,
-  generatedPrompts: [],
-  masterScene: '',
-  lookBible: '',
-  identityBible: '',
-  styleBible: '',
-  lookParts: null,
-  previousMasterScenes: [],
-  previousGroupSignatures: [],
-  sceneAnchorEnabled: true,
 
-  // Step 3
+  // Step 3 全局
   selectedImageGenModel: typeof window !== 'undefined'
     ? (localStorage.getItem('ai_image_gen_model') || 'gpt-image-2')
     : 'gpt-image-2',
-  selectedAspectId: '3:4',
-  selectedQuality: 'high',
-  useReferenceImage: true,
-  isBatchGenerating: false,
-  generationTasks: [],
-  // 生产方向与工坊模式 (默认开启爆款复刻工坊)
-  workshopMode: 'social_face_product_swap',
-  socialGalleryTab: 'social',
-  clonedSocialImages: [],
-  modelPersona: typeof window !== 'undefined'
-    ? (localStorage.getItem('drawing_model_persona') || '🌸 亚洲清纯甜美女生 (日常精致微表情、自然裸妆感)')
-    : '🌸 亚洲清纯甜美女生 (日常精致微表情、自然裸妆感)',
-  // 仅恢复各模式「专属正脸」偏好，不恢复整组工坊草稿（商品/参考/生图）
+
+  workshopMode: 'social_face_product_swap' as WorkshopMode,
   anchorFaceImageUrl: typeof window !== 'undefined'
     ? (localStorage.getItem(SOCIAL_ANCHOR_FACE_LS_KEY) || undefined)
     : undefined,
@@ -87,14 +74,56 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   getEffectiveIsAnchorFaceConfirmed: () => pickEffectiveIsAnchorFaceConfirmed(get()),
 
   setWorkshopMode: (workshopMode) => set((state) => {
+    if (workshopMode === state.workshopMode) return {};
+
+    const currentMode = state.workshopMode;
+    const currentSnapshot = extractWorkshopModeSession(state);
+    const currentCacheKey = workshopModeSessionKey(currentMode);
+    const nextCacheKey = workshopModeSessionKey(workshopMode);
+
+    const nextSession = state[nextCacheKey] ?? createDefaultWorkshopSession(workshopMode);
+    const applied = applyWorkshopModeSession(nextSession);
+
     if (workshopMode === 'social_face_product_swap') {
-      const selectedCount = state.clonedSocialImages.filter(i => i.selected).length;
-      return {
-        workshopMode,
-        shotCount: selectedCount > 0 ? selectedCount : state.shotCount
-      };
+      const selectedCount = applied.clonedSocialImages?.filter(i => i.selected).length ?? 0;
+      if (selectedCount > 0) {
+        applied.shotCount = selectedCount;
+      }
     }
-    return { workshopMode };
+
+    return {
+      workshopMode,
+      [currentCacheKey]: currentSnapshot,
+      ...applied,
+      isAnalyzing: false,
+      error: null,
+    };
+  }),
+
+  resetModeSession: (mode) => set((state) => {
+    const targetMode = mode ?? state.workshopMode;
+    const fresh = createDefaultWorkshopSession(targetMode);
+    const cacheKey = workshopModeSessionKey(targetMode);
+    const patch: Partial<AppState> = {
+      [cacheKey]: fresh,
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(
+          targetMode === 'social_face_product_swap' ? STUDIO_DRAFT_SOCIAL_KEY : STUDIO_DRAFT_ORIGINAL_KEY,
+        );
+      } catch {}
+    }
+
+    if (targetMode === state.workshopMode) {
+      Object.assign(patch, applyWorkshopModeSession(fresh), {
+        isAnalyzing: false,
+        error: null,
+      });
+    }
+
+    return patch;
   }),
   setSocialGalleryTab: (socialGalleryTab) => set({ socialGalleryTab }),
   setTargetProductImage: (url) => set((state) => {
@@ -152,11 +181,8 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
     };
   }),
   setModelPersona: (modelPersona) => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('drawing_model_persona', modelPersona);
-      } catch {}
-    }
+    const mode = get().workshopMode;
+    persistModePersonaPref(mode, modelPersona);
     set({ modelPersona });
   },
   setAnchorFaceImageUrl: (anchorFaceImageUrl) => {
@@ -173,11 +199,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
       let nextPersona = state.modelPersona;
       if (anchorFaceImageUrl && isPure) {
         nextPersona = '🌸 亚洲清纯甜美女生 (日常精致微表情、自然裸妆感)';
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('drawing_model_persona', nextPersona);
-          } catch {}
-        }
+        persistModePersonaPref(state.workshopMode, nextPersona);
       }
       if (isOriginal) {
         return {
@@ -519,7 +541,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
     const isSocialMode = state.workshopMode === 'social_face_product_swap';
     const selectedClonedList = state.clonedSocialImages.filter(i => i.selected);
 
-    let selectedPrompts = state.generatedPrompts.filter(p => p.selected !== false);
+    const selectedPrompts = state.generatedPrompts.filter(p => p.selected !== false);
     let effectivePrompts = selectedPrompts.length > 0 ? selectedPrompts : state.generatedPrompts;
 
     // 🌟 爆款复刻模式下：严格保证分镜任务数量与用户勾选的爆款参考图数量 1:1 严格一致 (选 5 张出 5 张)

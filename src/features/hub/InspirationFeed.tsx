@@ -1,22 +1,16 @@
 'use client';
 import { useState } from 'react';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import { 
-  Search, 
-  Sparkles, 
-  Copy, 
-  Check 
-} from 'lucide-react';
-import InspirationModal, { InspirationItem } from './InspirationModal';
+import { Search } from 'lucide-react';
+import InspirationModal, { InspirationItem, InspirationUseOptions } from './InspirationModal';
 
 interface Props {
-  onUsePrompt: (prompt: string, refImage?: string) => void;
+  onUsePrompt: (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => void;
   onOpenProductVault: () => void;
 }
 
 export default function InspirationFeed({ onUsePrompt, onOpenProductVault }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
 
   // 高美感商用爆款案例库（100% 真实 AI 旗舰模型生成）
@@ -38,6 +32,38 @@ export default function InspirationFeed({ onUsePrompt, onOpenProductVault }: Pro
       date: '2026-08-16 | 内容由 AI 生成',
       aspectRatio: '3:4',
       model: 'Seedance 2.5',
+      quality: '720P'
+    },
+    {
+      id: 'item-video-shadow-puppet-wusong-tiger',
+      category: 'video',
+      tag: '🎭 国风皮影 · Seedance',
+      title: '武松打虎 · 北方皮影戏动画',
+      prompt: `# 总体设定 画幅：16:9 横屏
+机位：固定机位，无运镜
+风格：传统北方皮影戏
+场景：@3 山林景，一棵枯树，几块怪石，远景隐约山形
+角色：武松@1 （皮影造型，壮汉身形）、老虎@2 （皮影造型，四肢关节清晰）
+无台词，无兵器，纯肢体对抗 --- # 《武松打虎》1分钟皮影戏动画分镜脚本 ## 第一幕：铺垫 · 风起（00:00 - 00:15） 核心任务： 建立皮影视觉基调，展现醉态与危机逼近的氛围。 ### Shot 1：武松醉步 - 时间/时长： 00:00 - 00:05 （5秒） - 景别： 全景 (Wide Shot) - 构图： 经典的皮影戏舞台构图。画面左侧是一棵枯树，右侧散落几块怪石，背景是静态的远山剪影@3 。武松@1 处于画面中偏右位置。 - 画面内容： 武松（皮影侧面造型）@1 以踉跄的步伐从右向左上场，一边走路一边拿出一个酒葫芦喝酒。他的头部和躯干关节呈现不规则的前后摇晃，表现出严重的醉态。他走到枯树旁，单臂抬起，手部皮影靠在枯树干上支撑身体。 ### Shot 2：倚树暂歇 - 时间/时长： 00:05 - 00:09 （4秒） - 景别： 中景 (Medium Shot) - 构图： 画面中心为武松与枯树。 - 画面内容： 武松@1 身体重心下沉，背部靠在枯树上，双腿微曲。他的头部皮影低垂，手臂关节自然下垂，胸部皮影通过微小的上下平移来模拟沉重的呼吸，拿出一个酒葫芦喝了几口酒，然后准备坐在树边休息，眼睛微微闭起。 ### Shot 3：猛虎暗伏 - 时间/时长： 00:09 - 00:12 （3秒） - 景别： 中景 (Medium Shot) - 构图： 画面主体移至右侧的怪石与草丛区域。 - 画面内容： 伴随风声，怪石后的草丛皮影部件发生轻微的左右摆动。一只四肢关节粗壮的老虎@2 皮影从草丛后低伏探出头来。老虎身体压低，尾巴在身后平缓摇动，双目（镂空处透出亮光）死死盯着画面左侧。 ### Shot 4：惊觉杀机 - 时间/时长： 00:12 - 00:15 （3秒） - 景别： 中景 (Medium Shot) - 构图： 画面回到左侧的武松。 - 画面内容： 武松似乎察觉到了动静，原本低垂的头部猛地抬起并向右扭转（皮影头部部件快速翻面或替换为直视前方的侧脸）。他原本放松的手臂迅速抬起，摆出防御的起手式，身体微微下蹲。`,
+      image: '/inspirations/shadow_puppet_wusong_tiger.mp4',
+      video: '/inspirations/shadow_puppet_wusong_tiger.mp4',
+      mediaType: 'video' as const,
+      referenceImages: [
+        '/inspirations/shadow_puppet_wusong_ref.png',
+        '/inspirations/shadow_puppet_tiger_ref.png',
+        '/inspirations/shadow_puppet_scene_ref.png',
+      ],
+      referenceLabels: ['武松皮影 @1', '老虎皮影 @2', '山林场景 @3'],
+      videoRefMode: 'omni',
+      videoDuration: 15,
+      author: {
+        name: '贝壳云图',
+        badge: '官方精选'
+      },
+      likes: 86,
+      date: '2026-08-22 | 内容由 AI 生成',
+      aspectRatio: '16:9',
+      model: 'doubao-seedance-2-0-260128',
       quality: '720P'
     },
     {
@@ -282,22 +308,10 @@ export default function InspirationFeed({ onUsePrompt, onOpenProductVault }: Pro
     return true;
   });
 
-  const handleCopy = (text: string, idx: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 2000);
-  };
-
   const scrollHubToTop = () => {
     const hub = document.querySelector('[data-hub-scroll]') as HTMLElement | null;
     if (hub) hub.scrollTo({ top: 0, behavior: 'smooth' });
     else window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleApply = (prompt: string, img?: string) => {
-    onUsePrompt(prompt, img);
-    scrollHubToTop();
   };
 
   return (
@@ -336,36 +350,24 @@ export default function InspirationFeed({ onUsePrompt, onOpenProductVault }: Pro
         </div>
       </div>
 
-      {/* 🌟 2. 即梦同款灵感瀑布流 (首张支持活动大横幅 Banner 卡片，其余为紧凑纯图瀑布流) */}
+      {/* 灵感瀑布流：纯图卡片，点击进入详情 */}
       <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-5 2xl:columns-6 gap-4.5 sm:gap-5.5 [column-fill:_balance]">
-        {filteredItems.map((item, idx) => {
-          const isSpecialBanner = idx === 0 && !searchTerm;
-
-          return (
+        {filteredItems.map((item) => (
             <div
               key={item.id}
               onClick={() => setSelectedModalItem(item)}
-              className={`break-inside-avoid mb-4 sm:mb-5 w-full inline-block rounded-2xl sm:rounded-3xl bg-slate-100 shadow-2xs hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer relative border border-slate-100 ${
-                isSpecialBanner ? 'ring-1 ring-amber-500/20' : ''
-              }`}
+              className="break-inside-avoid mb-4 sm:mb-5 w-full inline-block rounded-2xl sm:rounded-3xl bg-slate-100 shadow-2xs hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer relative border border-slate-100"
             >
-              {/* 纯净图片/视频主体 */}
               <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl">
                 {item.mediaType === 'video' || item.video || item.image.endsWith('.mp4') ? (
-                  <div className="relative w-full">
-                    <video
-                      src={item.video || item.image}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-103 rounded-2xl sm:rounded-3xl"
-                    />
-                    <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1.5 shadow-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                      <span>Seedance 2.5 视频</span>
-                    </div>
-                  </div>
+                  <video
+                    src={item.video || item.image}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-103 rounded-2xl sm:rounded-3xl"
+                  />
                 ) : (
                   <img
                     src={item.image}
@@ -385,66 +387,9 @@ export default function InspirationFeed({ onUsePrompt, onOpenProductVault }: Pro
                     className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-103 bg-slate-100 min-h-[140px]"
                   />
                 )}
-
-                {/* 🌟 特殊横幅底部固定常驻标签 (对标即梦 Banner：AI 广告爆改大赛 · 已有 2415 人参与) */}
-                {isSpecialBanner && (
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3.5 sm:p-4 text-white pointer-events-none">
-                    <div className="text-xs sm:text-sm font-extrabold leading-snug drop-shadow-sm">
-                      AI 广告爆改大赛 · 经典广告你来演！
-                    </div>
-                    <div className="flex items-center justify-between mt-1.5 text-[11px] text-white/80 font-medium">
-                      <span>已有 2415 人参与</span>
-                      <div className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                        <span className="w-1 h-1 rounded-full bg-white/50"></span>
-                        <span className="w-1 h-1 rounded-full bg-white/50"></span>
-                        <span className="w-1 h-1 rounded-full bg-white/50"></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 悬停毛玻璃与快捷做同款浮层 */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-between p-3.5 sm:p-4">
-                  {/* 顶部标签与复制 */}
-                  <div className="flex items-center justify-between w-full">
-                    <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-bold shadow-xs">
-                      {item.tag}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopy(item.prompt, idx, e)}
-                      className="p-1.5 rounded-md bg-black/60 hover:bg-black/90 backdrop-blur-md text-white transition-colors cursor-pointer"
-                      title="复制提示词"
-                    >
-                      {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  </div>
-
-                  {/* 底部标题与做同款操作按钮 */}
-                  <div className="space-y-2">
-                    <p className="text-white text-xs font-semibold line-clamp-1 drop-shadow-md">
-                      {item.title}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const isVideoItem = item.mediaType === 'video' || !!item.video || item.image.endsWith('.mp4');
-                        // 文生图做同款只带提示词；视频做同款才携带参考素材
-                        handleApply(item.prompt, isVideoItem ? (item.video || item.image) : undefined);
-                      }}
-                      className="w-full py-1.5 px-2 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold shadow-md flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>做同款</span>
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
-          );
-        })}
+          ))}
       </div>
 
       {/* 🌟 3. 灵感大图详情与做同款模态框 */}
@@ -458,8 +403,8 @@ export default function InspirationFeed({ onUsePrompt, onOpenProductVault }: Pro
           onUsePrompt(prompt);
           scrollHubToTop();
         }}
-        onUseAsReference={(prompt, imgUrl) => {
-          onUsePrompt(prompt, imgUrl);
+        onUseAsReference={(prompt, imgUrl, opts) => {
+          onUsePrompt(prompt, imgUrl, opts);
           scrollHubToTop();
         }}
         onNavigate={(newItem) => setSelectedModalItem(newItem)}

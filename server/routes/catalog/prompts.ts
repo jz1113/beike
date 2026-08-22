@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
+import { formatUserError } from '../../lib/formatApiError';
 
 // 获取所有提示词生成历史记录
 export async function GET() {
@@ -23,7 +24,7 @@ export async function GET() {
 
     return jsonResponse({ success: true, records: formatted });
   } catch (error: any) {
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
     return jsonResponse({ success: true, record });
   } catch (error: any) {
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -66,6 +67,6 @@ export async function DELETE(req: Request) {
 
     return jsonResponse({ success: true });
   } catch (error: any) {
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }

@@ -12,6 +12,7 @@ import AspectRatioSelector from '@/shared/ui/AspectRatioSelector';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { normalizeImageUrlToStandardJpg } from '@/lib/drawing';
+import CollapsibleSidePanel from '@/shared/ui/CollapsibleSidePanel';
 import type { GenerationTask } from '@/store/useAppStore';
 
 interface ImageGenParamPanelProps {
@@ -71,7 +72,12 @@ export default function ImageGenParamPanel({
             ? '静物陈设：主体只认商品垫图'
             : null;
   return (
-    <div className="w-[360px] md:w-[380px] lg:w-[400px] xl:w-[420px] 2xl:w-[440px] flex-shrink-0 bg-white border-r border-slate-200/80 flex flex-col h-full overflow-y-auto p-5 space-y-6 shadow-[2px_0_12px_rgba(0,0,0,0.03)] z-10">
+    <CollapsibleSidePanel
+      storageKey="image-gen-param-panel"
+      title="生图设置"
+      widthClass="w-[360px] md:w-[380px] lg:w-[400px] xl:w-[420px] 2xl:w-[440px]"
+      className="overflow-y-auto p-5 space-y-6"
+    >
       {/* Header Navigation */}
       {!hideChromeNav && (
       <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
@@ -294,6 +300,6 @@ export default function ImageGenParamPanel({
           })}
         </div>
       </div>
-    </div>
+    </CollapsibleSidePanel>
   );
 }

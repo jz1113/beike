@@ -80,7 +80,7 @@ export default function ImageGenTaskGrid({
   imageModelsReady = true,
 }: ImageGenTaskGridProps) {
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F8F9FC]">
+    <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-[#F8F9FC]">
       {socialPromptStale && (
         <div className="mx-6 mt-4 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-3 flex-shrink-0">
           <span>
@@ -368,7 +368,7 @@ export default function ImageGenTaskGrid({
           })()}
 
           {/* Modern Clean Minimalist Gallery Grid (纯净无杂质沉浸画廊) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6 pb-24">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {generationTasks.map((task, idx) => (
             <ImageGenResultCard
               key={task.id}

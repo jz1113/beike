@@ -3,7 +3,7 @@ import { saveToDownloadDir } from '@/lib/desktopDownload';
 import { isTauriDesktop } from '@/lib/desktopRuntime';
 import { fetchWithDerivedCache } from '@/lib/idbMediaCache';
 
-/** 桌面端用系统浏览器/默认应用打开外链，Web 端用 window.open */
+/** 桌面端用系统浏览器/默认应用打开外链，Web 端用 window.open / 程序化 <a> 兜底 */
 export async function openExternalUrl(url: string): Promise<void> {
   if (!url) return;
   if (isTauriDesktop()) {
@@ -11,11 +11,20 @@ export async function openExternalUrl(url: string): Promise<void> {
       const { openUrl } = await import('@tauri-apps/plugin-opener');
       await openUrl(url);
       return;
-    } catch {
-      /* fallback */
+    } catch (err) {
+      console.warn('[openExternalUrl] Tauri opener failed, trying fallback:', err);
     }
   }
-  window.open(url, '_blank');
+  const opened = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!opened) {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
 }
 
 async function fetchMediaBlob(url: string): Promise<Blob> {

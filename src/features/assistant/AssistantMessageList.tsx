@@ -441,13 +441,18 @@ export default function AssistantMessageList({
           )}
 
           {/* 生成中 Loading 动效 + 停止生成按钮 */}
-          {isSendingCurrent && (
+          {isSendingCurrent && (() => {
+            const pendingStatus = [...currentSessionMessages].reverse().find(
+              (m) => m.role === 'assistant' && m.streamingStatus
+            )?.streamingStatus;
+            const statusText = pendingStatus || 'AI 正在流式输出中…';
+            return (
             <div className="flex items-center gap-3 animate-fade-in">
               <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-red-500 shadow-2xs">
                 <Loader2 className="w-4 h-4 animate-spin" />
               </div>
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2 shadow-2xs">
-                <span>AI 正在流式输出中...</span>
+                <span>{statusText}</span>
                 <button
                   type="button"
                   onClick={handleStopGeneration}
@@ -459,7 +464,8 @@ export default function AssistantMessageList({
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           <div ref={messagesEndRef} />
         </div>

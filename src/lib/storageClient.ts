@@ -1,5 +1,7 @@
 /**
  * 浏览器安全的对象存储客户端助手（无 Prisma / AWS SDK）
+ *
+ * 非敏感配置仍可在 localStorage 保留供 UI 回显；Secret 由桌面 Keychain + sidecar .env 提供。
  */
 
 export interface StorageConfig {
@@ -14,32 +16,25 @@ export interface StorageConfig {
   region?: string;
 }
 
-/**
- * 客户端辅助：读取本地对象存储配置并编码为请求头（不依赖 Prisma / Node）
- *
- * 安全提示：Secret 会经 Base64 请求头随 API 发送，XSS/扩展可读。
- * 生产环境建议将 Secret 写入桌面数据目录 `.env`，由服务端 sidecar 读取。
- */
+/** @deprecated 对象存储凭证已服务端化，不再经请求头发送 */
 export function getClientStorageHeaders(): Record<string, string> {
+  return {};
+}
+
+/** 读取本地非敏感存储配置（供设置页 UI 回显） */
+export function getLocalStorageUiConfig(): StorageConfig {
   if (typeof window === 'undefined') return {};
   try {
     const enabled = localStorage.getItem('storage_enabled') === 'true';
-    if (!enabled) return {};
-    const config: StorageConfig = {
+    if (!enabled) return { enabled: false };
+    return {
       enabled: true,
       provider: (localStorage.getItem('storage_provider') as StorageConfig['provider']) || 'r2',
       accountId: localStorage.getItem('storage_account_id') || '',
       endpoint: localStorage.getItem('storage_endpoint') || '',
       accessKeyId: localStorage.getItem('storage_access_key_id') || '',
-      secretAccessKey: localStorage.getItem('storage_secret_access_key') || '',
       bucketName: localStorage.getItem('storage_bucket_name') || '',
       publicDomain: localStorage.getItem('storage_public_domain') || '',
-    };
-    return {
-      'x-storage-config':
-        typeof btoa !== 'undefined'
-          ? btoa(unescape(encodeURIComponent(JSON.stringify(config))))
-          : JSON.stringify(config),
     };
   } catch {
     return {};

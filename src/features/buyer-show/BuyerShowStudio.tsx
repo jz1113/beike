@@ -1,6 +1,9 @@
 'use client';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { isImageFile } from '@/lib/mediaUpload';
+import { compressImageFilesToDataUrls } from '@/lib/workshopFileDrop';
 import StudioSidebar from './StudioSidebar';
 import StudioGallery from './StudioGallery';
 import PromptStudio from './PromptStudio';
@@ -29,10 +32,73 @@ export default function BuyerShowStudio({
     workshopMode,
     clonedSocialImages,
     initGenerationTasks,
+    setClonedSocialImages,
+    setProductData,
+    resetModeSession,
   } = useAppStore();
 
   const [step3Action, setStep3Action] = useState<WorkshopPrimaryAction | null>(null);
   const [step4Action, setStep4Action] = useState<WorkshopPrimaryAction | null>(null);
+  const [workshopToast, setWorkshopToast] = useState<string | null>(null);
+
+  const showWorkshopToast = useCallback((msg: string) => {
+    setWorkshopToast(msg);
+    setTimeout(() => setWorkshopToast(null), 2500);
+  }, []);
+
+  const rejectWorkshopDrop = useCallback(() => {
+    showWorkshopToast('无法识别拖入的文件，请使用 JPG/PNG/WebP 等图片');
+  }, [showWorkshopToast]);
+
+  const routeWorkshopFiles = useCallback(
+    async (files: File[]) => {
+      if (workshopMode === 'social_face_product_swap') {
+        const urls = await compressImageFilesToDataUrls(files);
+        if (urls.length > 0) {
+          setClonedSocialImages(urls);
+          showWorkshopToast(`已载入 ${urls.length} 张参考图`);
+        } else {
+          rejectWorkshopDrop();
+        }
+        return;
+      }
+
+      const urls = await compressImageFilesToDataUrls(files);
+      if (urls.length === 0) {
+        rejectWorkshopDrop();
+        return;
+      }
+
+      if (product) {
+        const existing = useAppStore.getState().images;
+        const newImgs = urls.map((url) => ({ url, type: 'detail' as const, selected: true }));
+        useAppStore.setState({ images: [...existing, ...newImgs] });
+        showWorkshopToast(`已补充 ${urls.length} 张商品图`);
+        return;
+      }
+
+      const baseName = files[0]?.name.replace(/\.[^/.]+$/, '') || '本地导入素材';
+      const localProduct = {
+        id: 'local_temp_' + Date.now(),
+        platform: 'local',
+        itemId: `LOCAL_${Date.now()}`,
+        title: baseName,
+        picUrl: urls[0] || '',
+        createdAt: new Date().toISOString(),
+      };
+      setProductData(localProduct, { main: urls, details: [], skus: [] }, '📁 拖入导入 (未入库)');
+      showWorkshopToast(`已导入 ${urls.length} 张商品图`);
+    },
+    [workshopMode, product, setClonedSocialImages, setProductData, showWorkshopToast, rejectWorkshopDrop],
+  );
+
+  const { dropZoneProps: workshopDropProps } = useFileDropZone({
+    onFiles: (files) => {
+      void routeWorkshopFiles(files);
+    },
+    accept: isImageFile,
+    onReject: rejectWorkshopDrop,
+  });
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -56,7 +122,7 @@ export default function BuyerShowStudio({
 
   const canEnterStep2 =
     workshopMode === 'social_face_product_swap'
-      ? selectedSocialCount > 0
+      ? selectedSocialCount > 0 && Boolean(product) && selectedImageCount > 0
       : Boolean(product) && selectedImageCount > 0;
   const canEnterStep3 = selectedPromptCount > 0 && generatedPrompts.length > 0;
   const canEnterStep4 = successCount > 0;
@@ -81,6 +147,7 @@ export default function BuyerShowStudio({
   }, [initGenerationTasks, setStep]);
 
   const goBackToStep1 = useCallback(() => setStep(1), [setStep]);
+  const handleResetSession = useCallback(() => resetModeSession(), [resetModeSession]);
   const goBackToStep2 = useCallback(() => setStep(2), [setStep]);
   const goStep4 = useCallback(() => setStep(4), [setStep]);
   const goBackToStep3 = useCallback(() => setStep(3), [setStep]);
@@ -142,7 +209,7 @@ export default function BuyerShowStudio({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F8F9FA]">
+    <div className="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-[#F8F9FA]">
       <WorkshopTopBar
         currentStep={(currentStep as WorkshopStepId) || 1}
         maxReachableStep={maxReachableStep}
@@ -150,16 +217,24 @@ export default function BuyerShowStudio({
         primaryAction={primaryAction}
       />
 
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 min-w-0 relative">
+        {workshopToast && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold shadow-xl pointer-events-none">
+            {workshopToast}
+          </div>
+        )}
         {currentStep === 1 ? (
-          <>
+          <div
+            {...workshopDropProps}
+            className="flex-1 flex overflow-hidden min-h-0 min-w-0 relative"
+          >
             <StudioSidebar
               onOpenHistory={onOpenHistory}
               onNextStep={goStep2}
               hideFooterCta
             />
             <StudioGallery onNextStep={goStep2} hideFloatingCta />
-          </>
+          </div>
         ) : currentStep === 2 ? (
           <PromptStudio
             onBackToStep1={goBackToStep1}
@@ -178,7 +253,7 @@ export default function BuyerShowStudio({
         ) : currentStep === 4 ? (
           <ExportStudio
             onBackToStep3={goBackToStep3}
-            onResetToStep1={goBackToStep1}
+            onResetToStep1={handleResetSession}
             hideChromeNav
             onBindPrimaryAction={setStep4Action}
           />

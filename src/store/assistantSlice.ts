@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { AssistantSession } from '@/types/app-store';
 import { setStoredMultimodalModelId } from '@/lib/workflowModels';
+import { formatUserError } from '@/lib/upstreamErrors';
 import {
   assistantDeletedIds,
   clearAssistantPersistTimer,
@@ -86,7 +87,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
         }
       } catch (e: any) {
         serverOk = false;
-        serverError = e?.message || '删除请求失败';
+        serverError = formatUserError(e, '删除请求失败');
       }
     }
 

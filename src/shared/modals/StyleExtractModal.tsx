@@ -1,6 +1,9 @@
 'use client';
+import { getGatewayClientOverrides } from '@/lib/gatewayClient';
 import {apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { 
   X, 
   Sparkles, 
@@ -308,8 +311,6 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
     setIsParsingLink(true);
     try {
       const localScraperId = localStorage.getItem('external_scraper_id');
-      const localCustomUrl = localStorage.getItem('social_api_url');
-      const localCustomKey = localStorage.getItem('social_api_key');
 
       // 并发请求解析所有链接
       const promises = lines.map(line =>
@@ -320,8 +321,6 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
             url: line,
             text: line,
             customScraperId: localScraperId || undefined,
-            customBaseUrl: localCustomUrl || undefined,
-            customApiKey: localCustomKey || undefined
           })
         }).then(res => res.json())
       );
@@ -376,25 +375,35 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
         throw new Error(lastErr || '未能从所填链接中提取到有效图片');
       }
     } catch (e: any) {
-      alert(e.message || '社媒链接解析超时，请直接手动上传截图');
+      alert(formatUserError(e, '社媒链接解析超时，请直接手动上传截图'));
     } finally {
       setIsParsingLink(false);
     }
   };
 
   // 2. 本地图片文件选择 (自动轻量压缩)
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const promises = Array.from(files).map(file => compressImageFile(file));
+  const ingestStyleImages = useCallback(async (files: File[]) => {
+    const promises = files.map((file) => compressImageFile(file));
     const urls = await Promise.all(promises);
     const validUrls = urls.filter(Boolean);
     if (validUrls.length > 0) {
-      setSelectedImages(prev => Array.from(new Set([...prev, ...validUrls])));
+      setSelectedImages((prev) => Array.from(new Set([...prev, ...validUrls])));
       showToast(`🎉 成功添加 ${validUrls.length} 张高清参考图！`);
     }
+  }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await ingestStyleImages(Array.from(files));
   };
+
+  const { dropZoneProps: styleUploadDropProps } = useFileDropZone({
+    onFiles: (files) => {
+      void ingestStyleImages(files);
+    },
+    accept: (file) => file.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp|gif)$/i.test(file.name),
+  });
 
   // 3. 网络 URL 直传
   const handleAddUrls = () => {
@@ -423,8 +432,7 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
 
     // 全量多图分析：完整传递所有选中的参考图片（支持数十至上百张并发分片深度解构）
     const imagesToSend = selectedImages;
-    const localUrl = typeof window !== 'undefined' ? localStorage.getItem('ai_base_url') || undefined : undefined;
-    const localKey = typeof window !== 'undefined' ? localStorage.getItem('ai_api_key') || undefined : undefined;
+    const { customBaseUrl: localUrl } = getGatewayClientOverrides();
 
     try {
       const res = await apiFetch('/api/catalog/styles/extract', {
@@ -435,7 +443,6 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
           userHint: userHint.trim(),
           model: extractModel,
           customBaseUrl: localUrl,
-          customApiKey: localKey
         })
       });
       const data = await res.json();
@@ -447,7 +454,7 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
       setExtractedRecipe(data.recipe);
       showToast('🎉 AI 风格逆向解构完成！');
     } catch (e: any) {
-      alert(e.message || 'AI 逆向提炼超时，请重试');
+      alert(formatUserError(e, 'AI 逆向提炼超时，请重试'));
     } finally {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -495,7 +502,7 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
         onClose();
       }, 600);
     } catch (e: any) {
-      alert(e.message || '保存配方失败');
+      alert(formatUserError(e, '保存配方失败'));
     } finally {
       setIsSaving(false);
     }
@@ -725,7 +732,10 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
             {/* Panel Content for Local Upload */}
             {sourceType === 'upload' && (
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                <label className="border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors bg-white group">
+                <label
+                  {...styleUploadDropProps}
+                  className="border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors bg-white group"
+                >
                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center text-indigo-600 transition-colors">
                     <UploadCloud className="w-6 h-6" />
                   </div>

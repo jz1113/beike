@@ -85,7 +85,7 @@ const dedicated4k = buildImageRequest({
 });
 assert(dedicated4k.modelId === 'gpt-image-2-4k', '专线 model 保持 gpt-image-2-4k');
 assert(dedicated4k.payload.quality == null || dedicated4k.payload.quality === undefined, '专线 omit quality');
-assert(dedicated4k.payload.size === '2160x3840', '专线+3:4 size=2160x3840');
+assert(dedicated4k.payload.size === '2448x3264', '专线+3:4 size=2448x3264');
 
 const suffix2k = buildImageRequest({
   model: 'gpt-image-2-2k',
@@ -100,6 +100,6 @@ assert(suffix2k.payload.size === '1536x2048', '2k suffix+3:4 size=1536x2048');
 
 const dirtyId = normalizeOpenAiImageRequest('gpt-image-2-4k-2k', '3:4', 'high');
 assert(dirtyId.modelId === 'gpt-image-2-4k', '脏 id 清理为 gpt-image-2-4k');
-assert(dirtyId.size === '2160x3840', '脏 id 专线 3:4 → 2160x3840');
+assert(dirtyId.size === '2448x3264', '脏 id 专线 3:4 → 2448x3264');
 
 console.log('\nAll adapter checks passed.');

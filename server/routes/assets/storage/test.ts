@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../../adapters/http';
 import { testStorageConnection, StorageConfig } from '@/lib/storage';
+import { formatUserError } from '../../../lib/formatApiError';
 
 /**
  * POST /api/assets/storage/test
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     return jsonResponse({
       success: false,
-      message: `测试异常: ${error.message}`
+      message: `测试异常: ${formatUserError(error)}`
     }, 500);
   }
 }

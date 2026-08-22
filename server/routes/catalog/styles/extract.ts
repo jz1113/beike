@@ -2,6 +2,12 @@ import { jsonResponse } from '../../../adapters/http';
 import { convertToStandardJpegDataUrl } from '@/lib/imageConverter';
 import { normalizeVisionModelId } from '@/lib/vision';
 import { resolveGatewayCreds } from '@/lib/gatewayCreds';
+import {
+  resolveVisionTimeoutMs,
+  VISION_EXTRACT_MASTER_TIMEOUT_MS,
+  VISION_EXTRACT_SHARD_TIMEOUT_MS,
+} from '@/lib/visionTimeouts';
+import { formatUserError } from '../../../lib/formatApiError';
 
 const DEFAULT_BASE_URL = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
 const DEFAULT_API_KEY = process.env.AI_DRAWING_API_KEY || '';
@@ -82,6 +88,10 @@ export async function POST(req: Request) {
 
         for (const targetModel of modelsToTry) {
           try {
+            const shardTimeoutMs = Math.max(
+              resolveVisionTimeoutMs(targetModel, true),
+              VISION_EXTRACT_SHARD_TIMEOUT_MS,
+            );
             const resp = await fetch(`${targetBaseUrl}/v1/chat/completions`, {
               method: 'POST',
               headers: {
@@ -93,7 +103,7 @@ export async function POST(req: Request) {
                 messages: [{ role: 'user', content: contentArray }],
                 temperature: 0.4
               }),
-              signal: AbortSignal.timeout(45000)
+              signal: AbortSignal.timeout(shardTimeoutMs)
             });
             if (resp.ok) {
               const data = await resp.json();
@@ -194,6 +204,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
 
     for (const targetModel of modelsToTry) {
       try {
+        const masterTimeoutMs = resolveVisionTimeoutMs(targetModel, true);
         const response = await fetch(`${targetBaseUrl}/v1/chat/completions`, {
           method: 'POST',
           headers: {
@@ -205,12 +216,12 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
             messages: [{ role: 'user', content: masterContentArray }],
             temperature: 0.6
           }),
-          signal: AbortSignal.timeout(90000)
+          signal: AbortSignal.timeout(Math.max(masterTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS))
         });
 
         if (!response.ok) {
           const errText = await response.text();
-          throw new Error(`Model [${targetModel}] HTTP ${response.status}: ${errText}`);
+          throw new Error(`模型调用失败（HTTP ${response.status}）`);
         }
 
         const data = await response.json();
@@ -276,7 +287,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
     });
   } catch (error: any) {
     console.error('[StyleExtract] 异常:', error);
-    return jsonResponse({ error: error.message || '风格架构提炼失败，请重试' }, 500);
+    return jsonResponse({ error: formatUserError(error, '风格架构提炼失败，请重试') }, 500);
   }
 }
 

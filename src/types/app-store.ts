@@ -91,6 +91,8 @@ export interface AssistantMessage {
   }>;
   /** 请求失败标记（用于展示「重新执行」） */
   error?: boolean;
+  /** 流式生成阶段提示（准备/规划/生成中） */
+  streamingStatus?: string;
 }
 
 export interface AssistantSession {

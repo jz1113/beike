@@ -490,7 +490,7 @@ export function cleanPromptText(rawPrompt: string): string {
  */
 export function stripWorkshopPromptGuards(prompt: string): string {
   if (!prompt) return prompt;
-  let text = prompt
+  const text = prompt
     .replace(/【(?:原创|爆款)[^】]*】[^【]*?。/g, ' ')
     .replace(/【身份硬锁定[^\]]*】[^【]*?。/g, ' ')
     .replace(/【表情解耦】[^【]*?。/g, ' ')
@@ -1315,6 +1315,24 @@ export function formatDisplayModel(model?: string, isVideo?: boolean): string {
   if (m.includes('seedream')) return 'Seedream 5.0';
   if (m.includes('grok')) return 'Grok 4.1';
   return model;
+}
+
+/**
+ * 卡片角标等紧凑场景用的模型名（截断过长 id，保留完整名于 title）
+ */
+export function formatDisplayModelCompact(
+  model?: string,
+  isVideo?: boolean,
+  maxLen = 12,
+): string {
+  const full = formatDisplayModel(model, isVideo);
+  const m = (model || '').toLowerCase();
+  if (m.includes('nano-banana')) {
+    if (m.includes('2k') || m.includes('2-2k')) return 'Banana 2K';
+    return 'Banana 2';
+  }
+  if (full.length <= maxLen) return full;
+  return full.slice(0, maxLen - 1) + '…';
 }
 
 /**

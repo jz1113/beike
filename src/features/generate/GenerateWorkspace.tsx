@@ -1,13 +1,16 @@
 'use client';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useAppStore, GenerationTask, ChatSession } from '@/store/useAppStore';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { isImageOrVideoFile, processDroppedMediaFiles } from '@/lib/mediaUpload';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { getAspectRatioFromSize, formatDisplayModel, formatImageQualityLabel, stripWorkshopPromptGuards, cleanPromptText } from '@/lib/drawing';
-import { getClientStorageHeaders } from '@/lib/storageClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
 import {apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import PromptActionBar from '@/features/hub/PromptActionBar';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
+import { pageRootSplit, pageToolbar, pageToolbarStart, subToolbarScroll } from '@/shared/ui/layoutClasses';
 import { 
   SquarePen, 
   MessageSquare, 
@@ -127,10 +130,13 @@ export default function GenerateWorkspace({
     addHubGeneration,
     updateHubGeneration,
     deleteHubGeneration,
-    setCurrentView
+    setCurrentView,
+    addQuickRefImage,
   } = useAppStore();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true,
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
@@ -168,19 +174,42 @@ export default function GenerateWorkspace({
   const menuRef = useRef<HTMLDivElement>(null);
   const headerFilterRef = useRef<HTMLDivElement>(null);
 
+  const ingestPageMediaFiles = useCallback(
+    (files: File[]) => {
+      void processDroppedMediaFiles(files, (url) => {
+        addQuickRefImage(url);
+      }, {
+        onAllSkipped: () => showToast('无法识别拖入的文件，请使用 JPG/PNG/WebP 等图片或 MP4/MOV 视频'),
+        onError: (msg) => showToast(msg),
+      }).catch(() => showToast('无法读取拖入的文件'));
+    },
+    [addQuickRefImage, showToast],
+  );
+
+  const { dropZoneProps: pageMediaDropProps } = useFileDropZone({
+    onFiles: ingestPageMediaFiles,
+    accept: isImageOrVideoFile,
+    onReject: () => showToast('无法识别拖入的文件，请使用 JPG/PNG/WebP 等图片或 MP4/MOV 视频'),
+  });
+
   // 点击外部关闭更多操作菜单与筛选下拉
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Element;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setOpenMenuSessionId(null);
       }
-      if (headerFilterRef.current && !headerFilterRef.current.contains(e.target as Node)) {
+      if (headerFilterRef.current && !headerFilterRef.current.contains(target)) {
         setShowTimeMenu(false);
         setShowModeMenu(false);
         setShowStatusMenu(false);
       }
-      setOpenMenuTaskId(null);
-      setOpenMenuBatchId(null);
+      if (!target.closest('[data-task-menu]')) {
+        setOpenMenuTaskId(null);
+      }
+      if (!target.closest('[data-batch-menu]')) {
+        setOpenMenuBatchId(null);
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
@@ -414,13 +443,11 @@ export default function GenerateWorkspace({
       try {
         const isVideo = task.mediaType === 'video' || task.model?.toLowerCase().includes('seedance') || task.model?.toLowerCase().includes('veo') || task.model?.toLowerCase().includes('kling');
         const pollEndpoint = isVideo ? '/api/generate/video' : '/api/generate/image';
-        const localUrl = typeof window !== 'undefined' ? localStorage.getItem('ai_base_url') || '' : '';
-        const localKey = typeof window !== 'undefined' ? localStorage.getItem('ai_api_key') || '' : '';
         const queryParams = new URLSearchParams({ taskId: task.taskId });
+        const localUrl = getGatewayClientOverrides().customBaseUrl || '';
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
-            ...getClientStorageHeaders(),
-            ...(localKey ? { 'x-custom-api-key': localKey } : {}),
+            ...getGatewayClientHeaders(),
             ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
           }
         }).catch(() => null);
@@ -527,7 +554,7 @@ export default function GenerateWorkspace({
   };
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-[#F8F9FA] select-none">
+    <div className={`${pageRootSplit} bg-[#F8F9FA] select-none`}>
       {/* 🌟 1. 左侧二级会话侧边栏 (对照图2 & 重命名菜单图: 开启创作 + 新对话 + 最近会话列表) */}
       <aside 
         className={`bg-white border-r border-slate-200/80 transition-all duration-300 flex flex-col flex-shrink-0 z-30 ${
@@ -724,8 +751,8 @@ export default function GenerateWorkspace({
         )}
 
         {/* 顶部过滤筛选工具栏 */}
-        <header className="h-14 px-6 border-b border-slate-200/60 bg-white/80 backdrop-blur-md flex items-center justify-between flex-shrink-0 z-20">
-          <div className="flex items-center gap-3">
+        <header className={`min-h-14 py-2 px-4 sm:px-6 border-b border-slate-200/60 bg-white/80 backdrop-blur-md ${pageToolbar} flex-shrink-0 z-20`}>
+          <div className={`${pageToolbarStart} gap-3`}>
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
@@ -760,20 +787,20 @@ export default function GenerateWorkspace({
             </div>
 
             {/* 搜索框 */}
-            <div className="relative">
+            <div className="relative w-full max-w-[200px] min-w-[120px]">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="在当前对话中搜索..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 sm:w-60 pl-8 pr-3 py-1.5 rounded-full bg-slate-100/90 border border-transparent focus:border-slate-300 focus:bg-white text-xs outline-none transition-all placeholder:text-slate-400 text-slate-700"
+                className="w-full pl-8 pr-3 py-1.5 rounded-full bg-slate-100/90 border border-transparent focus:border-slate-300 focus:bg-white text-xs outline-none transition-all placeholder:text-slate-400 text-slate-700"
               />
             </div>
           </div>
 
           {/* 右侧筛选下拉与资产库按钮 */}
-          <div ref={headerFilterRef} className="flex items-center gap-2 text-xs">
+          <div ref={headerFilterRef} className={`${subToolbarScroll} text-xs`}>
             {/* 时间筛选 */}
             <div className="relative">
               <button 
@@ -931,7 +958,11 @@ export default function GenerateWorkspace({
         </header>
 
         {/* 中间：可滚动的会话对话流 (对话形式，纯净聚焦，支持自动引用当前对话内容修改) */}
-        <div data-generate-scroll className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 pb-64 space-y-8">
+        <div
+          data-generate-scroll
+          {...pageMediaDropProps}
+          className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 pb-64 space-y-8 relative"
+        >
           {taskBatches.length === 0 ? (
             /* 新对话/空状态 */
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 max-w-lg mx-auto animate-fade-in">
@@ -1151,7 +1182,7 @@ export default function GenerateWorkspace({
                                 </button>
 
                                 {/* 更多菜单 */}
-                                <div className="relative shrink-0">
+                                <div className="relative shrink-0" data-task-menu>
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1167,6 +1198,7 @@ export default function GenerateWorkspace({
                                   {openMenuTaskId === primaryTask.id && (
                                     <div 
                                       onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
                                       className="absolute right-0 bottom-full mb-2 w-40 bg-white rounded-2xl shadow-xl border border-slate-200/80 p-1.5 z-40 space-y-0.5 text-xs text-slate-700 animate-fade-in"
                                     >
                                       {primaryTask.resultUrl && (
@@ -1363,7 +1395,7 @@ export default function GenerateWorkspace({
                                 </button>
 
                                 {/* 更多菜单 */}
-                                <div className="relative">
+                                <div className="relative" data-task-menu>
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1379,6 +1411,7 @@ export default function GenerateWorkspace({
                                   {openMenuTaskId === primaryTask.id && (
                                     <div 
                                       onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
                                       className="absolute right-0 bottom-full mb-2 w-40 bg-white rounded-2xl shadow-xl border border-slate-200/80 p-1.5 z-40 space-y-0.5 text-xs text-slate-700 animate-fade-in"
                                     >
                                       <button
@@ -1527,8 +1560,8 @@ export default function GenerateWorkspace({
         </div>
 
         {/* 🌟 3. 底部吸底提示词控制栏 (去除两侧多余毛玻璃翅膀，仅保留核心控制栏本身) */}
-        <div className="absolute bottom-4 inset-x-6 z-30 pointer-events-none">
-          <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] mx-auto pointer-events-auto">
+        <div className="absolute bottom-4 inset-x-4 sm:inset-x-6 z-30 pointer-events-none min-w-0">
+          <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] mx-auto pointer-events-auto min-w-0">
             <PromptActionBar 
               onOpenProductVault={onOpenProductVault}
               dropdownPlacement="up"

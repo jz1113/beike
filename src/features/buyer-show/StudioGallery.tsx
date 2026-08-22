@@ -1,5 +1,9 @@
 'use client';
-import { useState, useRef } from 'react';
+import { formatUserError } from '@/lib/upstreamErrors';
+import { useState, useRef, useCallback } from 'react';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { isImageFile } from '@/lib/mediaUpload';
+import { compressImageFilesToDataUrls } from '@/lib/workshopFileDrop';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import { useAppStore } from '@/store/useAppStore';
@@ -48,7 +52,6 @@ export default function StudioGallery({ onNextStep, hideFloatingCta }: Props) {
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [isDraggingSupplement, setIsDraggingSupplement] = useState(false);
 
   const supplementInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,7 +69,9 @@ export default function StudioGallery({ onNextStep, hideFloatingCta }: Props) {
     toggleClonedSocialImage,
     selectAllClonedImages,
     modelPersona,
-    anchorFaceImageUrl
+    anchorFaceImageUrl,
+    setClonedSocialImages,
+    setProductData,
   } = useAppStore();
 
   const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>, rawUrl?: string) => {
@@ -173,29 +178,91 @@ export default function StudioGallery({ onNextStep, hideFloatingCta }: Props) {
   };
 
   // 补充上传本地图片到当前商品素材池
-  const handleSupplementUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const ingestSupplementFiles = useCallback(async (files: File[]) => {
     try {
-      const newImgs: any[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const url = await compressImageToDataUrl(files[i], 1200, 0.85);
-        newImgs.push({
-          url,
-          type: 'detail',
-          selected: true
-        });
+      const urls = await compressImageFilesToDataUrls(files, 1200, 0.85);
+      if (urls.length === 0) {
+        showToast('无法识别拖入的图片');
+        return;
       }
+      const newImgs = urls.map((url) => ({ url, type: 'detail' as const, selected: true }));
       const existing = useAppStore.getState().images;
       useAppStore.setState({ images: [...existing, ...newImgs] });
       showToast(`已成功补充 ${newImgs.length} 张本地素材`);
     } catch (err) {
-      console.error('补充上传失败:', err);
+      showToast(`❌ 补充上传失败: ${formatUserError(err, '请重试')}`);
     }
+  }, [showToast]);
+
+  const rejectGalleryDrop = useCallback(() => {
+    showToast('无法识别拖入的文件，请使用 JPG/PNG/WebP 等图片');
+  }, []);
+
+  const routeGalleryFiles = useCallback(
+    async (files: File[]) => {
+      if (workshopMode === 'social_face_product_swap') {
+        const urls = await compressImageFilesToDataUrls(files);
+        if (urls.length > 0) {
+          setClonedSocialImages(urls);
+          showToast(`已载入 ${urls.length} 张参考图`);
+        } else {
+          rejectGalleryDrop();
+        }
+        return;
+      }
+
+      if (product) {
+        await ingestSupplementFiles(files);
+        return;
+      }
+
+      const urls = await compressImageFilesToDataUrls(files);
+      if (urls.length === 0) {
+        rejectGalleryDrop();
+        return;
+      }
+      const baseName = files[0]?.name.replace(/\.[^/.]+$/, '') || '本地导入素材';
+      const localProduct = {
+        id: 'local_temp_' + Date.now(),
+        platform: 'local',
+        itemId: `LOCAL_${Date.now()}`,
+        title: baseName,
+        picUrl: urls[0] || '',
+        createdAt: new Date().toISOString(),
+      };
+      setProductData(localProduct, { main: urls, details: [], skus: [] }, '📁 拖入导入 (未入库)');
+      showToast(`已导入 ${urls.length} 张商品图`);
+    },
+    [workshopMode, product, setClonedSocialImages, setProductData, ingestSupplementFiles, rejectGalleryDrop],
+  );
+
+  const { dropZoneProps: galleryDropProps } = useFileDropZone({
+    onFiles: (files) => {
+      void routeGalleryFiles(files);
+    },
+    accept: isImageFile,
+    onReject: rejectGalleryDrop,
+  });
+
+  const { dropZoneProps: supplementDropZoneProps } = useFileDropZone({
+    onFiles: (files) => {
+      void ingestSupplementFiles(files);
+    },
+    accept: isImageFile,
+    onReject: rejectGalleryDrop,
+  });
+
+  const handleSupplementUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await ingestSupplementFiles(Array.from(files));
   };
 
   return (
-    <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#F8F9FA] relative select-none">
+    <main
+      {...galleryDropProps}
+      className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-[#F8F9FA] relative select-none"
+    >
       {/* Toast message popup */}
       {toastMsg && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold shadow-xl border border-slate-700 animate-fade-in flex items-center gap-2">
@@ -513,6 +580,11 @@ export default function StudioGallery({ onNextStep, hideFloatingCta }: Props) {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {selectedCount === 0 && (
+                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">
+                    请勾选至少 1 张商品图后再进入「提示词」步骤（爆款复刻需要商品实物图参与分析与生图）。
+                  </div>
+                )}
                 {/* 核心主图提示横幅 */}
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
@@ -959,48 +1031,15 @@ export default function StudioGallery({ onNextStep, hideFloatingCta }: Props) {
                       {/* Card 2: 补充更多实拍图 (可选拖拽上传区) */}
                       <div
                         onClick={() => supplementInputRef.current?.click()}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setIsDraggingSupplement(true);
-                        }}
-                        onDragLeave={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setIsDraggingSupplement(false);
-                        }}
-                        onDrop={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setIsDraggingSupplement(false);
-                          const files = e.dataTransfer.files;
-                          if (files && files.length > 0) {
-                            try {
-                              const newImgs: any[] = [];
-                              for (let i = 0; i < files.length; i++) {
-                                const url = await compressImageToDataUrl(files[i], 1200, 0.85);
-                                newImgs.push({ url, type: 'detail', selected: true });
-                              }
-                              const existing = useAppStore.getState().images;
-                              useAppStore.setState({ images: [...existing, ...newImgs] });
-                              showToast(`已成功补充 ${newImgs.length} 张实拍图`);
-                            } catch (err) {
-                              console.error('拖入上传失败:', err);
-                            }
-                          }
-                        }}
-                        className={`p-6 rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 text-center cursor-pointer group ${
-                          isDraggingSupplement
-                            ? 'border-indigo-500 bg-indigo-50/80 ring-2 ring-indigo-500/20 scale-[1.01]'
-                            : 'border-slate-300 hover:border-indigo-400 bg-white hover:bg-indigo-50/30'
-                        }`}
+                        {...supplementDropZoneProps}
+                        className="p-6 rounded-3xl border-2 border-dashed border-slate-300 hover:border-indigo-400 bg-white hover:bg-indigo-50/30 transition-all flex flex-col items-center justify-center gap-2 text-center cursor-pointer group"
                       >
                         <div className="p-2.5 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:scale-110 transition-transform shadow-2xs">
                           <Upload className="w-5 h-5" />
                         </div>
                         <div>
                           <div className="text-xs font-bold text-slate-800">
-                            {isDraggingSupplement ? '松开鼠标即可添加' : '有更多实拍图/细节图？可直接拖入此处补充'}
+                            有更多实拍图/细节图？可直接拖入此处补充
                           </div>
                           <div className="text-[10px] text-slate-400 mt-0.5">
                             支持拖入多张商品背面、接口、特写照片补充到画廊中

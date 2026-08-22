@@ -11,9 +11,10 @@ import {
 } from '@/lib/drawing';
 import { compressImageToDataUrl } from '@/lib/image-utils';
 import { getEnabledImageModelsFromSettings } from '@/lib/workflowModels';
-import { getClientStorageHeaders } from '@/lib/storageClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
 import { recordModelUsage } from '@/lib/usageTracker';
 import { normalizeVisionModelId } from '@/lib/vision';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { Sparkles, X } from 'lucide-react';
 
 import ImageGenParamPanel from './ImageGenParamPanel';
@@ -120,8 +121,7 @@ export default function ImageGenStudio({
     setIsReconstructingId(task.id);
     showToast('✨ AI 视觉总监正在为您重新构想此分镜机位与叙事焦点...');
     try {
-      const localUrl = typeof window !== 'undefined' ? localStorage.getItem('ai_base_url') || undefined : undefined;
-      const localKey = typeof window !== 'undefined' ? localStorage.getItem('ai_api_key') || undefined : undefined;
+      const { customBaseUrl: localUrl } = getGatewayClientOverrides();
       const rawVisionModel = typeof window !== 'undefined'
         ? (localStorage.getItem('ai_multimodal_model') || localStorage.getItem('ai_vision_model') || 'gpt-5.6-luna')
         : 'gpt-5.6-luna';
@@ -138,7 +138,6 @@ export default function ImageGenStudio({
           extraRequirements: `针对分镜【${task.title || '当前分镜'}】，换一个截然不同的全新摄影机位与独特生活动线视角（如：大广角生活空间透视、超低机位贴地延伸、越肩抓拍、微距光影、第一人称沉浸使用等），要求必须为纯中文生图提示词，保持商品物理特征与主空间环境一致。原提示词：${task.prompt}`,
           model: targetVisionModel,
           customBaseUrl: localUrl,
-          customApiKey: localKey
         })
       });
       const data = await res.json();
@@ -157,7 +156,7 @@ export default function ImageGenStudio({
         throw new Error(data.error || 'AI 重构失败');
       }
     } catch (e: any) {
-      showToast(`❌ 重构失败: ${e.message || '网络连接异常'}`);
+      showToast(`❌ 重构失败: ${formatUserError(e, '网络连接异常')}`);
     } finally {
       setIsReconstructingId(null);
     }
@@ -171,15 +170,6 @@ export default function ImageGenStudio({
       return `${trimmed}，${keyword}`;
     });
   };
-
-  const pollingRef = useRef<{ [taskId: string]: boolean }>({});
-  const pollCancelledRef = useRef(false);
-  useEffect(() => {
-    pollCancelledRef.current = false;
-    return () => {
-      pollCancelledRef.current = true;
-    };
-  }, []);
 
   // 加载设置页已启用的生图模型（与 Hub 同源）
   useEffect(() => {
@@ -211,68 +201,21 @@ export default function ImageGenStudio({
     }
   }, [generatedPrompts, generationTasks.length, initGenerationTasks, generationTasks]);
 
-  // 轮询单个任务状态
-  const pollTaskStatus = async (taskId: string, internalId: string) => {
-    if (pollingRef.current[taskId]) return;
-    pollingRef.current[taskId] = true;
-
-    let attempts = 0;
-    const maxAttempts = 60; // 最多轮询 120 秒
-
-    while (attempts < maxAttempts) {
-      await new Promise(r => setTimeout(r, 2500));
-      if (pollCancelledRef.current) return;
-      attempts++;
-
-      try {
-        const localUrl = typeof window !== 'undefined' ? localStorage.getItem('ai_base_url') || '' : '';
-        const localKey = typeof window !== 'undefined' ? localStorage.getItem('ai_api_key') || '' : '';
-        const queryParams = new URLSearchParams({ taskId });
-        if (pollCancelledRef.current) break;
-
-        const res = await apiFetch(`/api/generate/image?${queryParams.toString()}`, {
-          headers: {
-            ...getClientStorageHeaders(),
-            ...(localKey ? { 'x-custom-api-key': localKey } : {}),
-            ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
-          },
-        }).catch(() => null);
-        if (pollCancelledRef.current) break;
-        if (!res || !res.ok) continue;
-        const data = await res.json().catch(() => null);
-
-        if (data?.success) {
-          updateGenerationTask(internalId, {
-            status: data.status,
-            progress: data.progress || `${Math.min(attempts * 5, 95)}%`,
-            resultUrl: data.resultUrl,
-            failReason: data.failReason
-          });
-
-        if (data.status === 'SUCCESS' || data.status === 'FAILURE') {
-            // 禁止用生活照结果自动定脸：会把 Shot1 表情锁进整组；仅用户上传正脸或手动「确认此人脸」
-            pollingRef.current[taskId] = false;
-            break;
-          }
-        }
-      } catch (err) {
-        console.warn('轮询状态异常:', err);
-      }
+  /** 等待全局引擎将分镜轮询至 SUCCESS / FAILURE（场景定桩批量用） */
+  const waitForGenerationTaskResult = async (
+    internalId: string,
+    options?: { timeoutMs?: number; intervalMs?: number }
+  ): Promise<boolean> => {
+    const timeoutMs = options?.timeoutMs ?? 360_000;
+    const intervalMs = options?.intervalMs ?? 2000;
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const task = useAppStore.getState().generationTasks.find((t) => t.id === internalId);
+      if (task?.status === 'SUCCESS' && task.resultUrl) return true;
+      if (task?.status === 'FAILURE') return false;
+      await new Promise((r) => setTimeout(r, intervalMs));
     }
-    // 超时仍未完成：明确标为 FAILURE，避免永久「渲染中」
-    if (pollCancelledRef.current) {
-      pollingRef.current[taskId] = false;
-      return;
-    }
-    const latest = useAppStore.getState().generationTasks.find(t => t.id === internalId);
-    if (latest && latest.status === 'IN_PROGRESS') {
-      updateGenerationTask(internalId, {
-        status: 'FAILURE',
-        failReason: '渲染超时，请点击重试',
-        progress: '0%'
-      });
-    }
-    pollingRef.current[taskId] = false;
+    return false;
   };
 
   // 启动单个分镜生图
@@ -294,8 +237,7 @@ export default function ImageGenStudio({
       failReason: undefined
     });
 
-    const localUrl = typeof window !== 'undefined' ? localStorage.getItem('ai_base_url') || undefined : undefined;
-    const localKey = typeof window !== 'undefined' ? localStorage.getItem('ai_api_key') || undefined : undefined;
+    const { customBaseUrl: localUrl } = getGatewayClientOverrides();
 
     const isFirstShot = generationTasks[0]?.id === task.id;
     const hasHuman = task.has_human === true || (task.has_human !== false && task.shot_type === 'model_shot');
@@ -548,7 +490,6 @@ export default function ImageGenStudio({
             : undefined,
           productTitle: product?.title || '电商商品',
           customBaseUrl: localUrl,
-          customApiKey: localKey
       };
       if (!hasSlotFields && orderedImages.length > 0) {
         requestBody.images = orderedImages;
@@ -566,7 +507,7 @@ export default function ImageGenStudio({
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...getClientStorageHeaders()
+          ...getGatewayClientHeaders()
         },
         body: bodyStr,
       }).catch(() => null);
@@ -613,19 +554,20 @@ export default function ImageGenStudio({
         });
         // 不自动 setAnchorFaceImageUrl(resultUrl)，避免生活照表情污染后续分镜
       } else if (data.taskId) {
-        // 异步任务进入轮询
+        // 异步任务：持久化 taskId，由 App 级 useGenerationEngine 全局轮询
         updateGenerationTask(task.id, {
           status: 'IN_PROGRESS',
           progress: '正在排队渲染中...',
+          taskId: data.taskId,
+          ...(data.recordId ? { dbId: data.recordId } : {}),
           ...(data.model ? { model: data.model } : {}),
         });
-        pollTaskStatus(data.taskId, task.id);
       }
     } catch (err: any) {
       console.warn('生图请求未成功:', err?.message || err);
       updateGenerationTask(task.id, {
         status: 'FAILURE',
-        failReason: err?.message || '生成请求未成功完成'
+        failReason: formatUserError(err, '生成请求未成功完成')
       });
     }
   };
@@ -675,8 +617,8 @@ export default function ImageGenStudio({
         const firstTask = currentTasks[0];
         if (firstTask?.prompt && firstTask.status !== 'SUCCESS') {
           await handleGenerateSingle(firstTask);
-          const refreshed = useAppStore.getState().generationTasks[0];
-          if (refreshed?.status !== 'SUCCESS') {
+          const shot1Ready = await waitForGenerationTaskResult(firstTask.id);
+          if (!shot1Ready) {
             showToast('分镜 1 未成功，已暂停后续分镜（场景定桩需要首图）');
             return;
           }
@@ -846,7 +788,7 @@ export default function ImageGenStudio({
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#F8F9FA] text-slate-900 select-none">
+    <div className="flex-1 min-w-0 flex overflow-hidden bg-[#F8F9FA] text-slate-900 select-none">
       <ImageGenParamPanel
         hideChromeNav={hideChromeNav}
         onBackToStep2={onBackToStep2}

@@ -1,6 +1,9 @@
 'use client';
+import { getGatewayClientOverrides } from '@/lib/gatewayClient';
 import {apiFetch, proxyMediaUrl } from '@/lib/apiClient';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { isImageFile, isVideoFile } from '@/lib/mediaUpload';
 import { useAppStore, AssistantMessage, MediaAttachment } from '@/store/useAppStore';
 import { extractVideoThumbnail, extractVideoFramesFromSrc, fileToDataUrl, isVideoMediaUrl } from '@/lib/mediaHelper';
 import { normalizeImageUrlToStandardJpg } from '@/lib/drawing';
@@ -11,6 +14,7 @@ import { extractShotsFromMessage } from '@/features/assistant/assistantShotParse
 import CustomSkillModal from '@/features/assistant/CustomSkillModal';
 import AssistantMessageList from '@/features/assistant/AssistantMessageList';
 import AssistantInputArea from '@/features/assistant/AssistantInputArea';
+import { formatUserError } from '@/lib/upstreamErrors';
 import {
   DEFAULT_ASSISTANT_MODELS,
   LEGACY_OFFICE_EXT_RE,
@@ -32,7 +36,6 @@ import {
   ChevronRight,
   ChevronDown,
   Sparkles,
-  Image as ImageIcon,
   Bot,
   Maximize2,
   Minimize2,
@@ -154,7 +157,6 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
   const isSendingCurrent = sendingSessionId === currentSession?.id;
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // 🌟 自动响应外部组件（如全渠道采集）传递的即时提问草稿
   useEffect(() => {
@@ -230,7 +232,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
       showToast(`✨ 已导入 ${result.imported} 个 Skill`);
       setShowSkillMenu(true);
     } catch (err: any) {
-      showToast(`❌ ${err?.message || '导入失败'}`);
+      showToast(`❌ ${formatUserError(err, '导入失败')}`);
     } finally {
       if (skillImportInputRef.current) skillImportInputRef.current.value = '';
     }
@@ -413,16 +415,16 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
         showToast(`⚠️ ${file.name}: 请另存为 .docx / .pptx 后再上传`);
         continue;
       }
-      if (file.type.startsWith('image/')) {
+      if (isImageFile(file)) {
         const url = await fileToDataUrl(file);
         addAssistantAttachment({
           type: 'image',
           url,
           name: file.name,
           size: file.size,
-          mime: file.type,
+          mime: file.type || undefined,
         });
-      } else if (file.type.startsWith('video/')) {
+      } else if (isVideoFile(file)) {
         const thumb = await extractVideoThumbnail(file);
         const url = URL.createObjectURL(file);
         addAssistantAttachment({
@@ -472,7 +474,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           });
           showToast(truncated ? `📄 已挂载 ${file.name}（文本已截断）` : `📄 已挂载文档 ${file.name}`);
         } catch (err: any) {
-          showToast(`❌ ${file.name}: ${err?.message || '文档上传失败'}`);
+          showToast(`❌ ${file.name}: ${formatUserError(err, '文档上传失败')}`);
         }
       } else {
         showToast(`⚠️ 暂不支持「${file.name}」。文档请用：${SUPPORTED_DOC_FORMATS}`);
@@ -480,27 +482,17 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     }
   };
 
-  // 拖拽上传
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(true);
-  };
+  const ingestAssistantFiles = useCallback(
+    (files: File[]) => {
+      void handleFiles(files);
+    },
+    [handleFiles],
+  );
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files);
-    }
-  };
+  const { dropZoneProps } = useFileDropZone({
+    onFiles: ingestAssistantFiles,
+    disabled: !isAssistantOpen,
+  });
 
   // 🌟 剪贴板粘贴上传处理 (支持 Ctrl+V / Cmd+V 粘贴截图与图片文件，严格防冒泡与防重复)
   const handlePaste = async (e: React.ClipboardEvent) => {
@@ -647,8 +639,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     abortControllerRef.current = abortCtrl;
 
     try {
-      const localUrl = localStorage.getItem('ai_base_url') || undefined;
-      const localKey = localStorage.getItem('ai_api_key') || undefined;
+      const { customBaseUrl: localUrl } = getGatewayClientOverrides();
 
       /** 视频抽帧；文档带 extractedText；图片原样 */
       const expandAttachmentsForApi = async (
@@ -765,7 +756,6 @@ ${selectedSkill.systemPrompt}
           fallbackModels: availableAssistantModels.map((m: any) => m.id).filter(Boolean),
           historyLimit: assistantHistoryLimit,
           customBaseUrl: localUrl,
-          customApiKey: localKey,
           systemPrompt: (adaptiveSystemPrompt || '') + langInstruction,
           skillId: selectedSkill ? selectedSkill.id : undefined,
           enableAgentTools: true,
@@ -824,10 +814,12 @@ ${selectedSkill.systemPrompt}
                 showToast(`主模型不可用，已改用「${modelUsed}」`);
               }
               if (productWidget) {
-                updateAssistantMessage(sessionId, assistantMsgId, { productWidget, modelUsed });
+                updateAssistantMessage(sessionId, assistantMsgId, { productWidget, modelUsed, streamingStatus: undefined });
               } else if (modelUsed) {
-                updateAssistantMessage(sessionId, assistantMsgId, { modelUsed });
+                updateAssistantMessage(sessionId, assistantMsgId, { modelUsed, streamingStatus: undefined });
               }
+            } else if (evt.type === 'status' && evt.message) {
+              updateAssistantMessage(sessionId, assistantMsgId, { streamingStatus: String(evt.message) });
             } else if (evt.type === 'tool_call' || evt.type === 'tool_result') {
               const prev = useAppStore.getState().assistantSessions
                 .find(s => s.id === sessionId)
@@ -855,6 +847,7 @@ ${selectedSkill.systemPrompt}
                 content: accumulated,
                 modelUsed,
                 error: false,
+                streamingStatus: undefined,
               });
             } else if (evt.type === 'thinking' && evt.content) {
               // 思考过程暂不展示，可后续扩展折叠展示
@@ -875,7 +868,8 @@ ${selectedSkill.systemPrompt}
       updateAssistantMessage(sessionId, assistantMsgId, {
         content: accumulated || '抱歉，暂时未能解析出内容。',
         modelUsed,
-        productWidget
+        productWidget,
+        streamingStatus: undefined,
       });
 
       // 🌟 记录模型用量
@@ -915,7 +909,7 @@ ${selectedSkill.systemPrompt}
         });
       } else {
         updateAssistantMessage(sessionId, assistantMsgId, {
-          content: `⚠️ 请求失败: ${err.message || '网络连接超时，请检查网络或 API Key 设置。'}`,
+          content: `⚠️ 请求失败: ${formatUserError(err, '网络连接超时，请检查网络或 API Key 设置。')}`,
           error: true,
         });
       }
@@ -969,38 +963,25 @@ ${selectedSkill.systemPrompt}
 
   return (
     <div
-      className={`fixed inset-0 z-50 pointer-events-none flex justify-end select-none ${
+      className={`fixed inset-0 z-50 flex justify-end select-none pointer-events-none ${
         isAssistantOpen ? '' : 'invisible opacity-0'
       }`}
       aria-hidden={!isAssistantOpen}
     >
-      {/* 遮罩背景 (宽屏模式下可点击关闭) */}
-      <div 
-        onClick={() => setIsAssistantOpen(false)}
-        className={`fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity duration-300 pointer-events-auto ${
-          isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`} 
+      {/* 遮罩背景（宽屏纯视觉淡化，不拦截主界面点击） */}
+      <div
+        className={`fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity duration-300 pointer-events-none ${
+          isExpanded ? 'opacity-100' : 'opacity-0'
+        }`}
       />
 
       {/* 🌟 核心明亮轻奢全站统一侧滑工作台抽屉 */}
-      <div 
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`relative h-full bg-white/95 backdrop-blur-2xl border-l border-slate-200/90 shadow-[-16px_0_40px_rgba(0,0,0,0.06)] flex flex-col pointer-events-auto transition-all duration-300 text-slate-800 ${
+      <div
+        {...(isAssistantOpen ? dropZoneProps : {})}
+        className={`relative h-full bg-white/95 backdrop-blur-2xl border-l border-slate-200/90 shadow-[-16px_0_40px_rgba(0,0,0,0.06)] flex flex-col transition-all duration-300 text-slate-800 pointer-events-auto ${
           isExpanded ? 'w-full max-w-4xl sm:w-[840px] md:w-[920px]' : 'w-full sm:w-[580px] md:w-[640px]'
         }`}
       >
-        {/* 拖拽上传全屏半透明指示层 */}
-        {isDraggingOver && (
-          <div className="absolute inset-0 z-50 bg-red-600/15 backdrop-blur-sm border-2 border-dashed border-red-500 flex flex-col items-center justify-center gap-3 text-red-600 animate-fade-in pointer-events-none">
-            <div className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg">
-              <ImageIcon className="w-8 h-8" />
-            </div>
-            <span className="text-sm font-bold">释放鼠标，上传图片 / 视频 / 文档</span>
-          </div>
-        )}
-
         {/* 🌟 1. 顶部操作栏 (Header) */}
         <div className="h-14 px-4 sm:px-5 border-b border-slate-100 bg-slate-50/90 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -1069,7 +1050,7 @@ ${selectedSkill.systemPrompt}
             {/* 展开/宽屏切换 */}
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="hidden sm:flex p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="flex p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               title={isExpanded ? "收起宽屏" : "展开宽屏"}
             >
               {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}

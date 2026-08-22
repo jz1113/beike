@@ -1,5 +1,6 @@
 'use client';
 import {apiFetch, proxyMediaUrl } from '@/lib/apiClient';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
@@ -119,7 +120,7 @@ export default function ProductHistoryModal({ isOpen, onClose }: Props) {
       onClose();
     } catch (err: any) {
       console.error('[ProductHistoryModal] 调入异常:', err);
-      showToast('调入数据解析异常: ' + (err?.message || ''));
+      showToast('调入数据解析异常: ' + formatUserError(err, '数据格式无效'));
     }
   };
 

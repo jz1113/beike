@@ -3,6 +3,7 @@ import path from 'node:path';
 import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
 import { clearProxyVideoCache } from './proxy-image';
+import { formatUserError } from '../../lib/formatApiError';
 
 function dirStats(dir: string): { bytes: number; fileCount: number } {
   let bytes = 0;
@@ -130,7 +131,7 @@ export async function GET() {
       dataDir,
     });
   } catch (error: any) {
-    return jsonResponse({ success: false, error: error?.message || '读取存储统计失败' }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error, '读取存储统计失败') }, 500);
   }
 }
 
@@ -154,6 +155,6 @@ export async function POST() {
       message: `已清理派生磁盘缓存${clearedVideos ? `（含 ${clearedVideos} 条视频内存缓存）` : ''}`,
     });
   } catch (error: any) {
-    return jsonResponse({ success: false, error: error?.message || '清理失败' }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error, '清理失败') }, 500);
   }
 }

@@ -60,7 +60,7 @@ export default function PromptBarModelPicker({
       <button
         type="button"
         onClick={() => setShowModelDropdown(!showModelDropdown)}
-        className={`h-11 sm:h-12 px-4.5 sm:px-5 rounded-2xl font-semibold flex items-center gap-2.5 border transition-all cursor-pointer text-sm sm:text-[14.5px] ${
+        className={`${compactPill} px-3 sm:px-5 rounded-2xl font-semibold flex items-center gap-1.5 sm:gap-2.5 border transition-all cursor-pointer ${
           showModelDropdown
             ? 'bg-slate-50 text-slate-950 border-slate-300 shadow-2xs'
             : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 shadow-2xs'
@@ -69,7 +69,7 @@ export default function PromptBarModelPicker({
         <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
           {getModelIcon(hubGenMode === 'video' ? activeVideoModelObj.id : activeImageModelObj.id, "w-5 h-5")}
         </div>
-        <span className="truncate max-w-[150px] sm:max-w-[200px]">
+        <span className="truncate max-w-[80px] sm:max-w-[150px] lg:max-w-[200px] hidden sm:inline">
           {hubGenMode === 'video' ? activeVideoModelObj.name : activeImageModelObj.name}
         </span>
         <span className="text-xs text-cyan-500 font-bold">✦</span>

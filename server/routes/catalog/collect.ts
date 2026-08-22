@@ -2,6 +2,7 @@ import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
 import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@/lib/drawing';
 import { buildComprehensiveProductProps } from '@/lib/props';
+import { formatUserError } from '../../lib/formatApiError';
 
 // 🌟 京东官方原生高保真备用解析器 (仅当万邦接口未命中时作为备用，严格提取真实正品大图，杜绝 UI 角标)
 async function fetchJdDirect(skuId: string): Promise<any> {
@@ -130,7 +131,7 @@ async function fetchWithRetry(url: string, retries = 1, timeoutMs = 12000): Prom
       });
       clearTimeout(timeoutId);
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+        throw new Error(`服务请求失败（HTTP ${res.status}）`);
       }
       return await res.json();
     } catch (err: any) {
@@ -155,7 +156,7 @@ function extractUrls(source: any): string[] {
       const imgRegex = /<img[^>]+(?:src|data-original|data-src|data-lazyload|data-ks-lazyload)=["']([^"']+)["']/gi;
       let match;
       while ((match = imgRegex.exec(clean)) !== null) {
-        let u = match[1]?.trim();
+        const u = match[1]?.trim();
         if (u) {
           const normalized = normalizeImageUrlToStandardJpg(u);
           if (normalized && !urls.includes(normalized)) urls.push(normalized);
@@ -528,6 +529,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('[Collect] 路由致命异常:', error);
-    return jsonResponse({ error: error.message || '采集遇到未知异常' }, 500);
+    return jsonResponse({ error: formatUserError(error, '采集遇到未知异常') }, 500);
   }
 }

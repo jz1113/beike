@@ -13,6 +13,15 @@ import {
 } from 'lucide-react';
 import { formatPromptParagraphs, formatDisplayModel } from '@/lib/drawing';
 
+export interface InspirationUseOptions {
+  referenceImages?: string[];
+  videoRefMode?: string;
+  videoDuration?: number;
+  videoModel?: string;
+  videoAspectId?: string;
+  videoResolution?: '480P' | '720P' | '1080P' | '4K';
+}
+
 export interface InspirationItem {
   id: string | number;
   isBanner?: boolean;
@@ -23,6 +32,10 @@ export interface InspirationItem {
   image: string;
   video?: string;
   mediaType?: 'image' | 'video';
+  referenceImages?: string[];
+  referenceLabels?: string[];
+  videoRefMode?: string;
+  videoDuration?: number;
   author?: {
     name: string;
     avatar?: string;
@@ -41,7 +54,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onUsePromptOnly: (prompt: string) => void;
-  onUseAsReference: (prompt: string, imageUrl: string) => void;
+  onUseAsReference: (prompt: string, imageUrl: string, opts?: InspirationUseOptions) => void;
   onNavigate?: (newItem: InspirationItem) => void;
 }
 
@@ -245,6 +258,32 @@ export default function InspirationModal({
               </div>
             </div>
 
+            {/* 参考素材（视频全能参考 / 多帧） */}
+            {item.referenceImages && item.referenceImages.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <div className="text-xs font-medium text-slate-400">
+                  参考素材 ({item.referenceImages.length})
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {item.referenceImages.map((refUrl, refIdx) => (
+                    <div key={refIdx} className="space-y-1">
+                      <div className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80">
+                        <img
+                          src={refUrl}
+                          alt={item.referenceLabels?.[refIdx] || `参考素材 ${refIdx + 1}`}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium text-center truncate px-0.5">
+                        {item.referenceLabels?.[refIdx] || `@${refIdx + 1}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 参数规格标签条 */}
             <div className="pt-2.5 flex items-center gap-2.5 text-xs text-slate-400 font-sans border-t border-slate-100">
               <span className="font-medium text-slate-700">{formatDisplayModel(item.model || (isVideo ? 'Seedance 2.5' : 'gpt-image-2'))}</span>
@@ -271,8 +310,17 @@ export default function InspirationModal({
               onClick={() => {
                 const isVideoItem = item.mediaType === 'video' || !!item.video || item.image.endsWith('.mp4');
                 if (isVideoItem) {
-                  // 视频做同款：携带参考视频
-                  onUseAsReference(item.prompt, item.video || item.image);
+                  const useOpts: InspirationUseOptions | undefined = item.referenceImages?.length
+                    ? {
+                        referenceImages: item.referenceImages,
+                        videoRefMode: item.videoRefMode || 'omni',
+                        videoDuration: item.videoDuration,
+                        videoModel: item.model,
+                        videoAspectId: item.aspectRatio,
+                        videoResolution: (item.quality?.toUpperCase() as InspirationUseOptions['videoResolution']) || '720P',
+                      }
+                    : undefined;
+                  onUseAsReference(item.prompt, item.video || item.image, useOpts);
                 } else {
                   // 文生图做同款：只填提示词，不把成品图当参考图
                   onUsePromptOnly(item.prompt);

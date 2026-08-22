@@ -138,7 +138,7 @@ export default function PromptBarImageControls({
         </div>
         {showStandard4kHint && (
           <p className="text-[11px] text-amber-700/90 leading-snug px-1">
-            标准 GPT Image 2 选 4K 将传 quality=high 与官方 4K 尺寸（如 3840×2160），model 保持 gpt-image-2。
+            标准 GPT Image 2 选 4K 将传 quality=high 与按所选比例映射的 4K 像素尺寸（如 3:4 → 2448×3264），model 保持 gpt-image-2。
           </p>
         )}
         {showDedicated2kHint && (

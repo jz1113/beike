@@ -4,6 +4,7 @@ import { useGenerationEngine } from '@/features/generate/useGenerationEngine';
 import { syncAppTokenCookie } from '@/lib/apiClient';
 import { migrateLegacyCredentialsOnce } from '@/lib/credentialClient';
 import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@/lib/workflowModels';
+import { usePreventBrowserFileOpen } from '@/lib/useFileDropZone';
 import AppSidebar from '@/shared/ui/AppSidebar';
 import Navbar from '@/shared/ui/Navbar';
 import ProductHistoryModal from '@/shared/modals/ProductHistoryModal';
@@ -27,6 +28,8 @@ export default function Home() {
   const [isCollectorOpen, setIsCollectorOpen] = useState(false);
 
   const { currentView, setCurrentView, currentStep, setStep } = useAppStore();
+
+  usePreventBrowserFileOpen();
 
   // 全局生图引擎：与视图解耦，切页后仍提交/轮询
   useGenerationEngine();
@@ -93,22 +96,17 @@ export default function Home() {
       />
 
       {/* 🌟 2. 右侧主工作区 */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         {/* 顶部轻奢导航栏 (仅在买家秀工坊流程中展示 4 步进度条，展馆和生成工作区纯净展示) */}
         {currentView === 'buyer_show' && (
           <Navbar 
             currentView={currentView}
-            currentStep={currentStep} 
             onBackToHub={() => setCurrentView('hub')}
-            onSelectStep={(step) => setStep(step)}
-            onOpenHistory={() => setIsHistoryOpen(true)} 
-            onOpenPromptHistory={() => setIsPromptHistoryOpen(true)}
-            onOpenSettings={() => setIsSettingsOpen(true)}
           />
         )}
 
         {/* 页面主视图：展馆首页 vs 生成工作区 vs 沉浸式买家秀工坊 vs 资产中心 */}
-        <main className="flex-1 overflow-hidden flex flex-col">
+        <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
           <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-400 text-sm">加载中…</div>}>
           {currentView === 'hub' ? (
             <CreativeHub 
@@ -140,14 +138,9 @@ export default function Home() {
               resetLabel="重置工坊"
               onReset={() => {
                 clearBuyerShowStudioDraft();
-                useAppStore.setState({
-                  product: null,
-                  images: [],
-                  generatedPrompts: [],
-                  generationTasks: [],
-                  clonedSocialImages: [],
-                });
-                setStep(1);
+                const store = useAppStore.getState();
+                store.resetModeSession('social_face_product_swap');
+                store.resetModeSession('storyboard_generate');
               }}
             >
               <BuyerShowStudio 

@@ -25,15 +25,15 @@ export default function AppSidebar({
   onOpenSettings
 }: Props) {
   return (
-    <aside className="w-[78px] flex-shrink-0 h-full bg-white border-r border-slate-100/90 flex flex-col items-center justify-between py-5 select-none z-40 relative shadow-2xs">
+    <aside className="w-[56px] lg:w-[78px] flex-shrink-0 h-full bg-white border-r border-slate-100/90 flex flex-col items-center justify-between py-4 lg:py-5 select-none z-40 relative shadow-2xs">
       {/* 🌟 1. 顶部：系统品牌 LOGO (原生纯粹无框，高质感悬浮) */}
       <div className="flex flex-col items-center pt-1">
         <button
           onClick={onNavigateHub}
-          className="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer group relative focus:outline-none"
+          className="w-9 h-9 lg:w-12 lg:h-12 flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer group relative focus:outline-none"
           title="贝壳云图 · 回到灵感首页"
         >
-          <div className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center">
+          <div className="relative w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center">
             <img 
               src="/app_logo.png" 
               alt="贝壳云图" 
@@ -50,11 +50,11 @@ export default function AppSidebar({
       </div>
 
       {/* 🌟 2. 中间导航按钮组 (大号现代矢量图标 + 放大字号) */}
-      <nav className="flex flex-col items-center gap-5 w-full my-auto py-2">
+      <nav className="flex flex-col items-center gap-3 lg:gap-5 w-full my-auto py-2">
         {/* 灵感 (首页展馆) */}
         <button
           onClick={onNavigateHub}
-          className={`group flex flex-col items-center justify-center gap-1.5 w-16 py-2 rounded-2xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center justify-center gap-0 lg:gap-1.5 w-10 lg:w-16 py-2.5 lg:py-2 rounded-2xl transition-all cursor-pointer ${
             currentView === 'hub'
               ? 'text-slate-950 font-bold'
               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
@@ -85,7 +85,7 @@ export default function AppSidebar({
               )}
             </svg>
           </div>
-          <span className={`text-[13px] tracking-tight leading-none ${currentView === 'hub' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`hidden lg:block text-[13px] tracking-tight leading-none ${currentView === 'hub' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             灵感
           </span>
         </button>
@@ -93,7 +93,7 @@ export default function AppSidebar({
         {/* 生成工作区 */}
         <button
           onClick={onNavigateGenerate}
-          className={`group flex flex-col items-center justify-center gap-1.5 w-16 py-2 rounded-2xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center justify-center gap-0 lg:gap-1.5 w-10 lg:w-16 py-2.5 lg:py-2 rounded-2xl transition-all cursor-pointer ${
             currentView === 'generate'
               ? 'text-slate-950 font-bold'
               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
@@ -124,7 +124,7 @@ export default function AppSidebar({
               )}
             </svg>
           </div>
-          <span className={`text-[13px] tracking-tight leading-none ${currentView === 'generate' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`hidden lg:block text-[13px] tracking-tight leading-none ${currentView === 'generate' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             生成
           </span>
         </button>
@@ -132,7 +132,7 @@ export default function AppSidebar({
         {/* 种草工坊 */}
         <button
           onClick={onNavigateBuyerShow}
-          className={`group flex flex-col items-center justify-center gap-1.5 w-16 py-2 rounded-2xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center justify-center gap-0 lg:gap-1.5 w-10 lg:w-16 py-2.5 lg:py-2 rounded-2xl transition-all cursor-pointer ${
             currentView === 'buyer_show'
               ? 'text-slate-950 font-bold'
               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
@@ -147,7 +147,7 @@ export default function AppSidebar({
               className="w-full h-full object-contain" 
             />
           </div>
-          <span className={`text-[13px] tracking-tight leading-none ${currentView === 'buyer_show' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`hidden lg:block text-[13px] tracking-tight leading-none ${currentView === 'buyer_show' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             工坊
           </span>
         </button>
@@ -155,7 +155,7 @@ export default function AppSidebar({
         {/* 资产中心 */}
         <button
           onClick={onNavigateAssets}
-          className={`group flex flex-col items-center justify-center gap-1.5 w-16 py-2 rounded-2xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center justify-center gap-0 lg:gap-1.5 w-10 lg:w-16 py-2.5 lg:py-2 rounded-2xl transition-all cursor-pointer ${
             currentView === 'assets'
               ? 'text-slate-950 font-bold'
               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
@@ -180,7 +180,7 @@ export default function AppSidebar({
               )}
             </svg>
           </div>
-          <span className={`text-[13px] tracking-tight leading-none ${currentView === 'assets' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`hidden lg:block text-[13px] tracking-tight leading-none ${currentView === 'assets' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             资产
           </span>
         </button>
@@ -190,13 +190,13 @@ export default function AppSidebar({
       <div className="flex flex-col items-center pb-2 w-full px-2">
         <button
           onClick={onOpenSettings}
-          className="group flex flex-col items-center justify-center gap-1.5 w-16 py-2 rounded-2xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all cursor-pointer select-none"
+          className="group flex flex-col items-center justify-center gap-0 lg:gap-1.5 w-10 lg:w-16 py-2.5 lg:py-2 rounded-2xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all cursor-pointer select-none"
           title="系统设置 / 模型与接口配置"
         >
           <div className="relative w-7 h-7 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-45">
             <Settings className="w-5.5 h-5.5 stroke-slate-500 group-hover:stroke-slate-900 stroke-[1.8]" />
           </div>
-          <span className="text-[13px] font-medium text-slate-600 group-hover:text-slate-900 tracking-tight leading-none">
+          <span className="hidden lg:block text-[13px] font-medium text-slate-600 group-hover:text-slate-900 tracking-tight leading-none">
             设置
           </span>
         </button>

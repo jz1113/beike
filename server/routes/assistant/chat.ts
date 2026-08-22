@@ -12,6 +12,7 @@ import {
   toolDisplayName,
   type AssistantDocAttachment,
 } from '@/lib/assistantTools';
+import { formatUserError } from '../../lib/formatApiError';
 
 const DEFAULT_BASE_URL = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
 const DEFAULT_API_KEY = process.env.AI_DRAWING_API_KEY || '';
@@ -51,6 +52,30 @@ function summarizeToolResult(raw: string): string {
   } catch {
     return raw.slice(0, 80);
   }
+}
+
+/** 仅在有 URL / 文档 / 商品库查询等明确需求时跑工具规划轮，避免纯文本对话多等一整轮 LLM */
+function needsAssistantTools(
+  lastUserMsg: string,
+  documents: AssistantDocAttachment[],
+  enableAgentTools: boolean,
+): boolean {
+  if (enableAgentTools === false) return false;
+  if (documents.length > 0) return true;
+  if (/https?:\/\/[^\s"'<>]+/i.test(lastUserMsg)) return true;
+  if (/(?:xhslink\.com|xiaohongshu\.com|douyin\.com|kuaishou\.com|weibo\.com|b23\.tv|bilibili\.com)/i.test(lastUserMsg)) {
+    return true;
+  }
+  if (/(?:item\.jd\.com|item\.taobao\.com|detail\.tmall\.com|1688\.com|pinduoduo\.com)/i.test(lastUserMsg)) {
+    return true;
+  }
+  if (/(?:抓取|采集|解析|商品库|我有哪些商品|历史采集|本地商品|万邦|sku)/i.test(lastUserMsg)) {
+    return true;
+  }
+  if (/\b\d{9,16}\b/.test(lastUserMsg) && /(?:抓取|采集|商品|sku|万邦)/i.test(lastUserMsg)) {
+    return true;
+  }
+  return false;
 }
 
 interface ChatMessage {
@@ -103,6 +128,25 @@ export async function POST(req: Request) {
       }, 400);
     }
 
+    const encoder = new TextEncoder();
+    const sseHeaders = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    };
+
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          const send = (payload: Record<string, unknown>) => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          };
+
+          try {
+            send({ type: 'status', phase: 'preparing', message: '正在处理请求…' });
+            const pipelineStart = Date.now();
+
     const validHistoryLimit = Math.max(1, Math.min(100, Number(historyLimit) > 0 ? Number(historyLimit) : 100));
     const recentMessages: ChatMessage[] = messages.slice(-validHistoryLimit);
 
@@ -134,7 +178,7 @@ export async function POST(req: Request) {
 
       try {
         // 优先在本地数据库中查询
-        let productRecord = await prisma.product.findFirst({
+        const productRecord = await prisma.product.findFirst({
           where: { itemId: extractedSku }
         });
 
@@ -413,7 +457,7 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
                 
                 let rawTitle = root.title || apiaData.title || '';
                 let rawDesc = root.desc || root.text || apiaData.desc || apiaData.text || '';
-                let author = root.author?.nickname || root.user_name || root.nickname || root.author || apiaData.author || '社媒创作者';
+                const author = root.author?.nickname || root.user_name || root.nickname || root.author || apiaData.author || '社媒创作者';
 
                 if (rawTitle.includes('|||')) {
                   const parts = rawTitle.split('|||').map((p: string) => p.trim()).filter(Boolean);
@@ -705,6 +749,9 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
       }
     }
 
+    console.log(`[Chat API] 消息组装完成 (${Date.now() - pipelineStart}ms)`);
+    send({ type: 'status', phase: 'ready', message: '消息已就绪，正在连接模型…' });
+
     // 🚀 轻量智能体：可选 tools 规划轮 + SSE 流式最终回复
     console.log(`[Chat API] 正在调用用户指定模型: ${model}`);
 
@@ -731,14 +778,16 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
       .map((a) => ({ name: a.name, extractedText: a.extractedText }));
 
     const toolCtx = { origin, documents };
-    const toolEvents: Array<{ type: string; name: string; displayName: string; status: string; detail?: string }> = [];
 
     let workingMessages: any[] = [...formattedMessages];
     let actualModel = normalizedReqModel || model;
     let toolsWereUsed = false;
 
+    const runToolPlanning = needsAssistantTools(lastUserMsg, documents, enableAgentTools !== false);
+
     // —— 工具调用循环（非流式，最多 MAX_TOOL_ROUNDS 轮）——
-    if (enableAgentTools !== false) {
+    if (runToolPlanning) {
+      send({ type: 'status', phase: 'planning', message: '正在规划工具调用…' });
       const plannerMessages = toTextOnlyMessages(workingMessages);
       // 注入工具使用提示
       if (plannerMessages[0]?.role === 'system') {
@@ -750,7 +799,7 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
         };
       }
 
-      let roundMessages = [...plannerMessages];
+      const roundMessages = [...plannerMessages];
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         let toolRoundResp: any = null;
@@ -829,7 +878,7 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
           const callId = call?.id || `call_${Date.now()}`;
           const displayName = toolDisplayName(fnName);
 
-          toolEvents.push({
+          send({
             type: 'tool_call',
             name: fnName,
             displayName,
@@ -886,7 +935,7 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
             } catch {}
           }
 
-          toolEvents.push({
+          send({
             type: 'tool_result',
             name: fnName,
             displayName,
@@ -903,7 +952,12 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
 
         workingMessages = [...roundMessages];
       }
+      console.log(`[Chat API] 工具规划完成 (${Date.now() - pipelineStart}ms)`);
+    } else {
+      console.log('[Chat API] 跳过工具规划轮（无 URL/文档/商品库意图）');
     }
+
+    send({ type: 'status', phase: 'generating', message: '正在生成回复…' });
 
     // —— 最终流式回复 ——
     let streamMessages = formattedMessages;
@@ -977,139 +1031,92 @@ ${Object.entries(propsDict).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}
       throw new Error('未能获取到模型流式响应');
     }
 
-    const encoder = new TextEncoder();
+    console.log(`[Chat API] 模型流已连接 (${Date.now() - pipelineStart}ms)`);
+
     const decoder = new TextDecoder();
     const upstreamReader = streamResponse.body.getReader();
 
-    const sseStream = new ReadableStream({
-      async start(controller) {
-        const metaEvent = `data: ${JSON.stringify({
-          type: 'meta',
-          modelUsed: actualModel,
-          modelSwitched: Boolean(requestedModelId && actualModel && actualModel !== requestedModelId && actualModel !== model),
-          requestedModel: requestedModelId || model,
-          productWidget: productWidgetData || undefined,
-        })}\n\n`;
-        controller.enqueue(encoder.encode(metaEvent));
+    send({
+      type: 'meta',
+      modelUsed: actualModel,
+      modelSwitched: Boolean(requestedModelId && actualModel && actualModel !== requestedModelId && actualModel !== model),
+      requestedModel: requestedModelId || model,
+      productWidget: productWidgetData || undefined,
+    });
 
-        for (const ev of toolEvents) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
-        }
+    let buffer = '';
+    let doneEmitted = false;
 
-        let buffer = '';
-        let doneEmitted = false;
+    while (true) {
+      const { done, value } = await upstreamReader.read();
+      if (done) break;
 
-        try {
-          while (true) {
-            const { done, value } = await upstreamReader.read();
-            if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const payload = trimmed.slice(6);
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith('data: ')) continue;
-              const payload = trimmed.slice(6);
-
-              if (payload === '[DONE]') {
-                if (!doneEmitted) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
-                  doneEmitted = true;
-                }
-                continue;
-              }
-
-              try {
-                const chunk = JSON.parse(payload);
-                const delta = chunk.choices?.[0]?.delta;
-                if (delta?.content) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({
-                        type: 'delta',
-                        content: delta.content,
-                      })}\n\n`
-                    )
-                  );
-                }
-                if (delta?.reasoning_content) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({
-                        type: 'thinking',
-                        content: delta.reasoning_content,
-                      })}\n\n`
-                    )
-                  );
-                }
-                if (chunk.usage) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({
-                        type: 'usage',
-                        usage: chunk.usage,
-                      })}\n\n`
-                    )
-                  );
-                }
-              } catch {}
-            }
-          }
-
-          if (buffer.trim()) {
-            const trimmed = buffer.trim();
-            if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
-              try {
-                const chunk = JSON.parse(trimmed.slice(6));
-                const delta = chunk.choices?.[0]?.delta;
-                if (delta?.content) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({
-                        type: 'delta',
-                        content: delta.content,
-                      })}\n\n`
-                    )
-                  );
-                }
-              } catch {}
-            }
-          }
-
+        if (payload === '[DONE]') {
           if (!doneEmitted) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+            send({ type: 'done' });
             doneEmitted = true;
           }
-        } catch (streamErr: any) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: 'error',
-                error: streamErr.message || '流式传输中断',
-              })}\n\n`
-            )
-          );
-        } finally {
-          controller.close();
+          continue;
         }
-      },
-    });
 
-    return new Response(sseStream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      },
-    });
+        try {
+          const chunk = JSON.parse(payload);
+          const delta = chunk.choices?.[0]?.delta;
+          if (delta?.content) {
+            send({ type: 'delta', content: delta.content });
+          }
+          if (delta?.reasoning_content) {
+            send({ type: 'thinking', content: delta.reasoning_content });
+          }
+          if (chunk.usage) {
+            send({ type: 'usage', usage: chunk.usage });
+          }
+        } catch {}
+      }
+    }
+
+    if (buffer.trim()) {
+      const trimmed = buffer.trim();
+      if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
+        try {
+          const chunk = JSON.parse(trimmed.slice(6));
+          const delta = chunk.choices?.[0]?.delta;
+          if (delta?.content) {
+            send({ type: 'delta', content: delta.content });
+          }
+        } catch {}
+      }
+    }
+
+    if (!doneEmitted) {
+      send({ type: 'done' });
+    }
+
+    console.log(`[Chat API] 对话完成，总耗时 ${Date.now() - pipelineStart}ms`);
+          } catch (error: any) {
+            console.error('[Chat API] 异常:', error);
+            send({ type: 'error', error: formatUserError(error, '请求大模型服务异常') });
+          } finally {
+            controller.close();
+          }
+        },
+      }),
+      { headers: sseHeaders },
+    );
   } catch (error: any) {
     console.error('[Chat API] 异常:', error);
     return jsonResponse({
       success: false,
-      error: error.message || '请求大模型服务异常'
+      error: formatUserError(error, '请求大模型服务异常')
     }, 500);
   }
 }

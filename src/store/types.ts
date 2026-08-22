@@ -94,7 +94,43 @@ export interface GenerateSlice {
   syncDatabaseTasks: (tasks: GenerationTask[]) => void;
 }
 
+export type WorkshopMode = 'storyboard_generate' | 'social_face_product_swap';
+
+export interface WorkshopModeSession {
+  currentStep: number;
+  product: any | null;
+  images: ProductImage[];
+  apiUsed: string | null;
+  clonedSocialImages: { url: string; selected: boolean }[];
+  socialGalleryTab: 'social' | 'product';
+  generatedPrompts: ShotPrompt[];
+  shotCount: number;
+  extraRequirements: string;
+  selectedStyleId: string;
+  productFingerprint: string;
+  productRole: OriginalProductRole | null;
+  masterScene: string;
+  lookBible: string;
+  identityBible: string;
+  styleBible: string;
+  lookParts: OriginalLookParts | null;
+  previousMasterScenes: string[];
+  previousGroupSignatures: PreviousGroupSignature[];
+  sceneAnchorEnabled: boolean;
+  socialPromptSourceKey: string;
+  modelPersona: string;
+  generationTasks: GenerationTask[];
+  selectedAspectId: string;
+  selectedQuality: 'high' | 'medium' | 'low';
+  useReferenceImage: boolean;
+  isBatchGenerating: boolean;
+}
+
 export interface WorkshopSlice {
+  /** 爆款复刻模式独立会话缓存（切换模式时保存/恢复） */
+  socialSessionCache: WorkshopModeSession;
+  /** 原创生成模式独立会话缓存 */
+  originalSessionCache: WorkshopModeSession;
   currentStep: number;
   product: any | null;
   images: ProductImage[];
@@ -124,7 +160,7 @@ export interface WorkshopSlice {
   useReferenceImage: boolean;
   isBatchGenerating: boolean;
   generationTasks: GenerationTask[];
-  workshopMode: 'storyboard_generate' | 'social_face_product_swap';
+  workshopMode: WorkshopMode;
   socialGalleryTab: 'social' | 'product';
   clonedSocialImages: { url: string; selected: boolean }[];
   modelPersona: string;
@@ -137,7 +173,8 @@ export interface WorkshopSlice {
   socialPromptSourceKey: string;
   getEffectiveAnchorFaceImageUrl: () => string | undefined;
   getEffectiveIsAnchorFaceConfirmed: () => boolean;
-  setWorkshopMode: (mode: 'storyboard_generate' | 'social_face_product_swap') => void;
+  setWorkshopMode: (mode: WorkshopMode) => void;
+  resetModeSession: (mode?: WorkshopMode) => void;
   setSocialGalleryTab: (tab: 'social' | 'product') => void;
   setTargetProductImage: (url: string) => void;
   setClonedSocialImages: (images: string[]) => void;

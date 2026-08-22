@@ -4,13 +4,7 @@ import { Sparkles, Users, ArrowLeft, ChevronRight } from 'lucide-react';
 
 interface NavbarProps {
   currentView?: 'hub' | 'buyer_show';
-  currentStep?: number;
   onBackToHub?: () => void;
-  onOpenHistory?: () => void;
-  onOpenPromptHistory?: () => void;
-  onOpenSettings?: () => void;
-  onSelectStep?: (step: number) => void;
-  savedCount?: number;
 }
 
 export default function Navbar({ 
@@ -28,13 +22,13 @@ export default function Navbar({
   const finishedTasksCount = generationTasks.filter(t => t.status === 'SUCCESS' && t.resultUrl).length;
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 h-15 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-      <div className="flex items-center justify-between w-full gap-4">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-6 min-h-15 py-2 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between w-full gap-x-4 gap-y-2 min-w-0">
         
         {/* Left: Breadcrumbs / Studio Navigation & Mode Selector */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           {currentView === 'buyer_show' ? (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 min-w-0">
               <button
                 onClick={onBackToHub}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-[13px] font-bold transition-all cursor-pointer active:scale-95"
@@ -45,7 +39,7 @@ export default function Navbar({
               </button>
 
               {/* 制作方向切换药丸：爆款复刻 vs 原创生成 */}
-              <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-inner">
+              <div className="flex flex-wrap items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-inner">
                 <button
                   type="button"
                   onClick={() => setWorkshopMode('social_face_product_swap')}
@@ -99,6 +93,9 @@ export default function Navbar({
         <div className="flex items-center gap-2 flex-shrink-0">
           {currentView === 'buyer_show' ? (
             <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+              <span className="px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-bold">
+                {workshopMode === 'social_face_product_swap' ? '爆款复刻' : '原创生成'}
+              </span>
               {promptsCount > 0 && (
                 <span className="px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-bold">
                   提示词 {promptsCount}

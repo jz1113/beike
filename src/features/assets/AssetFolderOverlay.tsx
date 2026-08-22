@@ -13,6 +13,7 @@ import { saveToDownloadDir } from '@/lib/desktopDownload';
 import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDisplayModel, normalizeImageUrlToStandardJpg } from '@/lib/drawing';
+import { formatUserError } from '@/lib/upstreamErrors';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import Folder from '@/shared/media/Folder';
 import LazyVideoCover from './LazyVideoCover';
@@ -99,7 +100,7 @@ export default function AssetFolderOverlay({
                       showToast(`🎉 成功打包并下载 ${itemsToExport.length} 项套组素材！`);
                     } catch (err: any) {
                       console.error('套组打包下载失败:', err);
-                      showToast(`❌ 打包下载失败: ${err.message || '请稍后重试'}`);
+                      showToast(`❌ 打包下载失败: ${formatUserError(err, '请稍后重试')}`);
                     } finally {
                       setIsDownloadingZip(false);
                     }

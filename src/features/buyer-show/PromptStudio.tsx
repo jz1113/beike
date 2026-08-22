@@ -1,8 +1,10 @@
 'use client';
+import { getGatewayClientOverrides } from '@/lib/gatewayClient';
 import {apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { STYLE_PRESETS, getMergedStylePresets, VISION_MODELS, ShotPrompt, getMergedCategories, pickVisionAnalyzeFallbacks } from '@/lib/vision';
+import { formatVisionAnalyzeError } from '@/lib/visionTimeouts';
 import {
   normalizeImageUrlToStandardJpg,
   cleanPromptText,
@@ -60,6 +62,7 @@ import PromptStudioAnalyzePanel from './PromptStudioAnalyzePanel';
 import PromptStudioGroupLocks from './PromptStudioGroupLocks';
 import PromptStudioShotList from './PromptStudioShotList';
 import PromptStudioEmptyPreview from './PromptStudioEmptyPreview';
+import CollapsibleSidePanel from '@/shared/ui/CollapsibleSidePanel';
 
 interface Props {
   onBackToStep1: () => void;
@@ -308,8 +311,7 @@ export default function PromptStudio({
 
       const activeVisionModel = availableVisionModels.find(m => m.id === selectedVisionModel) || availableVisionModels[0] || VISION_MODELS[0];
       const targetVisionModel = activeVisionModel?.id || selectedVisionModel || 'gemini-3.1-pro-preview-thinking-high';
-      const localUrl = typeof window !== 'undefined' ? localStorage.getItem('ai_base_url') || undefined : undefined;
-      const localKey = typeof window !== 'undefined' ? localStorage.getItem('ai_api_key') || undefined : undefined;
+      const { customBaseUrl: localUrl } = getGatewayClientOverrides();
 
       const isSocialMode = workshopMode === 'social_face_product_swap';
       const targetSingleProductImg = product?.picUrl || effectiveImages[0]?.url;
@@ -352,7 +354,6 @@ export default function PromptStudio({
             availableVisionModels.map((m: any) => m.id).filter(Boolean)
           ),
           customBaseUrl: localUrl,
-          customApiKey: localKey,
           // 跨批次反雷同：组签名优先，兼容旧 masterScene 列表
           previousMasterScenes: isSocialMode
             ? []
@@ -516,9 +517,8 @@ export default function PromptStudio({
         success: true
       });
     } catch (e: any) {
-      const errMsg = e.message || '视觉大模型分析超时，请重试';
+      const errMsg = formatVisionAnalyzeError(e);
       setAnalysisError(errMsg);
-      alert(errMsg);
     } finally {
       setIsAnalyzing(false);
     }
@@ -576,9 +576,13 @@ export default function PromptStudio({
   const selectedPromptCount = generatedPrompts.filter(p => p.selected !== false).length;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#F8F9FA] text-slate-900 select-none">
+    <div className="flex-1 flex overflow-hidden bg-[#F8F9FA] text-slate-900 select-none min-w-0">
       {/* Left Sidebar: Vision Parameters Workbench (Enhanced Breathing Room & Luxury Light Theme) */}
-      <div className="w-[360px] md:w-[400px] lg:w-[420px] xl:w-[450px] 2xl:w-[480px] flex-shrink-0 bg-white border-r border-slate-200/80 flex flex-col h-full shadow-[2px_0_12px_rgba(0,0,0,0.03)] z-10">
+      <CollapsibleSidePanel
+        storageKey="prompt-studio-sidebar"
+        title="提示词策划"
+        widthClass="w-[360px] md:w-[400px] lg:w-[420px] xl:w-[450px] 2xl:w-[480px]"
+      >
         {/* Top Header */}
         {!hideChromeNav && (
         <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between flex-shrink-0 bg-white">
@@ -668,10 +672,10 @@ export default function PromptStudio({
             />
           }
         />
-      </div>
+      </CollapsibleSidePanel>
 
       {/* Right Canvas: Shot Cards & Fast Management Workbench */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F8F9FA]">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-[#F8F9FA]">
         {/* Top Action Bar */}
         <div className="h-16 px-6 lg:px-8 border-b border-slate-200/80 bg-white flex items-center justify-between flex-shrink-0 shadow-xs">
           <div>

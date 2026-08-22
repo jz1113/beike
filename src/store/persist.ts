@@ -302,6 +302,8 @@ export function persistDrawingStateToStorage(allGens?: GenerationTask[], session
 }
 
 export const STUDIO_DRAFT_KEY = 'buyer_show_studio_draft';
+export const STUDIO_DRAFT_SOCIAL_KEY = 'buyer_show_social_draft';
+export const STUDIO_DRAFT_ORIGINAL_KEY = 'buyer_show_original_draft';
 let saveStudioDraftTimer: ReturnType<typeof setTimeout> | null = null;
 
 function sanitizeStudioUrl(url?: string) {
@@ -376,7 +378,52 @@ export function persistStudioDraftToStorage(state: {
   previousMasterScenes?: string[];
   previousGroupSignatures?: PreviousGroupSignature[];
   sceneAnchorEnabled?: boolean;
+  socialGalleryTab?: 'social' | 'product';
+  modelPersona?: string;
+  isBatchGenerating?: boolean;
 }) {
+  const mode = state.workshopMode === 'storyboard_generate'
+    ? 'storyboard_generate'
+    : 'social_face_product_swap';
+  persistWorkshopModeDraftToStorage(mode, state);
+}
+
+function studioDraftStorageKey(mode: 'storyboard_generate' | 'social_face_product_swap') {
+  return mode === 'social_face_product_swap' ? STUDIO_DRAFT_SOCIAL_KEY : STUDIO_DRAFT_ORIGINAL_KEY;
+}
+
+export function persistWorkshopModeDraftToStorage(
+  mode: 'storyboard_generate' | 'social_face_product_swap',
+  state: {
+    currentStep: number;
+    product: any;
+    images: ProductImage[];
+    apiUsed: string | null;
+    generatedPrompts: ShotPrompt[];
+    generationTasks: GenerationTask[];
+    clonedSocialImages: { url: string; selected: boolean }[];
+    shotCount: number;
+    extraRequirements: string;
+    selectedStyleId: string;
+    selectedAspectId: string;
+    selectedQuality: string;
+    useReferenceImage: boolean;
+    productFingerprint: string;
+    productRole?: string | null;
+    socialPromptSourceKey?: string;
+    masterScene?: string;
+    lookBible?: string;
+    identityBible?: string;
+    styleBible?: string;
+    lookParts?: OriginalLookParts | null;
+    previousMasterScenes?: string[];
+    previousGroupSignatures?: PreviousGroupSignature[];
+    sceneAnchorEnabled?: boolean;
+    socialGalleryTab?: 'social' | 'product';
+    modelPersona?: string;
+    isBatchGenerating?: boolean;
+  },
+) {
   if (typeof window === 'undefined') return;
   if (saveStudioDraftTimer) clearTimeout(saveStudioDraftTimer);
   saveStudioDraftTimer = setTimeout(() => {
@@ -395,7 +442,6 @@ export function persistStudioDraftToStorage(state: {
         clonedSocialImages: (state.clonedSocialImages || [])
           .map((i) => ({ ...i, url: sanitizeStudioUrl(i.url) || '' }))
           .filter((i) => i.url),
-        workshopMode: state.workshopMode,
         shotCount: state.shotCount,
         extraRequirements: state.extraRequirements,
         selectedStyleId: state.selectedStyleId,
@@ -404,7 +450,6 @@ export function persistStudioDraftToStorage(state: {
         useReferenceImage: state.useReferenceImage,
         productFingerprint: state.productFingerprint,
         productRole: state.productRole || null,
-        anchorFaceImageUrl: sanitizeStudioUrl(state.anchorFaceImageUrl),
         socialPromptSourceKey: state.socialPromptSourceKey || '',
         masterScene: state.masterScene || '',
         lookBible: state.lookBible || '',
@@ -414,21 +459,26 @@ export function persistStudioDraftToStorage(state: {
         previousMasterScenes: (state.previousMasterScenes || []).slice(0, 2),
         previousGroupSignatures: (state.previousGroupSignatures || []).slice(0, 3),
         sceneAnchorEnabled: state.sceneAnchorEnabled !== false,
+        socialGalleryTab: state.socialGalleryTab || 'social',
+        modelPersona: state.modelPersona || '',
+        isBatchGenerating: Boolean(state.isBatchGenerating),
         savedAt: Date.now(),
       };
-      sessionStorage.setItem(STUDIO_DRAFT_KEY, JSON.stringify(draft));
+      sessionStorage.setItem(studioDraftStorageKey(mode), JSON.stringify(draft));
     } catch {
       try {
-        sessionStorage.removeItem(STUDIO_DRAFT_KEY);
+        sessionStorage.removeItem(studioDraftStorageKey(mode));
       } catch {}
     }
   }, 200);
 }
 
-export function getStoredStudioDraft() {
+export function getStoredWorkshopModeDraft(
+  mode: 'storyboard_generate' | 'social_face_product_swap',
+) {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = sessionStorage.getItem(STUDIO_DRAFT_KEY);
+    const raw = sessionStorage.getItem(studioDraftStorageKey(mode));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
@@ -436,6 +486,11 @@ export function getStoredStudioDraft() {
   } catch {
     return null;
   }
+}
+
+export function getStoredStudioDraft() {
+  return getStoredWorkshopModeDraft('social_face_product_swap')
+    || getStoredWorkshopModeDraft('storyboard_generate');
 }
 
 export const getStoredDrawingSessions = () => {
@@ -511,5 +566,7 @@ export function clearBuyerShowStudioDraft() {
   if (typeof window === 'undefined') return;
   try {
     sessionStorage.removeItem(STUDIO_DRAFT_KEY);
+    sessionStorage.removeItem(STUDIO_DRAFT_SOCIAL_KEY);
+    sessionStorage.removeItem(STUDIO_DRAFT_ORIGINAL_KEY);
   } catch {}
 }

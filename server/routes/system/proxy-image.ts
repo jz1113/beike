@@ -170,7 +170,7 @@ async function proxyVideo(req: Request, imageUrl: string): Promise<Response> {
     });
   }
 
-  let headers = buildUpstreamHeaders(imageUrl, true, clientRange);
+  const headers = buildUpstreamHeaders(imageUrl, true, clientRange);
   let response = await fetchRemote(imageUrl, headers, timeoutMs);
 
   // 上游直接支持 Range：透传 206（不缓存分片）

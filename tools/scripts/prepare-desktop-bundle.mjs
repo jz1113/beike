@@ -77,6 +77,9 @@ function copyNodeDeps(destModules) {
   }
 }
 
+console.log('→ typecheck');
+run('npx', ['tsc', '--noEmit']);
+
 console.log('→ prisma generate');
 run('npx', ['prisma', 'generate']);
 

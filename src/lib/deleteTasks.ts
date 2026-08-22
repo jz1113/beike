@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiClient';
+import { formatUserError } from '@/lib/upstreamErrors';
 
 export interface DeleteTasksResult {
   ok: boolean;
@@ -33,8 +34,7 @@ export async function deleteTasksFromServer(
     }
     return { ok: true, count };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '网络异常';
-    return { ok: false, error: message };
+    return { ok: false, error: formatUserError(err, '网络异常') };
   }
 }
 
@@ -50,7 +50,6 @@ export async function clearFailedTasksFromServer(): Promise<DeleteTasksResult> {
     }
     return { ok: true, count: data.count };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '网络异常';
-    return { ok: false, error: message };
+    return { ok: false, error: formatUserError(err, '网络异常') };
   }
 }

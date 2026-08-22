@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
+import { formatUserError } from '../../lib/formatApiError';
 
 function sanitizeAttachment(a: any) {
   if (!a || typeof a !== 'object') return null;
@@ -82,7 +83,7 @@ export async function GET() {
 
     return jsonResponse({ success: true, sessions });
   } catch (error: any) {
-    return jsonResponse({ success: false, error: error.message }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
   }
 }
 
@@ -159,7 +160,7 @@ export async function PUT(req: Request) {
       currentId: body?.currentId || null,
     });
   } catch (error: any) {
-    return jsonResponse({ success: false, error: error.message }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
   }
 }
 
@@ -175,6 +176,6 @@ export async function DELETE(req: Request) {
     await prisma.assistantThread.delete({ where: { id } }).catch(() => null);
     return jsonResponse({ success: true });
   } catch (error: any) {
-    return jsonResponse({ success: false, error: error.message }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
   }
 }

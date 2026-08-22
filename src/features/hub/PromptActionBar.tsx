@@ -1,7 +1,9 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { isImageOrVideoFile, processDroppedMediaFiles } from '@/lib/mediaUpload';
 import { useAppStore, GenerationTask } from '@/store/useAppStore';
 import { cleanPromptText, normalizeImageUrlToStandardJpg, stripWorkshopPromptGuards } from '@/lib/drawing';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
@@ -22,6 +24,7 @@ import {
   VideoGenModel 
 } from '@/lib/video';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
+import { compactPill } from '@/shared/ui/layoutClasses';
 import { ShellTechLogo } from '@/shared/ui/BrandIcons';
 import { 
   Plus, 
@@ -154,7 +157,6 @@ export default function PromptActionBar({
   const [showAspectDropdown, setShowAspectDropdown] = useState(false);
   const [showVideoRefModeDropdown, setShowVideoRefModeDropdown] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isExpandedRefImages, setIsExpandedRefImages] = useState(false);
 
   // @ 主体选择相关状态 (支持同时@多个主体，如 @insp_1, @insp_2)
@@ -501,59 +503,30 @@ export default function PromptActionBar({
     }
   }, [quickPrompt]);
 
-  // 拖拽上传支持
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(true);
-  };
+  // 拖拽 / 粘贴上传支持
+  const rejectDrop = useCallback(() => {
+    showToast('无法识别拖入的文件，请使用 JPG/PNG/WebP 等图片或 MP4/MOV 视频');
+  }, [showToast]);
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-  };
+  const ingestMediaFiles = useCallback(
+    (files: File[]) => {
+      void processDroppedMediaFiles(files, (url, origName) => {
+        setRefImageNames((prev) => ({ ...prev, [url]: origName }));
+        addQuickRefImage(url);
+        setIsExpandedRefImages(true);
+      }, { onAllSkipped: rejectDrop, onError: (msg) => showToast(msg) }).catch(() => showToast('无法读取拖入的文件'));
+    },
+    [addQuickRefImage, rejectDrop],
+  );
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      Array.from(files).forEach(file => {
-        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-          const origName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name;
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (typeof event.target?.result === 'string') {
-              const url = event.target.result;
-              setRefImageNames(prev => ({ ...prev, [url]: origName }));
-              addQuickRefImage(url);
-              setIsExpandedRefImages(true);
-            }
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-    }
-  };
+  const { dropZoneProps } = useFileDropZone({
+    onFiles: ingestMediaFiles,
+    accept: isImageOrVideoFile,
+    onReject: rejectDrop,
+  });
 
-  // 剪贴板粘贴图片处理（供 RichPromptInput / 卡片区域调用）
   const handlePasteFiles = (files: File[]) => {
-    files.forEach((file) => {
-      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return;
-      const origName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name || '粘贴素材';
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (typeof event.target?.result === 'string') {
-          const url = event.target.result;
-          setRefImageNames((prev) => ({ ...prev, [url]: origName }));
-          addQuickRefImage(url);
-          setIsExpandedRefImages(true);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    ingestMediaFiles(files);
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -707,6 +680,8 @@ export default function PromptActionBar({
     }
   };
 
+  const isGenerateDock = currentView === 'generate';
+
   return (
     <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1460px] mx-auto select-none">
       {/* 🌟 1. 顶部主标题：贝壳云图 (顶级极简现代视觉设计) */}
@@ -714,14 +689,12 @@ export default function PromptActionBar({
 
       {/* 🌟 2. 核心指令生成控制大卡片 (即梦同款纯净白底高圆角与柔和微阴影) */}
       <div 
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        {...dropZoneProps}
         onPaste={handlePaste}
-        className={`relative rounded-[36px] sm:rounded-[48px] bg-white border transition-all p-7 sm:p-9 ${
-          isDraggingOver 
-            ? 'border-sky-400 shadow-[0_12px_40px_rgba(56,189,248,0.25)] ring-2 ring-sky-400/40' 
-            : 'border-slate-200/90 shadow-[0_12px_45px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_55px_rgba(0,0,0,0.065)]'
+        className={`relative bg-white border border-slate-200/90 shadow-[0_12px_45px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_55px_rgba(0,0,0,0.065)] transition-all ${
+          isGenerateDock
+            ? 'rounded-2xl sm:rounded-[36px] p-4 sm:p-7'
+            : 'rounded-[36px] sm:rounded-[48px] p-5 sm:p-9'
         }`}
       >
         {/* 隐藏的图片文件选择器 */}
@@ -768,7 +741,7 @@ export default function PromptActionBar({
         />
 
         {/* 顶部区域：左侧垫图方块 + 中间多行输入框 */}
-        <div className="flex items-start gap-3.5 sm:gap-4.5">
+        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4.5">
           {/* 左侧多图垫图展示/上传方块 (支持首尾帧专属双卡片 & 悬停多图平铺) */}
           <PromptBarRefMediaPanel
             hubGenMode={hubGenMode}
@@ -794,7 +767,7 @@ export default function PromptActionBar({
           />
 
           {/* 中间输入框区域 (即梦同款纯净内联版式，顶行开始输入) */}
-          <div className="flex-1 min-w-0 py-0.5 relative flex items-start min-h-[96px] sm:min-h-[112px]">
+          <div className="flex-1 min-w-0 w-full py-0.5 relative flex items-start min-h-[72px] sm:min-h-[96px] lg:min-h-[112px]">
             <RichPromptInput
               ref={richInputRef}
               value={quickPrompt}
@@ -806,9 +779,9 @@ export default function PromptActionBar({
                   ? (quickVideoRefMode === 'multi_frame'
                       ? "请添加智能多帧的镜头"
                       : quickVideoRefMode === 'first_last_frame'
-                        ? "输入文字，描述你想创作的画面内容、运动过程..."
-                        : "上传最多50个参考素材、输入文字或 @ 参考内容，自由组合图、文、音、视频多元素，定义精彩互动。例如：@图片1 模仿 @视频1 的动作，音色参考 @音频1，")
-                  : "上传参考图、输入文字或 @ 主体，描述你想生成的图片。"
+                        ? (isGenerateDock ? "描述画面内容与运动过程..." : "输入文字，描述你想创作的画面内容、运动过程...")
+                        : (isGenerateDock ? "上传参考素材或 @ 内容，描述视频..." : "上传最多50个参考素材、输入文字或 @ 参考内容，自由组合图、文、音、视频多元素，定义精彩互动。例如：@图片1 模仿 @视频1 的动作，音色参考 @音频1，"))
+                  : (isGenerateDock ? "上传参考图、输入文字或 @ 主体..." : "上传参考图、输入文字或 @ 主体，描述你想生成的图片。")
               }
               allSubjects={allSubjects}
               quickRefImages={quickRefImages}
@@ -888,7 +861,7 @@ export default function PromptActionBar({
         </div>
 
         {/* 🌟 底部药丸工具条 (精准对照即梦/各平台专业创作条) */}
-        <div className="mt-6 pt-5 sm:mt-7 sm:pt-6 border-t border-slate-100/90 flex flex-wrap items-center justify-between gap-3.5 text-xs sm:text-sm">
+        <div className="mt-4 pt-4 sm:mt-6 sm:pt-5 lg:mt-7 lg:pt-6 border-t border-slate-100/90 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3.5 text-xs sm:text-sm">
           {/* 左侧药丸按钮组 */}
           <div className="flex flex-wrap items-center gap-3">
             {/* 药丸 0: 模式切换药丸 (视频生成 ⌄ / 图片生成 ⌄) */}
@@ -896,7 +869,7 @@ export default function PromptActionBar({
               <button
                 type="button"
                 onClick={() => setShowModeDropdown(!showModeDropdown)}
-                className={`h-11 sm:h-12 px-4.5 sm:px-5 rounded-2xl font-semibold flex items-center gap-2.5 text-sm sm:text-[14.5px] transition-all cursor-pointer border ${
+                className={`${compactPill} px-3 sm:px-5 rounded-2xl font-semibold flex items-center gap-1.5 sm:gap-2.5 transition-all cursor-pointer border ${
                   hubGenMode === 'video'
                     ? (showModeDropdown 
                         ? 'bg-cyan-50/70 border-cyan-300 text-cyan-800 shadow-2xs' 
@@ -913,7 +886,7 @@ export default function PromptActionBar({
                       <path d="M16 9.5L21.5 6.5V17.5L16 14.5" strokeLinecap="round" strokeLinejoin="round" />
                       <polygon points="7.5,9.5 7.5,14.5 11.5,12" className="fill-cyan-600 stroke-none" />
                     </svg>
-                    <span>视频生成</span>
+                    <span className="hidden sm:inline">视频生成</span>
                   </>
                 ) : (
                   <>
@@ -922,7 +895,7 @@ export default function PromptActionBar({
                       <circle cx="8.5" cy="8.5" r="1.5" className="fill-sky-600 stroke-none" />
                       <path d="M21 15L16 10L6 20" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <span>图片生成</span>
+                    <span className="hidden sm:inline">图片生成</span>
                   </>
                 )}
                 <ChevronDown className="w-4 h-4 opacity-60 ml-0.5" />
@@ -1017,7 +990,7 @@ export default function PromptActionBar({
               <button
                 type="button"
                 onClick={() => setShowAspectDropdown(!showAspectDropdown)}
-                className={`h-11 sm:h-12 px-4.5 sm:px-5 rounded-2xl font-semibold flex items-center gap-2.5 border transition-all cursor-pointer text-sm sm:text-[14.5px] ${
+                className={`${compactPill} px-3 sm:px-5 rounded-2xl font-semibold flex items-center gap-1.5 sm:gap-2.5 border transition-all cursor-pointer ${
                   showAspectDropdown 
                     ? 'bg-slate-50 text-slate-950 border-slate-300 shadow-2xs' 
                     : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 shadow-2xs'
@@ -1026,31 +999,31 @@ export default function PromptActionBar({
                 {hubGenMode === 'video' ? (
                   <>
                     {renderRatioMiniIcon(activeVideoRatioObj.iconType, "w-4.5 h-4.5 opacity-80 shrink-0")}
-                    <span className="font-mono text-sm sm:text-[14.5px] font-semibold">{activeVideoRatioObj.label}</span>
-                    <span className="text-slate-300">|</span>
-                    <span className="font-mono text-sm sm:text-[14.5px] flex items-center gap-0.5 text-cyan-600 font-bold">
+                    <span className="font-mono hidden sm:inline">{activeVideoRatioObj.label}</span>
+                    <span className="text-slate-300 hidden sm:inline">|</span>
+                    <span className="font-mono flex items-center gap-0.5 text-cyan-600 font-bold">
                       {quickVideoResolution} <span className="text-cyan-500 font-bold text-[11px]">✦</span>
                     </span>
-                    <span className="text-slate-300">|</span>
-                    <span className="font-mono text-sm sm:text-[14.5px]">{quickVideoCount}</span>
+                    <span className="text-slate-300 hidden sm:inline">|</span>
+                    <span className="font-mono">{quickVideoCount}</span>
                   </>
                 ) : (
                   <>
                     {renderRatioMiniIcon(activeImageRatioObj.iconType, "w-4.5 h-4.5 opacity-80 shrink-0")}
-                    <span className="font-mono text-sm sm:text-[14.5px] font-semibold">{activeImageRatioObj.id === 'smart' ? '智能比例' : activeImageRatioObj.label}</span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-sm sm:text-[14.5px] font-bold text-cyan-600 font-mono">
+                    <span className="font-mono hidden sm:inline">{activeImageRatioObj.id === 'smart' ? '智能比例' : activeImageRatioObj.label}</span>
+                    <span className="text-slate-300 hidden sm:inline">|</span>
+                    <span className="font-bold text-cyan-600 font-mono">
                       {quickQuality === 'low' ? '1K' : quickQuality === 'medium' ? '2K ✦' : '4K ✦'}
                     </span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-sm sm:text-[14.5px] font-mono">{quickCount}</span>
+                    <span className="text-slate-300 hidden sm:inline">|</span>
+                    <span className="font-mono">{quickCount}</span>
                   </>
                 )}
                 <ChevronDown className="w-4 h-4 opacity-60" />
               </button>
 
               {showAspectDropdown && (
-                <div className={`absolute left-0 ${isUp ? 'bottom-full mb-3 origin-bottom' : 'top-full mt-2 origin-top'} w-[480px] sm:w-[520px] rounded-[32px] bg-white border border-slate-200/90 shadow-2xl p-6 z-50 animate-fade-in space-y-5 text-left`}>
+                <div className={`absolute left-0 ${isUp ? 'bottom-full mb-3 origin-bottom' : 'top-full mt-2 origin-top'} w-[min(520px,calc(100vw-2rem))] rounded-[32px] bg-white border border-slate-200/90 shadow-2xl p-6 z-50 animate-fade-in space-y-5 text-left`}>
                   {hubGenMode === 'video' ? (
                     <PromptBarVideoParamsPanel
                       quickVideoAspectId={quickVideoAspectId}
@@ -1103,7 +1076,7 @@ export default function PromptActionBar({
                 || (hubGenMode === 'image' && availableImageModels.length === 0)
                 || (!quickPrompt.trim() && quickRefImages.length === 0 && activeSubjects.length === 0 && !quickVideoFirstFrame)
               }
-              className={`w-12.5 h-12.5 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-md ${
+              className={`w-10 h-10 sm:w-12.5 sm:h-12.5 lg:w-14 lg:h-14 rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-md ${
                 !isSubmitting
                 && !(hubGenMode === 'image' && availableImageModels.length === 0)
                 && (quickPrompt.trim() || quickRefImages.length > 0 || activeSubjects.length > 0 || quickVideoFirstFrame)

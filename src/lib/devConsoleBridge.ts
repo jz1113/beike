@@ -11,7 +11,7 @@ interface PendingEntry {
 const FLUSH_MS = 200;
 const MAX_BATCH = 20;
 
-let pending: PendingEntry[] = [];
+const pending: PendingEntry[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let installed = false;
 

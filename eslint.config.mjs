@@ -20,6 +20,21 @@ export default defineConfig([
       '@typescript-eslint/no-require-imports': 'off',
       'react-hooks/exhaustive-deps': 'warn',
       'prefer-const': 'warn',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-useless-escape': 'warn',
+      'no-misleading-character-class': 'warn',
+      'no-control-regex': 'warn',
+    },
+  },
+  {
+    files: ['tools/scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
   {
@@ -30,7 +45,9 @@ export default defineConfig([
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',
-      'no-empty': ['warn', { allowEmptyCatch: true }],
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-useless-escape': 'warn',
+      'no-control-regex': 'warn',
     },
   },
 ]);

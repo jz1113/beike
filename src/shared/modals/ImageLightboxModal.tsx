@@ -268,7 +268,7 @@ export default function ImageLightboxModal() {
         </div>
 
         {/* 🌟 2. 右侧：精致大方的信息与操作面板 */}
-        <div className="w-full md:w-[350px] lg:w-[380px] xl:w-[400px] max-h-[86vh] bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 flex flex-col justify-between flex-shrink-0 overflow-y-auto relative">
+        <div className="w-full md:w-[350px] lg:w-[380px] xl:w-[400px] max-h-[40vh] md:max-h-[86vh] bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 flex flex-col justify-between flex-shrink-0 overflow-y-auto relative">
           
           <div className="space-y-4">
             {/* 顶部 Header: 左侧作者信息，右侧翻页胶囊与关闭按钮 (单行自适应弹性布局，彻底杜绝重叠) */}
@@ -376,7 +376,7 @@ export default function ImageLightboxModal() {
             </div>
 
             {/* 参数规格标签条 (严格对标展示：友好模型名称 ｜ 比例 ｜ 画质 ｜ 更多 ⓘ) */}
-            <div className="pt-2.5 flex items-center gap-2.5 text-xs text-slate-400 font-sans border-t border-slate-100">
+            <div className="pt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-400 font-sans border-t border-slate-100">
               <span className="font-medium text-slate-700">{formatDisplayModel(previewTask.model, isVideo)}</span>
               <span className="text-slate-300">|</span>
               <span className="font-mono text-slate-600">{getAspectRatioFromSize(previewTask.size) || '3:4'}</span>

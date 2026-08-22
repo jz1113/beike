@@ -23,6 +23,10 @@ const excludes = [
   'dist',
   '.DS_Store',
   '.desktop-dev-port',
+  '.desktop-dev-token',
+  '.env',
+  '.env.*',
+  '*.db',
 ];
 if (process.env.WITH_GIT !== '1') {
   excludes.push('.git');

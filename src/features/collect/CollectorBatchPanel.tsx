@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useFileDropZone } from '@/lib/useFileDropZone';
 import { confirmAction } from '@/lib/confirmAction';
 import {
   X, Plus, Loader2, Download, Trash2, Upload, FileSpreadsheet, ListPlus,
@@ -19,6 +20,7 @@ export interface CollectorBatchPanelProps {
   setBatchTextarea: (v: string) => void;
   handleAddTasksFromText: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onBatchFileSelect?: (file: File) => void;
   handleDownloadCsvTemplate: (e: React.MouseEvent) => void;
   batchTasks: BatchTaskItem[];
   setBatchTasks: React.Dispatch<React.SetStateAction<BatchTaskItem[]>>;
@@ -43,6 +45,7 @@ export default function CollectorBatchPanel({
   setBatchTextarea,
   handleAddTasksFromText,
   fileInputRef,
+  onBatchFileSelect,
   handleDownloadCsvTemplate,
   batchTasks,
   setBatchTasks,
@@ -59,6 +62,20 @@ export default function CollectorBatchPanel({
   executeSingleTask,
   setPreviewImageUrl,
 }: CollectorBatchPanelProps) {
+  const acceptBatchFile = (file: File) =>
+    /\.(xlsx|xls|csv|txt)$/i.test(file.name) ||
+    file.type.includes('spreadsheet') ||
+    file.type === 'text/plain' ||
+    file.type.includes('csv');
+
+  const { dropZoneProps: batchFileDropProps } = useFileDropZone({
+    onFiles: (files) => {
+      if (files[0] && onBatchFileSelect) onBatchFileSelect(files[0]);
+    },
+    accept: acceptBatchFile,
+    disabled: !onBatchFileSelect,
+  });
+
   return (
             <div className="max-w-5xl mx-auto space-y-5">
               {/* 导入与配置面板 */}
@@ -128,6 +145,7 @@ export default function CollectorBatchPanel({
                   <div className="space-y-3">
                     <div
                       onClick={() => fileInputRef.current?.click()}
+                      {...batchFileDropProps}
                       className="p-6 sm:p-7 rounded-2xl border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/60 hover:bg-blue-50/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all space-y-2.5 group"
                     >
                       <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform">

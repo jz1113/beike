@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../../adapters/http';
 import { assertSafeRemoteUrl } from '@/lib/safeUrl';
+import { formatUserError } from '../../../lib/formatApiError';
 
 // 自动尝试解析短链重定向 (例如 v.douyin.com, xhslink.com, v.kuaishou.com)
 async function resolveShortUrlRedirect(shortUrl: string): Promise<string> {
@@ -67,9 +68,9 @@ function extractMediaFromData(data: any): {
 
   const root = data.data && typeof data.data === 'object' ? data.data : data;
 
-  let rawTitle = root.title || data.title || '';
-  let rawDesc = root.desc || root.text || data.desc || data.text || '';
-  let author = root.author?.nickname || root.user_name || root.nickname || root.author || data.author || '';
+  const rawTitle = root.title || data.title || '';
+  const rawDesc = root.desc || root.text || data.desc || data.text || '';
+  const author = root.author?.nickname || root.user_name || root.nickname || root.author || data.author || '';
 
   // 智能拆分标题与正文文案 (处理平台常见的 || 分隔符或长文案)
   let cleanTitle = rawTitle;
@@ -88,7 +89,7 @@ function extractMediaFromData(data: any): {
   }
 
   // 去除标题前缀冗余符号
-  cleanTitle = cleanTitle.replace(/^[📌📱🔴🔥✨\s]+/, '').trim() || '社媒精选爆款素材';
+  cleanTitle = cleanTitle.replace(/^[📌📱🔴🔥✨\s]+/u, '').trim() || '社媒精选爆款素材';
 
   // 封面
   let cover = root.cover || root.download_image || root.image || root.cover_url || root.video_cover || data.cover || data.download_image || '';
@@ -277,7 +278,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('[ParseLink] 全局异常:', error);
     return jsonResponse({
-      error: error.message || '解析遇到未知错误'
+      error: formatUserError(error, '解析遇到未知错误')
     }, 500);
   }
 }

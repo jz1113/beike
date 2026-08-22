@@ -30,6 +30,7 @@ import { ComflyLogo, OneBoundLogo, ApiaLogo } from '@/shared/ui/BrandIcons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { API_SERVICES, type WorkflowModel } from '../settingsShared';
 import { isMultimodalWorkflowModel } from '@/lib/workflowModels';
+import { formatUserError } from '@/lib/upstreamErrors';
 
 export interface ApiServicesTabProps {
   selectedServiceId: string;
@@ -69,10 +70,12 @@ export interface ApiServicesTabProps {
   setIsWanbangEnabled: (v: boolean) => void;
   handleTestWanbang: () => void;
   isTestingWanbang: boolean;
+  handleSaveWanbangConfig: () => void;
   scraperId: string;
   setScraperId: (v: string) => void;
   scraperSecret: string;
   setScraperSecret: (v: string) => void;
+  handleSaveScraperConfig: () => void;
   isApiaEnabled: boolean;
   setIsApiaEnabled: (v: boolean) => void;
   storageEnabled: boolean;
@@ -97,6 +100,7 @@ export interface ApiServicesTabProps {
   setIsTestingStorage: (v: boolean) => void;
   isMigratingStorage: boolean;
   setIsMigratingStorage: (v: boolean) => void;
+  handleSaveStorageConfig: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -138,10 +142,12 @@ export default function ApiServicesTab({
   setIsWanbangEnabled,
   handleTestWanbang,
   isTestingWanbang,
+  handleSaveWanbangConfig,
   scraperId,
   setScraperId,
   scraperSecret,
   setScraperSecret,
+  handleSaveScraperConfig,
   isApiaEnabled,
   setIsApiaEnabled,
   storageEnabled,
@@ -166,6 +172,7 @@ export default function ApiServicesTab({
   setIsTestingStorage,
   isMigratingStorage,
   setIsMigratingStorage,
+  handleSaveStorageConfig,
   showToast,
 }: ApiServicesTabProps) {
   const filteredServices = useMemo(() => {
@@ -199,8 +206,8 @@ export default function ApiServicesTab({
 
   return (
     <>
-      {/* Middle service list column */}
-            <div className="w-72 sm:w-80 border-r border-slate-100 bg-white p-3.5 flex flex-col flex-shrink-0 min-h-0">
+      {/* Middle service list column — 窄屏隐藏，改由详情区顶部下拉选择 */}
+            <div className="hidden lg:flex w-72 xl:w-80 border-r border-slate-100 bg-white p-3.5 flex-col flex-shrink-0 min-h-0">
               {/* 搜索框 */}
               <div className="relative mb-2.5">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -256,8 +263,23 @@ export default function ApiServicesTab({
               </div>
             </div>
       {/* Right detail panel */}
-      <div className="flex-1 overflow-y-auto bg-white min-h-0">
+      <div className="flex-1 overflow-y-auto bg-white min-h-0 min-w-0">
               <div className="p-6 sm:p-8 space-y-6 max-w-4xl">
+                {/* 窄屏：服务切换下拉 */}
+                <div className="lg:hidden">
+                  <label className="text-xs font-bold text-slate-600 mb-1.5 block">接口服务</label>
+                  <select
+                    value={selectedServiceId}
+                    onChange={(e) => setSelectedServiceId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 font-medium outline-none cursor-pointer"
+                  >
+                    {API_SERVICES.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name.split(' ')[0]} — {service.subTitle}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 
                 {/* 1. 🌟 Comfly AI 大模型网关接口 */}
                 {selectedServiceId === 'comfly_gateway' && (
@@ -699,10 +721,7 @@ export default function ApiServicesTab({
                         <input
                           type="text"
                           value={wanbangKey}
-                          onChange={e => {
-                            setWanbangKey(e.target.value);
-                            localStorage.setItem('wanbang_api_key', e.target.value);
-                          }}
+                          onChange={e => setWanbangKey(e.target.value)}
                           placeholder="填入万邦开放平台 API Key"
                           className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-slate-400 shadow-2xs"
                         />
@@ -713,10 +732,7 @@ export default function ApiServicesTab({
                         <input
                           type="password"
                           value={wanbangSecret}
-                          onChange={e => {
-                            setWanbangSecret(e.target.value);
-                            localStorage.setItem('wanbang_api_secret', e.target.value);
-                          }}
+                          onChange={e => setWanbangSecret(e.target.value)}
                           placeholder="填入万邦开放平台 API Secret"
                           className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-slate-400 shadow-2xs"
                         />
@@ -734,11 +750,7 @@ export default function ApiServicesTab({
 
                       <div className="flex items-center gap-3 pt-2">
                         <button
-                          onClick={() => {
-                            localStorage.setItem('wanbang_api_key', wanbangKey);
-                            localStorage.setItem('wanbang_api_secret', wanbangSecret);
-                            showToast('✅ 万邦电商采集接口配置已保存');
-                          }}
+                          onClick={handleSaveWanbangConfig}
                           className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-colors cursor-pointer shadow-xs"
                         >
                           保存万邦接口配置
@@ -827,10 +839,7 @@ export default function ApiServicesTab({
                         <input
                           type="password"
                           value={scraperSecret}
-                          onChange={e => {
-                            setScraperSecret(e.target.value);
-                            localStorage.setItem('external_scraper_secret', e.target.value);
-                          }}
+                          onChange={e => setScraperSecret(e.target.value)}
                           placeholder="请输入外站抓取 Secret"
                           className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-slate-400 shadow-2xs"
                         />
@@ -849,7 +858,7 @@ export default function ApiServicesTab({
                       </div>
 
                       <button
-                        onClick={() => showToast('✅ APIA 第三方解析接口配置已保存')}
+                        onClick={handleSaveScraperConfig}
                         className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-colors cursor-pointer shadow-xs"
                       >
                         保存 APIA 接口配置
@@ -995,7 +1004,10 @@ export default function ApiServicesTab({
 
                       {/* Access Key ID */}
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1.5">Access Key ID</label>
+                        <label className="font-bold text-slate-700 block mb-1.5">
+                          访问密钥 ID
+                          <span className="ml-1.5 text-[10px] font-normal text-slate-400">Access Key ID</span>
+                        </label>
                         <input
                           type="text"
                           value={storageAccessKeyId}
@@ -1010,15 +1022,15 @@ export default function ApiServicesTab({
 
                       {/* Secret Access Key */}
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1.5">Secret Access Key</label>
+                        <label className="font-bold text-slate-700 block mb-1.5">
+                          秘密访问密钥
+                          <span className="ml-1.5 text-[10px] font-normal text-slate-400">Secret Access Key</span>
+                        </label>
                         <div className="relative">
                           <input
                             type={showStorageSecret ? "text" : "password"}
                             value={storageSecretAccessKey}
-                            onChange={e => {
-                              setStorageSecretAccessKey(e.target.value);
-                              localStorage.setItem('storage_secret_access_key', e.target.value);
-                            }}
+                            onChange={e => setStorageSecretAccessKey(e.target.value)}
                             placeholder="填写您的 S3 / R2 API Secret Key"
                             className="w-full pl-4 pr-11 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-slate-400 shadow-2xs"
                           />
@@ -1094,7 +1106,7 @@ export default function ApiServicesTab({
                                 showToast('🔴 ' + (data.message || '存储桶连接失败'));
                               }
                             } catch (e: any) {
-                              showToast('🔴 测试异常: ' + e.message);
+                              showToast('🔴 测试异常: ' + formatUserError(e));
                             } finally {
                               setIsTestingStorage(false);
                             }
@@ -1138,7 +1150,7 @@ export default function ApiServicesTab({
                                 showToast('🔴 迁移失败: ' + (data.error || '执行异常'));
                               }
                             } catch (e: any) {
-                              showToast('🔴 迁移异常: ' + e.message);
+                              showToast('🔴 迁移异常: ' + formatUserError(e));
                             } finally {
                               setIsMigratingStorage(false);
                             }
@@ -1151,17 +1163,7 @@ export default function ApiServicesTab({
 
                         <button
                           type="button"
-                          onClick={() => {
-                            localStorage.setItem('storage_enabled', String(storageEnabled));
-                            localStorage.setItem('storage_provider', storageProvider);
-                            localStorage.setItem('storage_account_id', storageAccountId);
-                            localStorage.setItem('storage_endpoint', storageEndpoint);
-                            localStorage.setItem('storage_access_key_id', storageAccessKeyId);
-                            localStorage.setItem('storage_secret_access_key', storageSecretAccessKey);
-                            localStorage.setItem('storage_bucket_name', storageBucketName);
-                            localStorage.setItem('storage_public_domain', storagePublicDomain);
-                            showToast('✅ 对象存储配置已保存生效');
-                          }}
+                          onClick={handleSaveStorageConfig}
                           className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs ml-auto"
                         >
                           保存存储配置

@@ -1,6 +1,7 @@
 import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
 import { isAdminAuthorized, unauthorizedJson } from '@/lib/apiAuth';
+import { formatUserError } from '../../lib/formatApiError';
 
 /**
  * GET /api/assets/tasks
@@ -64,7 +65,7 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     console.error('获取历史生图任务失败:', error);
-    return jsonResponse({ success: false, error: error.message || '获取任务失败' }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error, '获取任务失败') }, 500);
   }
 }
 
@@ -156,6 +157,6 @@ export async function DELETE(req: Request) {
     return jsonResponse({ success: true, count: deleteResult.count });
   } catch (error: any) {
     console.error('删除生图任务失败:', error);
-    return jsonResponse({ success: false, error: error.message }, 500);
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
   }
 }

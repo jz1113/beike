@@ -1,6 +1,7 @@
 'use client';
 import { apiFetch } from '@/lib/apiClient';
 import { confirmAction } from '@/lib/confirmAction';
+import { persistAiGatewayConfig, persistExternalScraperConfig, persistStorageConfig, persistWanbangConfig } from '@/lib/persistDesktopSecrets';
 import { persistDesktopApiConfig } from '@/lib/persistDesktopEnv';
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -18,7 +19,8 @@ import { useAppStore } from '@/store/useAppStore';
 import { getUsageSummary, type UsageSummary } from '@/lib/usageTracker';
 import { logLatencyAudit } from '@/lib/latencyAudit';
 import { getStoredMultimodalModelId, gatewayModelToWorkflowModel, inferWorkflowCapabilitiesFromId, repairWorkflowModelsForSettings } from '@/lib/workflowModels';
-import { credentialSet, credentialHas } from '@/lib/credentialClient';
+import { formatUserError } from '@/lib/upstreamErrors';
+import { credentialHas } from '@/lib/credentialClient';
 import { isTauriDesktop } from '@/lib/desktopRuntime';
 import GatewayModelModal, { GatewayModelItem } from './GatewayModelModal';
 import {
@@ -188,20 +190,20 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
         setBaseUrl(savedUrl);
         if (isTauriDesktop()) {
           const hasKey = await credentialHas('ai_api_key');
-          setApiKey(hasKey ? '' : (localStorage.getItem('ai_api_key') || ''));
+          setApiKey(hasKey ? '' : '');
         } else {
-          setApiKey(localStorage.getItem('ai_api_key') || '');
+          setApiKey('');
         }
 
-      const savedWbKey = localStorage.getItem('wanbang_api_key') || '';
-      const savedWbSec = localStorage.getItem('wanbang_api_secret') || '';
-      setWanbangKey(savedWbKey);
-      setWanbangSecret(savedWbSec);
+      const hasWbKey = await credentialHas('wanbang_api_key');
+      const hasWbSec = await credentialHas('wanbang_api_secret');
+      setWanbangKey(hasWbKey ? '' : '');
+      setWanbangSecret(hasWbSec ? '' : '');
 
       const savedScraperId = localStorage.getItem('external_scraper_id') || '';
-      const savedScraperSec = localStorage.getItem('external_scraper_secret') || '';
+      const hasScraperSec = await credentialHas('external_scraper_secret');
       setScraperId(savedScraperId);
-      setScraperSecret(savedScraperSec);
+      setScraperSecret(hasScraperSec ? '' : '');
 
       const savedAppToken = localStorage.getItem('app_access_token') || '';
       setAppAccessToken(savedAppToken || 'azhuo-local-dev');
@@ -212,7 +214,7 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
       const savedStorageAccId = localStorage.getItem('storage_account_id') || '';
       const savedStorageEndpoint = localStorage.getItem('storage_endpoint') || '';
       const savedStorageKeyId = localStorage.getItem('storage_access_key_id') || '';
-      const savedStorageSecret = localStorage.getItem('storage_secret_access_key') || '';
+      const hasStorageSecret = await credentialHas('storage_secret_access_key');
       const savedStorageBucket = localStorage.getItem('storage_bucket_name') || '';
       const savedStorageDomain = localStorage.getItem('storage_public_domain') || '';
 
@@ -221,7 +223,7 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
       setStorageAccountId(savedStorageAccId);
       setStorageEndpoint(savedStorageEndpoint);
       setStorageAccessKeyId(savedStorageKeyId);
-      setStorageSecretAccessKey(savedStorageSecret);
+      setStorageSecretAccessKey(hasStorageSecret ? '' : '');
       setStorageBucketName(savedStorageBucket);
       setStoragePublicDomain(savedStorageDomain);
 
@@ -314,7 +316,7 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
         message: 'gateway ping failed',
         data: { error: String(e?.message || e), elapsedMs: Date.now() - start },
       });
-      showToast(`🔴 网络超时: ${e.message || '网关连接失败'}`);
+      showToast(`🔴 网络超时: ${formatUserError(e, '网关连接失败')}`);
     } finally {
       setIsTesting(false);
     }
@@ -340,7 +342,7 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
         showToast(`🔴 万邦接口异常: ${data.error || '无法连通万邦网关'}`);
       }
     } catch (err: any) {
-      showToast(`🔴 网络超时: ${err.message || '测试失败'}`);
+      showToast(`🔴 网络超时: ${formatUserError(err, '测试失败')}`);
     } finally {
       setIsTestingWanbang(false);
     }
@@ -348,17 +350,36 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
 
   // 自动保存 API 配置
   const handleSaveApiConfig = (newUrl: string, newKey: string) => {
-    localStorage.setItem('ai_base_url', newUrl);
-    if (newKey.trim()) {
-      void credentialSet('ai_api_key', newKey.trim());
-      localStorage.removeItem('ai_api_key');
-    }
     void persistDesktopApiConfig(newUrl, newKey);
     apiFetch('/api/system/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'ai', baseUrl: newUrl, apiKey: newKey, model: activeImageGenModel || 'gpt-image-2' })
     }).catch(() => {});
+  };
+
+  const handleSaveWanbangConfig = () => {
+    void persistWanbangConfig(wanbangKey, wanbangSecret);
+    showToast('✅ 万邦电商采集接口配置已保存');
+  };
+
+  const handleSaveScraperConfig = () => {
+    void persistExternalScraperConfig(scraperId, scraperSecret);
+    showToast('✅ 社媒解析接口配置已保存');
+  };
+
+  const handleSaveStorageConfig = () => {
+    void persistStorageConfig({
+      enabled: storageEnabled,
+      provider: storageProvider,
+      accountId: storageAccountId,
+      endpoint: storageEndpoint,
+      accessKeyId: storageAccessKeyId,
+      secretAccessKey: storageSecretAccessKey,
+      bucketName: storageBucketName,
+      publicDomain: storagePublicDomain,
+    });
+    showToast('✅ 对象存储配置已保存生效');
   };
 
   // 获取网关模型列表 (854+)
@@ -389,7 +410,7 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
       if (!res.ok || !data.success) throw new Error(data.error || '获取失败');
       setAllGatewayModels(data.models || []);
     } catch (err: any) {
-      alert(err.message || '获取网关模型列表失败');
+      alert(formatUserError(err, '获取网关模型列表失败'));
     } finally {
       setIsFetchingGateway(false);
     }
@@ -702,6 +723,9 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
               setIsTestingStorage={setIsTestingStorage}
               isMigratingStorage={isMigratingStorage}
               setIsMigratingStorage={setIsMigratingStorage}
+              handleSaveWanbangConfig={handleSaveWanbangConfig}
+              handleSaveScraperConfig={handleSaveScraperConfig}
+              handleSaveStorageConfig={handleSaveStorageConfig}
               showToast={showToast}
             />
           )}

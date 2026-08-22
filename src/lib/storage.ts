@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from './prisma';
+import { formatUserError } from './upstreamErrors';
 
 export interface StorageConfig {
   enabled?: boolean;
@@ -14,21 +15,10 @@ export interface StorageConfig {
 }
 
 /**
- * 从 Request 或请求 Body 中提取前端传递的存储配置
+ * 从 Request 或请求 Body 中提取存储配置（仅 body.storageConfig；不再读取 x-storage-config）
  */
-export function extractStorageConfigFromRequest(req: any, body?: any): StorageConfig | undefined {
+export function extractStorageConfigFromRequest(_req: unknown, body?: { storageConfig?: StorageConfig }): StorageConfig | undefined {
   if (body?.storageConfig) return body.storageConfig;
-  const headerVal = req?.headers?.get ? req.headers.get('x-storage-config') : null;
-  if (headerVal) {
-    try {
-      const decoded = Buffer.from(headerVal, 'base64').toString('utf-8');
-      return JSON.parse(decoded);
-    } catch {
-      try {
-        return JSON.parse(headerVal);
-      } catch {}
-    }
-  }
   return undefined;
 }
 
@@ -162,10 +152,11 @@ export async function uploadRemoteMediaToStorage(
 
   // 5. 组装永久公开访问链接
   let permanentUrl = '';
-  if (config.publicDomain) {
-    permanentUrl = `${config.publicDomain}/${key}`;
-  } else if (config.provider === 'r2' && config.publicDomain) {
-    permanentUrl = `${config.publicDomain}/${key}`;
+  const normalizedPublicDomain = config.publicDomain?.trim().replace(/\/+$/, '');
+  if (normalizedPublicDomain) {
+    permanentUrl = `${normalizedPublicDomain}/${key}`;
+  } else if (config.provider === 'r2' && config.accountId) {
+    permanentUrl = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucketName}/${key}`;
   } else if (config.endpoint) {
     permanentUrl = `${config.endpoint}/${config.bucketName}/${key}`;
   } else {
@@ -273,7 +264,7 @@ export async function testStorageConnection(config: StorageConfig): Promise<{
   } catch (error: any) {
     return {
       success: false,
-      message: `连接失败: ${error.message || '网络连接超时或凭证无效'}`
+      message: `连接失败: ${formatUserError(error, '网络连接超时或凭证无效')}`
     };
   }
 }

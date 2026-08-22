@@ -1,10 +1,14 @@
 'use client';
 import {apiFetch, proxyMediaUrl } from '@/lib/apiClient';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useFileDropZone } from '@/lib/useFileDropZone';
+import { isImageFile } from '@/lib/mediaUpload';
+import { compressImageFilesToDataUrls } from '@/lib/workshopFileDrop';
 import { useAppStore } from '@/store/useAppStore';
 import { MODEL_PERSONAS } from '@/lib/vision';
 import { compressImageToDataUrl } from '@/lib/image-utils';
 import { normalizeImageUrlToStandardJpg } from '@/lib/drawing';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { 
   Search, 
   Loader2, 
@@ -29,6 +33,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { JdIcon, TaobaoIcon, AIExtractIcon, WorkflowNextIcon, StudioConsoleIcon } from '@/shared/ui/BrandIcons';
+import CollapsibleSidePanel from '@/shared/ui/CollapsibleSidePanel';
 import { ProductRecord } from '@/types';
 
 interface Props {
@@ -57,7 +62,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
   const [isFetchingTarget, setIsFetchingTarget] = useState(false);
   const [targetProductImage, setTargetProductImage] = useState<string>('');
   const [targetProductTitle, setTargetProductTitle] = useState<string>('');
-  const [isDraggingTarget, setIsDraggingTarget] = useState(false);
   const targetProductInputRef = useRef<HTMLInputElement>(null);
   const socialFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -66,7 +70,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
   const [localTitle, setLocalTitle] = useState('');
   const [localItemId, setLocalItemId] = useState('');
   const [isSavingLocal, setIsSavingLocal] = useState(false);
-  const [isDraggingLocal, setIsDraggingLocal] = useState(false);
 
   // 编辑当前工作商品信息
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
@@ -139,9 +142,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
         extractedId = numMatch[1] || numMatch[0];
       }
 
-      const customWbKey = typeof window !== 'undefined' ? localStorage.getItem('wanbang_api_key') || undefined : undefined;
-      const customWbSec = typeof window !== 'undefined' ? localStorage.getItem('wanbang_api_secret') || undefined : undefined;
-
       const res = await apiFetch('/api/catalog/collect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,8 +151,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
           platform: targetPlatform,
           force_refresh: forceRefresh,
           forceRefresh,
-          customWanbangKey: customWbKey,
-          customWanbangSecret: customWbSec
         })
       });
 
@@ -169,7 +167,7 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
       );
       fetchRecentProducts();
     } catch (err: any) {
-      setError(err.message || '网络连接超时，请重试');
+      setError(formatUserError(err, '网络连接超时，请重试'));
     } finally {
       setLoading(false);
     }
@@ -242,35 +240,43 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
     e.target.value = '';
   };
 
-  const handleLocalFilesDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingLocal(false);
+  const acceptLocalImage = useCallback(
+    (file: File) => isImageFile(file),
+    [],
+  );
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const files = e.dataTransfer.files;
+  const ingestLocalFiles = useCallback(
+    async (files: File[]) => {
+      setActiveTab('upload');
       const newFiles: { name: string; url: string }[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp|gif)$/i.test(file.name)) {
-          try {
-            const url = await compressImageToDataUrl(file, 1600, 0.85);
-            if (url?.startsWith('data:image/')) newFiles.push({ name: file.name, url });
-          } catch {
-            /* skip */
-          }
+      for (const file of files) {
+        if (!acceptLocalImage(file)) continue;
+        try {
+          const url = await compressImageToDataUrl(file, 1600, 0.85);
+          if (url?.startsWith('data:image/')) newFiles.push({ name: file.name, url });
+        } catch {
+          /* skip */
         }
       }
       if (newFiles.length > 0) {
-        setLocalFiles(prev => [...prev, ...newFiles]);
+        setLocalFiles((prev) => [...prev, ...newFiles]);
         if (!localTitle && newFiles.length > 0) {
-          const baseName = newFiles[0].name.replace(/\.[^/.]+$/, "");
+          const baseName = newFiles[0].name.replace(/\.[^/.]+$/, '');
           setLocalTitle(baseName);
           setLocalItemId('LOCAL_' + Date.now().toString().slice(-6));
         }
       }
-    }
-  };
+    },
+    [acceptLocalImage, localTitle],
+  );
+
+  const { dropZoneProps: localDropZoneProps } = useFileDropZone({
+    onFiles: (files) => {
+      setActiveTab('upload');
+      void ingestLocalFiles(files);
+    },
+    accept: acceptLocalImage,
+  });
 
   const handleRemoveLocalFile = (idx: number) => {
     setLocalFiles(prev => prev.filter((_, i) => i !== idx));
@@ -314,8 +320,8 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
       setLocalFiles([]);
       setLocalTitle('');
       setLocalItemId('');
-    } catch (err: any) {
-      console.error('载入本地商品素材失败:', err);
+    } catch (err: unknown) {
+      setError(formatUserError(err, '载入本地商品素材失败'));
     } finally {
       setIsSavingLocal(false);
     }
@@ -358,8 +364,8 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
         setIsEditingCurrent(false);
         fetchRecentProducts();
       }
-    } catch (e: any) {
-      console.error('更新商品信息失败:', e);
+    } catch (e: unknown) {
+      setError(formatUserError(e, '更新商品信息失败'));
     }
   };
 
@@ -388,14 +394,15 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
         throw new Error('未在该笔记中提取到有效高清图片');
       }
     } catch (err: any) {
-      setError(err.message || '采集外站图集失败');
+      setError(formatUserError(err, '采集外站图集失败'));
     } finally {
       setIsScrapingSocial(false);
     }
   };
 
   const processTargetProductFile = (file: File) => {
-    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|bmp|gif)$/i.test(file.name)) return;
+    if (!isImageFile(file)) return;
+    setTargetCollectMethod('upload');
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
@@ -419,32 +426,44 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
     processTargetProductFile(file);
   };
 
-  const handleTargetProductDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingTarget(false);
+  const { dropZoneProps: targetDropZoneProps } = useFileDropZone({
+    onFiles: (files) => {
+      setTargetCollectMethod('upload');
+      if (files[0]) processTargetProductFile(files[0]);
+    },
+    accept: acceptLocalImage,
+    onDropWithoutFiles: (e) => {
+      const text = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+      if (text && (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('data:image/'))) {
+        setTargetCollectMethod('upload');
+        setTargetProductImage(text);
+        const dummyProd = {
+          id: 'target_' + Date.now(),
+          title: targetProductTitle || '拖入的目标商品',
+          itemId: 'TARGET_' + Date.now(),
+          picUrl: text,
+          platform: 'custom',
+        };
+        setProductData(dummyProd, { main: [text], details: [], skus: [] }, '目标商品实物绑定');
+      }
+    },
+  });
 
-    // 1. 本地图片文件拖拽
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      processTargetProductFile(file);
-      return;
-    }
+  const ingestSocialRefFiles = useCallback(
+    async (files: File[]) => {
+      setSocialInputMode('upload');
+      const urls = await compressImageFilesToDataUrls(files);
+      if (urls.length > 0) setClonedSocialImages(urls);
+    },
+    [setClonedSocialImages],
+  );
 
-    // 2. 网页/外站图片链接拖拽
-    const text = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-    if (text && (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('data:image/'))) {
-      setTargetProductImage(text);
-      const dummyProd = {
-        id: 'target_' + Date.now(),
-        title: targetProductTitle || '拖入的目标商品',
-        itemId: 'TARGET_' + Date.now(),
-        picUrl: text,
-        platform: 'custom'
-      };
-      setProductData(dummyProd, { main: [text], details: [], skus: [] }, '目标商品实物绑定');
-    }
-  };
+  const { dropZoneProps: socialRefDropProps } = useFileDropZone({
+    onFiles: (files) => {
+      void ingestSocialRefFiles(files);
+    },
+    accept: acceptLocalImage,
+  });
 
   const handleFetchTargetProduct = async () => {
     const targetId = targetNumIid.trim();
@@ -463,9 +482,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
         extractedId = numMatch[1] || numMatch[0];
       }
 
-      const customWbKey = typeof window !== 'undefined' ? localStorage.getItem('wanbang_api_key') || undefined : undefined;
-      const customWbSec = typeof window !== 'undefined' ? localStorage.getItem('wanbang_api_secret') || undefined : undefined;
-
       const res = await apiFetch('/api/catalog/collect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -475,8 +491,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
           platform: targetPlatform,
           force_refresh: targetForceRefresh,
           forceRefresh: targetForceRefresh,
-          customWanbangKey: customWbKey,
-          customWanbangSecret: customWbSec
         })
       });
 
@@ -497,14 +511,18 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
       }
       fetchRecentProducts();
     } catch (err: any) {
-      setError(err.message || '网络连接超时，请重试');
+      setError(formatUserError(err, '网络连接超时，请重试'));
     } finally {
       setIsFetchingTarget(false);
     }
   };
 
   return (
-    <aside className="w-[380px] md:w-[420px] lg:w-[460px] xl:w-[480px] 2xl:w-[520px] flex-shrink-0 bg-white border-r border-slate-200/80 flex flex-col h-full overflow-hidden select-none shadow-[2px_0_12px_rgba(0,0,0,0.03)] z-10">
+    <CollapsibleSidePanel
+      storageKey="studio-sidebar"
+      title="素材准备"
+      widthClass="w-[380px] md:w-[420px] lg:w-[460px] xl:w-[480px] 2xl:w-[520px]"
+    >
       {/* Sidebar Header */}
       <div className="p-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/60">
         <div className="flex items-center gap-2">
@@ -627,14 +645,19 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
                       e.target.value = '';
                     }}
                   />
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    {...socialRefDropProps}
                     onClick={() => socialFileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') socialFileInputRef.current?.click();
+                    }}
                     className="w-full py-6 rounded-xl border border-dashed border-slate-300 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/40 text-xs font-bold text-slate-700 flex flex-col items-center gap-1.5 cursor-pointer transition-all"
                   >
                     <Upload className="w-4 h-4 text-indigo-600" />
-                    <span>点击上传参考图（可多选）</span>
-                  </button>
+                    <span>点击或拖入参考图（可多选）</span>
+                  </div>
                 </div>
               )}
 
@@ -726,22 +749,8 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
                 </div>
               ) : (
                 <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setIsDraggingTarget(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setIsDraggingTarget(false);
-                  }}
-                  onDrop={handleTargetProductDrop}
-                  className={`p-3 rounded-xl border border-dashed transition-all space-y-2 ${
-                    isDraggingTarget
-                      ? 'border-indigo-500 bg-indigo-50/60'
-                      : 'border-slate-300 bg-slate-50/50'
-                  }`}
+                  {...targetDropZoneProps}
+                  className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 transition-all space-y-2"
                 >
                   <input
                     ref={targetProductInputRef}
@@ -1266,30 +1275,14 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
 
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setIsDraggingLocal(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setIsDraggingLocal(false);
-                  }}
-                  onDrop={handleLocalFilesDrop}
-                  className={`w-full py-6 px-3 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 cursor-pointer text-center group ${
-                    isDraggingLocal
-                      ? 'border-indigo-500 bg-indigo-50/80 scale-[1.01] ring-2 ring-indigo-500/20'
-                      : 'border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30'
-                  }`}
+                  {...localDropZoneProps}
+                  className="w-full py-6 px-3 rounded-2xl border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer text-center group"
                 >
                   <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 group-hover:scale-110 transition-transform">
                     <Upload className="w-5 h-5" />
                   </div>
                   <div className="text-xs font-bold text-slate-800">
-                    {isDraggingLocal
-                      ? '松开鼠标即可添加图片'
-                      : localFiles.length > 0
+                    {localFiles.length > 0
                       ? `已选择 ${localFiles.length} 张本地图片 (可继续拖入)`
                       : '点击或拖拽本地商品图片至此处'}
                   </div>
@@ -1457,9 +1450,28 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
             </div>
           </div>
         )}
+
+        {workshopMode === 'social_face_product_swap' && (
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="text-[11px] font-bold text-slate-700">进入「提示词」步骤需完成：</div>
+            <ul className="space-y-1.5 text-[11px]">
+              <li className={`flex items-center gap-2 ${clonedSocialImages.filter(i => i.selected).length > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>至少勾选 1 张参考分镜</span>
+              </li>
+              <li className={`flex items-center gap-2 ${product ? 'text-emerald-700' : 'text-amber-700'}`}>
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>载入目标商品（槽位 2）</span>
+              </li>
+              <li className={`flex items-center gap-2 ${selectedCount > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>在「商品图库」勾选至少 1 张商品图</span>
+              </li>
+            </ul>
+          </div>
+        )}
       </div>
 
-      {/* Footer Step Next CTA */}
       {!hideFooterCta && (
       <div className="p-4 border-t border-slate-200/80 bg-slate-50/80">
         {workshopMode === 'social_face_product_swap' ? (
@@ -1471,7 +1483,11 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
               }
               onNextStep();
             }}
-            disabled={clonedSocialImages.filter(i => i.selected).length === 0}
+            disabled={
+              clonedSocialImages.filter(i => i.selected).length === 0
+              || !product
+              || selectedCount === 0
+            }
             className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]"
           >
             <WorkflowNextIcon className="w-3.5 h-3.5" />
@@ -1489,6 +1505,6 @@ export default function StudioSidebar({ onOpenHistory, onNextStep, hideFooterCta
         )}
       </div>
       )}
-    </aside>
+    </CollapsibleSidePanel>
   );
 }

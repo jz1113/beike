@@ -5,6 +5,7 @@ import { persistMediaUrl, extractStorageConfigFromRequest } from '@/lib/storage'
 import { convertToStandardJpegDataUrl } from '@/lib/imageConverter';
 import { buildVideoRequest } from '@/lib/modelAdapters';
 import { createImageConvertCache, logLatencyAudit } from '@/lib/latencyAudit';
+import { formatUserError } from '../../lib/formatApiError';
 
 const DEFAULT_BASE_URL = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
 const DEFAULT_API_KEY = process.env.AI_DRAWING_API_KEY || '';
@@ -288,7 +289,7 @@ export async function POST(req: Request) {
     });
     return jsonResponse({
       success: false,
-      error: error.message || '视频生成任务提交失败'
+      error: formatUserError(error, '视频生成任务提交失败')
     }, 500);
   }
 }
@@ -368,7 +369,8 @@ export async function GET(req: Request) {
       : (resData.progress !== undefined 
         ? (String(resData.progress).endsWith('%') ? String(resData.progress) : `${resData.progress}%`) 
         : (rawStatus === 'SUCCESS' || rawStatus === 'COMPLETED' ? '100%' : '35%'));
-    const failReason = taskInfo.fail_reason || resData.fail_reason || resData.message || taskInfo.error?.message || taskInfo.error || '';
+    const rawFailReason = taskInfo.fail_reason || resData.fail_reason || resData.message || taskInfo.error?.message || taskInfo.error || '';
+    const failReason = rawFailReason ? formatUserError(String(rawFailReason), '视频生成失败') : '';
 
     // 🌟 全量提取结果视频 URL (覆盖 url / video_url / output / outputs / download_url 等所有格式)
     let resultUrl = '';
@@ -449,7 +451,7 @@ export async function GET(req: Request) {
     console.error('[AI视频-轮询] 异常:', error);
     return jsonResponse({
       success: false,
-      error: error.message || '查询视频任务状态失败'
+      error: formatUserError(error, '查询视频任务状态失败')
     }, 500);
   }
 }

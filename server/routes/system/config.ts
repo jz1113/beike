@@ -1,6 +1,7 @@
 import { jsonResponse } from '../../adapters/http';
 import { VISION_MODELS } from '@/lib/vision';
 import { IMAGE_GEN_MODELS } from '@/lib/drawing';
+import { formatUserError } from '../../lib/formatApiError';
 
 // 获取系统当前模型与接口配置（密钥只返回是否已配置，不泄露明文/前后缀）
 export async function GET() {
@@ -210,11 +211,10 @@ export async function POST(req: Request) {
 
     if (!testRes.ok) {
       const errText = await testRes.text();
-      const { humanizeUpstreamError } = await import('@/lib/upstreamErrors');
       return jsonResponse({
         success: false,
         status: testRes.status,
-        error: humanizeUpstreamError(`接口响应异常: ${errText.slice(0, 300)}`),
+        error: formatUserError(`接口响应异常: ${errText.slice(0, 300)}`),
         latencyMs
       }, 400);
     }
@@ -230,7 +230,7 @@ export async function POST(req: Request) {
     const latencyMs = Date.now() - startTime;
     return jsonResponse({
       success: false,
-      error: error.message || '网络连接超时或地址不可达',
+      error: formatUserError(error, '网络连接超时或地址不可达'),
       latencyMs
     }, 500);
   }

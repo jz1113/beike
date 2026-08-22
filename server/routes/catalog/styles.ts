@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
+import { formatUserError } from '../../lib/formatApiError';
 
 // 获取所有已保存的自定义风格配方列表
 export async function GET(req: Request) {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
     return jsonResponse({ success: true, recipes });
   } catch (error: any) {
     console.error('[StyleRecipe] GET 异常:', error);
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
     return jsonResponse({ success: true, recipe });
   } catch (error: any) {
     console.error('[StyleRecipe] POST 异常:', error);
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -93,7 +94,7 @@ export async function PUT(req: Request) {
     return jsonResponse({ success: true, recipe: updated });
   } catch (error: any) {
     console.error('[StyleRecipe] PUT 异常:', error);
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -114,6 +115,6 @@ export async function DELETE(req: Request) {
     return jsonResponse({ success: true });
   } catch (error: any) {
     console.error('[StyleRecipe] DELETE 异常:', error);
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }

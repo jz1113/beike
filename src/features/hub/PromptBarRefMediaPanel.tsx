@@ -234,10 +234,10 @@ export default function PromptBarRefMediaPanel({
         <button
           type="button"
           onClick={onUploadClick}
-          className="w-22 h-26 sm:w-24 sm:h-28 rounded-2xl bg-[#F4F5F8] hover:bg-[#EBEDF2] -rotate-[3.5deg] hover:rotate-0 hover:scale-105 border border-slate-200/80 shadow-2xs text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group/empty flex-shrink-0"
+          className="w-18 h-20 sm:w-24 sm:h-28 rounded-2xl bg-[#F4F5F8] hover:bg-[#EBEDF2] -rotate-[3.5deg] hover:rotate-0 hover:scale-105 border border-slate-200/80 shadow-2xs text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group/empty flex-shrink-0"
           title={hubGenMode === 'video' ? '上传参考素材/首帧/动作图或拖入文件' : '上传参考图或直接拖入图片'}
         >
-          <Plus className="w-7 h-7 text-slate-400 group-hover/empty:scale-110 transition-transform stroke-[2.2]" />
+          <Plus className="w-5 h-5 sm:w-7 sm:h-7 text-slate-400 group-hover/empty:scale-110 transition-transform stroke-[2.2]" />
           {hubGenMode === 'video' && (
             <span className="text-xs sm:text-[13px] text-slate-400 font-medium leading-none">参考内容</span>
           )}
@@ -309,7 +309,7 @@ export default function PromptBarRefMediaPanel({
         /* 🎴 折叠态：拍立得照片叠层卡片堆 (严格对标图 1) */
         <div
           onClick={() => setIsExpandedRefImages(true)}
-          className="relative w-20 h-24 sm:w-22 sm:h-26 cursor-pointer flex-shrink-0 group/stack select-none transition-all hover:scale-105"
+          className="relative w-16 h-20 sm:w-22 sm:h-26 cursor-pointer flex-shrink-0 group/stack select-none transition-all hover:scale-105"
           title="点击展开查看全部参考素材"
         >
           {/* 叠底层 2 (微向右倾斜 rotate-[6deg]) */}

@@ -9,7 +9,7 @@ const isDevLogEnabled =
  */
 export async function POST(req: Request) {
   if (!isDevLogEnabled) {
-    return jsonResponse({ success: false, error: 'Not found' }, 404);
+    return jsonResponse({ success: false, error: '接口不存在' }, 404);
   }
 
   try {

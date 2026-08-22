@@ -4,6 +4,7 @@ import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import { saveToDownloadDir } from '@/lib/desktopDownload';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore, GenerationTask } from '@/store/useAppStore';
+import { formatUserError } from '@/lib/upstreamErrors';
 import {
   Package,
   Download,
@@ -26,6 +27,7 @@ import {
   Camera,
   Info
 } from 'lucide-react';
+import CollapsibleSidePanel from '@/shared/ui/CollapsibleSidePanel';
 import type { WorkshopPrimaryAction } from './WorkshopTopBar';
 
 interface Props {
@@ -115,7 +117,7 @@ export default function ExportStudio({
       const blob = await res.blob();
       await saveToDownloadDir(`${payload.skuId}_买家秀成套交付包.zip`, blob);
     } catch (e: any) {
-      alert(`打包失败: ${e.message || '网络连接超时'}`);
+      alert(`打包失败: ${formatUserError(e, '网络连接超时')}`);
     } finally {
       setIsExportingZip(false);
     }
@@ -174,9 +176,14 @@ export default function ExportStudio({
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#F8F9FA] text-slate-900 select-none">
+    <div className="flex-1 flex overflow-hidden bg-[#F8F9FA] text-slate-900 select-none min-w-0">
       {/* Left Sidebar: Delivery Parameter Configuration */}
-      <div className="w-80 lg:w-96 flex-shrink-0 bg-white border-r border-slate-200/80 flex flex-col h-full overflow-y-auto p-5 space-y-5 shadow-[1px_0_4px_rgba(0,0,0,0.02)]">
+      <CollapsibleSidePanel
+        storageKey="export-studio-sidebar"
+        title="导出设置"
+        widthClass="w-80 lg:w-96"
+        className="overflow-y-auto p-5 space-y-5 shadow-[1px_0_4px_rgba(0,0,0,0.02)]"
+      >
         {/* Header Navigation */}
         {!hideChromeNav ? (
         <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
@@ -311,10 +318,10 @@ export default function ExportStudio({
             <span>开始新商品</span>
           </button>
         </div>
-      </div>
+      </CollapsibleSidePanel>
 
       {/* Right Canvas */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F8F9FA]">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-[#F8F9FA]">
         {/* Top Action Bar */}
         <div className="h-16 px-6 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl flex items-center justify-between flex-shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
           <div>
@@ -341,15 +348,6 @@ export default function ExportStudio({
             >
               {copiedAllPrompts ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedAllPrompts ? '已复制清单' : '复制提示词清单'}</span>
-            </button>
-
-            <button
-              onClick={handleExportZip}
-              disabled={isExportingZip || selectedTaskIds.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>打包下载 ZIP ({selectedTaskIds.length})</span>
             </button>
           </div>
         </div>

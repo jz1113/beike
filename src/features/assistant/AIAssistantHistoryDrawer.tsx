@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { confirmAction } from '@/lib/confirmAction';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { useAppStore } from '@/store/useAppStore';
 import { 
   MessageSquare, 
@@ -54,7 +55,7 @@ export default function AIAssistantHistoryDrawer({ isOpen, onClose }: Props) {
         showToast('会话已删除');
       }
     } catch (err: any) {
-      showToast(err?.message || '删除失败');
+      showToast(formatUserError(err, '删除失败'));
     } finally {
       setDeletingId(null);
     }

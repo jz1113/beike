@@ -23,6 +23,7 @@ import {
 import CollectorSinglePanel from '@/features/collect/CollectorSinglePanel';
 import CollectorBatchPanel from '@/features/collect/CollectorBatchPanel';
 import CollectorHistoryPanel from '@/features/collect/CollectorHistoryPanel';
+import { formatUserError } from '@/lib/upstreamErrors';
 import CollectorResultPanel from '@/features/collect/CollectorResultPanel';
 
 interface Props {
@@ -258,9 +259,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
         }
       } else {
         // 电商商品采集专线 (万邦 OneBound)
-        const customWbKey = localStorage.getItem('wanbang_api_key') || undefined;
-        const customWbSec = localStorage.getItem('wanbang_api_secret') || undefined;
-
         const res = await apiFetch('/api/catalog/collect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -268,8 +266,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
             url: query,
             platform: platform,
             forceRefresh: forceRefresh,
-            customWanbangKey: customWbKey,
-            customWanbangSecret: customWbSec
           })
         });
 
@@ -318,7 +314,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
         }
       }
     } catch (err: any) {
-      showToast(`❌ 采集网络异常: ${err.message || '请检查接口与网络'}`);
+      showToast(`❌ 采集网络异常: ${formatUserError(err, '请检查接口与网络')}`);
     } finally {
       setIsCollectingSingle(false);
     }
@@ -372,10 +368,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
   };
 
   // 从文件 (CSV / TXT / Excel) 导入任务
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processBatchUploadFile = async (file: File) => {
     try {
       const fileName = file.name.toLowerCase();
       let rawText = '';
@@ -434,7 +427,16 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
       setBatchTasks(prev => [...prev, ...newItems]);
       showToast(`🎉 成功从文件「${file.name}」导入 ${newItems.length} 个采集任务！`);
     } catch (err: any) {
-      showToast(`❌ 文件解析失败: ${err.message}`);
+      showToast(`❌ 文件解析失败: ${formatUserError(err)}`);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await processBatchUploadFile(file);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -457,9 +459,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
 
   // 执行单条任务采集
   const executeSingleTask = async (task: BatchTaskItem): Promise<BatchTaskItem> => {
-    const customWbKey = localStorage.getItem('wanbang_api_key') || undefined;
-    const customWbSec = localStorage.getItem('wanbang_api_secret') || undefined;
-
     try {
       if (task.platform === 'social') {
         const res = await apiFetch('/api/catalog/styles/parse-link', {
@@ -512,8 +511,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
             url: task.url,
             platform: task.platform,
             forceRefresh: true,
-            customWanbangKey: customWbKey,
-            customWanbangSecret: customWbSec
           })
         });
 
@@ -571,7 +568,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
       return {
         ...task,
         status: 'failed',
-        error: err.message || '网络连接异常'
+        error: formatUserError(err, '网络连接异常')
       };
     }
   };
@@ -688,7 +685,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
       await saveToDownloadDir(`全渠道批量采集成果包_${new Date().toISOString().slice(0, 10)}.zip`, blob);
       showToast('🎉 批量结构化 ZIP 压缩包已成功下载！');
     } catch (err: any) {
-      showToast(`❌ 批量打包下载失败: ${err.message}`);
+      showToast(`❌ 批量打包下载失败: ${formatUserError(err)}`);
     } finally {
       setBatchExporting(false);
     }
@@ -728,7 +725,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
       await saveToDownloadDir(`贝壳云图采集汇总_批量导出_${selectedList.length}款.zip`, blob);
       showToast('🎉 选中的商品已成功全量打包下载！');
     } catch (err: any) {
-      showToast(`❌ 批量打包下载失败: ${err.message}`);
+      showToast(`❌ 批量打包下载失败: ${formatUserError(err)}`);
     } finally {
       setIsDownloadingZip(false);
     }
@@ -794,7 +791,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
       await saveToDownloadDir(`${item.title.slice(0, 20).replace(/[\\/:*?"<>|]/g, '_')}_高清图集.zip`, blob);
       showToast('🎉 高清图集 ZIP 已成功下载！');
     } catch (err: any) {
-      showToast(`❌ 打包下载失败: ${err.message}`);
+      showToast(`❌ 打包下载失败: ${formatUserError(err)}`);
     } finally {
       setIsDownloadingZip(false);
     }
@@ -1047,6 +1044,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterBuyerS
               setBatchTextarea={setBatchTextarea}
               handleAddTasksFromText={handleAddTasksFromText}
               fileInputRef={fileInputRef}
+              onBatchFileSelect={processBatchUploadFile}
               handleDownloadCsvTemplate={handleDownloadCsvTemplate}
               batchTasks={batchTasks}
               setBatchTasks={setBatchTasks}

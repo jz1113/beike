@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from '@/lib/apiClient';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { useState, useEffect } from 'react';
 import { 
   Sparkles, 
@@ -216,7 +217,7 @@ export default function CustomSkillModal({
       }
     } catch (err: any) {
       console.error('提炼失败:', err);
-      setErrorMsg(err.message || 'AI 提炼异常，已为您填入基础配置');
+      setErrorMsg(formatUserError(err, 'AI 提炼异常，已为您填入基础配置'));
       
       // 容灾保底：确保 System Prompt 绝不留空
       setSkillName('✨ 3C测评与爆款商拍定制 Skill');

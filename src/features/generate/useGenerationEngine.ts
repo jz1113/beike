@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useAppStore, GenerationTask } from '@/store/useAppStore';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@/lib/drawing';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
-import { getClientStorageHeaders } from '@/lib/storageClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
 import { recordModelUsage } from '@/lib/usageTracker';
 import { logLatencyAudit } from '@/lib/latencyAudit';
 import { apiFetch } from '@/lib/apiClient';
+import { formatUserError } from '@/lib/upstreamErrors';
+
+const SLOW_POLL_HINT = '生成较慢，后台继续等待…';
 
 function isVideoTask(t: GenerationTask): boolean {
   const m = t.model?.toLowerCase() || '';
@@ -29,12 +32,152 @@ function isVideoTask(t: GenerationTask): boolean {
   );
 }
 
-function getAiCreds() {
-  if (typeof window === 'undefined') return { url: undefined as string | undefined, key: undefined as string | undefined };
-  return {
-    url: localStorage.getItem('ai_base_url') || undefined,
-    key: localStorage.getItem('ai_api_key') || undefined,
-  };
+function getMaxPollCount(t: GenerationTask): number {
+  if (isVideoTask(t)) return 300;
+  const q = (t.quality || '').toLowerCase();
+  const size = (t.size || '').toLowerCase();
+  const model = (t.model || '').toLowerCase();
+  const is4K =
+    q === 'high' ||
+    model.includes('4k') ||
+    /4k|2448|3264|4096|3840|2160/.test(size);
+  if (is4K) return 450;
+  if (q === 'medium' || /2k|1632|2048/.test(size)) return 300;
+  return 180;
+}
+
+function getGatewayBaseUrl(): string | undefined {
+  return getGatewayClientOverrides().customBaseUrl;
+}
+
+type TaskUpdater = (id: string, updates: Partial<GenerationTask>) => void;
+
+async function pollTasksOnce(
+  tasks: GenerationTask[],
+  update: TaskUpdater,
+  pollCounts: Record<string, number>,
+  slowPollIds: Set<string>,
+  options?: { skipTimeout?: boolean; skipCountIncrement?: boolean; location?: string }
+) {
+  const localUrl = getGatewayBaseUrl();
+  const gatewayHeaders = getGatewayClientHeaders();
+
+  for (const t of tasks) {
+    const video = isVideoTask(t);
+    const maxCount = getMaxPollCount(t);
+    let count = pollCounts[t.id] || 0;
+
+    if (!options?.skipCountIncrement) {
+      count += 1;
+      pollCounts[t.id] = count;
+    }
+
+    if (!options?.skipTimeout && count > maxCount) {
+      slowPollIds.add(t.id);
+      update(t.id, {
+        status: 'IN_PROGRESS',
+        progress: '97%',
+        failReason: SLOW_POLL_HINT,
+      });
+      continue;
+    }
+
+    if (options?.skipTimeout) {
+      update(t.id, { progress: '97%', failReason: SLOW_POLL_HINT });
+    } else {
+      const dynamicProgress = Math.min(97, Math.floor(15 + (count / maxCount) * 82));
+      update(t.id, { progress: `${dynamicProgress}%`, failReason: undefined });
+    }
+
+    try {
+      const pollEndpoint = video ? '/api/generate/video' : '/api/generate/image';
+      const queryParams = new URLSearchParams({ taskId: t.taskId! });
+
+      const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
+        headers: {
+          ...gatewayHeaders,
+          ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
+        },
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if ((data?.status === 'SUCCESS' || Boolean(data?.resultUrl)) && data?.resultUrl) {
+          slowPollIds.delete(t.id);
+          delete pollCounts[t.id];
+          update(t.id, {
+            status: 'SUCCESS',
+            resultUrl: data.resultUrl,
+            progress: '100%',
+            failReason: undefined,
+          });
+        } else if (data?.status === 'FAILURE') {
+          slowPollIds.delete(t.id);
+          delete pollCounts[t.id];
+          update(t.id, {
+            status: 'FAILURE',
+            failReason: data.failReason || '模型渲染失败',
+          });
+        }
+      }
+    } catch (e) {
+      console.warn(`[generationEngine] 轮询任务 ${t.id} 失败 (${options?.location || 'poll'}):`, e);
+    }
+  }
+}
+
+function getOngoingHubTasks(): GenerationTask[] {
+  return useAppStore
+    .getState()
+    .hubGenerations.filter((t) => t.status === 'IN_PROGRESS' && t.taskId && !t.resultUrl);
+}
+
+function getOngoingWorkshopTasks(): GenerationTask[] {
+  return useAppStore
+    .getState()
+    .generationTasks.filter((t) => t.status === 'IN_PROGRESS' && t.taskId && !t.resultUrl);
+}
+
+async function probeFailedTasks(
+  tasks: GenerationTask[],
+  update: TaskUpdater,
+  recoveredOnce: Set<string>,
+  slowPollIds: Set<string>
+) {
+  const localUrl = getGatewayBaseUrl();
+  const gatewayHeaders = getGatewayClientHeaders();
+
+  for (const t of tasks) {
+    if (recoveredOnce.has(t.id)) continue;
+    try {
+      const video = isVideoTask(t);
+      const pollEndpoint = video ? '/api/generate/video' : '/api/generate/image';
+      const queryParams = new URLSearchParams({ taskId: t.taskId! });
+
+      const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
+        headers: {
+          ...gatewayHeaders,
+          ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
+        },
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if ((data?.status === 'SUCCESS' || Boolean(data?.resultUrl)) && data?.resultUrl) {
+          recoveredOnce.add(t.id);
+          slowPollIds.delete(t.id);
+          update(t.id, {
+            status: 'SUCCESS',
+            resultUrl: data.resultUrl,
+            progress: '100%',
+            failReason: undefined,
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /**
@@ -42,12 +185,20 @@ function getAiCreds() {
  */
 export function useGenerationEngine() {
   const hubGenerations = useAppStore((s) => s.hubGenerations);
+  const generationTasks = useAppStore((s) => s.generationTasks);
   const updateHubGeneration = useAppStore((s) => s.updateHubGeneration);
+  const updateGenerationTask = useAppStore((s) => s.updateGenerationTask);
   const syncDatabaseTasks = useAppStore((s) => s.syncDatabaseTasks);
 
   const submittingTaskIdsRef = useRef<Set<string>>(new Set());
   const pollCountsRef = useRef<Record<string, number>>({});
+  const workshopPollCountsRef = useRef<Record<string, number>>({});
+  const hubSlowPollIdsRef = useRef<Set<string>>(new Set());
+  const workshopSlowPollIdsRef = useRef<Set<string>>(new Set());
   const recoveredOnceRef = useRef<Set<string>>(new Set());
+  const workshopRecoveredOnceRef = useRef<Set<string>>(new Set());
+  const prevHubTaskStateRef = useRef<Map<string, { status: string; failReason?: string }>>(new Map());
+  const prevWorkshopTaskStateRef = useRef<Map<string, { status: string; failReason?: string }>>(new Map());
 
   const taskList = useMemo(() => {
     const map = new Map<string, GenerationTask>();
@@ -77,6 +228,130 @@ export function useGenerationEngine() {
         .join(','),
     [taskList]
   );
+
+  const workshopOngoingTasksKey = useMemo(
+    () =>
+      generationTasks
+        .filter((t) => t.status === 'IN_PROGRESS' && t.taskId && !t.resultUrl)
+        .map((t) => t.id)
+        .join(','),
+    [generationTasks]
+  );
+
+  const hubSlowPollTasksKey = useMemo(
+    () =>
+      hubGenerations
+        .filter(
+          (t) =>
+            t.status === 'IN_PROGRESS' &&
+            t.taskId &&
+            !t.resultUrl &&
+            (hubSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT)
+        )
+        .map((t) => t.id)
+        .join(','),
+    [hubGenerations]
+  );
+
+  const workshopSlowPollTasksKey = useMemo(
+    () =>
+      generationTasks
+        .filter(
+          (t) =>
+            t.status === 'IN_PROGRESS' &&
+            t.taskId &&
+            !t.resultUrl &&
+            (workshopSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT)
+        )
+        .map((t) => t.id)
+        .join(','),
+    [generationTasks]
+  );
+
+  const hubTimeoutFailureKey = useMemo(
+    () =>
+      hubGenerations
+        .filter(
+          (t) =>
+            t.status === 'FAILURE' &&
+            t.taskId &&
+            (!t.resultUrl || t.resultUrl.trim() === '') &&
+            (t.failReason || '').includes('渲染超时')
+        )
+        .map((t) => t.id)
+        .join(','),
+    [hubGenerations]
+  );
+
+  const hubOtherFailureKey = useMemo(
+    () =>
+      hubGenerations
+        .filter(
+          (t) =>
+            t.status === 'FAILURE' &&
+            t.taskId &&
+            (!t.resultUrl || t.resultUrl.trim() === '') &&
+            !(t.failReason || '').includes('渲染超时')
+        )
+        .map((t) => t.id)
+        .join(','),
+    [hubGenerations]
+  );
+
+  const workshopTimeoutFailureKey = useMemo(
+    () =>
+      generationTasks
+        .filter(
+          (t) =>
+            t.status === 'FAILURE' &&
+            t.taskId &&
+            (!t.resultUrl || t.resultUrl.trim() === '') &&
+            (t.failReason || '').includes('渲染超时')
+        )
+        .map((t) => t.id)
+        .join(','),
+    [generationTasks]
+  );
+
+  const workshopOtherFailureKey = useMemo(
+    () =>
+      generationTasks
+        .filter(
+          (t) =>
+            t.status === 'FAILURE' &&
+            t.taskId &&
+            (!t.resultUrl || t.resultUrl.trim() === '') &&
+            !(t.failReason || '').includes('渲染超时')
+        )
+        .map((t) => t.id)
+        .join(','),
+    [generationTasks]
+  );
+
+  // 重试时重置 poll 计数（FAILURE → IN_PROGRESS 且 failReason 已清空）
+  useEffect(() => {
+    hubGenerations.forEach((t) => {
+      const prev = prevHubTaskStateRef.current.get(t.id);
+      if (prev?.status === 'FAILURE' && t.status === 'IN_PROGRESS' && !t.failReason) {
+        delete pollCountsRef.current[t.id];
+        hubSlowPollIdsRef.current.delete(t.id);
+        recoveredOnceRef.current.delete(t.id);
+      }
+      prevHubTaskStateRef.current.set(t.id, { status: t.status, failReason: t.failReason });
+    });
+  }, [hubGenerations]);
+
+  useEffect(() => {
+    generationTasks.forEach((t) => {
+      const prev = prevWorkshopTaskStateRef.current.get(t.id);
+      if (prev?.status === 'FAILURE' && t.status === 'IN_PROGRESS' && !t.failReason) {
+        delete workshopPollCountsRef.current[t.id];
+        workshopSlowPollIdsRef.current.delete(t.id);
+        workshopRecoveredOnceRef.current.delete(t.id);
+      }
+      prevWorkshopTaskStateRef.current.set(t.id, { status: t.status, failReason: t.failReason });
+    });
+  }, [generationTasks]);
 
   // 启动时从 DB 同步历史任务（全局一次）
   useEffect(() => {
@@ -140,7 +415,8 @@ export function useGenerationEngine() {
       submittingTaskIdsRef.current.add(t.id);
 
       try {
-        const { url: localUrl, key: localKey } = getAiCreds();
+        const localUrl = getGatewayBaseUrl();
+        const gatewayHeaders = getGatewayClientHeaders();
         const video = isVideoTask(t);
         const clientT0 = Date.now();
         const refCount = Array.isArray(t.referenceImages)
@@ -171,7 +447,7 @@ export function useGenerationEngine() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                ...getClientStorageHeaders(),
+                ...gatewayHeaders,
               },
               body: JSON.stringify({
                 prompt: t.prompt,
@@ -188,7 +464,6 @@ export function useGenerationEngine() {
                 audio: (t as any).generateAudio,
                 watermark: false,
                 customBaseUrl: localUrl,
-                customApiKey: localKey,
               }),
             });
           } else {
@@ -226,9 +501,7 @@ export function useGenerationEngine() {
                 productTitle: t.title,
                 source: 'hub',
                 customBaseUrl: localUrl,
-                customApiKey: localKey,
             };
-            // 已有单槽 URL 时不再重复塞整表 images
             if (!refUrl && imgList?.length) {
               imgBody.images = imgList;
               imgBody.referenceImages = imgList;
@@ -241,7 +514,7 @@ export function useGenerationEngine() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                ...getClientStorageHeaders(),
+                ...gatewayHeaders,
               },
               body: imgBodyStr,
             });
@@ -263,7 +536,7 @@ export function useGenerationEngine() {
           });
           updateHubGeneration(t.id, {
             status: 'FAILURE',
-            failReason: networkErr?.message || '网络连接异常，请检查网络后重试',
+            failReason: formatUserError(networkErr, '网络连接异常，请检查网络后重试'),
           });
           return;
         }
@@ -319,6 +592,8 @@ export function useGenerationEngine() {
             ...(data.recordId ? { dbId: data.recordId } : {}),
           });
         } else if (data.taskId) {
+          delete pollCountsRef.current[t.id];
+          hubSlowPollIdsRef.current.delete(t.id);
           updateHubGeneration(t.id, {
             status: 'IN_PROGRESS',
             progress: '25%',
@@ -336,7 +611,7 @@ export function useGenerationEngine() {
         console.warn(`[generationEngine] 任务 ${t.id} 失败:`, err?.message);
         updateHubGeneration(t.id, {
           status: 'FAILURE',
-          failReason: err?.message || '网络连接异常或模型接口错误',
+          failReason: formatUserError(err, '网络连接异常或模型接口错误'),
         });
       } finally {
         submittingTaskIdsRef.current.delete(t.id);
@@ -344,133 +619,206 @@ export function useGenerationEngine() {
     });
   }, [unsubmittedTasksKey, taskList, updateHubGeneration]);
 
-  // 轮询进行中任务
+  // 轮询进行中 Hub 任务（仅依赖 ongoingTasksKey，progress 更新不重建 interval）
   useEffect(() => {
-    const ongoingTasks = taskList.filter((t) => t.status === 'IN_PROGRESS' && t.taskId && !t.resultUrl);
-    if (ongoingTasks.length === 0) return;
+    if (!ongoingTasksKey) return;
 
-    const interval = setInterval(async () => {
-      const { url: localUrl, key: localKey } = getAiCreds();
+    const pollRound = async () => {
+      const tasks = getOngoingHubTasks().filter((t) => !hubSlowPollIdsRef.current.has(t.id));
+      if (tasks.length === 0) return;
+      await pollTasksOnce(tasks, updateHubGeneration, pollCountsRef.current, hubSlowPollIdsRef.current, {
+        location: 'hub',
+      });
+    };
 
-      for (const t of ongoingTasks) {
-        const video = isVideoTask(t);
-        const maxCount = video ? 300 : 180;
-        const count = (pollCountsRef.current[t.id] || 0) + 1;
-        pollCountsRef.current[t.id] = count;
+    pollRound();
+    const interval = setInterval(pollRound, 2000);
+    return () => clearInterval(interval);
+  }, [ongoingTasksKey, updateHubGeneration]);
 
-        if (count > maxCount) {
-          updateHubGeneration(t.id, {
+  // Hub 软超时任务：5s 后台继续轮询
+  useEffect(() => {
+    if (!hubSlowPollTasksKey) return;
+
+    const pollSlow = async () => {
+      const tasks = getOngoingHubTasks().filter(
+        (t) => hubSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT
+      );
+      tasks.forEach((t) => hubSlowPollIdsRef.current.add(t.id));
+      if (tasks.length === 0) return;
+      await pollTasksOnce(tasks, updateHubGeneration, pollCountsRef.current, hubSlowPollIdsRef.current, {
+        skipTimeout: true,
+        skipCountIncrement: true,
+        location: 'hub-slow',
+      });
+    };
+
+    pollSlow();
+    const interval = setInterval(pollSlow, 5000);
+    return () => clearInterval(interval);
+  }, [hubSlowPollTasksKey, updateHubGeneration]);
+
+  // 轮询进行中 Workshop 分镜任务
+  useEffect(() => {
+    if (!workshopOngoingTasksKey) return;
+
+    const pollRound = async () => {
+      const tasks = getOngoingWorkshopTasks().filter((t) => !workshopSlowPollIdsRef.current.has(t.id));
+      if (tasks.length === 0) return;
+      await pollTasksOnce(tasks, updateGenerationTask, workshopPollCountsRef.current, workshopSlowPollIdsRef.current, {
+        location: 'workshop',
+      });
+    };
+
+    pollRound();
+    const interval = setInterval(pollRound, 2000);
+    return () => clearInterval(interval);
+  }, [workshopOngoingTasksKey, updateGenerationTask]);
+
+  // Workshop 软超时任务：5s 后台继续轮询
+  useEffect(() => {
+    if (!workshopSlowPollTasksKey) return;
+
+    const pollSlow = async () => {
+      const tasks = getOngoingWorkshopTasks().filter(
+        (t) => workshopSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT
+      );
+      tasks.forEach((t) => workshopSlowPollIdsRef.current.add(t.id));
+      if (tasks.length === 0) return;
+      await pollTasksOnce(tasks, updateGenerationTask, workshopPollCountsRef.current, workshopSlowPollIdsRef.current, {
+        skipTimeout: true,
+        skipCountIncrement: true,
+        location: 'workshop-slow',
+      });
+    };
+
+    pollSlow();
+    const interval = setInterval(pollSlow, 5000);
+    return () => clearInterval(interval);
+  }, [workshopSlowPollTasksKey, updateGenerationTask]);
+
+  // 清理无法恢复的 Workshop 脏状态（无 taskId 且超时）
+  useEffect(() => {
+    const staleThreshold = 3 * 60 * 1000;
+    const now = Date.now();
+
+    generationTasks.forEach((t) => {
+      if (t.status === 'IN_PROGRESS' && !t.taskId && !t.resultUrl) {
+        const age = t.createdAt ? now - t.createdAt : 0;
+        if (age > staleThreshold) {
+          updateGenerationTask(t.id, {
             status: 'FAILURE',
-            failReason: '渲染超时，请点击下方重试',
+            failReason: '渲染状态丢失，请点击重试',
+            progress: '0%',
           });
-          continue;
-        }
-
-        const dynamicProgress = Math.min(97, Math.floor(15 + (count / maxCount) * 82));
-        updateHubGeneration(t.id, { progress: `${dynamicProgress}%` });
-
-        try {
-          const pollEndpoint = video ? '/api/generate/video' : '/api/generate/image';
-          const queryParams = new URLSearchParams({ taskId: t.taskId! });
-
-          const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
-            headers: {
-              ...getClientStorageHeaders(),
-              ...(localKey ? { 'x-custom-api-key': localKey } : {}),
-              ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
-            },
-          }).catch(() => null);
-
-          if (res && res.ok) {
-            const data = await res.json().catch(() => null);
-            if ((data?.status === 'SUCCESS' || Boolean(data?.resultUrl)) && data?.resultUrl) {
-              const startedAt = (pollCountsRef.current as any)[`_start_${t.id}`] as number | undefined;
-              const e2eMs = startedAt ? Date.now() - startedAt : undefined;
-              logLatencyAudit({
-                hypothesisId: 'H5',
-                location: 'useGenerationEngine.ts:poll-success',
-                message: 'generation completed',
-                data: {
-                  taskLocalId: t.id,
-                  taskId: t.taskId,
-                  video,
-                  model: t.model,
-                  pollCount: count,
-                  e2eMs,
-                  e2eSec: e2eMs ? Math.round(e2eMs / 1000) : null,
-                  anomaly: (e2eMs || 0) > 180000 || count > 90,
-                },
-              });
-              delete pollCountsRef.current[t.id];
-              delete (pollCountsRef.current as any)[`_start_${t.id}`];
-              updateHubGeneration(t.id, {
-                status: 'SUCCESS',
-                resultUrl: data.resultUrl,
-                progress: '100%',
-                failReason: undefined,
-              });
-            } else if (data?.status === 'FAILURE') {
-              delete pollCountsRef.current[t.id];
-              updateHubGeneration(t.id, {
-                status: 'FAILURE',
-                failReason: data.failReason || '模型渲染失败',
-              });
-            }
-          }
-        } catch (e) {
-          console.warn(`[generationEngine] 轮询任务 ${t.id} 失败:`, e);
         }
       }
-    }, 2000);
+    });
+  }, [generationTasks, updateGenerationTask]);
 
-    return () => clearInterval(interval);
-  }, [ongoingTasksKey, taskList, updateHubGeneration]);
-
-  // 周期性探测「超时失败但可能已就绪」的任务（不只在 mount）
+  // 新出现的 Workshop 进行中任务立即探测一次
   useEffect(() => {
+    const recoverable = getOngoingWorkshopTasks();
+    if (recoverable.length === 0) return;
+
+    pollTasksOnce(recoverable, updateGenerationTask, workshopPollCountsRef.current, workshopSlowPollIdsRef.current, {
+      skipTimeout: true,
+      skipCountIncrement: true,
+      location: 'workshop-recover',
+    });
+  }, [workshopOngoingTasksKey, updateGenerationTask]);
+
+  // 加速 recovery：「渲染超时」失败任务每 5s 探测
+  useEffect(() => {
+    if (!hubTimeoutFailureKey) return;
+
     const probe = async () => {
-      const timeoutTasks = taskList.filter(
-        (t) => t.status === 'FAILURE' && t.taskId && (!t.resultUrl || t.resultUrl.trim() === '')
+      const timeoutTasks = useAppStore.getState().hubGenerations.filter(
+        (t) =>
+          t.status === 'FAILURE' &&
+          t.taskId &&
+          (!t.resultUrl || t.resultUrl.trim() === '') &&
+          (t.failReason || '').includes('渲染超时')
       );
       if (timeoutTasks.length === 0) return;
+      await probeFailedTasks(timeoutTasks, updateHubGeneration, recoveredOnceRef.current, hubSlowPollIdsRef.current);
+    };
 
-      const { url: localUrl, key: localKey } = getAiCreds();
+    probe();
+    const id = setInterval(probe, 5000);
+    return () => clearInterval(id);
+  }, [hubTimeoutFailureKey, updateHubGeneration]);
 
-      for (const t of timeoutTasks) {
-        if (recoveredOnceRef.current.has(t.id)) continue;
-        try {
-          const video = isVideoTask(t);
-          const pollEndpoint = video ? '/api/generate/video' : '/api/generate/image';
-          const queryParams = new URLSearchParams({ taskId: t.taskId! });
+  // 其他 Hub 失败任务每 30s 探测
+  useEffect(() => {
+    if (!hubOtherFailureKey) return;
 
-          const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
-            headers: {
-              ...getClientStorageHeaders(),
-              ...(localKey ? { 'x-custom-api-key': localKey } : {}),
-              ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
-            },
-          }).catch(() => null);
-
-          if (res && res.ok) {
-            const data = await res.json().catch(() => null);
-            if ((data?.status === 'SUCCESS' || Boolean(data?.resultUrl)) && data?.resultUrl) {
-              recoveredOnceRef.current.add(t.id);
-              updateHubGeneration(t.id, {
-                status: 'SUCCESS',
-                resultUrl: data.resultUrl,
-                progress: '100%',
-                failReason: undefined,
-              });
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-      }
+    const probe = async () => {
+      const failedTasks = useAppStore.getState().hubGenerations.filter(
+        (t) =>
+          t.status === 'FAILURE' &&
+          t.taskId &&
+          (!t.resultUrl || t.resultUrl.trim() === '') &&
+          !(t.failReason || '').includes('渲染超时')
+      );
+      if (failedTasks.length === 0) return;
+      await probeFailedTasks(failedTasks, updateHubGeneration, recoveredOnceRef.current, hubSlowPollIdsRef.current);
     };
 
     probe();
     const id = setInterval(probe, 30000);
     return () => clearInterval(id);
-  }, [taskList, updateHubGeneration]);
+  }, [hubOtherFailureKey, updateHubGeneration]);
+
+  // Workshop「渲染超时」失败任务每 5s recovery
+  useEffect(() => {
+    if (!workshopTimeoutFailureKey) return;
+
+    const probe = async () => {
+      const timeoutTasks = useAppStore.getState().generationTasks.filter(
+        (t) =>
+          t.status === 'FAILURE' &&
+          t.taskId &&
+          (!t.resultUrl || t.resultUrl.trim() === '') &&
+          (t.failReason || '').includes('渲染超时')
+      );
+      if (timeoutTasks.length === 0) return;
+      await probeFailedTasks(
+        timeoutTasks,
+        updateGenerationTask,
+        workshopRecoveredOnceRef.current,
+        workshopSlowPollIdsRef.current
+      );
+    };
+
+    probe();
+    const id = setInterval(probe, 5000);
+    return () => clearInterval(id);
+  }, [workshopTimeoutFailureKey, updateGenerationTask]);
+
+  // Workshop 其他失败任务每 30s recovery
+  useEffect(() => {
+    if (!workshopOtherFailureKey) return;
+
+    const probe = async () => {
+      const failedTasks = useAppStore.getState().generationTasks.filter(
+        (t) =>
+          t.status === 'FAILURE' &&
+          t.taskId &&
+          (!t.resultUrl || t.resultUrl.trim() === '') &&
+          !(t.failReason || '').includes('渲染超时')
+      );
+      if (failedTasks.length === 0) return;
+      await probeFailedTasks(
+        failedTasks,
+        updateGenerationTask,
+        workshopRecoveredOnceRef.current,
+        workshopSlowPollIdsRef.current
+      );
+    };
+
+    probe();
+    const id = setInterval(probe, 30000);
+    return () => clearInterval(id);
+  }, [workshopOtherFailureKey, updateGenerationTask]);
 }

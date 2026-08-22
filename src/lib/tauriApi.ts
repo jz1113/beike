@@ -1,15 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getApiBase, resolveApiUrl } from '@/lib/desktopRuntime';
 import { getClientAccessToken } from '@/lib/apiToken';
-import { getClientStorageHeaders } from '@/lib/storageClient';
+import { getGatewayClientHeaders } from '@/lib/gatewayClient';
 
 function buildHeaders(extra?: HeadersInit): Record<string, string> {
   const headers = new Headers(extra || {});
   if (!headers.has('x-app-token')) {
     headers.set('x-app-token', getClientAccessToken());
   }
-  const storage = getClientStorageHeaders();
-  Object.entries(storage).forEach(([k, v]) => {
+  const gateway = getGatewayClientHeaders();
+  Object.entries(gateway).forEach(([k, v]) => {
     if (!headers.has(k)) headers.set(k, v);
   });
   const out: Record<string, string> = {};

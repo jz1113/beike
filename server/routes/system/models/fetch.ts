@@ -328,7 +328,7 @@ export async function POST(req: Request) {
     const timeout = setTimeout(() => controller.abort(), 40000);
 
     let rawList: any[] = [];
-    let isFallback = false;
+    const isFallback = false;
 
     try {
       const res = await fetch(endpoint, {

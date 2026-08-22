@@ -3,14 +3,18 @@ import { isTauriDesktop } from '@/lib/desktopRuntime';
 
 export type CredentialKey =
   | 'ai_api_key'
+  | 'wanbang_api_key'
   | 'wanbang_api_secret'
   | 'social_parse_secret'
+  | 'external_scraper_secret'
   | 'storage_secret_access_key';
 
 const LEGACY_LOCAL_KEYS: Record<CredentialKey, string> = {
   ai_api_key: 'ai_api_key',
+  wanbang_api_key: 'wanbang_api_key',
   wanbang_api_secret: 'wanbang_api_secret',
   social_parse_secret: 'social_parse_secret',
+  external_scraper_secret: 'external_scraper_secret',
   storage_secret_access_key: 'storage_secret_access_key',
 };
 

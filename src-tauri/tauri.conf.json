@@ -22,7 +22,8 @@
         "visible": false,
         "center": true,
         "decorations": true,
-        "titleBarStyle": "Visible"
+        "titleBarStyle": "Visible",
+        "dragDropEnabled": false
       }
     ],
     "security": {
@@ -42,12 +43,15 @@
     "resources": ["resources/api-server"],
     "externalBin": ["binaries/node"],
     "macOS": {
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": null
     },
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
-      }
+      },
+      "certificateThumbprint": null,
+      "timestampUrl": "http://timestamp.digicert.com"
     }
   }
 }

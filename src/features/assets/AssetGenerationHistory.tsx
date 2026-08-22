@@ -14,11 +14,12 @@ import {
   ArrowUpDown,
   Maximize2,
 } from 'lucide-react';
-import { formatDisplayModel, normalizeImageUrlToStandardJpg } from '@/lib/drawing';
+import { formatDisplayModel, formatDisplayModelCompact, normalizeImageUrlToStandardJpg } from '@/lib/drawing';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import { useAppStore } from '@/store/useAppStore';
+import { autoFillGrid, cardContainer, subToolbar } from '@/shared/ui/layoutClasses';
 import LazyVideoCover from './LazyVideoCover';
 import type { AssetTaskBatch } from './assetBatchUtils';
 
@@ -101,6 +102,9 @@ export default function AssetGenerationHistory(props: Props) {
     const coverUrl = primaryTask?.resultUrl || batch.tasks.find(t => t.resultUrl)?.resultUrl;
     const isCoverVideo = primaryTask?.mediaType === 'video' || coverUrl?.includes('.mp4');
 
+    const modelFull = formatDisplayModel(batch.model, isVid);
+    const modelCompact = formatDisplayModelCompact(batch.model, isVid);
+
     return (
       <div
         key={batch.batchId}
@@ -120,7 +124,7 @@ export default function AssetGenerationHistory(props: Props) {
             }
           }
         }}
-        className={`group relative rounded-2xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-2xs cursor-pointer aspect-square select-none will-change-transform transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
+        className={`${cardContainer} group relative rounded-2xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-2xs cursor-pointer aspect-square select-none will-change-transform transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
           isAllSelected ? 'ring-2 ring-indigo-600 border-indigo-500' : 'hover:border-slate-300'
         }`}
       >
@@ -132,8 +136,8 @@ export default function AssetGenerationHistory(props: Props) {
           </>
         )}
 
-        {/* Top-left: Selection or Batch Badge */}
-        <div className={`absolute top-2 left-2 z-30 flex items-center gap-1.5 pointer-events-none max-w-[calc(100%-3.5rem)] ${isBatchMode ? '' : ''}`}>
+        {/* Top-left: Selection or Batch Badge — 随卡片宽度分层显示 */}
+        <div className={`absolute top-2 left-2 z-30 flex items-center gap-1.5 pointer-events-none max-w-[calc(100%-2.5rem)] @min-[160px]/card:max-w-[calc(100%-3.5rem)]`}>
           {isBatchMode ? (
             <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all shadow-xs pointer-events-auto ${
               isAllSelected ? 'bg-indigo-600 text-white' : isSomeSelected ? 'bg-indigo-100 text-indigo-700 border border-indigo-400' : 'bg-white/90 border border-slate-300'
@@ -141,27 +145,34 @@ export default function AssetGenerationHistory(props: Props) {
               {isAllSelected ? <Check className="w-3 h-3 stroke-[3]" /> : isSomeSelected ? <div className="w-2 h-2 bg-indigo-600 rounded-xs" /> : null}
             </div>
           ) : (
-            <span className="px-2.5 py-1 rounded-lg bg-indigo-600/95 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1 shadow-md border border-white/20 truncate">
+            <span
+              className="px-1.5 py-1 @min-[160px]/card:px-2.5 rounded-lg bg-indigo-600/95 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1 shadow-md border border-white/20 min-w-0"
+              title={`套图 ${batch.tasks.length} 张 · ${modelFull}`}
+            >
               <Layers className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">套图 {batch.tasks.length} 张</span>
+              <span className="hidden @min-[160px]/card:inline truncate">套图 · {batch.tasks.length}</span>
+              <span className="hidden @min-[220px]/card:inline truncate">张</span>
             </span>
           )}
         </div>
 
-        {/* Bottom-right: 始终可见的数量角标 */}
+        {/* Bottom-right: 始终可见的数量角标（窄卡片时为主要计数提示） */}
         {!isBatchMode && batch.tasks.length > 1 && (
-          <div className="absolute bottom-2 right-2 z-30 pointer-events-none">
+          <div className="absolute bottom-2 right-2 z-30 pointer-events-none @min-[220px]/card:opacity-100">
             <span className="min-w-[2rem] h-7 px-2 rounded-lg bg-black/75 backdrop-blur-md text-white text-xs font-mono font-bold flex items-center justify-center shadow-lg border border-white/15">
               ×{batch.tasks.length}
             </span>
           </div>
         )}
 
-        {/* Top-right Model Badge */}
+        {/* Top-right Model Badge — 窄卡片隐藏，避免与套图角标重叠 */}
         {!isBatchMode && (
-        <div className="absolute top-2 right-2 z-30 pointer-events-none">
-          <span className="px-2 py-0.5 rounded-full bg-black/55 backdrop-blur-xs text-white text-[9px] font-mono font-medium shadow-xs border border-white/10 max-w-[5.5rem] truncate">
-            {formatDisplayModel(batch.model, isVid)}
+        <div className="absolute top-2 right-2 z-30 pointer-events-none hidden @min-[160px]/card:block max-w-[calc(100%-3rem)]">
+          <span
+            className="px-2 py-0.5 rounded-full bg-black/55 backdrop-blur-xs text-white text-[9px] font-mono font-medium shadow-xs border border-white/10 max-w-[5.5rem] @min-[220px]/card:max-w-[7rem] truncate block"
+            title={modelFull}
+          >
+            {modelCompact}
           </span>
         </div>
         )}
@@ -260,6 +271,10 @@ export default function AssetGenerationHistory(props: Props) {
     const isRunning = (task.status === 'IN_PROGRESS' || task.status === 'PENDING') && !task.resultUrl;
     const isFailed = task.status === 'FAILURE' && !task.resultUrl;
 
+    const isVidTask = task.mediaType === 'video' || task.resultUrl?.includes('.mp4');
+    const taskModelFull = formatDisplayModel(task.model, isVidTask);
+    const taskModelCompact = formatDisplayModelCompact(task.model, isVidTask);
+
     return (
       <div
         key={task.id}
@@ -292,7 +307,7 @@ export default function AssetGenerationHistory(props: Props) {
             });
           }
         }}
-        className={`group relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border transition-all duration-200 cursor-pointer aspect-square flex flex-col justify-between shadow-2xs hover:shadow-lg hover:-translate-y-0.5 select-none [content-visibility:auto] [contain-intrinsic-size:200px] will-change-transform ${
+        className={`${cardContainer} group relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border transition-all duration-200 cursor-pointer aspect-square flex flex-col justify-between shadow-2xs hover:shadow-lg hover:-translate-y-0.5 select-none [content-visibility:auto] [contain-intrinsic-size:200px] will-change-transform ${
           isSelected 
             ? 'ring-2 ring-indigo-600 border-indigo-500' 
             : 'border-slate-200/80 hover:border-slate-300'
@@ -309,11 +324,14 @@ export default function AssetGenerationHistory(props: Props) {
           )}
         </div>
 
-        {/* Top-right Model Tag (鼠标悬停时自动隐去，避免遮挡操作按钮) */}
+        {/* Top-right Model Tag — 窄卡片隐藏 */}
         {!isRunning && !isBatchMode && (
-          <div className="absolute top-2 right-2 z-20 pointer-events-none group-hover:opacity-0 transition-opacity duration-200">
-            <span className="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-xs text-white text-[9px] font-mono font-medium shadow-xs">
-              {formatDisplayModel(task.model, task.mediaType === 'video' || task.resultUrl?.includes('.mp4'))}
+          <div className="absolute top-2 right-2 z-20 pointer-events-none group-hover:opacity-0 transition-opacity duration-200 hidden @min-[160px]/card:block max-w-[calc(100%-0.5rem)]">
+            <span
+              className="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-xs text-white text-[9px] font-mono font-medium shadow-xs truncate block max-w-full"
+              title={taskModelFull}
+            >
+              {taskModelCompact}
             </span>
           </div>
         )}
@@ -489,9 +507,9 @@ export default function AssetGenerationHistory(props: Props) {
   return (
     <>
       {(section === 'toolbar' || section === 'both') && (
-        <div className="px-6 lg:px-8 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between flex-shrink-0 text-xs">
+        <div className="px-6 lg:px-8 py-2.5 bg-white border-b border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-y-2 gap-x-3 flex-shrink-0 text-xs min-w-0">
           {/* Media Types */}
-          <div className="flex items-center gap-1">
+          <div className={`${subToolbar} shrink-0`}>
             {[
               { id: 'image', label: '图片' },
               { id: 'video', label: '视频' },
@@ -516,7 +534,7 @@ export default function AssetGenerationHistory(props: Props) {
           </div>
 
           {/* Filters & Sort */}
-          <div className="flex items-center gap-2.5">
+          <div className={`${subToolbar} lg:justify-end`}>
             {/* 筛选下拉 */}
             <div className="relative flex items-center">
               <select
@@ -588,7 +606,7 @@ export default function AssetGenerationHistory(props: Props) {
                         <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight pb-0.5">
                           今天
                         </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 pt-1">
+                        <div className={`${autoFillGrid} pt-1`}>
                           {visibleToday.map(batch => renderBatchCard(batch))}
                         </div>
                       </div>
@@ -600,7 +618,7 @@ export default function AssetGenerationHistory(props: Props) {
                         <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight pb-0.5">
                           昨天
                         </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 pt-1">
+                        <div className={`${autoFillGrid} pt-1`}>
                           {visibleYesterday.map(batch => renderBatchCard(batch))}
                         </div>
                       </div>
@@ -612,7 +630,7 @@ export default function AssetGenerationHistory(props: Props) {
                         <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight pb-0.5">
                           更早
                         </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 pt-1">
+                        <div className={`${autoFillGrid} pt-1`}>
                           {visibleEarlier.map(batch => renderBatchCard(batch))}
                         </div>
                       </div>

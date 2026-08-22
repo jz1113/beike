@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronRight, Loader2 } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Sparkles, Users } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 export type WorkshopStepId = 1 | 2 | 3 | 4;
@@ -38,10 +38,11 @@ export default function WorkshopTopBar({
   const selectedImages = images.filter((i) => i.selected).length;
   const promptCount = generatedPrompts.length;
   const successCount = generationTasks.filter((t) => t.status === 'SUCCESS' && t.resultUrl).length;
+  const isSocial = workshopMode === 'social_face_product_swap';
 
   const badgeFor = (id: WorkshopStepId): string | null => {
     if (id === 1) {
-      const n = workshopMode === 'social_face_product_swap' ? selectedSocial : selectedImages;
+      const n = isSocial ? selectedSocial : selectedImages;
       return n > 0 ? `${n}` : null;
     }
     if (id === 2) return promptCount > 0 ? `${promptCount}` : null;
@@ -51,8 +52,19 @@ export default function WorkshopTopBar({
   };
 
   return (
-    <header className="h-14 flex-shrink-0 px-4 lg:px-5 border-b border-slate-200/80 bg-white flex items-center justify-between gap-3 z-20">
-      <nav className="flex items-center gap-0.5 min-w-0 overflow-x-auto scrollbar-none" aria-label="种草工坊步骤">
+    <header className="min-h-14 py-2 flex-shrink-0 px-4 lg:px-5 border-b border-slate-200/80 bg-white flex flex-wrap items-center justify-between gap-x-3 gap-y-2 z-20 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <span
+          className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold flex-shrink-0 ${
+            isSocial
+              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+              : 'bg-violet-50 text-violet-700 border border-violet-200'
+          }`}
+        >
+          {isSocial ? <Users className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+          <span>{isSocial ? '爆款复刻' : '原创生成'}</span>
+        </span>
+        <nav className="flex items-center gap-0.5 min-w-0 overflow-x-auto scrollbar-none flex-1" aria-label="种草工坊步骤">
         {STEPS.map((step, idx) => {
           const isActive = currentStep === step.id;
           const isDone = step.id < currentStep;
@@ -98,7 +110,8 @@ export default function WorkshopTopBar({
             </div>
           );
         })}
-      </nav>
+        </nav>
+      </div>
 
       {primaryAction && (
         <button

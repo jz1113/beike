@@ -68,10 +68,10 @@ export function getInternalApiHeaders(extra?: HeadersInit): Headers {
   return headers;
 }
 
-export function unauthorizedJson(message = 'Unauthorized') {
+export function unauthorizedJson(message = '未授权：访问令牌缺失或无效') {
   return Response.json({ success: false, error: message }, { status: 401 });
 }
 
-export function forbiddenJson(message = 'Forbidden') {
+export function forbiddenJson(message = '无权限执行此操作') {
   return Response.json({ success: false, error: message }, { status: 403 });
 }

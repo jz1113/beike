@@ -2,6 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/apiClient';
 import { getMergedCategories } from '@/lib/vision';
+import { formatUserError } from '@/lib/upstreamErrors';
 import { X, FileText, Upload, Loader2, Save, Play } from 'lucide-react';
 
 export interface ManualArchitectureResult {
@@ -123,7 +124,7 @@ export default function ManualArchitecturePanel({
       onUse(buildResult(recipe));
       onClose();
     } catch (e: any) {
-      setError(e?.message || '保存到配方库失败');
+      setError(formatUserError(e, '保存到配方库失败'));
     } finally {
       setSaving(false);
     }

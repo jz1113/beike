@@ -15,13 +15,16 @@ import {
 } from '@/lib/drawing';
 import { resolveGatewayCreds } from '@/lib/gatewayCreds';
 import { convertToStandardJpegDataUrl } from '@/lib/imageConverter';
+import {
+  resolveVisionAnalyzeMaxTokens,
+  resolveVisionTimeoutMs,
+  formatVisionAnalyzeError,
+} from '@/lib/visionTimeouts';
 
 const DEFAULT_BASE_URL = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
 const DEFAULT_API_KEY = process.env.AI_DRAWING_API_KEY || '';
 const ANALYZE_IMAGE_MAX_DIMENSION = 640;
 const ANALYZE_IMAGE_QUALITY = 70;
-const PRIMARY_VISION_TIMEOUT_MS = 45_000;
-const FALLBACK_VISION_TIMEOUT_MS = 20_000;
 const MAX_VISION_FALLBACKS = 2;
 
 function isGptFamily(modelId: string) {
@@ -31,11 +34,6 @@ function isGptFamily(modelId: string) {
 
 function isGeminiFamily(modelId: string) {
   return modelId.toLowerCase().includes('gemini');
-}
-
-function isThinkingModel(modelId: string) {
-  const id = modelId.toLowerCase();
-  return id.includes('thinking') || id.includes('luna') || id.includes('terra') || id.includes('pro-preview');
 }
 
 async function prepareAnalyzeImages(imageUrls: string[]): Promise<string[]> {
@@ -112,7 +110,8 @@ async function callVisionModel(
   contentArray: any[],
   baseUrl: string = DEFAULT_BASE_URL,
   apiKey: string = DEFAULT_API_KEY || '',
-  fallbackModels: string[] = []
+  fallbackModels: string[] = [],
+  shotCount: number = 4,
 ): Promise<{ rawText: string; actualModel: string; triedModels: string[] }> {
   const normalized = normalizeVisionModelId(requestedModel);
   const userFallbacks = (Array.isArray(fallbackModels) ? fallbackModels : [])
@@ -129,7 +128,6 @@ async function callVisionModel(
   let lastError: any = null;
   let skipGptFamily = false;
   let skipGeminiFamily = false;
-  let skipThinking = false;
 
   if (modelsToTry.length === 0) {
     throw new Error('未指定可用的视觉模型');
@@ -139,13 +137,13 @@ async function callVisionModel(
     const model = modelsToTry[index];
     if (skipGptFamily && isGptFamily(model)) continue;
     if (skipGeminiFamily && isGeminiFamily(model)) continue;
-    if (skipThinking && isThinkingModel(model)) continue;
 
     triedModels.push(model);
+    const isPrimary = index === 0;
+    const timeoutMs = resolveVisionTimeoutMs(model, isPrimary);
     try {
-      console.log(`[Vision API] 尝试视觉模型: ${model}...`);
+      console.log(`[Vision API] 尝试视觉模型: ${model}（超时 ${Math.round(timeoutMs / 1000)}s）...`);
       const controller = new AbortController();
-      const timeoutMs = index === 0 ? PRIMARY_VISION_TIMEOUT_MS : FALLBACK_VISION_TIMEOUT_MS;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/v1/chat/completions`, {
@@ -162,7 +160,8 @@ async function callVisionModel(
               content: contentArray
             }
           ],
-          temperature: 0.7
+          temperature: 0.7,
+          max_tokens: resolveVisionAnalyzeMaxTokens(shotCount),
         }),
         signal: controller.signal
       }).finally(() => clearTimeout(timeoutId));
@@ -189,11 +188,13 @@ async function callVisionModel(
         return { rawText, actualModel: model, triedModels };
       }
     } catch (e: any) {
+      if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message || ''))) {
+        const timeoutSec = Math.round(timeoutMs / 1000);
+        console.warn(`[Vision API] 模型 [${model}] 响应超时（${timeoutSec}s），不再切换备用模型以免重复扣费`);
+        throw new Error(`视觉模型响应超时（已等待约 ${timeoutSec} 秒），请稍后重试或换用 Flash 极速模型`);
+      }
       console.warn(`[Vision API] 模型 [${model}] 请求异常: ${e.message}，准备尝试下一个...`);
       lastError = e;
-      if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message || ''))) {
-        skipThinking = true;
-      }
     }
   }
 
@@ -474,12 +475,18 @@ ${imageRoleDescriptions.join('\n')}`;
     let triedModels: string[] = [];
 
     console.log(`[Vision Analyze] 正在使用用户指定模型 ${model} 进行视觉提示词提炼...`);
+    const effectiveShotCap =
+      mode === 'social_face_product_swap' && referenceImageUrls.length > 0
+        ? referenceImageUrls.length
+        : shotCount;
+
     const visionResult = await callVisionModel(
       model,
       buildVisionContent(systemPrompt, preparedImages),
       targetBaseUrl,
       targetApiKey,
-      Array.isArray(fallbackModels) ? fallbackModels : []
+      Array.isArray(fallbackModels) ? fallbackModels : [],
+      effectiveShotCap,
     );
     rawOutput = visionResult.rawText;
     actualModelUsed = visionResult.actualModel;
@@ -507,7 +514,8 @@ ${imageRoleDescriptions.join('\n')}`;
             buildVisionContent(refillPrompt, preparedImages),
             targetBaseUrl,
             targetApiKey,
-            Array.isArray(fallbackModels) ? fallbackModels : []
+            Array.isArray(fallbackModels) ? fallbackModels : [],
+            refCount,
           );
           const extra = parseResponseJson(refillResult.rawText).prompts || [];
           rawPrompts = mergePromptsByShotNo(rawPrompts, extra, refCount);
@@ -724,6 +732,6 @@ ${imageRoleDescriptions.join('\n')}`;
 
   } catch (error: any) {
     console.error('Vision Analyze API Error:', error);
-    return jsonResponse({ error: error.message || '视觉模型分析失败' }, 500);
+    return jsonResponse({ error: formatVisionAnalyzeError(error) }, 500);
   }
 }

@@ -1,6 +1,7 @@
 import { jsonResponse } from '../../adapters/http';
 import { prisma } from '@/lib/prisma';
 import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@/lib/drawing';
+import { formatUserError } from '../../lib/formatApiError';
 
 // 获取已采集保存的商品记录列表（分页）
 export async function GET(req: Request) {
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
 
     return jsonResponse({ success: true, page, pageSize, total, products: formatted });
   } catch (error: any) {
-    return jsonResponse({ success: false, products: [], error: error.message }, 500);
+    return jsonResponse({ success: false, products: [], error: formatUserError(error) }, 500);
   }
 }
 
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
 
     return jsonResponse({ success: true, product });
   } catch (error: any) {
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -125,7 +126,7 @@ export async function PUT(req: Request) {
 
     return jsonResponse({ success: true, product: updated });
   } catch (error: any) {
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 
@@ -145,7 +146,7 @@ export async function DELETE(req: Request) {
 
     return jsonResponse({ success: true });
   } catch (error: any) {
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
 

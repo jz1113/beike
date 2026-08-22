@@ -1,6 +1,7 @@
 import { jsonResponse } from '../../adapters/http';
 import { readResponseBodyLimited } from '../../lib/readBodyLimited';
 import { parseExportZipBody } from '../../lib/validate';
+import { formatUserError } from '../../lib/formatApiError';
 import JSZip from 'jszip';
 
 const MAX_ZIP_TOTAL_BYTES = 500 * 1024 * 1024;
@@ -425,7 +426,7 @@ export async function POST(req: Request) {
     console.error('Export ZIP error:', error);
     return jsonResponse({
       success: false,
-      error: error.message || '导出 ZIP 压缩包失败'
+      error: formatUserError(error, '导出 ZIP 压缩包失败')
     }, 500);
   }
 }

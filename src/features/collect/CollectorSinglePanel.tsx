@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
+import { pasteIntoField } from '@/lib/clipboard';
 import {
   X, ShoppingBag, Sparkles, Check, Loader2, Link2, Download, Maximize2,
   Square, Film, Bot, Send, Compass
@@ -72,6 +73,17 @@ export default function CollectorSinglePanel({
   handleImportToAIAssistant,
   showToast,
 }: CollectorSinglePanelProps) {
+  const singleInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePasteInput = () => {
+    void pasteIntoField({
+      inputEl: singleInputRef.current,
+      onText: (text) => setSingleInput(text),
+      onNeedManualPaste: () =>
+        showToast('已聚焦输入框，请按 Ctrl+V / ⌘V 粘贴'),
+    });
+  };
+
   return (
             <div className="max-w-5xl mx-auto space-y-5">
               {/* 输入控制卡片 */}
@@ -106,9 +118,17 @@ export default function CollectorSinglePanel({
                   <div className="flex-1 relative flex items-center">
                     <Link2 className="w-4 h-4 text-slate-400 absolute left-4 pointer-events-none" />
                     <input
+                      ref={singleInputRef}
                       type="text"
                       value={singleInput}
                       onChange={(e) => setSingleInput(e.target.value)}
+                      onPaste={(e) => {
+                        const text = e.clipboardData.getData('text/plain')?.trim();
+                        if (text) {
+                          e.preventDefault();
+                          setSingleInput(text);
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSingleCollect();
                       }}
@@ -128,14 +148,7 @@ export default function CollectorSinglePanel({
                       )}
                       <button
                         type="button"
-                        onClick={async () => {
-                          try {
-                            const text = await navigator.clipboard.readText();
-                            if (text) setSingleInput(text.trim());
-                          } catch {
-                            showToast('⚠️ 无法读取剪贴板，请手动粘贴');
-                          }
-                        }}
+                        onClick={handlePasteInput}
                         className="px-3 py-1.5 rounded-xl bg-white border border-slate-200/90 text-slate-700 text-xs hover:bg-slate-50 font-semibold cursor-pointer shadow-2xs transition-colors"
                       >
                         粘贴
