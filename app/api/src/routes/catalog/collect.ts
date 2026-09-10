@@ -1,8 +1,8 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/shared/drawing';
-import { buildComprehensiveProductProps } from '@beike/shared/props';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/domain/drawing';
+import { buildComprehensiveProductProps } from '@beike/domain/props';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { parseJsonBody, collectBodySchema } from '../../core/validate';
 
 // 辅助函数：带智能错误识别和快速失败机制的 fetch（默认最多重试 1 次，超时 7s，快速跳过不存在的商品）

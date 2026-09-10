@@ -5,8 +5,8 @@ import {
   getAdminToken,
   isAccessTokenConfigured,
   isAuthorized,
-} from '@beike/shared/apiAuth';
-import { verifyMediaSignature } from '@beike/shared/mediaSign';
+} from '@beike/server-kit/apiAuth';
+import { verifyMediaSignature } from '@beike/server-kit/mediaSign';
 
 function isProxyMediaAuthorized(c: Context): boolean {
   const token = extractRequestToken(c.req.raw);

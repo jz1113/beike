@@ -1,7 +1,7 @@
 import {storageProviderError} from '../storageValidation';
 import { Database, Eye, EyeOff, Loader2, RotateCcw, Zap } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 export interface ApiServicesStoragePanelProps {
   storageEnabled: boolean;

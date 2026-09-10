@@ -8,7 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { Eye, FileText, Loader2, Paperclip, Play, RotateCcw } from 'lucide-react';
 import { AssistantMessage, MediaAttachment, useAppStore } from '@/store/useAppStore';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import FormattedMarkdown from '@/features/assistant/FormattedMarkdown';
 import { getReplyReferenceMedia } from './assistantPromptReferences';

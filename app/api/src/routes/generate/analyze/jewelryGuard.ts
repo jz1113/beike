@@ -1,4 +1,4 @@
-import { isJewelryProductTitle, buildJewelryTemplateStyle } from '@beike/shared/jewelryArchHelpers';
+import { isJewelryProductTitle, buildJewelryTemplateStyle } from '@beike/domain/jewelryArchHelpers';
 
 export function resolveTemplateStyleWithJewelryGuard(
   templateStyle: unknown,

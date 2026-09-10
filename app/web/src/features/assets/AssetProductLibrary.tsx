@@ -1,7 +1,7 @@
 import { ShoppingBag, FileImage, Trash2, ArrowRight } from 'lucide-react';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { JdIcon, TaobaoIcon } from '@/shared/ui/BrandIcons';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 
 interface Props {
   products: any[];

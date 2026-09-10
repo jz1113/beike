@@ -14,7 +14,7 @@ import {
 } from './PromptBarVideoControls';
 import PromptBarAspectPicker from './PromptBarAspectPicker';
 import { PromptBarAtMenu } from './PromptBarAtMenu';
-import type { DepthVideoStyle, DepthQuality, QuickGenMode } from '@beike/shared/depthVideo';
+import type { DepthVideoStyle, DepthQuality, QuickGenMode } from '@beike/domain/depthVideo';
 
 interface PromptBarControlsRowProps {
   isUp: boolean;

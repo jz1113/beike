@@ -4,7 +4,7 @@ import {
   getEnabledMultimodalModelsFromSettings,
   resolveStoredMultimodalModelId,
   type WorkflowCapability,
-} from '@beike/shared/workflowModels';
+} from '@beike/domain/workflowModels';
 import {
   exportDeconstructRecordsToCsv,
   transformQueueItemToRecordRow,
@@ -12,7 +12,7 @@ import {
 } from '../assetDeconstructCsvExport';
 import { buildQueueItemsFromFiles } from '../assetFolderImport';
 import type { ImageSetQueueItem } from '../assetPromptConstants';
-import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/shared/productCategoryHelpers';
+import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategoryHelpers';
 import {
   clearDeconstructQueueDraft,
   persistDeconstructQueue,

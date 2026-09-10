@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-vi.mock('@beike/shared/prisma', () => ({ prisma: {} }));
-vi.mock('@beike/shared/latencyAudit', () => ({ logLatencyAudit: vi.fn() }));
+vi.mock('@beike/server-kit/prisma', () => ({ prisma: {} }));
+vi.mock('@beike/domain/latencyAudit', () => ({ logLatencyAudit: vi.fn() }));
 vi.mock('../poll', () => ({}));
 import { dispatchSubmitCandidates } from '../submit';
-import { buildImageRequest } from '@beike/shared/modelAdapters';
+import { buildImageRequest } from '@beike/domain/modelAdapters';
 
 const adapted = buildImageRequest({ model: 'gpt-image-2.5-flare', prompt: 'test', size: '3:4', quality: 'high', plainMode: true });
 const options = { submitCandidates: adapted.endpoints('https://gateway.test').submit, adapted, apiKey: 'test-only', payloadJson: JSON.stringify(adapted.payload), editsImageUrls: [], identityLockedSlots: null, baseUrl: 'https://gateway.test', model: 'gpt-image-2.5-flare', parseMs: 0, convertMs: 0, imageCount: 0, convertCacheHits: 0, t0: Date.now() };

@@ -1,4 +1,4 @@
-import type { AssistantDocAttachment } from '@beike/shared/assistant/toolRegistry';
+import type { AssistantDocAttachment } from '@beike/domain/assistant/tools/defs';
 
 export function resolveRequestOrigin(req: Request): string {
   const proto = req.headers.get('x-forwarded-proto') || 'http';

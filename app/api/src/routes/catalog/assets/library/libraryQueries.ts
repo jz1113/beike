@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { resolveShotsForScene, type ActionLike } from '@beike/shared/sceneBundle';
-import { stableAssetCode } from '@beike/shared/assetSampling';
+import { prisma } from '@beike/server-kit/prisma';
+import { resolveShotsForScene, type ActionLike } from '@beike/domain/sceneBundle';
+import { stableAssetCode } from '@beike/domain/assetSampling';
 import { buildAssetCategoryWhere } from '../../../../services/libraryQueries';
 
 const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {

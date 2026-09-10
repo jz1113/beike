@@ -1,4 +1,4 @@
-import type { ShotPrompt } from '@beike/shared/vision';
+import type { ShotPrompt } from '@beike/domain/vision';
 import type { BatchProductItem, BatchTaskItem } from './batchTypes';
 
 export interface SingleShotRunnerDeps {

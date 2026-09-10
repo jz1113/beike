@@ -1,10 +1,10 @@
 import { jsonResponse } from '../../core/http';
 import { resolveCredentials } from '../../services/imageHelpers';
 import { guardSubmission } from '../../services/submissionGuard';
-import { parseDecomposedLayers } from '@beike/shared/layerDecomposition';
+import { parseDecomposedLayers } from '@beike/domain/layerDecomposition';
 import { ensurePersistableResultUrl } from './image/poll';
-import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/shared/storage';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 export async function POST(req: Request) {
   try {

@@ -1,8 +1,15 @@
 packages:
   - 'app/*'
+  - 'packages/*'
   - 'db/*'
 allowBuilds:
   esbuild: true
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  '@vgpu/adapter-node': true
+  webgpu: true
+  sharp: true
 
 # Resolve internal @beike packages from this workspace.
 linkWorkspacePackages: true

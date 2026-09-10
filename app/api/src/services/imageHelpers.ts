@@ -1,6 +1,6 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
-import { allowClientCustomBaseUrl } from '@beike/shared/gatewayCreds';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
+import { allowClientCustomBaseUrl } from '@beike/domain/gatewayCreds';
 
 export function getDefaultBaseUrl(): string {
   return process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
@@ -12,7 +12,7 @@ export function getDefaultApiKey(): string {
 
 const NETWORK_ERROR_RE = /(fetch failed|failed to fetch|networkerror|network request failed|econnreset|econnrefused|enotfound|etimedout|eai_again|socket hang up)/i;
 
-export { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+export { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 
 /**
  * 获取请求使用的 Base URL 和 API Key (优先使用客户端自定义配置)

@@ -1,4 +1,4 @@
-import { resolveGptImageSizeForModel } from '@beike/shared/modelAdapters/image/gptImageSafeSizes';
+import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
 import type { GenerationTask, MediaAttachment } from '@/types/app-store';
 import { prepareAssistantImagePrompt } from './assistantPromptReferences';
 

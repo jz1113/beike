@@ -7,7 +7,7 @@ import {
   type SubCategoryDef,
   getSubCategoriesForCategory,
   matchItemSubCategory,
-} from '@beike/shared/productCategoryHelpers';
+} from '@beike/domain/productCategoryHelpers';
 import {
   humanizeShotType,
   normalizeTagToChinese,

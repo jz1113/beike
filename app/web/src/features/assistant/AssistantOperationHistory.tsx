@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from 'react';
 import { Activity, ChevronDown, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import type { AssistantItem, ToolCallItem, ToolResultItem } from '@beike/shared/assistant/types';
+import type { AssistantItem, ToolCallItem, ToolResultItem } from '@beike/domain/assistant/types';
 
 interface Props {
   items: AssistantItem[];

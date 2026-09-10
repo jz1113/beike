@@ -3,7 +3,7 @@ import { Bot, Palette, Video } from 'lucide-react';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { settingsPanelPad } from '@/shared/ui/layoutClasses';
 import type { WorkflowModel } from '../settingsShared';
-import { getEnabledMultimodalModelsFromSettings, setStoredMultimodalModelId } from '@beike/shared/workflowModels';
+import { getEnabledMultimodalModelsFromSettings, setStoredMultimodalModelId } from '@beike/domain/workflowModels';
 
 export interface DefaultsTabProps {
   customModels: WorkflowModel[];

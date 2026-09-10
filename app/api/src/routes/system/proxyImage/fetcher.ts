@@ -1,4 +1,4 @@
-import { extractStorageKeyFromUrl, getObjectBufferFromStorage } from '@beike/shared/storage';
+import { extractStorageKeyFromUrl, getObjectBufferFromStorage } from '@beike/server-kit/storage';
 import {
   getCachedVideo,
   setCachedVideo,

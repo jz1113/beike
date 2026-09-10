@@ -1,12 +1,12 @@
 import { migrateTravelCopySkill } from './migrateTravelCopySkill';
 import { StateCreator } from 'zustand';
 import { AppState } from '@/types/store';
-import type { AssistantSkill } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 import {
   BUILTIN_ASSISTANT_SKILLS,
   mergeAssistantSkills,
   parseSkillFileContent,
-} from '@beike/shared/assistant/skills';
+} from '@beike/domain/assistant/skills';
 
 const SKILLS_STORAGE_KEY = 'azhuo_assistant_skills_vault';
 const ACTIVE_SKILL_STORAGE_KEY = 'azhuo_active_assistant_skill_id';

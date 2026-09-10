@@ -1,5 +1,5 @@
 import { isGenerationDeleted } from '@/store/persist/generation';
-import { getAspectRatioFromSize } from '@beike/shared/drawing';
+import { getAspectRatioFromSize } from '@beike/domain/drawing';
 import type { useAppStore } from '@/store/useAppStore';
 type AppState = ReturnType<typeof useAppStore.getState>;
 interface MergeAssetTaskInput {

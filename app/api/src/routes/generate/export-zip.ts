@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../core/http';
 import { readResponseBodyLimited } from '../../core/readBodyLimited';
 import { parseExportZipBody } from '../../core/validate';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import JSZip from 'jszip';
 
 /** 打包下载默认使用最高并发（上限 16 路） */
@@ -178,7 +178,7 @@ export async function POST(req: Request) {
         }
 
         if (url.startsWith('/') && !url.startsWith('//')) {
-          const { resolvePublicPath } = await import('@beike/shared/safeUrl');
+          const { resolvePublicPath } = await import('@beike/server-kit/safeUrl');
           const localFilePath = resolvePublicPath(url);
           if (localFilePath) {
             const fs = await import('fs');
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
           return null;
         }
 
-        const { assertSafeRemoteUrl, MAX_PROXY_BYTES } = await import('@beike/shared/safeUrl');
+        const { assertSafeRemoteUrl, MAX_PROXY_BYTES } = await import('@beike/server-kit/safeUrl');
         try {
           await assertSafeRemoteUrl(url, { requireAllowlist: true });
         } catch (e: any) {

@@ -1,8 +1,8 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../core/http';
-import { resolveGatewayCreds } from '@beike/shared/gatewayCreds';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
+import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/imageHelpers';
 
 interface CopywritingRequest {

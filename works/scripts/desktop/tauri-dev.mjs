@@ -2,7 +2,7 @@
 /**
  * 桌面开发监督器：拉起 API / Vite、前缀日志输出，再启动 `tauri dev`。
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync, exec } from 'node:child_process';
 import { existsSync, readFileSync, readlinkSync, rmSync, writeFileSync, mkdirSync, copyFileSync, cpSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,7 @@ import {
   getRepoRoot,
   getWorkspaceRoot,
   killChild,
+  stopTauriApp,
 } from './desktop-dev-shared.mjs';
 
 const repoRoot = getRepoRoot();
@@ -93,6 +94,7 @@ function writeDevConfig() {
 ensureTauriDevCache();
 syncDevLocalization();
 writeDevConfig();
+stopTauriApp();
 
 const apiPort = await resolveDesktopPort();
 writeDesktopPort(repoRoot, apiPort);
@@ -162,7 +164,13 @@ console.log('   停止  npm run desktop:stop');
 console.log('=========================================================');
 console.log('');
 
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const hasRust =
+  !process.argv.includes('--no-tauri') &&
+  !process.argv.includes('--web') &&
+  spawnSync(process.platform === 'win32' ? 'where.exe' : 'which', ['rustc'], { stdio: 'ignore' }).status === 0;
+
+if (hasRust) {
+  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   const devArgs = ['tauri', 'dev', '--config', devConfigPath];
   if (process.platform === 'darwin') {
     // 传递 macOS 原生语言参数，确保开发模式下 NSOpenPanel / NSSavePanel 系统弹窗显示简体中文
@@ -171,6 +179,7 @@ const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   tauriChild = spawn(npx, devArgs, {
     cwd: workspaceRoot,
     stdio: 'inherit',
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
       AZHUO_DESKTOP_PORT: String(apiPort),
@@ -179,19 +188,39 @@ const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
     },
   });
 
-tauriChild.on('exit', (code, signal) => {
-  console.log('');
+  tauriChild.on('exit', (code, signal) => {
+    console.log('');
+    console.log('=========================================================');
+    console.log(`   Tauri 已退出 (code=${code ?? 'null'}, signal=${signal ?? 'null'})`);
+    console.log('=========================================================');
+    console.log('→ 运行 npm run desktop:status 查看 API / Vite 是否仍在运行');
+    console.log('→ 运行 npm run desktop:stop 停止后台服务');
+    console.log('');
+
+    spawn(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'desktop-status.mjs')], {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+    }).on('exit', () => {
+      process.exit(code ?? 1);
+    });
+  });
+} else {
   console.log('=========================================================');
-  console.log(`   Tauri 已退出 (code=${code ?? 'null'}, signal=${signal ?? 'null'})`);
+  console.log('   提示：未检测到 Rust 编译环境 (rustc/cargo)');
+  console.log('   已自动以「独立桌面原生窗口」模式启动贝壳云图');
+  console.log('   （API 服务与全套功能均在后台完整运行）');
+  console.log('   按 Ctrl+C 可停止全部开发服务');
   console.log('=========================================================');
-  console.log('→ 运行 npm run desktop:status 查看 API / Vite 是否仍在运行');
-  console.log('→ 运行 npm run desktop:stop 停止后台服务');
   console.log('');
 
-  spawn(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'desktop-status.mjs')], {
-    cwd: workspaceRoot,
-    stdio: 'inherit',
-  }).on('exit', () => {
-    process.exit(code ?? 1);
-  });
-});
+  const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+  const openCmd =
+    process.platform === 'win32'
+      ? (existsSync(edgePath)
+          ? `"${edgePath}" --app=http://127.0.0.1:${VITE_PORT}`
+          : `start http://127.0.0.1:${VITE_PORT}`)
+      : process.platform === 'darwin'
+        ? `open -a "Google Chrome" --args --app=http://127.0.0.1:${VITE_PORT} || open http://127.0.0.1:${VITE_PORT}`
+        : `xdg-open http://127.0.0.1:${VITE_PORT}`;
+  exec(openCmd, () => {});
+}

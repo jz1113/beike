@@ -1,8 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { AssistantSession } from '@/types/app-store';
 import { apiFetch } from '@/lib/apiClient';
-import { setStoredMultimodalModelId } from '@beike/shared/workflowModels';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { setStoredMultimodalModelId } from '@beike/domain/workflowModels';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   assistantDeletedIds,
   clearAssistantPersistTimer,

@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 const ACTIVE_STATUSES = ['running', 'awaiting_approval'] as const;
 

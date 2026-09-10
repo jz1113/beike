@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Cpu } from 'lucide-react';
 import { useMemo, useCallback } from 'react';
 import { API_SERVICES, type WorkflowModel } from '../settingsShared';
-import { isMultimodalWorkflowModel } from '@beike/shared/workflowModels';
+import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 import { ApiServicesWanbangPanel } from '../components/ApiServicesWanbangPanel';
 import { ApiServicesApiaPanel } from '../components/ApiServicesApiaPanel';
 import { ApiServicesQiyunPanel } from '../components/ApiServicesQiyunPanel';

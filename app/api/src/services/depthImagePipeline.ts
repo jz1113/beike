@@ -5,9 +5,9 @@ import {
   type DepthInferenceMeta,
   type DepthQuality,
   type DepthVideoStyle,
-} from '@beike/shared/depthVideo';
-import { persistBufferToStorage } from '@beike/shared/persistDataUrl';
-import type { StorageConfig } from '@beike/shared/storage';
+} from '@beike/domain/depthVideo';
+import { persistBufferToStorage } from '@beike/server-kit/persistDataUrl';
+import type { StorageConfig } from '@beike/server-kit/storage';
 import { runDepthPython } from './depthPythonRunner';
 
 function cleanupDir(dir: string) {

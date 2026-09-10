@@ -14,8 +14,8 @@ import {
   Download,
   Check,
 } from 'lucide-react';
-import { formatPromptParagraphs, formatDisplayModel } from '@beike/shared/drawing';
-import type { StoryboardPresetConfig } from '@beike/shared/prompt-engine/storyboardPreset';
+import { formatPromptParagraphs, formatDisplayModel } from '@beike/domain/drawing';
+import type { StoryboardPresetConfig } from '@beike/domain/prompt-engine/storyboardPreset';
 
 export interface InspirationUseOptions {
   referenceImages?: string[];

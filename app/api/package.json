@@ -11,7 +11,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",
     "@beike/contracts": "*",
-    "@beike/shared": "*",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@hono/node-server": "^1.14.4",
     "ffprobe-static": "^3.1.0",
@@ -22,6 +21,8 @@
     "unpdf": "^1.7.0",
     "xlsx": "^0.18.5",
     "zod": "^3.25.76",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "@beike/domain": "*",
+    "@beike/server-kit": "*"
   }
 }

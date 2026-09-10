@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { confirmAction } from '@/lib/confirmAction';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/useAppStore';
 import { 

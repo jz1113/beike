@@ -15,11 +15,14 @@ async function getAppWindow() {
   }
 }
 
-/** 检查事件目标是否属于交互元素（按钮、输入框、链接等） */
-function isInteractiveElement(target: EventTarget | null): boolean {
-  if (!target || !(target instanceof HTMLElement)) return false;
-  const interactiveSelector = 'button, input, textarea, select, a, [role="button"], [data-no-drag], .no-drag';
-  return Boolean(target.closest(interactiveSelector));
+/** 检查事件目标是否属于交互元素（按钮、输入框、链接等，含内部 SVG 图标与文本） */
+export function isInteractiveElement(target: EventTarget | null): boolean {
+  if (!target) return false;
+  const el = target instanceof Element ? target : (target as Node).parentElement;
+  if (!el || !(el instanceof Element)) return false;
+  const interactiveSelector =
+    'button, input, textarea, select, a, [role="button"], [data-no-drag], .no-drag, [data-tauri-drag-region="false"]';
+  return Boolean(el.closest(interactiveSelector));
 }
 
 /** 触发原生窗口拖拽（若在非交互元素上按下鼠标左键） */

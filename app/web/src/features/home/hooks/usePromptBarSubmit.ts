@@ -4,7 +4,7 @@ import { registerRefMedia } from '@/lib/refMediaRegistry';
 import { useAppStore } from '@/store/useAppStore';
 import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '../utils/promptBarSubmit';
 import { registerDepthSubmit } from './useDepthGeneration';
-import type { QuickGenMode } from '@beike/shared/depthVideo';
+import type { QuickGenMode } from '@beike/domain/depthVideo';
 import type { SubjectItem } from '../data/promptBarConstants';
 
 interface UsePromptBarSubmitOptions {
@@ -29,6 +29,7 @@ interface UsePromptBarSubmitOptions {
   quickVideoDuration: number;
   currentView: string;
   availableImageModelsLength: number;
+  availableVideoModelsLength?: number;
   quickDepthStyle: any;
   quickDepthQuality: any;
   refMediaFile: File | null;
@@ -61,6 +62,7 @@ export function usePromptBarSubmit({
   quickVideoDuration,
   currentView,
   availableImageModelsLength,
+  availableVideoModelsLength,
   quickDepthStyle,
   quickDepthQuality,
   refMediaFile,
@@ -121,6 +123,7 @@ export function usePromptBarSubmit({
       quickVideoDuration,
       currentView,
       hasImageModels: availableImageModelsLength > 0,
+      hasVideoModels: (availableVideoModelsLength ?? 0) > 0,
       quickDepthStyle,
       quickDepthQuality,
       refMediaFile,
@@ -278,6 +281,7 @@ export function usePromptBarSubmit({
     quickVideoDuration,
     currentView,
     hasImageModels: availableImageModelsLength > 0,
+    hasVideoModels: (availableVideoModelsLength ?? 0) > 0,
     isSubmitting,
     quickDepthStyle,
     quickDepthQuality,

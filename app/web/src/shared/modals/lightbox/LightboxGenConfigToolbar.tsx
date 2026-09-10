@@ -2,7 +2,7 @@ import { useLightboxImageModels } from './useLightboxImageModels';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { getModelIcon } from '../../ui/ModelIcons';
-import '@beike/shared/workflowModels';
+import '@beike/domain/workflowModels';
 import { getModelProviderName } from '@/features/home/utils/modelDisplayHelpers';
 
 export interface LightboxGenConfigToolbarProps {

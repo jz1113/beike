@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
 import { getCachedProducts, setCachedProducts } from '@/lib/catalogCache';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { confirmAction } from '@/lib/confirmAction';
 import { useAppStore } from '@/store/useAppStore';
 import AssetProductLibrary from '@/features/assets/AssetProductLibrary';

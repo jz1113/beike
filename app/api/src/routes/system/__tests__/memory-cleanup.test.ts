@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as memoryCleanup from '../memory-cleanup';
-import { checkpointDatabase } from '@beike/shared/prisma';
+import { checkpointDatabase } from '@beike/server-kit/prisma';
 
 describe('memory-cleanup system route', () => {
   it('successfully executes memory cleanup and returns metrics', async () => {

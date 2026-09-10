@@ -11,7 +11,7 @@ const results=await eslint.lintFiles(['app','works']);const added=[];let remaini
 for(const result of results) for(const message of result.messages) {
   if(message.ruleId!=='@typescript-eslint/no-unused-vars')continue;
   remaining++;
-  const file=path.relative(root,result.filePath),key=`${file}\0${message.message}`,left=allowed.get(key)||0;
+  const file=path.relative(root,result.filePath).replace(/\\/g, '/'),key=`${file}\0${message.message}`,left=allowed.get(key)||0;
   if(left>0) allowed.set(key,left-1);else added.push(`${file}:${message.line} ${message.message}`);
 }
 if(added.length){console.error('New unused bindings:\n'+added.join('\n'));process.exitCode=1;}

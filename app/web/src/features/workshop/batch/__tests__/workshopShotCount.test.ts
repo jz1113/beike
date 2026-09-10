@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { useWorkshopShotCount } from '../useWorkshopShotCount';
 
-vi.mock('@beike/shared/prompt-engine/storyboardPreset', () => ({
+vi.mock('@beike/domain/prompt-engine/storyboardPreset', () => ({
   restoreStoredStoryboardPreset: () => ({ shotCount: 1 }),
 }));
 afterEach(() => { cleanup(); localStorage.removeItem('workshop_shot_count'); });

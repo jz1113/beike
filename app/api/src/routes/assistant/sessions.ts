@@ -1,7 +1,7 @@
 import { assistantMemory } from '../../services/assistantMemory';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 function sanitizeAttachment(a: any) {
   if (!a || typeof a !== 'object') return null;

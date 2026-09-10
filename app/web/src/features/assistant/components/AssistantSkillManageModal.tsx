@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { AssistantSkillCardIcon, AssistantSkillIcon } from './AssistantSkillIcon';
 import FormattedMarkdown from '../FormattedMarkdown';
-import type { AssistantSkill } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 
 interface Props {
   isOpen: boolean;

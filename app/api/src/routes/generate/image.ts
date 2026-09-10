@@ -1,9 +1,11 @@
 import { guardSubmission } from '../../services/submissionGuard';
 import { jsonResponse } from '../../core/http';
-import { buildImageRequest } from '@beike/shared/modelAdapters';
-import { normalizeOpenAiImageRequest } from '@beike/shared/modelAdapters/image/normalizeOpenAiImageModel';
-import { logLatencyAudit } from '@beike/shared/latencyAudit';
-import { humanizeUpstreamError, formatUserError } from '@beike/shared/upstreamErrors';
+import { buildImageRequest } from '@beike/domain/modelAdapters';
+import { setPresignedUrlSigner } from '@beike/domain/modelAdapters/image/adapters';
+import { getPresignedStorageUrl } from '@beike/server-kit/storage';
+import { normalizeOpenAiImageRequest } from '@beike/domain/modelAdapters/image/normalizeOpenAiImageModel';
+import { logLatencyAudit } from '@beike/domain/latencyAudit';
+import { humanizeUpstreamError, formatUserError } from '@beike/domain/upstreamErrors';
 import {
   resolveCredentials,
   buildImageSubmitCandidates,
@@ -11,6 +13,8 @@ import {
 import { executeImagePoll, ensurePersistableResultUrl } from './image/poll';
 import { resolveImageSlotsAndPrompt } from './image/slotResolver';
 import { dispatchSubmitCandidates, persistImageTaskRecord } from './image/submit';
+
+setPresignedUrlSigner(getPresignedStorageUrl);
 
 export { executeImagePoll } from './image/poll';
 export { resolveImageSlotsAndPrompt } from './image/slotResolver';

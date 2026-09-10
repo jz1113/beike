@@ -13,7 +13,7 @@ import {
 import { AssistantSkillIcon } from './AssistantSkillIcon';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/useAppStore';
-import type { AssistantSkill } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 import AssistantSkillEditorModal from './AssistantSkillEditorModal';
 import AssistantSkillManageModal from './AssistantSkillManageModal';
 

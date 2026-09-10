@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { sanitizeScenePrompt, outfitSimilarity } from '@beike/shared/assetDeconstruct/validate';
+import { prisma } from '@beike/server-kit/prisma';
+import { sanitizeScenePrompt, outfitSimilarity } from '@beike/domain/assetDeconstruct/validate';
 
 // 🌟 一键智能提纯、分类归位与去重
 export async function executeLibraryDeduplication() {

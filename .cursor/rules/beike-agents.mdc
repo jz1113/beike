@@ -1,16 +1,16 @@
 ---
-description: 贝壳云图项目 Agent 规则（完整版见 工程/docs/AGENTS.md）
+description: 贝壳云图项目 Agent 规则（完整版见 docs/AGENTS.md）
 alwaysApply: true
 ---
 
-项目 Agent 规则已迁移至 [工程/docs/AGENTS.md](工程/docs/AGENTS.md)。
+项目 Agent 规则完整版见 [docs/AGENTS.md](docs/AGENTS.md)。
 
 要点：
-- npm 工作区根目录为 `工程/`，所有 `npm run` 在此执行
-- 源码：`工程/apps`、`工程/packages`、`工程/tools`
-- 依赖：`依赖/node`（`工程/node_modules` 为符号链接）
-- 文档：`工程/docs/`
-
-**禁止在仓库根（阿卓工作台/）创建以下目录**：`apps/`、`tools/`、`packages/`、`docs/`、`configs/`。这些目录只能存在于 `工程/` 下。
-- 文档中的 `tools/scripts/...` 均指 `工程/tools/scripts/...`（cwd 为 `工程/` 时的相对路径）
-- 所有新建/修改的源码、脚本、文档路径必须以 `工程/` 为前缀
+- 仓库根即 monorepo 根；包管理器为 **pnpm**（`packageManager` 字段为准），在根目录执行 `pnpm install` / `pnpm run …`
+- 核心目录：`app/`（可运行应用）、`packages/`（共享库）、`db/`、`desktop/`、`works/`、`docs/`
+- 应用：`app/web`（`@beike/web`）、`app/api`（`@beike/api`）
+- 库：`packages/contracts`、`packages/domain`、`packages/server-kit`；`db/prisma` 为 `@beike/prisma`
+- 依赖方向：`web` → `contracts` + `domain`；`api` → `contracts` + `domain` + `server-kit` + `prisma`；`domain` 不得依赖 Node/Prisma/sharp/S3
+- **禁止**再引入 `工程/`、`依赖/` 中文根布局；不要在仓库根新建与 `check-root-layout` 冲突的杂项目录
+- 工具与脚本在 `works/`（configs / e2e / launch / scripts），不是 workspace 业务包
+- 新建/修改源码、脚本、文档路径必须以现有扁平布局为准（`app/`、`packages/`、`db/`、`desktop/`、`works/`、`docs/`）

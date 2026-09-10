@@ -7,8 +7,8 @@
  * - 高峰期自动丢弃最新事件（队列上限 5000），优先保证流式响应
  */
 
-import { prisma } from '@beike/shared/prisma';
-import type { AssistantItem } from '@beike/shared/assistant/types';
+import { prisma } from '@beike/server-kit/prisma';
+import type { AssistantItem } from '@beike/domain/assistant/types';
 import { extractItemFields } from './assistantTurnPersist';
 
 const QUEUE_MAX = 5000;

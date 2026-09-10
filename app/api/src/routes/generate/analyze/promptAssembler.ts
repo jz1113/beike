@@ -1,4 +1,4 @@
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import {
   assembleOriginalShotPrompt,
   cleanPromptText,
@@ -11,9 +11,9 @@ import {
   sanitizeLookPartsForProductRole,
   harmonizeOriginalPrompt,
   stripGarmentsFromAction,
-} from '@beike/shared/drawing';
-import { buildActionDigestFromShots } from '@beike/shared/vision';
-import { getShotLightingVariation } from '@beike/shared/assetSampling';
+} from '@beike/domain/drawing';
+import { buildActionDigestFromShots } from '@beike/domain/vision';
+import { getShotLightingVariation } from '@beike/domain/assetSampling';
 import {
   parseResponseJson,
   padMissingOriginalShots,
@@ -21,7 +21,7 @@ import {
 import {
   inferProductCategoryAndAnatomy,
   buildCategoryCloseUpOptics,
-} from '@beike/shared/productCategoryHelpers';
+} from '@beike/domain/productCategoryHelpers';
 
 // 🌟 辅助工具：提取或绑定标准资产编号 (如 [#P-01], [#S-01], [#O-01], [#A-01])
 function formatAssetWithCode(

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { AssistantSkill } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 import { migrateTravelCopySkill } from '../migrateTravelCopySkill';
 
 const original = {

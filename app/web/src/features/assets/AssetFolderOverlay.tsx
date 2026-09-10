@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import { downloadMediaOrOpen } from '@/lib/downloadMedia';
-import { normalizeImageUrlToStandardJpg, getAspectRatioFromSize } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg, getAspectRatioFromSize } from '@beike/domain/drawing';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import DepthCarousel from '@/shared/media/DepthCarousel';
 import LazyVideoCover from './LazyVideoCover';

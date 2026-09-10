@@ -3,8 +3,8 @@ import {
   buildUnifiedDeconstructPrompt,
   resolveUnifiedShardSize,
   type PerImageResult,
-} from '@beike/shared/assetDeconstruct/prompts';
-import type { SubCategoryDef } from '@beike/shared/productCategoryHelpers';
+} from '@beike/domain/assetDeconstruct/prompts';
+import type { SubCategoryDef } from '@beike/domain/productCategoryHelpers';
 import { callVisionJson } from './visionCall';
 import { parseUnifiedFromResponse } from './jsonHealer';
 import type { VisionCallDiagnostics, VisionCallTracker } from './diagnostics';

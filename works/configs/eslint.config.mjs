@@ -16,7 +16,7 @@ export default defineConfig([
     files: ['app/web/src/**/*.{ts,tsx}'],
     ignores: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['node:*', '@prisma/client', '@beike/shared/prisma', '@beike/shared/storage', '@beike/shared/persistDataUrl', '@beike/shared/safeUrl'] }],
+      'no-restricted-imports': ['error', { patterns: ['node:*', '@prisma/client', '@beike/server-kit', '@beike/server-kit/*', '@beike/shared', '@beike/shared/*'] }],
     },
   },
   js.configs.recommended,
@@ -57,7 +57,9 @@ export default defineConfig([
   {
     files: [
       'app/api/src/**/*.{ts,tsx}',
-      'app/shared/src/**/*.{ts,tsx}',
+      'packages/server-kit/src/**/*.{ts,tsx}',
+      'packages/domain/src/**/*.{ts,tsx}',
+      'packages/contracts/src/**/*.{ts,tsx}',
       'works/scripts/**/*.{js,mjs,ts}',
     ],
     languageOptions: {

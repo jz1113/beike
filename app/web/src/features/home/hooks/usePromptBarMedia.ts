@@ -18,7 +18,7 @@ import {
 import type { SubjectItem } from '../data/promptBarConstants';
 import { buildPromptBarSubjects } from '../utils/promptBarSubmit';
 import type { RichPromptInputRef } from '../components/prompt-bar/RichPromptInput';
-import type { QuickGenMode } from '@beike/shared/depthVideo';
+import type { QuickGenMode } from '@beike/domain/depthVideo';
 
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -1,15 +1,15 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { guardSubmission } from '../../services/submissionGuard';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import LRUCache from 'lru-cache';
-import { cleanPromptText } from '@beike/shared/drawing';
-import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/shared/storage';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
-import { buildVideoRequest } from '@beike/shared/modelAdapters';
-import { createImageConvertCache, logLatencyAudit } from '@beike/shared/latencyAudit';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { allowClientCustomBaseUrl } from '@beike/shared/gatewayCreds';
+import { cleanPromptText } from '@beike/domain/drawing';
+import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
+import { buildVideoRequest } from '@beike/domain/modelAdapters';
+import { createImageConvertCache, logLatencyAudit } from '@beike/domain/latencyAudit';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { allowClientCustomBaseUrl } from '@beike/domain/gatewayCreds';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/imageHelpers';
 
 /**

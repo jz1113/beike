@@ -21,8 +21,8 @@ import {
 } from 'lucide-react';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { settingsModalShell, settingsPanelPad, settingsTouchBtn } from '@/shared/ui/layoutClasses';
-import { inferWorkflowCapabilitiesFromId } from '@beike/shared/workflowModels';
-import { VENDORS, identifyVendor, type VendorMeta } from '@beike/shared/vendorRegistry';
+import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
+import { VENDORS, identifyVendor, type VendorMeta } from '@beike/domain/vendorRegistry';
 
 export interface GatewayModelItem {
   id: string;

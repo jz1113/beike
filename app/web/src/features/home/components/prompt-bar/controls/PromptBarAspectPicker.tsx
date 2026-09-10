@@ -4,7 +4,7 @@ import { densityComposerPill } from '@/shared/ui/layoutClasses';
 import { renderRatioMiniIcon } from '../../../utils/modelDisplayHelpers';
 import { PromptBarVideoParamsPanel } from './PromptBarVideoControls';
 import PromptBarImageControls from './PromptBarImageControls';
-import type { QuickGenMode } from '@beike/shared/depthVideo';
+import type { QuickGenMode } from '@beike/domain/depthVideo';
 
 interface PromptBarAspectPickerProps {
   isUp: boolean;

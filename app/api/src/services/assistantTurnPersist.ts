@@ -7,9 +7,9 @@
  * - Snapshot 批量更新（debounced）
  */
 
-import { prisma } from '@beike/shared/prisma';
-import type { AgentRuntime } from '@beike/shared/assistant/agentRuntime';
-import type { AssistantItem } from '@beike/shared/assistant/types';
+import { prisma } from '@beike/server-kit/prisma';
+import type { AgentRuntime } from '@beike/server-kit/assistant/agentRuntime';
+import type { AssistantItem } from '@beike/domain/assistant/types';
 
 let snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const SNAPSHOT_DEBOUNCE_MS = 100;

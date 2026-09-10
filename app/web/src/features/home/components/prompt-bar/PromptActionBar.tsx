@@ -3,12 +3,11 @@ import { Plus, ArrowUp } from 'lucide-react';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useDropdownMenu } from '@/lib/useDropdownMenu';
 import { 
-  VIDEO_GEN_MODELS, 
   VIDEO_ASPECT_RATIOS, 
   VIDEO_REF_MODES, 
   getVideoDurationBounds,
   clampVideoDuration 
-} from '@beike/shared/video';
+} from '@beike/domain/video';
 import { usePromptBarWorkflowModels } from '../../hooks/usePromptBarWorkflowModels';
 import { usePromptBarStoreState } from '../../hooks/usePromptBarStoreState';
 import { densityComposerPad, composerContainer } from '@/shared/ui/layoutClasses';
@@ -20,7 +19,7 @@ import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
 import PromptBarBrandHero from './PromptBarBrandHero';
 import PromptBarRefMediaPanel from './media/PromptBarRefMediaPanel';
 import { useDepthEnvCheck } from '../../hooks/useDepthGeneration';
-import { isDepthGenMode, type QuickGenMode } from '@beike/shared/depthVideo';
+import { isDepthGenMode, type QuickGenMode } from '@beike/domain/depthVideo';
 import {
   resolvePromptPlaceholder,
   resolveFileAccept,
@@ -123,7 +122,7 @@ export default function PromptActionBar({
 
   const activeImageModelObj = availableImageModels.find(m => m.id === quickModel) || availableImageModels[0] || { id: '', name: '请从网关拉取生图模型', provider: 'Gateway' };
   const activeImageRatioObj = IMAGE_RATIO_ITEMS.find(r => r.id === quickAspectId) || IMAGE_RATIO_ITEMS[0];
-  const activeVideoModelObj = availableVideoModels.find(m => m.id === quickVideoModel) || availableVideoModels[0] || VIDEO_GEN_MODELS[0];
+  const activeVideoModelObj = availableVideoModels.find(m => m.id === quickVideoModel) || availableVideoModels[0] || { id: '', name: '请从网关拉取视频模型', provider: 'Gateway' };
   const activeVideoRefModeObj = VIDEO_REF_MODES.find(m => m.id === quickVideoRefMode) || VIDEO_REF_MODES[0];
   const activeVideoRatioObj = VIDEO_ASPECT_RATIOS.find(r => r.id === quickVideoAspectId) || VIDEO_ASPECT_RATIOS[1];
   const videoDurationBounds = getVideoDurationBounds(activeVideoModelObj?.id || quickVideoModel);
@@ -202,6 +201,7 @@ export default function PromptActionBar({
     quickVideoDuration,
     currentView,
     availableImageModelsLength: availableImageModels.length,
+    availableVideoModelsLength: availableVideoModels.length,
     quickDepthStyle,
     quickDepthQuality,
     refMediaFile: media.refMediaFile,

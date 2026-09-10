@@ -14,8 +14,8 @@ import { getFilesFromDataTransfer } from '../assetFolderImport';
 import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from '@/lib/xhsLinkBatch';
 import type { DeconstructQueueApi } from '../hooks/useDeconstructQueue';
 import type { useXhsBatchImport } from '../hooks/useXhsBatchImport';
-import type { WorkflowCapability } from '@beike/shared/workflowModels';
-import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/shared/productCategoryHelpers';
+import type { WorkflowCapability } from '@beike/domain/workflowModels';
+import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategoryHelpers';
 
 type XhsImportApi = ReturnType<typeof useXhsBatchImport>;
 

@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../../core/http';
-import { inferWorkflowCapabilitiesFromId } from '@beike/shared/workflowModels';
+import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
 // 官方旗舰推荐内置兜底模型库 (保证弱网/网关超时下系统永不卡死)
 const FALLBACK_FLAGSHIP_MODELS = [
   // 1. 多模态与视觉分析大模型

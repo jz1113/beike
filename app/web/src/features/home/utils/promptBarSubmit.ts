@@ -8,7 +8,7 @@ import {
   mentionTokenToName,
   isStandardImageMention,
   isGenericSubjectMention,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import {
   DEPTH_IMAGE_LIMITS,
   DEPTH_IMAGE_MODEL_ID,
@@ -18,7 +18,7 @@ import {
   type DepthQuality,
   type DepthVideoStyle,
   type QuickGenMode,
-} from '@beike/shared/depthVideo';
+} from '@beike/domain/depthVideo';
 import '@/lib/mediaHelper';
 import { isVideoFile } from '@/lib/mediaUpload';
 import { resolveRefMediaFile, resolveRefMediaName } from '@/lib/refMediaRegistry';
@@ -46,6 +46,7 @@ export interface PromptBarSubmitInput {
   quickVideoDuration: number;
   currentView: string;
   hasImageModels: boolean;
+  hasVideoModels?: boolean;
   quickDepthStyle: DepthVideoStyle;
   quickDepthQuality: DepthQuality;
   quickVideoGenerateAudio?: boolean;
@@ -154,13 +155,14 @@ export function canSubmitPromptBar(
 ): boolean {
   if (input.isSubmitting) return false;
   if (input.quickGenMode === 'image' && !input.hasImageModels) return false;
+  if (input.quickGenMode === 'video' && input.hasVideoModels === false) return false;
   if (isDepthGenMode(input.quickGenMode) && input.depthModelReady === false) return false;
   const effectiveImages = collectEffectiveImages(input);
   return validationError(input, effectiveImages) === null;
 }
 
 function validationError(input: PromptBarSubmitInput, effectiveImages: string[]): string | null {
-  const { quickGenMode, quickPrompt, quickVideoRefMode, hasImageModels, refMediaFile } = input;
+  const { quickGenMode, quickPrompt, quickVideoRefMode, hasImageModels, hasVideoModels, refMediaFile } = input;
 
   if (isDepthGenMode(quickGenMode)) {
     if (effectiveImages.length === 0) {
@@ -189,6 +191,10 @@ function validationError(input: PromptBarSubmitInput, effectiveImages: string[])
 
   if (quickGenMode === 'image' && !hasImageModels) {
     return '请先在设置中从网关拉取生图模型';
+  }
+
+  if (quickGenMode === 'video' && hasVideoModels === false) {
+    return '请先在设置中从网关拉取视频模型';
   }
 
   if (!quickPrompt.trim() && effectiveImages.length === 0) {

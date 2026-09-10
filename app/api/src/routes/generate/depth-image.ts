@@ -4,9 +4,9 @@ import {
   DEPTH_MODEL_SETUP_COMMAND,
   resolveDepthQuality,
   resolveDepthVideoStyle,
-} from '@beike/shared/depthVideo';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { extractStorageConfigFromRequest } from '@beike/shared/storage';
+} from '@beike/domain/depthVideo';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { checkDepthModelReady } from '../../services/depthEnvCheck';
 import { runDepthImageJob } from '../../services/depthImagePipeline';
 

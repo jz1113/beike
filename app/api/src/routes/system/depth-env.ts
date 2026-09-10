@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { DEPTH_MODEL_SETUP_COMMAND } from '@beike/shared/depthVideo';
+import { DEPTH_MODEL_SETUP_COMMAND } from '@beike/domain/depthVideo';
 import { checkDepthModelReady, getDepthEnvStatus } from '../../services/depthEnvCheck';
 import { getFfmpegEnvStatus } from '../../services/videoFrames';
 

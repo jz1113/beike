@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { filterParseLinkImages, formatXhsLinksToOnePerLine } from '../xhsLinkBatch';
-import { MAX_IMAGES_PER_SET, MIN_IMAGES_PER_SET } from '@beike/shared/assetDeconstruct/prompts';
+import { MAX_IMAGES_PER_SET, MIN_IMAGES_PER_SET } from '@beike/domain/assetDeconstruct/prompts';
 
 describe('formatXhsLinksToOnePerLine', () => {
   it('correctly stitches broken newline URLs and normalizes to one per line', () => {

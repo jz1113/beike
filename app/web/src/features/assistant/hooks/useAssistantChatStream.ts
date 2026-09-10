@@ -1,12 +1,12 @@
-import type { AssistantRunMode, ReferenceScope } from '@beike/shared/assistant/taskPolicy';
+import type { AssistantRunMode, ReferenceScope } from '@beike/domain/assistant/taskPolicy';
 import { persistAssistantImages } from '../persistAssistantImages';
 import { useState, useRef, useMemo } from 'react';
 import { apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import { extractVideoFramesFromSrc, isVideoMediaUrl } from '@/lib/mediaHelper';
 import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { buildBrandKitSystemPrompt } from '@beike/shared/brandKitModels';
-import { composeSkillRuntime } from '@beike/shared/assistant/skills';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { buildBrandKitSystemPrompt } from '@beike/domain/brandKitModels';
+import { composeSkillRuntime } from '@beike/domain/assistant/skills';
 import { useAppStore, AssistantMessage, MediaAttachment } from '@/store/useAppStore';
 import { useAssistantTurn } from '@/features/assistant/hooks/useAssistantTurn';
 import type { PendingApproval } from '@/features/assistant/assistantTurnTypes';

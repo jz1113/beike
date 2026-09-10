@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/apiClient';
 import { recordModelUsage } from '@/lib/usageTracker';
-import { DEPTH_MODEL_SETUP_COMMAND, type DepthQuality, type DepthVideoStyle } from '@beike/shared/depthVideo';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { DEPTH_MODEL_SETUP_COMMAND, type DepthQuality, type DepthVideoStyle } from '@beike/domain/depthVideo';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { getDerived, putDerived } from '@/lib/idbMediaCache';
 import { resolveRefMediaFile, snapshotRefMediaFiles } from '@/lib/refMediaRegistry';
 

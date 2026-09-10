@@ -1,5 +1,5 @@
 import type { GenerationTask } from '@/types/app-store';
-import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID } from '@beike/shared/depthVideo';
+import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID } from '@beike/domain/depthVideo';
 
 export function mapDbTaskToGenerationTask(t: Record<string, unknown>): GenerationTask {
   const mediaType = t.mediaType as string | undefined;

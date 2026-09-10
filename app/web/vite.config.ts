@@ -9,13 +9,13 @@ import type { ServerResponse } from 'node:http';
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(webRoot, '../..');
-const portFile = existsSync(resolve(workspaceRoot, '.desktop-dev-port'))
-  ? resolve(workspaceRoot, '.desktop-dev-port')
-  : resolve(webRoot, '../../../.desktop-dev-port');
+const portFilePath = resolve(workspaceRoot, '.desktop-dev-port');
 let apiPort = 3000;
 try {
-  const n = Number.parseInt(readFileSync(portFile, 'utf8').trim(), 10);
-  if (Number.isFinite(n) && n > 0) apiPort = n;
+  if (existsSync(portFilePath)) {
+    const n = Number.parseInt(readFileSync(portFilePath, 'utf8').trim(), 10);
+    if (Number.isFinite(n) && n > 0) apiPort = n;
+  }
 } catch {
   /* default */
 }
@@ -25,8 +25,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(webRoot, 'src'),
-      '@beike/shared': resolve(workspaceRoot, 'app/shared/src'),
-      '@beike/contracts': resolve(workspaceRoot, 'app/contracts/src'),
+      '@beike/domain': resolve(workspaceRoot, 'packages/domain/src'),
+      '@beike/contracts': resolve(workspaceRoot, 'packages/contracts/src'),
     },
   },
   server: {

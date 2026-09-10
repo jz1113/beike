@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { PreviousGroupSignature } from '@beike/shared/vision';
+import { PreviousGroupSignature } from '@beike/domain/vision';
 import { useWorkshopShotCount } from './useWorkshopShotCount';
 import { 
   BatchProductItem, 
@@ -8,7 +8,7 @@ import {
 } from './batchTypes';
 import {
   shouldAutoSelectJewelryArch,
-} from '@beike/shared/jewelryArchHelpers';
+} from '@beike/domain/jewelryArchHelpers';
 import {
   exportBatchExcel,
   exportSingleProductZip,

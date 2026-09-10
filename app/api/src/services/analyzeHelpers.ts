@@ -1,11 +1,11 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
-import { getHarmonizedStoryboardForScene } from '@beike/shared/drawing';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
-import { normalizeVisionModelId } from '@beike/shared/vision';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { getHarmonizedStoryboardForScene } from '@beike/domain/drawing';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
+import { normalizeVisionModelId } from '@beike/domain/vision';
 import {
   resolveVisionAnalyzeMaxTokens,
   resolveVisionTimeoutMs,
-} from '@beike/shared/visionTimeouts';
+} from '@beike/domain/visionTimeouts';
 
 import { getDefaultBaseUrl, getDefaultApiKey } from './imageHelpers';
 export { getDefaultBaseUrl, getDefaultApiKey };

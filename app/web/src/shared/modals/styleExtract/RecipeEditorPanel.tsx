@@ -8,7 +8,7 @@ import {
   Check, 
   Loader2 
 } from 'lucide-react';
-import { CategoryItem } from '@beike/shared/vision';
+import { CategoryItem } from '@beike/domain/vision';
 import { ExtractedRecipeData } from './types';
 
 interface RecipeEditorPanelProps {

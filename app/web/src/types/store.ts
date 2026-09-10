@@ -1,5 +1,5 @@
-import type { ShotPrompt, PreviousGroupSignature } from '@beike/shared/vision';
-import type { OriginalLookParts, OriginalProductRole } from '@beike/shared/drawing';
+import type { ShotPrompt, PreviousGroupSignature } from '@beike/domain/vision';
+import type { OriginalLookParts, OriginalProductRole } from '@beike/domain/drawing';
 import type { ProductImage, ProductData } from '@/types/product';
 import type { ProductWidgetData } from '@/types/app-store';
 import type {
@@ -10,7 +10,7 @@ import type {
   MediaAttachment,
 } from '@/types/app-store';
 import type { AppView } from '@/store/view';
-import type { DepthQuality, DepthVideoStyle, QuickGenMode } from '@beike/shared/depthVideo';
+import type { DepthQuality, DepthVideoStyle, QuickGenMode } from '@beike/domain/depthVideo';
 
 export type { AppView } from '@/store/view';
 

@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Bell, RefreshCw, X, Sparkles } from 'lucide-react';
 import { useTaskCenter, type ActiveRun } from '@/store/useTaskCenter';
-import type { AssistantItem } from '@beike/shared/assistant/types';
+import type { AssistantItem } from '@beike/domain/assistant/types';
 
 interface Props {
   onResume?: (snapshot: { items: AssistantItem[]; modelUsed?: string; turnId: string }) => void;

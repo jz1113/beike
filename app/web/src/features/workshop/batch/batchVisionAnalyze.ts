@@ -4,7 +4,7 @@ import {
   ShotPrompt,
   pickVisionAnalyzeFallbacks,
   PreviousGroupSignature,
-} from '@beike/shared/vision';
+} from '@beike/domain/vision';
 import {
   assembleOriginalShotPrompt,
   assembleGrid2x2Prompt,
@@ -17,10 +17,10 @@ import {
   extractOutfitFromPrompt,
   isGenericLook,
   preventJewelryGlitches,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import { getGatewayClientOverrides } from '@/lib/gatewayClient';
 import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
-import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@beike/shared/jewelryArchHelpers';
+import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@beike/domain/jewelryArchHelpers';
 import type { BatchProductItem } from './batchTypes';
 import { resolveHarmonizedTemplatesForItem } from './batchVisionAnalyzeHelpers';
 

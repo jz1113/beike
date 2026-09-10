@@ -1,5 +1,5 @@
 import type { SVGProps } from 'react';
-import type { AssistantSkill } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 
 export interface AssistantSkillIconProps extends SVGProps<SVGSVGElement> {
   className?: string;

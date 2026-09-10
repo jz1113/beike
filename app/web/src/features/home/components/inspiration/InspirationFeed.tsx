@@ -7,7 +7,7 @@ import InspirationModal, { InspirationItem, InspirationUseOptions } from './Insp
 import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../utils/inspirationMediaHelpers';
 import { LazyFeedVideo } from './LazyFeedVideo';
-import { getStoryboardPresetById, persistStoryboardPreset } from '@beike/shared/prompt-engine/storyboardPreset';
+import { getStoryboardPresetById, persistStoryboardPreset } from '@beike/domain/prompt-engine/storyboardPreset';
 import { useAppStore } from '@/store/useAppStore';
 
 const INITIAL_VISIBLE = 24;

@@ -16,8 +16,8 @@ if (removed > 0) {
 }
 const result = spawnSync('rustc', ['-vV'], { encoding: 'utf8' });
 if (result.status !== 0) {
-  console.error('rustc not found. Install Rust from https://rustup.rs/');
-  process.exit(1);
+  console.warn('[desktop] rustc 未安装，跳过桌面原生 sidecar 准备（若需原生窗口请安装 Rust：https://rustup.rs/）');
+  process.exit(0);
 }
 const match = String(result.stdout).match(/host: (\S+)/);
 if (!match) {

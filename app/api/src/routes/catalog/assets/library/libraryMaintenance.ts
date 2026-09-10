@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import {
   SEED_SCENE_TITLES,
   SEED_OUTFIT_TITLES,

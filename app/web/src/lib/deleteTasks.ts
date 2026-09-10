@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/apiClient';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 export interface DeleteTasksResult {
   ok: boolean;

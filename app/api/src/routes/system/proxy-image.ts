@@ -1,6 +1,6 @@
 import sharp from 'sharp';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
-import { assertSafeRemoteUrl, resolvePublicPath } from '@beike/shared/safeUrl';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
+import { assertSafeRemoteUrl, resolvePublicPath } from '@beike/server-kit/safeUrl';
 import { getCachedImage, setCachedImage } from './proxyImage/cache';
 import { proxyVideo } from './proxyImage/fetcher';
 import {

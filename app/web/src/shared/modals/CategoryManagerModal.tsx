@@ -15,7 +15,7 @@ import {
   saveCategoriesList, 
   deleteCategoryItem, 
   resetCategoriesToDefault 
-} from '@beike/shared/vision';
+} from '@beike/domain/vision';
 
 interface Props {
   isOpen: boolean;

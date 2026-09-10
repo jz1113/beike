@@ -1,7 +1,7 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
-import { mapWithConcurrency } from '@beike/shared/asyncPool';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
-import { resolveVisionTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS } from '@beike/shared/visionTimeouts';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { mapWithConcurrency } from '@beike/domain/asyncPool';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
+import { resolveVisionTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS } from '@beike/domain/visionTimeouts';
 import { getRetryDelayMs, isNetworkLikeError } from '../../../../services/imageHelpers';
 import {
   VisionCallDiagnostics,

@@ -1,4 +1,4 @@
-import { isProductImageUrl, normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { isProductImageUrl, normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 
 /**
  * 修复小红书图片域名

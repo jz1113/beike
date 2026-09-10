@@ -1,19 +1,19 @@
 vi.mock('./assistantMemory', () => ({ assistantMemory: { remember: vi.fn(async () => ({ enabled: true, summary: '' })), get: vi.fn() }, summarizeMemory: vi.fn() }));
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { socialCollectionIntent, collectSocialImages } from './assistantSocialCollection';
-import { AgentRuntime } from '@beike/shared/assistant/agentRuntime';
+import { AgentRuntime } from '@beike/server-kit/assistant/agentRuntime';
 import { runAssistantTurn } from './assistantAgent';
 import { buildAssistantMessages } from './assistantMessageBuilder';
-import { runAgentLoop } from '@beike/shared/assistant/agentLoop';
+import { runAgentLoop } from '@beike/server-kit/assistant/agentLoop';
 const config = vi.hoisted(() => ({ key: '' }));
 
 vi.mock('./assistantTurnPersist', () => ({ upsertTurn: vi.fn(async () => {}), updateTurnStatus: vi.fn(async () => {}), syncRuntimeToDb: vi.fn(async () => {}), syncSnapshot: vi.fn(async () => {}) }));
 vi.mock('./itemPersistQueue', () => ({ enqueueItemPersist: vi.fn(), flushItemQueue: vi.fn(async () => {}) }));
 vi.mock('./imageHelpers', () => ({ getDefaultBaseUrl: () => 'https://model.invalid', getDefaultApiKey: () => '' }));
-vi.mock('@beike/shared/gatewayCreds', () => ({ resolveGatewayCreds: () => ({baseUrl: 'https://model.invalid', apiKey: config.key}) }));
+vi.mock('@beike/domain/gatewayCreds', () => ({ resolveGatewayCreds: () => ({baseUrl: 'https://model.invalid', apiKey: config.key}) }));
 vi.mock('./assistantMessageBuilder', () => ({ buildAssistantMessages: vi.fn(async () => ({formattedMessages:[],lastUserMsg:'',documents:[]})) }));
 
-vi.mock('@beike/shared/assistant/agentLoop', () => ({ runAgentLoop: vi.fn(async (opts) => ({runtime: opts.runtime ?? new AgentRuntime(opts), textStreamed:true, modelUsed:'test-model', finalMessages:opts.messages})), streamFinalReply: vi.fn() }));
+vi.mock('@beike/server-kit/assistant/agentLoop', () => ({ runAgentLoop: vi.fn(async (opts) => ({runtime: opts.runtime ?? new AgentRuntime(opts), textStreamed:true, modelUsed:'test-model', finalMessages:opts.messages})), streamFinalReply: vi.fn() }));
 
 const urls = Array.from({length: 15}, (_, i) => `https://image.example/${i}.jpg`);
 const fetchMock = vi.fn(async () => new Response(JSON.stringify({success: true, data: {title: '测试图集', images: urls}})));

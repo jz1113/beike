@@ -4,15 +4,14 @@ import {
   getEnabledImageModelsFromSettings,
   getEnabledVideoModelsFromSettings,
   readWorkflowModelsFromStorage,
-} from '@beike/shared/workflowModels';
-import { VIDEO_GEN_MODELS } from '@beike/shared/video';
+} from '@beike/domain/workflowModels';
 
 export function usePromptBarWorkflowModels(
   setQuickModel: (id: string) => void,
   setQuickVideoModel: (id: string) => void,
 ) {
   const [availableImageModels, setAvailableImageModels] = useState<any[]>([]);
-  const [availableVideoModels, setAvailableVideoModels] = useState<any[]>(VIDEO_GEN_MODELS);
+  const [availableVideoModels, setAvailableVideoModels] = useState<any[]>([]);
 
   useEffect(() => {
     const loadCustomModels = () => {
@@ -35,8 +34,8 @@ export function usePromptBarWorkflowModels(
         }
       }
 
+      setAvailableVideoModels(customVideo);
       if (customVideo.length > 0) {
-        setAvailableVideoModels(customVideo);
         const activeVid = useAppStore.getState().quickVideoModel;
         if (activeVid && customVideo.some((m) => m.id === activeVid)) {
           /* keep */
@@ -48,8 +47,6 @@ export function usePromptBarWorkflowModels(
             setQuickVideoModel(customVideo[0].id as string);
           }
         }
-      } else {
-        setAvailableVideoModels(VIDEO_GEN_MODELS);
       }
     };
 

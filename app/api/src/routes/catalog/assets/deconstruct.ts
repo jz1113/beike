@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../../core/http';
-import { buildPass1VisionModelsToTry, filterVisionCapableModels } from '@beike/shared/vision';
-import { resolveGatewayCreds } from '@beike/shared/gatewayCreds';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { buildPass1VisionModelsToTry, filterVisionCapableModels } from '@beike/domain/vision';
+import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   normalizeGatewayBaseUrl,
   getDefaultBaseUrl,
@@ -11,9 +11,9 @@ import {
   MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
   type PerImageResult,
-} from '@beike/shared/assetDeconstruct/prompts';
-import type { SubCategoryDef } from '@beike/shared/productCategoryHelpers';
-import { reconcileAssetsFromPerImage } from '@beike/shared/assetDeconstruct/validate';
+} from '@beike/domain/assetDeconstruct/prompts';
+import type { SubCategoryDef } from '@beike/domain/productCategoryHelpers';
+import { reconcileAssetsFromPerImage } from '@beike/domain/assetDeconstruct/validate';
 
 // 导入解构子系统
 // 导入解构子系统

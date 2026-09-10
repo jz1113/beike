@@ -13,7 +13,7 @@ import {
   ChevronRight,
   Loader2,
 } from 'lucide-react';
-import { formatPromptParagraphs, buildMultiAnglePrompt, buildSmartEditPrompt } from '@beike/shared/drawing';
+import { formatPromptParagraphs, buildMultiAnglePrompt, buildSmartEditPrompt } from '@beike/domain/drawing';
 import type { GenerationTask } from '@/types/app-store';
 import { LightboxInfoPanel } from './lightbox/LightboxInfoPanel';
 import { LightboxToolPanel } from './lightbox/LightboxToolPanel';

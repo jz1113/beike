@@ -9,7 +9,7 @@ import {
   Video,
 } from 'lucide-react';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
-import { isMultimodalWorkflowModel } from '@beike/shared/workflowModels';
+import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 import { settingsCapabilityPill } from '@/shared/ui/layoutClasses';
 import type { WorkflowModel } from './settingsShared';
 

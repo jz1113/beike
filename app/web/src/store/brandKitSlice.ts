@@ -3,7 +3,7 @@ import { AppState } from '@/types/store';
 import {
   BrandKitProfile,
   DEFAULT_BRAND_KITS
-} from '@beike/shared/brandKitModels';
+} from '@beike/domain/brandKitModels';
 
 const BRAND_KITS_STORAGE_KEY = 'azhuo_brand_kits_vault';
 const ACTIVE_BRAND_KIT_STORAGE_KEY = 'azhuo_active_brand_kit_id';

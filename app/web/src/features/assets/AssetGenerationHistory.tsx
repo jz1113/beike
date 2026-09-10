@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Trash2, Check, RotateCw, Loader2, AlertCircle, ImageIcon, Film, Layers, Music } from 'lucide-react';
-import { formatDisplayModel, formatDisplayModelCompact, normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { formatDisplayModel, formatDisplayModelCompact, normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import '@/lib/downloadMedia';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';

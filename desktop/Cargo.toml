@@ -1,6 +1,6 @@
 [package]
 name = "azhuo-workbench"
-version = "1.0.0"
+version = "0.0.2"
 description = "贝壳云图桌面壳"
 authors = ["azhuo"]
 edition = "2021"
@@ -24,3 +24,13 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 sysinfo = "0.33"
 dirs = "6"
 getrandom = "0.2"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { upsertEnvFile } from '@beike/shared/desktopEnvFile';
+import { upsertEnvFile } from '@beike/server-kit/desktopEnvFile';
 import path from 'node:path';
 
 function applyEnvUpdates(updates: Record<string, string>) {

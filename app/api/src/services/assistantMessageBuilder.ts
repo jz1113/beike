@@ -1,7 +1,7 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
-import { CLEAN_CHAT_SYSTEM_PROMPT } from '@beike/shared/skills/ecommerce-visual-director';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
-import type { AssistantDocAttachment } from '@beike/shared/assistant/toolRegistry';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { CLEAN_CHAT_SYSTEM_PROMPT } from '@beike/domain/skills/ecommerce-visual-director';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
+import type { AssistantDocAttachment } from '@beike/domain/assistant/tools/defs';
 import type { ChatMessage } from './assistantChatHelpers';
 
 

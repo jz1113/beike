@@ -10,7 +10,7 @@ import {
   DEPTH_VIDEO_MODEL_ID,
   type DepthQuality,
   type DepthVideoStyle,
-} from '@beike/shared/depthVideo';
+} from '@beike/domain/depthVideo';
 import {
   AlertCircle,
   Upload,

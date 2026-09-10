@@ -6,7 +6,7 @@ import {
   ChevronDown,
   Check,
 } from 'lucide-react';
-import type { ActionCategoryId, SubCategoryDef } from '@beike/shared/productCategoryHelpers';
+import type { ActionCategoryId, SubCategoryDef } from '@beike/domain/productCategoryHelpers';
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
 import type { AssetSubTab } from './AssetLibraryToolbar';
 import DynamicTagDropdown from './DynamicTagDropdown';

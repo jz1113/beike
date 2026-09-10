@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { resolveStorageConfig, uploadRemoteMediaToStorage, isAlreadyPermanentUrl, StorageConfig } from '@beike/shared/storage';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { resolveStorageConfig, uploadRemoteMediaToStorage, isAlreadyPermanentUrl, StorageConfig } from '@beike/server-kit/storage';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 /**
  * POST /api/assets/storage/migrate

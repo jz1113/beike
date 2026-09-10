@@ -8,7 +8,7 @@ import {
   getEnabledMultimodalModelsFromSettings,
   repairWorkflowModelsInStorage,
   resolveStoredMultimodalModelId,
-} from '@beike/shared/workflowModels';
+} from '@beike/domain/workflowModels';
 
 interface UseAssistantModelsOptions {
   assistantModel: string;

@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import type { AssistantTurn } from '@beike/shared/assistant/types';
+import { prisma } from '@beike/server-kit/prisma';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import type { AssistantTurn } from '@beike/domain/assistant/types';
 
 /**
  * 从 pathname 中提取 `:threadId` 或 `:turnId`（路径最后第二个段）。

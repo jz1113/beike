@@ -1,9 +1,9 @@
 import { apiFetch } from '@/lib/apiClient';
-import { mapWithConcurrency } from '@beike/shared/asyncPool';
+import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import {
   MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
-} from '@beike/shared/assetDeconstruct/prompts';
+} from '@beike/domain/assetDeconstruct/prompts';
 import { RateLimiter } from '@/lib/rateLimiter';
 import type { ImageSetQueueItem } from '@/features/assets/assetPromptConstants';
 

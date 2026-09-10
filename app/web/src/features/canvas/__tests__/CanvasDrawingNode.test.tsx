@@ -5,7 +5,7 @@ import { CanvasDrawingNode } from '../components/CanvasDrawingNode';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useAppStore } from '@/store/useAppStore';
 import type { CanvasNode } from '../types';
-vi.mock('@beike/shared/workflowModels', async importOriginal => ({ ...await importOriginal<typeof import('@beike/shared/workflowModels')>(), readWorkflowModelsFromStorage: () => [], getEnabledVideoModelsFromSettings: () => [{id:'video-test',name:'Video',supportedDurations:[5],supportedResolutions:['720P'],supportedAspectRatios:['16:9']}], getEnabledImageModelsFromSettings: () => [{id:'gpt-image-2',name:'GPT Image 2'}] }));
+vi.mock('@beike/domain/workflowModels', async importOriginal => ({ ...await importOriginal<typeof import('@beike/domain/workflowModels')>(), readWorkflowModelsFromStorage: () => [], getEnabledVideoModelsFromSettings: () => [{id:'video-test',name:'Video',supportedDurations:[5],supportedResolutions:['720P'],supportedAspectRatios:['16:9']}], getEnabledImageModelsFromSettings: () => [{id:'gpt-image-2',name:'GPT Image 2'}] }));
 vi.mock('../canvasMediaImport', () => ({ persistCanvasMedia: vi.fn() }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 it('queues current image generation tasks with node settings and rejects duplicate submit', () => {

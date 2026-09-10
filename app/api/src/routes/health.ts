@@ -1,6 +1,6 @@
 import { jsonResponse } from '../core/http';
-import { getAccessToken, isAuthorized } from '@beike/shared/apiAuth';
-import { createMediaSignature } from '@beike/shared/mediaSign';
+import { getAccessToken, isAuthorized } from '@beike/server-kit/apiAuth';
+import { createMediaSignature } from '@beike/server-kit/mediaSign';
 
 /** Public liveness never discloses credentials. Rust IPC attaches the desktop token. */
 export async function GET(req?: Request) {

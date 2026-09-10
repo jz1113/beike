@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import { clearProxyVideoCache } from './proxy-image';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 function dirStats(dir: string): { bytes: number; fileCount: number } {
   let bytes = 0;

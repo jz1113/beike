@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { jsonResponse } from '../../../core/http';
-import { persistBufferToStorage, persistDataUrlToStorage } from '@beike/shared/persistDataUrl';
-import type { StorageCategory, StorageConfig } from '@beike/shared/storage';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { persistBufferToStorage, persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
+import type { StorageCategory, StorageConfig } from '@beike/server-kit/storage';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 /**
  * POST /api/assets/storage/upload

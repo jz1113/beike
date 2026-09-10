@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { DEPTH_MODEL_SETUP_COMMAND } from '@beike/shared/depthVideo';
+import { DEPTH_MODEL_SETUP_COMMAND } from '@beike/domain/depthVideo';
 
 const execFileAsync = promisify(execFile);
 

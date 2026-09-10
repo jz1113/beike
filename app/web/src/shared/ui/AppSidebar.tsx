@@ -34,15 +34,18 @@ export default function AppSidebar({
       >
         <button
           onClick={onNavigateHub}
+          onMouseDown={(e) => e.stopPropagation()}
+          data-no-drag
+          data-tauri-drag-region="false"
           className="w-10 h-10 xl:w-14 xl:h-14 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer group relative focus:outline-none"
           title="贝壳云图 · 回到首页"
         >
-          <div className="relative w-9.5 h-9.5 xl:w-13.5 xl:h-13.5 flex items-center justify-center">
+          <div className="relative w-9.5 h-9.5 xl:w-13.5 xl:h-13.5 flex items-center justify-center pointer-events-none">
             <img 
               src="/app_logo.png" 
               alt="贝壳云图" 
               draggable={false}
-              className="w-full h-full object-contain filter drop-shadow-[0_2px_8px_rgba(239,68,68,0.3)] group-hover:drop-shadow-[0_4px_14px_rgba(239,68,68,0.5)] transition-all duration-300"
+              className="w-full h-full object-contain filter drop-shadow-[0_2px_8px_rgba(239,68,68,0.3)] group-hover:drop-shadow-[0_4px_14px_rgba(239,68,68,0.5)] transition-all duration-300 pointer-events-none"
             />
           </div>
 
@@ -54,10 +57,13 @@ export default function AppSidebar({
       </div>
 
       {/* 🌟 2. 中间导航按钮组 */}
-      <nav className="flex flex-col items-center gap-2 xl:gap-4 w-full my-auto py-2">
+      <nav data-no-drag data-tauri-drag-region="false" className="flex flex-col items-center gap-2 xl:gap-4 w-full my-auto py-2">
         {/* 1. 首页 */}
         <button
           onClick={onNavigateHub}
+          onMouseDown={(e) => e.stopPropagation()}
+          data-no-drag
+          data-tauri-drag-region="false"
           className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer ${
             currentView === 'home'
               ? 'text-slate-950 font-bold'
@@ -66,10 +72,10 @@ export default function AppSidebar({
           title="首页 / 灵感展馆"
         >
           {/* 现代极简优雅 Home 图标 */}
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110">
+          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
             <NavHomeIcon active={currentView === 'home'} />
           </div>
-          <span className={`hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'home' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'home' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             首页
           </span>
         </button>
@@ -77,6 +83,9 @@ export default function AppSidebar({
         {/* 2. 生成工作区 */}
         <button
           onClick={onNavigateGenerate}
+          onMouseDown={(e) => e.stopPropagation()}
+          data-no-drag
+          data-tauri-drag-region="false"
           className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer ${
             currentView === 'generate'
               ? 'text-slate-950 font-bold'
@@ -85,10 +94,10 @@ export default function AppSidebar({
           title="生成 · AI 对话与极速生成工作区"
         >
           {/* 精美 AI 创作双星光芒图标 (生成) */}
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110">
+          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
             <NavGenerateIcon active={currentView === 'generate'} />
           </div>
-          <span className={`hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'generate' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'generate' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             生成
           </span>
         </button>
@@ -96,6 +105,9 @@ export default function AppSidebar({
         {/* 3. 资产中心 */}
         <button
           onClick={onNavigateAssets}
+          onMouseDown={(e) => e.stopPropagation()}
+          data-no-drag
+          data-tauri-drag-region="false"
           className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer ${
             currentView === 'assets'
               ? 'text-slate-950 font-bold'
@@ -104,7 +116,7 @@ export default function AppSidebar({
           title="资产 · 生成历史与媒体资产库"
         >
           {/* 高保真现代数字媒体资产画廊图标 (资产) */}
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110">
+          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
             <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
               {currentView === 'assets' ? (
                 <>
@@ -123,16 +135,19 @@ export default function AppSidebar({
               )}
             </svg>
           </div>
-          <span className={`hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'assets' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'assets' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             资产
           </span>
         </button>
       </nav>
 
       {/* 🌟 3. 底部操作区：系统设置 */}
-      <div className="flex flex-col items-center pb-2 w-full px-2">
+      <div data-no-drag data-tauri-drag-region="false" className="flex flex-col items-center pb-2 w-full px-2">
         <button
           onClick={onOpenSettings}
+          onMouseDown={(e) => e.stopPropagation()}
+          data-no-drag
+          data-tauri-drag-region="false"
           className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer select-none ${
             currentView === 'settings'
               ? 'text-slate-950 font-bold bg-slate-100/80'
@@ -140,10 +155,10 @@ export default function AppSidebar({
           }`}
           title="系统设置 / 模型与接口配置"
         >
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-45">
+          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-45 pointer-events-none">
             <Settings className={`w-5 h-5 xl:w-6 xl:h-6 stroke-[1.8] ${currentView === 'settings' ? 'stroke-slate-950 text-slate-950' : 'stroke-slate-500 group-hover:stroke-slate-900'} transition-colors`} />
           </div>
-          <span className={`hidden xl:block text-[13px] tracking-tight leading-none mt-0.5 ${currentView === 'settings' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
+          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none mt-0.5 ${currentView === 'settings' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
             设置
           </span>
         </button>

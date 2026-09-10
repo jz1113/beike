@@ -1,7 +1,11 @@
 import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
+import { isTauriDesktop, isMacOs } from '@/lib/desktopRuntime';
 
 export default function MacTitleBar() {
+  // 仅在 macOS 平台渲染（为 macOS 原生红绿灯交通灯与 Overlay 模式预留间距与拖拽区）
+  // 在 Windows 平台已有系统原生标题栏（含最小化、最大化、关闭按钮），坚决不重复渲染第二层标题栏
+  if (!isMacOs()) return null;
+
   return (
     <header
       data-tauri-drag-region
@@ -40,7 +44,7 @@ export default function MacTitleBar() {
             data-tauri-drag-region
             className="text-[10px] font-mono text-white/60 tracking-tight"
           >
-            v1.0.0
+            v0.0.2
           </span>
         )}
       </div>

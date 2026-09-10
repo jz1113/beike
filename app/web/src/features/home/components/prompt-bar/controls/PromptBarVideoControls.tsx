@@ -5,7 +5,8 @@ import {
   VIDEO_REF_MODES,
   VIDEO_RESOLUTIONS,
   clampVideoDuration,
-} from '@beike/shared/video';
+} from '@beike/domain/video';
+import { densityComposerPill } from '@/shared/ui/layoutClasses';
 import '../../../utils/modelDisplayHelpers';
 
 interface VideoModelLike {
@@ -204,10 +205,10 @@ export function PromptBarVideoRefModePill({
       <button
         type="button"
         onClick={() => setShowVideoRefModeDropdown(!showVideoRefModeDropdown)}
-        className={`h-8 sm:h-9 xl:h-11 px-2 sm:px-2.5 xl:px-3 rounded-2xl font-semibold flex items-center gap-1 xl:gap-2.5 border transition-all cursor-pointer text-xs xl:text-sm ${
+        className={`${densityComposerPill} rounded-2xl font-semibold flex items-center gap-1 xl:gap-2.5 border-0 transition-all cursor-pointer ${
           showVideoRefModeDropdown
-            ? 'bg-slate-50 text-slate-950 border-slate-300 shadow-2xs'
-            : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 shadow-2xs'
+            ? 'bg-slate-100 text-slate-950 shadow-none'
+            : 'bg-transparent hover:bg-slate-50 text-slate-800 shadow-none'
         }`}
       >
         <Film className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-80 text-current shrink-0" />
@@ -293,10 +294,10 @@ export function PromptBarVideoDurationPill({
       <button
         type="button"
         onClick={() => setShowDurationDropdown(!showDurationDropdown)}
-        className={`h-8 sm:h-9 xl:h-11 px-2 sm:px-2.5 xl:px-3 rounded-2xl font-semibold flex items-center gap-1 xl:gap-2.5 border transition-all cursor-pointer text-xs xl:text-sm ${
+        className={`${densityComposerPill} rounded-2xl font-semibold flex items-center gap-1 xl:gap-2.5 border-0 transition-all cursor-pointer ${
           showDurationDropdown
-            ? 'bg-slate-50 text-slate-950 border-slate-300 shadow-2xs'
-            : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 shadow-2xs'
+            ? 'bg-slate-100 text-slate-950 shadow-none'
+            : 'bg-transparent hover:bg-slate-50 text-slate-800 shadow-none'
         }`}
       >
         <Clock className="w-3.5 h-3.5 opacity-80 text-current" />

@@ -2,7 +2,7 @@ import { compressImageToDataUrl } from '@/lib/image-utils';
 import {
   MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
-} from '@beike/shared/assetDeconstruct/prompts';
+} from '@beike/domain/assetDeconstruct/prompts';
 import type { ImageSetQueueItem } from './assetPromptConstants';
 
 export interface FolderImportSkipRecord {

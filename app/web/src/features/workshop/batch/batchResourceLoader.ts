@@ -1,13 +1,13 @@
 import { apiFetch } from '@/lib/apiClient';
 import { useAppStore } from '@/store';
-import { VISION_MODELS } from '@beike/shared/vision';
-import { IMAGE_GEN_MODELS } from '@beike/shared/drawing';
+import { VISION_MODELS } from '@beike/domain/vision';
+import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
 import {
   getEnabledMultimodalModelsFromSettings,
   getEnabledImageModelsFromSettings,
   getStoredMultimodalModelId,
   repairWorkflowModelsInStorage,
-} from '@beike/shared/workflowModels';
+} from '@beike/domain/workflowModels';
 import { getGlobalAssetLibrary } from '@/features/assets/assetLibraryCache';
 import { SYSTEM_MASTER_RECIPES } from './batchTypes';
 

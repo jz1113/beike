@@ -1,13 +1,13 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import { DepthVideoSubmitBodySchema } from '@beike/contracts';
 import {
   DEPTH_MODEL_SETUP_COMMAND,
   DEPTH_VIDEO_LIMITS,
   resolveDepthQuality,
   resolveDepthVideoStyle,
-} from '@beike/shared/depthVideo';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+} from '@beike/domain/depthVideo';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { checkDepthModelReady } from '../../services/depthEnvCheck';
 import { createDepthVideoTask, getDepthVideoRuntimeState } from '../../services/depthVideoPipeline';
 import { checkFfmpegAvailable } from '../../services/videoFrames';

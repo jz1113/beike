@@ -1,6 +1,6 @@
-import { AgentRuntime } from '@beike/shared/assistant/agentRuntime';
-import { toolParseUrl } from '@beike/shared/assistant/tools/productTools';
-import { productWidgetFromToolResult } from '@beike/shared/assistant/agentLoop/toolExecutor';
+import { AgentRuntime } from '@beike/server-kit/assistant/agentRuntime';
+import { toolParseUrl } from '@beike/server-kit/assistant/tools/productTools';
+import { productWidgetFromToolResult } from '@beike/server-kit/assistant/agentLoop/toolExecutor';
 
 export function socialCollectionIntent(text: string) {
   const urls = [...new Set((text.match(/https?:\/\/[^\s<>「」『』"，。；！）)]+/gi) || []).filter((raw) => {

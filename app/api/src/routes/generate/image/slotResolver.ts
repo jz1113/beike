@@ -3,9 +3,9 @@ import {
   normalizeReferenceMentions,
   resolveReferenceMentionNames,
   normalizeLegacyMultiAnglePrompt,
-} from '@beike/shared/drawing';
-import { createImageConvertCache } from '@beike/shared/latencyAudit';
-import { emphasizeIdentityFacePlate, obfuscateCompositionFaces } from '@beike/shared/faceObfuscate';
+} from '@beike/domain/drawing';
+import { createImageConvertCache } from '@beike/domain/latencyAudit';
+import { emphasizeIdentityFacePlate, obfuscateCompositionFaces } from '@beike/server-kit/faceObfuscate';
 import { fetchImageAsSafeDataUrl } from '../../../services/imageHelpers';
 
 export interface ImageSlotResolutionResult {

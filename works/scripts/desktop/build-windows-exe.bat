@@ -4,6 +4,8 @@ chcp 65001 >nul
 title 贝壳云图 - Windows 安装包一键构建
 cd /d "%~dp0\..\..\.."
 
+if exist "%USERPROFILE%\.cargo\bin" set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
+
 echo [1/4] 检查 Node.js、Rust 和 C++ 编译环境...
 where node >nul 2>nul
 if errorlevel 1 goto missing_node

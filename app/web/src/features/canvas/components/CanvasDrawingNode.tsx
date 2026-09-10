@@ -6,7 +6,7 @@ import { ArrowUp, Square, Plus, Loader2, WandSparkles, X, Info, Volume2 } from '
 import { useAppStore } from '@/store/useAppStore';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import { getEnabledVideoModelsFromSettings, getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@beike/shared/workflowModels';
+import { getEnabledVideoModelsFromSettings, getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@beike/domain/workflowModels';
 import { buildPromptBarGenerationTasks } from '@/features/home/utils/promptBarSubmit';
 import { calculateImageDimensions } from '@/features/home/utils/promptBarDisplay';
 import { IMAGE_RATIO_ITEMS } from '@/features/home/data/promptBarConstants';
@@ -133,7 +133,6 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
     } finally { lock.current = false; }
   };
   const geometry=drawingGeometry(node);
-  const control = 'rounded-lg bg-transparent px-2 py-1.5 text-xs text-slate-600 outline-none hover:bg-indigo-50 focus-visible:ring-1 focus-visible:ring-indigo-400';
   return <div className="text-slate-600" aria-label={isVideo ? '视频生成节点' : '绘图节点'}>
     <div data-testid="drawing-preview" style={{width:geometry.width,height:geometry.height}} className={`mx-auto flex items-center justify-center overflow-hidden rounded-[20px] border bg-white transition-[border-color,box-shadow] ${selected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200 group-hover:border-indigo-300'}`}>
       {isVideo && node.videoUrl ? <video src={proxyMediaUrl(node.videoUrl)} controls playsInline preload="metadata" onMouseDown={event => event.stopPropagation()} onDoubleClick={() => onPreview?.(node.videoUrl!)} onLoadedMetadata={event => { const video = event.currentTarget; if(video.videoWidth && video.videoHeight && (node.resultWidth !== video.videoWidth || node.resultHeight !== video.videoHeight)) updateNode(projectId,node.id,{resultWidth:video.videoWidth,resultHeight:video.videoHeight}); }} className="h-full w-full object-contain" /> : node.imageUrl ? <button type="button" aria-label="预览绘图结果" onMouseDown={event => event.stopPropagation()} onClick={() => onPreview?.(node.imageUrl!)} className="h-full w-full"><img src={proxyMediaUrl(node.imageUrl)} alt="绘图结果" onLoad={event=>{const image=event.currentTarget;if(image.naturalWidth && image.naturalHeight && (node.resultWidth!==image.naturalWidth || node.resultHeight!==image.naturalHeight))updateNode(projectId,node.id,{resultWidth:image.naturalWidth,resultHeight:image.naturalHeight});}} className="h-full w-full object-contain" draggable={false} /></button> : busy ? <AIGeneratingCard embedded task={{id:node.taskId,model:selectedModel,mediaType:isVideo ? 'video' : 'image',prompt:node.content}} progressNumber={node.progress} className="h-full w-full" /> : <div className="flex flex-col items-center gap-3"><WandSparkles className="h-10 w-10 text-slate-400" />{node.status === 'error' && <span className="text-xs text-slate-500">生成失败，请检查设置后重试</span>}</div>}
@@ -288,7 +287,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
                 type="button"
                 onClick={() => change({ audio: true } as any)}
                 className={`py-1.5 text-xs font-medium rounded-lg transition-all text-center ${
-                  Boolean(config.audio)
+                  config.audio
                     ? 'bg-white text-slate-900 font-semibold shadow-xs'
                     : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
                 }`}

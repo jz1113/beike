@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(scriptDir, '../..');
 
-const REQUIRED_DIRS = ['app', 'db', 'desktop', 'works'];
+const REQUIRED_DIRS = ['app', 'packages', 'db', 'desktop', 'works', 'docs'];
 
 const missing = REQUIRED_DIRS.filter((name) => {
   const dir = path.join(workspaceRoot, name);

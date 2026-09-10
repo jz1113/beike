@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../../core/http';
-import { testStorageConnection, StorageConfig } from '@beike/shared/storage';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { testStorageConnection, StorageConfig } from '@beike/server-kit/storage';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 /**
  * POST /api/assets/storage/test

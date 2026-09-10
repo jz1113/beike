@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../core/http';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_CHARS = 80000;

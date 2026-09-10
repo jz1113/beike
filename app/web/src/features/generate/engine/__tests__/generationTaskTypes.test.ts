@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEPTH_VIDEO_MODEL_ID } from '@beike/shared/depthVideo';
+import { DEPTH_VIDEO_MODEL_ID } from '@beike/domain/depthVideo';
 import {
   isDepthVideoTask,
   isDepthImageTask,

@@ -15,7 +15,7 @@ import {
   formatImageQualityLabel,
   getAspectRatioFromSize,
   isDepthMediaType,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import type { GenerationTask } from '@/store/useAppStore';

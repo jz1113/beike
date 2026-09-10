@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const persist = vi.hoisted(() => vi.fn(async (_buffer, _mime, options) => `/storage/${options.filename}`));
-vi.mock('@beike/shared/persistDataUrl', () => ({ persistBufferToStorage: persist, persistDataUrlToStorage: vi.fn() }));
+vi.mock('@beike/server-kit/persistDataUrl', () => ({ persistBufferToStorage: persist, persistDataUrlToStorage: vi.fn() }));
 import { POST } from '../upload';
 beforeEach(() => { persist.mockClear(); });
 it('同名上传使用不同安全路径并保留视频类型', async () => {

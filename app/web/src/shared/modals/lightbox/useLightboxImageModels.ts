@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@beike/shared/workflowModels';
+import { getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@beike/domain/workflowModels';
 
 export function useLightboxImageModels() {
   // 获取启用的生图模型列表

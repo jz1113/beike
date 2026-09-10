@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 // 获取已保存的自定义风格配方列表（分页）
 export async function GET(req: Request) {
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const action = url.searchParams.get('action');
 
     if (action === 'seed') {
-      const { OFFICIAL_MASTER_RECIPES } = await import('@beike/shared/masterRecipes');
+      const { OFFICIAL_MASTER_RECIPES } = await import('@beike/domain/masterRecipes');
 
       for (const item of OFFICIAL_MASTER_RECIPES) {
         const exists = await prisma.styleRecipe.findFirst({

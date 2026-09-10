@@ -2,7 +2,7 @@ import { useState, useMemo, type RefObject } from 'react';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import type { RefMediaKind } from '@/lib/mediaUpload';
 import { Plus, X, ArrowLeftRight, Minimize2, AlertCircle } from 'lucide-react';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import {
   densityComposerPolaroidFrame,
   densityComposerPolaroidFrameExpanded,
@@ -12,7 +12,7 @@ import {
 import { PromptBarRefImageStack } from './PromptBarRefImageStack';
 import { RefMediaThumb } from './PromptBarRefMediaThumb';
 import { PromptBarRefMediaLightbox } from './PromptBarRefMediaLightbox';
-import type { QuickGenMode } from '@beike/shared/depthVideo';
+import type { QuickGenMode } from '@beike/domain/depthVideo';
 import type { SubjectItem } from '../../../data/promptBarConstants';
 
 function refUploadLabel(mode: QuickGenMode): { label: string; title: string } {

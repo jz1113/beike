@@ -18,7 +18,7 @@ export default function AboutTab() {
                   专注电商全场景的 AI 视觉策划与高保真商业生图工作台
                 </p>
                 <div className="text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-100 flex items-center justify-center">
-                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 font-bold text-slate-600">v1.0.0</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 font-bold text-slate-600">v0.0.2</span>
                 </div>
               </div>
   );

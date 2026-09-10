@@ -8,8 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(root, 'app/web/src'),
-      '@beike/shared': resolve(root, 'app/shared/src'),
-      '@beike/contracts': resolve(root, 'app/contracts/src'),
+      '@beike/contracts': resolve(root, 'packages/contracts/src'),
+      '@beike/domain': resolve(root, 'packages/domain/src'),
+      '@beike/server-kit': resolve(root, 'packages/server-kit/src'),
     },
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
   },
@@ -27,7 +28,9 @@ export default defineConfig({
       'app/web/src/**/*.test.tsx',
       'app/api/src/**/*.test.ts',
       'desktop/src/**/*.test.ts',
-      'app/shared/src/**/*.test.ts',
+      'packages/domain/src/**/*.test.ts',
+      'packages/domain/src/**/*.test.tsx',
+      'packages/server-kit/src/**/*.test.ts',
     ],
     globals: false,
   },

@@ -2,7 +2,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 vi.mock('../../services/imageHelpers',()=>({resolveCredentials:()=>({baseUrl:'https://gateway.example',apiKey:'test-key'})}));
 vi.mock('../../services/submissionGuard',()=>({guardSubmission:(_req:Request,_kind:string,_creds:unknown,run:()=>Promise<Response>)=>run()}));
 vi.mock('./image/poll',()=>({ensurePersistableResultUrl:async(url:string)=>url}));
-vi.mock('@beike/shared/storage',()=>({extractStorageConfigFromRequest:()=>undefined,persistMediaUrl:async()=>null}));
+vi.mock('@beike/server-kit/storage',()=>({extractStorageConfigFromRequest:()=>undefined,persistMediaUrl:async()=>null}));
 import {POST} from './layer-decomposition';
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 const request=()=>new Request('http://localhost/api/generate/layer-decomposition',{method:'POST',body:JSON.stringify({model:'seedream-v5-pro/layer-decomposition',image:'data:image/png;base64,AAAA',prompt:'拆分人物',size:'auto'})});

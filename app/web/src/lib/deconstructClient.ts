@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/apiClient';
 import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
-import { pickOrderedMultimodalFallbacks } from '@beike/shared/workflowModels';
+import { pickOrderedMultimodalFallbacks } from '@beike/domain/workflowModels';
 import type { ImageSetQueueItem } from '@/features/assets/assetPromptConstants';
 import { resolveQueueItemPartial } from '@/features/assets/assetDeconstructCsvExport';
 
@@ -54,7 +54,7 @@ export async function fetchDeconstructWithRetry(
   throw lastErr ?? new Error('反推请求失败');
 }
 
-import type { SubCategoryDef } from '@beike/shared/productCategoryHelpers';
+import type { SubCategoryDef } from '@beike/domain/productCategoryHelpers';
 
 export interface ProcessDeconstructItemInput {
   item: ImageSetQueueItem;

@@ -1,15 +1,16 @@
 {
   "name": "beike-cloud-graph",
-  "version": "1.0.0",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "workspaces": [
     "app/*",
+    "packages/*",
     "db/*"
   ],
   "scripts": {
-    "dev:api": "NODE_OPTIONS='--max-old-space-size=2048 --expose-gc' tsx watch --tsconfig tsconfig.json app/api/src/index.ts",
-    "dev:ui": "npm run dev -w @beike/web",
+    "dev:api": "node --max-old-space-size=2048 --expose-gc ./node_modules/tsx/dist/cli.mjs watch --tsconfig tsconfig.json app/api/src/index.ts",
+    "dev:ui": "pnpm --filter @beike/web run dev",
     "dev:desktop": "node works/scripts/desktop/dev-desktop.mjs",
     "desktop:status": "node works/scripts/desktop/desktop-status.mjs",
     "desktop:stop": "node works/scripts/desktop/desktop-stop.mjs",
@@ -17,18 +18,18 @@
     "test": "vitest run --config works/configs/vitest.config.ts",
     "test:watch": "vitest --config works/configs/vitest.config.ts",
     "test:e2e": "playwright test -c works/configs/playwright.config.ts",
-    "build:ui": "npm run build -w @beike/web",
-    "build": "npm run typecheck && npm run postinstall -w @beike/prisma && npm run build:ui",
-    "check": "npm run typecheck && npm run lint && npm run lint:unused && npm run test && npm run build:ui",
+    "build:ui": "pnpm --filter @beike/web run build",
+    "build": "pnpm run typecheck && pnpm --filter @beike/prisma run postinstall && pnpm run build:ui",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run lint:unused && pnpm run test && pnpm run build:ui",
     "check:desktop": "cargo check --manifest-path desktop/Cargo.toml",
     "check:root-layout": "node works/scripts/check-root-layout.mjs",
-    "postinstall": "npm run postinstall -w @beike/prisma && node works/scripts/depth/fix-ffmpeg-perms.mjs && node works/scripts/check-root-layout.mjs",
+    "postinstall": "pnpm --filter @beike/prisma run postinstall && node works/scripts/depth/fix-ffmpeg-perms.mjs && node works/scripts/check-root-layout.mjs",
     "setup:depth-env": "node works/scripts/depth/fix-ffmpeg-perms.mjs && python3 works/scripts/depth/infer_video_depth.py --check-env && node works/scripts/depth/verify-env.mjs",
     "setup:depth-model": "node works/scripts/depth/setup-depth-model.mjs",
     "clean": "rm -rf desktop/target app/web/dist dist",
     "clean:sidecar": "rm -rf desktop/binaries/node-*",
-    "clean:dev": "npm run clean && npm run clean:sidecar",
-    "clean:all": "npm run clean:dev && rm -rf node_modules",
+    "clean:dev": "pnpm run clean && pnpm run clean:sidecar",
+    "clean:all": "pnpm run clean:dev && rm -rf node_modules",
     "pack:source": "node works/scripts/pack-source.mjs",
     "pack:zip": "node works/scripts/pack-source.mjs --zip --keep-env",
     "db:clean-assets": "tsx works/scripts/db-maintenance/cleanDirtyAssetLibrary.ts",
@@ -36,11 +37,11 @@
     "agent:stats": "node works/scripts/agent-stats.mjs",
     "desktop:sidecar": "node works/scripts/desktop/ensure-desktop-sidecar.mjs",
     "lint": "eslint -c works/configs/eslint.config.mjs",
-    "lint:gate": "eslint -c works/configs/eslint.config.mjs --quiet && npm run lint:unused",
-    "desktop:prepare": "npm run typecheck && node works/scripts/desktop/prepare-desktop-bundle.mjs",
+    "lint:gate": "eslint -c works/configs/eslint.config.mjs --quiet && pnpm run lint:unused",
+    "desktop:prepare": "pnpm run typecheck && node works/scripts/desktop/prepare-desktop-bundle.mjs",
     "tauri": "tauri",
     "tauri:dev": "node works/scripts/desktop/ensure-desktop-sidecar.mjs && node works/scripts/desktop/tauri-dev.mjs",
-    "tauri:build": "npm run lint:gate && npm run typecheck && tauri build --config desktop/tauri.conf.json",
+    "tauri:build": "pnpm run lint:gate && pnpm run typecheck && tauri build --config desktop/tauri.conf.json",
     "tauri:build:windows": "tauri build --config desktop/tauri.conf.json --bundles nsis",
     "tauri:release": "node works/scripts/desktop/tauri-release.mjs",
     "audit:source": "node works/scripts/quality/source-audit.mjs",
@@ -68,5 +69,16 @@
   "packageManager": "pnpm@10.13.1",
   "engines": {
     "node": ">=20.20.2 <23"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "@vgpu/adapter-node",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "webgpu"
+    ]
   }
 }

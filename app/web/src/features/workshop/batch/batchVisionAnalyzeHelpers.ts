@@ -1,5 +1,5 @@
-import { getHarmonizedStoryboardForScene } from '@beike/shared/drawing';
-import { isJewelryProductTitle } from '@beike/shared/jewelryArchHelpers';
+import { getHarmonizedStoryboardForScene } from '@beike/domain/drawing';
+import { isJewelryProductTitle } from '@beike/domain/jewelryArchHelpers';
 
 export function resolveHarmonizedTemplatesForItem(opts: {
   masterScene: string;

@@ -4,7 +4,7 @@ import {
   DEPTH_STYLE_LABELS,
   DEPTH_VIDEO_STYLES,
   type DepthVideoStyle,
-} from '@beike/shared/depthVideo';
+} from '@beike/domain/depthVideo';
 import { densityComposerPill } from '@/shared/ui/layoutClasses';
 
 interface Props {
@@ -34,10 +34,10 @@ export default function PromptBarDepthStylePill({
       <button
         type="button"
         onClick={() => setShowStyleDropdown(!showStyleDropdown)}
-        className={`${densityComposerPill} rounded-2xl font-semibold flex items-center gap-1 xl:gap-2 transition-all cursor-pointer border shrink-0 ${
+        className={`${densityComposerPill} rounded-2xl font-semibold flex items-center gap-1 xl:gap-2 transition-all cursor-pointer border-0 shrink-0 ${
           showStyleDropdown
-            ? 'bg-violet-50/70 border-violet-300 text-violet-800 shadow-2xs'
-            : 'bg-white hover:bg-slate-50 text-violet-600 border-slate-200/90 shadow-2xs'
+            ? 'bg-violet-50/70 text-violet-800 shadow-none'
+            : 'bg-transparent hover:bg-slate-50 text-violet-600 shadow-none'
         }`}
       >
         <UserRound className="w-4 h-4 shrink-0" />

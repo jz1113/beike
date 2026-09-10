@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MAX_IMAGES_PER_SET, MIN_IMAGES_PER_SET } from '@beike/shared/assetDeconstruct/prompts';
+import { MAX_IMAGES_PER_SET, MIN_IMAGES_PER_SET } from '@beike/domain/assetDeconstruct/prompts';
 
 vi.mock('@/lib/image-utils', () => ({
   compressImageToDataUrl: vi.fn(async (file: File) => `data:image/jpeg;base64,${file.name}`),

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveImageSlotsAndPrompt } from '../slotResolver';
-import { buildImageRequest } from '@beike/shared/modelAdapters';
+import { buildImageRequest } from '@beike/domain/modelAdapters';
 
 describe('resolveImageSlotsAndPrompt 文生图提示词保护测试', () => {
   it('普通文生图 (无参考图) 严禁注入 @图片1 或商品实物模板', async () => {

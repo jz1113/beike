@@ -1,8 +1,8 @@
-import type { PerImageResult } from '@beike/shared/assetDeconstruct/prompts';
+import type { PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
 import {
   normalizePerImageResult,
   ensurePerImageQuality,
-} from '@beike/shared/assetDeconstruct/validate';
+} from '@beike/domain/assetDeconstruct/validate';
 
 export function sanitizeJsonControlChars(str: string): string {
   let inString = false;

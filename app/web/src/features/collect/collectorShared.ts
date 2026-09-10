@@ -1,6 +1,6 @@
 import React from 'react';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 
 export type DetectedPlatform = 'jd' | 'taobao' | '1688' | 'pinduoduo' | 'social';
 

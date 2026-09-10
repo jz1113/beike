@@ -2,11 +2,27 @@
   "extends": "./works/configs/tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@/*": ["./app/web/src/*"],
-      "@beike/shared": ["./app/shared/src/index.ts"],
-      "@beike/shared/*": ["./app/shared/src/*"],
-      "@beike/contracts": ["./app/contracts/src/index.ts"],
-      "@beike/contracts/*": ["./app/contracts/src/*"]
+      "@/*": [
+        "./app/web/src/*"
+      ],
+      "@beike/domain": [
+        "./packages/domain/src/index.ts"
+      ],
+      "@beike/domain/*": [
+        "./packages/domain/src/*"
+      ],
+      "@beike/server-kit": [
+        "./packages/server-kit/src/index.ts"
+      ],
+      "@beike/server-kit/*": [
+        "./packages/server-kit/src/*"
+      ],
+      "@beike/contracts": [
+        "./packages/contracts/src/index.ts"
+      ],
+      "@beike/contracts/*": [
+        "./packages/contracts/src/*"
+      ]
     }
   },
   "include": [
@@ -14,8 +30,9 @@
     "app/web/src/**/*.tsx",
     "app/web/src/vite-env.d.ts",
     "app/api/src/**/*.ts",
-    "app/shared/src/**/*.ts",
-    "app/contracts/src/**/*.ts"
+    "packages/domain/src/**/*.ts",
+    "packages/server-kit/src/**/*.ts",
+    "packages/contracts/src/**/*.ts"
   ],
   "exclude": [
     "node_modules",

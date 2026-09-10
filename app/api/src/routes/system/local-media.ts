@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { resolveStorageRoot, safeResolveWithinRoot, resolveStoredMediaPath } from '@beike/shared/storagePaths';
-export { resolveStorageRoot } from '@beike/shared/storagePaths';
+import { resolveStorageRoot, safeResolveWithinRoot, resolveStoredMediaPath } from '@beike/server-kit/storagePaths';
+export { resolveStorageRoot } from '@beike/server-kit/storagePaths';
 
 function guessContentType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();

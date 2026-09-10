@@ -1,6 +1,6 @@
-import type { ApprovalDecision } from '@beike/shared/assistant/types';
-import type { AssistantSSEEvent } from '@beike/shared/assistant/events';
-import type { ApprovalWaiter } from '@beike/shared/assistant/agentLoop';
+import type { ApprovalDecision } from '@beike/domain/assistant/types';
+import type { AssistantSSEEvent } from '@beike/domain/assistant/events';
+import type { ApprovalWaiter } from '@beike/server-kit/assistant/agentLoop';
 
 const APPROVAL_TIMEOUT_MS = 60_000;
 

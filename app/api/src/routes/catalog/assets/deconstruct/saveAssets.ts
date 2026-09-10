@@ -1,20 +1,20 @@
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import {
   createCompactThumbnailDataUrl,
   createCompactSourceImagesJson,
-} from '@beike/shared/imageConverter';
+} from '@beike/server-kit/imageConverter';
 import {
   sanitizeActionPrompt,
   sanitizeActionTitle,
   sanitizeScenePrompt,
   isActionTitle,
   dedupeOutfitCandidates,
-} from '@beike/shared/assetDeconstruct/validate';
+} from '@beike/domain/assetDeconstruct/validate';
 import {
   extractActionCategories,
   extractActionFocusAnchors,
-} from '@beike/shared/productCategoryHelpers';
-import type { PerImageResult } from '@beike/shared/assetDeconstruct/prompts';
+} from '@beike/domain/productCategoryHelpers';
+import type { PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
 
 export interface SavedRecords {
   scenes: any[];

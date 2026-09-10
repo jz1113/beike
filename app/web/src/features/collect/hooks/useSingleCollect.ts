@@ -1,7 +1,7 @@
 import { normalizeCollectedImages } from '../normalizeCollectedImages';
 import { useState, useRef } from 'react';
 import { apiFetch } from '@/lib/apiClient';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
 import { parseSocialLinkWithRateLimit } from '@/lib/xhsLinkBatch';
 import { RateLimiter } from '@/lib/rateLimiter';

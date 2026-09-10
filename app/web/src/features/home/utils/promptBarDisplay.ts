@@ -1,5 +1,5 @@
-import type { QuickGenMode } from '@beike/shared/depthVideo';
-import { resolveGptImageSizeForModel } from '@beike/shared/modelAdapters/image/gptImageSafeSizes';
+import type { QuickGenMode } from '@beike/domain/depthVideo';
+import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
 
 /**
  * 解析输入框提示文案 (Placeholder)

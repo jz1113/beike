@@ -1,5 +1,5 @@
 import {apiFetch} from '@/lib/apiClient';
-import {parseDecomposedLayers, type DecomposedLayer} from '@beike/shared/layerDecomposition';
+import {parseDecomposedLayers, type DecomposedLayer} from '@beike/domain/layerDecomposition';
 import {useCanvasStore} from './store/useCanvasStore';
 import type {CanvasNode} from './types';
 

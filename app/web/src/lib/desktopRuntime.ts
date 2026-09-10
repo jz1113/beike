@@ -39,3 +39,41 @@ export function resolveApiUrl(input: RequestInfo | URL): RequestInfo | URL {
 export function isTauriDesktop(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
+
+export type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'unknown';
+
+export function getDesktopPlatform(): DesktopPlatform {
+  if (typeof navigator === 'undefined') return 'unknown';
+
+  // 1. 优先使用现代 User-Agent Client Hints API (Chromium / WebView2 规范)
+  const uaDataPlatform = (navigator as any).userAgentData?.platform?.toLowerCase();
+  if (uaDataPlatform) {
+    if (uaDataPlatform.includes('win')) return 'windows';
+    if (uaDataPlatform.includes('mac')) return 'macos';
+    if (uaDataPlatform.includes('linux')) return 'linux';
+  }
+
+  // 2. 传统 navigator.platform / navigator.userAgent 规范 (WebKit / macOS 规范)
+  const platformStr = (navigator.platform || '').toLowerCase();
+  const ua = (navigator.userAgent || '').toLowerCase();
+
+  if (platformStr.includes('win') || ua.includes('windows')) return 'windows';
+  if (
+    (platformStr.includes('mac') || ua.includes('macintosh') || ua.includes('mac os x')) &&
+    !ua.includes('iphone') &&
+    !ua.includes('ipad')
+  ) {
+    return 'macos';
+  }
+  if (platformStr.includes('linux') || ua.includes('linux')) return 'linux';
+
+  return 'unknown';
+}
+
+export function isMacOs(): boolean {
+  return getDesktopPlatform() === 'macos';
+}
+
+export function isWindows(): boolean {
+  return getDesktopPlatform() === 'windows';
+}

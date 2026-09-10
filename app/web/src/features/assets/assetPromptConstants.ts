@@ -2,7 +2,7 @@ export {
   OFFICIAL_REVERSE_SYSTEM_PROMPT,
   MIN_IMAGES_PER_SET,
   MAX_IMAGES_PER_SET,
-} from '@beike/shared/assetDeconstruct/prompts';
+} from '@beike/domain/assetDeconstruct/prompts';
 
 /** 英文底层标签 → 标准中文映射表 */
 export const TAG_I18N_MAP: Record<string, string> = {
@@ -403,7 +403,7 @@ export function resolveAssetApiType(activeSubTab: AssetSubTab): string {
   return activeSubTab;
 }
 
-import { sanitizeScenePrompt, sanitizeActionPrompt } from '@beike/shared/assetDeconstruct/validate';
+import { sanitizeScenePrompt, sanitizeActionPrompt } from '@beike/domain/assetDeconstruct/validate';
 
 function extractSubjectPreview(text: string): string {
   const marker = '【主体】';

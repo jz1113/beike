@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { apiFetch as rawApiFetch } from '@/lib/apiClient';
-import { pickAssetEditFields } from '@beike/shared/assetEdit';
+import { pickAssetEditFields } from '@beike/domain/assetEdit';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
 async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Response> {
@@ -14,7 +14,7 @@ import { invalidateGlobalAssetCache } from '../assetLibraryCache';
 import { resolveAssetApiType } from '../assetPromptConstants';
 import { buildBackupData, parseBackupDataToBulkItems } from '../assetBackupUtils';
 import { parsePersonaLayers, formatPersonaPrompt } from '../assetPromptConstants';
-import type { SceneShot } from '@beike/shared/sceneBundle';
+import type { SceneShot } from '@beike/domain/sceneBundle';
 
 export interface UseAssetCrudOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';

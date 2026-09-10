@@ -1,5 +1,5 @@
 import { JEWELRY_ALL_MASTER_SNIPPET } from './jewelryMasterSnippet';
-import { ShotPrompt } from '@beike/shared/vision';
+import { ShotPrompt } from '@beike/domain/vision';
 
 export interface MasterRecipe {
   id: string;

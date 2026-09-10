@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { uploadBufferToStorage, extractStorageConfigFromRequest, resolveStorageConfig } from '@beike/shared/storage';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { uploadBufferToStorage, extractStorageConfigFromRequest, resolveStorageConfig } from '@beike/server-kit/storage';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 /**
  * POST /api/generate/upload-ref

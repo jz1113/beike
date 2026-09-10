@@ -1,9 +1,9 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { resolveTelemetryDir } from './agentTelemetry';
-import { modelRequestError } from '@beike/shared/assistant/agentLoop/requestError';
+import { modelRequestError } from '@beike/server-kit/assistant/agentLoop/requestError';
 
 interface MemoryMessage { id: string; role: string; content: string; timestamp?: number }
 interface MemoryRecord {

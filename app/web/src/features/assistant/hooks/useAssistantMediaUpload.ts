@@ -5,7 +5,7 @@ import { extractVideoThumbnail, fileToDataUrl } from '@/lib/mediaHelper';
 import { useFileDropZone } from '@/lib/useFileDropZone';
 import { useBlobUrl } from '@/lib/useBlobUrl';
 import { SHORTCUT_REPEAT_GUARD_MS } from '@/lib/constants/timing';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   LEGACY_OFFICE_EXT_RE,
   PLAIN_TEXT_EXT_RE,

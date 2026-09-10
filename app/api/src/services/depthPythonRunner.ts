@@ -10,7 +10,7 @@ import {
   type DepthInferenceMeta,
   type DepthQuality,
   type DepthVideoStyle,
-} from '@beike/shared/depthVideo';
+} from '@beike/domain/depthVideo';
 
 import { PROJECT_ROOT, resolveDepthPythonScript } from './depthEnvCheck';
 

@@ -1,8 +1,8 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/shared/drawing';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { deleteObjectsFromStorage } from '@beike/shared/storage';
+import { prisma } from '@beike/server-kit/prisma';
+import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/domain/drawing';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { deleteObjectsFromStorage } from '@beike/server-kit/storage';
 
 // 获取已采集保存的商品记录列表（分页）
 export async function GET(req: Request) {

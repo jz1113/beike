@@ -1,4 +1,4 @@
-import type { AssistantSkill } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 
 // 仅迁移这份已确认的旧技能；历史消息快照及其他技能保持原样。
 const replacements: Array<[string, string]> = [

@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../../core/http';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { parseSocialLinkViaApia } from '@beike/shared/apiaScraper';
-import { parseSocialLinkViaQiyun } from '@beike/shared/qiyunScraper';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { parseSocialLinkViaApia } from '@beike/server-kit/apiaScraper';
+import { parseSocialLinkViaQiyun } from '@beike/server-kit/qiyunScraper';
 
 export async function POST(req: Request) {
   try {

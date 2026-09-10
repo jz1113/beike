@@ -1,8 +1,8 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { normalizeVisionModelId } from '@beike/shared/vision';
-import { resolveGatewayCreds } from '@beike/shared/gatewayCreds';
-import { formatVisionAnalyzeError } from '@beike/shared/visionTimeouts';
+import { prisma } from '@beike/server-kit/prisma';
+import { normalizeVisionModelId } from '@beike/domain/vision';
+import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
+import { formatVisionAnalyzeError } from '@beike/domain/visionTimeouts';
 import { parseJsonBody, analyzeBodySchema } from '../../core/validate';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/imageHelpers';
 import { resolveTemplateStyleWithJewelryGuard } from './analyze/jewelryGuard';

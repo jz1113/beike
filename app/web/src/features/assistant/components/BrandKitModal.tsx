@@ -12,7 +12,7 @@ import {
   Edit3,
   RotateCcw
 } from 'lucide-react';
-import { BrandKitProfile, DEFAULT_BRAND_KITS } from '@beike/shared/brandKitModels';
+import { BrandKitProfile, DEFAULT_BRAND_KITS } from '@beike/domain/brandKitModels';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/useAppStore';
 

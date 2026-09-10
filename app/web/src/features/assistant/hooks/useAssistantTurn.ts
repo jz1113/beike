@@ -1,4 +1,4 @@
-import type { AssistantRunMode, ReferenceScope } from '@beike/shared/assistant/taskPolicy';
+import type { AssistantRunMode, ReferenceScope } from '@beike/domain/assistant/taskPolicy';
 import { useCallback, useRef } from 'react';
 import { apiFetch } from '@/lib/apiClient';
 import { getGatewayClientOverrides } from '@/lib/gatewayClient';
@@ -18,7 +18,7 @@ import type {
   AgentReasoningItem,
   UserMessageItem,
   SubAgentItem,
-} from '@beike/shared/assistant/types';
+} from '@beike/domain/assistant/types';
 
 export interface RunTurnParams {
   sessionId: string;

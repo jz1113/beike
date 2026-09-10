@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/apiClient';
-import type { AssetLibrarySlim } from '@beike/shared/assetLibraryTypes';
+import type { AssetLibrarySlim } from '@beike/domain/assetLibraryTypes';
 import type { AssetSubTab } from '@/features/assets/assetPromptConstants';
 import { resolveAssetApiType } from '@/features/assets/assetPromptConstants';
 

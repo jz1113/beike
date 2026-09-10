@@ -1,6 +1,6 @@
 import { useState, type DragEvent } from 'react';
 import { type WorkflowModel } from '../settingsShared';
-import { isMultimodalWorkflowModel } from '@beike/shared/workflowModels';
+import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 
 interface UseModelDragSortProps {
   customModels: WorkflowModel[];

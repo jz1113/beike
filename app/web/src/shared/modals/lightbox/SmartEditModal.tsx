@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../../store';
 import { getModelIcon } from '../../ui/ModelIcons';
-import '@beike/shared/workflowModels';
+import '@beike/domain/workflowModels';
 import '@/features/home/utils/modelDisplayHelpers';
 import { proxyMediaUrl } from '@/lib/apiClient';
 

@@ -19,7 +19,7 @@ import {
   getStoredMultimodalModelId,
   gatewayModelToWorkflowModel,
   inferWorkflowCapabilitiesFromId,
-} from '@beike/shared/workflowModels';
+} from '@beike/domain/workflowModels';
 import GatewayModelModal, { GatewayModelItem } from './GatewayModelModal';
 import {
   type WorkflowModel,

@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { readResponseBodyLimited } from '../../../core/readBodyLimited';
-import { assertSafeRemoteUrl, MAX_PROXY_BYTES } from '@beike/shared/safeUrl';
-import { extractStorageKeyFromUrl, getObjectBufferFromStorage } from '@beike/shared/storage';
+import { assertSafeRemoteUrl, MAX_PROXY_BYTES } from '@beike/server-kit/safeUrl';
+import { extractStorageKeyFromUrl, getObjectBufferFromStorage } from '@beike/server-kit/storage';
 import { setCachedImage, inFlightImageFetches } from './cache';
 import { buildUpstreamHeaders, fetchRemote } from './fetcher';
 

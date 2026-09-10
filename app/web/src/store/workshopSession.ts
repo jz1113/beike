@@ -1,5 +1,5 @@
-import type { ShotPrompt, PreviousGroupSignature } from '@beike/shared/vision';
-import type { OriginalLookParts, OriginalProductRole } from '@beike/shared/drawing';
+import type { ShotPrompt, PreviousGroupSignature } from '@beike/domain/vision';
+import type { OriginalLookParts, OriginalProductRole } from '@beike/domain/drawing';
 import type { ProductImage, ProductData, ProductWidgetData } from '@/types';
 import type { GenerationTask } from '@/types/app-store';
 import type { WorkshopMode, WorkshopModeSession } from '@/types/store';

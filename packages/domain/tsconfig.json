@@ -1,0 +1,24 @@
+{
+  "extends": "../../works/configs/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "noEmit": true,
+    "paths": {
+      "@beike/domain": [
+        "./src/index.ts"
+      ],
+      "@beike/domain/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

@@ -9,7 +9,7 @@ import {
   persistWanbangConfig,
 } from '@/lib/persistDesktopSecrets';
 import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/lib/gatewayClient';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { credentialGet } from '@/lib/credentialClient';
 import { isTauriDesktop } from '@/lib/desktopRuntime';
 

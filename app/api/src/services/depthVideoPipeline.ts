@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import {
   DEPTH_VIDEO_LIMITS,
   DEPTH_VIDEO_MODEL_ID,
@@ -10,9 +10,9 @@ import {
   type DepthInferenceMeta,
   type DepthQuality,
   type DepthVideoStyle,
-} from '@beike/shared/depthVideo';
-import { persistBufferToStorage } from '@beike/shared/persistDataUrl';
-import { extractStorageConfigFromRequest, type StorageConfig } from '@beike/shared/storage';
+} from '@beike/domain/depthVideo';
+import { persistBufferToStorage } from '@beike/server-kit/persistDataUrl';
+import { extractStorageConfigFromRequest, type StorageConfig } from '@beike/server-kit/storage';
 import { runDepthPython } from './depthPythonRunner';
 import { encodeVideoFromFrames, extractFrames, probeVideo } from './videoFrames';
 

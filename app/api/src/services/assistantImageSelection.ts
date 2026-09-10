@@ -1,4 +1,4 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';

@@ -1,4 +1,4 @@
-import { getAspectRatioFromSize } from '@beike/shared/drawing';
+import { getAspectRatioFromSize } from '@beike/domain/drawing';
 
 export function getAspectRatioClass(sizeStr?: string) {
   if (!sizeStr) return 'aspect-[3/4]';

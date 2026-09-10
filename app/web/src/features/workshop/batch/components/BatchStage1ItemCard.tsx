@@ -9,7 +9,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { BatchProductItem } from '../batchTypes';
-import { extractActionCategories } from '@beike/shared/productCategoryHelpers';
+import { extractActionCategories } from '@beike/domain/productCategoryHelpers';
 
 export interface BatchStage1ItemCardProps {
   item: BatchProductItem;

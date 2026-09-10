@@ -4,7 +4,7 @@ import { useAppStore, clearWorkshopStudioDraft } from '@/store/useAppStore';
 import { useGenerationEngine } from '@/features/generate/useGenerationEngine';
 import { syncAppTokenCookie } from '@/lib/apiClient';
 import { migrateLegacyCredentialsOnce } from '@/lib/credentialClient';
-import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@beike/shared/workflowModels';
+import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@beike/domain/workflowModels';
 import { usePreventBrowserFileOpen } from '@/lib/useFileDropZone';
 import { useViewportDensity } from '@/lib/useMediaQuery';
 import { useCompactLayout } from '@/lib/useCompactLayout';

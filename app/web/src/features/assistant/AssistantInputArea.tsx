@@ -15,7 +15,7 @@ import {
 import AssistantSkillsMenu from '@/features/assistant/components/AssistantSkillsMenu';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/useAppStore';
-import type { AssistantSkillInputRequirement } from '@beike/shared/assistant/skills/types';
+import type { AssistantSkillInputRequirement } from '@beike/domain/assistant/skills/types';
 
 
 

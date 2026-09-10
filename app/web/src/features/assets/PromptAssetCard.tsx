@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { getAssetCardSummary, isValidDisplayTag } from './assetPromptConstants';
 import { type AssetSubTab } from './assetPromptConstants';
-import { resolveActionCardDisplayBadges } from '@beike/shared/productCategoryHelpers';
+import { resolveActionCardDisplayBadges } from '@beike/domain/productCategoryHelpers';
 
 interface PromptAssetCardProps {
   item: Record<string, unknown> & {

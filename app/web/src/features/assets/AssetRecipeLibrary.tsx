@@ -10,9 +10,9 @@ import {
   X,
   Plus,
 } from 'lucide-react';
-import '@beike/shared/drawing';
+import '@beike/domain/drawing';
 import { apiFetch } from '@/lib/apiClient';
-import type { CategoryItem } from '@beike/shared/vision';
+import type { CategoryItem } from '@beike/domain/vision';
 import { useSafeTimeout } from '@/lib/useSafeTimeout';
 
 interface Props {

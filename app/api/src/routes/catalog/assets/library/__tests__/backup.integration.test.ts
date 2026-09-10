@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import { executeLibraryGet } from '../libraryQueries';
 import { executeLibraryPost } from '../libraryMutations';
 it('exports more than 1000 records and restores scene references to newly created IDs', async () => {

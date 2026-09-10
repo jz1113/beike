@@ -52,7 +52,12 @@ function run(cmd, args, options = {}) {
 }
 
 function rustHostTriple() {
-  const result = spawnSync('rustc', ['-vV'], { encoding: 'utf8' });
+  const cargoBin = process.env.USERPROFILE ? join(process.env.USERPROFILE, '.cargo', 'bin') : '';
+  const env = { ...process.env };
+  if (cargoBin && existsSync(cargoBin)) {
+    env.PATH = `${cargoBin};${env.PATH || ''}`;
+  }
+  const result = spawnSync('rustc', ['-vV'], { encoding: 'utf8', env });
   if (result.status !== 0) {
     console.error('rustc not found; install Rust to prepare desktop sidecar.');
     process.exit(1);
@@ -68,7 +73,7 @@ function rustHostTriple() {
 function copyNodeDeps(destModules) {
   mkdirSync(destModules, { recursive: true });
   const copied = new Map();
-  const sharedRequire = createRequire(join(workspaceRoot, 'app/shared/package.json'));
+  const serverKitRequire = createRequire(join(workspaceRoot, 'packages/server-kit/package.json'));
   function copyDependency(name, from, optional = false) {
     let manifest;
     try { manifest = from.resolve(`${name}/package.json`); }
@@ -88,12 +93,12 @@ function copyNodeDeps(destModules) {
     for (const dependency of Object.keys(info.dependencies || {})) copyDependency(dependency, nested);
     for (const dependency of Object.keys(info.optionalDependencies || {})) copyDependency(dependency, nested, true);
   }
-  copyDependency('@prisma/client', sharedRequire);
-  const clientRequire = createRequire(sharedRequire.resolve('@prisma/client/package.json'));
+  copyDependency('@prisma/client', serverKitRequire);
+  const clientRequire = createRequire(serverKitRequire.resolve('@prisma/client/package.json'));
   const generated = clientRequire.resolve('.prisma/client/package.json');
   cpSync(dirname(generated), join(destModules, '.prisma/client'), { recursive: true, dereference: true });
-  copyDependency('sharp', sharedRequire);
-  copyDependency('quickjs-emscripten', sharedRequire);
+  copyDependency('sharp', serverKitRequire);
+  copyDependency('quickjs-emscripten', serverKitRequire);
   const apiRequire = createRequire(join(workspaceRoot, 'app/api/package.json'));
   copyDependency('@ffmpeg-installer/ffmpeg', apiRequire);
   copyDependency('ffprobe-static', apiRequire);
@@ -129,7 +134,9 @@ run('npx', [
   '--external:sharp',
   '--external:quickjs-emscripten',
   '--external:@img/*',
-  `--alias:@beike/shared=${join(workspaceRoot, 'app/shared/src')}`,
+  `--alias:@beike/domain=${join(workspaceRoot, 'packages/domain/src')}`,
+  `--alias:@beike/server-kit=${join(workspaceRoot, 'packages/server-kit/src')}`,
+  `--alias:@beike/contracts=${join(workspaceRoot, 'packages/contracts/src')}`,
   `--outfile=${join(apiDir, 'index.cjs')}`,
 ]);
 copyNodeDeps(join(apiDir, 'node_modules'));

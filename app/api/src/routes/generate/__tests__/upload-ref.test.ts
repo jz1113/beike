@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { POST } from '../upload-ref';
-import * as storageModule from '@beike/shared/storage';
+import * as storageModule from '@beike/server-kit/storage';
 
 describe('参考素材上传端点测试 (/api/generate/upload-ref)', () => {
   afterEach(() => {

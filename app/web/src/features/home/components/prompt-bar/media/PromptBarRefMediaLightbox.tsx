@@ -5,7 +5,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { isImageFile, isVideoFile, type RefMediaKind } from '@/lib/mediaUpload';
 import { isVideoRef, RefMediaThumb } from './PromptBarRefMediaThumb';
 

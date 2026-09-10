@@ -1,13 +1,13 @@
 import type { GenerationTask } from '@/store/useAppStore';
 import { apiFetch } from '@/lib/apiClient';
 import { getGatewayClientHeaders } from '@/lib/gatewayClient';
-import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@beike/domain/drawing';
 import { prepareImageSubmission } from './prepareImageSubmission';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import { resolveRefMediaFile } from '@/lib/refMediaRegistry';
 import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
-import { logLatencyAudit } from '@beike/shared/latencyAudit';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { logLatencyAudit } from '@beike/domain/latencyAudit';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   clearDepthSubmit,
   peekDepthSubmit,

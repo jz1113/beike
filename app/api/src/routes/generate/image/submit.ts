@@ -1,6 +1,6 @@
-import { prisma } from '@beike/shared/prisma';
-import { logLatencyAudit } from '@beike/shared/latencyAudit';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { logLatencyAudit } from '@beike/domain/latencyAudit';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   buildEditsMultipart,
   fetchWithRetry,

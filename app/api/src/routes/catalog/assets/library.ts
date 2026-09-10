@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../../core/http';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { executeLibraryGet } from './library/libraryQueries';
 import {
   executeLibraryPost,

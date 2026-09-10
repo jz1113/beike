@@ -4,7 +4,7 @@ import { isImageFile, isVideoFile, type RefMediaKind } from '@/lib/mediaUpload';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import { compressImageToDataUrl } from '@/lib/image-utils';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { videoPlaybackManager } from '@/lib/videoPlaybackManager';
 
 export function isVideoRef(

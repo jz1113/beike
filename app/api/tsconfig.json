@@ -3,10 +3,12 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "paths": {
-      "@beike/shared": ["../shared/src/index.ts"],
-      "@beike/shared/*": ["../shared/src/*"],
-      "@beike/contracts": ["../contracts/src/index.ts"],
-      "@beike/contracts/*": ["../contracts/src/*"]
+      "@beike/contracts": ["../../packages/contracts/src/index.ts"],
+      "@beike/contracts/*": ["../../packages/contracts/src/*"],
+      "@beike/domain": ["../../packages/domain/src/index.ts"],
+      "@beike/domain/*": ["../../packages/domain/src/*"],
+      "@beike/server-kit": ["../../packages/server-kit/src/index.ts"],
+      "@beike/server-kit/*": ["../../packages/server-kit/src/*"]
     }
   },
   "include": ["src/**/*.ts"],

@@ -1,13 +1,13 @@
-import type { ShotPrompt } from '@beike/shared/vision';
+import type { ShotPrompt } from '@beike/domain/vision';
 import {
   assembleGrid2x2Prompt,
   assembleReplicationGrid2x2Prompt,
   enforceLookConsistency,
   extractCanonicalOutfitFromPrompts,
   isGenericLook,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import { sliceGridImage2x2 } from '@/lib/imageGridSlicer';
-import { resolveGptImageSizeForModel } from '@beike/shared/modelAdapters/image/gptImageSafeSizes';
+import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
 import type { BatchProductItem } from './batchTypes';
 import { compressProductImageIfNeeded, submitImageGenTask } from './batchImageTasks';
 import { ensureItemPromptsPad } from './batchPromptPadding';

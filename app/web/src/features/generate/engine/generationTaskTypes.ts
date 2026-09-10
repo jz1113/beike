@@ -1,5 +1,5 @@
 import type { GenerationTask } from '@/store/useAppStore';
-import { DEPTH_VIDEO_MODEL_ID } from '@beike/shared/depthVideo';
+import { DEPTH_VIDEO_MODEL_ID } from '@beike/domain/depthVideo';
 import { getGatewayClientOverrides } from '@/lib/gatewayClient';
 
 export const SLOW_POLL_HINT = '生成较慢，后台继续等待…';

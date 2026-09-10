@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { createCompactThumbnailDataUrl, createCompactSourceImagesJson } from '@beike/shared/imageConverter';
+import { createCompactThumbnailDataUrl, createCompactSourceImagesJson } from '@beike/server-kit/imageConverter';
 
 async function compactDatabase(dbPath: string) {
   console.log(`[compactAssetImages] Starting database compaction for ${dbPath}...`);

@@ -23,7 +23,7 @@ import {
   ApprovalRequestItem,
   SubAgentItem,
   AgentReasoningItem,
-} from '@beike/shared/assistant/types';
+} from '@beike/domain/assistant/types';
 import type { ApprovalDecision, PendingApproval } from '@/features/assistant/assistantTurnTypes';
 import ThinkingBlock from '@/features/assistant/components/ThinkingBlock';
 import ApprovalCard from '@/features/assistant/components/ApprovalCard';

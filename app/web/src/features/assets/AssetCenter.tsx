@@ -10,7 +10,7 @@ import {
   permanentDeleteGeneration,
 } from '@/lib/permanentDeleteGeneration';
 import { saveToDownloadDir } from '@/lib/desktopDownload';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import '@/store/persist/generation';
-import '@beike/shared/drawing';
+import '@beike/domain/drawing';
 import { useCanvasStore } from '@/features/canvas/store/useCanvasStore';
 import { groupTasksIntoBatches, type AssetTaskBatch } from './assetBatchUtils';
 import AssetGenerationHistory from './AssetGenerationHistory';

@@ -1,27 +1,27 @@
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import {
   prepareAnalyzeImages,
   callVisionModel,
   buildVisionContent,
 } from '../../../services/analyzeHelpers';
-import { buildVisionSystemPrompt } from '@beike/shared/vision';
+import { buildVisionSystemPrompt } from '@beike/domain/vision';
 import {
   getCategoryTailoredOutfits,
   getCategoryTailoredPersonas,
   buildSuitableCategoriesOr,
-} from '@beike/shared/jewelryArchHelpers';
-import { resolveShotsForScene } from '@beike/shared/sceneBundle';
+} from '@beike/domain/jewelryArchHelpers';
+import { resolveShotsForScene } from '@beike/domain/sceneBundle';
 import {
   pickWeightedRandom,
   computeSamplingSeed,
   pickActionSet,
   stableAssetCode,
-} from '@beike/shared/assetSampling';
+} from '@beike/domain/assetSampling';
 import {
   extractPureActionFromPrompt,
   stripGarmentsFromAction,
-} from '@beike/shared/drawing';
-import { inferProductCategoryAndAnatomy } from '@beike/shared/productCategoryHelpers';
+} from '@beike/domain/drawing';
+import { inferProductCategoryAndAnatomy } from '@beike/domain/productCategoryHelpers';
 import { ANATOMY_ACTION_PRESETS } from './anatomyPresets';
 import { assembleStoryboardShots } from './promptAssembler';
 

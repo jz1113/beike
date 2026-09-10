@@ -11,8 +11,9 @@ export default function setup() {
   process.env.AZHUO_DATA_DIR = dir;
   process.env.AZHUO_CACHE_DIR = join(dir, 'storage');
   process.env.NODE_ENV = 'test';
+  const repoRoot = resolve(__dirname, '../..');
   try {
-    execFileSync(process.execPath, [resolve('node_modules/prisma/build/index.js'), 'db', 'push', '--skip-generate', '--schema', resolve('db/prisma/schema.prisma')], {
+    execFileSync(process.execPath, [resolve(repoRoot, 'node_modules/prisma/build/index.js'), 'db', 'push', '--skip-generate', '--schema', resolve(repoRoot, 'db/prisma/schema.prisma')], {
       env: process.env, stdio: 'pipe',
     });
   } catch (error) {

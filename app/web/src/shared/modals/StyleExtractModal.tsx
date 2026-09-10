@@ -6,7 +6,7 @@ import {
   Loader2,
   Cpu,
 } from 'lucide-react';
-import { normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import CategoryManagerModal from './CategoryManagerModal';
 import { RecipeEditorPanel } from './styleExtract/RecipeEditorPanel';

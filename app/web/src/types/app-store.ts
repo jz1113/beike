@@ -1,8 +1,8 @@
-import type { AssistantTaskState, AssistantRunMode, ReferenceScope } from '@beike/shared/assistant/taskPolicy';
+import type { AssistantTaskState, AssistantRunMode, ReferenceScope } from '@beike/domain/assistant/taskPolicy';
 /** Domain types used by the Zustand app store (and UI that consumes them). */
 
-import type { DepthVideoStyle } from '@beike/shared/depthVideo';
-import type { AssistantItem } from '@beike/shared/assistant/types';
+import type { DepthVideoStyle } from '@beike/domain/depthVideo';
+import type { AssistantItem } from '@beike/domain/assistant/types';
 
 export type GenerationMediaType = 'image' | 'video' | 'depth-image' | 'depth-video';
 

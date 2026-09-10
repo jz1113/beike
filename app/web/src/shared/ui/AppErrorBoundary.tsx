@@ -1,6 +1,6 @@
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 interface Props {
   children: ReactNode;

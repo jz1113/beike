@@ -2,11 +2,11 @@ import {
   buildReplicationReverseSystemPrompt,
   buildReplicationOptimizeSystemPrompt,
   buildActionDigestFromShots,
-} from '@beike/shared/vision';
+} from '@beike/domain/vision';
 import {
   cleanPromptText,
   ensureReplicationPromptSlots,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import {
   prepareAnalyzeImages,
   buildVisionContent,

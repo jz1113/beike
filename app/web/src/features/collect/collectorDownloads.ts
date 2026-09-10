@@ -1,7 +1,7 @@
 import { apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import { saveToDownloadDir } from '@/lib/desktopDownload';
 import { openExternalUrl } from '@/lib/downloadMedia';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import type { BatchTaskItem } from './collectorShared';
 
 /**

@@ -9,7 +9,7 @@ import {
   isDepthMediaType,
   stripWorkshopPromptGuards,
   cleanPromptText,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
 import { apiFetch } from '@/lib/apiClient';
 import { isGenerateVideoTask, type FlatBatchItem } from '../generateWorkspaceHelpers';
@@ -24,7 +24,7 @@ import {
   DEPTH_VIDEO_MODEL_ID,
   type DepthQuality,
   type DepthVideoStyle,
-} from '@beike/shared/depthVideo';
+} from '@beike/domain/depthVideo';
 import { dockSafeArea } from '@/shared/ui/layoutClasses';
 import FeedBatchHeader from './FeedBatchHeader';
 import FeedSingleCard from './FeedSingleCard';

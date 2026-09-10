@@ -1,7 +1,7 @@
 import { cleanupAssistantMedia } from './routes/assistant/media';
 // 优先加载本地环境变量配置
 import path from 'node:path';
-import { applyEnvFileToProcess } from '@beike/shared/desktopEnvFile';
+import { applyEnvFileToProcess } from '@beike/server-kit/desktopEnvFile';
 
 if (typeof (process as any).loadEnvFile === 'function') {
   try {
@@ -135,7 +135,7 @@ app.use('/api/*', apiAuthMiddleware);
 
 app.get('/api/health', async (c) => health.GET(c.req.raw));
 
-import { checkpointDatabase, prisma, initializeDatabase } from '@beike/shared/prisma';
+import { checkpointDatabase, prisma, initializeDatabase } from '@beike/server-kit/prisma';
 
 app.route('/api/catalog', catalogRoutes);
 app.route('/api/generate', generateRoutes);

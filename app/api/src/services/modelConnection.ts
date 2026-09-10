@@ -1,4 +1,4 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 
 /** Connectivity checks must not create billable image/video generation tasks. */
 export async function checkMediaModelConnection(baseUrl: string, apiKey: string, model: string, fetcher: typeof fetch = fetch) {

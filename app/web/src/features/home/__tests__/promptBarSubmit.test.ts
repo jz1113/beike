@@ -66,6 +66,20 @@ describe('canSubmitPromptBar', () => {
     expect(canSubmitPromptBar(input)).toBe(false);
   });
 
+  it('blocks video submit when no video models configured', () => {
+    const input = makeInput({
+      quickGenMode: 'video',
+      quickPrompt: 'hello video',
+      hasVideoModels: false,
+    });
+    expect(canSubmitPromptBar(input)).toBe(false);
+    const res = buildPromptBarGenerationTasks(input);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toBe('请先在设置中从网关拉取视频模型');
+    }
+  });
+
   it('blocks submit while isSubmitting', () => {
     const input = makeInput({
       quickPrompt: 'hello',

@@ -1,4 +1,4 @@
-import { Semaphore } from '@beike/shared/asyncPool';
+import { Semaphore } from '@beike/domain/asyncPool';
 
 export const RATE_LIMIT_BACKOFF_MS = [2000, 4000, 8000];
 export const MAX_NETWORK_ATTEMPTS = 3;

@@ -1,6 +1,6 @@
-import { validateAssetEdit, pickAssetEditFields } from '@beike/shared/assetEdit';
+import { validateAssetEdit, pickAssetEditFields } from '@beike/domain/assetEdit';
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import { queueMediaReview } from '../../../../services/mediaReviewQueue';
 
 // 创建单项或批量导入原子资产

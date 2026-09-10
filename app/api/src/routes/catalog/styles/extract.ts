@@ -1,14 +1,14 @@
-import { normalizeGatewayBaseUrl } from '@beike/shared/gatewayUrl';
+import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../../core/http';
-import { convertToStandardJpegDataUrl } from '@beike/shared/imageConverter';
-import { buildVisionModelsToTry } from '@beike/shared/vision';
-import { resolveGatewayCreds } from '@beike/shared/gatewayCreds';
+import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
+import { buildVisionModelsToTry } from '@beike/domain/vision';
+import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import {
   resolveVisionTimeoutMs,
   VISION_EXTRACT_MASTER_TIMEOUT_MS,
   VISION_EXTRACT_SHARD_TIMEOUT_MS,
-} from '@beike/shared/visionTimeouts';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+} from '@beike/domain/visionTimeouts';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../../services/imageHelpers';
 
 export async function POST(req: Request) {

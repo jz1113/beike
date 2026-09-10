@@ -1,8 +1,8 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { isAdminAuthorized, unauthorizedJson } from '@beike/shared/apiAuth';
-import { formatUserError } from '@beike/shared/upstreamErrors';
-import { deleteObjectsFromStorage } from '@beike/shared/storage';
+import { prisma } from '@beike/server-kit/prisma';
+import { isAdminAuthorized, unauthorizedJson } from '@beike/server-kit/apiAuth';
+import { formatUserError } from '@beike/domain/upstreamErrors';
+import { deleteObjectsFromStorage } from '@beike/server-kit/storage';
 
 const PROMPT_SUMMARY_LEN = 120;
 

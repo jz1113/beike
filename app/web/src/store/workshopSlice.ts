@@ -1,13 +1,13 @@
 import type { StateCreator } from 'zustand';
 import { apiFetch } from '@/lib/apiClient';
-import { ShotPrompt, buildActionDigestFromShots } from '@beike/shared/vision';
-import { ASPECT_RATIOS, normalizeImageUrlToStandardJpg } from '@beike/shared/drawing';
+import { ShotPrompt, buildActionDigestFromShots } from '@beike/domain/vision';
+import { ASPECT_RATIOS, normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import type { ProductImage } from '@/types';
 import type { GenerationTask } from '@/types/app-store';
 import {
   getStoredMultimodalModelId,
   setStoredMultimodalModelId,
-} from '@beike/shared/workflowModels';
+} from '@beike/domain/workflowModels';
 import {
   buildSocialPromptSourceKey,
   invalidateSocialPromptsIfNeeded,

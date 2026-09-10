@@ -48,7 +48,7 @@ export function resolveDevCli(workspaceRoot, packageName, binName, workspace = '
 }
 
 export function getRepoRoot() {
-  return join(getWorkspaceRoot(), '..');
+  return getWorkspaceRoot();
 }
 
 /** 与 Tauri app.path().app_data_dir() 对齐的 dev 数据目录 */
@@ -232,12 +232,27 @@ export async function waitFor(fn, label, timeoutMs = 60000, child = null) {
 }
 
 /** 仅停止本项目的 Hono API，避免 lsof -ti :port 误杀 Tauri/npm 进程 */
-export async function stopApiServer() {
+export async function stopApiServer(apiPort = 3000) {
   if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/F', '/FI', 'WINDOWTITLE eq beike-api*'], {
-      stdio: 'ignore',
-      shell: true,
-    });
+    const pids = readPidFile(getRepoRoot());
+    if (pids?.api && isProcessAlive(pids.api)) {
+      killChild({ pid: pids.api });
+    }
+    try {
+      const out = spawnSync('cmd.exe', ['/c', `netstat -ano | findstr :${apiPort}`], { encoding: 'utf8' });
+      const lines = (out.stdout || '').split('\n');
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 5 && parts[1].includes(`:${apiPort}`) && parts[3] === 'LISTENING') {
+          const pid = Number.parseInt(parts[4], 10);
+          if (Number.isFinite(pid) && pid > 0) {
+            spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore' });
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     return;
   }
   spawnSync('pkill', ['-f', 'tsx.*app/api/src/index.ts'], { stdio: 'ignore' });
@@ -248,10 +263,25 @@ export async function stopApiServer() {
 
 export function stopViteServer(vitePort = VITE_PORT, { force = false } = {}) {
   if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/F', '/FI', 'WINDOWTITLE eq vite*'], {
-      stdio: 'ignore',
-      shell: true,
-    });
+    const pids = readPidFile(getRepoRoot());
+    if (pids?.vite && isProcessAlive(pids.vite)) {
+      killChild({ pid: pids.vite });
+    }
+    try {
+      const out = spawnSync('cmd.exe', ['/c', `netstat -ano | findstr :${vitePort}`], { encoding: 'utf8' });
+      const lines = (out.stdout || '').split('\n');
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 5 && parts[1].includes(`:${vitePort}`) && parts[3] === 'LISTENING') {
+          const pid = Number.parseInt(parts[4], 10);
+          if (Number.isFinite(pid) && pid > 0) {
+            spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore' });
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     return;
   }
   const result = spawnSync('lsof', ['-ti', `:${vitePort}`], { encoding: 'utf8' });
@@ -285,7 +315,20 @@ export function stopTauriApp() {
 }
 
 export function findTauriPid() {
-  if (process.platform === 'win32') return null;
+  if (process.platform === 'win32') {
+    try {
+      const out = spawnSync('tasklist', ['/FI', 'IMAGENAME eq azhuo-workbench.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8' });
+      const line = (out.stdout || '').trim().split('\n')[0];
+      if (line && line.includes('azhuo-workbench.exe')) {
+        const parts = line.split(',');
+        const pid = Number.parseInt(parts[1]?.replace(/"/g, ''), 10);
+        return Number.isFinite(pid) ? pid : null;
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
   const result = spawnSync('pgrep', ['-f', 'azhuo-workbench'], { encoding: 'utf8' });
   const pid = Number.parseInt(String(result.stdout || '').trim().split('\n')[0], 10);
   return Number.isFinite(pid) ? pid : null;

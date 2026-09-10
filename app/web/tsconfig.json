@@ -3,10 +3,10 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["./src/*"],
-      "@beike/shared": ["../shared/src/index.ts"],
-      "@beike/shared/*": ["../shared/src/*"],
-      "@beike/contracts": ["../contracts/src/index.ts"],
-      "@beike/contracts/*": ["../contracts/src/*"]
+      "@beike/contracts": ["../../packages/contracts/src/index.ts"],
+      "@beike/contracts/*": ["../../packages/contracts/src/*"],
+      "@beike/domain": ["../../packages/domain/src/index.ts"],
+      "@beike/domain/*": ["../../packages/domain/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/vite-env.d.ts"],

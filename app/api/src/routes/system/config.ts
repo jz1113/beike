@@ -1,12 +1,12 @@
-import { isKnownImageOnlyModel, isKnownVideoOnlyModel } from '@beike/shared/workflowModels';
+import { isKnownImageOnlyModel, isKnownVideoOnlyModel } from '@beike/domain/workflowModels';
 import { checkMediaModelConnection } from '../../services/modelConnection';
 import { jsonResponse } from '../../core/http';
-import { VISION_MODELS } from '@beike/shared/vision';
-import { IMAGE_GEN_MODELS } from '@beike/shared/drawing';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { VISION_MODELS } from '@beike/domain/vision';
+import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { normalizeGatewayBaseUrl } from '../../services/imageHelpers';
-import { testApiaConnection } from '@beike/shared/apiaScraper';
-import { testQiyunConnection } from '@beike/shared/qiyunScraper';
+import { testApiaConnection } from '@beike/server-kit/apiaScraper';
+import { testQiyunConnection } from '@beike/server-kit/qiyunScraper';
 
 // 获取系统当前模型与接口配置（密钥只返回是否已配置，不泄露明文/前后缀）
 export async function GET() {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Tag, Check, Sparkles, AlertCircle } from 'lucide-react';
 import type { AssetSubTab } from '../assetPromptConstants';
-import { resolveActionCardDisplayBadges } from '@beike/shared/productCategoryHelpers';
+import { resolveActionCardDisplayBadges } from '@beike/domain/productCategoryHelpers';
 
 export interface TagEditModalProps {
   item: any;

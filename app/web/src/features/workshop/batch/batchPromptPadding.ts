@@ -1,11 +1,11 @@
-import type { ShotPrompt } from '@beike/shared/vision';
+import type { ShotPrompt } from '@beike/domain/vision';
 import {
   assembleOriginalShotPrompt,
   ensureReplicationPromptSlots,
   softenReplicationSafetyWording,
   enforceLookConsistency,
   extractCanonicalOutfitFromPrompts,
-} from '@beike/shared/drawing';
+} from '@beike/domain/drawing';
 import type { BatchProductItem } from './batchTypes';
 import { resolveHarmonizedTemplatesForItem } from './batchVisionAnalyzeHelpers';
 

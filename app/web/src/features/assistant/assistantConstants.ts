@@ -1,4 +1,4 @@
-import { VISION_MODELS } from '@beike/shared/vision';
+import { VISION_MODELS } from '@beike/domain/vision';
 import {
   getModelProviderName,
   isPlaceholderModelMeta,

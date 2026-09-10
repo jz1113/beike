@@ -1,9 +1,9 @@
 import { jsonResponse } from '../../../core/http';
-import { prisma } from '@beike/shared/prisma';
+import { prisma } from '@beike/server-kit/prisma';
 import LRUCache from 'lru-cache';
-import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/shared/storage';
-import { persistDataUrlToStorage } from '@beike/shared/persistDataUrl';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
+import { persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 import { resolveCredentials } from '../../../services/imageHelpers';
 
 // 任务轮询端点记忆缓存 (提升 300% 轮询响应速度，使用 LRU 限制内存增长)

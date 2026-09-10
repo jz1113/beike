@@ -1,4 +1,4 @@
-import type { AssistantTaskState } from '@beike/shared/assistant/taskPolicy';
+import type { AssistantTaskState } from '@beike/domain/assistant/taskPolicy';
 import type { ProductWidgetData } from '@/types/app-store';
 
 export type ApprovalDecision = 'accept' | 'decline' | 'acceptForSession' | 'cancel';

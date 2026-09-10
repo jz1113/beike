@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { mapWithConcurrency } from '@beike/shared/asyncPool';
+import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
 import {
   batchParseXhsLinks,

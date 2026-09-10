@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/shared/prisma';
-import { formatUserError } from '@beike/shared/upstreamErrors';
+import { prisma } from '@beike/server-kit/prisma';
+import { formatUserError } from '@beike/domain/upstreamErrors';
 
 // 获取所有提示词生成历史记录
 export async function GET() {
