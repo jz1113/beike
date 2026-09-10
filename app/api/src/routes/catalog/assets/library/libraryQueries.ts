@@ -1,0 +1,377 @@
+import { jsonResponse } from '../../../../core/http';
+import { prisma } from '@beike/shared/prisma';
+import { resolveShotsForScene, type ActionLike } from '@beike/shared/sceneBundle';
+import { stableAssetCode } from '@beike/shared/assetSampling';
+import { buildAssetCategoryWhere } from '../../../../services/libraryQueries';
+
+const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {
+  const text = typeof reversePromptZh === 'string' ? reversePromptZh.trim() : '';
+  if (!text) return undefined;
+  return text.slice(0, maxLen);
+};
+
+const slimAsset = <T extends Record<string, unknown>>(row: T, extra: string[] = []) => {
+  const base: Record<string, unknown> = {
+    id: row.id,
+    title: row.title ?? row.name,
+    name: row.name,
+    tags: row.tags,
+    category: row.category,
+    isFavorite: row.isFavorite,
+    usageCount: row.usageCount,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    code: row.code,
+    coverUrl: row.coverUrl ?? row.avatarUrl,
+    suitableAnatomy: row.suitableAnatomy,
+    shotType: row.shotType,
+    albumName: row.albumName,
+  };
+  for (const key of extra) {
+    if (row[key] !== undefined) base[key] = row[key];
+  }
+  return base;
+};
+
+export async function executeLibraryGet(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const assetType = searchParams.get('type') || 'scene'; // scene | scene_bundle | outfit | action | persona | all
+  const category = searchParams.get('category');
+  const keyword = (searchParams.get('keyword') || '').trim();
+  const isFavorite = searchParams.get('isFavorite') === 'true' ? true : undefined;
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10) || 50));
+  const slim = searchParams.get('slim') === '1';
+  const detailId = searchParams.get('id');
+
+  if (detailId && assetType !== 'all') {
+    if (assetType === 'scene' || assetType === 'scene_bundle') {
+      const item = await prisma.sceneAsset.findUnique({
+        where: { id: detailId },
+        include: { actions: { orderBy: [{ shotOrder: 'asc' }, { createdAt: 'asc' }] } },
+      });
+      if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
+      const linkedActions = (item as typeof item & { actions?: ActionLike[] }).actions || [];
+      return jsonResponse({
+        success: true,
+        assetType,
+        item: {
+          ...item,
+          shots: resolveShotsForScene(item, linkedActions),
+          shotCount: resolveShotsForScene(item, linkedActions).length,
+        },
+      });
+    }
+    if (assetType === 'outfit') {
+      const item = await prisma.outfitAsset.findUnique({ where: { id: detailId } });
+      if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
+      return jsonResponse({ success: true, assetType, item });
+    }
+    if (assetType === 'action') {
+      const item = await prisma.actionAsset.findUnique({ where: { id: detailId } });
+      if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
+      return jsonResponse({ success: true, assetType, item });
+    }
+    if (assetType === 'persona') {
+      const item = await prisma.personaAsset.findUnique({ where: { id: detailId } });
+      if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
+      return jsonResponse({ success: true, assetType, item });
+    }
+    if (assetType === 'full_prompt') {
+      const item = await prisma.fullPromptAsset.findUnique({ where: { id: detailId } });
+      if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
+      return jsonResponse({ success: true, assetType, item });
+    }
+  }
+
+  if (assetType === 'all' && searchParams.get('export') === '1') {
+    const result = await prisma.$transaction(async tx => {
+      const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
+        tx.sceneAsset.findMany({ orderBy: { id: 'asc' } }),
+        tx.outfitAsset.findMany({ orderBy: { id: 'asc' } }),
+        tx.actionAsset.findMany({ orderBy: { id: 'asc' } }),
+        tx.personaAsset.findMany({ orderBy: { id: 'asc' } }),
+        tx.fullPromptAsset.findMany({ orderBy: { id: 'asc' } }),
+      ]);
+      return { scenes, outfits, actions, personas, fullPrompts };
+    }, { timeout: 60_000 });
+    return jsonResponse({ success: true, complete: true, mediaIncluded: false, ...result,
+      counts: Object.fromEntries(Object.entries(result).map(([key, rows]) => [key, rows.length])) });
+  }
+
+  if (assetType === 'all') {
+    const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
+      prisma.sceneAsset.findMany({
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        take: 1000,
+        skip: (page - 1) * 1000,
+        include: {
+          actions: {
+            orderBy: [{ shotOrder: 'asc' }, { createdAt: 'asc' }],
+            take: 4,
+          },
+        },
+      }),
+      prisma.outfitAsset.findMany({
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        take: 1000,
+        skip: (page - 1) * 1000,
+      }),
+      prisma.actionAsset.findMany({
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        take: 1000,
+        skip: (page - 1) * 1000,
+      }),
+      prisma.personaAsset.findMany({
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        take: 1000,
+        skip: (page - 1) * 1000,
+      }),
+      prisma.fullPromptAsset.findMany({
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        take: 1000,
+        skip: (page - 1) * 1000,
+      }),
+    ]);
+
+    return jsonResponse({
+      success: true,
+      slim,
+      page,
+      hasMore: [scenes, outfits, actions, personas, fullPrompts].some(rows => rows.length === 1000),
+      scenes: scenes.map((s) => {
+        const linkedActions = (s as typeof s & { actions?: ActionLike[] }).actions || [];
+        const shots = resolveShotsForScene(s, linkedActions);
+        const mapped = {
+          ...s,
+          code: stableAssetCode('S', String(s.id)),
+          shots,
+          shotCount: shots.length,
+        };
+        return slim
+          ? slimAsset(mapped as Record<string, unknown>, ['shotCount', 'spatialType', 'lighting'])
+          : mapped;
+      }),
+      outfits: outfits.map((o) => {
+        const mapped = { ...o, code: stableAssetCode('O', String(o.id)) };
+        return slim ? slimAsset(mapped as Record<string, unknown>) : mapped;
+      }),
+      actions: actions.map((a) => {
+        const mapped = { ...a, code: stableAssetCode('A', String(a.id)) };
+        return slim ? slimAsset(mapped as Record<string, unknown>, ['action', 'camera']) : mapped;
+      }),
+      personas: personas.map((p) => {
+        const mapped = { ...p, code: stableAssetCode('P', String(p.id)) };
+        return slim ? slimAsset(mapped as Record<string, unknown>, ['description']) : mapped;
+      }),
+      fullPrompts: fullPrompts.map((f) => {
+        const mapped = { ...f, code: stableAssetCode('R', String(f.id)) };
+        if (!slim) return mapped;
+        const slimmed = slimAsset(mapped as Record<string, unknown>, [
+          'albumName',
+          'sceneSummary',
+          'outfitSummary',
+          'actionSummary',
+          'personaSummary',
+          'sourceImageIndex',
+          'provenance',
+        ]);
+        const preview = buildPromptPreview(f.reversePromptZh);
+        if (preview) slimmed.promptPreview = preview;
+        return slimmed;
+      }),
+    });
+  }
+
+  if (assetType === 'scene' || assetType === 'scene_bundle') {
+    const where: any = {};
+    if (category && category !== 'all') {
+      const categoryOr = buildAssetCategoryWhere('scene', category);
+      if (categoryOr) where.OR = categoryOr;
+    }
+    if (isFavorite !== undefined) where.isFavorite = isFavorite;
+    if (keyword) {
+      where.OR = [
+        { title: { contains: keyword } },
+        { description: { contains: keyword } },
+        { reversePrompt: { contains: keyword } },
+        { tags: { contains: keyword } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.sceneAsset.count({ where }),
+      prisma.sceneAsset.findMany({
+        where,
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          actions: {
+            orderBy: [{ shotOrder: 'asc' }, { createdAt: 'asc' }],
+            take: 4,
+          },
+        },
+      }),
+    ]);
+
+    const mappedItems = items.map((item) => {
+      const code = stableAssetCode('S', String(item.id));
+      if (assetType !== 'scene_bundle') {
+        return { ...item, code };
+      }
+      const linkedActions = (item as typeof item & { actions?: ActionLike[] }).actions || [];
+      const shots = resolveShotsForScene(item, linkedActions);
+      return {
+        ...item,
+        code,
+        shots,
+        shotCount: shots.length,
+      };
+    });
+
+    return jsonResponse({
+      success: true,
+      assetType,
+      total,
+      page,
+      pageSize,
+      items: mappedItems,
+    });
+  }
+
+  if (assetType === 'outfit') {
+    const where: any = {};
+    if (category && category !== 'all') {
+      const categoryOr = buildAssetCategoryWhere('outfit', category);
+      if (categoryOr) where.OR = categoryOr;
+    }
+    if (isFavorite !== undefined) where.isFavorite = isFavorite;
+    if (keyword) {
+      where.OR = [
+        { title: { contains: keyword } },
+        { top: { contains: keyword } },
+        { bottom: { contains: keyword } },
+        { reversePrompt: { contains: keyword } },
+        { tags: { contains: keyword } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.outfitAsset.count({ where }),
+      prisma.outfitAsset.findMany({
+        where,
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    const mappedItems = items.map((item) => ({
+      ...item,
+      code: stableAssetCode('O', String(item.id)),
+    }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+  }
+
+  if (assetType === 'action') {
+    const where: any = {};
+    if (category && category !== 'all') {
+      const categoryOr = buildAssetCategoryWhere('action', category);
+      if (categoryOr) where.OR = categoryOr;
+    }
+    if (isFavorite !== undefined) where.isFavorite = isFavorite;
+    if (keyword) {
+      where.OR = [
+        { title: { contains: keyword } },
+        { action: { contains: keyword } },
+        { reversePrompt: { contains: keyword } },
+        { tags: { contains: keyword } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.actionAsset.count({ where }),
+      prisma.actionAsset.findMany({
+        where,
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    const mappedItems = items.map((item) => ({
+      ...item,
+      code: stableAssetCode('A', String(item.id)),
+    }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+  }
+
+  if (assetType === 'persona') {
+    const where: any = {};
+    if (category && category !== 'all') {
+      const categoryOr = buildAssetCategoryWhere('persona', category);
+      if (categoryOr) where.OR = categoryOr;
+    }
+    if (isFavorite !== undefined) where.isFavorite = isFavorite;
+    if (keyword) {
+      where.OR = [
+        { name: { contains: keyword } },
+        { description: { contains: keyword } },
+        { reversePrompt: { contains: keyword } },
+        { tags: { contains: keyword } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.personaAsset.count({ where }),
+      prisma.personaAsset.findMany({
+        where,
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    const mappedItems = items.map((item) => ({
+      ...item,
+      code: stableAssetCode('P', String(item.id)),
+    }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+  }
+
+  if (assetType === 'full_prompt') {
+    const where: any = {};
+    if (category && category !== 'all') {
+      const categoryOr = buildAssetCategoryWhere('full_prompt', category);
+      if (categoryOr) where.OR = categoryOr;
+    }
+    if (isFavorite !== undefined) where.isFavorite = isFavorite;
+    if (keyword) {
+      where.OR = [
+        { title: { contains: keyword } },
+        { albumName: { contains: keyword } },
+        { reversePromptZh: { contains: keyword } },
+        { reversePromptEn: { contains: keyword } },
+        { tags: { contains: keyword } },
+        { sceneSummary: { contains: keyword } },
+        { outfitSummary: { contains: keyword } },
+        { actionSummary: { contains: keyword } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.fullPromptAsset.count({ where }),
+      prisma.fullPromptAsset.findMany({
+        where,
+        orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    const mappedItems = items.map((item) => ({
+      ...item,
+      code: stableAssetCode('R', String(item.id)),
+    }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+  }
+
+  return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);
+}

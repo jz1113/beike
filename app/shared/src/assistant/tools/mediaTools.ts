@@ -1,0 +1,107 @@
+import { getInternalApiHeaders } from '@beike/shared/apiAuth';
+import {
+  inspectVideoMetadata,
+  extractVideoStoryboards,
+  extractVideoSegmentFrames,
+} from '../../videoDeconstructService';
+import { parseReversePromptSections } from './productTools';
+
+export async function toolDeconstructImage(args: { image_url?: string }, origin: string): Promise<string> {
+  const imageUrl = String(args.image_url || '').trim();
+  if (!imageUrl) return JSON.stringify({ success: false, error: '缺少 image_url' });
+
+  try {
+    const res = await fetch(`${origin}/api/catalog/assets/deconstruct`, {
+      method: 'POST',
+      headers: getInternalApiHeaders(),
+      body: JSON.stringify({ imageUrl, mode: 'single' }),
+      signal: AbortSignal.timeout(120000),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return JSON.stringify({ success: false, error: data.error || '反推失败' });
+    }
+    return JSON.stringify({
+      success: true,
+      reversePrompt: data.reversePrompt || data.prompt || '',
+      title: data.title || '',
+      sections: parseReversePromptSections(String(data.reversePrompt || data.prompt || '')),
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '反推请求失败';
+    return JSON.stringify({ success: false, error: msg });
+  }
+}
+
+export async function toolInspectVideoMedia(videoUrl: string): Promise<string> {
+  const target = videoUrl.trim();
+  if (!target) return JSON.stringify({ success: false, error: '缺少 video_url 参数' });
+  try {
+    const meta = await inspectVideoMetadata(target);
+    return JSON.stringify({
+      success: true,
+      message: `视频物理参数探查完毕: 时长 ${meta.duration}秒, 分辨率 ${meta.width}x${meta.height}, 帧率 ${meta.fps}fps, 长宽比 ${meta.aspectRatio}`,
+      duration: meta.duration,
+      width: meta.width,
+      height: meta.height,
+      fps: meta.fps,
+      frameCount: meta.frameCount,
+      aspectRatio: meta.aspectRatio,
+      filename: meta.filename,
+    });
+  } catch (err: unknown) {
+    return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+export async function toolExtractVideoStoryboard(videoUrl: string, sampleCount: number): Promise<string> {
+  const target = videoUrl.trim();
+  if (!target) return JSON.stringify({ success: false, error: '缺少 video_url 参数' });
+  try {
+    const res = await extractVideoStoryboards(target, { sampleCount });
+    return JSON.stringify({
+      success: true,
+      message: `已成功对视频全片抽样 ${res.sampleCount} 帧并拼合为全景故事板九宫格`,
+      dimensions: res.dimensions,
+      duration: res.duration,
+      aspectRatio: res.aspectRatio,
+      contactSheetUrl: res.contactSheetUrl,
+      sampleFrames: res.frameUrls,
+      _visualImages: [
+        { url: res.contactSheetUrl, label: `全景故事板九宫格 (${res.sampleCount}帧, ${res.duration}秒)` },
+      ],
+    });
+  } catch (err: unknown) {
+    return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+export async function toolExtractVideoDetailedFrames(
+  videoUrl: string,
+  startSec: number,
+  endSec: number,
+  frameCount: number,
+): Promise<string> {
+  const target = videoUrl.trim();
+  if (!target) return JSON.stringify({ success: false, error: '缺少 video_url 参数' });
+  try {
+    const res = await extractVideoSegmentFrames(target, {
+      startSec,
+      endSec,
+      frameCount,
+    });
+    return JSON.stringify({
+      success: true,
+      message: `已成功在区间 ${res.timeRange} 内深度截取 ${res.count} 张高清特写画面`,
+      timeRange: res.timeRange,
+      duration: res.duration,
+      frameUrls: res.frameUrls,
+      _visualImages: res.frameUrls.map((u, i) => ({
+        url: u,
+        label: `镜头特写帧 #${i + 1} (${res.timeRange})`,
+      })),
+    });
+  } catch (err: unknown) {
+    return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) });
+  }
+}

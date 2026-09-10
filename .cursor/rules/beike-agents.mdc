@@ -1,0 +1,16 @@
+---
+description: 贝壳云图项目 Agent 规则（完整版见 工程/docs/AGENTS.md）
+alwaysApply: true
+---
+
+项目 Agent 规则已迁移至 [工程/docs/AGENTS.md](工程/docs/AGENTS.md)。
+
+要点：
+- npm 工作区根目录为 `工程/`，所有 `npm run` 在此执行
+- 源码：`工程/apps`、`工程/packages`、`工程/tools`
+- 依赖：`依赖/node`（`工程/node_modules` 为符号链接）
+- 文档：`工程/docs/`
+
+**禁止在仓库根（阿卓工作台/）创建以下目录**：`apps/`、`tools/`、`packages/`、`docs/`、`configs/`。这些目录只能存在于 `工程/` 下。
+- 文档中的 `tools/scripts/...` 均指 `工程/tools/scripts/...`（cwd 为 `工程/` 时的相对路径）
+- 所有新建/修改的源码、脚本、文档路径必须以 `工程/` 为前缀

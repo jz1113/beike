@@ -1,0 +1,415 @@
+@import "tailwindcss";
+
+@custom-variant compact (&:is(:where(html[data-layout="compact"]) *));
+
+:root {
+  --background: #FAFAFC;
+  --foreground: #0F172A;
+  --ui-density: 1;
+  --ui-space: 1;
+
+  /* ============================================
+   * 统一设计 Token（采集中心 / 通用面板）
+   * ============================================ */
+
+  /* 圆角 */
+  --radius-panel: 1.5rem;   /* 24px - 模态/大面板 */
+  --radius-card: 1rem;      /* 16px - 内容卡片 */
+  --radius-btn: 0.75rem;    /* 12px - 按钮/输入框 */
+  --radius-chip: 0.5rem;    /* 8px  - 小标签/徽标 */
+
+  /* 间距（基于 4px 网格） */
+  --space-1: 0.25rem;       /* 4px */
+  --space-2: 0.5rem;        /* 8px */
+  --space-3: 0.75rem;       /* 12px */
+  --space-4: 1rem;          /* 16px */
+  --space-5: 1.25rem;       /* 20px */
+  --space-6: 1.5rem;        /* 24px */
+
+  /* 阴影 */
+  --shadow-panel: 0 25px 70px rgba(0, 0, 0, 0.2);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-popover: 0 8px 24px rgba(15, 23, 42, 0.12);
+
+  /* 主色（蓝色品牌） */
+  --color-brand-50: #EFF6FF;
+  --color-brand-100: #DBEAFE;
+  --color-brand-500: #3B82F6;
+  --color-brand-600: #2563EB;
+  --color-brand-700: #1D4ED8;
+
+  /* 状态色 */
+  --color-success-50: #ECFDF5;
+  --color-success-500: #10B981;
+  --color-success-600: #059669;
+  --color-danger-50: #FEF2F2;
+  --color-danger-500: #EF4444;
+  --color-danger-600: #DC2626;
+  --color-warning-50: #FFFBEB;
+  --color-warning-500: #F59E0B;
+  --color-warning-600: #D97706;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* 将圆角 CSS 变量映射到 Tailwind */
+  --radius-panel: var(--radius-panel);
+  --radius-card: var(--radius-card);
+  --radius-btn: var(--radius-btn);
+  --radius-chip: var(--radius-chip);
+}
+
+html {
+  font-size: clamp(12.5px, calc(16px * var(--ui-density, 1)), 16px);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.text-\[10px\] {
+  font-size: max(9.5px, calc(10px * var(--ui-density, 1)));
+}
+
+.text-\[11px\] {
+  font-size: max(10.5px, calc(11px * var(--ui-density, 1)));
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* 禁用浏览器默认的图片拖拽幽灵（Logo / 图标 / UI 配图） */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* ============================================
+ * Skeleton 骨架屏 shimmer 动画
+ * ============================================ */
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  animation: skeleton-shimmer 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
+}
+
+button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button:active:not(:disabled), [role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.97);
+  transition: transform 0.05s ease;
+}
+
+/* Prevent scroll chaining from nested panels/dropdowns to parent containers */
+.scroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Custom Sleek Scrollbar (Light Luxury) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+
+.no-scrollbar,
+.scrollbar-none,
+.rich-mention-contenteditable,
+.rich-mention-contenteditable * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+.rich-mention-contenteditable::-webkit-scrollbar,
+.rich-mention-contenteditable *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Light Luxury Glassmorphism & Card Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.04);
+}
+
+.glass-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* Shimmer Button Effect */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    60deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 80%
+  );
+  transform: rotate(30deg);
+  animation: shimmerMove 4s infinite linear;
+}
+
+@keyframes shimmerMove {
+  0% {
+    transform: translateX(-100%) rotate(30deg);
+  }
+  100% {
+    transform: translateX(100%) rotate(30deg);
+  }
+}
+
+/* Futuristic AI Generating Animations - 纯 GPU 合成层硬件加速，0 Reflow 0 Repaint */
+@keyframes laserScan {
+  0% {
+    transform: translateY(-100%) translateZ(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(220%) translateZ(0);
+    opacity: 0;
+  }
+}
+
+@keyframes radarSpin {
+  from {
+    transform: rotate(0deg) translateZ(0);
+  }
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+@keyframes radarSpinReverse {
+  from {
+    transform: rotate(360deg) translateZ(0);
+  }
+  to {
+    transform: rotate(0deg) translateZ(0);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px) scale(1) translateZ(0);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.03) translateZ(0);
+  }
+}
+
+@keyframes auroraFlow {
+  0% {
+    opacity: 0.7;
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04) translateZ(0);
+  }
+  100% {
+    opacity: 0.7;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+.animate-laser-scan {
+  animation: laserScan 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.animate-radar-spin {
+  animation: radarSpin 12s linear infinite;
+  will-change: transform;
+}
+
+.animate-radar-spin-reverse {
+  animation: radarSpinReverse 16s linear infinite;
+  will-change: transform;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 3.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-aurora {
+  animation: auroraFlow 6s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* 🌟 旗舰级影视摄影与 AI 渲染光效 (Cinema Viewfinder & Quantum Denoising Engine - 120fps GPU 加速) */
+@keyframes prismConic {
+  0% { transform: rotate(0deg) translateZ(0); }
+  100% { transform: rotate(360deg) translateZ(0); }
+}
+
+@keyframes pulseHalo {
+  0%, 100% { transform: scale(1) translateZ(0); opacity: 0.35; }
+  50% { transform: scale(1.22) translateZ(0); opacity: 0.85; }
+}
+
+@keyframes orbitSpin {
+  0% { transform: rotate(0deg) translateX(40px) rotate(0deg) translateZ(0); }
+  100% { transform: rotate(360deg) translateX(40px) rotate(-360deg) translateZ(0); }
+}
+
+@keyframes orbitSpinReverse {
+  0% { transform: rotate(360deg) translateX(28px) rotate(-360deg) translateZ(0); }
+  100% { transform: rotate(0deg) translateX(28px) rotate(0deg) translateZ(0); }
+}
+
+@keyframes lineGlowSweep {
+  0% { transform: translateY(-100%) translateZ(0); opacity: 0; }
+  25% { opacity: 0.85; }
+  75% { opacity: 0.85; }
+  100% { transform: translateY(220%) translateZ(0); opacity: 0; }
+}
+
+@keyframes eqBarPulse {
+  0%, 100% { transform: scaleY(0.22) translateZ(0); transform-origin: bottom; }
+  50% { transform: scaleY(1) translateZ(0); transform-origin: bottom; }
+}
+
+@keyframes neonGlow {
+  0%, 100% { opacity: 0.65; transform: scale(0.99) translateZ(0); }
+  50% { opacity: 1; transform: scale(1.01) translateZ(0); }
+}
+
+.animate-prism-spin {
+  animation: prismConic 7s linear infinite;
+}
+
+.animate-prism-spin-reverse {
+  animation: prismConic 10s linear infinite reverse;
+}
+
+.animate-pulse-halo {
+  animation: pulseHalo 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-orbit {
+  animation: orbitSpin 4.5s linear infinite;
+}
+
+.animate-orbit-reverse {
+  animation: orbitSpinReverse 3.5s linear infinite;
+}
+
+.animate-scan-sweep {
+  animation: lineGlowSweep 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-neon-glow {
+  animation: neonGlow 2.5s ease-in-out infinite;
+}
+
+.animate-eq-1 { animation: eqBarPulse 0.8s ease-in-out infinite 0.1s; }
+.animate-eq-2 { animation: eqBarPulse 0.8s ease-in-out infinite 0.35s; }
+.animate-eq-3 { animation: eqBarPulse 0.8s ease-in-out infinite 0.2s; }
+.animate-eq-4 { animation: eqBarPulse 0.8s ease-in-out infinite 0.5s; }
+.animate-eq-5 { animation: eqBarPulse 0.8s ease-in-out infinite 0.25s; }
+
+/* 生产交付模块专用动画 */
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.25s ease-out;
+}
+
+/* 进度条填充动画 */
+@keyframes progressFill {
+  from { width: 0; }
+  to { width: var(--progress-width, 0); }
+}
+
+.animate-progress-fill {
+  animation: progressFill 0.6s ease-out;
+}

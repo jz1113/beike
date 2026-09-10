@@ -1,0 +1,25 @@
+import {act, cleanup, fireEvent, renderHook} from '@testing-library/react';
+import {afterEach, expect, it, vi} from 'vitest';
+import {useCanvasGestures} from '../hooks/useCanvasGestures';
+afterEach(cleanup);
+it('supports cross-platform zoom, hand mode and temporary Space mode', () => {
+  const {result} = renderHook(() => useCanvasGestures(undefined,vi.fn(),vi.fn()));
+  fireEvent.keyDown(window,{key:'=',metaKey:true});
+  expect(result.current.zoom).toBe(1.1);
+  fireEvent.keyDown(window,{key:'-',ctrlKey:true});
+  expect(result.current.zoom).toBe(1);
+  fireEvent.keyDown(window,{key:'h'});
+  expect(result.current.isHandMode).toBe(true);
+  fireEvent.keyDown(window,{key:'v'});
+  expect(result.current.isHandMode).toBe(false);
+  fireEvent.keyDown(window,{key:' ',code:'Space'});
+  expect(result.current.isHandMode).toBe(true);
+  fireEvent.keyUp(window,{key:' ',code:'Space'});
+  expect(result.current.isHandMode).toBe(false);
+  const input = document.createElement('input');
+  document.body.append(input); input.focus();
+  act(() => {fireEvent.keyDown(input,{key:'h'}); fireEvent.keyDown(input,{key:'=',metaKey:true});});
+  expect(result.current.isHandMode).toBe(false);
+  expect(result.current.zoom).toBe(1);
+  input.remove();
+});

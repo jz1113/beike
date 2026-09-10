@@ -1,0 +1,10 @@
+{
+  "version": "7",
+  "datasource": {
+    "url": "***"
+  },
+  "database": {
+    "provider": "sqlite"
+  },
+  "migration": "20260904000000_assistant_allowed_tools"
+}

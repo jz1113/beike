@@ -1,0 +1,29 @@
+{
+  "extends": "./works/configs/tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./app/web/src/*"],
+      "@beike/shared": ["./app/shared/src/index.ts"],
+      "@beike/shared/*": ["./app/shared/src/*"],
+      "@beike/contracts": ["./app/contracts/src/index.ts"],
+      "@beike/contracts/*": ["./app/contracts/src/*"]
+    }
+  },
+  "include": [
+    "app/web/src/**/*.ts",
+    "app/web/src/**/*.tsx",
+    "app/web/src/vite-env.d.ts",
+    "app/api/src/**/*.ts",
+    "app/shared/src/**/*.ts",
+    "app/contracts/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "works/e2e",
+    "**/*.test.ts",
+    "vitest.config.ts",
+    "works/configs/vitest.config.ts",
+    "playwright.config.ts",
+    "works/configs/playwright.config.ts"
+  ]
+}

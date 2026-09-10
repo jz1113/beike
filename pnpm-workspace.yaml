@@ -1,0 +1,8 @@
+packages:
+  - 'app/*'
+  - 'db/*'
+allowBuilds:
+  esbuild: true
+
+# Resolve internal @beike packages from this workspace.
+linkWorkspacePackages: true

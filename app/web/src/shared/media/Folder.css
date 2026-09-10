@@ -1,0 +1,161 @@
+:root {
+  --folder-color: #4f46e5;
+  --folder-back-color: #3730a3;
+  --paper-1: #e2e8f0;
+  --paper-2: #f1f5f9;
+  --paper-3: #ffffff;
+}
+
+.folder {
+  position: relative;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* 🌟 悬停特效 (Hover Effect) - 纯 GPU 硬件加速，零 JS 消耗，120fps 超流畅 */
+.folder:not(.folder--disabled):hover,
+.group:hover .folder:not(.folder--disabled) {
+  transform: translateY(-5px) translateZ(0);
+}
+
+.folder:not(.folder--disabled):hover .paper:nth-child(1),
+.group:hover .folder:not(.folder--disabled) .paper:nth-child(1) {
+  transform: translate(-55%, -8%) rotate(-5deg) translateZ(0);
+}
+
+.folder:not(.folder--disabled):hover .paper:nth-child(2),
+.group:hover .folder:not(.folder--disabled) .paper:nth-child(2) {
+  transform: translate(-50%, -13%) rotate(0deg) translateZ(0);
+}
+
+.folder:not(.folder--disabled):hover .paper:nth-child(3),
+.group:hover .folder:not(.folder--disabled) .paper:nth-child(3) {
+  transform: translate(-45%, -18%) rotate(5deg) translateZ(0);
+}
+
+.folder:not(.folder--disabled):hover .folder__front,
+.group:hover .folder:not(.folder--disabled) .folder__front {
+  transform: skew(14deg) scaleY(0.68) translateZ(0);
+}
+
+.folder:not(.folder--disabled):hover .right,
+.group:hover .folder:not(.folder--disabled) .right {
+  transform: skew(-14deg) scaleY(0.68) translateZ(0);
+}
+
+/* 🌟 展开模式 (可选独立使用) */
+.folder.open {
+  transform: translateY(-5px) translateZ(0);
+}
+
+.folder.open .paper:nth-child(1) {
+  transform: translate(-65%, -15%) rotate(-10deg) translateZ(0);
+}
+
+.folder.open .paper:nth-child(2) {
+  transform: translate(-50%, -20%) rotate(0deg) translateZ(0);
+}
+
+.folder.open .paper:nth-child(3) {
+  transform: translate(-35%, -15%) rotate(10deg) translateZ(0);
+}
+
+.folder.open .folder__front {
+  transform: skew(14deg) scaleY(0.68) translateZ(0);
+}
+
+.folder.open .right {
+  transform: skew(-14deg) scaleY(0.68) translateZ(0);
+}
+
+/* 🌟 文件夹底座 (Back Base) */
+.folder__back {
+  position: relative;
+  width: 110px;
+  height: 86px;
+  background: linear-gradient(145deg, var(--folder-back-color), var(--folder-color));
+  border-radius: 0px 12px 12px 12px;
+  box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.22), 0 3px 8px -2px rgba(0, 0, 0, 0.12);
+}
+
+/* 文件夹左上角标签耳朵 */
+.folder__back::after {
+  position: absolute;
+  z-index: 0;
+  bottom: 98%;
+  left: 0;
+  content: '';
+  width: 36px;
+  height: 12px;
+  background: var(--folder-back-color);
+  border-radius: 6px 6px 0 0;
+}
+
+/* 🌟 纸张/卡片素材 (Papers) */
+.paper {
+  position: absolute;
+  z-index: 2;
+  bottom: 10%;
+  left: 50%;
+  transform: translate(-50%, 10%) translateZ(0);
+  width: 72%;
+  height: 82%;
+  background: var(--paper-1);
+  border-radius: 8px;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  will-change: transform;
+}
+
+.paper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.paper:nth-child(2) {
+  background: var(--paper-2);
+  width: 82%;
+  height: 72%;
+}
+
+.paper:nth-child(3) {
+  background: var(--paper-3);
+  width: 92%;
+  height: 62%;
+}
+
+/* 🌟 文件夹封面 (Front Flap) */
+.folder__front {
+  position: absolute;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--folder-color), var(--folder-back-color));
+  border-radius: 6px 12px 12px 12px;
+  transform-origin: bottom;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: inset 0 1.5px 2px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.folder__front.right {
+  opacity: 0.15;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), transparent);
+  pointer-events: none;
+}
+
+.folder:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 4px;
+  border-radius: 12px;
+}

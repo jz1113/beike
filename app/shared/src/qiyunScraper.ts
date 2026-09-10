@@ -1,0 +1,197 @@
+import { extractUrlFromShareText } from './apiaScraper';
+
+export type QiyunMediaResult = {
+  title: string;
+  description: string;
+  author: string;
+  authorAvatar?: string;
+  cover: string;
+  images: string[];
+  video: string | null;
+  music?: string;
+  livePhotos?: string[];
+};
+
+export type QiyunCredentials = {
+  appId: string;
+  appKey: string;
+  endpoint?: string;
+};
+
+export type QiyunParseResult =
+  | { success: true; media: QiyunMediaResult; apiUsed: string }
+  | { success: false; error: string; upstreamCode?: string | number };
+
+const DEFAULT_QIYUN_ENDPOINT = 'https://qyapi.ipaybuy.cn/api/video';
+const QIYUN_TIMEOUT_MS = 25_000;
+
+const QIYUN_ERROR_MAP: Record<string | number, string> = {
+  '200': '解析成功',
+  '204': '暂时不支持解析该平台或作者设置了权限',
+  '500': '解析失败，请检查链接是否正确或该作品是否已被删除',
+  '1001': '参数错误，请检查请求参数',
+  '1005': '奇云商户平台服务账号状态异常，请联系客服',
+  '3001': '请求过于频繁，请稍后再试',
+  '3002': '奇云解析调用次数不足，请升级套餐或充值',
+  '3003': '奇云解析今日调用次数已达上限',
+};
+
+export function mapQiyunErrorCode(code: string | number | undefined, fallback?: string): string {
+  if (code == null) return fallback || '短视频或图集解析异常';
+  return QIYUN_ERROR_MAP[String(code)] || fallback || '短视频或图集解析异常';
+}
+
+/**
+ * 通过奇云 API 解析多平台短视频 / 图集去水印
+ * 支持抖音、快手、小红书、微信视频号、微博、B站、皮皮虾等 30+ 平台
+ */
+export async function parseSocialLinkViaQiyun(
+  rawText: string,
+  credentials: QiyunCredentials,
+): Promise<QiyunParseResult> {
+  const appId = credentials.appId?.trim();
+  const appKey = credentials.appKey?.trim();
+
+  if (!appId || !appKey) {
+    return { success: false, error: '未配置奇云 AppId 与 AppKey' };
+  }
+
+  const targetUrl = extractUrlFromShareText(rawText);
+  if (!targetUrl || !targetUrl.startsWith('http')) {
+    return { success: false, error: '未能从输入中提取有效社媒链接' };
+  }
+
+  const endpoint = credentials.endpoint || DEFAULT_QIYUN_ENDPOINT;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      },
+      body: JSON.stringify({
+        appId,
+        appKey,
+        url: targetUrl,
+      }),
+      signal: AbortSignal.timeout(QIYUN_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `奇云网关返回 HTTP ${res.status}: ${res.statusText}`,
+        upstreamCode: res.status,
+      };
+    }
+
+    const data = await res.json();
+    if (!data) {
+      return { success: false, error: '奇云接口返回空响应' };
+    }
+
+    if (data.code === 200 && data.data) {
+      const item = data.data;
+
+      // 提取纯图片列表（去掉实况视频与视频直链，只保留静态高清图片）
+      const isVideoLike = (u: string) => /\.(mp4|mov|m4v|webm|avi|flv)(\?|#|$)/i.test(u);
+
+      const rawImages: string[] = [];
+
+      if (Array.isArray(item.images)) {
+        for (const img of item.images) {
+          let imgUrl = '';
+          if (typeof img === 'string') {
+            imgUrl = img.trim();
+          } else if (img && typeof img === 'object') {
+            // 明确只提取静态图片 URL，绝不使用 live_photo_url
+            if (img.url && typeof img.url === 'string') {
+              imgUrl = img.url.trim();
+            }
+          }
+
+          // 严格剔除可能混入的视频/实况流地址
+          if (imgUrl && !isVideoLike(imgUrl)) {
+            rawImages.push(imgUrl);
+          }
+        }
+      }
+
+      // 核心业务规则：对于图文/图集/实况图笔记，完全去掉实况（不返回 livePhotos，且将 video 置为 null）
+      // 避免实况图的视频流导致整篇图文被误识别为视频作品，只保留干净的高清图片列表；纯视频作品才保留 video_url
+      const isImageNote = rawImages.length > 0;
+      const cleanVideo = isImageNote ? null : (item.video_url ? item.video_url.trim() : null);
+
+      // 仅在非视频作品且 rawImages 为空但有静态封面图时才备选
+      if (!cleanVideo && rawImages.length === 0 && item.cover_url && !isVideoLike(item.cover_url)) {
+        rawImages.push(item.cover_url.trim());
+      }
+
+      const media: QiyunMediaResult = {
+        title: (item.title || '').trim(),
+        description: (item.content || item.title || '').trim(),
+        author: (item.author?.name || '').trim(),
+        authorAvatar: (item.author?.avatar || '').trim(),
+        cover: (rawImages[0] || item.cover_url || '').trim(),
+        images: rawImages,
+        video: cleanVideo,
+        music: item.music_url ? item.music_url.trim() : undefined,
+      };
+
+      return {
+        success: true,
+        media,
+        apiUsed: '⚡ 奇云多平台短视频/图集去水印解析 (30+平台)',
+      };
+    }
+
+    const errorMsg = mapQiyunErrorCode(data.code, data.msg);
+    return {
+      success: false,
+      error: errorMsg || data.msg || '解析失败',
+      upstreamCode: data.code,
+    };
+  } catch (err: unknown) {
+    const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+    return {
+      success: false,
+      error: isTimeout ? '请求奇云解析服务超时（25秒）' : (err instanceof Error ? err.message : '连接奇云网关失败'),
+    };
+  }
+}
+
+/**
+ * 测试奇云解析接口连通性
+ */
+export async function testQiyunConnection(
+  credentials: QiyunCredentials,
+  testUrl = 'https://v.douyin.com/iLrqc12/',
+): Promise<{
+  success: boolean;
+  message: string;
+  upstreamCode?: string | number;
+}> {
+  const res = await parseSocialLinkViaQiyun(testUrl, credentials);
+  if (res.success) {
+    return {
+      success: true,
+      message: `奇云接口测试通过！已成功提取《${res.media.title.slice(0, 20) || '作品'}》`,
+    };
+  }
+
+  // 1001/204 说明密钥有效但测试链接已过期或未公开
+  if (res.upstreamCode === 204 || res.upstreamCode === 500) {
+    return {
+      success: true,
+      message: `奇云 AppId/AppKey 凭证校验通过（测试样本返回状态码: ${res.upstreamCode}）`,
+      upstreamCode: res.upstreamCode,
+    };
+  }
+
+  return {
+    success: false,
+    message: res.error,
+    upstreamCode: res.upstreamCode,
+  };
+}

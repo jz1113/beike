@@ -1,0 +1,6 @@
+interface:
+  display_name: "关键词审核与垂类标注"
+  short_description: "批量审核关键词、划分内容垂类并回填完整 Excel 工作簿"
+  default_prompt: "Use $keyword-review-workflow to audit the uploaded keyword workbook and return a completed Excel file."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://jsrepo.dev/v1/schema.json",
+  "paths": {
+    "*": "src/shared/ui",
+    "component": "src/shared/ui",
+    "registry:component": "src/shared/ui"
+  }
+}

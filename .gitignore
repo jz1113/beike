@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+
+# Build output
+out/
+build/
+dist/
+app/web/dist/
+
+# Release artifacts (do not commit)
+release/
+
+# Tauri Desktop
+desktop/target/
+desktop/gen/
+desktop/resources/api-server/**
+!desktop/resources/api-server/.gitkeep
+desktop/resources/server/
+desktop/binaries/node-*
+.desktop-dev-port
+.desktop-dev-token
+.desktop-dev-pids.json
+desktop/tauri.conf.dev.json
+
+# Local Environment Variables
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# System & IDE files
+.DS_Store
+*/.DS_Store
+*.pem
+*.log
+npm-debug.log*
+yarn-debug.log*
+.vscode/*
+!.vscode/settings.json
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+src/generated/prisma
+
+# SQLite Databases & Local Storage
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+db/prisma/*.db*
+dev.db*
+
+# Runtime local media cache & data
+storage/
+!app/api/src/routes/assets/storage/
+!app/api/src/routes/assets/storage/**
+**/.azhuo_storage/
+**/app_data/
+
+# Cursor debug logs
+.cursor/*.log
+
+# Local submission receipts and deferred media review state
+.local/
+
+# Generated test reports
+test-results/
+playwright-report/
+coverage/
+
+# Large media files (> 100MB strictly banned by GitHub)
+app/web/public/inspirations/imported-20260910/grandma-granddaughter-story.mp4
+app/web/public/inspirations/imported-20260910/siblings-story.mp4

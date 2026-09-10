@@ -1,0 +1,24 @@
+{
+  "name": "@beike/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./modelAdapters": "./src/modelAdapters/index.ts",
+    "./prompt-engine": "./src/prompt-engine/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --config ../../works/configs/vitest.config.ts"
+  },
+  "dependencies": {
+    "quickjs-emscripten": "0.32.0",
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "@prisma/client": "^5.22.0",
+    "sharp": "^0.35.3"
+  }
+}

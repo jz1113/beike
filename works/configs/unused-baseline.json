@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "note": "Reviewed residual warnings only. No automatic baseline refresh; additions require review. Removal is always allowed.",
+  "entries": [
+    {
+      "file": "app/api/src/routes/catalog/assets/deconstruct/jsonHealer.ts",
+      "message": "'_omit' is assigned a value but never used.",
+      "count": 1,
+      "reason": "通过解构排除字段；不能移除排除行为。"
+    },
+    {
+      "file": "app/api/src/routes/catalog/assets/seed.ts",
+      "message": "'_req' is defined but never used.",
+      "count": 1,
+      "reason": "保留路由 Request 签名，后续统一接口处理。"
+    },
+    {
+      "file": "app/api/src/routes/catalog/styles/parse-link.ts",
+      "message": "'persistToStorage' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/catalog/styles/parse-link.ts",
+      "message": "'rawStorageConfig' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/generate/analyze.ts",
+      "message": "'groupSignature' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/generate/image/slotResolver.ts",
+      "message": "'options' is defined but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/generate/video.ts",
+      "message": "'clientTaskId' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/system/config.ts",
+      "message": "'wanbangKey' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/system/config.ts",
+      "message": "'wanbangSecret' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/routes/system/local-storage.ts",
+      "message": "'_req' is defined but never used.",
+      "count": 1,
+      "reason": "保留路由 Request 签名，后续统一接口处理。"
+    },
+    {
+      "file": "app/api/src/routes/system/models/fetch.ts",
+      "message": "'err' is defined but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/api/src/services/depthPythonRunner.ts",
+      "message": "'safeResolveWithinRoot' is defined but never used.",
+      "count": 1,
+      "reason": "未使用的路径校验候选需结合深度模型执行边界另审，保留安全语义。"
+    },
+    {
+      "file": "app/shared/src/assetDeconstruct/outfitDedup.ts",
+      "message": "'minColors' is assigned a value but never used.",
+      "count": 1,
+      "reason": "规则阈值变量需与去重语义一起审查，本次不改变规则。"
+    },
+    {
+      "file": "app/shared/src/assetDeconstruct/outfitDedup.ts",
+      "message": "'minGarments' is assigned a value but never used.",
+      "count": 1,
+      "reason": "规则阈值变量需与去重语义一起审查，本次不改变规则。"
+    },
+    {
+      "file": "app/shared/src/assistant/agentRuntime.ts",
+      "message": "'req' is assigned a value but never used.",
+      "count": 1,
+      "reason": "助手运行时请求参数涉及独立接口演进，本次不删接口。"
+    },
+    {
+      "file": "app/shared/src/assistant/subAgent.ts",
+      "message": "'_evt' is defined but never used.",
+      "count": 1,
+      "reason": "异步事件接口占位参数，保留生成器契约。"
+    },
+    {
+      "file": "app/shared/src/jewelryArchHelpers.ts",
+      "message": "'titleStr' is defined but never used.",
+      "count": 1,
+      "reason": "导出函数参数涉及公共工具契约，保留兼容。"
+    },
+    {
+      "file": "app/shared/src/jewelryArchHelpers.ts",
+      "message": "'targetAnatomy' is defined but never used.",
+      "count": 1,
+      "reason": "导出函数参数涉及公共工具契约，保留兼容。"
+    },
+    {
+      "file": "app/shared/src/mediaSign.ts",
+      "message": "'appendMediaSignature' is defined but never used.",
+      "count": 1,
+      "reason": "内部签名辅助函数候选，涉及历史URL签名兼容，暂保留。"
+    },
+    {
+      "file": "app/shared/src/prompt-engine/multiAngle.ts",
+      "message": "'angleName' is assigned a value but never used.",
+      "count": 1,
+      "reason": "提示词生成接口参数，保留现有调用签名。"
+    },
+    {
+      "file": "app/shared/src/prompt-engine/storyboard.ts",
+      "message": "'_isJewelry' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/assets/AssetCenter.tsx",
+      "message": "'_props' is assigned a value but never used.",
+      "count": 1,
+      "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
+    },
+    {
+      "file": "app/web/src/features/assets/AssetCenter.tsx",
+      "message": "'isLoadingTasks' is assigned a value but never used.",
+      "count": 1,
+      "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
+    },
+    {
+      "file": "app/web/src/features/assets/AssetCenter.tsx",
+      "message": "'t' is assigned a value but never used.",
+      "count": 1,
+      "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
+    },
+    {
+      "file": "app/web/src/features/assets/AssetGenerationHistory.tsx",
+      "message": "'showModelBadge' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/assets/AssetGenerationHistory.tsx",
+      "message": "'modelFull' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/assets/LazyVideoCover.tsx",
+      "message": "'isPlaying' is assigned a value but never used.",
+      "count": 1,
+      "reason": "播放状态回调仍有消费者，保留播放管理器生命周期。"
+    },
+    {
+      "file": "app/web/src/features/assets/assetBackupUtils.ts",
+      "message": "'_' is assigned a value but never used.",
+      "count": 1,
+      "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
+    },
+    {
+      "file": "app/web/src/features/assets/assetBackupUtils.ts",
+      "message": "'__' is assigned a value but never used.",
+      "count": 1,
+      "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
+    },
+    {
+      "file": "app/web/src/features/assets/assetBackupUtils.ts",
+      "message": "'___' is assigned a value but never used.",
+      "count": 1,
+      "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
+    },
+    {
+      "file": "app/web/src/features/assets/hooks/useAssetCrud.ts",
+      "message": "'_shot' is defined but never used.",
+      "count": 1,
+      "reason": "批量导入字段剔除兼容；后续可改为显式删除副本字段。"
+    },
+    {
+      "file": "app/web/src/features/assistant/AssistantInputArea.tsx",
+      "message": "'missingRequirements' is assigned a value but never used.",
+      "count": 1,
+      "reason": "技能必需输入检查暂保留；助手界面有并行变动，避免改变校验契约。"
+    },
+    {
+      "file": "app/web/src/features/canvas/store/useCanvasStore.ts",
+      "message": "'get' is defined but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/home/__tests__/PromptBarRefMediaLightbox.test.tsx",
+      "message": "'container' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/home/hooks/usePromptBarMedia.ts",
+      "message": "'insertMentionsIntoPrompt' is defined but never used.",
+      "count": 1,
+      "reason": "媒体入口与插入主体关系待专项核查，不改变现有生成输入行为。"
+    },
+    {
+      "file": "app/web/src/features/home/hooks/usePromptBarMedia.ts",
+      "message": "'addRefMedia' is assigned a value but never used.",
+      "count": 1,
+      "reason": "媒体入口与插入主体关系待专项核查，不改变现有生成输入行为。"
+    },
+    {
+      "file": "app/web/src/features/workshop/batch/batchVisionAnalyze.ts",
+      "message": "'effectiveIndex' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/workshop/batch/components/BatchImageSelectionPanel.tsx",
+      "message": "'readyCount' is assigned a value but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/features/workshop/views/WorkshopRecipeView.tsx",
+      "message": "'isLoading' is assigned a value but never used.",
+      "count": 1,
+      "reason": "状态更新仍在交互路径中，暂保留待UI专项。"
+    },
+    {
+      "file": "app/web/src/features/workshop/views/WorkshopRecipeView.tsx",
+      "message": "'isCategoryManagerOpen' is assigned a value but never used.",
+      "count": 1,
+      "reason": "状态更新仍在交互路径中，暂保留待UI专项。"
+    },
+    {
+      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
+      "message": "'_sx' is defined but never used.",
+      "count": 1,
+      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
+    },
+    {
+      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
+      "message": "'_sy' is defined but never used.",
+      "count": 1,
+      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
+    },
+    {
+      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
+      "message": "'_sw' is defined but never used.",
+      "count": 1,
+      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
+    },
+    {
+      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
+      "message": "'_sh' is defined but never used.",
+      "count": 1,
+      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
+    },
+    {
+      "file": "app/web/src/lib/xhsLinkBatch.ts",
+      "message": "'sourceUrl' is defined but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    },
+    {
+      "file": "app/web/src/shared/ui/ParticleText.tsx",
+      "message": "'event' is defined but never used.",
+      "count": 1,
+      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
+    }
+  ]
+}

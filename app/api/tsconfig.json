@@ -1,0 +1,14 @@
+{
+  "extends": "../../works/configs/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@beike/shared": ["../shared/src/index.ts"],
+      "@beike/shared/*": ["../shared/src/*"],
+      "@beike/contracts": ["../contracts/src/index.ts"],
+      "@beike/contracts/*": ["../contracts/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "**/*.test.ts"]
+}
