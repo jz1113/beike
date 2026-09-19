@@ -2,13 +2,8 @@
  * 模型调用耗时审计：分阶段日志（上传转码 / 网关提交 / 客户端往返 / 出图完成）
  * 不记录 API Key / 完整图片内容。
  * 仅当 LATENCY_AUDIT=1 时 POST 到 ingest；默认 no-op。
- * 禁止 require('fs')：本模块会被客户端组件引用，Node fs 会导致 webpack Module not found。
  */
-
-const INGEST =
-  (typeof process !== 'undefined' && process.env?.LATENCY_AUDIT_ENDPOINT) || '';
-const SESSION =
-  (typeof process !== 'undefined' && process.env?.LATENCY_AUDIT_SESSION) || 'default';
+import { domainEnv, domainFetch } from './runtime';
 
 export type LatencyAuditPayload = {
   hypothesisId: string;
@@ -19,15 +14,17 @@ export type LatencyAuditPayload = {
 };
 
 function isAuditEnabled(): boolean {
-  if (typeof process === 'undefined' || !process.env) return false;
-  return process.env.LATENCY_AUDIT === '1' && Boolean(INGEST);
+  const ingest = domainEnv('LATENCY_AUDIT_ENDPOINT') || '';
+  return domainEnv('LATENCY_AUDIT') === '1' && Boolean(ingest);
 }
 
 export function logLatencyAudit(payload: LatencyAuditPayload): void {
   if (!isAuditEnabled()) return;
+  const ingest = domainEnv('LATENCY_AUDIT_ENDPOINT') || '';
+  const session = domainEnv('LATENCY_AUDIT_SESSION') || 'default';
 
   const body = {
-    sessionId: SESSION,
+    sessionId: session,
     runId: payload.runId || 'latency-audit',
     hypothesisId: payload.hypothesisId,
     location: payload.location,
@@ -37,11 +34,11 @@ export function logLatencyAudit(payload: LatencyAuditPayload): void {
   };
 
   try {
-    fetch(INGEST, {
+    void domainFetch(ingest, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Debug-Session-Id': SESSION,
+        'X-Debug-Session-Id': session,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(3000),

@@ -1,8 +1,9 @@
 import { VISION_MODELS } from '@beike/domain/vision';
+import { listApprovedModels, vendorLabel } from '@beike/domain/modelCatalog';
 import {
   getModelProviderName,
   isPlaceholderModelMeta,
-} from '@/features/home/utils/modelDisplayHelpers';
+} from '@/shared/ui/modelDisplayHelpers';
 
 export const DOC_EXT_RE = /\.(pdf|docx|pptx|xlsx|xls|md|txt|csv|json)$/i;
 export const LEGACY_OFFICE_EXT_RE = /\.(doc|ppt)$/i;
@@ -49,17 +50,13 @@ export const HISTORY_LIMIT_OPTIONS = [
   { value: 200, label: '回读200条' }
 ];
 
-export const DEFAULT_ASSISTANT_MODELS = [
-  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash (极速思考)', shortName: 'Gemini 3.7 Flash', badge: '首选推荐', provider: 'Google' },
-  { id: 'gemini-3.1-pro-preview-thinking-high', name: 'Gemini 3.1 Pro (深度思考)', shortName: 'Gemini 3.1 Pro', badge: '视觉旗舰', provider: 'Google' },
-  { id: 'gpt-5.5-pro', name: 'GPT 5.5 Pro (综合多模态)', shortName: 'GPT 5.5 Pro', badge: '旗舰', provider: 'OpenAI' },
-  { id: 'gpt-4o', name: 'GPT-4o (官方多模态)', shortName: 'GPT-4o', badge: '全能', provider: 'OpenAI' },
-  { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet (最强逻辑)', shortName: 'Claude 3.7', badge: '最强推理', provider: 'Anthropic' },
-  { id: 'grok-4.6', name: 'Grok 4.6 (反AI实拍)', shortName: 'Grok 4.6', badge: '反AI纪实', provider: 'xAI' },
-  { id: 'deepseek-chat', name: 'DeepSeek V3 (全能电商)', shortName: 'DeepSeek V3', badge: '国产旗舰', provider: 'DeepSeek' },
-  { id: 'deepseek-reasoner', name: 'DeepSeek R1 (深度思考)', shortName: 'DeepSeek R1', badge: '深度推理', provider: 'DeepSeek' },
-  { id: 'qwen-max', name: '通义千问 Qwen Max', shortName: 'Qwen Max', badge: '阿里电商', provider: 'Alibaba' },
-];
+export const DEFAULT_ASSISTANT_MODELS = listApprovedModels('multimodal').map((m) => ({
+  id: m.id,
+  name: m.name,
+  shortName: m.shortName,
+  badge: m.badge,
+  provider: vendorLabel(m.vendor),
+}));
 
 export type AssistantModelDisplay = {
   id: string;

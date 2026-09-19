@@ -1,11 +1,11 @@
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../../repositories/db';
 import { logLatencyAudit } from '@beike/domain/latencyAudit';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   buildEditsMultipart,
   fetchWithRetry,
   shouldUseEditsSubmit,
-} from '../../../services/imageHelpers';
+} from '../../../services/gatewayCredentials';
 import './poll';
 
 const IMAGE_SUBMIT_TIMEOUT_MS = 45_000;

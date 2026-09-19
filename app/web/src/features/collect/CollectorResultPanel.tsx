@@ -6,7 +6,7 @@ import {
   displayVideoSrc,
   handleImgError,
   mediaAssetCount,
-} from '@/features/collect/collectorShared';
+} from '@/features/collect/collectorTypes';
 
 export interface CollectorResultPanelProps {
   inspectingItem: any;

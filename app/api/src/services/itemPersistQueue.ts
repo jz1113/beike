@@ -21,7 +21,7 @@ interface PersistTask {
 }
 
 const queue: PersistTask[] = [];
-let draining = false;
+let drainPromise: Promise<void> | null = null;
 let droppedCount = 0;
 
 export function getDroppedItemCount(): number {
@@ -87,33 +87,36 @@ async function persistOne(task: PersistTask): Promise<void> {
   });
 }
 
-async function drainLoop(): Promise<void> {
-  if (draining) return;
-  draining = true;
-  try {
-    while (queue.length > 0) {
-      const task = queue.shift()!;
-      try {
-        await persistOne(task);
-      } catch (err) {
-        task.attempts += 1;
-        if (task.attempts < RETRY_LIMIT) {
-          // 重新入队（保留在队尾）
-          enqueue(task);
-          // 让出当前 tick，避免阻塞 IO
-          await new Promise((r) => setTimeout(r, 25 * task.attempts));
-        } else {
-          console.warn('[ItemPersistQueue] failed after retries', {
-            turnId: task.turnId,
-            itemId: task.item.id,
-            err,
-          });
+async function drainLoop(opts?: { throwOnError?: boolean }): Promise<void> {
+  if (drainPromise) return drainPromise;
+  drainPromise = (async () => {
+    try {
+      while (queue.length > 0) {
+        const task = queue.shift()!;
+        try {
+          await persistOne(task);
+        } catch (err) {
+          task.attempts += 1;
+          const newerQueued = queue.some((queued) => queued.turnId === task.turnId && queued.item.id === task.item.id);
+          if (newerQueued) continue;
+          if (opts?.throwOnError || task.attempts < RETRY_LIMIT) {
+            enqueue(task);
+          } else {
+            console.warn('[ItemPersistQueue] failed after retries', {
+              turnId: task.turnId,
+              itemId: task.item.id,
+              err,
+            });
+          }
+          if (opts?.throwOnError) throw err;
+          await new Promise((r) => setTimeout(r, 25 * Math.max(1, task.attempts)));
         }
       }
+    } finally {
+      drainPromise = null;
     }
-  } finally {
-    draining = false;
-  }
+  })();
+  return drainPromise;
 }
 
 /**
@@ -125,12 +128,12 @@ export function pumpItemQueue(): void {
   void drainLoop();
 }
 
-// 每 100ms 驱动一次 drain。失败也只是写入后台日志，不会抛出。
-if (typeof setInterval !== 'undefined') {
-  setInterval(pumpItemQueue, 100);
+if (typeof setInterval !== 'undefined' && process.env.VITEST !== 'true') {
+  const timer = setInterval(pumpItemQueue, 100);
+  if (typeof timer === 'object' && timer && 'unref' in timer) (timer as NodeJS.Timeout).unref();
 }
 
-/** 测试用：等待队列清空 */
+/** 测试用：等待队列清空；失败时把任务留在队列并抛出 */
 export async function flushItemQueue(): Promise<void> {
-  await drainLoop();
+  await drainLoop({ throwOnError: true });
 }

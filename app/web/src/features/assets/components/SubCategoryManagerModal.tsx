@@ -20,7 +20,7 @@ import {
   resetSubCategoriesForCategory,
   importSubCategoriesFromText,
   consolidateSubCategoriesLocally,
-} from '@beike/domain/productCategoryHelpers';
+} from '@beike/domain/productCategory';
 
 export interface SubCategoryManagerModalProps {
   isOpen: boolean;

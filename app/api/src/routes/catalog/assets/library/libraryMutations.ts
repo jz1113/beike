@@ -1,23 +1,38 @@
 import { validateAssetEdit, pickAssetEditFields } from '@beike/domain/assetEdit';
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../../../repositories/db';
 import { queueMediaReview } from '../../../../services/mediaReviewQueue';
+import { mutateOrganization } from '../../../../services/library/organization';
+import { importLibraryBackup, remapItemData, withOrganization } from './libraryImport';
 
 // 创建单项或批量导入原子资产
 export async function executeLibraryPost(req: Request) {
   const body = await req.json();
 
+  if (typeof body.action === 'string' && [
+    'save-product-category',
+    'reorder-product-categories',
+    'classify-albums',
+    'classify-assets',
+  ].includes(body.action)) {
+    return mutateOrganization(body);
+  }
+
   if (body.action === 'bulk-import' && Array.isArray(body.items)) {
     const items = body.items as Array<{ assetType: string; data: Record<string, unknown>; sourceId?: string }>;
     const created: unknown[] = [];
     const sceneIds = new Map<string, string>();
+    const maps = await importLibraryBackup(body, created);
     await prisma.$transaction(async (tx) => {
       for (const item of [...items].sort((a, b) => Number(b.assetType === 'scene') - Number(a.assetType === 'scene'))) {
         const { assetType } = item;
-        const data = pickAssetEditFields(assetType, item.data || {});
-        const error = validateAssetEdit(assetType, data);
+        const data = await withOrganization(assetType, remapItemData(pickAssetEditFields(assetType, item.data || {}), maps));
+        const error = validateAssetEdit(assetType, pickAssetEditFields(assetType, data));
         if (error) throw new Error(error);
-        if (assetType === 'action' && data.sceneId) data.sceneId = sceneIds.get(String(data.sceneId)) || null;
+        if (assetType === 'action') {
+          const actionData = data as { sceneId?: string | null };
+          if (actionData.sceneId) actionData.sceneId = sceneIds.get(String(actionData.sceneId)) || null;
+        }
         if (!assetType || !data) continue;
         if (assetType === 'scene') {
           const scene = await tx.sceneAsset.create({ data: data as any });
@@ -98,19 +113,24 @@ export async function executeLibraryPost(req: Request) {
       },
     });
   } else if (assetType === 'persona') {
+    const org = await withOrganization('persona', data);
     created = await prisma.personaAsset.create({
       data: {
         name: data.name || '新人设博主',
         description: data.description || '',
         tags: Array.isArray(data.tags) ? data.tags.join(', ') : data.tags || '',
         avatarUrl: data.avatarUrl || '',
+        albumId: org.albumId as string | null,
+        productCategoryIds: String(org.productCategoryIds || '[]'),
+        isUniversal: org.isUniversal === true,
       },
     });
   } else if (assetType === 'full_prompt') {
+    const org = await withOrganization('full_prompt', data);
     created = await prisma.fullPromptAsset.create({
       data: {
         title: data.title || '新完整反推提示词',
-        albumName: data.albumName || '',
+        albumName: String(org.albumName || data.albumName || ''),
         reversePromptZh: data.reversePromptZh || '',
         reversePromptEn: data.reversePromptEn || '',
         dimensions:
@@ -133,6 +153,9 @@ export async function executeLibraryPost(req: Request) {
         tags: Array.isArray(data.tags) ? data.tags.join(', ') : data.tags || '',
         category: data.category || 'general',
         provenance: data.provenance || 'manual',
+        albumId: org.albumId as string,
+        productCategoryIds: String(org.productCategoryIds || '[]'),
+        isUniversal: false,
       },
     });
   } else {

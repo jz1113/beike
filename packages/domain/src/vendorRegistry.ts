@@ -25,19 +25,16 @@ const OWNED_BY_VENDOR: Record<string, string> = {
   shengshu: 'vidu',
 };
 
-// 30+ 知名大模型厂商精准归类规则
 export const VENDORS: VendorMeta[] = [
   {
     id: 'openai',
-    name: 'OpenAI (GPT / DALL-E / Sora / Voice)',
+    name: 'OpenAI (GPT / Sora)',
     shortLabel: 'O',
     iconBg: 'bg-emerald-600',
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.startsWith('gpt') || lower.includes('openai') || lower.includes('net-gpt') || lower.startsWith('o1') || lower.startsWith('o3') || lower.startsWith('o4') ||
-             lower.startsWith('chatgpt') || lower.startsWith('dall-e') || lower.startsWith('dall') || lower.startsWith('text-embedding') ||
-             lower.includes('whisper') || lower.startsWith('tts') || lower.startsWith('sora') || lower.includes('advanced-voice') || lower.includes('avatar-');
+      return lower.startsWith('gpt') || lower.includes('openai') || lower.startsWith('sora');
     }
   },
   {
@@ -50,24 +47,13 @@ export const VENDORS: VendorMeta[] = [
   },
   {
     id: 'google',
-    name: 'Google (Gemini / Veo / Imagen / Banana)',
+    name: 'Google (Gemini / Veo / Banana)',
     shortLabel: 'G',
     iconBg: 'bg-blue-600',
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.includes('gemini') || lower.includes('gemma') || lower.includes('imagen') || lower.includes('veo') || lower.includes('palm') || lower.includes('google') || lower.includes('banana') || lower.includes('nanobanana');
-    }
-  },
-  {
-    id: 'mistral',
-    name: 'Mistral AI (Mistral / Mixtral / Pixtral)',
-    shortLabel: 'M',
-    iconBg: 'bg-amber-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('mistral') || lower.includes('mixtral') || lower.includes('pixtral') || lower.includes('codestral') || lower.includes('ministral');
+      return lower.includes('gemini') || lower.includes('veo') || lower.includes('banana') || lower.includes('omni_flash') || lower.includes('google');
     }
   },
   {
@@ -80,24 +66,24 @@ export const VENDORS: VendorMeta[] = [
   },
   {
     id: 'bytedance',
-    name: '字节跳动 (Seedream / 即梦 / 豆包)',
+    name: '字节跳动 (Seedream / Seedance)',
     shortLabel: '字',
     iconBg: 'bg-blue-500',
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.includes('seedream') || lower.includes('seedance') || lower.includes('doubao') || lower.includes('bytedance') || lower.includes('jimeng') || lower.includes('volc') || lower.includes('skylark');
+      return lower.includes('seedream') || lower.includes('seedance') || lower.includes('doubao') || lower.includes('bytedance');
     }
   },
   {
     id: 'alibaba',
-    name: '阿里巴巴 (通义千问 / 万相 / Animate Anyone)',
+    name: '阿里巴巴 (通义千问 / 万相)',
     shortLabel: '阿',
     iconBg: 'bg-orange-600',
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.includes('qwen') || isAlibabaWanModel(lower) || lower.includes('tongyi') || lower.includes('dashscope') || lower.includes('animate-anyone') || lower.includes('alibaba') || lower.includes('aliyun');
+      return lower.includes('qwen') || isAlibabaWanModel(lower) || lower.includes('z-image') || lower.includes('tongyi') || lower.includes('dashscope');
     }
   },
   {
@@ -106,10 +92,7 @@ export const VENDORS: VendorMeta[] = [
     shortLabel: 'F',
     iconBg: 'bg-zinc-800',
     iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('flux') || lower.includes('black-forest') || lower.includes('bfl');
-    }
+    matcher: (id) => id.toLowerCase().includes('flux') || id.toLowerCase().includes('bfl')
   },
   {
     id: 'midjourney',
@@ -119,34 +102,23 @@ export const VENDORS: VendorMeta[] = [
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.includes('midjourney') || lower.includes('mj_') || lower.includes('niji');
+      return lower.includes('midjourney') || lower.includes('mj_') || /^mjv?\d/.test(lower);
     }
   },
   {
     id: 'kuaishou',
-    name: '快手 (可灵 Kling / 可图 Kolors)',
+    name: '快手 (可灵 Kling)',
     shortLabel: '快',
     iconBg: 'bg-red-500',
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.includes('kling') || lower.includes('kolors') || lower.includes('kwai') || lower.includes('keling');
-    }
-  },
-  {
-    id: 'zhipu',
-    name: '智谱 AI (GLM / CogView / CogVideo)',
-    shortLabel: '智',
-    iconBg: 'bg-blue-700',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('glm') || lower.includes('cogview') || lower.includes('cogvideo') || lower.includes('chatglm') || lower.includes('zhipu');
+      return lower.includes('kling') || lower.includes('keling') || lower.includes('kuaishou');
     }
   },
   {
     id: 'moonshot',
-    name: '月之暗面 (Kimi / Moonshot)',
+    name: '月之暗面 (Kimi)',
     shortLabel: '月',
     iconBg: 'bg-emerald-700',
     iconColor: 'text-white',
@@ -157,62 +129,13 @@ export const VENDORS: VendorMeta[] = [
   },
   {
     id: 'minimax',
-    name: 'MiniMax (海螺 / abab)',
+    name: 'MiniMax',
     shortLabel: 'M',
     iconBg: 'bg-rose-600',
     iconColor: 'text-white',
     matcher: (id) => {
       const lower = id.toLowerCase();
-      return lower.includes('minimax') || lower.includes('abab') || lower.includes('hailuo');
-    }
-  },
-  {
-    id: 'runway',
-    name: 'Runway (Gen-2 / Gen-3 Alpha)',
-    shortLabel: 'R',
-    iconBg: 'bg-violet-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('runway') || lower.includes('gen-2') || lower.includes('gen-3') || lower.includes('gen2') || lower.includes('gen3');
-    }
-  },
-  {
-    id: 'luma',
-    name: 'Luma AI (Dream Machine / Photon)',
-    shortLabel: 'L',
-    iconBg: 'bg-rose-500',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('luma') || lower.includes('dream-machine') || lower.includes('photon');
-    }
-  },
-  {
-    id: 'pika',
-    name: 'Pika (Pika 2.0 / Effects)',
-    shortLabel: 'P',
-    iconBg: 'bg-amber-500',
-    iconColor: 'text-white',
-    matcher: (id) => id.toLowerCase().includes('pika')
-  },
-  {
-    id: 'ideogram',
-    name: 'Ideogram (Ideogram 2.0)',
-    shortLabel: 'I',
-    iconBg: 'bg-teal-600',
-    iconColor: 'text-white',
-    matcher: (id) => id.toLowerCase().includes('ideogram')
-  },
-  {
-    id: 'stability',
-    name: 'Stability AI (SD / SDXL / Cascade)',
-    shortLabel: 'S',
-    iconBg: 'bg-purple-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('stable-diffusion') || lower.includes('sdxl') || lower.includes('sd-') || lower.includes('sd3') || lower.includes('stability') || lower.includes('cascade');
+      return lower.includes('minimax') || lower.includes('hailuo');
     }
   },
   {
@@ -222,126 +145,6 @@ export const VENDORS: VendorMeta[] = [
     iconBg: 'bg-black',
     iconColor: 'text-white',
     matcher: (id) => id.toLowerCase().includes('grok') || id.toLowerCase().includes('xai')
-  },
-  {
-    id: 'meta',
-    name: 'Meta (Llama)',
-    shortLabel: 'L',
-    iconBg: 'bg-sky-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('llama') || lower.includes('meta-') || lower.includes('meta/');
-    }
-  },
-  {
-    id: 'baai',
-    name: '北京智源 (BAAI / BGE)',
-    shortLabel: '智',
-    iconBg: 'bg-cyan-700',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('baai') || lower.includes('bge');
-    }
-  },
-  {
-    id: 'tencent',
-    name: '腾讯 (混元 Hunyuan)',
-    shortLabel: '腾',
-    iconBg: 'bg-blue-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('hunyuan') || lower.includes('tencent');
-    }
-  },
-  {
-    id: 'baidu',
-    name: '百度 (文心一言 / Ernie)',
-    shortLabel: '百',
-    iconBg: 'bg-blue-700',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('baidu') || lower.includes('ernie') || lower.includes('wenxin');
-    }
-  },
-  {
-    id: 'stepfun',
-    name: '阶跃星辰 (Stepfun / Step)',
-    shortLabel: '阶',
-    iconBg: 'bg-purple-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('stepfun') || lower.includes('step-');
-    }
-  },
-  {
-    id: 'yi',
-    name: '零一万物 (01.AI / Yi)',
-    shortLabel: '零',
-    iconBg: 'bg-emerald-600',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('01.ai') || lower.includes('01ai') || lower.startsWith('yi-') || lower.includes('yi-large') || lower.includes('yi-medium') || lower.includes('yi-vision');
-    }
-  },
-  {
-    id: 'sensenova',
-    name: '商汤科技 (SenseNova / 日日新)',
-    shortLabel: '商',
-    iconBg: 'bg-blue-800',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('sensenova') || lower.includes('sense-') || lower.includes('商汤');
-    }
-  },
-  {
-    id: 'baichuan',
-    name: '百川智能 (Baichuan)',
-    shortLabel: '川',
-    iconBg: 'bg-orange-700',
-    iconColor: 'text-white',
-    matcher: (id) => {
-      const lower = id.toLowerCase();
-      return lower.includes('baichuan') || lower.includes('百川');
-    }
-  },
-  {
-    id: 'recraft',
-    name: 'Recraft AI',
-    shortLabel: 'R',
-    iconBg: 'bg-pink-600',
-    iconColor: 'text-white',
-    matcher: (id) => id.toLowerCase().includes('recraft')
-  },
-  {
-    id: 'suno',
-    name: 'Suno (AI 音乐)',
-    shortLabel: 'S',
-    iconBg: 'bg-zinc-900',
-    iconColor: 'text-white',
-    matcher: (id) => id.toLowerCase().includes('suno')
-  },
-  {
-    id: 'viggle',
-    name: 'Viggle AI (动作迁移)',
-    shortLabel: 'V',
-    iconBg: 'bg-emerald-500',
-    iconColor: 'text-white',
-    matcher: (id) => id.toLowerCase().includes('viggle')
-  },
-  {
-    id: 'tripo',
-    name: 'Tripo 3D',
-    shortLabel: 'T',
-    iconBg: 'bg-indigo-600',
-    iconColor: 'text-white',
-    matcher: (id) => id.toLowerCase().includes('tripo')
   },
   {
     id: 'vidu',
@@ -356,7 +159,7 @@ export const VENDORS: VendorMeta[] = [
   },
   {
     id: 'other',
-    name: '其他厂商 / 社区开源模型',
+    name: '其他厂商',
     shortLabel: '社',
     iconBg: 'bg-slate-700',
     iconColor: 'text-white',

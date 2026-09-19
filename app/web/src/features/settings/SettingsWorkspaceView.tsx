@@ -134,7 +134,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const [isAddingModelModalOpen, setIsAddingModelModalOpen] = useState(false);
 
   // 7. 业务默认模型路由状态
-  const [activeVisionModel, setActiveVisionModel] = useState('gemini-3.1-pro-preview-thinking-high');
+  const [activeVisionModel, setActiveVisionModel] = useState('gemini-3.1-pro-preview');
   const [, setActiveAssistantModel] = useState('gpt-5.6-luna');
   const [activeImageGenModel, setActiveImageGenModel] = useState('gpt-image-2');
   const [activeVideoGenModel, setActiveVideoGenModel] = useState('doubao-seedance-2.5');

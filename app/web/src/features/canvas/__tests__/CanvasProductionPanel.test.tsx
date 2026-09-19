@@ -1,0 +1,41 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { CanvasProductionPanel } from '../components/CanvasProductionPanel';
+import { useCanvasStore } from '../store/useCanvasStore';
+import { persistCanvasMedia } from '../canvasMediaImport';
+import { apiFetch } from '@/lib/apiClient';
+vi.mock('../canvasMediaImport', () => ({ persistCanvasMedia: vi.fn() }));
+vi.mock('@/lib/apiClient', () => ({ apiFetch: vi.fn() }));
+beforeEach(() => { vi.clearAllMocks(); useCanvasStore.setState({ projects: [{ id: 'plan', title: '制作项目', createdAt: 1, updatedAt: 1, nodes: [] }], activeProjectId: 'plan' }); });
+afterEach(cleanup);
+const open = () => { render(<CanvasProductionPanel projectId="plan" />); fireEvent.click(screen.getByRole('button', { name: '素材与分镜' })); };
+it('imports multiple assets with partial failure and retains material roles', async () => {
+  vi.mocked(persistCanvasMedia).mockResolvedValueOnce({ type: 'image', imageUrl: '/storage/a.png', title: '商品图', x: 0, y: 0, width: 300, height: 400 }).mockRejectedValueOnce(new Error('格式不支持')).mockResolvedValueOnce({ type: 'audio', audioUrl: '/storage/a.mp3', title: '旁白', x: 0, y: 0, width: 300, height: 100 });
+  open();
+  fireEvent.change(screen.getByLabelText('批量提交已有素材'), { target: { files: [new File(['a'], 'a.png'), new File(['b'], 'b.bin'), new File(['c'], 'c.mp3')] } });
+  await waitFor(() => expect(screen.getByRole('status').textContent).toContain('已保存 2/3'));
+  expect(useCanvasStore.getState().projects[0].nodes.map(n => n.assetRole)).toEqual(['product', 'audio']);
+});
+it('creates linked nodes without invoking generation, avoids duplicate creation and preserves draft on close', () => {
+  open();
+  fireEvent.change(screen.getByLabelText('制作方案原文'), { target: { value: '开盒 | 2 | 汉堡近景 | 手打开包装' } });
+  fireEvent.click(screen.getByRole('button', { name: '提取分镜草稿' }));
+  fireEvent.click(screen.getByRole('button', { name: '创建分镜节点' }));
+  expect(useCanvasStore.getState().projects[0].nodes).toHaveLength(3);
+  fireEvent.click(screen.getByRole('button', { name: '创建分镜节点' }));
+  expect(useCanvasStore.getState().projects[0].nodes).toHaveLength(3);
+  expect(apiFetch).not.toHaveBeenCalled();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '素材与分镜' }));
+  expect((screen.getByLabelText('制作方案原文') as HTMLTextAreaElement).value).toContain('汉堡近景');
+});
+it('reads documents locally and keeps unstructured content for review', async () => {
+  vi.mocked(apiFetch).mockResolvedValue(Response.json({ success: true, text: '一段不能自动拆分的制作建议' }));
+  open();
+  fireEvent.change(screen.getByLabelText('导入制作方案'), { target: { files: [new File(['doc'], '方案.docx')] } });
+  await waitFor(() => expect((screen.getByLabelText('制作方案原文') as HTMLTextAreaElement).value).toContain('制作建议'));
+  fireEvent.click(screen.getByRole('button', { name: '提取分镜草稿' }));
+  expect(screen.getByRole('status').textContent).toContain('未识别到分镜');
+  expect(useCanvasStore.getState().projects[0].nodes).toHaveLength(0);
+});

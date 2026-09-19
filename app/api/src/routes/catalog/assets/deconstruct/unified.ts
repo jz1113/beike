@@ -4,7 +4,7 @@ import {
   resolveUnifiedShardSize,
   type PerImageResult,
 } from '@beike/domain/assetDeconstruct/prompts';
-import type { SubCategoryDef } from '@beike/domain/productCategoryHelpers';
+import type { SubCategoryDef } from '@beike/domain/productCategory';
 import { callVisionJson } from './visionCall';
 import { parseUnifiedFromResponse } from './jsonHealer';
 import type { VisionCallDiagnostics, VisionCallTracker } from './diagnostics';

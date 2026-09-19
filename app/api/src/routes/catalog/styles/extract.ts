@@ -1,3 +1,4 @@
+import { gatewayFetch } from '../../../gateways/http';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../../core/http';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
@@ -9,7 +10,7 @@ import {
   VISION_EXTRACT_SHARD_TIMEOUT_MS,
 } from '@beike/domain/visionTimeouts';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { getDefaultBaseUrl, getDefaultApiKey } from '../../../services/imageHelpers';
+import { getDefaultBaseUrl, getDefaultApiKey } from '../../../services/gatewayCredentials';
 
 export async function POST(req: Request) {
   try {
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
               resolveVisionTimeoutMs(targetModel, true),
               VISION_EXTRACT_SHARD_TIMEOUT_MS,
             );
-            const resp = await fetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
+            const resp = await gatewayFetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -195,7 +196,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
     for (const targetModel of modelsToTry) {
       try {
         const masterTimeoutMs = resolveVisionTimeoutMs(targetModel, true);
-        const response = await fetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
+        const response = await gatewayFetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

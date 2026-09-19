@@ -52,16 +52,8 @@ cp .env.example .env
 
 ---
 
-### 3. 一键启动（按平台）
+### 3. 一键启动（macOS）
 
-#### 🪟 Windows 用户
-进入项目根目录，直接双击运行：
-```text
-启动桌面.bat
-```
-*(脚本会自动检测并执行 `pnpm install` 安装依赖，完成初始化并启动应用)*
-
-#### 🍏 macOS 用户
 进入项目根目录，直接双击运行：
 ```text
 启动桌面.command
@@ -78,23 +70,14 @@ cp .env.example .env
 # 安装依赖
 pnpm install
 
-# 模式 A：启动桌面全栈开发模式（Tauri 窗口 + Web + API）
-npm run tauri:dev
+# 本机 Web：同时启动 API + Vite，并打开浏览器
+pnpm run dev:web
+# 打开浏览器访问：http://127.0.0.1:5173
 
-# 模式 B：纯网页端轻量开发模式（无需 Rust，浏览器快速调试）
-npm run dev:ui
-npm run dev:api
-# 打开浏览器访问：http://localhost:5173
+# 也可分开启动
+pnpm run dev:ui
+pnpm run dev:api
 ```
-
----
-
-## 📦 桌面端打包发布
-
-项目内置了一键打包脚本，可直接生成对应平台的安装文件：
-
-- **Windows 打包安装程序**：双击运行 `一键打包Windows安装包.bat`（产物为 `.exe` / `.msi` 安装包）。
-- **macOS 打包安装镜像**：运行 `./一键打包Mac安装包.command`（产物为 `.dmg` 镜像）。
 
 ---
 

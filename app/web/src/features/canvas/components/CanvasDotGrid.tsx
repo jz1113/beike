@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import { getPerformanceMode } from '@/lib/performancePreference';
+import { CanvasDotGridStatic } from './canvasDotGridStatic';
 
 export interface CanvasDotGridProps {
   /** 画布视口当前的平移量 (px) */
@@ -45,7 +47,14 @@ function hexToRgb(hex: string) {
  * 3. 环境水波流动微光 (Ambient Fluid Waves)：参考主页图 2 质感，点阵具有柔和轻盈的起伏呼吸光影。
  * 4. 鼠标靠近变色与弹性微推 (Interactive Proximity)：光标滑过产生流体般的变色与微弹动排斥。
  */
-export const CanvasDotGrid: React.FC<CanvasDotGridProps> = ({
+export const CanvasDotGrid: React.FC<CanvasDotGridProps> = (props) => {
+  if (getPerformanceMode() !== 'fidelity') {
+    return <CanvasDotGridStatic {...props} />;
+  }
+  return <CanvasDotGridAnimated {...props} />;
+};
+
+const CanvasDotGridAnimated: React.FC<CanvasDotGridProps> = ({
   pan,
   zoom,
   isPanning = false,

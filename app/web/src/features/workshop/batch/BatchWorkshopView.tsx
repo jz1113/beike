@@ -123,6 +123,7 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
     isAutoPilotRunning,
     startAutoPilotPipeline,
     toastMsg,
+    workspaceStatus,
   } = runner;
 
   const readyProductCount = successfulItems.filter(i => i.selectedProductImages && i.selectedProductImages.length > 0).length;
@@ -279,6 +280,7 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
         onSwitchMode={handleSwitchMode}
         isAutoPilotRunning={isAutoPilotRunning}
       />
+      {workspaceStatus ? <p role="status">{workspaceStatus}</p> : null}
 
       {/* 主体工作区 Content Area（Stage 1 采编采用黄金阅读宽度；Stage 2+ 选图及后续生产流水线自适应全屏大画幅充盈放大） */}
       <div className="flex-1 overflow-y-auto pl-[84px] pr-3 sm:pl-[100px] sm:pr-5 xl:pl-[108px] xl:pr-7 py-3 sm:py-4 flex flex-col">

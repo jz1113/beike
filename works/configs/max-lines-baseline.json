@@ -1,0 +1,284 @@
+{
+  "files": [
+    {
+      "file": "app/api/src/routes/catalog/collect.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/api/src/routes/generate/video.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/api/src/routes/system/models/fetch.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/api/src/services/analyze/promptAssembler.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/api/src/services/analyze/storyboard.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/api/src/services/assistantAgent.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/api/src/services/deconstruct/saveAssets.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/AssetCenter.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/AssetGenerationHistory.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/AssetPromptLibrary.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/components/AssetDetailModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/components/AssetLibraryFilterBar.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/components/DeconstructModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assets/components/SubCategoryManagerModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/AIAssistantDrawer.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/AssistantInputArea.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/AssistantMessageList.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/components/AssistantSkillsMenu.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/components/BrandKitModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/FormattedMarkdown.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/hooks/useAssistantChatStream.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/hooks/useAssistantTurn.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/assistant/ProductCardWidget.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/canvas/__tests__/InfiniteCanvasEditor.test.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/canvas/components/CanvasDrawingNode.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/canvas/components/CanvasLightingModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/canvas/components/CanvasMultiAngleModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/canvas/components/InfiniteCanvasEditor.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/collect/CollectorSinglePanel.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/generate/components/GenerateTaskFeed.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/home/components/inspiration/InspirationModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/home/components/prompt-bar/media/PromptBarRefMediaPanel.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/home/components/prompt-bar/PromptActionBar.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/home/components/prompt-bar/RichPromptInput.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/home/hooks/usePromptBarMedia.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/settings/components/ApiServicesGatewayPanel.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/settings/GatewayModelModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/settings/settingsShared.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/settings/SettingsWorkspaceView.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/settings/tabs/LocalStorageTab.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/settings/tabs/UsageTab.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/workshop/batch/batchVisionAnalyze.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/workshop/batch/BatchWorkshopView.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/workshop/batch/components/BatchStage4ProductItem.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/workshop/batch/useBatchWorkshopRunner.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/features/workshop/components/WorkshopSettingsModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/lib/usageTracker.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/media/DepthCarousel.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/modals/ImageLightboxModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/modals/lightbox/MultiAngleModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/modals/lightbox/SmartEditModal.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/modals/styleExtract/useStyleExtractWorkflow.ts",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/ui/GlobalContextMenu.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/shared/ui/ParticleText.tsx",
+      "lines": 401
+    },
+    {
+      "file": "app/web/src/store/workshopSlice.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/assetDeconstruct/prompts.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/assetDeconstruct/validate.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/assistant/tools/defs.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/drawing.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/modelAdapters/video/adapters.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/productCategory/anatomy.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/productCategory/subcategoryStore.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/prompt-engine/assembler.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/prompt-engine/guards.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/prompt-engine/roles.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/vision.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/domain/src/workflowModels.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/server-kit/src/apiaScraper.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/server-kit/src/assistant/agentRuntime.ts",
+      "lines": 401
+    },
+    {
+      "file": "packages/server-kit/src/storage.ts",
+      "lines": 401
+    }
+  ]
+}

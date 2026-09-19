@@ -1,3 +1,4 @@
+import { gatewayFetch } from '../../gateways/http';
 import { jsonResponse } from '../../core/http';
 import { readResponseBodyLimited } from '../../core/readBodyLimited';
 import { parseExportZipBody } from '../../core/validate';
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
       let currentUrl = url;
       let res: Response | null = null;
       for (let redirectCount = 0; redirectCount < 3; redirectCount++) {
-        res = await fetch(currentUrl, {
+        res = await gatewayFetch(currentUrl, {
           headers,
           signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
           redirect: 'manual',

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { COLLECTOR_STORAGE_KEY } from '../collectorShared';
-import { sanitizeCollectedItem } from '../collectorUrlHelpers';
+import { COLLECTOR_STORAGE_KEY } from '../collectorTypes';
+import { sanitizeCollectedItem } from '../collectorUrls';
 
 export function useCollectorHistory(isOpen: boolean) {
   const [historyItems, setHistoryItems] = useState<any[]>([]);

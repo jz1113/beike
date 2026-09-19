@@ -1,9 +1,10 @@
+import { gatewayFetch } from '../../gateways/http';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../core/http';
 import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
-import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/imageHelpers';
+import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/gatewayCredentials';
 
 interface CopywritingRequest {
   model?: string;
@@ -248,11 +249,11 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
 
     const modelsToTry = Array.from(new Set([
       body.model || '',
-      'gpt-4o-mini',
-      'gpt-4o',
-      'deepseek-chat',
-      'qwen-plus',
-      'gemini-1.5-flash'
+      'gpt-5.4-mini',
+      'gpt-5.6-luna',
+      'deepseek-v4-flash',
+      'qwen3.8-max',
+      'gemini-3.7-flash'
     ].filter(Boolean)));
 
     let lastError: any = null;
@@ -267,7 +268,7 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 18000);
 
-          const upstreamRes = await fetch(`${normalizeGatewayBaseUrl(baseUrl)}/v1/chat/completions`, {
+          const upstreamRes = await gatewayFetch(`${normalizeGatewayBaseUrl(baseUrl)}/v1/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -335,7 +336,7 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
           content: finalContent,
           tags: tagsList,
         },
-        model: usedModel || 'gpt-4o-mini',
+        model: usedModel || 'gpt-5.4-mini',
         usage: copyUsage,
       });
     }

@@ -1,13 +1,14 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { normalizeVisionModelId } from '@beike/domain/vision';
 import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import { formatVisionAnalyzeError } from '@beike/domain/visionTimeouts';
 import { parseJsonBody, analyzeBodySchema } from '../../core/validate';
-import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/imageHelpers';
+import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/gatewayCredentials';
 import { resolveTemplateStyleWithJewelryGuard } from './analyze/jewelryGuard';
 import { executeSocialSwap } from './analyze/socialSwap';
-import { executeStoryboard } from './analyze/storyboard';
+import { executeStoryboard } from '../../services/analyze/storyboard';
+import { DEFAULT_MULTIMODAL_MODEL_ID } from '@beike/domain/modelCatalog';
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
       templateStyle = 'auto',
       shotCount = 4,
       extraRequirements = '',
-      model = 'gpt-5.6-luna',
+      model = DEFAULT_MULTIMODAL_MODEL_ID,
       fallbackModels = [],
       customBaseUrl,
       customApiKey,

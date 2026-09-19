@@ -42,15 +42,15 @@ export function useStyleExtractWorkflow({
   const [visibleCount, setVisibleCount] = useState<number>(24);
 
   // AI 逆向状态
-  const [extractModel, setExtractModel] = useState<string>('gemini-3.1-pro-preview-thinking-high');
+  const [extractModel, setExtractModel] = useState<string>('gemini-3.1-pro-preview');
   const [multimodalModels, setMultimodalModels] = useState<Array<{ id: string; name: string }>>([
-    { id: 'gemini-3.1-pro-preview-thinking-high', name: 'Gemini 3.1 Pro (深度思考 - 首选)' },
-    { id: 'gpt-4o', name: 'GPT-4o (旗舰多模态)' },
-    { id: 'grok-4.6', name: 'Grok 4.6 (反AI纪实)' },
-    { id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet (极速推理)' },
-    { id: 'claude-opus-5', name: 'Claude Opus 5 (顶级推理)' },
-    { id: 'gpt-5.5-pro', name: 'GPT 5.5 Pro (综合旗舰)' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini (轻量极速)' },
+    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' },
+    { id: 'gpt-5.6-luna', name: 'GPT 5.6 Luna' },
+    { id: 'grok-4.6', name: 'Grok 4.6' },
+    { id: 'claude-sonnet-5', name: 'Claude Sonnet 5' },
+    { id: 'claude-opus-5', name: 'Claude Opus 5' },
+    { id: 'gpt-5.4-mini', name: 'GPT 5.4 Mini' },
+    { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
   ]);
   const [userHint, setUserHint] = useState('');
   const [extractStepText, setExtractStepText] = useState('⚡ 正在提取并对齐图集特征...');

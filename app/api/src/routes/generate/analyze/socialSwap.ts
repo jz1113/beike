@@ -15,7 +15,7 @@ import {
   padMissingSocialShots,
   callVisionModel,
   parseResponseJson,
-} from '../../../services/analyzeHelpers';
+} from '../../../services/analyzeVisionCall';
 
 export interface SocialSwapParams {
   referenceImageUrls: string[];

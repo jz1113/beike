@@ -1,10 +1,10 @@
 import { type GenerationTask, useAppStore } from '@/store/useAppStore';
-import { getAspectRatioClass } from '../generateCanvasHelpers';
+import { getAspectRatioClass } from '../generateCanvasLayout';
 import { proxyMediaUrl } from '@/lib/apiClient';
-import LazyVideoCover from '@/features/assets/LazyVideoCover';
+import LazyVideoCover from '@/shared/media/LazyVideoCover';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import { registerRefMedia } from '@/lib/refMediaRegistry';
-import { registerDepthSubmit, peekDepthSubmit } from '@/features/home/hooks/useDepthGeneration';
+import { registerDepthSubmit, peekDepthSubmit } from '@/lib/depthGeneration';
 import {
   DEPTH_IMAGE_MODEL_ID,
   DEPTH_VIDEO_MODEL_ID,

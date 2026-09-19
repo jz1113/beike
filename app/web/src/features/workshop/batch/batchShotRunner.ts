@@ -54,7 +54,8 @@ export async function runSingleShotGeneration(
         shot1Url = await executeSingleImageTask(currentItem, shot1, undefined);
         if (shot1Url) break;
       } catch (shot1Err: unknown) {
-        if (shot1Attempt === 0 && !isAborted()) {
+        const retryable = (shot1Err as { retryable?: boolean })?.retryable !== false;
+        if (shot1Attempt === 0 && retryable && !isAborted()) {
           await new Promise((r) => setTimeout(r, 1200));
           continue;
         }
@@ -64,6 +65,7 @@ export async function runSingleShotGeneration(
           if (updated[0]) updated[0] = { ...updated[0], status: 'FAILURE', error: msg };
           return updated;
         });
+        break;
       }
     }
 
@@ -82,7 +84,7 @@ export async function runSingleShotGeneration(
   }
 
   const anchorFaceForNextShots = hasHumanPersona && shot1Url ? shot1Url : undefined;
-  const remainingIndices = [1, 2, 3].filter((idx) => shouldRunShot(idx));
+  const remainingIndices = effectivePrompts.map((_, idx) => idx).filter((idx) => idx > 0 && shouldRunShot(idx));
 
   if (remainingIndices.length > 0) {
     updateItemTasks(currentItemId, (tasks) =>
@@ -103,7 +105,8 @@ export async function runSingleShotGeneration(
           shotUrl = await executeSingleImageTask(currentItem, shot, anchorFaceForNextShots);
           if (shotUrl) break;
         } catch (shotErr: unknown) {
-          if (shotAttempt === 0 && !isAborted()) {
+          const retryable = (shotErr as { retryable?: boolean })?.retryable !== false;
+          if (shotAttempt === 0 && retryable && !isAborted()) {
             await new Promise((r) => setTimeout(r, 1200));
             continue;
           }
@@ -115,6 +118,7 @@ export async function runSingleShotGeneration(
             }
             return updated;
           });
+          break;
         }
       }
 

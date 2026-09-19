@@ -34,7 +34,7 @@
 - `__tests__/assetSampling.test.ts`
 - `__tests__/asyncPool.test.ts`
 - `__tests__/depthVideo.test.ts`
-- `__tests__/productCategoryHelpers.test.ts`
+- `__tests__/productCategory.test.ts`
 - `__tests__/qiyunScraper.test.ts`
 - `__tests__/sceneBundle.test.ts`
 - `__tests__/storage.test.ts`
@@ -93,7 +93,7 @@
 - `gatewayUrl.test.ts`
 - `gatewayUrl.ts`
 - `index.ts`
-- `jewelryArchHelpers.ts`
+- `jewelryArch.ts`
 - `latencyAudit.ts`
 - `layerDecomposition.test.ts`
 - `layerDecomposition.ts`
@@ -113,7 +113,7 @@
 - `productCategory/defs.ts`
 - `productCategory/infer.ts`
 - `productCategory/subcategoryStore.ts`
-- `productCategoryHelpers.ts`
+- `productCategory.ts`
 - `prompt-engine/assembler.ts`
 - `prompt-engine/guards.ts`
 - `prompt-engine/index.ts`

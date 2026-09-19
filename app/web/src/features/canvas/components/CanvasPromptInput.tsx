@@ -1,5 +1,5 @@
 import { forwardRef, useId, useImperativeHandle, useRef, useState } from 'react';
-import { RichPromptInput, type RichPromptInputRef } from '@/features/home/components/prompt-bar/RichPromptInput';
+import { RichPromptInput, type RichPromptInputRef } from '@/shared/prompt-bar/RichPromptInput';
 import { proxyMediaUrl } from '@/lib/apiClient';
 
 export interface CanvasPromptInputRef { insertReference: (index: number) => void }

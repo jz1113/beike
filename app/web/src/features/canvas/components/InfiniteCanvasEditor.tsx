@@ -21,6 +21,7 @@ import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
 import CanvasPromptDock from './CanvasPromptDock';
+import { CanvasProductionPanel } from './CanvasProductionPanel';
 import { LightingIcon, MultiAngleIcon, CanvasUploadIcon, CanvasAssetFolderIcon } from '@/shared/icons';
 import CanvasAssetImportModal from './CanvasAssetImportModal';
 import CanvasLightingModal, { type LightingParams } from './CanvasLightingModal';
@@ -541,6 +542,7 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
       onMouseUp={handleMouseUp}
     >
       {/* 隐藏的本地图片/视频选择器 */}
+      {currentProject && <CanvasProductionPanel projectId={projectId} />}
       {canvasSaveFailed && (
         <div role="alert" className="absolute bottom-5 left-20 z-50 rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
           画布尚未保存，请勿关闭窗口。

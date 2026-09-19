@@ -5,6 +5,12 @@
 
 import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
 import { VIDEO_GEN_MODELS } from '@beike/domain/video';
+import {
+  DEFAULT_MULTIMODAL_MODEL_ID,
+  getApprovedModel,
+  isApprovedModel,
+} from '@beike/domain/modelCatalog';
+import { domainStorage } from './runtime';
 
 export type WorkflowCapability = {
   id: string;
@@ -35,25 +41,33 @@ export type InferredWorkflowCapabilities = {
   isAudio: boolean;
 };
 
-const IMAGE_MODEL_ID_RE =
-  /qwen-image|nano-banana|banana-2|seedream|flux|midjourney|dall-e|dalle|recraft|kolors|ideogram|cogview|wanx|imagine-image|grok-.*-image|gpt-image|gemini-.*-image/i;
-const VIDEO_MODEL_ID_RE =
-  /seedance|veo|sora|kling|runway|luma|hailuo|minimax.*video|wan.*video|t2v|i2v|s2v|cogvideo|vidu|pika|animate|liveportrait|avatar|svd|hunyuan/i;
-
 export function isKnownImageOnlyModel(id: string): boolean {
-  const lower = id.toLowerCase();
-  if (IMAGE_GEN_MODELS.some((m) => lower === m.id || lower.startsWith(`${m.id}-`))) return true;
-  return IMAGE_MODEL_ID_RE.test(lower);
+  return getApprovedModel(id)?.capability === 'image';
 }
 
 export function isKnownVideoOnlyModel(id: string): boolean {
-  const lower = id.toLowerCase();
-  if (VIDEO_GEN_MODELS.some((m) => lower === m.id || lower.startsWith(`${m.id}-`))) return true;
-  return VIDEO_MODEL_ID_RE.test(lower);
+  return getApprovedModel(id)?.capability === 'video';
 }
 
 /** 根据模型 ID 推断能力标签（网关拉取 / 接入 / 修复 localStorage 共用） */
 export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCapabilities {
+  const approved = getApprovedModel(id);
+  if (approved) {
+    const isImage = approved.capability === 'image';
+    const isVideo = approved.capability === 'video';
+    const isMultimodal = approved.capability === 'multimodal';
+    return {
+      isImage,
+      isVideo,
+      isMultimodal,
+      isVision: isMultimodal,
+      isAssistant: isMultimodal,
+      isThinking: Boolean(approved.isThinking),
+      isEmbedding: false,
+      isAudio: false,
+    };
+  }
+
   const lower = id.toLowerCase();
 
   const isEmbedding =
@@ -83,24 +97,10 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     (lower.includes('video') ||
       lower.includes('seedance') ||
       lower.includes('veo') ||
-      lower.includes('luma') ||
       lower.includes('kling') ||
       lower.includes('sora') ||
-      lower.includes('runway') ||
-      lower.includes('pika') ||
-      lower.includes('animate') ||
-      lower.includes('liveportrait') ||
-      lower.includes('avatar') ||
-      lower.includes('cogvideo') ||
       lower.includes('vidu') ||
-      lower.includes('svd') ||
-      lower.includes('hailuo') ||
       lower.includes('minimax') ||
-      lower.includes('h3') ||
-      lower.includes('hunyuan') ||
-      lower.includes('t2v') ||
-      lower.includes('i2v') ||
-      lower.includes('s2v') ||
       isKnownVideoOnlyModel(id));
 
   const isImage =
@@ -109,34 +109,16 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     !isVideo &&
     (lower.includes('image') ||
       lower.includes('flux') ||
-      lower.includes('dall') ||
-      lower.includes('midjourney') ||
-      lower.includes('mj-') ||
       lower.includes('seedream') ||
-      lower.includes('recraft') ||
-      lower.includes('sd-') ||
-      lower.includes('sdxl') ||
-      lower.includes('stable-diffusion') ||
-      lower.includes('doubao-seedream') ||
-      lower.includes('cogview') ||
-      lower.includes('wanx') ||
-      lower.includes('imagine') ||
-      lower.includes('inpaint') ||
-      lower.includes('sd3') ||
-      lower.includes('kolors') ||
-      lower.includes('ideogram') ||
+      lower.includes('midjourney') ||
+      lower.includes('mjv') ||
       lower.includes('nano-banana') ||
-      lower.includes('banana-2') ||
       isKnownImageOnlyModel(id));
 
   const isThinking =
     lower.includes('thinking') ||
     lower.includes('reasoner') ||
-    lower.includes('o1') ||
-    lower.includes('o3') ||
-    lower.includes('r1') ||
-    lower.includes('deepseek-r1') ||
-    lower.includes('qwq');
+    lower.includes('luna');
 
   const isMultimodal =
     !isEmbedding &&
@@ -144,30 +126,13 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     !isVideo &&
     !isImage &&
     (lower.includes('vision') ||
-      (lower.includes('gemini') && !lower.includes('image')) ||
-      lower.includes('claude-3') ||
-      lower.includes('claude-opus') ||
-      lower.includes('claude-fable') ||
-      lower.includes('4o') ||
-      lower.includes('gpt-4-turbo') ||
-      lower.includes('gpt-4-vision') ||
+      lower.includes('gemini') ||
+      lower.includes('claude') ||
       /gpt-[45]/.test(lower) ||
-      lower.includes('grok-2-vision') ||
       lower.includes('grok-4') ||
-      lower.includes('grok-3') ||
-      lower.includes('qwen-vl') ||
-      lower.includes('qwen2-vl') ||
-      lower.includes('qwen2.5-vl') ||
       lower.includes('qwen3') ||
-      lower.includes('qwen-max') ||
-      lower.includes('glm-4v') ||
-      lower.includes('glm-5') ||
-      lower.includes('internvl') ||
-      lower.includes('minicpm-v') ||
-      lower.includes('llava') ||
-      lower.includes('pixtral') ||
-      lower.includes('deepseek-chat') ||
-      lower.includes('luna'));
+      lower.includes('deepseek') ||
+      lower.includes('kimi'));
 
   return {
     isImage,
@@ -243,6 +208,7 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
 
   for (const item of raw) {
     const canonicalId = repairWorkflowModelId(item.id);
+    if (!isApprovedModel(canonicalId)) continue;
     if (seen.has(canonicalId.toLowerCase())) continue;
     seen.add(canonicalId.toLowerCase());
 
@@ -261,9 +227,9 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
   }
 
   const changed = JSON.stringify(raw) !== JSON.stringify(repaired);
-  if (changed && typeof window !== 'undefined') {
+  if (changed) {
     try {
-      localStorage.setItem('custom_models', JSON.stringify(repaired));
+      domainStorage()?.setItem('custom_models', JSON.stringify(repaired));
     } catch {
       /* ignore quota errors */
     }
@@ -294,9 +260,8 @@ export function repairWorkflowModelsForSettings() {
 }
 
 export function readWorkflowModelsFromStorage(): WorkflowCapability[] {
-  if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('custom_models');
+    const raw = domainStorage()?.getItem('custom_models');
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -336,24 +301,26 @@ export function isMultimodalWorkflowModel(m: WorkflowCapability): boolean {
 
 /** 读取全局默认多模态模型（设置 / 助手 / 提示词工作室共用） */
 export function getStoredMultimodalModelId(
-  fallback = 'gemini-3.1-pro-preview-thinking-high'
+  fallback = DEFAULT_MULTIMODAL_MODEL_ID
 ): string {
-  if (typeof window === 'undefined') return fallback;
+  const storage = domainStorage();
+  if (!storage) return fallback;
   return (
-    localStorage.getItem('ai_multimodal_model') ||
-    localStorage.getItem('ai_vision_model') ||
-    localStorage.getItem('ai_assistant_model') ||
+    storage.getItem('ai_multimodal_model') ||
+    storage.getItem('ai_vision_model') ||
+    storage.getItem('ai_assistant_model') ||
     fallback
   );
 }
 
 /** 写入全局默认多模态模型，同步全部 legacy key */
 export function setStoredMultimodalModelId(id: string): void {
-  if (typeof window === 'undefined') return;
+  const storage = domainStorage();
+  if (!storage) return;
   try {
-    localStorage.setItem('ai_multimodal_model', id);
-    localStorage.setItem('ai_vision_model', id);
-    localStorage.setItem('ai_assistant_model', id);
+    storage.setItem('ai_multimodal_model', id);
+    storage.setItem('ai_vision_model', id);
+    storage.setItem('ai_assistant_model', id);
   } catch {
     /* ignore quota errors */
   }
@@ -362,7 +329,7 @@ export function setStoredMultimodalModelId(id: string): void {
 /** 若当前存储的是生图/无效模型，自动回退到首个可用多模态模型 */
 export function resolveStoredMultimodalModelId(
   enabledModels?: WorkflowCapability[],
-  fallback = 'gemini-3.1-pro-preview-thinking-high'
+  fallback = DEFAULT_MULTIMODAL_MODEL_ID
 ): string {
   const list = enabledModels ?? getEnabledMultimodalModelsFromSettings();
   const stored = getStoredMultimodalModelId(fallback);
@@ -411,7 +378,7 @@ export function getEnabledImageModelsFromSettings(
     })
   );
   return list
-    .filter((m) => m.isImage)
+    .filter((m) => m.isImage && isApprovedModel(m.id, 'image'))
     .filter((m) => {
       const key = m.id.toLowerCase();
       if (seen.has(key)) return false;
@@ -442,7 +409,7 @@ export function getEnabledVideoModelsFromSettings(
 ): Array<Record<string, unknown>> {
   const list = (models ?? repairWorkflowModelsInStorage()).map(normalizeWorkflowModel);
   return list
-    .filter((m) => m.isVideo)
+    .filter((m) => m.isVideo && isApprovedModel(m.id, 'video'))
     .map((m) => {
       const builtin = VIDEO_GEN_MODELS.find((x) => x.id === m.id);
       return {
@@ -465,7 +432,7 @@ export function getEnabledMultimodalModelsFromSettings(
   models?: WorkflowCapability[]
 ): WorkflowCapability[] {
   const list = models ?? repairWorkflowModelsInStorage();
-  return list.filter(isMultimodalWorkflowModel);
+  return list.filter((m) => isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal'));
 }
 
 /** 按设置列表顺序选取 fallback（排除当前主模型，最多 max 个） */

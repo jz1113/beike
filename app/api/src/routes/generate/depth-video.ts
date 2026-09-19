@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { DepthVideoSubmitBodySchema } from '@beike/contracts';
 import {
   DEPTH_MODEL_SETUP_COMMAND,

@@ -21,6 +21,16 @@ export interface ParseLinkMedia {
 export interface XhsParseSkipRecord {
   url: string;
   reason: string;
+  kind: 'failed' | 'filtered';
+}
+
+export interface XhsParseProgress {
+  current: number;
+  total: number;
+  success: number;
+  filtered: number;
+  failed: number;
+  skipped?: number;
 }
 
 export interface XhsParseResult {
@@ -121,7 +131,8 @@ export function filterParseLinkImages(
 export function toXhsQueueItem(
   filtered: { images: string[]; title: string; author: string },
   sourceUrl: string,
-  index: number
+  index: number,
+  apiUsed?: string,
 ): ImageSetQueueItem {
   return {
     id: `xhs_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -130,6 +141,7 @@ export function toXhsQueueItem(
     sourceUrl,
     author: filtered.author,
     status: 'pending',
+    apiUsed,
   };
 }
 
@@ -140,7 +152,7 @@ export async function fetchParseLinkWithRateLimit(
   scraperSecret: string | undefined,
   rateLimiter: RateLimiter,
   extra?: { qiyunAppId?: string; qiyunAppKey?: string }
-): Promise<{ success: true; media: ParseLinkMedia } | { success: false; error: string }> {
+): Promise<{ success: true; media: ParseLinkMedia; apiUsed?: string } | { success: false; error: string }> {
   const qiyunAppId =
     extra?.qiyunAppId ||
     (typeof window !== 'undefined' ? (localStorage.getItem('qiyun_app_id') || '').trim() || undefined : undefined);
@@ -170,7 +182,7 @@ export async function fetchParseLinkWithRateLimit(
 
       const data = await res.json().catch(() => ({}));
       if (data.success && data.data) {
-        return { success: true, media: data.data as ParseLinkMedia };
+        return { success: true, media: data.data as ParseLinkMedia, apiUsed: data.apiUsed };
       }
       return { success: false, error: data.error || '解析接口无有效数据' };
     } catch (e: unknown) {
@@ -190,7 +202,7 @@ export async function batchParseXhsLinks(
   scraperSecret: string | undefined,
   opts?: {
     concurrency?: number;
-    onProgress?: (progress: { current: number; total: number; success: number; skipped: number }) => void;
+    onProgress?: (progress: XhsParseProgress) => void;
   }
 ): Promise<XhsParseResult> {
   const candidateUrls = parseXhsUrlsFromText(rawText);
@@ -202,24 +214,28 @@ export async function batchParseXhsLinks(
   const queueItems: ImageSetQueueItem[] = [];
   const skipped: XhsParseSkipRecord[] = [];
   const concurrency = Math.min(opts?.concurrency ?? 8, candidateUrls.length);
+  let completed = 0;
 
-  await mapWithConcurrency(candidateUrls, concurrency, async (url, currentIndex) => {
+  await mapWithConcurrency(candidateUrls, concurrency, async (url) => {
     const parsed = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, rateLimiter);
     if (parsed.success) {
       const filtered = filterParseLinkImages(parsed.media, url);
       if (filtered.ok) {
-        queueItems.push(toXhsQueueItem(filtered, url, queueItems.length));
+        queueItems.push(toXhsQueueItem(filtered, url, queueItems.length, parsed.apiUsed));
       } else {
-        skipped.push({ url, reason: filtered.reason });
+        skipped.push({ url, reason: filtered.reason, kind: 'filtered' });
       }
     } else {
-      skipped.push({ url, reason: parsed.error });
+      skipped.push({ url, reason: parsed.error, kind: 'failed' });
     }
 
+    completed += 1;
     opts?.onProgress?.({
-      current: currentIndex + 1,
+      current: completed,
       total: candidateUrls.length,
       success: queueItems.length,
+      filtered: skipped.filter((item) => item.kind === 'filtered').length,
+      failed: skipped.filter((item) => item.kind === 'failed').length,
       skipped: skipped.length,
     });
   });

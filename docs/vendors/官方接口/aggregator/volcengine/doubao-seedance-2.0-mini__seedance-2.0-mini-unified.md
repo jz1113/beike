@@ -1,0 +1,204 @@
+---
+model: "doubao-seedance-2.0-mini"
+capability: "video"
+vendor: "volcengine"
+source: "aggregator"
+apifoxId: "510506694"
+sourceUrl: "https://gpt-best.apifox.cn/api-510506694.md"
+fetchedAt: "2026-09-19"
+---
+# doubao-seedance-2.0-mini — seedance-2.0-mini-unified
+
+来源：https://gpt-best.apifox.cn/api-510506694.md
+
+# doubao-seedance-2.0-mini 统一格式
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.0.1
+info:
+  title: ''
+  description: ''
+  version: 1.0.0
+paths:
+  /v2/videos/generations:
+    post:
+      summary: doubao-seedance-2.0-mini 统一格式
+      deprecated: false
+      description: 统一接口格式
+      tags:
+        - 123、未开放
+      parameters:
+        - name: Authorization
+          in: header
+          description: ''
+          required: false
+          example: Bearer {{YOUR_API_KEY}}
+          schema:
+            type: string
+            default: Bearer {{YOUR_API_KEY}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                  description: >-
+                    文本提示词（必填）：支持中英文。建议不超过500字。字数过多信息容易分散，模型可能因此忽略细节，只关注重点，造成视频缺失部分元素
+                  x-apifox-mock: cat dance
+                  title: 一只戴着黑色墨镜的白猫正在开心地跳舞，动作自然流畅，镜头缓慢推进
+                model:
+                  type: string
+                  description: |+
+                    型号名称。示例：sdols-2.0
+
+                  x-apifox-mock: sdols-2.0
+                  enum:
+                    - doubao-seedance-2-0-260128
+                    - doubao-seedance-2-0-fast-260128
+                    - doubao-seedance-2.0-mini
+                  x-apifox-enum:
+                    - value: doubao-seedance-2-0-260128
+                      name: ''
+                      description: ''
+                    - value: doubao-seedance-2-0-fast-260128
+                      name: ''
+                      description: ''
+                    - value: doubao-seedance-2.0-mini
+                      name: ''
+                      description: ''
+                  title: doubao-seedance-2.0-mini
+                  nullable: true
+                duration:
+                  type: integer
+                  description: 生成视频的持续时间（以秒为单位）。4-15s
+                  x-apifox-mock: '5'
+                  enum:
+                    - 5
+                    - 10
+                  x-apifox-enum:
+                    - value: 5
+                      name: ''
+                      description: ''
+                    - value: 10
+                      name: ''
+                      description: ''
+                  default: 5
+                  title: 否
+                resolution:
+                  type: string
+                  description: |
+                    视频分辨率
+                  enum:
+                    - 480p
+                    - 720p
+                    - 1080p
+                  x-apifox-enum:
+                    - value: 480p
+                      name: ''
+                      description: ''
+                    - value: 720p
+                      name: ''
+                      description: ''
+                    - value: 1080p
+                      name: ''
+                      description: ''
+                  default: 480p
+                  title: 否
+                ratio:
+                  type: string
+                  description: |-
+                    生成视频的宽高比例
+                    21:9
+                    16:9 
+                    4:3
+                    1:1
+                    3:4
+                    9:16
+                    9:21
+                    adaptive：根据所上传图片的比例，自动选择最合适的宽高比。
+                  default: '16:9'
+                  title: 否
+              required:
+                - prompt
+                - model
+                - duration
+              x-apifox-orders:
+                - prompt
+                - model
+                - duration
+                - resolution
+                - ratio
+            examples:
+              '1':
+                value:
+                  model: doubao-seedance-2.0-mini
+                  prompt: 一只戴着黑色墨镜的白猫正在开心地跳舞，动作自然流畅，镜头缓慢推进
+                  duration: 5
+                  ratio: '16:9'
+                  resolution: 720p
+                summary: 文生视频
+              '2':
+                value:
+                  model: doubao-seedance-2.0-mini
+                  prompt: 白猫戴上墨镜跳舞
+                  image: https://output.anyroutes.cn/demo/demo_glasses.png
+                  duration: 5
+                  ratio: '16:9'
+                  resolution: 720p
+                summary: 图生视频
+              '3':
+                value:
+                  model: doubao-seedance-2.0-mini
+                  prompt: 白猫从普通状态逐渐戴上墨镜，动作自然连贯，最后定格为戴着墨镜的状态
+                  first_frame: https://output.anyroutes.cn/demo/demo_cat.png
+                  last_frame: https://output.anyroutes.cn/demo/demo_glasses.png
+                  duration: 5
+                  ratio: '16:9'
+                  resolution: 720p
+                  generate_audio: true
+                summary: 首尾帧图生视频
+              '4':
+                value:
+                  model: doubao-seedance-2.0-mini
+                  prompt: 参考图片中的白猫戴墨镜造型，并参考视频中的跳舞动作和节奏，生成一段自然连贯的白猫戴墨镜跳舞视频
+                  reference_images:
+                    - https://output.anyroutes.cn/demo/demo_glasses.png
+                  reference_video: https://output.anyroutes.cn/demo/demo_cat_glasses.mp4
+                  duration: 5
+                  ratio: '16:9'
+                  resolution: 720p
+                  generate_audio: true
+                summary: 多模态参考生视频
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                required:
+                  - task_id
+                x-apifox-orders:
+                  - task_id
+              example:
+                task_id: cgt-20250831141439-sqmgf
+          headers: {}
+          x-apifox-name: 成功
+      security: []
+      x-apifox-folder: 123、未开放
+      x-apifox-status: released
+      x-run-in-apifox: https://app.apifox.com/web/project/3868318/apis/api-510506694-run
+components:
+  schemas: {}
+  securitySchemes: {}
+servers: []
+security: []
+
+```

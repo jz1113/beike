@@ -7,7 +7,7 @@ import {
   extractCanonicalOutfitFromPrompts,
 } from '@beike/domain/drawing';
 import type { BatchProductItem } from './batchTypes';
-import { resolveHarmonizedTemplatesForItem } from './batchVisionAnalyzeHelpers';
+import { resolveHarmonizedTemplatesForItem } from './batchVisionTemplates';
 
 export interface PromptPaddingContext {
   batchMode: 'original' | 'replication';

@@ -8,7 +8,7 @@ import {
 } from './batchTypes';
 import {
   shouldAutoSelectJewelryArch,
-} from '@beike/domain/jewelryArchHelpers';
+} from '@beike/domain/jewelryArch';
 import {
   exportBatchExcel,
   exportSingleProductZip,
@@ -42,6 +42,8 @@ import {
   retryFailedImageTasksCoordinator,
   retrySingleShotTaskCoordinator,
 } from './batchGenerationCoordinator';
+import { useLiveWorkshopWorkspace } from './workshopSnapshotBridge';
+import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 
 export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'replication' }) {
   const fixedBatchMode = opts?.fixedBatchMode;
@@ -593,6 +595,37 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     });
   };
 
+  const applyWorkspaceSnapshot = useCallback((value: WorkshopSnapshot) => {
+    if (!fixedBatchMode) setBatchMode(value.mode);
+    setCurrentStage(value.currentStage);
+    setBatchInputText(value.batchInputText);
+    setItems(value.items as BatchProductItem[]);
+    setSelectedVisionModel(value.settings.selectedVisionModel);
+    setSelectedImageGenModel(value.settings.selectedImageGenModel);
+    setSelectedArchId(value.settings.selectedArchId);
+    setHasHumanPersona(value.settings.hasHumanPersona);
+    setSelectedQuality(value.settings.selectedQuality);
+    setSelectedAspect(value.settings.selectedAspect);
+    setSelectedShotCount(value.settings.selectedShotCount);
+    setUseAssetLibrary(value.settings.useAssetLibrary);
+    setLockedPersonaId(value.settings.lockedPersonaId);
+    setLockedSceneId(value.settings.lockedSceneId);
+    setLockedOutfitId(value.settings.lockedOutfitId);
+    setLockedActionId(value.settings.lockedActionId);
+    setGenerationStrategy(value.settings.generationStrategy);
+    setReplicationInputMode(value.settings.replicationInputMode);
+    setMatrixMasterRefUrl(value.settings.matrixMasterRefUrl);
+    setMatrixMasterRefImages(value.settings.matrixMasterRefImages);
+  }, [fixedBatchMode, setSelectedArchId, setSelectedShotCount, setGenerationStrategy]);
+
+  const workspace = useLiveWorkshopWorkspace({
+    batchMode, currentStage, batchInputText, items,
+    selectedVisionModel, selectedImageGenModel, selectedArchId,
+    hasHumanPersona, selectedQuality, selectedAspect, selectedShotCount,
+    useAssetLibrary, lockedPersonaId, lockedSceneId, lockedOutfitId, lockedActionId,
+    generationStrategy, replicationInputMode, matrixMasterRefUrl, matrixMasterRefImages,
+  }, applyWorkspaceSnapshot);
+
   return {
     batchMode,
     currentStage,
@@ -690,5 +723,6 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     startAutoPilotPipeline,
     toastMsg,
     showToast,
+    workspaceStatus: workspace.status,
   };
 }

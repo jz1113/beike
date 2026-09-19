@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppView } from '@/store/view';
 
-const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'assets'];
+const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'assets', 'canvas', 'workshop', 'replicate'];
 
 interface ViewKeepAlivePanelProps {
   view: AppView;
@@ -9,22 +9,21 @@ interface ViewKeepAlivePanelProps {
   children: ReactNode;
 }
 
-/** 缓存已访问视图 DOM，切换时隐藏而非卸载，减少重复加载 */
+/** 缓存已访问视图 DOM，切换时隐藏而非卸载；隐藏期间冻结 children，避免父级重绘。 */
 export function ViewKeepAlivePanel({ view, currentView, children }: ViewKeepAlivePanelProps) {
   const active = view === currentView;
   const [hasRendered, setHasRendered] = useState(active);
+  const frozenChildren = useRef(children);
+  if (active) frozenChildren.current = children;
 
   useEffect(() => {
-    if (active) {
-      setHasRendered(true);
-    }
+    if (active) setHasRendered(true);
   }, [active]);
 
   if (!KEEP_ALIVE_VIEWS.includes(view)) {
     return active ? <>{children}</> : null;
   }
 
-  // 既不是当前激活的视图，且此前从未渲染过，则惰性跳过，不创建多余 DOM
   if (!active && !hasRendered) return null;
 
   return (
@@ -33,7 +32,7 @@ export function ViewKeepAlivePanel({ view, currentView, children }: ViewKeepAliv
       aria-hidden={!active}
       data-view-panel={view}
     >
-      {children}
+      {active ? children : frozenChildren.current}
     </div>
   );
 }

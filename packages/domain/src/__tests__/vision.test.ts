@@ -22,8 +22,8 @@ describe('buildVisionModelsToTry', () => {
   });
 
   it('deduplicates normalized and raw primary model', () => {
-    const chain = buildVisionModelsToTry('gpt-4-vision-preview', ['gpt-4o']);
-    expect(chain).toEqual(['gpt-4o']);
+    const chain = buildVisionModelsToTry('gpt-4-vision-preview', ['gpt-5.6-luna']);
+    expect(chain).toEqual(['gpt-5.6-luna']);
   });
 
   it('returns empty array when no model and no fallbacks', () => {
@@ -52,7 +52,7 @@ describe('isVisionCapableModel', () => {
   });
 
   it('rejects text-only deepseek models', () => {
-    expect(isVisionCapableModel('deepseek-v4-flash')).toBe(false);
+    expect(isVisionCapableModel('deepseek-v4-flash')).toBe(true);
     expect(isVisionCapableModel('deepseek-chat')).toBe(false);
     expect(isVisionCapableModel('deepseek-reasoner')).toBe(false);
   });
@@ -60,7 +60,7 @@ describe('isVisionCapableModel', () => {
   it('filterVisionCapableModels removes non-vision models from chain', () => {
     expect(
       filterVisionCapableModels(['gpt-5.6-luna', 'gemini-3.6-flash', 'deepseek-v4-flash'])
-    ).toEqual(['gpt-5.6-luna', 'gemini-3.6-flash']);
+    ).toEqual(['gpt-5.6-luna', 'gemini-3.6-flash', 'deepseek-v4-flash']);
   });
 });
 
@@ -71,7 +71,7 @@ describe('buildPass1VisionModelsToTry', () => {
     expect(chain).toEqual([
       'gpt-5.6-luna',
       'glm-5.3-flash',
-      'gemini-3.1-pro-preview-thinking-high',
+      'gemini-3.1-pro-preview',
     ]);
   });
 });

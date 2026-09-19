@@ -35,6 +35,12 @@ export function ImageLightboxModal() {
     setQuickGenMode,
     quickRefImage,
     addGenerationTask,
+    quickModel,
+    quickQuality,
+    quickAspectId,
+    setQuickModel,
+    setQuickQuality,
+    setQuickAspectId,
   } = useAppStore(
     useShallow((s) => ({
       previewTask: s.previewTask,
@@ -48,6 +54,12 @@ export function ImageLightboxModal() {
       setQuickGenMode: s.setQuickGenMode,
       quickRefImage: s.quickRefImage,
       addGenerationTask: s.addGenerationTask,
+      quickModel: s.quickModel,
+      quickQuality: s.quickQuality,
+      quickAspectId: s.quickAspectId,
+      setQuickModel: s.setQuickModel,
+      setQuickQuality: s.setQuickQuality,
+      setQuickAspectId: s.setQuickAspectId,
     })),
   );
 
@@ -768,6 +780,12 @@ export function ImageLightboxModal() {
             imageUrl={previewTask.resultUrl}
             originalPrompt={previewTask.prompt}
             onSubmitSmartEdit={handleSubmitSmartEdit}
+            quickModel={quickModel}
+            quickQuality={quickQuality}
+            quickAspectId={quickAspectId}
+            onChangeQuickModel={setQuickModel}
+            onChangeQuickQuality={setQuickQuality}
+            onChangeQuickAspectId={setQuickAspectId}
           />
 
           <OutpaintModal

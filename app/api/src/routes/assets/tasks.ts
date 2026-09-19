@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { isAdminAuthorized, unauthorizedJson } from '@beike/server-kit/apiAuth';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { deleteObjectsFromStorage } from '@beike/server-kit/storage';
@@ -151,12 +151,7 @@ export async function DELETE(req: Request) {
 
     if (clearFailed) {
       const deleteResult = await prisma.imageTask.deleteMany({
-        where: {
-          OR: [
-            { status: 'FAILURE' },
-            { status: 'IN_PROGRESS', resultUrl: null },
-          ],
-        },
+        where: { status: 'FAILURE' },
       });
       prisma.$executeRawUnsafe('VACUUM;').catch(() => {});
       return jsonResponse({ success: true, count: deleteResult.count });

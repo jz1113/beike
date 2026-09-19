@@ -3,6 +3,8 @@
  * 首页前置「分镜与模型预设」改造 - 预设类型定义
  */
 
+import { domainStorage } from '../runtime';
+
 export type StoryboardShotType = 
   | 'single_shot'      // 单张独立分镜
   | 'lifestyle_interaction' // 生活互动场景
@@ -102,10 +104,8 @@ export function getStoryboardPresetById(id: string): StoryboardPresetConfig | un
 
 /** 从 localStorage 恢复预设 */
 export function restoreStoredStoryboardPreset(): StoryboardPresetConfig {
-  if (typeof window === 'undefined') return getDefaultStoryboardPreset();
-  
   try {
-    const stored = localStorage.getItem(STORYBOARD_PRESET_STORAGE_KEY);
+    const stored = domainStorage()?.getItem(STORYBOARD_PRESET_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as StoryboardPresetConfig;
       const found = getStoryboardPresetById(parsed.id);
@@ -118,9 +118,7 @@ export function restoreStoredStoryboardPreset(): StoryboardPresetConfig {
 
 /** 保存预设到 localStorage */
 export function persistStoryboardPreset(preset: StoryboardPresetConfig): void {
-  if (typeof window === 'undefined') return;
-  
   try {
-    localStorage.setItem(STORYBOARD_PRESET_STORAGE_KEY, JSON.stringify(preset));
+    domainStorage()?.setItem(STORYBOARD_PRESET_STORAGE_KEY, JSON.stringify(preset));
   } catch {}
 }

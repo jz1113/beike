@@ -8,6 +8,9 @@ import * as prompts from '../catalog/prompts';
 import * as assetDeconstruct from '../catalog/assets/deconstruct';
 import * as assetLibrary from '../catalog/assets/library';
 import * as assetSeed from '../catalog/assets/seed';
+import * as workspace from '../catalog/workspace';
+import * as assetReviews from '../catalog/assets/reviews';
+import * as assetSourceCheck from '../catalog/assets/source-check';
 
 const catalog = new Hono();
 
@@ -35,5 +38,11 @@ catalog.get('/assets/library', (c) => assetLibrary.GET(c.req.raw));
 catalog.post('/assets/library', (c) => assetLibrary.POST(c.req.raw));
 catalog.put('/assets/library', (c) => assetLibrary.PUT(c.req.raw));
 catalog.delete('/assets/library', (c) => assetLibrary.DELETE(c.req.raw));
+catalog.get('/assets/reviews', (c) => assetReviews.GET(c.req.raw));
+catalog.post('/assets/reviews', (c) => assetReviews.POST(c.req.raw));
+catalog.get('/assets/source-check', () => assetSourceCheck.GET());
+catalog.post('/assets/source-check', (c) => assetSourceCheck.POST(c.req.raw));
+catalog.get('/workshop-workspace', (c) => workspace.GET(c.req.raw));
+catalog.put('/workshop-workspace', (c) => workspace.PUT(c.req.raw));
 
 export default catalog;

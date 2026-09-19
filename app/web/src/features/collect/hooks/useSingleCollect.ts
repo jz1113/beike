@@ -5,8 +5,8 @@ import { formatUserError } from '@beike/domain/upstreamErrors';
 import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
 import { parseSocialLinkWithRateLimit } from '@/lib/xhsLinkBatch';
 import { RateLimiter } from '@/lib/rateLimiter';
-import { detectPlatformFromText } from '../collectorShared';
-import { sanitizeCollectedItem } from '../collectorUrlHelpers';
+import { detectPlatformFromText } from '../collectorTypes';
+import { sanitizeCollectedItem } from '../collectorUrls';
 
 interface UseSingleCollectOptions {
   showToast: (msg: string) => void;

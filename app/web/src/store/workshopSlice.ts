@@ -1,5 +1,4 @@
 import type { StateCreator } from 'zustand';
-import { apiFetch } from '@/lib/apiClient';
 import { ShotPrompt, buildActionDigestFromShots } from '@beike/domain/vision';
 import { ASPECT_RATIOS, normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import type { ProductImage } from '@/types';
@@ -152,19 +151,6 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
       ...img,
       selected: img.url === url
     }));
-
-    // 异步同步到数据库，确保只持久化用户当前选定的实物图链接
-    if (state.product?.id) {
-      apiFetch('/api/catalog/products', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: state.product.id,
-          picUrl: url,
-          selectedImages: [url]
-        })
-      }).catch(() => {});
-    }
 
     return {
       product: updatedProduct,

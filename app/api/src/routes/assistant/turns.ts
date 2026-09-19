@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import type { AssistantTurn } from '@beike/domain/assistant/types';
 

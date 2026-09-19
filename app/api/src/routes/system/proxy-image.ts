@@ -1,14 +1,14 @@
 import sharp from 'sharp';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { assertSafeRemoteUrl, resolvePublicPath } from '@beike/server-kit/safeUrl';
-import { getCachedImage, setCachedImage } from './proxyImage/cache';
-import { proxyVideo } from './proxyImage/fetcher';
+import { getCachedImage, setCachedImage } from './proxy-image/cache';
+import { proxyVideo } from './proxy-image/fetcher';
 import {
   getFallbackSvgImage,
   fetchAndProcessImage,
-} from './proxyImage/imageProcessor';
+} from './proxy-image/imageProcessor';
 
-export { clearProxyVideoCache } from './proxyImage/cache';
+export { clearProxyVideoCache } from './proxy-image/cache';
 
 export async function GET(req: Request) {
   try {

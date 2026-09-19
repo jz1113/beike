@@ -12,7 +12,7 @@ import { normalizeImageUrlToStandardJpg, getAspectRatioFromSize } from '@beike/d
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import DepthCarousel from '@/shared/media/DepthCarousel';
 import LazyVideoCover from './LazyVideoCover';
-import type { AssetTaskBatch } from './assetBatchUtils';
+import type { AssetTaskBatch } from './assetBatch';
 
 interface Props {
   folderBatch: AssetTaskBatch;

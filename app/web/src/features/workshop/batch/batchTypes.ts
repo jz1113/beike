@@ -33,6 +33,7 @@ export interface BatchTaskItem {
   status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
   resultUrl?: string;
   error?: string;
+  recoveryRequired?: boolean;
 }
 
 export type GenerationStrategy = 'grid_first' | 'single_shot';
@@ -99,4 +100,5 @@ export interface BatchProductItem {
   // 配套 AI 种草文案
   copywriting?: BatchCopywriting;
   isCopywritingGenerating?: boolean;
+  copywritingError?: string;
 }

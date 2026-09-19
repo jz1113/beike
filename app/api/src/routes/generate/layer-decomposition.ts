@@ -1,5 +1,6 @@
+import { gatewayFetch } from '../../gateways/http';
 import { jsonResponse } from '../../core/http';
-import { resolveCredentials } from '../../services/imageHelpers';
+import { resolveCredentials } from '../../services/gatewayCredentials';
 import { guardSubmission } from '../../services/submissionGuard';
 import { parseDecomposedLayers } from '@beike/domain/layerDecomposition';
 import { ensurePersistableResultUrl } from './image/poll';
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     if (!credentials.apiKey) return jsonResponse({success:false,error:'请先配置聚合平台 API 密钥'},400);
     return await guardSubmission(req, 'layer-decomposition', credentials, async () => {
       try {
-        const response = await fetch(endpoint, {
+        const response = await gatewayFetch(endpoint, {
           method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${credentials.apiKey}`},
           body:JSON.stringify({model,image:body.image,prompt:body.prompt,size:body.size || 'auto',layer_decomposition:true,output_format:'png',response_format:'url',watermark:false}),
           signal:AbortSignal.timeout(300_000),

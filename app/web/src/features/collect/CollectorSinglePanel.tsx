@@ -11,7 +11,7 @@ import {
   handleImgError,
   mediaAssetCount,
   secondaryBtnClass,
-} from '@/features/collect/collectorShared';
+} from '@/features/collect/collectorTypes';
 import Skeleton from '@/shared/ui/Skeleton';
 
 export interface CollectorSinglePanelProps {

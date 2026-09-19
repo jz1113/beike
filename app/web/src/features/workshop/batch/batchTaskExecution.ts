@@ -8,6 +8,7 @@ import {
 } from '@beike/domain/drawing';
 import { sliceGridImage2x2 } from '@/lib/imageGridSlicer';
 import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
+import { isActionAllowedForProduct } from '@beike/domain/phoneProductPolicy';
 import type { BatchProductItem } from './batchTypes';
 import { compressProductImageIfNeeded, submitImageGenTask } from './batchImageTasks';
 import { ensureItemPromptsPad } from './batchPromptPadding';
@@ -22,6 +23,13 @@ export interface TaskExecutionConfig {
   lockedSceneId?: string;
   availableScenes?: any[];
   isAborted: () => boolean;
+}
+
+function gridSliceSize(aspect: string): { targetWidth: number; targetHeight: number } {
+  if (aspect === '1:1') return { targetWidth: 1440, targetHeight: 1440 };
+  if (aspect === '16:9') return { targetWidth: 1920, targetHeight: 1080 };
+  if (aspect === '9:16') return { targetWidth: 1080, targetHeight: 1920 };
+  return { targetWidth: 1440, targetHeight: 1920 };
 }
 
 export async function executeSingleImageTask(
@@ -49,7 +57,11 @@ export async function executeSingleImageTask(
   if (!chosenProductImg) {
     throw new Error('缺少商品垫图，请先在选图步骤勾选商品图');
   }
+  if (!isActionAllowedForProduct(item.title, { title: shot.title })) {
+    throw new Error('该分镜为过期包装机位，请重新分析');
+  }
 
+  const skipFace = shot.has_human === false || shot.shot_type === 'pure_product' || shot.shot_type === 'hand_held_only';
   const safeProductImg = await compressProductImageIfNeeded(chosenProductImg);
   const qualityTier = (config.selectedQuality || 'high') as 'high' | 'medium' | 'low';
   const pixelSize = resolveGptImageSizeForModel(
@@ -66,7 +78,7 @@ export async function executeSingleImageTask(
       aspectRatio: config.selectedAspect,
       quality: config.selectedQuality,
       productImageUrl: safeProductImg,
-      anchorFaceImageUrl: anchorFaceUrl || undefined,
+      anchorFaceImageUrl: skipFace ? undefined : anchorFaceUrl || undefined,
       padSocialRef: false,
       referenceImageUrl: safeProductImg,
       useReferenceImage: true,
@@ -144,10 +156,17 @@ export async function executeGridImageTask(
       lighting_type: p.lighting_type,
       scene: p.scene,
       has_human: p.has_human,
+      promptFallback: p.prompt,
     }));
     gridPrompt = isSocialMode
       ? assembleReplicationGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 })
       : assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
+    const confirmedEdits = gridShots
+      .map((shot) => (shot.promptFallback || '').trim())
+      .filter((text) => text.length > 0);
+    if (confirmedEdits.length > 0) {
+      gridPrompt = `${gridPrompt}\n\n【已确认分镜描述】：\n${confirmedEdits.join('\n')}`;
+    }
   }
 
   if (!gridPrompt) {
@@ -244,9 +263,9 @@ export async function generateItemViaGrid(
 
   let sliced: [string, string, string, string] | undefined;
   try {
+    const sliceSize = gridSliceSize(config.selectedAspect);
     sliced = await sliceGridImage2x2(masterGridUrl, {
-      targetWidth: 1440,
-      targetHeight: 1920,
+      ...sliceSize,
       autoTrimBorders: true,
       quality: 0.96,
     });

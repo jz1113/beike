@@ -1,16 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// 模拟 Tauri 桌面环境
-vi.mock('@/lib/desktopRuntime', () => ({
-  isTauriDesktop: () => true,
-}));
-
-// 模拟 Tauri invoke
-const invokeMock = vi.fn();
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
-}));
-
 vi.mock('@/lib/apiClient', () => ({
   apiFetch: vi.fn().mockResolvedValue({ ok: true }),
 }));
@@ -19,44 +8,31 @@ import {
   persistAiGatewayConfig,
   persistWanbangConfig,
   persistStorageConfig,
-  CredentialPersistError,
 } from '@/lib/persistDesktopSecrets';
+import { apiFetch } from '@/lib/apiClient';
 
-describe('persistDesktopSecrets — 密钥仅入 Keychain (PR1 Critical)', () => {
+describe('persistDesktopSecrets — Web 本地持久化', () => {
   beforeEach(() => {
-    invokeMock.mockReset();
-    invokeMock.mockResolvedValue(undefined);
+    vi.mocked(apiFetch).mockResolvedValue({ ok: true } as Response);
     if (typeof window !== 'undefined') {
       window.localStorage.clear();
     }
   });
 
-  it('persistAiGatewayConfig 不应将密钥写入 localStorage', async () => {
-    invokeMock.mockResolvedValueOnce(undefined); // credential_set
-    invokeMock.mockResolvedValueOnce(undefined); // save_desktop_env
+  it('persistAiGatewayConfig 将密钥写入 localStorage，并通知服务端', async () => {
     await persistAiGatewayConfig('https://api.openai.com/v1', 'sk-very-secret');
-    const stored = window.localStorage.getItem('ai_api_key');
-    expect(stored).toBeNull();
-    // 仅 baseUrl 允许保留
-    expect(window.localStorage.getItem('ai_base_url')).toBe(
-      'https://api.openai.com/v1',
-    );
+    expect(window.localStorage.getItem('ai_api_key')).toBe('sk-very-secret');
+    expect(window.localStorage.getItem('ai_base_url')).toBe('https://api.openai.com/v1');
+    expect(apiFetch).toHaveBeenCalled();
   });
 
-  it('persistWanbangConfig 不应将密钥写入 localStorage', async () => {
-    invokeMock.mockResolvedValue(undefined);
+  it('persistWanbangConfig 将密钥写入 localStorage', async () => {
     await persistWanbangConfig('wb-key', 'wb-secret');
-    expect(window.localStorage.getItem('wanbang_api_key')).toBeNull();
-    expect(window.localStorage.getItem('wanbang_api_secret')).toBeNull();
-    // 验证 credential_set 被调用两次
-    const calls = invokeMock.mock.calls.filter(
-      (c) => c[0] === 'credential_set',
-    );
-    expect(calls.length).toBe(2);
+    expect(window.localStorage.getItem('wanbang_api_key')).toBe('wb-key');
+    expect(window.localStorage.getItem('wanbang_api_secret')).toBe('wb-secret');
   });
 
-  it('persistStorageConfig 不应将 secretAccessKey 写入 localStorage', async () => {
-    invokeMock.mockResolvedValue(undefined);
+  it('persistStorageConfig 保留非敏感配置，并将 secret 写入凭证存储', async () => {
     await persistStorageConfig({
       enabled: true,
       provider: 'r2',
@@ -67,18 +43,8 @@ describe('persistDesktopSecrets — 密钥仅入 Keychain (PR1 Critical)', () =>
       bucketName: 'bkt',
       publicDomain: 'cdn.example.com',
     });
-    expect(window.localStorage.getItem('storage_secret_access_key')).toBeNull();
+    expect(window.localStorage.getItem('storage_secret_access_key')).toBe('super-secret');
     expect(window.localStorage.getItem('storage_access_key_id')).toBe('AKID-public');
     expect(window.localStorage.getItem('storage_bucket_name')).toBe('bkt');
-  });
-
-  it('Keychain 写入失败时应抛出 CredentialPersistError', async () => {
-    invokeMock.mockRejectedValueOnce(new Error('Keychain locked'));
-    invokeMock.mockResolvedValueOnce(undefined); // save_desktop_env (后续)
-    await expect(
-      persistAiGatewayConfig('https://api.openai.com/v1', 'sk-fail'),
-    ).rejects.toBeInstanceOf(CredentialPersistError);
-    // 关键：失败后密钥绝不应泄漏到 localStorage
-    expect(window.localStorage.getItem('ai_api_key')).toBeNull();
   });
 });

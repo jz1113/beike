@@ -3,7 +3,7 @@ import type {
   AssistantSession,
   MediaAttachment,
 } from '@/types/app-store';
-import { apiFetch } from '@/lib/apiClient';
+import { putAssistantSessionsRemote } from '@/features/assistant/api/sessions';
 import { isProjectAutosaveEnabled } from '@/lib/localStoragePrefs';
 
 function sanitizeAssistantAttachment(a: MediaAttachment): MediaAttachment {
@@ -131,11 +131,7 @@ async function syncAssistantToServer(sessions: AssistantSession[], currentId?: s
   if (typeof window === 'undefined') return;
   try {
     const lightweight = sanitizeAssistantSessions(sessions).filter((s) => !assistantDeletedIds.has(s.id));
-    await apiFetch('/api/assistant/sessions', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions: lightweight, currentId }),
-    });
+    await putAssistantSessionsRemote(lightweight, currentId);
   } catch (err) {
     console.warn('[assistant] 同步服务端失败:', err);
   }

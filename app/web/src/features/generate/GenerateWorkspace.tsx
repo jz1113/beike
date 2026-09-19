@@ -3,14 +3,14 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, GenerationTask } from '@/store/useAppStore';
 import { useQuickRefMediaDrop } from '@/lib/useQuickRefMediaDrop';
 import { X } from 'lucide-react';
-import PromptActionBar from '@/features/home/components/prompt-bar/PromptActionBar';
+import PromptActionBar from '@/shared/prompt-bar';
 import { GenerateWorkspaceToolbar } from './components/GenerateWorkspaceToolbar';
 import { GenerateTaskFeed } from './components/GenerateTaskFeed';
 import {
   groupTasksIntoBatches,
   groupBatchesByDate,
   flattenDateBatches,
-} from './generateWorkspaceHelpers';
+} from './generateWorkspaceLayout';
 import { pageRoot } from '@/shared/ui/layoutClasses';
 import { useSafeTimeout } from '@/lib/useSafeTimeout';
 

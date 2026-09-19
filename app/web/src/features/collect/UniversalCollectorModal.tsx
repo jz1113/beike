@@ -12,7 +12,7 @@ import {
   handleImgError,
   isLikelyVideoUrl,
   buildCollectorAIAssistantPayload,
-} from '@/features/collect/collectorShared';
+} from '@/features/collect/collectorTypes';
 import CollectorSinglePanel from '@/features/collect/CollectorSinglePanel';
 import CollectorBatchPanel from '@/features/collect/CollectorBatchPanel';
 import CollectorHistoryPanel from '@/features/collect/CollectorHistoryPanel';

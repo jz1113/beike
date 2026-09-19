@@ -116,7 +116,11 @@ export function resolveGptImagePixelSize(
       : isKnownAspectId(trimmed)
         ? trimmed
         : DEFAULT_ASPECT_ID;
-    return { pixelSize: trimmed.replace(/\s+/g, ''), aspectId };
+    const raw = trimmed.replace(/\s+/g, '');
+    const pixelSize = userModelId.toLowerCase().includes('gpt-image-2.5')
+      ? clampGptImageOfficialPixelSize(raw)
+      : raw;
+    return { pixelSize, aspectId };
   }
 
   const aspectId = isKnownAspectId(trimmed)
@@ -135,6 +139,45 @@ export function maxEdgeForGptImageModel(userModelId: string, quality?: GptImageQ
   const id = sanitizeGptImageModelIdForSize(userModelId).toLowerCase();
   if (id === 'gpt-image-2-4k') return 3840;
   if (id === 'gpt-image-2-2k') return 2048;
+  if (id.startsWith('gpt-image-2.5')) return 3840;
   if (quality === 'high') return 3840;
   return 2048;
+}
+
+/** gpt-image-2.5：边长 ≤3840、必须是 16 的倍数、长短边比 ≤3、像素 655360–8294400 */
+export function clampGptImageOfficialPixelSize(pixelSize: string): string {
+  const match = /^\s*(\d+)\s*x\s*(\d+)\s*$/i.exec(pixelSize);
+  if (!match) return pixelSize;
+  let width = Number(match[1]);
+  let height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return pixelSize;
+
+  const snap = (value: number) => Math.max(16, Math.round(value / 16) * 16);
+  width = snap(Math.min(3840, width));
+  height = snap(Math.min(3840, height));
+
+  const longEdge = Math.max(width, height);
+  const shortEdge = Math.min(width, height);
+  if (shortEdge > 0 && longEdge / shortEdge > 3) {
+    const nextShort = snap(Math.ceil(longEdge / 3));
+    if (width >= height) height = nextShort;
+    else width = nextShort;
+  }
+
+  let pixels = width * height;
+  if (pixels < 655_360) {
+    const scale = Math.sqrt(655_360 / pixels);
+    width = snap(width * scale);
+    height = snap(height * scale);
+    pixels = width * height;
+  }
+  if (pixels > 8_294_400) {
+    const scale = Math.sqrt(8_294_400 / pixels);
+    width = snap(width * scale);
+    height = snap(height * scale);
+  }
+
+  width = Math.min(3840, width);
+  height = Math.min(3840, height);
+  return `${width}x${height}`;
 }

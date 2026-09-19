@@ -1,8 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { AssistantSession } from '@/types/app-store';
-import { apiFetch } from '@/lib/apiClient';
+import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@/features/assistant/api/sessions';
 import { setStoredMultimodalModelId } from '@beike/domain/workflowModels';
-import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   assistantDeletedIds,
   clearAssistantPersistTimer,
@@ -91,19 +90,9 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
     let serverOk = true;
     let serverError: string | undefined;
     if (typeof window !== 'undefined') {
-      try {
-        const res = await apiFetch(`/api/assistant/sessions?id=${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.success === false) {
-          serverOk = false;
-          serverError = data.error || `删除失败 (HTTP ${res.status})`;
-        }
-      } catch (e: any) {
-        serverOk = false;
-        serverError = formatUserError(e, '删除请求失败');
-      }
+      const remote = await deleteAssistantSessionRemote(id);
+      serverOk = remote.success;
+      serverError = remote.error;
     }
 
     const state = get();
@@ -203,20 +192,17 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
     loadAssistantTombstones();
     let remoteSessions: AssistantSession[] | null = null;
     try {
-      const res = await apiFetch('/api/assistant/sessions');
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        if (data?.success && Array.isArray(data.sessions) && data.sessions.length > 0) {
-          remoteSessions = data.sessions
-            .filter((s: any) => s?.id && !assistantDeletedIds.has(s.id))
-            .map((s: any) => ({
-              id: s.id,
-              title: s.title || '新对话',
-              createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
-              updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : Date.now(),
-              messages: Array.isArray(s.messages) ? s.messages : [],
-            }));
-        }
+      const sessions = await fetchAssistantSessionsRemote();
+      if (sessions && sessions.length > 0) {
+        remoteSessions = sessions
+          .filter((s) => s?.id && !assistantDeletedIds.has(s.id))
+          .map((s) => ({
+            id: s.id,
+            title: s.title || '新对话',
+            createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
+            updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : Date.now(),
+            messages: Array.isArray(s.messages) ? s.messages : [],
+          }));
       }
     } catch {}
 

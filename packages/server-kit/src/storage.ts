@@ -489,15 +489,8 @@ export async function persistMediaUrl(
     // 自动更新数据库中的记录为永久链接
     if (permanentUrl && taskId) {
       await prisma.imageTask.updateMany({
-        where: {
-          OR: [
-            { taskId: taskId },
-            { id: taskId }
-          ]
-        },
-        data: {
-          resultUrl: permanentUrl
-        }
+        where: { OR: [{ taskId }, { id: taskId }], resultUrl: tempUrl },
+        data: { resultUrl: permanentUrl },
       }).catch(() => { /* Keep the durable file URL even if task metadata is temporarily unavailable. */ });
       console.log(`[对象存储-入库] 任务 ${taskId} 数据库链接已平滑切换为永久链接`);
     }

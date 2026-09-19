@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { countLocalRecords } from '../../repositories/system';
 import { clearProxyVideoCache } from './proxy-image';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
@@ -94,27 +94,7 @@ function rmDirContents(dir: string) {
  */
 export async function GET() {
   try {
-    const [
-      imageTaskCount,
-      productCount,
-      sceneCount,
-      outfitCount,
-      actionCount,
-      personaCount,
-      styleRecipeCount,
-      assistantThreadCount,
-      promptRecordCount,
-    ] = await Promise.all([
-      prisma.imageTask.count().catch(() => 0),
-      prisma.product.count().catch(() => 0),
-      prisma.sceneAsset.count().catch(() => 0),
-      prisma.outfitAsset.count().catch(() => 0),
-      prisma.actionAsset.count().catch(() => 0),
-      prisma.personaAsset.count().catch(() => 0),
-      prisma.styleRecipe.count().catch(() => 0),
-      prisma.assistantThread.count().catch(() => 0),
-      prisma.promptRecord.count().catch(() => 0),
-    ]);
+    const counts = await countLocalRecords();
 
     const dataDir = resolveDataDir();
     const cacheRoot = resolveCacheRoot();
@@ -134,16 +114,7 @@ export async function GET() {
 
     return jsonResponse({
       success: true,
-      imageTaskCount,
-      productCount,
-      sceneCount,
-      outfitCount,
-      actionCount,
-      personaCount,
-      styleRecipeCount,
-      assistantThreadCount,
-      promptRecordCount,
-      promptAssetsTotal: sceneCount + outfitCount + actionCount + personaCount,
+      ...counts,
       dbBytes,
       dbPath,
       dbReadable,

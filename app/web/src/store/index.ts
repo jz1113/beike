@@ -124,7 +124,7 @@ export {
   clearWorkshopStudioDraft,
 } from './persist/index';
 
-if (typeof window !== 'undefined') {
-  (window as any).useAppStore = useAppStore;
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  (window as { useAppStore?: typeof useAppStore }).useAppStore = useAppStore;
 }
 

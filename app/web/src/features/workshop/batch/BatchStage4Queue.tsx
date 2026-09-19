@@ -145,10 +145,9 @@ export default function BatchStage4Queue({
                 <h3 className="px-2 py-2 text-xs font-semibold text-slate-600">商品列表 · {successfulItems.length} 款</h3>
                 <div className="max-h-80 overflow-y-auto space-y-1.5">
                   {successfulItems.map((product, index) => {
-                    const tasks = product.tasks || [];
-                    const done = tasks.filter(task => task.status === 'SUCCESS').length;
-                    const failed = tasks.some(task => task.status === 'FAILURE');
                     const cover = product.selectedProductImages?.[0] || product.coverImage;
+                    const copyFailed = Boolean(product.copywritingError);
+                    const copyReady = Boolean(product.copywriting?.title && product.copywriting?.content);
                     return <button key={product.id} type="button" aria-current={index === safeIndex ? 'true' : undefined}
                       onClick={() => setActiveItemIndex(index)} title={product.title}
                       className={`w-full flex items-center gap-3 rounded-xl p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -157,8 +156,9 @@ export default function BatchStage4Queue({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-medium">{index + 1}. {product.title}</span>
-                        <span className={`block mt-1 text-[11px] ${failed ? 'text-rose-600' : 'text-slate-400'}`}>
-                          {tasks.length === 0 ? '待生成' : done === tasks.length ? '已完成' : `${done}/${tasks.length} 已完成${failed ? ' · 有失败' : ''}`}
+                        <span className="block mt-1 text-[11px] text-slate-500">图片已完成</span>
+                        <span className={`block text-[11px] ${copyFailed ? 'text-rose-600' : 'text-slate-400'}`}>
+                          {copyFailed ? '文案失败，待重试' : copyReady ? '文案已就绪' : '文案待生成'}
                         </span>
                       </span>
                     </button>;

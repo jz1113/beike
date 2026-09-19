@@ -7,7 +7,7 @@ import { CanvasHomeFeed } from '../components/CanvasHomeFeed';
 import { useCanvasStore } from '../store/useCanvasStore';
 
 // Mock PromptActionBar 简化渲染
-vi.mock('@/features/home/components/prompt-bar/PromptActionBar', () => ({
+vi.mock('@/shared/prompt-bar', () => ({
   default: () => <div data-testid="mock-prompt-action-bar">PromptActionBar</div>,
 }));
 

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { mapWithConcurrency } from '@beike/domain/asyncPool';
+import { apiFetch } from '@/lib/apiClient';
 import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
 import {
   batchParseXhsLinks,
@@ -16,6 +17,7 @@ import {
 } from '../assetDeconstructCsvExport';
 import type { ImageSetQueueItem } from '../assetPromptConstants';
 import type { DeconstructQueueApi } from './useDeconstructQueue';
+import { mergeParsedQueueItems, selectFreshSourceUrls, type CollectionIssue } from './xhsSourceCheck';
 
 export type UseXhsBatchImportOptions = {
   queueApi: DeconstructQueueApi;
@@ -27,6 +29,7 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
   const [deconstructSourceMode, setDeconstructSourceMode] = useState<'local' | 'xhs'>('xhs');
   const [xhsLinksInput, setXhsLinksInput] = useState('');
   const [isParsingXhsLinks, setIsParsingXhsLinks] = useState(false);
+  const [collectionIssues, setCollectionIssues] = useState<CollectionIssue[]>([]);
   const [xhsParseProgress, setXhsParseProgress] = useState<{
     current: number;
     total: number;
@@ -58,15 +61,39 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
 
     setIsParsingXhsLinks(true);
     setXhsParseProgress({ current: 0, total: 0, success: 0, skipped: 0 });
+    setCollectionIssues([]);
 
     try {
+      const candidateUrls = parseXhsUrlsFromText(rawText);
+      const checkRes = await apiFetch('/api/catalog/assets/source-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls: candidateUrls }),
+      });
+      const checkData = await checkRes.json().catch(() => ({}));
+      if (!checkRes.ok || checkData.success === false) {
+        showToast(checkData.error || '查重服务暂不可用，请稍后重试');
+        return;
+      }
+      const { urls, issues } = selectFreshSourceUrls(Array.isArray(checkData.data) ? checkData.data : [], queue);
+      setCollectionIssues(issues);
+      if (urls.length === 0) {
+        showToast(issues.length > 0 ? '所选链接均已在资产库或队列中' : '未采编到符合条件的图集');
+        return;
+      }
+
       const { scraperId, scraperSecret } = await getExternalScraperCredentials();
-      const { queueItems, skipped } = await batchParseXhsLinks(rawText, scraperId, scraperSecret, {
-        onProgress: (progress) => setXhsParseProgress(progress),
+      const { queueItems, skipped } = await batchParseXhsLinks(urls.join('\n'), scraperId, scraperSecret, {
+        onProgress: (progress) => setXhsParseProgress({
+          current: progress.current,
+          total: progress.total,
+          success: progress.success,
+          skipped: progress.skipped ?? 0,
+        }),
       });
 
       if (queueItems.length > 0) {
-        setQueue((prev) => [...prev, ...queueItems]);
+        setQueue(mergeParsedQueueItems(queue, queueItems));
         setXhsLinksInput('');
         showToast(
           `成功采编 ${queueItems.length} 套图集（每套截取前 10 张图加入队列），跳过 ${skipped.length} 套（纯视频或不足3图）`
@@ -81,7 +108,7 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
       setIsParsingXhsLinks(false);
       setXhsParseProgress(null);
     }
-  }, [xhsLinksInput, setQueue, showToast]);
+  }, [xhsLinksInput, queue, setQueue, showToast]);
 
   const runFullPipelineClosedLoop = useCallback(async () => {
     const rawText = xhsLinksInput.trim();
@@ -280,6 +307,7 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
     setXhsLinksInput,
     isParsingXhsLinks,
     xhsParseProgress,
+    collectionIssues,
     handleBatchParseXhsLinks,
     runFullPipelineClosedLoop,
   };

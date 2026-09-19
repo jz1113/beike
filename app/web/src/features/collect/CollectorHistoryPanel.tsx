@@ -9,7 +9,7 @@ import {
   COLLECTOR_STORAGE_KEY,
   displayMediaSrc,
   handleImgError,
-} from '@/features/collect/collectorShared';
+} from '@/features/collect/collectorTypes';
 import {
   HISTORY_ROW_HEIGHT,
   HISTORY_ROW_GAP,

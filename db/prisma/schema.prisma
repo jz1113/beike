@@ -167,12 +167,17 @@ model SceneAsset {
   isFavorite         Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  albumId            String?
+  productCategoryIds String   @default("[]")
+  isUniversal        Boolean  @default(false)
   actions            ActionAsset[]
 
   @@index([category])
   @@index([spatialType])
   @@index([isFavorite])
   @@index([createdAt])
+  @@index([albumId])
+  @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "SceneAsset_library_order_idx")
 }
 
 // 2. 穿搭 OOTD 资产库
@@ -197,10 +202,15 @@ model OutfitAsset {
   isFavorite         Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  albumId            String?
+  productCategoryIds String   @default("[]")
+  isUniversal        Boolean  @default(false)
 
   @@index([category])
   @@index([isFavorite])
   @@index([createdAt])
+  @@index([albumId])
+  @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "OutfitAsset_library_order_idx")
 }
 
 // 3. 动作姿态资产库
@@ -224,8 +234,11 @@ model ActionAsset {
   shotOrder        Int         @default(0) // 分镜排序 1~4
   usageCount       Int         @default(0)
   isFavorite       Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  albumId            String?
+  productCategoryIds String   @default("[]")
+  isUniversal        Boolean  @default(false)
   scene            SceneAsset? @relation(fields: [sceneId], references: [id], onDelete: SetNull)
 
   @@index([shotType])
@@ -233,6 +246,8 @@ model ActionAsset {
   @@index([sceneId])
   @@index([isFavorite])
   @@index([createdAt])
+  @@index([albumId])
+  @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "ActionAsset_library_order_idx")
 }
 
 // 4. 人物博主资产库
@@ -249,12 +264,17 @@ model PersonaAsset {
   imageType        String?
   provenance       String   @default("manual")
   usageCount       Int      @default(0)
-  isFavorite  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isFavorite       Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  albumId            String?
+  productCategoryIds String   @default("[]")
+  isUniversal        Boolean  @default(false)
 
   @@index([isFavorite])
   @@index([createdAt])
+  @@index([albumId])
+  @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "PersonaAsset_library_order_idx")
 }
 
 // 6. 完整反推提示词资产库（整条母本提示词与九维溯源对照）
@@ -283,11 +303,63 @@ model FullPromptAsset {
   isFavorite         Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  albumId            String?
+  productCategoryIds String   @default("[]")
+  isUniversal        Boolean  @default(false)
 
   @@index([category])
   @@index([isFavorite])
   @@index([createdAt])
   @@index([albumName])
+  @@index([albumId])
+  @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "FullPromptAsset_library_order_idx")
+}
+
+model AssetProductCategory {
+  id       String  @id @default(cuid())
+  name     String
+  parentId String?
+  position Int     @default(0)
+  parent   AssetProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children AssetProductCategory[] @relation("CategoryTree")
+  albums   PromptAlbum[]
+
+  @@index([parentId, position])
+}
+
+model PromptAlbum {
+  id                String   @id @default(cuid())
+  name              String
+  sourceKey         String   @unique
+  productCategoryId String?
+  createdAt         DateTime @default(now())
+  productCategory   AssetProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: Restrict)
+
+  @@index([productCategoryId])
+}
+
+model WorkshopWorkspace {
+  id           String @id
+  revision     Int    @default(1)
+  snapshotJson String
+  updatedAt    String
+}
+
+model DeconstructReview {
+  id        String @id
+  albumName String
+  payload   String
+  status    String @default("pending")
+  createdAt String
+}
+
+model PromptImportSource {
+  sourceKey String  @id
+  requestId String
+  state     String
+  albumName String  @default("")
+  albumId   String?
+  updatedAt String
 }
 
 

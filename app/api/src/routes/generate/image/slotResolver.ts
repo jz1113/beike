@@ -6,7 +6,7 @@ import {
 } from '@beike/domain/drawing';
 import { createImageConvertCache } from '@beike/domain/latencyAudit';
 import { emphasizeIdentityFacePlate, obfuscateCompositionFaces } from '@beike/server-kit/faceObfuscate';
-import { fetchImageAsSafeDataUrl } from '../../../services/imageHelpers';
+import { fetchImageAsSafeDataUrl } from '../../../services/gatewayCredentials';
 
 export interface ImageSlotResolutionResult {
   isHumanShot: boolean;

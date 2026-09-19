@@ -2,7 +2,7 @@ import { apiFetch } from '@/lib/apiClient';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
 import { compressImageToDataUrl } from '@/lib/image-utils';
 import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
-import { isTransientPollError, imageGenBusinessError } from './batchRunnerUtils';
+import { isTransientPollError, imageGenBusinessError, nonRetryableError } from './batchRunnerIo';
 
 /**
  * 若图片为超过 1.2MB 的 base64 data URL，进行压缩优化
@@ -23,14 +23,15 @@ export async function compressProductImageIfNeeded(img: string): Promise<string>
  */
 export async function pollSingleTask(
   taskId: string,
-  isAborted: () => boolean
+  _isAborted: () => boolean
 ): Promise<string> {
+  void _isAborted;
   const timeoutMs = 360000;
   const start = Date.now();
   const gatewayHeaders = getGatewayClientHeaders();
   const localUrl = gatewayHeaders['x-custom-base-url'];
 
-  while (Date.now() - start < timeoutMs && !isAborted()) {
+  while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 2000));
     try {
       const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}`, {
@@ -66,7 +67,7 @@ export async function pollSingleTask(
       if (!isTransientPollError(e)) throw e;
     }
   }
-  throw new Error('生图超时（已等待 6 分钟）');
+  throw nonRetryableError(`生图超时（已等待 6 分钟，任务 ${taskId}）`);
 }
 
 export interface SubmitImageGenTaskDeps {
@@ -80,6 +81,9 @@ export async function submitImageGenTask(
   payload: Record<string, any>,
   deps: SubmitImageGenTaskDeps
 ): Promise<string> {
+  if (deps.isAborted()) {
+    throw nonRetryableError('已停止后续生图，不提交新任务');
+  }
   const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
 
   const finalPayload = {
@@ -99,10 +103,10 @@ export async function submitImageGenTask(
 
   const data = await res.json().catch(() => null);
   if (!data) {
-    throw new Error(payload.isGrid2x2 ? '四宫格生图响应解析失败' : '生图响应解析失败');
+    throw nonRetryableError(payload.isGrid2x2 ? '四宫格生图响应解析失败' : '生图响应解析失败');
   }
   if (!res.ok || !data.success) {
-    throw new Error(
+    throw nonRetryableError(
       data.error || (payload.isGrid2x2 ? '四宫格生图提交失败' : '生图任务提交失败')
     );
   }
@@ -128,7 +132,7 @@ export async function submitImageGenTask(
     return await pollSingleTask(data.taskId, deps.isAborted);
   }
 
-  throw new Error(
+  throw nonRetryableError(
     payload.isGrid2x2 ? '四宫格生图网关未返回有效任务 ID' : '生图网关未返回有效任务 ID'
   );
 }

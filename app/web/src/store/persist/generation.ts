@@ -76,6 +76,9 @@ export function sanitizeTaskForStorage(task: GenerationTask): GenerationTask {
 }
 
 let saveDrawingTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingGens: GenerationTask[] | undefined;
+let pendingSessions: ChatSession[] | undefined;
+let pendingCurrentId: string | undefined;
 
 export function persistDrawingStateToStorage(
   allGens?: GenerationTask[],
@@ -84,30 +87,39 @@ export function persistDrawingStateToStorage(
 ) {
   if (typeof window === 'undefined') return;
   if (!isProjectAutosaveEnabled()) return;
+  if (allGens !== undefined) pendingGens = allGens;
+  if (sessions !== undefined) pendingSessions = sessions;
+  if (currentId !== undefined) pendingCurrentId = currentId;
   if (saveDrawingTimer) clearTimeout(saveDrawingTimer);
   saveDrawingTimer = setTimeout(() => {
+    const gens = pendingGens;
+    const nextSessions = pendingSessions;
+    const id = pendingCurrentId;
+    pendingGens = undefined;
+    pendingSessions = undefined;
+    pendingCurrentId = undefined;
     try {
-      if (allGens) {
-        const lightweightGens = allGens.slice(0, 100).map(sanitizeTaskForStorage);
+      if (gens !== undefined) {
+        const lightweightGens = gens.slice(0, 100).map(sanitizeTaskForStorage);
         localStorage.setItem('drawing_all_generations', JSON.stringify(lightweightGens));
       }
-      if (sessions) {
-        const lightweightSessions = sessions.slice(0, 25).map(s => ({
+      if (nextSessions !== undefined) {
+        const lightweightSessions = nextSessions.slice(0, 25).map(s => ({
           ...s,
           tasks: (s.tasks || []).slice(0, 30).map(sanitizeTaskForStorage)
         }));
         localStorage.setItem('drawing_sessions', JSON.stringify(lightweightSessions));
       }
-      if (currentId) {
-        localStorage.setItem('drawing_current_session_id', currentId);
+      if (id !== undefined) {
+        localStorage.setItem('drawing_current_session_id', id);
       }
     } catch (e: unknown) {
       const err = e as { name?: string; code?: number };
       if (err?.name === 'QuotaExceededError' || err?.code === 22) {
         try {
           localStorage.removeItem('drawing_all_generations');
-          if (sessions) {
-            localStorage.setItem('drawing_sessions', JSON.stringify(sessions.slice(0, 5).map(s => ({
+          if (nextSessions) {
+            localStorage.setItem('drawing_sessions', JSON.stringify(nextSessions.slice(0, 5).map(s => ({
               ...s,
               tasks: (s.tasks || []).slice(0, 10).map(sanitizeTaskForStorage)
             }))));

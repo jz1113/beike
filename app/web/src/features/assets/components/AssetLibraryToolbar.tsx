@@ -8,7 +8,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import type { ActionCategoryId, SubCategoryDef } from '@beike/domain/productCategoryHelpers';
+import type { ActionCategoryId, SubCategoryDef } from '@beike/domain/productCategory';
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
 import { AssetLibraryMoreMenu } from './AssetLibraryMoreMenu';
 import { AssetLibraryFilterBar } from './AssetLibraryFilterBar';

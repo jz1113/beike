@@ -1,6 +1,6 @@
 import { assistantMemory } from '../../services/assistantMemory';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 function sanitizeAttachment(a: any) {

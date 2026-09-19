@@ -2,7 +2,7 @@ import { apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import { saveToDownloadDir } from '@/lib/desktopDownload';
 import { openExternalUrl } from '@/lib/downloadMedia';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import type { BatchTaskItem } from './collectorShared';
+import type { BatchTaskItem } from './collectorTypes';
 
 /**
  * 下载标准批量采集表格导入模板
@@ -187,9 +187,20 @@ export async function downloadSingleVideo(
     if (!res.ok) throw new Error(`视频下载失败 HTTP ${res.status}`);
 
     const blob = await res.blob();
+    const contentType = (res.headers.get('content-type') || blob.type || '').toLowerCase();
+    const unusable = contentType.includes('image/svg') || blob.size < 1024;
+    const downloadBlob = unusable
+      ? await (async () => {
+          const direct = await fetch(videoUrl);
+          if (!direct.ok) throw new Error(`视频下载失败 HTTP ${direct.status}`);
+          const directBlob = await direct.blob();
+          if (directBlob.size < 1024) throw new Error('视频下载失败');
+          return directBlob;
+        })()
+      : blob;
     await saveToDownloadDir(
       `${(item.title || '社媒视频').slice(0, 20).replace(/[\\/:*?"<>|]/g, '_')}_无水印原视频.mp4`,
-      blob,
+      downloadBlob,
     );
     showToast('🎉 无水印高清原视频 (MP4) 已成功下载！');
   } catch {

@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, clearWorkshopStudioDraft } from '@/store/useAppStore';
-import { useGenerationEngine } from '@/features/generate/useGenerationEngine';
+import { GenerationEngineHost } from '@/features/generate/GenerationEngineHost';
 import { syncAppTokenCookie } from '@/lib/apiClient';
 import { migrateLegacyCredentialsOnce } from '@/lib/credentialClient';
 import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@beike/domain/workflowModels';
@@ -27,6 +27,7 @@ import GenerateWorkspace from '@/features/generate/GenerateWorkspace';
 import WorkshopStudio from '@/features/workshop/WorkshopStudio';
 import ReplicationStudio from '@/features/replicate/ReplicationStudio';
 import AssetCenter from '@/features/assets/AssetCenter';
+import CanvasRecentProjects from '@/features/canvas/components/CanvasRecentProjects';
 
 // 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
 function lazyWithRetry<T extends React.ComponentType<any>>(
@@ -103,8 +104,7 @@ export default function App() {
     onOpenSettings: navigateToSettings,
   });
 
-  // 全局生图引擎：与视图解耦，切页后仍提交/轮询
-  useGenerationEngine();
+  // 全局生图引擎挂在独立宿主上，避免进度更新重绘首页
 
   useEffect(() => {
     syncAppTokenCookie();
@@ -176,6 +176,7 @@ export default function App() {
 
   return (
     <GeneratingEffectsProvider>
+    <GenerationEngineHost />
     <div className="h-screen w-screen bg-[#FAFAFC] text-slate-900 flex flex-col overflow-hidden selection:bg-blue-100 selection:text-blue-900" data-density={density}>
       {/* 🌟 0. 顶部 macOS 专属全宽拖拽控制条 (画板、全屏设置与种草工坊时隐藏，由各页面头部接管) */}
       {!isDedicatedFullscreen && <MacTitleBar />}
@@ -230,6 +231,7 @@ export default function App() {
                       onEnterWorkshop={enterOriginalWorkshop}
                       onEnterReplication={enterReplication}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
+                      recentProjects={<CanvasRecentProjects onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>

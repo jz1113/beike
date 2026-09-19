@@ -11,6 +11,7 @@
   "scripts": {
     "dev:api": "node --max-old-space-size=2048 --expose-gc ./node_modules/tsx/dist/cli.mjs watch --tsconfig tsconfig.json app/api/src/index.ts",
     "dev:ui": "pnpm --filter @beike/web run dev",
+    "dev:web": "node works/scripts/web/dev-web.mjs",
     "dev:desktop": "node works/scripts/desktop/dev-desktop.mjs",
     "desktop:status": "node works/scripts/desktop/desktop-status.mjs",
     "desktop:stop": "node works/scripts/desktop/desktop-stop.mjs",
@@ -20,9 +21,10 @@
     "test:e2e": "playwright test -c works/configs/playwright.config.ts",
     "build:ui": "pnpm --filter @beike/web run build",
     "build": "pnpm run typecheck && pnpm --filter @beike/prisma run postinstall && pnpm run build:ui",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run lint:unused && pnpm run test && pnpm run build:ui",
+    "check": "pnpm run check:root-layout && pnpm run check:model-catalog && pnpm run typecheck && pnpm run lint && pnpm run lint:unused && pnpm run lint:max-lines && pnpm run lint:boundaries && pnpm run test && pnpm run build:ui",
     "check:desktop": "cargo check --manifest-path desktop/Cargo.toml",
     "check:root-layout": "node works/scripts/check-root-layout.mjs",
+    "check:model-catalog": "node works/scripts/check-model-catalog.mjs",
     "postinstall": "pnpm --filter @beike/prisma run postinstall && node works/scripts/depth/fix-ffmpeg-perms.mjs && node works/scripts/check-root-layout.mjs",
     "setup:depth-env": "node works/scripts/depth/fix-ffmpeg-perms.mjs && python3 works/scripts/depth/infer_video_depth.py --check-env && node works/scripts/depth/verify-env.mjs",
     "setup:depth-model": "node works/scripts/depth/setup-depth-model.mjs",
@@ -45,7 +47,10 @@
     "tauri:build:windows": "tauri build --config desktop/tauri.conf.json --bundles nsis",
     "tauri:release": "node works/scripts/desktop/tauri-release.mjs",
     "audit:source": "node works/scripts/quality/source-audit.mjs",
-    "lint:unused": "node works/scripts/quality/check-unused.mjs"
+    "lint:unused": "node works/scripts/quality/check-unused.mjs",
+    "lint:max-lines": "node works/scripts/quality/check-max-lines.mjs",
+    "lint:boundaries": "node works/scripts/quality/check-import-boundaries.mjs",
+    "lint:deps": "depcruise app/web/src app/api/src packages --config works/configs/dependency-cruiser.mjs"
   },
   "tauri": {
     "path": "desktop"
@@ -63,8 +68,10 @@
     "typescript-eslint": "^8.35.0",
     "vitest": "^3.2.4",
     "prisma": "5.22.0",
+    "@prisma/client": "5.22.0",
     "fake-indexeddb": "^6.0.0",
-    "@eslint/js": "^9.39.5"
+    "@eslint/js": "^9.39.5",
+    "dependency-cruiser": "^16.10.4"
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {

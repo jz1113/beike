@@ -1,8 +1,9 @@
+import { gatewayFetch } from '../../../../gateways/http';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { resolveVisionTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS } from '@beike/domain/visionTimeouts';
-import { getRetryDelayMs, isNetworkLikeError } from '../../../../services/imageHelpers';
+import { getRetryDelayMs, isNetworkLikeError } from '../../../../services/gatewayCredentials';
 import {
   VisionCallDiagnostics,
   VisionCallTracker,
@@ -68,7 +69,7 @@ export async function callVisionJson(params: {
             const timer = setTimeout(() => controller.abort(), timeoutMs);
 
             try {
-              const resp = await fetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
+              const resp = await gatewayFetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',

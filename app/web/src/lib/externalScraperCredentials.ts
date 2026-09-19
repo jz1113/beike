@@ -8,24 +8,22 @@ export type ExternalScraperCredentials = {
   preferredScraper?: 'auto' | 'qiyun' | 'apia';
 };
 
+const CREDENTIAL_KEYS = ['external_scraper_id', 'external_scraper_secret', 'qiyun_app_id', 'qiyun_app_key'] as const;
+
 export async function getExternalScraperCredentials(): Promise<ExternalScraperCredentials> {
   if (typeof window === 'undefined') {
     return {};
   }
 
-  const localId = (localStorage.getItem('external_scraper_id') || '').trim();
-  const secureSecret = (await credentialGet('external_scraper_secret')).trim();
-  const localSecret = (localStorage.getItem('external_scraper_secret') || '').trim();
-
-  const qiyunAppId = (localStorage.getItem('qiyun_app_id') || '').trim();
-  const secureQiyunKey = (await credentialGet('qiyun_app_key')).trim();
-  const localQiyunKey = (localStorage.getItem('qiyun_app_key') || '').trim();
+  const [scraperId, scraperSecret, qiyunAppId, qiyunAppKey] = await Promise.all(
+    CREDENTIAL_KEYS.map((key) => credentialGet(key).then((value) => value.trim())),
+  );
 
   return {
-    scraperId: localId || undefined,
-    scraperSecret: secureSecret || localSecret || undefined,
+    scraperId: scraperId || undefined,
+    scraperSecret: scraperSecret || undefined,
     qiyunAppId: qiyunAppId || undefined,
-    qiyunAppKey: secureQiyunKey || localQiyunKey || undefined,
+    qiyunAppKey: qiyunAppKey || undefined,
   };
 }
 

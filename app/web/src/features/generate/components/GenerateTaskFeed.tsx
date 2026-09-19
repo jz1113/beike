@@ -12,12 +12,12 @@ import {
 } from '@beike/domain/drawing';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
 import { apiFetch } from '@/lib/apiClient';
-import { isGenerateVideoTask, type FlatBatchItem } from '../generateWorkspaceHelpers';
+import { isGenerateVideoTask, type FlatBatchItem } from '../generateWorkspaceLayout';
 import {
   cloneDepthSubmit,
   peekDepthSubmit,
   resolveDepthSubmit,
-} from '@/features/home/hooks/useDepthGeneration';
+} from '@/lib/depthGeneration';
 import { resolveRefMediaFile, registerRefMedia } from '@/lib/refMediaRegistry';
 import {
   DEPTH_IMAGE_MODEL_ID,

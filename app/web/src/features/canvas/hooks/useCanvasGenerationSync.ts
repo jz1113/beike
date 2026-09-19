@@ -2,6 +2,16 @@ import { useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { CanvasProject } from '../types';
 import type { GenerationTask } from '@/types/app-store';
+
+function parseGenerationProgress(progress: unknown): number | undefined {
+  if (typeof progress === 'number' && Number.isFinite(progress)) return progress;
+  if (typeof progress === 'string') {
+    const parsed = Number.parseFloat(progress.replace(/%/g, '').trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 export function useCanvasGenerationSync(currentProject: CanvasProject | null | undefined, generationTasks: GenerationTask[], updateNode: ReturnType<typeof useCanvasStore.getState>['updateNode']) {
   // 🌟 1. 监听全局任务完成事件，实现生成成功后 100% 自动揭晓与真实图片展示
   useEffect(() => {
@@ -77,9 +87,11 @@ export function useCanvasGenerationSync(currentProject: CanvasProject | null | u
           });
         }
       } else if (matchedTask.status === 'IN_PROGRESS' || (matchedTask.status as string) === 'PENDING') {
-        const prog = (matchedTask as any).progress;
-        if (typeof prog === 'number' && prog > (node.progress || 0)) {
-          updateNode(currentProject.id, node.id, { progress: prog });
+        const parsed = parseGenerationProgress(matchedTask.progress);
+        if (parsed == null) return;
+        const progress = parsed >= 100 ? 99 : parsed;
+        if (progress > (node.progress || 0) || node.status !== 'generating') {
+          updateNode(currentProject.id, node.id, { status: 'generating', progress });
         }
       }
     });

@@ -1,7 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
 import { apiFetch } from '@/lib/apiClient';
 import { credentialSet, credentialDelete, type CredentialKey } from '@/lib/credentialClient';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
 import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/lib/gatewayClient';
 
 export interface StorageConfig {
@@ -30,11 +28,7 @@ export type DesktopEnvPayload = {
 };
 
 /**
- * ⚠️ 安全约定：所有敏感凭证（API Key / Secret / Storage Secret 等）**禁止**写入
- * `localStorage` 或 Cookie，仅允许：
- *   1. 桌面端通过 Rust `credentialSet` 写入系统 Keychain
- *   2. 通过 IPC 写入桌面端 `.env`（Rust 独占）
- * Keychain 写入失败必须抛出错误并在 UI 显式提示，**不允许**静默降级到 localStorage。
+ * Web 模式：敏感凭证写入 localStorage，并由 HTTP `/api/system/desktop-env` 同步到本机服务。
  */
 
 class CredentialPersistError extends Error {
@@ -44,37 +38,12 @@ class CredentialPersistError extends Error {
   }
 }
 
-/** Rust 独占写 .env；Hono 仅热更新 sidecar process.env */
+/** 通过 HTTP 写入服务端 .env 并热更新 sidecar process.env */
 async function postDesktopEnv(payload: DesktopEnvPayload): Promise<void> {
-  if (isTauriDesktop()) {
-    try {
-      await invoke('save_desktop_env', {
-        baseUrl: payload.baseUrl?.trim() ?? null,
-        apiKey: payload.apiKey?.trim() ?? null,
-        wanbangKey: payload.wanbangKey?.trim() ?? null,
-        wanbangSecret: payload.wanbangSecret?.trim() ?? null,
-        externalScraperId: payload.externalScraperId?.trim() ?? null,
-        externalScraperSecret: payload.externalScraperSecret?.trim() ?? null,
-        storageEnabled: payload.storage?.enabled ?? null,
-        storageProvider: payload.storage?.provider ?? null,
-        storageAccountId: payload.storage?.accountId ?? null,
-        storageEndpoint: payload.storage?.endpoint ?? null,
-        storageAccessKeyId: payload.storage?.accessKeyId ?? null,
-        storageSecretAccessKey: payload.storage?.secretAccessKey ?? null,
-        storageBucketName: payload.storage?.bucketName ?? null,
-        storagePublicDomain: payload.storage?.publicDomain ?? null,
-        cacheDir: payload.cacheDir?.trim() ?? null,
-      });
-    } catch (err) {
-      throw new Error('配置写入磁盘失败，请重试', { cause: err });
-    }
-  }
-
   const res = await apiFetch('/api/system/desktop-env', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error('配置保存后未能应用到当前服务，请重试');
-
 }
 
 /**

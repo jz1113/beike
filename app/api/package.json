@@ -23,6 +23,8 @@
     "zod": "^3.25.76",
     "jszip": "^3.10.1",
     "@beike/domain": "*",
-    "@beike/server-kit": "*"
+    "@beike/server-kit": "*",
+    "@beike/prisma": "*",
+    "@prisma/client": "5.22.0"
   }
 }

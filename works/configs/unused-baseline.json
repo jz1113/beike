@@ -99,13 +99,13 @@
       "reason": "异步事件接口占位参数，保留生成器契约。"
     },
     {
-      "file": "app/shared/src/jewelryArchHelpers.ts",
+      "file": "app/shared/src/jewelryArch.ts",
       "message": "'titleStr' is defined but never used.",
       "count": 1,
       "reason": "导出函数参数涉及公共工具契约，保留兼容。"
     },
     {
-      "file": "app/shared/src/jewelryArchHelpers.ts",
+      "file": "app/shared/src/jewelryArch.ts",
       "message": "'targetAnatomy' is defined but never used.",
       "count": 1,
       "reason": "导出函数参数涉及公共工具契约，保留兼容。"
@@ -165,19 +165,19 @@
       "reason": "播放状态回调仍有消费者，保留播放管理器生命周期。"
     },
     {
-      "file": "app/web/src/features/assets/assetBackupUtils.ts",
+      "file": "app/web/src/features/assets/assetBackup.ts",
       "message": "'_' is assigned a value but never used.",
       "count": 1,
       "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
     },
     {
-      "file": "app/web/src/features/assets/assetBackupUtils.ts",
+      "file": "app/web/src/features/assets/assetBackup.ts",
       "message": "'__' is assigned a value but never used.",
       "count": 1,
       "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
     },
     {
-      "file": "app/web/src/features/assets/assetBackupUtils.ts",
+      "file": "app/web/src/features/assets/assetBackup.ts",
       "message": "'___' is assigned a value but never used.",
       "count": 1,
       "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"

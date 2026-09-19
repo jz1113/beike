@@ -2,7 +2,7 @@ import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { CLEAN_CHAT_SYSTEM_PROMPT } from '@beike/domain/skills/ecommerce-visual-director';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import type { AssistantDocAttachment } from '@beike/domain/assistant/tools/defs';
-import type { ChatMessage } from './assistantChatHelpers';
+import type { ChatMessage } from './assistantChat';
 
 
 /** Summarize early messages using LLM to reduce context length */

@@ -35,6 +35,51 @@ export const AssetTasksListResponseSchema = z.object({
 export type ImageTask = z.infer<typeof ImageTaskSchema>;
 export type AssetTasksListResponse = z.infer<typeof AssetTasksListResponseSchema>;
 
+export const GenerationMediaTypeSchema = z.enum(['image', 'video', 'depth-image', 'depth-video']);
+export const GenerationTaskSchema = z.object({
+  id: z.string(),
+  batchId: z.string().optional(),
+  shotNo: z.number().optional(),
+  title: z.string(),
+  prompt: z.string(),
+  scene: z.string().optional(),
+  camera_focal_length: z.string().optional(),
+  angle: z.string().optional(),
+  lighting_type: z.string().optional(),
+  expression: z.string().optional(),
+  action: z.string().optional(),
+  model: z.string(),
+  size: z.string(),
+  quality: z.string(),
+  has_human: z.boolean().optional(),
+  shot_type: z.enum(['model_shot', 'hand_held_only', 'pure_product']).optional(),
+  mediaType: GenerationMediaTypeSchema.optional(),
+  depthStyle: z.string().optional(),
+  videoDuration: z.number().optional(),
+  videoResolution: z.string().optional(),
+  videoRefMode: z.string().optional(),
+  generateAudio: z.boolean().optional(),
+  productImageUrl: z.string().optional(),
+  referenceImageUrl: z.string().optional(),
+  referenceImages: z.array(z.string()).optional(),
+  images: z.array(z.string()).optional(),
+  useReferenceImage: z.boolean(),
+  taskType: z.enum(['multi_angle', 'smart_edit', 'outpaint', 'generation']).optional(),
+  angleName: z.string().optional(),
+  sourceImageUrl: z.string().optional(),
+  status: z.enum(['IDLE', 'IN_PROGRESS', 'SUCCESS', 'FAILURE']),
+  progress: z.string(),
+  taskId: z.string().optional(),
+  dbId: z.string().optional(),
+  resultUrl: z.string().optional(),
+  failReason: z.string().optional(),
+  createdAt: z.number().optional(),
+  sessionId: z.string().optional(),
+  sessionTitle: z.string().optional(),
+});
+export type GenerationTask = z.infer<typeof GenerationTaskSchema>;
+export type GenerationMediaType = z.infer<typeof GenerationMediaTypeSchema>;
+
 export const DepthVideoStyleSchema = z.enum(['mocap', 'turbo', 'raw']);
 export const DepthVideoColormapSchema = z.enum(['gray', 'turbo']);
 export const DepthQualitySchema = z.enum(['fast', 'standard', 'high']);

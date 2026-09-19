@@ -4,14 +4,16 @@ import {
   DEFAULT_SUBCATEGORIES_MAP,
   SUBCATEGORY_STORAGE_KEY_PREFIX,
 } from './defs';
+import { domainStorage } from '../runtime';
 
 /**
  * 获取指定一级品类的二级类目表（支持读取本地导入持久化数据）
  */
 export function getSubCategoriesForCategory(categoryId: ActionCategoryId): SubCategoryDef[] {
-  if (typeof window !== 'undefined' && window.localStorage) {
+  const storage = domainStorage();
+  if (storage) {
     try {
-      const stored = window.localStorage.getItem(`${SUBCATEGORY_STORAGE_KEY_PREFIX}${categoryId}`);
+      const stored = storage.getItem(`${SUBCATEGORY_STORAGE_KEY_PREFIX}${categoryId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -29,9 +31,10 @@ export function getSubCategoriesForCategory(categoryId: ActionCategoryId): SubCa
  * 保存指定一级品类的二级类目表到本地存储
  */
 export function saveSubCategoriesForCategory(categoryId: ActionCategoryId, list: SubCategoryDef[]): void {
-  if (typeof window !== 'undefined' && window.localStorage) {
+  const storage = domainStorage();
+  if (storage) {
     try {
-      window.localStorage.setItem(`${SUBCATEGORY_STORAGE_KEY_PREFIX}${categoryId}`, JSON.stringify(list));
+      storage.setItem(`${SUBCATEGORY_STORAGE_KEY_PREFIX}${categoryId}`, JSON.stringify(list));
       window.dispatchEvent(
         new CustomEvent('antigravity_subcategory_changed', {
           detail: { categoryId, list },
@@ -48,9 +51,10 @@ export function saveSubCategoriesForCategory(categoryId: ActionCategoryId, list:
  */
 export function resetSubCategoriesForCategory(categoryId: ActionCategoryId): SubCategoryDef[] {
   const defaults = DEFAULT_SUBCATEGORIES_MAP[categoryId] || [];
-  if (typeof window !== 'undefined' && window.localStorage) {
+  const storage = domainStorage();
+  if (storage) {
     try {
-      window.localStorage.removeItem(`${SUBCATEGORY_STORAGE_KEY_PREFIX}${categoryId}`);
+      storage.removeItem(`${SUBCATEGORY_STORAGE_KEY_PREFIX}${categoryId}`);
       window.dispatchEvent(
         new CustomEvent('antigravity_subcategory_changed', {
           detail: { categoryId, list: defaults },

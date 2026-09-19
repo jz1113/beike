@@ -1,9 +1,9 @@
+import type { ReactNode } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import { useQuickRefMediaDrop } from '@/lib/useQuickRefMediaDrop';
 import PromptActionBar from './components/prompt-bar/PromptActionBar';
 import FeatureCapsules from './components/FeatureCapsules';
-import CanvasRecentProjects from '@/features/canvas/components/CanvasRecentProjects';
 import InspirationFeed from './components/inspiration/InspirationFeed';
 import { type InspirationUseOptions } from './components/inspiration/InspirationModal';
 
@@ -11,14 +11,15 @@ interface Props {
   onEnterWorkshop: () => void;
   onEnterReplication: () => void;
   onOpenCollectorHub?: () => void;
+  recentProjects?: ReactNode;
 }
 
 export default function HomePage({
   onEnterWorkshop,
   onEnterReplication,
   onOpenCollectorHub,
+  recentProjects,
 }: Props) {
-  const setCurrentView = useAppStore((s) => s.setCurrentView);
   const setQuickPrompt = useAppStore((s) => s.setQuickPrompt);
   const setQuickRefImage = useAppStore((s) => s.setQuickRefImage);
   const setQuickRefImages = useAppStore((s) => s.setQuickRefImages);
@@ -30,10 +31,6 @@ export default function HomePage({
   const setQuickVideoResolution = useAppStore((s) => s.setQuickVideoResolution);
 
   const { dropZoneProps: pageMediaDropProps, toastMsg } = useQuickRefMediaDrop();
-
-  const handleEnterCanvas = () => {
-    setCurrentView('canvas');
-  };
 
   const handleUsePrompt = (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => {
     const isVideo = !!(refMedia && isVideoMediaUrl(refMedia));
@@ -83,7 +80,7 @@ export default function HomePage({
 
         {/* 🌟 楼层一：最近项目 · 画布创作 */}
         <div className="w-full relative z-10 pt-1">
-          <CanvasRecentProjects onEnterCanvas={handleEnterCanvas} />
+          {recentProjects}
         </div>
 
         {/* 🌟 楼层二：灵感探索瀑布流 */}

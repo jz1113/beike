@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 // 获取所有提示词生成历史记录
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         productId: productId || null,
         productTitle: productTitle || '未命名商品',
         productFingerprint: productFingerprint || '',
-        modelUsed: modelUsed || 'gemini-3.1-pro-preview-thinking-high',
+        modelUsed: modelUsed || 'gemini-3.1-pro-preview',
         styleName: styleName || '📱 真实手机买家秀',
         promptsJson: typeof prompts === 'string' ? prompts : JSON.stringify(prompts || [])
       }

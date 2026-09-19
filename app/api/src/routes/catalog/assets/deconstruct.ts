@@ -6,13 +6,13 @@ import {
   normalizeGatewayBaseUrl,
   getDefaultBaseUrl,
   getDefaultApiKey,
-} from '../../../services/imageHelpers';
+} from '../../../services/gatewayCredentials';
 import {
   MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
   type PerImageResult,
 } from '@beike/domain/assetDeconstruct/prompts';
-import type { SubCategoryDef } from '@beike/domain/productCategoryHelpers';
+import type { SubCategoryDef } from '@beike/domain/productCategory';
 import { reconcileAssetsFromPerImage } from '@beike/domain/assetDeconstruct/validate';
 
 // 导入解构子系统
@@ -20,7 +20,10 @@ import { reconcileAssetsFromPerImage } from '@beike/domain/assetDeconstruct/vali
 import { createVisionCallDiagnostics, createVisionCallTracker, buildDeconstructFailureResponse } from './deconstruct/diagnostics';
 import { convertImagesInBatches } from './deconstruct/visionCall';
 import { runUnifiedDeconstruct, resolveEnablePass2, type PipelineMode } from './deconstruct/unified';
-import { persistDeconstructedAssets, type SavedRecords } from './deconstruct/saveAssets';
+import { persistDeconstructedAssets, type SavedRecords } from '../../../services/deconstruct/saveAssets';
+import { xhsSourceKey } from '@beike/domain/xhsSource';
+import { AppError, errorResponse } from '../../../core/errors';
+import { claimProcessingSource, releaseIncompleteSource } from './source-check';
 
 // 向后兼容导出（供单元测试与其他调用方使用）
 export {
@@ -54,6 +57,8 @@ export {
 } from './deconstruct/concurrency';
 
 export async function POST(req: Request) {
+  let claimedKey: string | undefined;
+  let claimedRequestId: string | undefined;
   try {
     const body = await req.json();
     const {
@@ -68,6 +73,8 @@ export async function POST(req: Request) {
       autoSave = true,
       albumName: bodyAlbumName,
       productTitle,
+      sourceUrl,
+      reviewRequestId,
     } = body;
 
     const targetCategory =
@@ -94,6 +101,13 @@ export async function POST(req: Request) {
 
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
       return jsonResponse({ error: '请至少提供 1 张参考风格或买家秀图片' }, 400);
+    }
+
+    const sourceKey = typeof sourceUrl === 'string' ? xhsSourceKey(sourceUrl) : null;
+    if (sourceKey) {
+      claimedKey = sourceKey;
+      claimedRequestId = typeof reviewRequestId === 'string' && reviewRequestId ? reviewRequestId : crypto.randomUUID();
+      await claimProcessingSource(sourceKey, claimedRequestId, albumName);
     }
 
     if (!targetApiKey) {
@@ -125,6 +139,7 @@ export async function POST(req: Request) {
 
     if (safeImgs.length === 0) {
       console.warn(`[AssetDeconstruct] 所有 ${targetImgs.length} 张图片预处理均未成功获取有效数据`);
+      if (claimedKey && claimedRequestId) await releaseIncompleteSource(claimedKey, claimedRequestId);
       return jsonResponse(
         {
           error: '原贴图片下载受限或已失效，请检查原贴链接或重试',
@@ -229,6 +244,7 @@ export async function POST(req: Request) {
         albumName,
         isSingleImage,
         category,
+        sourceKey: claimedKey,
       });
       console.log(`[AssetDeconstruct] 入库耗时 ${Date.now() - dbSaveStart}ms`);
     }
@@ -266,6 +282,8 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: any) {
+    if (claimedKey && claimedRequestId) await releaseIncompleteSource(claimedKey, claimedRequestId).catch(() => {});
+    if (error instanceof AppError) return errorResponse(error);
     console.error('[AssetDeconstruct] 异常:', error);
     return jsonResponse({ error: formatUserError(error) }, 500);
   }

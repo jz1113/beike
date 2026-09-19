@@ -6,9 +6,27 @@ test('large prompt library keeps DOM bounded and searches/selects the full colle
     id: `virtual-asset-${index}`, title: `测试资产 ${index}`, code: `R-${index}`,
     promptPreview: `提示词预览 ${index}`, tags: '', isFavorite: false,
   }));
-  await page.route('**/api/catalog/assets/library?type=all&slim=1', (route) => route.fulfill({
-    json: { success: true, fullPrompts, scenes: [], actions: [], outfits: [], personas: [] },
-  }));
+  await page.route('**/api/catalog/assets/library**', async (route) => {
+    const url = new URL(route.request().url());
+    const type = url.searchParams.get('type') || '';
+    const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || '100') || 100));
+    const pool = type === 'full_prompt' || type === 'all' ? fullPrompts : [];
+    const items = pool.slice((page - 1) * pageSize, page * pageSize);
+    await route.fulfill({
+      json: {
+        success: true,
+        items,
+        total: pool.length,
+        fullPrompts: type === 'all' ? items : pool,
+        scenes: [],
+        actions: [],
+        outfits: [],
+        personas: [],
+        hasMore: page * pageSize < pool.length,
+      },
+    });
+  });
   await page.goto('/');
   await page.getByText('种草工坊', { exact: true }).click();
   await page.getByRole('button', { name: '提示词资产库', exact: true }).click();
@@ -17,7 +35,7 @@ test('large prompt library keeps DOM bounded and searches/selects the full colle
   expect(await cards.count()).toBeLessThan(40);
 
   // The repositioned workshop button must not cover the category controls.
-  const home = await page.getByTitle('原创种草工坊 · 点击返回首页').boundingBox();
+  const home = await page.getByTitle('原创种草工坊 · 点击返回首页').filter({ visible: true }).first().boundingBox();
   const category = await page.getByRole('button', { name: '完整提示词', exact: true }).boundingBox();
   expect(category!.y + category!.height).toBeLessThanOrEqual(home!.y);
 

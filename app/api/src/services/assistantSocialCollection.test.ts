@@ -9,7 +9,7 @@ const config = vi.hoisted(() => ({ key: '' }));
 
 vi.mock('./assistantTurnPersist', () => ({ upsertTurn: vi.fn(async () => {}), updateTurnStatus: vi.fn(async () => {}), syncRuntimeToDb: vi.fn(async () => {}), syncSnapshot: vi.fn(async () => {}) }));
 vi.mock('./itemPersistQueue', () => ({ enqueueItemPersist: vi.fn(), flushItemQueue: vi.fn(async () => {}) }));
-vi.mock('./imageHelpers', () => ({ getDefaultBaseUrl: () => 'https://model.invalid', getDefaultApiKey: () => '' }));
+vi.mock('./gatewayCredentials', () => ({ getDefaultBaseUrl: () => 'https://model.invalid', getDefaultApiKey: () => '' }));
 vi.mock('@beike/domain/gatewayCreds', () => ({ resolveGatewayCreds: () => ({baseUrl: 'https://model.invalid', apiKey: config.key}) }));
 vi.mock('./assistantMessageBuilder', () => ({ buildAssistantMessages: vi.fn(async () => ({formattedMessages:[],lastUserMsg:'',documents:[]})) }));
 

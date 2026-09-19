@@ -11,7 +11,7 @@ import {
 } from '@/features/assistant/assistantConstants';
 import {
   getModelProviderName,
-} from '@/features/home/utils/modelDisplayHelpers';
+} from '@/shared/ui/modelDisplayHelpers';
 import AssistantSkillsMenu from '@/features/assistant/components/AssistantSkillsMenu';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/useAppStore';

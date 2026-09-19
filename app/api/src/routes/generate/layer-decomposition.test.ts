@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-vi.mock('../../services/imageHelpers',()=>({resolveCredentials:()=>({baseUrl:'https://gateway.example',apiKey:'test-key'})}));
+vi.mock('../../services/gatewayCredentials',()=>({resolveCredentials:()=>({baseUrl:'https://gateway.example',apiKey:'test-key'})}));
 vi.mock('../../services/submissionGuard',()=>({guardSubmission:(_req:Request,_kind:string,_creds:unknown,run:()=>Promise<Response>)=>run()}));
 vi.mock('./image/poll',()=>({ensurePersistableResultUrl:async(url:string)=>url}));
 vi.mock('@beike/server-kit/storage',()=>({extractStorageConfigFromRequest:()=>undefined,persistMediaUrl:async()=>null}));

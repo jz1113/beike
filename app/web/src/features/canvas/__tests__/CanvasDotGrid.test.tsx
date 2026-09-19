@@ -2,9 +2,11 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CanvasDotGrid } from '../components/CanvasDotGrid';
+import { setPerformanceMode } from '@/lib/performancePreference';
 
 describe('CanvasDotGrid component', () => {
   beforeEach(() => {
+    setPerformanceMode('fidelity');
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       return setTimeout(() => cb(performance.now()), 16) as unknown as number;
     });
@@ -15,6 +17,7 @@ describe('CanvasDotGrid component', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    localStorage.removeItem('zhuo_performance_mode');
   });
 
   it('renders a canvas element with aria-hidden', () => {

@@ -1,7 +1,7 @@
 import {InspirationReferences} from './InspirationReferences';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { handleImgError } from '@/features/collect/collectorShared';
+import { handleImgError } from '@/shared/media/imageError';
 import { isVideoMediaUrl } from '@/lib/mediaHelper';
 import { downloadMediaOrOpen } from '@/lib/downloadMedia';
 import { 

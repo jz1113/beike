@@ -38,9 +38,9 @@ export default function WorkshopStudio({
 
       {/* 核心工作区内容渲染 */}
       <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative z-10 ${activeWorkshopTab !== 'studio' ? 'pl-[72px] sm:pl-20' : ''}`}>
-        {activeWorkshopTab === 'studio' && (
+        <div className={activeWorkshopTab === 'studio' ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>
           <BatchWorkshopView fixedBatchMode="original" />
-        )}
+        </div>
 
         {activeWorkshopTab === 'prompt_assets' && (
           <AssetPromptLibrary toolbarTarget={assetToolbarTarget} onEnterWorkshop={() => setActiveWorkshopTab('studio')} />

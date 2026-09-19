@@ -10,7 +10,7 @@ import {
   type TaskUpdater,
   SLOW_POLL_HINT,
 } from './generationTaskTypes';
-import { peekDepthSubmit } from '@/features/home/hooks/useDepthGeneration';
+import { peekDepthSubmit } from '@/lib/depthGeneration';
 
 const pollingTaskIds = new Set<string>();
 

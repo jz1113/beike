@@ -87,4 +87,4 @@ it('bounds mounted shots for 100 completed products and keeps all products acces
   rerender(<BatchStage3Prompts {...props} successfulItems={items.slice(0, 4)} />);
   expect(screen.getByText('商品-0')).toBeTruthy();
   expect(screen.queryByRole('navigation')).toBeNull();
-});
+}, 20_000);

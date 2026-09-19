@@ -2,19 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { prisma } from '../prisma';
 import { readFileSync } from 'node:fs';
 
-describe('prisma.ts — 自愈迁移表名白名单 (PR1 High)', () => {
-  it('ALLOWED_SELF_HEAL_TABLES 仅含已知业务表', () => {
-    // 通过源代码静态校验
-    const src = readFileSync(
-      'packages/server-kit/src/prisma.ts',
-      'utf8',
-    ).toString();
-    expect(src).toContain("'SceneAsset'");
-    expect(src).toContain("'OutfitAsset'");
-    expect(src).toContain("'ActionAsset'");
-    expect(src).toContain("'PersonaAsset'");
-    expect(src).toContain('ALLOWED_SELF_HEAL_TABLES');
-    expect(src).toContain('if (!ALLOWED_SELF_HEAL_TABLES.has(table))');
+describe('prisma.ts — 运行时表结构由 desktopMigrations 演进', () => {
+  it('启动路径只做 PRAGMA 与 migrateDatabase，不再内联自愈建表', () => {
+    const src = readFileSync('packages/server-kit/src/prisma.ts', 'utf8');
+    expect(src).toContain('migrateDatabase(prisma)');
+    expect(src).not.toContain('ALLOWED_SELF_HEAL_TABLES');
+    expect(src).not.toContain('CREATE TABLE IF NOT EXISTS');
   });
 
   it('prisma 实例已导出且类型正确', () => {

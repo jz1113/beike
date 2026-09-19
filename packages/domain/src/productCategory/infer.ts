@@ -1,7 +1,8 @@
 /**
  * 电商多品类与解剖学部位推断与光学提示词构建
  */
-import { isJewelryProductTitle } from '../jewelryArchHelpers';
+import { isJewelryProductTitle } from '../jewelryArch';
+import { isPhoneProduct } from '../phoneProductPolicy';
 import { detectJewelryAnatomy } from '../prompt-engine/roles';
 
 export interface ProductCategoryInfo {
@@ -85,8 +86,16 @@ export function inferProductCategoryAndAnatomy(
     };
   }
 
-  // 7. 3C数码生活 (Digital & Lifestyle)
-  if (/手机壳|耳机|蓝牙耳机|头戴式|数码|保温杯|咖啡杯|水杯|phonecase|headphones|mug/i.test(text)) {
+  // 7. 3C数码：先识别在售手机本体，再识别壳/耳机等配件与日用数码
+  if (isPhoneProduct(title || undefined)) {
+    return {
+      primaryCategory: 'digital',
+      targetAnatomy: 'hand',
+      categoryTags: ['digital', 'hand', 'phone', 'all'],
+      subType: 'phone',
+    };
+  }
+  if (/手机壳|耳机|蓝牙耳机|头戴式|数码|平板|保温杯|咖啡杯|水杯|phonecase|headphones|mug/i.test(text)) {
     return {
       primaryCategory: 'digital',
       targetAnatomy: 'hand',

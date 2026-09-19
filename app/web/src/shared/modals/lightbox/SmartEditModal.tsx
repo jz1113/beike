@@ -13,10 +13,8 @@ import {
   ChevronDown,
   Check,
 } from 'lucide-react';
-import { useAppStore } from '../../../store';
 import { getModelIcon } from '../../ui/ModelIcons';
 import '@beike/domain/workflowModels';
-import '@/features/home/utils/modelDisplayHelpers';
 import { proxyMediaUrl } from '@/lib/apiClient';
 
 export interface MarkerPoint {
@@ -48,6 +46,12 @@ export interface SmartEditModalProps {
     quality: string;
     aspectRatio?: string;
   }) => void;
+  quickModel?: string;
+  quickQuality?: string;
+  quickAspectId?: string;
+  onChangeQuickModel?: (id: string) => void;
+  onChangeQuickQuality?: (quality: 'low' | 'medium' | 'high') => void;
+  onChangeQuickAspectId?: (id: string) => void;
 }
 
 export const SmartEditModal: React.FC<SmartEditModalProps> = ({
@@ -56,6 +60,12 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
   imageUrl,
   originalPrompt = '',
   onSubmitSmartEdit,
+  quickModel,
+  quickQuality,
+  quickAspectId,
+  onChangeQuickModel,
+  onChangeQuickQuality,
+  onChangeQuickAspectId,
 }) => {
   const [markers, setMarkers] = useState<MarkerPoint[]>([]);
   const [activeMarkerId, setActiveMarkerId] = useState<string>('');
@@ -100,12 +110,12 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
   }, [currentImgSrc, imageUrl]);
 
   // 联动生图工作台的模型和尺寸配置
-  const storeQuickModel = useAppStore((s) => s.quickModel);
-  const storeQuickQuality = useAppStore((s) => s.quickQuality);
-  const storeQuickAspectId = useAppStore((s) => s.quickAspectId);
-  const setQuickModel = useAppStore((s) => s.setQuickModel);
-  const setQuickQuality = useAppStore((s) => s.setQuickQuality);
-  const setQuickAspectId = useAppStore((s) => s.setQuickAspectId);
+  const storeQuickModel = quickModel;
+  const storeQuickQuality = quickQuality;
+  const storeQuickAspectId = quickAspectId;
+  const setQuickModel = onChangeQuickModel || (() => {});
+  const setQuickQuality = onChangeQuickQuality || (() => {});
+  const setQuickAspectId = onChangeQuickAspectId || (() => {});
 
   const availableImageModels = useLightboxImageModels();
 
@@ -736,6 +746,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                       : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
                   }`}
                   title="点击切换尺寸与分辨率"
+                  aria-label="点击切换尺寸与分辨率"
                 >
                   <span className="font-bold text-slate-900">{selectedQuality}</span>
                   <span className="text-slate-300">·</span>
@@ -753,6 +764,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                           <button
                             key={q}
                             type="button"
+                            aria-label={`清晰度 ${q}`}
                             onClick={() => handleSelectQuality(q)}
                             className={`py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                               selectedQuality === q

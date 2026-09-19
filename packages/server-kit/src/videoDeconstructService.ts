@@ -1,4 +1,5 @@
 import { resolveStorageRoot, resolveStoredMediaPath } from './storagePaths';
+import { assertSafeVideoPath } from './videoPathSecurity';
 import fs from 'node:fs';
 import path from 'node:path';
 import 'node:os';
@@ -60,7 +61,7 @@ export function localUrlToDataUrl(localUrl: string): string {
  * 若为 URL 或 /storage 相对路径，解析为实际本地文件
  */
 export async function resolveLocalVideoPath(urlOrPath: string): Promise<{ localPath: string; isTemp: boolean }> {
-  const raw = urlOrPath.trim();
+  const raw = assertSafeVideoPath(urlOrPath);
 
   // 1. 本地绝对路径
   if (path.isAbsolute(raw) && fs.existsSync(raw)) {

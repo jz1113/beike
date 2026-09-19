@@ -15,7 +15,7 @@ import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from '@/lib/xhsLinkB
 import type { DeconstructQueueApi } from '../hooks/useDeconstructQueue';
 import type { useXhsBatchImport } from '../hooks/useXhsBatchImport';
 import type { WorkflowCapability } from '@beike/domain/workflowModels';
-import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategoryHelpers';
+import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategory';
 
 type XhsImportApi = ReturnType<typeof useXhsBatchImport>;
 
@@ -559,7 +559,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
               /* 本地模式或队列已有图集：执行队列智能解构 */
               <button
                 type="button"
-                onClick={runQueueDeconstruction}
+                onClick={() => { void runQueueDeconstruction(); }}
                 disabled={isDeconstructing || queue.length === 0 || multimodalModels.length === 0}
                 className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-xs shadow-2xs hover:shadow transition-all disabled:opacity-40 disabled:hover:bg-indigo-600 cursor-pointer"
               >

@@ -1,10 +1,12 @@
+import { gatewayFetch } from '../../../gateways/http';
 import { jsonResponse } from '../../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../../repositories/db';
 import LRUCache from 'lru-cache';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { resolveCredentials } from '../../../services/imageHelpers';
+import { resolveCredentials } from '../../../services/gatewayCredentials';
+import { mutableGenerationStatuses, withPersistedGenerationStatus } from '../../../services/generationTerminalState';
 
 // 任务轮询端点记忆缓存 (提升 300% 轮询响应速度，使用 LRU 限制内存增长)
 export const taskEndpointCache = new LRUCache<string, string>({ max: 500 });
@@ -23,6 +25,10 @@ export async function ensurePersistableResultUrl(url: string, req: Request): Pro
  * 查询异步生图任务状态 (多端点高可用智能探测)
  */
 export async function executeImagePoll(req: Request) {
+  return withPersistedGenerationStatus(req, () => pollImageOnce(req));
+}
+
+async function pollImageOnce(req: Request) {
   const { searchParams } = new URL(req.url);
   const taskId = searchParams.get('taskId');
 
@@ -82,7 +88,7 @@ export async function executeImagePoll(req: Request) {
   // 单端点安全探测函数
   const probeUrl = async (qUrl: string) => {
     try {
-      const r = await fetch(qUrl, {
+      const r = await gatewayFetch(qUrl, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
         },
@@ -195,7 +201,7 @@ export async function executeImagePoll(req: Request) {
   if (detectedFailureReason && (!resData || !resData.status || !resData.data?.status)) {
     try {
       await prisma.imageTask.updateMany({
-        where: { taskId },
+        where: { taskId, status: { in: [...mutableGenerationStatuses] } },
         data: {
           status: 'FAILURE',
           failReason: detectedFailureReason,
@@ -341,7 +347,7 @@ export async function executeImagePoll(req: Request) {
   if (status === 'SUCCESS' || status === 'FAILURE') {
     try {
       await prisma.imageTask.updateMany({
-        where: { taskId },
+        where: { taskId, status: { in: [...mutableGenerationStatuses] } },
         data: {
           status,
           resultUrl: resultUrl || undefined,

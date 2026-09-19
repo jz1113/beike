@@ -12,7 +12,7 @@ import {
 } from '../assetDeconstructCsvExport';
 import { buildQueueItemsFromFiles } from '../assetFolderImport';
 import type { ImageSetQueueItem } from '../assetPromptConstants';
-import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategoryHelpers';
+import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategory';
 import {
   clearDeconstructQueueDraft,
   persistDeconstructQueue,
@@ -20,6 +20,12 @@ import {
   readDeconstructQueueDraft,
   readQueueConcurrency,
 } from '../deconstructQueueStorage';
+import {
+  categoryForQueueItem,
+  resolveActionCategory,
+  selectedQueueImages,
+  type ProductCategoryOption,
+} from './deconstructQueueOps';
 
 function loadMultimodalModels(): WorkflowCapability[] {
   return getEnabledMultimodalModelsFromSettings();
@@ -28,15 +34,25 @@ function loadMultimodalModels(): WorkflowCapability[] {
 export type UseDeconstructQueueOptions = {
   showToast: (msg: string) => void;
   onRefreshAssets: () => void;
+  defaultProductCategoryId?: string | null;
+  productCategories?: ProductCategoryOption[];
 };
 
-export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstructQueueOptions) {
+export function useDeconstructQueue({
+  showToast,
+  onRefreshAssets,
+  defaultProductCategoryId = null,
+  productCategories,
+}: UseDeconstructQueueOptions) {
   const [showDeconstructModal, setShowDeconstructModal] = useState(false);
   const [multimodalModels, setMultimodalModels] = useState<WorkflowCapability[]>(() => loadMultimodalModels());
   const [selectedVisionModel, setSelectedVisionModel] = useState<string>(() =>
     resolveStoredMultimodalModelId(loadMultimodalModels())
   );
-  const [targetCategory, setTargetCategory] = useState<ActionCategoryId>('jewelry');
+  const [targetCategory, setTargetCategory] = useState<ActionCategoryId>(() =>
+    resolveActionCategory(defaultProductCategoryId, productCategories)
+  );
+  const [architectureMode] = useState<'auto'>('auto');
   const [queue, setQueue] = useState<ImageSetQueueItem[]>([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
   const [userHint, setUserHint] = useState('');
@@ -46,6 +62,9 @@ export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstru
   const [deconstructRecordRows, setDeconstructRecordRows] = useState<DeconstructedRecordRow[]>([]);
   const [lastExportedCsvFilename, setLastExportedCsvFilename] = useState<string | null>(null);
 
+  useEffect(() => {
+    setTargetCategory(resolveActionCategory(defaultProductCategoryId, productCategories));
+  }, [defaultProductCategoryId, productCategories]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const isDeconstructingRef = useRef(false);
@@ -133,12 +152,13 @@ export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstru
     [showToast]
   );
 
-  const runQueueDeconstruction = useCallback(async () => {
+  const runQueueDeconstruction = useCallback(async (options?: { reviewBeforeSave?: boolean }) => {
     if (isDeconstructingRef.current) return;
 
     const pendingIndices = queue
       .map((item, idx) => (item.status === 'pending' || item.status === 'error' ? idx : -1))
-      .filter((i) => i !== -1);
+      .filter((i) => i !== -1)
+      .filter((i) => selectedQueueImages(queue[i]).length > 0);
 
     if (pendingIndices.length === 0) {
       showToast('⚠️ 没有待处理的图集队列');
@@ -187,14 +207,17 @@ export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstru
       );
       syncQueueState(idx);
 
-      const customSubCategories = getSubCategoriesForCategory(targetCategory);
+      const images = selectedQueueImages(targetItem);
+      const itemCategory = categoryForQueueItem(targetItem, targetCategory, productCategories);
+      const customSubCategories = getSubCategoriesForCategory(itemCategory);
       const result = await processDeconstructQueueItem({
-        item: targetItem,
+        item: { ...targetItem, images },
         userHint,
         selectedVisionModel,
         modelIds,
-        targetCategory,
+        targetCategory: itemCategory,
         customSubCategories,
+        reviewBeforeSave: options?.reviewBeforeSave,
       });
 
       if (result.ok) {
@@ -207,6 +230,7 @@ export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstru
                 status: 'done' as const,
                 result: result.data as Record<string, unknown>,
                 deconstructStats: result.stats as ImageSetQueueItem['deconstructStats'],
+                reviewId: result.reviewId,
               }
             : it
         );
@@ -274,6 +298,7 @@ export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstru
     userHint,
     selectedVisionModel,
     targetCategory,
+    productCategories,
     showToast,
     onRefreshAssets,
   ]);
@@ -293,6 +318,7 @@ export function useDeconstructQueue({ showToast, onRefreshAssets }: UseDeconstru
     setSelectedVisionModel,
     targetCategory,
     setTargetCategory,
+    architectureMode,
     queue,
     setQueue,
     currentQueueIndex,

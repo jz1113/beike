@@ -16,7 +16,7 @@ import { useLibraryUiState } from './hooks/useLibraryUiState';
 import { useAssetList } from './hooks/useAssetList';
 import { useAssetDetail } from './hooks/useAssetDetail';
 import { useAssetCrud } from './hooks/useAssetCrud';
-import { getAssetPreviewText as getAssetPreviewTextHelper } from './assetApplyHelpers';
+import { getAssetPreviewText as getAssetPreviewTextHelper } from './assetApply';
 import { AssetEditModal } from './components/AssetEditModal';
 import { AssetDetailModal } from './components/AssetDetailModal';
 import { AssetPromptSpecModal } from './components/AssetPromptSpecModal';

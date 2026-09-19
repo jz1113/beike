@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 // 获取已保存的自定义风格配方列表（分页）

@@ -1,18 +1,12 @@
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { apiFetch, proxyMediaUrl } from '@/lib/apiClient';
 import { saveToDownloadDir } from '@/lib/desktopDownload';
 import { fetchWithDerivedCache, getDerived, putDerived } from '@/lib/idbMediaCache';
 
-/** 桌面原生唤起系统默认浏览器打开外链 */
+/** 在新标签页打开外链 */
 export async function openExternalUrl(url: string): Promise<void> {
   if (!url) return;
-  try {
-    await openUrl(url);
-  } catch (err) {
-    console.warn('[openExternalUrl] Tauri opener failed:', err);
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -41,7 +35,32 @@ function fixFilenameExtension(filename: string, mimeType: string): string {
   return `${filename}.png`;
 }
 
-// 前端内存缓存与飞行请求合并
+function isLocalPersistedMedia(url: string): boolean {
+  return url.startsWith('/storage/') || url.startsWith('/api/assets/storage/');
+}
+
+async function blobIsReadable(blob: Blob): Promise<boolean> {
+  try {
+    await blob.arrayBuffer();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isTruncatedResponse(res: Response, blob: Blob): boolean {
+  if (res.status === 206) return true;
+  const range = res.headers.get('content-range');
+  if (range) {
+    const match = /bytes\s+\d+-\d+\/(\d+|\*)/i.exec(range);
+    if (match?.[1] && match[1] !== '*') {
+      const total = Number(match[1]);
+      if (Number.isFinite(total) && blob.size < total) return true;
+    }
+  }
+  const length = Number(res.headers.get('content-length') || '');
+  return Number.isFinite(length) && length > 0 && blob.size < length;
+}
 const memoryBlobCache = new Map<string, { blob: Blob; at: number }>();
 const MEMORY_CACHE_TTL_MS = 30 * 60 * 1000;
 const MEMORY_CACHE_MAX_ITEMS = 50;
@@ -96,19 +115,24 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
 
   const cachedMem = memoryBlobCache.get(url);
   if (cachedMem && Date.now() - cachedMem.at < MEMORY_CACHE_TTL_MS) {
-    return cachedMem.blob;
+    if (await blobIsReadable(cachedMem.blob)) return cachedMem.blob;
+    memoryBlobCache.delete(url);
   }
 
+  const skipIdb = isLocalPersistedMedia(url);
+
   // 4. 检查 IndexedDB 离线持久化缓存 (<2ms)
-  try {
-    const idbBlob = await getDerived(url);
-    if (idbBlob && idbBlob.size > 200) {
-      memoryBlobCache.set(url, { blob: idbBlob, at: Date.now() });
-      evictMemoryBlobCache();
-      return idbBlob;
+  if (!skipIdb) {
+    try {
+      const idbBlob = await getDerived(url);
+      if (idbBlob && idbBlob.size > 200 && await blobIsReadable(idbBlob)) {
+        memoryBlobCache.set(url, { blob: idbBlob, at: Date.now() });
+        evictMemoryBlobCache();
+        return idbBlob;
+      }
+    } catch {
+      /* fallback to network */
     }
-  } catch {
-    /* fallback to network */
   }
 
   // 5. 远端 HTTP / HTTPS 资源拉取（带请求飞行合并 In-Flight Deduplication）
@@ -123,7 +147,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
         const res = await apiFetch(proxyUrl);
         if (res.ok) {
           const blob = await res.blob();
-          if (blob.size > 200 && blob.type !== 'image/svg+xml') {
+          if (blob.size > 200 && blob.type !== 'image/svg+xml' && !isTruncatedResponse(res, blob)) {
             resultBlob = blob;
           }
         }
@@ -137,7 +161,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
           const directRes = await fetch(url, { mode: 'cors' });
           if (directRes.ok) {
             const directBlob = await directRes.blob();
-            if (directBlob.size > 200) {
+            if (directBlob.size > 200 && !isTruncatedResponse(directRes, directBlob)) {
               resultBlob = directBlob;
             }
           }
@@ -158,14 +182,14 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
 
       // 存入内存高速缓存与 IndexedDB
       setMemoryBlobCache(url, resultBlob);
-      putDerived(url, resultBlob).catch(() => {});
+      if (!skipIdb) putDerived(url, resultBlob).catch(() => {});
       return resultBlob;
     })();
 
     inFlightBlobFetches.set(url, fetchPromise);
-    fetchPromise.finally(() => {
+    void fetchPromise.finally(() => {
       inFlightBlobFetches.delete(url);
-    });
+    }).catch(() => undefined);
   }
 
   return fetchPromise;

@@ -8,6 +8,7 @@ import {
 } from './library/libraryMutations';
 import { purgeSeedAssets, clearAllAssets } from './library/libraryMaintenance';
 import { executeLibraryDeduplication } from './library/libraryDeduplicate';
+import { mutateOrganization } from '../../../services/library/organization';
 
 // 获取原子资产列表与统计（支持按类型、分类、收藏、关键词过滤，分页，以及全量 slim 预热）
 export async function GET(req: Request) {
@@ -20,8 +21,20 @@ export async function GET(req: Request) {
 }
 
 // 创建单项原子资产或批量导入
+const ORGANIZATION_ACTIONS = new Set([
+  'save-product-category',
+  'reorder-product-categories',
+  'classify-albums',
+  'classify-assets',
+]);
+
 export async function POST(req: Request) {
   try {
+    const cloned = req.clone();
+    const body = await cloned.json().catch(() => null);
+    if (body && typeof body.action === 'string' && ORGANIZATION_ACTIONS.has(body.action)) {
+      return mutateOrganization(body);
+    }
     return await executeLibraryPost(req);
   } catch (error: any) {
     console.error('[AssetLibrary] POST 异常:', error);

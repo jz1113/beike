@@ -1,5 +1,7 @@
 import { guardSubmission } from '../../services/submissionGuard';
 import { jsonResponse } from '../../core/http';
+import { AppError, errorResponse } from '../../core/errors';
+import { DEFAULT_IMAGE_MODEL_ID, isApprovedModel } from '@beike/domain/modelCatalog';
 import { buildImageRequest } from '@beike/domain/modelAdapters';
 import { setPresignedUrlSigner } from '@beike/domain/modelAdapters/image/adapters';
 import { getPresignedStorageUrl } from '@beike/server-kit/storage';
@@ -9,7 +11,7 @@ import { humanizeUpstreamError, formatUserError } from '@beike/domain/upstreamEr
 import {
   resolveCredentials,
   buildImageSubmitCandidates,
-} from '../../services/imageHelpers';
+} from '../../services/gatewayCredentials';
 import { executeImagePoll, ensurePersistableResultUrl } from './image/poll';
 import { resolveImageSlotsAndPrompt } from './image/slotResolver';
 import { dispatchSubmitCandidates, persistImageTaskRecord } from './image/submit';
@@ -48,7 +50,7 @@ async function submit(req: Request) {
     const parseMs = Date.now() - t0;
     const {
       prompt,
-      model = 'gpt-image-2',
+      model = DEFAULT_IMAGE_MODEL_ID,
       size,
       aspectRatio,
       quality,
@@ -73,8 +75,22 @@ async function submit(req: Request) {
     if (typeof prompt !== "string" || !prompt.trim()) {
       return jsonResponse({ success: false, error: '提示词不能为空' }, 400);
     }
+    if (!isApprovedModel(String(model), 'image')) {
+      return jsonResponse({ success: false, error: `模型 ${model} 不在当前生图白名单中` }, 400);
+    }
 
     const { baseUrl, apiKey } = resolveCredentials(req, body);
+    try {
+      const host = new URL(baseUrl).hostname.toLowerCase();
+      if (model === 'openai/gpt-image-2' && (host === 'comfly.org' || host.endsWith('.comfly.org'))) {
+        throw new AppError('模型与接口不匹配：openai/gpt-image-2 不能使用 Comfly 地址', 400);
+      }
+      if (model === 'gpt-image-2' && (host === 'api.gapnet.ai' || host.endsWith('.gapnet.ai'))) {
+        throw new AppError('模型与接口不匹配：gpt-image-2 请使用 Comfly，Gapnet 请使用 openai/gpt-image-2', 400);
+      }
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+    }
     if (!apiKey) {
       return jsonResponse(
         {
@@ -255,6 +271,7 @@ async function submit(req: Request) {
     return jsonResponse(responseData);
   } catch (error: any) {
     console.error('[AI生图] 任务提交发生异常:', error);
+    if (error instanceof AppError) return errorResponse(error, '生图任务提交失败');
     logLatencyAudit({
       hypothesisId: 'H2',
       location: 'generate-image/route.ts:POST-catch',

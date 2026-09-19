@@ -10,7 +10,7 @@ import {
   type BatchTaskItem,
   detectPlatformFromText,
   extractUrlsFromRawText,
-} from '../collectorShared';
+} from '../collectorTypes';
 
 interface UseBatchTaskQueueOptions {
   isOpen: boolean;

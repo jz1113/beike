@@ -15,8 +15,8 @@ beike-main/
 │   └── server-kit/    # @beike/server-kit — Node-only（Prisma、存储、爬虫等）
 ├── db/prisma/         # @beike/prisma — schema + migrations
 ├── desktop/           # Tauri v2（非 pnpm 包）
-├── works/             # configs / e2e / launch / scripts
-└── docs/              # architecture/ 内部约定；vendors/ 第三方 API 草稿
+├── works/             # configs / e2e / launch / scripts / test-support
+└── docs/              # architecture/ 内部约定；vendors/官方接口 厂商与聚合文档
 ```
 
 权威校验：`pnpm run check:root-layout`（[`works/scripts/check-root-layout.mjs`](../works/scripts/check-root-layout.mjs)）。
@@ -54,8 +54,9 @@ beike-main/
 ## 文档分层
 
 - [`docs/architecture/`](architecture/) — 内部架构与边界
-- [`docs/vendors/`](vendors/) — 第三方厂商 API 草稿（原 `API文档` 等）
+- [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合平台 OpenAPI spec + 厂商官网索引
 - 其它操作说明（打包等）可保留在 `docs/` 子目录
+- 启动桌面：[`works/launch/start-desktop.command`](../works/launch/start-desktop.command)（根目录 `启动桌面.command` 为薄包装）
 
 ## 明确不做
 

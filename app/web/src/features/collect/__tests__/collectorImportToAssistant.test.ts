@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCollectorAIAssistantPayload } from '../collectorShared';
+import { buildCollectorAIAssistantPayload } from '../collectorTypes';
 
 describe('buildCollectorAIAssistantPayload', () => {
   it('correctly imports social video item from history with video and companion images', () => {

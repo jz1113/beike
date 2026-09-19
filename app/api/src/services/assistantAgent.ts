@@ -12,12 +12,13 @@ import type { ClientContext, McpServerConfig } from '@beike/domain/assistant/typ
 import type { TurnStartBody } from '@beike/contracts/assistant';
 import { socialCollectionIntent, collectSocialImages } from './assistantSocialCollection';
 import { buildAssistantMessages } from './assistantMessageBuilder';
-import { resolveRequestOrigin } from './assistantChatHelpers';
+import { resolveRequestOrigin } from './assistantChat';
 import { apiApprovalWaiter } from './assistantApprovalStore';
 import { upsertTurn, updateTurnStatus, syncRuntimeToDb, syncSnapshot } from './assistantTurnPersist';
 import { TurnTimer } from './agentTelemetry';
 import { enqueueItemPersist, flushItemQueue } from './itemPersistQueue';
-import { getDefaultBaseUrl, getDefaultApiKey } from './imageHelpers';
+import { DEFAULT_ASSISTANT_MODEL_ID, isApprovedModel } from '@beike/domain/modelCatalog';
+import { getDefaultBaseUrl, getDefaultApiKey } from './gatewayCredentials';
 
 function resolveModelCandidates(modelId: string, clientFallbacks: string[] = []): string[] {
   // Never silently fan out across unrelated models; fallback is user-configured.
@@ -77,7 +78,10 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   const threadId = typeof rawThreadId === 'string' && rawThreadId.trim().length > 0 ? rawThreadId.trim() : 'default';
 
   // 统一清洗 nullish 字段：保证下游接收的不是 null，而是合法的 string | undefined / default
-  const model: string = typeof body.model === 'string' && body.model.trim().length > 0 ? body.model.trim() : 'gemini-3.7-flash';
+  const model: string = typeof body.model === 'string' && body.model.trim().length > 0 ? body.model.trim() : DEFAULT_ASSISTANT_MODEL_ID;
+  if (!isApprovedModel(model, 'multimodal')) {
+    throw new Error(`模型 ${model} 不在当前多模态白名单中`);
+  }
   const customBaseUrl = body.customBaseUrl ?? undefined;
   const customApiKey = body.customApiKey ?? undefined;
   const systemPrompt = body.systemPrompt ?? undefined;

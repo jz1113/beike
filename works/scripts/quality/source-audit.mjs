@@ -35,7 +35,7 @@ for(const file of sourceFiles) {
 }
 // Package entry points and ambient types are not runtime dead-file candidates.
 const roots=['app/web/src/main.tsx','app/api/src/index.ts'];
-for(const directory of ['app/shared','app/contracts']) {
+for (const directory of ['packages/contracts', 'packages/domain', 'packages/server-kit']) {
   const pkg=JSON.parse(fs.readFileSync(path.join(root,directory,'package.json'),'utf8'));
   for(const entry of [pkg.main,pkg.types,...Object.values(pkg.exports||{})]) {
     if(typeof entry==='string'&&!entry.includes('*')) roots.push(path.normalize(path.join(directory,entry)));

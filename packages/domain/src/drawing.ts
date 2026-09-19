@@ -2,6 +2,8 @@
  * AI 种草生图模型与参数适配引擎
  */
 
+import { listApprovedModels, vendorLabel } from '@beike/domain/modelCatalog';
+
 export interface ImageGenModel {
   id: string;
   name: string;
@@ -15,152 +17,18 @@ export interface ImageGenModel {
   description?: string;
 }
 
-export const IMAGE_GEN_MODELS: ImageGenModel[] = [
-  {
-    id: 'gpt-image-2',
-    name: 'GPT Image 2',
-    shortName: 'GPT Image 2',
-    provider: 'OpenAI',
-    isPrimary: true,
-    supportedQualities: ['high', 'medium', 'low'],
-    defaultSize: '2448x3264',
-    supportEdits: true,
-    badge: '4K标准',
-    description: 'OpenAI 官方文档标准通道，支持 low/medium/high 画质与参考图编辑'
-  },
-  {
-    id: 'gpt-image-2-4k',
-    name: 'GPT Image 2 4K (专线)',
-    shortName: 'GPT Image 2 4K',
-    provider: 'OpenAI',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2048x2048',
-    supportEdits: true,
-    badge: '4K专线',
-    description: 'OpenAI 4K 高分辨率专线加速通道'
-  },
-  {
-    id: 'gpt-image-2-2k',
-    name: 'GPT Image 2 2K',
-    shortName: 'GPT Image 2 2K',
-    provider: 'OpenAI',
-    supportedQualities: ['medium', 'low'],
-    defaultSize: '1536x2048',
-    supportEdits: true,
-    badge: '2K',
-    description: 'comfly 网关 2K 档位 model id（gpt-image-2-2k）'
-  },
-  {
-    id: 'grok-imagine-image-2.0',
-    name: 'Grok 4.1 Image',
-    shortName: 'Grok 4.1 Image',
-    provider: 'xAI',
-    supportedQualities: ['medium', 'low'],
-    defaultSize: '2448x3264',
-    supportEdits: false,
-    badge: '真实写实',
-    description: 'xAI 旗舰写实光影与漫反射细节'
-  },
-  {
-    id: 'grok-4.2-image',
-    name: 'Grok 4.2 Image',
-    shortName: 'Grok 4.2 Image',
-    provider: 'xAI',
-    supportedQualities: ['medium', 'low'],
-    defaultSize: '2448x3264',
-    supportEdits: false,
-    badge: '最新',
-    description: 'xAI Grok 4.2 文生图（aspect_ratio 驱动）'
-  },
-  {
-    id: 'gemini-3.1-flash-image-preview-4k',
-    name: 'Gemini 3.1 Flash Image',
-    shortName: 'Gemini 3.1 Image',
-    provider: 'Google',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2448x3264',
-    supportEdits: true,
-    badge: '极速 4K',
-    description: 'Google 旗舰多模态图文对齐与高保真商业生成'
-  },
-  {
-    id: 'nano-banana-2',
-    name: 'Nano Banana 2',
-    shortName: 'Nano Banana 2',
-    provider: 'Google',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2448x3264',
-    supportEdits: true,
-    badge: '极速多图',
-    description: 'Gemini 系极速多参考图生图通道'
-  },
-  {
-    id: 'doubao-seedream-5-0-260128',
-    name: 'Seedream 5.0 官',
-    shortName: 'Seedream 5.0',
-    provider: 'Bytedance',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2448x3264',
-    supportEdits: true,
-    badge: '电商旗舰',
-    description: '火山引擎官方电商生成旗舰模型'
-  },
-  {
-    id: 'seedream-3.0',
-    name: 'Seedream 3.0',
-    shortName: 'Seedream 3.0',
-    provider: 'Bytedance',
-    supportedQualities: ['high', 'medium', 'low'],
-    defaultSize: '2048x2048',
-    supportEdits: true,
-    badge: '极速生成',
-    description: '低延迟电商主图与买家秀生成'
-  },
-  {
-    id: 'flux-pro',
-    name: 'Flux Pro',
-    shortName: 'Flux Pro',
-    provider: 'Black Forest Labs',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2048x2048',
-    supportEdits: true,
-    badge: '极致光影',
-    description: 'Black Forest Labs 顶级商业质感生图模型'
-  },
-  {
-    id: 'flux-kontext-pro',
-    name: 'Flux Kontext Pro',
-    shortName: 'Flux Kontext',
-    provider: 'Black Forest Labs',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2048x2048',
-    supportEdits: true,
-    badge: '多图编辑',
-    description: 'Flux Kontext 多图参考编辑生图'
-  },
-  {
-    id: 'midjourney-v6',
-    name: 'Midjourney v6.1',
-    shortName: 'Midjourney',
-    provider: 'Midjourney',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2048x2048',
-    supportEdits: true,
-    badge: '艺术质感',
-    description: '艺术设计与高级摄影风格生图'
-  },
-  {
-    id: 'recraft-v3',
-    name: 'Recraft V3',
-    shortName: 'Recraft',
-    provider: 'Recraft',
-    supportedQualities: ['high', 'medium'],
-    defaultSize: '2048x2048',
-    supportEdits: false,
-    badge: '设计矢量',
-    description: '品牌设计与矢量风格生图'
-  }
-];
+export const IMAGE_GEN_MODELS: ImageGenModel[] = listApprovedModels('image').map((m) => ({
+  id: m.id,
+  name: m.name,
+  shortName: m.shortName,
+  provider: vendorLabel(m.vendor),
+  isPrimary: m.isPrimary,
+  supportedQualities: m.supportedQualities || ['high', 'medium', 'low'],
+  defaultSize: m.defaultSize || '1024x1024',
+  supportEdits: m.supportEdits ?? true,
+  badge: m.badge,
+  description: m.description,
+}));
 
 export interface AspectRatioOption {
   id: string;

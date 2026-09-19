@@ -201,7 +201,7 @@ export default function PromptActionBar({
     quickVideoDuration,
     currentView,
     availableImageModelsLength: availableImageModels.length,
-    availableVideoModelsLength: availableVideoModels.length,
+    availableVideoModelsLength: currentView === 'canvas' ? Math.max(availableVideoModels.length, 1) : availableVideoModels.length,
     quickDepthStyle,
     quickDepthQuality,
     refMediaFile: media.refMediaFile,

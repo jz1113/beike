@@ -5,9 +5,9 @@
  * 点击某条 → 调 recoverTurn → 把 items 注入当前会话展示
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, Bell, RefreshCw, X, Sparkles } from 'lucide-react';
-import { useTaskCenter, type ActiveRun } from '@/store/useTaskCenter';
+import { useAssistantRunsQuery, recoverAssistantTurn, type ActiveRun } from '@/features/assistant/hooks/useAssistantRunsQuery';
 import type { AssistantItem } from '@beike/domain/assistant/types';
 
 interface Props {
@@ -57,18 +57,13 @@ function timeAgo(ts: number): string {
 }
 
 export default function TaskCenterPanel({ onResume, onClose }: Props) {
-  const { runs, loading, fetchRuns, recoverTurn, startPolling, stopPolling } = useTaskCenter();
+  const { data: runs = [], isFetching: loading, refetch: fetchRuns } = useAssistantRunsQuery();
   const [resuming, setResuming] = useState<string | null>(null);
-
-  useEffect(() => {
-    startPolling(5000);
-    return () => stopPolling();
-  }, [startPolling, stopPolling]);
 
   const handleResume = async (turnId: string) => {
     setResuming(turnId);
     try {
-      const snap = (await recoverTurn(turnId)) as {
+      const snap = (await recoverAssistantTurn(turnId)) as {
         items?: any[];
         modelUsed?: string;
         turnId?: string;
@@ -136,7 +131,7 @@ export default function TaskCenterPanel({ onResume, onClose }: Props) {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => fetchRuns()}
+            onClick={() => { void fetchRuns(); }}
             className="p-1 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
             title="刷新"
           >

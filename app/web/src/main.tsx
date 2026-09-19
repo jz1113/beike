@@ -1,3 +1,4 @@
+import { configureDomainRuntime } from '@beike/domain/runtime';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -22,6 +23,11 @@ if (typeof window !== 'undefined') {
 }
 
 applyViewportDensity(getViewportDensity());
+
+configureDomainRuntime({
+  storage: window.localStorage,
+  fetch: window.fetch.bind(window),
+});
 
 installDevConsoleBridge();
 

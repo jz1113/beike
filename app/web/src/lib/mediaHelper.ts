@@ -286,3 +286,53 @@ export async function fileToDataUrl(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+export async function extractVideoMetadataFromFile(file: File): Promise<{
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  duration: number;
+}> {
+  const thumbnailUrl = await extractVideoThumbnailFromFile(file);
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    const url = URL.createObjectURL(file);
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
+    };
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth || 0;
+      const height = video.videoHeight || 0;
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      cleanup();
+      resolve({ thumbnailUrl, width, height, duration });
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('无法读取视频元数据'));
+    };
+    video.src = url;
+  });
+}
+
+export async function extractImageDimensionsFromFile(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const width = image.naturalWidth || 0;
+      const height = image.naturalHeight || 0;
+      URL.revokeObjectURL(url);
+      resolve({ width, height });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('无法读取图片尺寸'));
+    };
+    image.src = url;
+  });
+}

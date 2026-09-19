@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { canvasStorage } from './canvasPersistence';
 export type { CanvasProject, CanvasNode } from '../types';
-import type { CanvasProject, CanvasNode } from '../types';
+import type { CanvasProject, CanvasNode, CanvasProductionDraft } from '../types';
 
 interface CanvasStoreState {
   projects: CanvasProject[];
@@ -13,9 +13,11 @@ interface CanvasStoreState {
   updateProjectTitle: (id: string, title: string) => void;
   deleteProject: (id: string) => void;
   addNode: (projectId: string, node: Omit<CanvasNode, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
+  addNodes: (projectId: string, nodes: CanvasNode[]) => void;
   updateNode: (projectId: string, nodeId: string, patch: Partial<CanvasNode>) => void;
   patchNodes: (projectId: string, patches: Record<string, Partial<CanvasNode>>) => void;
   deleteNode: (projectId: string, nodeId: string) => void;
+  setProductionDraft: (projectId: string, draft: CanvasProductionDraft) => void;
 }
 
 export const useCanvasStore = create<CanvasStoreState>()(
@@ -93,6 +95,18 @@ export const useCanvasStore = create<CanvasStoreState>()(
         }));
       },
 
+      addNodes: (projectId, nodes) => {
+        for (const node of nodes) get().addNode(projectId, node);
+      },
+
+      setProductionDraft: (projectId, draft) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === projectId ? { ...p, productionDraft: draft, updatedAt: Date.now() } : p,
+          ),
+        }));
+      },
+
       updateNode: (projectId, nodeId, patch) => {
         set((state) => ({
           projects: state.projects.map((p) => {
@@ -126,10 +140,18 @@ export const useCanvasStore = create<CanvasStoreState>()(
     }),
     {
       name: 'beike_canvas_projects_store',
-      merge:(persisted,current)=>({...current,projects:normalizeCanvasProjects((persisted as {projects?:CanvasProject[]})?.projects || [])}),
+      merge:(persisted,current)=>{
+        const saved = persisted as {projects?:CanvasProject[]; activeProjectId?: string | null} | undefined;
+        return {
+          ...current,
+          projects:normalizeCanvasProjects(saved?.projects || []),
+          activeProjectId: saved?.activeProjectId ?? current.activeProjectId,
+        };
+      },
       storage: createJSONStorage(() => canvasStorage),
       partialize: (state) => ({
         projects: state.projects,
+        activeProjectId: state.activeProjectId,
       }),
     },
   ),

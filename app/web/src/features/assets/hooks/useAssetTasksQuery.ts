@@ -2,14 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { GenerationTask } from '@/types/app-store';
 import { useAppStore } from '@/store/useAppStore';
-import { fetchAssetTasks } from '@/features/generate/api/generationApi';
+import { fetchAssetTasks } from '@/lib/generationApi';
 
 export const assetTasksQueryKey = ['assets', 'tasks'] as const;
 
-/** 资产中心 / 全局任务列表：服务端状态由 Query 管理，结果同步到 Zustand */
+/** 服务端任务列表由 Query 持有；Zustand 只保留本地引擎草稿，不再双写 DB 列表。 */
 export function useAssetTasksQuery(page = 1, enabled = true) {
-  const syncDatabaseTasks = useAppStore((s) => s.syncDatabaseTasks);
-
   const query = useQuery({
     queryKey: [...assetTasksQueryKey, page],
     queryFn: () => fetchAssetTasks(page),
@@ -30,13 +28,6 @@ export function useAssetTasksQuery(page = 1, enabled = true) {
     },
   });
 
-  useEffect(() => {
-    if (query.data?.tasks?.length) {
-      syncDatabaseTasks(query.data.tasks);
-    }
-  }, [query.data, syncDatabaseTasks]);
-
-  // 监听任务完成全局广播，立即刷新服务端任务
   useEffect(() => {
     const handleCompleted = () => {
       void query.refetch();

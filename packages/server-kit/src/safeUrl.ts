@@ -23,6 +23,9 @@ const ALLOWED_HOST_SUFFIXES = [
   'byteimg.com',
   'bytecdn.cn',
   'bytegoofy.com',
+  '365yg.com',
+  'amemv.com',
+  'ixigua.com',
   'pstatp.com',
   'snssdk.com',
   'tos-cn-i-0000.volccdn.com',
@@ -110,14 +113,28 @@ const BLOCKED_HOSTS = new Set([
 ]);
 
 export function isPrivateIp(ip: string): boolean {
-  if (!net.isIP(ip)) return false;
-  if (ip === '127.0.0.1' || ip === '::1') return true;
-  if (ip.startsWith('10.')) return true;
-  if (ip.startsWith('192.168.')) return true;
-  if (ip.startsWith('169.254.')) return true;
-  const parts = ip.split('.').map(Number);
-  if (parts.length === 4 && parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe80')) return true;
+  const raw = ip.replace(/^\[|\]$/g, '').toLowerCase();
+  const mapped = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+  if (mapped === '::1' || mapped === '0.0.0.0') return true;
+  if (mapped.startsWith('fe80:') || mapped.startsWith('fc') || mapped.startsWith('fd')) return true;
+  if (!net.isIP(mapped) && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(mapped)) {
+    return net.isIP(ip) ? ip === '127.0.0.1' || ip === '::1' || ip.startsWith('fe80') || ip.startsWith('fc') || ip.startsWith('fd') : false;
+  }
+  const host = mapped;
+  if (host === '127.0.0.1' || host === '::1') return true;
+  const parts = host.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80');
+  }
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 192 && b === 0 && parts[2] <= 2) return true;
+  if (a === 198 && b === 51 && parts[2] === 100) return true;
+  if (a === 203 && b === 0 && parts[2] === 113) return true;
   return false;
 }
 

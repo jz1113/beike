@@ -1,4 +1,12 @@
+import { listApprovedModels, vendorLabel, DEFAULT_MULTIMODAL_MODEL_ID, getApprovedModel } from '@beike/domain/modelCatalog';
 import { REVERSE_ENGINE_CORE_SPEC } from './assetDeconstruct/prompts';
+import { domainStorage } from './runtime';
+import {
+  appendPhoneGenerationPolicy,
+  buildAssetLibraryPromptSection,
+  buildVisionDiversityAxis,
+  shouldLockJewelryHalfBody,
+} from './visionPromptAssets';
 
 /** 跨批次反雷同签名：场景 + 动作/表情库摘要 */
 export interface PreviousGroupSignature {
@@ -93,8 +101,9 @@ export const DEFAULT_CATEGORIES: CategoryItem[] = [
 ];
 
 export function getMergedCategories(): CategoryItem[] {
-  if (typeof window === 'undefined') return DEFAULT_CATEGORIES;
-  const saved = localStorage.getItem('custom_categories');
+  const storage = domainStorage();
+  if (!storage) return DEFAULT_CATEGORIES;
+  const saved = storage.getItem('custom_categories');
   if (!saved) return DEFAULT_CATEGORIES;
   try {
     const custom: CategoryItem[] = JSON.parse(saved);
@@ -106,15 +115,15 @@ export function getMergedCategories(): CategoryItem[] {
 }
 
 export function saveCategoriesList(list: CategoryItem[]): CategoryItem[] {
-  if (typeof window === 'undefined') return list;
+  const storage = domainStorage();
+  if (!storage) return list;
   try {
-    localStorage.setItem('custom_categories', JSON.stringify(list));
+    storage.setItem('custom_categories', JSON.stringify(list));
   } catch {}
   return list;
 }
 
 export function deleteCategoryItem(catId: string): CategoryItem[] {
-  if (typeof window === 'undefined') return [];
   const current = getMergedCategories();
   const updated = current.filter(c => c.id !== catId);
   return saveCategoriesList(updated);
@@ -133,103 +142,47 @@ export interface VisionModel {
   description?: string;
 }
 
-export const VISION_MODELS: VisionModel[] = [
-  { 
-    id: 'gemini-3.1-pro-preview-thinking-high', 
-    name: 'Gemini 3.1 Pro (深度思考)',
-    shortName: 'Gemini 3.1 Pro',
-    provider: 'Google',
-    badge: '首选推荐',
-    description: 'Google 旗舰视觉模型，中文生活化场景推断最强'
-  },
-  { 
-    id: 'gpt-5.6-luna', 
-    name: 'gpt-5.6-luna (多模态)',
-    shortName: 'gpt-5.6-luna',
-    provider: 'OpenAI',
-    badge: '多模态',
-    description: 'OpenAI 新一代多模态视觉推理与生活化空间构图'
-  },
-  { 
-    id: 'gemini-3.7-flash', 
-    name: 'gemini-3.7-flash',
-    shortName: 'gemini-3.7-flash',
-    provider: 'Google',
-    badge: '多模态极速',
-    description: 'Google 新一代多模态推理与生活化场景解构'
-  },
-  { 
-    id: 'gpt-5.5-pro', 
-    name: 'GPT 5.5 Pro',
-    shortName: 'GPT 5.5 Pro',
-    provider: 'OpenAI',
-    badge: '多模态旗舰',
-    description: 'OpenAI 顶级综合理解能力与物理一致性把控'
-  },
-  { 
-    id: 'grok-4.6', 
-    name: 'Grok 4.6 (反AI纪实)',
-    shortName: 'Grok 4.6',
-    provider: 'xAI',
-    badge: '反AI纪实',
-    description: 'xAI 自然语言表达与生活感反 AI 拍摄提示词生成'
-  },
-  { 
-    id: 'claude-3-7-sonnet-thinking', 
-    name: 'Claude 3.7 Sonnet (思考)',
-    shortName: 'Claude 3.7 Sonnet',
-    provider: 'Anthropic',
-    badge: '深度推理',
-    description: 'Anthropic 旗舰思考模型，超高审美细节与质感策划'
-  },
-  { 
-    id: 'gemini-2.5-flash', 
-    name: 'Gemini 2.5 Flash',
-    shortName: 'Gemini 2.5 Flash',
-    provider: 'Google',
-    badge: '极速秒级',
-    description: '秒级极速响应，适合轻量级快速分镜构思'
-  }
-];
+export const VISION_MODELS: VisionModel[] = listApprovedModels('multimodal').map((m) => ({
+  id: m.id,
+  name: m.name,
+  shortName: m.shortName,
+  provider: vendorLabel(m.vendor),
+  badge: m.badge,
+  description: m.description,
+}));
 
 /** 模型是否支持 image_url 多模态输入（反推管线专用，排除纯文本 deepseek 等） */
 export function isVisionCapableModel(modelId?: string): boolean {
-  const raw = (modelId || '').trim().toLowerCase();
+  const raw = (modelId || '').trim();
   if (!raw) return false;
+  const approved = getApprovedModel(raw);
+  if (approved) return approved.capability === 'multimodal';
+  const lower = raw.toLowerCase();
 
   if (
-    raw.includes('embedding') ||
-    raw.includes('embed') ||
-    raw.includes('whisper') ||
-    raw.includes('tts') ||
-    raw.includes('suno') ||
-    raw.includes('rerank')
+    lower.includes('embedding') ||
+    lower.includes('embed') ||
+    lower.includes('whisper') ||
+    lower.includes('tts') ||
+    lower.includes('suno') ||
+    lower.includes('rerank')
   ) {
     return false;
   }
 
-  if (raw.includes('deepseek') && !raw.includes('vl')) {
+  if (lower.includes('deepseek') && !lower.includes('vl')) {
     return false;
   }
 
   if (
-    raw.includes('vision') ||
-    raw.includes('gemini') ||
-    raw.includes('claude') ||
-    raw.includes('grok') ||
-    raw.includes('4o') ||
-    /gpt-[45]/.test(raw) ||
-    raw.includes('qwen-vl') ||
-    raw.includes('qwen2-vl') ||
-    raw.includes('qwen2.5-vl') ||
-    raw.includes('qwen3-vl') ||
-    raw.includes('glm-4v') ||
-    raw.includes('glm-5') ||
-    raw.includes('internvl') ||
-    raw.includes('llava') ||
-    raw.includes('pixtral') ||
-    raw.includes('luna') ||
-    raw.includes('minicpm-v')
+    lower.includes('vision') ||
+    lower.includes('gemini') ||
+    lower.includes('claude') ||
+    lower.includes('grok') ||
+    lower.includes('4o') ||
+    /gpt-[45]/.test(lower) ||
+    lower.includes('qwen-vl') ||
+    lower.includes('luna')
   ) {
     return true;
   }
@@ -302,21 +255,26 @@ export function pickVisionAnalyzeFallbacks(selectedId: string, availableIds: str
 }
 
 export function normalizeVisionModelId(modelId?: string): string {
-  if (!modelId) return 'gpt-5.6-luna';
+  if (!modelId) return DEFAULT_MULTIMODAL_MODEL_ID;
   const clean = modelId.trim().toLowerCase();
-  if (clean === 'gpt-4-vision-preview' || clean === 'gpt-4-turbo-vision') {
-    return 'gpt-4o';
-  }
-  if (clean === 'gemini-1.5-flash' || clean === 'gemini-2.0-flash') {
-    return 'gemini-2.5-flash';
-  }
-  if (clean === 'gemini-1.5-pro' || clean === 'gemini-2.5-pro') {
-    return 'gemini-3.1-pro-preview-thinking-high';
-  }
-  if (clean === 'claude-3-5-sonnet' || clean === 'claude-3-5-sonnet-20241022') {
-    return 'claude-3-7-sonnet-thinking';
-  }
-  return modelId;
+  const aliases: Record<string, string> = {
+    'gpt-4-vision-preview': 'gpt-5.6-luna',
+    'gpt-4-turbo-vision': 'gpt-5.6-luna',
+    'gpt-4o': 'gpt-5.6-luna',
+    'gpt-5.5-pro': 'gpt-5.6-luna',
+    'gemini-1.5-flash': 'gemini-3.7-flash',
+    'gemini-2.0-flash': 'gemini-3.7-flash',
+    'gemini-2.5-flash': 'gemini-3.7-flash',
+    'gemini-1.5-pro': 'gemini-3.1-pro-preview',
+    'gemini-2.5-pro': 'gemini-3.1-pro-preview',
+    'gemini-3.1-pro-preview-thinking-high': 'gemini-3.1-pro-preview',
+    'claude-3-5-sonnet': 'claude-sonnet-5',
+    'claude-3-5-sonnet-20241022': 'claude-sonnet-5',
+    'claude-3-7-sonnet': 'claude-sonnet-5',
+    'claude-3-7-sonnet-thinking': 'claude-opus-5',
+    'claude-3-7-sonnet-20250219': 'claude-sonnet-5',
+  };
+  return aliases[clean] || modelId;
 }
 
 export function buildVisionSystemPrompt(params: VisionAnalyzeParams): string {
@@ -334,6 +292,7 @@ export function buildVisionSystemPrompt(params: VisionAnalyzeParams): string {
     assetLibraryData,
     lockedAssets,
   } = params;
+  const lockJewelryHalfBody = shouldLockJewelryHalfBody(productTitle, assetLibraryData);
 
   const isNoModel =
     architectureMode === 'pure_product' ||
@@ -464,7 +423,7 @@ ${hasAnchorFace
   - \`placed_object\`：纯陈设静物（若误判人物模式勿用）。
 - **严禁文字描写商品颜色/几何/支架/镜头排列**；外观唯一真相是 @图片1。`;
 
-  return `# Role: 擅长拍摄小红书百万赞爆款图文的小红书真实生活博主与摄影师，专注真实手机原相机生活抓拍感（Shot on iPhone, Candid Lifestyle）、自然生活采光与自然清秀半身人像质感；核心目标是输出「纯正东亚女性自然骨相与清秀五官比例、原生健康透气冷白肤质与细微毛孔呼吸感、真实皮肤次表面散射与微弱皮脂光泽（零过度磨皮、零美颜滤镜假面）、发际线细软胎毛与随性碎发、100% 全员半身像/中近景/微距构图（绝对无远景全身）、充满生活烟火气的真实物理空间与自然斑驳日光（Dappled sunlight）、扎实的物理接触阴影（Contact Shadows）、手部动作有自然物理依托且绝不向镜头伸手畸变、绝无 3D 建模渲染假人感与塑料假背景」的照片级提示词。
+  return appendPhoneGenerationPolicy(`# Role: 擅长拍摄小红书百万赞爆款图文的小红书真实生活博主与摄影师，专注真实手机原相机生活抓拍感（Shot on iPhone, Candid Lifestyle）、自然生活采光与自然清秀半身人像质感；核心目标是输出「纯正东亚女性自然骨相与清秀五官比例、原生健康透气冷白肤质与细微毛孔呼吸感、真实皮肤次表面散射与微弱皮脂光泽（零过度磨皮、零美颜滤镜假面）、发际线细软胎毛与随性碎发、100% 全员半身像/中近景/微距构图（绝对无远景全身）、充满生活烟火气的真实物理空间与自然斑驳日光（Dappled sunlight）、扎实的物理接触阴影（Contact Shadows）、手部动作有自然物理依托且绝不向镜头伸手畸变、绝无 3D 建模渲染假人感与塑料假背景」的照片级提示词。
 
 你的任务：根据【目标商品实物图 @图片1】${hasAnchorFace && !isNoModel ? '与【专属正脸 ID 图】' : ''}及【品类/自定义提示词架构】，自主为商品策划一套 ${shotCount} 镜**同一身份 · 完全同一套穿搭 · 同一真实生活主空间**、但**机位/动作/特写角度完全随机自由**的结构化字段（最终中文 Prompt 由系统按 8 段骨架拼装）。
 
@@ -512,13 +471,7 @@ ${lookLock}
 
 ---
 ## 【Diversity Axis · 组内差异轴与 🚨 组内动作严禁同质化 / 严禁连续托腮】（最高优先级）
-- 🚨 【构图景别硬红线：全员 100% 锁定为半身相、胸部以上肖像与局部微距，绝对禁止远景全身】：
-  - ❌ **绝对禁止任何「远景（Long Shot）、全景（Wide Shot）、全身站立（Full-body standing shot）」**！严禁出现人物在画面中只占一小截、大面积空荡荡的地板走廊！
-  - 🌟 **全套 4 镜构图比例标准（人物与饰品占画面 65%~80% 视觉中心）**：
-    1. **【正面半身/胸部以上自然肖像 (Half-body / Chest-up)】**：平视视线对焦镜头，女生神态明媚自然，双手自然轻搭在身前桌沿或单手捏起吊坠向镜头展示，眼神清澈含笑自然互动；
-    2. **【45° 侧颜半身抓拍 (45-degree Profile Half-body)】**：侧身看窗外或街景天光，微风吹拂发丝，单手自然撩起耳边碎发别至耳后，清晰展现侧颜下颌线条与耳饰/项链光影；
-    3. **【佩戴部位生活化动作超清特写/微距 (Macro Close-up)】**：单手捏起吊坠向镜头展示细节、双手轻拉细链两端、或手部自然平放于台面大光圈浅景深聚焦首饰（严禁多画手腕手镯，严禁无依托悬空手势），背景柔和虚化；
-    4. **【生活氛围感半身交互随拍 (Lifestyle Half-body Interaction)】**：生活空间舒适倚靠、车内副驾手搭安全带、街角漫步回眸、手捧水杯或单手轻扶包带，展现高级私服与生活温度。
+${buildVisionDiversityAxis(shotCount, lockJewelryHalfBody)}
 - 🚨 【动作多样性与排他性铁律（彻底封杀托腮垄断，实现百变姿态）】：
   - ❌ **全套 4 个分镜中，4 个姿态必须展现 4 种截然不同的人体状态与手势，严禁全套出现 2 次及以上托腮/托下巴动作！**
   - 🌟 **动作全开放脑暴原则**：
@@ -548,71 +501,7 @@ ${templateStyle}
   - 手持数码类：写「手持/使用 @图片1 所示商品，外观 100% 以 @图片1 为准」
   - 纯商品静物：写「画面主体为 @图片1 所示商品实物，外观 100% 以 @图片1 为准」
 - **分镜策划的重点**：全部聚焦在**空间置景、光影色温、机位角度、摄影焦段、景深焦点、人物动作姿势、微表情与生活化道具互动**！
-${(() => {
-  if (!assetLibraryData && !lockedAssets) return '';
-  const parts: string[] = [];
-  parts.push('\n---\n## 【📚 提示词资产库精选零件插槽（已沉淀原子资产 · 优先选用组装）】');
-  parts.push('系统已从用户专属「提示词资产库」中拉取了下列高品质真实场景、显白穿搭、抓拍动作与博主人设。');
-  parts.push('🚨 **【资产库强装配与分镜动作 1:1 严格分配铁律（最高优先级执行）】**：\n- 若下方提供了【可选真实场景库】、【可选抓拍动作库】、【可选显白穿搭库】、【可选博主人设库】，你必须 **100% 直接选用** 库中的具体资产进行装配！严禁编造任何脱离资产库的假想场景或动作！\n- **【套图一致性】**：同一套 4 分镜必须共用同一 scene / outfit / persona（master_scene、look_bible、identity_bible 全组一致），但 **4 个分镜的 action、camera、lighting 必须互不相同**！\n- **【分镜动作 1:1 严格绑定与排他性（绝对禁止同一套图动作雷同）】**：\n  • **分镜 1 必须绑定动作库第 1 个动作（专属超清微距/近景）**，applied_action 填对应编号；\n  • **分镜 2 必须绑定动作库第 2 个动作（45°侧颜互动）**，applied_action 填对应编号；\n  • **分镜 3 必须绑定动作库第 3 个动作（手势与桌面依托）**，applied_action 填对应编号；\n  • **分镜 4 必须绑定动作库第 4 个动作（生活氛围随拍）**，applied_action 填对应编号；\n  • 🚨 **绝对禁止在同一套中复用相同的动作编号！4 个分镜必须是 4 种截然不同的人体姿态、机位与采光描述！**\n- **【商品细节看清与极致拉近铁律】**：\n  • 分镜 1 必须为**极近距离局部微距超清特写（Tight Macro Close-Up）**，镜头对准手腕/手指/锁骨/耳垂/发髻，商品实物占据画面 55%~75% 核心画幅，超高解析度呈现做工纹理与金属光泽，绝无全身远景；\n  • 分镜 2~4 为**胸部以上中近景（Tight Bust-up Close-Up）**，模特佩戴部位清晰置于前景受光处（占画面 35%~50%），首饰清晰可辨；\n- 必须在输出 JSON 中完整回填溯源字段：master_scene 填入所选场景完整描述，applied_scene 填入所选场景标题（含资产编号）；look_bible 填入所选穿搭，applied_outfit 填入所选穿搭标题；identity_bible 填入所选人设，applied_persona 填入所选人设名称；各分镜 applied_action 必须严格按 1:1 填入动作库中对应的不同动作编号与标题！各分镜 lighting_type 必须写出互异的采光变化！\n');
-
-  if (lockedAssets) {
-    const lockedLines: string[] = [];
-    if (lockedAssets.personaName) lockedLines.push(`- 🔒 **强制锁定模特人设**：${lockedAssets.personaName}`);
-    if (lockedAssets.sceneTitle) lockedLines.push(`- 🔒 **强制锁定拍摄场景**：${lockedAssets.sceneTitle}`);
-    if (lockedAssets.outfitTitle) lockedLines.push(`- 🔒 **强制锁定显白穿搭**：${lockedAssets.outfitTitle}`);
-    if (lockedAssets.actionTitle) lockedLines.push(`- 🔒 **强制锁定核心动作**：${lockedAssets.actionTitle}`);
-    if (lockedLines.length > 0) {
-      parts.push(`### 🎯【用户强制锁定的特定资产】：\n${lockedLines.join('\n')}\n`);
-    }
-  }
-
-  if (assetLibraryData) {
-    if (Array.isArray(assetLibraryData.personas) && assetLibraryData.personas.length > 0) {
-      parts.push(`### 👤 可选博主人设库 (Persona Assets)：`);
-      assetLibraryData.personas.slice(0, 5).forEach((p, idx) => {
-        const codeStr = p.code ? `[#${p.code.replace(/^#/, '')}]` : `[#P-${String(idx + 1).padStart(2, '0')}]`;
-        const body = p.reversePrompt || p.description;
-        parts.push(`${idx + 1}. 【${codeStr} ${p.name}】：${body}`);
-      });
-      parts.push('');
-    }
-
-    if (Array.isArray(assetLibraryData.scenes) && assetLibraryData.scenes.length > 0) {
-      parts.push(`### 🏡 可选真实场景库 (Scene Assets)：`);
-      assetLibraryData.scenes.slice(0, 8).forEach((s, idx) => {
-        const codeStr = s.code ? `[#${s.code.replace(/^#/, '')}]` : `[#S-${String(idx + 1).padStart(2, '0')}]`;
-        const body = s.reversePrompt || s.description;
-        parts.push(`${idx + 1}. 【${codeStr} ${s.title}】：${body}${s.lighting ? ` ｜ 光影：${s.lighting}` : ''}`);
-      });
-      parts.push('');
-    }
-
-    if (Array.isArray(assetLibraryData.outfits) && assetLibraryData.outfits.length > 0) {
-      parts.push(`### 👗 可选显白穿搭库 (Outfit Assets)：`);
-      assetLibraryData.outfits.slice(0, 8).forEach((o, idx) => {
-        const codeStr = o.code ? `[#${o.code.replace(/^#/, '')}]` : `[#O-${String(idx + 1).padStart(2, '0')}]`;
-        if (o.reversePrompt) {
-          parts.push(`${idx + 1}. 【${codeStr} ${o.title}】：${o.reversePrompt}`);
-        } else {
-          parts.push(`${idx + 1}. 【${codeStr} ${o.title}】：上装「${o.top}」+ 下装「${o.bottom}」${o.colorPalette ? ` ｜ 配色：「${o.colorPalette}」` : ''}`);
-        }
-      });
-      parts.push('');
-    }
-
-    if (Array.isArray(assetLibraryData.actions) && assetLibraryData.actions.length > 0) {
-      parts.push(`### 📸 可选抓拍动作库 (Action Assets - 4个分镜必须1:1分别选用下列4个动作，严禁重复)：`);
-      assetLibraryData.actions.slice(0, 8).forEach((a, idx) => {
-        const codeStr = a.code ? `[#${a.code.replace(/^#/, '')}]` : `[#A-${String(idx + 1).padStart(2, '0')}]`;
-        const body = a.reversePrompt || a.action;
-        parts.push(`${idx + 1}. 【${codeStr} ${a.title}】：${body}${a.camera ? ` ｜ 镜头：${a.camera}` : ''}`);
-      });
-      parts.push('');
-    }
-  }
-
-  return parts.join('\n');
-})()}
+${buildAssetLibraryPromptSection(assetLibraryData, lockedAssets, lockJewelryHalfBody)}
 ${antiDupSection}
 ${extraRequirements ? `\n【用户定制补充要求】：\n${extraRequirements}\n` : ''}
 ## 输出格式（合法 JSON，无 Markdown 前言）
@@ -657,7 +546,7 @@ ${extraRequirements ? `\n【用户定制补充要求】：\n${extraRequirements}
 - prompts 数组长度必须恰好为 ${shotCount}，shot_no 从 1 到 ${shotCount}。
 - 🌟 prompt 字段是大模型多模态视觉理解的核心价值：必须结合 @图片1 实物实拍的金属/布料/宝石光泽与做工质感，打磨本镜的独有动作、机位与受光焦点，为系统拼装提供最高品质的视觉精修文案。
 - product_role 必须与商品实物一致（衬衫/外套等=worn_apparel，手镯/项链/耳饰/戒指=worn_accessory）。
-`;
+`, productTitle);
 }
 
 /** 爆款复刻 Pass1：全维图像反推（仅对标图，不绑定商品） */
@@ -762,7 +651,7 @@ ${s.reverse_prompt}`;
     })
     .join('\n\n');
 
-  return `你是电商「爆款复刻」提示词优化引擎。已完成对 ${referenceImageCount} 张外站参考图的全维反推；请结合目标商品，将每条 reverse_prompt 改写成**可直接生图的最终 prompt**。
+  return appendPhoneGenerationPolicy(`你是电商「爆款复刻」提示词优化引擎。已完成对 ${referenceImageCount} 张外站参考图的全维反推；请结合目标商品，将每条 reverse_prompt 改写成**可直接生图的最终 prompt**。
 
 ## 目标商品
 - 标题: ${productTitle}${propsSection}${
@@ -818,5 +707,5 @@ ${extraRequirements ? `【用户定制补充要求】：\n${extraRequirements}\n
   ]
 }
 \`\`\`
-`;
+`, productTitle);
 }

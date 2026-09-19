@@ -54,7 +54,7 @@ export async function fetchDeconstructWithRetry(
   throw lastErr ?? new Error('反推请求失败');
 }
 
-import type { SubCategoryDef } from '@beike/domain/productCategoryHelpers';
+import type { SubCategoryDef } from '@beike/domain/productCategory';
 
 export interface ProcessDeconstructItemInput {
   item: ImageSetQueueItem;
@@ -63,17 +63,18 @@ export interface ProcessDeconstructItemInput {
   modelIds: string[];
   targetCategory?: string;
   customSubCategories?: SubCategoryDef[];
+  reviewBeforeSave?: boolean;
 }
 
 export type ProcessDeconstructItemResult =
-  | { ok: true; partial: boolean; data: unknown; stats: unknown }
+  | { ok: true; partial: boolean; data: unknown; stats: unknown; reviewId?: string }
   | { ok: false; error: string };
 
 /** 执行单条反推请求（队列与流水线共用） */
 export async function processDeconstructQueueItem(
   input: ProcessDeconstructItemInput
 ): Promise<ProcessDeconstructItemResult> {
-  const { item, userHint, selectedVisionModel, modelIds, targetCategory, customSubCategories } = input;
+  const { item, userHint, selectedVisionModel, modelIds, targetCategory, customSubCategories, reviewBeforeSave } = input;
 
   try {
     const res = await fetchDeconstructWithRetry({
@@ -84,7 +85,8 @@ export async function processDeconstructQueueItem(
       customSubCategories,
       model: selectedVisionModel,
       fallbackModels: pickOrderedMultimodalFallbacks(selectedVisionModel, modelIds),
-      autoSave: true,
+      autoSave: !reviewBeforeSave,
+      reviewBeforeSave: Boolean(reviewBeforeSave),
     });
 
     if (res && res.ok) {
@@ -118,7 +120,7 @@ export async function processDeconstructQueueItem(
           deconstructStats: data.stats,
         });
 
-        return { ok: true, partial, data: data.data, stats: data.stats };
+        return { ok: true, partial, data: data.data, stats: data.stats, reviewId: data.reviewId };
       }
       return { ok: false, error: data.error || '解构失败' };
     }

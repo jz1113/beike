@@ -1,9 +1,8 @@
 /** 视觉 / 多模态 API 超时与 token 上限（前后端共用） */
 
-export const VISION_ANALYZE_TIMEOUT_OVERRIDE_MS =
-  typeof process !== 'undefined' && process.env
-    ? Number(process.env.VISION_ANALYZE_TIMEOUT_MS) || 0
-    : 0;
+import { domainEnv } from './runtime';
+
+export const VISION_ANALYZE_TIMEOUT_OVERRIDE_MS = 0;
 
 export const VISION_TIMEOUT_THINKING_MS = 360_000;
 export const VISION_TIMEOUT_STANDARD_MS = 300_000;
@@ -37,8 +36,9 @@ export function isThinkingVisionModel(modelId: string): boolean {
 
 /** 按模型类型分级等待时长；主模型可经 VISION_ANALYZE_TIMEOUT_MS 环境变量覆盖 */
 export function resolveVisionTimeoutMs(modelId: string, isPrimary = true): number {
-  if (isPrimary && VISION_ANALYZE_TIMEOUT_OVERRIDE_MS > 0) {
-    return VISION_ANALYZE_TIMEOUT_OVERRIDE_MS;
+  const override = Number(domainEnv('VISION_ANALYZE_TIMEOUT_MS') || 0);
+  if (isPrimary && override > 0) {
+    return override;
   }
   if (isThinkingVisionModel(modelId)) {
     return VISION_TIMEOUT_THINKING_MS;
@@ -50,9 +50,8 @@ export function resolveVisionTimeoutMs(modelId: string, isPrimary = true): numbe
 }
 
 /** 分镜分析 completion token 上限：4 镜约 1500，上限 2400，收敛大模型生成长度，极大缩短推理用时 */
-export function resolveVisionAnalyzeMaxTokens(shotCount: number): number {
-  const n = Math.max(1, Math.min(12, Math.floor(shotCount) || 4));
-  return Math.min(2400, Math.max(1200, n * 380));
+export function resolveVisionAnalyzeMaxTokens(_shotCount: number): number {
+  return 8192;
 }
 
 import { formatUserError } from '@beike/domain/upstreamErrors';

@@ -198,6 +198,18 @@ const fields: Record<string, Record<string, [string, boolean]>> = {
     "isFavorite": [
       "boolean",
       false
+    ],
+    "albumId": [
+      "string",
+      true
+    ],
+    "productCategoryIds": [
+      "string",
+      false
+    ],
+    "isUniversal": [
+      "boolean",
+      false
     ]
   },
   "full_prompt": {
@@ -282,6 +294,18 @@ const fields: Record<string, Record<string, [string, boolean]>> = {
       false
     ],
     "isFavorite": [
+      "boolean",
+      false
+    ],
+    "albumId": [
+      "string",
+      true
+    ],
+    "productCategoryIds": [
+      "string",
+      false
+    ],
+    "isUniversal": [
       "boolean",
       false
     ]

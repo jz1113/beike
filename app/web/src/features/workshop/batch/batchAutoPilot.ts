@@ -11,6 +11,7 @@ export interface AutoPilotDeps {
   showToast: (msg: string) => void;
   setIsAutoPilotRunning: (running: boolean) => void;
   batchMode: 'original' | 'replication';
+  isAborted?: () => boolean;
 }
 
 /**
@@ -53,10 +54,14 @@ export async function startAutoPilotPipeline(deps: AutoPilotDeps): Promise<void>
     if (unreadyItems.length > 0 || successCount === 0) {
       deps.setIsAutoPilotRunning(false);
       // 🚨 严禁自动跳入阶段 4！强制停留在阶段 3【分镜提示词】，保护用户额度并等待重试
-      deps.setCurrentStage(deps.batchMode === 'original' ? 2 : 3);
+      deps.setCurrentStage(3);
       deps.showToast(
         `🚨 生产安全阻断：有 ${unreadyItems.length} 款商品提示词分析失败或超时，已终止自动生图！请点击单款重试或切换极速模型。`
       );
+      return;
+    }
+
+    if (deps.isAborted?.()) {
       return;
     }
 

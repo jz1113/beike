@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useDocumentHidden } from '@/lib/useDocumentHidden';
-import { useAssetTasksQuery } from '@/features/assets/hooks/useAssetTasksQuery';
+import { useAssetTasksQuery } from '@/lib/useAssetTasksQuery';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   SLOW_POLL_HINT,

@@ -3,6 +3,7 @@ import { getAspectRatioFromSize } from '@beike/domain/drawing';
 import {
   GPT_IMAGE_GATEWAY_SAFE_SIZES,
   GPT_IMAGE_SUFFIX_2K_SIZES,
+  clampGptImageOfficialPixelSize,
   resolveGptImageSizeForModel,
 } from './gptImageSafeSizes';
 
@@ -41,7 +42,19 @@ describe('resolveGptImageSizeForModel', () => {
     expect(resolveGptImageSizeForModel('2:3', 'gpt-image-2-4k', 'high')).toBe('2160x3240');
   });
 
-  it('9:16 + gpt-image-2-2k → 1152x2048', () => {
+  it('3:4 + gpt-image-2-2k → 1152x2048', () => {
     expect(resolveGptImageSizeForModel('9:16', 'gpt-image-2-2k', 'high')).toBe('1152x2048');
+  });
+});
+
+describe('clampGptImageOfficialPixelSize', () => {
+  it('caps long edge at 3840 and keeps documented square size', () => {
+    const [width, height] = clampGptImageOfficialPixelSize('4096x3072').split('x').map(Number);
+    expect(width).toBeLessThanOrEqual(3840);
+    expect(height).toBeLessThanOrEqual(3840);
+    expect(width % 16).toBe(0);
+    expect(height % 16).toBe(0);
+    expect(width * height).toBeLessThanOrEqual(8_294_400);
+    expect(clampGptImageOfficialPixelSize('1024x1024')).toBe('1024x1024');
   });
 });

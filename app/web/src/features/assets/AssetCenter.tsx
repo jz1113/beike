@@ -1,5 +1,5 @@
 import { mergeAssetTasks } from './mergeAssetTasks';
-import { fetchAssetTasks } from '@/features/generate/api/generationApi';
+import { fetchAssetTasks } from '@/lib/generationApi';
 import { useAssetTasksQuery } from '@/features/assets/hooks/useAssetTasksQuery';
 import { apiFetch } from '@/lib/apiClient';
 import { confirmAction } from '@/lib/confirmAction';
@@ -27,13 +27,13 @@ import { useAppStore } from '@/store/useAppStore';
 import '@/store/persist/generation';
 import '@beike/domain/drawing';
 import { useCanvasStore } from '@/features/canvas/store/useCanvasStore';
-import { groupTasksIntoBatches, type AssetTaskBatch } from './assetBatchUtils';
+import { groupTasksIntoBatches, type AssetTaskBatch } from './assetBatch';
 import AssetGenerationHistory from './AssetGenerationHistory';
 import AssetFolderOverlay from './AssetFolderOverlay';
 import { pageRoot, densityPill } from '@/shared/ui/layoutClasses';
 import { useSafeTimeout } from '@/lib/useSafeTimeout';
 
-export type { AssetTaskBatch } from './assetBatchUtils';
+export type { AssetTaskBatch } from './assetBatch';
 
 interface Props {
   onEnterWorkshop?: () => void;

@@ -1,4 +1,6 @@
-import type { SubCategoryDef } from '../productCategoryHelpers';
+import type { SubCategoryDef } from '../productCategory';
+import { PHONE_REVERSE_POLICY } from '../phoneProductPolicy';
+import { categoryArchitectureGuidance } from '../assetCategoryArchitecture';
 
 /** 中文反推提示词最低字数要求（与 validate.ts MIN_PROMPT_LENGTH 同步） */
 export const MIN_REVERSE_PROMPT_LENGTH = 180;
@@ -397,7 +399,7 @@ function buildCategoryDeconstructGuidance(
   userHint = '',
   customSubCategories?: SubCategoryDef[]
 ): string {
-  // 如果用户或系统传入了二级类目表（无论是用户自定义导入还是默认黄金类目表）
+  const architecture = categoryArchitectureGuidance(targetCategory);
   if (customSubCategories && customSubCategories.length > 0) {
     const listLines = customSubCategories
       .map((sub, idx) => {
@@ -409,6 +411,8 @@ function buildCategoryDeconstructGuidance(
       .join('\n');
 
     return `
+${architecture}
+
 ### 🏷️ 目标品类二级细分类目规范（强约束对齐）
 当前任务重点解析【${targetCategory === 'jewelry' ? '珠宝首饰' : targetCategory || '指定品类'}】品类，必须严格对照以下用户类目表字典进行机位姿态拆解打标：
 ${listLines}
@@ -417,11 +421,13 @@ ${listLines}
 `;
   }
 
-  const isJewelry = targetCategory === 'jewelry' || /首饰|珠宝|项链|戒指|手镯|手串|耳环|耳饰|发簪|胸针|jewelry|necklace/i.test(userHint);
-  const isDigital = targetCategory === 'digital_3c' || /手机|数码|平板|耳机|手机壳|全面屏|镜头模组|digital/i.test(userHint);
+  const isJewelry = targetCategory === 'jewelry' || (!targetCategory && /首饰|珠宝|项链|戒指|手镯|手串|耳环|耳饰|发簪|胸针|jewelry|necklace/i.test(userHint));
+  const isDigital = targetCategory === 'digital_3c' || (!targetCategory && /手机|数码|平板|耳机|手机壳|全面屏|镜头模组|digital/i.test(userHint));
 
   if (isJewelry) {
     return `
+${architecture}
+
 ### 💎 珠宝首饰商拍二级细分类目规范（重点强化）
 当前任务重点解析【珠宝首饰】品类，必须严格对照以下 6 大二级细分类目标准字典进行机位姿态打标：
 1. **项链 / 锁骨链 (necklace)**: 聚焦锁骨、领口、颈肩；单手触锁骨、双指捻链托坠、垂眸俯视吊坠；focus_anatomy 必须为 "necklace"，suitable_anatomy 包含 ["necklace", "collarbone"]，tags 包含 ["首饰", "项链特写"]
@@ -437,6 +443,8 @@ ${listLines}
 
   if (isDigital) {
     return `
+${architecture}
+
 ### 📱 手机数码商拍细分规范（重点强化）
 当前任务重点解析【手机数码】品类，必须严格对照以下细分类目进行打标：
 1. **镜头模组 (camera_deco)**: focus_anatomy = "camera_deco", tags 包含 ["手机数码", "镜头模组"]
@@ -446,7 +454,7 @@ ${listLines}
 `;
   }
 
-  return '';
+  return architecture;
 }
 
 function buildMachineJsonLayer(params: {
@@ -455,22 +463,24 @@ function buildMachineJsonLayer(params: {
   targetCategory?: string;
   customSubCategories?: SubCategoryDef[];
   singleImageOnly?: boolean;
+  imageIndex?: number;
 }): string {
-  const { imageCount, userHint = '', targetCategory, customSubCategories, singleImageOnly = false } = params;
-  const isSingleImage = imageCount === 1;
+  const { imageCount, userHint = '', targetCategory, customSubCategories, singleImageOnly = false, imageIndex } = params;
+  const isSingleImage = singleImageOnly || imageCount === 1;
+  const focusIndex = imageIndex || (singleImageOnly ? imageCount : 1);
 
   const singleImageGuard = isSingleImage
-    ? `\n🚨【单图铁律】per_image 仅 1 条；scenes/outfits/actions 各仅 1 条。`
+    ? `\n🚨【单图铁律】只输出第 ${focusIndex} 张图片的分析；per_image 仅 1 条且 image_index=${focusIndex}；scenes/outfits/actions 各仅 1 条。`
     : `\n🚨【多图铁律】必须输出恰好 ${imageCount} 条 per_image（image_index 从 1 到 ${imageCount} 连续不遗漏）；actions 数量 ≤ ${imageCount}；scenes 聚类去重后 1~3 个，严禁每张图各建 1 场景。`;
 
   const perImageExamples = singleImageOnly
-    ? PER_IMAGE_JSON_TEMPLATE(1)
+    ? PER_IMAGE_JSON_TEMPLATE(focusIndex)
     : Array.from({ length: Math.min(imageCount, 2) }, (_, i) =>
         PER_IMAGE_JSON_TEMPLATE(i + 1)
       ).join(',\n    ');
 
   const jsonOutput = singleImageOnly
-    ? PER_IMAGE_JSON_TEMPLATE(imageCount)
+    ? PER_IMAGE_JSON_TEMPLATE(focusIndex)
     : `{
   "theme_category": "chinese_style | luxury_modern | casual_street | vacation_nature | commuting_car | home_living | minimal_office",
   "per_image": [
@@ -548,7 +558,11 @@ ${singleImageGuard}
 - action.title 必须使用「姿态+机位」命名，严禁服装名词
 - persona 不得包含服装、动作和背景
 - 严格遵循标准合法 JSON 语法：字符串值中严禁包含未转义的原生回车换行符，多行文本分段必须使用 \\n 转义，字符串与键名一律使用英文双引号
-- 必须完整输出全部 ${imageCount} 张图片的分析，各图描述保持高密度精炼，确保输出的单个 JSON 语法完整闭合
+${isSingleImage ? `- 只输出第 ${focusIndex} 张图片的分析，不要输出其它 image_index` : `- 必须完整输出全部 ${imageCount} 张图片的分析，各图描述保持高密度精炼，确保输出的单个 JSON 语法完整闭合`}
+- 无人物时 has_human=false
+- JSON 键名和枚举保留模板中的英文
+
+${PHONE_REVERSE_POLICY}
 
 ${buildCategoryDeconstructGuidance(targetCategory, userHint, customSubCategories)}
 
@@ -693,15 +707,17 @@ export function buildPerImageReversePrompt(params: {
   imageIndex: number;
   totalImages: number;
   userHint?: string;
+  targetCategory?: string;
+  customSubCategories?: SubCategoryDef[];
 }): string {
-  const { imageIndex, totalImages, userHint = '' } = params;
+  const { imageIndex, totalImages, userHint = '', targetCategory, customSubCategories } = params;
 
   return `${REVERSE_ENGINE_CORE_SPEC}
 
-请仔细观察这张参考图片（第 ${imageIndex} 张，共 ${totalImages} 张），执行全维反推与四维正交原子解构。
+请仔细观察这张参考图片（第 ${imageIndex} 张，共 ${totalImages} 张），执行全维反推与四维正交原子解构。只输出第 ${imageIndex} 张图片的分析。
 
 ${PROMPT_GOOD_BAD_EXAMPLES}
-${buildMachineJsonLayer({ imageCount: imageIndex, userHint, singleImageOnly: true })}`;
+${buildMachineJsonLayer({ imageCount: 1, imageIndex, userHint, targetCategory, customSubCategories, singleImageOnly: true })}`;
 }
 
 /** 批量导入时，每套图集最少图片数 */

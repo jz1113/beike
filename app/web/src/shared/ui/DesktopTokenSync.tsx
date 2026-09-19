@@ -5,9 +5,8 @@ import {
   DESKTOP_API_READY_EVENT,
   type DesktopBootstrapStatus,
 } from '@/lib/desktopBootstrap';
-import { isTauriDesktop, setApiBase } from '@/lib/desktopRuntime';
+import { isTauriDesktop } from '@/lib/desktopRuntime';
 import { invokeTauriApi } from '@/lib/tauriApi';
-import { invoke } from '@tauri-apps/api/core';
 import DesktopBootstrapShell from '@/shared/ui/DesktopBootstrapShell';
 
 const MAX_ATTEMPTS = 24;
@@ -31,13 +30,6 @@ export default function DesktopTokenSync({ children }: { children: ReactNode }) 
   const bootstrapDesktop = useCallback(async (runId: number) => {
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       if (runIdRef.current !== runId) return;
-
-      try {
-        const base = await invoke<string>('get_api_base');
-        if (base) setApiBase(base);
-      } catch {
-        /* sidecar 尚未就绪 */
-      }
 
       try {
         const res = await invokeTauriApi('/api/health');

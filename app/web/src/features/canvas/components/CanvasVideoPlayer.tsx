@@ -6,9 +6,11 @@ export const CanvasVideoPlayer: React.FC<{
   videoUrl: string;
   poster?: string;
   height?: number;
-}> = ({ videoUrl, poster, height }) => {
+  onLoadedMetadata?: (info: { videoWidth: number; videoHeight: number; duration: number }) => void;
+}> = ({ videoUrl, poster, height, onLoadedMetadata }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<string | undefined>();
 
   const handleTogglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -25,8 +27,11 @@ export const CanvasVideoPlayer: React.FC<{
   return (
     <div
       onClick={handleTogglePlay}
-      style={height ? {height} : undefined}
-      className={`relative w-full ${height ? '' : 'aspect-[9/16] max-h-[520px]'} bg-slate-950 rounded-xl overflow-hidden shadow-xs group/video flex items-center justify-center cursor-pointer select-none`}
+      style={{
+        ...(height ? { height } : undefined),
+        ...(aspectRatio ? { aspectRatio } : undefined),
+      }}
+      className={`relative w-full ${height || aspectRatio ? '' : 'aspect-[9/16] max-h-[520px]'} bg-slate-950 rounded-xl overflow-hidden shadow-xs group/video flex items-center justify-center cursor-pointer select-none`}
     >
       <video
         ref={videoRef}
@@ -36,6 +41,17 @@ export const CanvasVideoPlayer: React.FC<{
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
+        onLoadedMetadata={(e) => {
+          const video = e.currentTarget;
+          const videoWidth = video.videoWidth;
+          const videoHeight = video.videoHeight;
+          if (videoWidth && videoHeight) setAspectRatio(`${videoWidth} / ${videoHeight}`);
+          onLoadedMetadata?.({
+            videoWidth,
+            videoHeight,
+            duration: video.duration,
+          });
+        }}
         className="w-full h-full object-contain select-none pointer-events-none"
       />
       {/* 居中半透明磨砂圆形控制按钮：未播放时常驻 Play；播放中 hover 展现 Pause */}

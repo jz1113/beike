@@ -35,32 +35,33 @@ export function parseBatchInputLines(
       line.match(/\b\d{7,16}\b/) ||
       line.match(/\d+/);
     const itemId = numMatch ? (numMatch[1] || numMatch[0]) : line;
-
-    if (!seenIds.has(itemId)) {
-      seenIds.add(itemId);
-      newItems.push({
-        id: `batch_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
-        itemId,
-        platform,
-        title: `待采编商品 (${itemId})`,
-        price: 0,
-        category: '待采编',
-        brand: '',
-        coverImage: '',
-        mainImages: [],
-        skuImages: [],
-        detailImages: [],
-        props: {},
-        status: 'pending',
-        selected: true,
-        allTypedImages: [],
-        selectedProductImages: [],
-        availableReferenceImages: [],
-        selectedReferenceImages: [],
-        prompts: [],
-        tasks: [],
-      });
+    const dedupeKey = `${platform}:${itemId}`;
+    if (seenIds.has(dedupeKey) || seenIds.has(itemId)) {
+      return;
     }
+    seenIds.add(dedupeKey);
+    newItems.push({
+      id: `batch_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+      itemId,
+      platform,
+      title: `待采编商品 (${itemId})`,
+      price: 0,
+      category: '待采编',
+      brand: '',
+      coverImage: '',
+      mainImages: [],
+      skuImages: [],
+      detailImages: [],
+      props: {},
+      status: 'pending',
+      selected: true,
+      allTypedImages: [],
+      selectedProductImages: [],
+      availableReferenceImages: [],
+      selectedReferenceImages: [],
+      prompts: [],
+      tasks: [],
+    });
   });
 
   if (newItems.length === 0) {

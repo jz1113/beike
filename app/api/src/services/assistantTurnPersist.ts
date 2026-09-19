@@ -71,14 +71,19 @@ export function extractItemFields(item: AssistantItem): {
       };
     }
     case 'approvalRequest': {
-      const ar = item as { toolName: string; displayName?: string; args?: Record<string, unknown> };
+      const ar = item as { toolName: string; displayName?: string; args?: Record<string, unknown>; status?: string };
+      const approvalStatus =
+        ar.status === 'accepted' ? 'done'
+        : ar.status === 'declined' ? 'error'
+        : ar.status === 'expired' ? 'cancelled'
+        : 'running';
       return {
         ...base,
         kind: 'approvalRequest',
         toolName: ar.toolName,
         displayName: ar.displayName || ar.toolName,
         argsJson: JSON.stringify(ar.args || {}),
-        status: (item as { status: string }).status === 'done' ? 'done' : (item as { status: string }).status === 'cancelled' ? 'cancelled' : 'running',
+        status: approvalStatus,
       };
     }
     default:
@@ -112,7 +117,7 @@ export async function updateTurnStatus(
 ): Promise<void> {
   const update: Record<string, unknown> = {
     status,
-    completedAt: new Date(),
+    completedAt: status === 'awaiting_approval' ? null : new Date(),
   };
 
   if (usage) {
@@ -157,6 +162,9 @@ export async function upsertItem(turnId: string, item: AssistantItem): Promise<v
       summary: fields.summary,
       actionJson: fields.actionJson,
       visualImagesJson: fields.visualImagesJson,
+      argsJson: fields.argsJson,
+      displayName: fields.displayName,
+      toolName: fields.toolName,
     },
   });
 }
@@ -195,6 +203,9 @@ export async function upsertItems(turnId: string, items: AssistantItem[]): Promi
           summary: fields.summary,
           actionJson: fields.actionJson,
           visualImagesJson: fields.visualImagesJson,
+          argsJson: fields.argsJson,
+          displayName: fields.displayName,
+          toolName: fields.toolName,
         },
       });
     }),

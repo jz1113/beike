@@ -1,10 +1,12 @@
+import { gatewayFetch } from '../../gateways/http';
 import { isKnownImageOnlyModel, isKnownVideoOnlyModel } from '@beike/domain/workflowModels';
 import { checkMediaModelConnection } from '../../services/modelConnection';
 import { jsonResponse } from '../../core/http';
 import { VISION_MODELS } from '@beike/domain/vision';
 import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
+import { DEFAULT_IMAGE_MODEL_ID, DEFAULT_MULTIMODAL_MODEL_ID } from '@beike/domain/modelCatalog';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { normalizeGatewayBaseUrl } from '../../services/imageHelpers';
+import { normalizeGatewayBaseUrl } from '../../services/gatewayCredentials';
 import { testApiaConnection } from '@beike/server-kit/apiaScraper';
 import { testQiyunConnection } from '@beike/server-kit/qiyunScraper';
 
@@ -38,8 +40,8 @@ export async function GET() {
       hasQiyun: Boolean(qiyunAppId && qiyunAppKey),
       qiyunAppKeyConfigured: Boolean(qiyunAppKey),
       qiyunHost: 'https://qyapi.ipaybuy.cn/api/video',
-      defaultVisionModel: 'gemini-3.1-pro-preview-thinking-high',
-      defaultImageModel: 'gpt-image-2',
+      defaultVisionModel: DEFAULT_MULTIMODAL_MODEL_ID,
+      defaultImageModel: DEFAULT_IMAGE_MODEL_ID,
       visionModels: VISION_MODELS,
       imageModels: IMAGE_GEN_MODELS,
       fallbackChain: []
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
       type = 'ai',
       baseUrl = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org', 
       apiKey = process.env.AI_DRAWING_API_KEY, 
-      model = 'gemini-3.1-pro-preview-thinking-high',
+      model = DEFAULT_MULTIMODAL_MODEL_ID,
       wanbangKey = process.env.WANBANG_API_KEY,
       wanbangSecret = process.env.WANBANG_API_SECRET,
       externalScraperId = process.env.EXTERNAL_SCRAPER_ID,
@@ -178,7 +180,7 @@ export async function POST(req: Request) {
 
       for (const endpoint of testEndpoints) {
         try {
-          const res = await fetch(endpoint, {
+          const res = await gatewayFetch(endpoint, {
             signal: AbortSignal.timeout(12000),
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -248,7 +250,7 @@ export async function POST(req: Request) {
       return jsonResponse({ ...result, latencyMs: Date.now() - startTime }, result.success ? 200 : 400);
     } else {
       // 测试视觉/文本大模型端点
-      testRes = await fetch(`${normalizedBaseUrl}/v1/chat/completions`, {
+      testRes = await gatewayFetch(`${normalizedBaseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

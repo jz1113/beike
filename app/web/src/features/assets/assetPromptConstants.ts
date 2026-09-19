@@ -3,6 +3,8 @@ export {
   MIN_IMAGES_PER_SET,
   MAX_IMAGES_PER_SET,
 } from '@beike/domain/assetDeconstruct/prompts';
+import type { ImageSetQueueItem } from './assetQueueTypes';
+export type { ImageSetQueueItem } from './assetQueueTypes';
 
 /** 英文底层标签 → 标准中文映射表 */
 export const TAG_I18N_MAP: Record<string, string> = {
@@ -148,35 +150,6 @@ export function isValidDisplayTag(tag: string): boolean {
   if (cleaned.includes('、') || cleaned.includes(',') || cleaned.includes('，')) return false;
   if (SYSTEM_TAG_BLACKLIST.has(cleaned.toLowerCase())) return false;
   return true;
-}
-
-export interface ImageSetQueueItem {
-  id: string;
-  name: string;
-  images: string[];
-  sourceUrl?: string;
-  author?: string;
-  status: 'pending' | 'processing' | 'done' | 'error';
-  result?: Record<string, unknown>;
-  deconstructStats?: {
-    imageCount?: number;
-    pass1Succeeded?: number;
-    pass1Failed?: number;
-    pass1FailedIndices?: number[];
-    perImageCount?: number;
-    pass2Skipped?: boolean;
-    pipelineMode?: string;
-    shardCount?: number;
-    visionCallCount?: number;
-    visionModelsUsed?: string[];
-    scenesCount?: number;
-    actionsCount?: number;
-    scenesBeforeDedup?: number;
-    scenesAfterDedup?: number;
-    actionsBeforeDedup?: number;
-    actionsAfterDedup?: number;
-  };
-  error?: string;
 }
 
 /** 景别/机位英文枚举 → 中文短标签 */

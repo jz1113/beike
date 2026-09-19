@@ -6,7 +6,7 @@ import {
   BatchTaskItem,
   displayMediaSrc,
   handleImgError,
-} from '@/features/collect/collectorShared';
+} from '@/features/collect/collectorTypes';
 
 export interface BatchTaskCardProps {
   task: BatchTaskItem;

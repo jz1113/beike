@@ -2,8 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
-import { sanitizeActionPrompt, sanitizeActionTitle } from '../../../app/shared/src/assetDeconstruct/validate';
-import { extractActionCategories, extractActionFocusAnchors } from '../../../app/shared/src/productCategoryHelpers';
+import { sanitizeActionPrompt, sanitizeActionTitle } from '@beike/domain/assetDeconstruct/validate';
+import { extractActionCategories, extractActionFocusAnchors } from '@beike/domain/productCategory';
 
 async function main() {
   const desktopDbPath = path.join(

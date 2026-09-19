@@ -12,7 +12,7 @@ async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Respon
 import { useAppStore } from '@/store';
 import { invalidateGlobalAssetCache } from '../assetLibraryCache';
 import { resolveAssetApiType } from '../assetPromptConstants';
-import { buildBackupData, parseBackupDataToBulkItems } from '../assetBackupUtils';
+import { buildBackupData, parseBackupDataToBulkItems } from '../assetBackup';
 import { parsePersonaLayers, formatPersonaPrompt } from '../assetPromptConstants';
 import type { SceneShot } from '@beike/domain/sceneBundle';
 

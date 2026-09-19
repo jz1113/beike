@@ -1,3 +1,4 @@
+import { gatewayFetch } from '../../gateways/http';
 import { jsonResponse } from '../../core/http';
 
 export interface GatewayUserResponse {
@@ -75,7 +76,7 @@ export async function POST(req: Request): Promise<Response> {
     const timeout = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const upstreamRes = await fetch(endpoint, {
+      const upstreamRes = await gatewayFetch(endpoint, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${systemToken}`,
@@ -131,7 +132,7 @@ export async function POST(req: Request): Promise<Response> {
 
       // 🌟 2. 通道 B (智能兼容)：若通道 A 未通过，探测 New-API / One-API 官方通用 API Key 账单接口
       try {
-        const subRes = await fetch(`${targetUrl}/dashboard/billing/subscription`, {
+        const subRes = await gatewayFetch(`${targetUrl}/dashboard/billing/subscription`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${systemToken}`,
@@ -143,7 +144,7 @@ export async function POST(req: Request): Promise<Response> {
           if (subJson && subJson.object === 'billing_subscription') {
             // 获取消耗用量
             const today = new Date().toISOString().split('T')[0];
-            const usageRes = await fetch(`${targetUrl}/dashboard/billing/usage?start_date=2026-01-01&end_date=${today}`, {
+            const usageRes = await gatewayFetch(`${targetUrl}/dashboard/billing/usage?start_date=2026-01-01&end_date=${today}`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${systemToken}`,

@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../repositories/db';
 import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/domain/drawing';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { deleteObjectsFromStorage } from '@beike/server-kit/storage';

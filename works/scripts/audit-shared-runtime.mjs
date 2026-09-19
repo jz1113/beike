@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = path.resolve('app/shared/src');
+const root = path.resolve('packages/domain/src');
 const nodeMarkers = [
   /from ['"]node:/,
   /from ['"]fs['"]/,

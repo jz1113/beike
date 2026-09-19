@@ -23,6 +23,7 @@ desktop/binaries/node-*
 .desktop-dev-port
 .desktop-dev-token
 .desktop-dev-pids.json
+.local-api-port
 desktop/tauri.conf.dev.json
 
 # Local Environment Variables

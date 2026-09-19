@@ -17,7 +17,7 @@ import {
   parseAssetDimensions,
   parsePersonaLayers,
 } from '../assetPromptConstants';
-import { resolveActionCardDisplayBadges } from '@beike/domain/productCategoryHelpers';
+import { resolveActionCardDisplayBadges } from '@beike/domain/productCategory';
 
 export interface AssetDetailModalProps {
   detailItem: any | null;

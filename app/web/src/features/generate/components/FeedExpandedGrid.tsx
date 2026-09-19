@@ -1,5 +1,5 @@
 import { type GenerationTask } from '@/store/useAppStore';
-import { getAspectRatioClass, getBatchGridClass } from '../generateCanvasHelpers';
+import { getAspectRatioClass, getBatchGridClass } from '../generateCanvasLayout';
 import { proxyMediaUrl } from '@/lib/apiClient';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import { getFeedImageUrl } from './FeedSingleCard';

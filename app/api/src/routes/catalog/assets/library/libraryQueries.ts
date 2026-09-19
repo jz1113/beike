@@ -1,8 +1,9 @@
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../../../repositories/db';
 import { resolveShotsForScene, type ActionLike } from '@beike/domain/sceneBundle';
 import { stableAssetCode } from '@beike/domain/assetSampling';
-import { buildAssetCategoryWhere } from '../../../../services/libraryQueries';
+import { readOrganization } from '../../../../services/library/organization';
+import { buildLibraryListWhere } from './libraryListWhere';
 
 const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {
   const text = typeof reversePromptZh === 'string' ? reversePromptZh.trim() : '';
@@ -35,10 +36,8 @@ const slimAsset = <T extends Record<string, unknown>>(row: T, extra: string[] = 
 
 export async function executeLibraryGet(req: Request) {
   const { searchParams } = new URL(req.url);
+  if (searchParams.get('view') === 'organization') return readOrganization();
   const assetType = searchParams.get('type') || 'scene'; // scene | scene_bundle | outfit | action | persona | all
-  const category = searchParams.get('category');
-  const keyword = (searchParams.get('keyword') || '').trim();
-  const isFavorite = searchParams.get('isFavorite') === 'true' ? true : undefined;
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10) || 50));
   const slim = searchParams.get('slim') === '1';
@@ -184,20 +183,7 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'scene' || assetType === 'scene_bundle') {
-    const where: any = {};
-    if (category && category !== 'all') {
-      const categoryOr = buildAssetCategoryWhere('scene', category);
-      if (categoryOr) where.OR = categoryOr;
-    }
-    if (isFavorite !== undefined) where.isFavorite = isFavorite;
-    if (keyword) {
-      where.OR = [
-        { title: { contains: keyword } },
-        { description: { contains: keyword } },
-        { reversePrompt: { contains: keyword } },
-        { tags: { contains: keyword } },
-      ];
-    }
+    const where: any = await buildLibraryListWhere('scene', searchParams, ['title', 'description', 'reversePrompt', 'tags']);
 
     const [total, items] = await Promise.all([
       prisma.sceneAsset.count({ where }),
@@ -241,21 +227,7 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'outfit') {
-    const where: any = {};
-    if (category && category !== 'all') {
-      const categoryOr = buildAssetCategoryWhere('outfit', category);
-      if (categoryOr) where.OR = categoryOr;
-    }
-    if (isFavorite !== undefined) where.isFavorite = isFavorite;
-    if (keyword) {
-      where.OR = [
-        { title: { contains: keyword } },
-        { top: { contains: keyword } },
-        { bottom: { contains: keyword } },
-        { reversePrompt: { contains: keyword } },
-        { tags: { contains: keyword } },
-      ];
-    }
+    const where: any = await buildLibraryListWhere('outfit', searchParams, ['title', 'top', 'bottom', 'reversePrompt', 'tags']);
 
     const [total, items] = await Promise.all([
       prisma.outfitAsset.count({ where }),
@@ -274,20 +246,7 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'action') {
-    const where: any = {};
-    if (category && category !== 'all') {
-      const categoryOr = buildAssetCategoryWhere('action', category);
-      if (categoryOr) where.OR = categoryOr;
-    }
-    if (isFavorite !== undefined) where.isFavorite = isFavorite;
-    if (keyword) {
-      where.OR = [
-        { title: { contains: keyword } },
-        { action: { contains: keyword } },
-        { reversePrompt: { contains: keyword } },
-        { tags: { contains: keyword } },
-      ];
-    }
+    const where: any = await buildLibraryListWhere('action', searchParams, ['title', 'action', 'reversePrompt', 'tags']);
 
     const [total, items] = await Promise.all([
       prisma.actionAsset.count({ where }),
@@ -306,20 +265,7 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'persona') {
-    const where: any = {};
-    if (category && category !== 'all') {
-      const categoryOr = buildAssetCategoryWhere('persona', category);
-      if (categoryOr) where.OR = categoryOr;
-    }
-    if (isFavorite !== undefined) where.isFavorite = isFavorite;
-    if (keyword) {
-      where.OR = [
-        { name: { contains: keyword } },
-        { description: { contains: keyword } },
-        { reversePrompt: { contains: keyword } },
-        { tags: { contains: keyword } },
-      ];
-    }
+    const where: any = await buildLibraryListWhere('persona', searchParams, ['name', 'description', 'reversePrompt', 'tags']);
 
     const [total, items] = await Promise.all([
       prisma.personaAsset.count({ where }),
@@ -338,24 +284,7 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'full_prompt') {
-    const where: any = {};
-    if (category && category !== 'all') {
-      const categoryOr = buildAssetCategoryWhere('full_prompt', category);
-      if (categoryOr) where.OR = categoryOr;
-    }
-    if (isFavorite !== undefined) where.isFavorite = isFavorite;
-    if (keyword) {
-      where.OR = [
-        { title: { contains: keyword } },
-        { albumName: { contains: keyword } },
-        { reversePromptZh: { contains: keyword } },
-        { reversePromptEn: { contains: keyword } },
-        { tags: { contains: keyword } },
-        { sceneSummary: { contains: keyword } },
-        { outfitSummary: { contains: keyword } },
-        { actionSummary: { contains: keyword } },
-      ];
-    }
+    const where: any = await buildLibraryListWhere('full_prompt', searchParams, ['title', 'albumName', 'reversePromptZh', 'reversePromptEn', 'tags', 'sceneSummary', 'outfitSummary', 'actionSummary']);
 
     const [total, items] = await Promise.all([
       prisma.fullPromptAsset.count({ where }),

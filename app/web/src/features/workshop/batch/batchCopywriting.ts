@@ -8,37 +8,35 @@ export interface CopywritingContext {
   selectedVisionModel: string;
   showToast: (msg: string) => void;
   analyzeConcurrency?: number;
+  isAborted?: () => boolean;
 }
 
-/**
- * 为单个商品生成种草文案
- */
-export async function generateCopywritingForProduct(
-  item: BatchProductItem,
-  ctx: CopywritingContext
-): Promise<void> {
-  ctx.setItems(prev =>
-    prev.map(p => (p.id === item.id ? { ...p, isCopywritingGenerating: true } : p))
-  );
+const inFlight = new Map<string, Promise<boolean>>();
+let batchRun: Promise<void> | null = null;
+
+function patchItem(ctx: CopywritingContext, itemId: string, patch: Partial<BatchProductItem>) {
+  ctx.setItems(prev => prev.map(item => (item.id === itemId ? { ...item, ...patch } : item)));
+}
+
+function isCompleteCopy(data: { title?: string; content?: string } | null | undefined): data is { title: string; content: string } {
+  return Boolean(data?.title?.trim() && data?.content?.trim());
+}
+
+async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContext): Promise<boolean> {
+  patchItem(ctx, item.id, { isCopywritingGenerating: true, copywritingError: undefined });
+  const existingTitles = ctx.getItems()
+    .filter(product => product.id !== item.id && product.copywriting?.title)
+    .map(product => product.copywriting!.title);
+  const generatedImages = (item.tasks || [])
+    .filter(task => task.status === 'SUCCESS' && task.resultUrl)
+    .map(task => task.resultUrl!);
+  const effectiveImages = generatedImages.length > 0
+    ? generatedImages.slice(0, 2)
+    : item.selectedProductImages.length > 0
+      ? item.selectedProductImages.slice(0, 2)
+      : [item.coverImage];
 
   try {
-    // 收集批次内已有商品标题用于严格排重
-    const currentItems = ctx.getItems();
-    const existingTitles = currentItems
-      .filter(p => p.id !== item.id && p.copywriting?.title)
-      .map(p => p.copywriting!.title);
-
-    // 优先提取该商品已成功的切片图或大图作为视觉参考
-    const generatedImages = (item.tasks || [])
-      .filter(t => t.status === 'SUCCESS' && t.resultUrl)
-      .map(t => t.resultUrl!);
-    const effectiveImages =
-      generatedImages.length > 0
-        ? generatedImages.slice(0, 2)
-        : item.selectedProductImages.length > 0
-          ? item.selectedProductImages.slice(0, 2)
-          : [item.coverImage];
-
     const res = await apiFetch('/api/generate/copywriting', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -48,112 +46,105 @@ export async function generateCopywritingForProduct(
         productCategory: item.category,
         productRole: item.productRole || 'held_object',
         imageUrls: effectiveImages,
-        shotPrompts: (item.prompts || []).map(p => p.title + ': ' + p.scene),
+        shotPrompts: (item.prompts || []).map(prompt => `${prompt.title}: ${prompt.scene}`),
         style: 'authentic',
         existingTitles,
       }),
     });
+    const data = await res.json().catch(() => ({}));
+    const latest = ctx.getItems().find(product => product.id === item.id);
+    const preserved = latest?.copywriting;
 
-    const data = await res.json();
-    if (res.ok && data.success && data.data) {
-      // 记录文案大模型调用与 Token
-      try {
-        const copyModel = data.model || ctx.selectedVisionModel || 'gpt-4o-mini';
-        const copyUsage = data.usage || {};
-        const pTokens = copyUsage.promptTokens || 120;
-        const cTokens = copyUsage.completionTokens || 350;
-        recordModelUsage({
-          modelId: copyModel,
-          modelName: copyModel,
-          provider: resolveModelVendor(copyModel),
-          type: 'chat',
-          promptTokens: pTokens,
-          completionTokens: cTokens,
-          totalTokens: pTokens + cTokens,
-          success: true,
-        });
-      } catch {}
-
-      ctx.setItems(prev =>
-        prev.map(p => {
-          if (p.id !== item.id) return p;
-          return {
-            ...p,
-            isCopywritingGenerating: false,
-            copywriting: {
-              title: data.data.title,
-              content: data.data.content,
-              tags: data.data.tags || [],
-            },
-          };
-        })
-      );
-      ctx.showToast(`已为「${item.title.slice(0, 10)}」生成专属种草文案`);
-    } else {
-      ctx.setItems(prev =>
-        prev.map(p => (p.id === item.id ? { ...p, isCopywritingGenerating: false } : p))
-      );
+    if (!res.ok || !data.success || data.fromFallback || !isCompleteCopy(data.data)) {
+      const error = data.fromFallback
+        ? '模型未返回有效文案，禁止使用本地模板冒充成功'
+        : data.error || (!data.data || !isCompleteCopy(data.data) ? '需要完整标题和正文' : '文案生成失败');
+      patchItem(ctx, item.id, { isCopywritingGenerating: false, copywriting: preserved, copywritingError: error });
+      return false;
     }
+
+    const usage = data.usage || {};
+    recordModelUsage({
+      modelId: data.model || ctx.selectedVisionModel || 'gpt-5.4-mini',
+      modelName: data.model || ctx.selectedVisionModel || 'gpt-5.4-mini',
+      provider: resolveModelVendor(data.model || ctx.selectedVisionModel || 'gpt-5.4-mini'),
+      type: 'chat',
+      promptTokens: usage.promptTokens ?? usage.prompt_tokens ?? 0,
+      completionTokens: usage.completionTokens ?? usage.completion_tokens ?? 0,
+      totalTokens: usage.totalTokens ?? usage.total_tokens ?? 0,
+      success: true,
+    });
+    patchItem(ctx, item.id, {
+      isCopywritingGenerating: false,
+      copywritingError: undefined,
+      copywriting: {
+        title: data.data.title,
+        content: data.data.content,
+        tags: data.data.tags || [],
+      },
+    });
+    return true;
   } catch (err) {
-    console.warn('[generateCopywritingForProduct] 文案生成异常:', err);
-    ctx.setItems(prev =>
-      prev.map(p => (p.id === item.id ? { ...p, isCopywritingGenerating: false } : p))
-    );
+    const latest = ctx.getItems().find(product => product.id === item.id);
+    patchItem(ctx, item.id, {
+      isCopywritingGenerating: false,
+      copywriting: latest?.copywriting,
+      copywritingError: err instanceof Error ? err.message : '文案生成异常',
+    });
+    return false;
   }
 }
 
-/**
- * 手动更新单个商品的文案
- */
+export async function generateCopywritingForProduct(
+  item: BatchProductItem,
+  ctx: CopywritingContext
+): Promise<boolean> {
+  const existing = inFlight.get(item.id);
+  if (existing) return existing;
+  const pending = requestCopywriting(item, ctx).finally(() => { inFlight.delete(item.id); });
+  inFlight.set(item.id, pending);
+  return pending;
+}
+
 export function updateItemCopywriting(
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>,
   itemId: string,
   copywriting: { title: string; content: string; tags?: string[] }
 ): void {
   setItems(prev =>
-    prev.map(p =>
-      p.id === itemId
-        ? {
-            ...p,
-            copywriting: {
-              title: copywriting.title,
-              content: copywriting.content,
-              tags: copywriting.tags || p.copywriting?.tags || [],
-            },
-          }
-        : p
+    prev.map(item =>
+      item.id === itemId
+        ? { ...item, copywriting: { title: copywriting.title, content: copywriting.content, tags: copywriting.tags || item.copywriting?.tags || [] } }
+        : item
     )
   );
 }
 
-/**
- * 批量并发生成文案
- */
-export async function generateAllCopywriting(ctx: CopywritingContext): Promise<void> {
-  const currentItems = ctx.getItems();
-  const targetItems = currentItems.filter(i =>
-    (i.tasks || []).some(t => t.status === 'SUCCESS' && t.resultUrl)
+async function runCopywritingBatch(ctx: CopywritingContext): Promise<void> {
+  const pendingItems = ctx.getItems().filter(item =>
+    (item.tasks || []).some(task => task.status === 'SUCCESS' && task.resultUrl) && !item.copywriting?.content
   );
-  if (targetItems.length === 0) return;
-
-  const pendingItems = targetItems.filter(i => !i.copywriting?.content);
   if (pendingItems.length === 0) return;
-
   ctx.showToast(`正在为 ${pendingItems.length} 款商品批量生成小红书种草文案...`);
   const concurrency = Math.min(ctx.analyzeConcurrency || 2, pendingItems.length);
   const queue = [...pendingItems];
+  let success = 0;
+  let failed = 0;
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (queue.length > 0) {
+      if (ctx.isAborted?.()) break;
+      const item = queue.shift();
+      if (!item) break;
+      if (await generateCopywritingForProduct(item, ctx)) success += 1;
+      else failed += 1;
+    }
+  }));
+  const suffix = failed > 0 ? `，失败 ${failed} 款，可重试` : '';
+  ctx.showToast(`文案生成结束：成功 ${success} 款${suffix}`);
+}
 
-  const workers = Array(Math.min(concurrency, queue.length))
-    .fill(null)
-    .map(async () => {
-      while (queue.length > 0) {
-        const item = queue.shift();
-        if (item) {
-          await generateCopywritingForProduct(item, ctx);
-        }
-      }
-    });
-
-  await Promise.all(workers);
-  ctx.showToast(`全套 ${pendingItems.length} 款商品种草文案全部生成完毕！`);
+export async function generateAllCopywriting(ctx: CopywritingContext): Promise<void> {
+  if (batchRun) return batchRun;
+  batchRun = runCopywritingBatch(ctx).finally(() => { batchRun = null; });
+  return batchRun;
 }

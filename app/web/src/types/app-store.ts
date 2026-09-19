@@ -3,50 +3,12 @@ import type { AssistantTaskState, AssistantRunMode, ReferenceScope } from '@beik
 
 import type { DepthVideoStyle } from '@beike/domain/depthVideo';
 import type { AssistantItem } from '@beike/domain/assistant/types';
+import type { GenerationTask as ContractGenerationTask, GenerationMediaType } from '@beike/contracts/generate';
 
-export type GenerationMediaType = 'image' | 'video' | 'depth-image' | 'depth-video';
-
-export interface GenerationTask {
-  id: string; // unique shot key e.g. "shot-0" or "fast-xxx"
-  batchId?: string; // 任务批次ID，支持同一任务批次内多图并排，不同任务换行隔离
-  shotNo?: number;
-  title: string;
-  prompt: string;
-  scene?: string; // 🌟 场景机位说明
-  camera_focal_length?: string; // 🌟 镜头焦段
-  angle?: string; // 🌟 拍摄角度
-  lighting_type?: string; // 🌟 采光属性
-  expression?: string;
-  action?: string;
-  model: string;
-  size: string;
-  quality: string;
-  has_human?: boolean; // 🌟 是否包含人物/模特 (false: 纯静物/无人物)
-  shot_type?: 'model_shot' | 'hand_held_only' | 'pure_product'; // 🌟 分镜类型
-  mediaType?: GenerationMediaType;
+export type { GenerationMediaType };
+export type GenerationTask = ContractGenerationTask & {
   depthStyle?: DepthVideoStyle;
-  videoDuration?: number; // 视频时长 (秒: 4, 5, 8, 10)
-  videoResolution?: string; // 视频分辨率 ('720P' | '1080P' | '4K')
-  videoRefMode?: string; // 视频参考模式 ('omni' | 'first_last_frame' | ...)
-  generateAudio?: boolean; // 🌟 视频生成是否开启音频
-  productImageUrl?: string; // 🌟 该分镜绑定的具体商品实物图（正面/背面/侧面/细节）
-  referenceImageUrl?: string;
-  referenceImages?: string[]; // 🌟 多参考素材/首尾帧列表
-  images?: string[]; // 🌟 多模态引用素材列表
-  useReferenceImage: boolean;
-  taskType?: 'multi_angle' | 'smart_edit' | 'outpaint' | 'generation'; // 🌟 细分任务类型
-  angleName?: string; // 🌟 多角度名称，如“微俯”、“仰视”
-  sourceImageUrl?: string; // 🌟 溯源基准原图（用于多角度、智能编辑对准原图）
-  status: 'IDLE' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
-  progress: string;
-  taskId?: string;
-  dbId?: string;
-  resultUrl?: string;
-  failReason?: string;
-  createdAt?: number;
-  sessionId?: string; // 🌟 所属对话会话ID
-  sessionTitle?: string; // 🌟 所属对话会话名称
-}
+};
 
 export interface ChatSession {
   id: string;

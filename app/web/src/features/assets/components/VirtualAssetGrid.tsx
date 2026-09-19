@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { memo, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 interface Props<T extends { id: string }> {
@@ -8,6 +8,19 @@ interface Props<T extends { id: string }> {
   openItemId: string | null;
   renderItem: (item: T) => ReactNode;
 }
+
+const CachedCard = memo(function CachedCard<T extends { id: string }>({
+  item,
+  renderItem,
+}: {
+  item: T;
+  renderItem: (item: T) => ReactNode;
+}) {
+  return <>{renderItem(item)}</>;
+}, (prev, next) => prev.item === next.item && prev.renderItem === next.renderItem) as <T extends { id: string }>(props: {
+  item: T;
+  renderItem: (item: T) => ReactNode;
+}) => ReactElement;
 
 /** Keep the full collection available for filtering while mounting only visible rows. */
 export function VirtualAssetGrid<T extends { id: string }>({
@@ -66,7 +79,9 @@ export function VirtualAssetGrid<T extends { id: string }>({
               zIndex: rowItems.some((item) => item.id === openItemId) ? 1 : undefined,
             }}
           >
-            {rowItems.map(renderItem)}
+            {rowItems.map((item) => (
+              <CachedCard key={item.id} item={item} renderItem={renderItem} />
+            ))}
           </div>
         );
       })}

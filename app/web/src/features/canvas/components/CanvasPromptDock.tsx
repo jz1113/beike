@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import PromptActionBar, { type SubjectItem } from '@/features/home/components/prompt-bar/PromptActionBar';
+import PromptActionBar, { type SubjectItem } from '@/shared/prompt-bar';
 import { useAppStore } from '@/store/useAppStore';
 import type { CanvasSubject } from '../types';
 

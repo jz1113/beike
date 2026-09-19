@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '@beike/server-kit/prisma';
+import { prisma } from '../../../../repositories/db';
 import { sanitizeScenePrompt, outfitSimilarity } from '@beike/domain/assetDeconstruct/validate';
 
 // 🌟 一键智能提纯、分类归位与去重

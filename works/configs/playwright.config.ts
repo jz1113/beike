@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+process.env.API_BASE ||= 'http://127.0.0.1:3000';
+
 export default defineConfig({
   testDir: '../e2e',
   timeout: 60_000,
@@ -9,13 +11,13 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'npm run dev:api',
+      command: 'pnpm run dev:api',
       url: 'http://127.0.0.1:3000/api/health',
       reuseExistingServer: true,
       timeout: 120_000,
     },
     {
-      command: 'npm run dev:ui',
+      command: 'pnpm run dev:ui',
       url: 'http://127.0.0.1:5173',
       reuseExistingServer: true,
       timeout: 120_000,

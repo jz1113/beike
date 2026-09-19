@@ -1,0 +1,29 @@
+import { jsonResponse } from './http';
+import { safeErrorMessage } from './validate';
+
+export class AppError extends Error {
+  constructor(
+    message: string,
+    readonly status = 500,
+    readonly code = 'internal_error',
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+export function errorEnvelope(error: unknown, fallback = '服务器内部错误') {
+  if (error instanceof AppError) {
+    return { body: { success: false, error: error.message, code: error.code }, status: error.status };
+  }
+  return { body: { success: false, error: safeErrorMessage(error, fallback), code: 'internal_error' }, status: 500 };
+}
+
+export function errorResponse(error: unknown, fallback = '服务器内部错误') {
+  const { body, status } = errorEnvelope(error, fallback);
+  return jsonResponse(body, status);
+}
+
+export function successEnvelope<T extends Record<string, unknown>>(data: T, status = 200) {
+  return jsonResponse({ success: true, ...data }, status);
+}

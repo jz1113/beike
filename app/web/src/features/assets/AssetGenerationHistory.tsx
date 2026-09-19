@@ -8,7 +8,7 @@ import { autoFillGrid, cardContainer } from '@/shared/ui/layoutClasses';
 import { useViewportDensity } from '@/lib/useMediaQuery';
 import Folder from '@/shared/media/Folder';
 import LazyVideoCover from './LazyVideoCover';
-import type { AssetTaskBatch } from './assetBatchUtils';
+import type { AssetTaskBatch } from './assetBatch';
 
 interface Props {
   mediaCategory: 'image' | 'video' | 'audio' | 'canvas';

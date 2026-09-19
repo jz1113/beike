@@ -1,4 +1,4 @@
-/** 生图会话与进行中任务：UI 草稿 + 本地缓存；DB 列表由 TanStack Query → syncDatabaseTasks 注入 */
+/** 生图会话与进行中任务：UI 草稿 + 本地缓存；服务端列表由 TanStack Query 持有 */
 import type { StateCreator } from 'zustand';
 import type { ChatSession, GenerationTask } from '@/types/app-store';
 import {
@@ -99,12 +99,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
       tasks: []
     };
     const updatedSessions = [newSession, ...state.sessions];
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('drawing_sessions', JSON.stringify(updatedSessions));
-        localStorage.setItem('drawing_current_session_id', newSessionId);
-      } catch {}
-    }
+    persistDrawingStateToStorage(undefined, updatedSessions, newSessionId);
     return {
       sessions: updatedSessions,
       currentSessionId: newSessionId,
@@ -115,11 +110,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   }),
 
   switchSession: (id) => set(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('drawing_current_session_id', id);
-      } catch {}
-    }
+    persistDrawingStateToStorage(undefined, undefined, id);
     return {
       currentSessionId: id
     };
@@ -164,11 +155,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
       tasks: s.tasks.map(t => ({ ...t, sessionTitle: trimmed }))
     } : s);
     const updatedGenTasks = state.generationTasks.map(t => t.sessionId === id ? { ...t, sessionTitle: trimmed } : t);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('drawing_sessions', JSON.stringify(updated));
-      } catch {}
-    }
+    persistDrawingStateToStorage(updatedGenTasks, updated);
     return { sessions: updated, generationTasks: updatedGenTasks };
   }),
 
@@ -180,11 +167,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
       if (!a.isPinned && b.isPinned) return 1;
       return b.createdAt - a.createdAt;
     });
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('drawing_sessions', JSON.stringify(updated));
-      } catch {}
-    }
+    persistDrawingStateToStorage(undefined, updated);
     return { sessions: updated };
   }),
 
@@ -194,11 +177,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
       ...s,
       tasks: s.tasks.map(t => t.id === taskId ? { ...t, title: newTitle } : t)
     }));
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('drawing_sessions', JSON.stringify(updatedSessions));
-      } catch {}
-    }
+    persistDrawingStateToStorage(updatedGenTasks, updatedSessions);
     return {
       generationTasks: updatedGenTasks,
       sessions: updatedSessions,

@@ -383,7 +383,7 @@ export const midjourneyImageAdapter: ImageModelAdapter = {
   id: 'midjourney',
   match: (modelId) => {
     const m = modelId.toLowerCase();
-    return m.includes('midjourney') || m.includes('mj_') || m === 'mj' || m.includes('niji');
+    return m.includes('midjourney') || m.includes('mj_') || m === 'mj' || m.includes('niji') || /^mjv?\d/.test(m);
   },
   build: (input) => {
     const base = formatModelPayload(input.model, buildFormatPayloadInput(input));

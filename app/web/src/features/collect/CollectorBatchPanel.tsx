@@ -5,7 +5,7 @@ import { confirmAction } from '@/lib/confirmAction';
 import { Plus, Loader2, Download, Trash2, Upload, FileSpreadsheet, ListPlus, Play, Pause, FolderDown, Info } from 'lucide-react';
 import {
   BatchTaskItem,
-} from '@/features/collect/collectorShared';
+} from '@/features/collect/collectorTypes';
 import BatchTaskCard from './BatchTaskCard';
 
 export interface CollectorBatchPanelProps {

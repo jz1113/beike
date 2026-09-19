@@ -14,7 +14,7 @@ import {
   resolveDepthSubmit,
   submitDepthImage,
   submitDepthVideo,
-} from '@/features/home/hooks/useDepthGeneration';
+} from '@/lib/depthGeneration';
 import {
   isDepthVideoTask,
   isDepthImageTask,
