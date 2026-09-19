@@ -1,9 +1,9 @@
 {
-  "extends": "./works/configs/tsconfig.base.json",
+  "extends": "./tools/configs/tsconfig.base.json",
   "compilerOptions": {
     "paths": {
       "@/*": [
-        "./app/web/src/*"
+        "./apps/web/src/*"
       ],
       "@beike/domain": [
         "./packages/domain/src/index.ts"
@@ -26,10 +26,10 @@
     }
   },
   "include": [
-    "app/web/src/**/*.ts",
-    "app/web/src/**/*.tsx",
-    "app/web/src/vite-env.d.ts",
-    "app/api/src/**/*.ts",
+    "apps/web/src/**/*.ts",
+    "apps/web/src/**/*.tsx",
+    "apps/web/src/vite-env.d.ts",
+    "apps/api/src/**/*.ts",
     "packages/domain/src/**/*.ts",
     "packages/server-kit/src/**/*.ts",
     "packages/contracts/src/**/*.ts"

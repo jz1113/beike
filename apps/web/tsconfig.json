@@ -1,0 +1,14 @@
+{
+  "extends": "../../tools/configs/tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "@beike/contracts": ["../../packages/contracts/src/index.ts"],
+      "@beike/contracts/*": ["../../packages/contracts/src/*"],
+      "@beike/domain": ["../../packages/domain/src/index.ts"],
+      "@beike/domain/*": ["../../packages/domain/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/vite-env.d.ts"],
+  "exclude": ["node_modules"]
+}

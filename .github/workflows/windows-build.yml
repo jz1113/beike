@@ -40,11 +40,11 @@ jobs:
           echo "Production keys injected successfully."
       - name: Build Windows EXE installer
         # beforeBuildCommand builds frontend, Windows sidecar, embedded production keys and clean template DB.
-        run: pnpm exec tauri build --config desktop/tauri.conf.json --bundles nsis
+        run: pnpm exec tauri build --config apps/desktop/tauri.conf.json --bundles nsis
       - name: Save installer
         uses: actions/upload-artifact@v4
         with:
           name: beike-windows-x64-installer
-          path: desktop/target/release/bundle/nsis/*-setup.exe
+          path: apps/desktop/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 7

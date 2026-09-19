@@ -6,20 +6,20 @@
 
 ```text
 beike-main/
-├── app/
+├── apps/
 │   ├── web/           # @beike/web — React + Vite UI
-│   └── api/           # @beike/api — Hono Node sidecar
+│   ├── api/           # @beike/api — Hono Node sidecar
+│   └── desktop/       # Tauri v2 桌面壳
 ├── packages/
 │   ├── contracts/     # @beike/contracts — Zod DTO（薄）
 │   ├── domain/        # @beike/domain — browser-safe 纯逻辑 / 类型
-│   └── server-kit/    # @beike/server-kit — Node-only（Prisma、存储、爬虫等）
-├── db/prisma/         # @beike/prisma — schema + migrations
-├── desktop/           # Tauri v2（非 pnpm 包）
-├── works/             # configs / e2e / launch / scripts / test-support
+│   ├── server-kit/    # @beike/server-kit — Node-only（Prisma、存储、爬虫等）
+│   └── prisma/        # @beike/prisma — schema + migrations
+├── tools/             # configs / scripts
 └── docs/              # architecture/ 内部约定；vendors/官方接口 厂商与聚合文档
 ```
 
-权威校验：`pnpm run check:root-layout`（[`works/scripts/check-root-layout.mjs`](../works/scripts/check-root-layout.mjs)）。
+权威校验：`pnpm run check:root-layout`（[`tools/scripts/check-root-layout.mjs`](../tools/scripts/check-root-layout.mjs)）。
 
 **不要**使用已废弃的 `工程/`、`依赖/node`、`工程/apps|packages|tools` 布局。
 
@@ -40,7 +40,7 @@ beike-main/
 ```
 
 - Web 前端 **禁止** 直接依赖 `@beike/server-kit`。
-- 前端 UI 共用代码放在 `app/web/src/ui`（历史目录名 `shared` 已弃用），不要与 `@beike/domain` 混称。
+- 前端 UI 共用代码放在 `apps/web/src/shared`，不要与 `@beike/domain` 混称。
 - 深导入：`@beike/domain/drawing`、`@beike/server-kit/prisma` 等；避免从包根 barrel 拉全量。
 
 ## 命名
@@ -56,7 +56,7 @@ beike-main/
 - [`docs/architecture/`](architecture/) — 内部架构与边界
 - [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合平台 OpenAPI spec + 厂商官网索引
 - 其它操作说明（打包等）可保留在 `docs/` 子目录
-- 启动桌面：[`works/launch/start-desktop.command`](../works/launch/start-desktop.command)（根目录 `启动桌面.command` 为薄包装）
+- 启动桌面：根目录 [`启动桌面.command`](../启动桌面.command)
 
 ## 明确不做
 

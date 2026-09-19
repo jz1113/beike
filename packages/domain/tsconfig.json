@@ -1,5 +1,5 @@
 {
-  "extends": "../../works/configs/tsconfig.base.json",
+  "extends": "../../tools/configs/tsconfig.base.json",
   "compilerOptions": {
     "lib": [
       "ES2022",

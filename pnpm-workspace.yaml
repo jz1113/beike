@@ -1,7 +1,6 @@
 packages:
-  - 'app/*'
+  - 'apps/*'
   - 'packages/*'
-  - 'db/*'
 allowBuilds:
   esbuild: true
   '@prisma/client': true

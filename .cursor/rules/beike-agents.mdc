@@ -7,10 +7,10 @@ alwaysApply: true
 
 要点：
 - 仓库根即 monorepo 根；包管理器为 **pnpm**（`packageManager` 字段为准），在根目录执行 `pnpm install` / `pnpm run …`
-- 核心目录：`app/`（可运行应用）、`packages/`（共享库）、`db/`、`desktop/`、`works/`、`docs/`
-- 应用：`app/web`（`@beike/web`）、`app/api`（`@beike/api`）
-- 库：`packages/contracts`、`packages/domain`、`packages/server-kit`；`db/prisma` 为 `@beike/prisma`
+- 核心目录：`apps/`（可运行应用）、`packages/`（共享库）、`tools/`、`docs/`
+- 应用：`apps/web`（`@beike/web`）、`apps/api`（`@beike/api`）、`apps/desktop`（Tauri 壳）
+- 库：`packages/contracts`、`packages/domain`、`packages/server-kit`、`packages/prisma`（`@beike/prisma`）
 - 依赖方向：`web` → `contracts` + `domain`；`api` → `contracts` + `domain` + `server-kit` + `prisma`；`domain` 不得依赖 Node/Prisma/sharp/S3
 - **禁止**再引入 `工程/`、`依赖/` 中文根布局；不要在仓库根新建与 `check-root-layout` 冲突的杂项目录
-- 工具与脚本在 `works/`（configs / e2e / launch / scripts），不是 workspace 业务包
-- 新建/修改源码、脚本、文档路径必须以现有扁平布局为准（`app/`、`packages/`、`db/`、`desktop/`、`works/`、`docs/`）
+- 工具与脚本在 `tools/`（configs / scripts），不是 workspace 业务包
+- 新建/修改源码、脚本、文档路径必须以现有扁平布局为准（`apps/`、`packages/`、`tools/`、`docs/`）

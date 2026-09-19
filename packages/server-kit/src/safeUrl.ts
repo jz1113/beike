@@ -236,7 +236,7 @@ export function resolvePublicPath(relUrl: string): string | null {
   const relative = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
   const publicRoots = [
     path.resolve(process.cwd(), 'public'),
-    path.resolve(process.cwd(), 'app/web/public'),
+    path.resolve(process.cwd(), 'apps/web/public'),
     path.resolve(process.cwd(), '../web/public'),
   ];
   for (const publicRoot of publicRoots) {

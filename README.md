@@ -15,14 +15,13 @@
 - **工程管理**：pnpm workspace 多包管理架构
 
 ```text
-├── app/
+├── apps/
 │   ├── api/       # 后端 API 服务 (Hono + TypeScript)
-│   └── web/       # 前端应用 (React + Vite)
-├── db/
-│   └── prisma/    # 数据库定义与迁移 (SQLite + Prisma Schema)
-├── desktop/       # Tauri 桌面端工程 (Rust 配置与系统托盘/窗口管理)
-├── docs/          # 接口文档与开发规范
-└── works/         # 跨平台构建、自动化测试与维护脚本
+│   ├── web/       # 前端应用 (React + Vite)
+│   └── desktop/   # Tauri 桌面端工程 (Rust 配置与窗口管理)
+├── packages/      # 共享库（contracts / domain / server-kit / prisma）
+├── tools/         # 构建、校验与维护脚本
+└── docs/          # 接口文档与开发规范
 ```
 
 ---
@@ -96,7 +95,7 @@ pnpm run dev:api
    git pull
    ```
 
-> ⚠️ **注意**：`.env`（密钥）与 `db/prisma/dev.db`（本地 SQLite 数据库）未包含在 Git 仓库中。首次在另一台电脑配置时，请手动从常用电脑拷贝一次 `.env` 配置文件。
+> ⚠️ **注意**：`.env`（密钥）与 `packages/prisma/dev.db`（本地 SQLite 数据库）未包含在 Git 仓库中。首次在另一台电脑配置时，请手动从常用电脑拷贝一次 `.env` 配置文件。
 
 ---
 
@@ -106,5 +105,4 @@ pnpm run dev:api
 | :--- | :--- |
 | `npm run typecheck` | 执行 TypeScript 全量静态类型检查 |
 | `npm run lint` | ESLint 代码质量检查 |
-| `npm run test` | 运行单元测试 (Vitest) |
 | `npm run pack:zip` | 一键生成带密钥的纯源码离线轻量压缩包 |
