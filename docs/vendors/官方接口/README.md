@@ -6,7 +6,8 @@
 - `aggregator/` — 聚合平台 [gpt-best.apifox.cn](https://gpt-best.apifox.cn/llms.txt) 的 OpenAPI spec
 - `vendor/` — 各厂商官网文档入口（链接索引）
 
-同步脚本：`node works/scripts/fetch-vendor-docs.mjs`（配置：`works/configs/vendor-docs.map.json`）。
+文档映射配置：[`tools/configs/vendor-docs.map.json`](../../../tools/configs/vendor-docs.map.json)。
+历史草稿（官方接口转 / Comfly / 万邦 / 三方解析）在 [`legacy/`](legacy/)。
 
 运行时约定：
 
@@ -81,5 +82,6 @@ docs/vendors/官方接口/
   README.md
   aggregator/   # openai google volcengine alibaba midjourney bfl kling xai minimax vidu chat
   vendor/       # 同上 + anthropic deepseek moonshot
+  legacy/       # 官方接口转、comfly统一接口、万邦接口、三方解析
 ```
 

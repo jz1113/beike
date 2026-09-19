@@ -3,7 +3,7 @@
   "note": "Reviewed residual warnings only. No automatic baseline refresh; additions require review. Removal is always allowed.",
   "entries": [
     {
-      "file": "apps/api/src/routes/catalog/assets/deconstruct/jsonHealer.ts",
+      "file": "apps/api/src/services/deconstruct/jsonHealer.ts",
       "message": "'_omit' is assigned a value but never used.",
       "count": 1,
       "reason": "通过解构排除字段；不能移除排除行为。"
@@ -73,60 +73,6 @@
       "message": "'safeResolveWithinRoot' is defined but never used.",
       "count": 1,
       "reason": "未使用的路径校验候选需结合深度模型执行边界另审，保留安全语义。"
-    },
-    {
-      "file": "app/shared/src/assetDeconstruct/outfitDedup.ts",
-      "message": "'minColors' is assigned a value but never used.",
-      "count": 1,
-      "reason": "规则阈值变量需与去重语义一起审查，本次不改变规则。"
-    },
-    {
-      "file": "app/shared/src/assetDeconstruct/outfitDedup.ts",
-      "message": "'minGarments' is assigned a value but never used.",
-      "count": 1,
-      "reason": "规则阈值变量需与去重语义一起审查，本次不改变规则。"
-    },
-    {
-      "file": "app/shared/src/assistant/agentRuntime.ts",
-      "message": "'req' is assigned a value but never used.",
-      "count": 1,
-      "reason": "助手运行时请求参数涉及独立接口演进，本次不删接口。"
-    },
-    {
-      "file": "app/shared/src/assistant/subAgent.ts",
-      "message": "'_evt' is defined but never used.",
-      "count": 1,
-      "reason": "异步事件接口占位参数，保留生成器契约。"
-    },
-    {
-      "file": "app/shared/src/jewelryArch.ts",
-      "message": "'titleStr' is defined but never used.",
-      "count": 1,
-      "reason": "导出函数参数涉及公共工具契约，保留兼容。"
-    },
-    {
-      "file": "app/shared/src/jewelryArch.ts",
-      "message": "'targetAnatomy' is defined but never used.",
-      "count": 1,
-      "reason": "导出函数参数涉及公共工具契约，保留兼容。"
-    },
-    {
-      "file": "app/shared/src/mediaSign.ts",
-      "message": "'appendMediaSignature' is defined but never used.",
-      "count": 1,
-      "reason": "内部签名辅助函数候选，涉及历史URL签名兼容，暂保留。"
-    },
-    {
-      "file": "app/shared/src/prompt-engine/multiAngle.ts",
-      "message": "'angleName' is assigned a value but never used.",
-      "count": 1,
-      "reason": "提示词生成接口参数，保留现有调用签名。"
-    },
-    {
-      "file": "app/shared/src/prompt-engine/storyboard.ts",
-      "message": "'_isJewelry' is assigned a value but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
       "file": "apps/web/src/features/assets/components/AssetCenter.tsx",

@@ -1,6 +1,6 @@
 import { mergeAssetTasks } from '../utils/mergeAssetTasks';
 import { fetchAssetTasks } from '@/shared/api/generationApi';
-import { useAssetTasksQuery } from '@/features/assets/hooks/useAssetTasksQuery';
+import { useAssetTasksQuery } from '@/shared/hooks/useAssetTasksQuery';
 import { apiFetch } from '@/shared/api/apiClient';
 import { confirmAction } from '@/shared/utils/confirmAction';
 import { clearFailedTasksFromServer } from '@/shared/api/deleteTasks';

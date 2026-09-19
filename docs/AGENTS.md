@@ -54,7 +54,7 @@ beike-main/
 ## 文档分层
 
 - [`docs/architecture/`](architecture/) — 内部架构与边界
-- [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合平台 OpenAPI spec + 厂商官网索引
+- [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合平台 OpenAPI spec + 厂商官网索引；`legacy/` 为历史扁平草稿
 - 其它操作说明（打包等）可保留在 `docs/` 子目录
 - 启动桌面：根目录 [`启动桌面.command`](../启动桌面.command)
 

@@ -5,7 +5,6 @@ import BatchStage2Config from './BatchStage2Config';
 import { BatchConfigProvider, type BatchConfigContextValue } from './BatchConfigContext';
 import BatchStage3Prompts from './BatchStage3Prompts';
 import BatchStage4Queue from './BatchStage4Queue';
-import './components/BatchPipelineHeader';
 import { WorkshopTopBar } from '../../components/WorkshopTopBar';
 import { BatchPreviewLightbox } from './BatchPreviewLightbox';
 import { WorkshopSettingsModal } from '../../components/WorkshopSettingsModal';

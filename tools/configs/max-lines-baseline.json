@@ -275,6 +275,10 @@
     {
       "file": "packages/server-kit/src/storage.ts",
       "lines": 401
+    },
+    {
+      "file": "packages/domain/src/modelCatalog.ts",
+      "lines": 401
     }
   ]
 }

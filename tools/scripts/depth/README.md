@@ -2,16 +2,15 @@
 
 将抽帧后的 PNG 序列转为深度可视化帧，供 API `depthVideoPipeline` 与 `depthImagePipeline` 调用。
 
-以下命令均在 `工程/` 目录下执行。
+以下命令均在仓库根目录执行。
 
 ## 安装
 
 ### 一键检查（推荐）
 
 ```bash
-cd 工程
-npm run setup:depth-env
-npm run setup:depth-model
+pnpm run setup:depth-env
+pnpm run setup:depth-model
 ```
 
 `setup:depth-model` 会安装 `torch` + `transformers` + `Depth Anything V2`，这是产出真实深度动作捕捉效果的**必需步骤**（约 400MB）。
@@ -19,10 +18,8 @@ npm run setup:depth-model
 ### 手动安装
 
 ```bash
-cd 工程
-
 # 1) 项目内 FFmpeg（已随 @beike/api 依赖安装，无需 brew）
-npm install
+pnpm install
 
 # 2) Python 基础依赖（OpenCV 可视化）
 python3 -m pip install --user -r tools/scripts/depth/requirements.txt
@@ -44,7 +41,6 @@ brew install ffmpeg
 ## 本地测试
 
 ```bash
-cd 工程
 python3 tools/scripts/depth/infer_video_depth.py --check-env
 
 # 视频帧序列

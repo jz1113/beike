@@ -103,6 +103,6 @@ pnpm run dev:api
 
 | 命令 | 说明 |
 | :--- | :--- |
-| `npm run typecheck` | 执行 TypeScript 全量静态类型检查 |
-| `npm run lint` | ESLint 代码质量检查 |
-| `npm run pack:zip` | 一键生成带密钥的纯源码离线轻量压缩包 |
+| `pnpm run typecheck` | 执行 TypeScript 全量静态类型检查 |
+| `pnpm run lint` | ESLint 代码质量检查 |
+| `pnpm run pack:zip` | 一键生成带密钥的纯源码离线轻量压缩包 |
