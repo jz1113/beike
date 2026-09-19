@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Wallet, RefreshCw, ExternalLink, Key, AlertTriangle, User, Eye, EyeOff, Sparkles, AlertCircle } from 'lucide-react';
 import { type GatewayUserInfo } from '../hooks/useGatewayUser';
-import { getGatewayClientOverrides } from '../../../lib/gatewayClient';
+import { getGatewayClientOverrides } from '../../../shared/api/gatewayClient';
 
 interface GatewayBalanceCardProps {
   userId: string;

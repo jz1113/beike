@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useId } from 'react';
 import { Film } from 'lucide-react';
-import { isImageFile, isVideoFile, type RefMediaKind } from '@/lib/mediaUpload';
-import { isVideoMediaUrl } from '@/lib/mediaHelper';
-import { compressImageToDataUrl } from '@/lib/image-utils';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { isImageFile, isVideoFile, type RefMediaKind } from '@/shared/api/mediaUpload';
+import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
+import { compressImageToDataUrl } from '@/shared/media/image-utils';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
-import { videoPlaybackManager } from '@/lib/videoPlaybackManager';
+import { videoPlaybackManager } from '@/shared/media/videoPlaybackManager';
 
 export function isVideoRef(
   url: string,

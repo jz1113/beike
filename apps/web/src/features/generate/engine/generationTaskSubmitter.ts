@@ -1,11 +1,11 @@
-import type { GenerationTask } from '@/store/useAppStore';
-import { apiFetch } from '@/lib/apiClient';
-import { getGatewayClientHeaders } from '@/lib/gatewayClient';
+import type { GenerationTask } from '@/store';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getGatewayClientHeaders } from '@/shared/api/gatewayClient';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@beike/domain/drawing';
 import { prepareImageSubmission } from './prepareImageSubmission';
-import { isVideoMediaUrl } from '@/lib/mediaHelper';
-import { resolveRefMediaFile } from '@/lib/refMediaRegistry';
-import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
+import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
+import { resolveRefMediaFile } from '@/shared/media/refMediaRegistry';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { logLatencyAudit } from '@beike/domain/latencyAudit';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
@@ -14,7 +14,7 @@ import {
   resolveDepthSubmit,
   submitDepthImage,
   submitDepthVideo,
-} from '@/lib/depthGeneration';
+} from '@/shared/api/depthGeneration';
 import {
   isDepthVideoTask,
   isDepthImageTask,

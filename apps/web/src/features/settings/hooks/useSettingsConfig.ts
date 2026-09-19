@@ -1,17 +1,17 @@
 import {storageProviderError} from '../storageValidation';
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import {
   persistAiGatewayConfig,
   persistExternalScraperConfig,
   persistQiyunConfig,
   persistStorageConfig,
   persistWanbangConfig,
-} from '@/lib/persistDesktopSecrets';
-import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/lib/gatewayClient';
+} from '@/shared/desktop/persistDesktopSecrets';
+import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/shared/api/gatewayClient';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { credentialGet } from '@/lib/credentialClient';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
+import { credentialGet } from '@/shared/api/credentialClient';
+import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 
 interface UseSettingsConfigOptions {
   isOpen: boolean;

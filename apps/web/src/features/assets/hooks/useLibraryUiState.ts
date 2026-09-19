@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 
 /**
  * 资产中心 UI 交互状态（Toast、复制反馈、卡片更多操作菜单、图片放大灯箱）

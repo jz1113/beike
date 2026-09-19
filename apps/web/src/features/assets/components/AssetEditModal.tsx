@@ -4,7 +4,7 @@ import {
   type PersonaLayers,
   parsePersonaLayers,
   formatPersonaPrompt,
-} from '../assetPromptConstants';
+} from '../utils/assetPromptConstants';
 
 export interface AssetEditModalProps {
   editingItem: any;

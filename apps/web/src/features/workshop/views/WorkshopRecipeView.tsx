@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, ArrowLeft } from 'lucide-react';
-import { apiFetch } from '@/lib/apiClient';
-import { getCachedRecipes, setCachedRecipes } from '@/lib/catalogCache';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getCachedRecipes, setCachedRecipes } from '@/shared/api/catalogCache';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { confirmAction } from '@/lib/confirmAction';
-import { useAppStore } from '@/store/useAppStore';
+import { confirmAction } from '@/shared/utils/confirmAction';
+import { useAppStore } from '@/store';
 import { DEFAULT_CATEGORIES, getMergedCategories, type CategoryItem } from '@beike/domain/vision';
-import AssetRecipeLibrary from '@/features/assets/AssetRecipeLibrary';
+import AssetRecipeLibrary from '@/features/assets/components/AssetRecipeLibrary';
 import StyleExtractModal from '@/shared/modals/StyleExtractModal';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 
 interface Props {
   onEnterStudio: () => void;

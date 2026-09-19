@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { UsageSummary } from '@/lib/usageTracker';
+import type { UsageSummary } from '@/shared/utils/usageTracker';
 import { buildUsageHeatmap } from '../usageHeatmap';
 
 type HeatmapRange = 'year' | 'half_year' | 'quarter';

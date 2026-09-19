@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
+import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 
 const queryClient = new QueryClient({
   defaultOptions: {

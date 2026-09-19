@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { SystemConfigResponseSchema } from '@beike/contracts';
 
 export const systemConfigQueryKey = ['system', 'config'] as const;

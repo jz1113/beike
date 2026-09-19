@@ -1,5 +1,5 @@
-import { apiFetch } from '@/lib/apiClient';
-import { extractImageDimensionsFromFile, extractVideoMetadataFromFile } from '@/lib/mediaHelper';
+import { apiFetch } from '@/shared/api/apiClient';
+import { extractImageDimensionsFromFile, extractVideoMetadataFromFile } from '@/shared/media/mediaHelper';
 import type { CanvasNode } from './types';
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;

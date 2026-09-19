@@ -9,10 +9,10 @@ import type {
   GenerationTask,
   MediaAttachment,
 } from '@/types/app-store';
-import type { AppView } from '@/store/view';
+import type { AppView } from '@/store/appView';
 import type { DepthQuality, DepthVideoStyle, QuickGenMode } from '@beike/domain/depthVideo';
 
-export type { AppView } from '@/store/view';
+export type { AppView } from '@/store/appView';
 
 export type {
   ProductImage,

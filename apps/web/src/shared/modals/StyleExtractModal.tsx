@@ -7,7 +7,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import CategoryManagerModal from './CategoryManagerModal';
 import { RecipeEditorPanel } from './styleExtract/RecipeEditorPanel';
 import { StyleExtractSourcePanel } from './styleExtract/StyleExtractSourcePanel';

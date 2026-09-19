@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   src?: string | null;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Maximize2, X, AlertCircle } from 'lucide-react';
-import type { RefMediaKind } from '@/lib/mediaUpload';
+import type { RefMediaKind } from '@/shared/api/mediaUpload';
 import { RefMediaThumb } from './PromptBarRefMediaThumb';
 
 interface Props {

@@ -1,5 +1,5 @@
-import { apiFetch } from '@/lib/apiClient';
-import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
+import { apiFetch } from '@/shared/api/apiClient';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import type { BatchProductItem } from './batchTypes';
 
 export interface CopywritingContext {

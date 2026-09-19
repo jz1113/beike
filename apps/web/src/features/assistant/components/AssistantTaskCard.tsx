@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AssistantTaskState } from '@beike/domain/assistant/taskPolicy';
 import { Check, Loader2, CircleAlert, ChevronDown } from 'lucide-react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 export default function AssistantTaskCard({ task }: { task: AssistantTaskState }) {
   const [expanded, setExpanded] = useState(false);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchAssetDetail } from '../assetLibraryCache';
+import { fetchAssetDetail } from '../utils/assetLibraryCache';
 
 export interface UseAssetDetailOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';

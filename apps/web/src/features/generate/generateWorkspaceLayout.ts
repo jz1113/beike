@@ -1,5 +1,5 @@
 import type { GenerationTask } from '@/types/app-store';
-import { groupTasksIntoBatches as groupTasksCore } from '@/lib/taskBatchGrouping';
+import { groupTasksIntoBatches as groupTasksCore } from '@/shared/utils/taskBatchGrouping';
 
 export type TimeFilter = 'all' | 'today' | '7days' | '30days' | '90days' | 'custom';
 export type ModeFilter = 'all' | 'image' | 'video' | 'depth-image' | 'depth-video';

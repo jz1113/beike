@@ -5,9 +5,9 @@ import App from './App';
 import { AppProviders } from '@/app/providers';
 import AppErrorBoundary from '@/shared/ui/AppErrorBoundary';
 import DesktopTokenSync from '@/shared/ui/DesktopTokenSync';
-import { installDevConsoleBridge } from '@/lib/devConsoleBridge';
+import { installDevConsoleBridge } from '@/shared/utils/devConsoleBridge';
 import './styles/globals.css';
-import { applyViewportDensity, getViewportDensity } from '@/lib/useMediaQuery';
+import { applyViewportDensity, getViewportDensity } from '@/shared/hooks/useMediaQuery';
 
 // 拦截旧 Chunk 404/失效错误并无缝自动重载
 if (typeof window !== 'undefined') {

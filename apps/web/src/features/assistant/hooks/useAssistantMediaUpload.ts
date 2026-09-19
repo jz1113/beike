@@ -1,10 +1,10 @@
 import { useRef, useCallback } from 'react';
-import { apiFetch } from '@/lib/apiClient';
-import { isImageFile, isVideoFile } from '@/lib/mediaUpload';
-import { extractVideoThumbnail, fileToDataUrl } from '@/lib/mediaHelper';
-import { useFileDropZone } from '@/lib/useFileDropZone';
-import { useBlobUrl } from '@/lib/useBlobUrl';
-import { SHORTCUT_REPEAT_GUARD_MS } from '@/lib/constants/timing';
+import { apiFetch } from '@/shared/api/apiClient';
+import { isImageFile, isVideoFile } from '@/shared/api/mediaUpload';
+import { extractVideoThumbnail, fileToDataUrl } from '@/shared/media/mediaHelper';
+import { useFileDropZone } from '@/shared/hooks/useFileDropZone';
+import { useBlobUrl } from '@/shared/hooks/useBlobUrl';
+import { SHORTCUT_REPEAT_GUARD_MS } from '@/shared/constants/timing';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   LEGACY_OFFICE_EXT_RE,
@@ -12,8 +12,8 @@ import {
   SUPPORTED_DOC_FORMATS,
   isDocumentFile,
   truncateDocText,
-} from '@/features/assistant/assistantConstants';
-import type { MediaAttachment } from '@/store/useAppStore';
+} from '@/features/assistant/utils/assistantConstants';
+import type { MediaAttachment } from '@/store';
 
 interface UseAssistantMediaUploadOptions {
   isAssistantOpen: boolean;

@@ -1,5 +1,5 @@
 import { Loader2, Link2 } from 'lucide-react';
-import { ApiaLogo } from '@/shared/ui/BrandIcons';
+import { ApiaLogo } from '@/shared/icons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 
 export interface ApiServicesApiaPanelProps {

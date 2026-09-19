@@ -1,4 +1,4 @@
-import { GrassWorkshopIcon, CollectorHubIcon, ReplicationIcon } from '@/shared/ui/BrandIcons';
+import { GrassWorkshopIcon, CollectorHubIcon, ReplicationIcon } from '@/shared/icons';
 
 interface Props {
   onEnterWorkshop: () => void;

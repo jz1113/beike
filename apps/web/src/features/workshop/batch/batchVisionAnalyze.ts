@@ -1,9 +1,9 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { pickVisionAnalyzeFallbacks, PreviousGroupSignature } from '@beike/domain/vision';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
-import { getGatewayClientOverrides } from '@/lib/gatewayClient';
-import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
+import { getGatewayClientOverrides } from '@/shared/api/gatewayClient';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@beike/domain/jewelryArch';
 import type { BatchProductItem } from './batchTypes';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';

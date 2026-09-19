@@ -12,7 +12,7 @@ import {
   humanizeShotType,
   normalizeTagToChinese,
   type AssetSubTab,
-} from '../assetPromptConstants';
+} from '../utils/assetPromptConstants';
 
 export type ActionShotScale = 'all' | 'macro_closeup' | 'half_body' | 'full_body';
 

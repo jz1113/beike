@@ -1,21 +1,21 @@
 import { useState, useCallback } from 'react';
 import { mapWithConcurrency } from '@beike/domain/asyncPool';
-import { apiFetch } from '@/lib/apiClient';
-import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getExternalScraperCredentials } from '@/shared/utils/externalScraperCredentials';
 import {
   batchParseXhsLinks,
   fetchParseLinkWithRateLimit,
   filterParseLinkImages,
   parseXhsUrlsFromText,
   toXhsQueueItem,
-} from '@/lib/xhsLinkBatch';
-import { processDeconstructQueueItem } from '@/lib/deconstructClient';
-import { RateLimiter } from '@/lib/rateLimiter';
+} from '@/shared/utils/xhsLinkBatch';
+import { processDeconstructQueueItem } from '@/shared/api/deconstructClient';
+import { RateLimiter } from '@/shared/utils/rateLimiter';
 import {
   exportDeconstructRecordsToCsv,
   transformQueueItemToRecordRow,
-} from '../assetDeconstructCsvExport';
-import type { ImageSetQueueItem } from '../assetPromptConstants';
+} from '../utils/assetDeconstructCsvExport';
+import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
 import type { DeconstructQueueApi } from './useDeconstructQueue';
 import { mergeParsedQueueItems, selectFreshSourceUrls, type CollectionIssue } from './xhsSourceCheck';
 

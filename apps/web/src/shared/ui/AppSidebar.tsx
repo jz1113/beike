@@ -1,6 +1,6 @@
 import { Settings } from 'lucide-react';
-import type { AppView } from '@/store/view';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
+import type { AppView } from '@/store/appView';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { NavHomeIcon, NavGenerateIcon } from '@/shared/icons';
 
 interface Props {

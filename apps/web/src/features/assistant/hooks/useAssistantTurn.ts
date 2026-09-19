@@ -1,13 +1,13 @@
 import type { AssistantRunMode, ReferenceScope } from '@beike/domain/assistant/taskPolicy';
 import { useCallback, useRef } from 'react';
-import { apiFetch } from '@/lib/apiClient';
-import { getGatewayClientOverrides } from '@/lib/gatewayClient';
-import { approveAssistantTool, executeClientToolAction } from '@/features/assistant/assistantClientActions';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getGatewayClientOverrides } from '@/shared/api/gatewayClient';
+import { approveAssistantTool, executeClientToolAction } from '@/features/assistant/utils/assistantClientActions';
 import type {
   TurnStreamState,
   ApprovalDecision,
   ToolActivityEntry,
-} from '@/features/assistant/assistantTurnTypes';
+} from '@/features/assistant/utils/assistantTurnTypes';
 import type {
   AssistantItem,
   ApprovalRequestItem,

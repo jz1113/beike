@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 import type { BatchProductItem, GenerationStrategy } from './batchTypes';
-import { useWorkshopWorkspace } from './useWorkshopWorkspace';
+import { useWorkshopWorkspace } from './hooks/useWorkshopWorkspace';
 
 export interface WorkshopLiveState {
   batchMode: 'original' | 'replication';

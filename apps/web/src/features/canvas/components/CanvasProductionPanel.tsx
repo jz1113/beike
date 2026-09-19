@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCanvasStore } from '../store/useCanvasStore';
-import { useAppStore } from '@/store/useAppStore';
-import { apiFetch } from '@/lib/apiClient';
+import { useAppStore } from '@/store';
+import { apiFetch } from '@/shared/api/apiClient';
 import { persistCanvasMedia } from '../canvasMediaImport';
 import { assetRoleLabels, buildProductionNodes, newShot, parseProductionText } from '../canvasProduction';
 import { getVideoModelById } from '@beike/domain/video';

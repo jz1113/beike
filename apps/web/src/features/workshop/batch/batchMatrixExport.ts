@@ -1,5 +1,5 @@
-import { fetchMediaBlob } from '@/lib/downloadMedia';
-import { apiFetch } from '@/lib/apiClient';
+import { fetchMediaBlob } from '@/shared/media/downloadMedia';
+import { apiFetch } from '@/shared/api/apiClient';
 import type { BatchProductItem } from './batchTypes';
 
 export interface MatrixExportRow {

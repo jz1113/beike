@@ -1,4 +1,4 @@
-import {apiFetch, proxyMediaUrl} from '@/lib/apiClient';
+import {apiFetch, proxyMediaUrl} from '@/shared/api/apiClient';
 import {persistCanvasMedia} from './canvasMediaImport';
 import type {CanvasNode} from './types';
 

@@ -9,9 +9,9 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
-import { formatDeconstructSummary, type ImageSetQueueItem } from '../assetPromptConstants';
-import { getFilesFromDataTransfer } from '../assetFolderImport';
-import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from '@/lib/xhsLinkBatch';
+import { formatDeconstructSummary, type ImageSetQueueItem } from '../utils/assetPromptConstants';
+import { getFilesFromDataTransfer } from '../utils/assetFolderImport';
+import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from '@/shared/utils/xhsLinkBatch';
 import type { DeconstructQueueApi } from '../hooks/useDeconstructQueue';
 import type { useXhsBatchImport } from '../hooks/useXhsBatchImport';
 import type { WorkflowCapability } from '@beike/domain/workflowModels';

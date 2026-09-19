@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileCode, X, Copy } from 'lucide-react';
-import { OFFICIAL_REVERSE_SYSTEM_PROMPT } from '../assetPromptConstants';
+import { OFFICIAL_REVERSE_SYSTEM_PROMPT } from '../utils/assetPromptConstants';
 
 export interface AssetPromptSpecModalProps {
   isOpen: boolean;

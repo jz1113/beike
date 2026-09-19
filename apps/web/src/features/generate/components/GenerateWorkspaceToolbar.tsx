@@ -1,5 +1,5 @@
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
-import type { ChatSession } from '@/store/useAppStore';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
+import type { ChatSession } from '@/store';
 import { GenerateSessionDropdown } from './GenerateSessionDropdown';
 
 export interface GenerateWorkspaceToolbarProps {

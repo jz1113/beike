@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { getModelIcon } from '../../ui/ModelIcons';
 import '@beike/domain/workflowModels';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 export interface MarkerPoint {
   id: string;

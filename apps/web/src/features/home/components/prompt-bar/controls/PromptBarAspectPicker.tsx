@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { densityComposerPill } from '@/shared/ui/layoutClasses';
-import { renderRatioMiniIcon } from '../../../utils/modelDisplayHelpers';
+import { renderRatioMiniIcon } from '@/shared/ui/modelDisplayHelpers';
 import { PromptBarVideoParamsPanel } from './PromptBarVideoControls';
 import PromptBarImageControls from './PromptBarImageControls';
 import type { QuickGenMode } from '@beike/domain/depthVideo';

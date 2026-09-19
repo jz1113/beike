@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { SquarePen, PanelLeft, Trash2, Pencil } from 'lucide-react';
-import type { ChatSession } from '@/store/useAppStore';
+import type { ChatSession } from '@/store';
 import { GenerateSessionThumbnail } from '../GenerateSessionThumbnail';
 
 export interface GenerateSessionDropdownProps {

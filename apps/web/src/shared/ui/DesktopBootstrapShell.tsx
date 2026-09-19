@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
-import { useDesktopBootstrap } from '@/lib/desktopBootstrap';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
+import { useDesktopBootstrap } from '@/shared/desktop/desktopBootstrap';
+import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 
 export default function DesktopBootstrapShell({ children }: { children: ReactNode }) {
   const { status, message, retry } = useDesktopBootstrap();

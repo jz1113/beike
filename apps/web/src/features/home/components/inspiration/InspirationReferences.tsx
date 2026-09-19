@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState,useId} from 'react';
 import {createPortal} from 'react-dom';
 import {ChevronLeft,ChevronRight} from 'lucide-react';
-import {isVideoMediaUrl} from '@/lib/mediaHelper';
+import {isVideoMediaUrl} from '@/shared/media/mediaHelper';
 
 export function InspirationReferences({images,labels,mode}:{images:string[];labels?:string[];mode?:string}) {
   const [index,setIndex]=useState(0);

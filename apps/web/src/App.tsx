@@ -1,24 +1,24 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore, clearWorkshopStudioDraft } from '@/store/useAppStore';
+import { useAppStore, clearWorkshopStudioDraft } from '@/store';
 import { GenerationEngineHost } from '@/features/generate/GenerationEngineHost';
-import { syncAppTokenCookie } from '@/lib/apiClient';
-import { migrateLegacyCredentialsOnce } from '@/lib/credentialClient';
+import { syncAppTokenCookie } from '@/shared/api/apiClient';
+import { migrateLegacyCredentialsOnce } from '@/shared/api/credentialClient';
 import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@beike/domain/workflowModels';
-import { usePreventBrowserFileOpen } from '@/lib/useFileDropZone';
-import { useViewportDensity } from '@/lib/useMediaQuery';
-import { useCompactLayout } from '@/lib/useCompactLayout';
+import { usePreventBrowserFileOpen } from '@/shared/hooks/useFileDropZone';
+import { useViewportDensity } from '@/shared/hooks/useMediaQuery';
+import { useCompactLayout } from '@/shared/hooks/useCompactLayout';
 import AppSidebar from '@/shared/ui/AppSidebar';
-import AIAssistantButton from '@/features/assistant/AIAssistantButton';
+import AIAssistantButton from '@/features/assistant/components/AIAssistantButton';
 import AppErrorBoundary from '@/shared/ui/AppErrorBoundary';
 import MacTitleBar from '@/shared/ui/MacTitleBar';
 import GlobalContextMenu from '@/shared/ui/GlobalContextMenu';
 import { GeneratingEffectsProvider } from '@/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@/shared/ui/ViewKeepAlive';
-import { usePerformanceMode } from '@/lib/performancePreference';
+import { usePerformanceMode } from '@/shared/utils/performancePreference';
 import GlobalDynamicBackground from '@/shared/media/GlobalDynamicBackground';
 
-import { useDesktopShortcuts } from '@/lib/useDesktopShortcuts';
+import { useDesktopShortcuts } from '@/shared/hooks/useDesktopShortcuts';
 import { parseViewFromSearchParams, syncViewToUrl } from '@/app/routes';
 import { useCanvasStore } from '@/features/canvas/store/useCanvasStore';
 
@@ -26,7 +26,7 @@ import HomePage from '@/features/home/HomePage';
 import GenerateWorkspace from '@/features/generate/GenerateWorkspace';
 import WorkshopStudio from '@/features/workshop/WorkshopStudio';
 import ReplicationStudio from '@/features/replicate/ReplicationStudio';
-import AssetCenter from '@/features/assets/AssetCenter';
+import AssetCenter from '@/features/assets/components/AssetCenter';
 import CanvasRecentProjects from '@/features/canvas/components/CanvasRecentProjects';
 
 // 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
@@ -68,8 +68,8 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
 }
 
 const SettingsWorkspaceView = lazyWithRetry(() => import('@/features/settings/SettingsWorkspaceView'));
-const UniversalCollectorModal = lazyWithRetry(() => import('@/features/collect/UniversalCollectorModal'));
-const AIAssistantDrawer = lazyWithRetry(() => import('@/features/assistant/AIAssistantDrawer'));
+const UniversalCollectorModal = lazyWithRetry(() => import('@/features/collect/components/UniversalCollectorModal'));
+const AIAssistantDrawer = lazyWithRetry(() => import('@/features/assistant/components/AIAssistantDrawer'));
 const ImageLightboxModal = lazyWithRetry(() => import('@/shared/modals/ImageLightboxModal'));
 const CanvasWorkspaceView = lazyWithRetry(() => import('@/features/canvas/CanvasWorkspaceView'));
 

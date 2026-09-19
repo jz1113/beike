@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
-import { fetchMediaBlob, downloadMediaOrOpen } from '@/lib/downloadMedia';
-import { saveToDownloadDir } from '@/lib/desktopDownload';
+import { fetchMediaBlob, downloadMediaOrOpen } from '@/shared/media/downloadMedia';
+import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
 import type { BatchProductItem } from './batchTypes';
 import { blobExtFromMime, sanitizeShotTitle } from './batchRunnerIo';
 import { buildMatrixExportRows } from './batchMatrixExport';

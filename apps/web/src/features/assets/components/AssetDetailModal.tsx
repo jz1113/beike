@@ -16,7 +16,7 @@ import {
   humanizeImageType,
   parseAssetDimensions,
   parsePersonaLayers,
-} from '../assetPromptConstants';
+} from '../utils/assetPromptConstants';
 import { resolveActionCardDisplayBadges } from '@beike/domain/productCategory';
 
 export interface AssetDetailModalProps {

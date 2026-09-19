@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { LayoutGrid, Layers, Download, ImagePlus, X, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter } from 'lucide-react';
 import type { CanvasNode } from '../types';
 import { useCanvasStore } from '../store/useCanvasStore';
-import { downloadMediaOrOpen } from '@/lib/downloadMedia';
+import { downloadMediaOrOpen } from '@/shared/media/downloadMedia';
 
 export interface CanvasMultiSelectToolbarProps {
   projectId: string;

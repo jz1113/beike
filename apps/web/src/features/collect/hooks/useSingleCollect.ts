@@ -1,12 +1,12 @@
-import { normalizeCollectedImages } from '../normalizeCollectedImages';
+import { normalizeCollectedImages } from '../utils/normalizeCollectedImages';
 import { useState, useRef } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
-import { parseSocialLinkWithRateLimit } from '@/lib/xhsLinkBatch';
-import { RateLimiter } from '@/lib/rateLimiter';
-import { detectPlatformFromText } from '../collectorTypes';
-import { sanitizeCollectedItem } from '../collectorUrls';
+import { getExternalScraperCredentials } from '@/shared/utils/externalScraperCredentials';
+import { parseSocialLinkWithRateLimit } from '@/shared/utils/xhsLinkBatch';
+import { RateLimiter } from '@/shared/utils/rateLimiter';
+import { detectPlatformFromText } from '../utils/collectorTypes';
+import { sanitizeCollectedItem } from '../utils/collectorUrls';
 
 interface UseSingleCollectOptions {
   showToast: (msg: string) => void;

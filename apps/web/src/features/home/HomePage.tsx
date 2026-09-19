@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { useAppStore } from '@/store/useAppStore';
-import { isVideoMediaUrl } from '@/lib/mediaHelper';
-import { useQuickRefMediaDrop } from '@/lib/useQuickRefMediaDrop';
+import { useAppStore } from '@/store';
+import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
+import { useQuickRefMediaDrop } from '@/shared/hooks/useQuickRefMediaDrop';
 import PromptActionBar from './components/prompt-bar/PromptActionBar';
 import FeatureCapsules from './components/FeatureCapsules';
 import InspirationFeed from './components/inspiration/InspirationFeed';

@@ -1,7 +1,7 @@
 import { Search, RefreshCw, Activity, Download, FileSpreadsheet, ChevronDown, ChevronUp, CheckCircle2, XCircle } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
-import { confirmAction } from '@/lib/confirmAction';
-import { getUsageLogs, clearUsageLogs, type UsageSummary } from '@/lib/usageTracker';
+import { confirmAction } from '@/shared/utils/confirmAction';
+import { getUsageLogs, clearUsageLogs, type UsageSummary } from '@/shared/utils/usageTracker';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { settingsPanelPad } from '@/shared/ui/layoutClasses';
 import GatewayBalanceCard from '../components/GatewayBalanceCard';

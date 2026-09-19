@@ -1,4 +1,4 @@
-import type { UsageSummary } from '@/lib/usageTracker';
+import type { UsageSummary } from '@/shared/utils/usageTracker';
 
 export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiveMap' | 'heatmapDetailsMap'>, heatmapRange: 'year' | 'half_year' | 'quarter', currentYear: number, now = new Date()) {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

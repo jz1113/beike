@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useAppStore } from '@/store/useAppStore';
-import BatchWorkshopView from './batch/BatchWorkshopView';
+import { useAppStore } from '@/store';
+import BatchWorkshopView from './batch/components/BatchWorkshopView';
 import { WorkshopTopBar } from './components/WorkshopTopBar';
 import { WorkshopSideCapsuleBar } from './components/WorkshopSideCapsuleBar';
 import WorkshopRecipeView from './views/WorkshopRecipeView';
 import WorkshopProductView from './views/WorkshopProductView';
-import AssetPromptLibrary from '@/features/assets/AssetPromptLibrary';
+import AssetPromptLibrary from '@/features/assets/components/AssetPromptLibrary';
 
 interface Props {
   onOpenSettings?: () => void;

@@ -1,4 +1,4 @@
-import { normalizeAppView, type AppView } from '@/store/view';
+import { normalizeAppView, type AppView } from '@/store/appView';
 
 /** 声明式视图 ↔ URL 映射（轻量路由层，无需引入 TanStack Router） */
 export const VIEW_URL_ALIASES: Record<string, AppView> = {

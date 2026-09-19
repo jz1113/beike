@@ -1,16 +1,16 @@
-import { normalizeCollectedImages } from '../normalizeCollectedImages';
+import { normalizeCollectedImages } from '../utils/normalizeCollectedImages';
 import { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
-import { parseSocialLinkWithRateLimit } from '@/lib/xhsLinkBatch';
-import { RateLimiter } from '@/lib/rateLimiter';
+import { getExternalScraperCredentials } from '@/shared/utils/externalScraperCredentials';
+import { parseSocialLinkWithRateLimit } from '@/shared/utils/xhsLinkBatch';
+import { RateLimiter } from '@/shared/utils/rateLimiter';
 import {
   type BatchTaskItem,
   detectPlatformFromText,
   extractUrlsFromRawText,
-} from '../collectorTypes';
+} from '../utils/collectorTypes';
 
 interface UseBatchTaskQueueOptions {
   isOpen: boolean;

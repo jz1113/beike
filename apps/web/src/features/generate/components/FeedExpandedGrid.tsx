@@ -1,6 +1,6 @@
-import { type GenerationTask } from '@/store/useAppStore';
+import { type GenerationTask } from '@/store';
 import { getAspectRatioClass, getBatchGridClass } from '../generateCanvasLayout';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import { getFeedImageUrl } from './FeedSingleCard';
 import { AlertCircle, RotateCw, Maximize2, Trash2, X } from 'lucide-react';

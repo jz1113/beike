@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import {
   getEnabledImageModelsFromSettings,
   getEnabledVideoModelsFromSettings,

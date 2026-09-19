@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { apiFetch } from '../../../lib/apiClient';
-import { credentialGet, credentialSet, credentialDelete } from '../../../lib/credentialClient';
-import { getGatewayClientOverrides } from '../../../lib/gatewayClient';
+import { apiFetch } from '../../../shared/api/apiClient';
+import { credentialGet, credentialSet, credentialDelete } from '../../../shared/api/credentialClient';
+import { getGatewayClientOverrides } from '../../../shared/api/gatewayClient';
 
 export interface GatewayUserInfo {
   id: number | string;

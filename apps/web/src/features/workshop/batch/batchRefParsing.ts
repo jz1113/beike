@@ -1,5 +1,5 @@
-import { apiFetch } from '@/lib/apiClient';
-import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getExternalScraperCredentials } from '@/shared/utils/externalScraperCredentials';
 
 /**
  * 解析单条小红书等对标笔记链接中的图片列表

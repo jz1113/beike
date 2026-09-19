@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
 import type { WorkflowModel } from '../settingsShared';
-import { credentialGet } from '@/lib/credentialClient';
-import { readImageGatewayConfig, saveImageGatewayConfig, fixedImageModelRoute, readIndependentTextModels } from '@/lib/imageGateway';
+import { credentialGet } from '@/shared/api/credentialClient';
+import { readImageGatewayConfig, saveImageGatewayConfig, fixedImageModelRoute, readIndependentTextModels } from '@/shared/api/imageGateway';
 
 export function ImageGatewayPanel({ models }: { models: { id: string; isImage: boolean; isVideo?: boolean; isMultimodal?: boolean; isAssistant?: boolean }[] }) {
   const [modelIds, setModelIds] = useState<string[] | null>(() => readImageGatewayConfig().modelIds);

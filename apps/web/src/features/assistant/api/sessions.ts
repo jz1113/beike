@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import type { AssistantSession } from '@/types/app-store';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 

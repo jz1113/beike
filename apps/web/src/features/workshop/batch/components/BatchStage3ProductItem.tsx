@@ -10,7 +10,7 @@ import { BatchProductItem } from '../batchTypes';
 import BatchShotGrid from './BatchShotGrid';
 import BatchStatusBadge from './BatchStatusBadge';
 import { BatchStage3ShotCard } from './BatchStage3ShotCard';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import { formatAssetBadgeText } from './BatchAssetTag';
 
 export interface BatchStage3ProductItemProps {

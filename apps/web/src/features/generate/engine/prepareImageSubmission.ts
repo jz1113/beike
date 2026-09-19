@@ -1,5 +1,5 @@
-import { compressImageForSubmission } from '@/lib/image-utils';
-import { resolveRefMediaFile } from '@/lib/refMediaRegistry';
+import { compressImageForSubmission } from '@/shared/media/image-utils';
+import { resolveRefMediaFile } from '@/shared/media/refMediaRegistry';
 
 // Leave headroom below the API/gateway's approximately 8 MB request boundary.
 export const IMAGE_SUBMISSION_MAX_BYTES = 6_000_000;

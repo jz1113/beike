@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { AppView } from '@/store/view';
+import type { AppView } from '@/store/appView';
 
 const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'assets', 'canvas', 'workshop', 'replicate'];
 

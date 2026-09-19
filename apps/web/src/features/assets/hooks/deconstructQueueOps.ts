@@ -3,7 +3,7 @@ import {
   inferProductCategoryAndAnatomy,
   type ActionCategoryId,
 } from '@beike/domain/productCategory';
-import type { ImageSetQueueItem } from '../assetPromptConstants';
+import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
 
 export type ProductCategoryOption = { id: string; name: string; parentId?: string | null; position?: number };
 

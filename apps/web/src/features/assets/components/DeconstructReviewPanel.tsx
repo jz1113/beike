@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 
 type Review = { id: string; albumName: string; payload: { productCategoryId?: string; imageUrls: string[]; perImageResults: { image_index: number; title?: string; reverse_prompt_zh?: string; reverse_prompt?: string }[] } };
 export default function DeconstructReviewPanel({ refreshKey, onApproved }: { refreshKey: boolean; onApproved: () => void }) {

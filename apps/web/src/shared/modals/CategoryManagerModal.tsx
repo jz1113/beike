@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { confirmAction } from '@/lib/confirmAction';
+import { confirmAction } from '@/shared/utils/confirmAction';
 import {
   X, 
   Trash2, 

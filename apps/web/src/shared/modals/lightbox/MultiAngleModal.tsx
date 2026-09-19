@@ -13,7 +13,7 @@ import {
   ArrowDownRight,
   Circle,
 } from 'lucide-react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import { useAppStore } from '../../../store';
 import { LightboxGenConfigToolbar } from './LightboxGenConfigToolbar';
 

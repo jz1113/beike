@@ -129,55 +129,55 @@
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
-      "file": "apps/web/src/features/assets/AssetCenter.tsx",
+      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
       "message": "'_props' is assigned a value but never used.",
       "count": 1,
       "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
     },
     {
-      "file": "apps/web/src/features/assets/AssetCenter.tsx",
+      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
       "message": "'isLoadingTasks' is assigned a value but never used.",
       "count": 1,
       "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
     },
     {
-      "file": "apps/web/src/features/assets/AssetCenter.tsx",
+      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
       "message": "'t' is assigned a value but never used.",
       "count": 1,
       "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
     },
     {
-      "file": "apps/web/src/features/assets/AssetGenerationHistory.tsx",
+      "file": "apps/web/src/features/assets/components/AssetGenerationHistory.tsx",
       "message": "'showModelBadge' is assigned a value but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
-      "file": "apps/web/src/features/assets/AssetGenerationHistory.tsx",
+      "file": "apps/web/src/features/assets/components/AssetGenerationHistory.tsx",
       "message": "'modelFull' is assigned a value but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
-      "file": "apps/web/src/features/assets/LazyVideoCover.tsx",
+      "file": "apps/web/src/shared/media/LazyVideoCover.tsx",
       "message": "'isPlaying' is assigned a value but never used.",
       "count": 1,
       "reason": "播放状态回调仍有消费者，保留播放管理器生命周期。"
     },
     {
-      "file": "apps/web/src/features/assets/assetBackup.ts",
+      "file": "apps/web/src/features/assets/utils/assetBackup.ts",
       "message": "'_' is assigned a value but never used.",
       "count": 1,
       "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
     },
     {
-      "file": "apps/web/src/features/assets/assetBackup.ts",
+      "file": "apps/web/src/features/assets/utils/assetBackup.ts",
       "message": "'__' is assigned a value but never used.",
       "count": 1,
       "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
     },
     {
-      "file": "apps/web/src/features/assets/assetBackup.ts",
+      "file": "apps/web/src/features/assets/utils/assetBackup.ts",
       "message": "'___' is assigned a value but never used.",
       "count": 1,
       "reason": "排除主键与时间字段以恢复资产，保留剔除语义。"
@@ -189,7 +189,7 @@
       "reason": "批量导入字段剔除兼容；后续可改为显式删除副本字段。"
     },
     {
-      "file": "apps/web/src/features/assistant/AssistantInputArea.tsx",
+      "file": "apps/web/src/features/assistant/components/AssistantInputArea.tsx",
       "message": "'missingRequirements' is assigned a value but never used.",
       "count": 1,
       "reason": "技能必需输入检查暂保留；助手界面有并行变动，避免改变校验契约。"
@@ -237,7 +237,7 @@
       "reason": "状态更新仍在交互路径中，暂保留待UI专项。"
     },
     {
-      "file": "apps/web/src/lib/xhsLinkBatch.ts",
+      "file": "apps/web/src/shared/utils/xhsLinkBatch.ts",
       "message": "'sourceUrl' is defined but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"

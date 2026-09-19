@@ -1,6 +1,6 @@
 import { useState, useMemo, type RefObject } from 'react';
-import { proxyMediaUrl } from '@/lib/apiClient';
-import type { RefMediaKind } from '@/lib/mediaUpload';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
+import type { RefMediaKind } from '@/shared/api/mediaUpload';
 import { Plus, X, ArrowLeftRight, Minimize2, AlertCircle } from 'lucide-react';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import {
@@ -13,7 +13,7 @@ import { PromptBarRefImageStack } from './PromptBarRefImageStack';
 import { RefMediaThumb } from './PromptBarRefMediaThumb';
 import { PromptBarRefMediaLightbox } from './PromptBarRefMediaLightbox';
 import type { QuickGenMode } from '@beike/domain/depthVideo';
-import type { SubjectItem } from '../../../data/promptBarConstants';
+import type { SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
 
 function refUploadLabel(mode: QuickGenMode): { label: string; title: string } {
   if (mode === 'depth-image') {

@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getGatewayClientOverrides } from '@/lib/gatewayClient';
-import { apiFetch } from '@/lib/apiClient';
-import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
-import { compressImageToDataUrl } from '@/lib/image-utils';
+import { getGatewayClientOverrides } from '@/shared/api/gatewayClient';
+import { apiFetch } from '@/shared/api/apiClient';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
+import { compressImageToDataUrl } from '@/shared/media/image-utils';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { DEFAULT_CATEGORIES, getMergedCategories, CategoryItem } from '@beike/domain/vision';
 import { pickOrderedMultimodalFallbacks } from '@beike/domain/workflowModels';
 import '@beike/domain/drawing';
-import { getExternalScraperCredentials } from '@/lib/externalScraperCredentials';
-import { useFileDropZone } from '@/lib/useFileDropZone';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
+import { getExternalScraperCredentials } from '@/shared/utils/externalScraperCredentials';
+import { useFileDropZone } from '@/shared/hooks/useFileDropZone';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 import type { ExtractedRecipeData } from './types';
 
 export interface UseStyleExtractWorkflowOptions {

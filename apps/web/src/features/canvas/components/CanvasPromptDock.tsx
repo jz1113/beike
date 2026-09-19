@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PromptActionBar, { type SubjectItem } from '@/shared/prompt-bar';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import type { CanvasSubject } from '../types';
 
 export interface CanvasPromptDockProps {

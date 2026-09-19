@@ -7,7 +7,7 @@ import {
   Package, 
   Settings2 
 } from 'lucide-react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 
 export interface WorkshopSideCapsuleBarProps {
   activeTab: WorkshopTab;

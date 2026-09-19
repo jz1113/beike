@@ -1,6 +1,6 @@
 import React from 'react';
 import DotGrid from './DotGrid';
-import type { AppView } from '@/store/useAppStore';
+import type { AppView } from '@/store';
 
 interface Props {
   currentView?: AppView;

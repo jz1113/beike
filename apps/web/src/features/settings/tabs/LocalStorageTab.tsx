@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FolderOpen, ExternalLink, Save, Activity, PieChart, Trash2, HardDrive, RefreshCw } from 'lucide-react';
 import { settingsPanelPad } from '@/shared/ui/layoutClasses';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
+import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 import {
   formatBytes,
   getCacheDir,
@@ -13,7 +13,7 @@ import {
   setCacheDirEnabled,
   setIdbCacheEnabled,
   setProjectAutosaveEnabled,
-} from '@/lib/localStoragePrefs';
+} from '@/shared/utils/localStoragePrefs';
 import {
   dispatchMemoryCleanup,
   getAppDataDir,
@@ -24,15 +24,15 @@ import {
   pickDownloadDir,
   resolveDownloadDir,
   type AppMemoryUsage,
-} from '@/lib/desktopDownload';
-import { clearDerivedCache } from '@/lib/idbMediaCache';
-import { apiFetch } from '@/lib/apiClient';
+} from '@/shared/desktop/desktopDownload';
+import { clearDerivedCache } from '@/shared/media/idbMediaCache';
+import { apiFetch } from '@/shared/api/apiClient';
 import {
   clearDerivedDiskCache,
   fetchLocalStorageStats,
   persistCacheDirToEnv,
   type LocalStorageStats,
-} from '@/lib/storageStatsClient';
+} from '@/shared/api/storageStatsClient';
 
 export interface LocalStorageTabProps {
   showToast: (msg: string) => void;

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { WorkshopTab } from '@/types/store';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { 
   Sparkles, 
   BookOpen, 
@@ -9,7 +9,7 @@ import {
   Check, 
   ChevronRight
 } from 'lucide-react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 
 export interface WorkshopTopBarProps {
   assetToolbarRef?: React.Ref<HTMLDivElement>;

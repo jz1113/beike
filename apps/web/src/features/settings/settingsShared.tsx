@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Database } from 'lucide-react';
-import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@/shared/ui/BrandIcons';
+import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@/shared/icons';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
 
 export interface WorkflowModel {

@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { AssistantSkillCardIcon, AssistantSkillIcon } from './AssistantSkillIcon';
-import FormattedMarkdown from '../FormattedMarkdown';
+import FormattedMarkdown from './FormattedMarkdown';
 import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 
 interface Props {

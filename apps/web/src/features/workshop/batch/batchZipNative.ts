@@ -1,4 +1,4 @@
-import { exportZipDownload } from '@/lib/exportZipDownload';
+import { exportZipDownload } from '@/shared/api/exportZipDownload';
 import type { BatchProductItem } from './batchTypes';
 
 export function toStoragePath(url: string): string {

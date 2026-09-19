@@ -1,13 +1,13 @@
 import { extractTaskReferenceImages } from './lightbox/taskReferenceImages';
-import { proxyMediaUrl } from '@/lib/apiClient';
-import '@/lib/permanentDeleteGeneration';
-import { downloadMediaOrOpen, openExternalUrl } from '@/lib/downloadMedia';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
+import '@/shared/api/permanentDeleteGeneration';
+import { downloadMediaOrOpen, openExternalUrl } from '@/shared/media/downloadMedia';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '@/store/useAppStore';
-import { useToast } from '@/lib/useToast';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
-import { TOAST_DURATION_MS } from '@/lib/constants/timing';
+import { useAppStore } from '@/store';
+import { useToast } from '@/shared/hooks/useToast';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
+import { TOAST_DURATION_MS } from '@/shared/constants/timing';
 import {
   ChevronLeft,
   ChevronRight,

@@ -7,7 +7,7 @@ import {
   clampVideoDuration,
 } from '@beike/domain/video';
 import { densityComposerPill } from '@/shared/ui/layoutClasses';
-import '../../../utils/modelDisplayHelpers';
+import '@/shared/ui/modelDisplayHelpers';
 
 interface VideoModelLike {
   id: string;

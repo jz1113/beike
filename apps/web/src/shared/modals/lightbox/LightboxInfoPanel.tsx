@@ -16,9 +16,9 @@ import {
   getAspectRatioFromSize,
   isDepthMediaType,
 } from '@beike/domain/drawing';
-import { isVideoMediaUrl } from '@/lib/mediaHelper';
-import { proxyMediaUrl } from '@/lib/apiClient';
-import type { GenerationTask } from '@/store/useAppStore';
+import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
+import type { GenerationTask } from '@/store';
 
 function ReferenceThumbnail({ url, video }: { url: string; video: boolean }) {
   const [useOriginal, setUseOriginal] = useState(false);

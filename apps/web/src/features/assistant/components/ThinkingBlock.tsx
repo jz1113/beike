@@ -1,5 +1,5 @@
 import { ChevronDown, Brain } from 'lucide-react';
-import { getShowThinkingPreference } from '@/features/assistant/assistantTurnTypes';
+import { getShowThinkingPreference } from '@/features/assistant/utils/assistantTurnTypes';
 
 interface Props {
   content: string;

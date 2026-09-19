@@ -6,7 +6,7 @@ import {
   DepthVideoModeIcon,
   ImageGenModeIcon,
   VideoGenModeIcon,
-} from '@/shared/ui/GenModeIcons';
+} from '@/shared/icons';
 import type { QuickGenMode } from '@beike/domain/depthVideo';
 
 interface PromptBarModeSelectorProps {

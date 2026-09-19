@@ -1,4 +1,4 @@
-import type { GenerationTask } from '@/store/useAppStore';
+import type { GenerationTask } from '@/store';
 import {
   cleanPromptText,
   stripWorkshopPromptGuards,
@@ -19,9 +19,9 @@ import {
   type DepthVideoStyle,
   type QuickGenMode,
 } from '@beike/domain/depthVideo';
-import '@/lib/mediaHelper';
-import { isVideoFile } from '@/lib/mediaUpload';
-import { resolveRefMediaFile, resolveRefMediaName } from '@/lib/refMediaRegistry';
+import '@/shared/media/mediaHelper';
+import { isVideoFile } from '@/shared/api/mediaUpload';
+import { resolveRefMediaFile, resolveRefMediaName } from '@/shared/media/refMediaRegistry';
 import { resolveSubjectByMention } from './promptMentions';
 import { formatSubjectName, type SubjectItem } from './promptBarConstants';
 

@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 import {
   getCachedAssetsSync,
   getCategoryAssetLibrary,
   invalidateGlobalAssetCache,
   isAssetLibraryLoaded,
-} from '../assetLibraryCache';
+} from '../utils/assetLibraryCache';
 
 export interface UseAssetListOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';

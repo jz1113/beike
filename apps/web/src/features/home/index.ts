@@ -7,4 +7,4 @@ export { default } from './HomePage';
 export { default as PromptActionBar } from './components/prompt-bar/PromptActionBar';
 export { default as FeatureCapsules } from './components/FeatureCapsules';
 export { default as InspirationFeed } from './components/inspiration/InspirationFeed';
-export * from './data/promptBarConstants';
+export * from '@/shared/prompt-bar/promptBarConstants';

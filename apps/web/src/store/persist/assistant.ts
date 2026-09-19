@@ -4,7 +4,7 @@ import type {
   MediaAttachment,
 } from '@/types/app-store';
 import { putAssistantSessionsRemote } from '@/features/assistant/api/sessions';
-import { isProjectAutosaveEnabled } from '@/lib/localStoragePrefs';
+import { isProjectAutosaveEnabled } from '@/shared/utils/localStoragePrefs';
 
 function sanitizeAssistantAttachment(a: MediaAttachment): MediaAttachment {
   const persistableUrl = (u?: string) => {

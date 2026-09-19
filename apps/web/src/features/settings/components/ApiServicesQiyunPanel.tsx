@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2, Link2 } from 'lucide-react';
-import { QiyunLogo } from '@/shared/ui/BrandIcons';
+import { QiyunLogo } from '@/shared/icons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 
 export interface ApiServicesQiyunPanelProps {

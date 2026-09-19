@@ -1,5 +1,5 @@
 import { Settings } from 'lucide-react';
-import BatchWorkshopView from '@/features/workshop/batch/BatchWorkshopView';
+import BatchWorkshopView from '@/features/workshop/batch/components/BatchWorkshopView';
 
 interface Props {
   onOpenSettings?: () => void;

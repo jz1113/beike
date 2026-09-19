@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { processDeconstructQueueItem } from '@/lib/deconstructClient';
+import { processDeconstructQueueItem } from '@/shared/api/deconstructClient';
 import {
   getEnabledMultimodalModelsFromSettings,
   resolveStoredMultimodalModelId,
@@ -9,9 +9,9 @@ import {
   exportDeconstructRecordsToCsv,
   transformQueueItemToRecordRow,
   type DeconstructedRecordRow,
-} from '../assetDeconstructCsvExport';
-import { buildQueueItemsFromFiles } from '../assetFolderImport';
-import type { ImageSetQueueItem } from '../assetPromptConstants';
+} from '../utils/assetDeconstructCsvExport';
+import { buildQueueItemsFromFiles } from '../utils/assetFolderImport';
+import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
 import { getSubCategoriesForCategory, type ActionCategoryId } from '@beike/domain/productCategory';
 import {
   clearDeconstructQueueDraft,
@@ -19,7 +19,7 @@ import {
   persistQueueConcurrency,
   readDeconstructQueueDraft,
   readQueueConcurrency,
-} from '../deconstructQueueStorage';
+} from '../utils/deconstructQueueStorage';
 import {
   categoryForQueueItem,
   resolveActionCategory,

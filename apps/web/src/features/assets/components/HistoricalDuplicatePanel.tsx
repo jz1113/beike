@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 export function HistoricalDuplicatePanel({ onView }: { onView?: (id: string) => void }) {
   const [groups, setGroups] = useState<Array<Array<{ id: string; name: string }>> | null>(null);
   const [busy, setBusy] = useState(false);

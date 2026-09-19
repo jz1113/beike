@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { setClientAccessToken, setMediaSession } from '@/lib/apiClient';
+import { setClientAccessToken, setMediaSession } from '@/shared/api/apiClient';
 import {
   DesktopBootstrapContext,
   DESKTOP_API_READY_EVENT,
   type DesktopBootstrapStatus,
-} from '@/lib/desktopBootstrap';
-import { isTauriDesktop } from '@/lib/desktopRuntime';
-import { invokeTauriApi } from '@/lib/tauriApi';
+} from '@/shared/desktop/desktopBootstrap';
+import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
+import { invokeTauriApi } from '@/shared/desktop/tauriApi';
 import DesktopBootstrapShell from '@/shared/ui/DesktopBootstrapShell';
 
 const MAX_ATTEMPTS = 24;

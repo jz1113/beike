@@ -6,7 +6,7 @@ import {
   extractCanonicalOutfitFromPrompts,
   isGenericLook,
 } from '@beike/domain/drawing';
-import { sliceGridImage2x2 } from '@/lib/imageGridSlicer';
+import { sliceGridImage2x2 } from '@/shared/media/imageGridSlicer';
 import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
 import { isActionAllowedForProduct } from '@beike/domain/phoneProductPolicy';
 import type { BatchProductItem } from './batchTypes';

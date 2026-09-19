@@ -1,15 +1,15 @@
 import type { AssistantRunMode, ReferenceScope } from '@beike/domain/assistant/taskPolicy';
-import { persistAssistantImages } from '../persistAssistantImages';
+import { persistAssistantImages } from '../utils/persistAssistantImages';
 import { useState, useRef, useMemo } from 'react';
-import { apiFetch, proxyMediaUrl } from '@/lib/apiClient';
-import { extractVideoFramesFromSrc, isVideoMediaUrl } from '@/lib/mediaHelper';
-import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
+import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
+import { extractVideoFramesFromSrc, isVideoMediaUrl } from '@/shared/media/mediaHelper';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { buildBrandKitSystemPrompt } from '@beike/domain/brandKitModels';
 import { composeSkillRuntime } from '@beike/domain/assistant/skills';
-import { useAppStore, AssistantMessage, MediaAttachment } from '@/store/useAppStore';
+import { useAppStore, AssistantMessage, MediaAttachment } from '@/store';
 import { useAssistantTurn } from '@/features/assistant/hooks/useAssistantTurn';
-import type { PendingApproval } from '@/features/assistant/assistantTurnTypes';
+import type { PendingApproval } from '@/features/assistant/utils/assistantTurnTypes';
 import { createStreamPatchBatcher } from './streamPatchBatcher';
 
 interface UseAssistantChatStreamOptions {

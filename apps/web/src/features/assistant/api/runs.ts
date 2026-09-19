@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 
 export interface ActiveRun {
   turnId: string;

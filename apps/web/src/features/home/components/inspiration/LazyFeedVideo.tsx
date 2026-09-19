@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {videoPlaybackManager} from '@/lib/videoPlaybackManager';
+import {videoPlaybackManager} from '@/shared/media/videoPlaybackManager';
 import {FeedImage} from './FeedImage';
 interface Props {src:string;poster?:string;className?:string;onAspectRatio?:(ratio:number)=>void;}
 /** Feed previews stay still until the pointer enters. */

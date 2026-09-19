@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image as ImageIcon, Compass, Wand2, Maximize2, RotateCcw, RotateCw } from 'lucide-react';
-import type { GenerationTask } from '@/store/useAppStore';
+import type { GenerationTask } from '@/store';
 
 export interface LightboxToolPanelProps {
   previewTask: GenerationTask;

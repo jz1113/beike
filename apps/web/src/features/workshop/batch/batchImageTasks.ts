@@ -1,7 +1,7 @@
-import { apiFetch } from '@/lib/apiClient';
-import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
-import { compressImageToDataUrl } from '@/lib/image-utils';
-import { recordModelUsage, resolveModelVendor } from '@/lib/usageTracker';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/shared/api/gatewayClient';
+import { compressImageToDataUrl } from '@/shared/media/image-utils';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { isTransientPollError, imageGenBusinessError, nonRetryableError } from './batchRunnerIo';
 
 /**

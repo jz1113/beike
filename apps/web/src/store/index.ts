@@ -95,6 +95,9 @@ if (typeof window !== 'undefined') {
   }
 }
 
+export type { AppView } from './appView';
+export { normalizeAppView, isAppView } from './appView';
+
 export type {
   AppState,
   ViewSlice,

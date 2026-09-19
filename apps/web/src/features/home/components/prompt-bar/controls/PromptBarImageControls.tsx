@@ -1,5 +1,5 @@
 import { Link as LinkIcon } from 'lucide-react';
-import { IMAGE_RATIO_ITEMS } from '../../../data/promptBarConstants';
+import { IMAGE_RATIO_ITEMS } from '@/shared/prompt-bar/promptBarConstants';
 
 interface Props {
   quickAspectId: string;

@@ -1,6 +1,6 @@
-import { useAppStore, type GenerationTask } from '@/store/useAppStore';
-import { apiFetch } from '@/lib/apiClient';
-import { getGatewayClientHeaders } from '@/lib/gatewayClient';
+import { useAppStore, type GenerationTask } from '@/store';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getGatewayClientHeaders } from '@/shared/api/gatewayClient';
 import {
   isDepthVideoTask,
   isDepthImageTask,
@@ -10,7 +10,7 @@ import {
   type TaskUpdater,
   SLOW_POLL_HINT,
 } from './generationTaskTypes';
-import { peekDepthSubmit } from '@/lib/depthGeneration';
+import { peekDepthSubmit } from '@/shared/api/depthGeneration';
 
 const pollingTaskIds = new Set<string>();
 

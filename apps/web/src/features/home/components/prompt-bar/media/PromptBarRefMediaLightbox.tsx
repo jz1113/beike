@@ -4,9 +4,9 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
-import { isImageFile, isVideoFile, type RefMediaKind } from '@/lib/mediaUpload';
+import { isImageFile, isVideoFile, type RefMediaKind } from '@/shared/api/mediaUpload';
 import { isVideoRef, RefMediaThumb } from './PromptBarRefMediaThumb';
 
 export interface PromptBarRefMediaLightboxProps {

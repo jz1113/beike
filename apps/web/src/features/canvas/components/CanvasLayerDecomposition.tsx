@@ -2,7 +2,7 @@ import { runLayerDecompositionTask } from '../layerDecompositionTask';
 import {useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Layers, X, Undo2, Redo2} from 'lucide-react';
-import {apiFetch, proxyMediaUrl} from '@/lib/apiClient';
+import {apiFetch, proxyMediaUrl} from '@/shared/api/apiClient';
 import type {CanvasNode} from '../types';
 
 async function prepareImage(url: string) {

@@ -1,14 +1,14 @@
 import {justifiedRows} from '../../utils/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { handleImgError } from '@/shared/media/imageError';
-import { isVideoMediaUrl } from '@/lib/mediaHelper';
+import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
 import { Search, X } from 'lucide-react';
 import InspirationModal, { InspirationItem, InspirationUseOptions } from './InspirationModal';
 import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../utils/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
 import { getStoryboardPresetById, persistStoryboardPreset } from '@beike/domain/prompt-engine/storyboardPreset';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 
 const INITIAL_VISIBLE = 24;
 const LOAD_MORE_STEP = 16;

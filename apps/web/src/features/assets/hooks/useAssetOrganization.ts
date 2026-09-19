@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/apiClient';
-import { invalidateGlobalAssetCache } from '../assetLibraryCache';
+import { apiFetch } from '@/shared/api/apiClient';
+import { invalidateGlobalAssetCache } from '../utils/assetLibraryCache';
 import type { AssetProductCategory, PromptAlbum } from '@beike/domain/assetOrganization';
 
 export function useAssetOrganization(showToast: (message: string) => void) {

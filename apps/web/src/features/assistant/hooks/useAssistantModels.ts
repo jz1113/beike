@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import {
   DEFAULT_ASSISTANT_MODELS,
   enrichAssistantModelDisplay,
-} from '@/features/assistant/assistantConstants';
+} from '@/features/assistant/utils/assistantConstants';
 import {
   getEnabledMultimodalModelsFromSettings,
   repairWorkflowModelsInStorage,

@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { TOAST_DURATION_MS } from '@/lib/constants/timing';
-import { registerRefMedia } from '@/lib/refMediaRegistry';
-import { useAppStore } from '@/store/useAppStore';
-import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '../utils/promptBarSubmit';
-import { registerDepthSubmit } from './useDepthGeneration';
+import { TOAST_DURATION_MS } from '@/shared/constants/timing';
+import { registerRefMedia } from '@/shared/media/refMediaRegistry';
+import { useAppStore } from '@/store';
+import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '@/shared/prompt-bar/promptBarSubmit';
+import { registerDepthSubmit } from '@/shared/api/depthGeneration';
 import type { QuickGenMode } from '@beike/domain/depthVideo';
-import type { SubjectItem } from '../data/promptBarConstants';
+import type { SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
 
 interface UsePromptBarSubmitOptions {
   quickGenMode: QuickGenMode;

@@ -2,7 +2,7 @@ import {
   Loader2,
   Zap,
 } from 'lucide-react';
-import { OneBoundLogo } from '@/shared/ui/BrandIcons';
+import { OneBoundLogo } from '@/shared/icons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 
 export interface ApiServicesWanbangPanelProps {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '@/lib/apiClient';
-import { confirmAction } from '@/lib/confirmAction';
+import { apiFetch } from '@/shared/api/apiClient';
+import { confirmAction } from '@/shared/utils/confirmAction';
 import {
   DEFAULT_PRESET_MODELS,
   type WorkflowModel,

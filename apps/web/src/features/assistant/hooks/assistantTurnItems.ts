@@ -2,7 +2,7 @@ import type {
   TurnStreamState,
   PendingApproval,
   ToolActivityEntry,
-} from '@/features/assistant/assistantTurnTypes';
+} from '@/features/assistant/utils/assistantTurnTypes';
 import type {
   AssistantItem,
   ToolCallItem,

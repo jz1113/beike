@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { useAppStore } from '@/store';
 import { VISION_MODELS } from '@beike/domain/vision';
 import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
@@ -8,7 +8,7 @@ import {
   getStoredMultimodalModelId,
   repairWorkflowModelsInStorage,
 } from '@beike/domain/workflowModels';
-import { getGlobalAssetLibrary } from '@/features/assets/assetLibraryCache';
+import { getGlobalAssetLibrary } from '@/features/assets/utils/assetLibraryCache';
 import { SYSTEM_MASTER_RECIPES } from './batchTypes';
 
 /**

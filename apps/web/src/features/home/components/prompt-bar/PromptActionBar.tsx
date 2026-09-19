@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Plus, ArrowUp } from 'lucide-react';
-import { useScrollLock } from '@/lib/useScrollLock';
-import { useDropdownMenu } from '@/lib/useDropdownMenu';
+import { useScrollLock } from '@/shared/hooks/useScrollLock';
+import { useDropdownMenu } from '@/shared/hooks/useDropdownMenu';
 import { 
   VIDEO_ASPECT_RATIOS, 
   VIDEO_REF_MODES, 
@@ -11,14 +11,14 @@ import {
 import { usePromptBarWorkflowModels } from '../../hooks/usePromptBarWorkflowModels';
 import { usePromptBarStoreState } from '../../hooks/usePromptBarStoreState';
 import { densityComposerPad, composerContainer } from '@/shared/ui/layoutClasses';
-import { useAppLayoutMode } from '@/lib/useCompactLayout';
+import { useAppLayoutMode } from '@/shared/hooks/useCompactLayout';
 
-import { RichPromptInput, RichPromptInputRef } from './RichPromptInput';
-import { IMAGE_RATIO_ITEMS, type SubjectItem } from '../../data/promptBarConstants';
+import { RichPromptInput, RichPromptInputRef } from '@/shared/prompt-bar/RichPromptInput';
+import { IMAGE_RATIO_ITEMS, type SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
 import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
 import PromptBarBrandHero from './PromptBarBrandHero';
 import PromptBarRefMediaPanel from './media/PromptBarRefMediaPanel';
-import { useDepthEnvCheck } from '../../hooks/useDepthGeneration';
+import { useDepthEnvCheck } from '@/shared/api/depthGeneration';
 import { isDepthGenMode, type QuickGenMode } from '@beike/domain/depthVideo';
 import {
   resolvePromptPlaceholder,
@@ -27,7 +27,7 @@ import {
   hasSidebarRefMedia,
   resolveUseTopStrip,
   calculateImageDimensions,
-} from '../../utils/promptBarDisplay';
+} from '@/shared/prompt-bar/promptBarDisplay';
 import { usePromptBarVideoFrames } from '../../hooks/usePromptBarVideoFrames';
 import { usePromptBarMedia } from '../../hooks/usePromptBarMedia';
 import { usePromptBarSubmit } from '../../hooks/usePromptBarSubmit';
@@ -41,7 +41,7 @@ interface Props {
   extraSubjects?: SubjectItem[];
 }
 
-export type { SubjectItem } from '../../data/promptBarConstants';
+export type { SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
 
 export default function PromptActionBar({ 
   dropdownPlacement = 'auto',

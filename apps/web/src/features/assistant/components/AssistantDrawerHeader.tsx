@@ -7,7 +7,7 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 
 interface AssistantDrawerHeaderProps {
   sessionTitle: string;

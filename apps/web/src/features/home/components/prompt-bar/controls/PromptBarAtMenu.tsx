@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { Plus, Check } from 'lucide-react';
-import { proxyMediaUrl } from '@/lib/apiClient';
-import type { SubjectItem } from '../../../data/promptBarConstants';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
+import type { SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
 
 export interface PromptBarAtMenuProps {
   atMenuRef?: RefObject<HTMLDivElement | null>;

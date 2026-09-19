@@ -4,8 +4,8 @@ import {
   getUiScaleOverride,
   setUiScaleOverride,
   UI_SCALE_OVERRIDE_KEY,
-} from '@/lib/useMediaQuery';
-import { usePerformanceMode } from '@/lib/performancePreference';
+} from '@/shared/hooks/useMediaQuery';
+import { usePerformanceMode } from '@/shared/utils/performancePreference';
 
 const SCALE_OPTIONS = [
   { value: 0.85, label: '85% 极简' },

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type RefObject } from 'react';
-import { useFileDropZone } from '@/lib/useFileDropZone';
+import { useFileDropZone } from '@/shared/hooks/useFileDropZone';
 import {
   isImageFile,
   isImageOrVideoFile,
@@ -8,16 +8,16 @@ import {
   readImageFileAsDataUrl,
   readVideoPreviewUrl,
   type RefMediaKind,
-} from '@/lib/mediaUpload';
+} from '@/shared/api/mediaUpload';
 import {
   registerRefMedia,
   resolveRefMediaFile,
   resolveRefMediaKind,
   unregisterRefMedia,
-} from '@/lib/refMediaRegistry';
-import type { SubjectItem } from '../data/promptBarConstants';
-import { buildPromptBarSubjects } from '../utils/promptBarSubmit';
-import type { RichPromptInputRef } from '../components/prompt-bar/RichPromptInput';
+} from '@/shared/media/refMediaRegistry';
+import type { SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
+import { buildPromptBarSubjects } from '@/shared/prompt-bar/promptBarSubmit';
+import type { RichPromptInputRef } from '@/shared/prompt-bar/RichPromptInput';
 import type { QuickGenMode } from '@beike/domain/depthVideo';
 
 function escapeRegExp(str: string): string {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, Download, Copy, Link2, Scissors, Clipboard, CheckSquare } from 'lucide-react';
-import { openExternalUrl, fetchMediaBlob, downloadMediaOrOpen } from '@/lib/downloadMedia';
+import { openExternalUrl, fetchMediaBlob, downloadMediaOrOpen } from '@/shared/media/downloadMedia';
 
 interface ContextMenuState {
   visible: boolean;

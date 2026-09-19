@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {ArrowUp, ArrowDown, Eye, EyeOff, Lock, Unlock, Layers, ChevronDown, ChevronUp} from 'lucide-react';
-import {proxyMediaUrl} from '@/lib/apiClient';
+import {proxyMediaUrl} from '@/shared/api/apiClient';
 import {useCanvasStore} from '../store/useCanvasStore';
 import {mergeCanvasLayers, orderedLayers, layerBounds} from '../canvasLayers';
 import type {CanvasNode, CanvasProject} from '../types';

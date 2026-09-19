@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useId } from 'react';
-import { videoPlaybackManager } from '@/lib/videoPlaybackManager';
+import { videoPlaybackManager } from '@/shared/media/videoPlaybackManager';
 
 export default function LazyVideoCover({
   src,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 export type CanvasToolQuality = '1K' | '2K' | '4K';
 const qualityToLabel = (quality?: string): CanvasToolQuality => quality === 'low' ? '1K' : quality === 'high' ? '4K' : '2K';
 /** Model/quality/aspect selection shared by canvas image tools. */

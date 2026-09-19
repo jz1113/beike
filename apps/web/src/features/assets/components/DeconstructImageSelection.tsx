@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ImageSetQueueItem } from '../assetPromptConstants';
+import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
 
 export default function DeconstructImageSelection({ item, disabled, onChange }: {
   item: ImageSetQueueItem; disabled: boolean; onChange: (excluded: number[]) => void;

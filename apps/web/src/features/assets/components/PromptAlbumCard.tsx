@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Layers, Check, MoreHorizontal, Tag } from 'lucide-react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 export default function PromptAlbumCard({ album, categoryName, matchedCount, searching, selected, batch, onOpen, onSelect, onClassify }: {
   album: { name: string; items: any[] }; categoryName: string; matchedCount: number; searching: boolean; selected: boolean; batch: boolean;
   onOpen: () => void; onSelect: () => void; onClassify: () => void;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
-import { useToast } from '@/lib/useToast';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
+import { useToast } from '@/shared/hooks/useToast';
 import {
   ArrowLeft,
   Search,
@@ -13,8 +13,8 @@ import {
   X,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '@/store/useAppStore';
-import { getUsageSummary, type UsageSummary } from '@/lib/usageTracker';
+import { useAppStore } from '@/store';
+import { getUsageSummary, type UsageSummary } from '@/shared/utils/usageTracker';
 import {
   getStoredMultimodalModelId,
   gatewayModelToWorkflowModel,

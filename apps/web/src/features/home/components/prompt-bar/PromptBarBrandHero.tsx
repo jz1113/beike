@@ -1,4 +1,4 @@
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { TrueFocus } from '@/shared/ui/TrueFocus';
 
 export default function PromptBarBrandHero() {

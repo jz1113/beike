@@ -1,6 +1,6 @@
 import { forwardRef, useId, useImperativeHandle, useRef, useState } from 'react';
 import { RichPromptInput, type RichPromptInputRef } from '@/shared/prompt-bar/RichPromptInput';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 export interface CanvasPromptInputRef { insertReference: (index: number) => void }
 export const CanvasPromptInput = forwardRef<CanvasPromptInputRef, {value: string; references: string[]; onChange: (value: string) => void; onSubmit: () => void}>(function CanvasPromptInput({value, references, onChange, onSubmit}: {

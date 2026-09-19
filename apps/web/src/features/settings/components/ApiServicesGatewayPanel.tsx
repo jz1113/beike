@@ -16,7 +16,7 @@ import {
   ExternalLink,
   Info,
 } from 'lucide-react';
-import { ComflyLogo } from '@/shared/ui/BrandIcons';
+import { ComflyLogo } from '@/shared/icons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 import WorkflowModelRow from '../WorkflowModelRow';

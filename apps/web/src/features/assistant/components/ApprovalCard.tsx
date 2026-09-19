@@ -1,5 +1,5 @@
 import { Check, X, Shield } from 'lucide-react';
-import type { PendingApproval, ApprovalDecision } from '@/features/assistant/assistantTurnTypes';
+import type { PendingApproval, ApprovalDecision } from '@/features/assistant/utils/assistantTurnTypes';
 
 interface Props {
   approval: PendingApproval;

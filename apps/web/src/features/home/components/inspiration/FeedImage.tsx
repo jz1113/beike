@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 /** Bounded retries; changing a source resets errors instead of reusing DOM retry counters. */
 export function FeedImage({ src, alt = '', className, eager = false, onAspectRatio, onUnavailable }: {

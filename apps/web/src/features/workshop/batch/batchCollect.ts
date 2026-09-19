@@ -1,4 +1,4 @@
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../../shared/api/apiClient';
 import type { BatchProductItem, TypedProductImage } from './batchTypes';
 
 export interface ParseBatchInputResult {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiFetch as rawApiFetch } from '@/lib/apiClient';
+import { apiFetch as rawApiFetch } from '@/shared/api/apiClient';
 import { pickAssetEditFields } from '@beike/domain/assetEdit';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
@@ -10,10 +10,10 @@ async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Respon
   return res;
 }
 import { useAppStore } from '@/store';
-import { invalidateGlobalAssetCache } from '../assetLibraryCache';
-import { resolveAssetApiType } from '../assetPromptConstants';
-import { buildBackupData, parseBackupDataToBulkItems } from '../assetBackup';
-import { parsePersonaLayers, formatPersonaPrompt } from '../assetPromptConstants';
+import { invalidateGlobalAssetCache } from '../utils/assetLibraryCache';
+import { resolveAssetApiType } from '../utils/assetPromptConstants';
+import { buildBackupData, parseBackupDataToBulkItems } from '../utils/assetBackup';
+import { parsePersonaLayers, formatPersonaPrompt } from '../utils/assetPromptConstants';
 import type { SceneShot } from '@beike/domain/sceneBundle';
 
 export interface UseAssetCrudOptions {

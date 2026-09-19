@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useAppStore, type GenerationTask } from '@/store/useAppStore';
+import { useAppStore, type GenerationTask } from '@/store';
 import {
   getAspectRatioFromSize,
   formatDisplayModel,
@@ -10,15 +10,15 @@ import {
   stripWorkshopPromptGuards,
   cleanPromptText,
 } from '@beike/domain/drawing';
-import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/lib/gatewayClient';
-import { apiFetch } from '@/lib/apiClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/shared/api/gatewayClient';
+import { apiFetch } from '@/shared/api/apiClient';
 import { isGenerateVideoTask, type FlatBatchItem } from '../generateWorkspaceLayout';
 import {
   cloneDepthSubmit,
   peekDepthSubmit,
   resolveDepthSubmit,
-} from '@/lib/depthGeneration';
-import { resolveRefMediaFile, registerRefMedia } from '@/lib/refMediaRegistry';
+} from '@/shared/api/depthGeneration';
+import { resolveRefMediaFile, registerRefMedia } from '@/shared/media/refMediaRegistry';
 import {
   DEPTH_IMAGE_MODEL_ID,
   DEPTH_VIDEO_MODEL_ID,

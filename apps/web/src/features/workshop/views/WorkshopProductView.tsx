@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { apiFetch } from '@/lib/apiClient';
-import { getCachedProducts, setCachedProducts } from '@/lib/catalogCache';
+import { apiFetch } from '@/shared/api/apiClient';
+import { getCachedProducts, setCachedProducts } from '@/shared/api/catalogCache';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { confirmAction } from '@/lib/confirmAction';
-import { useAppStore } from '@/store/useAppStore';
-import AssetProductLibrary from '@/features/assets/AssetProductLibrary';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
+import { confirmAction } from '@/shared/utils/confirmAction';
+import { useAppStore } from '@/store';
+import AssetProductLibrary from '@/features/assets/components/AssetProductLibrary';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 
 interface Props {
   onEnterStudio: () => void;

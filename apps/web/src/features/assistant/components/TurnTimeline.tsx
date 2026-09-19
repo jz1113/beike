@@ -1,7 +1,7 @@
-import AssistantToolActivity from '@/features/assistant/AssistantToolActivity';
+import AssistantToolActivity from '@/features/assistant/components/AssistantToolActivity';
 import ThinkingBlock from '@/features/assistant/components/ThinkingBlock';
 import ApprovalCard from '@/features/assistant/components/ApprovalCard';
-import type { ToolActivityEntry, PendingApproval, ApprovalDecision } from '@/features/assistant/assistantTurnTypes';
+import type { ToolActivityEntry, PendingApproval, ApprovalDecision } from '@/features/assistant/utils/assistantTurnTypes';
 
 interface Props {
   toolActivity: ToolActivityEntry[];

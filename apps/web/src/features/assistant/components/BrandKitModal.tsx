@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { BrandKitProfile, DEFAULT_BRAND_KITS } from '@beike/domain/brandKitModels';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 
 interface Props {
   isOpen: boolean;

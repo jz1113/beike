@@ -1,5 +1,5 @@
-import { handleWindowDrag, handleWindowDoubleClick } from '@/lib/windowDrag';
-import { isTauriDesktop, isMacOs } from '@/lib/desktopRuntime';
+import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
+import { isTauriDesktop, isMacOs } from '@/shared/desktop/desktopRuntime';
 
 export default function MacTitleBar() {
   // 仅在 macOS 平台渲染（为 macOS 原生红绿灯交通灯与 Overlay 模式预留间距与拖拽区）

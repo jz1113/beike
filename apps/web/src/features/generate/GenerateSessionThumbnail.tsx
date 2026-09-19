@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Film, MessageSquare } from 'lucide-react';
-import { useAppStore, type ChatSession, type GenerationTask } from '@/store/useAppStore';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { useAppStore, type ChatSession, type GenerationTask } from '@/store';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 /** 校验是否为合法有效的图片/视频媒体地址 */
 function isValidMediaUrl(url?: string | null): boolean {

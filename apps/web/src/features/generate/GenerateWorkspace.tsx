@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore, GenerationTask } from '@/store/useAppStore';
-import { useQuickRefMediaDrop } from '@/lib/useQuickRefMediaDrop';
+import { useAppStore, GenerationTask } from '@/store';
+import { useQuickRefMediaDrop } from '@/shared/hooks/useQuickRefMediaDrop';
 import { X } from 'lucide-react';
 import PromptActionBar from '@/shared/prompt-bar';
 import { GenerateWorkspaceToolbar } from './components/GenerateWorkspaceToolbar';
@@ -12,7 +12,7 @@ import {
   flattenDateBatches,
 } from './generateWorkspaceLayout';
 import { pageRoot } from '@/shared/ui/layoutClasses';
-import { useSafeTimeout } from '@/lib/useSafeTimeout';
+import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 
 interface Props {
   onOpenSettings?: () => void;

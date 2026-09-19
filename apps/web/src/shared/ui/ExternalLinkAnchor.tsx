@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode } from 'react';
-import { openExternalUrl } from '@/lib/downloadMedia';
+import { openExternalUrl } from '@/shared/media/downloadMedia';
 
 type ExternalLinkAnchorProps = {
   href: string;

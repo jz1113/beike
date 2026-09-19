@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 
 const EMPTY_STRING_ARRAY: string[] = [];
 const EMPTY_ANY_ARRAY: any[] = [];

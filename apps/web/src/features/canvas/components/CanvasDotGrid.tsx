@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import { getPerformanceMode } from '@/lib/performancePreference';
+import { getPerformanceMode } from '@/shared/utils/performancePreference';
 import { CanvasDotGridStatic } from './canvasDotGridStatic';
 
 export interface CanvasDotGridProps {

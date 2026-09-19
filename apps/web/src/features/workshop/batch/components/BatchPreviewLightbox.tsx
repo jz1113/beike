@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { proxyMediaUrl } from '@/lib/apiClient';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 import {
   X,
   ChevronLeft,

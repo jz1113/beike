@@ -1,5 +1,5 @@
 import type { ChatSession, GenerationTask } from '@/types/app-store';
-import { isProjectAutosaveEnabled } from '@/lib/localStoragePrefs';
+import { isProjectAutosaveEnabled } from '@/shared/utils/localStoragePrefs';
 import { MAX_GENERATION_TASKS_IN_MEMORY, STARTUP_TASK_SUMMARY_COUNT } from '../generationLimits';
 
 export const generationDeletedKeys = new Set<string>();

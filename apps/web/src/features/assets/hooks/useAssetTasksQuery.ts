@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { GenerationTask } from '@/types/app-store';
-import { useAppStore } from '@/store/useAppStore';
-import { fetchAssetTasks } from '@/lib/generationApi';
+import { useAppStore } from '@/store';
+import { fetchAssetTasks } from '@/shared/api/generationApi';
 
 export const assetTasksQueryKey = ['assets', 'tasks'] as const;
 
