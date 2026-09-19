@@ -1,4 +1,4 @@
-import { jsonResponse } from '../../../../core/http';
+import { jsonResponse } from '../../core/http';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 export type VisionCallDiagnostics = {

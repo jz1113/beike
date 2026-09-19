@@ -15,11 +15,10 @@ import {
 import type { SubCategoryDef } from '@beike/domain/productCategory';
 import { reconcileAssetsFromPerImage } from '@beike/domain/assetDeconstruct/validate';
 
-// 导入解构子系统
-// 导入解构子系统
-import { createVisionCallDiagnostics, createVisionCallTracker, buildDeconstructFailureResponse } from './deconstruct/diagnostics';
-import { convertImagesInBatches } from './deconstruct/visionCall';
-import { runUnifiedDeconstruct, resolveEnablePass2, type PipelineMode } from './deconstruct/unified';
+// 解构子系统
+import { createVisionCallDiagnostics, createVisionCallTracker, buildDeconstructFailureResponse } from '../../../services/deconstruct/diagnostics';
+import { convertImagesInBatches } from '../../../services/deconstruct/visionCall';
+import { runUnifiedDeconstruct, resolveEnablePass2, type PipelineMode } from '../../../services/deconstruct/unified';
 import { persistDeconstructedAssets, type SavedRecords } from '../../../services/deconstruct/saveAssets';
 import { xhsSourceKey } from '@beike/domain/xhsSource';
 import { AppError, errorResponse } from '../../../core/errors';
@@ -31,7 +30,7 @@ export {
   repairSingleObjectJson,
   repairAndParseDeconstructJson,
   parseUnifiedFromResponse,
-} from './deconstruct/jsonHealer';
+} from '../../../services/deconstruct/jsonHealer';
 export {
   createVisionCallDiagnostics,
   noteModelAttempt,
@@ -41,7 +40,7 @@ export {
   noteVisionCall,
   type VisionCallDiagnostics,
   type VisionCallTracker,
-} from './deconstruct/diagnostics';
+} from '../../../services/deconstruct/diagnostics';
 export {
   resolveDeconstructConcurrency,
   resolveMaxInflight,
@@ -54,7 +53,7 @@ export {
   isRateLimitResponse,
   RATE_LIMIT_BACKOFF_MS,
   MAX_NETWORK_ATTEMPTS,
-} from './deconstruct/concurrency';
+} from '../../../services/deconstruct/concurrency';
 
 export async function POST(req: Request) {
   let claimedKey: string | undefined;

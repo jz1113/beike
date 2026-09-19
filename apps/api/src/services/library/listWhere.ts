@@ -1,5 +1,5 @@
-import { prisma } from '../../../../repositories/db';
-import { buildAssetCategoryWhere } from '../../../../services/libraryQueries';
+import { prisma } from '../../repositories/db';
+import { buildAssetCategoryWhere } from '../libraryQueries';
 import { organizationWhere } from '@beike/server-kit/assetOrganization';
 
 export async function buildLibraryListWhere(assetType: string, searchParams: URLSearchParams, keywordFields: string[]) {

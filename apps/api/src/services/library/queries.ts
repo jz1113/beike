@@ -1,9 +1,9 @@
-import { jsonResponse } from '../../../../core/http';
-import { prisma } from '../../../../repositories/db';
+import { jsonResponse } from '../../core/http';
+import { prisma } from '../../repositories/db';
 import { resolveShotsForScene, type ActionLike } from '@beike/domain/sceneBundle';
 import { stableAssetCode } from '@beike/domain/assetSampling';
-import { readOrganization } from '../../../../services/library/organization';
-import { buildLibraryListWhere } from './libraryListWhere';
+import { readOrganization } from './organization';
+import { buildLibraryListWhere } from './listWhere';
 
 const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {
   const text = typeof reversePromptZh === 'string' ? reversePromptZh.trim() : '';

@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../../core/http';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { executeLibraryGet } from './library/libraryQueries';
+import { executeLibraryGet } from '../../../services/library/queries';
 import {
   executeLibraryPost,
   executeLibraryPut,

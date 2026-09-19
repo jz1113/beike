@@ -1,9 +1,9 @@
-import { gatewayFetch } from '../../../../gateways/http';
+import { gatewayFetch } from '../../gateways/http';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { resolveVisionTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS } from '@beike/domain/visionTimeouts';
-import { getRetryDelayMs, isNetworkLikeError } from '../../../../services/gatewayCredentials';
+import { getRetryDelayMs, isNetworkLikeError } from '../gatewayCredentials';
 import {
   VisionCallDiagnostics,
   VisionCallTracker,
