@@ -93,10 +93,6 @@
       "lines": 401
     },
     {
-      "file": "app/web/src/features/canvas/__tests__/InfiniteCanvasEditor.test.tsx",
-      "lines": 401
-    },
-    {
       "file": "app/web/src/features/canvas/components/CanvasDrawingNode.tsx",
       "lines": 401
     },

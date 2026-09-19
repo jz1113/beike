@@ -31,7 +31,7 @@ for (const rel of FORBIDDEN_DIRS) {
   }
 }
 
-const worksExpected = ['configs', 'e2e', 'scripts', 'test-support', 'launch'];
+const worksExpected = ['configs', 'scripts', 'launch'];
 for (const name of worksExpected) {
   const dir = path.join(workspaceRoot, 'works', name);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {

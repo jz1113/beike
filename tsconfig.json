@@ -35,13 +35,6 @@
     "packages/contracts/src/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "works/e2e",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "vitest.config.ts",
-    "works/configs/vitest.config.ts",
-    "playwright.config.ts",
-    "works/configs/playwright.config.ts"
+    "node_modules"
   ]
 }

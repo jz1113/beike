@@ -14,7 +14,6 @@ export default defineConfig([
   ]),
   {
     files: ['app/web/src/**/*.{ts,tsx}'],
-    ignores: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
       'no-restricted-imports': ['error', { patterns: ['node:*', '@prisma/client', '@beike/server-kit', '@beike/server-kit/*', '@beike/shared', '@beike/shared/*'] }],
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
@@ -77,7 +76,6 @@ export default defineConfig([
   },
   {
     files: ['app/api/src/routes/**/*.ts'],
-    ignores: ['**/*.test.ts', '**/__tests__/**'],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{ name: '@beike/server-kit/prisma', message: '路由层不得直接访问 Prisma，改走 repositories/' }],
@@ -87,7 +85,6 @@ export default defineConfig([
   },
   {
     files: ['packages/domain/src/**/*.ts'],
-    ignores: ['**/*.test.ts', '**/__tests__/**'],
     rules: {
       'no-restricted-globals': ['error',
         { name: 'localStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
@@ -99,7 +96,6 @@ export default defineConfig([
   },
   {
     files: ['app/api/src/**/*.ts', 'packages/server-kit/src/**/*.ts', 'packages/contracts/src/**/*.ts'],
-    ignores: ['**/*.test.ts', '**/__tests__/**'],
     rules: {
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
     },

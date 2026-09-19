@@ -201,12 +201,6 @@
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
-      "file": "app/web/src/features/home/__tests__/PromptBarRefMediaLightbox.test.tsx",
-      "message": "'container' is assigned a value but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
       "file": "app/web/src/features/home/hooks/usePromptBarMedia.ts",
       "message": "'insertMentionsIntoPrompt' is defined but never used.",
       "count": 1,
@@ -241,30 +235,6 @@
       "message": "'isCategoryManagerOpen' is assigned a value but never used.",
       "count": 1,
       "reason": "状态更新仍在交互路径中，暂保留待UI专项。"
-    },
-    {
-      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
-      "message": "'_sx' is defined but never used.",
-      "count": 1,
-      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
-    },
-    {
-      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
-      "message": "'_sy' is defined but never used.",
-      "count": 1,
-      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
-    },
-    {
-      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
-      "message": "'_sw' is defined but never used.",
-      "count": 1,
-      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
-    },
-    {
-      "file": "app/web/src/lib/__tests__/imageGridSlicer.test.ts",
-      "message": "'_sh' is defined but never used.",
-      "count": 1,
-      "reason": "模拟 Canvas 方法签名的前置占位参数，后续参数有断言。"
     },
     {
       "file": "app/web/src/lib/xhsLinkBatch.ts",
