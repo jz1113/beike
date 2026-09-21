@@ -4,6 +4,7 @@ import { X, Download, Maximize2, Film, Bot } from 'lucide-react';
 import {
   displayMediaSrc,
   displayVideoSrc,
+  collectedVideos,
   handleImgError,
   mediaAssetCount,
 } from '@/features/collect/utils/collectorTypes';
@@ -25,6 +26,7 @@ export default function CollectorResultPanel({
   handleImportToAIAssistant,
   handleDownloadSingleZip,
 }: CollectorResultPanelProps) {
+  const videos = collectedVideos(inspectingItem);
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in select-none">
       <div className="relative w-full max-w-4xl max-h-[85vh] rounded-3xl bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden text-left p-6 space-y-4">
@@ -39,7 +41,7 @@ export default function CollectorResultPanel({
             />
             <div>
               <h3 className="font-bold text-base text-slate-900 break-words whitespace-normal leading-snug">{inspectingItem.title}</h3>
-              <p className="text-xs text-slate-400">共 {mediaAssetCount(inspectingItem)} 项素材{inspectingItem.video ? '（含视频）' : ''}</p>
+              <p className="text-xs text-slate-400">共 {mediaAssetCount(inspectingItem)} 项素材{videos.length ? `（含 ${videos.length} 条视频/动态）` : ''}</p>
             </div>
           </div>
 
@@ -76,13 +78,14 @@ export default function CollectorResultPanel({
         </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 overflow-y-auto max-h-[60vh] pr-1">
-          {inspectingItem.video && (
+          {videos.map((videoUrl, videoIndex) => (
             <div
+              key={videoUrl}
               className="group relative aspect-square rounded-2xl overflow-hidden border border-rose-200 bg-black col-span-2"
               onClick={(e) => e.stopPropagation()}
             >
               <video
-                src={displayVideoSrc(inspectingItem.video)}
+                src={displayVideoSrc(videoUrl)}
                 poster={displayMediaSrc(inspectingItem.coverImage || inspectingItem.images?.[0]) || undefined}
                 controls
                 playsInline
@@ -92,10 +95,10 @@ export default function CollectorResultPanel({
               />
               <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold flex items-center gap-1 pointer-events-none">
                 <Film className="w-3 h-3" />
-                原视频
+                视频/动态 {videoIndex + 1}
               </div>
             </div>
-          )}
+          ))}
           {inspectingItem.images?.map((u: string, idx: number) => (
             <div
               key={idx}

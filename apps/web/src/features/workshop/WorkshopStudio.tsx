@@ -21,7 +21,7 @@ export default function WorkshopStudio({
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-transparent relative select-none">
-      {/* 🌟 侧边悬浮深色胶囊导航栏（对标图4垂直药丸工具栏） */}
+      {/* 顶部右侧模块导航；内容区域不再为旧版侧边栏预留空白 */}
       <WorkshopSideCapsuleBar
         activeTab={activeWorkshopTab}
         onSelectTab={setActiveWorkshopTab}
@@ -37,9 +37,9 @@ export default function WorkshopStudio({
       )}
 
       {/* 核心工作区内容渲染 */}
-      <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative z-10 ${activeWorkshopTab !== 'studio' ? 'pl-[72px] sm:pl-20' : ''}`}>
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
         <div className={activeWorkshopTab === 'studio' ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>
-          <BatchWorkshopView fixedBatchMode="original" />
+          <BatchWorkshopView />
         </div>
 
         {activeWorkshopTab === 'prompt_assets' && (

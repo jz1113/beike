@@ -11,6 +11,7 @@ import {
 } from '@/shared/api/permanentDeleteGeneration';
 import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { isImageTaskActive, isImageTaskFailed } from '@beike/domain/taskStatus';
 import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -35,14 +36,9 @@ import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 
 export type { AssetTaskBatch } from '../utils/assetBatch';
 
-interface Props {
-  onEnterWorkshop?: () => void;
-  onOpenSettings?: () => void;
-}
+const EMPTY_ASSET_ITEMS: never[] = [];
 
-export default function AssetCenter(_props: Props = {}) {
-  const { data: assetTasksQueryData, refetch: refetchAssetTasks } = useAssetTasksQuery(1, true);
-
+export default function AssetCenter() {
   const {
     currentView,
     generationTasks,
@@ -61,6 +57,10 @@ export default function AssetCenter(_props: Props = {}) {
     })),
   );
 
+  // 资产页只在实际打开时订阅列表。任务查询本身已由全局生成引擎共享，
+  // 这里直接复用缓存，避免切换侧边栏时重复拉取同一页详情数据。
+  const { data: assetTasksQueryData, refetch: refetchAssetTasks, isError: isAssetTasksError, isLoading: isLoadingTasks } = useAssetTasksQuery(1, currentView === 'assets');
+
   // 画布项目数据
   const canvasProjects = useCanvasStore((s) => s.projects);
 
@@ -75,11 +75,8 @@ export default function AssetCenter(_props: Props = {}) {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
 
-  // 历史任务数据
-  const [dbTasks, setDbTasks] = useState<any[]>([]);
+  const [extraDbTasks, setExtraDbTasks] = useState<any[]>([]);
   const [tasksPage, setTasksPage] = useState(1);
-  const [tasksTotal, setTasksTotal] = useState(0);
-  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const { setSafeTimeout } = useSafeTimeout();
@@ -88,90 +85,75 @@ export default function AssetCenter(_props: Props = {}) {
   // 套组文件夹浮层弹窗
   const [folderBatch, setFolderBatch] = useState<AssetTaskBatch | null>(null);
 
-  const showToast = (msg: string) => {
+  // 首次进入资产中心时先让导航与骨架完成一帧绘制，再合并任务、会话和画布数据。
+  // 这些数据在历史较多时会有明显的同步计算成本，不应阻塞侧栏点击反馈。
+  const [isGalleryReady, setIsGalleryReady] = useState(false);
+  useEffect(() => {
+    if (currentView !== 'assets') {
+      setIsGalleryReady(false);
+      return;
+    }
+    let secondFrame: number | null = null;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => setIsGalleryReady(true));
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame !== null) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [currentView]);
+
+  const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
     setSafeTimeout(() => setToastMsg(null), 2500);
-  };
+  }, [setSafeTimeout]);
 
-  // 1. 加载生图历史任务（分页）
-  const fetchTasks = useCallback(async (page = 1, append = false) => {
-    if (append) setIsLoadingMoreTasks(true);
-    else setIsLoadingTasks(true);
+  const page1Tasks = useMemo(
+    () => filterDbTasksFromTombstones(assetTasksQueryData?.tasks || []),
+    [assetTasksQueryData],
+  );
+  const dbTasks = useMemo(() => {
+    if (extraDbTasks.length === 0) return page1Tasks;
+    const incomingIds = new Set(page1Tasks.map((t: { id?: string; taskId?: string }) => t.id || t.taskId));
+    return [...page1Tasks, ...extraDbTasks.filter((t: { id?: string; taskId?: string }) => !incomingIds.has(t.id || t.taskId))];
+  }, [page1Tasks, extraDbTasks]);
+  const tasksTotal = assetTasksQueryData?.total ?? dbTasks.length;
+
+  const refreshTasks = useCallback(async () => {
+    setExtraDbTasks([]);
+    setTasksPage(1);
+    await refetchAssetTasks();
+  }, [refetchAssetTasks]);
+
+  const fetchMoreTasks = useCallback(async (page: number) => {
+    setIsLoadingMoreTasks(true);
     try {
       const data = await fetchAssetTasks(page, 40);
       const incoming = filterDbTasksFromTombstones(data.tasks || []);
-      setDbTasks((prev) => (append ? [...prev, ...incoming] : incoming));
+      setExtraDbTasks((prev) => [...prev, ...incoming]);
       setTasksPage(page);
-      setTasksTotal(data.total || incoming.length);
     } catch (err) {
       console.warn('加载生图任务历史轻微异常:', err);
-      if (!append) showToast('历史记录加载失败，删除/同步可能不可用');
+      showToast('历史记录加载失败，删除/同步可能不可用');
     } finally {
-      setIsLoadingTasks(false);
       setIsLoadingMoreTasks(false);
     }
-  }, []);
-
-  useEffect(() => {
-    void fetchTasks(1, false);
-  }, [fetchTasks]);
-
-  // 1. 当 React Query 的任务数据拉取到更新时，增量合并至内部 dbTasks
-  useEffect(() => {
-    if (assetTasksQueryData?.tasks && assetTasksQueryData.tasks.length > 0) {
-      const incoming = filterDbTasksFromTombstones(assetTasksQueryData.tasks);
-      setDbTasks((prev) => {
-        if (tasksPage === 1) return incoming;
-        const incomingIds = new Set(incoming.map((t: any) => t.id || t.taskId));
-        const kept = prev.filter((p: any) => !incomingIds.has(p.id || p.taskId));
-        return [...incoming, ...kept];
-      });
-      if (typeof assetTasksQueryData.total === 'number') {
-        setTasksTotal(assetTasksQueryData.total);
-      }
-    }
-  }, [assetTasksQueryData, tasksPage]);
-
-  // 2. 🌟 切页即时同步：只要用户切换至“资产中心”，立即静默拉取最新数据库任务
-  useEffect(() => {
-    if (currentView === 'assets') {
-      void fetchTasks(1, false);
-      void refetchAssetTasks();
-    }
-  }, [currentView, fetchTasks, refetchAssetTasks]);
-
-  // 3. 🌟 生成完成即时同步：监听全局 azhuo:generation-completed 事件，防抖 200ms 刷新资产列表
-  useEffect(() => {
-    let timer: any = null;
-    const handleCompleted = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        void fetchTasks(1, false);
-        void refetchAssetTasks();
-      }, 200);
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('azhuo:generation-completed', handleCompleted);
-      return () => {
-        if (timer) clearTimeout(timer);
-        window.removeEventListener('azhuo:generation-completed', handleCompleted);
-      };
-    }
-  }, [fetchTasks, refetchAssetTasks]);
+  }, [showToast]);
 
   const tasksHasMore = dbTasks.length < tasksTotal;
 
   const loadMoreDbTasks = useCallback(() => {
     if (isLoadingMoreTasks || !tasksHasMore) return;
-    void fetchTasks(tasksPage + 1, true);
-  }, [fetchTasks, isLoadingMoreTasks, tasksHasMore, tasksPage]);
+    void fetchMoreTasks(tasksPage + 1);
+  }, [fetchMoreTasks, isLoadingMoreTasks, tasksHasMore, tasksPage]);
 
   // 🌟 画布项目转换为资产任务与文件夹批次
+  const activeCanvasProjects = isGalleryReady ? canvasProjects : EMPTY_ASSET_ITEMS;
   const { canvasTasks, canvasBatches } = useMemo(() => {
     const tasks: any[] = [];
     const batches: AssetTaskBatch[] = [];
 
-    (canvasProjects || []).forEach((proj) => {
+    activeCanvasProjects.forEach((proj) => {
       const mediaNodes = (proj.nodes || []).filter(
         (n) => n.imageUrl || n.videoUrl || n.type === 'image' || n.type === 'video'
       );
@@ -219,6 +201,8 @@ export default function AssetCenter(_props: Props = {}) {
           mediaType: 'image',
           rawTask: proj,
         };
+        projectTasks.push(t);
+        tasks.push(t);
       } else {
         // 🌟 空画布项目：同样构建文件夹批次，展示默认艺术封面，确保在资产中心随时可见并支持一键直达编辑
         const t = {
@@ -262,10 +246,14 @@ export default function AssetCenter(_props: Props = {}) {
     });
 
     return { canvasTasks: tasks, canvasBatches: batches };
-  }, [canvasProjects]);
+  }, [activeCanvasProjects]);
+
+  const activeGenerationTasks = isGalleryReady ? generationTasks : EMPTY_ASSET_ITEMS;
+  const activeSessions = isGalleryReady ? sessions : EMPTY_ASSET_ITEMS;
+  const activeDbTasks = isGalleryReady ? dbTasks : EMPTY_ASSET_ITEMS;
 
   // 合并内存中的 generationTasks 与数据库中的任务
-  const mergedTasks = useMemo(() => mergeAssetTasks({ dbTasks, generationTasks, mediaCategory, searchKeyword, timeFilter, sessions, canvasTasks }), [dbTasks, generationTasks, mediaCategory, searchKeyword, timeFilter, sessions, canvasTasks]);
+  const mergedTasks = useMemo(() => mergeAssetTasks({ dbTasks: activeDbTasks, generationTasks: activeGenerationTasks, mediaCategory, searchKeyword, timeFilter, sessions: activeSessions, canvasTasks }), [activeDbTasks, activeGenerationTasks, mediaCategory, searchKeyword, timeFilter, activeSessions, canvasTasks]);
 
   // 分批渲染逻辑 (时间分段分组)
   const allBatches = useMemo(() => {
@@ -346,10 +334,9 @@ export default function AssetCenter(_props: Props = {}) {
 
     try {
       const delRes = await permanentDeleteGeneration(task);
-      setDbTasks((prev) => filterDbTasksAfterDelete(prev, delRes.ids, delRes.urls));
+      setExtraDbTasks((prev) => filterDbTasksAfterDelete(prev, delRes.ids, delRes.urls));
       showToast('🗑️ 已删除该记录');
-      await fetchTasks(1, false);
-      void refetchAssetTasks();
+      await refreshTasks();
     } catch (err) {
       showToast(`❌ 删除失败: ${formatUserError(err, '请重试')}`);
     }
@@ -381,9 +368,8 @@ export default function AssetCenter(_props: Props = {}) {
     if (regularTargets.length > 0) {
       try {
         const delRes = await permanentDeleteGeneration(regularTargets);
-        setDbTasks((prev) => filterDbTasksAfterDelete(prev, delRes.ids, delRes.urls));
-        await fetchTasks(1, false);
-        void refetchAssetTasks();
+        setExtraDbTasks((prev) => filterDbTasksAfterDelete(prev, delRes.ids, delRes.urls));
+        await refreshTasks();
       } catch (err) {
         showToast(`❌ 批量删除失败: ${formatUserError(err, '请稍后重试')}`);
         return;
@@ -433,7 +419,7 @@ export default function AssetCenter(_props: Props = {}) {
   // 清理失败或超时的卡顿记录
   const handleClearFailedAndStuck = async () => {
     const failedTasks = mergedTasks.filter(
-      (t) => t.status === 'FAILURE' || (!t.resultUrl && (t.status === 'IN_PROGRESS' || t.status === 'PENDING'))
+      (t) => isImageTaskFailed(t.status) || (!t.resultUrl && isImageTaskActive(t.status))
     );
     if (failedTasks.length === 0) return;
     if (!(await confirmAction(`确定清理全部 ${failedTasks.length} 条失败或卡顿记录吗？`))) return;
@@ -460,13 +446,11 @@ export default function AssetCenter(_props: Props = {}) {
 
       // 4. 同步清空内存 store 与内部 dbTasks 状态
       useAppStore.getState().deleteGenerationPermanently(allIds, allUrls);
-      setDbTasks((prev) => filterDbTasksAfterDelete(prev, allIds, allUrls));
+      setExtraDbTasks((prev) => filterDbTasksAfterDelete(prev, allIds, allUrls));
 
       showToast(`🧹 已彻底清理 ${failedTasks.length} 条异常记录`);
 
-      // 5. 重新拉取服务端数据同步内部 dbTasks，确保彻底清除
-      await fetchTasks(1, false);
-      void refetchAssetTasks();
+      await refreshTasks();
     } catch (err) {
       showToast(`❌ 清理失败: ${formatUserError(err, '请重试')}`);
     }
@@ -487,10 +471,9 @@ export default function AssetCenter(_props: Props = {}) {
 
     try {
       const delRes = await permanentDeleteGeneration(batch.tasks);
-      setDbTasks((prev) => filterDbTasksAfterDelete(prev, delRes.ids, delRes.urls));
+      setExtraDbTasks((prev) => filterDbTasksAfterDelete(prev, delRes.ids, delRes.urls));
       showToast('🗑️ 已删除该分镜批次');
-      await fetchTasks(1, false);
-      void refetchAssetTasks();
+      await refreshTasks();
     } catch (err) {
       showToast(`❌ 删除失败: ${formatUserError(err, '请重试')}`);
     }
@@ -515,6 +498,7 @@ export default function AssetCenter(_props: Props = {}) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const historyProps = {
+    isPreparing: currentView === 'assets' && !isGalleryReady,
     mediaCategory,
     mergedTasks,
     visibleToday,
@@ -622,7 +606,7 @@ export default function AssetCenter(_props: Props = {}) {
           {/* Right: 清理失败 + 批量操作 */}
           <div className="flex items-center gap-2.5 shrink-0 ml-auto">
             {/* 一键清理失败/卡顿任务按钮 */}
-            {mergedTasks.some(t => t.status === 'FAILURE' || (!t.resultUrl && (t.status === 'IN_PROGRESS' || t.status === 'PENDING'))) && (
+            {mergedTasks.some(t => isImageTaskFailed(t.status) || (!t.resultUrl && isImageTaskActive(t.status))) && (
               <button
                 onClick={handleClearFailedAndStuck}
                 className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
@@ -693,6 +677,16 @@ export default function AssetCenter(_props: Props = {}) {
 
       {/* 🌟 2. Main Gallery Area */}
       <div className="flex-1 overflow-y-auto px-6 lg:px-8 py-6">
+        {isLoadingTasks && dbTasks.length === 0 && (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-xs font-medium text-slate-500">
+            正在加载生成历史…
+          </div>
+        )}
+        {isAssetTasksError && (
+          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+            生成历史加载失败，删除或同步可能暂时不可用。
+          </div>
+        )}
         <AssetGenerationHistory {...historyProps} />
       </div>
 

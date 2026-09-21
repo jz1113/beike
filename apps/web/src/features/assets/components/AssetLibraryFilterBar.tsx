@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Filter,
   X,
@@ -12,6 +12,8 @@ import type { AssetSubTab } from './AssetLibraryToolbar';
 import DynamicTagDropdown from './DynamicTagDropdown';
 
 export interface AssetLibraryFilterBarProps {
+  /** 与筛选维度同级的资产类型导航，由父级提供以保持筛选栏的单行布局。 */
+  navigation?: ReactNode;
   activeSubTab: AssetSubTab;
   dynamicTagList: Array<{ tag: string; count: number }>;
   selectedTag: string | null;
@@ -28,7 +30,7 @@ export interface AssetLibraryFilterBarProps {
   actionShotScaleCounts?: { all: number; macro_closeup: number; half_body: number; full_body: number };
   actionAnchor?: string | null;
   setActionAnchor?: (anchor: string | null) => void;
-  actionCategoryCounts?: { all: number; universal: number; jewelry: number; digital_3c: number; apparel: number };
+  actionCategoryCounts?: Partial<Record<ActionCategoryId | 'all', number>>;
   availableAnchors?: Array<{ id: string; label: string; count: number }>;
   isAnyFilterActive: boolean;
   onResetAllFilters: () => void;
@@ -38,6 +40,7 @@ export interface AssetLibraryFilterBarProps {
 }
 
 export function AssetLibraryFilterBar({
+  navigation,
   activeSubTab,
   dynamicTagList,
   selectedTag,
@@ -70,16 +73,19 @@ export function AssetLibraryFilterBar({
 
   const closeDropdowns = () => setActiveDropdown(null);
 
-  // 品类列表配置
+  const actionAssetsExist = activeSubTab === 'action' && (actionCategoryCounts?.all || 0) > 0;
+  // 这是「动作适用的商品」而不是资产库的主导航。零条目的类别完全不露出。
   const categoryOptions = [
-    { id: 'all', label: '全部品类', count: actionCategoryCounts?.all },
-    { id: 'jewelry', label: '珠宝首饰', count: actionCategoryCounts?.jewelry },
+    { id: 'all', label: '全部商品', count: actionCategoryCounts?.all },
     { id: 'universal', label: '通用日常', count: actionCategoryCounts?.universal },
+    { id: 'jewelry', label: '珠宝首饰', count: actionCategoryCounts?.jewelry },
     { id: 'digital_3c', label: '手机数码', count: actionCategoryCounts?.digital_3c },
-    ...(actionCategoryCounts?.apparel && actionCategoryCounts.apparel > 0
-      ? [{ id: 'apparel', label: '服饰穿搭', count: actionCategoryCounts?.apparel }]
-      : []),
-  ];
+    { id: 'apparel', label: '服饰穿搭', count: actionCategoryCounts?.apparel },
+    { id: 'bag', label: '箱包手袋', count: actionCategoryCounts?.bag },
+    { id: 'shoes', label: '鞋靴配饰', count: actionCategoryCounts?.shoes },
+    { id: 'beauty', label: '美妆香氛', count: actionCategoryCounts?.beauty },
+    { id: 'eyewear', label: '眼镜配饰', count: actionCategoryCounts?.eyewear },
+  ].filter((option) => option.id === 'all' || (option.count || 0) > 0);
 
   // 景别列表配置
   const scaleOptions = [
@@ -96,15 +102,22 @@ export function AssetLibraryFilterBar({
   const currentAnchorLabel = availableAnchors?.find((a) => a.id === actionAnchor)?.label || '聚焦部位';
 
   return (
-    <div className="flex items-center justify-between pl-20 pr-5 sm:pl-24 sm:pr-7 py-3 bg-transparent border-b border-slate-200/60 gap-3 flex-wrap text-xs select-none">
+    <div className="flex items-center justify-between px-5 sm:px-7 py-3 bg-transparent border-b border-slate-200/60 gap-3 flex-wrap text-xs select-none">
       <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 shrink-0 mr-1">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <span>维度筛选:</span>
-        </span>
+        {navigation}
+
+        {actionAssetsExist && (
+          <span className="h-5 w-px bg-slate-200 mx-1 shrink-0" aria-hidden="true" />
+        )}
+        {actionAssetsExist && (
+          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span>动作筛选</span>
+          </span>
+        )}
 
         {/* 1. 动作品类筛选下拉胶囊 */}
-        {activeSubTab === 'action' && setActionCategory && (
+        {actionAssetsExist && setActionCategory && (
           <div className="relative">
             <button
               type="button"
@@ -125,7 +138,7 @@ export function AssetLibraryFilterBar({
                 onMouseLeave={closeDropdowns}
               >
                 <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  选择适用品类
+                  此动作适用的商品
                 </div>
                 {categoryOptions.map((cat) => {
                   const isSelected = actionCategory === cat.id;
@@ -158,7 +171,7 @@ export function AssetLibraryFilterBar({
         )}
 
         {/* 2. 构图景别筛选下拉胶囊 */}
-        {activeSubTab === 'action' && setActionShotScale && (
+        {actionAssetsExist && setActionShotScale && (
           <div className="relative">
             <button
               type="button"
@@ -214,7 +227,7 @@ export function AssetLibraryFilterBar({
         )}
 
         {/* 3. 二级细分类目下拉联动胶囊 */}
-        {activeSubTab === 'action' && actionCategory !== 'all' && actionCategory !== 'universal' && currentSubCategories && currentSubCategories.length > 0 && (
+        {actionAssetsExist && actionCategory !== 'all' && actionCategory !== 'universal' && currentSubCategories && currentSubCategories.length > 0 && (
           <div className="relative">
             <button
               type="button"
@@ -301,7 +314,7 @@ export function AssetLibraryFilterBar({
         )}
 
         {/* 4. 聚焦部位特写下拉 */}
-        {activeSubTab === 'action' && (actionShotScale === 'macro_closeup' || actionAnchor !== null) && availableAnchors && availableAnchors.length > 0 && (
+        {actionAssetsExist && (actionShotScale === 'macro_closeup' || actionAnchor !== null) && availableAnchors && availableAnchors.length > 0 && (
           <div className="relative">
             <button
               type="button"
@@ -384,89 +397,21 @@ export function AssetLibraryFilterBar({
           />
         )}
 
-        {/* 6. 已激活过滤条件 Chips 汇总区 */}
-        <div className="flex items-center gap-1.5 flex-wrap ml-1">
-          {activeSubTab === 'action' && actionCategory !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-purple-100/70 text-purple-800 border border-purple-200">
-              <span>品类: {currentCatLabel}</span>
-              <button
-                type="button"
-                onClick={() => setActionCategory?.('all')}
-                className="hover:text-purple-950 cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-
-          {activeSubTab === 'action' && actionShotScale !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-slate-200 text-slate-800 border border-slate-300">
-              <span>景别: {currentScaleLabel}</span>
-              <button
-                type="button"
-                onClick={() => setActionShotScale?.('all')}
-                className="hover:text-black cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-
-          {activeSubTab === 'action' && actionSubCategory !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-amber-100/80 text-amber-800 border border-amber-200">
-              <span>细分: {currentSubCatLabel}</span>
-              <button
-                type="button"
-                onClick={() => setActionSubCategory?.('all')}
-                className="hover:text-amber-950 cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-
-          {activeSubTab === 'action' && actionAnchor !== null && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-purple-100/80 text-purple-800 border border-purple-200">
-              <span>部位: {currentAnchorLabel}</span>
-              <button
-                type="button"
-                onClick={() => setActionAnchor?.(null)}
-                className="hover:text-purple-950 cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-
-          {selectedTag && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-indigo-100/80 text-indigo-800 border border-indigo-200">
-              <span>标签: {selectedTag}</span>
-              <button
-                type="button"
-                onClick={() => setSelectedTag(null)}
-                className="hover:text-indigo-950 cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-
-          {/* 一键重置全部过滤条件 */}
-          {isAnyFilterActive && (
-            <button
-              type="button"
-              onClick={() => {
-                onResetAllFilters();
-                closeDropdowns();
-              }}
-              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-              title="清空所有已选筛选条件"
-            >
-              <X className="w-3 h-3" />
-              <span>清空筛选</span>
-            </button>
-          )}
-        </div>
+        {/* 下拉按钮本身已表达当前选择，不再重复生成一排同义筛选标签。 */}
+        {isAnyFilterActive && (
+          <button
+            type="button"
+            onClick={() => {
+              onResetAllFilters();
+              closeDropdowns();
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+            title="清空搜索、收藏与全部筛选条件"
+          >
+            <X className="w-3 h-3" />
+            <span>重置</span>
+          </button>
+        )}
       </div>
 
       {/* 右侧：资产统计与视图排序切换 */}

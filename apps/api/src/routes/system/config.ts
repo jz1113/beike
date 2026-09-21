@@ -9,6 +9,7 @@ import { formatUserError } from '@beike/domain/upstreamErrors';
 import { normalizeGatewayBaseUrl } from '../../services/gatewayCredentials';
 import { testApiaConnection } from '@beike/server-kit/apiaScraper';
 import { testQiyunConnection } from '@beike/server-kit/qiyunScraper';
+import { parseWanbangResponse, withWanbangCredentials } from '../../gateways/wanbang';
 
 // 获取系统当前模型与接口配置（密钥只返回是否已配置，不泄露明文/前后缀）
 export async function GET() {
@@ -167,9 +168,8 @@ export async function POST(req: Request) {
         return jsonResponse({ error: '请先在输入框中填入万邦 API Key 与 API Secret 后再测试' }, 400);
       }
 
-      // 测试候选端点 (优先测试快速的淘宝接口，失败则测试京东接口)
-      // 安全：密钥通过 Authorization header 传输，不进入 URL query，避免日志/Referer 泄露
-      const auth = `key=${encodeURIComponent(key)} secret=${encodeURIComponent(secret)}`;
+      // 测试候选端点 (优先测试快速的淘宝接口，失败则测试京东接口)。
+      // 万邦网关按其公开协议从 query 参数读取 key/secret；请求只在服务端发起且不会写入日志。
       const testEndpoints = [
         `https://api-gw.onebound.cn/taobao/item_get/?num_iid=520813250866&cache=yes&is_promotion=1`,
         `https://api-gw.onebound.cn/jd/item_get_pro/?num_iid=10057467958584&cache=yes&watermark=1`,
@@ -180,33 +180,38 @@ export async function POST(req: Request) {
 
       for (const endpoint of testEndpoints) {
         try {
-          const res = await gatewayFetch(endpoint, {
+          const res = await gatewayFetch(withWanbangCredentials(endpoint, key, secret), {
             signal: AbortSignal.timeout(12000),
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-              'Authorization': auth,
             },
           });
-          if (res.ok) {
-            const data = await res.json();
-            testData = data;
-            // 如果账号鉴权通过 (无论是 0000 成功，还是含有有效 api_info 配额信息)
-            if (data.api_info || data.error_code === '0000') {
-              break;
-            }
-            if (data.error_code === '4005' || data.error_code === '1001' || data.error_code === '4001') {
-              lastError = `万邦接口鉴权失败 [${data.error_code}]: ${data.reason || data.error}`;
-              break;
-            }
+          if (!res.ok) {
+            lastError = `万邦网关请求失败（HTTP ${res.status}）`;
+            continue;
           }
-        } catch (e: any) {
-          lastError = e.message;
+
+          const data = await parseWanbangResponse(res);
+          // 明确的鉴权错误不再尝试下一个商品端点，避免掩盖凭证问题。
+          if (data.error_code === '4005' || data.error_code === '1001' || data.error_code === '4001') {
+            lastError = `万邦接口鉴权失败 [${data.error_code}]: ${data.reason || data.error || '请检查 Key 与 Secret'}`;
+            break;
+          }
+          if (data.error_code && data.error_code !== '0000') {
+            lastError = `万邦接口返回异常 [${data.error_code}]: ${data.reason || data.error || '未知错误'}`;
+            continue;
+          }
+
+          testData = data;
+          break;
+        } catch (e: unknown) {
+          lastError = e instanceof Error ? e.message : '万邦网关请求失败';
         }
       }
 
       const latencyMs = Date.now() - startTime;
 
-      if (!testData || (testData.error_code && ['4005', '1001', '4001', '4003'].includes(testData.error_code))) {
+      if (!testData) {
         return jsonResponse({
           success: false,
           error: lastError || (testData?.reason || testData?.error || '万邦网关响应异常，请检查 Key 与 Secret'),
@@ -256,6 +261,7 @@ export async function POST(req: Request) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
+        signal: AbortSignal.timeout(12_000),
         body: JSON.stringify({
           model: model,
           messages: [

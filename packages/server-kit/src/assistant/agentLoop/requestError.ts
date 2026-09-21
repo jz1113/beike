@@ -1,3 +1,5 @@
+import { isRetryableUpstreamError } from '@beike/domain/upstreamErrors';
+
 /** Preserve actionable upstream failures without exposing response bodies or credentials. */
 export function modelRequestError(status: number, responseText = '', retryAfter?: string | null): Error {
   const reasons: Record<number, string> = {
@@ -31,5 +33,11 @@ export function modelRequestError(status: number, responseText = '', retryAfter?
       reasons[429] += `；上游建议等待 ${Number(retryAfter)} 秒`;
     }
   }
-  return new Error(`模型请求失败（HTTP ${status}）：${reasons[status] || '上游未成功处理请求'}`);
+  const error = new Error(`模型请求失败（HTTP ${status}）：${reasons[status] || '上游未成功处理请求'}`) as Error & { status?: number };
+  error.status = status;
+  return error;
+}
+
+export function isRetryableModelRequestError(error: unknown): boolean {
+  return isRetryableUpstreamError(error);
 }

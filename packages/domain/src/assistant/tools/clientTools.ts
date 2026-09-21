@@ -30,7 +30,7 @@ export function toolGetViewCapabilities(args: { view?: string }, ctx: ToolExecCo
         'load_product',
         'set_arch',
         'generate_shots',
-        'switch_mode(social_face_product_swap|storyboard_generate)',
+        'switch_mode(storyboard_generate)',
         'navigate',
       ],
       tools: [

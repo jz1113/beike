@@ -10,6 +10,8 @@ export function resolveModelVendor(modelId: string = '', rawProvider?: string): 
     m.includes('gemini') || 
     m.includes('google') || 
     m.includes('veo') || 
+    m.includes('omni_flash') ||
+    m.includes('omni-flash') ||
     m.includes('imagen') || 
     m.includes('nano-banana') || 
     m.includes('nanobanana') || 
@@ -64,6 +66,7 @@ export function resolveModelVendor(modelId: string = '', rawProvider?: string): 
   // 6. 阿里巴巴 / 阿里百炼 (Qwen 通义千问, Wan / Wanx 万相)
   if (
     m.includes('qwen') || 
+    m.includes('z-image') ||
     m.includes('wanx') || 
     m.includes('wan2') || 
     m.includes('wan-') || 

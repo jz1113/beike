@@ -1,0 +1,18 @@
+[Unit]
+Description=Beike Cloud Graph web+api
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/beike
+Environment=NODE_ENV=production
+EnvironmentFile=/var/lib/beike/.env
+ExecStart=/usr/bin/node /opt/beike/tools/scripts/web/start-web.mjs
+Restart=on-failure
+RestartSec=5
+User=beike
+Group=beike
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

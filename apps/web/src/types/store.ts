@@ -112,7 +112,7 @@ export interface GenerateSlice {
   syncDatabaseTasks: (tasks: GenerationTask[]) => void;
 }
 
-export type WorkshopMode = 'storyboard_generate' | 'social_face_product_swap';
+export type WorkshopMode = 'storyboard_generate';
 
 export interface WorkshopModeSession {
   currentStep: number;
@@ -146,7 +146,7 @@ export interface WorkshopModeSession {
 }
 
 export interface WorkshopSlice {
-  /** 爆款复刻模式独立会话缓存（切换模式时保存/恢复） */
+  /** 兼容旧会话缓存的预留字段。 */
   socialSessionCache: WorkshopModeSession;
   /** 原创生成模式独立会话缓存 */
   originalSessionCache: WorkshopModeSession;
@@ -183,7 +183,7 @@ export interface WorkshopSlice {
   socialGalleryTab: 'social' | 'product';
   clonedSocialImages: { url: string; selected: boolean }[];
   modelPersona: string;
-  /** 爆款复刻专属正脸 */
+  /** 旧版会话正脸字段。 */
   anchorFaceImageUrl?: string;
   isAnchorFaceConfirmed: boolean;
   /** 原创生成专属正脸（与爆款槽位隔离，避免遗留人脸泄漏） */

@@ -13,6 +13,6 @@ export {
   getBuiltinAssistantSkill,
   resolveSkillAllowedTools,
 } from './builtin';
-export { buildActiveSkillPrompt, composeSkillRuntime } from './composeSkillRuntime';
+export { composeSkillRuntime } from './composeSkillRuntime';
 export { resolveSkillReferenceContent } from './references';
 export { parseSkillFileContent, mergeAssistantSkills } from './parseSkillFile';

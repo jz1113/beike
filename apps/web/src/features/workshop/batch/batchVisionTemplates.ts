@@ -4,11 +4,11 @@ import { isJewelryProductTitle } from '@beike/domain/jewelryArch';
 export function resolveHarmonizedTemplatesForItem(opts: {
   masterScene: string;
   productTitle: string;
-  hasHumanPersona: boolean;
+  defaultHasHuman: boolean;
   lockedSceneId?: string;
   availableScenes: any[];
 }) {
-  const { masterScene, productTitle, hasHumanPersona, lockedSceneId, availableScenes } = opts;
+  const { masterScene, productTitle, defaultHasHuman, lockedSceneId, availableScenes } = opts;
   const isJewelry = isJewelryProductTitle(productTitle || '');
 
   if (lockedSceneId !== 'auto') {
@@ -44,12 +44,12 @@ export function resolveHarmonizedTemplatesForItem(opts: {
           expression: '神态自然从容，眼神清澈灵动',
           camera,
           angle,
-          hasHuman: hasHumanPersona,
+          hasHuman: defaultHasHuman,
           shotType: isJewelry && shot.shotType === 'wide_shot' ? 'medium_shot' : shot.shotType,
         };
       });
     }
   }
 
-  return getHarmonizedStoryboardForScene(masterScene || '', isJewelry, !hasHumanPersona, productTitle);
+  return getHarmonizedStoryboardForScene(masterScene || '', isJewelry, !defaultHasHuman, productTitle);
 }

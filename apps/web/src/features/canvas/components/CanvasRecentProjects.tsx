@@ -1,6 +1,6 @@
 import {visibleCanvasProjects} from '../store/canvasProjectDefaults';
-import React, { useState, useEffect, useId } from 'react';
-import { Plus, MoreHorizontal, Trash2, Edit2, ChevronRight, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, MoreHorizontal, Trash2, Edit2, ChevronRight } from 'lucide-react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { CanvasProject } from '../types';
 
@@ -17,15 +17,6 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
 }) => {
   const { projects:allProjects, createProject, selectProject, updateProjectTitle, deleteProject } = useCanvasStore();
   const projects=visibleCanvasProjects(allProjects);
-  const contentId=useId();
-  const [collapsed,setCollapsed]=useState(()=>{
-    try{return localStorage.getItem('canvas-recent-projects-collapsed')==='true';}catch{return false;}
-  });
-  const toggleCollapsed=()=>{
-    const next=!collapsed;
-    setCollapsed(next);setMenuOpenId(null);setEditingId(null);
-    try{localStorage.setItem('canvas-recent-projects-collapsed',String(next));}catch{/* Keep the control usable when storage is unavailable. */}
-  };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -69,47 +60,49 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
 
   // 🌟 全屏下一排最多放 8 个（1 个新建项目 + 最多 7 个最近画布）
   const displayedProjects = maxDisplay > 0 ? projects.slice(0, maxDisplay) : projects;
+  const hasRecentProjects = projects.length > 0;
 
   return (
     <section className={`w-full space-y-4 select-none ${className}`}>
-      {/* 楼层标题行 */}
-      <div className="flex items-center justify-between pb-1 border-b border-slate-200/50">
-        <button type="button" onClick={toggleCollapsed} aria-expanded={!collapsed} aria-controls={contentId} aria-label={collapsed ? '展开最近项目' : '收起最近项目'} className="flex items-center gap-2 rounded-md py-1 text-left focus-visible:outline-indigo-500">
-          <ChevronDown aria-hidden="true" className={`h-4 w-4 text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
-          <span className="text-base font-bold text-slate-900 tracking-tight">
-            最近项目
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium font-mono">
-            {projects.length} 个画布
-          </span>
-        </button>
+      {/* 空画布不展示“最近项目 · 0 个画布”的无效标题行，直接给出新建入口。 */}
+      {hasRecentProjects && (
+        <div className="flex items-center justify-between pb-1 border-b border-slate-200/50">
+          <div className="flex items-center gap-2 py-1">
+            <span className="text-base font-bold text-slate-900 tracking-tight">
+              最近项目
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium font-mono">
+              {projects.length} 个画布
+            </span>
+          </div>
 
-        {!collapsed && projects.length > maxDisplay && (
-          <button
-            type="button"
-            onClick={() => {
-              if (projects[0]) {
-                handleSelectCard(projects[0].id);
-              } else {
-                handleCreateNew();
-              }
-            }}
-            className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-0.5 transition-colors cursor-pointer"
-          >
-            进入画板查看全部
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
+          {projects.length > maxDisplay && (
+            <button
+              type="button"
+              onClick={() => {
+                if (projects[0]) {
+                  handleSelectCard(projects[0].id);
+                } else {
+                  handleCreateNew();
+                }
+              }}
+              className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-0.5 transition-colors cursor-pointer"
+            >
+              进入画板查看全部
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
-      {/* 项目栅格卡片列表：全屏下自适应扩展，最多能放 8 个 (8列) */}
-      {!collapsed && <div id={contentId} className="grid grid-cols-2 min-[540px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 min-[1800px]:grid-cols-8 gap-3.5 sm:gap-4">
+      {/* 大屏固定为四列，让少量项目也能以画布入口应有的尺度展示。 */}
+      <div className="grid grid-cols-1 min-[540px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
         {/* 🌟 新建项目卡片 */}
         <div
           onClick={handleCreateNew}
           className="group/new flex flex-col gap-2 cursor-pointer transition-all duration-200"
         >
-          <div className="w-full aspect-[16/10] rounded-2xl border border-slate-200/80 bg-slate-100/70 hover:bg-slate-200/70 hover:border-slate-300 flex items-center justify-center transition-all duration-200 shadow-2xs group-hover/new:shadow-md group-hover/new:-translate-y-0.5">
+          <div className="w-full aspect-video rounded-2xl border border-slate-200/80 bg-slate-100/70 hover:bg-slate-200/70 hover:border-slate-300 flex items-center justify-center transition-all duration-200 shadow-2xs group-hover/new:shadow-md group-hover/new:-translate-y-0.5">
             <div className="w-10 h-10 rounded-full bg-white/80 shadow-2xs flex items-center justify-center text-slate-400 group-hover/new:text-slate-900 group-hover/new:scale-110 transition-all duration-200">
               <Plus className="w-6 h-6 stroke-[2.2]" />
             </div>
@@ -135,7 +128,7 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
               className="group/card flex flex-col gap-2 cursor-pointer transition-all duration-200 relative"
             >
               {/* 卡片封面预览视口 */}
-              <div className="w-full aspect-[16/10] rounded-2xl border border-slate-200/80 bg-slate-100 overflow-hidden relative shadow-2xs group-hover/card:shadow-md group-hover/card:-translate-y-0.5 transition-all duration-200">
+              <div className="w-full aspect-video rounded-2xl border border-slate-200/80 bg-slate-100 overflow-hidden relative shadow-2xs group-hover/card:shadow-md group-hover/card:-translate-y-0.5 transition-all duration-200">
                 {proj.thumbnail ? (
                   <img
                     src={proj.thumbnail}
@@ -218,7 +211,7 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
             </div>
           );
         })}
-      </div>}
+      </div>
     </section>
   );
 };

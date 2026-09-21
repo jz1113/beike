@@ -95,7 +95,7 @@ export async function persistDeconstructedAssets(params: {
   };
 
   const persisted = await persistFullPromptRecords({
-    perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey,
+    parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey,
     sampleImagesJson, thumbForUrl, defaultCoverUrl,
   });
   savedRecords.fullPrompts = persisted.fullPrompts;

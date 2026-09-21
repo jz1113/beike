@@ -1,8 +1,6 @@
 import type { ShotPrompt } from '@beike/domain/vision';
 import {
   assembleOriginalShotPrompt,
-  ensureReplicationPromptSlots,
-  softenReplicationSafetyWording,
   enforceLookConsistency,
   extractCanonicalOutfitFromPrompts,
 } from '@beike/domain/drawing';
@@ -10,8 +8,6 @@ import type { BatchProductItem } from './batchTypes';
 import { resolveHarmonizedTemplatesForItem } from './batchVisionTemplates';
 
 export interface PromptPaddingContext {
-  batchMode: 'original' | 'replication';
-  hasHumanPersona: boolean;
   lockedSceneId?: string;
   availableScenes: any[];
   selectedShotCount?: number;
@@ -31,7 +27,6 @@ export function ensureItemPromptsPad(
   if (!item.prompts || item.prompts.length === 0) {
     return [];
   }
-  const isSocialMode = ctx.batchMode === 'replication';
   // 🚨 从分镜 1 或已有分镜中精准提取模特实际穿着的权威服装 (Shot-1 As Single Source of Truth)
   const canonicalOutfit =
     item.prompts && item.prompts.length > 0
@@ -41,7 +36,7 @@ export function ensureItemPromptsPad(
   const harmonizedTemplates = resolveHarmonizedTemplatesForItem({
     masterScene: item.masterScene || '',
     productTitle: item.title || '',
-    hasHumanPersona: ctx.hasHumanPersona,
+    defaultHasHuman: item.prompts.some((shot) => shot.has_human !== false),
     lockedSceneId: ctx.lockedSceneId,
     availableScenes: ctx.availableScenes,
   });
@@ -50,24 +45,13 @@ export function ensureItemPromptsPad(
   while (padded.length < finalCount) {
     const idx = padded.length;
     const t = harmonizedTemplates[idx % harmonizedTemplates.length];
-    const isHumanShot = ctx.hasHumanPersona && t.hasHuman;
+    const isHumanShot = t.hasHuman;
     const assignedImg =
       (item.selectedProductImages &&
         item.selectedProductImages[idx % item.selectedProductImages.length]) ||
       item.coverImage;
 
-    const fallbackPrompt = isSocialMode
-      ? softenReplicationSafetyWording(
-          ensureReplicationPromptSlots(
-            `【爆款复刻实拍】：按对标图 ${idx + 1} 反推美学生成真实生活实拍，主体为 @图片1 所示商品实物，无鼠标光标或广告文字。`,
-            {
-              hasHuman: isHumanShot,
-              hasFace: false,
-              expression: t.expression,
-            }
-          )
-        )
-      : assembleOriginalShotPrompt(
+    const fallbackPrompt = assembleOriginalShotPrompt(
           {
             identityBible: item.identityBible,
             lookBible: item.lookBible,
@@ -112,7 +96,7 @@ export function ensureItemPromptsPad(
   }
 
   // 🚨 全组 4 镜穿搭强同步：强制将分镜 1 的权威穿搭统一刷入全组所有人物分镜，100% 杜绝换装！
-  if (ctx.hasHumanPersona) {
+  if (padded.some((shot) => shot.has_human !== false)) {
     padded.forEach((p) => {
       if (p.has_human !== false) {
         p.prompt = enforceLookConsistency(
@@ -121,9 +105,6 @@ export function ensureItemPromptsPad(
           item.productRole,
           item.productFingerprint || item.title
         );
-        if (isSocialMode) {
-          p.prompt = softenReplicationSafetyWording(p.prompt);
-        }
       }
     });
   }

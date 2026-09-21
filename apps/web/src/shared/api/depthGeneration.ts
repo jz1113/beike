@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch } from '@/shared/api/apiClient';
 import { recordModelUsage } from '@/shared/utils/usageTracker';
 import { DEPTH_MODEL_SETUP_COMMAND, type DepthQuality, type DepthVideoStyle } from '@beike/domain/depthVideo';
@@ -351,22 +351,6 @@ export async function pollDepthVideoTask(taskId: string): Promise<{
     progress: data.progress ? String(data.progress) : undefined,
     stage: data.stage ? String(data.stage) : undefined,
   };
-}
-
-export function useCopySetupCommand() {
-  const [copied, setCopied] = useState(false);
-
-  const copy = useCallback(async (command: string) => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  return { copied, copy };
 }
 
 export function formatDepthSubmitError(error: unknown, fallback: string): string {

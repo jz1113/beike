@@ -21,6 +21,7 @@ export interface BatchCoordinatorDeps {
   setCompletedTaskCount: (val: number) => void;
   setSuccessTaskCount: (val: number) => void;
   setFailTaskCount: (val: number) => void;
+  autoGenerateCopywriting: boolean;
   generateAllCopywriting: () => Promise<void>;
 }
 
@@ -97,6 +98,7 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
     setCompletedTaskCount,
     setSuccessTaskCount,
     setFailTaskCount,
+    autoGenerateCopywriting,
     generateAllCopywriting,
   } = deps;
 
@@ -141,7 +143,7 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
       })
     );
 
-    setCurrentStage(config.batchMode === 'original' ? 4 : 5);
+    setCurrentStage(4);
     setIsGeneratingBatch(true);
     isAbortedRef.current = false;
 
@@ -180,9 +182,11 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
       return;
     }
 
-    void generateAllCopywriting();
+    if (autoGenerateCopywriting) {
+      void generateAllCopywriting();
+    }
     if (failCount === 0) {
-      showToast(`批量生图全部完成！成功 ${successCount} 张 / ${latestSuccessful.length} 款商品`);
+      showToast(`批量生图全部完成！成功 ${successCount} 张 / ${latestSuccessful.length} 款商品${autoGenerateCopywriting ? '，正在生成文案' : '；文案自动生成已关闭，可在交付页手动生成'}`);
     } else if (successCount === 0) {
       showToast(`批量生图全部失败（${failCount} 张）。请查看失败原因后重试`);
     } else {

@@ -1,10 +1,6 @@
-/** 桌面本地存储偏好（localStorage） */
+/** 浏览器端持久化偏好（localStorage） */
 
-export const DESKTOP_PREFS = {
-  downloadDir: 'desktop_download_dir',
-  downloadDirHandle: 'desktop_download_dir_handle',
-  cacheDir: 'desktop_cache_dir',
-  cacheEnabled: 'desktop_cache_enabled',
+export const BROWSER_STORAGE_PREFS = {
   projectAutosave: 'project_autosave_enabled',
   idbCacheEnabled: 'idb_cache_enabled',
 } as const;
@@ -21,63 +17,20 @@ function writeBool(key: string, value: boolean) {
   localStorage.setItem(key, String(value));
 }
 
-function readStr(key: string): string {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem(key) || '';
-}
-
-function writeStr(key: string, value: string) {
-  if (typeof window === 'undefined') return;
-  if (!value.trim()) localStorage.removeItem(key);
-  else localStorage.setItem(key, value.trim());
-}
-
-export function getDownloadDir(): string {
-  return readStr(DESKTOP_PREFS.downloadDir);
-}
-
-export function setDownloadDir(dir: string) {
-  writeStr(DESKTOP_PREFS.downloadDir, dir);
-}
-
-export function getDownloadDirHandle(): string {
-  return readStr(DESKTOP_PREFS.downloadDirHandle);
-}
-
-export function setDownloadDirHandle(handle: string) {
-  writeStr(DESKTOP_PREFS.downloadDirHandle, handle);
-}
-
-export function getCacheDir(): string {
-  return readStr(DESKTOP_PREFS.cacheDir);
-}
-
-export function setCacheDir(dir: string) {
-  writeStr(DESKTOP_PREFS.cacheDir, dir);
-}
-
-export function isCacheDirEnabled(): boolean {
-  return readBool(DESKTOP_PREFS.cacheEnabled, false);
-}
-
-export function setCacheDirEnabled(enabled: boolean) {
-  writeBool(DESKTOP_PREFS.cacheEnabled, enabled);
-}
-
 export function isProjectAutosaveEnabled(): boolean {
-  return readBool(DESKTOP_PREFS.projectAutosave, true);
+  return readBool(BROWSER_STORAGE_PREFS.projectAutosave, true);
 }
 
 export function setProjectAutosaveEnabled(enabled: boolean) {
-  writeBool(DESKTOP_PREFS.projectAutosave, enabled);
+  writeBool(BROWSER_STORAGE_PREFS.projectAutosave, enabled);
 }
 
 export function isIdbCacheEnabled(): boolean {
-  return readBool(DESKTOP_PREFS.idbCacheEnabled, true);
+  return readBool(BROWSER_STORAGE_PREFS.idbCacheEnabled, true);
 }
 
 export function setIdbCacheEnabled(enabled: boolean) {
-  writeBool(DESKTOP_PREFS.idbCacheEnabled, enabled);
+  writeBool(BROWSER_STORAGE_PREFS.idbCacheEnabled, enabled);
 }
 
 export function formatBytes(bytes: number): string {

@@ -2,6 +2,7 @@ import { useState, useEffect, Suspense, lazy } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, clearWorkshopStudioDraft } from '@/store';
 import { GenerationEngineHost } from '@/features/generate/GenerationEngineHost';
+import { abortActiveGenerationEngine } from '@/features/generate/useGenerationEngine';
 import { syncAppTokenCookie } from '@/shared/api/apiClient';
 import { migrateLegacyCredentialsOnce } from '@/shared/api/credentialClient';
 import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@beike/domain/workflowModels';
@@ -16,18 +17,12 @@ import GlobalContextMenu from '@/shared/ui/GlobalContextMenu';
 import { GeneratingEffectsProvider } from '@/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@/shared/ui/ViewKeepAlive';
 import { usePerformanceMode } from '@/shared/utils/performancePreference';
-import GlobalDynamicBackground from '@/shared/media/GlobalDynamicBackground';
 
 import { useDesktopShortcuts } from '@/shared/hooks/useDesktopShortcuts';
 import { parseViewFromSearchParams, syncViewToUrl } from '@/app/routes';
 import { useCanvasStore } from '@/features/canvas/store/useCanvasStore';
 
 import HomePage from '@/features/home/HomePage';
-import GenerateWorkspace from '@/features/generate/GenerateWorkspace';
-import WorkshopStudio from '@/features/workshop/WorkshopStudio';
-import ReplicationStudio from '@/features/replicate/ReplicationStudio';
-import AssetCenter from '@/features/assets/components/AssetCenter';
-import CanvasRecentProjects from '@/features/canvas/components/CanvasRecentProjects';
 
 // 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
 function lazyWithRetry<T extends React.ComponentType<any>>(
@@ -72,6 +67,14 @@ const UniversalCollectorModal = lazyWithRetry(() => import('@/features/collect/c
 const AIAssistantDrawer = lazyWithRetry(() => import('@/features/assistant/components/AIAssistantDrawer'));
 const ImageLightboxModal = lazyWithRetry(() => import('@/shared/modals/ImageLightboxModal'));
 const CanvasWorkspaceView = lazyWithRetry(() => import('@/features/canvas/CanvasWorkspaceView'));
+// 首页只下载创作入口。完整工作区及其 xlsx、jszip、动画等依赖，在实际进入时再下载。
+const GenerateWorkspace = lazyWithRetry(() => import('@/features/generate/GenerateWorkspace'));
+const WorkshopStudio = lazyWithRetry(() => import('@/features/workshop/WorkshopStudio'));
+const HeadlinePosterStudio = lazyWithRetry(() => import('@/features/headline-poster/HeadlinePosterStudio'));
+const AssetCenter = lazyWithRetry(() => import('@/features/assets/components/AssetCenter'));
+const CanvasRecentProjects = lazyWithRetry(() => import('@/features/canvas/components/CanvasRecentProjects'));
+// 点阵背景为纯装饰，延后下载，使首页核心控件和灵感流优先可用。
+const GlobalDynamicBackground = lazyWithRetry(() => import('@/shared/media/GlobalDynamicBackground'));
 
 export default function App() {
   const [isCollectorOpen, setIsCollectorOpen] = useState(false);
@@ -144,8 +147,8 @@ export default function App() {
   const isCanvasFullscreen = currentView === 'canvas' && !!activeCanvasProjectId;
   // 🌟 Codex 风格独立全屏设置界面：进入后接管窗口，左侧由设置专属侧栏驱动，带「← 返回应用」
   const isSettingsFullscreen = currentView === 'settings';
-  // 🌟 种草工坊与爆款复刻独立全屏工作台：打开后像画布一样是新的单独界面，隐藏全局 Sidebar，全屏沉浸
-  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'replicate';
+  // 种草工坊与大字报工作台使用独立全屏布局。
+  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster';
   const isDedicatedFullscreen = isCanvasFullscreen || isSettingsFullscreen || isWorkshopFullscreen;
 
   useEffect(() => {
@@ -169,9 +172,8 @@ export default function App() {
     setCurrentView('workshop');
   };
 
-  const enterReplication = () => {
-    useAppStore.getState().setWorkshopMode('social_face_product_swap');
-    setCurrentView('replicate');
+  const enterHeadlinePoster = () => {
+    setCurrentView('headline_poster');
   };
 
   return (
@@ -203,7 +205,9 @@ export default function App() {
         /* 🌟 2. 主体区域 (左侧 Sidebar + 右侧主工作区，通体贯穿无边框点阵背景) */
         <div className="flex-1 min-w-0 flex overflow-hidden relative">
           {/* 🌟 全局轻奢自适应动态背景（首页右上角流体粒子 + 工作区交互式点阵微澜 + 智能降级兜底） */}
-          {(!isDedicatedFullscreen || currentView === 'workshop') && <GlobalDynamicBackground currentView={currentView} />}
+          <Suspense fallback={null}>
+            {(!isDedicatedFullscreen || isWorkshopFullscreen) && <GlobalDynamicBackground />}
+          </Suspense>
 
           {!isDedicatedFullscreen && (
             <AppSidebar
@@ -229,7 +233,7 @@ export default function App() {
                   <AppErrorBoundary title="首页异常" resetLabel="重新加载" onReset={() => window.location.reload()}>
                     <HomePage 
                       onEnterWorkshop={enterOriginalWorkshop}
-                      onEnterReplication={enterReplication}
+                      onOpenHeadlinePoster={enterHeadlinePoster}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
                       recentProjects={<CanvasRecentProjects onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
@@ -237,7 +241,10 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="generate" currentView={currentView}>
-                  <AppErrorBoundary title="生成工作区异常" resetLabel="清空会话" onReset={() => useAppStore.setState({ generationTasks: [] })}>
+                  <AppErrorBoundary title="生成工作区异常" resetLabel="清空会话" onReset={() => {
+                    abortActiveGenerationEngine();
+                    useAppStore.setState({ generationTasks: [] });
+                  }}>
                     <GenerateWorkspace 
                       onOpenSettings={navigateToSettings}
                     />
@@ -254,10 +261,7 @@ export default function App() {
                       }
                     }}
                   >
-                    <AssetCenter 
-                      onEnterWorkshop={enterOriginalWorkshop}
-                      onOpenSettings={navigateToSettings}
-                    />
+                    <AssetCenter />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -282,7 +286,6 @@ export default function App() {
                     onReset={() => {
                       clearWorkshopStudioDraft();
                       const store = useAppStore.getState();
-                      store.resetModeSession('social_face_product_swap');
                       store.resetModeSession('storyboard_generate');
                     }}
                   >
@@ -290,18 +293,13 @@ export default function App() {
                       onOpenSettings={navigateToSettings}
                     />
                   </AppErrorBoundary>
-                ) : currentView === 'replicate' ? (
+                ) : currentView === 'headline_poster' ? (
                   <AppErrorBoundary
-                    title="爆款复刻异常"
-                    resetLabel="重置复刻"
-                    onReset={() => {
-                      clearWorkshopStudioDraft();
-                      useAppStore.getState().resetModeSession('social_face_product_swap');
-                    }}
+                    title="大字报生成异常"
+                    resetLabel="返回首页"
+                    onReset={() => setCurrentView('home')}
                   >
-                    <ReplicationStudio
-                      onOpenSettings={navigateToSettings}
-                    />
+                    <HeadlinePosterStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 ) : null}
               </Suspense>

@@ -280,7 +280,7 @@ export async function POST(req: Request) {
         actionsAfterDedup: reconcileStats.actionsAfterDedup,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (claimedKey && claimedRequestId) await releaseIncompleteSource(claimedKey, claimedRequestId).catch(() => {});
     if (error instanceof AppError) return errorResponse(error);
     console.error('[AssetDeconstruct] 异常:', error);

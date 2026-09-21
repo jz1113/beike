@@ -52,6 +52,21 @@ function filterUpdatesByWhitelist(input: Record<string, string>): Record<string,
 export async function POST(req: Request) {
   const dataDir = process.env.AZHUO_DATA_DIR?.trim() || process.cwd();
   const isDesktopShell = process.env.DESKTOP_SHELL === '1';
+  const isSharedWeb = process.env.NODE_ENV === 'production' && !isDesktopShell;
+
+  // 公网 Web 是多人共用一份 process.env / .env。浏览器里填的密钥只能跟当次请求走，
+  // 绝不能写进服务器默认配置，否则后保存的人会覆盖先保存的人。
+  if (isSharedWeb) {
+    return jsonResponse({
+      success: true,
+      skipped: true,
+      fileWritten: false,
+      hasApiKey: Boolean(process.env.AI_DRAWING_API_KEY),
+      baseUrl: process.env.AI_DRAWING_BASE_URL || '',
+      hasWanbang: Boolean(process.env.WANBANG_API_KEY && process.env.WANBANG_API_SECRET),
+      storageEnabled: process.env.STORAGE_ENABLED === 'true',
+    });
+  }
 
   try {
     const body = await req.json().catch(() => ({}));

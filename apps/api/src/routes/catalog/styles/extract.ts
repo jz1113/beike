@@ -9,7 +9,11 @@ import {
   VISION_EXTRACT_MASTER_TIMEOUT_MS,
   VISION_EXTRACT_SHARD_TIMEOUT_MS,
 } from '@beike/domain/visionTimeouts';
-import { formatUserError } from '@beike/domain/upstreamErrors';
+import {
+  formatUserError,
+  isRetryableUpstreamError,
+  isRetryableUpstreamStatus,
+} from '@beike/domain/upstreamErrors';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../../services/gatewayCredentials';
 
 export async function POST(req: Request) {
@@ -96,15 +100,20 @@ export async function POST(req: Request) {
               }),
               signal: AbortSignal.timeout(shardTimeoutMs)
             });
-            if (resp.ok) {
-              const data = await resp.json();
-              const text = data.choices?.[0]?.message?.content || '';
-              if (text) {
-                console.log(`[StyleExtract] 分片 ${shardIdx + 1}/${shards.length} 分析成功 (${targetModel})`);
-                return `【分片 ${shardIdx + 1}/${shards.length}（包含 ${shardImgs.length} 张图）视觉特征分析】：\n${text}`;
-              }
+            if (!resp.ok) {
+              const error = new Error(`分片模型调用失败（HTTP ${resp.status}）`) as Error & { status?: number };
+              error.status = resp.status;
+              if (!isRetryableUpstreamStatus(resp.status)) throw error;
+              continue;
+            }
+            const data = await resp.json();
+            const text = data.choices?.[0]?.message?.content || '';
+            if (text) {
+              console.log(`[StyleExtract] 分片 ${shardIdx + 1}/${shards.length} 分析成功 (${targetModel})`);
+              return `【分片 ${shardIdx + 1}/${shards.length}（包含 ${shardImgs.length} 张图）视觉特征分析】：\n${text}`;
             }
           } catch (e: any) {
+            if (!isRetryableUpstreamError(e)) throw e;
             console.warn(`[StyleExtract] 分片 ${shardIdx + 1} 模型 ${targetModel} 异常:`, e.message);
           }
         }
@@ -213,8 +222,10 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
         });
 
         if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`模型调用失败（HTTP ${response.status}）: ${errText.slice(0, 100)}`);
+          await response.text();
+          const error = new Error(`模型调用失败（HTTP ${response.status}）`) as Error & { status?: number };
+          error.status = response.status;
+          throw error;
         }
 
         const data = await response.json();
@@ -224,6 +235,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
           break;
         }
       } catch (err: any) {
+        if (!isRetryableUpstreamError(err)) throw err;
         lastError = err;
         console.warn(`[StyleExtract] 模型 ${targetModel} 响应异常，尝试备选模型:`, err.message);
       }
@@ -283,4 +295,3 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
     return jsonResponse({ error: formatUserError(error, '风格架构提炼失败，请重试') }, 500);
   }
 }
-

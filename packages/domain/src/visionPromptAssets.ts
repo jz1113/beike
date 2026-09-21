@@ -3,7 +3,7 @@ import { isPhoneProduct, phoneGenerationPolicy } from './phoneProductPolicy';
 export interface VisionAssetLibraryData {
   scenes?: Array<{ id: string; code?: string; title: string; description: string; lighting?: string | null; reversePrompt?: string | null }>;
   outfits?: Array<{ id: string; code?: string; title: string; top: string; bottom: string; colorPalette?: string | null; reversePrompt?: string | null }>;
-  actions?: Array<{ id: string; code?: string; title: string; action: string; shotType?: string; camera?: string | null; suitableAnatomy?: string; reversePrompt?: string | null }>;
+  actions?: Array<{ id: string; code?: string; title: string; action: string; shotType?: string; camera?: string | null; suitableAnatomy?: string; reversePrompt?: string | null; has_human?: boolean }>;
   personas?: Array<{ id: string; code?: string; name: string; description: string; reversePrompt?: string | null }>;
 }
 
@@ -73,6 +73,7 @@ export function buildAssetLibraryPromptSection(
   } else {
     parts.push('🚨 **【资产库强装配：绑定资产但保留真实姿态】**：\n- 若下方提供了场景/动作/穿搭/人设库，必须 **100% 直接选用** 库中具体资产，严禁编造脱离资产库的假想场景或动作。\n- **【套图一致性】**：同一套分镜共用同一 scene / outfit / persona，但各镜 action、camera、lighting 必须互不相同。\n- **【动作绑定】**：按动作库列表顺序选用并写入 applied_action，必须保留对应资产的真实姿态、机位与焦段；禁止把列表位置改写成固定模板角色，禁止按「微距 / 侧颜 / 半身」重排资产。\n- 必须回填 master_scene、applied_scene、look_bible、applied_outfit、identity_bible、applied_persona，以及各镜不同的 applied_action 与 lighting_type。\n');
   }
+  parts.push('- **【逐镜出镜规则】**：每个分镜的 `has_human` 与 `shot_type` 必须严格遵循对应动作资产的「出镜」标注。标为“纯商品/无人”的动作只画商品，禁止人物、模特、人脸、肢体与手部；标为“人物出镜”的动作才装配人设与穿搭。');
 
   if (lockedAssets) {
     const lockedLines: string[] = [];
@@ -115,7 +116,8 @@ export function buildAssetLibraryPromptSection(
       : '### 📸 可选抓拍动作库 (Action Assets - 按列表绑定并保留真实姿态，严禁改写成固定模板角色)：';
     const actions = listCodedAssets(assetLibraryData.actions, 8, 'A', (a, idx, codeStr) => {
       const body = a.reversePrompt || a.action;
-      return `${idx + 1}. 【${codeStr} ${a.title}】：${body}${a.camera ? ` ｜ 镜头：${a.camera}` : ''}`;
+      const subject = a.has_human === false ? '纯商品/无人' : a.has_human === true ? '人物出镜' : '按动作描述';
+      return `${idx + 1}. 【${codeStr} ${a.title}】：${body}${a.camera ? ` ｜ 镜头：${a.camera}` : ''} ｜ 出镜：${subject}`;
     });
     if (actions.length) {
       parts.push(actionHeading);

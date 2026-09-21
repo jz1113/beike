@@ -10,12 +10,10 @@ import { sanitizeCollectedItem } from '../utils/collectorUrls';
 
 interface UseSingleCollectOptions {
   showToast: (msg: string) => void;
-  saveToCollectorHistory: (item: any) => void;
 }
 
 export function useSingleCollect({
   showToast,
-  saveToCollectorHistory,
 }: UseSingleCollectOptions) {
   const [singlePlatform, setSinglePlatform] = useState<'auto' | 'jd' | 'taobao' | '1688' | 'pinduoduo' | 'social'>('auto');
   const [singleInput, setSingleInput] = useState('');
@@ -51,6 +49,10 @@ export function useSingleCollect({
         if (parsed.success) {
           const result = parsed.data;
           const images = Array.isArray(result.images) ? result.images : [];
+          const videos = Array.from(new Set([
+            ...(Array.isArray(result.videos) ? result.videos : []),
+            result.video,
+          ].filter((url): url is string => typeof url === 'string' && Boolean(url))));
 
           const parsedItem = {
             id: `social_${Date.now()}`,
@@ -60,8 +62,10 @@ export function useSingleCollect({
             author: result.author || '社媒达人',
             coverImage: result.cover || images[0] || '',
             images: images,
-            video: result.video || null,
+            video: videos[0] || null,
+            videos,
             sourceUrl: query,
+            importOrder: Date.now(),
             time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
           };
 
@@ -70,13 +74,13 @@ export function useSingleCollect({
           setSelectedSingleImages(sanitized.images || []);
           setSelectedVideo(Boolean(sanitized.video));
           setSingleImageFilter('all');
-          saveToCollectorHistory(sanitized);
           const imgN = sanitized.images?.length || 0;
-          const hasVid = Boolean(sanitized.video);
+          const videoN = Array.isArray(sanitized.videos) ? sanitized.videos.length : 0;
+          const hasVid = videoN > 0;
           showToast(
             hasVid
-              ? `🎉 成功解析${imgN > 0 ? ` ${imgN} 张图` : ''}${hasVid ? ' + 原视频' : ''}！已存入汇总库`
-              : `🎉 成功解析 ${imgN} 张高清无水印社媒图集！已存入汇总库`,
+              ? `🎉 成功解析${imgN > 0 ? ` ${imgN} 张图` : ''} + ${videoN} 条视频/动态！`
+              : `🎉 成功解析 ${imgN} 张高清无水印社媒图集！`,
           );
         } else {
           showToast(`❌ 社媒解析失败: ${parsed.error || '未能提取到图片内容'}`);
@@ -114,6 +118,7 @@ export function useSingleCollect({
             descImages: descImgs,
             props: prod.props || data.images?.props || {},
             sourceUrl: query,
+            importOrder: Date.now(),
             time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
           };
 
@@ -122,7 +127,6 @@ export function useSingleCollect({
           setSelectedSingleImages(sanitized.images || []);
           setSelectedVideo(false);
           setSingleImageFilter('all');
-          saveToCollectorHistory(sanitized);
           showToast(`🎉 成功解析商品「${sanitized.title}」，共 ${sanitized.images.length} 张高清无水印素材！`);
         } else {
           showToast(`❌ 采集失败: ${data.error || '未能获取到商品主图'}`);

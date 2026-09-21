@@ -8,7 +8,8 @@ import { DEFAULT_VIDEO_MODEL_ID, isApprovedModel } from '@beike/domain/modelCata
 import { createImageConvertCache, logLatencyAudit } from '@beike/domain/latencyAudit';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { cleanPromptText } from '@beike/domain/drawing';
-import { resolveCredentials, videoTaskEndpointCache } from './videoGenerationTypes';
+import { resolveCredentials } from '../gatewayCredentials';
+import { videoTaskEndpointCache } from './videoGenerationTypes';
 
 /**
  * POST /api/generate/video

@@ -19,6 +19,7 @@ import {
 import { ComflyLogo } from '@/shared/icons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
+import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
 import WorkflowModelRow from '../WorkflowModelRow';
 import type { WorkflowModel } from '../settingsShared';
 
@@ -271,7 +272,7 @@ export function ApiServicesGatewayPanel({
               className="px-2.5 py-1.5 rounded-xl border border-indigo-200/70 hover:bg-indigo-50/60 text-indigo-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
             >
               <RefreshCw className={`w-3 h-3 text-indigo-600 ${isFetchingGateway ? 'animate-spin' : ''}`} />
-              <span>获取网关模型库 ({allGatewayModels.length || '854+'})</span>
+              <span>获取网关模型库 ({allGatewayModels.length || APPROVED_MODELS.length})</span>
             </button>
 
             <button

@@ -19,6 +19,7 @@ import type {
 import type { ApprovalWaiter } from './agentLoop';
 import { type ToolExecContext } from './toolRegistry';
 import '@beike/domain/asyncPool';
+import { buildMultimodalUpstreamFallbackChain } from '@beike/domain/modelCatalog';
 import { runAgentLoop } from './agentLoop';
 
 const MAX_SUBAGENT_PER_PARENT = 5;
@@ -117,7 +118,7 @@ export async function runSubAgent(opts: {
   try {
     const loopResult = await runAgentLoop({
       messages: subMessages,
-      modelsToTry: ['gemini-3.7-flash'],
+      modelsToTry: buildMultimodalUpstreamFallbackChain('gpt-5.6-luna'),
       baseUrl,
       apiKey,
       toolCtx,

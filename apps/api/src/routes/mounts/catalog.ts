@@ -9,6 +9,7 @@ import * as assetDeconstruct from '../catalog/assets/deconstruct';
 import * as assetLibrary from '../catalog/assets/library';
 import * as assetSeed from '../catalog/assets/seed';
 import * as workspace from '../catalog/workspace';
+import * as workshopBatches from '../catalog/workshopBatches';
 import * as assetReviews from '../catalog/assets/reviews';
 import * as assetSourceCheck from '../catalog/assets/source-check';
 
@@ -44,5 +45,14 @@ catalog.get('/assets/source-check', () => assetSourceCheck.GET());
 catalog.post('/assets/source-check', (c) => assetSourceCheck.POST(c.req.raw));
 catalog.get('/workshop-workspace', (c) => workspace.GET(c.req.raw));
 catalog.put('/workshop-workspace', (c) => workspace.PUT(c.req.raw));
+catalog.get('/workshop-batches', () => workshopBatches.LIST());
+catalog.post('/workshop-batches', (c) => workshopBatches.CREATE(c.req.raw));
+catalog.get('/workshop-batches/active', () => workshopBatches.ACTIVE());
+catalog.post('/workshop-batches/active/archive', () => workshopBatches.ARCHIVE_ACTIVE());
+catalog.delete('/workshop-batches/history', () => workshopBatches.CLEAR_HISTORY());
+catalog.get('/workshop-batches/:id', (c) => workshopBatches.GET(c.req.param('id')));
+catalog.put('/workshop-batches/:id', (c) => workshopBatches.PUT(c.req.raw, c.req.param('id')));
+catalog.patch('/workshop-batches/:id', (c) => workshopBatches.RENAME(c.req.raw, c.req.param('id')));
+catalog.post('/workshop-batches/:id/duplicate', (c) => workshopBatches.DUPLICATE(c.req.param('id')));
 
 export default catalog;

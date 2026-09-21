@@ -30,8 +30,20 @@ for(const file of sourceFiles) {
     ts.forEachChild(node,visit);
   }
   visit(source);
-  edges[file]=imports.map(name=>ts.resolveModuleName(name,absolute,options,ts.sys).resolvedModule?.resolvedFileName)
-    .filter(Boolean).map(target=>path.relative(root,target)).filter(target=>sourceFiles.has(target));
+  edges[file]=imports.flatMap(name => {
+    const resolved=ts.resolveModuleName(name,absolute,options,ts.sys).resolvedModule?.resolvedFileName;
+    if(!resolved) return [];
+    const target=path.relative(root,resolved).replace(/\\/g,'/');
+    const extras=[];
+    if(target.endsWith('.d.ts')) {
+      const base=target.slice(0,-5);
+      for(const ext of ['.jsx','.tsx','.js','.ts']) {
+        const sibling=base+ext;
+        if(sourceFiles.has(sibling)) extras.push(sibling);
+      }
+    }
+    return [target,...extras].filter(item=>sourceFiles.has(item));
+  });
 }
 // Package entry points and ambient types are not runtime dead-file candidates.
 const roots=['apps/web/src/main.tsx','apps/api/src/index.ts'];

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowUp, Check, ChevronDown, FileText, Play, Square, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, FileText, Play, Square, X, PanelsTopLeft } from 'lucide-react';
 import { AssistantSkillIcon } from '@/features/assistant/components/AssistantSkillIcon';
 import { MediaAttachment } from '@/store';
 import { proxyMediaUrl } from '@/shared/api/apiClient';
@@ -9,9 +9,6 @@ import {
   FILE_ACCEPT,
   resolveAssistantModelLabel,
 } from '@/features/assistant/utils/assistantConstants';
-import {
-  getModelProviderName,
-} from '@/shared/ui/modelDisplayHelpers';
 import AssistantSkillsMenu from '@/features/assistant/components/AssistantSkillsMenu';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store';
@@ -66,6 +63,7 @@ export interface AssistantInputAreaProps {
   setChatPreview: (v: { url: string; type: 'image' | 'video'; poster?: string } | null) => void;
   onOpenBrandKitModal?: () => void;
   addAssistantAttachment?: (att: MediaAttachment) => void;
+  workspaceContext?: { label: string; detail: string };
 }
 
 export default function AssistantInputArea({
@@ -92,6 +90,7 @@ export default function AssistantInputArea({
   setAssistantModel,
   resolveAssistantMediaSrc,
   setChatPreview,
+  workspaceContext,
 }: AssistantInputAreaProps) {
   const skillTokenRef = useRef<HTMLDivElement>(null);
   const [skillTokenWidth, setSkillTokenWidth] = useState(0);
@@ -177,6 +176,15 @@ export default function AssistantInputArea({
           }}
         >
           {/* 附件缩略图预览（位于输入卡片内部顶部，整齐紧凑） */}
+          {workspaceContext && (
+            <div className="mb-2 flex min-w-0 items-center gap-1.5 text-[11px] text-slate-500">
+              <span className="inline-flex min-w-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1">
+                <PanelsTopLeft className="h-3 w-3 shrink-0 text-slate-500" />
+                <span className="shrink-0 font-medium text-slate-600">{workspaceContext.label}</span>
+                <span className="min-w-0 truncate text-slate-400">{workspaceContext.detail}</span>
+              </span>
+            </div>
+          )}
           {assistantAttachments.length > 0 && (
             <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2 animate-fade-in">
               {assistantAttachments.map((att, idx) => (
@@ -341,7 +349,6 @@ export default function AssistantInputArea({
                         .map(m => {
                           const isCurrent = assistantModel === m.id;
                           const label = resolveAssistantModelLabel(m);
-                          const providerName = getModelProviderName(m.id, m.name || label, m.provider);
                           return (
                             <button
                               key={m.id}
@@ -365,11 +372,6 @@ export default function AssistantInputArea({
                                     <span className={`truncate min-w-0 text-xs ${isCurrent ? 'font-bold' : 'font-semibold'}`}>
                                       {label}
                                     </span>
-                                    {providerName && (
-                                      <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-medium shrink-0">
-                                        {providerName}
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
                               </div>

@@ -10,9 +10,7 @@ const DEFAULT_PERSONA = '🌸 亚洲清纯甜美女生 (日常精致微表情、
 
 function readPersonaPref(mode: WorkshopMode): string {
   if (typeof window === 'undefined') return DEFAULT_PERSONA;
-  const key = mode === 'social_face_product_swap'
-    ? 'drawing_model_persona_social'
-    : 'drawing_model_persona_original';
+  const key = 'drawing_model_persona_original';
   try {
     return localStorage.getItem(key) || localStorage.getItem('drawing_model_persona') || DEFAULT_PERSONA;
   } catch {
@@ -145,14 +143,12 @@ export function applyWorkshopModeSession(
 }
 
 export function workshopModeSessionKey(mode: WorkshopMode): 'socialSessionCache' | 'originalSessionCache' {
-  return mode === 'social_face_product_swap' ? 'socialSessionCache' : 'originalSessionCache';
+  return 'originalSessionCache';
 }
 
 export function persistModePersonaPref(mode: WorkshopMode, persona: string) {
   if (typeof window === 'undefined') return;
-  const key = mode === 'social_face_product_swap'
-    ? 'drawing_model_persona_social'
-    : 'drawing_model_persona_original';
+  const key = 'drawing_model_persona_original';
   try {
     localStorage.setItem(key, persona);
   } catch {}

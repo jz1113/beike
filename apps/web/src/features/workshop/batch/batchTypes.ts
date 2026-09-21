@@ -1,4 +1,4 @@
-import { JEWELRY_ALL_MASTER_SNIPPET } from './jewelryMasterSnippet';
+import { OFFICIAL_MASTER_RECIPES } from '@beike/domain/masterRecipes';
 import { ShotPrompt } from '@beike/domain/vision';
 
 export interface MasterRecipe {
@@ -9,16 +9,14 @@ export interface MasterRecipe {
   promptSnippet?: string;
 }
 
-// 官方唯一的 8 段式高保真拍摄大架构（与配方库保持 100% 一致）
-export const SYSTEM_MASTER_RECIPES: MasterRecipe[] = [
-  {
-    id: 'recipe_jewelry_master',
-    name: '珠宝首饰全品类 (V6.0)',
-    category: 'jewelry_luxury',
-    tag: '8段式高保真拍摄大架构 V6.0 (资产库联动版)',
-    promptSnippet: JEWELRY_ALL_MASTER_SNIPPET
-  }
-];
+// 官方 8 段式高保真拍摄大架构（与配方库 / masterRecipes 保持一致，禁止删除）
+export const SYSTEM_MASTER_RECIPES: MasterRecipe[] = OFFICIAL_MASTER_RECIPES.map((recipe) => ({
+  id: recipe.id,
+  name: recipe.name,
+  category: recipe.category,
+  tag: recipe.tag,
+  promptSnippet: recipe.promptSnippet,
+}));
 
 export interface TypedProductImage {
   url: string;
@@ -65,12 +63,6 @@ export interface BatchProductItem {
   // 全量分类图片池
   allTypedImages: TypedProductImage[];
   selectedProductImages: string[];
-
-  // 爆款复刻专属
-  referenceUrl?: string;
-  availableReferenceImages: string[];
-  selectedReferenceImages: string[];
-  isRefParsing?: boolean;
 
   // 原创生成专属（完全对接单个模式的多模态分析结构）
   isAnalyzing?: boolean;

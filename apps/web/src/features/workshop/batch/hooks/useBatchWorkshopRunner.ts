@@ -22,11 +22,9 @@ import { usePersistentNumber, usePersistentEnum } from '@/shared/hooks/usePersis
 import { useBatchPreviewGallery, useBatchToast } from './useBatchPreviewGallery';
 import { fetchRecipes, loadSystemConfiguredModels, fetchAssetLibraryOptions } from '../batchResourceLoader';
 import { parseBatchInputLines, runBatchCollect } from '../batchCollect';
-import { parseSingleRefLink } from '../batchRefParsing';
 import {
   toggleProductImageSelection as toggleProductImageSelectionPure,
   batchSetProductImages as batchSetProductImagesPure,
-  toggleReferenceImageSelection as toggleReferenceImageSelectionPure,
 } from '../batchImageSelection';
 import {
   generateCopywritingForProduct as generateCopywritingForProductUtil,
@@ -45,9 +43,7 @@ import {
 import { useLiveWorkshopWorkspace } from '../workshopSnapshotBridge';
 import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 
-export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'replication' }) {
-  const fixedBatchMode = opts?.fixedBatchMode;
-  const [batchMode, setBatchMode] = useState<'original' | 'replication'>(fixedBatchMode ?? 'original');
+export function useBatchWorkshopRunner() {
   const [currentStage, setCurrentStage] = useState<number>(1);
 
   // 阶段 1: 批量采编与清洗状态
@@ -95,14 +91,11 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     fallback: 'grid_first',
     isValid: (v): v is GenerationStrategy => v === 'grid_first' || v === 'single_shot',
   });
+  // 文案自动生成是批次配置：关闭后仍可在交付页手动写作或按需生成。
+  const [autoGenerateCopywriting, setAutoGenerateCopywriting] = useState(true);
 
   const [activeImgFilter, setActiveImgFilter] = useState<'all' | 'main' | 'sku' | 'detail'>('all');
 
-  const [replicationInputMode, setReplicationInputMode] = useState<'one_to_one' | 'matrix'>('one_to_one');
-  const [matrixMasterRefUrl, setMatrixMasterRefUrl] = useState('');
-  const [matrixMasterRefImages, setMatrixMasterRefImages] = useState<string[]>([]);
-  const [isMatrixParsing, setIsMatrixParsing] = useState(false);
-  const [isBatchRefParsing, setIsBatchRefParsing] = useState(false);
 
   // 资产库支持
   const [useAssetLibrary, setUseAssetLibrary] = useState(true);
@@ -202,8 +195,6 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
 
   useEffect(() => {
     if (!pendingBatchPromptImport?.prompts?.length) return;
-    if (fixedBatchMode === 'replication') return;
-
     const { productTitle, productFingerprint, prompts } = pendingBatchPromptImport;
     const importId = `hist_${Date.now()}`;
 
@@ -231,8 +222,6 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
         selected: true,
         allTypedImages: [],
         selectedProductImages: [],
-        availableReferenceImages: [],
-        selectedReferenceImages: [],
         analyzedSuccess: true,
         productFingerprint: productFingerprint || '',
         prompts,
@@ -241,22 +230,15 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
       return [...prev, importItem];
     });
 
-    setBatchMode('original');
     setCurrentStage(3);
     setPendingBatchPromptImport(null);
     showToast(`已载入 ${prompts.length} 条历史分镜，请补充商品图后生图`);
-  }, [pendingBatchPromptImport, setPendingBatchPromptImport, fixedBatchMode, showToast]);
-
-  const handleSwitchMode = (mode: 'original' | 'replication') => {
-    if (fixedBatchMode) return;
-    setBatchMode(mode);
-    setCurrentStage(1);
-  };
+  }, [pendingBatchPromptImport, setPendingBatchPromptImport, showToast]);
 
   const successfulItems = items.filter((i) => i.status === 'success' && i.selected);
 
   useEffect(() => {
-    if (batchMode !== 'original' || items.length === 0) return;
+    if (items.length === 0) return;
     const hasJewelry = items.some(
       (p) => shouldAutoSelectJewelryArch(p.title, p.props) || /珠宝|首饰/i.test(p.category || '')
     );
@@ -273,7 +255,7 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     }
     setUseAssetLibrary(true);
     setGenerationStrategy('grid_first');
-  }, [items, batchMode, recipes, selectedArchId, setSelectedArchId, setGenerationStrategy]);
+  }, [items, recipes, selectedArchId, setSelectedArchId, setGenerationStrategy]);
 
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -284,19 +266,20 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     const res = parseBatchInputLines(batchInputText, new Set(items.map((i) => i.itemId)));
     if (res.error === 'EMPTY_INPUT') {
       showToast('请输入至少一条商品链接或 SKU');
-      return;
+      return [];
     }
     if (res.error === 'NO_NEW_ITEMS' || res.newItems.length === 0) {
       showToast('没有识别到新的不重复商品');
-      return;
+      return [];
     }
     setItems((prev) => [...prev, ...res.newItems]);
     setBatchInputText('');
     showToast(`成功加入 ${res.newItems.length} 个待采商品`);
+    return res.newItems;
   };
 
-  const startBatchCollect = async () => {
-    const pendingItems = items.filter((i) => i.status === 'pending' || i.status === 'failed');
+  const startBatchCollect = async (itemsToCollect = items) => {
+    const pendingItems = itemsToCollect.filter((i) => i.status === 'pending' || i.status === 'failed');
     if (pendingItems.length === 0) {
       showToast('没有待采集或需要重试的商品');
       return;
@@ -319,64 +302,6 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     showToast(`批量采编完成：已就绪 ${res.success} 款商品`);
   };
 
-  // 爆款复刻对标解析
-  const handleParseMatrixMasterRef = async () => {
-    if (!matrixMasterRefUrl.trim()) {
-      showToast('请输入爆款母版笔记链接');
-      return;
-    }
-    setIsMatrixParsing(true);
-    const imgs = await parseSingleRefLink(matrixMasterRefUrl);
-    setIsMatrixParsing(false);
-
-    if (imgs.length === 0) {
-      showToast('未能从母版链接中提取到有效图片');
-      return;
-    }
-
-    setMatrixMasterRefImages(imgs);
-    setItems((prev) =>
-      prev.map((p) => {
-        if (p.status !== 'success') return p;
-        return {
-          ...p,
-          referenceUrl: matrixMasterRefUrl,
-          availableReferenceImages: imgs,
-          selectedReferenceImages: imgs.length > 0 ? [imgs[0]] : [],
-        };
-      })
-    );
-    showToast(`母版解析成功！已提取 ${imgs.length} 张参考图并分发到所有商品`);
-  };
-
-  const handleBatchParse1to1Refs = async () => {
-    setIsBatchRefParsing(true);
-    let parsedCount = 0;
-
-    for (const item of successfulItems) {
-      if (item.referenceUrl) {
-        const imgs = await parseSingleRefLink(item.referenceUrl);
-        if (imgs.length > 0) {
-          setItems((prev) =>
-            prev.map((p) =>
-              p.id === item.id
-                ? {
-                    ...p,
-                    availableReferenceImages: imgs,
-                    selectedReferenceImages: [imgs[0]],
-                  }
-                : p
-            )
-          );
-          parsedCount++;
-        }
-      }
-    }
-
-    setIsBatchRefParsing(false);
-    showToast(`已成功解析 ${parsedCount} 款商品的对标素材图`);
-  };
-
   // 选图纯函数绑定
   const toggleProductImageSelection = (itemId: string, imgUrl: string) => {
     setItems((prev) => toggleProductImageSelectionPure(prev, itemId, imgUrl));
@@ -386,21 +311,15 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     setItems((prev) => batchSetProductImagesPure(prev, itemId, mode));
   };
 
-  const toggleReferenceImageSelection = (itemId: string, imgUrl: string) => {
-    setItems((prev) => toggleReferenceImageSelectionPure(prev, itemId, imgUrl));
-  };
-
   // 视觉分析
   const visionAnalyzeDeps: VisionAnalyzeDeps = {
     recipes,
     selectedArchId,
-    batchMode,
     items,
     availablePersonas,
     availableScenes,
     availableOutfits,
     selectedShotCount,
-    hasHumanPersona,
     lockedPersonaId,
     lockedSceneId,
     lockedOutfitId,
@@ -419,7 +338,16 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     return analyzeBatchProduct(visionAnalyzeDeps, item, itemIndex);
   };
 
-  const startBatchVisionAnalyze = async (): Promise<number> => {
+  const startBatchVisionAnalyze = async (architectureId = selectedArchId): Promise<number> => {
+    if (!recipes.some((recipe) => recipe.id === architectureId)) {
+      showToast('请先确认类目拍摄架构，再开始提示词分析');
+      return 0;
+    }
+
+    const analysisDeps = architectureId === selectedArchId
+      ? visionAnalyzeDeps
+      : { ...visionAnalyzeDeps, selectedArchId: architectureId };
+
     const activeItems = itemsRef.current.filter((i) => i.status === 'success' && i.selected);
     if (activeItems.length === 0) {
       showToast('没有待分析的商品');
@@ -434,7 +362,7 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
       concurrency: analyzeConcurrency || 2,
       isAborted: () => isAbortedRef.current,
       analyzeOne: async (item, index) => {
-        await analyzeBatchProduct(visionAnalyzeDeps, item, index);
+        await analyzeBatchProduct(analysisDeps, item, index);
       },
       onItemStart: () => {},
       onItemFinish: (finished, total) => {
@@ -453,8 +381,6 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
 
   // 任务执行配置
   const taskExecutionConfig: TaskExecutionConfig = {
-    batchMode,
-    hasHumanPersona,
     selectedQuality,
     selectedAspect,
     selectedImageGenModel,
@@ -480,6 +406,7 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
       setCompletedTaskCount,
       setSuccessTaskCount,
       setFailTaskCount,
+      autoGenerateCopywriting,
       generateAllCopywriting,
     });
   };
@@ -501,6 +428,7 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
         setCompletedTaskCount,
         setSuccessTaskCount,
         setFailTaskCount,
+        autoGenerateCopywriting,
         generateAllCopywriting,
       },
       successfulItems,
@@ -587,16 +515,13 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
       setItems,
       startBatchVisionAnalyze,
       startBatchGeneration,
-      generateAllCopywriting,
       setCurrentStage,
       showToast,
       setIsAutoPilotRunning,
-      batchMode,
     });
   };
 
   const applyWorkspaceSnapshot = useCallback((value: WorkshopSnapshot) => {
-    if (!fixedBatchMode) setBatchMode(value.mode);
     setCurrentStage(value.currentStage);
     setBatchInputText(value.batchInputText);
     setItems(value.items as BatchProductItem[]);
@@ -613,24 +538,20 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     setLockedOutfitId(value.settings.lockedOutfitId);
     setLockedActionId(value.settings.lockedActionId);
     setGenerationStrategy(value.settings.generationStrategy);
-    setReplicationInputMode(value.settings.replicationInputMode);
-    setMatrixMasterRefUrl(value.settings.matrixMasterRefUrl);
-    setMatrixMasterRefImages(value.settings.matrixMasterRefImages);
-  }, [fixedBatchMode, setSelectedArchId, setSelectedShotCount, setGenerationStrategy]);
+    setAutoGenerateCopywriting(value.settings.autoGenerateCopywriting);
+  }, [setSelectedArchId, setSelectedShotCount, setGenerationStrategy]);
 
   const workspace = useLiveWorkshopWorkspace({
-    batchMode, currentStage, batchInputText, items,
+    currentStage, batchInputText, items,
     selectedVisionModel, selectedImageGenModel, selectedArchId,
     hasHumanPersona, selectedQuality, selectedAspect, selectedShotCount,
     useAssetLibrary, lockedPersonaId, lockedSceneId, lockedOutfitId, lockedActionId,
-    generationStrategy, replicationInputMode, matrixMasterRefUrl, matrixMasterRefImages,
+    generationStrategy, autoGenerateCopywriting,
   }, applyWorkspaceSnapshot);
 
   return {
-    batchMode,
     currentStage,
     setCurrentStage,
-    handleSwitchMode,
     batchInputText,
     setBatchInputText,
     items,
@@ -675,19 +596,8 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     analyzeProgress,
     activeImgFilter,
     setActiveImgFilter,
-    replicationInputMode,
-    setReplicationInputMode,
-    matrixMasterRefUrl,
-    setMatrixMasterRefUrl,
-    matrixMasterRefImages,
-    setMatrixMasterRefImages,
-    isMatrixParsing,
-    isBatchRefParsing,
-    handleParseMatrixMasterRef,
-    handleBatchParse1to1Refs,
     toggleProductImageSelection,
     batchSetProductImages,
-    toggleReferenceImageSelection,
     analyzeSingleProduct,
     startBatchVisionAnalyze,
     analyzeConcurrency,
@@ -711,6 +621,8 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     handleDownloadSingleTaskImage,
     generationStrategy,
     setGenerationStrategy,
+    autoGenerateCopywriting,
+    setAutoGenerateCopywriting,
     imageGenConcurrency,
     setImageGenConcurrency,
     previewImageUrl,
@@ -723,6 +635,16 @@ export function useBatchWorkshopRunner(opts?: { fixedBatchMode?: 'original' | 'r
     startAutoPilotPipeline,
     toastMsg,
     showToast,
-    workspaceStatus: workspace.status,
+    workspaceError: workspace.error,
+    workspaceReady: workspace.ready,
+    activeBatch: workspace.activeBatch,
+    historyBatches: workspace.historyBatches,
+    refreshBatchHistory: workspace.refreshHistory,
+    createNewBatch: workspace.createNewBatch,
+    duplicateBatch: workspace.duplicateBatch,
+    archiveCurrentBatch: workspace.archiveCurrentBatch,
+    clearHistory: workspace.clearHistory,
+    renameBatch: workspace.renameBatch,
+    readBatch: workspace.readBatch,
   };
 }

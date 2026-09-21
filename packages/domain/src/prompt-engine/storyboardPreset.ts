@@ -9,8 +9,7 @@ export type StoryboardShotType =
   | 'single_shot'      // 单张独立分镜
   | 'lifestyle_interaction' // 生活互动场景
   | 'pure_product'     // 纯商品特写
-  | 'model_shot'       // 模特展示
-  | 'replication';     // 爆款复刻 1:1
+  | 'model_shot';      // 模特展示
 
 export type SceneStyle = 
   | 'studio'    // 室内摄影棚
@@ -66,16 +65,6 @@ export const STORYBOARD_PRESETS: StoryboardPresetConfig[] = [
     isNoModel: true,
     description: '纯商品特写，无人物入镜，适合饰品/箱包',
     icon: '💎',
-  },
-  {
-    id: 'replication-1to1',
-    label: '爆款复刻',
-    shotCount: 4,
-    shotType: 'replication',
-    sceneStyle: 'street',
-    isNoModel: false,
-    description: '1:1 复刻爆款参考图的镜头语言与构图',
-    icon: '🔥',
   },
   {
     id: 'jewelry-macro',

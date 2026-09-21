@@ -1,7 +1,7 @@
 import AssistantMemoryPanel from './AssistantMemoryPanel';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '@/store';
+import { useAppStore, type MediaAttachment } from '@/store';
 import { useToast } from '@/shared/hooks/useToast';
 import { COPY_FEEDBACK_DURATION_MS } from '@/shared/constants/timing';
 import { proxyMediaUrl } from '@/shared/api/apiClient';
@@ -16,6 +16,11 @@ import { DEFAULT_ASSISTANT_MODELS } from '@/features/assistant/utils/assistantCo
 import { useAssistantModels } from '@/features/assistant/hooks/useAssistantModels';
 import { useAssistantMediaUpload } from '@/features/assistant/hooks/useAssistantMediaUpload';
 import { useAssistantChatStream } from '@/features/assistant/hooks/useAssistantChatStream';
+import {
+  getCanvasWorkspaceAttachments,
+  getCanvasWorkspaceSnapshot,
+  useCanvasWorkspaceSelection,
+} from '@/shared/workspace/canvasWorkspace';
 import { Sparkles } from 'lucide-react';
 
 interface Props {
@@ -26,6 +31,7 @@ export { DEFAULT_ASSISTANT_MODELS };
 
 export default function AIAssistantDrawer({ onOpenSettings }: Props) {
   void onOpenSettings;
+  const { activeNodeId: activeCanvasNodeId, activeProject: activeCanvasProject } = useCanvasWorkspaceSelection();
   const {
     isAssistantOpen,
     setIsAssistantOpen,
@@ -214,6 +220,47 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
 
   // 3. 聊天流式发送与调度 Hook
   const activeBrandKit = getActiveBrandKit();
+  // 只在发送时读取精简画布摘要：让助手知道当前项目状态，同时避免把图片 URL、
+  // 完整提示词或画布坐标塞入上下文。
+  const getWorkspaceSnapshot = useCallback((): Record<string, unknown> => {
+    if (currentView === 'canvas') {
+      return getCanvasWorkspaceSnapshot();
+    }
+
+    if (currentView === 'workshop') {
+      return {
+        workspaceType: 'workshop',
+        title: product?.title || '种草工坊',
+        summary: product?.title
+          ? `当前已加载商品「${product.title}」，处于工坊第 ${currentStep || 1} 步。`
+          : '当前尚未加载商品。',
+      };
+    }
+
+    return {
+      workspaceType: currentView === 'generate' ? 'generate' : currentView === 'assets' ? 'assets' : currentView === 'home' ? 'home' : 'other',
+    };
+  }, [currentStep, currentView, product?.title]);
+
+  // 仅将“当前选中”的可视节点作为本轮参考附件带入模型；画布里其他素材仍以摘要传递。
+  // 这样既能让视觉模型真正看见用户正在讨论的图，也不会把整张画布重复上传。
+  const getWorkspaceAttachments = useCallback((): MediaAttachment[] => {
+    if (currentView !== 'canvas') return [];
+    return getCanvasWorkspaceAttachments();
+  }, [currentView]);
+
+  const canvasAssistantContext = useMemo(() => {
+    if (currentView !== 'canvas') return undefined;
+    if (!activeCanvasProject) return { label: '画布上下文', detail: '当前未打开画布' };
+    const selected = activeCanvasProject.nodes.find((node) => node.id === activeCanvasNodeId);
+    return {
+      label: selected ? '已引用画布选中节点' : '已读取当前画布',
+      detail: selected
+        ? (selected.title || selected.content || '未命名节点').replace(/\s+/g, ' ').trim().slice(0, 36)
+        : `${activeCanvasProject.title} · ${activeCanvasProject.nodes.length} 个节点`,
+    };
+  }, [activeCanvasNodeId, activeCanvasProject, currentView]);
+
   const {
     sendingSessionId,
     streamingAssistantMsgId,
@@ -240,6 +287,8 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     workshopMode,
     activeWorkshopTab,
     activeBrandKit,
+    getWorkspaceSnapshot,
+    getWorkspaceAttachments,
     getActiveAssistantSkill,
     showToast,
   });
@@ -252,14 +301,6 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
         '💡 如何提升买家秀生活化纪实质感避免AI假图感？',
         '🎬 拆解小红书爆款图集的人像构图与色彩配方',
         '📐 推荐适合这件商品的摄影焦段与自然漫反射打光',
-      ];
-    }
-    if (currentView === 'replicate') {
-      return [
-        '🎯 如何选对对标爆款图提升复刻还原度？',
-        '📸 1对1对标与爆款母版分发哪种更适合当前商品？',
-        '💡 复刻提示词如何保留爆款氛围又突出自家商品？',
-        '🔍 分析对标图的光影构图与人物姿态特征',
       ];
     }
     if (currentView === 'generate') {
@@ -416,6 +457,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           setChatPreview={setChatPreview}
           onOpenBrandKitModal={() => setIsBrandKitModalOpen(true)}
           addAssistantAttachment={addAssistantAttachment}
+          workspaceContext={canvasAssistantContext}
         />
 
         {/* 历史对话记录侧滑抽屉 */}

@@ -1,4 +1,11 @@
-import { listApprovedModels, vendorLabel, DEFAULT_MULTIMODAL_MODEL_ID, getApprovedModel } from '@beike/domain/modelCatalog';
+import {
+  buildMultimodalUpstreamFallbackChain,
+  listApprovedModels,
+  vendorLabel,
+  DEFAULT_MULTIMODAL_MODEL_ID,
+  getApprovedModel,
+  MULTIMODAL_UPSTREAM_FALLBACK_ORDER,
+} from '@beike/domain/modelCatalog';
 import { REVERSE_ENGINE_CORE_SPEC } from './assetDeconstruct/prompts';
 import { domainStorage } from './runtime';
 import {
@@ -18,7 +25,7 @@ export interface PreviousGroupSignature {
 export interface AssetLibrarySlotData {
   scenes?: Array<{ id: string; code?: string; title: string; description: string; lighting?: string | null; reversePrompt?: string | null }>;
   outfits?: Array<{ id: string; code?: string; title: string; top: string; bottom: string; colorPalette?: string | null; reversePrompt?: string | null }>;
-  actions?: Array<{ id: string; code?: string; title: string; action: string; shotType?: string; camera?: string | null; suitableAnatomy?: string; reversePrompt?: string | null }>;
+  actions?: Array<{ id: string; code?: string; title: string; action: string; shotType?: string; camera?: string | null; suitableAnatomy?: string; reversePrompt?: string | null; has_human?: boolean }>;
   personas?: Array<{ id: string; code?: string; name: string; description: string; reversePrompt?: string | null }>;
 }
 
@@ -195,63 +202,29 @@ export function filterVisionCapableModels(models: string[]): string[] {
   return models.filter((m) => isVisionCapableModel(m));
 }
 
-/** 根据用户指定主模型与 fallback 列表构建视觉 API 尝试链（不注入内置模型） */
+/** 根据当前模型构建统一的多模态上游降级链。 */
 export function buildVisionModelsToTry(
   requestedModel: string | undefined,
-  fallbackModels: string[] = [],
-  maxTotal = 3,
+  _fallbackModels: string[] = [],
+  maxTotal = MULTIMODAL_UPSTREAM_FALLBACK_ORDER.length + 1,
 ): string[] {
   const raw = (requestedModel || '').trim();
-  const primary = raw ? normalizeVisionModelId(raw) : undefined;
-  const fallbacks = (Array.isArray(fallbackModels) ? fallbackModels : [])
-    .map((id) => String(id || '').trim())
-    .filter(Boolean)
-    .map((id) => normalizeVisionModelId(id))
-    .filter((id) => id && id !== primary);
-
-  const chain = Array.from(new Set([primary, ...fallbacks].filter((m): m is string => Boolean(m))));
+  const primary = raw ? normalizeVisionModelId(raw) : DEFAULT_MULTIMODAL_MODEL_ID;
+  const chain = buildMultimodalUpstreamFallbackChain(primary);
   return chain.slice(0, Math.max(1, maxTotal));
 }
 
-/** Pass1 逐图反推：用户主模型优先，但 flash 模型前置以降低延迟与 429 */
+/** Pass1 逐图反推与其他视觉入口使用完全相同的上游降级顺序。 */
 export function buildPass1VisionModelsToTry(
   requestedModel: string | undefined,
   fallbackModels: string[] = [],
-  maxTotal = 3,
+  maxTotal = MULTIMODAL_UPSTREAM_FALLBACK_ORDER.length + 1,
 ): string[] {
-  const chain = buildVisionModelsToTry(requestedModel, fallbackModels, maxTotal);
-  const requested = (requestedModel || '').trim();
-  const flashPreferred = ['gemini-3.7-flash', 'gemini-2.5-flash'];
-  const ordered: string[] = [];
-
-  if (requested) ordered.push(requested);
-  for (const id of flashPreferred) {
-    if (chain.includes(id) && !ordered.includes(id)) ordered.push(id);
-  }
-  for (const id of chain) {
-    if (!ordered.includes(id)) ordered.push(id);
-  }
-  return ordered.slice(0, Math.max(1, maxTotal));
+  return buildVisionModelsToTry(requestedModel, fallbackModels, maxTotal);
 }
 
-export function pickVisionAnalyzeFallbacks(selectedId: string, availableIds: string[]): string[] {
-  const selected = (selectedId || '').trim();
-  const ids = availableIds.map((id) => String(id || '').trim()).filter(Boolean);
-  const preferred = ['gemini-3.7-flash', 'gemini-2.5-flash'];
-  const isThinking = (id: string) => {
-    const s = id.toLowerCase();
-    return s.includes('thinking') || s.includes('luna') || s.includes('terra') || s.includes('pro-preview');
-  };
-  const picked: string[] = [];
-  for (const id of preferred) {
-    if (id !== selected && ids.includes(id) && !picked.includes(id)) picked.push(id);
-  }
-  for (const id of ids) {
-    if (picked.length >= 2) break;
-    if (id === selected || picked.includes(id) || isThinking(id)) continue;
-    picked.push(id);
-  }
-  return picked.slice(0, 2);
+export function pickVisionAnalyzeFallbacks(selectedId: string, _availableIds: string[]): string[] {
+  return buildMultimodalUpstreamFallbackChain(normalizeVisionModelId(selectedId)).slice(1);
 }
 
 export function normalizeVisionModelId(modelId?: string): string {
@@ -294,14 +267,16 @@ export function buildVisionSystemPrompt(params: VisionAnalyzeParams): string {
   } = params;
   const lockJewelryHalfBody = shouldLockJewelryHalfBody(productTitle, assetLibraryData);
 
+  // 显式架构优先于旧版人设字段；资产库模式会传入 asset_driven，不能被误判为无人。
   const isNoModel =
     architectureMode === 'pure_product' ||
-    !modelPersona ||
-    modelPersona === 'none' ||
-    modelPersona.includes('无人物') ||
-    modelPersona.includes('无需模特') ||
-    modelPersona.includes('纯商品') ||
-    modelPersona.includes('纯静物');
+    (architectureMode !== 'seed_portrait' &&
+      (!modelPersona ||
+        modelPersona === 'none' ||
+        modelPersona.includes('无人物') ||
+        modelPersona.includes('无需模特') ||
+        modelPersona.includes('纯商品') ||
+        modelPersona.includes('纯静物')));
 
   const propsSection = productProps && Object.keys(productProps).length > 0
     ? `\n- 核心规格参数 (Props):\n${Object.entries(productProps).map(([k, v]) => `  • ${k}: ${v}`).join('\n')}`
@@ -547,45 +522,6 @@ ${extraRequirements ? `\n【用户定制补充要求】：\n${extraRequirements}
 - 🌟 prompt 字段是大模型多模态视觉理解的核心价值：必须结合 @图片1 实物实拍的金属/布料/宝石光泽与做工质感，打磨本镜的独有动作、机位与受光焦点，为系统拼装提供最高品质的视觉精修文案。
 - product_role 必须与商品实物一致（衬衫/外套等=worn_apparel，手镯/项链/耳饰/戒指=worn_accessory）。
 `, productTitle);
-}
-
-/** 爆款复刻 Pass1：全维图像反推（仅对标图，不绑定商品） */
-export function buildReplicationReverseSystemPrompt(params: {
-  referenceImageCount: number;
-}): string {
-  const { referenceImageCount } = params;
-  return `${REVERSE_ENGINE_CORE_SPEC}
-
-本次任务：对传入的 ${referenceImageCount} 张外站/社媒参考图逐张 1:1 反推，产出可直接生图的九段式正向提示词。
-
-## 爆款复刻 Pass1 补充铁律
-1. **本阶段不绑定任何目标商品**：忠实还原参考图本身的主体与美学。
-2. **截屏噪声**：若含鼠标光标、浏览器边框、状态栏、水印，在 negative_prompt 中排除。
-3. **人物判定**（与参考图像素一致，禁止脑补）：
-   - 无人物 → has_human=false, shot_type=pure_product
-   - 仅手部持物无面部 → has_human=false, shot_type=hand_held_only
-   - 有模特/人脸出镜 → has_human=true, shot_type=model_shot
-4. image_type 映射：人物摄影→photography，建筑或室内→general，产品或静物→product，风景或道路→landscape，海报/UI→typography 或 ui，多种元素混合→mixed
-
-## 输出格式
-🚨 最终必须且仅输出一个合法 JSON 对象，严禁 Markdown 前言。
-- prompts 数组长度必须恰好等于 ${referenceImageCount}，shot_no 从 1 到 ${referenceImageCount}，与传入参考图顺序 1:1。
-\`\`\`json
-{
-  "prompts": [
-    {
-      "shot_no": 1,
-      "image_type": "photography",
-      "has_human": false,
-      "shot_type": "pure_product",
-      "title": "对应参考图要点短标题",
-      "scene": "场景结构与光影一句话",
-      "reverse_prompt": "【主体】…\\n【发型与面部】…\\n【穿搭或物体细节】…\\n【动作或摆放】…\\n【场景结构】…\\n【光影】…\\n【构图镜头】…\\n【材质与真实感】…\\n【画质与限制】…（≥180字）",
-      "negative_prompt": "根据参考图生成的负面约束清单"
-    }
-  ]
-}
-\`\`\``;
 }
 
 /** 爆款复刻 Pass2：用商品信息优化反推词，产出最终生图提示词（仅 @图片1） */

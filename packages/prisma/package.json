@@ -6,6 +6,8 @@
   "scripts": {
     "postinstall": "prisma generate --schema schema.prisma",
     "db:push": "prisma db push --schema schema.prisma",
+    "db:migrate": "prisma migrate dev --schema schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema schema.prisma",
     "db:push:desktop": "DATABASE_URL=\"file:$HOME/Library/Application Support/com.azhuo.workbench/azhuo.db\" prisma db push --schema schema.prisma --accept-data-loss"
   },
   "dependencies": {

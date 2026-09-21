@@ -1,12 +1,7 @@
 import React from 'react';
 import DotGrid from './DotGrid';
-import type { AppView } from '@/store';
 
-interface Props {
-  currentView?: AppView;
-}
-
-export const GlobalDynamicBackground: React.FC<Props> = () => {
+export const GlobalDynamicBackground: React.FC = React.memo(() => {
   return (
     <div
       className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none"
@@ -18,14 +13,15 @@ export const GlobalDynamicBackground: React.FC<Props> = () => {
         gap={28}
         baseColor="#CBD5E1"
         activeColor="#94A3B8"
-        proximity={130}
-        speedTrigger={70}
-        shockRadius={220}
-        shockStrength={4}
+        proximity={96}
+        speedTrigger={240}
+        shockRadius={150}
+        shockStrength={2}
+        returnDuration={0.65}
         className="absolute inset-0 w-full h-full"
       />
     </div>
   );
-};
+});
 
 export default GlobalDynamicBackground;

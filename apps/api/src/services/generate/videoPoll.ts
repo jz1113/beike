@@ -1,17 +1,24 @@
-import { gatewayFetch } from '../../gateways/http';
 import { jsonResponse } from '../../core/http';
 import { prisma } from '../../repositories/db';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { resolveCredentials, videoTaskEndpointCache } from './videoGenerationTypes';
+import { resolveCredentials } from '../gatewayCredentials';
+import { videoTaskEndpointCache } from './videoGenerationTypes';
 import { mutableGenerationStatuses, withPersistedGenerationStatus } from '../generationTerminalState';
+import { recordPollTelemetry } from '../agentTelemetry';
+import { decideProbeMissPoll } from './pollStatus';
+import { probeUpstreamTask, rememberMatchedEndpoint } from './probeUpstream';
 
 /**
  * GET /api/generate/video?taskId={taskId}
  * 轮询查询异步视频任务状态 (严格支持 /seedance/v3/... 与 /v1/videos/:id 与 /v2/videos/generations/:id 各类返回载荷)
  */
 export async function GET(req: Request) {
-  return withPersistedGenerationStatus(req, () => pollVideoOnce(req));
+  let provider: string | undefined;
+  try {
+    provider = new URL(resolveCredentials(req).baseUrl).hostname;
+  } catch { /* ignore */ }
+  return recordPollTelemetry('video-poll', req, () => withPersistedGenerationStatus(req, () => pollVideoOnce(req)), provider);
 }
 
 async function pollVideoOnce(req: Request) {
@@ -50,38 +57,47 @@ async function pollVideoOnce(req: Request) {
     let res: Response | null = null;
     let resData: any = null;
 
-    for (const qUrl of queryUrls) {
-      try {
-        const timeoutMs = isCgtTask ? 3500 : 5000;
-        const r = await gatewayFetch(qUrl, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`
-          },
-          signal: AbortSignal.timeout(timeoutMs)
-        });
-        if (r.ok) {
-          const d = await r.json().catch(() => null);
-          if (d && (d.status || d.data?.status || d.output?.task_status || d.video_url || d.url || d.data?.output || d.output || d.data?.data || d.content)) {
-            res = r;
-            resData = d;
-            // 记忆命中的端点基础路径
-            const matchedBase = qUrl.replace(`/${taskId}`, '').replace(`?task_id=${taskId}`, '');
-            videoTaskEndpointCache.set(cacheKey, matchedBase);
-            videoTaskEndpointCache.set(baseUrl, matchedBase);
-            break;
-          }
-        }
-      } catch {}
+    const probed = await probeUpstreamTask({
+      urls: queryUrls,
+      apiKey,
+      timeoutMs: isCgtTask ? 3500 : 5000,
+      isValid: (data, response) => {
+        if (!response.ok || !data || typeof data !== 'object') return false;
+        const d = data as Record<string, any>;
+        return Boolean(
+          d.status ||
+          d.data?.status ||
+          d.output?.task_status ||
+          d.video_url ||
+          d.url ||
+          d.data?.output ||
+          d.output ||
+          d.data?.data ||
+          d.content,
+        );
+      },
+    });
+    if (probed) {
+      res = probed.response;
+      resData = probed.data;
+      rememberMatchedEndpoint(videoTaskEndpointCache, cacheKey, baseUrl, probed.url, taskId);
     }
 
     if (!res || !res.ok || !resData) {
-      console.warn(`[AI视频-轮询] 查询任务 ${taskId} 状态暂未就绪`);
-      return jsonResponse({
-        success: true,
-        taskId,
-        status: 'IN_PROGRESS',
-        progress: '15%'
-      });
+      let record: { status: string | null; resultUrl: string | null; failReason: string | null } | null = null;
+      let dbError = false;
+      try {
+        record = await prisma.imageTask.findFirst({
+          where: { taskId },
+          select: { status: true, resultUrl: true, failReason: true },
+        });
+      } catch (error) {
+        dbError = true;
+        console.warn('[AI视频-轮询] 探测失败后回查数据库异常:', error);
+      }
+      const decision = decideProbeMissPoll(taskId, record, dbError, 'video');
+      console.warn(`[AI视频-轮询] 查询任务 ${taskId} 状态暂未就绪: ${decision.body.status}`);
+      return jsonResponse(decision.body, decision.httpStatus);
     }
 
     const taskInfo = resData.data || resData.output || resData;
@@ -239,8 +255,8 @@ async function pollVideoOnce(req: Request) {
             }
           })();
         }
-      } catch {
-        // ignore
+      } catch (error) {
+        console.warn(`[AI视频-轮询] 更新任务终态失败:`, error);
       }
     }
 

@@ -3,7 +3,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { getModelIcon } from '../../ui/ModelIcons';
 import '@beike/domain/workflowModels';
-import { getModelProviderName } from '@/shared/ui/modelDisplayHelpers';
 
 export interface LightboxGenConfigToolbarProps {
   selectedModelId: string;
@@ -103,7 +102,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
             {getModelIcon(selectedModelId, 'w-3.5 h-3.5')}
           </div>
           <span className="truncate max-w-[85px] sm:max-w-[120px] inline-block font-semibold">
-            {activeModelObj.name}
+            {activeModelObj.shortName || activeModelObj.name}
           </span>
           <ChevronDown className="w-3 h-3 opacity-60 shrink-0 ml-0.5" />
         </button>
@@ -132,7 +131,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
             <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5">
               {availableImageModels.map((m) => {
                 const isSelected = selectedModelId === m.id;
-                const provider = getModelProviderName(m.id, m.name, m.provider);
+                const label = m.shortName || m.name;
                 return (
                   <button
                     key={m.id}
@@ -162,21 +161,12 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                         {getModelIcon(m.id, 'w-4 h-4')}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1">
-                          <span
-                            className={`truncate text-[11px] font-bold ${
-                              isDark ? 'text-zinc-100' : 'text-slate-900'
-                            }`}
-                          >
-                            {m.name}
-                          </span>
-                        </div>
                         <span
-                          className={`text-[9.5px] font-mono ${
-                            isDark ? 'text-zinc-400' : 'text-slate-400'
+                          className={`truncate text-[11px] font-bold ${
+                            isDark ? 'text-zinc-100' : 'text-slate-900'
                           }`}
                         >
-                          {provider}
+                          {label}
                         </span>
                       </div>
                     </div>

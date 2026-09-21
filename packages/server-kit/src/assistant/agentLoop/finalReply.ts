@@ -1,5 +1,5 @@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
-import { modelRequestError } from './requestError';
+import { isRetryableModelRequestError, modelRequestError } from './requestError';
 import type { AssistantSSEEvent } from '@beike/domain/assistant/events';
 import { AgentRuntime } from '../agentRuntime';
 
@@ -103,7 +103,7 @@ export async function streamFinalReply(opts: {
       return modelUsed;
     } catch (error) {
       signal?.throwIfAborted();
-      if (emittedContent) throw error;
+      if (emittedContent || !isRetryableModelRequestError(error)) throw error;
       lastError = error;
       continue;
     }

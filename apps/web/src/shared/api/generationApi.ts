@@ -1,7 +1,17 @@
 import { apiFetch } from '@/shared/api/apiClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/shared/api/gatewayClient';
 import { AssetTasksListResponseSchema } from '@beike/contracts/generate';
 import type { GenerationTask } from '@/types/app-store';
 import { mapDbTaskToGenerationTask } from '@/shared/api/mapDbTask';
+import { compressImageToDataUrl } from '@/shared/media/image-utils';
+import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
+import {
+  imageGenBusinessError,
+  isTransientPollError,
+  nonRetryableError,
+  classifyGenerationPollResult,
+} from '@/shared/api/generationErrors';
+import { sleepWhilePolling, throwIfGenerationAborted } from '@/shared/api/generationAbort';
 
 export async function fetchAssetTasks(page = 1, pageSize = 40): Promise<{
   tasks: GenerationTask[];
@@ -35,4 +45,138 @@ export async function pollGenerationTask(
     throw new Error(`轮询失败 (${res.status})`);
   }
   return res.json();
+}
+
+export async function compressProductImageIfNeeded(img: string): Promise<string> {
+  if (typeof img === 'string' && img.startsWith('data:') && img.length > 1_200_000) {
+    try {
+      return await compressImageToDataUrl(img, 1400, 0.82);
+    } catch (compErr) {
+      console.warn('[compressProductImageIfNeeded] 垫图压缩失败，回退原图:', compErr);
+    }
+  }
+  return img;
+}
+
+export async function pollSingleTask(
+  taskId: string,
+  isAborted: () => boolean
+): Promise<string> {
+  const timeoutMs = 360000;
+  const start = Date.now();
+  const gatewayHeaders = getGatewayClientHeaders();
+  const localUrl = gatewayHeaders['x-custom-base-url'];
+
+  while (Date.now() - start < timeoutMs) {
+    throwIfGenerationAborted(isAborted);
+    await sleepWhilePolling(2000, isAborted);
+    try {
+      const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}`, {
+        headers: {
+          ...gatewayHeaders,
+          ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
+        },
+      });
+      const pData = await pRes.json().catch(() => null);
+
+      if (!pData) {
+        continue;
+      }
+
+      if (pRes.status >= 500 || pData.status === 'QUERY_FAILED') {
+        continue;
+      }
+
+      const outcome = classifyGenerationPollResult(pData, { httpOk: pRes.ok });
+      if (outcome === 'success') {
+        return String(pData.resultUrl);
+      }
+      if (outcome === 'failure') {
+        throw imageGenBusinessError(pData.failReason || pData.error || '生图任务失败');
+      }
+    } catch (e: unknown) {
+      throwIfGenerationAborted(isAborted);
+      if (!isTransientPollError(e)) throw e;
+    }
+  }
+  throwIfGenerationAborted(isAborted);
+  throw nonRetryableError(`生图超时（已等待 6 分钟，任务 ${taskId}）`);
+}
+
+export interface SubmitImageGenTaskDeps {
+  isAborted: () => boolean;
+}
+
+const LOCAL_API_RETRY_DELAYS_MS = [800, 1600, 2600] as const;
+
+async function isLocalApiUnavailable(response: Response): Promise<boolean> {
+  if (response.status !== 502) return false;
+  const data = await response.clone().json().catch(() => null);
+  return typeof data?.error === 'string' && /本地后台服务未连接/.test(data.error);
+}
+
+export async function submitImageGenTask(
+  payload: Record<string, unknown>,
+  deps: SubmitImageGenTaskDeps
+): Promise<string> {
+  throwIfGenerationAborted(deps.isAborted);
+  const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
+
+  const finalPayload = {
+    ...payload,
+    customBaseUrl: localUrl,
+    customApiKey: localApiKey,
+  };
+
+  const submit = () => apiFetch('/api/generate/image', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getGatewayClientHeaders(),
+    },
+    body: JSON.stringify(finalPayload),
+  });
+
+  let res = await submit();
+  for (const delayMs of LOCAL_API_RETRY_DELAYS_MS) {
+    throwIfGenerationAborted(deps.isAborted);
+    if (!(await isLocalApiUnavailable(res))) break;
+    await sleepWhilePolling(delayMs, deps.isAborted);
+    res = await submit();
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!data) {
+    throw nonRetryableError(payload.isGrid2x2 ? '四宫格生图响应解析失败' : '生图响应解析失败');
+  }
+  if (!res.ok || !data.success) {
+    throw nonRetryableError(
+      data.error || (payload.isGrid2x2 ? '四宫格生图提交失败' : '生图任务提交失败')
+    );
+  }
+
+  try {
+    const resolvedModelId = data.model || payload.model || 'gpt-image-2';
+    recordModelUsage({
+      modelId: String(resolvedModelId),
+      modelName: String(resolvedModelId),
+      provider: resolveModelVendor(String(resolvedModelId)),
+      type: 'image',
+      mediaCount: 1,
+      success: true,
+    });
+  } catch {}
+
+  if (data.status === 'SUCCESS' && data.resultUrl) {
+    return data.resultUrl;
+  }
+
+  if (data.taskId) {
+    throwIfGenerationAborted(deps.isAborted);
+    return await pollSingleTask(data.taskId, deps.isAborted);
+  }
+
+  throw nonRetryableError(
+    payload.isGrid2x2 ? '四宫格生图网关未返回有效任务 ID' : '生图网关未返回有效任务 ID'
+  );
 }

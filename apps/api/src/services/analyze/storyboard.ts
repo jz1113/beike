@@ -24,6 +24,7 @@ import {
 import { inferProductCategoryAndAnatomy } from '@beike/domain/productCategory';
 import { ANATOMY_ACTION_PRESETS } from '../../routes/generate/analyze/anatomyPresets';
 import { assembleStoryboardShots } from './promptAssembler';
+import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
 
 export interface ExecuteStoryboardParams {
   productTitle?: string;
@@ -39,7 +40,6 @@ export interface ExecuteStoryboardParams {
   fallbackModels: string[];
   targetBaseUrl: string;
   targetApiKey: string;
-  isNoModel: boolean;
   hasAnchorFace: boolean;
   previousMasterScenes?: any[];
   previousGroupSignatures?: any[];
@@ -69,7 +69,6 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     fallbackModels = [],
     targetBaseUrl,
     targetApiKey,
-    isNoModel,
     hasAnchorFace,
     previousMasterScenes = [],
     previousGroupSignatures = [],
@@ -384,13 +383,22 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
           const rawAction = a.action || a.reversePrompt || '';
           const pureAction = extractPureActionFromPrompt(rawAction);
           const cleanedAction = stripGarmentsFromAction(pureAction || rawAction, idx);
+          const subject = resolveAssetShotSubject({
+            has_human: a.has_human,
+            hasHuman: a.hasHuman,
+            shotType: a.shotType,
+            title: a.title,
+            action: a.action,
+            reversePrompt: a.reversePrompt,
+          });
           return {
             id: a.id,
             code: a.code || stableAssetCode('A', String(a.id)),
             title: a.title,
             action: cleanedAction,
             camera: a.camera,
-            shotType: a.shotType,
+            shotType: subject?.shot_type || a.shotType,
+            has_human: subject?.has_human,
             suitableAnatomy: a.suitableAnatomy,
             reversePrompt: a.reversePrompt
               ? stripGarmentsFromAction(extractPureActionFromPrompt(a.reversePrompt), idx)
@@ -418,6 +426,14 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     }
   }
 
+  // 出镜主体由每条动作资产决定：仅当这组动作都明确为无人时，才启用纯商品架构。
+  // 混合资产保留逐镜 has_human，不能再由一个全局开关覆盖。
+  const actionSubjects = assetLibraryData?.actions || [];
+  const isAllStillLife =
+    actionSubjects.length > 0 &&
+    actionSubjects.every((action: { has_human?: boolean }) => action.has_human === false);
+  const assetDrivenNoModel = isAllStillLife;
+
   let systemPrompt = buildVisionSystemPrompt({
     productTitle: productTitle || '指定商品',
     productProps,
@@ -425,8 +441,8 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     shotCount,
     extraRequirements,
     modelPersona: personaText,
-    hasAnchorFace: hasAnchorFace && !isNoModel,
-    architectureMode: isNoModel ? 'pure_product' : 'seed_portrait',
+    hasAnchorFace: hasAnchorFace && !assetDrivenNoModel,
+    architectureMode: isAllStillLife ? 'pure_product' : 'seed_portrait',
     previousMasterScenes: Array.isArray(previousMasterScenes)
       ? previousMasterScenes.filter((s: unknown) => typeof s === 'string' && s.trim()).slice(0, 2)
       : [],
@@ -447,10 +463,10 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   const coreProductImages = (Array.isArray(imageUrls) ? imageUrls : []).slice(0, 3);
   const imagesToInspect = [
     ...coreProductImages,
-    ...(hasAnchorFace && !isNoModel ? [anchorFaceImageUrl] : []),
+    ...(hasAnchorFace && !assetDrivenNoModel ? [anchorFaceImageUrl] : []),
   ].filter(Boolean) as string[];
 
-  if (hasAnchorFace && !isNoModel) {
+  if (hasAnchorFace && !assetDrivenNoModel) {
     systemPrompt += `\n\n【传入图片顺序】：第 1 张起为商品实物图（@图片1）；最后一张为专属正脸 ID（生图 @图片2，仅五官）。`;
   }
 
@@ -479,7 +495,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     shotCount,
     productTitle,
     productProps,
-    isNoModel,
+    isNoModel: assetDrivenNoModel,
     hasAnchorFace,
     productIndex,
     assetLibraryData,

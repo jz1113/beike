@@ -7,6 +7,8 @@ export type ApiaMediaResult = {
   cover: string;
   images: string[];
   video: string | null;
+  /** 全量视频/实况流；video 保留首条以兼容旧调用方。 */
+  videos: string[];
 };
 
 export type ApiaCredentials = {
@@ -145,7 +147,7 @@ export async function buildApiaCandidateUrls(rawText: string): Promise<string[]>
 /** 深度提取 APIA 响应中的图片、封面与视频 */
 export function extractMediaFromApiaData(data: unknown): ApiaMediaResult {
   if (!data || typeof data !== 'object') {
-    return { title: '', description: '', author: '', cover: '', images: [], video: null };
+    return { title: '', description: '', author: '', cover: '', images: [], video: null, videos: [] };
   }
 
   const payload = data as Record<string, unknown>;
@@ -234,38 +236,32 @@ export function extractMediaFromApiaData(data: unknown): ApiaMediaResult {
   }
   // 使用精确 URL 去重，不能去掉查询参数：部分接口用同一路径的不同参数标识不同图片。
   const cleanImages = [...new Set(rawList.flatMap((entry) => staticUrls(entry)))];
-  const isLive = sources.some((source) => String(source.type || '').toLowerCase() === 'live' ||
-    Array.isArray(source.live) || Array.isArray(source.live_photos) || Array.isArray(source.livePhotos));
-  const isImageNote = cleanImages.length > 0 || isLive;
   cover = staticUrls(root.cover || root.download_image || root.cover_url || root.video_cover || payload.cover || payload.download_image)[0] || cleanImages[0] || '';
 
   const VIDEO_CDN_RE = /kwaicdn|kwai|yximgs|snssdk|bytecdn|xhscdn|douyinvod/i;
   const looksLikeVideoUrl = (u: string) =>
     u.includes('.mp4') || u.includes('video') || VIDEO_CDN_RE.test(u);
 
-  const trustedVideo =
-    root.video ||
-    root.down ||
-    root.download_video ||
-    (Array.isArray(root.videos) && root.videos[0]) ||
-    (Array.isArray(root.live) && (root.live[0] as { video?: string })?.video) ||
-    payload.video ||
-    payload.down;
+  const videoUrls = (value: unknown, depth = 0): string[] => {
+    if (depth > 8 || value == null) return [];
+    if (typeof value === 'string') {
+      const url = value.trim().replace(/^\/\//, 'https://');
+      return /^https?:\/\//i.test(url) && (isVideoUrl(url) || looksLikeVideoUrl(url)) ? [url] : [];
+    }
+    if (Array.isArray(value)) return value.flatMap((entry) => videoUrls(entry, depth + 1));
+    if (typeof value !== 'object') return [];
+    const item = value as Record<string, unknown>;
+    return ['videos', 'video', 'down', 'download_video', 'download_url', 'play_url', 'url']
+      .flatMap((field) => videoUrls(item[field], depth + 1));
+  };
 
-  const fallbackUrl = root.url || payload.url;
-  const videoCandidate =
-    typeof trustedVideo === 'string' && trustedVideo.trim()
-      ? trustedVideo
-      : typeof fallbackUrl === 'string' && looksLikeVideoUrl(fallbackUrl)
-        ? fallbackUrl
-        : null;
-
-  const videoUrl =
-    typeof videoCandidate === 'string'
-      ? videoCandidate.startsWith('//')
-        ? 'https:' + videoCandidate
-        : videoCandidate
-      : null;
+  // 实况作品同时包含静态封面与多段动态流，不能因存在图片而丢掉视频。
+  const rawVideos = sources.flatMap((source) => [
+    source.videos, source.video, source.down, source.download_video,
+    source.live, source.live_photos, source.livePhotos,
+  ].flatMap(videoUrls));
+  const fallbackVideos = videoUrls([root.url, payload.url]);
+  const cleanVideos = [...new Set([...rawVideos, ...fallbackVideos])];
 
   if (cleanImages.length === 0 && cover) {
     const cleanCover = cover.startsWith('//') ? 'https:' + cover : cover;
@@ -281,7 +277,8 @@ export function extractMediaFromApiaData(data: unknown): ApiaMediaResult {
     author,
     cover: coverOut,
     images: cleanImages,
-    video: isImageNote ? null : videoUrl,
+    video: cleanVideos[0] || null,
+    videos: cleanVideos,
   };
 }
 

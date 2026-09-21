@@ -2,27 +2,18 @@ import type { ShotPrompt } from '@beike/domain/vision';
 import {
   assembleOriginalShotPrompt,
   assembleGrid2x2Prompt,
-  assembleReplicationGrid2x2Prompt,
   cleanPromptText,
-  ensureReplicationPromptSlots,
-  softenReplicationSafetyWording,
   enforceLookConsistency,
   extractOutfitFromPrompt,
   isGenericLook,
   preventJewelryGlitches,
 } from '@beike/domain/drawing';
 import type { BatchProductItem } from './batchTypes';
-import { resolveHarmonizedTemplatesForItem } from './batchVisionTemplates';
 
 export function formatAnalyzedStoryboard(opts: {
   data: any;
   item: BatchProductItem;
   imagePayload: string[];
-  isSocialMode: boolean;
-  hasHumanPersona: boolean;
-  lockedSceneId: string;
-  availableScenes?: unknown[];
-  targetShotCount: number;
 }): {
   formattedPrompts: ShotPrompt[];
   gridPrompt: string;
@@ -34,7 +25,7 @@ export function formatAnalyzedStoryboard(opts: {
   productRole: any;
   productFingerprint: string;
 } {
-  const { data, item, imagePayload, isSocialMode, hasHumanPersona, lockedSceneId, availableScenes, targetShotCount } = opts;
+  const { data, item, imagePayload } = opts;
   const lookPartsFromApi = data?.lookParts || data?.look_parts || null;
   const styleBibleFromApi = data?.styleBible || data?.style_bible || '';
   const masterFromApi = data?.masterScene || data?.master_scene || '';
@@ -46,12 +37,8 @@ export function formatAnalyzedStoryboard(opts: {
   const formattedPrompts: ShotPrompt[] = (data.prompts || []).map((p: any, idx: number) => {
     const assignedImg = imagePayload[idx % imagePayload.length] || item.coverImage;
     const rawPrompt = cleanPromptText(p.prompt || p.description || '');
-    const isHumanShot = typeof p.has_human === 'boolean' ? p.has_human : hasHumanPersona;
-    const finalPrompt = isSocialMode
-      ? softenReplicationSafetyWording(ensureReplicationPromptSlots(rawPrompt, {
-          hasHuman: isHumanShot, hasFace: false, expression: p.expression || '',
-        }))
-      : assembleOriginalShotPrompt({
+    const isHumanShot = typeof p.has_human === 'boolean' ? p.has_human : true;
+    const finalPrompt = assembleOriginalShotPrompt({
           identityBible: identityFromApi, lookBible: lookFromApi, lookParts: lookPartsFromApi || undefined,
           masterScene: masterFromApi, styleBible: styleBibleFromApi, productRole: productRoleFromApi || undefined,
           productFingerprint: fingerprintFromApi || undefined,
@@ -84,33 +71,6 @@ export function formatAnalyzedStoryboard(opts: {
     };
   });
 
-  if (isSocialMode) {
-    const templates = resolveHarmonizedTemplatesForItem({
-      masterScene: masterFromApi || '', productTitle: item.title || '', hasHumanPersona,
-      lockedSceneId, availableScenes: availableScenes as Array<{ id: string; shots?: unknown[]; description?: string; title?: string }>,
-    });
-    while (formattedPrompts.length < targetShotCount) {
-      const idx = formattedPrompts.length;
-      const t = templates[idx % templates.length];
-      const isHumanShot = hasHumanPersona && t.hasHuman;
-      formattedPrompts.push({
-        shot_no: idx + 1, title: t.title,
-        scene: t.sceneSuffix || masterFromApi || '真实买家秀生活场景',
-        expression: isHumanShot ? t.expression : '', action: t.action,
-        prop: '与生活场景匹配的极简自然道具',
-        optics: `${t.camera}，${t.angle}`,
-        camera_focal_length: t.camera, angle: t.angle, lighting_type: '柔和自然漫反射',
-        has_human: isHumanShot, shot_type: isHumanShot ? 'model_shot' : 'pure_product',
-        productImageUrl: imagePayload[idx % imagePayload.length] || item.coverImage,
-        prompt: softenReplicationSafetyWording(ensureReplicationPromptSlots(
-          `【爆款复刻实拍】：按对标图 ${idx + 1} 反推美学生成真实生活实拍，主体为 @图片1 所示商品实物，无鼠标光标或广告文字。`,
-          { hasHuman: isHumanShot, hasFace: false, expression: t.expression }
-        )),
-        selected: true,
-      });
-    }
-  }
-
   let canonicalOutfit = lookPartsFromApi;
   if (formattedPrompts.some(p => p.has_human !== false)) {
     if (!canonicalOutfit?.top || isGenericLook(canonicalOutfit.top)) {
@@ -124,7 +84,7 @@ export function formatAnalyzedStoryboard(opts: {
     }
     formattedPrompts.forEach((p) => {
       p.prompt = p.has_human !== false
-        ? (isSocialMode ? softenReplicationSafetyWording(enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi, fingerprintFromApi)) : enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi, fingerprintFromApi))
+        ? enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi, fingerprintFromApi)
         : preventJewelryGlitches(p.prompt, fingerprintFromApi);
     });
   }
@@ -134,7 +94,7 @@ export function formatAnalyzedStoryboard(opts: {
     ? `身穿${canonicalOutfit.top}${canonicalOutfit.bottom ? `，搭配${canonicalOutfit.bottom}` : ''}`
     : (lookFromApi || '质感显白私服穿搭');
   const gridBible = {
-    identityBible: identityFromApi || (hasHumanPersona ? '' : '纯商品静物，无人物'),
+    identityBible: identityFromApi || (formattedPrompts.every(p => p.has_human === false) ? '纯商品静物，无人物' : ''),
     lookBible, lookParts, masterScene: masterFromApi || '真实买家秀生活场景',
     styleBible: styleBibleFromApi, productRole: productRoleFromApi || undefined, productFingerprint: fingerprintFromApi || undefined,
   };
@@ -143,9 +103,7 @@ export function formatAnalyzedStoryboard(opts: {
     optics: p.optics, camera_focal_length: p.camera_focal_length, angle: p.angle, lighting_type: p.lighting_type,
     scene: p.scene, has_human: p.has_human,
   }));
-  const gridPrompt = isSocialMode
-    ? assembleReplicationGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 })
-    : assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
+  const gridPrompt = assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
 
   return {
     formattedPrompts, gridPrompt, lookBible, lookParts, identityBible: identityFromApi,

@@ -4,6 +4,7 @@ import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { resolveVisionTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS } from '@beike/domain/visionTimeouts';
 import { getRetryDelayMs, isNetworkLikeError } from '../gatewayCredentials';
+import { isRetryableUpstreamError, isRetryableUpstreamStatus } from '@beike/domain/upstreamErrors';
 import {
   VisionCallDiagnostics,
   VisionCallTracker,
@@ -110,6 +111,7 @@ export async function callVisionJson(params: {
                 console.warn(
                   `[AssetDeconstruct] ${label} 模型 ${targetModel} 失败 (${resp.status}): ${errText}`
                 );
+                if (!isRetryableUpstreamStatus(resp.status)) return null;
                 modelDone = true;
                 break;
               }
@@ -146,6 +148,7 @@ export async function callVisionJson(params: {
                 hadNetworkFailure = true;
               } else {
                 hadHttpFailure = true;
+                if (!isRetryableUpstreamError(err)) return null;
               }
 
               console.warn(`[AssetDeconstruct] ${label} 模型 ${targetModel} 异常:`, message);
@@ -168,7 +171,10 @@ export async function callVisionJson(params: {
         const message = err instanceof Error ? err.message : String(err);
         if (diagnostics) diagnostics.lastError = message;
         if (isNetworkLikeError(err)) hadNetworkFailure = true;
-        else hadHttpFailure = true;
+        else {
+          hadHttpFailure = true;
+          if (!isRetryableUpstreamError(err)) return null;
+        }
         console.warn(`[AssetDeconstruct] ${label} 模型 ${targetModel} 异常:`, message);
       }
     }

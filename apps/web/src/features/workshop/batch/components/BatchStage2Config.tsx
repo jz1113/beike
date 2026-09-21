@@ -1,14 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import BatchImageSelectionPanel from './BatchImageSelectionPanel';
 import { useBatchConfig } from './BatchConfigContext';
-import { BatchStage2ReplicationRefs } from './BatchStage2ReplicationRefs';
 import { BatchStage2PresetBar } from './BatchStage2PresetBar';
 import { useAppStore } from '@/store';
 import type { AppState } from '../../../../types/store';
 
 export default function BatchStage2Config() {
   const {
-    batchMode,
     currentStage,
     successfulItems,
     setItems,
@@ -18,22 +16,12 @@ export default function BatchStage2Config() {
     selectedVisionModel,
     availableImageModels,
     selectedImageGenModel,
-    hasHumanPersona,
     selectedAspect,
     selectedShotCount,
     activeImgFilter,
     setActiveImgFilter,
     batchSetProductImages,
-    toggleReferenceImageSelection,
     handleRemoveItem,
-    replicationInputMode,
-    setReplicationInputMode,
-    matrixMasterRefUrl,
-    setMatrixMasterRefUrl,
-    isMatrixParsing,
-    isBatchRefParsing,
-    handleParseMatrixMasterRef,
-    handleBatchParse1to1Refs,
     onPreviewGallery,
     onPreviewImage,
     onNextStage,
@@ -41,28 +29,6 @@ export default function BatchStage2Config() {
   } = useBatchConfig();
   const setIsWorkshopConfigOpen = useAppStore((s: AppState) => s.setIsWorkshopConfigOpen);
   const handleOpenSettings = openWorkshopConfig || (() => setIsWorkshopConfigOpen(true));
-
-  // Replication stage 2 view (对标配对输入界面)
-  if (batchMode === 'replication' && currentStage === 2) {
-    return (
-      <BatchStage2ReplicationRefs
-        replicationInputMode={replicationInputMode}
-        setReplicationInputMode={setReplicationInputMode}
-        matrixMasterRefUrl={matrixMasterRefUrl}
-        setMatrixMasterRefUrl={setMatrixMasterRefUrl}
-        handleParseMatrixMasterRef={handleParseMatrixMasterRef}
-        isMatrixParsing={isMatrixParsing}
-        isBatchRefParsing={isBatchRefParsing}
-        handleBatchParse1to1Refs={handleBatchParse1to1Refs}
-        successfulItems={successfulItems}
-        setItems={setItems}
-        handleRemoveItem={handleRemoveItem}
-        onNextStage={onNextStage}
-      />
-    );
-  }
-
-  // ── Original 模式 & Replication 模式选图阶段 ──
 
   // 商品筛选状态（全部 / 待选图 / 已就绪）
   const [productFilter, setProductFilter] = useState<'pending' | 'completed' | 'all'>('all');
@@ -72,13 +38,11 @@ export default function BatchStage2Config() {
   const completedIdSet = useMemo(() => {
     const ids = new Set<string>();
     for (const i of successfulItems) {
-      const ready = batchMode === 'replication'
-        ? i.selectedProductImages.length > 0 && (i.selectedReferenceImages.length > 0 || i.availableReferenceImages.length === 0)
-        : i.selectedProductImages.length > 0;
+      const ready = i.selectedProductImages.length > 0;
       if (ready) ids.add(i.id);
     }
     return ids;
-  }, [successfulItems, batchMode]);
+  }, [successfulItems]);
 
   const completedItems = useMemo(
     () => successfulItems.filter(i => completedIdSet.has(i.id)),
@@ -116,7 +80,6 @@ export default function BatchStage2Config() {
         selectedArchId={selectedArchId}
         selectedShotCount={selectedShotCount}
         selectedAspect={selectedAspect}
-        hasHumanPersona={hasHumanPersona}
         selectedVisionModel={selectedVisionModel}
         availableVisionModels={availableVisionModels}
         selectedImageGenModel={selectedImageGenModel}
@@ -135,7 +98,6 @@ export default function BatchStage2Config() {
           displayedItems={displayedItems}
           focusedIndex={focusedIndex}
           activeImgFilter={activeImgFilter}
-          batchMode={batchMode}
           productFilter={productFilter}
           onFilterChange={setActiveImgFilter}
           onProductFilterChange={setProductFilter}
@@ -143,7 +105,6 @@ export default function BatchStage2Config() {
           setItems={setItems}
           batchSetProductImages={batchSetProductImages}
           handleRemoveItem={handleRemoveItem}
-          toggleReferenceImageSelection={toggleReferenceImageSelection}
           onPreviewGallery={onPreviewGallery}
           onPreviewImage={onPreviewImage}
           pendingItems={pendingItems}

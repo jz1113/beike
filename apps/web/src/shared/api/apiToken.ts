@@ -87,10 +87,19 @@ export function getClientAccessToken(): string {
     return '';
   }
 
+  const envToken = import.meta.env.VITE_APP_ACCESS_TOKEN?.trim();
+  // 本机 Vite 开发服务与 API 共用脚本生成的短期令牌。若浏览器残留了
+  // 上一次启动留下的 Cookie，必须由当前开发令牌覆盖，否则 API 重启后会
+  // 出现“服务可用但所有接口 401”的假故障。
+  if (import.meta.env.DEV && envToken) {
+    const cookieToken = readCookie(TOKEN_COOKIE_NAME)?.trim();
+    if (cookieToken !== envToken) writeCookie(TOKEN_COOKIE_NAME, envToken, TOKEN_TTL_SECONDS);
+    return envToken;
+  }
+
   const cookieToken = readCookie(TOKEN_COOKIE_NAME);
   if (cookieToken && cookieToken.trim()) return cookieToken.trim();
 
-  const envToken = import.meta.env.VITE_APP_ACCESS_TOKEN?.trim();
   if (envToken) return envToken;
 
   return DEFAULT_DEV_TOKEN;

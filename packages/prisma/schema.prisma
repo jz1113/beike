@@ -277,7 +277,7 @@ model PersonaAsset {
   @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "PersonaAsset_library_order_idx")
 }
 
-// 6. 完整反推提示词资产库（整条母本提示词与九维溯源对照）
+// 6. 完整反推提示词资产库（以内容图组为母本；旧单图记录保持兼容）
 model FullPromptAsset {
   id                 String   @id @default(cuid())
   title              String   // 短标题
@@ -287,6 +287,12 @@ model FullPromptAsset {
   dimensions         String?  // 九维分析 JSON 字符串
   imageType          String?  // photography | landscape | general 等
   sourceImageIndex   Int?     // 图集第几张 (1-based)
+  sourceImageIndices String?  // 图组包含的来源图序号 JSON，如 [1,2,3,4]
+  groupIndex         Int?     // 同一图集内的图组序号 (1-based)
+  contentSummary     String?  // 整条外站内容的简明总结
+  architectureSummary String? // 固定不替换的图组架构：镜头节奏、动作、出镜规则
+  replaceableSlots   String?  // 图组级可替换槽位 JSON（人物/穿搭/场景）
+  shotPromptsJson    String?  // 图组逐镜结构化提示词 JSON，可直接载入工坊
   coverUrl           String?  // 来源单图缩略图
   sourceImages       String?  // 来源整套图集 URL JSON 数组
   hasHuman           Boolean  @default(true)
@@ -312,6 +318,7 @@ model FullPromptAsset {
   @@index([createdAt])
   @@index([albumName])
   @@index([albumId])
+  @@index([albumId, groupIndex])
   @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "FullPromptAsset_library_order_idx")
 }
 
@@ -345,6 +352,25 @@ model WorkshopWorkspace {
   updatedAt    String
 }
 
+model WorkshopBatch {
+  id              String @id
+  name            String
+  status          String
+  revision        Int    @default(1)
+  snapshotJson    String
+  createdAt       String
+  updatedAt       String
+  legacyRecovered Boolean @default(false)
+
+  @@index([updatedAt])
+}
+
+model WorkshopBatchState {
+  id               String @id
+  activeBatchId    String?
+  legacyMigratedAt String?
+}
+
 model DeconstructReview {
   id        String @id
   albumName String
@@ -361,6 +387,3 @@ model PromptImportSource {
   albumId   String?
   updatedAt String
 }
-
-
-

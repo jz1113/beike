@@ -11,6 +11,14 @@ interface Props {
   onOpenSettings: () => void;
 }
 
+function SidebarTooltip({ children }: { children: string }) {
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 translate-x-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-white opacity-0 shadow-lg transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
+      {children}
+    </span>
+  );
+}
+
 export default function AppSidebar({
   currentView,
   onNavigateHub,
@@ -37,10 +45,10 @@ export default function AppSidebar({
           onMouseDown={(e) => e.stopPropagation()}
           data-no-drag
           data-tauri-drag-region="false"
-          className="w-10 h-10 xl:w-14 xl:h-14 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer group relative focus:outline-none"
-          title="贝壳云图 · 回到首页"
+          aria-label="贝壳云图首页"
+          className="group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25"
         >
-          <div className="relative w-9.5 h-9.5 xl:w-13.5 xl:h-13.5 flex items-center justify-center pointer-events-none">
+          <div className="relative flex h-10 w-10 items-center justify-center pointer-events-none">
             <img 
               src="/app_logo.png" 
               alt="贝壳云图" 
@@ -48,36 +56,30 @@ export default function AppSidebar({
               className="w-full h-full object-contain filter drop-shadow-[0_2px_8px_rgba(239,68,68,0.3)] group-hover:drop-shadow-[0_4px_14px_rgba(239,68,68,0.5)] transition-all duration-300 pointer-events-none"
             />
           </div>
-
-          {/* 悬停浮动品牌微气泡 */}
-          <div className="absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold tracking-wide shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-slate-800 flex items-center gap-1 z-50">
-            <span>贝壳云图 · 首页</span>
-          </div>
         </button>
       </div>
 
       {/* 🌟 2. 中间导航按钮组 */}
-      <nav data-no-drag data-tauri-drag-region="false" className="flex flex-col items-center gap-2 xl:gap-4 w-full my-auto py-2">
+      <nav data-no-drag data-tauri-drag-region="false" className="flex w-full flex-col items-center gap-3 py-2">
         {/* 1. 首页 */}
         <button
           onClick={onNavigateHub}
           onMouseDown={(e) => e.stopPropagation()}
           data-no-drag
           data-tauri-drag-region="false"
-          className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer ${
+          aria-label="首页"
+          className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'home'
-              ? 'text-slate-950 font-bold'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              ? 'bg-slate-950 text-white shadow-sm'
+              : 'text-slate-400 hover:bg-white/85 hover:text-slate-950'
           }`}
           title="首页 / 灵感展馆"
         >
           {/* 现代极简优雅 Home 图标 */}
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
+          <div className="relative flex h-6 w-6 items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
             <NavHomeIcon active={currentView === 'home'} />
           </div>
-          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'home' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
-            首页
-          </span>
+          <SidebarTooltip>首页</SidebarTooltip>
         </button>
 
         {/* 2. 生成工作区 */}
@@ -86,20 +88,19 @@ export default function AppSidebar({
           onMouseDown={(e) => e.stopPropagation()}
           data-no-drag
           data-tauri-drag-region="false"
-          className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer ${
+          aria-label="生成"
+          className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'generate'
-              ? 'text-slate-950 font-bold'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              ? 'bg-slate-950 text-white shadow-sm'
+              : 'text-slate-400 hover:bg-white/85 hover:text-slate-950'
           }`}
           title="生成 · AI 对话与极速生成工作区"
         >
           {/* 精美 AI 创作双星光芒图标 (生成) */}
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
+          <div className="relative flex h-6 w-6 items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
             <NavGenerateIcon active={currentView === 'generate'} />
           </div>
-          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'generate' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
-            生成
-          </span>
+          <SidebarTooltip>生成</SidebarTooltip>
         </button>
 
         {/* 3. 资产中心 */}
@@ -108,59 +109,57 @@ export default function AppSidebar({
           onMouseDown={(e) => e.stopPropagation()}
           data-no-drag
           data-tauri-drag-region="false"
-          className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer ${
+          aria-label="资产"
+          className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'assets'
-              ? 'text-slate-950 font-bold'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              ? 'bg-slate-950 text-white shadow-sm'
+              : 'text-slate-400 hover:bg-white/85 hover:text-slate-950'
           }`}
           title="资产 · 生成历史与媒体资产库"
         >
           {/* 高保真现代数字媒体资产画廊图标 (资产) */}
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
+          <div className="relative flex h-6 w-6 items-center justify-center transition-transform group-hover:scale-110 pointer-events-none">
             <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
               {currentView === 'assets' ? (
                 <>
-                  <rect x="2.5" y="5.5" width="19" height="15" rx="3.5" className="fill-slate-950 stroke-slate-950 stroke-[1.2]" />
-                  <path d="M6 3.5H18" className="stroke-slate-950 stroke-[2]" strokeLinecap="round" />
-                  <circle cx="8" cy="10.5" r="1.5" className="fill-white" />
-                  <path d="M21 16.5L15.5 12L6.5 19.5" className="stroke-white stroke-[1.8]" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="2.5" y="5.5" width="19" height="15" rx="3.5" className="fill-current stroke-current stroke-[1.2]" />
+                  <path d="M6 3.5H18" className="stroke-current stroke-[2]" strokeLinecap="round" />
+                  <circle cx="8" cy="10.5" r="1.5" className="fill-slate-950" />
+                  <path d="M21 16.5L15.5 12L6.5 19.5" className="stroke-slate-950 stroke-[1.8]" strokeLinecap="round" strokeLinejoin="round" />
                 </>
               ) : (
                 <>
-                  <rect x="2.5" y="5.5" width="19" height="15" rx="3.5" className="stroke-slate-500 group-hover:stroke-slate-900 stroke-[1.8]" />
-                  <path d="M6 3.5H18" className="stroke-slate-400 group-hover:stroke-slate-700 stroke-[1.8]" strokeLinecap="round" />
-                  <circle cx="8" cy="10.5" r="1.5" className="fill-slate-500 group-hover:fill-slate-900" />
-                  <path d="M21 16.5L15.5 12L6.5 19.5" className="stroke-slate-500 group-hover:stroke-slate-900 stroke-[1.8]" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="2.5" y="5.5" width="19" height="15" rx="3.5" className="stroke-current stroke-[1.8]" />
+                  <path d="M6 3.5H18" className="stroke-current stroke-[1.8]" strokeLinecap="round" />
+                  <circle cx="8" cy="10.5" r="1.5" className="fill-current" />
+                  <path d="M21 16.5L15.5 12L6.5 19.5" className="stroke-current stroke-[1.8]" strokeLinecap="round" strokeLinejoin="round" />
                 </>
               )}
             </svg>
           </div>
-          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none ${currentView === 'assets' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
-            资产
-          </span>
+          <SidebarTooltip>资产</SidebarTooltip>
         </button>
       </nav>
 
       {/* 🌟 3. 底部操作区：系统设置 */}
-      <div data-no-drag data-tauri-drag-region="false" className="flex flex-col items-center pb-2 w-full px-2">
+      <div data-no-drag data-tauri-drag-region="false" className="flex w-full flex-col items-center border-t border-slate-200/70 pt-3">
         <button
           onClick={onOpenSettings}
           onMouseDown={(e) => e.stopPropagation()}
           data-no-drag
           data-tauri-drag-region="false"
-          className={`group flex flex-col items-center justify-center gap-0 xl:gap-1.5 w-9 xl:w-16 py-2 xl:py-2.5 rounded-2xl transition-all cursor-pointer select-none ${
+          aria-label="设置"
+          className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'settings'
-              ? 'text-slate-950 font-bold bg-slate-100/80'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              ? 'bg-slate-950 text-white shadow-sm'
+              : 'text-slate-400 hover:bg-white/85 hover:text-slate-950'
           }`}
           title="系统设置 / 模型与接口配置"
         >
-          <div className="relative w-6 h-6 xl:w-7 xl:h-7 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-45 pointer-events-none">
-            <Settings className={`w-5 h-5 xl:w-6 xl:h-6 stroke-[1.8] ${currentView === 'settings' ? 'stroke-slate-950 text-slate-950' : 'stroke-slate-500 group-hover:stroke-slate-900'} transition-colors`} />
+          <div className="relative flex h-6 w-6 items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-45 pointer-events-none">
+            <Settings className="h-5 w-5 stroke-current stroke-[1.8] transition-colors" />
           </div>
-          <span className={`pointer-events-none hidden xl:block text-[13px] tracking-tight leading-none mt-0.5 ${currentView === 'settings' ? 'font-bold text-slate-950' : 'font-medium text-slate-600 group-hover:text-slate-900'}`}>
-            设置
-          </span>
+          <SidebarTooltip>设置</SidebarTooltip>
         </button>
       </div>
     </aside>

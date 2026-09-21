@@ -15,13 +15,11 @@ import {
 interface UseBatchTaskQueueOptions {
   isOpen: boolean;
   showToast: (msg: string) => void;
-  saveToCollectorHistory: (item: any) => void;
 }
 
 export function useBatchTaskQueue({
   isOpen,
   showToast,
-  saveToCollectorHistory,
 }: UseBatchTaskQueueOptions) {
   const [batchInputMode, setBatchInputMode] = useState<'text' | 'file'>('text');
   const [batchTextarea, setBatchTextarea] = useState('');
@@ -33,16 +31,40 @@ export function useBatchTaskQueue({
   const batchAbortedRef = useRef(false);
   const batchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socialRateLimiterRef = useRef(new RateLimiter(8.5));
+  const aliveRef = useRef(true);
+  const batchAbortControllerRef = useRef<AbortController | null>(null);
 
-  // 模态关闭时强制停止批量任务并清理所有定时器
+  const mergeAbortSignals = (...signals: Array<AbortSignal | undefined>) => {
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    for (const signal of signals) {
+      if (!signal) continue;
+      if (signal.aborted) {
+        controller.abort();
+        break;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    return controller.signal;
+  };
+
+  // 模态关闭时强制停止批量任务并 abort 进行中的请求
   useEffect(() => {
     if (!isOpen) {
       batchAbortedRef.current = true;
+      batchAbortControllerRef.current?.abort();
       if (batchIntervalRef.current !== null) {
         clearInterval(batchIntervalRef.current);
         batchIntervalRef.current = null;
       }
+      return;
     }
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      batchAbortedRef.current = true;
+      batchAbortControllerRef.current?.abort();
+    };
   }, [isOpen]);
 
   // 从粘贴文本添加任务
@@ -56,6 +78,7 @@ export function useBatchTaskQueue({
     const existingUrls = new Set(batchTasks.map((t) => t.url));
     const newItems: BatchTaskItem[] = [];
 
+    const nextOrder = batchTasks.reduce((max, task) => Math.max(max, task.importOrder || 0), 0) + 1;
     urls.forEach((url, idx) => {
       if (!existingUrls.has(url)) {
         const plat = detectPlatformFromText(url);
@@ -64,6 +87,7 @@ export function useBatchTaskQueue({
           url,
           platform: plat,
           status: 'pending',
+          importOrder: nextOrder + idx,
         });
       }
     });
@@ -116,14 +140,16 @@ export function useBatchTaskQueue({
       const existingUrls = new Set(batchTasks.map((t) => t.url));
       const newItems: BatchTaskItem[] = [];
 
-      urls.forEach((url, idx) => {
+    const nextOrder = batchTasks.reduce((max, task) => Math.max(max, task.importOrder || 0), 0) + 1;
+    urls.forEach((url, idx) => {
         if (!existingUrls.has(url)) {
           const plat = detectPlatformFromText(url);
           newItems.push({
             id: `task_file_${Date.now()}_${idx}`,
             url,
-            platform: plat,
-            status: 'pending',
+          platform: plat,
+          status: 'pending',
+          importOrder: nextOrder + idx,
           });
         }
       });
@@ -153,32 +179,35 @@ export function useBatchTaskQueue({
 
   // 执行单条任务采集
   const executeSingleTask = async (task: BatchTaskItem): Promise<BatchTaskItem> => {
+    if (batchAbortedRef.current) {
+      return { ...task, status: 'failed', error: '已取消采集任务' };
+    }
+    const requestSignal = mergeAbortSignals(
+      AbortSignal.timeout(30_000),
+      batchAbortControllerRef.current?.signal,
+    );
     try {
       if (task.platform === 'social') {
         const { scraperId, scraperSecret } = await getExternalScraperCredentials();
+        if (batchAbortedRef.current) {
+          return { ...task, status: 'failed', error: '已取消采集任务' };
+        }
         const parsed = await parseSocialLinkWithRateLimit(
           task.url,
           scraperId,
           scraperSecret,
           socialRateLimiterRef.current,
         );
+        if (batchAbortedRef.current) {
+          return { ...task, status: 'failed', error: '已取消采集任务' };
+        }
         if (parsed.success) {
           const result = parsed.data;
           const images = Array.isArray(result.images) ? result.images : [];
-
-          const historyRecord = {
-            id: `social_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            type: 'social',
-            title: result.title || '社媒爆款图集素材',
-            description: result.description || '',
-            author: result.author || '社媒作者',
-            coverImage: result.cover || images[0] || '',
-            images: images,
-            video: result.video || null,
-            sourceUrl: task.url,
-            time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-          };
-          saveToCollectorHistory(historyRecord);
+          const videos = Array.from(new Set([
+            ...(Array.isArray(result.videos) ? result.videos : []),
+            result.video,
+          ].filter((url): url is string => typeof url === 'string' && Boolean(url))));
 
           return {
             ...task,
@@ -186,7 +215,8 @@ export function useBatchTaskQueue({
             title: result.title || '社媒爆款图集素材',
             coverImage: result.cover || images[0] || '',
             images: images,
-            video: result.video || null,
+            video: videos[0] || null,
+            videos,
             author: result.author,
             time: new Date().toLocaleTimeString(),
           };
@@ -202,7 +232,7 @@ export function useBatchTaskQueue({
         const res = await apiFetch('/api/catalog/collect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(30_000),
+          signal: requestSignal,
           body: JSON.stringify({
             url: task.url,
             platform: task.platform,
@@ -214,24 +244,6 @@ export function useBatchTaskQueue({
         if (data.success && data.product) {
           const prod = data.product;
           const { mainImgs, skuImgs, descImgs, allImgs, coverImg } = normalizeCollectedImages(data);
-
-          const historyRecord = {
-            id: `ecom_${prod.skuId || prod.itemId || Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            type: 'ecommerce',
-            platform: prod.platform || task.platform,
-            title: prod.title || '电商精选商品素材',
-            price: prod.price || 0,
-            skuId: prod.skuId || prod.itemId || task.url,
-            coverImage: coverImg,
-            images: allImgs,
-            mainImages: mainImgs,
-            skuImages: skuImgs,
-            descImages: descImgs,
-            props: prod.props || data.images?.props || {},
-            sourceUrl: task.url,
-            time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-          };
-          saveToCollectorHistory(historyRecord);
 
           return {
             ...task,
@@ -277,6 +289,8 @@ export function useBatchTaskQueue({
 
     setIsBatchRunning(true);
     batchAbortedRef.current = false;
+    batchAbortControllerRef.current?.abort();
+    batchAbortControllerRef.current = new AbortController();
     const CONCURRENCY = Math.max(1, Math.min(16, batchConcurrency || 6));
     showToast(`🚀 批量采集队列已启动（${CONCURRENCY} 并发），正在抓取 ${pendingTasks.length} 个任务...`);
 
@@ -304,6 +318,7 @@ export function useBatchTaskQueue({
         if (!claimed) break;
 
         const updated = await executeSingleTask(claimed.task);
+        if (!aliveRef.current) return;
         setBatchTasks((prev) => {
           const next = prev.map((t) => (t.id === claimed.id ? updated : t));
           batchTasksRef.current = next;
@@ -321,8 +336,8 @@ export function useBatchTaskQueue({
       batchIntervalRef.current = null;
     }
 
-    setIsBatchRunning(false);
-    if (!batchAbortedRef.current) {
+    if (aliveRef.current) setIsBatchRunning(false);
+    if (!batchAbortedRef.current && aliveRef.current) {
       showToast('🎉 批量采集任务队列执行完毕！已自动沉淀入汇总库');
     }
   };

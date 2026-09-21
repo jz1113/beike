@@ -2,11 +2,12 @@ import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import { persistCanvasMedia } from '../canvasMediaImport';
 import {drawingGeometry} from '../drawingGeometry';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Square, Plus, Loader2, WandSparkles, X, Info, Volume2 } from 'lucide-react';
+import { ArrowUp, Square, Plus, Loader2, WandSparkles, X, Volume2 } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { proxyMediaUrl } from '@/shared/api/apiClient';
 import { getEnabledVideoModelsFromSettings, getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@beike/domain/workflowModels';
+import { clampVideoDuration, getVideoDurationBounds } from '@beike/domain/video';
 import { buildPromptBarGenerationTasks } from '@/shared/prompt-bar/promptBarSubmit';
 import { calculateImageDimensions } from '@/shared/prompt-bar/promptBarDisplay';
 import { IMAGE_RATIO_ITEMS } from '@/shared/prompt-bar/promptBarConstants';
@@ -34,7 +35,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
   const isVideo = node.generationKind === 'video';
   const config = node.drawing || { model: isVideo ? initial.quickVideoModel : initial.quickModel, quality: isVideo ? '720P' : initial.quickQuality || 'medium', aspect: isVideo ? '16:9' : initial.quickAspectId || '1:1', count: 1, references: [] };
   const [models, setModels] = useState(() => loadModels(isVideo));
-  const [panel, setPanel] = useState<'settings' | 'count' | null>(null);
+  const [panel, setPanel] = useState<'settings' | 'reference' | 'duration' | 'audio' | 'count' | null>(null);
   const [error, setError] = useState('');
   const promptInput = useRef<CanvasPromptInputRef>(null);
   const lock = useRef(false);
@@ -47,7 +48,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
     return () => window.removeEventListener('models_updated', refresh);
   }, [isVideo]);
   useEffect(() => {
-    if (panel !== 'settings' && panel !== 'count') return;
+    if (!panel) return;
     const dismiss = (event: PointerEvent) => {
       if (!(event.target as Element).closest?.('[data-drawing-settings]')) setPanel(null);
     };
@@ -74,9 +75,8 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
   const videoAspects = (activeModel?.supportedAspectRatios as string[] | undefined)?.length ? (activeModel!.supportedAspectRatios as string[]) : ['16:9','4:3','1:1','3:4','9:16','21:9'];
   const rawResolutions = activeModel?.supportedResolutions as string[] | undefined;
   const videoResolutions: string[] = rawResolutions && Array.isArray(rawResolutions) && rawResolutions.length > 0 ? rawResolutions : ['480P', '720P', '1080P'];
-  const rawDurations = activeModel?.supportedDurations as number[] | undefined;
-  const videoDurations = rawDurations && Array.isArray(rawDurations) && rawDurations.length > 0 ? [...rawDurations].sort((a, b) => a - b) : [4, 5, 6, 7, 8, 9, 10, 11, 12];
-  const duration = config.duration || 5;
+  const videoDurations = getVideoDurationBounds(selectedModel).allowed;
+  const duration = clampVideoDuration(selectedModel, config.duration || 5);
   const linkedNodes = (node.referenceNodeIds || []).map(id => nodes.find(item => item.id === id)).filter((item): item is CanvasNode => Boolean(item));
   const refs = [...new Set([...config.references, ...linkedNodes.filter(canReference).map(item => item.imageUrl!)])];
   const uploadReferences = async (files: File[]) => {
@@ -134,7 +134,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
   };
   const geometry=drawingGeometry(node);
   return <div className="text-slate-600" aria-label={isVideo ? '视频生成节点' : '绘图节点'}>
-    <div data-testid="drawing-preview" style={{width:geometry.width,height:geometry.height}} className={`mx-auto flex items-center justify-center overflow-hidden rounded-[20px] border bg-white transition-[border-color,box-shadow] ${selected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200 group-hover:border-indigo-300'}`}>
+    <div data-testid="drawing-preview" style={{width:geometry.width,height:geometry.height}} className={`mx-auto flex items-center justify-center overflow-hidden rounded-[20px] bg-white shadow-[0_10px_28px_rgba(71,85,105,0.12)] transition-[box-shadow] ${selected ? 'ring-2 ring-indigo-400/35' : 'group-hover:shadow-[0_14px_34px_rgba(71,85,105,0.18)]'}`}>
       {isVideo && node.videoUrl ? <video src={proxyMediaUrl(node.videoUrl)} controls playsInline preload="metadata" onMouseDown={event => event.stopPropagation()} onDoubleClick={() => onPreview?.(node.videoUrl!)} onLoadedMetadata={event => { const video = event.currentTarget; if(video.videoWidth && video.videoHeight && (node.resultWidth !== video.videoWidth || node.resultHeight !== video.videoHeight)) updateNode(projectId,node.id,{resultWidth:video.videoWidth,resultHeight:video.videoHeight}); }} className="h-full w-full object-contain" /> : node.imageUrl ? <button type="button" aria-label="预览绘图结果" onMouseDown={event => event.stopPropagation()} onClick={() => onPreview?.(node.imageUrl!)} className="h-full w-full"><img src={proxyMediaUrl(node.imageUrl)} alt="绘图结果" onLoad={event=>{const image=event.currentTarget;if(image.naturalWidth && image.naturalHeight && (node.resultWidth!==image.naturalWidth || node.resultHeight!==image.naturalHeight))updateNode(projectId,node.id,{resultWidth:image.naturalWidth,resultHeight:image.naturalHeight});}} className="h-full w-full object-contain" draggable={false} /></button> : busy ? <AIGeneratingCard embedded task={{id:node.taskId,model:selectedModel,mediaType:isVideo ? 'video' : 'image',prompt:node.content}} progressNumber={node.progress} className="h-full w-full" /> : <div className="flex flex-col items-center gap-3"><WandSparkles className="h-10 w-10 text-slate-400" />{node.status === 'error' && <span className="text-xs text-slate-500">生成失败，请检查设置后重试</span>}</div>}
     </div>
     {selected && <div aria-label={isVideo ? '视频编辑面板' : '绘图编辑面板'} onClick={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onWheel={event => event.stopPropagation()} style={{width: Math.max(node.width, 960), marginLeft: (node.width - Math.max(node.width, 960)) / 2}} className="relative mt-7 rounded-[24px] border border-slate-200 bg-white px-6 pt-5 pb-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
@@ -152,39 +152,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
           data-drawing-settings
           className="absolute bottom-16 left-6 z-30 w-[332px] rounded-2xl bg-white/95 backdrop-blur-md text-slate-800 border border-slate-200/90 shadow-[0_16px_36px_rgba(15,23,42,0.12)] p-4 space-y-3.5 select-none text-left"
         >
-          {/* 1. 生成方式 */}
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 mb-1.5 flex items-center justify-between">
-              <span>生成方式</span>
-            </div>
-            <div className="w-full grid grid-cols-2 rounded-xl bg-slate-100/90 p-1 gap-1">
-              <button
-                type="button"
-                onClick={() => change({ refMode: 'first_last_frame' })}
-                className={`py-1.5 text-xs font-medium rounded-lg transition-all text-center flex items-center justify-center ${
-                  config.refMode === 'first_last_frame'
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                }`}
-              >
-                首尾帧
-              </button>
-              <button
-                type="button"
-                onClick={() => change({ refMode: 'omni' })}
-                className={`py-1.5 text-xs font-medium rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
-                  (config.refMode || 'omni') === 'omni'
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                }`}
-              >
-                <span>全能参考</span>
-                <Info className="w-3 h-3 text-slate-400 opacity-80 inline-block" />
-              </button>
-            </div>
-          </div>
-
-          {/* 2. 比例 */}
+          {/* 比例 */}
           <div>
             <div className="text-[11px] font-semibold text-slate-500 mb-1.5">
               比例
@@ -223,7 +191,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
             </div>
           </div>
 
-          {/* 3. 清晰度 */}
+          {/* 清晰度 */}
           <div>
             <div className="text-[11px] font-semibold text-slate-500 mb-1.5">
               清晰度
@@ -250,62 +218,34 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
             </div>
           </div>
 
-          {/* 4. 生成时长 */}
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500 mb-1.5">
-              生成时长
-            </div>
-            <div className="w-full flex items-center gap-1 rounded-xl bg-slate-100/90 p-1 overflow-x-auto no-scrollbar scroll-smooth">
-              {(videoDurations.length > 0 ? videoDurations : [4, 5, 6, 7, 8, 9, 10, 11, 12]).map((sec) => {
-                const isSelected = duration === sec;
-                return (
-                  <button
-                    key={sec}
-                    type="button"
-                    onClick={() => change({ duration: sec })}
-                    className={`px-2.5 py-1 text-xs font-mono font-medium rounded-lg shrink-0 transition-all ${
-                      isSelected
-                        ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                    }`}
-                  >
-                    {sec}s
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        </div>
+      )}
 
-          {/* 5. 生成音频 */}
-          <div>
-            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 mb-1.5">
-              <span>生成音频</span>
-              <Info className="w-3 h-3 text-slate-400 opacity-80 cursor-pointer" />
-            </div>
-            <div className="w-full grid grid-cols-2 rounded-xl bg-slate-100/90 p-1 gap-1">
-              <button
-                type="button"
-                onClick={() => change({ audio: true } as any)}
-                className={`py-1.5 text-xs font-medium rounded-lg transition-all text-center ${
-                  config.audio
-                    ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                }`}
-              >
-                开启
-              </button>
-              <button
-                type="button"
-                onClick={() => change({ audio: false } as any)}
-                className={`py-1.5 text-xs font-medium rounded-lg transition-all text-center ${
-                  !config.audio
-                    ? 'bg-white text-slate-900 font-semibold shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                }`}
-              >
-                关闭
-              </button>
-            </div>
+      {panel === 'reference' && isVideo && (
+        <div role="dialog" aria-label="视频参考方式" data-drawing-settings className="absolute bottom-16 left-6 z-30 w-[248px] rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] backdrop-blur-md text-left">
+          <p className="mb-2 px-1 text-[11px] font-semibold text-slate-500">选择生成方式</p>
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100/90 p-1">
+            <button type="button" onClick={() => { change({ refMode: 'first_last_frame' }); setPanel(null); }} className={`rounded-lg py-2 text-xs font-medium transition-all ${config.refMode === 'first_last_frame' ? 'bg-white font-semibold text-slate-900 shadow-xs' : 'text-slate-500 hover:bg-white/50 hover:text-slate-800'}`}>首尾帧</button>
+            <button type="button" onClick={() => { change({ refMode: 'omni' }); setPanel(null); }} className={`rounded-lg py-2 text-xs font-medium transition-all ${config.refMode !== 'first_last_frame' ? 'bg-white font-semibold text-slate-900 shadow-xs' : 'text-slate-500 hover:bg-white/50 hover:text-slate-800'}`}>全能参考</button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'duration' && isVideo && (
+        <div role="dialog" aria-label="视频生成时长" data-drawing-settings className="absolute bottom-16 left-6 z-30 w-[320px] rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] backdrop-blur-md text-left">
+          <p className="mb-2 px-1 text-[11px] font-semibold text-slate-500">选择生成时长</p>
+          <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100/90 p-1">
+            {videoDurations.map((sec) => <button key={sec} type="button" onClick={() => { change({ duration: sec }); setPanel(null); }} className={`min-w-10 flex-1 rounded-lg py-2 text-xs font-mono font-medium transition-all ${duration === sec ? 'bg-white font-semibold text-slate-900 shadow-xs' : 'text-slate-500 hover:bg-white/50 hover:text-slate-800'}`}>{sec}s</button>)}
+          </div>
+        </div>
+      )}
+
+      {panel === 'audio' && isVideo && (
+        <div role="dialog" aria-label="生成音频" data-drawing-settings className="absolute bottom-16 left-6 z-30 w-[216px] rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] backdrop-blur-md text-left">
+          <p className="mb-2 px-1 text-[11px] font-semibold text-slate-500">生成音频</p>
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100/90 p-1">
+            <button type="button" onClick={() => { change({ audio: true } as any); setPanel(null); }} className={`rounded-lg py-2 text-xs font-medium transition-all ${config.audio ? 'bg-white font-semibold text-slate-900 shadow-xs' : 'text-slate-500 hover:bg-white/50 hover:text-slate-800'}`}>开启</button>
+            <button type="button" onClick={() => { change({ audio: false } as any); setPanel(null); }} className={`rounded-lg py-2 text-xs font-medium transition-all ${!config.audio ? 'bg-white font-semibold text-slate-900 shadow-xs' : 'text-slate-500 hover:bg-white/50 hover:text-slate-800'}`}>关闭</button>
           </div>
         </div>
       )}
@@ -383,7 +323,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
       )}
       <div className="flex min-h-9 items-center gap-2">
         <div className="flex min-w-0 items-center gap-1">
-        <CanvasModelPicker models={models} value={selectedModel} onChange={model => { const next=models.find(item=>item.id===model); change(isVideo ? {model,aspect:(next?.supportedAspectRatios as string[])?.[0] || '16:9',quality:(next?.supportedResolutions as string[])?.[0] || '720P',duration:(next?.supportedDurations as number[])?.[0] || 5} : {model}); }} disabled={busy} />
+        <CanvasModelPicker models={models} value={selectedModel} onChange={model => { const next=models.find(item=>item.id===model); change(isVideo ? {model,aspect:(next?.supportedAspectRatios as string[])?.[0] || '16:9',quality:(next?.supportedResolutions as string[])?.[0] || '720P',duration:clampVideoDuration(model, config.duration || 5)} : {model}); }} disabled={busy} />
         <span aria-hidden="true" className="mx-1 h-3.5 w-px shrink-0 bg-slate-200" />
         <button
           type="button"
@@ -400,19 +340,9 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
           <Square aria-hidden="true" className="h-3.5 w-3.5 opacity-70" />
           {isVideo ? (
             <span className="font-mono flex items-center gap-1">
-              <span>{config.refMode === 'first_last_frame' ? '首尾帧' : '全能参考'}</span>
-              <span className="opacity-40">·</span>
               <span>{config.aspect}</span>
               <span className="opacity-40">·</span>
               <span>{(config.quality || '720P').toLowerCase()}</span>
-              <span className="opacity-40">·</span>
-              <span>{duration}s</span>
-              {config.audio && (
-                <>
-                  <span className="opacity-40">·</span>
-                  <Volume2 className="h-3.5 w-3.5 text-cyan-500 inline-block shrink-0" />
-                </>
-              )}
             </span>
           ) : (
             <span>
@@ -420,6 +350,19 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, on
             </span>
           )}
         </button>
+        {isVideo && <>
+          <button type="button" data-drawing-settings aria-label="视频参考方式" aria-expanded={panel === 'reference'} onClick={() => setPanel(panel === 'reference' ? null : 'reference')} className={`flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-indigo-400 ${panel === 'reference' ? 'bg-slate-900 font-medium text-white shadow-xs' : 'text-slate-700 hover:bg-slate-100'}`}>
+            <Square aria-hidden="true" className="h-3.5 w-3.5 opacity-70" />
+            <span>{config.refMode === 'first_last_frame' ? '首尾帧' : '全能参考'}</span>
+          </button>
+          <button type="button" data-drawing-settings aria-label="视频生成时长" aria-expanded={panel === 'duration'} onClick={() => setPanel(panel === 'duration' ? null : 'duration')} className={`flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-mono transition-colors focus-visible:outline-2 focus-visible:outline-indigo-400 ${panel === 'duration' ? 'bg-slate-900 font-medium text-white shadow-xs' : 'text-slate-700 hover:bg-slate-100'}`}>
+            {duration}s
+          </button>
+          <button type="button" data-drawing-settings aria-label="生成音频" aria-expanded={panel === 'audio'} onClick={() => setPanel(panel === 'audio' ? null : 'audio')} className={`flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-indigo-400 ${panel === 'audio' ? 'bg-slate-900 font-medium text-white shadow-xs' : config.audio ? 'text-cyan-700 hover:bg-cyan-50' : 'text-slate-500 hover:bg-slate-100'}`}>
+            <Volume2 aria-hidden="true" className="h-3.5 w-3.5" />
+            <span>{config.audio ? '音频开' : '音频关'}</span>
+          </button>
+        </>}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
         <div className="relative" data-drawing-settings>

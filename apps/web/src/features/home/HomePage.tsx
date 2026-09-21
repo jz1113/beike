@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useAppStore } from '@/store';
 import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
 import { useQuickRefMediaDrop } from '@/shared/hooks/useQuickRefMediaDrop';
@@ -9,17 +9,18 @@ import { type InspirationUseOptions } from './components/inspiration/Inspiration
 
 interface Props {
   onEnterWorkshop: () => void;
-  onEnterReplication: () => void;
+  onOpenHeadlinePoster: () => void;
   onOpenCollectorHub?: () => void;
   recentProjects?: ReactNode;
 }
 
 export default function HomePage({
   onEnterWorkshop,
-  onEnterReplication,
+  onOpenHeadlinePoster,
   onOpenCollectorHub,
   recentProjects,
 }: Props) {
+  const [homeMode, setHomeMode] = useState<'generate' | 'canvas'>('generate');
   const setQuickPrompt = useAppStore((s) => s.setQuickPrompt);
   const setQuickRefImage = useAppStore((s) => s.setQuickRefImage);
   const setQuickRefImages = useAppStore((s) => s.setQuickRefImages);
@@ -68,23 +69,65 @@ export default function HomePage({
           {toastMsg}
         </div>
       )}
-      <div className="w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-3 sm:pt-4 pb-5 sm:pb-6 space-y-6">
-        <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1360px] mx-auto space-y-3.5 relative z-20">
-          <PromptActionBar />
-          <FeatureCapsules
-            onEnterWorkshop={onEnterWorkshop}
-            onEnterReplication={onEnterReplication}
-            onOpenCollectorHub={onOpenCollectorHub}
-          />
-        </div>
+      <div className="w-full px-4 pb-5 pt-7 sm:px-6 sm:pt-10 lg:px-8 2xl:px-10">
+        <section className="mx-auto w-full max-w-6xl xl:max-w-[1440px] 2xl:max-w-[1640px]">
+          <div className="relative z-20 mx-auto max-w-[1120px] text-center">
+            <div className="mx-auto flex max-w-2xl flex-col items-center px-4">
+              <p className="font-brush mb-3 inline-flex items-baseline gap-2 text-slate-400">
+                <span className="text-[18px] tracking-[0.09em] text-slate-500 sm:text-[20px]">贝壳云图</span>
+                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#df6a48]" />
+                <span className="text-[13px] tracking-[0.18em] text-slate-400 sm:text-[14px]">CREATIVE STUDIO</span>
+              </p>
+              <h1 className="font-brush whitespace-nowrap text-[clamp(30px,3.7vw,60px)] leading-[1.04] tracking-[0.025em] text-[#0a0a0a]" aria-label="把灵感，变成画面">
+                把灵感，变成画面
+              </h1>
+              <p className="font-brush mt-2 text-[13px] tracking-[0.02em] text-slate-400 sm:text-[14px]">
+                从一张参考图或一句描述开始
+              </p>
+            </div>
+            <div role="tablist" aria-label="首页创作模式" className="mx-auto mt-6 inline-flex w-[min(100%,420px)] rounded-full bg-slate-100 p-1 shadow-inner">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={homeMode === 'generate'}
+                onClick={() => setHomeMode('generate')}
+                className={`flex-1 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${homeMode === 'generate' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}
+              >
+                生成
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={homeMode === 'canvas'}
+                onClick={() => setHomeMode('canvas')}
+                className={`flex-1 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${homeMode === 'canvas' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}
+              >
+                画布
+              </button>
+            </div>
+          </div>
 
-        {/* 🌟 楼层一：最近项目 · 画布创作 */}
-        <div className="w-full relative z-10 pt-1">
-          {recentProjects}
-        </div>
+          {homeMode === 'generate' ? (
+            <div className="relative z-20 mt-8">
+              <div className="mx-auto max-w-[1120px]">
+                <PromptActionBar showBrandHero={false} />
+              </div>
+              <div className="mt-4 w-full">
+                <FeatureCapsules
+                  onEnterWorkshop={onEnterWorkshop}
+                  onOpenHeadlinePoster={onOpenHeadlinePoster}
+                  onOpenCollectorHub={onOpenCollectorHub}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="relative z-20 mx-auto mt-9 w-full max-w-[1640px]">
+              <div className="w-full">{recentProjects}</div>
+            </div>
+          )}
+        </section>
 
-        {/* 🌟 楼层二：灵感探索瀑布流 */}
-        <div className="w-full relative z-0 pt-1">
+        <div className="relative z-0 mt-5 w-full">
           <InspirationFeed onUsePrompt={handleUsePrompt} />
         </div>
       </div>
@@ -92,4 +135,3 @@ export default function HomePage({
     </div>
   );
 }
-

@@ -129,3 +129,34 @@ export const DepthImageResponseSchema = z.object({
 });
 
 export type DepthImageResponse = z.infer<typeof DepthImageResponseSchema>;
+
+export const HeadlineAspectRatioSchema = z.enum(['3:4', '1:1']);
+
+export const HeadlineDesignRequestSchema = z.object({
+  model: z.string().optional(),
+  originalTitle: z.string().optional(),
+  coverTitle: z.string().optional(),
+  productTitle: z.string().optional(),
+  productName: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
+  aspectRatio: HeadlineAspectRatioSchema.optional(),
+  reservedArtDirection: z.object({
+    id: z.string().optional(),
+    description: z.string().optional(),
+  }).optional(),
+  customBaseUrl: z.string().optional(),
+  customApiKey: z.string().optional(),
+});
+
+export const HeadlineTitleRequestSchema = z.object({
+  model: z.string().optional(),
+  originalTitle: z.string().optional(),
+  productName: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
+  customBaseUrl: z.string().optional(),
+  customApiKey: z.string().optional(),
+});
+
+export type HeadlineDesignRequest = z.infer<typeof HeadlineDesignRequestSchema>;
+export type HeadlineTitleRequest = z.infer<typeof HeadlineTitleRequestSchema>;
+

@@ -22,6 +22,7 @@ import {
   inferProductCategoryAndAnatomy,
   buildCategoryCloseUpOptics,
 } from '@beike/domain/productCategory';
+import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
 
 // 🌟 辅助工具：提取或绑定标准资产编号 (如 [#P-01], [#S-01], [#O-01], [#A-01])
 function formatAssetWithCode(
@@ -49,6 +50,16 @@ function formatAssetWithCode(
   }
   const fallbackCode = list?.[fallbackIdx]?.code || `${prefix}-${String(fallbackIdx + 1).padStart(2, '0')}`;
   return `[#${fallbackCode.replace(/^#/, '')}] ${raw.replace(/^\[?#[PSOA]-[\w-]+\]?\s*/i, '')}`;
+}
+
+/** Remove portrait-only directions when an asset explicitly calls for a pure product frame. */
+function toPureProductPrompt(prompt: string): string {
+  const cleaned = prompt
+    .replace(/(?:人物|模特|女生|女性|人像|面容|人脸|五官|发型|表情|穿搭|服装|侧颜)[^；;。\n]*/g, '')
+    .replace(/(?:手持|双手|手部)[^；;。\n]*/g, '')
+    .replace(/[；;]\s*[；;]/g, '；')
+    .trim();
+  return `${cleaned}；画面仅呈现 @图片1 所示商品实物，禁止人物、模特、人脸、肢体与手部出镜`;
 }
 
 export interface AssembleStoryboardParams {
@@ -154,14 +165,17 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
         promptText.includes('手部操作') ||
         promptText.includes('双手'));
 
-    const finalHasHuman =
+    const inferredHasHuman =
       hasHumanExplicit !== undefined
         ? hasHumanExplicit
         : isPureStillLife
         ? false
         : true;
+    const derivedSubject = resolveAssetShotSubject(assetLibraryData?.actions?.[idx] || {});
+    const finalHasHuman = derivedSubject?.has_human ?? inferredHasHuman;
 
     const finalShotType =
+      derivedSubject?.shot_type ||
       p.shot_type ||
       (finalHasHuman ? 'model_shot' : isHandHeldOnly ? 'hand_held_only' : 'pure_product');
 
@@ -270,7 +284,9 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
   const formattedPrompts = diversified.map((p: any, pIdx: number) => {
     const availableActionAssets = assetLibraryData?.actions || [];
     const selectedActionAsset = availableActionAssets[pIdx];
-    const stillAsset = Boolean(selectedActionAsset && /纯静物|无人物|平放台面/.test(`${selectedActionAsset.title || ''} ${selectedActionAsset.action || ''}`));
+    const assetSubject = resolveAssetShotSubject(selectedActionAsset || {});
+    const hasHuman = assetSubject?.has_human ?? p.has_human;
+    const shotType = assetSubject?.shot_type || p.shot_type;
 
     const shotAppliedAction = selectedActionAsset?.code
       ? `[#${selectedActionAsset.code.replace(/^#/, '')}] ${selectedActionAsset.title || ''}`
@@ -354,7 +370,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       },
       {
         shot_no: p.shot_no,
-        expression: p.expression || '神态自然从容，眼神清澈灵动',
+        expression: hasHuman === false ? '无（静物）' : (p.expression || '神态自然从容，眼神清澈灵动'),
         action: effectiveAction,
         prop: effectiveProp,
         optics: effectiveOptics,
@@ -363,10 +379,10 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
         lighting_type: effectiveShotLighting,
         scene: effectiveSceneConcept,
         title: selectedActionAsset?.title || p.title || effectiveAngle,
-        has_human: stillAsset ? false : p.has_human,
-        promptFallback: (p.prompt || '').trim(),
+        has_human: hasHuman,
+        promptFallback: hasHuman === false ? toPureProductPrompt((p.prompt || '').trim()) : (p.prompt || '').trim(),
       },
-      { hasFace: hasAnchorFace && p.has_human !== false }
+      { hasFace: hasAnchorFace && hasHuman !== false }
     );
 
     const harmonized = harmonizeOriginalPrompt(assembled, {
@@ -376,10 +392,10 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       camera: effectiveCamera,
       productRole,
       productFingerprint: productFingerprintRaw,
-      hasHuman: stillAsset ? false : p.has_human,
-      appliedScene: stillAsset ? undefined : appliedSceneTitle,
-      appliedOutfit: stillAsset ? undefined : appliedOutfitTitle,
-      appliedPersona: stillAsset ? undefined : appliedPersonaName,
+      hasHuman,
+      appliedScene: hasHuman === false ? undefined : appliedSceneTitle,
+      appliedOutfit: hasHuman === false ? undefined : appliedOutfitTitle,
+      appliedPersona: hasHuman === false ? undefined : appliedPersonaName,
       appliedAction: shotAppliedAction,
     });
 
@@ -387,19 +403,19 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       shot_no: p.shot_no,
       title: selectedActionAsset?.title || p.title || effectiveAngle,
       scene: effectiveSceneConcept,
-      expression: p.expression || '神态自然从容，眼神清澈灵动',
+      expression: hasHuman === false ? '无（静物）' : (p.expression || '神态自然从容，眼神清澈灵动'),
       action: harmonized.action,
       prop: effectiveProp,
       optics: effectiveOptics,
       camera_focal_length: effectiveCamera,
       angle: harmonized.angle,
       lighting_type: effectiveShotLighting,
-      has_human: stillAsset ? false : p.has_human,
-      shot_type: stillAsset ? 'pure_product' : p.shot_type,
+      has_human: hasHuman,
+      shot_type: shotType,
       prompt: harmonized.prompt,
-      applied_scene: stillAsset ? undefined : appliedSceneTitle,
-      applied_outfit: stillAsset ? undefined : appliedOutfitTitle,
-      applied_persona: stillAsset ? undefined : appliedPersonaName,
+      applied_scene: hasHuman === false ? undefined : appliedSceneTitle,
+      applied_outfit: hasHuman === false ? undefined : appliedOutfitTitle,
+      applied_persona: hasHuman === false ? undefined : appliedPersonaName,
       applied_action: shotAppliedAction,
       appliedActionId: selectedActionAsset?.id,
     };

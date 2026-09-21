@@ -33,6 +33,7 @@ interface Props {
   handleDownloadSingleTaskImage?: (url: string, filename?: string) => Promise<void>;
   setPreviewImageUrl: (url: string | null) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
+  readOnly?: boolean;
 }
 
 export default function BatchStage4Queue({
@@ -60,10 +61,11 @@ export default function BatchStage4Queue({
   handleDownloadSingleTaskImage,
   setPreviewImageUrl,
   onPreviewGallery,
+  readOnly = false,
 }: Props) {
   const [showEngineSettings, setShowEngineSettings] = useState(false);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<'single' | 'grid' | 'gallery'>('single');
+  const [viewMode, setViewMode] = useState<'single' | 'gallery'>('single');
 
   // 确保 activeItemIndex 不越界
   const safeIndex = Math.min(Math.max(0, activeItemIndex), Math.max(0, successfulItems.length - 1));
@@ -87,10 +89,12 @@ export default function BatchStage4Queue({
       );
 
   const currentModelName =
-    availableImageModels.find(m => m.id === selectedImageGenModel)?.name || selectedImageGenModel;
+    availableImageModels.find(m => m.id === selectedImageGenModel)?.shortName
+    || availableImageModels.find(m => m.id === selectedImageGenModel)?.name
+    || selectedImageGenModel;
 
   return (
-    <div className={`relative max-w-[1520px] mx-auto space-y-5 rounded-3xl bg-slate-50 border border-slate-200/70 p-3 sm:p-5 ${viewMode === 'single' && successfulItems.length > 1 ? 'pr-16 sm:pr-20' : ''}`}>
+    <div className={`relative w-full space-y-5 rounded-3xl bg-slate-50 border border-slate-200/70 p-3 sm:p-5 ${viewMode === 'single' && successfulItems.length > 1 ? 'pr-16 sm:pr-20' : ''}`}>
       {viewMode === 'single' && successfulItems.length > 1 && (
         <nav aria-label="快速切换商品" className="absolute right-2 sm:right-3 top-64 flex flex-col items-center gap-3">
           <button type="button" aria-label="上一个商品" title="上一个商品" disabled={safeIndex === 0}
@@ -132,6 +136,7 @@ export default function BatchStage4Queue({
         successfulItems={successfulItems}
         safeIndex={safeIndex}
         setActiveItemIndex={setActiveItemIndex}
+        readOnly={readOnly}
       />
 
       {/* 视图展现 */}
@@ -175,6 +180,7 @@ export default function BatchStage4Queue({
             handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
             setPreviewImageUrl={setPreviewImageUrl}
             onPreviewGallery={onPreviewGallery}
+            readOnly={readOnly}
           />
         ) : (
           <div className="p-12 text-center text-slate-400 text-xs">暂无待交付的商品</div>
@@ -187,27 +193,7 @@ export default function BatchStage4Queue({
           onPreviewGallery={onPreviewGallery}
           setPreviewImageUrl={setPreviewImageUrl}
         />
-      ) : (
-        /* 全景平铺模式 */
-        <div className="space-y-8 divide-y divide-slate-100">
-          {successfulItems.map((item, idx) => (
-            <div key={item.id} className={idx > 0 ? 'pt-8' : ''}>
-              <BatchStage4ProductItem
-                item={item}
-                generateCopywritingForProduct={generateCopywritingForProduct}
-                updateItemCopywriting={updateItemCopywriting}
-                retryFailedImageTasks={retryFailedImageTasks}
-                retrySingleShotTask={retrySingleShotTask}
-                isExportingZip={isExportingZip}
-                handleExportSingleProductZip={handleExportSingleProductZip}
-                handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
-                setPreviewImageUrl={setPreviewImageUrl}
-                onPreviewGallery={onPreviewGallery}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,8 @@ export type QiyunMediaResult = {
   cover: string;
   images: string[];
   video: string | null;
+  /** 作品可能含多个视频或实况视频；video 是首条兼容字段。 */
+  videos: string[];
   music?: string;
   livePhotos?: string[];
 };
@@ -94,10 +96,11 @@ export async function parseSocialLinkViaQiyun(
     if (data.code === 200 && data.data) {
       const item = data.data;
 
-      // 提取纯图片列表（去掉实况视频与视频直链，只保留静态高清图片）
+      // 静态图片与实况视频分别收集。实况笔记可同时拥有图片和动态流。
       const isVideoLike = (u: string) => /\.(mp4|mov|m4v|webm|avi|flv)(\?|#|$)/i.test(u);
 
       const rawImages: string[] = [];
+      const rawVideos: string[] = [];
 
       if (Array.isArray(item.images)) {
         for (const img of item.images) {
@@ -105,10 +108,11 @@ export async function parseSocialLinkViaQiyun(
           if (typeof img === 'string') {
             imgUrl = img.trim();
           } else if (img && typeof img === 'object') {
-            // 明确只提取静态图片 URL，绝不使用 live_photo_url
             if (img.url && typeof img.url === 'string') {
               imgUrl = img.url.trim();
             }
+            const liveUrl = img.live_photo_url || img.livePhotoUrl || img.video_url;
+            if (typeof liveUrl === 'string' && liveUrl.trim()) rawVideos.push(liveUrl.trim());
           }
 
           // 严格剔除可能混入的视频/实况流地址
@@ -118,13 +122,26 @@ export async function parseSocialLinkViaQiyun(
         }
       }
 
-      // 核心业务规则：对于图文/图集/实况图笔记，完全去掉实况（不返回 livePhotos，且将 video 置为 null）
-      // 避免实况图的视频流导致整篇图文被误识别为视频作品，只保留干净的高清图片列表；纯视频作品才保留 video_url
-      const isImageNote = rawImages.length > 0;
-      const cleanVideo = isImageNote ? null : (item.video_url ? item.video_url.trim() : null);
+      const videoCandidates = [
+        ...rawVideos,
+        item.video_url,
+        item.video,
+        ...(Array.isArray(item.videos) ? item.videos : []),
+        ...(Array.isArray(item.live_photos) ? item.live_photos : []),
+      ].flatMap((entry: unknown) => {
+        if (typeof entry === 'string') return entry.trim() ? [entry.trim()] : [];
+        if (entry && typeof entry === 'object') {
+          const obj = entry as Record<string, unknown>;
+          return [obj.video_url, obj.video, obj.url, obj.live_photo_url]
+            .filter((url): url is string => typeof url === 'string' && Boolean(url.trim()))
+            .map((url) => url.trim());
+        }
+        return [];
+      }).filter((url) => isVideoLike(url) || /video|live/i.test(url));
+      const videos = [...new Set(videoCandidates)];
 
       // 仅在非视频作品且 rawImages 为空但有静态封面图时才备选
-      if (!cleanVideo && rawImages.length === 0 && item.cover_url && !isVideoLike(item.cover_url)) {
+      if (videos.length === 0 && rawImages.length === 0 && item.cover_url && !isVideoLike(item.cover_url)) {
         rawImages.push(item.cover_url.trim());
       }
 
@@ -135,7 +152,8 @@ export async function parseSocialLinkViaQiyun(
         authorAvatar: (item.author?.avatar || '').trim(),
         cover: (rawImages[0] || item.cover_url || '').trim(),
         images: rawImages,
-        video: cleanVideo,
+        video: videos[0] || null,
+        videos,
         music: item.music_url ? item.music_url.trim() : undefined,
       };
 

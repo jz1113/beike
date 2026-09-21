@@ -60,8 +60,8 @@ function getModelLogoDataUri(modelId: string): string | null {
 export function getModelLogoPath(modelId: string = ''): string {
   const m = (modelId || '').toLowerCase();
 
-  // 1. Google (Gemini / Imagen / Veo / Gemma / PaLM / Banana / NanoBanana)
-  if (m.includes('gemini') || m.includes('google') || m.includes('gemma') || m.includes('imagen') || m.includes('veo') || m.includes('palm') || m.includes('bard') || m.includes('banana') || m.includes('nanobanana')) {
+  // 1. Google (Gemini / Imagen / Veo / Omni Flash / Gemma / PaLM / Banana / NanoBanana)
+  if (m.includes('gemini') || m.includes('google') || m.includes('gemma') || m.includes('imagen') || m.includes('veo') || m.includes('omni_flash') || m.includes('omni-flash') || m.includes('palm') || m.includes('bard') || m.includes('banana') || m.includes('nanobanana')) {
     return '/logo/gemini.svg';
   }
 
@@ -130,8 +130,8 @@ export function getModelLogoPath(modelId: string = ''): string {
     return '/logo/stability.svg';
   }
 
-  // 15. 阿里通义千问 Qwen / 万相 Wanx / Wan 视频 / Animate Anyone
-  if (m.includes('qwen') || m.includes('tongyi') || m.includes('wanx') || m.includes('wan2') || m.includes('wan-') || /^wan[\d.-]/.test(m) || m.startsWith('wan') || m.includes('alibaba') || m.includes('aliyun') || m.includes('dashscope') || m.includes('animate-anyone') || m.includes('通义') || m.includes('万相')) {
+  // 15. 阿里通义千问 Qwen / Z-Image / 万相 Wanx / Wan 视频 / Animate Anyone
+  if (m.includes('qwen') || m.includes('z-image') || m.includes('tongyi') || m.includes('wanx') || m.includes('wan2') || m.includes('wan-') || /^wan[\d.-]/.test(m) || m.startsWith('wan') || m.includes('alibaba') || m.includes('aliyun') || m.includes('dashscope') || m.includes('animate-anyone') || m.includes('通义') || m.includes('万相')) {
     return '/logo/qwen.svg';
   }
 
@@ -287,33 +287,3 @@ export function LetterBadgeIcon({
     </div>
   );
 }
-
-// 导出各个独立命名的官方组件
-export const OpenAIIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('openai', className);
-export const GeminiIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('gemini', className);
-export const ClaudeIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('claude', className);
-export const GrokIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('grok', className);
-export const MidjourneyIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('midjourney', className);
-export const FluxIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('flux', className);
-export const DoubaoIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('doubao', className);
-export const JimengIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('jimeng', className);
-export const ByteDanceIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('bytedance', className);
-export const DeepSeekIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('deepseek', className);
-export const QwenIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('qwen', className);
-export const StabilityAIIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('stability', className);
-export const ZhipuGLMIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('zhipu', className);
-export const KlingIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('kling', className);
-export const IdeogramIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('ideogram', className);
-export const RunwayIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('runway', className);
-export const LumaIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('luma', className);
-export const MiniMaxIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('minimax', className);
-export const SoraIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('sora', className);
-export const PikaIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('pika', className);
-export const BaiduErnieIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('baidu', className);
-export const TencentHunyuanIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('hunyuan', className);
-export const KimiIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('kimi', className);
-export const MetaLlamaIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('meta', className);
-export const MistralIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('mistral', className);
-export const SunoIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('suno', className);
-export const StepfunIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('stepfun', className);
-export const YiIcon = ({ className = 'w-6 h-6' }: { className?: string }) => getModelIcon('yi', className);

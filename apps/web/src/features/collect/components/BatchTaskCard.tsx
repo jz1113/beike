@@ -5,6 +5,7 @@ import {
 import {
   BatchTaskItem,
   displayMediaSrc,
+  collectedVideos,
   handleImgError,
 } from '@/features/collect/utils/collectorTypes';
 
@@ -25,6 +26,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
   onPreview,
   onDownloadZip,
 }: BatchTaskCardProps) {
+  const videoCount = collectedVideos(task).length;
   const handleRetry = useCallback(async () => {
     await onRetry(task);
   }, [onRetry, task]);
@@ -113,7 +115,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
         )}
 
         {/* 单独打包下载 */}
-        {task.status === 'success' && task.images && task.images.length > 0 && (
+        {task.status === 'success' && ((task.images?.length || 0) > 0 || videoCount > 0) && (
           <button
             type="button"
             onClick={handleDownload}

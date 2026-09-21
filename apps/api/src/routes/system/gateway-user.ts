@@ -1,5 +1,6 @@
 import { gatewayFetch } from '../../gateways/http';
 import { jsonResponse } from '../../core/http';
+import { getDefaultBaseUrl } from '../../services/gatewayCredentials';
 
 export interface GatewayUserResponse {
   success: boolean;
@@ -35,9 +36,7 @@ export async function POST(req: Request): Promise<Response> {
     const rawUrl = (
       body.baseUrl ||
       req.headers.get('x-custom-base-url') ||
-      process.env.AI_DRAWING_API_BASE_URL ||
-      process.env.AI_API_BASE ||
-      'https://ai.comfly.org'
+      getDefaultBaseUrl()
     );
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
 

@@ -14,15 +14,19 @@ import assistantRoutes from './routes/mounts/assistant';
 import systemRoutes from './routes/mounts/system';
 import * as localMedia from './routes/system/local-media';
 import { applyCors } from './bootstrap/cors';
-import { applyDevLogging } from './bootstrap/logging';
-import { installShutdown, recoverOnBoot } from './bootstrap/lifecycle';
+import { applyRequestLogging } from './bootstrap/logging';
+import { requestIdMiddleware } from './core/requestId';
+import { installShutdown, recoverOnBoot, runPeriodicMaintenance } from './bootstrap/lifecycle';
 import { cleanupAssistantMedia } from './routes/assistant/media';
-import { checkpointDatabase, initializeDatabase } from '@beike/server-kit/prisma';
+import { initializeDatabase } from '@beike/server-kit/prisma';
+import { seedOfficialCatalog } from '@beike/server-kit/officialCatalogSeed';
+import { mountWebShell } from './core/webShell';
 
 const app = new Hono();
 
 applyCors(app);
-applyDevLogging(app);
+app.use('*', requestIdMiddleware);
+applyRequestLogging(app);
 app.onError((error) => errorResponse(error));
 app.use('/api/*', apiAuthMiddleware);
 app.get('/api/health', async (c) => health.GET(c.req.raw));
@@ -32,19 +36,22 @@ app.route('/api/assets', assetsRoutes);
 app.route('/api/assistant', assistantRoutes);
 app.route('/api/system', systemRoutes);
 app.get('/storage/*', (c) => localMedia.GET(c.req.raw));
+const webShellMounted = mountWebShell(app);
 
 export { app };
 
 async function startServer() {
   await initializeDatabase();
+  await seedOfficialCatalog();
   const port = Number.parseInt(process.env.PORT || '3000', 10);
   const hostname = process.env.HOSTNAME || '127.0.0.1';
   console.log(`→ 贝壳云图 API 服务 http://${hostname}:${port}`);
+  if (webShellMounted) console.log(`→ Web 静态托管已启用 WEB_DIST_DIR=${process.env.WEB_DIST_DIR}`);
   await recoverOnBoot();
   void cleanupAssistantMedia();
   const walInterval = setInterval(() => {
     void cleanupAssistantMedia();
-    checkpointDatabase().catch(() => {});
+    void runPeriodicMaintenance();
   }, 10 * 60 * 1000);
   walInterval.unref();
   const server = serve({ fetch: app.fetch, port, hostname });

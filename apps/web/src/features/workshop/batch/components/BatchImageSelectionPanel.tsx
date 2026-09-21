@@ -7,7 +7,6 @@ interface Props {
   displayedItems: BatchProductItem[];
   focusedIndex: number;
   activeImgFilter: 'all' | 'main' | 'sku' | 'detail';
-  batchMode: 'original' | 'replication';
   productFilter: 'all' | 'pending' | 'completed';
   onFilterChange: (f: 'all' | 'main' | 'sku' | 'detail') => void;
   onProductFilterChange: (f: 'all' | 'pending' | 'completed') => void;
@@ -15,7 +14,6 @@ interface Props {
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
   batchSetProductImages: (itemId: string, mode: 'all_main' | 'all' | 'first' | 'clear') => void;
   handleRemoveItem: (id: string) => void;
-  toggleReferenceImageSelection: (itemId: string, imgUrl: string) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
   onPreviewImage?: (url: string) => void;
   onConfirmAndNext: () => void;
@@ -27,13 +25,11 @@ export default function BatchImageSelectionPanel({
   displayedItems,
   focusedIndex,
   activeImgFilter,
-  batchMode,
   onFilterChange,
   setFocusedIndex,
   setItems,
   batchSetProductImages,
   handleRemoveItem,
-  toggleReferenceImageSelection,
   onPreviewGallery,
   onPreviewImage,
   onConfirmAndNext,
@@ -114,27 +110,19 @@ export default function BatchImageSelectionPanel({
         currentItem={currentItem}
         focusedIndex={focusedIndex}
         totalDisplayed={displayedItems.length}
-        displayedItems={displayedItems}
         activeImgFilter={activeImgFilter}
         onFilterChange={onFilterChange}
         filteredTypedImgs={filteredTypedImgs}
         selectedSet={selectedSet}
         galleryReady={galleryReady}
-        batchMode={batchMode}
         setItems={setItems}
         batchSetProductImages={batchSetProductImages}
         handleRemoveItem={handleRemoveItem}
-        toggleReferenceImageSelection={toggleReferenceImageSelection}
         handleSelect={handleSelect}
         handlePreview={handlePreview}
         setFocusedIndex={setFocusedIndex}
         onConfirmAndNext={onConfirmAndNext}
         canContinue={canContinue}
-        pendingCount={pendingItems.length}
-        onGoToPending={() => {
-          onProductFilterChange('pending');
-          setFocusedIndex(0);
-        }}
         handleBatchSelectFirst={handleBatchSelectFirst}
         handleBatchSelectAllMain={handleBatchSelectAllMain}
       />

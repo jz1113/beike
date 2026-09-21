@@ -1,6 +1,6 @@
 import type { AssistantRunMode, ReferenceScope } from '@beike/domain/assistant/taskPolicy';
 import { persistAssistantImages } from '../utils/persistAssistantImages';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
 import { extractVideoFramesFromSrc, isVideoMediaUrl } from '@/shared/media/mediaHelper';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
@@ -30,6 +30,9 @@ interface UseAssistantChatStreamOptions {
   workshopMode: any;
   activeWorkshopTab: any;
   activeBrandKit: any;
+  getWorkspaceSnapshot?: () => Record<string, unknown> | undefined;
+  /** 由当前工作区显式选中的视觉节点；只在新消息时作为参考素材随本轮发送。 */
+  getWorkspaceAttachments?: () => MediaAttachment[] | undefined;
   getActiveAssistantSkill: () => any;
   showToast: (msg: string) => void;
 }
@@ -52,6 +55,8 @@ export function useAssistantChatStream({
   workshopMode,
   activeWorkshopTab,
   activeBrandKit,
+  getWorkspaceSnapshot,
+  getWorkspaceAttachments,
   getActiveAssistantSkill,
   showToast,
 }: UseAssistantChatStreamOptions) {
@@ -61,6 +66,13 @@ export function useAssistantChatStream({
   const sendingGuard = useRef(false);
   const sessionApprovalsRef = useRef<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    };
+  }, []);
 
   const { runTurn, handleApprovalDecision, getItems, turnIdRef } = useAssistantTurn();
   const runTurnHook = useMemo(() => ({ getItems }), [getItems]);
@@ -132,9 +144,12 @@ export function useAssistantChatStream({
     // 绑定发送时会话，避免中途切换导致串台
     const sessionId = currentSession.id;
 
+    const workspaceAttachments = retryUserMsg ? [] : (getWorkspaceAttachments?.() || []);
     let attachmentsToSend = retryUserMsg
       ? [...(retryUserMsg.attachments || [])]
-      : [...assistantAttachments];
+      : [...assistantAttachments, ...workspaceAttachments.filter((candidate) =>
+          !assistantAttachments.some((attachment) => attachment.url === candidate.url),
+        )];
     sendingGuard.current = true;
     setSendingSessionId(sessionId);
     try {
@@ -196,6 +211,8 @@ export function useAssistantChatStream({
         id: assistantMsgId,
         role: 'assistant',
         content: '',
+        // 首帧即给出与当前工作区一致的真实准备状态；服务端后续 status 事件会覆盖它。
+        streamingStatus: currentView === 'canvas' ? '正在读取当前画布，准备回应…' : '正在准备回应…',
         timestamp: Date.now(),
       };
       addAssistantMessage(sessionId, placeholderMsg);
@@ -340,6 +357,7 @@ export function useAssistantChatStream({
             currentView === 'workshop' && activeWorkshopTab === 'prompt_assets'
               ? 'full_prompt'
               : undefined,
+          workspaceSnapshot: getWorkspaceSnapshot?.(),
         },
         sessionApprovals: sessionApprovalsRef.current,
         signal: abortCtrl.signal,

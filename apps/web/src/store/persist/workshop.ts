@@ -101,18 +101,15 @@ export function persistStudioDraftToStorage(state: {
   modelPersona?: string;
   isBatchGenerating?: boolean;
 }) {
-  const mode = state.workshopMode === 'storyboard_generate'
-    ? 'storyboard_generate'
-    : 'social_face_product_swap';
-  persistWorkshopModeDraftToStorage(mode, state);
+  persistWorkshopModeDraftToStorage('storyboard_generate', state);
 }
 
-function studioDraftStorageKey(mode: 'storyboard_generate' | 'social_face_product_swap') {
-  return mode === 'social_face_product_swap' ? STUDIO_DRAFT_SOCIAL_KEY : STUDIO_DRAFT_ORIGINAL_KEY;
+function studioDraftStorageKey(mode: 'storyboard_generate') {
+  return STUDIO_DRAFT_ORIGINAL_KEY;
 }
 
 export function persistWorkshopModeDraftToStorage(
-  mode: 'storyboard_generate' | 'social_face_product_swap',
+  mode: 'storyboard_generate',
   state: {
     currentStep: number;
     product: unknown;
@@ -189,7 +186,7 @@ export function persistWorkshopModeDraftToStorage(
 }
 
 export function getStoredWorkshopModeDraft(
-  mode: 'storyboard_generate' | 'social_face_product_swap',
+  mode: 'storyboard_generate',
 ) {
   if (typeof window === 'undefined') return null;
   try {
@@ -204,8 +201,7 @@ export function getStoredWorkshopModeDraft(
 }
 
 export function getStoredStudioDraft() {
-  return getStoredWorkshopModeDraft('social_face_product_swap')
-    || getStoredWorkshopModeDraft('storyboard_generate');
+  return getStoredWorkshopModeDraft('storyboard_generate');
 }
 
 export function clearWorkshopStudioDraft() {

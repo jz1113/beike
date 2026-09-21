@@ -36,6 +36,8 @@ import { PromptBarControlsRow } from './controls/PromptBarControlsRow';
 interface Props {
   dropdownPlacement?: 'up' | 'down' | 'auto';
   collapsible?: boolean;
+  /** 首页外层已有欢迎区时，避免重复渲染品牌 Hero。 */
+  showBrandHero?: boolean;
   onExpandChange?: (expanded: boolean) => void;
   onSubmitSuccess?: (info: { prompt: string; refImages: string[]; mode: QuickGenMode; tasks: any[] }) => void;
   extraSubjects?: SubjectItem[];
@@ -46,6 +48,7 @@ export type { SubjectItem } from '@/shared/prompt-bar/promptBarConstants';
 export default function PromptActionBar({ 
   dropdownPlacement = 'auto',
   collapsible,
+  showBrandHero,
   onExpandChange,
   onSubmitSuccess,
   extraSubjects,
@@ -313,7 +316,7 @@ export default function PromptActionBar({
   const isFloatingDock = isGenerateDock || currentView === 'canvas';
 
   // 🌟 首页品牌标题仅在首页展示（生成页与画布页均不展示）
-  const showBrandHero = currentView === 'home';
+  const shouldShowBrandHero = showBrandHero ?? currentView === 'home';
 
   return (
     <div
@@ -322,11 +325,11 @@ export default function PromptActionBar({
       onBlur={handleContainerBlur}
       className={`w-full relative ${anyDropdownOpen ? 'z-40' : 'z-20'} ${!isFloatingDock ? composerContainer : ''}`}
     >
-      {showBrandHero && <PromptBarBrandHero />}
+      {shouldShowBrandHero && <PromptBarBrandHero />}
 
       <div
         {...media.dropZoneProps}
-        className={`w-full transition-all duration-300 ease-out relative ${
+        className={`w-full transition-[background-color,border-color,box-shadow,border-radius] duration-200 ease-out relative ${
           anyDropdownOpen ? 'z-40' : 'z-20'
         } group/composer ${
           isExpanded

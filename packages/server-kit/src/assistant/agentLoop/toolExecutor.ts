@@ -1,4 +1,5 @@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { isRetryableModelRequestError, modelRequestError } from './requestError';
 import { runCodeSandbox } from '../codeSandbox';
 import type { AgentLoopOptions, ToolCallTask, ToolTaskResult } from './types';
 import type { AssistantSSEEvent } from '@beike/domain/assistant/events';
@@ -160,7 +161,7 @@ export async function runNonStreamingToolRound(
       if (!resp.ok) {
         const errText = await resp.text();
         if (/tool|function|unsupported|not support/i.test(errText)) return null;
-        continue;
+        throw modelRequestError(resp.status, errText, resp.headers.get('retry-after'));
       }
 
       const data = await resp.json();
@@ -170,7 +171,8 @@ export async function runNonStreamingToolRound(
         return { toolCalls: [], modelUsed: tryModel, content: typeof choiceMsg?.content === 'string' ? choiceMsg.content : undefined };
       }
       return { toolCalls, modelUsed: tryModel, content: typeof choiceMsg?.content === 'string' ? choiceMsg.content : undefined };
-    } catch {
+    } catch (error) {
+      if (!isRetryableModelRequestError(error)) throw error;
       continue;
     }
   }

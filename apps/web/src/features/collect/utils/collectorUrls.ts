@@ -45,6 +45,11 @@ export function sanitizeCollectedItem(it: any): any {
   const all = Array.from(new Set([...cleanMain, ...cleanSkus, ...cleanDesc])).filter(Boolean);
   const rawCover = fixXhsUrl(normalizeImageUrlToStandardJpg(it.coverImage) || cleanMain[0] || all[0] || '');
   const cover = keepUrl(rawCover) ? fixXhsUrl(normalizeImageUrlToStandardJpg(rawCover) || rawCover) : all[0] || '';
+  const videos = Array.from(new Set([
+    ...(Array.isArray(it.videos) ? it.videos : []),
+    it.video,
+    it.videoUrl,
+  ].filter((url): url is string => typeof url === 'string' && Boolean(url.trim()))));
 
   return {
     ...it,
@@ -53,6 +58,7 @@ export function sanitizeCollectedItem(it: any): any {
     mainImages: cleanMain.length > 0 ? cleanMain : all.length > 0 ? [all[0]] : [],
     skuImages: cleanSkus,
     descImages: cleanDesc,
-    video: it.video || it.videoUrl || (Array.isArray(it.videos) && it.videos.length > 0 ? it.videos[0] : null),
+    video: videos[0] || null,
+    videos,
   };
 }

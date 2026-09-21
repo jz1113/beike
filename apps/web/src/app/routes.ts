@@ -10,7 +10,7 @@ export const VIEW_TO_URL: Record<AppView, string> = {
   home: 'home',
   generate: 'generate',
   workshop: 'workshop',
-  replicate: 'replicate',
+  headline_poster: 'headline_poster',
   assets: 'assets',
   canvas: 'canvas',
   settings: 'settings',
@@ -25,7 +25,10 @@ export function parseViewFromSearchParams(search: string): AppView {
 
 export function buildViewSearchParams(view: AppView, extra?: Record<string, string>): string {
   const params = new URLSearchParams();
-  params.set('view', VIEW_TO_URL[view] || view);
+  // 首页就是站点根路径，不再拼 ?view=home
+  if (view !== 'home') {
+    params.set('view', VIEW_TO_URL[view] || view);
+  }
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       if (v) params.set(k, v);
@@ -39,7 +42,7 @@ export function syncViewToUrl(view: AppView, extra?: Record<string, string>) {
   const next = buildViewSearchParams(view, extra);
   const current = window.location.search.replace(/^\?/, '');
   if (current === next) return;
-  const url = `${window.location.pathname}?${next}`;
+  const url = next ? `${window.location.pathname}?${next}` : window.location.pathname || '/';
   window.history.replaceState(null, '', url);
 }
 

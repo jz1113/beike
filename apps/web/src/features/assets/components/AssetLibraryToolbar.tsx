@@ -53,7 +53,7 @@ export type AssetLibraryToolbarProps = {
   actionShotScaleCounts?: { all: number; macro_closeup: number; half_body: number; full_body: number };
   actionAnchor?: string | null;
   setActionAnchor?: (anchor: string | null) => void;
-  actionCategoryCounts?: { all: number; universal: number; jewelry: number; digital_3c: number; apparel: number };
+  actionCategoryCounts?: Partial<Record<ActionCategoryId | 'all', number>>;
   availableAnchors?: Array<{ id: string; label: string; count: number }>;
   isAnyFilterActive: boolean;
   onResetAllFilters: () => void;
@@ -108,9 +108,10 @@ export default function AssetLibraryToolbar({
   sortBy,
   setSortBy,
 }: AssetLibraryToolbarProps) {
-  const [wideLayout, setWideLayout] = useState(() => window.matchMedia('(min-width: 1280px)').matches);
+  // 顶栏需同时容纳品牌、资产分类、右侧模块导航；只在充足宽度时挂到顶栏。
+  const [wideLayout, setWideLayout] = useState(() => window.matchMedia('(min-width: 1536px)').matches);
   useEffect(() => {
-    const query = window.matchMedia('(min-width: 1280px)');
+    const query = window.matchMedia('(min-width: 1536px)');
     const update = () => setWideLayout(query.matches);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
@@ -133,20 +134,24 @@ export default function AssetLibraryToolbar({
     </button>
   );
 
-  const mainToolbar = (
-      <div data-asset-main-toolbar className={`flex flex-wrap items-center justify-between gap-3 ${portalTarget ? 'h-12 bg-transparent' : 'px-6 lg:px-8 py-2.5 bg-transparent'}`}>
+  // 分类切换属于内容区的导航。让它靠左放在资产列表上方，避免与居中的工坊模块导航
+  // 和右侧操作抢占同一条顶栏；只有搜索和管理操作在宽屏时继续挂到顶栏右边。
+  const tabNavigation = (
+    <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+      <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl" aria-label="资产类型">
+        {tabBtn('full_prompt', '图组母本')}
+        <span className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden="true" />
+        {tabBtn('persona', '人物')}
+        {tabBtn('outfit', '穿搭')}
+        {tabBtn('scene', '场景')}
+        <span className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden="true" />
+        {tabBtn('action', '镜头动作')}
+      </div>
+    </div>
+  );
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl">
-            {tabBtn('full_prompt', '完整提示词')}
-            {tabBtn('persona', '人物')}
-            {tabBtn('outfit', '穿搭')}
-            {tabBtn('scene', '场景')}
-            {tabBtn('action', '动作')}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5">
+  const actionControls = (
+    <div className="flex items-center gap-2.5 shrink-0">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 border border-slate-200/60 rounded-xl transition-colors w-48 sm:w-60 h-9">
             <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
@@ -232,15 +237,29 @@ export default function AssetLibraryToolbar({
             onOpenPromptSpec={onOpenPromptSpec}
             onClearAssets={onClearAssets}
           />
-        </div>
-      </div>
-
+    </div>
   );
+
   return (
     <>
-      {portalTarget ? createPortal(mainToolbar, portalTarget) : mainToolbar}
+      {/* 窄屏没有顶栏挂载点时，让操作控件独占一行；分类导航始终紧跟“维度筛选”。 */}
+      {!portalTarget && (
+        <div
+          data-asset-main-toolbar
+          className="flex items-center justify-end gap-3 flex-wrap px-5 sm:px-7 xl:px-8 py-2.5 bg-transparent"
+        >
+          {actionControls}
+        </div>
+      )}
+      {portalTarget && createPortal(
+        <div className="flex h-12 min-w-0 items-center justify-end bg-transparent">
+          {actionControls}
+        </div>,
+        portalTarget,
+      )}
       {/* 🌟 紧凑型专业复合过滤控制栏 (Filter Bar) */}
       <AssetLibraryFilterBar
+        navigation={tabNavigation}
         activeSubTab={activeSubTab}
         dynamicTagList={dynamicTagList}
         selectedTag={selectedTag}

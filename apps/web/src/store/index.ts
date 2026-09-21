@@ -34,8 +34,8 @@ function buildInitialWorkshopHydration(): Partial<AppState> {
   if (typeof window === 'undefined') return {};
 
   const socialSession = hydrateWorkshopSessionFromDraft(
-    'social_face_product_swap',
-    getStoredWorkshopModeDraft('social_face_product_swap'),
+    'storyboard_generate',
+    getStoredWorkshopModeDraft('storyboard_generate'),
   );
   const originalSession = hydrateWorkshopSessionFromDraft(
     'storyboard_generate',
@@ -46,7 +46,7 @@ function buildInitialWorkshopHydration(): Partial<AppState> {
     socialSessionCache: socialSession,
     originalSessionCache: originalSession,
     ...applyWorkshopModeSession(socialSession),
-    workshopMode: 'social_face_product_swap',
+    workshopMode: 'storyboard_generate',
   };
 }
 
@@ -75,7 +75,7 @@ if (typeof window !== 'undefined') {
 
     persistWorkshopModeDraftToStorage(mode, sessionFields);
 
-    const cacheKey = mode === 'social_face_product_swap' ? 'socialSessionCache' : 'originalSessionCache';
+    const cacheKey = 'originalSessionCache';
     if (!areWorkshopSessionsEqual(state[cacheKey], sessionFields)) {
       useAppStore.setState({ [cacheKey]: sessionFields } as Partial<AppState>);
     }
@@ -130,4 +130,3 @@ export {
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as { useAppStore?: typeof useAppStore }).useAppStore = useAppStore;
 }
-

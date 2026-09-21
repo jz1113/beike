@@ -6,7 +6,6 @@ export interface BatchStage2PresetBarProps {
   selectedArchId: string;
   selectedShotCount: number;
   selectedAspect: string;
-  hasHumanPersona: boolean;
   selectedVisionModel: string;
   availableVisionModels: Array<{ id: string; name?: string; shortName?: string }>;
   selectedImageGenModel: string;
@@ -21,7 +20,6 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
   selectedArchId,
   selectedShotCount,
   selectedAspect,
-  hasHumanPersona,
   selectedVisionModel,
   availableVisionModels,
   selectedImageGenModel,
@@ -61,7 +59,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
         <span className="font-semibold text-slate-700 whitespace-nowrap">{selectedAspect}</span>
 
         <span className="text-slate-300">·</span>
-        <span className="font-semibold text-slate-700 whitespace-nowrap">{hasHumanPersona ? '真人出镜' : '纯商品实物'}</span>
+        <span className="font-semibold text-slate-700 whitespace-nowrap">出镜按资产库</span>
 
         <span className="text-slate-300 hidden md:inline">·</span>
         <span className="text-slate-400 font-medium hidden md:inline truncate max-w-[140px]" title={`视觉模型: ${currentVisionName}`}>

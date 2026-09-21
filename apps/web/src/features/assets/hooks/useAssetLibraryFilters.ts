@@ -127,6 +127,15 @@ export function useAssetLibraryFilters(
     setActionAnchor(null);
   }, [activeSubTab]);
 
+  // 空库不保留上次浏览时的动作筛选，否则会出现「0 条资产」却挂着珠宝/景别等条件的假象。
+  useEffect(() => {
+    if (activeSubTab !== 'action' || items.length > 0) return;
+    setActionCategory('all');
+    setActionSubCategory('all');
+    setActionShotScale('all');
+    setActionAnchor(null);
+  }, [activeSubTab, items.length]);
+
   const setActionCategoryWithReset = (cat: ActionCategoryId | 'all') => {
     setActionCategory(cat);
     setActionSubCategory('all');
@@ -135,10 +144,10 @@ export function useAssetLibraryFilters(
   // 计算动作资产在各大类目下的资产数量
   const actionCategoryCounts = useMemo(() => {
     if (activeSubTab !== 'action') {
-      return { all: 0, universal: 0, jewelry: 0, digital_3c: 0, apparel: 0 };
+      return { all: 0, universal: 0, jewelry: 0, digital_3c: 0, apparel: 0, bag: 0, shoes: 0, beauty: 0, eyewear: 0 };
     }
     const baseItems: any[] = items;
-    const counts = { all: baseItems.length, universal: 0, jewelry: 0, digital_3c: 0, apparel: 0 };
+    const counts = { all: baseItems.length, universal: 0, jewelry: 0, digital_3c: 0, apparel: 0, bag: 0, shoes: 0, beauty: 0, eyewear: 0 };
     for (const it of baseItems) {
       const cats = extractActionCategories(it);
       for (const c of cats) {
@@ -146,6 +155,10 @@ export function useAssetLibraryFilters(
         if (c.id === 'jewelry') counts.jewelry++;
         if (c.id === 'digital_3c') counts.digital_3c++;
         if (c.id === 'apparel') counts.apparel++;
+        if (c.id === 'bag') counts.bag++;
+        if (c.id === 'shoes') counts.shoes++;
+        if (c.id === 'beauty') counts.beauty++;
+        if (c.id === 'eyewear') counts.eyewear++;
       }
     }
     return counts;

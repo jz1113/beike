@@ -335,7 +335,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'veo3.1',
     capability: 'video',
     vendor: 'google',
-    name: 'Google Veo 3.1',
+    name: 'Veo 3.1',
     shortName: 'Veo 3.1',
     adapter: 'veo',
     docs: 'docs/vendors/官方接口/aggregator/google/veo3.1.md',
@@ -351,7 +351,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'veo3.1-fast',
     capability: 'video',
     vendor: 'google',
-    name: 'Google Veo 3.1 Fast',
+    name: 'Veo 3.1 Fast',
     shortName: 'Veo 3.1 Fast',
     adapter: 'veo',
     docs: 'docs/vendors/官方接口/aggregator/google/veo3.1-fast.md',
@@ -381,7 +381,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'kling-video-v3',
     capability: 'video',
     vendor: 'kuaishou',
-    name: '可灵 Kling Video v3',
+    name: 'Kling Video v3',
     shortName: 'Kling v3',
     adapter: 'kling',
     docs: 'docs/vendors/官方接口/aggregator/kling/kling-video-v3.md',
@@ -397,7 +397,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'kling-video-v3-omni',
     capability: 'video',
     vendor: 'kuaishou',
-    name: '可灵 Kling Video v3 Omni',
+    name: 'Kling Video v3 Omni',
     shortName: 'Kling v3 Omni',
     adapter: 'kling',
     docs: 'docs/vendors/官方接口/aggregator/kling/kling-video-v3-omni.md',
@@ -412,7 +412,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'kling-video-v2-5-turbo',
     capability: 'video',
     vendor: 'kuaishou',
-    name: '可灵 Kling Video v2.5 Turbo',
+    name: 'Kling Video v2.5 Turbo',
     shortName: 'Kling v2.5 Turbo',
     adapter: 'kling',
     docs: 'docs/vendors/官方接口/aggregator/kling/kling-video-v2-5-turbo.md',
@@ -427,7 +427,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'kling-video-v2-6',
     capability: 'video',
     vendor: 'kuaishou',
-    name: '可灵 Kling Video v2.6',
+    name: 'Kling Video v2.6',
     shortName: 'Kling v2.6',
     adapter: 'kling',
     docs: 'docs/vendors/官方接口/aggregator/kling/kling-video-v2-6.md',
@@ -442,8 +442,8 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'doubao-seedance-2-0-260128',
     capability: 'video',
     vendor: 'bytedance',
-    name: '即梦 Seedance 2.0',
-    shortName: '即梦 2.0',
+    name: 'Seedance 2.0',
+    shortName: 'Seedance 2.0',
     adapter: 'seedance',
     docs: 'docs/vendors/官方接口/aggregator/volcengine/doubao-seedance-2-0-260128.md',
     badge: '全模态',
@@ -457,8 +457,8 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'doubao-seedance-2-0-fast-260128',
     capability: 'video',
     vendor: 'bytedance',
-    name: '即梦 Seedance 2.0 Fast',
-    shortName: '即梦 2.0 Fast',
+    name: 'Seedance 2.0 Fast',
+    shortName: 'Seedance 2.0 Fast',
     adapter: 'seedance',
     docs: 'docs/vendors/官方接口/aggregator/volcengine/doubao-seedance-2-0-fast-260128.md',
     badge: '极速',
@@ -472,8 +472,8 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'doubao-seedance-2.0-mini',
     capability: 'video',
     vendor: 'bytedance',
-    name: '即梦 Seedance 2.0 mini',
-    shortName: '即梦 2.0 mini',
+    name: 'Seedance 2.0 mini',
+    shortName: 'Seedance 2.0 mini',
     adapter: 'seedance',
     docs: 'docs/vendors/官方接口/aggregator/volcengine/doubao-seedance-2.0-mini.md',
     badge: '性价比',
@@ -488,8 +488,8 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'doubao-seedance-2.5',
     capability: 'video',
     vendor: 'bytedance',
-    name: '即梦 Seedance 2.5',
-    shortName: '即梦 2.5',
+    name: 'Seedance 2.5',
+    shortName: 'Seedance 2.5',
     adapter: 'seedance',
     docs: 'docs/vendors/官方接口/aggregator/volcengine/doubao-seedance-2.5.md',
     badge: '最强模型',
@@ -504,7 +504,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'sora-2',
     capability: 'video',
     vendor: 'openai',
-    name: 'OpenAI Sora 2',
+    name: 'Sora 2',
     shortName: 'Sora 2',
     adapter: 'sora',
     docs: 'docs/vendors/官方接口/aggregator/openai/sora-2.md',
@@ -519,7 +519,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'sora-2-pro',
     capability: 'video',
     vendor: 'openai',
-    name: 'OpenAI Sora 2 Pro',
+    name: 'Sora 2 Pro',
     shortName: 'Sora 2 Pro',
     adapter: 'sora',
     docs: 'docs/vendors/官方接口/aggregator/openai/sora-2-pro.md',
@@ -550,7 +550,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     id: 'wan3.0-video',
     capability: 'video',
     vendor: 'alibaba',
-    name: '通义万相 Wan 3.0',
+    name: '万相 3.0',
     shortName: '万相 3.0',
     adapter: 'wan',
     docs: 'docs/vendors/官方接口/aggregator/alibaba/wan3.0-video.md',
@@ -854,6 +854,48 @@ export function canonicalModelId(id: string): string {
   const slash = trimmed.lastIndexOf('/');
   const stripped = slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
   return MODEL_ALIASES[stripped] || MODEL_ALIASES[stripped.toLowerCase()] || stripped;
+}
+
+/**
+ * 多模态上游异常时的统一降级顺序。
+ *
+ * 调用从当前模型在本列表中的位置开始，失败后向后尝试，抵达末尾后回绕。
+ * `deepseek-v4.1-flash` 仍可作为用户显式主模型，但不进入自动降级序列，因为
+ * 它不在本次确认的优先级名单中。
+ */
+export const MULTIMODAL_UPSTREAM_FALLBACK_ORDER = [
+  'gpt-5.6-luna',
+  'grok-4.6',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+  'deepseek-v4-flash',
+  'gpt-5.4-mini',
+  'claude-haiku-4-5-20251001-thinking',
+  'claude-sonnet-5',
+  'gpt-5.6-terra',
+  'gemini-3.1-pro-preview',
+  'claude-opus-5',
+  'claude-opus-4-7',
+  'gpt-5.6-sol',
+  'qwen3.8-max',
+  'kimi-k3',
+  'claude-fable-5',
+] as const;
+
+/** Builds a circular, de-duplicated fallback chain beginning with the requested model. */
+export function buildMultimodalUpstreamFallbackChain(requestedModel?: string): string[] {
+  const requested = canonicalModelId(requestedModel || '');
+  const start = MULTIMODAL_UPSTREAM_FALLBACK_ORDER.findIndex(
+    (model) => model.toLowerCase() === requested.toLowerCase(),
+  );
+  const ordered = start >= 0
+    ? [
+        ...MULTIMODAL_UPSTREAM_FALLBACK_ORDER.slice(start),
+        ...MULTIMODAL_UPSTREAM_FALLBACK_ORDER.slice(0, start),
+      ]
+    : [...MULTIMODAL_UPSTREAM_FALLBACK_ORDER];
+
+  return Array.from(new Set([requested, ...ordered].filter(Boolean)));
 }
 
 export function getApprovedModel(id: string): ApprovedModel | undefined {

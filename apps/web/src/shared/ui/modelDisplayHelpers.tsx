@@ -24,12 +24,12 @@ export function getModelProviderName(modelId: string = '', modelName: string = '
   if (low.includes('grok') || low.includes('xai')) return 'xAI';
   if (low.includes('seedream') || low.includes('seedance') || low.includes('doubao') || low.includes('bytedance') || low.includes('即梦') || low.includes('火山')) return '字节即梦';
   if (low.includes('midjourney') || low.includes('mj')) return 'Midjourney';
-  if (low.includes('gemini') || low.includes('imagen') || low.includes('google') || low.includes('veo')) return 'Google';
+  if (low.includes('gemini') || low.includes('imagen') || low.includes('google') || low.includes('veo') || low.includes('omni_flash') || low.includes('omni-flash')) return 'Google';
   if (low.includes('flux') || low.includes('black forest')) return 'BFL FLUX';
   if (low.includes('claude') || low.includes('anthropic')) return 'Anthropic';
   if (low.includes('kling') || low.includes('可灵') || low.includes('kuaishou')) return '快手可灵';
   if (low.includes('minimax') || low.includes('hailuo') || low.includes('海螺')) return 'MiniMax';
-  if (low.includes('wanx') || low.includes('qwen') || low.includes('tongyi') || low.includes('通义')) return '阿里通义';
+  if (low.includes('wanx') || low.includes('qwen') || low.includes('z-image') || low.includes('tongyi') || low.includes('通义')) return '阿里通义';
   if (low.includes('deepseek')) return 'DeepSeek';
   if (low.includes('zhipu') || low.includes('cogview') || low.includes('glm')) return '智谱AI';
   if (low.includes('sd') || low.includes('stable diffusion') || low.includes('stability')) return 'Stability AI';
@@ -135,4 +135,3 @@ export function renderRatioMiniIcon(iconType?: string, className = "w-3.5 h-3.5 
     </svg>
   );
 }
-

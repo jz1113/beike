@@ -5,6 +5,8 @@ import * as depthVideo from '../generate/depth-video';
 import * as depthImage from '../generate/depth-image';
 import * as analyze from '../generate/analyze';
 import * as copywriting from '../generate/copywriting';
+import * as headlineTitle from '../generate/headline-title';
+import * as headlineDesign from '../generate/headline-design';
 import * as exportZip from '../generate/export-zip';
 import * as uploadRef from '../generate/upload-ref';
 
@@ -22,6 +24,8 @@ generate.get('/depth-video', (c) => depthVideo.GET(c.req.raw));
 generate.post('/depth-image', (c) => depthImage.POST(c.req.raw));
 generate.post('/analyze', (c) => analyze.POST(c.req.raw));
 generate.post('/copywriting', (c) => copywriting.POST(c.req.raw));
+generate.post('/headline-title', (c) => headlineTitle.POST(c.req.raw));
+generate.post('/headline-design', (c) => headlineDesign.POST(c.req.raw));
 generate.post('/export-zip', (c) => exportZip.POST(c.req.raw));
 generate.post('/upload-ref', (c) => uploadRef.POST(c.req.raw));
 

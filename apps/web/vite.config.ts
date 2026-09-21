@@ -9,12 +9,23 @@ import type { ServerResponse } from 'node:http';
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(webRoot, '../..');
-const portFilePath = resolve(workspaceRoot, '.desktop-dev-port');
+// Web 与桌面开发启动器曾分别写入不同的端口文件：前者是
+// `.local-api-port`，后者是 `.desktop-dev-port`。代理只读后者时，API
+// 实际跑在 3001–3099 的场景仍会被错误转发至 3000，整批生图便会在提交前
+// 直接收到 502。优先读取 Web 启动器的文件；桌面开发没有该文件时再回退。
+const portFilePaths = [
+  resolve(workspaceRoot, '.local-api-port'),
+  resolve(workspaceRoot, '.desktop-dev-port'),
+];
 let apiPort = 3000;
 try {
-  if (existsSync(portFilePath)) {
+  for (const portFilePath of portFilePaths) {
+    if (!existsSync(portFilePath)) continue;
     const n = Number.parseInt(readFileSync(portFilePath, 'utf8').trim(), 10);
-    if (Number.isFinite(n) && n > 0) apiPort = n;
+    if (Number.isFinite(n) && n > 0) {
+      apiPort = n;
+      break;
+    }
   }
 } catch {
   /* default */
@@ -74,9 +85,6 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/zustand/')) {
             return 'vendor-react';
-          }
-          if (id.includes('node_modules/three/') || id.includes('node_modules/vgpu/') || id.includes('node_modules/ogl/')) {
-            return 'vendor-three';
           }
           if (id.includes('node_modules/@tanstack/')) {
             return 'vendor-query';

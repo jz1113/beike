@@ -248,7 +248,23 @@ export function useAssetCrud({
   const handleApplyToWorkshop = (item: any, _shot?: SceneShot) => {
     let promptSnippet = '';
     if (activeSubTab === 'full_prompt') {
-      promptSnippet = item.reversePromptZh || item.reversePrompt || '';
+      promptSnippet = [
+        item.contentSummary ? `【整条内容总结】${item.contentSummary}` : '',
+        item.architectureSummary ? `【固定图组架构（不得逐图替换）】${item.architectureSummary}` : '',
+        item.reversePromptZh || item.reversePrompt || '',
+      ].filter(Boolean).join('\n\n');
+      try {
+        const prompts = JSON.parse(String(item.shotPromptsJson || '[]'));
+        if (Array.isArray(prompts) && prompts.length > 0) {
+          useAppStore.getState().setPendingBatchPromptImport({
+            productTitle: item.title || '内容图组',
+            productFingerprint: `content_group_${item.id}`,
+            prompts,
+          });
+        }
+      } catch {
+        // 兼容旧单图母本：仍以完整提示词方式载入。
+      }
       setPendingBatchStage(1);
     } else if (activeSubTab === 'scene') {
       const desc = item.description || '';
@@ -284,7 +300,9 @@ export function useAssetCrud({
       setStep(2);
       setCurrentView('workshop');
     }
-    showToast('✨ 已载入种草工坊并锁定应用该提示词资产！');
+    showToast(activeSubTab === 'full_prompt' && item.groupIndex
+      ? '✨ 已载入内容图组：4 个分镜、场景与动作架构已锁定；请补充商品图后生图。'
+      : '✨ 已载入种草工坊并锁定应用该提示词资产！');
   };
 
   // 保存编辑后的资产

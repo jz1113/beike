@@ -41,6 +41,21 @@ export interface AgentTelemetryEvent {
   tags?: Record<string, string | number | boolean>;
 }
 
+export interface TelemetryEvent {
+  ts: number;
+  kind: string;
+  requestId?: string;
+  taskId?: string;
+  provider?: string;
+  durationMs?: number;
+  result?: string;
+  operation?: string;
+  success?: boolean;
+  reason?: string;
+}
+
+const SENSITIVE_KEY = /secret|password|prompt|cookie|credential|authorization|(api)?[_-]?key$/i;
+
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
 const ARCHIVE_PREFIX = 'turns-';
 
@@ -90,7 +105,7 @@ function fileFor(dir: string, day = dateStamp()): string {
 /**
  * 单事件写入；写入失败静默吞掉以避免污染主流程。
  */
-async function writeEvent(dir: string, evt: AgentTelemetryEvent): Promise<void> {
+async function writeEvent(dir: string, evt: object): Promise<void> {
   try {
     await ensureDir(dir);
     if (!currentFile || currentFile !== fileFor(dir)) {
@@ -125,9 +140,93 @@ async function writeEvent(dir: string, evt: AgentTelemetryEvent): Promise<void> 
  * 记录一条事件（异步非阻塞）。
  */
 export function recordAgentEvent(evt: Omit<AgentTelemetryEvent, 'ts'>): void {
-  const full: AgentTelemetryEvent = { ts: Date.now(), ...evt };
+  const full: AgentTelemetryEvent = { ts: Date.now(), ...sanitizeTelemetry(evt) };
+  enqueueWrite(full);
+}
+
+function canWriteLocalTelemetry(): boolean {
+  return process.env.DESKTOP_SHELL === '1' || process.env.NODE_ENV !== 'production';
+}
+
+function sanitizeTelemetry<T extends Record<string, unknown>>(evt: T): T {
+  const next = { ...evt };
+  for (const key of Object.keys(next)) {
+    if (SENSITIVE_KEY.test(key) || key.toLowerCase() === 'token') {
+      delete next[key];
+      continue;
+    }
+    const value = next[key];
+    if (typeof value === 'string' && /^(sk-|Bearer\s+)/i.test(value)) delete next[key];
+  }
+  return next;
+}
+
+function enqueueWrite(evt: object): void {
   const dir = resolveTelemetryDir();
-  writeChain = writeChain.then(() => writeEvent(dir, full)).catch(() => undefined);
+  writeChain = writeChain.then(() => writeEvent(dir, evt)).catch(() => undefined);
+}
+
+/** 通用本地遥测。只写 JSONL，生产环境不向未知 HTTP 地址发送。 */
+export function recordTelemetry(evt: Omit<TelemetryEvent, 'ts'>): void {
+  if (!canWriteLocalTelemetry()) return;
+  enqueueWrite({ ts: Date.now(), ...sanitizeTelemetry(evt) });
+}
+
+export function recordAuditEvent(evt: {
+  operation: string;
+  requestId?: string;
+  success: boolean;
+  reason?: string;
+}): void {
+  recordTelemetry({
+    kind: 'audit',
+    operation: evt.operation,
+    requestId: evt.requestId,
+    success: evt.success,
+    result: evt.success ? 'ok' : 'error',
+    reason: evt.reason,
+  });
+}
+
+export async function recordPollTelemetry(
+  kind: 'image-poll' | 'video-poll',
+  req: Request,
+  run: () => Promise<Response>,
+  provider?: string,
+): Promise<Response> {
+  const started = Date.now();
+  const requestId = req.headers.get('x-request-id')?.trim() || undefined;
+  const taskId = new URL(req.url).searchParams.get('taskId') || undefined;
+  try {
+    const response = await run();
+    let result = String(response.status);
+    try {
+      const payload = await response.clone().json() as { status?: string; success?: boolean };
+      if (typeof payload?.status === 'string') result = payload.status;
+      else if (payload?.success === false) result = 'failed';
+    } catch {
+      /* ignore */
+    }
+    recordTelemetry({
+      kind,
+      requestId,
+      taskId,
+      provider,
+      durationMs: Date.now() - started,
+      result,
+    });
+    return response;
+  } catch (error) {
+    recordTelemetry({
+      kind,
+      requestId,
+      taskId,
+      provider,
+      durationMs: Date.now() - started,
+      result: 'failed',
+    });
+    throw error;
+  }
 }
 
 /** 等待所有缓冲写入完成（用于测试与 graceful shutdown）。 */

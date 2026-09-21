@@ -57,8 +57,6 @@ export function parseBatchInputLines(
       selected: true,
       allTypedImages: [],
       selectedProductImages: [],
-      availableReferenceImages: [],
-      selectedReferenceImages: [],
       prompts: [],
       tasks: [],
     });

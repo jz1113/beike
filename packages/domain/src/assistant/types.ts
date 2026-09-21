@@ -117,6 +117,16 @@ export interface ClientContext {
   workshopMode?: string;
   assetLibraryTab?: string;
   assetLibraryKeyword?: string;
+  /** 发送时采样的当前工作区概要；只用于对话上下文。 */
+  workspaceSnapshot?: {
+    workspaceType?: 'canvas' | 'workshop' | 'generate' | 'assets' | 'home' | 'other';
+    title?: string;
+    summary?: string;
+    nodeCount?: number;
+    nodeTypes?: Record<string, number>;
+    nodes?: Array<{ type: string; title?: string; role?: string; status?: string }>;
+    production?: { aspect?: string; shotCount?: number };
+  };
 }
 
 export interface McpServerConfig {

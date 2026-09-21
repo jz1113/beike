@@ -85,12 +85,12 @@ export function cleanPromptText(rawPrompt: string): string {
 
 /**
  * 剥离工坊注入的守卫文案与尾部追加句（Hub/快速生图 plain 模式使用）。
- * 仅剥离真正的守卫标签，保留业务正文前缀（如【爆款复刻实拍】、【爆款构图复刻…】）。
+ * 仅剥离真正的守卫标签，保留业务正文前缀。
  */
 export function stripWorkshopPromptGuards(prompt: string): string {
   if (!prompt) return prompt;
   const text = prompt
-    // 真守卫：【爆款人物/静物守卫】【复刻人物/静物守卫】【原创*守卫】——勿匹配【爆款复刻实拍】等正文
+    // 仅匹配历史守卫标签，避免误删业务正文。
     .replace(/【(?:爆款人物守卫|爆款静物守卫|复刻人物守卫|复刻静物守卫|原创[^】]*守卫)】[^【]*?。/g, ' ')
     .replace(/【身份硬锁定[^\]]*】[^【]*?。/g, ' ')
     .replace(/【表情解耦】[^【]*?。/g, ' ')
@@ -117,16 +117,12 @@ export function getPlainNegativePrompt(): string {
 export function getDynamicNegativePrompt(options?: {
   hasHuman?: boolean;
   shotType?: string;
-  socialMode?: boolean;
   plainMode?: boolean;
 }): string {
   if (options?.plainMode) {
     return getPlainNegativePrompt();
   }
   const hasHuman = options?.hasHuman !== false && options?.shotType !== 'pure_product';
-  const socialLeak = options?.socialMode
-    ? ', competitor product body, wrong camera bump layout, old phone model, brand logo mismatch, packaging box of other SKU, sticker watermark from reference, influencer face identity from reference shot, original model face from composition reference, wrong person identity, random face, different person, face of girl in reference photo, keep original face, same face as image 2, copy face from pose reference, identity from composition image, fused face, morph face, hybrid identity, copied expression from identity reference, copied expression from composition reference, same facial expression as pose reference, mirrored social media face expression, wink from face plate, pout from face plate, forced wink, forced kiss pout, identity-photo expression, passport-photo expression, blurred face patch, mosaic face, pixelated head, censored face, face covered by blur rectangle, gaussian blur over face'
-    : '';
 
   // 🌟 截屏工件、UI图标、胸口徽章与虚假塑料3D场景排斥词
   const screenshotArtifacts = 'cursor, mouse cursor, mouse pointer, arrow cursor, hand cursor, pointer icon, UI overlay, screenshot artifact, browser chrome, browser toolbar, address bar, taskbar, desktop icons, system tray, window controls, minimize button, close button, scrollbar, notification popup, badge on clothes, chest badge, chest pin, brooch, camera icon, eye icon, button badge, clothing tag, sticker on shirt, floating logo, icon on strap, white borders, white dividing lines, white margin, white frame, blank space, split lines, outer border, padding, 白边, 白框, 分割白线, 留白边框, 相框, 十字分割线, fake plastic scene, synthetic studio backdrop, 3D CGI background, green screen background, virtual studio, plastic furniture, flat studio lighting, floating cutout subject, sterile showroom, unreal engine background, 塑料假背景, 虚拟样板间, 绿幕抠图感, 假景贴图, 悬浮无阴影, 纯色假背景, art gallery, exhibition hall, modern museum, empty corridor, abstract art on wall, geometric paintings, blank white museum walls, cold sterile minimalist gallery, long empty hallway, full body shot, distant shot, far away standing, standing in hallway, small human in distance, 艺术画廊, 展厅, 美术馆, 走廊长廊, 墙上抽象几何画作, 空旷白墙, 冰冷样板间, 远景全身, 远景小人, 站立远景';
@@ -136,136 +132,20 @@ export function getDynamicNegativePrompt(options?: {
 
   if (!hasHuman) {
     // 纯静物 / 商业实物特写专属负向词
-    return `${screenshotArtifacts}, promotional poster, marketing banner, text overlay, typography, Chinese text watermark, spec icons, parameter table, commercial advertisement, billboard, graphic design poster, spec sheet, product brochure, extra arms, human limbs, extra hands, mutated fingers, human in background, floating object, anti-gravity, distorted geometry, malformed product, plastic fake reflection, cheap CGI, 3d render, blender render, unreal engine, clay material, fake specular highlights, multiple rings, extra bracelets, blurry, low resolution, watermark, ugly text artifact, oversaturated, unrealistic perspective, dark gloomy lighting, muddy black shadows, flat sterile lighting, plastic toy look, washed out colors, harsh flat light${physicsArtifacts}${socialLeak}`;
+    return `${screenshotArtifacts}, promotional poster, marketing banner, text overlay, typography, Chinese text watermark, spec icons, parameter table, commercial advertisement, billboard, graphic design poster, spec sheet, product brochure, extra arms, human limbs, extra hands, mutated fingers, human in background, floating object, anti-gravity, distorted geometry, malformed product, plastic fake reflection, cheap CGI, 3d render, blender render, unreal engine, clay material, fake specular highlights, multiple rings, extra bracelets, blurry, low resolution, watermark, ugly text artifact, oversaturated, unrealistic perspective, dark gloomy lighting, muddy black shadows, flat sterile lighting, plastic toy look, washed out colors, harsh flat light${physicsArtifacts}`;
   }
 
   // 真人模特 / 手持操作专属负向词（含防走光、防低胸深V、防尺度违规底线拦截）
   const modestyNegative = ', deep cleavage, exposed breasts, low-cut plunge neckline, cleavage, provocative, nsfw, revealing clothing, bare chest, busty, plunge top, deep plunge, see-through clothing';
 
-  return `${screenshotArtifacts}, doll face, porcelain doll, anime face, plastic mannequin face, plastic skin, airbrushed skin, smoothed skin, over-smoothed face, fake porcelain skin, plastic silicone skin, wax doll look, AI face look, uncanny valley, exaggerated anime eyes, unnatural glossy skin, 塑料蜡像感, 假人感, 过度磨皮, 假睫毛网红脸, 硅胶脸, 3d render, cheap CGI, unreal engine, blender render, fake shiny face, mask face, double faces, glamour studio lighting, heavy digital makeup, airbrushed, oily skin, shiny plastic skin, greasy skin, videogame character, cgi character, mannequin, doll-like, fake reflections, sparkles, lens flare, glowing jewelry, oversized jewelry, giant earring, huge earring, oversized ear stud, giant medallion on ear, giant coin on ear, oversized bracelet, giant thick bangle, disproportionate jewelry size, 夸张巨大耳饰, 巨大耳环, 夸张大圆盘, 比例失调, necklace on neck when wearing bracelet, fine chain necklace on bare collarbone, pendant on chest, floating necklace, necklace when only showing bracelet, extra necklace on chest, 戴手镯时脖子出现项链, 锁骨链, 项链吊坠, 戴手镯时胸前出现项链, 戴耳饰时手腕出现手链, 戴发簪时脖子出现项链, extra bracelet on wrist when wearing earring, extra chain on wrist, extra necklace when wearing earring, extra jewelry not in reference, 手腕额外手镯, 脖子额外项链, 抢镜多余首饰, out of focus jewelry, blurred product on wrist, tiny blurry jewelry, product out of depth of field, blurred wrist, 首饰脱焦虚化, 手腕模糊看不清, 商品太小看不清细节, overexposed reflection, shiny glitter, bling bling, cgi glow, studio backdrop, fake artificial lighting, yellow tint, oversaturated skin, promotional poster, marketing banner, text overlay, typography, Chinese text watermark, extra arms, three arms, floating arms, third arm, extra hands, missing arms, duplicate limbs, bad hands, mutated fingers, bad anatomy, deformed limbs, floating hand holding phone, detached arms, deformed hands, distorted fingers, extra fingers, missing fingers, deformed wrist, fused wrists, multiple bracelets, extra bracelet, multiple rings, deformed jewellery, distorted necklace, floating jewellery, mutated body parts, low quality, blurry, watermark, ugly, text artifact, dark gloomy lighting, muddy black shadows${physicsArtifacts}${modestyNegative}${socialLeak}`;
+  return `${screenshotArtifacts}, doll face, porcelain doll, anime face, plastic mannequin face, plastic skin, airbrushed skin, smoothed skin, over-smoothed face, fake porcelain skin, plastic silicone skin, wax doll look, AI face look, uncanny valley, exaggerated anime eyes, unnatural glossy skin, 塑料蜡像感, 假人感, 过度磨皮, 假睫毛网红脸, 硅胶脸, 3d render, cheap CGI, unreal engine, blender render, fake shiny face, mask face, double faces, glamour studio lighting, heavy digital makeup, airbrushed, oily skin, shiny plastic skin, greasy skin, videogame character, cgi character, mannequin, doll-like, fake reflections, sparkles, lens flare, glowing jewelry, oversized jewelry, giant earring, huge earring, oversized ear stud, giant medallion on ear, giant coin on ear, oversized bracelet, giant thick bangle, disproportionate jewelry size, 夸张巨大耳饰, 巨大耳环, 夸张大圆盘, 比例失调, necklace on neck when wearing bracelet, fine chain necklace on bare collarbone, pendant on chest, floating necklace, necklace when only showing bracelet, extra necklace on chest, 戴手镯时脖子出现项链, 锁骨链, 项链吊坠, 戴手镯时胸前出现项链, 戴耳饰时手腕出现手链, 戴发簪时脖子出现项链, extra bracelet on wrist when wearing earring, extra chain on wrist, extra necklace when wearing earring, extra jewelry not in reference, 手腕额外手镯, 脖子额外项链, 抢镜多余首饰, out of focus jewelry, blurred product on wrist, tiny blurry jewelry, product out of depth of field, blurred wrist, 首饰脱焦虚化, 手腕模糊看不清, 商品太小看不清细节, overexposed reflection, shiny glitter, bling bling, cgi glow, studio backdrop, fake artificial lighting, yellow tint, oversaturated skin, promotional poster, marketing banner, text overlay, typography, Chinese text watermark, extra arms, three arms, floating arms, third arm, extra hands, missing arms, duplicate limbs, bad hands, mutated fingers, bad anatomy, deformed limbs, floating hand holding phone, detached arms, deformed hands, distorted fingers, extra fingers, missing fingers, deformed wrist, fused wrists, multiple bracelets, extra bracelet, multiple rings, deformed jewellery, distorted necklace, floating jewellery, mutated body parts, low quality, blurry, watermark, ugly, text artifact, dark gloomy lighting, muddy black shadows${physicsArtifacts}${modestyNegative}`;
 }
 
-/**
- * 爆款复刻人物镜生图硬守卫：身份只认正脸板；构图图只供姿势机位
- */
-export function buildSocialHumanGenGuard(options?: {
-  hasFace?: boolean;
-  hasHuman?: boolean;
-  socialMode?: boolean;
-}): string {
-  if (!options?.socialMode) return '';
-  const hasHuman = options.hasHuman === true;
-  const anatomy =
-    '【解剖与物理硬约束】严格仅两臂共10指、下肢仅两条腿，禁止第三只手/多余腿/融合肢体/悬浮肢体；道具必须有真实接触与重力落点，禁止悬空、禁止添加参考图中不存在的道具。';
-  if (!hasHuman) {
-    return `【爆款静物守卫】构图场景以 @图片2 为准，商品外观只认 @图片1；画面禁止人物出镜。${anatomy}`;
-  }
-  if (options.hasFace) {
-    return (
-      `【身份硬锁定·最高优先级】成图人物必须是 @图片3 同一真人：同一双眼间距、眼型、鼻梁、唇形、下颌与肤质纹理。` +
-      `严禁抄袭、融合或脑补 @图片2 中的原模特五官；@图片2 人脸区域已破坏身份，只能读取身体姿势、手势、服装动态、相机机位与场景布局。` +
-      `头部朝向与嘴部开合程度可参考 @图片2，但眉眼鼻唇骨相 100% 只认 @图片3。` +
-      `@图片2 与 @图片3 均不可作表情源：眉眼笑意/嘟嘴/眨眼等神态只认提示词中的表情关键词。` +
-      `禁止输出模糊脸、马赛克脸、矩形遮挡脸。商品外观只认 @图片1。${anatomy}`
-    );
-  }
-  return `【爆款人物守卫】肢体动作与机位以 @图片2 为准；商品外观只认 @图片1。禁止大块模糊脸/马赛克遮挡。${anatomy}`;
-}
-
-/**
- * 爆款复刻：人物+正脸时强制刷新身份锁定句，避免历史弱提示词继续诱导抄 @图片2 原脸
- */
-export function ensureSocialPromptSlots(
-  prompt: string,
-  options?: { hasHuman?: boolean; hasFace?: boolean; socialMode?: boolean; expression?: string }
-): string {
-  if (!options?.socialMode || !prompt) return prompt;
-  let text = prompt;
-  const hasFace = Boolean(options.hasFace);
-  const hasHuman = options.hasHuman === true;
-
-  if (!hasFace) {
-    // 尚未绑定正脸（首图定脸阶段）：彻底清除 @图片3 引用，避免大模型因缺少 @图片3 报错或困惑
-    text = text
-      .replace(/@图片\s*3[^\s，。；]*/g, '清透自然的年轻东亚女性')
-      .replace(/人物五官骨相只认\s*@图片\s*3[；;]?/g, '')
-      .replace(/人物五官 ID 仅以\s*@图片\s*3[^\s，。；]*[；;]?/g, '')
-      .replace(/五官骨相来自\s*@图片\s*3[；;]?/g, '')
-      .replace(/已绑定专属真人模特正脸图\s*@图片\s*3[^\s，。；]*[；;]?/g, '');
-  }
-
-  const guard = buildSocialHumanGenGuard({
-    hasFace,
-    hasHuman,
-    socialMode: true,
-  });
-
-  if (!hasHuman) {
-    text = text
-      .replace(/【(?:爆款人物守卫|身份硬锁定)[^】]*】[^【]*?。/g, '')
-      .replace(/【爆款静物守卫】[^【]*?。/g, '');
-    if (!text.includes('【爆款静物守卫】')) {
-      text = `${text} ${guard}`;
-    }
-    return text.replace(/\s+/g, ' ').trim();
-  }
-
-  if (hasFace) {
-    text = text
-      .replace(/【爆款人物守卫】[^【]*?。/g, '')
-      .replace(/【身份硬锁定·最高优先级】[^【]*?。/g, '');
-    if (!text.includes('【身份硬锁定·最高优先级】')) {
-      text = `${text} ${guard}`;
-    }
-  } else {
-    text = text
-      .replace(/【身份硬锁定·最高优先级】[^【]*?。/g, '')
-      .replace(/【爆款人物守卫】[^【]*?。/g, '');
-    if (!text.includes('【爆款人物守卫】')) {
-      text = `${text} ${guard}`;
-    }
-  }
-
-  const expression = (options?.expression || '').trim();
-  text = text.replace(/【表情解耦】[^【]*?。/g, '').replace(/表情关键词：[^。]+。/g, '');
-  if (expression) {
-    text = `${text} 表情关键词：${expression}。`;
-  }
-
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * 爆款复刻两段式（反推→商品优化）生图守卫：只垫 @图片1 商品图，剥离 @图片2 构图垫图语义
- */
-export function buildReplicationGenGuard(options?: {
-  hasFace?: boolean;
-  hasHuman?: boolean;
-}): string {
-  const hasHuman = options?.hasHuman === true;
-  const anatomy =
-    '【解剖与物理硬约束】严格仅两臂共10指、下肢仅两条腿，禁止第三只手/多余腿/融合肢体/悬浮肢体；道具须有真实接触与重力落点。';
-  if (!hasHuman) {
-    return `【复刻静物守卫】商品外观只认 @图片1；画面禁止人物出镜；禁止鼠标光标与截屏边框。${anatomy}`;
-  }
-  if (options?.hasFace) {
-    return (
-      `【身份硬锁定·最高优先级】成图人物必须是 @图片3 同一真人：同一双眼间距、眼型、鼻梁、唇形、下颌与肤质。` +
-      `表情只认提示词中的表情关键词，禁止证件照死板表情。` +
-      `禁止模糊脸/马赛克脸。商品外观只认 @图片1。${anatomy}`
-    );
-  }
-  return `【复刻人物守卫】商品外观只认 @图片1；人物按提示词人设与表情关键词生成；禁止大块模糊脸/马赛克。${anatomy}`;
-}
-
-/**
- * 爆款复刻两段式：强制 @图片1，剥离 @图片2 / 旧双垫图守卫
- */
 /**
  * 软化易触发 GPT Image 内容审核的项链/锁骨/胸前微距措辞（复刻与四宫格共用）。
  * 保留商品展示意图，改为端庄领口颈间半身近景。
  */
-export function softenReplicationSafetyWording(prompt: string): string {
+export function softenPromptSafetyWording(prompt: string): string {
   if (!prompt) return prompt;
   let text = prompt;
 
@@ -306,60 +186,6 @@ export function softenReplicationSafetyWording(prompt: string): string {
     .replace(/胸口/g, '身前')
     .replace(/胸部以上/g, '中近景半身')
     .replace(/大面积露胸|深V领|低胸|深沟|cleavage|抹胸|吊带衫|吊带裙/gi, '端庄圆领');
-
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-export function ensureReplicationPromptSlots(
-  prompt: string,
-  options?: { hasHuman?: boolean; hasFace?: boolean; expression?: string }
-): string {
-  if (!prompt) return prompt;
-  let text = prompt;
-  const hasFace = Boolean(options?.hasFace);
-  const hasHuman = options?.hasHuman === true;
-
-  // 剥离旧双垫图表述与守卫
-  text = text
-    .replace(/【爆款静物守卫】[^【]*?。/g, '')
-    .replace(/【爆款人物守卫】[^【]*?。/g, '')
-    .replace(/构图场景以\s*@图片\s*2\s*为准[，,]?/g, '')
-    .replace(/构图机位与肢体姿势以\s*@图片\s*2\s*为准[^。]*。?/g, '')
-    .replace(/肢体动作与机位以\s*@图片\s*2\s*为准[；;]?/g, '')
-    .replace(/以\s*@图片\s*2\s*为(?:本镜)?(?:参考图[^，。]*)?(?:的)?(?:空间)?构图[^，。]*[，。]?/g, '')
-    .replace(/忽略\s*@图片\s*2\s*中[^，。]*[，。]?/g, '')
-    .replace(/@图片\s*2/g, '画面构图与光影描述');
-
-  if (!hasFace) {
-    text = text
-      .replace(/@图片\s*3[^\s，。；]*/g, '清透自然的年轻东亚女性')
-      .replace(/人物五官骨相只认\s*@图片\s*3[；;]?/g, '')
-      .replace(/人物五官 ID 仅以\s*@图片\s*3[^\s，。；]*[；;]?/g, '')
-      .replace(/五官骨相来自\s*@图片\s*3[；;]?/g, '')
-      .replace(/已绑定专属真人模特正脸图\s*@图片\s*3[^\s，。；]*[；;]?/g, '');
-  }
-
-  if (!/@图片\s*1/.test(text)) {
-    text = `${text} 主体商品外观以 @图片1 为准。`;
-  } else if (!text.includes('商品外观以 @图片1') && !text.includes('商品外观只认 @图片1')) {
-    text = `${text} 商品外观以 @图片1 为准，禁止用文字描写商品几何细节。`;
-  }
-
-  const guard = buildReplicationGenGuard({ hasFace, hasHuman });
-  // 刷新守卫前清掉旧守卫 + 解剖句，避免 image.ts / formatModelPayload 二次调用留下孤儿解剖约束
-  text = text
-    .replace(/【复刻静物守卫】[^【]*?。/g, '')
-    .replace(/【复刻人物守卫】[^【]*?。/g, '')
-    .replace(/【身份硬锁定·最高优先级】[^【]*?。/g, '')
-    .replace(/【解剖与物理硬约束】[^【]*?。/g, '');
-
-  text = `${text} ${guard}`;
-
-  const expression = (options?.expression || '').trim();
-  text = text.replace(/【表情解耦】[^【]*?。/g, '').replace(/表情关键词：[^。]+。/g, '');
-  if (expression && hasHuman) {
-    text = `${text} 表情关键词：${expression}。`;
-  }
 
   return text.replace(/\s+/g, ' ').trim();
 }
@@ -533,7 +359,7 @@ export function harmonizeOriginalPrompt(
   }
 
   // 7. 清洗连贯标点与全链路安全词软化
-  text = softenReplicationSafetyWording(text);
+  text = softenPromptSafetyWording(text);
   text = text
     .replace(/[；;]{2,}/g, '；')
     .replace(/[，,]{2,}/g, '，')
@@ -562,26 +388,16 @@ export function finalizeImagePrompt(
     hasSceneAnchor?: boolean;
     productRole?: OriginalProductRole;
     productFingerprint?: string;
-    replicationTextOnly?: boolean;
-    socialMode?: boolean;
-    expression?: string;
   }
 ): string {
-  const text = softenReplicationSafetyWording(prompt);
+  const text = prompt;
   // 🌟 核心保护：Hub/普通创作区 (hub/plain) 纯文本自由创作，严禁注入电商工坊商品实物槽位或修改提示词
   if (
     options?.workshopMode === 'hub' ||
     options?.workshopMode === 'plain' ||
-    (!options?.socialMode && options?.workshopMode !== 'storyboard_generate')
+    options?.workshopMode !== 'storyboard_generate'
   ) {
     return text;
-  }
-  if (options?.socialMode) {
-    return ensureSocialPromptSlots(text, {
-      hasFace: options.hasFace,
-      hasHuman: options.hasHuman,
-      expression: options.expression,
-    });
   }
   if (options?.workshopMode === 'storyboard_generate') {
     return ensureOriginalPromptSlots(text, {

@@ -103,11 +103,7 @@ async function submit(req: Request) {
       );
     }
 
-    const slotResolution = await resolveImageSlotsAndPrompt(body, {
-      finalSize,
-      effectiveAspect,
-      effectiveQuality,
-    });
+    const slotResolution = await resolveImageSlotsAndPrompt(body);
 
     convertMs = slotResolution.convertMs;
     imageCount = slotResolution.imageCount;
@@ -135,12 +131,10 @@ async function submit(req: Request) {
       productImage: slotResolution.targetProductUrl || undefined,
       faceImage: slotResolution.faceForSlots,
       sceneImage: slotResolution.cleanSceneAnchorUrl || undefined,
-      compositionImage: slotResolution.safeSocialRef,
       images: slotResolution.multiImages,
       preferEdits:
         Boolean(useReferenceImage && slotResolution.primaryImgUrl) ||
         slotResolution.multiImages.length > 0,
-      socialMode: slotResolution.socialMode,
       plainMode: slotResolution.isPlainMode,
     });
 

@@ -11,9 +11,7 @@ import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
 export type VisionAnalyzeDeps = {
   recipes: Array<{ id: string; name: string; category?: string; promptSnippet?: string }>;
   selectedArchId: string;
-  batchMode?: 'original' | 'replication';
   items?: BatchProductItem[];
-  hasHumanPersona: boolean;
   lockedPersonaId: string;
   lockedSceneId: string;
   lockedOutfitId: string;
@@ -43,23 +41,21 @@ export async function analyzeBatchProduct(
     actions?: any[];
   }
 ): Promise<boolean> {
-    const archObj = deps.recipes.find(r => r.id === deps.selectedArchId) || deps.recipes[0];
-    const isSocialMode = deps.batchMode === 'replication';
-    const mode = isSocialMode ? 'social_face_product_swap' : 'storyboard_generate';
+    const archObj = deps.recipes.find(r => r.id === deps.selectedArchId);
+    if (!archObj) {
+      throw new Error('未确认有效的类目拍摄架构，无法开始提示词分析');
+    }
+    const mode = 'storyboard_generate';
 
     const chosenProductImgs = item.selectedProductImages.length > 0
       ? item.selectedProductImages
       : [item.coverImage];
     const imagePayload = chosenProductImgs.map(normalizeImageUrlToStandardJpg);
 
-    const chosenRefImgs = isSocialMode
-      ? (item.selectedReferenceImages.length > 0 ? item.selectedReferenceImages : item.availableReferenceImages)
-      : [];
-
     const effectivePersona = 'asset_driven';
 
     const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
-    const targetShotCount = isSocialMode ? Math.max(1, chosenRefImgs.length) : (deps.selectedShotCount || 4);
+    const targetShotCount = deps.selectedShotCount || 4;
 
     let data: any = null;
     let apiError: string | null = null;
@@ -101,7 +97,6 @@ export async function analyzeBatchProduct(
           productProps: item.props || {},
           productIndex: Math.max(0, computedProductIdx),
           imageUrls: imagePayload,
-          referenceImageUrls: chosenRefImgs,
           modelPersona: effectivePersona,
           templateStyle,
           useAssetLibrary: deps.useAssetLibrary,
@@ -150,7 +145,7 @@ export async function analyzeBatchProduct(
     }
 
     const returnedCount = Array.isArray(data.prompts) ? data.prompts.length : 0;
-    if (!isSocialMode && returnedCount < targetShotCount) {
+    if (returnedCount < targetShotCount) {
       const analysisError = `仅返回 ${returnedCount} 个分镜，需要 ${targetShotCount} 个，请重新分析`;
       deps.setItems?.(prev => prev.map(p => (
         p.id === item.id
@@ -220,11 +215,6 @@ export async function analyzeBatchProduct(
       data,
       item,
       imagePayload,
-      isSocialMode,
-      hasHumanPersona: deps.hasHumanPersona,
-      lockedSceneId: deps.lockedSceneId,
-      availableScenes: deps.availableScenes,
-      targetShotCount,
     });
 
     deps.setItems?.(prev => prev.map(p => {

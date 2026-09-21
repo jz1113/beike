@@ -1,15 +1,15 @@
-import { gatewayFetch } from '../../../gateways/http';
 import { jsonResponse } from '../../../core/http';
 import { prisma } from '../../../repositories/db';
-import LRUCache from 'lru-cache';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { resolveCredentials } from '../../../services/gatewayCredentials';
 import { mutableGenerationStatuses, withPersistedGenerationStatus } from '../../../services/generationTerminalState';
+import { recordPollTelemetry } from '../../../services/agentTelemetry';
+import { decideDirectImagePoll, decideProbeMissPoll } from '../../../services/generate/pollStatus';
+import { createTaskEndpointCache, fetchProbeJson, rememberMatchedEndpoint } from '../../../services/generate/probeUpstream';
 
-// 任务轮询端点记忆缓存 (提升 300% 轮询响应速度，使用 LRU 限制内存增长)
-export const taskEndpointCache = new LRUCache<string, string>({ max: 500 });
+export const taskEndpointCache = createTaskEndpointCache();
 
 export async function ensurePersistableResultUrl(url: string, req: Request): Promise<string> {
   if (!url) return url;
@@ -25,7 +25,11 @@ export async function ensurePersistableResultUrl(url: string, req: Request): Pro
  * 查询异步生图任务状态 (多端点高可用智能探测)
  */
 export async function executeImagePoll(req: Request) {
-  return withPersistedGenerationStatus(req, () => pollImageOnce(req));
+  let provider: string | undefined;
+  try {
+    provider = new URL(resolveCredentials(req).baseUrl).hostname;
+  } catch { /* ignore */ }
+  return recordPollTelemetry('image-poll', req, () => withPersistedGenerationStatus(req, () => pollImageOnce(req)), provider);
 }
 
 async function pollImageOnce(req: Request) {
@@ -38,24 +42,19 @@ async function pollImageOnce(req: Request) {
 
   // 若直接为 direct_ 开头的同步已完成任务
   if (taskId.startsWith('direct_')) {
-    let directResultUrl = '';
+    let record: { resultUrl: string | null; status: string | null; failReason: string | null } | null = null;
+    let dbError = false;
     try {
-      const taskRecord = await prisma.imageTask.findFirst({
+      record = await prisma.imageTask.findFirst({
         where: { taskId },
-        select: { resultUrl: true },
+        select: { resultUrl: true, status: true, failReason: true },
       });
-      if (taskRecord?.resultUrl) {
-        directResultUrl = taskRecord.resultUrl;
-      }
-    } catch {}
-
-    return jsonResponse({
-      success: true,
-      taskId,
-      status: 'SUCCESS',
-      progress: '100%',
-      resultUrl: directResultUrl || undefined,
-    });
+    } catch (error) {
+      dbError = true;
+      console.warn('[image-poll] 查询同步任务失败:', error);
+    }
+    const decision = decideDirectImagePoll(taskId, record, dbError);
+    return jsonResponse(decision.body, decision.httpStatus);
   }
 
   const { baseUrl, apiKey } = resolveCredentials(req);
@@ -88,15 +87,10 @@ async function pollImageOnce(req: Request) {
   // 单端点安全探测函数
   const probeUrl = async (qUrl: string) => {
     try {
-      const r = await gatewayFetch(qUrl, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-        signal: AbortSignal.timeout(3500),
-      });
-
-      const d = await r.json().catch(() => null);
-      if (!d) return null;
+      const probed = await fetchProbeJson(qUrl, apiKey, 3500);
+      if (!probed) return null;
+      const r = probed.response;
+      const d = probed.data as Record<string, any>;
 
       // 提取原始状态与潜在错误原因
       const innerInfo = d.data || d;
@@ -170,9 +164,7 @@ async function pollImageOnce(req: Request) {
     if (quickResult.isFailed && quickResult.failReason) {
       detectedFailureReason = String(quickResult.failReason);
     }
-    const baseTemplate = primaryUrl.replace(taskId, '').replace(/\/$/, '');
-    taskEndpointCache.set(cacheKey, baseTemplate);
-    taskEndpointCache.set(cleanBaseUrl, baseTemplate);
+    rememberMatchedEndpoint(taskEndpointCache, cacheKey, cleanBaseUrl, primaryUrl, taskId);
   } else {
     // 并发请求所有候选端点，谁最先返回有效状态就采用谁
     const probePromises = candidateUrls.map((u) =>
@@ -189,9 +181,7 @@ async function pollImageOnce(req: Request) {
       if (winner.isFailed && winner.failReason) {
         detectedFailureReason = String(winner.failReason);
       }
-      const baseTemplate = winner.url.replace(taskId, '').replace(/\/$/, '');
-      taskEndpointCache.set(cacheKey, baseTemplate);
-      taskEndpointCache.set(cleanBaseUrl, baseTemplate);
+      rememberMatchedEndpoint(taskEndpointCache, cacheKey, cleanBaseUrl, winner.url, taskId);
     } catch {
       // 所有端点均未返回有效状态（可能仍未同步或已被清理）
     }
@@ -207,7 +197,9 @@ async function pollImageOnce(req: Request) {
           failReason: detectedFailureReason,
         },
       });
-    } catch {}
+    } catch (error) {
+      console.warn('[image-poll] 写入失败状态失败:', error);
+    }
 
     return jsonResponse({
       success: true,
@@ -220,42 +212,22 @@ async function pollImageOnce(req: Request) {
   }
 
   if (!res || !resData) {
+    let record: { status: string | null; resultUrl: string | null; failReason: string | null } | null = null;
+    let dbError = false;
     try {
-      const taskRecord = await prisma.imageTask.findFirst({
+      record = await prisma.imageTask.findFirst({
         where: { taskId },
         select: { status: true, resultUrl: true, failReason: true },
       });
-      if (taskRecord?.resultUrl) {
-        return jsonResponse({
-          success: true,
-          taskId,
-          status: 'SUCCESS',
-          progress: '100%',
-          resultUrl: taskRecord.resultUrl,
-          failReason: '',
-        });
-      }
-      if (taskRecord?.status === 'FAILURE') {
-        return jsonResponse({
-          success: true,
-          taskId,
-          status: 'FAILURE',
-          progress: '0%',
-          resultUrl: '',
-          failReason: taskRecord.failReason
-            ? formatUserError(String(taskRecord.failReason), '生图任务失败')
-            : '生图任务失败',
-        });
-      }
-    } catch {
-      /* ignore DB fallback errors */
+    } catch (error) {
+      dbError = true;
+      console.warn('[image-poll] 探测失败后回查数据库异常:', error);
     }
-    return jsonResponse({
-      success: true,
-      taskId,
-      status: 'IN_PROGRESS',
-      progress: '25%',
-    });
+    const decision = decideProbeMissPoll(taskId, record, dbError);
+    if (decision.body.failReason) {
+      decision.body.failReason = formatUserError(decision.body.failReason, '生图任务失败');
+    }
+    return jsonResponse(decision.body, decision.httpStatus);
   }
 
   const taskInfo = resData.data || resData;
@@ -354,22 +326,8 @@ async function pollImageOnce(req: Request) {
           failReason: failReason || undefined,
         },
       });
-
-      // 🌟 自动转存至永久对象存储 (生成图片 -> azhuo/generated/images/...)
-      if (status === 'SUCCESS' && resultUrl) {
-        const storageConfig = extractStorageConfigFromRequest(req);
-        const permanent = await persistMediaUrl(
-          taskId,
-          resultUrl,
-          'generated/images',
-          storageConfig
-        ).catch(() => null);
-        if (permanent) {
-          resultUrl = permanent;
-        }
-      }
-    } catch {
-      // ignore
+    } catch (error) {
+      console.warn('[image-poll] 更新任务终态失败:', error);
     }
   }
 

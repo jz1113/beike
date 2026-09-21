@@ -2,9 +2,10 @@ import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/wind
 import { isTauriDesktop, isMacOs } from '@/shared/desktop/desktopRuntime';
 
 export default function MacTitleBar() {
-  // 仅在 macOS 平台渲染（为 macOS 原生红绿灯交通灯与 Overlay 模式预留间距与拖拽区）
+  // 仅在 macOS 桌面壳渲染：浏览器已有自己的窗口栏，不应额外占用页面高度。
+  // 为 Tauri 的 macOS 原生红绿灯与 Overlay 模式预留间距和拖拽区。
   // 在 Windows 平台已有系统原生标题栏（含最小化、最大化、关闭按钮），坚决不重复渲染第二层标题栏
-  if (!isMacOs()) return null;
+  if (!isTauriDesktop() || !isMacOs()) return null;
 
   return (
     <header

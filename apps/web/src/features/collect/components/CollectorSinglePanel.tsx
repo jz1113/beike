@@ -8,6 +8,7 @@ import {
 import {
   displayMediaSrc,
   displayVideoSrc,
+  collectedVideos,
   handleImgError,
   mediaAssetCount,
   secondaryBtnClass,
@@ -74,6 +75,7 @@ export default function CollectorSinglePanel({
   showToast,
 }: CollectorSinglePanelProps) {
   const singleInputRef = useRef<HTMLInputElement>(null);
+  const collectedVideoList = collectedVideos(singleCollectedResult);
 
   const handlePasteInput = () => {
     void pasteIntoField({
@@ -85,12 +87,19 @@ export default function CollectorSinglePanel({
   };
 
   return (
-            <div className="max-w-5xl mx-auto space-y-5">
+            <div className="mx-auto max-w-[980px] space-y-5">
               {/* 输入控制卡片 */}
-              <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-4">
+              <div className="space-y-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_14px_32px_-24px_rgba(15,23,42,0.28)] sm:p-8">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <h2 className="text-base font-black tracking-tight text-slate-900">粘贴链接，自动收集整套素材</h2>
+                    <p className="mt-1 text-xs text-slate-400">识别平台后，统一提取主图、SKU、详情图与原视频。</p>
+                  </div>
+                </div>
+
                 {/* 平台选择胶囊群 */}
                 <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-                  <span className="text-slate-400 mr-1 text-xs">选择专线:</span>
+                  <span className="text-slate-500 mr-1 text-xs">来源平台:</span>
                   {[
                     { id: 'auto', name: '智能识别', color: 'text-blue-700 bg-blue-50 border-blue-200' },
                     { id: 'jd', name: '京东', color: 'text-red-700 bg-red-50 border-red-200' },
@@ -132,7 +141,7 @@ export default function CollectorSinglePanel({
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSingleCollect();
                       }}
-                      placeholder="粘贴商品详情链接（如 https://item.jd.com/... 或淘宝/1688）或小红书/抖音/快手作品链接..."
+                      placeholder="粘贴商品或社媒作品链接，系统会自动识别平台..."
                       className="w-full pl-11 pr-28 py-3.5 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all shadow-inner"
                     />
                     <div className="absolute right-2.5 flex items-center gap-1.5">
@@ -179,7 +188,12 @@ export default function CollectorSinglePanel({
                   </button>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />自动识别平台</span>
+                    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />高清素材提取</span>
+                    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />结果可入库</span>
+                  </div>
                   <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -267,12 +281,12 @@ export default function CollectorSinglePanel({
                           )}
                           <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">
                             素材总数: <strong className="text-slate-900 font-mono">{mediaAssetCount(singleCollectedResult)}</strong>
-                            {singleCollectedResult.video ? '（含视频）' : ' 张'}
+                            {collectedVideoList.length > 0 ? `（含 ${collectedVideoList.length} 条视频/动态）` : ' 张'}
                           </span>
-                          {singleCollectedResult.video && (
+                          {collectedVideoList.length > 0 && (
                             <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold font-mono flex items-center gap-1">
                               <Film className="w-3 h-3" />
-                              <span>高清原视频</span>
+                              <span>{collectedVideoList.length > 1 ? `${collectedVideoList.length} 条视频/动态` : '高清原视频'}</span>
                             </span>
                           )}
                         </div>
@@ -280,7 +294,7 @@ export default function CollectorSinglePanel({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {singleCollectedResult.video && (
+                      {collectedVideoList.length > 0 && (
                         <button
                           type="button"
                           onClick={() => handleDownloadSingleVideo(singleCollectedResult)}
@@ -336,14 +350,14 @@ export default function CollectorSinglePanel({
                       >
                         全部 ({mediaAssetCount(singleCollectedResult)})
                       </button>
-                      {singleCollectedResult.video && (
+                      {collectedVideoList.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setSingleImageFilter('video')}
                           className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${singleImageFilter === 'video' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                          原视频
+                          视频 / 动态 ({collectedVideoList.length})
                         </button>
                       )}
                       {singleCollectedResult.mainImages?.length > 0 && (
@@ -400,8 +414,9 @@ export default function CollectorSinglePanel({
 
                   {/* 缩略图矩阵 + 视频预览格 */}
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 max-h-96 overflow-y-auto pr-1">
-                    {singleCollectedResult.video && (singleImageFilter === 'all' || singleImageFilter === 'video') && (
+                    {collectedVideoList.length > 0 && (singleImageFilter === 'all' || singleImageFilter === 'video') && collectedVideoList.map((videoUrl, videoIndex) => (
                       <div
+                        key={videoUrl}
                         className={`group relative aspect-square rounded-2xl overflow-hidden border bg-slate-900 col-span-2 sm:col-span-2 cursor-pointer transition-all ${selectedVideo
                             ? 'border-blue-500 ring-2 ring-blue-500/30 shadow-xs'
                             : 'border-rose-200 ring-1 ring-rose-100'
@@ -409,7 +424,7 @@ export default function CollectorSinglePanel({
                         onClick={() => setSelectedVideo(v => !v)}
                       >
                         <video
-                          src={displayVideoSrc(singleCollectedResult.video)}
+                          src={displayVideoSrc(videoUrl)}
                           poster={displayMediaSrc(singleCollectedResult.coverImage) || undefined}
                           controls
                           playsInline
@@ -420,7 +435,7 @@ export default function CollectorSinglePanel({
                         />
                         <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold flex items-center gap-1 pointer-events-none">
                           <Film className="w-3 h-3" />
-                          原视频
+                          视频/动态 {videoIndex + 1}
                         </div>
                         <div className={`absolute top-2 right-2 w-5 h-5 rounded-md flex items-center justify-center transition-all pointer-events-none ${selectedVideo ? 'bg-blue-600 text-white' : 'bg-black/40 text-white/70 backdrop-blur-xs'
                           }`}>
@@ -430,7 +445,7 @@ export default function CollectorSinglePanel({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPreviewImageUrl(singleCollectedResult.video);
+                            setPreviewImageUrl(videoUrl);
                           }}
                           className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/50 hover:bg-black/75 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                           title="全屏预览视频"
@@ -438,7 +453,7 @@ export default function CollectorSinglePanel({
                           <Maximize2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                    )}
+                    ))}
 
                     {singleImageFilter !== 'video' &&
                       (singleImageFilter === 'main'
@@ -621,7 +636,7 @@ export default function CollectorSinglePanel({
                 </div>
               ) : (
                 /* 空状态引导 */
-                <div className="p-12 rounded-3xl bg-white border border-dashed border-slate-200/90 flex flex-col items-center justify-center text-center space-y-3">
+                <div className="min-h-[220px] p-10 sm:p-12 rounded-[28px] bg-white border border-dashed border-slate-200/90 flex flex-col items-center justify-center text-center space-y-3">
                   <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
                     <ShoppingBag className="w-7 h-7" />
                   </div>

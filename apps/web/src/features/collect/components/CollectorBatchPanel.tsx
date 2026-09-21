@@ -76,17 +76,17 @@ export default function CollectorBatchPanel({
   });
 
   return (
-            <div className="max-w-5xl mx-auto space-y-5">
+            <div className="mx-auto max-w-[980px] space-y-5">
               {/* 导入与配置面板 */}
-              <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+              <div className="space-y-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_14px_32px_-24px_rgba(15,23,42,0.28)] sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 border border-slate-200/70 shadow-inner">
                     <button
                       type="button"
                       onClick={() => setBatchInputMode('text')}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${batchInputMode === 'text'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'text-slate-600 hover:bg-slate-100'
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${batchInputMode === 'text'
+                          ? 'bg-slate-950 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-white/80'
                         }`}
                     >
                       <ListPlus className="w-3.5 h-3.5" />
@@ -96,9 +96,9 @@ export default function CollectorBatchPanel({
                     <button
                       type="button"
                       onClick={() => setBatchInputMode('file')}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${batchInputMode === 'file'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'text-slate-600 hover:bg-slate-100'
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${batchInputMode === 'file'
+                          ? 'bg-slate-950 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-white/80'
                         }`}
                     >
                       <Upload className="w-3.5 h-3.5" />

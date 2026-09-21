@@ -1,5 +1,5 @@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
-import { modelRequestError } from './agentLoop/requestError';
+import { isRetryableModelRequestError, modelRequestError } from './agentLoop/requestError';
 /**
  * 智能助手 Agent Loop 核心调度器
  * 
@@ -128,6 +128,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentLoopRes
           break;
         } catch (error) {
           signal?.throwIfAborted();
+          if (!isRetryableModelRequestError(error)) throw error;
           requestError = error;
           continue;
         }

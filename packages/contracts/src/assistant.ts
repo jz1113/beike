@@ -1,5 +1,31 @@
 import { z } from 'zod';
 
+export const workspaceSnapshotSchema = z.object({
+  /** 仅用于理解当前可见工作区；不传原始媒体、完整提示词或画布坐标。 */
+  workspaceType: z.enum(['canvas', 'workshop', 'generate', 'assets', 'home', 'other']).optional(),
+  title: z.string().max(160).optional(),
+  summary: z.string().max(1_200).optional(),
+  nodeCount: z.number().int().min(0).max(10_000).optional(),
+  nodeTypes: z.record(z.string(), z.number().int().min(0).max(10_000)).optional(),
+  nodes: z.array(z.object({
+    type: z.string().max(40),
+    title: z.string().max(160).optional(),
+    role: z.string().max(40).optional(),
+    status: z.string().max(40).optional(),
+  })).max(12).optional(),
+  /** 当前用户在画布中主动选中的节点摘要；媒体本体由消息附件单独传递。 */
+  selectedNode: z.object({
+    type: z.string().max(40),
+    title: z.string().max(160).optional(),
+    role: z.string().max(40).optional(),
+    status: z.string().max(40).optional(),
+  }).optional(),
+  production: z.object({
+    aspect: z.string().max(16).optional(),
+    shotCount: z.number().int().min(0).max(1_000).optional(),
+  }).optional(),
+}).optional();
+
 export const clientContextSchema = z.object({
   currentView: z.string().optional(),
   workshopStep: z.number().optional(),
@@ -9,6 +35,7 @@ export const clientContextSchema = z.object({
   workshopMode: z.string().optional(),
   assetLibraryTab: z.string().optional(),
   assetLibraryKeyword: z.string().optional(),
+  workspaceSnapshot: workspaceSnapshotSchema,
 });
 
 export const mcpServerConfigSchema = z.object({
@@ -59,10 +86,8 @@ export const turnInterruptBodySchema = z.object({
   turnId: z.string().min(1),
 });
 
-/** @deprecated alias */
-export const chatBodySchema = turnStartBodySchema;
-
 export type TurnStartBody = z.infer<typeof turnStartBodySchema>;
 export type TurnApproveBody = z.infer<typeof turnApproveBodySchema>;
 export type ClientContext = z.infer<typeof clientContextSchema>;
+export type WorkspaceSnapshot = z.infer<typeof workspaceSnapshotSchema>;
 export type McpServerConfig = z.infer<typeof mcpServerConfigSchema>;

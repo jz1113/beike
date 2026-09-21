@@ -53,6 +53,9 @@ export interface BatchTaskItem {
   coverImage?: string;
   images?: string[];
   video?: string | null;
+  videos?: string[];
+  /** 入队序号，下载包与 Excel 清单均以此排序。 */
+  importOrder?: number;
   price?: number;
   author?: string;
   error?: string;
@@ -91,8 +94,15 @@ export const isLikelyVideoUrl = (rawUrl?: string | null) => {
     || /snssdk\.com|bytecdn\.cn|kwaicdn|kwimgs|v\.kuaishou|yximgs\.com.*video/i.test(rawUrl);
 };
 
-export const mediaAssetCount = (item: { images?: string[]; video?: string | null; videoUrl?: string | null } | null | undefined) =>
-  (item?.images?.length || 0) + (item?.video || item?.videoUrl ? 1 : 0);
+export const collectedVideos = (item: { video?: string | null; videoUrl?: string | null; videos?: string[] } | null | undefined) =>
+  Array.from(new Set([
+    ...(Array.isArray(item?.videos) ? item.videos : []),
+    item?.video,
+    item?.videoUrl,
+  ].filter((url): url is string => typeof url === 'string' && Boolean(url))));
+
+export const mediaAssetCount = (item: { images?: string[]; video?: string | null; videoUrl?: string | null; videos?: string[] } | null | undefined) =>
+  (item?.images?.length || 0) + collectedVideos(item).length;
 
 export interface CollectorAIAssistantImportOptions {
   item: any;

@@ -16,7 +16,7 @@ beike-main/
 │   ├── server-kit/    # @beike/server-kit — Node-only（Prisma、存储、爬虫等）
 │   └── prisma/        # @beike/prisma — schema + migrations
 ├── tools/             # configs / scripts
-└── docs/              # architecture/ 内部约定；vendors/官方接口 厂商与聚合文档
+└── docs/              # architecture/ 内部约定；vendors/ 厂商与聚合索引
 ```
 
 权威校验：`pnpm run check:root-layout`（[`tools/scripts/check-root-layout.mjs`](../tools/scripts/check-root-layout.mjs)）。
@@ -53,10 +53,10 @@ beike-main/
 
 ## 文档分层
 
-- [`docs/architecture/`](architecture/) — 内部架构与边界
-- [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合平台 OpenAPI spec + 厂商官网索引；`legacy/` 为历史扁平草稿
-- 其它操作说明（打包等）可保留在 `docs/` 子目录
+- [`docs/architecture/`](architecture/) — 内部架构、包边界与产品操作说明
+- [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合索引 + 厂商官网索引
 - 启动桌面：根目录 [`启动桌面.command`](../启动桌面.command)
+- 不要在 `docs/` 根目录再放散落 markdown 或其它子目录
 
 ## 明确不做
 

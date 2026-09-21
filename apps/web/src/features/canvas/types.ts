@@ -1,21 +1,3 @@
-export type CanvasAssetRole = 'product' | 'person' | 'scene' | 'reference' | 'clip' | 'audio';
-
-export interface CanvasShotDraft {
-  id: string;
-  title: string;
-  seconds: number;
-  imagePrompt: string;
-  videoPrompt: string;
-  imageNodeId?: string;
-  videoNodeId?: string;
-}
-
-export interface CanvasProductionDraft {
-  source: string;
-  aspect: '9:16' | '16:9' | '1:1';
-  shots: CanvasShotDraft[];
-}
-
 export interface CanvasNode {
   id: string;
   taskId?: string;
@@ -32,9 +14,6 @@ export interface CanvasNode {
   isFoldLeader?: boolean;
   foldedInGroupId?: string;
   foldedCount?: number;
-  assetRole?: CanvasAssetRole;
-  productionShotId?: string;
-  editDuration?: number;
   referenceNodeIds?: string[];
   missingMedia?: boolean;
   type: 'image' | 'video' | 'audio' | 'file' | 'drawing' | 'prompt' | 'note' | 'group' | 'frame';
@@ -66,7 +45,6 @@ export interface CanvasProject {
   updatedAt: number;
   createdAt: number;
   nodes: CanvasNode[];
-  productionDraft?: CanvasProductionDraft;
 }
 
 export interface CanvasSubject {

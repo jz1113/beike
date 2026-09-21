@@ -3,6 +3,7 @@ import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../core/http';
 import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { buildMultimodalUpstreamFallbackChain, DEFAULT_MULTIMODAL_MODEL_ID } from '@beike/domain/modelCatalog';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/gatewayCredentials';
 
@@ -247,14 +248,9 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
       }
     }
 
-    const modelsToTry = Array.from(new Set([
-      body.model || '',
-      'gpt-5.4-mini',
-      'gpt-5.6-luna',
-      'deepseek-v4-flash',
-      'qwen3.8-max',
-      'gemini-3.7-flash'
-    ].filter(Boolean)));
+    const modelsToTry = buildMultimodalUpstreamFallbackChain(
+      typeof body.model === 'string' && body.model.trim() ? body.model : DEFAULT_MULTIMODAL_MODEL_ID,
+    );
 
     let lastError: any = null;
     let resultJson: any = null;

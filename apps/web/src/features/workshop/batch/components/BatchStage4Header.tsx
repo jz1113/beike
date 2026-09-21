@@ -2,7 +2,6 @@ import {
   Loader2,
   FileSpreadsheet,
   Sparkles,
-  LayoutGrid,
   Columns3,
   Image as ImageIcon,
 } from 'lucide-react';
@@ -25,14 +24,15 @@ export interface BatchStage4HeaderProps {
   setSelectedQuality: (q: 'high' | 'medium' | 'low') => void;
   selectedAspect: '3:4' | '1:1' | '9:16' | '16:9';
   setSelectedAspect: (a: '3:4' | '1:1' | '9:16' | '16:9') => void;
-  viewMode: 'single' | 'grid' | 'gallery';
-  setViewMode: (m: 'single' | 'grid' | 'gallery') => void;
+  viewMode: 'single' | 'gallery';
+  setViewMode: (m: 'single' | 'gallery') => void;
   generateAllCopywriting?: () => Promise<void>;
   handleExportZip: () => Promise<void>;
   isExportingZip: boolean;
   successfulItems: BatchProductItem[];
   safeIndex: number;
   setActiveItemIndex: (fn: number | ((prev: number) => number)) => void;
+  readOnly?: boolean;
 }
 
 export function BatchStage4Header({
@@ -42,6 +42,7 @@ export function BatchStage4Header({
   generateAllCopywriting,
   handleExportZip,
   isExportingZip,
+  readOnly = false,
 }: BatchStage4HeaderProps) {
   return (
     <div className="py-1">
@@ -69,19 +70,9 @@ export function BatchStage4Header({
               <ImageIcon className="w-3.5 h-3.5" />
               <span>画廊</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                viewMode === 'grid' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>总览</span>
-            </button>
           </div>
 
-          {generateAllCopywriting && (
+          {!readOnly && generateAllCopywriting && (
             <button
               type="button"
               onClick={generateAllCopywriting}
@@ -94,7 +85,7 @@ export function BatchStage4Header({
             </button>
           )}
 
-          <button
+          {!readOnly && <button
             type="button"
             onClick={handleExportZip}
             disabled={isExportingZip || !hasExportableSuccess}
@@ -103,7 +94,7 @@ export function BatchStage4Header({
           >
             {isExportingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
             <span>导出 Excel</span>
-          </button>
+          </button>}
         </div>
       </div>
 

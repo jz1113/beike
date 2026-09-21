@@ -274,7 +274,7 @@ function providerGuess(id: string, fallback?: string): string {
   if (fallback) return fallback;
   const m = id.toLowerCase();
   if (m.includes('gpt') || m.includes('sora') || m.includes('dall') || m.includes('o1') || m.includes('o3') || m.includes('o4') || m.includes('image2')) return 'OpenAI';
-  if (m.includes('gemini') || m.includes('veo') || m.includes('imagen') || m.includes('nano-banana') || m.includes('nanobanana') || m.includes('banana') || m.includes('gemma')) return 'Google';
+  if (m.includes('gemini') || m.includes('veo') || m.includes('omni_flash') || m.includes('omni-flash') || m.includes('imagen') || m.includes('nano-banana') || m.includes('nanobanana') || m.includes('banana') || m.includes('gemma')) return 'Google';
   if (m.includes('claude')) return 'Anthropic';
   if (m.includes('seedream') || m.includes('seedance') || m.includes('seededit') || m.includes('doubao') || m.includes('jimeng') || m.includes('bytedance')) return 'Bytedance';
   if (m.includes('flux')) return 'Black Forest Labs';
@@ -389,8 +389,8 @@ export function getEnabledImageModelsFromSettings(
       const builtin = IMAGE_GEN_MODELS.find((x) => x.id === m.id);
       return {
         id: m.id,
-        name: m.name || builtin?.name || m.id,
-        shortName: m.shortName || builtin?.shortName || m.name || m.id,
+        name: builtin?.shortName || builtin?.name || m.name || m.id,
+        shortName: builtin?.shortName || m.shortName || builtin?.name || m.name || m.id,
         provider: providerGuess(m.id, builtin?.provider),
         badge: m.badge || builtin?.badge,
         description: m.desc || m.description || builtin?.description,
@@ -414,8 +414,8 @@ export function getEnabledVideoModelsFromSettings(
       const builtin = VIDEO_GEN_MODELS.find((x) => x.id === m.id);
       return {
         id: m.id,
-        name: m.name || builtin?.name || m.id,
-        shortName: m.shortName || builtin?.shortName || m.name || m.id,
+        name: builtin?.shortName || builtin?.name || m.name || m.id,
+        shortName: builtin?.shortName || m.shortName || builtin?.name || m.name || m.id,
         provider: providerGuess(m.id, builtin?.provider),
         badge: m.badge || builtin?.badge,
         description: m.desc || m.description || builtin?.description || '',
@@ -432,22 +432,29 @@ export function getEnabledMultimodalModelsFromSettings(
   models?: WorkflowCapability[]
 ): WorkflowCapability[] {
   const list = models ?? repairWorkflowModelsInStorage();
-  return list.filter((m) => isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal'));
+  return sortModelsByMultimodalPriority(
+    list.filter((m) => isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal')),
+  );
 }
 
-/** 按设置列表顺序选取 fallback（排除当前主模型，最多 max 个） */
+/** Keep Model Management's stored order; it is the declared fallback priority. */
+export function sortModelsByMultimodalPriority<T extends { id: string }>(models: readonly T[]): T[] { return [...models]; }
+
+/** 返回设置页顺序中的备用模型，主模型本身不会重复传入。 */
 export function pickOrderedMultimodalFallbacks(
   selectedId: string,
   orderedIds: string[],
-  max = 2,
+  max = Number.MAX_SAFE_INTEGER,
 ): string[] {
-  const selected = (selectedId || '').trim();
-  const picked: string[] = [];
-  for (const id of orderedIds) {
-    const trimmed = String(id || '').trim();
-    if (!trimmed || trimmed === selected || picked.includes(trimmed)) continue;
-    picked.push(trimmed);
-    if (picked.length >= max) break;
-  }
-  return picked;
+  const primary = String(selectedId || '').trim().toLowerCase();
+  const seen = new Set<string>();
+  return orderedIds
+    .map((id) => String(id || '').trim())
+    .filter((id) => {
+      const key = id.toLowerCase();
+      if (!key || key === primary || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, Math.max(0, max));
 }

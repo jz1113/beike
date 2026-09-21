@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const workspaceIdSchema = z.enum(['original', 'replication']);
+export const workspaceIdSchema = z.literal('original');
 const strings = z.array(z.string()).max(2000);
 const task = z.object({
   id: z.string(), shot_no: z.number().int(), title: z.string(), prompt: z.string(),
@@ -14,13 +14,13 @@ const product = z.object({
   mainImages: strings, skuImages: strings, detailImages: strings, props: z.record(z.string()),
   status: z.enum(['pending', 'collecting', 'success', 'failed']), selected: z.boolean(),
   allTypedImages: z.array(z.object({ url: z.string(), type: z.enum(['main', 'sku', 'detail']) })),
-  selectedProductImages: strings, availableReferenceImages: strings, selectedReferenceImages: strings,
+  selectedProductImages: strings,
   prompts: z.array(z.object({ shot_no: z.number().int(), prompt: z.string(), title: z.string().optional() }).passthrough()),
   tasks: z.array(task),
 }).passthrough();
 export const workshopSnapshotSchema = z.object({
   version: z.literal(1), mode: workspaceIdSchema,
-  currentStage: z.number().int().min(1).max(5), batchInputText: z.string().max(100000),
+  currentStage: z.number().int().min(1).max(4), batchInputText: z.string().max(100000),
   items: z.array(product).max(200),
   settings: z.object({
     selectedVisionModel: z.string(), selectedImageGenModel: z.string(), selectedArchId: z.string(),
@@ -28,7 +28,8 @@ export const workshopSnapshotSchema = z.object({
     selectedAspect: z.enum(['3:4', '1:1', '9:16', '16:9']), selectedShotCount: z.number().int().min(1).max(100),
     useAssetLibrary: z.boolean(), lockedPersonaId: z.string(), lockedSceneId: z.string(), lockedOutfitId: z.string(), lockedActionId: z.string(),
     generationStrategy: z.enum(['grid_first', 'single_shot']),
-    replicationInputMode: z.enum(['one_to_one', 'matrix']), matrixMasterRefUrl: z.string(), matrixMasterRefImages: strings,
+    // Legacy batch snapshots did not carry this preference. Keep them compatible and retain the former behavior.
+    autoGenerateCopywriting: z.boolean().default(true),
   }),
 });
 export type WorkshopSnapshot = z.infer<typeof workshopSnapshotSchema>;
@@ -39,13 +40,14 @@ export function snapshotFixture(): WorkshopSnapshot {
     version: 1, mode: 'original', currentStage: 3, batchInputText: '123456', items: [{
       id: 'one', itemId: '123456', platform: 'jd', title: '手机', price: 100, category: '手机', brand: '', coverImage: '/storage/one.png',
       mainImages: [], skuImages: [], detailImages: [], props: {}, status: 'success', selected: true,
-      allTypedImages: [], selectedProductImages: ['/storage/one.png'], availableReferenceImages: [], selectedReferenceImages: [],
+      allTypedImages: [], selectedProductImages: ['/storage/one.png'],
       prompts: [{ shot_no: 1, prompt: '原始提示词', selected: true }], tasks: [],
     }], settings: {
       selectedVisionModel: 'vision', selectedImageGenModel: 'image', selectedArchId: 'arch',
       hasHumanPersona: true, selectedQuality: 'high', selectedAspect: '3:4', selectedShotCount: 4,
       useAssetLibrary: true, lockedPersonaId: '', lockedSceneId: '', lockedOutfitId: '', lockedActionId: '',
-      generationStrategy: 'single_shot', replicationInputMode: 'one_to_one', matrixMasterRefUrl: '', matrixMasterRefImages: [],
+      generationStrategy: 'single_shot',
+      autoGenerateCopywriting: true,
     },
   };
 }

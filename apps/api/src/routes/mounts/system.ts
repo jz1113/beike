@@ -8,6 +8,7 @@ import * as modelsFetch from '../system/models/fetch';
 import * as devLog from '../system/dev-log';
 import * as memoryCleanup from '../system/memory-cleanup';
 import * as gatewayUser from '../system/gateway-user';
+import * as mediaReview from '../system/media-review';
 
 const system = new Hono();
 
@@ -22,5 +23,6 @@ system.post('/models/fetch', (c) => modelsFetch.POST(c.req.raw));
 system.post('/gateway-user', (c) => gatewayUser.POST(c.req.raw));
 system.post('/dev-log', (c) => devLog.POST(c.req.raw));
 system.post('/memory-cleanup', () => memoryCleanup.POST());
+system.get('/media-review', () => mediaReview.GET());
 
 export default system;

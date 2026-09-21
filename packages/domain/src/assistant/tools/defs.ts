@@ -332,9 +332,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = OPENAI_TOOLS.map((t) => {
   return { name, ...meta, openaiTool: t };
 });
 
-/** @deprecated use getOpenAITools() */
-export const ASSISTANT_TOOLS = TOOL_DEFINITIONS.map((d) => d.openaiTool);
-
 export function getOpenAITools(
   extraMcpTools: ToolDefinition['openaiTool'][] = [],
   allowedToolNames?: string[],

@@ -138,7 +138,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
   const xhsImport = useXhsBatchImport({ queueApi, showToast, onRefreshAssets: refreshAssets });
   const { folderInputRef, setShowDeconstructModal, processFilesOrFolders } = queueApi;
 
-  // 查看大反推提示词模态框
+  // 查看反推规格模态框
   const [showPromptSpecModal, setShowPromptSpecModal] = useState(false);
   // 二级类目表管理模态框
   const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
@@ -250,7 +250,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
       )}
 
       {/* 🌟 3. 资产卡片瀑布流区域 */}
-      <div ref={assetScrollRef} data-asset-scroll className="flex-1 min-h-0 bg-transparent overflow-y-auto pl-20 pr-5 sm:pl-24 sm:pr-7 xl:pr-8 py-6">
+      <div ref={assetScrollRef} data-asset-scroll className="flex-1 min-h-0 bg-transparent overflow-y-auto px-5 sm:px-7 xl:px-8 py-6">
         {displayedItems.length > 0 ? (
           <VirtualAssetGrid
             items={displayedItems}

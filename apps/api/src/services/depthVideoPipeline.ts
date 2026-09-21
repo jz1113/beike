@@ -77,10 +77,35 @@ async function writeInputVideo(
   }
 
   if (source.videoUrl) {
-    const res = await fetch(source.videoUrl);
+    const maxBytes = DEPTH_VIDEO_LIMITS.maxDataUrlBytes;
+    const res = await fetch(source.videoUrl, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`下载视频失败 (HTTP ${res.status})`);
-    const arrayBuffer = await res.arrayBuffer();
-    fs.writeFileSync(inputPath, Buffer.from(arrayBuffer));
+    const declared = Number(res.headers.get('content-length') || 0);
+    if (declared > maxBytes) {
+      throw new Error(`视频过大，请控制在 ${Math.round(maxBytes / 1024 / 1024)}MB 以内`);
+    }
+    if (!res.body) {
+      const arrayBuffer = await res.arrayBuffer();
+      if (arrayBuffer.byteLength > maxBytes) {
+        throw new Error(`视频过大，请控制在 ${Math.round(maxBytes / 1024 / 1024)}MB 以内`);
+      }
+      fs.writeFileSync(inputPath, Buffer.from(arrayBuffer));
+      return inputPath;
+    }
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new Error(`视频过大，请控制在 ${Math.round(maxBytes / 1024 / 1024)}MB 以内`);
+      }
+      chunks.push(value);
+    }
+    fs.writeFileSync(inputPath, Buffer.concat(chunks));
     return inputPath;
   }
 
@@ -198,28 +223,51 @@ interface DepthQueueItem {
 
 const depthJobQueue: DepthQueueItem[] = [];
 let isProcessingDepthQueue = false;
+let shuttingDownDepthQueue = false;
+let currentDepthJob: Promise<void> | null = null;
 
 async function processDepthQueue() {
   if (isProcessingDepthQueue) return;
   isProcessingDepthQueue = true;
 
   while (depthJobQueue.length > 0) {
+    if (shuttingDownDepthQueue) break;
     const item = depthJobQueue.shift();
     if (!item) break;
-    try {
-      await runDepthVideoJob(item.options);
-    } catch (err) {
+    currentDepthJob = runDepthVideoJob(item.options).catch((err) => {
       console.error(`[深度动作捕捉队列] 任务 ${item.options.taskId} 执行出错:`, err);
-    }
+    });
+    await currentDepthJob;
+    currentDepthJob = null;
   }
 
   isProcessingDepthQueue = false;
 }
 
 export function enqueueDepthVideoJob(options: DepthQueueItem['options']) {
+  if (shuttingDownDepthQueue) {
+    console.warn(`[深度动作捕捉队列] 服务正在关闭，拒绝入队 ${options.taskId}`);
+    return;
+  }
   setTaskRuntime(options.taskId, 'queued', '5%');
   depthJobQueue.push({ options });
   void processDepthQueue();
+}
+
+export async function drainDepthVideoQueue(timeoutMs: number): Promise<void> {
+  shuttingDownDepthQueue = true;
+  if (!currentDepthJob && !isProcessingDepthQueue) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      currentDepthJob ?? Promise.resolve(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export async function createDepthVideoTask(

@@ -2,8 +2,16 @@ import { jsonResponse } from '../../../core/http';
 import { prisma } from '../../../repositories/db';
 import { resolveStorageConfig, uploadRemoteMediaToStorage, isAlreadyPermanentUrl, StorageConfig } from '@beike/server-kit/storage';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { isAdminAuthorized, unauthorizedJson } from '@beike/server-kit/apiAuth';
+import { getRequestId } from '../../../core/requestId';
+import { recordAuditEvent } from '../../../services/agentTelemetry';
 
 export async function POST(req: Request) {
+  const requestId = getRequestId(req);
+  if (!isAdminAuthorized(req)) {
+    recordAuditEvent({ operation: 'storage.migrate', requestId, success: false, reason: 'unauthorized' });
+    return unauthorizedJson('需要管理员权限');
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const customConfig: StorageConfig | undefined = body?.config;
@@ -11,6 +19,7 @@ export async function POST(req: Request) {
     const cursor = typeof body?.cursor === 'string' && body.cursor ? body.cursor : undefined;
     const config = resolveStorageConfig(customConfig);
     if (!config) {
+      recordAuditEvent({ operation: 'storage.migrate', requestId, success: false, reason: 'missing-storage-config' });
       return jsonResponse({ success: false, error: '未配置有效的对象存储凭证，请先在设置中填写并开启存储配置' }, 400);
     }
 
@@ -39,13 +48,14 @@ export async function POST(req: Request) {
           await prisma.imageTask.update({ where: { id: task.id }, data: { resultUrl: permanentUrl } });
           migratedCount++;
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         failedCount++;
         errors.push(`任务 ${task.taskId || task.id} 迁移失败: ${formatUserError(err)}`);
-        console.warn(`[对象存储-批量迁移] 任务 ${task.id} 转存失败:`, err.message);
+        console.warn(`[对象存储-批量迁移] 任务 ${task.id} 转存失败:`, err instanceof Error ? err.message : err);
       }
     }
 
+    recordAuditEvent({ operation: 'storage.migrate', requestId, success: failedCount === 0 });
     return jsonResponse({
       success: true,
       message: needMigrate.length === 0 && !hasMore
@@ -59,8 +69,9 @@ export async function POST(req: Request) {
       nextCursor: hasMore ? page[page.length - 1]?.id : undefined,
       errors: errors.slice(0, 10),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[对象存储-批量迁移] 异常:', error);
+    recordAuditEvent({ operation: 'storage.migrate', requestId, success: false, reason: 'exception' });
     return jsonResponse({ success: false, error: formatUserError(error, '批量迁移执行失败') }, 500);
   }
 }

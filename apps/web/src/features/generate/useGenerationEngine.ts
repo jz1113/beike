@@ -3,6 +3,7 @@ import { useAppStore } from '@/store';
 import { useDocumentHidden } from '@/shared/hooks/useDocumentHidden';
 import { useAssetTasksQuery } from '@/shared/hooks/useAssetTasksQuery';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { isImageTaskActive } from '@beike/domain/taskStatus';
 import {
   SLOW_POLL_HINT,
 } from './engine/generationTaskTypes';
@@ -13,6 +14,7 @@ import {
   getUnsubmittedGenerationTasks,
 } from './engine/generationTaskPolling';
 import { submitSingleGenerationTask } from './engine/generationTaskSubmitter';
+import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@/shared/api/generationAbort';
 
 export {
   isDepthVideoTask,
@@ -27,6 +29,19 @@ export {
  */
 // 模块级提交单飞锁：跨组件生命周期与重渲染严格持久化，同一个任务 ID 绝不发起并发/重复提交
 const globalSubmittingTaskIds = new Set<string>();
+const engineAbortControllers = new Map<string, AbortController>();
+
+export function abortActiveGenerationEngine() {
+  for (const controller of engineAbortControllers.values()) {
+    try {
+      controller.abort();
+    } catch {
+      /* ignore */
+    }
+  }
+  engineAbortControllers.clear();
+  globalSubmittingTaskIds.clear();
+}
 
 export function useGenerationEngine() {
   const generationTasks = useAppStore((s) => s.generationTasks);
@@ -36,6 +51,7 @@ export function useGenerationEngine() {
 
   // 轮询计数：任务 ID -> 已轮询次数
   const pollCountsRef = useRef<Record<string, number>>({});
+  const pollFailureCountsRef = useRef<Record<string, number>>({});
   // 达到上限后转入慢速轮询的任务 ID
   const homeSlowPollIdsRef = useRef<Set<string>>(new Set());
   // 提交锁：防止并发触发重复网络请求 (与 globalSubmittingTaskIds 协同)
@@ -46,6 +62,8 @@ export function useGenerationEngine() {
   const prevGenerationTaskStateRef = useRef<Map<string, { status?: string; failReason?: string }>>(new Map());
   // 避免对同一个超时失败任务反复探测
   const recoveredOnceRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => () => abortActiveGenerationEngine(), []);
 
   // 后台标签页/非生成相关页面：拉长轮询间隔，减少无谓的网络与 CPU 消耗
   const isInHubView = currentView === 'generate' || currentView === 'home';
@@ -61,7 +79,7 @@ export function useGenerationEngine() {
   const unsubmittedTasksKey = useMemo(
     () =>
       generationTasks
-        .filter((t) => (t.status === 'IN_PROGRESS' || t.status === 'IDLE' || !t.status) && !t.taskId && !t.resultUrl)
+        .filter((t) => isImageTaskActive(t.status) && !t.taskId && !t.resultUrl)
         .map((t) => t.id)
         .join(','),
     [generationTasks],
@@ -72,7 +90,7 @@ export function useGenerationEngine() {
       generationTasks
         .filter(
           (t) =>
-            t.status === 'IN_PROGRESS' &&
+            isImageTaskActive(t.status) &&
             t.taskId &&
             !t.resultUrl &&
             !homeSlowPollIdsRef.current.has(t.id) &&
@@ -88,7 +106,7 @@ export function useGenerationEngine() {
       generationTasks
         .filter(
           (t) =>
-            t.status === 'IN_PROGRESS' &&
+            isImageTaskActive(t.status) &&
             t.taskId &&
             !t.resultUrl &&
             (homeSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT),
@@ -134,6 +152,7 @@ export function useGenerationEngine() {
       const prev = prevGenerationTaskStateRef.current.get(t.id);
       if (prev?.status === 'FAILURE' && t.status === 'IN_PROGRESS' && !t.failReason) {
         delete pollCountsRef.current[t.id];
+        delete pollFailureCountsRef.current[t.id];
         homeSlowPollIdsRef.current.delete(t.id);
         recoveredOnceRef.current.delete(t.id);
       }
@@ -148,6 +167,7 @@ export function useGenerationEngine() {
     const unsubmittedTasks = getUnsubmittedGenerationTasks();
     if (unsubmittedTasks.length === 0) return;
 
+    const submittedIds: string[] = [];
     let isCancelled = false;
 
     const processQueue = async () => {
@@ -159,14 +179,14 @@ export function useGenerationEngine() {
       tasksToSubmit.forEach((t) => {
         submittingTaskIdsRef.current.add(t.id);
         globalSubmittingTaskIds.add(t.id);
+        submittedIds.push(t.id);
       });
 
       await Promise.allSettled(
         tasksToSubmit.map(async (t) => {
-          if (isCancelled) return;
-
           const ctrl = new AbortController();
           activeAbortControllersRef.current.set(t.id, ctrl);
+          engineAbortControllers.set(t.id, ctrl);
           try {
             await submitSingleGenerationTask(
               t,
@@ -175,8 +195,17 @@ export function useGenerationEngine() {
               homeSlowPollIdsRef.current,
               ctrl.signal,
             );
-          } catch (err: any) {
-            console.warn(`[generationEngine] 任务 ${t.id} 失败:`, err?.message);
+          } catch (err: unknown) {
+            if (isGenerationCancelled(err, ctrl.signal)) {
+              if (isCancelled) return;
+              updateGenerationTask(t.id, {
+                status: 'FAILURE',
+                failReason: GENERATION_CANCELLED_MESSAGE,
+              });
+              return;
+            }
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`[generationEngine] 任务 ${t.id} 失败:`, message);
             updateGenerationTask(t.id, {
               status: 'FAILURE',
               failReason: formatUserError(err, '网络连接异常或模型接口错误'),
@@ -185,6 +214,7 @@ export function useGenerationEngine() {
             submittingTaskIdsRef.current.delete(t.id);
             globalSubmittingTaskIds.delete(t.id);
             activeAbortControllersRef.current.delete(t.id);
+            engineAbortControllers.delete(t.id);
           }
         }),
       );
@@ -194,53 +224,78 @@ export function useGenerationEngine() {
 
     return () => {
       isCancelled = true;
+      submittedIds.forEach((id) => {
+        const ctrl = activeAbortControllersRef.current.get(id);
+        if (ctrl && !ctrl.signal.aborted) ctrl.abort();
+      });
     };
   }, [unsubmittedTasksKey, updateGenerationTask]);
 
   // 轮询进行中 Hub 任务
   useEffect(() => {
     if (!ongoingTasksKey) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const pollRound = async () => {
+    const schedule = async () => {
+      if (stopped) return;
       const tasks = getOngoingGenerationTasks().filter((t) => !homeSlowPollIdsRef.current.has(t.id));
-      if (tasks.length === 0) return;
-      await pollTasksOnce(tasks, updateGenerationTask, pollCountsRef.current, homeSlowPollIdsRef.current, {
-        location: 'home',
-      });
+      if (tasks.length > 0) {
+        await pollTasksOnce(tasks, updateGenerationTask, pollCountsRef.current, homeSlowPollIdsRef.current, {
+          location: 'home',
+          pollFailureCounts: pollFailureCountsRef.current,
+        });
+      }
+      if (stopped) return;
+      timer = setTimeout(() => { void schedule(); }, pollIntervalFast);
     };
 
-    pollRound();
-    const interval = setInterval(pollRound, pollIntervalFast);
-    return () => clearInterval(interval);
+    void schedule();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [ongoingTasksKey, updateGenerationTask, pollIntervalFast]);
 
-  // Hub 软超时任务：5s 后台继续轮询
+  // Hub 软超时任务：上一轮结束后再慢轮询
   useEffect(() => {
     if (!homeSlowPollTasksKey) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const pollSlow = async () => {
+    const schedule = async () => {
+      if (stopped) return;
       const tasks = getOngoingGenerationTasks().filter(
         (t) => homeSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT,
       );
       tasks.forEach((t) => homeSlowPollIdsRef.current.add(t.id));
-      if (tasks.length === 0) return;
-      await pollTasksOnce(tasks, updateGenerationTask, pollCountsRef.current, homeSlowPollIdsRef.current, {
-        skipTimeout: true,
-        skipCountIncrement: true,
-        location: 'home-slow',
-      });
+      if (tasks.length > 0) {
+        await pollTasksOnce(tasks, updateGenerationTask, pollCountsRef.current, homeSlowPollIdsRef.current, {
+          skipTimeout: true,
+          skipCountIncrement: true,
+          location: 'home-slow',
+          pollFailureCounts: pollFailureCountsRef.current,
+        });
+      }
+      if (stopped) return;
+      timer = setTimeout(() => { void schedule(); }, pollIntervalSlow);
     };
 
-    pollSlow();
-    const interval = setInterval(pollSlow, pollIntervalSlow);
-    return () => clearInterval(interval);
+    void schedule();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [homeSlowPollTasksKey, updateGenerationTask, pollIntervalSlow]);
 
-  // 加速 recovery：「渲染超时」失败任务每 5s 探测
+  // 加速 recovery：「渲染超时」失败任务探测
   useEffect(() => {
     if (!homeTimeoutFailureKey) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const probe = async () => {
+    const schedule = async () => {
+      if (stopped) return;
       const timeoutTasks = useAppStore
         .getState()
         .generationTasks.filter(
@@ -250,20 +305,28 @@ export function useGenerationEngine() {
             (!t.resultUrl || t.resultUrl.trim() === '') &&
             (t.failReason || '').includes('渲染超时'),
         );
-      if (timeoutTasks.length === 0) return;
-      await probeFailedTasks(timeoutTasks, updateGenerationTask, recoveredOnceRef.current, homeSlowPollIdsRef.current);
+      if (timeoutTasks.length > 0) {
+        await probeFailedTasks(timeoutTasks, updateGenerationTask, recoveredOnceRef.current, homeSlowPollIdsRef.current);
+      }
+      if (stopped) return;
+      timer = setTimeout(() => { void schedule(); }, probeIntervalFast);
     };
 
-    probe();
-    const id = setInterval(probe, probeIntervalFast);
-    return () => clearInterval(id);
+    void schedule();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [homeTimeoutFailureKey, updateGenerationTask, probeIntervalFast]);
 
-  // 其他 Hub 失败任务每 30s 探测
+  // 其他 Hub 失败任务探测
   useEffect(() => {
     if (!homeOtherFailureKey) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const probe = async () => {
+    const schedule = async () => {
+      if (stopped) return;
       const failedTasks = useAppStore
         .getState()
         .generationTasks.filter(
@@ -273,12 +336,17 @@ export function useGenerationEngine() {
             (!t.resultUrl || t.resultUrl.trim() === '') &&
             !(t.failReason || '').includes('渲染超时'),
         );
-      if (failedTasks.length === 0) return;
-      await probeFailedTasks(failedTasks, updateGenerationTask, recoveredOnceRef.current, homeSlowPollIdsRef.current);
+      if (failedTasks.length > 0) {
+        await probeFailedTasks(failedTasks, updateGenerationTask, recoveredOnceRef.current, homeSlowPollIdsRef.current);
+      }
+      if (stopped) return;
+      timer = setTimeout(() => { void schedule(); }, probeIntervalSlow);
     };
 
-    probe();
-    const id = setInterval(probe, probeIntervalSlow);
-    return () => clearInterval(id);
+    void schedule();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [homeOtherFailureKey, updateGenerationTask, probeIntervalSlow]);
 }

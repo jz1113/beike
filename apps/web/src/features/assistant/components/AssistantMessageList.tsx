@@ -17,8 +17,6 @@ import TurnTimeline from '@/features/assistant/components/TurnTimeline';
 import AssistantTurnList from '@/features/assistant/components/AssistantTurnList';
 import AssistantOperationHistory from '@/features/assistant/components/AssistantOperationHistory';
 import type { PendingApproval, ApprovalDecision } from '@/features/assistant/utils/assistantTurnTypes';
-import '@/shared/ui/ParticleText';
-import '@/features/assistant/utils/assistantConstants';
 
 export interface AssistantMessageListProps {
   isOpen?: boolean;
@@ -476,7 +474,7 @@ export default function AssistantMessageList({
           <div className="flex items-start gap-3 animate-fade-in">
             <div className="py-2 text-xs text-zinc-500 flex items-center gap-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400 shrink-0" />
-              <span>消息已就绪，正在连接模型...</span>
+              <span>正在读取当前工作区并准备回应...</span>
             </div>
           </div>
         )}

@@ -36,8 +36,3 @@ export function composeSkillRuntime(skill: AssistantSkill | null | undefined): A
     allowedTools,
   };
 }
-
-/** @deprecated 使用 composeSkillRuntime */
-export function buildActiveSkillPrompt(skill: AssistantSkill | null | undefined): string {
-  return composeSkillRuntime(skill)?.systemPrompt ?? '';
-}

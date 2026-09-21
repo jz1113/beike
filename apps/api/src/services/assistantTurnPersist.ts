@@ -1,18 +1,16 @@
 /**
  * Assistant Turn 持久化服务
- * 
+ *
  * 将 AgentRuntime 的 item 状态同步写入 DB，支持：
  * - Turn 生命周期管理（running -> completed/interrupted/failed）
  * - Item 增量写入（每个 item 事件完成时同步）
- * - Snapshot 批量更新（debounced）
+ * - Snapshot 立即同步
  */
 
 import { prisma } from '@beike/server-kit/prisma';
 import type { AgentRuntime } from '@beike/server-kit/assistant/agentRuntime';
 import type { AssistantItem } from '@beike/domain/assistant/types';
-
-let snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-const SNAPSHOT_DEBOUNCE_MS = 100;
+import { fromAssistantTurnStatus } from '@beike/domain/taskStatus';
 
 /** 提取 AssistantItem 的可存储字段 */
 export function extractItemFields(item: AssistantItem): {
@@ -115,9 +113,10 @@ export async function updateTurnStatus(
   status: 'completed' | 'interrupted' | 'failed' | 'awaiting_approval',
   usage?: { inputTokens: number; outputTokens: number },
 ): Promise<void> {
+  const canonical = fromAssistantTurnStatus(status);
   const update: Record<string, unknown> = {
     status,
-    completedAt: status === 'awaiting_approval' ? null : new Date(),
+    completedAt: canonical === 'running' ? null : new Date(),
   };
 
   if (usage) {
@@ -212,34 +211,8 @@ export async function upsertItems(turnId: string, items: AssistantItem[]): Promi
   );
 }
 
-/** 更新 Turn 的 snapshotJson（debounced） */
-export function scheduleSnapshotUpdate(turnId: string, snapshot: unknown): void {
-  if (snapshotDebounceTimer) {
-    clearTimeout(snapshotDebounceTimer);
-  }
-
-  snapshotDebounceTimer = setTimeout(async () => {
-    try {
-      await prisma.assistantTurn.update({
-        where: { id: turnId },
-        data: {
-          snapshotJson: JSON.stringify(snapshot),
-        },
-      });
-    } catch (error) {
-      console.error('[TurnPersist] Failed to update snapshot:', error);
-    }
-    snapshotDebounceTimer = null;
-  }, SNAPSHOT_DEBOUNCE_MS);
-}
-
-/** 立即同步 snapshot（不 debounce） */
+/** 立即同步 snapshot */
 export async function syncSnapshot(turnId: string, snapshot: unknown): Promise<void> {
-  if (snapshotDebounceTimer) {
-    clearTimeout(snapshotDebounceTimer);
-    snapshotDebounceTimer = null;
-  }
-
   await prisma.assistantTurn.update({
     where: { id: turnId },
     data: {

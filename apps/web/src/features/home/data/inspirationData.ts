@@ -101,7 +101,7 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       aspectRatio: '16:9',
       model: 'doubao-seedance-2-0-260128',
       quality: '720P',
-      storyboardPresetId: 'replication-1to1',
+      storyboardPresetId: 'lifestyle-4shot',
     },
     {
       id: 'item-1',

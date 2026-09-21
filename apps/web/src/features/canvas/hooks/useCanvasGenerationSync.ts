@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { CanvasProject } from '../types';
 import type { GenerationTask } from '@/types/app-store';
+import { isImageTaskActive, isImageTaskFailed, isImageTaskSucceeded } from '@beike/domain/taskStatus';
 
 function parseGenerationProgress(progress: unknown): number | undefined {
   if (typeof progress === 'number' && Number.isFinite(progress)) return progress;
@@ -39,7 +40,7 @@ export function useCanvasGenerationSync(currentProject: CanvasProject | null | u
             imageUrl: targetNode.type === 'video' || targetNode.generationKind === 'video' ? undefined : resultUrl,
             videoUrl: (targetNode.type === 'video' || targetNode.generationKind === 'video') ? resultUrl : undefined,
           });
-        } else if (status === 'FAILURE') {
+        } else if (isImageTaskFailed(status)) {
           updateNode(currentProject.id, targetNode.id, {
             status: 'error',
             progress: 0,
@@ -70,7 +71,7 @@ export function useCanvasGenerationSync(currentProject: CanvasProject | null | u
 
       if (!matchedTask) return;
 
-      if ((matchedTask.status === 'SUCCESS' || matchedTask.resultUrl) && matchedTask.resultUrl) {
+      if ((isImageTaskSucceeded(matchedTask.status) || matchedTask.resultUrl) && matchedTask.resultUrl) {
         if ((node.videoUrl || node.imageUrl) !== matchedTask.resultUrl || node.status !== 'success') {
           updateNode(currentProject.id, node.id, {
             status: 'success',
@@ -79,14 +80,14 @@ export function useCanvasGenerationSync(currentProject: CanvasProject | null | u
             videoUrl: (node.type === 'video' || node.generationKind === 'video') ? matchedTask.resultUrl : undefined,
           });
         }
-      } else if (matchedTask.status === 'FAILURE') {
+      } else if (isImageTaskFailed(matchedTask.status)) {
         if (node.status !== 'error') {
           updateNode(currentProject.id, node.id, {
             status: 'error',
             progress: 0,
           });
         }
-      } else if (matchedTask.status === 'IN_PROGRESS' || (matchedTask.status as string) === 'PENDING') {
+      } else if (isImageTaskActive(matchedTask.status)) {
         const parsed = parseGenerationProgress(matchedTask.progress);
         if (parsed == null) return;
         const progress = parsed >= 100 ? 99 : parsed;

@@ -1,6 +1,7 @@
 import { apiFetch } from '@/shared/api/apiClient';
 import { credentialSet, credentialDelete, type CredentialKey } from '@/shared/api/credentialClient';
 import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/shared/api/gatewayClient';
+import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 
 export interface StorageConfig {
   enabled?: boolean;
@@ -40,6 +41,8 @@ class CredentialPersistError extends Error {
 
 /** 通过 HTTP 写入服务端 .env 并热更新 sidecar process.env */
 async function postDesktopEnv(payload: DesktopEnvPayload): Promise<void> {
+  // 公网 Web 多人共用一台服务器：密钥只留在当前浏览器，经请求头发给当次接口。
+  if (!isTauriDesktop() && import.meta.env.PROD) return;
   const res = await apiFetch('/api/system/desktop-env', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });

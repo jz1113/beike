@@ -1,7 +1,8 @@
 import type { InspirationItem } from '../components/inspiration/InspirationModal';
 
 /** 首屏优先加载的灵感条目数量 */
-export const INSPIRATION_EAGER_COUNT = 12;
+// Keep the first viewport warm without decoding a dozen large assets at once.
+export const INSPIRATION_EAGER_COUNT = 6;
 
 /** 将 "3:4" 转为 CSS aspect-ratio 值 */
 export function inspirationAspectRatio(item: Pick<InspirationItem, 'aspectRatio'>): string {

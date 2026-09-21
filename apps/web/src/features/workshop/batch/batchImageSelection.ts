@@ -36,21 +36,3 @@ export function batchSetProductImages(
     return { ...p, selectedProductImages: next, coverImage: next[0] || p.coverImage };
   });
 }
-
-/**
- * 切换单个商品的参考对标图片选中状态（选中/取消选中）
- */
-export function toggleReferenceImageSelection(
-  items: BatchProductItem[],
-  itemId: string,
-  imgUrl: string
-): BatchProductItem[] {
-  return items.map(p => {
-    if (p.id !== itemId) return p;
-    const current = p.selectedReferenceImages || [];
-    const next = current.includes(imgUrl)
-      ? current.filter(u => u !== imgUrl)
-      : [...current, imgUrl];
-    return { ...p, selectedReferenceImages: next };
-  });
-}

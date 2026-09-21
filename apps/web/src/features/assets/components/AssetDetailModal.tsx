@@ -59,9 +59,19 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
       if (Array.isArray(arr)) sourceImagesList = arr;
     } catch {}
   }
+  let sourceImageIndices: number[] = [];
+  if (typeof detailItem.sourceImageIndices === 'string') {
+    try {
+      const arr = JSON.parse(detailItem.sourceImageIndices);
+      if (Array.isArray(arr)) sourceImageIndices = arr.filter((n): n is number => typeof n === 'number');
+    } catch {}
+  }
+  const visibleSourceImages = activeSubTab === 'full_prompt' && sourceImageIndices.length > 0
+    ? sourceImageIndices.map((index) => sourceImagesList[index - 1]).filter(Boolean)
+    : sourceImagesList;
   const currentCover = (detailItem.coverUrl || detailItem.avatarUrl) as string | undefined;
-  const hasVisualContent = currentCover || sourceImagesList.length > 0;
-  const activeSrc = sourceImagesList[detailActiveImageIndex] || currentCover || sourceImagesList[0];
+  const hasVisualContent = currentCover || visibleSourceImages.length > 0;
+  const activeSrc = visibleSourceImages[detailActiveImageIndex] || currentCover || visibleSourceImages[0];
   const sourceIdx = typeof detailItem.sourceImageIndex === 'number' ? detailItem.sourceImageIndex : null;
 
   return (
@@ -72,7 +82,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-slate-900 font-bold text-sm">
               {activeSubTab === 'full_prompt'
-                ? '完整反推提示词母本详情'
+                ? '内容图组母本详情'
                 : activeSubTab === 'scene'
                 ? '场景空间资产详情'
                 : activeSubTab === 'action'
@@ -134,6 +144,11 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   所属图集: {String(detailItem.albumName)}
                 </span>
               )}
+              {activeSubTab === 'full_prompt' && detailItem.groupIndex && (
+                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-semibold rounded-md border border-indigo-200">
+                  图组 {String(detailItem.groupIndex)} · {sourceImageIndices.length || 1} 张
+                </span>
+              )}
               {activeSubTab === 'action' ? (
                 (() => {
                   const badges = resolveActionCardDisplayBadges(detailItem as any);
@@ -193,7 +208,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       原图 #{sourceIdx}
                     </span>
                   )}
-                  {sourceImagesList.length > 1 && (
+                  {visibleSourceImages.length > 1 && (
                     <span className="text-slate-400 text-[11px] font-normal hidden sm:inline">
                       (所属图集共 {sourceImagesList.length} 张)
                     </span>
@@ -238,7 +253,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                         图集切换核对 (点击切换左侧原图)：
                       </span>
                       <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full">
-                        {sourceImagesList.map((imgUrl, i) => {
+                        {visibleSourceImages.map((imgUrl, i) => {
                           const isCurrent =
                             i === detailActiveImageIndex ||
                             (sourceIdx === i + 1 && detailActiveImageIndex === 0);
@@ -252,11 +267,11 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                                   ? 'border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs scale-105'
                                   : 'border-transparent opacity-65 hover:opacity-100 hover:border-slate-300'
                               }`}
-                              title={`切换至图 #${i + 1}`}
+                              title={`切换至图 #${sourceImageIndices[i] || i + 1}`}
                             >
                               <img
                                 src={imgUrl}
-                                alt={`图 #${i + 1}`}
+                                alt={`图 #${sourceImageIndices[i] || i + 1}`}
                                 className="w-full h-full object-cover"
                               />
                               <span
@@ -264,7 +279,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                                   isCurrent ? 'bg-indigo-600 text-white' : 'bg-black/60 text-white'
                                 }`}
                               >
-                                #{i + 1}
+                                #{sourceImageIndices[i] || i + 1}
                               </span>
                             </button>
                           );
@@ -276,7 +291,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   <div className="p-2 bg-white rounded-xl border border-slate-200/80 text-slate-500 leading-relaxed text-[11px]">
                     <p>
                       {activeSubTab === 'full_prompt'
-                        ? '视觉模型深度解析生成的完整生图母本，可直接用于一键生图或拆解重组。'
+                        ? '这是整组内容的母本：场景、镜头节奏与动作逻辑固定；人物、穿搭、场景只允许按整组替换。'
                         : '已剔除具体服装与杂乱背景，提纯为通用物理母本，可直接作为原子资产装配入工坊流水线。'}
                     </p>
                   </div>
@@ -292,7 +307,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                 {/* 完整中文生图提示词 */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-indigo-900 block text-xs">完整中文生图提示词：</span>
+                    <span className="font-bold text-indigo-900 block text-xs">图组生成母本：</span>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-slate-400">
                         {detailLoading
@@ -336,6 +351,15 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     )}
                   </div>
                 </div>
+
+                {(detailItem.contentSummary || detailItem.architectureSummary || detailItem.replaceableSlots) && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200/70">
+                    <span className="font-bold text-slate-800 block text-xs">图组规则：</span>
+                    {detailItem.contentSummary && <div className="p-2.5 bg-white border border-slate-200/80 rounded-xl"><b>整条内容：</b>{String(detailItem.contentSummary)}</div>}
+                    {detailItem.architectureSummary && <div className="p-2.5 bg-violet-50/60 border border-violet-200/80 rounded-xl whitespace-pre-wrap"><b>固定架构（不替换）：</b>{String(detailItem.architectureSummary)}</div>}
+                    {detailItem.replaceableSlots && <div className="p-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl"><b>可替换：</b>人物、穿搭、场景仅按整组替换；单图动作、机位、构图和场景连续性固定。</div>}
+                  </div>
+                )}
 
                 {/* 九维视觉分析 */}
                 {(() => {

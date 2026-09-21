@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Trash2, Check, RotateCw, Loader2, AlertCircle, ImageIcon, Film, Layers, Music } from 'lucide-react';
 import { formatDisplayModel, formatDisplayModelCompact, normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
+import { isImageTaskActive, isImageTaskFailed } from '@beike/domain/taskStatus';
 import { proxyMediaUrl } from '@/shared/api/apiClient';
 import '@/shared/media/downloadMedia';
 import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
@@ -11,6 +12,7 @@ import LazyVideoCover from '@/shared/media/LazyVideoCover';
 import type { AssetTaskBatch } from '../utils/assetBatch';
 
 interface Props {
+  isPreparing?: boolean;
   mediaCategory: 'image' | 'video' | 'audio' | 'canvas';
   mergedTasks: any[];
   visibleToday: AssetTaskBatch[];
@@ -39,6 +41,7 @@ interface Props {
 
 export default function AssetGenerationHistory(props: Props) {
   const {
+    isPreparing = false,
     mediaCategory,
     mergedTasks,
     visibleToday,
@@ -64,12 +67,24 @@ export default function AssetGenerationHistory(props: Props) {
 
   const premiumGeneratingTaskId = useMemo(() => {
     const running = mergedTasks.find(
-      (t) => (t.status === 'IN_PROGRESS' || t.status === 'PENDING' || !t.resultUrl)
-        && t.status !== 'SUCCESS'
-        && t.status !== 'FAILURE',
+      (t) => isImageTaskActive(t.status) && !t.resultUrl,
     );
     return running?.id ?? null;
   }, [mergedTasks]);
+
+  // 资产中心刚切入时先交出一帧可交互的骨架，下一帧再执行任务归并与缩略图挂载。
+  if (isPreparing) {
+    return (
+      <div aria-busy="true" aria-label="正在载入资产" className="space-y-5 animate-fade-in">
+        <div className="h-6 w-20 rounded-lg bg-slate-200/70" />
+        <div className={`${autoFillGrid} pt-1`}>
+          {[0, 1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className="aspect-square rounded-2xl bg-slate-100/85 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   function renderBatchCard(batch: AssetTaskBatch) {
     const isCanvas = batch.batchId.startsWith('canvas-') || mediaCategory === 'canvas';
@@ -80,8 +95,8 @@ export default function AssetGenerationHistory(props: Props) {
     }
 
     const validTasks = batch.tasks.filter(t => t.resultUrl && (t.status === 'SUCCESS' || !t.status));
-    const runningTasks = batch.tasks.filter(t => (t.status === 'IN_PROGRESS' || t.status === 'PENDING') && !t.resultUrl);
-    const failedTasks = batch.tasks.filter(t => t.status === 'FAILURE' && !t.resultUrl);
+    const runningTasks = batch.tasks.filter(t => isImageTaskActive(t.status) && !t.resultUrl);
+    const failedTasks = batch.tasks.filter(t => isImageTaskFailed(t.status) && !t.resultUrl);
 
     const primaryTask = validTasks[0] || batch.tasks[0];
     const isAllSelected = batch.tasks.every(t => selectedTaskIds.includes(t.id));
@@ -201,8 +216,9 @@ export default function AssetGenerationHistory(props: Props) {
       <div
         key={batch.batchId}
         onMouseEnter={() => {
-          // 🌟 悬浮预热预加载 3D 轮播所需的 320px 缩略图，进入浏览器高速缓存，点击即秒开
-          validTasks.forEach((t) => {
+          // 文件夹界面只展示前三张预览图；预热同样只取这三张。
+          // 过去会在鼠标恰好停留在首卡时预取整个批次，数十张图片会阻塞资产页切换。
+          validTasks.slice(0, 3).forEach((t) => {
             if (t.resultUrl) {
               const img = new Image();
               img.src = proxyMediaUrl(normalizeImageUrlToStandardJpg(t.resultUrl), { thumb: true, width: 320 });
@@ -263,8 +279,8 @@ export default function AssetGenerationHistory(props: Props) {
   function renderTaskCard(task: any) {
     const isSelected = selectedTaskIds.includes(task.id);
     const isSuccess = Boolean(task.resultUrl);
-    const isRunning = (task.status === 'IN_PROGRESS' || task.status === 'PENDING') && !task.resultUrl;
-    const isFailed = task.status === 'FAILURE' && !task.resultUrl;
+    const isRunning = isImageTaskActive(task.status) && !task.resultUrl;
+    const isFailed = isImageTaskFailed(task.status) && !task.resultUrl;
     void isFailed;
 
     const isVidTask = task.mediaType === 'video' || task.mediaType === 'depth-video' || task.resultUrl?.includes('.mp4');

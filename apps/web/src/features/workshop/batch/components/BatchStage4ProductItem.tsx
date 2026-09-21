@@ -26,6 +26,7 @@ export interface BatchStage4ProductItemProps {
   handleDownloadSingleTaskImage?: (url: string, filename?: string) => Promise<void>;
   setPreviewImageUrl: (url: string | null) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
+  readOnly?: boolean;
 }
 
 export function BatchStage4ProductItem({
@@ -40,6 +41,7 @@ export function BatchStage4ProductItem({
   handleDownloadSingleTaskImage,
   setPreviewImageUrl,
   onPreviewGallery,
+  readOnly = false,
 }: BatchStage4ProductItemProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -217,7 +219,7 @@ export function BatchStage4ProductItem({
               </button>
             )}
 
-            {retryFailedImageTasks && tasks.some(t => t.status === 'FAILURE') && (
+            {!readOnly && retryFailedImageTasks && tasks.some(t => t.status === 'FAILURE') && (
               <button
                 type="button"
                 onClick={() => void retryFailedImageTasks()}
@@ -253,7 +255,7 @@ export function BatchStage4ProductItem({
                         } else {
                           setPreviewImageUrl(task.resultUrl);
                         }
-                      } else if (isGenFailure && retrySingleShotTask) {
+                      } else if (!readOnly && isGenFailure && retrySingleShotTask) {
                         retrySingleShotTask(item.id, shotIdx);
                       }
                     }}
@@ -313,7 +315,7 @@ export function BatchStage4ProductItem({
                       <div className="p-4 text-center space-y-2">
                         <XCircle className="w-8 h-8 text-rose-500 mx-auto" />
                         <div className="text-xs font-bold text-rose-700">生成失败</div>
-                        <button
+                        {!readOnly && <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -322,7 +324,7 @@ export function BatchStage4ProductItem({
                           className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm"
                         >
                           重试
-                        </button>
+                        </button>}
                       </div>
                     ) : (
                       <div className="p-4 text-center space-y-2">
@@ -363,6 +365,7 @@ export function BatchStage4ProductItem({
         updateItemCopywriting={updateItemCopywriting}
         handleExportSingleProductZip={handleExportSingleProductZip}
         onCopyAll={handleCopyAllCopywriting}
+        readOnly={readOnly}
       />
     </div>
   );

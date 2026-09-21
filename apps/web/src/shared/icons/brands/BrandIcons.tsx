@@ -104,13 +104,12 @@ export function ComflyLogo({ className = "w-5 h-5" }: { className?: string }) {
  */
 export function CollectorHubIcon({ className = "w-10 h-10" }: { className?: string }) {
   return (
-    <div className={`relative ${className} flex-shrink-0 group-hover:scale-105 transition-transform flex items-center justify-center`}>
-      {/* 左上：万邦电商 OneBound 图标 */}
-      <div className="absolute top-0 left-0 w-6 h-6 rounded-lg overflow-hidden bg-white shadow-xs border border-slate-200/80 p-0.5 z-10 flex items-center justify-center">
+    <div className={`flex ${className} flex-shrink-0 items-center justify-center gap-[9%] rounded-[28%] transition-transform group-hover:scale-105`}>
+      {/* 两个来源图标并列呈现，避免在紧凑标题栏里相互遮挡。 */}
+      <div className="flex h-[68%] w-[42%] items-center justify-center overflow-hidden rounded-[28%] border border-slate-200/80 bg-white p-px shadow-xs">
         <OneBoundLogo className="w-full h-full" />
       </div>
-      {/* 右下：外站社媒 APIA 采集图标 */}
-      <div className="absolute bottom-0 right-0 w-6 h-6 rounded-lg overflow-hidden bg-white shadow-xs border border-slate-200/80 p-0.5 z-20 ring-2 ring-white flex items-center justify-center">
+      <div className="flex h-[68%] w-[42%] items-center justify-center overflow-hidden rounded-[28%] border border-slate-200/80 bg-white p-px shadow-xs">
         <ApiaLogo className="w-full h-full" />
       </div>
     </div>
@@ -286,24 +285,6 @@ export function StudioEmptyLens({ className = "w-10 h-10" }: { className?: strin
       <line x1="2" y1="12" x2="6" y2="12" />
       <line x1="18" y1="12" x2="22" y2="12" />
     </svg>
-  );
-}
-
-/**
- * 爆款复刻 3D 质感立体图标
- */
-export function ReplicationIcon({ className = "w-10 h-10" }: { className?: string }) {
-  return (
-    <div className={`relative ${className} rounded-xl bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 p-0.5 flex-shrink-0 shadow-md shadow-orange-500/20 group-hover:scale-105 transition-all overflow-hidden flex items-center justify-center`}>
-      <div className="w-full h-full rounded-[10px] bg-slate-950/20 backdrop-blur-xs flex items-center justify-center relative">
-        <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-white drop-shadow-sm">
-          <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.6" />
-          <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.6" />
-          <path d="M12 2V5M12 19V22M2 12H5M19 12H22" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M5.5 5.5L7.5 7.5M16.5 16.5L18.5 18.5M18.5 5.5L16.5 7.5M7.5 16.5L5.5 18.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-      </div>
-    </div>
   );
 }
 

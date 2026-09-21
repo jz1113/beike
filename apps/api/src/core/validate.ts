@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import { turnStartBodySchema } from '@beike/contracts/assistant';
 
 export { turnStartBodySchema, turnApproveBodySchema, turnInterruptBodySchema } from '@beike/contracts/assistant';
-
-/** @deprecated use turnStartBodySchema */
-export const chatBodySchema = turnStartBodySchema;
 
 /**
  * 安全提取错误消息。
@@ -118,14 +114,19 @@ export interface ExportZipBody {
   downloadConcurrency?: number;
   products?: Array<{
     skuId?: string;
+    /** 导出时使用的顺序命名（1、2、3…）。 */
+    currentName?: string;
     productTitle?: string;
     title?: string;
     description?: string;
+    sourceUrl?: string;
+    coverImage?: string;
     copywritingTitle?: string;
     copywritingContent?: string;
     copywritingTags?: string[];
     video?: string | null;
     videoUrl?: string | null;
+    videos?: string[];
     images: (string | ExportImageItem)[];
   }>;
   skuId?: string;
@@ -199,9 +200,12 @@ export function parseExportZipBody(body: unknown):
             }
             return {
               skuId: safeOptionalString(p.skuId, 128) || `PROD_${idx + 1}`,
+              currentName: safeOptionalString(p.currentName, 128),
               productTitle: safeOptionalString(p.productTitle, 500),
               title: safeOptionalString(p.title, 500) || `商品_${idx + 1}`,
               description: safeOptionalString(p.description, 50000),
+              sourceUrl: safeOptionalString(p.sourceUrl, 4096),
+              coverImage: safeOptionalString(p.coverImage, 4096),
               copywritingTitle: safeOptionalString(p.copywritingTitle, 500),
               copywritingContent: safeOptionalString(p.copywritingContent, 50000),
               copywritingTags: Array.isArray(p.copywritingTags)
@@ -209,6 +213,9 @@ export function parseExportZipBody(body: unknown):
                 : undefined,
               video: p.video === null ? null : safeOptionalString(p.video, 4096),
               videoUrl: p.videoUrl === null ? null : safeOptionalString(p.videoUrl, 4096),
+              videos: Array.isArray(p.videos)
+                ? p.videos.map((url: unknown) => safeString(url, 4096)).filter(Boolean).slice(0, 50)
+                : undefined,
               images: parseImages(p.images, 200) || [],
             };
           });

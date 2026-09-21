@@ -11,9 +11,13 @@ function cleanMedia(extracted: any) {
     ? extracted.images.filter((img: string) => typeof img === 'string' && !/\.(mp4|mov|m4v|webm|avi|flv)(\?|#|$)/i.test(img))
     : [];
   const video = typeof extracted.video === 'string' && extracted.video.trim() ? extracted.video.trim() : null;
-  if ('livePhotos' in extracted) delete extracted.livePhotos;
+  const videos = Array.from(new Set([
+    ...(Array.isArray(extracted.videos) ? extracted.videos : []),
+    video,
+  ].filter((url): url is string => typeof url === 'string' && Boolean(url.trim()))));
   extracted.images = images;
-  extracted.video = video;
+  extracted.videos = videos;
+  extracted.video = videos[0] || null;
   if (!extracted.cover && images[0]) extracted.cover = images[0];
   return extracted;
 }
@@ -84,6 +88,7 @@ export async function POST(req: Request) {
         cover: extracted.cover,
         images: extracted.images,
         video: extracted.video,
+        videos: extracted.videos,
         apiUsed: result.apiUsed,
         attempts,
         data: extracted,

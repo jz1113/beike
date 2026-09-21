@@ -31,7 +31,12 @@ export function getDroppedItemCount(): number {
 function enqueue(task: PersistTask): void {
   if (queue.length >= QUEUE_MAX) {
     droppedCount += 1;
-    queue.shift();
+    const dropped = queue.shift();
+    console.warn('[ItemPersistQueue] queue full, dropped oldest event', {
+      droppedCount,
+      droppedTurnId: dropped?.turnId,
+      droppedItemId: dropped?.item.id,
+    });
   }
   queue.push(task);
 }

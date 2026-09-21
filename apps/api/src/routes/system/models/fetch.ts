@@ -1,5 +1,6 @@
 import { gatewayFetch } from '../../../gateways/http';
 import { jsonResponse } from '../../../core/http';
+import { getDefaultApiKey, getDefaultBaseUrl } from '../../../services/gatewayCredentials';
 import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
 import {
   approvedModelDisplayName,
@@ -38,13 +39,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const { baseUrl, isPing, strict } = body;
-    const rawUrl = (baseUrl || req.headers.get('x-custom-base-url') || process.env.AI_DRAWING_BASE_URL || process.env.AI_BASE_URL || 'https://ai.comfly.org');
+    const rawUrl = (baseUrl || req.headers.get('x-custom-base-url') || getDefaultBaseUrl());
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
     const independentKey = Object.prototype.hasOwnProperty.call(body, 'apiKey');
     const targetKey = (
       independentKey
         ? body.apiKey
-        : (req.headers.get('x-custom-api-key') || process.env.AI_DRAWING_API_KEY || process.env.AI_API_KEY || '')
+        : (req.headers.get('x-custom-api-key') || getDefaultApiKey())
     ).toString().trim();
 
     if (independentKey && !targetKey) {

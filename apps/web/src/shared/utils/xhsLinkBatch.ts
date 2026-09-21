@@ -15,6 +15,7 @@ export interface ParseLinkMedia {
   description?: string;
   cover?: string;
   video?: string | null;
+  videos?: string[];
   images?: string[];
 }
 

@@ -1,14 +1,12 @@
-import React, { useMemo } from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, Plus } from 'lucide-react';
 import { BatchProductItem, MasterRecipe } from '../batchTypes';
 import { BatchStage1OverviewCard } from './BatchStage1OverviewCard';
 import { BatchStage1InputCard } from './BatchStage1InputCard';
 import { BatchStage1ItemCard } from './BatchStage1ItemCard';
-import { useSafeTimeout } from '@/shared/hooks/useSafeTimeout';
 
 
 interface Props {
-  batchMode: 'original' | 'replication';
   batchInputText: string;
   setBatchInputText: (val: string) => void;
   items: BatchProductItem[];
@@ -16,8 +14,8 @@ interface Props {
   isCollecting: boolean;
   collectProgress: { total: number; current: number; success: number; failed: number };
   successfulItems: BatchProductItem[];
-  handleParseInput: () => void;
-  startBatchCollect: () => Promise<void>;
+  handleParseInput: () => BatchProductItem[];
+  startBatchCollect: (itemsToCollect?: BatchProductItem[]) => Promise<void>;
   handleRemoveItem: (id: string) => void;
   onPreviewImage?: (url: string) => void;
   onNextStage: () => void;
@@ -34,7 +32,6 @@ interface Props {
 }
 
 export default function BatchStage1Collect({
-  batchMode,
   batchInputText,
   setBatchInputText,
   items,
@@ -55,14 +52,15 @@ export default function BatchStage1Collect({
   hasHumanPersona = false,
   onOpenSettings = () => { },
 }: Props) {
-  const { setSafeTimeout } = useSafeTimeout();
+  const [isAddingProducts, setIsAddingProducts] = useState(false);
+
   // 一键快捷采编：若输入框有文本但尚未点击解析，点击主按钮自动完成解析并立刻启动采编
   const handleSmartBatchCollect = async () => {
-    if (items.length === 0 && batchInputText.trim()) {
-      handleParseInput();
-      setSafeTimeout(() => {
-        void startBatchCollect();
-      }, 100);
+    if (batchInputText.trim()) {
+      const newItems = handleParseInput();
+      if (newItems.length === 0) return;
+      setIsAddingProducts(false);
+      await startBatchCollect(newItems);
       return;
     }
     await startBatchCollect();
@@ -101,6 +99,34 @@ export default function BatchStage1Collect({
         ? 'flex-1 justify-between gap-6 py-2 min-h-[calc(100vh-160px)]' 
         : 'min-h-[calc(100vh-140px)] justify-between space-y-6 pb-8'
     }`}>
+      {items.length > 0 && !isAddingProducts && (
+        <div className="fixed right-4 top-2 z-50 flex items-center gap-2 sm:right-8 xl:right-12">
+          <button
+            type="button"
+            onClick={() => {
+              setBatchInputText('');
+              setIsAddingProducts(true);
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-100 hover:shadow-md active:scale-98"
+          >
+            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+            添加新 SKU
+          </button>
+          {successfulItems.length > 0 && (
+            <button
+              type="button"
+              onClick={onNextStage}
+              title={`下一步：人工批量选图与提示词架构（${successfulItems.length} 款已就绪商品）`}
+              aria-label={`下一步：人工批量选图与提示词架构（${successfulItems.length} 款已就绪商品）`}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-black text-white shadow-md transition-all hover:bg-black hover:shadow-xl active:scale-98"
+            >
+              <span>下一步</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className={items.length === 0 ? "w-full my-auto py-2" : "space-y-5 w-full flex-1"}>
         {/* 🌟 顶部全宽智能采编工作舱：仅在初始未采集状态展示，采集后隐藏 */}
         {items.length === 0 && (
@@ -116,13 +142,27 @@ export default function BatchStage1Collect({
           </div>
         )}
 
+      {items.length > 0 && isAddingProducts && (
+        <div className="flex items-center justify-between gap-4 border-b border-slate-200/60 px-1 pb-3">
+          <div>
+            <h3 className="text-base font-black tracking-tight text-slate-900">添加新商品</h3>
+            <p className="mt-1 text-xs text-slate-500">当前采编清单已暂时收起，输入新的商品链接或 SKU 后会合并回清单。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsAddingProducts(false)}
+            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50"
+          >
+            返回清单
+          </button>
+        </div>
+      )}
+
       {/* 🌟 采编清单与图库状态 (采集后成为大画幅核心主角) */}
-      {items.length > 0 && (
+      {items.length > 0 && !isAddingProducts && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="px-1 pb-1 border-b border-slate-200/60">
-            <h3 className="text-base font-black text-slate-900 tracking-tight">
-              采编清单与图库状态
-            </h3>
+          <div className="flex items-center border-b border-slate-200/60 px-1 pb-2">
+            <h3 className="text-base font-black tracking-tight text-slate-900">采编清单与图库状态</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 sm:gap-4">
@@ -136,54 +176,38 @@ export default function BatchStage1Collect({
             ))}
           </div>
 
-          {successfulItems.length > 0 && (
-            <div className="flex justify-end pt-4 pb-2">
-              <button
-                type="button"
-                onClick={onNextStage}
-                className="px-8 py-3.5 rounded-2xl text-sm font-black bg-[#0F172A] hover:bg-black text-white shadow-md hover:shadow-xl flex items-center gap-2.5 cursor-pointer active:scale-98 transition-all"
-              >
-                <span>
-                  {batchMode === 'original' 
-                    ? `下一步：人工批量选图与提示词架构 (${successfulItems.length} 款已就绪商品)`
-                    : `下一步：批量采集对标链接 (${successfulItems.length} 款已就绪商品)`}
-                </span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
       )}
       </div>
 
-      {/* 🌟 智能输入舱 (常驻屏幕最底部，居中收缩避让 a 助手，提供高质感沉浸式采编体验) */}
-      <div 
-        data-testid="stage1-input-dock"
-        className={`w-full max-w-[calc(100%-5rem)] sm:max-w-[calc(100%-6.5rem)] md:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto sticky bottom-2 z-20 px-2 sm:px-4 ${
-          items.length === 0 ? "mt-auto" : "pt-4"
-        }`}
-      >
-        <BatchStage1InputCard
-          batchInputText={batchInputText}
-          setBatchInputText={setBatchInputText}
-          parsedLineCount={parsedLineCount}
-          handlePasteClipboard={handlePasteClipboard}
-          sampleDataA={sampleDataA}
-          isCollecting={isCollecting}
-          hasInputs={hasInputs}
-          collectProgress={collectProgress}
-          itemsCount={items.length}
-          handleParseInput={handleParseInput}
-          handleSmartBatchCollect={handleSmartBatchCollect}
-          recipeName={currentRecipe?.name}
-          selectedAspect={selectedAspect}
-          selectedQuality={selectedQuality}
-          selectedShotCount={selectedShotCount}
-          selectedImageGenModel={selectedImageGenModel}
-          hasHumanPersona={hasHumanPersona}
-          onOpenSettings={onOpenSettings}
-        />
-      </div>
+      {/* 商品清单出现后，输入已完成，收起底部输入舱以让商品状态成为唯一焦点。 */}
+      {(items.length === 0 || isAddingProducts) && (
+        <div
+          data-testid="stage1-input-dock"
+          className="w-full max-w-[calc(100%-5rem)] sm:max-w-[calc(100%-6.5rem)] md:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto sticky bottom-2 z-20 px-2 sm:px-4 mt-auto"
+        >
+          <BatchStage1InputCard
+            batchInputText={batchInputText}
+            setBatchInputText={setBatchInputText}
+            parsedLineCount={parsedLineCount}
+            handlePasteClipboard={handlePasteClipboard}
+            sampleDataA={sampleDataA}
+            isCollecting={isCollecting}
+            hasInputs={hasInputs}
+            collectProgress={collectProgress}
+            itemsCount={items.length}
+            handleParseInput={handleParseInput}
+            handleSmartBatchCollect={handleSmartBatchCollect}
+            recipeName={currentRecipe?.name}
+            selectedAspect={selectedAspect}
+            selectedQuality={selectedQuality}
+            selectedShotCount={selectedShotCount}
+            selectedImageGenModel={selectedImageGenModel}
+            hasHumanPersona={hasHumanPersona}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
+      )}
     </div>
   );
 }

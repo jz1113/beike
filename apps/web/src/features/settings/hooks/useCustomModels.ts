@@ -6,6 +6,12 @@ import {
   type WorkflowModel,
 } from '../settingsShared';
 import type { GatewayModelItem } from '../GatewayModelModal';
+import {
+  gatewayModelToWorkflowModel,
+  inferWorkflowCapabilitiesFromId,
+  sortModelsByMultimodalPriority,
+} from '@beike/domain/workflowModels';
+import { loadCustomModels, persistCustomModels } from '../customModelsStorage';
 
 interface UseCustomModelsOptions {
   isOpen: boolean;
@@ -38,26 +44,14 @@ export function useCustomModels({
     }
   };
 
-  // 初始化加载模型
+  // 初始化加载模型：损坏数据备份后保留内存中的旧值，绝不覆盖写成 []
   useEffect(() => {
     if (typeof window !== 'undefined' && isOpen) {
-      const savedCustom = localStorage.getItem('custom_models');
-      if (savedCustom !== null) {
-        try {
-          const parsed = JSON.parse(savedCustom);
-          if (Array.isArray(parsed)) {
-            setCustomModels(parsed as WorkflowModel[]);
-          } else {
-            setCustomModels([]);
-            localStorage.setItem('custom_models', JSON.stringify([]));
-          }
-        } catch {
-          setCustomModels([]);
-          localStorage.setItem('custom_models', JSON.stringify([]));
-        }
-      } else {
-        setCustomModels([]);
-        localStorage.setItem('custom_models', JSON.stringify([]));
+      const loaded = loadCustomModels(customModels);
+      setCustomModels(loaded.models);
+      if (!loaded.invalid) persistCustomModels(loaded.models);
+      if (loaded.invalid) {
+        showToast(loaded.recoveredFromBackup ? '自定义模型配置已损坏，已从备份恢复' : '自定义模型配置已损坏，已保留当前列表并备份原数据');
       }
     }
   }, [isOpen]);
@@ -99,8 +93,9 @@ export function useCustomModels({
         }
         return m;
       });
-      localStorage.setItem('custom_models', JSON.stringify(updated));
-      return updated;
+      const sorted = sortModelsByMultimodalPriority(updated);
+      persistCustomModels(sorted);
+      return sorted;
     });
     notifyModelsUpdated();
   };
@@ -109,8 +104,9 @@ export function useCustomModels({
   const handleDeleteModel = (modelId: string) => {
     setCustomModels((prev) => {
       const updated = prev.filter((m) => m.id !== modelId);
-      localStorage.setItem('custom_models', JSON.stringify(updated));
-      return updated;
+      const sorted = sortModelsByMultimodalPriority(updated);
+      persistCustomModels(sorted);
+      return sorted;
     });
     notifyModelsUpdated();
     showToast(`已移出模型 ${modelId}`);
@@ -137,8 +133,9 @@ export function useCustomModels({
         updated[idx] = updated[idx + 1];
         updated[idx + 1] = temp;
       }
-      localStorage.setItem('custom_models', JSON.stringify(updated));
-      return updated;
+      const sorted = sortModelsByMultimodalPriority(updated);
+      persistCustomModels(sorted);
+      return sorted;
     });
     notifyModelsUpdated();
     showToast(`已调整模型 ${modelId} 的优先级顺序`);
@@ -146,8 +143,9 @@ export function useCustomModels({
 
   // 拖拽全量重排序
   const handleReorderModels = (newOrder: WorkflowModel[]) => {
-    setCustomModels(newOrder);
-    localStorage.setItem('custom_models', JSON.stringify(newOrder));
+    const sorted = sortModelsByMultimodalPriority(newOrder);
+    setCustomModels(sorted);
+    persistCustomModels(sorted);
     notifyModelsUpdated();
     showToast('已更新模型列表优先级排序');
   };
@@ -155,8 +153,9 @@ export function useCustomModels({
   // 恢复系统默认预设模型列表
   const handleResetDefaultModels = async () => {
     if (await confirmAction('确定恢复系统默认预设模型列表吗？这将覆盖当前的模型修改。')) {
-      setCustomModels(DEFAULT_PRESET_MODELS);
-      localStorage.setItem('custom_models', JSON.stringify(DEFAULT_PRESET_MODELS));
+      const sorted = sortModelsByMultimodalPriority(DEFAULT_PRESET_MODELS);
+      setCustomModels(sorted);
+      persistCustomModels(sorted);
       notifyModelsUpdated();
       showToast('已恢复系统默认预设模型');
     }
@@ -166,8 +165,9 @@ export function useCustomModels({
   const handleAddCustomModel = (modelObj: WorkflowModel) => {
     setCustomModels((prev) => {
       const updated = [modelObj, ...prev.filter((m) => m.id !== modelObj.id)];
-      localStorage.setItem('custom_models', JSON.stringify(updated));
-      return updated;
+      const sorted = sortModelsByMultimodalPriority(updated);
+      persistCustomModels(sorted);
+      return sorted;
     });
     notifyModelsUpdated();
     showToast(`✨ 成功添加模型【${modelObj.name}】`);
@@ -175,10 +175,21 @@ export function useCustomModels({
 
   // 获取网关模型列表
   const handleOpenGatewayDiscovery = async (forceRefresh = false) => {
-    setIsGatewayModalOpen(true);
     if (!forceRefresh && allGatewayModels.length > 0) {
+      setIsGatewayModalOpen(true);
       return;
     }
+
+    // Web 部署不会、也不应把用户的第三方网关密钥放到服务器环境变量中。
+    // 只有当前浏览器已输入的密钥会随本次请求发送，因此先给出明确操作指引，
+    // 避免打开一个永远空白的“模型库”弹窗。
+    if (!apiKey.trim()) {
+      setAllGatewayModels([]);
+      showToast('请先填写并保存网关 API Key，再获取模型库');
+      return;
+    }
+
+    setIsGatewayModalOpen(true);
 
     setIsFetchingGateway(true);
     try {
@@ -191,15 +202,61 @@ export function useCustomModels({
         }),
       });
 
-      const data = await res.json();
-      if (data.models && Array.isArray(data.models) && data.models.length > 0) {
-        setAllGatewayModels(data.models);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !Array.isArray(data.models)) {
+        setAllGatewayModels([]);
+        showToast(`获取网关模型失败 (${data.gatewayStatus || res.status}): ${data.error || '网关未返回有效模型列表'}`);
+        return;
       }
+
+      if (data.models.length === 0) {
+        setAllGatewayModels([]);
+        showToast(`网关未返回可用模型${data.warning ? `：${data.warning}` : ''}`);
+        return;
+      }
+
+      setAllGatewayModels(data.models);
     } catch (err: any) {
+      setAllGatewayModels([]);
+      showToast(`获取网关模型失败：${err?.message || '网络连接异常'}`);
       console.warn('获取网关模型列表提示:', err);
     } finally {
       setIsFetchingGateway(false);
     }
+  };
+
+  const handleToggleGatewayModel = (model: GatewayModelItem) => {
+    setCustomModels((prev) => {
+      const exists = prev.some((m) => m.id === model.id);
+      const updated = exists
+        ? prev.filter((m) => m.id !== model.id)
+        : [...prev, gatewayModelToWorkflowModel(model) as WorkflowModel];
+      const sorted = sortModelsByMultimodalPriority(updated);
+      persistCustomModels(sorted);
+      return sorted;
+    });
+    notifyModelsUpdated();
+  };
+
+  const handleAddAllUsefulGatewayModels = (models: GatewayModelItem[]) => {
+    const useful = models.filter((m) => {
+      const caps = inferWorkflowCapabilitiesFromId(m.id);
+      return caps.isImage || caps.isVideo || caps.isMultimodal;
+    });
+    setCustomModels((prev) => {
+      const existingMap = new Map(prev.map((m) => [m.id, m]));
+      useful.forEach((m) => {
+        if (!existingMap.has(m.id)) {
+          existingMap.set(m.id, gatewayModelToWorkflowModel(m) as WorkflowModel);
+        }
+      });
+      const updated = Array.from(existingMap.values());
+      const sorted = sortModelsByMultimodalPriority(updated);
+      persistCustomModels(sorted);
+      return sorted;
+    });
+    notifyModelsUpdated();
+    return useful.length;
   };
 
   return {
@@ -220,6 +277,8 @@ export function useCustomModels({
     isFetchingGateway,
     allGatewayModels,
     handleOpenGatewayDiscovery,
+    handleToggleGatewayModel,
+    handleAddAllUsefulGatewayModels,
     notifyModelsUpdated,
   };
 }

@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
   ZoomIn,
   Tag,
+  Layers,
 } from 'lucide-react';
 import { getAssetCardSummary, isValidDisplayTag } from '../utils/assetPromptConstants';
 import { type AssetSubTab } from '../utils/assetPromptConstants';
@@ -29,6 +30,8 @@ interface PromptAssetCardProps {
     avatarUrl?: string | null;
     sourceImages?: string | null;
     sourceImageIndex?: number | null;
+    sourceImageIndices?: string | null;
+    groupIndex?: number | null;
     provenance?: string | null;
     tags?: string | null;
   };
@@ -109,6 +112,12 @@ export default function PromptAssetCard({
   // 提取来源原图 URL 与位置索引
   const imageUrl = (item.coverUrl || item.avatarUrl) as string | undefined;
   const sourceIndex = typeof item.sourceImageIndex === 'number' ? item.sourceImageIndex : null;
+  const sourceIndices = useMemo(() => {
+    try {
+      const parsed = JSON.parse(String(item.sourceImageIndices || '[]'));
+      return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number') : [];
+    } catch { return []; }
+  }, [item.sourceImageIndices]);
 
   // 提取精炼合规短标签（严格限制最多 1~2 个短标签，绝不允许长句或色系霸屏）
   const displayBadges = useMemo(() => {
@@ -162,7 +171,15 @@ export default function PromptAssetCard({
           </span>
 
           {/* 📷 来源原图定位徽标 */}
-          {sourceIndex !== null ? (
+          {sourceIndices.length > 0 ? (
+            <span
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0 flex items-center gap-0.5"
+              title={`内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
+            >
+              <Layers className="w-2.5 h-2.5" />
+              <span>图组 {sourceIndices.map((index) => `#${index}`).join('·')}</span>
+            </span>
+          ) : sourceIndex !== null ? (
             <span
               className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shrink-0 flex items-center gap-0.5"
               title={`此提示词资产提取自原图集的第 ${sourceIndex} 张图片`}

@@ -8,13 +8,14 @@ export interface CanvasPromptDockProps {
   disabled?: boolean;
   subjects?: CanvasSubject[];
   mentionTrigger?: { name: string; url: string; timestamp: number; type?: 'image' | 'video'; attachOnly?: boolean } | null;
+  'data-testid'?: string;
 }
 
 /**
  * 🌟 画板底部输入控制舱 (完全复用与对齐主页功能框设计，杜绝私自魔改功能)
  * 具备画布常态胶囊条折叠与点击聚焦自适应展开能力，严格与主页功能框保持一致
  */
-export const CanvasPromptDock: React.FC<CanvasPromptDockProps> = ({ onSubmit, subjects = [], mentionTrigger }) => {
+export const CanvasPromptDock: React.FC<CanvasPromptDockProps> = ({ onSubmit, subjects = [], mentionTrigger, 'data-testid': testId }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +63,7 @@ export const CanvasPromptDock: React.FC<CanvasPromptDockProps> = ({ onSubmit, su
   return (
     <div
       ref={dockRef}
+      data-testid={testId}
       className={`w-full mx-auto pointer-events-auto min-w-0 transition-all duration-300 ease-out select-none ${
         isExpanded ? 'max-w-3xl xl:max-w-4xl' : 'max-w-[560px] 2xl:max-w-[620px]'
       }`}

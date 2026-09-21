@@ -1,9 +1,17 @@
 import type { GenerationTask } from '@/types/app-store';
 import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID } from '@beike/domain/depthVideo';
+import { toUiGenerationStatus } from '@beike/domain/taskStatus';
+
+function resolveUiStatus(rawStatus: unknown, resultUrl: string | undefined): GenerationTask['status'] {
+  if (typeof rawStatus === 'string' && rawStatus.trim()) {
+    return toUiGenerationStatus(rawStatus);
+  }
+  return resultUrl ? 'SUCCESS' : 'IDLE';
+}
 
 export function mapDbTaskToGenerationTask(t: Record<string, unknown>): GenerationTask {
   const mediaType = t.mediaType as string | undefined;
-  const resultUrl = t.resultUrl as string | undefined;
+  const resultUrl = typeof t.resultUrl === 'string' && t.resultUrl ? t.resultUrl : undefined;
   const model = (t.model as string) || '';
 
   const depthMediaType =
@@ -13,14 +21,15 @@ export function mapDbTaskToGenerationTask(t: Record<string, unknown>): Generatio
         ? 'depth-video'
         : null;
 
+  const status = resolveUiStatus(t.status, resultUrl);
+  const createdAtRaw = t.createdAt;
+  const createdAt =
+    typeof createdAtRaw === 'number'
+      ? createdAtRaw
+      : new Date(createdAtRaw as string | Date).getTime();
+  const prompt = (t.prompt as string) || '';
+
   if (depthMediaType) {
-    const status = (t.status as GenerationTask['status']) || 'SUCCESS';
-    const createdAtRaw = t.createdAt;
-    const createdAt =
-      typeof createdAtRaw === 'number'
-        ? createdAtRaw
-        : new Date(createdAtRaw as string | Date).getTime();
-    const prompt = (t.prompt as string) || '';
     return {
       id: t.id as string,
       taskId: depthMediaType === 'depth-video'
@@ -46,15 +55,6 @@ export function mapDbTaskToGenerationTask(t: Record<string, unknown>): Generatio
     mediaType === 'video' ||
     Boolean(resultUrl?.includes('.mp4')) ||
     /seedance|veo|kling|sora|minimax|h3|wan|vidu|omni_flash/i.test(model);
-
-  const status = (t.status as GenerationTask['status']) || 'SUCCESS';
-  const createdAtRaw = t.createdAt;
-  const createdAt =
-    typeof createdAtRaw === 'number'
-      ? createdAtRaw
-      : new Date(createdAtRaw as string | Date).getTime();
-
-  const prompt = (t.prompt as string) || '';
 
   return {
     id: t.id as string,

@@ -9,21 +9,12 @@ import {
 
 import { inspectVisionPayload } from './analyzeVisionResponse';
 import { getDefaultBaseUrl, getDefaultApiKey } from './gatewayCredentials';
-import { isApprovedModel } from '@beike/domain/modelCatalog';
+import { buildMultimodalUpstreamFallbackChain, isApprovedModel } from '@beike/domain/modelCatalog';
+import { isRetryableUpstreamError, isRetryableUpstreamStatus } from '@beike/domain/upstreamErrors';
 export { getDefaultBaseUrl, getDefaultApiKey };
 
 const ANALYZE_IMAGE_MAX_DIMENSION = 640;
 const ANALYZE_IMAGE_QUALITY = 70;
-const MAX_VISION_FALLBACKS = 2;
-
-export function isGptFamily(modelId: string) {
-  const id = modelId.toLowerCase();
-  return id.includes('gpt-') || id.startsWith('gpt') || id.includes('o1') || id.includes('o3') || id.includes('o4');
-}
-
-export function isGeminiFamily(modelId: string) {
-  return modelId.toLowerCase().includes('gemini');
-}
 
 export async function prepareAnalyzeImages(imageUrls: string[], maxImages = 3): Promise<string[]> {
   // 仅截取最具代表性的前 2~3 张核心商品图（主图+细节特写），彻底杜绝 10+ 张高清图导致输入 Token 暴涨至 12,000+ 引发上游并发限流与 450s 严重排队
@@ -108,7 +99,7 @@ export function padMissingSocialShots(prompts: any[], cap: number) {
       expression: '无（静物）',
       has_human: false,
       shot_type: 'pure_product',
-      prompt: `【爆款复刻实拍】：主体为 @图片1 所示商品实物，按参考图 ${no} 反推所得的场景结构、景深、置景与光影生成真实生活实拍，对商品做物理重光照与接触阴影，无鼠标光标、截屏边框或广告文字。`,
+      prompt: `真实生活实拍：主体为 @图片1 所示商品实物，按照商品特征生成场景结构、景深、置景与光影，并呈现真实的重光照与接触阴影，无鼠标光标、截屏边框或广告文字。`,
       selected: true,
     };
   });
@@ -167,7 +158,7 @@ export async function callVisionModel(
   contentArray: any[],
   baseUrl?: string,
   apiKey?: string,
-  fallbackModels: string[] = [],
+  _fallbackModels: string[] = [],
   shotCount: number = 4,
   independent = false,
 ): Promise<{ 
@@ -179,22 +170,10 @@ export async function callVisionModel(
   const effectiveBaseUrl = (baseUrl && baseUrl.trim()) ? baseUrl.trim() : getDefaultBaseUrl();
   const effectiveApiKey = (apiKey && apiKey.trim()) ? apiKey.trim() : getDefaultApiKey();
   const normalized = independent ? requestedModel : normalizeVisionModelId(requestedModel);
-  const userFallbacks = independent ? [] : (Array.isArray(fallbackModels) ? fallbackModels : [])
-    .map((id) => String(id || '').trim())
-    .filter(Boolean)
-    .map((id) => normalizeVisionModelId(id))
-    .filter((id) => id && id !== normalized && id !== requestedModel)
-    .slice(0, MAX_VISION_FALLBACKS);
-
-  const modelsToTry = Array.from(
-    new Set([normalized, independent ? '' : requestedModel, ...userFallbacks].filter(Boolean))
-  )
-    .filter((id) => isApprovedModel(id, 'multimodal'))
-    .slice(0, 1 + MAX_VISION_FALLBACKS);
+  const modelsToTry = (independent ? [normalized] : buildMultimodalUpstreamFallbackChain(normalized))
+    .filter((id) => isApprovedModel(id, 'multimodal'));
   const triedModels: string[] = [];
   let lastError: any = null;
-  let skipGptFamily = false;
-  let skipGeminiFamily = false;
 
   if (modelsToTry.length === 0) {
     throw new Error('未指定可用的视觉模型');
@@ -202,8 +181,6 @@ export async function callVisionModel(
 
   for (let index = 0; index < modelsToTry.length; index++) {
     const model = modelsToTry[index];
-    if (skipGptFamily && isGptFamily(model)) continue;
-    if (skipGeminiFamily && isGeminiFamily(model)) continue;
 
     triedModels.push(model);
     const isPrimary = index === 0;
@@ -230,17 +207,18 @@ export async function callVisionModel(
 
         if (!response.ok) {
           const errText = await response.text();
-          console.warn(`[Vision API] 模型 [${model}] 返回 HTTP ${response.status}: ${errText.slice(0, 150)}，准备尝试下一用户模型...`);
-          lastError = new Error(`视觉模型 [${model}] 调用失败 (HTTP ${response.status}): ${errText}`);
-          if ([429, 502, 503, 520].includes(response.status) && isGptFamily(model)) skipGptFamily = true;
-          if (response.status === 400 && /PROHIBITED_CONTENT/i.test(errText) && isGeminiFamily(model)) skipGeminiFamily = true;
+          const error = new Error(`视觉模型 [${model}] 调用失败 (HTTP ${response.status})`) as Error & { status?: number };
+          error.status = response.status;
+          lastError = error;
+          if (!isRetryableUpstreamStatus(response.status)) throw error;
+          console.warn(`[Vision API] 模型 [${model}] 返回 HTTP ${response.status}，准备按统一顺序尝试下一模型...`);
           continue;
         }
 
         const data = await response.json();
         const { rawText } = inspectVisionPayload(data);
-        if (model !== normalized && model !== requestedModel) {
-          console.log(`[Vision API] 主模型不可用，已切换至用户列表内模型: ${model}`);
+        if (model !== normalized) {
+          console.log(`[Vision API] 主模型不可用，已按统一优先级切换至: ${model}`);
         }
         let promptTokens = Number(data.usage?.prompt_tokens || data.usage?.promptTokens || 0);
         let completionTokens = Number(data.usage?.completion_tokens || data.usage?.completionTokens || 0);
@@ -263,12 +241,11 @@ export async function callVisionModel(
     } catch (e: any) {
       if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message || ''))) {
         const timeoutSec = Math.round(timeoutMs / 1000);
-        console.warn(`[Vision API] 模型 [${model}] 响应超时（${timeoutSec}s），不再切换备用模型以免重复扣费`);
-        throw new Error(
-          `视觉模型响应超时（已等待约 ${timeoutSec} 秒），请稍后重试或换用 Flash 极速模型。上游可能仍会计费，请勿立刻重复提交`,
-        );
+        lastError = new Error(`视觉模型 [${model}] 响应超时（已等待约 ${timeoutSec} 秒）`);
+        console.warn(`[Vision API] 模型 [${model}] 响应超时（${timeoutSec}s），准备按统一顺序尝试下一模型...`);
+        continue;
       }
-      if (/网关|分析结果|token 额度|模型拒绝/.test(String(e?.message || ''))) throw e;
+      if (!isRetryableUpstreamError(e)) throw e;
       console.warn(`[Vision API] 模型 [${model}] 请求异常: ${e.message}，准备尝试下一个...`);
       lastError = e;
     }
@@ -418,4 +395,3 @@ export function parseResponseJson(text: string): {
     prompts: fallbackPrompts
   };
 }
-

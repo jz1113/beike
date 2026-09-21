@@ -27,7 +27,6 @@ interface AssetOption {
 }
 
 export interface BatchConfigContextValue {
-  batchMode: 'original' | 'replication';
   currentStage: number;
   successfulItems: BatchProductItem[];
   setItems: Dispatch<SetStateAction<BatchProductItem[]>>;
@@ -68,21 +67,10 @@ export interface BatchConfigContextValue {
   isAnalyzingAll: boolean;
   analyzeProgress: { current: number; total: number };
   startBatchAnalyze: () => Promise<number | void>;
-  replicationInputMode: 'one_to_one' | 'matrix';
-  setReplicationInputMode: (m: 'one_to_one' | 'matrix') => void;
-  matrixMasterRefUrl: string;
-  setMatrixMasterRefUrl: (url: string) => void;
-  matrixMasterRefImages: string[];
-  setMatrixMasterRefImages: (urls: string[]) => void;
-  isMatrixParsing: boolean;
-  handleParseMatrixMasterRef: () => Promise<void>;
-  isBatchRefParsing: boolean;
-  handleBatchParse1to1Refs: () => Promise<void>;
   activeImgFilter: 'all' | 'main' | 'sku' | 'detail';
   setActiveImgFilter: (f: 'all' | 'main' | 'sku' | 'detail') => void;
   toggleProductImageSelection: (itemId: string, imgUrl: string) => void;
   batchSetProductImages: (itemId: string, mode: 'all_main' | 'all' | 'first' | 'clear') => void;
-  toggleReferenceImageSelection: (itemId: string, imgUrl: string) => void;
   handleRemoveItem: (id: string) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
   onPreviewImage?: (url: string) => void;

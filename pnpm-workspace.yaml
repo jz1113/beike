@@ -9,6 +9,8 @@ allowBuilds:
   '@vgpu/adapter-node': true
   webgpu: true
   sharp: true
+  '@ffmpeg-installer/darwin-arm64': set this to true or false
+  simple-git-hooks: set this to true or false
 
 # Resolve internal @beike packages from this workspace.
 linkWorkspacePackages: true

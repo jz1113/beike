@@ -694,7 +694,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                     {getModelIcon(selectedModelId, 'w-3.5 h-3.5')}
                   </div>
                   <span className="truncate max-w-[90px] sm:max-w-[130px] inline-block font-semibold">
-                    {activeModelObj.name}
+                    {activeModelObj.shortName || activeModelObj.name}
                   </span>
                   <ChevronDown className="w-3 h-3 opacity-60 shrink-0 ml-0.5" />
                 </button>
@@ -722,7 +722,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                             <div className="w-4 h-4 flex items-center justify-center shrink-0">
                               {getModelIcon(m.id, 'w-4 h-4')}
                             </div>
-                            <span className="truncate">{m.name}</span>
+                            <span className="truncate">{m.shortName || m.name}</span>
                           </div>
                           {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
                         </button>

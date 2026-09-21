@@ -6,16 +6,15 @@ export interface AutoPilotDeps {
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
   startBatchVisionAnalyze: () => Promise<number>;
   startBatchGeneration: () => Promise<void>;
-  generateAllCopywriting: () => Promise<void>;
   setCurrentStage: (stage: number) => void;
   showToast: (msg: string) => void;
   setIsAutoPilotRunning: (running: boolean) => void;
-  batchMode: 'original' | 'replication';
   isAborted?: () => boolean;
 }
 
 /**
- * 启动全自动生产流水线（自动垫图 → 批量视觉分析 → 严格阻断门禁 → 批量生图 → 自动文案）
+ * 启动全自动生产流水线（自动垫图 → 批量视觉分析 → 严格阻断门禁 → 批量生图）。
+ * 文案是否自动生成由生图调度器依据当前批次预设决定，避免重复提交。
  */
 export async function startAutoPilotPipeline(deps: AutoPilotDeps): Promise<void> {
   if (deps.successfulItems.length === 0) {
@@ -68,8 +67,6 @@ export async function startAutoPilotPipeline(deps: AutoPilotDeps): Promise<void>
     // 3. 自动进入生图阶段并启动 2x2 四宫格队列生图
     await deps.startBatchGeneration();
 
-    // 4. 并行生成小红书文案
-    void deps.generateAllCopywriting();
   } catch (err: any) {
     console.error('AutoPilot pipeline error:', err);
     deps.showToast(`流水线执行异常: ${err.message || '未知错误'}`);

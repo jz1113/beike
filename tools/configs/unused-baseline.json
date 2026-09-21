@@ -9,42 +9,6 @@
       "reason": "通过解构排除字段；不能移除排除行为。"
     },
     {
-      "file": "apps/api/src/routes/catalog/assets/seed.ts",
-      "message": "'_req' is defined but never used.",
-      "count": 1,
-      "reason": "保留路由 Request 签名，后续统一接口处理。"
-    },
-    {
-      "file": "apps/api/src/routes/catalog/styles/parse-link.ts",
-      "message": "'persistToStorage' is assigned a value but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
-      "file": "apps/api/src/routes/catalog/styles/parse-link.ts",
-      "message": "'rawStorageConfig' is assigned a value but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
-      "file": "apps/api/src/routes/generate/analyze.ts",
-      "message": "'groupSignature' is assigned a value but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
-      "file": "apps/api/src/routes/generate/image/slotResolver.ts",
-      "message": "'options' is defined but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
-      "file": "apps/api/src/routes/generate/video.ts",
-      "message": "'clientTaskId' is assigned a value but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
       "file": "apps/api/src/routes/system/config.ts",
       "message": "'wanbangKey' is assigned a value but never used.",
       "count": 1,
@@ -75,22 +39,10 @@
       "reason": "未使用的路径校验候选需结合深度模型执行边界另审，保留安全语义。"
     },
     {
-      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
-      "message": "'_props' is assigned a value but never used.",
+      "file": "apps/api/src/routes/catalog/assets/seed.ts",
+      "message": "'_req' is defined but never used.",
       "count": 1,
-      "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
-    },
-    {
-      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
-      "message": "'isLoadingTasks' is assigned a value but never used.",
-      "count": 1,
-      "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
-    },
-    {
-      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
-      "message": "'t' is assigned a value but never used.",
-      "count": 1,
-      "reason": "旧Props、加载状态及缩略图分支待配套交互确认；本批只拆任务归一化。"
+      "reason": "保留路由 Request 签名，后续统一接口处理。"
     },
     {
       "file": "apps/web/src/features/assets/components/AssetGenerationHistory.tsx",
@@ -185,12 +137,6 @@
     {
       "file": "apps/web/src/shared/utils/xhsLinkBatch.ts",
       "message": "'sourceUrl' is defined but never used.",
-      "count": 1,
-      "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
-    },
-    {
-      "file": "apps/web/src/shared/ui/ParticleText.tsx",
-      "message": "'event' is defined but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     }

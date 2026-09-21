@@ -6,31 +6,17 @@ import {
   Search,
   Layers,
   Activity,
-  HardDrive,
-  Palette,
-  Info,
   CheckCircle2,
   X,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store';
 import { getUsageSummary, type UsageSummary } from '@/shared/utils/usageTracker';
-import {
-  getStoredMultimodalModelId,
-  gatewayModelToWorkflowModel,
-  inferWorkflowCapabilitiesFromId,
-} from '@beike/domain/workflowModels';
-import GatewayModelModal, { GatewayModelItem } from './GatewayModelModal';
-import {
-  type WorkflowModel,
-} from './settingsShared';
+import { getStoredMultimodalModelId } from '@beike/domain/workflowModels';
+import GatewayModelModal from './GatewayModelModal';
 import ApiServicesTab from './tabs/ApiServicesTab';
 import DefaultsTab from './tabs/DefaultsTab';
 import UsageTab from './tabs/UsageTab';
-import AppearanceTab from './tabs/AppearanceTab';
-import AboutTab from './tabs/AboutTab';
-import LocalStorageTab from './tabs/LocalStorageTab';
-import { SettingsNavSection } from './components/SettingsNav';
 import AddModelModal from './components/AddModelModal';
 import { useSystemConfigQuery } from './hooks/useSystemConfigQuery';
 import { useSettingsConfig } from './hooks/useSettingsConfig';
@@ -40,6 +26,8 @@ import { useGatewayUser } from './hooks/useGatewayUser';
 interface Props {
   onBack?: () => void;
 }
+
+type SettingsNavSection = 'api_services' | 'usage';
 
 interface NavGroupItem {
   id: SettingsNavSection;
@@ -178,29 +166,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             label: '用量统计',
             icon: Activity,
             keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '花费', '账单'],
-          },
-          {
-            id: 'local_storage',
-            label: '本地存储',
-            icon: HardDrive,
-            keywords: ['存储', '缓存', '本地', '清理', '占用', '数据', '离线'],
-          },
-        ],
-      },
-      {
-        groupTitle: '系统偏好',
-        items: [
-          {
-            id: 'appearance',
-            label: '外观偏好',
-            icon: Palette,
-            keywords: ['外观', '界面', '性能', '渲染', '帧率', '主题', '样式'],
-          },
-          {
-            id: 'about',
-            label: '关于系统',
-            icon: Info,
-            keywords: ['关于', '系统', '版本', '更新', '贝壳云图', '诊断'],
           },
         ],
       },
@@ -518,23 +483,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 </div>
               )}
 
-              {navSection === 'local_storage' && (
-                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden p-6 sm:p-8">
-                  <LocalStorageTab showToast={showToast} />
-                </div>
-              )}
-
-              {navSection === 'appearance' && (
-                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden p-6 sm:p-8">
-                  <AppearanceTab />
-                </div>
-              )}
-
-              {navSection === 'about' && (
-                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden p-6 sm:p-8">
-                  <AboutTab />
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -550,47 +498,13 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           activeModelIds={new Set(models.customModels.map((m) => m.id))}
           isLoading={models.isFetchingGateway}
           onToggleAddModel={(model) => {
-            models.setCustomModels((prev) => {
-              const exists = prev.some((m) => m.id === model.id);
-              let updated;
-              if (exists) {
-                updated = prev.filter((m) => m.id !== model.id);
-                showToast(`已移出模型 ${model.id}`);
-              } else {
-                updated = [
-                  ...prev,
-                  gatewayModelToWorkflowModel(model) as WorkflowModel,
-                ];
-                showToast(`✨ 已接入模型 ${model.id}`);
-              }
-              localStorage.setItem('custom_models', JSON.stringify(updated));
-              return updated;
-            });
-            models.notifyModelsUpdated();
+            const exists = models.customModels.some((m) => m.id === model.id);
+            models.handleToggleGatewayModel(model);
+            showToast(exists ? `已移出模型 ${model.id}` : `✨ 已接入模型 ${model.id}`);
           }}
           onAddAllUsefulModels={() => {
-            const useful = models.allGatewayModels.filter(
-              (m: GatewayModelItem) => {
-                const caps = inferWorkflowCapabilitiesFromId(m.id);
-                return caps.isImage || caps.isVideo || caps.isMultimodal;
-              }
-            );
-            models.setCustomModels((prev) => {
-              const existingMap = new Map(prev.map((m) => [m.id, m]));
-              useful.forEach((m: GatewayModelItem) => {
-                if (!existingMap.has(m.id)) {
-                  existingMap.set(
-                    m.id,
-                    gatewayModelToWorkflowModel(m) as WorkflowModel
-                  );
-                }
-              });
-              const updated = Array.from(existingMap.values());
-              localStorage.setItem('custom_models', JSON.stringify(updated));
-              return updated;
-            });
-            models.notifyModelsUpdated();
-            showToast(`🎉 成功接入 ${useful.length} 款核心模型！`);
+            const count = models.handleAddAllUsefulGatewayModels(models.allGatewayModels);
+            showToast(`🎉 成功接入 ${count} 款核心模型！`);
             models.setIsGatewayModalOpen(false);
           }}
         />

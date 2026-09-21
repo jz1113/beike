@@ -281,8 +281,6 @@ const RESOLUTION_4K_UPGRADE_MAP: Record<string, string> = {
 export * from './prompt-engine';
 import {
   cleanPromptText,
-  ensureSocialPromptSlots,
-  ensureReplicationPromptSlots,
   ensureOriginalPromptSlots,
   getDynamicNegativePrompt,
 } from './prompt-engine';
@@ -303,9 +301,6 @@ export function formatModelPayload(modelId: string, params: {
   n?: number;
   hasHuman?: boolean;
   shotType?: string;
-  socialMode?: boolean;
-  /** true=旧双垫（注入 @图片2）；false/缺省=两段式单商品垫 */
-  padSocialRef?: boolean;
   hasFace?: boolean;
   plainMode?: boolean;
   omitQuality?: boolean;
@@ -365,29 +360,17 @@ export function formatModelPayload(modelId: string, params: {
     (params as any).primaryImage ||
     ((params as any).images && (params as any).images.length > 0)
   );
-  const isWorkshopOriginal = !params.plainMode && !params.socialMode && hasProductRef;
+  const isWorkshopOriginal = !params.plainMode && hasProductRef;
 
   const cleanedPrompt = params.plainMode || !isWorkshopOriginal
     ? cleanPromptText(params.prompt)
-    : params.socialMode
-      ? (params.padSocialRef
-          ? ensureSocialPromptSlots(cleanPromptText(params.prompt), {
-              hasHuman: params.hasHuman,
-              hasFace: params.hasFace,
-              socialMode: true,
-            })
-          : ensureReplicationPromptSlots(cleanPromptText(params.prompt), {
-              hasHuman: params.hasHuman,
-              hasFace: params.hasFace,
-            }))
-      : ensureOriginalPromptSlots(cleanPromptText(params.prompt), {
+    : ensureOriginalPromptSlots(cleanPromptText(params.prompt), {
           hasHuman: params.hasHuman,
           hasFace: params.hasFace,
         });
   const dynamicNegative = getDynamicNegativePrompt({
     hasHuman: params.plainMode ? false : params.hasHuman,
     shotType: params.plainMode ? 'pure_product' : params.shotType,
-    socialMode: params.socialMode,
     plainMode: params.plainMode,
   });
 
@@ -434,7 +417,7 @@ export function isDepthMediaType(mediaType?: string): boolean {
  * 统一友好的模型名称格式化工具
  */
 export function formatDisplayModel(model?: string, isVideo?: boolean): string {
-  if (!model) return isVideo ? '即梦 Seedance' : 'GPT Image 2';
+  if (!model) return isVideo ? 'Seedance' : 'GPT Image 2';
   const m = model.toLowerCase().trim();
   const builtin = IMAGE_GEN_MODELS.find((x) => x.id.toLowerCase() === m);
   if (builtin) return builtin.shortName;
@@ -504,5 +487,4 @@ export function formatPromptParagraphs(prompt?: string): string[] {
 }
 
 export * from './prompt-engine';
-
 

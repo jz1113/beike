@@ -1,15 +1,10 @@
 import { apiFetch } from '@/shared/api/apiClient';
 import { useAppStore } from '@/store';
-import { VISION_MODELS } from '@beike/domain/vision';
-import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
-import {
-  getEnabledMultimodalModelsFromSettings,
-  getEnabledImageModelsFromSettings,
-  getStoredMultimodalModelId,
-  repairWorkflowModelsInStorage,
-} from '@beike/domain/workflowModels';
 import { getGlobalAssetLibrary } from '@/features/assets/utils/assetLibraryCache';
 import { SYSTEM_MASTER_RECIPES } from './batchTypes';
+import { loadSystemConfiguredModels } from '@/shared/models/configuredModels';
+
+export { loadSystemConfiguredModels };
 
 /**
  * 拉取自定义配方列表并与系统配方合并
@@ -57,57 +52,6 @@ export async function fetchRecipes(
       setSelectedArchId(SYSTEM_MASTER_RECIPES[0].id);
     }
   }
-}
-
-/**
- * 加载并计算系统配置的视觉多模态与生图模型
- */
-export function loadSystemConfiguredModels(): {
-  availableVisionModels: any[];
-  selectedVisionModel: string;
-  availableImageModels: any[];
-  selectedImageGenModel: string;
-} {
-  repairWorkflowModelsInStorage();
-
-  let availableVisionModels: any[];
-  let selectedVisionModel: string;
-
-  const multimodalFromSettings = getEnabledMultimodalModelsFromSettings();
-  if (multimodalFromSettings.length > 0) {
-    availableVisionModels = multimodalFromSettings.map((m: any) => ({
-      id: m.id,
-      name: m.name || m.id,
-      shortName: m.shortName || (m.name || m.id).split(' ')[0],
-      provider: m.provider || '多模态',
-    }));
-    selectedVisionModel = getStoredMultimodalModelId(availableVisionModels[0].id);
-  } else {
-    availableVisionModels = VISION_MODELS;
-    selectedVisionModel = getStoredMultimodalModelId('gemini-3.7-flash');
-  }
-
-  let availableImageModels: any[];
-  let selectedImageGenModel: string;
-
-  const imageFromSettings = getEnabledImageModelsFromSettings();
-  if (imageFromSettings.length > 0) {
-    availableImageModels = imageFromSettings as any[];
-    selectedImageGenModel =
-      localStorage.getItem('ai_image_gen_model') ||
-      (imageFromSettings[0] as any).id ||
-      'gpt-image-2';
-  } else {
-    availableImageModels = IMAGE_GEN_MODELS;
-    selectedImageGenModel = localStorage.getItem('ai_image_gen_model') || 'gpt-image-2';
-  }
-
-  return {
-    availableVisionModels,
-    selectedVisionModel,
-    availableImageModels,
-    selectedImageGenModel,
-  };
 }
 
 /**

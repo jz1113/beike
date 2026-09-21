@@ -10,8 +10,9 @@ import { LazyFeedVideo } from './LazyFeedVideo';
 import { getStoryboardPresetById, persistStoryboardPreset } from '@beike/domain/prompt-engine/storyboardPreset';
 import { useAppStore } from '@/store';
 
-const INITIAL_VISIBLE = 24;
-const LOAD_MORE_STEP = 16;
+// 限制首屏附近的图片并发下载与解码；用户开始浏览后再逐批补齐。
+const INITIAL_VISIBLE = 10;
+const LOAD_MORE_STEP = 10;
 
 interface Props {
   onUsePrompt: (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => void;
@@ -21,13 +22,34 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const [hasStartedBrowsing, setHasStartedBrowsing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const ratioUpdateFrameRef = useRef<number | null>(null);
+  const pendingRatiosRef = useRef<Record<string, number>>({});
   const [feedWidth,setFeedWidth]=useState(1200);
   const [mediaRatios,setMediaRatios]=useState<Record<string,number>>({});
-  const rememberRatio=(id:string|number,ratio:number)=>{
-    if(Number.isFinite(ratio) && ratio>0)setMediaRatios(previous=>Math.abs((previous[id] || 0)-ratio)<0.001?previous:{...previous,[id]:ratio});
-  };
+  const rememberRatio=useCallback((id:string|number,ratio:number)=>{
+    if(!Number.isFinite(ratio) || ratio<=0)return;
+    pendingRatiosRef.current[String(id)] = ratio;
+    if (ratioUpdateFrameRef.current !== null) return;
+    ratioUpdateFrameRef.current = window.requestAnimationFrame(() => {
+      ratioUpdateFrameRef.current = null;
+      const pending = pendingRatiosRef.current;
+      pendingRatiosRef.current = {};
+      setMediaRatios(previous => {
+        let changed = false;
+        const next = { ...previous };
+        for (const [key, value] of Object.entries(pending)) {
+          if (Math.abs((previous[key] || 0) - value) >= 0.001) {
+            next[key] = value;
+            changed = true;
+          }
+        }
+        return changed ? next : previous;
+      });
+    });
+  },[]);
 
   const mixedItems=useMemo(()=>{
     // Fixed shuffle seed keeps pagination, search and modal navigation consistent.
@@ -64,7 +86,20 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
+    setHasStartedBrowsing(false);
   }, [searchTerm]);
+
+  // 原生 lazy-loading 会预取视口下方一大段图片。若哨兵初始就在视口内，
+  // 自动分页会立刻把整条瀑布流渲染出来，抵消首屏限流效果。
+  useEffect(() => {
+    const hub = document.querySelector('[data-hub-scroll]') as HTMLElement | null;
+    if (!hub) return;
+    const onScroll = () => {
+      if (hub.scrollTop > 80) setHasStartedBrowsing(true);
+    };
+    hub.addEventListener('scroll', onScroll, { passive: true });
+    return () => hub.removeEventListener('scroll', onScroll);
+  }, []);
 
   const visibleItems = useMemo(
     () => filteredItems.slice(0, visibleCount),
@@ -97,7 +132,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
 
   useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el || !hasMore) return;
+    if (!el || !hasMore || !hasStartedBrowsing) return;
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) handleLoadMore();
@@ -106,7 +141,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, handleLoadMore, visibleItems.length]);
+  }, [hasMore, hasStartedBrowsing, handleLoadMore, visibleItems.length]);
 
   const scrollHubToTop = () => {
     const hub = document.querySelector('[data-hub-scroll]') as HTMLElement | null;
@@ -148,7 +183,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
       ) : (
         <>
           <div ref={gridRef} className="flex flex-col gap-1">
-            {rows.map(row=><div key={visibleItems[row[0]].id} className="flex gap-1" style={{height:(feedWidth-4*(row.length-1))/row.reduce((sum,index)=>sum+ratios[index],0)}}>
+            {rows.map(row=><div key={visibleItems[row[0]].id} className="flex gap-1 [content-visibility:auto] [contain-intrinsic-size:180px]" style={{height:(feedWidth-4*(row.length-1))/row.reduce((sum,index)=>sum+ratios[index],0)}}>
             {row.map(index => {
               const item=visibleItems[index];
               const isVideo=item.mediaType==='video' || !!item.video || isVideoMediaUrl(item.image);
@@ -158,7 +193,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                     key={item.id}
                     onClick={() => setSelectedModalItem(item)}
                     style={{flex:`${ratios[index]} 1 0%`}}
-                    className="min-w-0 h-full rounded-lg bg-slate-100 shadow-2xs hover:shadow-md transition-all duration-300 overflow-hidden group cursor-pointer relative border border-slate-100/80"
+                    className="min-w-0 h-full rounded-lg bg-slate-100 shadow-2xs hover:shadow-md transition-[box-shadow,border-color] duration-200 overflow-hidden group cursor-pointer relative border border-slate-100/80"
                   >
                     <div
                       className="relative w-full h-full overflow-hidden rounded-lg"
@@ -181,7 +216,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                           decoding="async"
                           referrerPolicy="no-referrer"
                           onError={(e) => handleImgError(e, item.image)}
-                          className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-103 bg-slate-100"
+                          className="w-full h-full object-cover block transition-transform duration-300 group-hover:scale-[1.02] bg-slate-100"
                         />
                       )}
                       {isVideo && (

@@ -6,7 +6,6 @@ import { formatVisionAnalyzeError } from '@beike/domain/visionTimeouts';
 import { parseJsonBody, analyzeBodySchema } from '../../core/validate';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/gatewayCredentials';
 import { resolveTemplateStyleWithJewelryGuard } from './analyze/jewelryGuard';
-import { executeSocialSwap } from './analyze/socialSwap';
 import { executeStoryboard } from '../../services/analyze/storyboard';
 import { DEFAULT_MULTIMODAL_MODEL_ID } from '@beike/domain/modelCatalog';
 
@@ -23,7 +22,6 @@ export async function POST(req: Request) {
       productTitle,
       productProps,
       imageUrls = [],
-      referenceImageUrls = [],
       anchorFaceImageUrl,
       modelPersona,
       productFingerprint,
@@ -58,15 +56,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const personaText = modelPersona || '';
-    const isNoModel =
-      !personaText ||
-      personaText === 'none' ||
-      personaText.includes('无人物') ||
-      personaText.includes('无需模特') ||
-      personaText.includes('纯商品') ||
-      personaText.includes('纯静物');
-
     const resolvedTemplateStyle = resolveTemplateStyleWithJewelryGuard(
       templateStyle,
       productTitle,
@@ -99,7 +88,6 @@ export async function POST(req: Request) {
     let styleBible = '';
     let identityBible = '';
     let actionDigest = '';
-    let groupSignature: { scene: string; actionDigest: string } | null = null;
     let formattedPrompts: any[] = [];
     let actualModelUsed = model;
     let triedModels: string[] = [];
@@ -109,32 +97,7 @@ export async function POST(req: Request) {
     let usedActionIds: string[] = [];
     let assetTrace: any = null;
 
-    if (mode === 'social_face_product_swap') {
-      const socialResult = await executeSocialSwap({
-        referenceImageUrls,
-        imageUrls,
-        shotCount,
-        model,
-        fallbackModels: Array.isArray(fallbackModels) ? fallbackModels : [],
-        targetBaseUrl,
-        targetApiKey,
-        productTitle,
-        productProps,
-        modelPersona,
-        hasAnchorFace,
-        anchorFaceImageUrl,
-        productFingerprint,
-        templateStyle: typeof templateStyle === 'string' ? templateStyle : undefined,
-        extraRequirements,
-      });
-
-      rawOutput = socialResult.rawOutput;
-      actualModelUsed = socialResult.actualModelUsed;
-      triedModels = socialResult.triedModels;
-      visionUsage = socialResult.visionUsage;
-      formattedPrompts = socialResult.prompts;
-      actionDigest = socialResult.actionDigest;
-    } else {
+    {
       const storyboardResult = await executeStoryboard({
         productTitle,
         productProps,
@@ -149,7 +112,6 @@ export async function POST(req: Request) {
         fallbackModels: Array.isArray(fallbackModels) ? fallbackModels : [],
         targetBaseUrl,
         targetApiKey,
-        isNoModel,
         hasAnchorFace,
         previousMasterScenes,
         previousGroupSignatures,
@@ -179,7 +141,6 @@ export async function POST(req: Request) {
       styleBible = storyboardResult.styleBible;
       identityBible = storyboardResult.identityBible;
       actionDigest = storyboardResult.actionDigest;
-      groupSignature = storyboardResult.groupSignature;
       formattedPrompts = storyboardResult.prompts;
       actualModelUsed = storyboardResult.actualModelUsed;
       triedModels = storyboardResult.triedModels;

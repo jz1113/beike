@@ -1,7 +1,6 @@
 import type { ShotPrompt } from '@beike/domain/vision';
 import {
   assembleGrid2x2Prompt,
-  assembleReplicationGrid2x2Prompt,
   enforceLookConsistency,
   extractCanonicalOutfitFromPrompts,
   isGenericLook,
@@ -14,8 +13,6 @@ import { compressProductImageIfNeeded, submitImageGenTask } from './batchImageTa
 import { ensureItemPromptsPad } from './batchPromptPadding';
 
 export interface TaskExecutionConfig {
-  batchMode: 'original' | 'replication';
-  hasHumanPersona: boolean;
   selectedQuality: 'high' | 'medium' | 'low';
   selectedAspect: '3:4' | '1:1' | '9:16' | '16:9';
   selectedImageGenModel: string;
@@ -38,7 +35,6 @@ export async function executeSingleImageTask(
   anchorFaceUrl: string | undefined,
   config: TaskExecutionConfig
 ): Promise<string> {
-  const isSocialMode = config.batchMode === 'replication';
   const chosenProductImg =
     shot.productImageUrl || item.selectedProductImages[0] || item.coverImage;
   let promptText = (shot.prompt || '').trim();
@@ -82,13 +78,13 @@ export async function executeSingleImageTask(
       padSocialRef: false,
       referenceImageUrl: safeProductImg,
       useReferenceImage: true,
-      has_human: shot.has_human !== undefined ? shot.has_human : config.hasHumanPersona,
+      has_human: shot.has_human !== undefined ? shot.has_human : true,
       shot_type: shot.shot_type,
       shot_no: shot.shot_no,
       productTitle: item.title || '电商商品',
       productFingerprint: item.productFingerprint || item.title || undefined,
       productRole: item.productRole || undefined,
-      workshopMode: isSocialMode ? 'social_face_product_swap' : 'storyboard_generate',
+      workshopMode: 'storyboard_generate',
     },
     {
       isAborted: config.isAborted,
@@ -100,7 +96,6 @@ export async function executeGridImageTask(
   item: BatchProductItem,
   config: TaskExecutionConfig
 ): Promise<string> {
-  const isSocialMode = config.batchMode === 'replication';
   let gridPrompt = (item.gridPrompt || '').trim();
   if (!gridPrompt) {
     if (!item.prompts || item.prompts.length === 0) {
@@ -111,8 +106,6 @@ export async function executeGridImageTask(
     const paddedPrompts = ensureItemPromptsPad(
       item,
       {
-        batchMode: config.batchMode,
-        hasHumanPersona: config.hasHumanPersona,
         lockedSceneId: config.lockedSceneId,
         availableScenes: config.availableScenes || [],
         selectedShotCount: config.selectedShotCount,
@@ -134,7 +127,7 @@ export async function executeGridImageTask(
         ? `身穿${canonicalOutfit.top}${canonicalOutfit.bottom ? `，搭配${canonicalOutfit.bottom}` : ''}`
         : item.lookBible || '质感显白私服穿搭';
     const gridBible = {
-      identityBible: item.identityBible || (config.hasHumanPersona ? '' : '纯商品静物，无人物'),
+      identityBible: item.identityBible || (effectivePrompts.every((shot) => shot.has_human === false) ? '纯商品静物，无人物' : ''),
       lookBible: effectiveLookBible,
       lookParts: effectiveLookParts,
       masterScene: item.masterScene || '真实买家秀生活场景',
@@ -158,9 +151,7 @@ export async function executeGridImageTask(
       has_human: p.has_human,
       promptFallback: p.prompt,
     }));
-    gridPrompt = isSocialMode
-      ? assembleReplicationGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 })
-      : assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
+    gridPrompt = assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
     const confirmedEdits = gridShots
       .map((shot) => (shot.promptFallback || '').trim())
       .filter((text) => text.length > 0);
@@ -197,11 +188,11 @@ export async function executeGridImageTask(
       padSocialRef: false,
       referenceImageUrl: safeProductImg,
       useReferenceImage: true,
-      has_human: config.hasHumanPersona,
+      has_human: item.prompts?.some((shot) => shot.has_human !== false) ?? true,
       productTitle: item.title || '电商商品',
       productFingerprint: item.productFingerprint || item.title || undefined,
       productRole: item.productRole || undefined,
-      workshopMode: isSocialMode ? 'social_face_product_swap' : 'storyboard_generate',
+      workshopMode: 'storyboard_generate',
     },
     {
       isAborted: config.isAborted,

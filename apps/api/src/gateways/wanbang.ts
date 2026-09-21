@@ -1,8 +1,42 @@
 import { gatewayFetch } from './http';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 
+/**
+ * 万邦网关的公开接口以 query 参数接收凭证。URL 只在服务端构造，且绝不能写入日志。
+ */
+export function withWanbangCredentials(endpoint: string, apiKey: string, apiSecret: string): string {
+  const url = new URL(endpoint);
+  url.searchParams.set('key', apiKey);
+  url.searchParams.set('secret', apiSecret);
+  return url.toString();
+}
+
+/**
+ * 万邦偶发会返回空 body 或 HTML 错误页；不要让底层 JSON.parse 错误泄露到界面。
+ */
+export async function parseWanbangResponse(res: Response): Promise<Record<string, unknown>> {
+  const raw = await res.text();
+  const body = raw.trim();
+
+  if (!body) {
+    throw new Error(`万邦网关返回空响应（HTTP ${res.status}），请稍后重试或检查接口权限`);
+  }
+
+  try {
+    const parsed = JSON.parse(body);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('invalid payload');
+    }
+    return parsed;
+  } catch {
+    const contentType = res.headers.get('content-type');
+    const responseKind = contentType?.includes('text/html') ? 'HTML 页面' : '非 JSON 内容';
+    throw new Error(`万邦网关返回 ${responseKind}（HTTP ${res.status}），请稍后重试或检查接口权限`);
+  }
+}
+
 // 辅助函数：带智能错误识别和快速失败机制的 fetch（默认最多重试 1 次，超时 7s，快速跳过不存在的商品）
-// 安全：API Key/Secret 通过 Authorization header 传递，避免出现在 URL query 中
+// 万邦要求 key/secret 位于 query；调用方禁止记录最终请求 URL。
 export async function fetchWithRetry(
   url: string,
   apiKey: string,
@@ -10,24 +44,22 @@ export async function fetchWithRetry(
   retries = 1,
   timeoutMs = 7000,
 ): Promise<any> {
-  const auth = `key=${encodeURIComponent(apiKey)} secret=${encodeURIComponent(apiSecret)}`;
   for (let i = 0; i <= retries; i++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const res = await gatewayFetch(url, {
+      const res = await gatewayFetch(withWanbangCredentials(url, apiKey, apiSecret), {
         signal: controller.signal,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          Authorization: auth,
         },
       });
       clearTimeout(timeoutId);
       if (!res.ok) {
         throw new Error(`万邦网关请求失败（HTTP ${res.status}）`);
       }
-      const json = await res.json();
+      const json = await parseWanbangResponse(res);
 
       // 1. 永久性错误（商品不存在、已下架、ID无效、缺少Key等）-> 立即返回失败，绝对不浪费时间重试！
       const errMsg = `${json?.error || ''} ${json?.reason || ''} ${json?.error_code || ''}`.toLowerCase();

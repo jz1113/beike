@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
 import BatchStage1Collect from './BatchStage1Collect';
 import BatchStage2Config from './BatchStage2Config';
@@ -8,32 +8,24 @@ import BatchStage4Queue from './BatchStage4Queue';
 import { WorkshopTopBar } from '../../components/WorkshopTopBar';
 import { BatchPreviewLightbox } from './BatchPreviewLightbox';
 import { WorkshopSettingsModal } from '../../components/WorkshopSettingsModal';
+import { BatchWorkspaceBatchControls } from './BatchWorkspaceBatchControls';
+import { BatchArchitectureConfirmDialog } from './BatchArchitectureConfirmDialog';
 import { useAppStore } from '@/store';
-import { 
-  BatchProductItem, 
-  TypedProductImage, 
-  SYSTEM_MASTER_RECIPES 
-} from '../batchTypes';
-
+import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../batchTypes';
+import type { WorkshopBatch } from '@beike/contracts/workshopBatches';
 export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
-
-interface Props {
-  fixedBatchMode?: 'original' | 'replication';
-}
-
-export default function BatchWorkshopView({ fixedBatchMode }: Props) {
-  const runner = useBatchWorkshopRunner({ fixedBatchMode });
+export default function BatchWorkshopView() {
+  const runner = useBatchWorkshopRunner();
   const isWorkshopConfigOpen = useAppStore(s => s.isWorkshopConfigOpen);
   const setIsWorkshopConfigOpen = useAppStore(s => s.setIsWorkshopConfigOpen);
   const activeWorkshopTab = useAppStore(s => s.activeWorkshopTab);
   const setActiveWorkshopTab = useAppStore(s => s.setActiveWorkshopTab);
-
+  const [historyGenerationBatch, setHistoryGenerationBatch] = useState<WorkshopBatch | null>(null);
+  const [isArchitectureConfirmOpen, setIsArchitectureConfirmOpen] = useState(false);
   const {
-    batchMode,
     currentStage,
     setCurrentStage,
-    handleSwitchMode,
     batchInputText,
     setBatchInputText,
     items,
@@ -68,6 +60,8 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
     availableOutfits,
     generationStrategy,
     setGenerationStrategy,
+    autoGenerateCopywriting,
+    setAutoGenerateCopywriting,
     imageGenConcurrency,
     setImageGenConcurrency,
     selectedQuality,
@@ -80,19 +74,8 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
     analyzeProgress,
     activeImgFilter,
     setActiveImgFilter,
-    replicationInputMode,
-    setReplicationInputMode,
-    matrixMasterRefUrl,
-    setMatrixMasterRefUrl,
-    matrixMasterRefImages,
-    setMatrixMasterRefImages,
-    isMatrixParsing,
-    isBatchRefParsing,
-    handleParseMatrixMasterRef,
-    handleBatchParse1to1Refs,
     toggleProductImageSelection,
     batchSetProductImages,
-    toggleReferenceImageSelection,
     analyzeSingleProduct,
     startBatchVisionAnalyze,
     analyzeConcurrency,
@@ -122,13 +105,21 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
     isAutoPilotRunning,
     startAutoPilotPipeline,
     toastMsg,
-    workspaceStatus,
+    showToast,
+    workspaceError,
+    workspaceReady,
+    activeBatch,
+    historyBatches,
+    refreshBatchHistory,
+    createNewBatch,
+    duplicateBatch,
+    archiveCurrentBatch,
+    clearHistory,
+    renameBatch,
+    readBatch,
   } = runner;
-
   const readyProductCount = successfulItems.filter(i => i.selectedProductImages && i.selectedProductImages.length > 0).length;
-
   const stage2ConfigValue = useMemo((): BatchConfigContextValue => ({
-    batchMode,
     currentStage,
     successfulItems,
     setItems,
@@ -169,39 +160,21 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
     isAnalyzingAll,
     analyzeProgress,
     startBatchAnalyze: startBatchVisionAnalyze,
-    replicationInputMode,
-    setReplicationInputMode,
-    matrixMasterRefUrl,
-    setMatrixMasterRefUrl,
-    matrixMasterRefImages,
-    setMatrixMasterRefImages,
-    isMatrixParsing,
-    handleParseMatrixMasterRef,
-    isBatchRefParsing,
-    handleBatchParse1to1Refs,
     activeImgFilter,
     setActiveImgFilter,
     toggleProductImageSelection,
     batchSetProductImages,
-    toggleReferenceImageSelection,
     handleRemoveItem,
     onPreviewGallery: openGalleryPreview,
     onPreviewImage: (url) => openGalleryPreview([url], 0),
     onStartAutoPilot: startAutoPilotPipeline,
     isAutoPilotRunning,
-    onPrevStage: () => setCurrentStage(batchMode === 'original' ? 1 : currentStage === 2 ? 1 : 2),
+    onPrevStage: () => setCurrentStage(1),
     openWorkshopConfig: () => setIsWorkshopConfigOpen(true),
-    onNextStage: () => {
-      if (batchMode === 'replication' && currentStage === 2) {
-        setCurrentStage(3);
-      } else {
-        setCurrentStage(batchMode === 'original' ? 3 : 4);
-        void startBatchVisionAnalyze();
-      }
-    },
+    onNextStage: () => setIsArchitectureConfirmOpen(true),
   }), [
     setIsWorkshopConfigOpen,
-    batchMode,
+    setIsArchitectureConfirmOpen,
     currentStage,
     successfulItems,
     setItems,
@@ -242,27 +215,28 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
     isAnalyzingAll,
     analyzeProgress,
     startBatchVisionAnalyze,
-    replicationInputMode,
-    setReplicationInputMode,
-    matrixMasterRefUrl,
-    setMatrixMasterRefUrl,
-    matrixMasterRefImages,
-    setMatrixMasterRefImages,
-    isMatrixParsing,
-    handleParseMatrixMasterRef,
-    isBatchRefParsing,
-    handleBatchParse1to1Refs,
     activeImgFilter,
     setActiveImgFilter,
     toggleProductImageSelection,
     batchSetProductImages,
-    toggleReferenceImageSelection,
     handleRemoveItem,
     openGalleryPreview,
     startAutoPilotPipeline,
     isAutoPilotRunning,
     setCurrentStage,
   ]);
+
+  const confirmArchitectureAndAnalyze = (architectureId: string) => {
+    if (!recipes.some((recipe) => recipe.id === architectureId)) {
+      showToast('请先选择有效的类目拍摄架构，再开始提示词分析');
+      return;
+    }
+
+    setSelectedArchId(architectureId);
+    setIsArchitectureConfirmOpen(false);
+    setCurrentStage(3);
+    void startBatchVisionAnalyze(architectureId);
+  };
 
   return (
     <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-transparent relative">
@@ -275,22 +249,71 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
         itemsCount={items.length}
         readyProductCount={readyProductCount}
         successfulItemsCount={successfulItems.length}
-        batchMode={batchMode}
-        onSwitchMode={handleSwitchMode}
         isAutoPilotRunning={isAutoPilotRunning}
       />
-      {workspaceStatus ? <p role="status">{workspaceStatus}</p> : null}
-
+      {workspaceError ? (
+        <p role="alert" className="px-4 sm:px-6 text-xs text-amber-800">
+          {workspaceError}
+        </p>
+      ) : null}
+      <BatchWorkspaceBatchControls
+        activeBatch={activeBatch}
+        historyBatches={historyBatches}
+        itemsCount={items.length}
+        currentStage={currentStage}
+        isGenerating={isGeneratingBatch}
+        ready={workspaceReady}
+        createNewBatch={createNewBatch}
+        refreshHistory={refreshBatchHistory}
+        duplicateBatch={duplicateBatch}
+        archiveCurrentBatch={archiveCurrentBatch}
+        clearHistory={clearHistory}
+        renameBatch={renameBatch}
+        readBatch={readBatch}
+        onOpenGenerationView={setHistoryGenerationBatch}
+        showToast={showToast}
+      />
       {/* 主体工作区 Content Area（Stage 1 采编采用黄金阅读宽度；Stage 2+ 选图及后续生产流水线自适应全屏大画幅充盈放大） */}
-      <div className="flex-1 overflow-y-auto pl-[84px] pr-3 sm:pl-[100px] sm:pr-5 xl:pl-[108px] xl:pr-7 py-3 sm:py-4 flex flex-col">
+      <div className="flex-1 overflow-y-auto px-3 pt-11 pb-3 sm:px-5 sm:pt-11 sm:pb-4 xl:px-7 flex flex-col">
         <div className={
-          currentStage === 1 && items.length === 0
+          !historyGenerationBatch && currentStage === 1 && items.length === 0
             ? "max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto w-full flex-1 flex flex-col justify-between"
-            : "w-full max-w-[1760px] 2xl:max-w-[1920px] mx-auto space-y-4"
+            : "w-full space-y-4"
         }>
-          {currentStage === 1 && (
+          {historyGenerationBatch ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-slate-900">历史批次生成查看 · {historyGenerationBatch.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">只读模式：可查看成图与文案，不会修改当前批次或重新提交任务。</p>
+                </div>
+                <button type="button" onClick={() => setHistoryGenerationBatch(null)} className="shrink-0 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50">返回当前批次</button>
+              </div>
+              <BatchStage4Queue
+                successfulItems={historyGenerationBatch.snapshot.items.filter(item => item.status === 'success' && item.selected) as BatchProductItem[]}
+                availableImageModels={availableImageModels}
+                selectedImageGenModel={historyGenerationBatch.snapshot.settings.selectedImageGenModel}
+                setSelectedImageGenModel={() => {}}
+                selectedQuality={historyGenerationBatch.snapshot.settings.selectedQuality}
+                setSelectedQuality={() => {}}
+                selectedAspect={historyGenerationBatch.snapshot.settings.selectedAspect}
+                setSelectedAspect={() => {}}
+                isGeneratingBatch={false}
+                totalTaskCount={0}
+                completedTaskCount={0}
+                successTaskCount={0}
+                failTaskCount={0}
+                hasHumanPersona={historyGenerationBatch.snapshot.settings.hasHumanPersona}
+                generateCopywritingForProduct={async () => {}}
+                isExportingZip={false}
+                handleExportZip={async () => {}}
+                setPreviewImageUrl={setPreviewImageUrl}
+                onPreviewGallery={openGalleryPreview}
+                readOnly
+              />
+            </>
+          ) : currentStage === 1 && (
             <BatchStage1Collect
-              batchMode={batchMode}
               batchInputText={batchInputText}
               setBatchInputText={setBatchInputText}
               items={items}
@@ -302,7 +325,7 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
               startBatchCollect={startBatchCollect}
               handleRemoveItem={handleRemoveItem}
               onPreviewImage={(url) => openGalleryPreview([url], 0, '商品封面')}
-              onNextStage={() => setCurrentStage(batchMode === 'original' ? 2 : 2)}
+              onNextStage={() => setCurrentStage(2)}
               recipes={recipes}
               selectedArchId={selectedArchId}
               selectedShotCount={selectedShotCount}
@@ -315,13 +338,13 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
             />
           )}
 
-          {((batchMode === 'original' && currentStage === 2) || (batchMode === 'replication' && (currentStage === 2 || currentStage === 3))) && (
+          {currentStage === 2 && (
             <BatchConfigProvider value={stage2ConfigValue}>
               <BatchStage2Config />
             </BatchConfigProvider>
           )}
 
-          {((batchMode === 'original' && currentStage === 3) || (batchMode === 'replication' && currentStage === 4)) && (
+          {currentStage === 3 && (
             <BatchStage3Prompts
               generationStrategy={generationStrategy}
               successfulItems={successfulItems}
@@ -335,11 +358,11 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
               handleRemoveItem={handleRemoveItem}
               startBatchGeneration={startBatchGeneration}
               onPreviewImage={(url) => openGalleryPreview([url], 0)}
-              onPrevStage={() => setCurrentStage(batchMode === 'original' ? 2 : 3)}
+              onPrevStage={() => setCurrentStage(2)}
             />
           )}
 
-          {((batchMode === 'original' && currentStage === 4) || (batchMode === 'replication' && currentStage === 5)) && (
+          {currentStage === 4 && (
             <BatchStage4Queue
               successfulItems={successfulItems}
               availableImageModels={availableImageModels}
@@ -380,7 +403,6 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
         setGalleryIndex={setGalleryIndex}
         handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
       />
-
       {/* 🌟 种草工坊全局生产预设中心模态框 */}
       <WorkshopSettingsModal
         isOpen={isWorkshopConfigOpen}
@@ -392,8 +414,6 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
         setSelectedShotCount={setSelectedShotCount}
         selectedAspect={selectedAspect}
         setSelectedAspect={setSelectedAspect}
-        hasHumanPersona={hasHumanPersona}
-        setHasHumanPersona={setHasHumanPersona}
         selectedQuality={selectedQuality}
         setSelectedQuality={setSelectedQuality}
         selectedVisionModel={selectedVisionModel}
@@ -404,6 +424,8 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
         availableImageModels={availableImageModels}
         generationStrategy={generationStrategy}
         setGenerationStrategy={setGenerationStrategy}
+        autoGenerateCopywriting={autoGenerateCopywriting}
+        setAutoGenerateCopywriting={setAutoGenerateCopywriting}
         imageGenConcurrency={imageGenConcurrency}
         setImageGenConcurrency={setImageGenConcurrency}
         analyzeConcurrency={analyzeConcurrency}
@@ -420,7 +442,15 @@ export default function BatchWorkshopView({ fixedBatchMode }: Props) {
         setLockedOutfitId={setLockedOutfitId}
         availableOutfits={availableOutfits}
       />
-
+      <BatchArchitectureConfirmDialog
+        key={isArchitectureConfirmOpen ? 'architecture-confirm-open' : 'architecture-confirm-closed'}
+        isOpen={isArchitectureConfirmOpen}
+        recipes={recipes}
+        selectedArchId={selectedArchId}
+        onCancel={() => setIsArchitectureConfirmOpen(false)}
+        onConfirm={confirmArchitectureAndAnalyze}
+        products={successfulItems}
+      />
       {/* 底部 Toast */}
       {toastMsg && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 bg-slate-900/95 text-white text-xs font-bold rounded-2xl shadow-2xl border border-slate-700/80 z-50 animate-in fade-in slide-in-from-bottom duration-200">

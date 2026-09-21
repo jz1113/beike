@@ -6,7 +6,8 @@ const ACTIVE_STATUSES = ['running', 'awaiting_approval'] as const;
 
 /**
  * GET /api/assistant/threads/:threadId/runs
- * 列出指定 thread 处于活跃状态的 turn，用于"任务中心"面板的快速过滤。
+ * 列出指定 thread 处于活跃状态的 turn。
+ * Web 任务中心前端已移除，路由保留给恢复/运维查询。
  */
 export async function listActiveRuns(req: Request): Promise<Response> {
   try {

@@ -26,10 +26,7 @@ export interface ImageAdapterInput {
   productImage?: string;
   faceImage?: string;
   sceneImage?: string;
-  compositionImage?: string;
   preferEdits?: boolean;
-  /** 爆款复刻：启用防穿帮负向词与 @图片槽位兜底 */
-  socialMode?: boolean;
   /** Hub 快速生图：不注入工坊守卫与电商长负向词 */
   plainMode?: boolean;
 }

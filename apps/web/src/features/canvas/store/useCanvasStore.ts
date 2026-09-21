@@ -3,21 +3,22 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { canvasStorage } from './canvasPersistence';
 export type { CanvasProject, CanvasNode } from '../types';
-import type { CanvasProject, CanvasNode, CanvasProductionDraft } from '../types';
+import type { CanvasProject, CanvasNode } from '../types';
 
 interface CanvasStoreState {
   projects: CanvasProject[];
   activeProjectId: string | null;
+  /** 当前画布正在查看的节点，仅用于工作区联动，不持久化为项目内容。 */
+  activeNodeId: string | null;
   selectProject: (id: string | null) => void;
+  selectNode: (id: string | null) => void;
   createProject: (title?: string) => CanvasProject;
   updateProjectTitle: (id: string, title: string) => void;
   deleteProject: (id: string) => void;
   addNode: (projectId: string, node: Omit<CanvasNode, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
-  addNodes: (projectId: string, nodes: CanvasNode[]) => void;
   updateNode: (projectId: string, nodeId: string, patch: Partial<CanvasNode>) => void;
   patchNodes: (projectId: string, patches: Record<string, Partial<CanvasNode>>) => void;
   deleteNode: (projectId: string, nodeId: string) => void;
-  setProductionDraft: (projectId: string, draft: CanvasProductionDraft) => void;
 }
 
 export const useCanvasStore = create<CanvasStoreState>()(
@@ -25,8 +26,10 @@ export const useCanvasStore = create<CanvasStoreState>()(
     (set, get) => ({
       projects: [],
       activeProjectId: null,
+      activeNodeId: null,
 
-      selectProject: (id) => set({ activeProjectId: id }),
+      selectProject: (id) => set({ activeProjectId: id, activeNodeId: null }),
+      selectNode: (id) => set({ activeNodeId: id }),
 
       createProject: (customTitle) => {
         if(!customTitle?.trim()) {
@@ -36,7 +39,7 @@ export const useCanvasStore = create<CanvasStoreState>()(
         const timestamp = Date.now();
         const newProject: CanvasProject = {
           id: `canvas-proj-${crypto.randomUUID()}`,
-          title: customTitle?.trim() || '新建画布',
+          title: customTitle?.trim() || '未命名项目',
           draft:!customTitle?.trim(),
           subtitle: '画布 · 刚刚修改',
           thumbnail: undefined,
@@ -95,18 +98,6 @@ export const useCanvasStore = create<CanvasStoreState>()(
         }));
       },
 
-      addNodes: (projectId, nodes) => {
-        for (const node of nodes) get().addNode(projectId, node);
-      },
-
-      setProductionDraft: (projectId, draft) => {
-        set((state) => ({
-          projects: state.projects.map((p) =>
-            p.id === projectId ? { ...p, productionDraft: draft, updatedAt: Date.now() } : p,
-          ),
-        }));
-      },
-
       updateNode: (projectId, nodeId, patch) => {
         set((state) => ({
           projects: state.projects.map((p) => {
@@ -135,6 +126,7 @@ export const useCanvasStore = create<CanvasStoreState>()(
               nodes: p.nodes.filter((n) => n.id !== nodeId).map(n => n.referenceNodeIds?.includes(nodeId) ? {...n, referenceNodeIds: n.referenceNodeIds.filter(id => id !== nodeId)} : n),
             };
           }),
+          activeNodeId: state.activeNodeId === nodeId ? null : state.activeNodeId,
         }));
       },
     }),
@@ -144,8 +136,9 @@ export const useCanvasStore = create<CanvasStoreState>()(
         const saved = persisted as {projects?:CanvasProject[]; activeProjectId?: string | null} | undefined;
         return {
           ...current,
-          projects:normalizeCanvasProjects(saved?.projects || []),
-          activeProjectId: saved?.activeProjectId ?? current.activeProjectId,
+        projects:normalizeCanvasProjects(saved?.projects || []),
+        activeProjectId: saved?.activeProjectId ?? current.activeProjectId,
+        activeNodeId: null,
         };
       },
       storage: createJSONStorage(() => canvasStorage),

@@ -2,7 +2,24 @@ import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
 import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
 import { openExternalUrl } from '@/shared/media/downloadMedia';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import type { BatchTaskItem } from './collectorTypes';
+import { collectedVideos, type BatchTaskItem } from './collectorTypes';
+
+function orderForExport<T extends { importOrder?: number }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (a.importOrder ?? Number.MAX_SAFE_INTEGER) - (b.importOrder ?? Number.MAX_SAFE_INTEGER));
+}
+
+function toExportProduct(item: any, currentName: number) {
+  return {
+    currentName: String(currentName),
+    skuId: item.skuId || item.id || `PROD_${currentName}`,
+    title: item.title || `采集素材_${currentName}`,
+    description: item.description || `来源: ${item.sourceUrl || item.url || ''}`,
+    sourceUrl: item.sourceUrl || item.url || '',
+    coverImage: item.coverImage || item.images?.[0] || '',
+    images: Array.isArray(item.images) ? item.images.filter(Boolean) : [],
+    videos: collectedVideos(item),
+  };
+}
 
 /**
  * 下载标准批量采集表格导入模板
@@ -28,9 +45,9 @@ export async function downloadBatchSuccessTasks(
   showToast: (msg: string) => void,
   setExporting: (loading: boolean) => void,
 ) {
-  const successTasks = tasks.filter(
-    (t) => t.status === 'success' && ((t.images && t.images.length > 0) || t.video),
-  );
+  const successTasks = orderForExport(tasks.filter(
+    (t) => t.status === 'success' && ((t.images && t.images.length > 0) || collectedVideos(t).length > 0),
+  ));
   if (successTasks.length === 0) {
     showToast('⚠️ 当前没有已采集成功的商品可供打包下载');
     return;
@@ -49,13 +66,7 @@ export async function downloadBatchSuccessTasks(
 
       showToast(`📦 正在打包第 ${chunkIdx + 1}/${totalChunks} 卷 (第 ${start + 1}~${end} 款)...`);
 
-      const payloadProducts = chunkTasks.map((t, idx) => ({
-        skuId: `PROD_${start + idx + 1}`,
-        title: t.title || `商品_${start + idx + 1}`,
-        description: `来源链接: ${t.url}\n抓取时间: ${t.time || ''}`,
-        images: Array.isArray(t.images) ? t.images.filter(Boolean) : [],
-        video: t.video || undefined,
-      }));
+      const payloadProducts = chunkTasks.map((t, idx) => toExportProduct(t, start + idx + 1));
 
       const res = await apiFetch('/api/generate/export-zip', {
         method: 'POST',
@@ -101,7 +112,7 @@ export async function downloadBatchSelectedHistory(
   showToast: (msg: string) => void,
   setDownloading: (loading: boolean) => void,
 ) {
-  const selectedList = items.filter((it) => selectedIds.includes(it.id));
+  const selectedList = orderForExport(items.filter((it) => selectedIds.includes(it.id)));
   if (selectedList.length === 0) {
     showToast('⚠️ 请先在汇总库中勾选需要打包下载的商品');
     return;
@@ -120,12 +131,7 @@ export async function downloadBatchSelectedHistory(
 
       showToast(`📦 正在打包第 ${chunkIdx + 1}/${totalChunks} 卷 (第 ${start + 1}~${end} 款)...`);
 
-      const payloadProducts = chunkList.map((it, idx) => ({
-        skuId: it.skuId || `PROD_${start + idx + 1}`,
-        title: it.title || '采集图集',
-        description: it.description || `来源: ${it.sourceUrl || ''}\n作者: ${it.author || ''}`,
-        images: it.images || [],
-      }));
+      const payloadProducts = chunkList.map((it, idx) => toExportProduct(it, start + idx + 1));
 
       const res = await apiFetch('/api/generate/export-zip', {
         method: 'POST',
@@ -169,7 +175,7 @@ export async function downloadSingleVideo(
   showToast: (msg: string) => void,
   setDownloading: (loading: boolean) => void,
 ) {
-  const videoUrl = item.video || item.videoUrl;
+  const videoUrl = collectedVideos(item)[0];
   if (!videoUrl) {
     showToast('⚠️ 未检测到该条目的可下载视频链接');
     return;
@@ -219,7 +225,7 @@ export async function downloadSingleZip(
   showToast: (msg: string) => void,
   setDownloading: (loading: boolean) => void,
 ) {
-  if ((!item.images || item.images.length === 0) && !item.video) {
+  if ((!item.images || item.images.length === 0) && collectedVideos(item).length === 0) {
     showToast('⚠️ 该条目没有可供下载的图片或视频');
     return;
   }
@@ -232,11 +238,8 @@ export async function downloadSingleZip(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        skuId: item.skuId || item.id,
-        productTitle: item.title,
-        description: item.description || `来源: ${item.sourceUrl || ''}`,
-        video: item.video || null,
-        images: item.images || [],
+        products: [toExportProduct(item, 1)],
+        batchTitle: item.title || '采集素材',
       }),
     });
 
@@ -244,10 +247,10 @@ export async function downloadSingleZip(
 
     const blob = await res.blob();
     await saveToDownloadDir(
-      `${item.title.slice(0, 20).replace(/[\\/:*?"<>|]/g, '_')}_高清图集.zip`,
+      `${item.title.slice(0, 20).replace(/[\\/:*?"<>|]/g, '_')}_素材包.zip`,
       blob,
     );
-    showToast('🎉 高清图集 ZIP 已成功下载！');
+    showToast('🎉 素材 ZIP 与 Excel 清单已成功下载！');
   } catch (err: any) {
     showToast(`❌ 打包下载失败: ${formatUserError(err)}`);
   } finally {

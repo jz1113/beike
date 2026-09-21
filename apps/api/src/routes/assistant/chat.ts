@@ -3,7 +3,7 @@ import { parseJsonBody } from '../../core/validate';
 import { turnStartBodySchema } from '@beike/contracts/assistant';
 import { createAssistantSSEStream } from '../../services/assistantAgent';
 
-/** Legacy alias — delegates to Codex-style agent turn engine */
+/** Legacy alias — 与 /turn/start 同引擎。Web 主路径已改用 /turn/start，此入口保留给旧客户端。 */
 export async function POST(req: Request) {
   let body: unknown;
   try {

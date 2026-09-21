@@ -1,13 +1,38 @@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
-import { allowClientCustomBaseUrl } from '@beike/domain/gatewayCreds';
+import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
+
+const LEGACY_BASE_URL_KEYS = ['AI_DRAWING_API_BASE_URL', 'AI_API_BASE', 'AI_BASE_URL'] as const;
+let warnedLegacyGatewayEnv = false;
+
+function warnLegacyGatewayEnv(name: string): void {
+  if (warnedLegacyGatewayEnv) return;
+  warnedLegacyGatewayEnv = true;
+  console.warn(`[API] 请改用 AI_DRAWING_BASE_URL / AI_DRAWING_API_KEY；当前回退读取 ${name}`);
+}
 
 export function getDefaultBaseUrl(): string {
-  return process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
+  const primary = process.env.AI_DRAWING_BASE_URL?.trim();
+  if (primary) return primary;
+  for (const key of LEGACY_BASE_URL_KEYS) {
+    const value = process.env[key]?.trim();
+    if (value) {
+      warnLegacyGatewayEnv(key);
+      return value;
+    }
+  }
+  return 'https://ai.comfly.org';
 }
 
 export function getDefaultApiKey(): string {
-  return process.env.AI_DRAWING_API_KEY || '';
+  const primary = process.env.AI_DRAWING_API_KEY?.trim();
+  if (primary) return primary;
+  const fallback = process.env.AI_API_KEY?.trim();
+  if (fallback) {
+    warnLegacyGatewayEnv('AI_API_KEY');
+    return fallback;
+  }
+  return '';
 }
 
 const NETWORK_ERROR_RE = /(fetch failed|failed to fetch|networkerror|network request failed|econnreset|econnrefused|enotfound|etimedout|eai_again|socket hang up)/i;
@@ -18,27 +43,11 @@ export { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
  * 获取请求使用的 Base URL 和 API Key (优先使用客户端自定义配置)
  */
 export function resolveCredentials(req: Request, body?: any) {
-  const url = new URL(req.url);
-  const customApiKey =
-    body?.customApiKey ||
-    req.headers.get('x-custom-api-key') ||
-    url.searchParams.get('customApiKey') ||
-    undefined;
-  const customBaseUrl = allowClientCustomBaseUrl()
-    ? (body?.customBaseUrl ||
-        req.headers.get('x-custom-base-url') ||
-        url.searchParams.get('customBaseUrl') ||
-        undefined)
-    : undefined;
-
-  const baseUrl = normalizeGatewayBaseUrl(
-    (customBaseUrl && customBaseUrl.trim())
-      ? customBaseUrl
-      : getDefaultBaseUrl()
-  );
-  const apiKey = (customApiKey && customApiKey.trim()) ? customApiKey.trim() : getDefaultApiKey();
-
-  return { baseUrl, apiKey };
+  const { baseUrl, apiKey } = resolveGatewayCreds(req, body, {
+    baseUrl: getDefaultBaseUrl(),
+    apiKey: getDefaultApiKey(),
+  });
+  return { baseUrl: normalizeGatewayBaseUrl(baseUrl), apiKey };
 }
 
 export function isNetworkLikeError(err: unknown): boolean {

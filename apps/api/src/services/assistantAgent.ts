@@ -17,11 +17,18 @@ import { apiApprovalWaiter } from './assistantApprovalStore';
 import { upsertTurn, updateTurnStatus, syncRuntimeToDb, syncSnapshot } from './assistantTurnPersist';
 import { TurnTimer } from './agentTelemetry';
 import { enqueueItemPersist, flushItemQueue } from './itemPersistQueue';
-import { DEFAULT_ASSISTANT_MODEL_ID, isApprovedModel } from '@beike/domain/modelCatalog';
+import {
+  buildMultimodalUpstreamFallbackChain,
+  DEFAULT_ASSISTANT_MODEL_ID,
+  isApprovedModel,
+} from '@beike/domain/modelCatalog';
 import { getDefaultBaseUrl, getDefaultApiKey } from './gatewayCredentials';
 
 function resolveModelCandidates(modelId: string, clientFallbacks: string[] = []): string[] {
-  // Never silently fan out across unrelated models; fallback is user-configured.
+  if (isApprovedModel(modelId, 'multimodal')) {
+    return buildMultimodalUpstreamFallbackChain(modelId);
+  }
+  // 为遗留自定义模型保留调用方传入的候补，白名单模型一律走统一顺序。
   return Array.from(new Set([modelId, ...clientFallbacks].map((value) => value.trim()).filter(Boolean)));
 }
 
@@ -34,6 +41,35 @@ export function interruptActiveAssistantTurn(turnId: string): boolean {
 
 function newTurnId() {
   return `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function workspaceStatusMessage(clientContext: ClientContext | undefined): string {
+  const snapshot = clientContext?.workspaceSnapshot;
+  if (snapshot?.workspaceType === 'canvas') {
+    const title = snapshot.title ? `「${snapshot.title}」` : '当前画布';
+    const count = typeof snapshot.nodeCount === 'number' ? `，${snapshot.nodeCount} 个节点` : '';
+    return `正在读取画布 ${title}${count}，整理本轮可执行路径…`;
+  }
+  if (snapshot?.workspaceType === 'workshop' && snapshot.title) {
+    return `正在读取工坊商品「${snapshot.title}」，整理本轮任务…`;
+  }
+  if (clientContext?.productTitle) return `正在读取当前商品「${clientContext.productTitle}」，整理本轮任务…`;
+  return '正在梳理本轮需求与已有上下文…';
+}
+
+/**
+ * 任务卡用于需要追踪的工作，不应用在“你好 / 在吗 / 继续”这类轻量对话上。
+ * 后者仍会携带工作区摘要并正常得到项目化回答，只是不占用一张执行状态卡。
+ */
+function shouldTrackAssistantTask(
+  text: string,
+  policy: Pick<AssistantTaskState, 'deliverable' | 'referenceScope'>,
+  hasCollectedReferences: boolean,
+): boolean {
+  if (hasCollectedReferences || policy.deliverable !== 'reply' || policy.referenceScope !== 'none') return true;
+  const compact = text.replace(/[\s，。！？、,.!?]/g, '');
+  if (/^(你好|嗨|哈喽|在吗|开始|继续|看看|帮忙|帮助|在不在)$/u.test(compact)) return false;
+  return compact.length > 12;
 }
 
 /** 给 started 事件构造一个最小化的 item，用于流式持久化入队 */
@@ -150,6 +186,7 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   const skillTools = resolveSkillAllowedTools(skillId, clientAllowedTools);
   const lastInput = [...messages].reverse().find((m: any) => m?.role === 'user') as { content?: string; attachments?: Array<{ type: string; url?: string; name?: string }> } | undefined;
   const policy = resolveTaskPolicy(lastInput?.content || '', body.runMode, body.referenceScope);
+  let trackTask = shouldTrackAssistantTask(lastInput?.content || '', policy, false);
   const taskTools = toolsForTask(policy.mode, skillTools);
   const allowedTools = taskTools;
   const collectionIntent = socialCollectionIntent(typeof lastInput?.content === 'string' ? lastInput.content : '');
@@ -208,6 +245,8 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     }
   }
 
+  trackTask = shouldTrackAssistantTask(lastInput?.content || '', policy, Boolean(collection?.images.length));
+
   const { baseUrl, apiKey } = resolveGatewayCreds(
     req,
     { customBaseUrl, customApiKey },
@@ -224,7 +263,7 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     return;
   }
 
-  send({ type: 'status', phase: 'preparing', message: '正在处理请求…' });
+  send({ type: 'status', phase: 'preparing', message: workspaceStatusMessage(clientContext as ClientContext | undefined) });
 
   let memorySummary = '';
   const memoryHeartbeat = setInterval(() => send({ type: 'ping' }), 15000);
@@ -257,8 +296,8 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   });
 
   const task: AssistantTaskState = { ...policy, goal: (lastInput?.content || '处理本次素材').slice(0, 180),
-    totalReferences: collection?.images.length || 0, references: [], status: 'running', stage: '准备上下文' };
-  if (!collection?.images.length) {
+    totalReferences: collection?.images.length || 0, references: [], status: 'running', stage: '读取当前工作区' };
+  if (!collection?.images.length && trackTask) {
     send({ type: 'task', task: { ...task } });
     await syncSnapshot(turnId, { task });
   }
@@ -280,13 +319,17 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
       }
       task.references = referenceContext.images.map(image => ({ number: collection!.images.findIndex(candidate => candidate.url === image.url) + 1, label: image.label, url: image.url }));
       task.stage = policy.deliverable === 'storyboard' ? '参考版式并撰写逐页方案' : '结合素材生成回复';
-      send({ type: 'task', task: { ...task } });
-      await syncSnapshot(turnId, { task });
+      if (trackTask) {
+        send({ type: 'task', task: { ...task } });
+        await syncSnapshot(turnId, { task });
+      }
     } catch (error) {
       const message = formatUserError(error, '素材处理失败');
       task.status = signal?.aborted ? 'cancelled' : 'failed'; task.stage = message;
-      send({ type: 'task', task: { ...task } });
-      await syncSnapshot(turnId, { task });
+      if (trackTask) {
+        send({ type: 'task', task: { ...task } });
+        await syncSnapshot(turnId, { task });
+      }
       await updateTurnStatus(turnId, signal?.aborted ? 'interrupted' : 'failed').catch(() => undefined);
       send({ type: 'error', error: message });
       turnTimer.complete({ status: signal?.aborted ? 'interrupted' : 'failed', reason: message });
@@ -302,7 +345,7 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     ] });
   }
 
-  send({ type: 'status', phase: 'ready', message: '消息已就绪，正在连接模型…' });
+  send({ type: 'status', phase: 'ready', message: '已整理当前上下文，正在生成可执行回应…' });
 
   const clientFallbacks = Array.isArray(fallbackModels)
     ? fallbackModels.filter((m): m is string => typeof m === 'string' && Boolean(m.trim())).map((m) => m.trim())
@@ -408,8 +451,8 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     else runtime.complete(false);
     task.status = signal?.aborted ? 'cancelled' : 'completed';
     task.stage = signal?.aborted ? '用户已停止' : '本轮已完成';
-    const snapshot = { ...runtime.snapshot(), task };
-    send({ type: 'task', task: { ...task } });
+    const snapshot = { ...runtime.snapshot(), ...(trackTask ? { task } : {}) };
+    if (trackTask) send({ type: 'task', task: { ...task } });
     send({
       type: 'turn/snapshot',
       turnId,
@@ -430,8 +473,10 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   } catch (error: unknown) {
     task.status = signal?.aborted ? 'cancelled' : 'failed';
     task.stage = signal?.aborted ? '用户已停止' : formatUserError(error, '本轮未完成');
-    send({ type: 'task', task: { ...task } });
-    await syncSnapshot(turnId, { task });
+    if (trackTask) {
+      send({ type: 'task', task: { ...task } });
+      await syncSnapshot(turnId, { task });
+    }
     if (signal?.aborted) {
       await updateTurnStatus(turnId, 'interrupted').catch(() => undefined);
       send({ type: 'turn/interrupted', turnId });

@@ -129,11 +129,6 @@ function attachReferenceFields(
     next.scene_anchor = safeScene;
     next.environment_anchor_image = safeScene;
   }
-  if (input.compositionImage) {
-    const safeComp = ensureSafePublicMediaUrl(input.compositionImage);
-    next.composition_image = safeComp;
-    next.composition_url = safeComp;
-  }
   if (input.images && input.images.length > 0) {
     const safeList = input.images.map((img) => ensureSafePublicMediaUrl(img) || img);
     next.images = safeList;
@@ -170,8 +165,6 @@ function buildFormatPayloadInput(input: ImageAdapterInput) {
       ? false
       : input.hasHuman === true || (input.hasHuman !== false && Boolean(input.faceImage)),
     shotType: input.shotType,
-    socialMode: input.socialMode,
-    padSocialRef: Boolean(input.compositionImage),
     hasFace: Boolean(input.faceImage),
     plainMode: input.plainMode,
   };

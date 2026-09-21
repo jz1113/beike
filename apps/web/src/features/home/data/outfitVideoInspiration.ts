@@ -37,5 +37,5 @@ export const OUTFIT_VIDEO_INSPIRATION:InspirationItem={
   image:'/inspirations/outfit-unboxing/poster.jpg',video:'/inspirations/outfit-unboxing/video.mp4',poster:'/inspirations/outfit-unboxing/poster.jpg',mediaType:'video',
   referenceImages:['/inspirations/outfit-unboxing/person.png','/inspirations/outfit-unboxing/dress.png'],
   referenceLabels:['博主人物 · 原提示词 @image1','连衣裙 · 原提示词 @image4（使用时为 @image2）'],
-  videoRefMode:'omni',videoDuration:10,actualVideoDuration:10.08,aspectRatio:'9:16',quality:'720P',storyboardPresetId:'replication-1to1',
+  videoRefMode:'omni',videoDuration:10,actualVideoDuration:10.08,aspectRatio:'9:16',quality:'720P',storyboardPresetId:'lifestyle-4shot',
 };

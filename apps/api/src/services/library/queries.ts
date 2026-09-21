@@ -127,6 +127,7 @@ export async function executeLibraryGet(req: Request) {
         skip: (page - 1) * 1000,
       }),
       prisma.fullPromptAsset.findMany({
+        where: { OR: [{ groupIndex: { not: null } }, { provenance: { not: 'legacy_single' } }] },
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
         skip: (page - 1) * 1000,
@@ -173,6 +174,12 @@ export async function executeLibraryGet(req: Request) {
           'actionSummary',
           'personaSummary',
           'sourceImageIndex',
+          'sourceImageIndices',
+          'groupIndex',
+          'contentSummary',
+          'architectureSummary',
+          'replaceableSlots',
+          'shotPromptsJson',
           'provenance',
         ]);
         const preview = buildPromptPreview(f.reversePromptZh);
@@ -284,7 +291,13 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'full_prompt') {
-    const where: any = await buildLibraryListWhere('full_prompt', searchParams, ['title', 'albumName', 'reversePromptZh', 'reversePromptEn', 'tags', 'sceneSummary', 'outfitSummary', 'actionSummary']);
+    const baseWhere: any = await buildLibraryListWhere('full_prompt', searchParams, ['title', 'albumName', 'reversePromptZh', 'reversePromptEn', 'tags', 'sceneSummary', 'outfitSummary', 'actionSummary']);
+    const where: any = {
+      AND: [
+        baseWhere,
+        { OR: [{ groupIndex: { not: null } }, { provenance: { not: 'legacy_single' } }] },
+      ],
+    };
 
     const [total, items] = await Promise.all([
       prisma.fullPromptAsset.count({ where }),

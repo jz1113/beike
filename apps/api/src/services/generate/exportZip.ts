@@ -4,6 +4,7 @@ import { readResponseBodyLimited } from '../../core/readBodyLimited';
 import { parseExportZipBody } from '../../core/validate';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 
 /** 打包下载默认使用最高并发（上限 16 路） */
 const DEFAULT_DOWNLOAD_CONCURRENCY = 16;
@@ -43,6 +44,42 @@ export function buildProductFolderName(skuId?: string, title?: string): string {
     return `${cleanId}-${cleanTitle}`;
   }
   return cleanId;
+}
+
+function mediaExtension(url: string, mediaType: 'image' | 'video'): string {
+  const dataMime = url.match(/^data:([a-z0-9.+-]+)\/([a-z0-9.+-]+);/i);
+  if (dataMime) {
+    const ext = dataMime[2].toLowerCase();
+    if (['jpeg', 'jpg', 'png', 'webp', 'gif', 'avif', 'bmp', 'mp4', 'quicktime', 'webm'].includes(ext)) {
+      return ext === 'jpeg' ? 'jpg' : ext === 'quicktime' ? 'mov' : ext;
+    }
+  }
+  try {
+    const ext = new URL(url.startsWith('//') ? `https:${url}` : url).pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase();
+    if (ext && ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'bmp', 'mp4', 'mov', 'm4v', 'webm', 'avi', 'flv'].includes(ext)) {
+      return ext === 'jpeg' ? 'jpg' : ext;
+    }
+  } catch {
+    // URL 非标准时保留默认扩展名，下载错误会写入同名 .error.txt。
+  }
+  return mediaType === 'video' ? 'mp4' : 'jpg';
+}
+
+type ExportManifestRow = {
+  '当前命名': string;
+  '原标题': string;
+  '链接': string;
+  '封面图链接': string;
+};
+
+function addExportManifest(zipFolder: JSZip, rows: ExportManifestRow[]) {
+  const sheet = XLSX.utils.json_to_sheet(rows, {
+    header: ['当前命名', '原标题', '链接', '封面图链接'],
+  });
+  sheet['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 72 }, { wch: 72 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, '采集清单');
+  zipFolder.file('采集清单.xlsx', XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }), MEDIA_FILE_OPTS);
 }
 
 /** 规范化拼接小红书种草文案文本文件内容 */
@@ -101,7 +138,6 @@ export async function POST(req: Request) {
       batchTitle = '全渠道采集批量导出',
       downloadConcurrency: requestedConcurrency,
       products,
-      skuId = 'COLLECTION_EXPORT',
       productTitle = '采集素材图集',
       description = '',
       video = null,
@@ -171,7 +207,7 @@ export async function POST(req: Request) {
       try {
         if (!url || typeof url !== 'string') return null;
         if (url.startsWith('data:')) {
-          const matches = url.match(/^data:([A-Za-z\-+/]+);base64,(.+)$/);
+          const matches = url.match(/^data:([A-Za-z0-9!#$&^_.+\-/]+);base64,(.+)$/);
           if (matches && matches.length === 3) {
             return Buffer.from(matches[2], 'base64');
           }
@@ -300,15 +336,28 @@ export async function POST(req: Request) {
       const cleanBatchName = (batchTitle || '全渠道批量采集成果').replace(/[\\/:*?"<>|]/g, '_');
       const rootFolder = zip.folder(cleanBatchName) || zip;
       const pendingTasks: PendingDownloadTask[] = [];
+      const manifestRows: ExportManifestRow[] = [];
 
       for (let pIdx = 0; pIdx < products.length; pIdx++) {
         const prod = products[pIdx];
         const pTitle = prod.copywritingTitle || prod.title || prod.productTitle || `商品_${pIdx + 1}`;
-        const pId = prod.skuId || `ID_${pIdx + 1}`;
-        const safeFolderName = buildProductFolderName(pId, pTitle);
+        const currentName = sanitizeFileSystemName(String(prod.currentName || pIdx + 1), String(pIdx + 1));
+        const safeFolderName = currentName;
         const prodFolder = rootFolder.folder(safeFolderName) || rootFolder;
+        const effectiveVideos = Array.from(new Set([
+          ...(Array.isArray(prod.videos) ? prod.videos : []),
+          prod.video,
+          prod.videoUrl,
+        ].filter((url): url is string => typeof url === 'string' && Boolean(url))));
 
-        const effectiveVideo = prod.video || prod.videoUrl;
+        const firstImage = prod.images?.[0];
+        const firstImageUrl = typeof firstImage === 'string' ? firstImage : firstImage?.url || '';
+        manifestRows.push({
+          '当前命名': currentName,
+          '原标题': pTitle,
+          '链接': prod.sourceUrl || '',
+          '封面图链接': prod.coverImage || firstImageUrl,
+        });
 
         const prodCopyTxt = buildCopywritingTxtContent(
           prod.copywritingTitle || prod.title,
@@ -335,8 +384,8 @@ export async function POST(req: Request) {
         for (let iIdx = 0; iIdx < uniqueList.length; iIdx++) {
           const item = uniqueList[iIdx];
           const u = typeof item === 'string' ? item : item.url;
-          const num = typeof item === 'object' && item.shotNo ? item.shotNo : iIdx + 1;
-          let filename = typeof item === 'object' && item.filename ? item.filename : `shot_${String(num).padStart(2, '0')}.jpg`;
+          const num = iIdx + 1;
+          let filename = typeof item === 'object' && item.filename ? item.filename : `${num}.${mediaExtension(u, 'image')}`;
           if (!filename.includes('.')) filename += '.jpg';
 
           pendingTasks.push({
@@ -348,17 +397,19 @@ export async function POST(req: Request) {
           });
         }
 
-        if (effectiveVideo) {
+        for (let vIdx = 0; vIdx < effectiveVideos.length; vIdx++) {
+          const videoUrl = effectiveVideos[vIdx];
           pendingTasks.push({
             folder: prodFolder,
-            filename: 'video_01.mp4',
-            url: effectiveVideo,
-            errorFilename: 'video_01.error.txt',
-            errorMessage: `视频下载失败，原始URL: ${effectiveVideo}`,
+            filename: `${uniqueList.length + vIdx + 1}.${mediaExtension(videoUrl, 'video')}`,
+            url: videoUrl,
+            errorFilename: `${uniqueList.length + vIdx + 1}.error.txt`,
+            errorMessage: `视频/动态下载失败，原始URL: ${videoUrl}`,
           });
         }
       }
 
+      addExportManifest(rootFolder, manifestRows);
       await runPendingDownloads(pendingTasks);
       return buildZipResponse(cleanBatchName);
     }
@@ -366,15 +417,15 @@ export async function POST(req: Request) {
     // -------------------------------------------------------------
     // 模式 B：单商品/单条目常规导出 (向后完全兼容，支持视频)
     // -------------------------------------------------------------
-    const targetVideo = video || videoUrl;
-    if ((!images || images.length === 0) && !targetVideo) {
+    const targetVideos = Array.from(new Set([video, videoUrl].filter((url): url is string => typeof url === 'string' && Boolean(url))));
+    if ((!images || images.length === 0) && targetVideos.length === 0) {
       return jsonResponse({ success: false, error: '没有可打包的图片或视频素材' }, 400);
     }
 
     const effectiveTitle = parsed.data.copywritingTitle || productTitle || '买家秀交付包';
     const cleanFolderName = parsed.data.folderName
       ? sanitizeFileSystemName(parsed.data.folderName)
-      : buildProductFolderName(skuId, effectiveTitle);
+      : '1';
 
     const folder = zip.folder(cleanFolderName) || zip;
 
@@ -398,11 +449,7 @@ export async function POST(req: Request) {
 
     const normalizedImages: ExportImageItem[] = uniqueImagesList.map((item, idx) => {
       if (typeof item === 'string') {
-        return {
-          url: item,
-          filename: `shot_${String(idx + 1).padStart(2, '0')}.jpg`,
-          shotNo: idx + 1
-        };
+        return { url: item, filename: `${idx + 1}.${mediaExtension(item, 'image')}`, shotNo: idx + 1 };
       }
       return item;
     });
@@ -419,7 +466,7 @@ export async function POST(req: Request) {
 
     const pendingTasks: PendingDownloadTask[] = normalizedImages.map((item, idx) => {
       const num = item.shotNo || idx + 1;
-      let filename = item.filename || `shot_${String(num).padStart(2, '0')}.jpg`;
+      let filename = item.filename || `${num}.${mediaExtension(item.url, 'image')}`;
       if (!filename.includes('.')) filename += '.jpg';
 
       return {
@@ -431,15 +478,23 @@ export async function POST(req: Request) {
       };
     });
 
-    if (targetVideo) {
+    for (let vIdx = 0; vIdx < targetVideos.length; vIdx++) {
+      const targetVideo = targetVideos[vIdx];
       pendingTasks.push({
         folder,
-        filename: `${cleanFolderName}_原视频.mp4`,
+        filename: `${normalizedImages.length + vIdx + 1}.${mediaExtension(targetVideo, 'video')}`,
         url: targetVideo,
-        errorFilename: `${cleanFolderName}_原视频.error.txt`,
-        errorMessage: `视频下载失败，原始URL: ${targetVideo}`,
+        errorFilename: `${normalizedImages.length + vIdx + 1}.error.txt`,
+        errorMessage: `视频/动态下载失败，原始URL: ${targetVideo}`,
       });
     }
+
+    addExportManifest(folder, [{
+      '当前命名': '1',
+      '原标题': effectiveTitle,
+      '链接': '',
+      '封面图链接': typeof images[0] === 'string' ? images[0] : images[0]?.url || '',
+    }]);
 
     await runPendingDownloads(pendingTasks);
     return buildZipResponse(cleanFolderName);

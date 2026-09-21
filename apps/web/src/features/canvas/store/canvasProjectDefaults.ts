@@ -1,4 +1,6 @@
 import type {CanvasProject} from '../types';
+
+/** 仅用于滤掉早期内置 Unsplash 演示项目，不再作为运行时素材来源。 */
 const LEGACY_PROJECTS: CanvasProject[] = [
   {
     id: 'project-preset-1',
@@ -64,6 +66,20 @@ export function normalizeCanvasProjects(projects:CanvasProject[]) {
       const keys=new Set([...Object.keys(node),...Object.keys(expected)]);
       return [...keys].every(key=>key==='createdAt' || JSON.stringify(node[key as keyof typeof node])===JSON.stringify(expected[key as keyof typeof expected]));
     });
-  })).map(project=> project.title.trim() && project.title!=='未命名项目' ? project : {...project,title:project.nodes.find(n=>n.title?.trim())?.title?.trim().slice(0,30) || '新建画布',draft:!project.nodes.length});
+  })).map(project => {
+    const rest = { ...project } as CanvasProject & { productionDraft?: unknown };
+    delete rest.productionDraft;
+    const title = rest.title?.trim() || '';
+    // 早期草稿可能被错误写入单个数字（如 "1"）。无节点时这不是有效名称，统一回到未命名状态。
+    const isUntitled = !title || title === '未命名项目' || title === '新建画布' || (!rest.nodes.length && /^\d+$/.test(title));
+    if (!isUntitled) return rest;
+
+    const firstNodeTitle = rest.nodes.find(node => node.title?.trim())?.title?.trim().slice(0, 30);
+    return {
+      ...rest,
+      title: firstNodeTitle || '未命名项目',
+      draft: !rest.nodes.length,
+    };
+  });
 }
 export const visibleCanvasProjects=(projects:CanvasProject[])=>normalizeCanvasProjects(projects).filter(project=>!project.draft || project.nodes.length>0);

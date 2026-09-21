@@ -181,7 +181,14 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
           wanbangSecret: wanbangSecret.trim() || undefined,
         }),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { success?: boolean; message?: string; error?: string } = {};
+      try {
+        data = raw.trim() ? JSON.parse(raw) : {};
+      } catch {
+        showToast('🔴 万邦接口异常: 服务端返回空或非 JSON 响应，请确认应用服务正在运行后重试');
+        return;
+      }
       if (res.ok && data.success) {
         showToast(`🟢 ${data.message || '万邦电商接口连通正常！'}`);
       } else {

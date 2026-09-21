@@ -16,7 +16,7 @@ import {
   preventJewelryGlitches,
 } from './roles';
 import { getOriginalDiversityForShot } from './storyboard';
-import { cleanPromptText, ensureReplicationPromptSlots, softenReplicationSafetyWording, harmonizeOriginalPrompt } from './guards';
+import { cleanPromptText, harmonizeOriginalPrompt } from './guards';
 import { sanitizeScenePrompt } from '../assetDeconstruct/sanitize';
 import { resolveJewelryShotOptics } from './jewelryFraming';
 import { buildGridCollagePrompt, type Grid2x2Options } from './gridPanels';
@@ -294,21 +294,4 @@ export function assembleGrid2x2Prompt(
     productRole: role,
     productFingerprint: bible.productFingerprint,
   });
-}
-
-/**
- * 确定性拼装复刻 2×2 四宫格 Master Collage 提示词
- */
-export function assembleReplicationGrid2x2Prompt(
-  bible: OriginalGroupBible,
-  shots: OriginalShotFields[],
-  options?: Grid2x2Options
-): string {
-  const collage = assembleGrid2x2Prompt(bible, shots, options);
-  return softenReplicationSafetyWording(
-    ensureReplicationPromptSlots(collage, {
-      hasHuman: bible.identityBible !== '纯商品静物，无人物',
-      hasFace: false,
-    })
-  );
 }

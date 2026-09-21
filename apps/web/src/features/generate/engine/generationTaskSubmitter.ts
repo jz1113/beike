@@ -8,6 +8,7 @@ import { resolveRefMediaFile } from '@/shared/media/refMediaRegistry';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { logLatencyAudit } from '@beike/domain/latencyAudit';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@/shared/api/generationAbort';
 import {
   clearDepthSubmit,
   peekDepthSubmit,
@@ -30,6 +31,14 @@ export async function submitSingleGenerationTask(
   slowPollIds: Set<string>,
   signal?: AbortSignal,
 ) {
+  if (signal?.aborted) {
+    updateGenerationTask(t.id, {
+      status: 'FAILURE',
+      failReason: GENERATION_CANCELLED_MESSAGE,
+    });
+    return;
+  }
+
   if (isDepthImageTask(t) || isDepthVideoTask(t)) {
     let payload = peekDepthSubmit(t.id);
     if (!payload) {
@@ -202,6 +211,13 @@ export async function submitSingleGenerationTask(
       });
     }
   } catch (networkErr: any) {
+    if (isGenerationCancelled(networkErr, signal)) {
+      updateGenerationTask(t.id, {
+        status: 'FAILURE',
+        failReason: GENERATION_CANCELLED_MESSAGE,
+      });
+      return;
+    }
     console.warn(`[generationEngine] 网络连接异常:`, networkErr?.message);
     logLatencyAudit({
       hypothesisId: 'H4',
@@ -219,6 +235,14 @@ export async function submitSingleGenerationTask(
     updateGenerationTask(t.id, {
       status: 'FAILURE',
       failReason: formatUserError(networkErr, '网络连接异常，请检查网络后重试'),
+    });
+    return;
+  }
+
+  if (signal?.aborted) {
+    updateGenerationTask(t.id, {
+      status: 'FAILURE',
+      failReason: GENERATION_CANCELLED_MESSAGE,
     });
     return;
   }

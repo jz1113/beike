@@ -61,37 +61,8 @@ export async function POST(req: Request) {
     const action = url.searchParams.get('action');
 
     if (action === 'seed') {
-      const { OFFICIAL_MASTER_RECIPES } = await import('@beike/domain/masterRecipes');
-
-      for (const item of OFFICIAL_MASTER_RECIPES) {
-        const exists = await prisma.styleRecipe.findFirst({
-          where: {
-            OR: [
-              { id: item.id },
-              { name: item.name },
-              { category: item.category },
-              { name: { contains: '珠宝' } },
-            ],
-          },
-        });
-        if (exists) {
-          await prisma.styleRecipe.update({
-            where: { id: exists.id },
-            data: {
-              name: item.name,
-              category: item.category,
-              tag: item.tag,
-              desc: item.desc,
-              promptSnippet: item.promptSnippet,
-              coverUrl: item.coverUrl,
-              sampleImages: item.sampleImages,
-              isFavorite: true,
-            },
-          });
-        } else {
-          await prisma.styleRecipe.create({ data: item });
-        }
-      }
+      const { upsertOfficialMasterRecipes } = await import('@beike/server-kit/officialCatalogSeed');
+      await upsertOfficialMasterRecipes();
       return jsonResponse({ success: true, message: '官方预置品类拍摄大架构已全面更新至 V6.0 资产库联动版' });
     }
 

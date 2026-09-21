@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const inFlight = new Map<string, Promise<Response>>();
+export const SUBMISSION_RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
+
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -10,6 +12,35 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 interface Receipt { fingerprint: string; status?: number; body?: string; createdAt: number }
+
+export function isExpiredReceipt(createdAt: number | undefined, now = Date.now()): boolean {
+  return !createdAt || now - createdAt >= SUBMISSION_RECEIPT_TTL_MS;
+}
+
+function receiptsDir(): string {
+  const root = process.env.AZHUO_DATA_DIR || path.resolve('.local/submission-receipts');
+  return path.join(root, 'submission-receipts');
+}
+
+export async function purgeExpiredSubmissionReceipts(now = Date.now()): Promise<number> {
+  const dir = receiptsDir();
+  const names = await fs.readdir(dir).catch(() => [] as string[]);
+  let purged = 0;
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    const file = path.join(dir, name);
+    try {
+      const saved = JSON.parse(await fs.readFile(file, 'utf8')) as Receipt;
+      if (isExpiredReceipt(saved.createdAt, now)) {
+        await fs.unlink(file);
+        purged += 1;
+      }
+    } catch {
+      /* ignore unreadable receipts */
+    }
+  }
+  return purged;
+}
 
 /** Durable receipt is claimed before dispatch. Unknown outcomes are never blindly resubmitted. */
 export async function guardSubmission(req: Request, kind: string, credentials: { baseUrl: string; apiKey: string }, submit: () => Promise<Response>): Promise<Response> {
@@ -36,19 +67,25 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
     return response.clone();
   }
   const run = async (): Promise<Response> => {
-    const root = process.env.AZHUO_DATA_DIR || path.resolve('.local/submission-receipts');
-    const dir = path.join(root, 'submission-receipts');
+    const dir = receiptsDir();
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
     const file = path.join(dir, `${key}.json`);
     const receipt: Receipt = { fingerprint, createdAt: Date.now() };
-    try {
-      await fs.writeFile(file, JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      const saved: Receipt = JSON.parse(await fs.readFile(file, 'utf8'));
-      if (saved.fingerprint !== fingerprint) return conflict();
-      if (saved.status && saved.body !== undefined) return new Response(saved.body, { status: saved.status, headers: { 'content-type': 'application/json', 'x-request-fingerprint': fingerprint } });
-      return Response.json({ success: false, error: '该任务正在提交或提交结果待核对，请查询原任务，不要重复提交', submissionUnknown: true }, { status: 409 });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await fs.writeFile(file, JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        const saved: Receipt = JSON.parse(await fs.readFile(file, 'utf8'));
+        if (isExpiredReceipt(saved.createdAt)) {
+          await fs.unlink(file).catch(() => {});
+          continue;
+        }
+        if (saved.fingerprint !== fingerprint) return conflict();
+        if (saved.status && saved.body !== undefined) return new Response(saved.body, { status: saved.status, headers: { 'content-type': 'application/json', 'x-request-fingerprint': fingerprint } });
+        return Response.json({ success: false, error: '该任务正在提交或提交结果待核对，请查询原任务，不要重复提交', submissionUnknown: true }, { status: 409 });
+      }
     }
     const response = await submit();
     const text = await response.clone().text();

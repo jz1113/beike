@@ -20,6 +20,25 @@ function extractErrorMessage(err: unknown): { name: string; message: string } {
   return { name: '', message: String(err ?? '') };
 }
 
+/**
+ * 上游模型不可用时可以安全切换的 HTTP 状态。
+ * 参数、鉴权、额度和内容安全类错误会原样返回，避免把同一请求扩散到多个模型。
+ */
+export function isRetryableUpstreamStatus(status: number): boolean {
+  return status === 404 || status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+/** 是否属于可由下一模型接手的网络或超时异常。 */
+export function isRetryableUpstreamError(err: unknown): boolean {
+  const status = Number((err as { status?: unknown } | undefined)?.status);
+  if (Number.isFinite(status)) return isRetryableUpstreamStatus(status);
+
+  const { name, message } = extractErrorMessage(err);
+  return /abort|timeout|timed out|network|fetch failed|load failed|econn|enotfound|socket|connection reset|terminated/i.test(
+    `${name} ${message}`,
+  );
+}
+
 function humanizeUpstreamMessage(raw: string): string {
   const msg = raw.trim();
   if (!msg) return '操作失败，请稍后重试';

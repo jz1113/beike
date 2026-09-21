@@ -209,10 +209,6 @@
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/ui/ParticleText.tsx",
-      "lines": 401
-    },
-    {
       "file": "apps/web/src/store/workshopSlice.ts",
       "lines": 401
     },

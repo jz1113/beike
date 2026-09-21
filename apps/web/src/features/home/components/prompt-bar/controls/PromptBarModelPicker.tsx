@@ -5,10 +5,12 @@ import { clampVideoDuration } from '@beike/domain/video';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { densityComposerPill } from '@/shared/ui/layoutClasses';
 const cleanModelName = (name: string = '') => name.replace(/\s*[（(]标准[）)]/g, '').trim();
+const pickerLabel = (m: { name: string; shortName?: string }) => cleanModelName(m.shortName || m.name);
 
 interface ModelLike {
   id: string;
   name: string;
+  shortName?: string;
   provider?: string;
   badge?: string;
   isPrimary?: boolean;
@@ -65,7 +67,7 @@ export default function PromptBarModelPicker({
           {getModelIcon(quickGenMode === 'video' ? activeVideoModelObj.id : activeImageModelObj.id, "w-5 h-5")}
         </div>
         <span className="truncate max-w-[110px] sm:max-w-[180px] lg:max-w-[240px] xl:max-w-[320px] inline-block font-medium">
-          {cleanModelName(quickGenMode === 'video' ? activeVideoModelObj.name : activeImageModelObj.name)}
+          {pickerLabel(quickGenMode === 'video' ? activeVideoModelObj : activeImageModelObj)}
         </span>
         <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
       </button>
@@ -116,7 +118,7 @@ export default function PromptBarModelPicker({
                         <div className="w-5 h-5 bg-transparent flex items-center justify-center shrink-0 p-0.5 group-hover:scale-105 transition-transform">
                           {getModelIcon(m.id, "w-3.5 h-3.5")}
                         </div>
-                        <span className="truncate text-[11.5px] sm:text-xs font-semibold text-slate-800 group-hover:text-slate-950">{cleanModelName(m.name)}</span>
+                        <span className="truncate text-[11.5px] sm:text-xs font-semibold text-slate-800 group-hover:text-slate-950">{pickerLabel(m)}</span>
                       </div>
 
                       {isSelected && (
@@ -160,7 +162,7 @@ export default function PromptBarModelPicker({
                       <div className="w-5 h-5 bg-transparent flex items-center justify-center shrink-0 p-0.5 group-hover:scale-105 transition-transform">
                         {getModelIcon(m.id, "w-3.5 h-3.5")}
                       </div>
-                      <span className="truncate text-[11.5px] sm:text-xs font-semibold text-slate-800 group-hover:text-slate-950">{cleanModelName(m.name)}</span>
+                      <span className="truncate text-[11.5px] sm:text-xs font-semibold text-slate-800 group-hover:text-slate-950">{pickerLabel(m)}</span>
                     </div>
 
                     {isSelected && (

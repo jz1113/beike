@@ -471,7 +471,7 @@ function buildMachineJsonLayer(params: {
 
   const singleImageGuard = isSingleImage
     ? `\n🚨【单图铁律】只输出第 ${focusIndex} 张图片的分析；per_image 仅 1 条且 image_index=${focusIndex}；scenes/outfits/actions 各仅 1 条。`
-    : `\n🚨【多图铁律】必须输出恰好 ${imageCount} 条 per_image（image_index 从 1 到 ${imageCount} 连续不遗漏）；actions 数量 ≤ ${imageCount}；scenes 聚类去重后 1~3 个，严禁每张图各建 1 场景。`;
+    : `\n🚨【多图铁律】必须输出恰好 ${imageCount} 条 per_image（image_index 从 1 到 ${imageCount} 连续不遗漏）；actions 数量 ≤ ${imageCount}；scenes 聚类去重后 1~3 个，严禁每张图各建 1 场景。必须额外输出 content_summary 与 content_groups：每个图组连续、最多 4 图、且一个图组只能有一个场景。`;
 
   const perImageExamples = singleImageOnly
     ? PER_IMAGE_JSON_TEMPLATE(focusIndex)
@@ -483,6 +483,17 @@ function buildMachineJsonLayer(params: {
     ? PER_IMAGE_JSON_TEMPLATE(focusIndex)
     : `{
   "theme_category": "chinese_style | luxury_modern | casual_street | vacation_nature | commuting_car | home_living | minimal_office",
+  "content_summary": "这一整条内容的商品叙事、拍摄调性与图文节奏总结；不逐一分析人物五官",
+  "content_groups": [
+    {
+      "group_index": 1,
+      "source_image_indices": [1, 2, 3, 4],
+      "title": "图组短标题",
+      "scene_summary": "本组唯一场景的空间骨架与采光，不含人物、穿搭",
+      "architecture_summary": "固定镜头节奏、每张图的景别/构图/动作逻辑；人物、穿搭、场景仅能按整组替换",
+      "has_human": true
+    }
+  ],
   "per_image": [
     ${perImageExamples}
   ],
@@ -560,6 +571,8 @@ ${singleImageGuard}
 - 严格遵循标准合法 JSON 语法：字符串值中严禁包含未转义的原生回车换行符，多行文本分段必须使用 \\n 转义，字符串与键名一律使用英文双引号
 ${isSingleImage ? `- 只输出第 ${focusIndex} 张图片的分析，不要输出其它 image_index` : `- 必须完整输出全部 ${imageCount} 张图片的分析，各图描述保持高密度精炼，确保输出的单个 JSON 语法完整闭合`}
 - 无人物时 has_human=false
+- content_groups 必须覆盖每一张图且不重复；图组按原图顺序连续划分，单组最多 4 张。若 8 张为同一内容，可输出两个 4 图组；不要将不同场景混在同一组。
+- 每个 content_group 固定一个场景、固定动作/摆放和构图节奏；人物、穿搭、场景只能作为整组可替换槽位，绝不能让每张图自由混搭。
 - JSON 键名和枚举保留模板中的英文
 
 ${PHONE_REVERSE_POLICY}
@@ -614,6 +627,19 @@ export interface PerImageResult {
     skin?: string;
     vibe?: string;
   };
+}
+
+/**
+ * 外站内容反推后得到的连续图组。每组最多四图、只允许一个场景；
+ * 人物、穿搭与场景只在图组层级替换，单图只保留镜头和动作差异。
+ */
+export interface ContentPromptGroup {
+  group_index: number;
+  source_image_indices: number[];
+  title?: string;
+  scene_summary?: string;
+  architecture_summary?: string;
+  has_human?: boolean;
 }
 
 export interface AssembleReversePromptOptions {

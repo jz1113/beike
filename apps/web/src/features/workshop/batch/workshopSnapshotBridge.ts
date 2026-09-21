@@ -1,10 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 import type { BatchProductItem, GenerationStrategy } from './batchTypes';
-import { useWorkshopWorkspace } from './hooks/useWorkshopWorkspace';
+import { useWorkshopBatchWorkspace } from './hooks/useWorkshopBatchWorkspace';
 
 export interface WorkshopLiveState {
-  batchMode: 'original' | 'replication';
   currentStage: number;
   batchInputText: string;
   items: BatchProductItem[];
@@ -21,16 +20,14 @@ export interface WorkshopLiveState {
   lockedOutfitId: string;
   lockedActionId: string;
   generationStrategy: GenerationStrategy;
-  replicationInputMode: 'one_to_one' | 'matrix';
-  matrixMasterRefUrl: string;
-  matrixMasterRefImages: string[];
+  autoGenerateCopywriting: boolean;
 }
 
 export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
   return {
     version: 1,
-    mode: state.batchMode,
-    currentStage: Math.min(5, Math.max(1, state.currentStage)),
+    mode: 'original',
+    currentStage: Math.min(4, Math.max(1, state.currentStage)),
     batchInputText: state.batchInputText,
     items: state.items as WorkshopSnapshot['items'],
     settings: {
@@ -47,9 +44,7 @@ export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
       lockedOutfitId: state.lockedOutfitId,
       lockedActionId: state.lockedActionId,
       generationStrategy: state.generationStrategy,
-      replicationInputMode: state.replicationInputMode,
-      matrixMasterRefUrl: state.matrixMasterRefUrl,
-      matrixMasterRefImages: state.matrixMasterRefImages,
+      autoGenerateCopywriting: state.autoGenerateCopywriting,
     },
   };
 }
@@ -59,13 +54,12 @@ export function useLiveWorkshopWorkspace(
   apply: (snapshot: WorkshopSnapshot) => void,
 ) {
   const snapshot = useMemo(() => toWorkshopSnapshot(state), [
-    state.batchMode, state.currentStage, state.batchInputText, state.items,
+    state.currentStage, state.batchInputText, state.items,
     state.selectedVisionModel, state.selectedImageGenModel, state.selectedArchId,
     state.hasHumanPersona, state.selectedQuality, state.selectedAspect, state.selectedShotCount,
     state.useAssetLibrary, state.lockedPersonaId, state.lockedSceneId, state.lockedOutfitId,
-    state.lockedActionId, state.generationStrategy, state.replicationInputMode,
-    state.matrixMasterRefUrl, state.matrixMasterRefImages,
+    state.lockedActionId, state.generationStrategy, state.autoGenerateCopywriting,
   ]);
   const restore = useCallback((value: WorkshopSnapshot) => { apply(value); }, [apply]);
-  return useWorkshopWorkspace(snapshot, restore);
+  return useWorkshopBatchWorkspace(snapshot, restore);
 }

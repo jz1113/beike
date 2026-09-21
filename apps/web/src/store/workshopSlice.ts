@@ -31,18 +31,25 @@ import type { AppState, WorkshopSlice } from '@/types/store';
 
 const WORKSHOP_SELECTED_ARCH_KEY = 'workshop_selected_arch_id';
 const LEGACY_STYLE_IDS = new Set(['computer_office_monitor', 'auto', 'arch_atomic_asset_hub', 'arch_jewelry_master']);
+const ARCH_ID_ALIASES: Record<string, string> = {
+  cmu25767x000011tybm2u7c3t: 'recipe_phone_comms_master',
+};
+
+function canonicalizeArchId(id: string): string {
+  return ARCH_ID_ALIASES[id] || id;
+}
 
 function readInitialSelectedArchId(): string {
   if (typeof window === 'undefined') return 'recipe_jewelry_master';
   try {
     const stored = localStorage.getItem(WORKSHOP_SELECTED_ARCH_KEY);
-    if (stored && stored.trim() && !LEGACY_STYLE_IDS.has(stored)) return stored;
+    if (stored && stored.trim() && !LEGACY_STYLE_IDS.has(stored)) return canonicalizeArchId(stored);
     const raw = sessionStorage.getItem('workshop_original_draft');
     if (raw) {
       const draft = JSON.parse(raw) as { selectedStyleId?: string };
       const legacy = draft?.selectedStyleId;
       if (typeof legacy === 'string' && legacy.trim() && !LEGACY_STYLE_IDS.has(legacy)) {
-        return legacy;
+        return canonicalizeArchId(legacy);
       }
     }
   } catch {}
@@ -56,7 +63,7 @@ function persistSelectedArchId(archId: string) {
   } catch {}
 }
 
-const defaultSocialSession = createDefaultWorkshopSession('social_face_product_swap');
+const defaultSocialSession = createDefaultWorkshopSession('storyboard_generate');
 const defaultOriginalSession = createDefaultWorkshopSession('storyboard_generate');
 
 export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> = (set, get) => ({
@@ -80,7 +87,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
     ? (localStorage.getItem('ai_image_gen_model') || 'gpt-image-2')
     : 'gpt-image-2',
 
-  workshopMode: 'social_face_product_swap' as WorkshopMode,
+  workshopMode: 'storyboard_generate' as WorkshopMode,
   anchorFaceImageUrl: undefined,
   isAnchorFaceConfirmed: false,
   originalAnchorFaceImageUrl: undefined,
@@ -103,7 +110,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
     const nextSession = state[nextCacheKey] ?? createDefaultWorkshopSession(workshopMode);
     const applied = applyWorkshopModeSession(nextSession);
 
-    if (workshopMode === 'social_face_product_swap') {
+    if (false) {
       const selectedCount = applied.clonedSocialImages?.filter(i => i.selected).length ?? 0;
       if (selectedCount > 0) {
         applied.shotCount = selectedCount;
@@ -130,7 +137,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem(
-          targetMode === 'social_face_product_swap' ? STUDIO_DRAFT_SOCIAL_KEY : STUDIO_DRAFT_ORIGINAL_KEY,
+          STUDIO_DRAFT_ORIGINAL_KEY,
         );
       } catch {}
     }
@@ -233,7 +240,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   },
   isSocialPromptSourceStale: () => {
     const state = get();
-    if (state.workshopMode !== 'social_face_product_swap') return false;
+    if (state.workshopMode !== 'storyboard_generate') return false;
     if (!state.socialPromptSourceKey) {
       return state.generatedPrompts.length > 0;
     }
@@ -336,7 +343,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   setGeneratedPrompts: (generatedPrompts, productFingerprint, meta) => {
     const state = get();
     const socialPromptSourceKey =
-      state.workshopMode === 'social_face_product_swap'
+      false
         ? buildSocialPromptSourceKey(state.clonedSocialImages)
         : '';
 
@@ -482,13 +489,13 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
 
   initWorkshopTasks: (forceReset = false) => {
     const state = get();
-    const isSocialMode = state.workshopMode === 'social_face_product_swap';
+    const isSocialMode = false;
     const selectedClonedList = state.clonedSocialImages.filter(i => i.selected);
 
     const selectedPrompts = state.generatedPrompts.filter(p => p.selected !== false);
     let effectivePrompts = selectedPrompts.length > 0 ? selectedPrompts : state.generatedPrompts;
 
-    // 🌟 爆款复刻模式下：严格保证分镜任务数量与用户勾选的爆款参考图数量 1:1 严格一致 (选 5 张出 5 张)
+    // 旧版会话兼容分支：正常原创工坊不进入。
     if (isSocialMode && selectedClonedList.length > 0) {
       effectivePrompts = effectivePrompts.slice(0, selectedClonedList.length);
     }
@@ -505,7 +512,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
       const shotProductImage = p.productImageUrl || effectiveImages[idx % effectiveImages.length]?.url || primarySelectedImage?.url;
 
       // 换人换品工坊下，每个分镜精准绑定其对应的已勾选社媒参考图作为垫图/ControlNet基准
-      const shotRefImage = state.workshopMode === 'social_face_product_swap'
+      const shotRefImage = false
         ? (selectedClonedList[idx]?.url || primarySelectedImage?.url)
         : primarySelectedImage?.url;
 
@@ -557,7 +564,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
         shot_type: forcedShotType,
         productImageUrl: shotProductImage,
         referenceImageUrl: shotRefImage,
-        useReferenceImage: state.workshopMode === 'social_face_product_swap' ? true : state.useReferenceImage,
+        useReferenceImage: state.useReferenceImage,
         status: 'IDLE',
         progress: '0%',
         createdAt: Date.now()

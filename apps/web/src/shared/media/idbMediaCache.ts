@@ -124,6 +124,16 @@ export async function getDerived(url: string): Promise<Blob | null> {
   }
 }
 
+export async function deleteDerived(url: string): Promise<void> {
+  if (typeof window === 'undefined' || !url) return;
+  try {
+    const db = await getDb();
+    await db.delete('derived', hashUrl(url));
+  } catch {
+    /* storage may be unavailable or already cleared */
+  }
+}
+
 export async function getDerivedCacheStats(): Promise<{ count: number; bytes: number }> {
   if (typeof window === 'undefined') return { count: 0, bytes: 0 };
   try {

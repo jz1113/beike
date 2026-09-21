@@ -113,7 +113,7 @@ export default function BatchStage3Prompts({
   const setIsWorkshopConfigOpen = useAppStore((s: AppState) => s.setIsWorkshopConfigOpen);
 
   return (
-    <div className="w-full max-w-[1440px] mx-auto space-y-4 pb-8 rounded-3xl bg-slate-50 p-3 sm:p-5 border border-slate-200/70">
+    <div className="w-full space-y-4 pb-8 rounded-3xl bg-slate-50 p-3 sm:p-5 border border-slate-200/70">
       {/* 极简扁平顶部栏 */}
       <BatchStage3Header
         readyCount={readyCount}

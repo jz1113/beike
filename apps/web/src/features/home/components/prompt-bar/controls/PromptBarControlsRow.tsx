@@ -183,21 +183,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow({
           </>
         )}
 
-        {quickGenMode === 'video' && (
-          <div className="compact:hidden">
-            <PromptBarVideoRefModePill
-              isUp={isUp}
-              showVideoRefModeDropdown={videoRefModeMenu.isOpen}
-              setShowVideoRefModeDropdown={videoRefModeMenu.setIsOpen}
-              videoRefModeDropdownRef={videoRefModeMenu.ref}
-              activeVideoRefModeObj={activeVideoRefModeObj}
-              quickVideoRefMode={quickVideoRefMode}
-              setQuickVideoRefMode={setQuickVideoRefMode}
-            />
-          </div>
-        )}
-
-        {/* 药丸 3: 比例、分辨率与数量 */}
+        {/* 比例、分辨率与数量 */}
         {!isDepthMode && (
           <PromptBarAspectPicker
             isUp={isUp}
@@ -227,18 +213,30 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow({
 
         {quickGenMode === 'video' && (
           <div className="compact:hidden">
-            <PromptBarVideoDurationPill
+            <PromptBarVideoRefModePill
               isUp={isUp}
-              showDurationDropdown={durationMenu.isOpen}
-              setShowDurationDropdown={durationMenu.setIsOpen}
-              durationDropdownRef={durationMenu.ref}
-              quickVideoDuration={quickVideoDuration}
-              setQuickVideoDuration={setQuickVideoDuration}
-              videoDurationBounds={videoDurationBounds}
-              activeVideoModelObj={activeVideoModelObj}
-              quickVideoModel={quickVideoModel}
+              showVideoRefModeDropdown={videoRefModeMenu.isOpen}
+              setShowVideoRefModeDropdown={videoRefModeMenu.setIsOpen}
+              videoRefModeDropdownRef={videoRefModeMenu.ref}
+              activeVideoRefModeObj={activeVideoRefModeObj}
+              quickVideoRefMode={quickVideoRefMode}
+              setQuickVideoRefMode={setQuickVideoRefMode}
             />
           </div>
+        )}
+
+        {quickGenMode === 'video' && (
+          <PromptBarVideoDurationPill
+            isUp={isUp}
+            showDurationDropdown={durationMenu.isOpen}
+            setShowDurationDropdown={durationMenu.setIsOpen}
+            durationDropdownRef={durationMenu.ref}
+            quickVideoDuration={quickVideoDuration}
+            setQuickVideoDuration={setQuickVideoDuration}
+            videoDurationBounds={videoDurationBounds}
+            activeVideoModelObj={activeVideoModelObj}
+            quickVideoModel={quickVideoModel}
+          />
         )}
 
         {/* 快捷操作: @ 主体快捷键 */}
