@@ -1,4 +1,5 @@
 import { deconstructReviews, fullPromptAssets, promptImportSources } from '../../../repositories/catalog';
+import { readJsonBody } from '../../../core/validate';
 import { jsonResponse } from '../../../core/http';
 import { persistDeconstructedAssets } from '../../../services/deconstruct/saveAssets';
 import { errorEnvelope } from '../../../core/errors';
@@ -10,8 +11,9 @@ export async function GET(req: Request) {
 }
 export async function POST(req: Request) {
   try {
-    const { id, action } = await req.json();
-    if (typeof id !== 'string' || !['approve', 'reject', 'restore'].includes(action)) return jsonResponse({ error: '无效审核操作' }, 400);
+    const body = await readJsonBody(req) as { id?: unknown; action?: unknown };
+    const { id, action } = body;
+    if (typeof id !== 'string' || typeof action !== 'string' || !['approve', 'reject', 'restore'].includes(action)) return jsonResponse({ error: '无效审核操作' }, 400);
     if (action !== 'approve') {
       const from = action === 'restore' ? 'rejected' : 'pending';
       const to = action === 'restore' ? 'pending' : 'rejected';

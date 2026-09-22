@@ -1,4 +1,4 @@
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import {
   assembleOriginalShotPrompt,
   cleanPromptText,
@@ -23,6 +23,7 @@ import {
   buildCategoryCloseUpOptics,
 } from '@beike/domain/productCategory';
 import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
+import { maybeApplyJewelryCameraFallback, type AssembleSlotsResult } from '@beike/domain/workshopPipeline';
 
 // 🌟 辅助工具：提取或绑定标准资产编号 (如 [#P-01], [#S-01], [#O-01], [#A-01])
 function formatAssetWithCode(
@@ -77,6 +78,7 @@ export interface AssembleStoryboardParams {
   actualModelUsed: string;
   triedModels: string[];
   visionUsage: any;
+  filledSlots?: AssembleSlotsResult;
 }
 
 export async function assembleStoryboardShots(params: AssembleStoryboardParams) {
@@ -95,6 +97,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     actualModelUsed,
     triedModels,
     visionUsage,
+    filledSlots,
   } = params;
 
   const parsedResult = parseResponseJson(rawOutput);
@@ -245,9 +248,10 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
   const baseLightVariation =
     ambientLightingVariations[productIndex % ambientLightingVariations.length];
 
-  const baseScene = selectedSceneAsset?.description
-    ? `${selectedSceneAsset.title}，${selectedSceneAsset.description}`
-    : masterScene || '干净有质感的真实生活空间';
+  const baseScene = filledSlots?.shots?.[0]?.scene
+    || (selectedSceneAsset?.description
+      ? `${selectedSceneAsset.title}，${selectedSceneAsset.description}`
+      : masterScene || '干净有质感的真实生活空间');
   const effectiveMasterScene =
     baseScene.includes('环境光') ||
     baseScene.includes('光线') ||
@@ -282,11 +286,12 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     : styleBible || '真实自然环境漫射光，立体通透';
 
   const formattedPrompts = diversified.map((p: any, pIdx: number) => {
+    const slot = filledSlots?.shots?.[pIdx];
     const availableActionAssets = assetLibraryData?.actions || [];
-    const selectedActionAsset = availableActionAssets[pIdx];
+    const selectedActionAsset = slot?.actionAsset || availableActionAssets[pIdx];
     const assetSubject = resolveAssetShotSubject(selectedActionAsset || {});
-    const hasHuman = assetSubject?.has_human ?? p.has_human;
-    const shotType = assetSubject?.shot_type || p.shot_type;
+    const hasHuman = slot?.hasHuman ?? assetSubject?.has_human ?? p.has_human;
+    const shotType = slot?.shotType || assetSubject?.shot_type || p.shot_type;
 
     const shotAppliedAction = selectedActionAsset?.code
       ? `[#${selectedActionAsset.code.replace(/^#/, '')}] ${selectedActionAsset.title || ''}`
@@ -294,46 +299,18 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
         ? formatAssetWithCode(p.applied_action, availableActionAssets, 'A', pIdx)
         : undefined;
 
-    let effectiveAction =
-      selectedActionAsset?.action || p.action || '自然随性生活抓拍姿态，展现佩戴细节';
-    let effectiveCamera =
-      selectedActionAsset?.camera || p.camera_focal_length || 'iPhone 85mm 人像中近景镜头';
-    let effectiveAngle =
-      selectedActionAsset?.title ||
-      p.angle ||
-      (pIdx === 0
-        ? '手腕/佩戴部位超清微距特写'
-        : pIdx === 1
-        ? '45° 侧颜中近景'
-        : pIdx === 2
-        ? '手部依托台面中近景'
-        : '生活氛围中近景抓拍');
-
-    const isJewelry =
-      productRole === 'worn_accessory' ||
-      /珠宝|首饰|配饰|发簪|耳饰|项链|手镯|戒指/.test(
-        `${productFingerprintRaw} ${productRole || ''}`
-      );
-    if (isJewelry) {
-      effectiveAngle = effectiveAngle
-        .replace(/(全景|远景|全身站立|全身照|全身|长廊)+/g, '胸部以上中近景')
-        .replace(/门廊前远景全景/g, '门廊前半身近镜头');
-      effectiveAction = effectiveAction.replace(
-        /(在[^\s，；;]*大步奔跑|大步快跑|跳跃奔跑|全速奔跑|跑动|路边蹲姿|坐在石阶|微模糊的复古跑动|门廊前远景全景展示)[^，；;]*/g,
-        '桌前优雅倚靠，手部自然依托台面，半身近镜头展露佩戴首饰'
-      );
-      if (
-        (effectiveCamera.includes('广角') ||
-          effectiveCamera.includes('全景') ||
-          effectiveCamera.includes('24mm') ||
-          effectiveCamera.includes('35mm')) &&
-        !effectiveCamera.includes('微距')
-      ) {
-        effectiveCamera = 'iPhone 85mm 人像中近景镜头';
-      }
-    }
-
-    effectiveAction = stripGarmentsFromAction(effectiveAction, pIdx);
+    const isJewelry = productRole === 'worn_accessory' || /珠宝|首饰|配饰|发簪|耳饰|项链|手镯|戒指/.test(`${productFingerprintRaw} ${productRole || ''}`);
+    const framed = maybeApplyJewelryCameraFallback({
+      isJewelry,
+      cameraFromAsset: Boolean(slot?.cameraFromAsset || selectedActionAsset?.camera || selectedActionAsset?.shotType),
+      action: slot?.action || selectedActionAsset?.action || p.action || '自然随性生活抓拍姿态，展现佩戴细节',
+      camera: slot?.camera || selectedActionAsset?.camera || p.camera_focal_length || 'iPhone 85mm 人像中近景镜头',
+      angle: slot?.angle || selectedActionAsset?.title || p.angle || (pIdx === 0 ? '手腕/佩戴部位超清微距特写' : pIdx === 1 ? '45° 侧颜中近景' : pIdx === 2 ? '手部依托台面中近景' : '生活氛围中近景抓拍'),
+    });
+    if (slot) slot.cameraRewritten = framed.rewritten;
+    const effectiveAction = stripGarmentsFromAction(framed.action, pIdx);
+    const effectiveCamera = framed.camera;
+    const effectiveAngle = framed.angle;
 
     const shotLighting = getShotLightingVariation(productIndex, pIdx);
     const effectiveShotLighting = selectedSceneAsset?.lighting
@@ -354,7 +331,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
           effectiveCamera,
           effectiveAngle
         )
-      : isJewelry
+      : isJewelry && !slot?.cameraFromAsset
       ? `${effectiveCamera}，${effectiveAngle}，Shot on iPhone 16 Pro 原相机实拍（Unedited RAW photo），f/1.8 自然光学浅景深，胸部以上中近景生活抓拍构图（Tight Bust-Up Frame），佩戴首饰的手部/部位自然置于前景显著受光处清晰展现（占据画面 35%~50% 面积），生动展露博主自然生活神态、私服穿搭氛围与清晰首饰细节，严禁退后到全身远景，微弱自然传感器胶片微颗粒感`
       : `${effectiveCamera}，${effectiveAngle}，Shot on iPhone 16 Pro 原相机实拍，自然手持或使用生活机位`;
 
@@ -380,9 +357,11 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
         scene: effectiveSceneConcept,
         title: selectedActionAsset?.title || p.title || effectiveAngle,
         has_human: hasHuman,
-        promptFallback: hasHuman === false ? toPureProductPrompt((p.prompt || '').trim()) : (p.prompt || '').trim(),
+        promptFallback: hasHuman === false
+          ? toPureProductPrompt((slot?.productSentence || p.prompt || '').trim())
+          : (slot?.productSentence || (filledSlots ? '' : (p.prompt || '').trim())),
       },
-      { hasFace: hasAnchorFace && hasHuman !== false }
+      { hasFace: hasAnchorFace && hasHuman !== false, preserveComposition: Boolean(slot?.cameraFromAsset), skipRichPrompt: Boolean(filledSlots) },
     );
 
     const harmonized = harmonizeOriginalPrompt(assembled, {
@@ -418,6 +397,8 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       applied_persona: hasHuman === false ? undefined : appliedPersonaName,
       applied_action: shotAppliedAction,
       appliedActionId: selectedActionAsset?.id,
+      used_asset_library: slot ? slot.usedAssetLibrary : undefined,
+      assembly_source: slot?.source,
     };
   });
 
@@ -465,7 +446,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     const incrementOps: Promise<unknown>[] = [];
     if (selectedSceneAsset?.id) {
       incrementOps.push(
-        prisma.sceneAsset.update({
+        db.sceneAsset.update({
           where: { id: selectedSceneAsset.id },
           data: { usageCount: { increment: 1 } },
         })
@@ -473,7 +454,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     }
     if (selectedOutfitAsset?.id) {
       incrementOps.push(
-        prisma.outfitAsset.update({
+        db.outfitAsset.update({
           where: { id: selectedOutfitAsset.id },
           data: { usageCount: { increment: 1 } },
         })
@@ -481,7 +462,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     }
     if (selectedPersonaAsset?.id) {
       incrementOps.push(
-        prisma.personaAsset.update({
+        db.personaAsset.update({
           where: { id: selectedPersonaAsset.id },
           data: { usageCount: { increment: 1 } },
         })
@@ -489,7 +470,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     }
     for (const actionId of (assetLibraryData?.actions || []).map((a: { id?: string }) => a.id).filter(Boolean)) {
       incrementOps.push(
-        prisma.actionAsset.update({
+        db.actionAsset.update({
           where: { id: actionId },
           data: { usageCount: { increment: 1 } },
         })
@@ -498,6 +479,15 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     if (incrementOps.length > 0) {
       await Promise.allSettled(incrementOps);
     }
+    const { recordAssetUsageEvents } = await import('../promptAsset/usage');
+    await recordAssetUsageEvents({
+      batchId: 'analyze',
+      sceneId: selectedSceneAsset?.id,
+      outfitId: selectedOutfitAsset?.id,
+      personaId: selectedPersonaAsset?.id,
+      actionIds: (assetLibraryData?.actions || []).map((item: { id?: string }) => item.id),
+      eventType: 'analysis_used',
+    });
   } catch (usageErr) {
     console.warn('[Analyze API] 资产 usageCount 递增忽略:', usageErr);
   }
@@ -531,5 +521,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     visionUsage,
     usedActionIds: (assetLibraryData?.actions || actionItems || []).map((a: any) => a.id).filter(Boolean),
     assetTrace: assetPickTrace || null,
+    usedAssetLibrary: filledSlots?.usedAssetLibrary,
+    assemblySource: filledSlots?.source,
   };
 }

@@ -38,6 +38,7 @@ export function ApiServicesNavList({
           const isSelected = selectedServiceId === service.id;
           const shortName =
             service.id === 'comfly_gateway' ? 'Comfly 网关' :
+            service.id === 'deepseek_official' ? 'DeepSeek 官方' :
             service.id === 'wanbang_ecommerce' ? '万邦电商' :
             service.id === 'apia_parser' ? 'APIA 解析' :
             service.id === 'qiyun_parser' ? '奇云解析' :

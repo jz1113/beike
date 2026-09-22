@@ -15,7 +15,7 @@ export type {
   ProductWidgetData,
   AssistantMessage,
   AssistantSession,
-} from './app-store';
+} from '@/store/appStoreTypes';
 
 export type {
   AppState,
@@ -28,4 +28,4 @@ export type {
   WorkshopSlice,
   AssistantSlice,
   BrandKitSlice,
-} from './store';
+} from '@/store/types';

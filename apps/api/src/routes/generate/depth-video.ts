@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { readJsonBody } from '../../core/validate';
+import { db } from '../../repositories/access';
 import { DepthVideoSubmitBodySchema } from '@beike/contracts';
 import {
   DEPTH_MODEL_SETUP_COMMAND,
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const rawBody = await req.json();
+    const rawBody = await readJsonBody(req);
     const parsed = DepthVideoSubmitBodySchema.safeParse(rawBody);
     if (!parsed.success) {
       return jsonResponse({
@@ -138,7 +139,7 @@ export async function GET(req: Request) {
       return jsonResponse({ success: false, error: '缺少 taskId 参数' }, 400);
     }
 
-    const record = await prisma.imageTask.findFirst({
+    const record = await db.imageTask.findFirst({
       where: {
         OR: [{ id: taskId }, { taskId: taskId }],
       },
@@ -158,7 +159,7 @@ export async function GET(req: Request) {
       if (ageMs > 45_000) {
         status = 'FAILURE';
         failReason = '任务执行已超时或已中断';
-        await prisma.imageTask.update({
+        await db.imageTask.update({
           where: { id: taskId },
           data: {
             status: 'FAILURE',

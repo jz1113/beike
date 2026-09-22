@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../core/http';
+import { readJsonBody } from '../../core/validate';
 import { parseJsonBody } from '../../core/validate';
 import { turnStartBodySchema, turnApproveBodySchema, turnInterruptBodySchema } from '@beike/contracts/assistant';
 import { createAssistantSSEStream, interruptActiveAssistantTurn } from '../../services/assistantAgent';
@@ -7,7 +8,7 @@ import { resolveApproval, rejectTurnApprovals } from '../../services/assistantAp
 export async function startTurn(req: Request) {
   let body: unknown;
   try {
-    body = await req.json();
+    body = await readJsonBody(req);
   } catch (parseErr: unknown) {
     const msg = parseErr instanceof Error ? parseErr.message : '内容格式异常';
     return jsonResponse({ success: false, error: `请求载荷解析失败: ${msg}` }, 400);
@@ -24,7 +25,7 @@ export async function startTurn(req: Request) {
 export async function approveTurn(req: Request) {
   let body: unknown;
   try {
-    body = await req.json();
+    body = await readJsonBody(req);
   } catch {
     return jsonResponse({ success: false, error: '无效 JSON' }, 400);
   }
@@ -46,7 +47,7 @@ export async function approveTurn(req: Request) {
 export async function interruptTurn(req: Request) {
   let body: unknown;
   try {
-    body = await req.json();
+    body = await readJsonBody(req);
   } catch {
     return jsonResponse({ success: false, error: '无效 JSON' }, 400);
   }

@@ -1,5 +1,6 @@
-import { Check, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, X } from 'lucide-react';
+import { Check, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, Type, X } from 'lucide-react';
 import Dock, { type DockItemData } from '@/shared/ui/Dock';
+import { ToolSuiteMark } from '@/shared/icons';
 
 interface Props {
   onBack: () => void;
@@ -43,8 +44,8 @@ export function PosterToolbar({
 
   return (
     <header className="relative flex min-h-[72px] items-center justify-between gap-3">
-      <button type="button" onClick={onBack} className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white" title="返回首页">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-orange-400 text-xs font-black text-white">大</span>
+      <button type="button" onClick={onBack} className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white" title="返回首页">
+        <ToolSuiteMark><Type className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
         <span className="text-sm font-black tracking-tight">大字报生成</span>
       </button>
       {isNewBatchConfirming ? (

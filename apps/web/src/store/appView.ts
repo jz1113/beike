@@ -1,4 +1,4 @@
-export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'assets' | 'canvas' | 'settings';
+export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'keyword_review' | 'assets' | 'canvas' | 'settings';
 
 const LEGACY_VIEW: Record<string, AppView> = {
   hub: 'home',
@@ -7,6 +7,7 @@ const LEGACY_VIEW: Record<string, AppView> = {
   generate: 'generate',
   workshop: 'workshop',
   headline_poster: 'headline_poster',
+  keyword_review: 'keyword_review',
   assets: 'assets',
   canvas: 'canvas',
   settings: 'settings',
@@ -23,6 +24,7 @@ export function isAppView(value: string): value is AppView {
     value === 'generate' ||
     value === 'workshop' ||
     value === 'headline_poster' ||
+    value === 'keyword_review' ||
     value === 'assets' ||
     value === 'canvas' ||
     value === 'settings'

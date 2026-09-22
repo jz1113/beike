@@ -1,11 +1,12 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { readJsonBody } from '../../core/validate';
+import { db } from '../../repositories/access';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 // 获取所有提示词生成历史记录
 export async function GET() {
   try {
-    const records = await prisma.promptRecord.findMany({
+    const records = await db.promptRecord.findMany({
       orderBy: { createdAt: 'desc' },
       take: 50
     });
@@ -31,10 +32,10 @@ export async function GET() {
 // 手动保存/更新提示词记录
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const { productId, productTitle, productFingerprint, modelUsed, styleName, prompts } = body;
 
-    const record = await prisma.promptRecord.create({
+    const record = await db.promptRecord.create({
       data: {
         productId: productId || null,
         productTitle: productTitle || '未命名商品',
@@ -61,7 +62,7 @@ export async function DELETE(req: Request) {
       return jsonResponse({ error: '缺少 id 参数' }, 400);
     }
 
-    await prisma.promptRecord.delete({
+    await db.promptRecord.delete({
       where: { id }
     });
 

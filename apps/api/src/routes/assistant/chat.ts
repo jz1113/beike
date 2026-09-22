@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../core/http';
+import { readJsonBody } from '../../core/validate';
 import { parseJsonBody } from '../../core/validate';
 import { turnStartBodySchema } from '@beike/contracts/assistant';
 import { createAssistantSSEStream } from '../../services/assistantAgent';
@@ -7,7 +8,7 @@ import { createAssistantSSEStream } from '../../services/assistantAgent';
 export async function POST(req: Request) {
   let body: unknown;
   try {
-    body = await req.json();
+    body = await readJsonBody(req);
   } catch (parseErr: unknown) {
     const msg = parseErr instanceof Error ? parseErr.message : '内容格式异常';
     return jsonResponse(

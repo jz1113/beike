@@ -30,7 +30,12 @@
 
 ### 1. 环境准备
 
-- **Node.js**：22 LTS（仓库 `.nvmrc` 已钉死；`engines.node` 为 `^22`）
+- **Node.js**：22 LTS（仓库 `.nvmrc` 已钉死；`engines.node` 为 `^22`）。本机若只有 20，请先切到 22：
+  ```bash
+  nvm install 22
+  nvm use
+  node --version   # v22.x
+  ```
 - **包管理器**：pnpm 10.13.1（与根目录 `packageManager` 字段一致）
 - **Git**：版本控制工具
 - **Rust 工具链**（仅在运行/打包 Tauri 桌面原生窗口时需要）：

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prisma } from '@beike/server-kit/prisma';
+import { db } from '../repositories/access';
 import {
   DEPTH_VIDEO_LIMITS,
   DEPTH_VIDEO_MODEL_ID,
@@ -183,7 +183,7 @@ export async function runDepthVideoJob(options: {
       filename: `depth_${taskId}.mp4`,
     });
 
-    await prisma.imageTask.update({
+    await db.imageTask.update({
       where: { id: taskId },
       data: {
         status: 'SUCCESS',
@@ -195,7 +195,7 @@ export async function runDepthVideoJob(options: {
     setTaskRuntime(taskId, 'done', '100%', inferenceMeta);
   } catch (error: any) {
     const message = error?.message || String(error);
-    await prisma.imageTask.update({
+    await db.imageTask.update({
       where: { id: taskId },
       data: {
         status: 'FAILURE',
@@ -284,7 +284,7 @@ export async function createDepthVideoTask(
   const prompt = '深度动作捕捉';
   const taskId = `depth_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-  const record = await prisma.imageTask.create({
+  const record = await db.imageTask.create({
     data: {
       id: taskId,
       taskId: taskId,

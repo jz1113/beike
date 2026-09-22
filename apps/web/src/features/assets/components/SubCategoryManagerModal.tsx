@@ -193,34 +193,27 @@ export default function SubCategoryManagerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+      <section role="dialog" aria-modal="true" aria-label="二级类目管理" className="w-full max-w-[720px] max-h-[90vh] overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] flex flex-col animate-in zoom-in-95 duration-150">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between gap-5 px-5 pb-3 pt-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
-              <FolderTree className="w-4 h-4" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100">
+              <FolderTree className="h-3.5 w-3.5 text-rose-500" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-800">二级类目表管理与导入</h2>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                  反推+筛选全链路联动
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                为一级品类配置二级细分类目与解剖部位，反推图集时强约束打标并联动筛选
-              </p>
+              <h2 className="text-sm font-black tracking-tight">二级类目管理</h2>
+              <p className="mt-0.5 text-[11px] text-slate-400">维护细分类目和关键词，自动同步至反推与筛选。</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
             title="关闭"
           >
             <X className="w-4 h-4" />
@@ -228,7 +221,7 @@ export default function SubCategoryManagerModal({
         </div>
 
         {/* 模式分栏导航与大品类切换栏 */}
-        <div className="flex items-center justify-between px-6 py-2.5 border-b border-slate-100 bg-slate-50/40 gap-3 flex-wrap">
+        <div className="flex items-center justify-between gap-3 border-y border-slate-100 px-5 py-2.5 sm:px-6 flex-wrap">
           {/* 一级品类切换 Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
             {CATEGORY_OPTIONS.map((cat) => {
@@ -291,7 +284,7 @@ export default function SubCategoryManagerModal({
         {/* 提示消息 */}
         {statusMsg && (
           <div
-            className={`mx-6 mt-3 px-3.5 py-2 rounded-xl text-xs flex items-center justify-between gap-2 animate-in fade-in duration-100 ${
+            className={`mx-5 mt-3 flex items-center justify-between gap-2 rounded-xl px-3.5 py-2 text-xs animate-in fade-in duration-100 sm:mx-6 ${
               statusMsg.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                 : statusMsg.type === 'error'
@@ -314,7 +307,7 @@ export default function SubCategoryManagerModal({
         )}
 
         {/* 内容区 */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 sm:px-6">
           {/* 🌟 智能语义聚类与查重预览面板（若激活） */}
           {consolidationResult && (
             <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 via-indigo-50/30 to-amber-50/20 border border-purple-200 shadow-sm space-y-3 animate-in fade-in duration-200">
@@ -522,7 +515,7 @@ export default function SubCategoryManagerModal({
                 onChange={(e) => setImportText(e.target.value)}
                 rows={9}
                 placeholder={`项链/锁骨链: 吊坠, 颈链, choker, 锁骨链\n手镯/手串: 叮当镯, 串珠, 佛珠, 玉镯\n戒指/指环: 钻戒, 对戒, 尾戒\n耳饰/耳环: 耳钉, 耳坠, 耳夹\n发簪/发饰: 发夹, 发冠, 头饰, 步摇`}
-                className="w-full text-xs font-mono p-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 bg-slate-50/50 resize-y leading-relaxed"
+                className="soft-textarea w-full p-3.5 text-xs font-mono resize-y leading-relaxed"
               />
 
               {/* 导入模式配置与预览 */}
@@ -585,7 +578,7 @@ export default function SubCategoryManagerModal({
         </div>
 
         {/* 底栏 */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-100 bg-slate-50/70 text-xs">
+        <footer className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-xs sm:px-6">
           <span className="text-[11px] text-slate-400">
             {modalTab === 'manage' ? '管理已配置生效的二级类目' : '批量解析导入二级类目与特征词'}
           </span>
@@ -602,13 +595,13 @@ export default function SubCategoryManagerModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 shadow-2xs transition-colors cursor-pointer"
+              className="rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800 cursor-pointer"
             >
               完成并关闭
             </button>
           </div>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 }

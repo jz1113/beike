@@ -28,6 +28,8 @@ export type UseXhsBatchImportOptions = {
 export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseXhsBatchImportOptions) {
   const [deconstructSourceMode, setDeconstructSourceMode] = useState<'local' | 'xhs'>('xhs');
   const [xhsLinksInput, setXhsLinksInput] = useState('');
+  // 采集成功后将链接编辑器收起，让图片选择成为弹窗的唯一主操作；需要追加时再显式展开。
+  const [showXhsLinkInput, setShowXhsLinkInput] = useState(true);
   const [isParsingXhsLinks, setIsParsingXhsLinks] = useState(false);
   const [collectionIssues, setCollectionIssues] = useState<CollectionIssue[]>([]);
   const [xhsParseProgress, setXhsParseProgress] = useState<{
@@ -59,12 +61,17 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
       return;
     }
 
+    const candidateUrls = parseXhsUrlsFromText(rawText);
+    if (candidateUrls.length === 0) {
+      showToast('未识别到有效的小红书笔记链接');
+      return;
+    }
+
     setIsParsingXhsLinks(true);
-    setXhsParseProgress({ current: 0, total: 0, success: 0, skipped: 0 });
+    setXhsParseProgress({ current: 0, total: candidateUrls.length, success: 0, skipped: 0 });
     setCollectionIssues([]);
 
     try {
-      const candidateUrls = parseXhsUrlsFromText(rawText);
       const checkRes = await apiFetch('/api/catalog/assets/source-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,8 +89,10 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
         return;
       }
 
-      const { scraperId, scraperSecret } = await getExternalScraperCredentials();
+      const { scraperId, scraperSecret, qiyunAppId, qiyunAppKey } = await getExternalScraperCredentials();
       const { queueItems, skipped } = await batchParseXhsLinks(urls.join('\n'), scraperId, scraperSecret, {
+        qiyunAppId,
+        qiyunAppKey,
         onProgress: (progress) => setXhsParseProgress({
           current: progress.current,
           total: progress.total,
@@ -92,14 +101,22 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
         }),
       });
 
+      const parseIssues = skipped.map((item) => ({
+        kind: 'error' as const,
+        url: item.url,
+        reason: item.reason,
+      }));
+      setCollectionIssues([...issues, ...parseIssues]);
+
       if (queueItems.length > 0) {
         setQueue(mergeParsedQueueItems(queue, queueItems));
         setXhsLinksInput('');
+        setShowXhsLinkInput(false);
         showToast(
-          `成功采编 ${queueItems.length} 套图集（每套截取前 10 张图加入队列），跳过 ${skipped.length} 套（纯视频或不足3图）`
+          `已提取 ${queueItems.length} 套图集，请在下方选择图片后再开始智能解构${skipped.length ? `；跳过 ${skipped.length} 套` : ''}`
         );
       } else {
-        showToast(`未采编到符合条件的图集（跳过 ${skipped.length} 套：纯视频或不足3图）`);
+        showToast(`未提取到可选图片：${skipped[0]?.reason || '请检查链接或稍后重试'}`);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -188,8 +205,10 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
     };
 
     try {
-      const { scraperId, scraperSecret } = await getExternalScraperCredentials();
-      const consumerConcurrency = Math.max(2, Math.min(queueConcurrency, 8));
+      const { scraperId, scraperSecret, qiyunAppId, qiyunAppKey } = await getExternalScraperCredentials();
+      // Visual requests share the same upstream group. Keep the closed-loop
+      // importer serial too; the old lower bound of 2 bypassed the UI setting.
+      const consumerConcurrency = 1;
 
       const consumerWorker = async () => {
         while (!producerFinished || deconstructWorkQueue.length > 0) {
@@ -208,7 +227,10 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
         candidateUrls,
         Math.min(8, candidateUrls.length),
         async (url, cIdx) => {
-          const parsed = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, rateLimiter);
+          const parsed = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, rateLimiter, {
+            qiyunAppId,
+            qiyunAppKey,
+          });
           if (parsed.success) {
             const filtered = filterParseLinkImages(parsed.media, url);
             if (filtered.ok) {
@@ -305,6 +327,8 @@ export function useXhsBatchImport({ queueApi, showToast, onRefreshAssets }: UseX
     setDeconstructSourceMode,
     xhsLinksInput,
     setXhsLinksInput,
+    showXhsLinkInput,
+    openXhsLinkInput: () => setShowXhsLinkInput(true),
     isParsingXhsLinks,
     xhsParseProgress,
     collectionIssues,

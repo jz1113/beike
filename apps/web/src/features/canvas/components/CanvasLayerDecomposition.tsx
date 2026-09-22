@@ -92,7 +92,7 @@ export function CanvasLayerDecomposition({node, projectId}: {node: CanvasNode; p
         </div>
         <div className="pointer-events-auto absolute top-full left-1/2 mt-3 w-[420px] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="mb-3 text-xs font-medium">图层分离</p>
-          <textarea aria-label="拆分要求" disabled={busy} value={prompt} onChange={e=>{setPrompt(e.target.value);operation.current='';}} placeholder="描述或框选希望拆分的图层，留空将自动识别并拆分" className="h-20 w-full resize-none rounded-xl bg-slate-100 p-3 text-xs outline-none focus:ring-1 focus:ring-indigo-300" />
+          <textarea aria-label="拆分要求" disabled={busy} value={prompt} onChange={e=>{setPrompt(e.target.value);operation.current='';}} placeholder="描述或框选希望拆分的图层，留空将自动识别并拆分" className="soft-textarea h-20 w-full resize-none p-3 text-xs" />
         <footer className="mt-3 flex gap-2"><button type="button" onClick={()=>setOpen(false)} className="flex-1 rounded-lg bg-slate-100 px-4 py-2 text-xs">取消</button><button type="button" onClick={run} className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-xs text-white">拆分</button></footer>
         </div>
       </section>

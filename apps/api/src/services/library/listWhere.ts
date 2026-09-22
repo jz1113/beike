@@ -1,4 +1,4 @@
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { buildAssetCategoryWhere } from './categoryWhere';
 import { organizationWhere } from '@beike/server-kit/assetOrganization';
 
@@ -13,6 +13,6 @@ export async function buildLibraryListWhere(assetType: string, searchParams: URL
   }
   if (keyword) and.push({ OR: keywordFields.map((field) => ({ [field]: { contains: keyword } })) });
   if (isFavorite !== undefined) and.push({ isFavorite });
-  and.push(...await organizationWhere(prisma, searchParams));
+  and.push(...await organizationWhere(db, searchParams));
   return and.length ? { AND: and } : {};
 }

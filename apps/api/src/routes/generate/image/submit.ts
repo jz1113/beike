@@ -1,4 +1,4 @@
-import { prisma } from '../../../repositories/db';
+import { db } from '../../../repositories/access';
 import { logLatencyAudit } from '@beike/domain/latencyAudit';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
@@ -252,18 +252,29 @@ export async function persistImageTaskRecord(options: {
   size: string;
   quality: string;
   directResultUrl?: string;
-}): Promise<{ recordId?: string; dbMs: number }> {
-  const { productId, prompt, finalTaskId, model, size, quality, directResultUrl } = options;
+  idempotencyKey?: string | null;
+}): Promise<{ recordId?: string; dbMs: number; reused?: boolean; resultUrl?: string }> {
+  const { productId, prompt, finalTaskId, model, size, quality, directResultUrl, idempotencyKey } = options;
   const tDb0 = Date.now();
+  if (idempotencyKey) {
+    const existing = await db.$queryRawUnsafe<Array<{ id: string; resultUrl: string | null }>>(
+      'SELECT "id", "resultUrl" FROM "ImageTask" WHERE "idempotencyKey" = ? AND "status" = ? ORDER BY "createdAt" DESC LIMIT 1',
+      idempotencyKey,
+      'SUCCESS',
+    ).catch(() => []);
+    if (existing[0]?.resultUrl) {
+      return { recordId: existing[0].id, dbMs: Date.now() - tDb0, reused: true, resultUrl: existing[0].resultUrl };
+    }
+  }
   let validProductId: string | null = null;
   if (productId) {
-    const existProduct = await prisma.product.findUnique({ where: { id: productId } }).catch(() => null);
+    const existProduct = await db.product.findUnique({ where: { id: productId } }).catch(() => null);
     if (existProduct) {
       validProductId = productId;
     }
   }
 
-  const taskRecord = await prisma.imageTask.create({
+  const taskRecord = await db.imageTask.create({
     data: {
       productId: validProductId,
       prompt,
@@ -276,6 +287,13 @@ export async function persistImageTaskRecord(options: {
       resultUrl: directResultUrl || undefined,
     },
   });
+  if (idempotencyKey) {
+    await db.$executeRawUnsafe(
+      'UPDATE "ImageTask" SET "idempotencyKey" = ? WHERE "id" = ?',
+      idempotencyKey,
+      taskRecord.id,
+    ).catch(() => 0);
+  }
   const dbMs = Date.now() - tDb0;
   console.log(`[AI生图-入库] 任务已持久化到数据库 dev.db: recordId=${taskRecord.id}`);
   return { recordId: taskRecord.id, dbMs };

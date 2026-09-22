@@ -1,4 +1,5 @@
 import { gatewayFetch } from '../../gateways/http';
+import { readJsonBody, safeErrorMessage } from '../../core/validate';
 import { jsonResponse } from '../../core/http';
 import { getDefaultBaseUrl } from '../../services/gatewayCredentials';
 
@@ -28,7 +29,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     let body: any = {};
     try {
-      body = await req.json();
+      body = await readJsonBody(req);
     } catch {
       body = {};
     }
@@ -202,20 +203,20 @@ export async function POST(req: Request): Promise<Response> {
         rawStatus: status,
       }, status >= 400 && status < 600 ? status : 400);
 
-    } catch (fetchErr: any) {
+    } catch (fetchErr: unknown) {
       clearTimeout(timeout);
-      const isTimeout = fetchErr.name === 'AbortError';
-      const msg = isTimeout ? '请求网关接口超时 (15s)，请检查网络或 Base URL 是否可达' : (fetchErr.message || '连接网关失败');
+      const isTimeout = fetchErr instanceof Error && fetchErr.name === 'AbortError';
+      const msg = isTimeout ? '请求网关接口超时 (15s)，请检查网络或 Base URL 是否可达' : safeErrorMessage(fetchErr, '连接网关失败');
       return jsonResponse({
         success: false,
         error: msg,
       }, 504);
     }
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     return jsonResponse({
       success: false,
-      error: err.message || '服务器内部错误',
+      error: safeErrorMessage(err, '服务器内部错误'),
     }, 500);
   }
 }

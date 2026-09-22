@@ -79,3 +79,10 @@ coverage/
 # Large media files (> 100MB strictly banned by GitHub)
 apps/web/public/inspirations/imported-20260910/grandma-granddaughter-story.mp4
 apps/web/public/inspirations/imported-20260910/siblings-story.mp4
+
+# Local scratch / generated intermediates
+tmp/
+
+# Local Prisma SQLite snapshots (never source)
+packages/prisma/backups/
+packages/prisma/database-backups/

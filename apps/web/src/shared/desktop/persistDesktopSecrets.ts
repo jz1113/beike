@@ -102,6 +102,11 @@ export async function persistAiGatewayConfig(baseUrl: string, apiKey: string): P
 
 }
 
+/** 保存 DeepSeek 官方密钥；只有用户明确启用时才会替换当前主接口。 */
+export async function persistDeepSeekConfig(apiKey: string): Promise<void> {
+  await persistCredentialStrict('deepseek_api_key', apiKey.trim());
+}
+
 export async function persistWanbangConfig(key: string, secret: string): Promise<void> {
   const cleanKey = key.trim();
   const cleanSecret = secret.trim();

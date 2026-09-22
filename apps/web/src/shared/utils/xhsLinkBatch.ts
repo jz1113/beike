@@ -6,6 +6,9 @@ import {
 } from '@beike/domain/assetDeconstruct/prompts';
 import { RateLimiter } from '@/shared/utils/rateLimiter';
 import type { ImageSetQueueItem } from '@/features/assets/utils/assetPromptConstants';
+import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from './xhsLinkFormatting';
+
+export { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from './xhsLinkFormatting';
 
 
 
@@ -37,67 +40,6 @@ export interface XhsParseProgress {
 export interface XhsParseResult {
   queueItems: ImageSetQueueItem[];
   skipped: XhsParseSkipRecord[];
-}
-
-/** 规范化小红书文本为标准的一行一条独立链接，自动合并断行参数、清理冗余跟踪符并去重 */
-export function formatXhsLinksToOnePerLine(rawText: string): string {
-  if (!rawText) return '';
-  // 1. 修复由于复制或排版导致的断行 URL：如上一行是 explore 链接或以 ? / & 结尾，下一行是参数
-  const rawLines = rawText.split(/\r?\n/);
-  const stitched: string[] = [];
-  for (let i = 0; i < rawLines.length; i++) {
-    let line = rawLines[i].trim();
-    if (!line) continue;
-    while (i + 1 < rawLines.length) {
-      const nextLine = rawLines[i + 1].trim();
-      if (
-        (line.endsWith('?') || line.endsWith('&') || line.includes('xiaohongshu.com/explore/')) &&
-        (nextLine.startsWith('xsec_') || nextLine.startsWith('&') || nextLine.startsWith('?'))
-      ) {
-        line = line + (line.endsWith('?') || nextLine.startsWith('&') || nextLine.startsWith('?') ? '' : '?') + nextLine;
-        i++;
-      } else {
-        break;
-      }
-    }
-    stitched.push(line);
-  }
-
-  // 2. 从每一行提取有效链接并规整
-  const urls: string[] = [];
-  const URL_REGEX = /(https?:\/\/[^\s"'<>，。；）)]+)/gi;
-
-  for (const line of stitched) {
-    const matches = line.match(URL_REGEX);
-    if (matches) {
-      for (let url of matches) {
-        url = url.replace(/[，。；）)\s]+$/, '');
-        // 若为小红书 explore/discovery 链接，统一清洗为规范的 https://www.xiaohongshu.com/explore/${noteId}
-        const xhsExploreMatch = url.match(/xiaohongshu\.com\/(?:explore|discovery\/item)\/([a-zA-Z0-9]+)/i);
-        if (xhsExploreMatch) {
-          const cleanUrl = `https://www.xiaohongshu.com/explore/${xhsExploreMatch[1]}`;
-          if (!urls.includes(cleanUrl)) urls.push(cleanUrl);
-        } else {
-          if (!urls.includes(url)) urls.push(url);
-        }
-      }
-    } else {
-      // 容错：如果用户直接粘贴了 24 位 noteId
-      const soloIdMatch = line.match(/^([a-zA-Z0-9]{24})$/);
-      if (soloIdMatch && !line.includes('token=')) {
-        const cleanUrl = `https://www.xiaohongshu.com/explore/${soloIdMatch[1]}`;
-        if (!urls.includes(cleanUrl)) urls.push(cleanUrl);
-      }
-    }
-  }
-
-  return urls.join('\n');
-}
-
-/** 从粘贴文本中提取小红书候选链接（去重保序，确保一行一条） */
-export function parseXhsUrlsFromText(rawText: string): string[] {
-  const formatted = formatXhsLinksToOnePerLine(rawText);
-  return formatted ? formatted.split('\n').filter(Boolean) : [];
 }
 
 /** 解析 parse-link 返回的媒体对象，过滤视频与不足 3 张图的笔记 */
@@ -204,6 +146,8 @@ export async function batchParseXhsLinks(
   opts?: {
     concurrency?: number;
     onProgress?: (progress: XhsParseProgress) => void;
+    qiyunAppId?: string;
+    qiyunAppKey?: string;
   }
 ): Promise<XhsParseResult> {
   const candidateUrls = parseXhsUrlsFromText(rawText);
@@ -218,7 +162,10 @@ export async function batchParseXhsLinks(
   let completed = 0;
 
   await mapWithConcurrency(candidateUrls, concurrency, async (url) => {
-    const parsed = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, rateLimiter);
+    const parsed = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, rateLimiter, {
+      qiyunAppId: opts?.qiyunAppId,
+      qiyunAppKey: opts?.qiyunAppKey,
+    });
     if (parsed.success) {
       const filtered = filterParseLinkImages(parsed.media, url);
       if (filtered.ok) {

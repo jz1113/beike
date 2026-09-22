@@ -12,6 +12,7 @@ import type { ActionCategoryId, SubCategoryDef } from '@beike/domain/productCate
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
 import { AssetLibraryMoreMenu } from './AssetLibraryMoreMenu';
 import { AssetLibraryFilterBar } from './AssetLibraryFilterBar';
+import { ASSET_TAB_HINT } from '../utils/promptLibraryEmptyCopy';
 
 export type AssetSubTab = 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';
 
@@ -129,6 +130,7 @@ export default function AssetLibraryToolbar({
           ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/10'
           : 'text-slate-600 hover:text-slate-900'
       }`}
+      title={ASSET_TAB_HINT[tab]}
     >
       {label}
     </button>
@@ -147,6 +149,7 @@ export default function AssetLibraryToolbar({
         <span className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden="true" />
         {tabBtn('action', '镜头动作')}
       </div>
+      <span className="text-[11px] text-slate-400">{ASSET_TAB_HINT[activeSubTab]}</span>
     </div>
   );
 

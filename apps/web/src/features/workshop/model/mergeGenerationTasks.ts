@@ -1,0 +1,59 @@
+import { buildImageTaskKey, resolveTaskMergeAction } from '@beike/domain/workshopPipeline';
+import type { BatchProductItem, BatchTaskItem } from './batchTypes';
+
+export interface MergeTaskContext {
+  batchId: string;
+  storyboardRevision: number;
+  model: string;
+  aspectRatio: string;
+  quality: string;
+}
+
+export function mergeGenerationTasks(
+  item: BatchProductItem,
+  context: MergeTaskContext,
+): BatchTaskItem[] {
+  const shots = (item.prompts || []).filter((shot) => shot.selected !== false);
+  const existing = new Map(
+    (item.tasks || [])
+      .filter((task) => task.resultStatus !== 'superseded')
+      .map((task) => [task.idempotencyKey || task.id, task]),
+  );
+
+  return shots.map((shot, idx) => {
+    const key = buildImageTaskKey({
+      batchId: context.batchId,
+      productId: item.id,
+      storyboardRevision: context.storyboardRevision,
+      shotNo: shot.shot_no,
+      prompt: shot.prompt || '',
+      selectedImageUrls: item.selectedProductImages || [],
+      model: context.model,
+      aspectRatio: context.aspectRatio,
+      quality: context.quality,
+    });
+    const previous = existing.get(key);
+    const action = resolveTaskMergeAction(previous ? { key, status: previous.status } : undefined);
+    if (previous && (action === 'reuse_success' || action === 'attach_running')) {
+      return { ...previous, idempotencyKey: key, resultStatus: 'current' };
+    }
+    return {
+      id: previous?.id || `gen_${item.id}_${shot.shot_no}_${idx}`,
+      shot_no: shot.shot_no,
+      title: shot.title || `分镜 ${shot.shot_no}`,
+      prompt: shot.prompt || '',
+      status: 'PENDING' as const,
+      idempotencyKey: key,
+      resultStatus: 'current' as const,
+      revision: (shot as { revision?: number }).revision || 0,
+      outputReview: 'unreviewed' as const,
+    };
+  });
+}
+
+export function needsGenerationSubmit(task: BatchTaskItem): boolean {
+  if (task.resultStatus === 'superseded') return false;
+  if (task.status === 'SUCCESS' && task.resultUrl) return false;
+  if (task.status === 'IN_PROGRESS' && !task.recoveryRequired) return false;
+  return true;
+}

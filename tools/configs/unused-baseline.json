@@ -99,25 +99,25 @@
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
-      "file": "apps/web/src/features/home/hooks/usePromptBarMedia.ts",
+      "file": "apps/web/src/shared/prompt-bar/hooks/usePromptBarMedia.ts",
       "message": "'insertMentionsIntoPrompt' is defined but never used.",
       "count": 1,
       "reason": "媒体入口与插入主体关系待专项核查，不改变现有生成输入行为。"
     },
     {
-      "file": "apps/web/src/features/home/hooks/usePromptBarMedia.ts",
+      "file": "apps/web/src/shared/prompt-bar/hooks/usePromptBarMedia.ts",
       "message": "'addRefMedia' is assigned a value but never used.",
       "count": 1,
       "reason": "媒体入口与插入主体关系待专项核查，不改变现有生成输入行为。"
     },
     {
-      "file": "apps/web/src/features/workshop/batch/batchVisionAnalyze.ts",
+      "file": "apps/web/src/features/workshop/model/batchVisionAnalyze.ts",
       "message": "'effectiveIndex' is assigned a value but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"
     },
     {
-      "file": "apps/web/src/features/workshop/batch/components/BatchImageSelectionPanel.tsx",
+      "file": "apps/web/src/features/workshop/components/BatchImageSelectionPanel.tsx",
       "message": "'readyCount' is assigned a value but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"

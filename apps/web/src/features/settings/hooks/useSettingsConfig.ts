@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '@/shared/api/apiClient';
 import {
   persistAiGatewayConfig,
+  persistDeepSeekConfig,
   persistExternalScraperConfig,
   persistQiyunConfig,
   persistStorageConfig,
@@ -25,6 +26,9 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [showKey, setShowKey] = useState(false);
   const [isGatewayEnabled, setIsGatewayEnabled] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
+  const [deepSeekApiKey, setDeepSeekApiKey] = useState('');
+  const [showDeepSeekKey, setShowDeepSeekKey] = useState(false);
+  const [isTestingDeepSeek, setIsTestingDeepSeek] = useState(false);
 
   // 万邦 (OneBound)
   const [wanbangKey, setWanbangKey] = useState('');
@@ -84,6 +88,9 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
         setApiKey(finalKey);
         setClientGatewayApiKey(finalKey);
         setClientGatewayBaseUrl(savedUrl);
+
+        const savedDeepSeekKey = await credentialGet('deepseek_api_key');
+        setDeepSeekApiKey(savedDeepSeekKey || localStorage.getItem('deepseek_api_key') || '');
 
         const savedWbKey = await credentialGet('wanbang_api_key');
         const savedWbSec = await credentialGet('wanbang_api_secret');
@@ -161,6 +168,48 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
       showToast(`🔴 网络超时: ${formatUserError(e, '网关连接失败')}`);
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleTestDeepSeek = async () => {
+    if (!deepSeekApiKey.trim()) {
+      showToast('⚠️ 请先填写 DeepSeek API Key');
+      return;
+    }
+    setIsTestingDeepSeek(true);
+    const start = Date.now();
+    try {
+      const res = await apiFetch('/api/system/models/fetch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: 'https://api.deepseek.com', apiKey: deepSeekApiKey.trim(), isPing: true, strict: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        showToast(`🟢 DeepSeek 官方接口连通正常！响应延迟: ${Date.now() - start}ms`);
+      } else {
+        showToast(`🔴 DeepSeek 接口异常 (${data.gatewayStatus || res.status}): ${data.error || '无法访问官方接口'}`);
+      }
+    } catch (e: unknown) {
+      showToast(`🔴 网络超时: ${formatUserError(e, 'DeepSeek 连接失败')}`);
+    } finally {
+      setIsTestingDeepSeek(false);
+    }
+  };
+
+  const handleSaveDeepSeekConfig = async (activate = false) => {
+    try {
+      await persistDeepSeekConfig(deepSeekApiKey);
+      if (activate) {
+        await handleSaveApiConfig('https://api.deepseek.com', deepSeekApiKey, false);
+        setBaseUrl('https://api.deepseek.com');
+        setApiKey(deepSeekApiKey.trim());
+        showToast('✅ 已启用 DeepSeek 官方接口；请在默认业务模型中选择 DeepSeek 模型');
+      } else {
+        showToast('✅ DeepSeek 官方 API Key 已安全保存');
+      }
+    } catch (err) {
+      console.warn('[handleSaveDeepSeekConfig] 保存失败:', err);
+      showToast('⚠️ DeepSeek API Key 保存异常，请稍后重试');
     }
   };
 
@@ -341,6 +390,13 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     isGatewayEnabled,
     setIsGatewayEnabled,
     isTesting,
+    deepSeekApiKey,
+    setDeepSeekApiKey,
+    showDeepSeekKey,
+    setShowDeepSeekKey,
+    isTestingDeepSeek,
+    handleTestDeepSeek,
+    handleSaveDeepSeekConfig,
     appAccessToken,
     setAppAccessToken,
     handleSaveApiConfig,

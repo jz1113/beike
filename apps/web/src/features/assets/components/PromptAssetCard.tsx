@@ -18,6 +18,7 @@ import {
 import { getAssetCardSummary, isValidDisplayTag } from '../utils/assetPromptConstants';
 import { type AssetSubTab } from '../utils/assetPromptConstants';
 import { resolveActionCardDisplayBadges } from '@beike/domain/productCategory';
+import { PromptAssetLifecycleBadges } from './PromptAssetLifecycleBadges';
 
 interface PromptAssetCardProps {
   item: Record<string, unknown> & {
@@ -85,6 +86,14 @@ const TAB_HOVER_TITLE_CLASS: Record<AssetSubTab, string> = {
   action: 'group-hover:text-purple-600',
 };
 
+const TAB_APPLY_LABEL: Record<AssetSubTab, string> = {
+  full_prompt: '载入图组',
+  persona: '锁定人设',
+  outfit: '锁定穿搭',
+  scene: '锁定场景',
+  action: '锁定镜头',
+};
+
 export default function PromptAssetCard({
   item,
   activeSubTab,
@@ -142,7 +151,7 @@ export default function PromptAssetCard({
   return (
     <div
       onClick={onCardClick}
-      className={`group relative flex flex-col bg-white rounded-[20px] p-5 min-h-[264px] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)] cursor-pointer border ${
+      className={`group relative flex flex-col bg-white rounded-[18px] p-4 min-h-[232px] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] cursor-pointer border ${
         isSelected
           ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20'
           : `border-slate-200/70 ${TAB_HOVER_BORDER_CLASS[activeSubTab]}`
@@ -174,10 +183,12 @@ export default function PromptAssetCard({
           {sourceIndices.length > 0 ? (
             <span
               className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0 flex items-center gap-0.5"
-              title={`内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
+              title={activeSubTab === 'full_prompt'
+                ? `图组母本为 #${sourceIndex ?? sourceIndices[0]}；联动参考图 ${sourceIndices.map((index) => `#${index}`).join('、')}`
+                : `内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
             >
               <Layers className="w-2.5 h-2.5" />
-              <span>图组 {sourceIndices.map((index) => `#${index}`).join('·')}</span>
+              <span>{activeSubTab === 'full_prompt' ? `母本 #${sourceIndex ?? sourceIndices[0]}` : `图组 ${sourceIndices.map((index) => `#${index}`).join('·')}`}</span>
             </span>
           ) : sourceIndex !== null ? (
             <span
@@ -197,6 +208,7 @@ export default function PromptAssetCard({
             </span>
           ) : null}
 
+          <PromptAssetLifecycleBadges item={item} />
 
         </div>
 
@@ -266,7 +278,7 @@ export default function PromptAssetCard({
 
       {/* 标题独立成行：单行截断，绝不串行折行 */}
       <h3
-        className={`text-sm font-semibold text-slate-900 truncate mb-3 leading-snug transition-colors block ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
+        className={`text-sm font-semibold text-slate-900 truncate mb-2 leading-snug transition-colors block ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
         title={item.title || item.name}
       >
         {item.title || item.name || '未命名资产'}
@@ -282,7 +294,7 @@ export default function PromptAssetCard({
                 onPreviewImage(imageUrl, e);
               }
             }}
-            className="group/thumb relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-slate-200/90 bg-slate-100 shadow-2xs cursor-zoom-in"
+            className="group/thumb relative w-[72px] h-[72px] rounded-xl overflow-hidden shrink-0 border border-slate-200/90 bg-slate-100 shadow-2xs cursor-zoom-in"
             title="点击放大查看来源参考原图"
           >
             <img
@@ -302,7 +314,7 @@ export default function PromptAssetCard({
             )}
           </div>
         ) : (
-          <div className="w-20 h-20 rounded-xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
+          <div className="w-[72px] h-[72px] rounded-xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
             <ImageIcon className="w-5 h-5" />
             <span className="text-[10px]">文字资产</span>
           </div>
@@ -310,7 +322,7 @@ export default function PromptAssetCard({
 
         <div className="flex-1 min-w-0">
           {summary ? (
-            <p className="text-xs text-slate-600 line-clamp-4 leading-5 select-text">
+            <p className="text-xs text-slate-600 line-clamp-3 leading-5 select-text">
               {summary}
             </p>
           ) : (
@@ -319,7 +331,7 @@ export default function PromptAssetCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 min-h-6 mt-3 mb-3">
+      <div className="flex items-center gap-1.5 min-h-5 mt-2.5 mb-2.5">
           {/* 精炼合规的核心分类徽标 */}
           {displayBadges.map((b) => (
             <button
@@ -344,7 +356,7 @@ export default function PromptAssetCard({
           onClick={onViewDetail}
           className="flex items-center gap-0.5 text-[11px] text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer font-medium"
         >
-          <span>查看提示词与原图</span>
+          <span>{activeSubTab === 'full_prompt' ? '查看图组与分镜' : '查看提示词与原图'}</span>
           <ChevronRight className="w-3 h-3" />
         </button>
 
@@ -353,7 +365,7 @@ export default function PromptAssetCard({
           className={`flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${TAB_APPLY_BTN_CLASS[activeSubTab]}`}
           title="应用到工坊流水线"
         >
-          <span>应用</span>
+          <span>{TAB_APPLY_LABEL[activeSubTab]}</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       </div>

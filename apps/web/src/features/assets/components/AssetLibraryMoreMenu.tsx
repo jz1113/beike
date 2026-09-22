@@ -111,7 +111,7 @@ export function AssetLibraryMoreMenu({
             }}
             className="w-full flex items-center gap-2 px-3.5 py-2 text-left hover:bg-rose-50 text-rose-700 font-medium transition-colors cursor-pointer"
           >
-            <span>清空全部原子资产</span>
+            <span>清空全部数据库数据</span>
           </button>
         </div>
       )}

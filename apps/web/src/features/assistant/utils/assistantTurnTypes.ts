@@ -1,5 +1,5 @@
 import type { AssistantTaskState } from '@beike/domain/assistant/taskPolicy';
-import type { ProductWidgetData } from '@/types/app-store';
+import type { ProductWidgetData } from '@/store/appStoreTypes';
 
 export type ApprovalDecision = 'accept' | 'decline' | 'acceptForSession' | 'cancel';
 

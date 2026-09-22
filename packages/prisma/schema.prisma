@@ -47,6 +47,7 @@ model ImageTask {
   mediaType   String?  @default("image") // image, video
   size        String?
   quality     String?
+  idempotencyKey String?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -56,6 +57,7 @@ model ImageTask {
   @@index([productId])
   @@index([createdAt])
   @@index([mediaType])
+  @@index([idempotencyKey])
 }
 
 // 提示词生成历史记录
@@ -327,6 +329,9 @@ model AssetProductCategory {
   name     String
   parentId String?
   position Int     @default(0)
+  aliases  String  @default("[]")
+  keywords String  @default("[]")
+  anatomy  String  @default("[]")
   parent   AssetProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children AssetProductCategory[] @relation("CategoryTree")
   albums   PromptAlbum[]
@@ -386,4 +391,85 @@ model PromptImportSource {
   albumName String  @default("")
   albumId   String?
   updatedAt String
+}
+
+model PromptAssetRegistry {
+  id              String   @id @default(cuid())
+  assetType       String
+  sourceAssetId   String
+  status          String   @default("draft")
+  version         Int      @default(1)
+  provenance      String   @default("manual")
+  sourceRef       String?
+  qualityScore    Float?
+  confidence      Float?
+  publishedAt     DateTime?
+  disabledReason  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([assetType, sourceAssetId])
+  @@index([assetType, status])
+  @@index([qualityScore])
+}
+
+model PromptAssetCategoryLink {
+  id         String @id @default(cuid())
+  assetId    String
+  categoryId String
+  scope      String @default("suitable")
+
+  @@unique([assetId, categoryId, scope])
+  @@index([categoryId])
+}
+
+model PromptAssetUsageEvent {
+  id         String   @id @default(cuid())
+  assetId    String
+  batchId    String
+  productId  String?
+  taskId     String?
+  eventType  String
+  createdAt  DateTime @default(now())
+  metadata   String   @default("{}")
+
+  @@index([assetId, eventType, createdAt])
+  @@index([batchId])
+}
+
+model WorkshopOutputReview {
+  id                   String   @id @default(cuid())
+  batchId              String
+  productId            String
+  taskId               String
+  decision             String
+  productFidelityScore Int?
+  compositionScore     Int?
+  aestheticScore       Int?
+  consistencyScore     Int?
+  reasonCodesJson      String   @default("[]")
+  note                 String?
+  createdAt            DateTime @default(now())
+
+  @@index([batchId, productId])
+  @@index([taskId])
+}
+
+model WorkshopPipelineRun {
+  id              String   @id @default(cuid())
+  batchId         String
+  kind            String
+  status          String
+  inputRevision   Int      @default(0)
+  totalTasks      Int      @default(0)
+  completedTasks  Int      @default(0)
+  successTasks    Int      @default(0)
+  failedTasks     Int      @default(0)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  errorSummary    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([batchId, status])
 }

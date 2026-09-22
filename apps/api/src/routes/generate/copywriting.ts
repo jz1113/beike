@@ -1,4 +1,5 @@
 import { gatewayFetch } from '../../gateways/http';
+import { readJsonBody } from '../../core/validate';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../core/http';
 import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
@@ -183,7 +184,7 @@ function generateLocalFallbackCopy(data: CopywritingRequest): { title: string; c
 
 export async function POST(req: Request) {
   try {
-    const body: CopywritingRequest = await req.json().catch(() => ({}));
+    const body: CopywritingRequest = await readJsonBody(req, {});
     const {
       productTitle = '',
       productCategory = '',

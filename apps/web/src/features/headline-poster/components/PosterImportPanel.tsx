@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ChangeEvent, type DragEvent, type RefObject } from 'react';
-import { ArrowUp, FileSpreadsheet, FileText, Plus, Square } from 'lucide-react';
+import { ArrowUp, FileSpreadsheet, FileText, Square, UploadCloud } from 'lucide-react';
 
 interface Props {
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -38,20 +38,20 @@ export function PosterImportPanel({
         <button type="button" onClick={() => onImportMode('file')} className={`inline-flex min-w-[164px] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${importMode === 'file' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileSpreadsheet className="h-4 w-4" />导入文件</button>
         <button type="button" onClick={() => onImportMode('paste')} className={`inline-flex min-w-[164px] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${importMode === 'paste' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileText className="h-4 w-4" />粘贴表格</button>
       </div>
-      <section className="mt-8 overflow-hidden rounded-[24px] border border-slate-200 bg-white text-left shadow-[0_14px_32px_-24px_rgba(15,23,42,0.28)]">
+      <section className={importMode === 'file' ? 'mt-8' : 'mt-8 min-h-[300px] overflow-hidden rounded-[32px] border-2 border-dashed border-slate-300 bg-white/80 text-left transition hover:border-rose-300 hover:bg-white'}>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onImportFile} />
         {importMode === 'file' ? (
-          <button type="button" onClick={() => fileInputRef.current?.click()} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} className={`group relative flex min-h-[172px] w-full flex-col items-center justify-center gap-3 overflow-hidden transition-colors ${isDraggingFile ? 'bg-rose-50 ring-2 ring-inset ring-rose-300' : 'bg-gradient-to-br from-slate-50 via-white to-slate-100/70 hover:from-slate-100 hover:to-white'}`}>
-            <span className="inline-flex h-14 w-20 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-[0_10px_20px_-12px_rgba(15,23,42,0.7)] transition-transform group-hover:scale-[1.03]">
-              <Plus className="h-7 w-7" strokeWidth={1.8} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} className={`group flex min-h-[300px] w-full flex-col items-center justify-center rounded-[32px] border-2 border-dashed px-8 text-center shadow-[0_28px_80px_-50px_rgba(15,23,42,.45)] transition ${isDraggingFile ? 'border-rose-500 bg-rose-50/90' : 'border-slate-300 bg-white/80 hover:border-rose-400 hover:bg-white'}`}>
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg transition group-hover:-translate-y-1 group-hover:bg-rose-600">
+              <UploadCloud className="h-7 w-7" />
             </span>
-            <span className="text-sm font-bold text-slate-800">导入 Excel / CSV 文件</span>
-            <span className="text-xs text-slate-400">拖入文件或点击上传</span>
+            <span className="mt-5 text-lg font-black text-slate-900">点击或拖拽上传大字报表格</span>
+            <span className="mt-2 text-sm text-slate-400">支持 .xlsx、.xls 和 .csv，自动识别图片链接、标题与文字方向</span>
           </button>
         ) : (
-          <div className="px-8 py-5 sm:px-9 sm:py-6">
-            <div className="relative">
-              <textarea ref={pasteInputRef} value={pasteText} onChange={(event) => onPasteText(event.target.value)} rows={1} wrap="off" spellCheck={false} aria-label="粘贴图片链接、原标题、文字方向和可选商品名称" placeholder={'从 Excel 复制四列内容到这里（第四列可留空）\n封面链接\t原标题\t文字方向\t商品名称/型号\nhttps://...\t洗衣效果很到位\t文字竖\t小米洗衣机 V10\nhttps://...\t轻盈贴合出行听得舒心\t文字横\tREDMI K100 Pro'} className="min-h-20 w-full max-h-72 resize-none overflow-auto whitespace-pre border-0 bg-transparent p-0 pr-24 text-sm leading-[1.8] text-slate-700 outline-none [scrollbar-width:none] placeholder:text-slate-400 focus:ring-0 [&::-webkit-scrollbar]:hidden" />
+          <div className="min-h-[296px] px-8 py-6 sm:px-9 sm:py-8">
+            <div className="relative min-h-[232px]">
+              <textarea ref={pasteInputRef} value={pasteText} onChange={(event) => onPasteText(event.target.value)} rows={1} wrap="off" spellCheck={false} aria-label="粘贴图片链接、原标题、文字方向和可选商品名称" placeholder={'从 Excel 复制四列内容到这里（第四列可留空）\n封面链接\t原标题\t文字方向\t商品名称/型号\nhttps://...\t洗衣效果很到位\t文字竖\t小米洗衣机 V10\nhttps://...\t轻盈贴合出行听得舒心\t文字横\tREDMI K100 Pro'} className="min-h-[220px] w-full max-h-72 resize-none overflow-auto whitespace-pre border-0 bg-transparent p-0 pr-24 text-sm leading-[1.8] text-slate-700 outline-none [scrollbar-width:none] placeholder:text-slate-400 focus:ring-0 [&::-webkit-scrollbar]:hidden" />
               <div className="absolute bottom-0 right-0">
               {isRunning ? (
                 <button type="button" onClick={onStop} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-black"><Square className="h-3.5 w-3.5 fill-current" />停止生成</button>

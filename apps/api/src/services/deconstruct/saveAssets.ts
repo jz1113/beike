@@ -1,4 +1,4 @@
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import {
   createCompactThumbnailDataUrl,
   createCompactSourceImagesJson,
@@ -76,6 +76,9 @@ export async function persistDeconstructedAssets(params: {
     actions: [],
     fullPrompts: [],
   };
+  // 纯商品/静物图组没有可复用的人物或穿搭。绝不能把模型返回的
+  // “无人物 / 无穿搭”占位文本写入对应资产库。
+  const hasHumanEvidence = perImageResults.some((image) => image.has_human !== false);
 
   const [compactCoverUrl, compactSampleImagesJson] = await Promise.all([
     createCompactThumbnailDataUrl(imageUrls[0] || '', 320),
@@ -100,7 +103,7 @@ export async function persistDeconstructedAssets(params: {
   });
   savedRecords.fullPrompts = persisted.fullPrompts;
   if (sourceKey) {
-    await prisma.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved', "albumName" = ${albumName}, "albumId" = ${persisted.album.id}, "updatedAt" = ${new Date().toISOString()} WHERE "sourceKey" = ${sourceKey}`;
+    await db.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved', "albumName" = ${albumName}, "albumId" = ${persisted.album.id}, "updatedAt" = ${new Date().toISOString()} WHERE "sourceKey" = ${sourceKey}`;
   }
 
   const rawScenes: any[] = Array.isArray(parsedResult.scenes)
@@ -141,10 +144,10 @@ export async function persistDeconstructedAssets(params: {
     const cleanSceneReverse = meta.reversePrompt ? sanitizeScenePrompt(meta.reversePrompt) : undefined;
 
     const existingScene = primaryIndex !== null
-      ? await prisma.sceneAsset.findFirst({
+      ? await db.sceneAsset.findFirst({
           where: { title, sourceImageIndex: primaryIndex },
         })
-      : await prisma.sceneAsset.findFirst({
+      : await db.sceneAsset.findFirst({
           where: { title },
         });
 
@@ -154,7 +157,7 @@ export async function persistDeconstructedAssets(params: {
     const sceneCoverUrl = await thumbForUrl(rawSceneCover);
 
     if (existingScene) {
-      const updated = await prisma.sceneAsset.update({
+      const updated = await db.sceneAsset.update({
         where: { id: existingScene.id },
         data: {
           usageCount: existingScene.usageCount + 1,
@@ -171,7 +174,7 @@ export async function persistDeconstructedAssets(params: {
         sceneIdBySourceIndex.set(idx, updated.id);
       }
     } else {
-      const created = await prisma.sceneAsset.create({
+      const created = await db.sceneAsset.create({
         data: {
           title,
           description: cleanSceneDesc,
@@ -199,11 +202,13 @@ export async function persistDeconstructedAssets(params: {
     }
   }
 
-  const rawOutfits: any[] = Array.isArray(parsedResult.outfits) && parsedResult.outfits.length > 0
-    ? parsedResult.outfits
-    : parsedResult.outfit
-    ? [parsedResult.outfit]
-    : perImageResults.map((img) => img.outfit).filter(Boolean);
+  const rawOutfits: any[] = !hasHumanEvidence
+    ? []
+    : Array.isArray(parsedResult.outfits) && parsedResult.outfits.length > 0
+      ? parsedResult.outfits
+      : parsedResult.outfit
+        ? [parsedResult.outfit]
+        : perImageResults.map((img) => img.outfit).filter(Boolean);
 
   const dedupedOutfits = dedupeOutfitCandidates(rawOutfits);
   const outfitsToProcess = isSingleImage && dedupedOutfits.length > 1 ? [dedupedOutfits[0]] : dedupedOutfits;
@@ -228,7 +233,7 @@ export async function persistDeconstructedAssets(params: {
       ...(clusterIndices.length > 1 ? [`cluster:${clusterIndices.join(',')}`] : []),
     ].filter(Boolean).join(', ');
 
-    const existingOutfit = await prisma.outfitAsset.findFirst({
+    const existingOutfit = await db.outfitAsset.findFirst({
       where: {
         OR: [
           { title },
@@ -238,7 +243,7 @@ export async function persistDeconstructedAssets(params: {
     });
 
     if (existingOutfit) {
-      const updated = await prisma.outfitAsset.update({
+      const updated = await db.outfitAsset.update({
         where: { id: existingOutfit.id },
         data: {
           usageCount: existingOutfit.usageCount + 1,
@@ -256,7 +261,7 @@ export async function persistDeconstructedAssets(params: {
       });
       savedRecords.outfits.push(updated);
     } else {
-      const created = await prisma.outfitAsset.create({
+      const created = await db.outfitAsset.create({
         data: {
           title,
           top: top || title,
@@ -308,10 +313,10 @@ export async function persistDeconstructedAssets(params: {
 
     const existingAction =
       meta.sourceImageIndex !== null
-        ? await prisma.actionAsset.findFirst({
+        ? await db.actionAsset.findFirst({
             where: { sourceImageIndex: meta.sourceImageIndex, title: actTitle },
           })
-        : await prisma.actionAsset.findFirst({
+        : await db.actionAsset.findFirst({
             where: {
               OR: [
                 { title: actTitle },
@@ -332,7 +337,7 @@ export async function persistDeconstructedAssets(params: {
     }
 
     if (existingAction) {
-      const updated = await prisma.actionAsset.update({
+      const updated = await db.actionAsset.update({
         where: { id: existingAction.id },
         data: {
           usageCount: existingAction.usageCount + 1,
@@ -387,7 +392,7 @@ export async function persistDeconstructedAssets(params: {
         ...anchors.map((a) => a.label),
       ])).join(', ');
 
-      const created = await prisma.actionAsset.create({
+      const created = await db.actionAsset.create({
         data: {
           title: actTitle,
           action: cleanActionDesc,
@@ -408,7 +413,7 @@ export async function persistDeconstructedAssets(params: {
     }
   }
 
-  if (parsedResult.persona) {
+  if (hasHumanEvidence && parsedResult.persona) {
     const ps = parsedResult.persona as Record<string, unknown>;
     const name = ((ps.name as string) || '气质博主').trim();
     const meta = extractAssetMeta(ps);
@@ -441,14 +446,14 @@ export async function persistDeconstructedAssets(params: {
     if (hair) personaTags.push(hair.slice(0, 10));
     if (vibe) personaTags.push(vibe.slice(0, 8));
 
-    const existingPersona = await prisma.personaAsset.findFirst({
+    const existingPersona = await db.personaAsset.findFirst({
       where: {
         OR: [{ name }, { description: finalDesc }],
       },
     });
 
     if (existingPersona) {
-      savedRecords.persona = await prisma.personaAsset.update({
+      savedRecords.persona = await db.personaAsset.update({
         where: { id: existingPersona.id },
         data: {
           usageCount: existingPersona.usageCount + 1,
@@ -462,7 +467,7 @@ export async function persistDeconstructedAssets(params: {
         },
       });
     } else {
-      savedRecords.persona = await prisma.personaAsset.create({
+      savedRecords.persona = await db.personaAsset.create({
         data: {
           name,
           description: finalDesc,

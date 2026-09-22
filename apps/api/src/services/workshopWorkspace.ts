@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../repositories/db';
+import type { PrismaClient } from '../repositories/access';
 import { workshopSnapshotSchema, type WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 
 type Row = { revision: number; snapshotJson: string; updatedAt: string };

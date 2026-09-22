@@ -125,7 +125,7 @@ export const StyleExtractSourcePanel = React.memo(function StyleExtractSourcePan
                   value={linkInput}
                   onChange={(e) => setLinkInput(e.target.value)}
                   placeholder={`支持导入多条链接（每行一条链接，长链接保持单行不换行）：\nhttps://www.xiaohongshu.com/explore/...\nhttps://www.xiaohongshu.com/explore/...`}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono resize-y overflow-x-auto whitespace-pre leading-relaxed shadow-xs"
+                  className="soft-textarea w-full px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 font-mono resize-y overflow-x-auto whitespace-pre leading-relaxed"
                   style={{ whiteSpace: 'pre', overflowX: 'auto' }}
                 />
               </div>
@@ -263,7 +263,7 @@ export const StyleExtractSourcePanel = React.memo(function StyleExtractSourcePan
             onChange={(e) => setUrlInput(e.target.value)}
             placeholder="请输入图片完整直链 URL，一行一个&#10;https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg"
             rows={3}
-            className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 font-mono resize-none"
+            className="soft-textarea w-full p-3 text-xs text-slate-900 placeholder-slate-400 font-mono resize-none"
           />
           <div className="flex justify-end">
             <button

@@ -8,6 +8,7 @@ export async function GET(req?: Request) {
   const authorized = req ? isAuthorized(req) : false;
   const token = getAccessToken() || '';
   return jsonResponse({
+    success: true,
     ok: true, desktop,
     desktopToken: desktop && authorized ? token : '',
     mediaSession: authorized && token ? createMediaSignature('proxy-media-session', token, 3600) : undefined,

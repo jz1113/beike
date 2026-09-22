@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, Check, Play, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 
 export interface CanvasAssetImportModalProps {
   isOpen: boolean;

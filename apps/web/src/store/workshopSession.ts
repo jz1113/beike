@@ -1,14 +1,15 @@
 import type { ShotPrompt, PreviousGroupSignature } from '@beike/domain/vision';
 import type { OriginalLookParts, OriginalProductRole } from '@beike/domain/drawing';
 import type { ProductImage, ProductData, ProductWidgetData } from '@/types';
-import type { GenerationTask } from '@/types/app-store';
-import type { WorkshopMode, WorkshopModeSession } from '@/types/store';
+import type { GenerationTask } from '@/store/appStoreTypes';
+import type { WorkshopMode, WorkshopModeSession } from '@/store/types';
 
 export type { WorkshopMode, WorkshopModeSession };
 
 const DEFAULT_PERSONA = '🌸 亚洲清纯甜美女生 (日常精致微表情、自然裸妆感)';
 
-function readPersonaPref(mode: WorkshopMode): string {
+function readPersonaPref(_mode: WorkshopMode): string {
+  void _mode;
   if (typeof window === 'undefined') return DEFAULT_PERSONA;
   const key = 'drawing_model_persona_original';
   try {
@@ -142,11 +143,13 @@ export function applyWorkshopModeSession(
   return { ...session };
 }
 
-export function workshopModeSessionKey(mode: WorkshopMode): 'socialSessionCache' | 'originalSessionCache' {
+export function workshopModeSessionKey(_mode: WorkshopMode): 'socialSessionCache' | 'originalSessionCache' {
+  void _mode;
   return 'originalSessionCache';
 }
 
-export function persistModePersonaPref(mode: WorkshopMode, persona: string) {
+export function persistModePersonaPref(_mode: WorkshopMode, persona: string) {
+  void _mode;
   if (typeof window === 'undefined') return;
   const key = 'drawing_model_persona_original';
   try {

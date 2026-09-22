@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../../core/http';
-import { prisma } from '../../../repositories/db';
+import { readJsonBody } from '../../../core/validate';
+import { db } from '../../../repositories/access';
 import { resolveStorageConfig, uploadRemoteMediaToStorage, isAlreadyPermanentUrl, StorageConfig } from '@beike/server-kit/storage';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { isAdminAuthorized, unauthorizedJson } from '@beike/server-kit/apiAuth';
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
     return unauthorizedJson('需要管理员权限');
   }
   try {
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, {});
     const customConfig: StorageConfig | undefined = body?.config;
     const limit = Math.min(500, Math.max(1, Number(body?.limit) || 100));
     const cursor = typeof body?.cursor === 'string' && body.cursor ? body.cursor : undefined;
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
       return jsonResponse({ success: false, error: '未配置有效的对象存储凭证，请先在设置中填写并开启存储配置' }, 400);
     }
 
-    const tasks = await prisma.imageTask.findMany({
+    const tasks = await db.imageTask.findMany({
       where: { status: 'SUCCESS', resultUrl: { not: null }, ...(cursor ? { id: { gt: cursor } } : {}) },
       orderBy: { id: 'asc' },
       take: limit + 1,
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
           customConfig: config,
         });
         if (permanentUrl) {
-          await prisma.imageTask.update({ where: { id: task.id }, data: { resultUrl: permanentUrl } });
+          await db.imageTask.update({ where: { id: task.id }, data: { resultUrl: permanentUrl } });
           migratedCount++;
         }
       } catch (err: unknown) {

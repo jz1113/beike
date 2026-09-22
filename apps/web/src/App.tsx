@@ -71,6 +71,7 @@ const CanvasWorkspaceView = lazyWithRetry(() => import('@/features/canvas/Canvas
 const GenerateWorkspace = lazyWithRetry(() => import('@/features/generate/GenerateWorkspace'));
 const WorkshopStudio = lazyWithRetry(() => import('@/features/workshop/WorkshopStudio'));
 const HeadlinePosterStudio = lazyWithRetry(() => import('@/features/headline-poster/HeadlinePosterStudio'));
+const KeywordReviewStudio = lazyWithRetry(() => import('@/features/keyword-review/KeywordReviewStudio'));
 const AssetCenter = lazyWithRetry(() => import('@/features/assets/components/AssetCenter'));
 const CanvasRecentProjects = lazyWithRetry(() => import('@/features/canvas/components/CanvasRecentProjects'));
 // 点阵背景为纯装饰，延后下载，使首页核心控件和灵感流优先可用。
@@ -148,7 +149,7 @@ export default function App() {
   // 🌟 Codex 风格独立全屏设置界面：进入后接管窗口，左侧由设置专属侧栏驱动，带「← 返回应用」
   const isSettingsFullscreen = currentView === 'settings';
   // 种草工坊与大字报工作台使用独立全屏布局。
-  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster';
+  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review';
   const isDedicatedFullscreen = isCanvasFullscreen || isSettingsFullscreen || isWorkshopFullscreen;
 
   useEffect(() => {
@@ -234,6 +235,7 @@ export default function App() {
                     <HomePage 
                       onEnterWorkshop={enterOriginalWorkshop}
                       onOpenHeadlinePoster={enterHeadlinePoster}
+                      onOpenKeywordReview={() => setCurrentView('keyword_review')}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
                       recentProjects={<CanvasRecentProjects onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
@@ -276,6 +278,12 @@ export default function App() {
                     }}
                   >
                     <CanvasWorkspaceView />
+                  </AppErrorBoundary>
+                </ViewKeepAlivePanel>
+
+                <ViewKeepAlivePanel view="keyword_review" currentView={currentView}>
+                  <AppErrorBoundary title="关键词审核异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <KeywordReviewStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 

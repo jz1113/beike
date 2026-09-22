@@ -1,5 +1,5 @@
 import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
-import type { GenerationTask, MediaAttachment } from '@/types/app-store';
+import type { GenerationTask, MediaAttachment } from '@/store/appStoreTypes';
 import { prepareAssistantImagePrompt } from './assistantPromptReferences';
 
 export function isImagePrompt(code: string, lang = '') {

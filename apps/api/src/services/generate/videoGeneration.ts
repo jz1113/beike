@@ -1,7 +1,8 @@
 import { gatewayFetch } from '../../gateways/http';
+import { readJsonBody } from '../../core/validate';
 import { guardSubmission } from '../submissionGuard';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { buildVideoRequest } from '@beike/domain/modelAdapters';
 import { DEFAULT_VIDEO_MODEL_ID, isApprovedModel } from '@beike/domain/modelCatalog';
@@ -24,7 +25,7 @@ async function submit(req: Request) {
   let endpointAttempts = 0;
   let convertCacheHits = 0;
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const parseMs = Date.now() - t0;
     const {
       prompt,
@@ -230,13 +231,13 @@ async function submit(req: Request) {
     try {
       let validProductId: string | null = null;
       if (productId) {
-        const existProduct = await prisma.product.findUnique({ where: { id: productId } }).catch(() => null);
+        const existProduct = await db.product.findUnique({ where: { id: productId } }).catch(() => null);
         if (existProduct) {
           validProductId = productId;
         }
       }
 
-      const taskRecord = await prisma.imageTask.upsert({
+      const taskRecord = await db.imageTask.upsert({
         where: { taskId: taskId },
         update: {
           productId: validProductId,
@@ -328,7 +329,7 @@ async function submit(req: Request) {
 
 export async function POST(req: Request) {
   let body;
-  try { body = await req.json(); } catch { return jsonResponse({ success: false, error: '请求格式不正确' }, 400); }
+  try { body = await readJsonBody(req); } catch { return jsonResponse({ success: false, error: '请求格式不正确' }, 400); }
   const replay = () => new Request(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(body) });
   try {
     return await guardSubmission(replay(), 'video', resolveCredentials(replay(), body), () => submit(replay()));

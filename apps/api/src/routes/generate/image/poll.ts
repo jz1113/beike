@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../../core/http';
-import { prisma } from '../../../repositories/db';
+import { db } from '../../../repositories/access';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
 import { formatUserError } from '@beike/domain/upstreamErrors';
@@ -45,7 +45,7 @@ async function pollImageOnce(req: Request) {
     let record: { resultUrl: string | null; status: string | null; failReason: string | null } | null = null;
     let dbError = false;
     try {
-      record = await prisma.imageTask.findFirst({
+      record = await db.imageTask.findFirst({
         where: { taskId },
         select: { resultUrl: true, status: true, failReason: true },
       });
@@ -190,7 +190,7 @@ async function pollImageOnce(req: Request) {
   // 若上游明确探测到了失败原因
   if (detectedFailureReason && (!resData || !resData.status || !resData.data?.status)) {
     try {
-      await prisma.imageTask.updateMany({
+      await db.imageTask.updateMany({
         where: { taskId, status: { in: [...mutableGenerationStatuses] } },
         data: {
           status: 'FAILURE',
@@ -215,7 +215,7 @@ async function pollImageOnce(req: Request) {
     let record: { status: string | null; resultUrl: string | null; failReason: string | null } | null = null;
     let dbError = false;
     try {
-      record = await prisma.imageTask.findFirst({
+      record = await db.imageTask.findFirst({
         where: { taskId },
         select: { status: true, resultUrl: true, failReason: true },
       });
@@ -318,7 +318,7 @@ async function pollImageOnce(req: Request) {
   // 任务状态完成时更新数据库记录
   if (status === 'SUCCESS' || status === 'FAILURE') {
     try {
-      await prisma.imageTask.updateMany({
+      await db.imageTask.updateMany({
         where: { taskId, status: { in: [...mutableGenerationStatuses] } },
         data: {
           status,

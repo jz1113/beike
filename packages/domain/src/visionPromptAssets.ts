@@ -16,6 +16,7 @@ export interface VisionLockedAssets {
   outfitTitle?: string;
   actionId?: string;
   actionTitle?: string;
+  fullPromptId?: string;
 }
 
 export function shouldLockJewelryHalfBody(

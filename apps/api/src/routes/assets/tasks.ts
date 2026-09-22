@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { readJsonBody } from '../../core/validate';
+import { db } from '../../repositories/access';
 import { isAdminAuthorized, unauthorizedJson } from '@beike/server-kit/apiAuth';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { deleteObjectsFromStorage } from '@beike/server-kit/storage';
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const detailId = searchParams.get('id');
     if (detailId) {
-      const task = await prisma.imageTask.findFirst({
+      const task = await db.imageTask.findFirst({
         where: { OR: [{ id: detailId }, { taskId: detailId }] },
         include: {
           product: {
@@ -102,8 +103,8 @@ export async function GET(req: Request) {
     }
 
     const [total, tasks] = await Promise.all([
-      prisma.imageTask.count({ where }),
-      prisma.imageTask.findMany({
+      db.imageTask.count({ where }),
+      db.imageTask.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
@@ -140,7 +141,7 @@ export async function GET(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const body = await req.json().catch(() => null);
+    const body = await readJsonBody(req, null);
 
     const id = searchParams.get('id');
     const idsParam = searchParams.get('ids');
@@ -150,10 +151,10 @@ export async function DELETE(req: Request) {
     const clearAll = searchParams.get('clearAll') === 'true' || body?.clearAll === true;
 
     if (clearFailed) {
-      const deleteResult = await prisma.imageTask.deleteMany({
+      const deleteResult = await db.imageTask.deleteMany({
         where: { status: 'FAILURE' },
       });
-      prisma.$executeRawUnsafe('VACUUM;').catch(() => {});
+      db.$executeRawUnsafe('VACUUM;').catch(() => {});
       return jsonResponse({ success: true, count: deleteResult.count });
     }
 
@@ -161,15 +162,15 @@ export async function DELETE(req: Request) {
       if (!isAdminAuthorized(req)) {
         return unauthorizedJson('clearAll requires admin token');
       }
-      const allTasks = await prisma.imageTask.findMany({ select: { resultUrl: true } });
+      const allTasks = await db.imageTask.findMany({ select: { resultUrl: true } });
       const allUrls = allTasks.map((t) => t.resultUrl).filter(Boolean) as string[];
       if (allUrls.length > 0) {
         deleteObjectsFromStorage(allUrls).catch((err) => {
           console.warn('[清空任务-OSS清理异常]', err);
         });
       }
-      const deleteResult = await prisma.imageTask.deleteMany({});
-      prisma.$executeRawUnsafe('VACUUM;').catch(() => {});
+      const deleteResult = await db.imageTask.deleteMany({});
+      db.$executeRawUnsafe('VACUUM;').catch(() => {});
       return jsonResponse({ success: true, count: deleteResult.count });
     }
 
@@ -203,7 +204,7 @@ export async function DELETE(req: Request) {
     }
 
     // 🌟 在删除数据库记录前，提取对应的 resultUrl 并向阿里云 OSS / 本地存储发起物理联动删除
-    const tasksToDelete = await prisma.imageTask.findMany({
+    const tasksToDelete = await db.imageTask.findMany({
       where: { OR: orConditions },
       select: { resultUrl: true },
     });
@@ -218,12 +219,12 @@ export async function DELETE(req: Request) {
       });
     }
 
-    const deleteResult = await prisma.imageTask.deleteMany({
+    const deleteResult = await db.imageTask.deleteMany({
       where: { OR: orConditions },
     });
 
     if (deleteResult.count > 5) {
-      prisma.$executeRawUnsafe('VACUUM;').catch(() => {});
+      db.$executeRawUnsafe('VACUUM;').catch(() => {});
     }
 
     return jsonResponse({ success: true, count: deleteResult.count });

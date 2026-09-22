@@ -1,8 +1,10 @@
 import React from 'react';
-import type { WorkshopTab } from '@/types/store';
+import { WandSparkles } from 'lucide-react';
+import type { WorkshopTab } from '@/store/types';
 import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useAppStore } from '@/store';
 import { isMacOs, isTauriDesktop } from '@/shared/desktop/desktopRuntime';
+import { ToolSuiteMark } from '@/shared/icons';
 
 export interface WorkshopTopBarProps {
   assetToolbarRef?: React.Ref<HTMLDivElement>;
@@ -39,16 +41,11 @@ export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarPro
       <button
         type="button"
         onClick={() => setCurrentView('home')}
-        className="flex items-center gap-2.5 h-10 px-3.5 sm:px-4 rounded-xl bg-white hover:bg-slate-50/90 border border-slate-200/90 text-[15px] font-medium select-none shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-98 group"
+        className="group flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-black tracking-tight text-slate-900 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white select-none cursor-pointer active:scale-98"
         title={`${studioTitle} · 点击返回首页`}
       >
-        <img
-          src="/brand/workshop_icon.png"
-          alt=""
-          draggable={false}
-          className="w-5.5 h-5.5 object-contain shrink-0 group-hover:scale-105 transition-transform"
-        />
-        <span className="font-bold text-slate-900 truncate leading-none">{studioTitle}</span>
+        <ToolSuiteMark><WandSparkles className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
+        <span className="truncate leading-none">{studioTitle}</span>
       </button>
 
       {/* 🌟 3. 右侧：保持通透留白（已彻底清除右侧生产预设冗余按钮，预设统一位于左侧悬浮胶囊栏） */}

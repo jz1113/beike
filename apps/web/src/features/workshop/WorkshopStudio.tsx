@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAppStore } from '@/store';
-import BatchWorkshopView from './batch/components/BatchWorkshopView';
+import BatchWorkshopView from './components/BatchWorkshopView';
 import { WorkshopTopBar } from './components/WorkshopTopBar';
 import { WorkshopSideCapsuleBar } from './components/WorkshopSideCapsuleBar';
 import WorkshopRecipeView from './views/WorkshopRecipeView';
-import WorkshopProductView from './views/WorkshopProductView';
+import WorkshopProductCategoryView from './views/WorkshopProductCategoryView';
 import AssetPromptLibrary from '@/features/assets/components/AssetPromptLibrary';
 
 interface Props {
@@ -27,7 +27,7 @@ export default function WorkshopStudio({
         onSelectTab={setActiveWorkshopTab}
       />
 
-      {/* 仅在非 studio 工作台（资产库/架构/商品库）时在顶级呈现顶栏；studio 工作台由 BatchWorkshopView 统一承载带步骤导轨的单层顶栏 */}
+      {/* 仅在非 studio 工作台（资产库/拍摄架构/商品类目）时在顶级呈现顶栏；studio 工作台由 BatchWorkshopView 统一承载带步骤导轨的单层顶栏 */}
       {activeWorkshopTab !== 'studio' && (
         <WorkshopTopBar
           assetToolbarRef={setAssetToolbarTarget}
@@ -50,8 +50,8 @@ export default function WorkshopStudio({
           <WorkshopRecipeView onEnterStudio={() => setActiveWorkshopTab('studio')} />
         )}
 
-        {activeWorkshopTab === 'products' && (
-          <WorkshopProductView onEnterStudio={() => setActiveWorkshopTab('studio')} />
+        {activeWorkshopTab === 'categories' && (
+          <WorkshopProductCategoryView onEnterStudio={() => setActiveWorkshopTab('studio')} />
         )}
       </div>
     </div>

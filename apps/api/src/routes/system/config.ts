@@ -1,4 +1,5 @@
 import { gatewayFetch } from '../../gateways/http';
+import { readJsonBody } from '../../core/validate';
 import { isKnownImageOnlyModel, isKnownVideoOnlyModel } from '@beike/domain/workflowModels';
 import { checkMediaModelConnection } from '../../services/modelConnection';
 import { jsonResponse } from '../../core/http';
@@ -54,7 +55,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const startTime = Date.now();
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const { 
       type = 'ai',
       baseUrl = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org', 

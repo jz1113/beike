@@ -1,5 +1,5 @@
 import { useCanvasStore } from '@/features/canvas/store/useCanvasStore';
-import type { MediaAttachment } from '@/types/app-store';
+import type { MediaAttachment } from '@/store/appStoreTypes';
 
 function clipText(value: string | undefined, max: number): string | undefined {
   const clipped = (value || '').replace(/\s+/g, ' ').trim().slice(0, max);

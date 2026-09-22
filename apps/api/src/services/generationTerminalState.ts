@@ -1,11 +1,11 @@
-import { prisma } from '@beike/server-kit/prisma';
+import { db } from '../repositories/access';
 import { isImageTaskTerminal } from '@beike/domain/taskStatus';
 import { jsonResponse } from '../core/http';
 
 export const mutableGenerationStatuses = ['PENDING', 'IN_PROGRESS'];
 
 async function savedTerminalResponse(taskId: string): Promise<Response | null> {
-  const task = await prisma.imageTask.findUnique({
+  const task = await db.imageTask.findUnique({
     where: { taskId }, select: { status: true, resultUrl: true, failReason: true },
   });
   if (!task || !isImageTaskTerminal(task.status)) return null;

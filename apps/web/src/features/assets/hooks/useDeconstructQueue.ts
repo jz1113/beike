@@ -124,7 +124,7 @@ export function useDeconstructQueue({
   }, [isDeconstructing]);
 
   const handleQueueConcurrencyChange = useCallback((value: number) => {
-    const next = Math.min(8, Math.max(1, value));
+    const next = Math.min(1, Math.max(1, value));
     setQueueConcurrency(next);
     persistQueueConcurrency(next);
   }, []);

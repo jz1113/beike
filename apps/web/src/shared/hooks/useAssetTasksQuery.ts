@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { useAppStore } from '@/store';
 import { fetchAssetTasks } from '@/shared/api/generationApi';
 import { isImageTaskActive } from '@beike/domain/taskStatus';

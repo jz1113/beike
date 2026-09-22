@@ -30,8 +30,10 @@ export {
 // 模块级提交单飞锁：跨组件生命周期与重渲染严格持久化，同一个任务 ID 绝不发起并发/重复提交
 const globalSubmittingTaskIds = new Set<string>();
 const engineAbortControllers = new Map<string, AbortController>();
+let generationEngineRunEpoch = 0;
 
 export function abortActiveGenerationEngine() {
+  generationEngineRunEpoch += 1;
   for (const controller of engineAbortControllers.values()) {
     try {
       controller.abort();
@@ -167,68 +169,69 @@ export function useGenerationEngine() {
     const unsubmittedTasks = getUnsubmittedGenerationTasks();
     if (unsubmittedTasks.length === 0) return;
 
-    const submittedIds: string[] = [];
-    let isCancelled = false;
-
     const processQueue = async () => {
+      const runEpoch = generationEngineRunEpoch;
       const tasksToSubmit = unsubmittedTasks.filter(
         (t) => !submittingTaskIdsRef.current.has(t.id),
       );
       if (tasksToSubmit.length === 0) return;
 
+      // 上游按分组共享并发配额。一次性提交整批图会挤占同组的分析请求，
+      // 导致后者 429；而且在提交结果不确定时，重放可能产生额外计费。
+      // 因此这里保守地一次只派发一张。每个任务仍使用自己的幂等键，
+      // 已提交的任务不会因后续任务失败而重新提交。
       tasksToSubmit.forEach((t) => {
         submittingTaskIdsRef.current.add(t.id);
         globalSubmittingTaskIds.add(t.id);
-        submittedIds.push(t.id);
       });
 
-      await Promise.allSettled(
-        tasksToSubmit.map(async (t) => {
-          const ctrl = new AbortController();
-          activeAbortControllersRef.current.set(t.id, ctrl);
-          engineAbortControllers.set(t.id, ctrl);
-          try {
-            await submitSingleGenerationTask(
-              t,
-              updateGenerationTask,
-              pollCountsRef.current,
-              homeSlowPollIdsRef.current,
-              ctrl.signal,
-            );
-          } catch (err: unknown) {
-            if (isGenerationCancelled(err, ctrl.signal)) {
-              if (isCancelled) return;
-              updateGenerationTask(t.id, {
-                status: 'FAILURE',
-                failReason: GENERATION_CANCELLED_MESSAGE,
-              });
-              return;
-            }
+      for (let index = 0; index < tasksToSubmit.length; index += 1) {
+        if (runEpoch !== generationEngineRunEpoch) {
+          // abortActiveGenerationEngine may be invoked while this serial queue is
+          // waiting. Release tasks that never reached the network; do not start
+          // the next billable request after a user cancellation.
+          for (const pending of tasksToSubmit.slice(index)) {
+            submittingTaskIdsRef.current.delete(pending.id);
+            globalSubmittingTaskIds.delete(pending.id);
+          }
+          break;
+        }
+        const t = tasksToSubmit[index];
+        const ctrl = new AbortController();
+        activeAbortControllersRef.current.set(t.id, ctrl);
+        engineAbortControllers.set(t.id, ctrl);
+        try {
+          await submitSingleGenerationTask(
+            t,
+            updateGenerationTask,
+            pollCountsRef.current,
+            homeSlowPollIdsRef.current,
+            ctrl.signal,
+          );
+        } catch (err: unknown) {
+          if (isGenerationCancelled(err, ctrl.signal)) {
+            updateGenerationTask(t.id, {
+              status: 'FAILURE',
+              failReason: GENERATION_CANCELLED_MESSAGE,
+            });
+          } else {
             const message = err instanceof Error ? err.message : String(err);
             console.warn(`[generationEngine] 任务 ${t.id} 失败:`, message);
             updateGenerationTask(t.id, {
               status: 'FAILURE',
               failReason: formatUserError(err, '网络连接异常或模型接口错误'),
             });
-          } finally {
-            submittingTaskIdsRef.current.delete(t.id);
-            globalSubmittingTaskIds.delete(t.id);
-            activeAbortControllersRef.current.delete(t.id);
-            engineAbortControllers.delete(t.id);
           }
-        }),
-      );
+        } finally {
+          submittingTaskIdsRef.current.delete(t.id);
+          globalSubmittingTaskIds.delete(t.id);
+          activeAbortControllersRef.current.delete(t.id);
+          engineAbortControllers.delete(t.id);
+        }
+      }
     };
 
     void processQueue();
-
-    return () => {
-      isCancelled = true;
-      submittedIds.forEach((id) => {
-        const ctrl = activeAbortControllersRef.current.get(id);
-        if (ctrl && !ctrl.signal.aborted) ctrl.abort();
-      });
-    };
   }, [unsubmittedTasksKey, updateGenerationTask]);
 
   // 轮询进行中 Hub 任务

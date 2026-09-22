@@ -1,7 +1,7 @@
 import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
 import { compressImageForSubmission } from '@/shared/media/image-utils';
 import { dataUrlToBlob } from '@/shared/media/downloadMedia';
-import type { MediaAttachment } from '@/types/app-store';
+import type { MediaAttachment } from '@/store/appStoreTypes';
 
 /** Save images before the message is committed; a failed save leaves the draft available. */
 export async function persistAssistantImages(attachments: MediaAttachment[]): Promise<MediaAttachment[]> {

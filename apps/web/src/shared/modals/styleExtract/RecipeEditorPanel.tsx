@@ -245,7 +245,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
           value={extractedRecipe.promptSnippet}
           onChange={e => setExtractedRecipe({ ...extractedRecipe, promptSnippet: e.target.value })}
           rows={6}
-          className="w-full p-3 rounded-2xl bg-white border border-slate-200 text-xs leading-relaxed text-slate-800 outline-none focus:border-indigo-500 font-mono shadow-xs resize-y custom-scrollbar"
+          className="soft-textarea w-full p-3 text-xs leading-relaxed text-slate-800 font-mono resize-y custom-scrollbar"
         />
 
         {/* 快捷微调增强标签 */}

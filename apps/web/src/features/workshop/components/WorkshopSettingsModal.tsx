@@ -4,6 +4,7 @@ import {
   Settings2, 
   CheckCircle2,
 } from 'lucide-react';
+import { WorkshopAssetLockRow } from './WorkshopAssetLockRow';
 
 export interface WorkshopSettingsModalProps {
   isOpen: boolean;
@@ -42,6 +43,14 @@ export interface WorkshopSettingsModalProps {
   lockedOutfitId?: string;
   setLockedOutfitId?: (id: string) => void;
   availableOutfits?: Array<{ id: string; title?: string; code?: string }>;
+  lockedActionId?: string;
+  setLockedActionId?: (id: string) => void;
+  availableActions?: Array<{ id: string; title?: string; code?: string }>;
+  lockedFullPromptId?: string;
+  setLockedFullPromptId?: (id: string) => void;
+  availableFullPrompts?: Array<{ id: string; title?: string; name?: string; code?: string; shotPromptsJson?: string }>;
+  personaMode?: 'asset_driven' | 'none';
+  setPersonaMode?: (mode: 'asset_driven' | 'none') => void;
 }
 
 export function WorkshopSettingsModal({
@@ -81,6 +90,14 @@ export function WorkshopSettingsModal({
   lockedOutfitId = 'auto',
   setLockedOutfitId,
   availableOutfits = [],
+  lockedActionId = 'auto',
+  setLockedActionId,
+  availableActions = [],
+  lockedFullPromptId = 'auto',
+  setLockedFullPromptId,
+  availableFullPrompts = [],
+  personaMode = 'asset_driven',
+  setPersonaMode,
 }: WorkshopSettingsModalProps) {
   if (!isOpen) return null;
 
@@ -92,7 +109,7 @@ export function WorkshopSettingsModal({
         onClick={onClose}
       />
 
-      <div className="relative z-10 flex max-h-[90vh] w-full max-w-[840px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] animate-in zoom-in-95 duration-200">
+      <div className="relative z-10 flex max-h-[90vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] animate-in zoom-in-95 duration-200">
         {/* 顶部标题栏 */}
         <div className="flex shrink-0 items-start justify-between gap-5 px-5 pb-3 pt-4 sm:px-6">
           <div className="flex items-center gap-2.5">
@@ -187,18 +204,34 @@ export function WorkshopSettingsModal({
 
             <section className="border-t border-slate-100 pt-3">
               <div className="flex items-center justify-between gap-4">
-                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">出镜、场景与穿搭均按提示词资产库的对应资产装配。</p></div>
+                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">图组母本锁定镜头顺序与机位；人物、穿搭、场景整组替换。</p></div>
                 <label className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-indigo-700 cursor-pointer hover:border-indigo-300">
                   <input type="checkbox" checked={useAssetLibrary} onChange={e => setUseAssetLibrary?.(e.target.checked)} className="h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500" />启用联动
                 </label>
               </div>
               {useAssetLibrary && (
-                <div className="mt-3 grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0 animate-in fade-in duration-150">
-                  <label className="flex items-center justify-between gap-2 py-2 sm:py-0 sm:pr-3"><span className="shrink-0 text-xs font-bold text-slate-700">人设 #P</span><select value={lockedPersonaId} onChange={e => setLockedPersonaId?.(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value="auto">智能轮循</option>{availablePersonas.map((p, idx) => <option key={p.id} value={p.id}>{p.code ? `[#${p.code.replace(/^#/, '')}]` : `[#P-${String(idx + 1).padStart(2, '0')}]`} {p.name}</option>)}</select></label>
-                  <label className="flex items-center justify-between gap-2 py-2 sm:px-3 sm:py-0"><span className="shrink-0 text-xs font-bold text-slate-700">场景 #S</span><select value={lockedSceneId} onChange={e => setLockedSceneId?.(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value="auto">智能轮循</option>{availableScenes.map((s, idx) => <option key={s.id} value={s.id}>{s.code ? `[#${s.code.replace(/^#/, '')}]` : `[#S-${String(idx + 1).padStart(2, '0')}]`} {s.title}</option>)}</select></label>
-                  <label className="flex items-center justify-between gap-2 py-2 sm:pl-3 sm:py-0"><span className="shrink-0 text-xs font-bold text-slate-700">穿搭 #O</span><select value={lockedOutfitId} onChange={e => setLockedOutfitId?.(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value="auto">智能轮循</option>{availableOutfits.map((o, idx) => <option key={o.id} value={o.id}>{o.code ? `[#${o.code.replace(/^#/, '')}]` : `[#O-${String(idx + 1).padStart(2, '0')}]`} {o.title}</option>)}</select></label>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-150">
+                  <WorkshopAssetLockRow label="图组母本" prefix="R" value={lockedFullPromptId} onChange={(id) => {
+                    setLockedFullPromptId?.(id);
+                    const group = availableFullPrompts.find((item) => item.id === id);
+                    try {
+                      const shots = JSON.parse(String(group?.shotPromptsJson || '[]'));
+                      if (Array.isArray(shots) && shots.length > 0) setSelectedShotCount(shots.length);
+                    } catch { /* keep current shot count */ }
+                  }} options={availableFullPrompts} />
+                  <WorkshopAssetLockRow label="人设 #P" prefix="P" value={lockedPersonaId} onChange={(id) => setLockedPersonaId?.(id)} options={availablePersonas} />
+                  <WorkshopAssetLockRow label="场景 #S" prefix="S" value={lockedSceneId} onChange={(id) => setLockedSceneId?.(id)} options={availableScenes} />
+                  <WorkshopAssetLockRow label="穿搭 #O" prefix="O" value={lockedOutfitId} onChange={(id) => setLockedOutfitId?.(id)} options={availableOutfits} />
+                  <WorkshopAssetLockRow label="动作 #A" prefix="A" value={lockedActionId} onChange={(id) => setLockedActionId?.(id)} options={availableActions} />
                 </div>
               )}
+              <label className="mt-3 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold text-slate-700">人物出镜</span>
+                <select value={personaMode} onChange={(event) => setPersonaMode?.(event.target.value as 'asset_driven' | 'none')} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
+                  <option value="asset_driven">由动作资产决定</option>
+                  <option value="none">纯商品 / 不强制出镜</option>
+                </select>
+              </label>
             </section>
           </div>
         </div>

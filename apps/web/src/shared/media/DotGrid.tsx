@@ -12,12 +12,14 @@ import {
   type GridMeta,
   type PointerState,
 } from './DotGrid.runtime';
+import { CanvasDotGrid, type CanvasDotGridProps } from './DotGridCanvas';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(InertiaPlugin);
 }
 
-export interface DotGridProps {
+export interface AmbientDotGridProps {
+  variant?: 'ambient';
   dotSize?: number;
   gap?: number;
   baseColor?: string;
@@ -33,7 +35,18 @@ export interface DotGridProps {
   style?: React.CSSProperties;
 }
 
-export const DotGrid: React.FC<DotGridProps> = ({
+export type DotGridProps = AmbientDotGridProps | (CanvasDotGridProps & { variant: 'canvas' });
+
+export function DotGrid(props: DotGridProps) {
+  if (props.variant === 'canvas') {
+    const canvasProps = { ...props };
+    delete (canvasProps as { variant?: string }).variant;
+    return <CanvasDotGrid {...canvasProps} />;
+  }
+  return <AmbientDotGrid {...props} />;
+}
+
+const AmbientDotGrid: React.FC<AmbientDotGridProps> = ({
   dotSize = 3,
   gap = 28,
   baseColor = '#CBD5E1',

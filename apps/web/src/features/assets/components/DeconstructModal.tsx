@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Layers,
   Sparkles,
+  Check,
 } from 'lucide-react';
 import { formatDeconstructSummary, type ImageSetQueueItem } from '../utils/assetPromptConstants';
 import { getFilesFromDataTransfer } from '../utils/assetFolderImport';
@@ -54,10 +55,12 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
     setDeconstructSourceMode,
     xhsLinksInput,
     setXhsLinksInput,
+    showXhsLinkInput,
+    openXhsLinkInput,
     isParsingXhsLinks,
     xhsParseProgress,
+    collectionIssues,
     handleBatchParseXhsLinks,
-    runFullPipelineClosedLoop,
   } = xhsImport;
 
   if (!showDeconstructModal) return null;
@@ -66,6 +69,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
   const hasLinks = Boolean(xhsLinksInput.trim());
   const linkCount = candidateUrls.length;
   const isBusy = isParsingXhsLinks || isDeconstructing;
+  // 首次采集和追加采集时显示编辑器；采集完成后把空间完全让给图集选择。
+  const shouldShowXhsLinkInput = showXhsLinkInput || queue.length === 0 || isParsingXhsLinks;
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const gutterRef = React.useRef<HTMLDivElement>(null);
@@ -80,6 +85,17 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
     if (!xhsLinksInput.trim()) return;
     const formatted = formatXhsLinksToOnePerLine(xhsLinksInput);
     setXhsLinksInput(formatted);
+  };
+
+  const toggleQueueImage = (itemId: string, imageIndex: number) => {
+    if (isBusy) return;
+    setQueue((prev) => prev.map((item) => {
+      if (item.id !== itemId) return item;
+      const excluded = new Set(item.excludedImageIndices || []);
+      if (excluded.has(imageIndex)) excluded.delete(imageIndex);
+      else if (item.images.length - excluded.size > 1) excluded.add(imageIndex);
+      return { ...item, excludedImageIndices: [...excluded].sort((a, b) => a - b) };
+    }));
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -115,7 +131,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl lg:max-w-4xl max-h-[90vh] flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.18)] overflow-hidden text-left">
+      <div className="relative w-[94vw] max-w-[1600px] max-h-[90vh] flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.18)] overflow-hidden text-left">
         
         {/* 顶部标题与模式切换栏 */}
         <div className="px-6 pt-5 pb-3.5 border-b border-slate-100 bg-white">
@@ -164,8 +180,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
         </div>
 
         {/* 主内容区域 */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs text-slate-700">
-          {deconstructSourceMode === 'xhs' ? (
+        <div className="flex-1 overflow-y-auto p-7 space-y-4 text-xs text-slate-700">
+          {deconstructSourceMode === 'xhs' && shouldShowXhsLinkInput ? (
             /* 小红书链接输入区 */
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -201,7 +217,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                 </div>
               </div>
 
-              <div className="relative flex rounded-xl border border-slate-200/90 bg-slate-50/70 hover:bg-slate-50 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 transition-all overflow-hidden">
+              <div className="relative flex overflow-hidden rounded-[24px] border-2 border-dashed border-slate-300 bg-white/70 transition hover:border-blue-300 hover:bg-white focus-within:border-blue-400 focus-within:bg-white">
                 {/* 左侧行号栏 */}
                 <div
                   ref={gutterRef}
@@ -247,8 +263,19 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   </span>
                 </div>
               )}
+
+              {collectionIssues.length > 0 && (
+                <div className="space-y-1 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-800">
+                  {collectionIssues.slice(0, 3).map((issue, index) => (
+                    <div key={`${issue.url}-${index}`} className="truncate" title={issue.url}>
+                      {issue.kind === 'duplicate' ? '已跳过重复链接' : '未能提取图片'}：{issue.reason || issue.url}
+                    </div>
+                  ))}
+                  {collectionIssues.length > 3 && <div>另有 {collectionIssues.length - 3} 条结果未显示</div>}
+                </div>
+              )}
             </div>
-          ) : (
+          ) : deconstructSourceMode === 'local' ? (
             /* 本地文件 / 文件夹导入区 */
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -353,81 +380,123 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                 }}
               />
             </div>
-          )}
+          ) : null}
 
 
           {/* 待反推图集清单（Queue List，仅在队列有项时展开） */}
           {queue.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-slate-500" />
-                  <span>待反推图集清单（共 {queue.length} 套）</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQueue([])}
-                  disabled={isDeconstructing}
-                  className="text-[11px] text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                >
-                  清空队列
-                </button>
+            <div className="space-y-4 pt-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-slate-800">
+                  <Layers className="w-4 h-4 text-indigo-500" />
+                  <span className="text-sm font-semibold">图集选择</span>
+                  <span className="text-[11px] text-slate-400">共 {queue.length} 套 · 点击图片保留或排除</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {deconstructSourceMode === 'xhs' && !shouldShowXhsLinkInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openXhsLinkInput();
+                        window.setTimeout(() => textareaRef.current?.focus(), 0);
+                      }}
+                      disabled={isDeconstructing}
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors cursor-pointer"
+                    >
+                      继续采集
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setQueue([])}
+                    disabled={isDeconstructing}
+                    className="text-[11px] text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                  >
+                    清空队列
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              <div className={`space-y-6 overflow-y-auto pr-1 ${shouldShowXhsLinkInput ? 'max-h-72' : 'max-h-[620px]'}`}>
                 {queue.map((item: ImageSetQueueItem, idx: number) => (
                   <div
                     key={item.id}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
-                      item.status === 'processing'
-                        ? 'bg-indigo-50/50 border-indigo-200 shadow-2xs'
-                        : item.status === 'done'
-                        ? 'bg-emerald-50/50 border-emerald-200/80'
-                        : item.status === 'error'
-                        ? 'bg-red-50/50 border-red-200/80'
-                        : 'bg-slate-50/70 border-slate-200/70'
-                    }`}
+                    className="space-y-3"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex -space-x-2 shrink-0">
-                        {item.images.slice(0, 3).map((img, i) => (
-                          <img
-                            key={i}
-                            src={img}
-                            alt=""
-                            className="w-7 h-7 rounded-lg object-cover border border-white shadow-2xs"
-                          />
-                        ))}
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0 flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5">
+                            <span>{item.name}</span>
+                            {item.sourceUrl && (
+                              <span className="shrink-0 text-rose-500 text-[10px] font-semibold">
+                                小红书图集
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            共 {item.images.length} 张图片
+                            {item.status === 'processing' &&
+                              (idx === currentQueueIndex
+                                ? ` · 正在逐图反推 ${item.images.length} 张...`
+                                : ' · 排队等待中...')}
+                            {item.status === 'done' && formatDeconstructSummary(item)}
+                            {item.status === 'error' && ` · 失败: ${item.error}`}
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-800 text-xs truncate flex items-center gap-1.5">
-                          <span>{item.name}</span>
-                          {item.sourceUrl && (
-                            <span className="shrink-0 px-1.5 py-0.2 bg-slate-100 text-slate-600 text-[10px] rounded font-medium border border-slate-200/60">
-                              小红书
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          共 {item.images.length} 张图片
-                          {item.status === 'processing' &&
-                            (idx === currentQueueIndex
-                              ? ` · 正在逐图反推 ${item.images.length} 张...`
-                              : ' · 排队等待中...')}
-                          {item.status === 'done' && formatDeconstructSummary(item)}
-                          {item.status === 'error' && ` · 失败: ${item.error}`}
-                        </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs font-semibold text-indigo-600">
+                          已选 {item.images.length - (item.excludedImageIndices?.length || 0)} / {item.images.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setQueue((prev) => prev.filter((_, i) => i !== idx))}
+                          disabled={isDeconstructing}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer rounded-lg"
+                          title="移除此图集"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setQueue((prev) => prev.filter((_, i) => i !== idx))}
-                      disabled={isDeconstructing}
-                      className="p-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer rounded"
-                      title="移除此图集"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2 pr-1">
+                      {item.images.map((img, imageIndex) => {
+                        const selected = !(item.excludedImageIndices || []).includes(imageIndex);
+                        return (
+                          <button
+                            key={img}
+                            type="button"
+                            onClick={() => toggleQueueImage(item.id, imageIndex)}
+                            disabled={isDeconstructing}
+                            aria-pressed={selected}
+                            title={selected ? '已选择，点击取消' : '未选择，点击加入'}
+                            className={`group relative w-[124px] shrink-0 aspect-[3/4] overflow-hidden rounded-2xl bg-slate-100 transition-all sm:w-[132px] xl:w-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
+                              selected
+                                ? 'ring-2 ring-indigo-500 ring-offset-2 shadow-md shadow-indigo-100/70'
+                                : 'opacity-40 grayscale hover:opacity-70'
+                            }`}
+                          >
+                            <img
+                              src={img}
+                              alt={`图 ${imageIndex + 1}${selected ? '，已选' : '，未选'}`}
+                              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            />
+                            <span className="absolute bottom-2 left-2 rounded-lg bg-slate-950/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                              图 {imageIndex + 1}
+                            </span>
+                            {selected && (
+                              <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md">
+                                <Check className="h-4 w-4" strokeWidth={3} />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -516,24 +585,12 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
               </button>
             )}
 
-            {/* 小红书模式下：若输入了链接且尚未提取入队，支持「仅提取待办」 */}
-            {deconstructSourceMode === 'xhs' && hasLinks && (
-              <button
-                type="button"
-                onClick={handleBatchParseXhsLinks}
-                disabled={isBusy}
-                className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium rounded-lg text-xs transition-all disabled:opacity-50 cursor-pointer shadow-2xs"
-              >
-                <span>仅提取待办</span>
-              </button>
-            )}
-
             {/* 主操作按钮 */}
             {deconstructSourceMode === 'xhs' && hasLinks ? (
               /* 小红书模式且有输入时：采编并直接反推入库 */
               <button
                 type="button"
-                onClick={runFullPipelineClosedLoop}
+                onClick={handleBatchParseXhsLinks}
                 disabled={isBusy || multimodalModels.length === 0}
                 className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-xs shadow-2xs hover:shadow transition-all disabled:opacity-40 disabled:hover:bg-indigo-600 cursor-pointer"
               >
@@ -552,7 +609,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                     <span>正在采编链接...</span>
                   </>
                 ) : (
-                  <span>开始解析并入库</span>
+                  <span>提取图片供选择</span>
                 )}
               </button>
             ) : (

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { workshopSnapshotSchema } from './workshopWorkspace';
+import { workshopBatchStatusSchema } from './workshopPipeline';
 
-export const workshopBatchStatusSchema = z.enum(['draft', 'collecting', 'review', 'generating', 'completed', 'archived']);
-export type WorkshopBatchStatus = z.infer<typeof workshopBatchStatusSchema>;
+export { workshopBatchStatusSchema };
+export type { WorkshopBatchStatus } from './workshopPipeline';
 
 export const workshopBatchIdSchema = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
 

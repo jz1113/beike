@@ -86,32 +86,32 @@ export default function CategoryManagerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in select-none">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-fade-in select-none">
       <div 
-        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-scale-up"
+        className="w-full max-w-[680px] max-h-[90vh] overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] flex flex-col animate-scale-up"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50/80 via-white to-slate-50">
+        <div className="flex items-center justify-between gap-5 px-5 pb-3 pt-4 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
-              <FolderOpen className="w-5 h-5" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100">
+              <FolderOpen className="h-3.5 w-3.5 text-rose-500" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-black tracking-tight">
                 <span>行业品类与分类管理</span>
                 <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-bold">
                   {categories.length} 个分类
                 </span>
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="mt-0.5 text-[11px] text-slate-400">
                 可自由删除内置或自定义分类，或根据需求创建新分类
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -126,7 +126,7 @@ export default function CategoryManagerModal({
         )}
 
         {/* Add Category Section */}
-        <div className="p-4 bg-slate-50/80 border-b border-slate-100">
+        <div className="border-y border-slate-100 px-5 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Tag className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -150,7 +150,7 @@ export default function CategoryManagerModal({
         </div>
 
         {/* Category List */}
-        <div className="p-4 overflow-y-auto flex-1 space-y-2 max-h-[420px] scrollbar-thin">
+        <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4 max-h-[420px] scrollbar-thin sm:px-6">
           {categories.map(cat => (
             <div 
               key={cat.id}
@@ -177,7 +177,7 @@ export default function CategoryManagerModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3 sm:px-6">
           <button
             type="button"
             onClick={handleReset}
@@ -190,7 +190,7 @@ export default function CategoryManagerModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer transition-all shadow-xs"
+            className="rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm cursor-pointer transition-colors hover:bg-slate-800"
           >
             完成
           </button>

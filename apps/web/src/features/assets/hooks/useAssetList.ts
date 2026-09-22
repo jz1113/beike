@@ -6,6 +6,7 @@ import {
   invalidateGlobalAssetCache,
   isAssetLibraryLoaded,
 } from '../utils/assetLibraryCache';
+import { isNonHumanPlaceholderAsset } from '../utils/assetPromptConstants';
 
 export interface UseAssetListOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';
@@ -26,8 +27,8 @@ export function useAssetList({
   const loadIdRef = useRef(0);
   const { setSafeTimeout } = useSafeTimeout();
   const [isLoading, setIsLoading] = useState(() => !isAssetLibraryLoaded());
-  const [items, setItems] = useState<any[]>(() => getCachedAssetsSync(activeSubTab));
-  const [totalCount, setTotalCount] = useState(() => getCachedAssetsSync(activeSubTab).length);
+  const [items, setItems] = useState<any[]>(() => getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab)));
+  const [totalCount, setTotalCount] = useState(() => getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab)).length);
 
   // 批量管理与选中状态
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -45,7 +46,7 @@ export function useAssetList({
       try {
         await getCategoryAssetLibrary(activeSubTab, forceReload);
         if (activeTabRef.current !== activeSubTab || loadIdRef.current !== loadId) return;
-        const list = getCachedAssetsSync(activeSubTab);
+        const list = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
         setItems(list);
         setTotalCount(list.length);
       } catch (err) {
@@ -64,7 +65,7 @@ export function useAssetList({
   // Tab 切换时：0ms 瞬间本地秒开，静默刷新
   useEffect(() => {
     let isMounted = true;
-    const list = getCachedAssetsSync(activeSubTab);
+    const list = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
     setItems(list);
     setTotalCount(list.length);
 
@@ -72,7 +73,7 @@ export function useAssetList({
       getCategoryAssetLibrary(activeSubTab, false)
         .then(() => {
           if (!isMounted) return;
-          const freshList = getCachedAssetsSync(activeSubTab);
+          const freshList = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
           setItems(freshList);
           setTotalCount(freshList.length);
         })

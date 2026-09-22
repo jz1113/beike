@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../../core/http';
+import { readJsonBody } from '../../../core/validate';
 import { testStorageConnection, StorageConfig } from '@beike/server-kit/storage';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { isAdminAuthorized, unauthorizedJson } from '@beike/server-kit/apiAuth';
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     return unauthorizedJson('需要管理员权限');
   }
   try {
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, {});
     const config: StorageConfig = body?.config || body || {};
 
     const result = await testStorageConnection(config);

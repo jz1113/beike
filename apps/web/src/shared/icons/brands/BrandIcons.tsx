@@ -1,6 +1,24 @@
 import React from 'react';
 
 /**
+ * 创作工具统一标识底座：三个工作台以不同线性图标区分功能，
+ * 但共享尺寸、圆角与品牌渐变，避免在顶部出现三套不相干的 Logo。
+ */
+export function ToolSuiteMark({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 text-white shadow-sm shadow-indigo-500/25 transition-transform group-hover:scale-105 ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+/**
  * 种草工坊 (Buyer Show Workshop) 品牌标志
  */
 export function GrassWorkshopIcon({ className = "w-4 h-4" }: { className?: string }) {

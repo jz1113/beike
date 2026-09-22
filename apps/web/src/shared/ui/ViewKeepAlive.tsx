@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppView } from '@/store/appView';
 
-const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'assets', 'canvas'];
+const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'keyword_review', 'assets', 'canvas'];
 
 interface ViewKeepAlivePanelProps {
   view: AppView;

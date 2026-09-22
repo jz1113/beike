@@ -2,7 +2,7 @@ import type { StateCreator } from 'zustand';
 import { ShotPrompt, buildActionDigestFromShots } from '@beike/domain/vision';
 import { ASPECT_RATIOS, normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import type { ProductImage } from '@/types';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import {
   getStoredMultimodalModelId,
   setStoredMultimodalModelId,
@@ -10,7 +10,6 @@ import {
 import {
   buildSocialPromptSourceKey,
   invalidateSocialPromptsIfNeeded,
-  STUDIO_DRAFT_SOCIAL_KEY,
   STUDIO_DRAFT_ORIGINAL_KEY,
 } from './persist/index';
 import {
@@ -27,7 +26,7 @@ import {
   workshopModeSessionKey,
   type WorkshopMode,
 } from './workshopSession';
-import type { AppState, WorkshopSlice } from '@/types/store';
+import type { AppState, WorkshopSlice } from '@/store/types';
 
 const WORKSHOP_SELECTED_ARCH_KEY = 'workshop_selected_arch_id';
 const LEGACY_STYLE_IDS = new Set(['computer_office_monitor', 'auto', 'arch_atomic_asset_hub', 'arch_jewelry_master']);
@@ -109,13 +108,6 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
 
     const nextSession = state[nextCacheKey] ?? createDefaultWorkshopSession(workshopMode);
     const applied = applyWorkshopModeSession(nextSession);
-
-    if (false) {
-      const selectedCount = applied.clonedSocialImages?.filter(i => i.selected).length ?? 0;
-      if (selectedCount > 0) {
-        applied.shotCount = selectedCount;
-      }
-    }
 
     return {
       workshopMode,
@@ -342,10 +334,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
 
   setGeneratedPrompts: (generatedPrompts, productFingerprint, meta) => {
     const state = get();
-    const socialPromptSourceKey =
-      false
-        ? buildSocialPromptSourceKey(state.clonedSocialImages)
-        : '';
+    const socialPromptSourceKey = '';
 
     const nextMaster = meta?.masterScene !== undefined ? meta.masterScene : state.masterScene;
     const nextLook = meta?.lookBible !== undefined ? meta.lookBible : state.lookBible;
@@ -489,16 +478,8 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
 
   initWorkshopTasks: (forceReset = false) => {
     const state = get();
-    const isSocialMode = false;
-    const selectedClonedList = state.clonedSocialImages.filter(i => i.selected);
-
     const selectedPrompts = state.generatedPrompts.filter(p => p.selected !== false);
-    let effectivePrompts = selectedPrompts.length > 0 ? selectedPrompts : state.generatedPrompts;
-
-    // 旧版会话兼容分支：正常原创工坊不进入。
-    if (isSocialMode && selectedClonedList.length > 0) {
-      effectivePrompts = effectivePrompts.slice(0, selectedClonedList.length);
-    }
+    const effectivePrompts = selectedPrompts.length > 0 ? selectedPrompts : state.generatedPrompts;
 
     const aspect = ASPECT_RATIOS.find(a => a.id === state.selectedAspectId) || ASPECT_RATIOS[0];
 
@@ -512,9 +493,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
       const shotProductImage = p.productImageUrl || effectiveImages[idx % effectiveImages.length]?.url || primarySelectedImage?.url;
 
       // 换人换品工坊下，每个分镜精准绑定其对应的已勾选社媒参考图作为垫图/ControlNet基准
-      const shotRefImage = false
-        ? (selectedClonedList[idx]?.url || primarySelectedImage?.url)
-        : primarySelectedImage?.url;
+      const shotRefImage = primarySelectedImage?.url;
 
       const existing = state.workshopTasks.find(t => t.id === `shot-${idx}`);
 

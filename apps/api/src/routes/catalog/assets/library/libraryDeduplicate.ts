@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '../../../../repositories/db';
+import { db } from '../../../../repositories/access';
 import { sanitizeScenePrompt, outfitSimilarity } from '@beike/domain/assetDeconstruct/validate';
 
 // 🌟 一键智能提纯、分类归位与去重
@@ -15,7 +15,7 @@ export async function executeLibraryDeduplication() {
     /(?:金发少女|复古少女|京都卷发女子|时尚博主|卷发女子|金橘发|波西米亚女子|波浪卷发|短发女生|黑长直|鹅蛋脸|猫系脸|清秀五官)/;
 
   // 1. 扫描 SceneAsset 并智能迁移
-  const allScenes = await prisma.sceneAsset.findMany({ orderBy: { createdAt: 'desc' } });
+  const allScenes = await db.sceneAsset.findMany({ orderBy: { createdAt: 'desc' } });
   const seenSceneTitles = new Set<string>();
 
   for (const s of allScenes) {
@@ -27,7 +27,7 @@ export async function executeLibraryDeduplication() {
     if (OUTFIT_KEYWORDS.test(title) && /(?:外套|套组|套装|穿搭|裙|西装|针织)/.test(title)) {
       const top = title;
       const bottom = desc.length > 10 ? desc.slice(0, 100) : '高腰垂感半身长裙';
-      await prisma.outfitAsset
+      await db.outfitAsset
         .create({
           data: {
             title,
@@ -41,7 +41,7 @@ export async function executeLibraryDeduplication() {
           },
         })
         .catch(() => {});
-      await prisma.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
+      await db.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
       migratedCount++;
       continue;
     }
@@ -61,7 +61,7 @@ export async function executeLibraryDeduplication() {
         shotType = 'close_up';
       else if (title.includes('俯视')) shotType = 'high_angle_seated_full_body';
 
-      await prisma.actionAsset
+      await db.actionAsset
         .create({
           data: {
             shotType,
@@ -72,14 +72,14 @@ export async function executeLibraryDeduplication() {
           },
         })
         .catch(() => {});
-      await prisma.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
+      await db.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
       migratedCount++;
       continue;
     }
 
     // C. 迁移至人设库
     if (PERSONA_KEYWORDS.test(title)) {
-      await prisma.personaAsset
+      await db.personaAsset
         .create({
           data: {
             name: title,
@@ -89,7 +89,7 @@ export async function executeLibraryDeduplication() {
           },
         })
         .catch(() => {});
-      await prisma.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
+      await db.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
       migratedCount++;
       continue;
     }
@@ -105,12 +105,12 @@ export async function executeLibraryDeduplication() {
       : '自然采光与清晰物理接触阴影';
     const key = cleanTitle.toLowerCase();
     if (seenSceneTitles.has(key)) {
-      await prisma.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
+      await db.sceneAsset.delete({ where: { id: s.id } }).catch(() => {});
       cleanedCount++;
     } else {
       seenSceneTitles.add(key);
       if (cleanTitle !== title || cleanDesc !== s.description || cleanLighting !== s.lighting) {
-        await prisma.sceneAsset
+        await db.sceneAsset
           .update({
             where: { id: s.id },
             data: {
@@ -125,7 +125,7 @@ export async function executeLibraryDeduplication() {
   }
 
   // 2. 去重 OutfitAsset（结合语义相似度与文本特征聚类）
-  const allOutfits = await prisma.outfitAsset.findMany({ orderBy: { createdAt: 'desc' } });
+  const allOutfits = await db.outfitAsset.findMany({ orderBy: { createdAt: 'desc' } });
   const keptOutfits: typeof allOutfits = [];
   for (const o of allOutfits) {
     let isDup = false;
@@ -137,7 +137,7 @@ export async function executeLibraryDeduplication() {
       }
     }
     if (isDup) {
-      await prisma.outfitAsset.delete({ where: { id: o.id } }).catch(() => {});
+      await db.outfitAsset.delete({ where: { id: o.id } }).catch(() => {});
       cleanedCount++;
     } else {
       keptOutfits.push(o);
@@ -145,12 +145,12 @@ export async function executeLibraryDeduplication() {
   }
 
   // 3. 去重 ActionAsset
-  const allActions = await prisma.actionAsset.findMany({ orderBy: { createdAt: 'desc' } });
+  const allActions = await db.actionAsset.findMany({ orderBy: { createdAt: 'desc' } });
   const seenActionKeys = new Set<string>();
   for (const a of allActions) {
     const key = a.title.trim().toLowerCase();
     if (seenActionKeys.has(key)) {
-      await prisma.actionAsset.delete({ where: { id: a.id } }).catch(() => {});
+      await db.actionAsset.delete({ where: { id: a.id } }).catch(() => {});
       cleanedCount++;
     } else {
       seenActionKeys.add(key);
@@ -158,12 +158,12 @@ export async function executeLibraryDeduplication() {
   }
 
   // 4. 去重 PersonaAsset
-  const allPersonas = await prisma.personaAsset.findMany({ orderBy: { createdAt: 'desc' } });
+  const allPersonas = await db.personaAsset.findMany({ orderBy: { createdAt: 'desc' } });
   const seenPersonaKeys = new Set<string>();
   for (const p of allPersonas) {
     const key = p.name.trim().toLowerCase();
     if (seenPersonaKeys.has(key)) {
-      await prisma.personaAsset.delete({ where: { id: p.id } }).catch(() => {});
+      await db.personaAsset.delete({ where: { id: p.id } }).catch(() => {});
       cleanedCount++;
     } else {
       seenPersonaKeys.add(key);

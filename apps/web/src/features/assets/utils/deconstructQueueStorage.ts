@@ -14,11 +14,11 @@ export function readQueueConcurrency(): number {
   try {
     const raw = localStorage.getItem(DECONSTRUCT_QUEUE_CONCURRENCY_KEY);
     const n = Number(raw);
-    if (Number.isFinite(n) && n >= 1) return n;
+    if (Number.isFinite(n) && n >= 1) return 1;
   } catch {
     /* ignore */
   }
-  return 4;
+  return 1;
 }
 
 export function persistQueueConcurrency(value: number) {

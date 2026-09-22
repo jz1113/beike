@@ -1,6 +1,7 @@
 import { fetchWithRetry, extractUrls } from '../../gateways/wanbang';
+import { readJsonBody } from '../../core/validate';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/domain/drawing';
 import { buildComprehensiveProductProps } from '@beike/domain/props';
 import { formatUserError } from '@beike/domain/upstreamErrors';
@@ -8,7 +9,7 @@ import { parseJsonBody, collectBodySchema } from '../../core/validate';
 
 export async function POST(req: Request) {
   try {
-    const rawBody: unknown = await req.json();
+    const rawBody: unknown = await readJsonBody(req);
     const parsed = parseJsonBody(rawBody, collectBodySchema);
     if (!parsed.success) {
       return jsonResponse({ success: false, error: parsed.error }, 400);
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
 
     // 3. 优先检查本地数据库中是否已存在该商品数据 (避免重复调用接口产生扣费)
     if (!force_refresh) {
-      const cachedProduct = await prisma.product.findFirst({
+      const cachedProduct = await db.product.findFirst({
         where: {
           platform,
           itemId: itemIdStr
@@ -267,7 +268,7 @@ export async function POST(req: Request) {
 
     // 保存到本地数据库
     const primarySelectedImg = picUrl || allImages.main[0] || '';
-    const existing = await prisma.product.findFirst({
+    const existing = await db.product.findFirst({
       where: { platform, itemId: itemIdStr }
     });
 
@@ -287,12 +288,12 @@ export async function POST(req: Request) {
 
     let product;
     if (existing) {
-      product = await prisma.product.update({
+      product = await db.product.update({
         where: { id: existing.id },
         data: dbPayload
       });
     } else {
-      product = await prisma.product.create({
+      product = await db.product.create({
         data: {
           platform,
           itemId: itemIdStr,

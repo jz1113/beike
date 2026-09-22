@@ -14,10 +14,10 @@ import {
   Loader2,
 } from 'lucide-react';
 import { formatPromptParagraphs, buildMultiAnglePrompt, buildSmartEditPrompt } from '@beike/domain/drawing';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { LightboxInfoPanel } from './lightbox/LightboxInfoPanel';
 import { LightboxToolPanel } from './lightbox/LightboxToolPanel';
-import { MultiAngleModal } from './lightbox/MultiAngleModal';
+import { MultiAngleModal } from './multiAngle';
 import { SmartEditModal } from './lightbox/SmartEditModal';
 import { OutpaintModal } from './lightbox/OutpaintModal';
 import { calculateTargetDimensions } from './lightbox/lightboxDimensions';

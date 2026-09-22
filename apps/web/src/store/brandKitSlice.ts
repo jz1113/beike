@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '@/types/store';
+import { AppState } from '@/store/types';
 import {
   BrandKitProfile,
   DEFAULT_BRAND_KITS

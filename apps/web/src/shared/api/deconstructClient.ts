@@ -1,57 +1,22 @@
 import { apiFetch } from '@/shared/api/apiClient';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
-import { pickOrderedMultimodalFallbacks } from '@beike/domain/workflowModels';
 import type { ImageSetQueueItem } from '@/features/assets/utils/assetPromptConstants';
 import { resolveQueueItemPartial } from '@/features/assets/utils/assetDeconstructCsvExport';
 
-const DECONSTRUCT_RETRY_DELAY_MS = 1500;
-
-export function isRetryableDeconstructError(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes('sidecar') ||
-    m.includes('error sending request') ||
-    m.includes('通信异常') ||
-    m.includes('failed to fetch') ||
-    m.includes('load failed') ||
-    m.includes('aborted') ||
-    m.includes('terminated') ||
-    m.includes('network') ||
-    m.includes('连接')
-  );
-}
-
+/**
+ * A vision POST is billable and its outcome can be unknown when its response is
+ * delayed. Do not automatically replay it for either HTTP failures or network
+ * errors: the user can inspect the original task and explicitly retry instead.
+ */
 export async function fetchDeconstructWithRetry(
   body: Record<string, unknown>,
-  retries = 2
+  _retries = 0
 ): Promise<Response> {
-  let lastErr: Error | null = null;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await apiFetch('/api/catalog/assets/deconstruct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (res.ok || res.status < 500) return res;
-      const data = await res.clone().json().catch(() => ({}));
-      const errMsg = (data as { error?: string }).error || `HTTP ${res.status}`;
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, DECONSTRUCT_RETRY_DELAY_MS));
-        continue;
-      }
-      throw new Error(errMsg);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      lastErr = err instanceof Error ? err : new Error(msg);
-      if (attempt < retries && isRetryableDeconstructError(msg)) {
-        await new Promise((r) => setTimeout(r, DECONSTRUCT_RETRY_DELAY_MS));
-        continue;
-      }
-      throw lastErr;
-    }
-  }
-  throw lastErr ?? new Error('反推请求失败');
+  return apiFetch('/api/catalog/assets/deconstruct', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 import type { SubCategoryDef } from '@beike/domain/productCategory';
@@ -84,7 +49,10 @@ export async function processDeconstructQueueItem(
       targetCategory,
       customSubCategories,
       model: selectedVisionModel,
-      fallbackModels: pickOrderedMultimodalFallbacks(selectedVisionModel, modelIds),
+      // The server only switches this ordered chain for a definitive “model
+      // unavailable” reply; rate limits wait on the current model instead.
+      fallbackModels: modelIds,
+      clientTaskId: item.id,
       autoSave: !reviewBeforeSave,
       reviewBeforeSave: Boolean(reviewBeforeSave),
     });

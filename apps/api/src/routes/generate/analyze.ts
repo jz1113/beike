@@ -1,9 +1,9 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { parseJsonBody, analyzeBodySchema, readJsonBody } from '../../core/validate';
+import { db } from '../../repositories/access';
 import { normalizeVisionModelId } from '@beike/domain/vision';
 import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import { formatVisionAnalyzeError } from '@beike/domain/visionTimeouts';
-import { parseJsonBody, analyzeBodySchema } from '../../core/validate';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../../services/gatewayCredentials';
 import { resolveTemplateStyleWithJewelryGuard } from './analyze/jewelryGuard';
 import { executeStoryboard } from '../../services/analyze/storyboard';
@@ -11,14 +11,13 @@ import { DEFAULT_MULTIMODAL_MODEL_ID } from '@beike/domain/modelCatalog';
 
 export async function POST(req: Request) {
   try {
-    const rawBody: unknown = await req.json();
+    const rawBody: unknown = await readJsonBody(req);
     const parsed = parseJsonBody(rawBody, analyzeBodySchema);
     if (!parsed.success) {
       return jsonResponse({ error: parsed.error }, 400);
     }
     const body: any = parsed.data;
     const {
-      mode = 'storyboard_generate',
       productTitle,
       productProps,
       imageUrls = [],
@@ -96,6 +95,9 @@ export async function POST(req: Request) {
       null;
     let usedActionIds: string[] = [];
     let assetTrace: any = null;
+    let qualityChecks: unknown[] = [];
+    let usedAssetLibrary: boolean | undefined;
+    let assemblySource: string | undefined;
 
     {
       const storyboardResult = await executeStoryboard({
@@ -121,6 +123,7 @@ export async function POST(req: Request) {
         lockedAssets: body.lockedAssets,
         productIndex,
         useAssetLibrary: body.useAssetLibrary,
+        batchId: body.batchId || body.workshopBatchId,
       });
 
       productFingerprintRaw = storyboardResult.productFingerprintRaw;
@@ -148,11 +151,14 @@ export async function POST(req: Request) {
       visionUsage = storyboardResult.visionUsage;
       usedActionIds = storyboardResult.usedActionIds;
       assetTrace = storyboardResult.assetTrace;
+      qualityChecks = storyboardResult.qualityChecks || [];
+      usedAssetLibrary = storyboardResult.usedAssetLibrary;
+      assemblySource = storyboardResult.assemblySource;
     }
 
     // 自动持久化保存到本地数据库
     try {
-      await prisma.promptRecord.create({
+      await db.promptRecord.create({
         data: {
           productTitle: productTitle || '未命名商品',
           productFingerprint: productFingerprintRaw,
@@ -206,6 +212,9 @@ export async function POST(req: Request) {
       usage: visionUsage,
       usedActionIds,
       assetTrace,
+      qualityChecks,
+      usedAssetLibrary,
+      assemblySource,
     });
   } catch (error: any) {
     console.error('Vision Analyze API Error:', error);

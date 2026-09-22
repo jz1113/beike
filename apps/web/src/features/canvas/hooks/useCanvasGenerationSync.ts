@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { CanvasProject } from '../types';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { isImageTaskActive, isImageTaskFailed, isImageTaskSucceeded } from '@beike/domain/taskStatus';
 
 function parseGenerationProgress(progress: unknown): number | undefined {

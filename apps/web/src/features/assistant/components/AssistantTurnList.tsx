@@ -29,7 +29,7 @@ import ThinkingBlock from '@/features/assistant/components/ThinkingBlock';
 import ApprovalCard from '@/features/assistant/components/ApprovalCard';
 import FormattedMarkdown from '@/features/assistant/components/FormattedMarkdown';
 import ProductCardWidget from '@/features/assistant/components/ProductCardWidget';
-import type { MediaAttachment, ProductWidgetData } from '@/types/app-store';
+import type { MediaAttachment, ProductWidgetData } from '@/store/appStoreTypes';
 
 export interface AssistantTurnListProps {
   items: AssistantItem[];

@@ -21,6 +21,8 @@ export type ApiaParseResult =
   | { success: false; error: string; upstreamCode?: string | number };
 
 const APIA_BASE = 'https://apia.vip/api/dsp';
+// 小红书笔记在上游需要回源时，12 秒不足以覆盖正常的响应时间；保留单次
+// 请求超时（避免批量任务永久挂起），但不要过早中断一个仍在正常解析的请求。
 const APIA_TIMEOUT_MS = 30_000;
 const RETRY_DELAY_MS = 1_500;
 
@@ -302,7 +304,7 @@ async function fetchApiaOnce(
   shareText: string,
   attempt: ApiaFetchAttempt,
   userAgent: string,
-): Promise<{ data: Record<string, unknown> | null; httpOk: boolean }> {
+): Promise<{ data: Record<string, unknown> | null; httpOk: boolean; timedOut?: boolean }> {
   const endpoint = `${APIA_BASE}/${secretKey}/${clientId}/`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), APIA_TIMEOUT_MS);
@@ -354,7 +356,7 @@ async function fetchApiaOnce(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[ApiaScraper] 请求异常 (${attempt.method}):`, msg);
-    return { data: null, httpOk: false };
+    return { data: null, httpOk: false, timedOut: controller.signal.aborted };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -389,8 +391,8 @@ async function tryCredentialOrder(
     const clientId = useSwapped ? credentials.secretKey : credentials.clientId;
 
     for (const attempt of FETCH_ATTEMPTS) {
-      const run = async (): Promise<ApiaMediaResult | 'auth_error' | null> => {
-        const { data, httpOk } = await fetchApiaOnce(
+      const run = async (): Promise<ApiaMediaResult | 'auth_error' | 'timeout' | null> => {
+        const { data, httpOk, timedOut } = await fetchApiaOnce(
           secretKey,
           clientId,
           targetUrl,
@@ -398,7 +400,13 @@ async function tryCredentialOrder(
           attempt,
           userAgent,
         );
-        if (!httpOk || !data) return null;
+        if (!httpOk || !data) {
+          if (timedOut) {
+            lastMsg = `APIA 社媒解析服务超时（${Math.round(APIA_TIMEOUT_MS / 1000)} 秒），请稍后重试或在设置中配置奇云解析作为备用`;
+            return 'timeout';
+          }
+          return null;
+        }
 
         const code = getApiaErrorCode(data);
         console.log('[ApiaScraper] 接口响应:', code, data.msg || data.title);
@@ -432,6 +440,10 @@ async function tryCredentialOrder(
         return { media: null, lastCode, lastMsg };
       }
 
+      if (result === 'timeout') {
+        return { media: null, lastCode, lastMsg };
+      }
+
       if (
         result === null &&
         retryOnTransient &&
@@ -439,6 +451,10 @@ async function tryCredentialOrder(
       ) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
         result = await run();
+      }
+
+      if (result === 'timeout') {
+        return { media: null, lastCode, lastMsg };
       }
 
       if (result && result !== 'auth_error') {

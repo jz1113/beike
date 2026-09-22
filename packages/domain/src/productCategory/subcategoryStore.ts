@@ -5,11 +5,14 @@ import {
   SUBCATEGORY_STORAGE_KEY_PREFIX,
 } from './defs';
 import { domainStorage } from '../runtime';
+import { getHydratedSubCategories } from './serverCache';
 
 /**
- * 获取指定一级品类的二级类目表（支持读取本地导入持久化数据）
+ * 获取指定一级品类的二级类目表。服务端 hydration 优先，本地存储仅作缓存。
  */
 export function getSubCategoriesForCategory(categoryId: ActionCategoryId): SubCategoryDef[] {
+  const hydrated = getHydratedSubCategories(categoryId);
+  if (hydrated && hydrated.length > 0) return hydrated;
   const storage = domainStorage();
   if (storage) {
     try {

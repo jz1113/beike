@@ -140,16 +140,16 @@ export function useBatchTaskQueue({
       const existingUrls = new Set(batchTasks.map((t) => t.url));
       const newItems: BatchTaskItem[] = [];
 
-    const nextOrder = batchTasks.reduce((max, task) => Math.max(max, task.importOrder || 0), 0) + 1;
-    urls.forEach((url, idx) => {
+      const nextOrder = batchTasks.reduce((max, task) => Math.max(max, task.importOrder || 0), 0) + 1;
+      urls.forEach((url, idx) => {
         if (!existingUrls.has(url)) {
           const plat = detectPlatformFromText(url);
           newItems.push({
             id: `task_file_${Date.now()}_${idx}`,
             url,
-          platform: plat,
-          status: 'pending',
-          importOrder: nextOrder + idx,
+            platform: plat,
+            status: 'pending',
+            importOrder: nextOrder + idx,
           });
         }
       });
@@ -243,7 +243,7 @@ export function useBatchTaskQueue({
         const data = await res.json();
         if (data.success && data.product) {
           const prod = data.product;
-          const { mainImgs, skuImgs, descImgs, allImgs, coverImg } = normalizeCollectedImages(data);
+          const { allImgs, coverImg } = normalizeCollectedImages(data);
 
           return {
             ...task,
@@ -338,7 +338,7 @@ export function useBatchTaskQueue({
 
     if (aliveRef.current) setIsBatchRunning(false);
     if (!batchAbortedRef.current && aliveRef.current) {
-      showToast('🎉 批量采集任务队列执行完毕！已自动沉淀入汇总库');
+      showToast('🎉 批量采集任务队列执行完毕！可直接在任务列表下载结果。');
     }
   };
 

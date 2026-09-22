@@ -2,6 +2,7 @@
 import React from 'react';
 import { Database } from 'lucide-react';
 import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@/shared/icons';
+import { ModelIcon } from '@/shared/ui/ModelIcons';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
 
 export interface WorkflowModel {
@@ -67,6 +68,21 @@ export const API_SERVICES: ApiServiceItem[] = [
     defaultBaseUrl: 'https://ai.comfly.org',
     description: '企业级大模型聚合网关，单 API Key 统一调度白名单内生图、生视频与多模态模型。',
     capabilities: ['白名单模型', '高并发负载均衡', '自动容灾切换', '官方原生流式响应']
+  },
+  {
+    id: 'deepseek_official',
+    name: 'DeepSeek 官方接口',
+    subTitle: 'OpenAI Compatible · 图像理解 / 对话',
+    category: 'core',
+    renderLogo: (cls = "w-5 h-5") => <ModelIcon modelId="deepseek-flash" className={cls} />,
+    isEnabled: true,
+    tag: 'DeepSeek 原生',
+    docsUrl: 'https://api-docs.deepseek.com/zh-cn/guides/images',
+    registerUrl: 'https://platform.deepseek.com',
+    registerName: '前往 DeepSeek Platform 获取 API Key',
+    defaultBaseUrl: 'https://api.deepseek.com',
+    description: '使用 DeepSeek 官方 OpenAI 兼容接口；启用后会将当前文本/图像理解模型请求切换到 DeepSeek。',
+    capabilities: ['Chat Completions', '图像理解', 'deepseek-flash', 'Bearer API Key']
   },
   {
     id: 'wanbang_ecommerce',

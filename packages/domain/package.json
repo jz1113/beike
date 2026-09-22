@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./modelAdapters": "./src/modelAdapters/index.ts",
     "./prompt-engine": "./src/prompt-engine/index.ts",
+    "./workshopPipeline": "./src/workshopPipeline/index.ts",
     "./*": "./src/*"
   },
   "scripts": {

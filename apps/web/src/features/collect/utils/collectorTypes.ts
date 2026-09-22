@@ -40,8 +40,6 @@ export function extractUrlsFromRawText(text: string): string[] {
     .filter(Boolean);
 }
 
-export const COLLECTOR_STORAGE_KEY = 'universal_collector_exclusive_vault';
-
 export interface BatchTaskItem {
   id: string;
   url: string;

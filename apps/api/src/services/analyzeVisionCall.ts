@@ -167,6 +167,7 @@ export async function callVisionModel(
   triedModels: string[]; 
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }> {
+  void _fallbackModels;
   const effectiveBaseUrl = (baseUrl && baseUrl.trim()) ? baseUrl.trim() : getDefaultBaseUrl();
   const effectiveApiKey = (apiKey && apiKey.trim()) ? apiKey.trim() : getDefaultApiKey();
   const normalized = independent ? requestedModel : normalizeVisionModelId(requestedModel);
@@ -207,6 +208,7 @@ export async function callVisionModel(
 
         if (!response.ok) {
           const errText = await response.text();
+          void errText;
           const error = new Error(`视觉模型 [${model}] 调用失败 (HTTP ${response.status})`) as Error & { status?: number };
           error.status = response.status;
           lastError = error;

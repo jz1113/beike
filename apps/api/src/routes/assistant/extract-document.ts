@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../core/http';
+import { safeErrorMessage } from '../../core/validate';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import { formatUserError } from '@beike/domain/upstreamErrors';
@@ -188,7 +189,7 @@ export async function POST(req: Request) {
     try {
       raw = await withParseTimeout(parse());
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '文档解析失败';
+      const msg = safeErrorMessage(err, '文档解析失败');
       const status = /过大|过多|超时/.test(msg) ? 413 : 422;
       return jsonResponse({ success: false, error: msg }, status);
     }

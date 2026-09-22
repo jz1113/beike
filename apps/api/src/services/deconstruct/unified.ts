@@ -37,6 +37,7 @@ export async function runUnifiedDeconstructBatch(params: {
   shardTotal?: number;
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
+  operationId?: string;
 }): Promise<{
   perImageResults: PerImageResult[];
   failedIndices: number[];
@@ -56,6 +57,7 @@ export async function runUnifiedDeconstructBatch(params: {
     shardTotal,
     tracker,
     diagnostics,
+    operationId,
   } = params;
 
   const total = safeImgs.length;
@@ -91,6 +93,7 @@ export async function runUnifiedDeconstructBatch(params: {
     contentArray,
     label,
     maxTokens: dynamicMaxTokens,
+    operationId: operationId ? `${operationId}:unified:${shardIndex ?? 0}` : undefined,
     tracker,
     diagnostics,
   });
@@ -124,6 +127,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
   albumName?: string;
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
+  operationId?: string;
 }): Promise<{ result: PerImageResult | null; usedModel: string }> {
   const {
     safeImgs,
@@ -135,6 +139,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
     albumName,
     tracker,
     diagnostics,
+    operationId,
   } = params;
 
   const url = safeImgs[0];
@@ -158,6 +163,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
     contentArray,
     label,
     maxTokens: 4096,
+    operationId: operationId ? `${operationId}:image:${globalIndex}` : undefined,
     tracker,
     diagnostics,
   });
@@ -190,6 +196,7 @@ export async function runUnifiedDeconstruct(params: {
   albumName?: string;
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
+  operationId?: string;
 }): Promise<{
   perImageResults: PerImageResult[];
   failedIndices: number[];
@@ -198,7 +205,7 @@ export async function runUnifiedDeconstruct(params: {
   pipelineMode: PipelineMode;
   shardCount: number;
 } | null> {
-  const { safeImgs, modelsToTry, targetBaseUrl, targetApiKey, userHint, targetCategory, customSubCategories, albumName, tracker, diagnostics } =
+  const { safeImgs, modelsToTry, targetBaseUrl, targetApiKey, userHint, targetCategory, customSubCategories, albumName, tracker, diagnostics, operationId } =
     params;
 
   const shardSize = resolveUnifiedShardSize(safeImgs.length);
@@ -216,6 +223,7 @@ export async function runUnifiedDeconstruct(params: {
       albumName,
       tracker,
       diagnostics,
+      operationId,
     });
 
     if (!single) return null;
@@ -237,6 +245,7 @@ export async function runUnifiedDeconstruct(params: {
           albumName,
           tracker,
           diagnostics,
+          operationId,
         });
         if (retry.result) {
           single.perImageResults.push(retry.result);
@@ -285,6 +294,7 @@ export async function runUnifiedDeconstruct(params: {
       shardTotal,
       tracker,
       diagnostics,
+      operationId,
     });
 
     if (!batch) {
@@ -321,6 +331,7 @@ export async function runUnifiedDeconstruct(params: {
       albumName,
       tracker,
       diagnostics,
+      operationId,
     });
     if (retry.result) {
       allResults.push(retry.result);

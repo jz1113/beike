@@ -1,4 +1,4 @@
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID } from '@beike/domain/depthVideo';
 import { toUiGenerationStatus } from '@beike/domain/taskStatus';
 

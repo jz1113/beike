@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../core/http';
 import { clearSharpCache } from '@beike/server-kit/imageConverter';
-import { checkpointDatabase } from '../../repositories/db';
+import { checkpointDatabase } from '../../repositories/access';
 
 /**
  * POST /api/system/memory-cleanup

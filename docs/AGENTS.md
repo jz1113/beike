@@ -53,8 +53,9 @@ beike-main/
 
 ## 文档分层
 
-- [`docs/architecture/`](architecture/) — 内部架构、包边界与产品操作说明
+- [`docs/architecture/`](architecture/) — 内部架构、包边界、目录分层与产品操作说明
 - [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合索引 + 厂商官网索引
+- [`docs/vendors/external-parsing.md`](vendors/external-parsing.md) — 外站链接解析接口
 - 启动桌面：根目录 [`启动桌面.command`](../启动桌面.command)
 - 不要在 `docs/` 根目录再放散落 markdown 或其它子目录
 

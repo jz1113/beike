@@ -101,7 +101,7 @@
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/canvas/components/CanvasMultiAngleModal.tsx",
+      "file": "apps/web/src/shared/modals/multiAngle/CanvasMultiAngleModal.tsx",
       "lines": 401
     },
     {
@@ -121,19 +121,19 @@
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/home/components/prompt-bar/media/PromptBarRefMediaPanel.tsx",
+      "file": "apps/web/src/shared/prompt-bar/media/PromptBarRefMediaPanel.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/home/components/prompt-bar/PromptActionBar.tsx",
+      "file": "apps/web/src/shared/prompt-bar/PromptActionBar.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/home/components/prompt-bar/RichPromptInput.tsx",
+      "file": "apps/web/src/shared/prompt-bar/RichPromptInput.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/home/hooks/usePromptBarMedia.ts",
+      "file": "apps/web/src/shared/prompt-bar/hooks/usePromptBarMedia.ts",
       "lines": 401
     },
     {
@@ -153,27 +153,23 @@
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/settings/tabs/LocalStorageTab.tsx",
-      "lines": 401
-    },
-    {
       "file": "apps/web/src/features/settings/tabs/UsageTab.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/batch/batchVisionAnalyze.ts",
+      "file": "apps/web/src/features/workshop/model/batchVisionAnalyze.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/batch/components/BatchWorkshopView.tsx",
+      "file": "apps/web/src/features/workshop/components/BatchWorkshopView.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/batch/components/BatchStage4ProductItem.tsx",
+      "file": "apps/web/src/features/workshop/components/BatchStage4ProductItem.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/batch/hooks/useBatchWorkshopRunner.ts",
+      "file": "apps/web/src/features/workshop/hooks/useBatchWorkshopRunner.ts",
       "lines": 401
     },
     {
@@ -193,7 +189,7 @@
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/modals/lightbox/MultiAngleModal.tsx",
+      "file": "apps/web/src/shared/modals/multiAngle/LightboxMultiAngleModal.tsx",
       "lines": 401
     },
     {

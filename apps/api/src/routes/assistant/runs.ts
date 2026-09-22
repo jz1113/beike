@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 const ACTIVE_STATUSES = ['running', 'awaiting_approval'] as const;
@@ -16,7 +16,7 @@ export async function listActiveRuns(req: Request): Promise<Response> {
     const threadId = parts[parts.length - 2];
     if (!threadId) return jsonResponse({ success: false, error: '缺少 threadId' }, 400);
 
-    const turns = await prisma.assistantTurn.findMany({
+    const turns = await db.assistantTurn.findMany({
       where: { threadId, status: { in: [...ACTIVE_STATUSES] } },
       orderBy: { startedAt: 'desc' },
       take: 20,
@@ -41,7 +41,7 @@ export async function listAllRuns(req: Request): Promise<Response> {
       ? {}
       : { status: { in: [...ACTIVE_STATUSES] } };
 
-    const turns = await prisma.assistantTurn.findMany({
+    const turns = await db.assistantTurn.findMany({
       where,
       orderBy: { startedAt: 'desc' },
       take: limit,

@@ -29,7 +29,7 @@ export type { Grid2x2Options };
 export function assembleOriginalShotPrompt(
   bible: OriginalGroupBible,
   shot: OriginalShotFields,
-  options?: { hasFace?: boolean; hasSceneAnchor?: boolean; preserveComposition?: boolean }
+  options?: { hasFace?: boolean; hasSceneAnchor?: boolean; preserveComposition?: boolean; skipRichPrompt?: boolean }
 ): string {
   const hasHuman = shot.has_human !== false;
   const hasFace = Boolean(options?.hasFace) && hasHuman;
@@ -49,7 +49,7 @@ export function assembleOriginalShotPrompt(
     rawFallback.includes('光影')
   );
 
-  if (hasRichPrompt) {
+  if (hasRichPrompt && !options?.skipRichPrompt) {
     let cleanRichPrompt = cleanPromptText(rawFallback);
     cleanRichPrompt = preventJewelryGlitches(cleanRichPrompt, bible.productFingerprint);
     cleanRichPrompt = enforceLookConsistency(cleanRichPrompt, bible.lookBible);

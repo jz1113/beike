@@ -160,3 +160,43 @@ export const HeadlineTitleRequestSchema = z.object({
 export type HeadlineDesignRequest = z.infer<typeof HeadlineDesignRequestSchema>;
 export type HeadlineTitleRequest = z.infer<typeof HeadlineTitleRequestSchema>;
 
+export const KeywordReviewRowSchema = z.object({
+  id: z.string().min(1).max(120),
+  query: z.string().min(1).max(500),
+  expansion: z.string().max(4000).optional(),
+  entityExpansion: z.string().max(4000).optional(),
+  contentType: z.string().max(500).optional(),
+});
+
+export const KeywordReviewRequestSchema = z.object({
+  model: z.string().max(160).optional(),
+  rows: z.array(KeywordReviewRowSchema).min(1).max(60),
+  customBaseUrl: z.string().optional(),
+  customApiKey: z.string().optional(),
+  lookup: z.boolean().optional(),
+});
+
+export const KeywordReviewResultSchema = z.object({
+  id: z.string(),
+  category: z.string(),
+  producible: z.enum(['制作', '不制作']),
+});
+
+export const KeywordReviewBalanceRequestSchema = z.object({
+  customBaseUrl: z.string().optional(),
+  customApiKey: z.string().optional(),
+});
+
+export const KeywordReviewBalanceSchema = z.object({
+  currency: z.enum(['CNY', 'USD']),
+  total: z.string(),
+  granted: z.string(),
+  toppedUp: z.string(),
+  available: z.boolean(),
+});
+
+export type KeywordReviewRow = z.infer<typeof KeywordReviewRowSchema>;
+export type KeywordReviewRequest = z.infer<typeof KeywordReviewRequestSchema>;
+export type KeywordReviewResult = z.infer<typeof KeywordReviewResultSchema>;
+export type KeywordReviewBalanceRequest = z.infer<typeof KeywordReviewBalanceRequestSchema>;
+export type KeywordReviewBalance = z.infer<typeof KeywordReviewBalanceSchema>;

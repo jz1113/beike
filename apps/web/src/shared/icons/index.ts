@@ -22,6 +22,7 @@ export type { GenModeIconProps } from './modes/GenModeIcons';
 // 3. 电商平台与品牌图标 (Brand & Platform Icons)
 export {
   GrassWorkshopIcon,
+  ToolSuiteMark,
   JdIcon,
   OneBoundLogo,
   ApiaLogo,

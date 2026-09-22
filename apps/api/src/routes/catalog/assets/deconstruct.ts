@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../../core/http';
+import { readJsonBody } from '../../../core/validate';
 import { buildPass1VisionModelsToTry, filterVisionCapableModels } from '@beike/domain/vision';
 import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import { formatUserError } from '@beike/domain/upstreamErrors';
@@ -51,6 +52,7 @@ export {
   backoffWithJitter,
   sleep,
   isRateLimitResponse,
+  isQuotaExhausted,
   RATE_LIMIT_BACKOFF_MS,
   MAX_NETWORK_ATTEMPTS,
 } from '../../../services/deconstruct/concurrency';
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
   let claimedKey: string | undefined;
   let claimedRequestId: string | undefined;
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const {
       imageUrls = [],
       userHint = '',
@@ -74,6 +76,7 @@ export async function POST(req: Request) {
       productTitle,
       sourceUrl,
       reviewRequestId,
+      clientTaskId,
     } = body;
 
     const targetCategory =
@@ -113,8 +116,10 @@ export async function POST(req: Request) {
       return jsonResponse({ error: '系统尚未配置 AI 视觉接口密钥，请在设置中填入' }, 500);
     }
 
-    const fallbackList = Array.isArray(fallbackModels) ? fallbackModels : [];
     const primaryModel = typeof model === 'string' ? model : undefined;
+    const fallbackList = Array.isArray(fallbackModels) ? fallbackModels : [];
+    // The gateway policy decides whether a fallback is safe. The full configured
+    // chain is retained only for an explicit “model unavailable” response.
     const pass1Models = filterVisionCapableModels(
       buildPass1VisionModelsToTry(primaryModel, fallbackList)
     );
@@ -175,6 +180,7 @@ export async function POST(req: Request) {
       albumName,
       tracker: visionTracker,
       diagnostics: visionDiagnostics,
+      operationId: typeof clientTaskId === 'string' ? clientTaskId : undefined,
     });
     console.log(`[AssetDeconstruct] Unified 阶段耗时 ${Date.now() - unifiedStart}ms`);
 

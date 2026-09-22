@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import type { PrismaClient } from '../repositories/db';
+import type { PrismaClient } from '../repositories/access';
 import {
   workshopBatchSchema,
   workshopBatchStatusSchema,
   type WorkshopBatch,
   type WorkshopBatchStatus,
 } from '@beike/contracts/workshopBatches';
-import { workshopSnapshotSchema, type WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
+import { emptyPipelineState, workshopSnapshotSchema, type WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
+import { statusToViewStage } from '@beike/domain/workshopPipeline';
 
 type BatchRow = {
   id: string;
@@ -32,22 +33,34 @@ const DEFAULT_SETTINGS: WorkshopSnapshot['settings'] = {
   selectedAspect: '3:4',
   selectedShotCount: 4,
   useAssetLibrary: true,
-  lockedPersonaId: '',
-  lockedSceneId: '',
-  lockedOutfitId: '',
-  lockedActionId: '',
+  lockedPersonaId: 'auto',
+  lockedSceneId: 'auto',
+  lockedOutfitId: 'auto',
+  lockedActionId: 'auto',
+  lockedFullPromptId: 'auto',
   generationStrategy: 'grid_first',
   autoGenerateCopywriting: true,
+  personaMode: 'asset_driven',
 };
 
 function emptySnapshot(): WorkshopSnapshot {
-  return { version: 1, mode: 'original', currentStage: 1, batchInputText: '', items: [], settings: DEFAULT_SETTINGS };
+  return {
+    version: 2,
+    mode: 'original',
+    currentStage: 1,
+    batchInputText: '',
+    items: [],
+    settings: DEFAULT_SETTINGS,
+    pipeline: emptyPipelineState('draft'),
+  };
 }
 
-function statusForSnapshot(snapshot: WorkshopSnapshot): WorkshopBatchStatus {
+export function statusForSnapshot(snapshot: WorkshopSnapshot): WorkshopBatchStatus {
+  if (snapshot.pipeline?.status) return snapshot.pipeline.status;
   if (snapshot.items.length === 0) return 'draft';
   if (snapshot.currentStage === 1) return 'collecting';
-  if (snapshot.currentStage === 2 || snapshot.currentStage === 3) return 'review';
+  if (snapshot.currentStage === 2) return 'plan_ready';
+  if (snapshot.currentStage === 3) return 'review_required';
   return 'generating';
 }
 
@@ -148,15 +161,36 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     },
     async duplicate(id: string) {
       const source = await this.get(id);
-      const snapshot = { ...source.snapshot, currentStage: 1, batchInputText: '' };
+      const snapshot: WorkshopSnapshot = {
+        ...source.snapshot,
+        currentStage: 1,
+        batchInputText: '',
+        pipeline: emptyPipelineState('draft'),
+      };
       const batch = await insert(makeId(), `${source.name}（副本）`, 'draft', snapshot);
       await db.$executeRaw`UPDATE "WorkshopBatchState" SET "activeBatchId" = ${batch.id} WHERE "id" = 'original'`;
       return batch;
     },
-    async archiveActive() {
+    async archiveActive(options: { force?: boolean } = {}) {
       const active = await initialize();
+      const completable = active.status === 'completed' || active.status === 'cancelled';
+      if (!completable && !options.force) {
+        throw new WorkshopBatchConflict('请先完成本批次，或确认放弃后再归档');
+      }
       const now = new Date().toISOString();
-      await db.$executeRaw`UPDATE "WorkshopBatch" SET "status" = 'archived', "updatedAt" = ${now} WHERE "id" = ${active.id}`;
+      const snapshot: WorkshopSnapshot = {
+        ...active.snapshot,
+        currentStage: statusToViewStage('archived'),
+        pipeline: {
+          ...active.snapshot.pipeline,
+          status: 'archived',
+        },
+      };
+      await db.$executeRaw`
+        UPDATE "WorkshopBatch"
+        SET "status" = 'archived', "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
+        WHERE "id" = ${active.id}
+      `;
       return this.create('未命名新批次');
     },
     async clearHistory() {

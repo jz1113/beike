@@ -1,4 +1,5 @@
 import { gatewayFetch } from '../../../gateways/http';
+import { readJsonBody } from '../../../core/validate';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../../core/http';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
@@ -18,7 +19,7 @@ import { getDefaultBaseUrl, getDefaultApiKey } from '../../../services/gatewayCr
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const { 
       imageUrls = [], 
       userHint = '', 

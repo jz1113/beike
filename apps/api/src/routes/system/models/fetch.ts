@@ -1,4 +1,5 @@
 import { gatewayFetch } from '../../../gateways/http';
+import { readJsonBody } from '../../../core/validate';
 import { jsonResponse } from '../../../core/http';
 import { getDefaultApiKey, getDefaultBaseUrl } from '../../../services/gatewayCredentials';
 import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
@@ -37,7 +38,7 @@ function emptyCatalog(status: number, error?: string) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, {});
     const { baseUrl, isPing, strict } = body;
     const rawUrl = (baseUrl || req.headers.get('x-custom-base-url') || getDefaultBaseUrl());
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');

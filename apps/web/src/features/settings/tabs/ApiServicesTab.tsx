@@ -7,6 +7,7 @@ import { ApiServicesWanbangPanel } from '../components/ApiServicesWanbangPanel';
 import { ApiServicesApiaPanel } from '../components/ApiServicesApiaPanel';
 import { ApiServicesQiyunPanel } from '../components/ApiServicesQiyunPanel';
 import { ApiServicesGatewayPanel } from '../components/ApiServicesGatewayPanel';
+import { ApiServicesDeepSeekPanel } from '../components/ApiServicesDeepSeekPanel';
 import { ApiServicesStoragePanel, type ApiServicesStoragePanelProps } from '../components/ApiServicesStoragePanel';
 import { ApiServicesNavList } from '../components/ApiServicesNavList';
 import { useModelDragSort } from '../hooks/useModelDragSort';
@@ -31,6 +32,13 @@ export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
   handleSaveApiConfig: (url: string, key: string, notify?: boolean) => void;
   handleTestPing: () => void;
   isTesting: boolean;
+  deepSeekApiKey: string;
+  setDeepSeekApiKey: (v: string) => void;
+  showDeepSeekKey: boolean;
+  setShowDeepSeekKey: (v: boolean) => void;
+  isTestingDeepSeek: boolean;
+  handleTestDeepSeek: () => void;
+  handleSaveDeepSeekConfig: (activate?: boolean) => void;
   handleOpenGatewayDiscovery: () => void;
   isFetchingGateway: boolean;
   allGatewayModels: unknown[];
@@ -94,6 +102,13 @@ export default function ApiServicesTab({
   handleSaveApiConfig,
   handleTestPing,
   isTesting,
+  deepSeekApiKey,
+  setDeepSeekApiKey,
+  showDeepSeekKey,
+  setShowDeepSeekKey,
+  isTestingDeepSeek,
+  handleTestDeepSeek,
+  handleSaveDeepSeekConfig,
   handleOpenGatewayDiscovery,
   isFetchingGateway,
   allGatewayModels,
@@ -215,12 +230,13 @@ export default function ApiServicesTab({
 
   const isServiceConfigured = useCallback((serviceId: string, defaultEnabled?: boolean) => {
     if (serviceId === 'comfly_gateway') return Boolean(apiKey.trim());
+    if (serviceId === 'deepseek_official') return Boolean(deepSeekApiKey.trim());
     if (serviceId === 'wanbang_ecommerce') return Boolean(wanbangKey.trim() && wanbangSecret.trim());
     if (serviceId === 'apia_parser') return Boolean(scraperId.trim() && scraperSecret.trim());
     if (serviceId === 'qiyun_parser') return Boolean(qiyunAppId.trim() && qiyunAppKey.trim());
     if (serviceId === 'cloud_storage') return Boolean(storageEnabled && storageAccountId && storageAccessKeyId);
     return Boolean(defaultEnabled);
-  }, [apiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageEnabled, storageAccountId, storageAccessKeyId]);
+  }, [apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageEnabled, storageAccountId, storageAccessKeyId]);
 
   return (
     <>
@@ -288,6 +304,18 @@ export default function ApiServicesTab({
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+            />
+          )}
+
+          {selectedServiceId === 'deepseek_official' && (
+            <ApiServicesDeepSeekPanel
+              apiKey={deepSeekApiKey}
+              setApiKey={setDeepSeekApiKey}
+              showKey={showDeepSeekKey}
+              setShowKey={setShowDeepSeekKey}
+              isTesting={isTestingDeepSeek}
+              onTest={handleTestDeepSeek}
+              onSave={handleSaveDeepSeekConfig}
             />
           )}
 

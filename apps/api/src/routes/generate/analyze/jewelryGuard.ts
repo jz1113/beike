@@ -8,7 +8,8 @@ export function resolveTemplateStyleWithJewelryGuard(
   let resolvedTemplateStyle = typeof templateStyle === 'string' ? templateStyle : 'auto';
   const looksLikeJewelryRecipe = /珠宝|jewelry|首饰|8段式.*装配骨架/i.test(resolvedTemplateStyle);
   if (resolvedTemplateStyle !== 'auto' && looksLikeJewelryRecipe && !isJewelryProductTitle(productTitle, productProps)) {
-    return 'auto';
+    const note = '\n\n## 【未套用珠宝子品类守卫】当前商品不是珠宝首饰，仅使用该架构的机位骨架，不套用珠宝半身/微距守卫。';
+    return resolvedTemplateStyle.includes('未套用珠宝子品类守卫') ? resolvedTemplateStyle : `${resolvedTemplateStyle}${note}`;
   }
   if (
     resolvedTemplateStyle !== 'auto' &&

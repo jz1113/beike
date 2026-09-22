@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { resolveCredentials } from '../gatewayCredentials';
@@ -87,7 +87,7 @@ async function pollVideoOnce(req: Request) {
       let record: { status: string | null; resultUrl: string | null; failReason: string | null } | null = null;
       let dbError = false;
       try {
-        record = await prisma.imageTask.findFirst({
+        record = await db.imageTask.findFirst({
           where: { taskId },
           select: { status: true, resultUrl: true, failReason: true },
         });
@@ -228,7 +228,7 @@ async function pollVideoOnce(req: Request) {
     // 任务完成时更新数据库记录并快速响应
     if (status === 'SUCCESS' || status === 'FAILURE') {
       try {
-        await prisma.imageTask.updateMany({
+        await db.imageTask.updateMany({
           where: { taskId: taskId, status: { in: [...mutableGenerationStatuses] } },
           data: {
             status: status,
@@ -245,7 +245,7 @@ async function pollVideoOnce(req: Request) {
             try {
               const permanent = await persistMediaUrl(taskId, currentResultUrl, 'generated/videos', storageConfig);
               if (permanent && permanent !== currentResultUrl) {
-                await prisma.imageTask.updateMany({
+                await db.imageTask.updateMany({
                   where: { taskId: taskId },
                   data: { resultUrl: permanent }
                 });

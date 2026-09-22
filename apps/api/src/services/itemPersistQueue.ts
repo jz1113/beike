@@ -7,7 +7,7 @@
  * - 高峰期自动丢弃最新事件（队列上限 5000），优先保证流式响应
  */
 
-import { prisma } from '@beike/server-kit/prisma';
+import { db } from '../repositories/access';
 import type { AssistantItem } from '@beike/domain/assistant/types';
 import { extractItemFields } from './assistantTurnPersist';
 
@@ -55,7 +55,7 @@ export function enqueueItemPersist(turnId: string, item: AssistantItem): void {
 
 async function persistOne(task: PersistTask): Promise<void> {
   const fields = extractItemFields(task.item);
-  await prisma.assistantTurnItem.upsert({
+  await db.assistantTurnItem.upsert({
     where: { id: task.item.id },
     create: {
       id: task.item.id,

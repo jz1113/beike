@@ -30,6 +30,41 @@ function loadPromptAssetSeed(): PromptAssetSeedData {
   return parsed.data || {};
 }
 
+/**
+ * A deliberate database reset must survive an API restart.  The marker lives
+ * beside the SQLite database rather than in it, so a successful reset leaves
+ * no application record behind merely to say that it was reset.
+ */
+function catalogResetMarkerPath(): string | null {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl?.startsWith('file:')) return null;
+
+  let databasePath = databaseUrl.slice('file:'.length);
+  if (databasePath.startsWith('//')) databasePath = databasePath.slice(2);
+  if (!path.isAbsolute(databasePath)) databasePath = path.resolve(process.cwd(), databasePath);
+  return `${databasePath}.catalog-reset`;
+}
+
+export function suppressOfficialCatalogSeedAfterReset(): boolean {
+  const markerPath = catalogResetMarkerPath();
+  if (!markerPath) {
+    throw new Error('当前数据库不是本地 SQLite 文件，无法持久化清空状态');
+  }
+  if (fs.existsSync(markerPath)) return false;
+  fs.writeFileSync(markerPath, 'The user explicitly cleared all local database data.\n', 'utf8');
+  return true;
+}
+
+export function resumeOfficialCatalogSeedAfterFailedReset(): void {
+  const markerPath = catalogResetMarkerPath();
+  if (markerPath) fs.rmSync(markerPath, { force: true });
+}
+
+function isOfficialCatalogSeedSuppressed(): boolean {
+  const markerPath = catalogResetMarkerPath();
+  return Boolean(markerPath && fs.existsSync(markerPath));
+}
+
 const BOOL_KEYS = new Set(['isFavorite', 'hasHuman', 'isUniversal']);
 const INT_KEYS = new Set([
   'sourceImageIndex',
@@ -214,6 +249,10 @@ export async function seedOfficialPromptAssets(): Promise<{ inserted: number }> 
 }
 
 export async function seedOfficialCatalog(): Promise<void> {
+  if (isOfficialCatalogSeedSuppressed()) {
+    console.log('→ 本地数据库已由用户清空，跳过官方种子回填');
+    return;
+  }
   const recipes = await upsertOfficialMasterRecipes();
   const assets = await seedOfficialPromptAssets();
   console.log(`→ 官方种子已同步：拍摄架构 ${recipes.upserted} 条，补齐提示词资产 ${assets.inserted} 条`);

@@ -199,7 +199,17 @@ async function submit(req: Request) {
         size: String(genPayload.size || finalSize || '2448x3264'),
         quality: effectiveQuality || String(genPayload.quality || 'medium'),
         directResultUrl,
+        idempotencyKey: req.headers.get('x-idempotency-key'),
       });
+      if (dbRes.reused && dbRes.resultUrl) {
+        return jsonResponse({
+          success: true,
+          taskId: finalTaskId,
+          status: 'SUCCESS',
+          resultUrl: dbRes.resultUrl,
+          reused: true,
+        });
+      }
       recordId = dbRes.recordId;
       dbMs = dbRes.dbMs;
     } catch (dbErr: any) {

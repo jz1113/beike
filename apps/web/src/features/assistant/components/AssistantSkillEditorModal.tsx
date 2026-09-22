@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 
 interface Props {
@@ -66,22 +66,22 @@ export default function AssistantSkillEditorModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in select-none">
-      <div className="w-full max-w-xl max-h-[88vh] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col text-slate-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <h3 className="text-sm font-bold text-slate-900">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-fade-in select-none">
+      <section role="dialog" aria-modal="true" aria-label={initialSkill ? '编辑技能' : '创建新技能'} className="flex max-h-[90vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)]">
+        <header className="flex shrink-0 items-center justify-between gap-5 border-b border-slate-100 px-5 pb-3 pt-4 sm:px-6">
+          <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100"><Sparkles className="h-3.5 w-3.5 text-rose-500" /></span><h3 className="text-sm font-black tracking-tight">
             {initialSkill ? '编辑技能' : '创建新技能'}
-          </h3>
+          </h3></div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
             <X className="w-4 h-4" />
           </button>
-        </div>
+        </header>
 
-        <div className="p-6 space-y-4 text-xs overflow-y-auto min-h-0 flex-1">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 text-xs sm:px-6">
           <div>
             <label className="block text-slate-700 font-medium mb-1.5">
               技能标识 (name，英文字母与连字符)
@@ -130,13 +130,13 @@ export default function AssistantSkillEditorModal({
               onChange={(e) => setPrompt(e.target.value)}
               disabled={isBuiltin}
               rows={12}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 focus:bg-white focus:border-amber-400 text-xs font-mono leading-relaxed text-slate-900 placeholder:text-slate-400 resize-y min-h-[200px] outline-none transition-all shadow-2xs"
+              className="soft-textarea min-h-[200px] w-full resize-y px-3.5 py-2.5 text-xs font-mono leading-relaxed text-slate-900 placeholder:text-slate-400"
               placeholder="# 技能名称&#10;&#10;## 目的&#10;说明此技能的目标...&#10;&#10;## 工作流程&#10;1. 明确要求...&#10;2. 构建时间线...&#10;&#10;## 输出合同&#10;返回结构..."
             />
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-white">
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-3 sm:px-6">
           <div>
             {!isBuiltin && initialSkill && onDelete && (
               <button
@@ -156,20 +156,20 @@ export default function AssistantSkillEditorModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              className="rounded-xl px-3.5 py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
             >
               取消
             </button>
             <button
               type="button"
               onClick={handleSubmit}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-all shadow-sm"
+              className="rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
             >
               保存技能
             </button>
           </div>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>,
     document.body,
   );

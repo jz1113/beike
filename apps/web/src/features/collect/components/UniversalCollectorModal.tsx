@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, X, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { ScanSearch, Sparkles, FileSpreadsheet } from 'lucide-react';
 import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store';
 import StyleExtractModal from '@/shared/modals/StyleExtractModal';
-import { CollectorHubIcon } from '@/shared/icons';
+import { ToolSuiteMark } from '@/shared/icons';
 import {
   type BatchTaskItem,
   displayMediaSrc,
@@ -59,7 +59,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
 
   // 详情查看模态状态
   const [inspectingItem, setInspectingItem] = useState<any | null>(null);
-  const [inspectingSelectedImages, setInspectingSelectedImages] = useState<string[]>([]);
+  const [inspectingSelectedImages] = useState<string[]>([]);
 
   // 大图全屏查看 Lightbox 状态
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -195,29 +195,13 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleBackHome}
-            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
+            className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
             aria-label="返回首页"
             title="返回首页"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-500 text-white">
-              <CollectorHubIcon className="h-5 w-5" />
-            </span>
+            <ToolSuiteMark><ScanSearch className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
             <span className="text-sm font-black tracking-tight">全渠道采集</span>
-            <ArrowLeft className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:-translate-x-0.5 group-hover:text-slate-700" aria-hidden="true" />
           </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={handleBackHome}
-              aria-label="返回首页"
-              title="返回首页"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-400 shadow-sm transition-all hover:border-slate-300 hover:bg-white hover:text-slate-700"
-            >
-              <X className="w-5 h-5" aria-hidden="true" />
-            </button>
-          </div>
         </header>
 
         {/* 中心工作区：大字报同款标题、切换与独立白卡 */}
@@ -241,8 +225,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
               setSingleInput={single.setSingleInput}
               handleSingleCollect={single.handleSingleCollect}
               isCollectingSingle={single.isCollectingSingle}
-              forceRefresh={single.forceRefresh}
-              setForceRefresh={single.setForceRefresh}
               singleCollectedResult={single.singleCollectedResult}
               selectedSingleImages={single.selectedSingleImages}
               setSelectedSingleImages={single.setSelectedSingleImages}
@@ -261,7 +243,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
               handleDownloadSingleZip={(item) => downloadSingleZip(item, showToast, setIsDownloadingZip)}
               handleImportToWorkshop={handleImportToWorkshop}
               handleImportToAIAssistant={handleImportToAIAssistant}
-              showToast={showToast}
             />
           )}
 

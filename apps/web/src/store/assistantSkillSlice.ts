@@ -1,6 +1,6 @@
 import { migrateTravelCopySkill } from './migrateTravelCopySkill';
 import { StateCreator } from 'zustand';
-import { AppState } from '@/types/store';
+import { AppState } from '@/store/types';
 import type { AssistantSkill } from '@beike/domain/assistant/skills/types';
 import {
   BUILTIN_ASSISTANT_SKILLS,

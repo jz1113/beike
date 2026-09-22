@@ -2,7 +2,6 @@
   "comment": "Reviewed cross-feature edges. New feature-to-feature imports must not appear; remove an entry when the coupling is deleted.",
   "edges": [
     "workshop->assets",
-    "assets->canvas",
-    "replicate->workshop"
+    "assets->canvas"
   ]
 }

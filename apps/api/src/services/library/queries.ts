@@ -1,9 +1,10 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { resolveShotsForScene, type ActionLike } from '@beike/domain/sceneBundle';
 import { stableAssetCode } from '@beike/domain/assetSampling';
 import { readOrganization } from './organization';
 import { buildLibraryListWhere } from './listWhere';
+import { attachRegistryMeta } from '../promptAsset/registry';
 
 const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {
   const text = typeof reversePromptZh === 'string' ? reversePromptZh.trim() : '';
@@ -45,7 +46,7 @@ export async function executeLibraryGet(req: Request) {
 
   if (detailId && assetType !== 'all') {
     if (assetType === 'scene' || assetType === 'scene_bundle') {
-      const item = await prisma.sceneAsset.findUnique({
+      const item = await db.sceneAsset.findUnique({
         where: { id: detailId },
         include: { actions: { orderBy: [{ shotOrder: 'asc' }, { createdAt: 'asc' }] } },
       });
@@ -62,29 +63,29 @@ export async function executeLibraryGet(req: Request) {
       });
     }
     if (assetType === 'outfit') {
-      const item = await prisma.outfitAsset.findUnique({ where: { id: detailId } });
+      const item = await db.outfitAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
       return jsonResponse({ success: true, assetType, item });
     }
     if (assetType === 'action') {
-      const item = await prisma.actionAsset.findUnique({ where: { id: detailId } });
+      const item = await db.actionAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
       return jsonResponse({ success: true, assetType, item });
     }
     if (assetType === 'persona') {
-      const item = await prisma.personaAsset.findUnique({ where: { id: detailId } });
+      const item = await db.personaAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
       return jsonResponse({ success: true, assetType, item });
     }
     if (assetType === 'full_prompt') {
-      const item = await prisma.fullPromptAsset.findUnique({ where: { id: detailId } });
+      const item = await db.fullPromptAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
       return jsonResponse({ success: true, assetType, item });
     }
   }
 
   if (assetType === 'all' && searchParams.get('export') === '1') {
-    const result = await prisma.$transaction(async tx => {
+    const result = await db.$transaction(async tx => {
       const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
         tx.sceneAsset.findMany({ orderBy: { id: 'asc' } }),
         tx.outfitAsset.findMany({ orderBy: { id: 'asc' } }),
@@ -100,7 +101,7 @@ export async function executeLibraryGet(req: Request) {
 
   if (assetType === 'all') {
     const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
-      prisma.sceneAsset.findMany({
+      db.sceneAsset.findMany({
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
         skip: (page - 1) * 1000,
@@ -111,22 +112,22 @@ export async function executeLibraryGet(req: Request) {
           },
         },
       }),
-      prisma.outfitAsset.findMany({
+      db.outfitAsset.findMany({
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
         skip: (page - 1) * 1000,
       }),
-      prisma.actionAsset.findMany({
+      db.actionAsset.findMany({
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
         skip: (page - 1) * 1000,
       }),
-      prisma.personaAsset.findMany({
+      db.personaAsset.findMany({
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
         skip: (page - 1) * 1000,
       }),
-      prisma.fullPromptAsset.findMany({
+      db.fullPromptAsset.findMany({
         where: { OR: [{ groupIndex: { not: null } }, { provenance: { not: 'legacy_single' } }] },
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
@@ -193,8 +194,8 @@ export async function executeLibraryGet(req: Request) {
     const where: any = await buildLibraryListWhere('scene', searchParams, ['title', 'description', 'reversePrompt', 'tags']);
 
     const [total, items] = await Promise.all([
-      prisma.sceneAsset.count({ where }),
-      prisma.sceneAsset.findMany({
+      db.sceneAsset.count({ where }),
+      db.sceneAsset.findMany({
         where,
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
@@ -229,65 +230,53 @@ export async function executeLibraryGet(req: Request) {
       total,
       page,
       pageSize,
-      items: mappedItems,
+      items: await attachRegistryMeta('scene', mappedItems),
     });
   }
 
   if (assetType === 'outfit') {
     const where: any = await buildLibraryListWhere('outfit', searchParams, ['title', 'top', 'bottom', 'reversePrompt', 'tags']);
-
     const [total, items] = await Promise.all([
-      prisma.outfitAsset.count({ where }),
-      prisma.outfitAsset.findMany({
+      db.outfitAsset.count({ where }),
+      db.outfitAsset.findMany({
         where,
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
-    const mappedItems = items.map((item) => ({
-      ...item,
-      code: stableAssetCode('O', String(item.id)),
-    }));
-    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+    const mappedItems = items.map((item) => ({ ...item, code: stableAssetCode('O', String(item.id)) }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: await attachRegistryMeta('outfit', mappedItems) });
   }
 
   if (assetType === 'action') {
     const where: any = await buildLibraryListWhere('action', searchParams, ['title', 'action', 'reversePrompt', 'tags']);
-
     const [total, items] = await Promise.all([
-      prisma.actionAsset.count({ where }),
-      prisma.actionAsset.findMany({
+      db.actionAsset.count({ where }),
+      db.actionAsset.findMany({
         where,
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
-    const mappedItems = items.map((item) => ({
-      ...item,
-      code: stableAssetCode('A', String(item.id)),
-    }));
-    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+    const mappedItems = items.map((item) => ({ ...item, code: stableAssetCode('A', String(item.id)) }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: await attachRegistryMeta('action', mappedItems) });
   }
 
   if (assetType === 'persona') {
     const where: any = await buildLibraryListWhere('persona', searchParams, ['name', 'description', 'reversePrompt', 'tags']);
-
     const [total, items] = await Promise.all([
-      prisma.personaAsset.count({ where }),
-      prisma.personaAsset.findMany({
+      db.personaAsset.count({ where }),
+      db.personaAsset.findMany({
         where,
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
-    const mappedItems = items.map((item) => ({
-      ...item,
-      code: stableAssetCode('P', String(item.id)),
-    }));
-    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+    const mappedItems = items.map((item) => ({ ...item, code: stableAssetCode('P', String(item.id)) }));
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: await attachRegistryMeta('persona', mappedItems) });
   }
 
   if (assetType === 'full_prompt') {
@@ -300,8 +289,8 @@ export async function executeLibraryGet(req: Request) {
     };
 
     const [total, items] = await Promise.all([
-      prisma.fullPromptAsset.count({ where }),
-      prisma.fullPromptAsset.findMany({
+      db.fullPromptAsset.count({ where }),
+      db.fullPromptAsset.findMany({
         where,
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
@@ -312,7 +301,7 @@ export async function executeLibraryGet(req: Request) {
       ...item,
       code: stableAssetCode('R', String(item.id)),
     }));
-    return jsonResponse({ success: true, assetType, total, page, pageSize, items: mappedItems });
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: await attachRegistryMeta('full_prompt', mappedItems) });
   }
 
   return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);

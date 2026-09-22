@@ -3,3 +3,7 @@ export * from './system';
 export * from './assistant';
 export * from './workshopWorkspace';
 export * from './workshopBatches';
+export * from './workshopPipeline';
+export * from './catalog';
+export * from './promptAsset';
+export * from './categoryMigration';

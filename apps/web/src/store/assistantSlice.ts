@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { AssistantSession } from '@/types/app-store';
+import type { AssistantSession } from '@/store/appStoreTypes';
 import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@/features/assistant/api/sessions';
 import { setStoredMultimodalModelId } from '@beike/domain/workflowModels';
 import {
@@ -11,7 +11,7 @@ import {
   persistAssistantSessions,
   writeAssistantLocalCache,
 } from './persist/index';
-import type { AppState, AssistantSlice } from '@/types/store';
+import type { AppState, AssistantSlice } from '@/store/types';
 
 const defaultAssistantId = 'asst-session-default';
 

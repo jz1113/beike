@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../core/http';
+import { readJsonBody, safeErrorMessage } from '../../core/validate';
 import { upsertEnvFile } from '@beike/server-kit/desktopEnvFile';
 import path from 'node:path';
 
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, {});
     const updates: Record<string, string> = {
       ALLOW_CUSTOM_BASE_URL: 'true',
     };
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
       storageEnabled: process.env.STORAGE_ENABLED === 'true',
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '写入 .env 失败';
+    const message = safeErrorMessage(err, '写入 .env 失败');
     return jsonResponse({ success: false, error: message }, 500);
   }
 }

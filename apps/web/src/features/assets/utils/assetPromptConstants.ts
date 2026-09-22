@@ -371,6 +371,21 @@ export function formatPersonaPrompt(layers: PersonaLayers): string {
 
 export type AssetSubTab = 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';
 
+/** Hide legacy placeholder records that were produced for a product-only image. */
+export function isNonHumanPlaceholderAsset(item: object, tab: AssetSubTab): boolean {
+  if (tab !== 'persona' && tab !== 'outfit') return false;
+  const fields = item as Record<string, unknown>;
+  const text = [
+    fields.title,
+    fields.name,
+    fields.description,
+    fields.reversePrompt,
+    fields.top,
+    fields.bottom,
+  ].filter((value): value is string => typeof value === 'string').join(' ');
+  return /无人物|无人(?:物|出镜)?|无模特|纯商品|纯静物|无穿搭|无服装|信息不足|无法确认/.test(text);
+}
+
 /** API 写入/删除时使用的资产类型 */
 export function resolveAssetApiType(activeSubTab: AssetSubTab): string {
   return activeSubTab;
@@ -445,4 +460,3 @@ export function getAssetCardSummary(item: Record<string, unknown>, activeSubTab:
   }
   return '';
 }
-

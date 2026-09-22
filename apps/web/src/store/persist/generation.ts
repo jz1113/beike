@@ -1,4 +1,4 @@
-import type { ChatSession, GenerationTask } from '@/types/app-store';
+import type { ChatSession, GenerationTask } from '@/store/appStoreTypes';
 import { isProjectAutosaveEnabled } from '@/shared/utils/localStoragePrefs';
 import { MAX_GENERATION_TASKS_IN_MEMORY, STARTUP_TASK_SUMMARY_COUNT } from '../generationLimits';
 

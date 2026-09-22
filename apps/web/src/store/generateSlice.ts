@@ -1,6 +1,6 @@
 /** 生图会话与进行中任务：UI 草稿 + 本地缓存；服务端列表由 TanStack Query 持有 */
 import type { StateCreator } from 'zustand';
-import type { ChatSession, GenerationTask } from '@/types/app-store';
+import type { ChatSession, GenerationTask } from '@/store/appStoreTypes';
 import {
   getStoredDrawingSessions,
   isGenerationDeleted,
@@ -8,7 +8,7 @@ import {
   persistDrawingStateToStorage,
 } from './persist/index';
 import { MAX_GENERATION_TASKS_IN_MEMORY } from './generationLimits';
-import type { AppState, GenerateSlice } from '@/types/store';
+import type { AppState, GenerateSlice } from '@/store/types';
 
 function capGenerationTasks(tasks: GenerationTask[]): GenerationTask[] {
   if (tasks.length <= MAX_GENERATION_TASKS_IN_MEMORY) return tasks;

@@ -1,8 +1,7 @@
 
-import React, { useRef } from 'react';
-import { pasteIntoField } from '@/shared/utils/clipboard';
+import React from 'react';
 import {
-  X, ShoppingBag, Sparkles, Check, Loader2, Link2, Download, Maximize2,
+  X, Sparkles, Check, Loader2, Download, Maximize2, ArrowUp,
   Square, Film, Bot, Send, Compass
 } from 'lucide-react';
 import {
@@ -22,8 +21,6 @@ export interface CollectorSinglePanelProps {
   setSingleInput: (v: string) => void;
   handleSingleCollect: () => void;
   isCollectingSingle: boolean;
-  forceRefresh: boolean;
-  setForceRefresh: (v: boolean) => void;
   singleCollectedResult: any | null;
   selectedSingleImages: string[];
   setSelectedSingleImages: React.Dispatch<React.SetStateAction<string[]>>;
@@ -42,7 +39,6 @@ export interface CollectorSinglePanelProps {
   handleDownloadSingleZip: (item: any) => void;
   handleImportToWorkshop: (item: any) => void;
   handleImportToAIAssistant: (item: any, prompt?: string, images?: string[], includeVideo?: boolean) => void;
-  showToast: (msg: string) => void;
 }
 
 export default function CollectorSinglePanel({
@@ -52,8 +48,6 @@ export default function CollectorSinglePanel({
   setSingleInput,
   handleSingleCollect,
   isCollectingSingle,
-  forceRefresh,
-  setForceRefresh,
   singleCollectedResult,
   selectedSingleImages,
   setSelectedSingleImages,
@@ -72,24 +66,13 @@ export default function CollectorSinglePanel({
   handleDownloadSingleZip,
   handleImportToWorkshop,
   handleImportToAIAssistant,
-  showToast,
 }: CollectorSinglePanelProps) {
-  const singleInputRef = useRef<HTMLInputElement>(null);
   const collectedVideoList = collectedVideos(singleCollectedResult);
-
-  const handlePasteInput = () => {
-    void pasteIntoField({
-      inputEl: singleInputRef.current,
-      onText: (text) => setSingleInput(text),
-      onNeedManualPaste: () =>
-        showToast('已聚焦输入框，请按 Ctrl+V / ⌘V 粘贴'),
-    });
-  };
 
   return (
             <div className="mx-auto max-w-[980px] space-y-5">
               {/* 输入控制卡片 */}
-              <div className="space-y-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_14px_32px_-24px_rgba(15,23,42,0.28)] sm:p-8">
+              <div className="space-y-5 rounded-[32px] border border-slate-200/80 bg-white/80 p-6 sm:p-8">
                 <div className="flex flex-col gap-3">
                   <div>
                     <h2 className="text-base font-black tracking-tight text-slate-900">粘贴链接，自动收集整套素材</h2>
@@ -122,87 +105,60 @@ export default function CollectorSinglePanel({
                   ))}
                 </div>
 
-                {/* 核心输入框与操作按钮 */}
-                <div className="flex items-center gap-2.5">
-                  <div className="flex-1 relative flex items-center">
-                    <Link2 className="w-4 h-4 text-slate-400 absolute left-4 pointer-events-none" />
-                    <input
-                      ref={singleInputRef}
-                      type="text"
-                      value={singleInput}
-                      onChange={(e) => setSingleInput(e.target.value)}
-                      onPaste={(e) => {
-                        const text = e.clipboardData.getData('text/plain')?.trim();
-                        if (text) {
-                          e.preventDefault();
-                          setSingleInput(text);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSingleCollect();
-                      }}
-                      placeholder="粘贴商品或社媒作品链接，系统会自动识别平台..."
-                      className="w-full pl-11 pr-28 py-3.5 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all shadow-inner"
-                    />
-                    <div className="absolute right-2.5 flex items-center gap-1.5">
-                      {singleInput && (
-                        <button
-                          type="button"
-                          onClick={() => setSingleInput('')}
-                          className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
-                          title="清空输入"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handlePasteInput}
-                        className="px-3 py-1.5 rounded-xl bg-white border border-slate-200/90 text-slate-700 text-xs hover:bg-slate-50 font-semibold cursor-pointer shadow-2xs transition-colors"
-                      >
-                        粘贴
-                      </button>
-                    </div>
-                  </div>
-
+                {/* 大面积链接输入区：按 Ctrl/Cmd + Enter 采集 */}
+                <div className="relative">
+                  <textarea
+                    rows={3}
+                    value={singleInput}
+                    onChange={(e) => setSingleInput(e.target.value)}
+                    onPaste={(e) => {
+                      const text = e.clipboardData.getData('text/plain')?.trim();
+                      if (text) {
+                        e.preventDefault();
+                        setSingleInput(text);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        handleSingleCollect();
+                      }
+                    }}
+                    placeholder={'粘贴商品或社媒作品链接到这里\n支持商品链接、数字 ID 或社媒作品链接'}
+                    className="block min-h-[124px] w-full resize-y rounded-[24px] border-2 border-dashed border-slate-300 bg-white/70 px-6 py-5 pr-24 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-blue-300 hover:bg-white focus:border-blue-400 focus:bg-white focus:ring-0"
+                    aria-label="商品或社媒作品链接"
+                  />
+                  {singleInput && (
+                    <button
+                      type="button"
+                      onClick={() => setSingleInput('')}
+                      className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 cursor-pointer"
+                      title="清空输入"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSingleCollect}
                     disabled={isCollectingSingle || !singleInput.trim()}
-                    className={`h-12 px-6 rounded-2xl text-sm font-bold flex items-center gap-2 transition-all cursor-pointer flex-shrink-0 select-none ${isCollectingSingle || !singleInput.trim()
-                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-md shadow-blue-500/25'
+                    className={`absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer select-none ${isCollectingSingle || !singleInput.trim()
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-900 text-white shadow-md shadow-slate-900/15 hover:bg-black active:scale-95'
                       }`}
+                    title={isCollectingSingle ? '正在采集' : '开始采集'}
+                    aria-label={isCollectingSingle ? '正在采集' : '开始采集'}
                   >
-                    {isCollectingSingle ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>正在解析穿透...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>一键采集商品</span>
-                      </>
-                    )}
+                    {isCollectingSingle ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                   </button>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
                     <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />自动识别平台</span>
                     <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />高清素材提取</span>
                     <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />结果可入库</span>
                   </div>
-                  <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={forceRefresh}
-                      onChange={(e) => setForceRefresh(e.target.checked)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                    />
-                    <span>强制穿透刷新缓存</span>
-                  </label>
                 </div>
               </div>
 
@@ -242,11 +198,12 @@ export default function CollectorSinglePanel({
                 </div>
               )}
 
-              {/* 采集结果展示卡片 */}
-              {singleCollectedResult ? (
-                <div className="p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-5 animate-fade-in">
-                  {/* 顶部：元信息纵向堆叠 + 工具栏 */}
-                  <div className="flex flex-col gap-3 pb-4.5 border-b border-slate-100">
+              {/* 采集完成后直接展示素材画廊；未采集时不占用页面空间 */}
+              {singleCollectedResult && (
+                <section className="space-y-4 animate-fade-in" aria-label="已采集素材画廊">
+                  {/* 画廊信息与操作 */}
+                  <div className="rounded-3xl bg-white p-5 sm:p-6 shadow-[0_14px_32px_-24px_rgba(15,23,42,0.28)]">
+                    <div className="flex flex-col gap-3">
                     <div className="flex items-start gap-3.5 min-w-0">
                       {displayMediaSrc(singleCollectedResult.coverImage) ? (
                         <img
@@ -338,6 +295,7 @@ export default function CollectorSinglePanel({
                       </button>
                     </div>
                   </div>
+                  </div>
 
                   {/* 图集分类切换与全选控制 */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
@@ -412,8 +370,8 @@ export default function CollectorSinglePanel({
                     )}
                   </div>
 
-                  {/* 缩略图矩阵 + 视频预览格 */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 max-h-96 overflow-y-auto pr-1">
+                  {/* 画廊缩略图矩阵 + 视频预览格 */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
                     {collectedVideoList.length > 0 && (singleImageFilter === 'all' || singleImageFilter === 'video') && collectedVideoList.map((videoUrl, videoIndex) => (
                       <div
                         key={videoUrl}
@@ -633,18 +591,7 @@ export default function CollectorSinglePanel({
                       ))}
                     </div>
                   </div>
-                </div>
-              ) : (
-                /* 空状态引导 */
-                <div className="min-h-[220px] p-10 sm:p-12 rounded-[28px] bg-white border border-dashed border-slate-200/90 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <ShoppingBag className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-base font-bold text-slate-800">尚未采集电商或社媒商品</h3>
-                  <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                    支持粘贴京东、淘宝、天猫、1688、拼多多等全网主流平台的商品链接或数字 ID，以及小红书笔记/抖音视频作品，一键穿透提取全量主图、SKU 图与详情高清素材。
-                  </p>
-                </div>
+                </section>
               )}
             </div>
 

@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import type { AssistantTurn } from '@beike/domain/assistant/types';
 
@@ -33,7 +33,7 @@ export async function listThreadTurns(req: Request): Promise<Response> {
       where.status = statusFilter;
     }
 
-    const turns = await prisma.assistantTurn.findMany({
+    const turns = await db.assistantTurn.findMany({
       where,
       orderBy: { startedAt: 'desc' },
       take: 50,
@@ -71,12 +71,12 @@ export async function getTurnSnapshot(req: Request): Promise<Response> {
       return jsonResponse({ success: false, error: '缺少 turnId' }, 400);
     }
 
-    const turn = await prisma.assistantTurn.findUnique({ where: { id: turnId } });
+    const turn = await db.assistantTurn.findUnique({ where: { id: turnId } });
     if (!turn) {
       return jsonResponse({ success: false, error: 'Turn 不存在' }, 404);
     }
 
-    const items = await prisma.assistantTurnItem.findMany({
+    const items = await db.assistantTurnItem.findMany({
       where: { turnId },
       orderBy: { startedAt: 'asc' },
     });

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readJsonBody } from '../../../core/validate';
 import { jsonResponse } from '../../../core/http';
 import { persistBufferToStorage, persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
 import type { StorageCategory, StorageConfig } from '@beike/server-kit/storage';
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
         urls.push(permanentUrl);
       }
     } else {
-      const body = await req.json().catch(() => ({}));
+      const body = await readJsonBody(req, {});
       const category = (body.category as StorageCategory) || 'generated/images';
       const customConfig: StorageConfig | undefined = body.customConfig;
       

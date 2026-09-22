@@ -1,6 +1,7 @@
 import { assistantMemory } from '../../services/assistantMemory';
+import { readJsonBody } from '../../core/validate';
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 function sanitizeAttachment(a: any) {
@@ -62,7 +63,7 @@ function sanitizeSession(s: any) {
  */
 export async function GET() {
   try {
-    const threads = await prisma.assistantThread.findMany({
+    const threads = await db.assistantThread.findMany({
       orderBy: { updatedAt: 'desc' },
       take: 50,
     });
@@ -103,7 +104,7 @@ export async function GET() {
  */
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const rawSessions = Array.isArray(body?.sessions) ? body.sessions : [];
     const sessions = rawSessions.slice(0, 40).map(sanitizeSession).filter((s: any) => s.id);
 
@@ -118,9 +119,9 @@ export async function PUT(req: Request) {
       (!sessions[0].messages || sessions[0].messages.length === 0);
 
     if (onlyEmptyDefault) {
-      const existingCount = await prisma.assistantThread.count();
+      const existingCount = await db.assistantThread.count();
       if (existingCount > 0) {
-        const existing = await prisma.assistantThread.findMany({
+        const existing = await db.assistantThread.findMany({
           orderBy: { updatedAt: 'desc' },
           take: 50,
         });
@@ -144,7 +145,7 @@ export async function PUT(req: Request) {
 
     // 安全：服务端时间戳强制由后端生成，避免客户端篡改时间
     const serverNow = new Date();
-    await prisma.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       for (const s of sessions) {
         await tx.assistantThread.upsert({
           where: { id: s.id },
@@ -184,7 +185,7 @@ export async function DELETE(req: Request) {
     if (!id) {
       return jsonResponse({ success: false, error: '缺少 id' }, 400);
     }
-    await prisma.assistantThread.delete({ where: { id } }).catch(() => null);
+    await db.assistantThread.delete({ where: { id } }).catch(() => null);
     await assistantMemory.remove(id);
     return jsonResponse({ success: true });
   } catch (error: any) {

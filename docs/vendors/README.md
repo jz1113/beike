@@ -7,4 +7,6 @@
 
 批准模型的单一真相源是 [`packages/domain/src/modelCatalog.ts`](../../packages/domain/src/modelCatalog.ts)。
 
+外站链接解析接口说明见 [`external-parsing.md`](external-parsing.md)。
+
 系统自身的内部架构与工程约定见 [`docs/architecture/`](../architecture/) 与 [`docs/AGENTS.md`](../AGENTS.md)。

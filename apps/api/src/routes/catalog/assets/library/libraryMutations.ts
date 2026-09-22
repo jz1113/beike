@@ -1,13 +1,14 @@
 import { validateAssetEdit, pickAssetEditFields } from '@beike/domain/assetEdit';
+import { readJsonBody } from '../../../../core/validate';
 import { jsonResponse } from '../../../../core/http';
-import { prisma } from '../../../../repositories/db';
+import { db } from '../../../../repositories/access';
 import { queueMediaReview } from '../../../../services/mediaReviewQueue';
 import { mutateOrganization } from '../../../../services/library/organization';
 import { importLibraryBackup, remapItemData, withOrganization } from './libraryImport';
 
 // 创建单项或批量导入原子资产
 export async function executeLibraryPost(req: Request) {
-  const body = await req.json();
+  const body = await readJsonBody(req);
 
   if (typeof body.action === 'string' && [
     'save-product-category',
@@ -23,7 +24,7 @@ export async function executeLibraryPost(req: Request) {
     const created: unknown[] = [];
     const sceneIds = new Map<string, string>();
     const maps = await importLibraryBackup(body, created);
-    await prisma.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       for (const item of [...items].sort((a, b) => Number(b.assetType === 'scene') - Number(a.assetType === 'scene'))) {
         const { assetType } = item;
         const data = await withOrganization(assetType, remapItemData(pickAssetEditFields(assetType, item.data || {}), maps));
@@ -60,7 +61,7 @@ export async function executeLibraryPost(req: Request) {
 
   let created: any;
   if (assetType === 'scene') {
-    created = await prisma.sceneAsset.create({
+    created = await db.sceneAsset.create({
       data: {
         title: data.title || '新生活场景',
         description: data.description || '',
@@ -79,7 +80,7 @@ export async function executeLibraryPost(req: Request) {
       },
     });
   } else if (assetType === 'outfit') {
-    created = await prisma.outfitAsset.create({
+    created = await db.outfitAsset.create({
       data: {
         title: data.title || '新显白穿搭',
         top: data.top || '',
@@ -96,7 +97,7 @@ export async function executeLibraryPost(req: Request) {
       },
     });
   } else if (assetType === 'action') {
-    created = await prisma.actionAsset.create({
+    created = await db.actionAsset.create({
       data: {
         title: data.title || '新抓拍动作',
         action: data.action || '',
@@ -114,7 +115,7 @@ export async function executeLibraryPost(req: Request) {
     });
   } else if (assetType === 'persona') {
     const org = await withOrganization('persona', data);
-    created = await prisma.personaAsset.create({
+    created = await db.personaAsset.create({
       data: {
         name: data.name || '新人设博主',
         description: data.description || '',
@@ -127,7 +128,7 @@ export async function executeLibraryPost(req: Request) {
     });
   } else if (assetType === 'full_prompt') {
     const org = await withOrganization('full_prompt', data);
-    created = await prisma.fullPromptAsset.create({
+    created = await db.fullPromptAsset.create({
       data: {
         title: data.title || '新完整反推提示词',
         albumName: String(org.albumName || data.albumName || ''),
@@ -162,12 +163,16 @@ export async function executeLibraryPost(req: Request) {
     return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);
   }
 
+  if (created?.id && ['scene', 'outfit', 'action', 'persona', 'full_prompt'].includes(assetType)) {
+    const { ensureRegistryForAsset } = await import('../../../../services/promptAsset/registry');
+    await ensureRegistryForAsset(assetType, created.id, created.provenance).catch(() => null);
+  }
   return jsonResponse({ success: true, item: created });
 }
 
 // 修改原子资产（编辑、修改收藏状态、增加调用计数）
 export async function executeLibraryPut(req: Request) {
-  const body = await req.json();
+  const body = await readJsonBody(req);
   const { assetType, id, data } = body;
 
   if (!assetType || !id || !data) {
@@ -179,27 +184,27 @@ export async function executeLibraryPut(req: Request) {
 
   let updated: any;
   if (assetType === 'scene') {
-    updated = await prisma.sceneAsset.update({
+    updated = await db.sceneAsset.update({
       where: { id },
       data,
     });
   } else if (assetType === 'outfit') {
-    updated = await prisma.outfitAsset.update({
+    updated = await db.outfitAsset.update({
       where: { id },
       data,
     });
   } else if (assetType === 'action') {
-    updated = await prisma.actionAsset.update({
+    updated = await db.actionAsset.update({
       where: { id },
       data,
     });
   } else if (assetType === 'persona') {
-    updated = await prisma.personaAsset.update({
+    updated = await db.personaAsset.update({
       where: { id },
       data,
     });
   } else if (assetType === 'full_prompt') {
-    updated = await prisma.fullPromptAsset.update({
+    updated = await db.fullPromptAsset.update({
       where: { id },
       data,
     });
@@ -215,7 +220,7 @@ export async function executeLibraryDeleteByIds(assetType: string, idsToDelete: 
   const mediaUrlsToDelete: string[] = [];
   let deleteRecords: () => Promise<{ count: number }>; 
   if (assetType === 'scene') {
-    const records = await prisma.sceneAsset.findMany({
+    const records = await db.sceneAsset.findMany({
       where: { id: { in: idsToDelete } },
       select: { coverUrl: true, sourceImages: true },
     });
@@ -230,36 +235,36 @@ export async function executeLibraryDeleteByIds(assetType: string, idsToDelete: 
         }
       }
     }
-    deleteRecords = () => prisma.sceneAsset.deleteMany({ where: { id: { in: idsToDelete } } });
+    deleteRecords = () => db.sceneAsset.deleteMany({ where: { id: { in: idsToDelete } } });
   } else if (assetType === 'outfit') {
-    const records = await prisma.outfitAsset.findMany({
+    const records = await db.outfitAsset.findMany({
       where: { id: { in: idsToDelete } },
       select: { coverUrl: true },
     });
     for (const r of records) {
       if (r.coverUrl) mediaUrlsToDelete.push(r.coverUrl);
     }
-    deleteRecords = () => prisma.outfitAsset.deleteMany({ where: { id: { in: idsToDelete } } });
+    deleteRecords = () => db.outfitAsset.deleteMany({ where: { id: { in: idsToDelete } } });
   } else if (assetType === 'action') {
-    const records = await prisma.actionAsset.findMany({
+    const records = await db.actionAsset.findMany({
       where: { id: { in: idsToDelete } },
       select: { coverUrl: true },
     });
     for (const r of records) {
       if (r.coverUrl) mediaUrlsToDelete.push(r.coverUrl);
     }
-    deleteRecords = () => prisma.actionAsset.deleteMany({ where: { id: { in: idsToDelete } } });
+    deleteRecords = () => db.actionAsset.deleteMany({ where: { id: { in: idsToDelete } } });
   } else if (assetType === 'persona') {
-    const records = await prisma.personaAsset.findMany({
+    const records = await db.personaAsset.findMany({
       where: { id: { in: idsToDelete } },
       select: { avatarUrl: true },
     });
     for (const r of records) {
       if (r.avatarUrl) mediaUrlsToDelete.push(r.avatarUrl);
     }
-    deleteRecords = () => prisma.personaAsset.deleteMany({ where: { id: { in: idsToDelete } } });
+    deleteRecords = () => db.personaAsset.deleteMany({ where: { id: { in: idsToDelete } } });
   } else if (assetType === 'full_prompt') {
-    deleteRecords = () => prisma.fullPromptAsset.deleteMany({ where: { id: { in: idsToDelete } } });
+    deleteRecords = () => db.fullPromptAsset.deleteMany({ where: { id: { in: idsToDelete } } });
   } else {
     return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);
   }

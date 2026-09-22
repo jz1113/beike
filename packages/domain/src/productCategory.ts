@@ -19,3 +19,7 @@ export * from './productCategory/subcategoryStore';
 
 // 4. 解剖学部位、动作锚点与徽章解析
 export * from './productCategory/anatomy';
+
+// 5. 本地类目迁到服务端的预览合并
+export * from './productCategory/migrationPreview';
+export * from './productCategory/serverCache';

@@ -1,5 +1,5 @@
 import { apiFetch } from '@/shared/api/apiClient';
-import type { AssistantSession } from '@/types/app-store';
+import type { AssistantSession } from '@/store/appStoreTypes';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 export async function deleteAssistantSessionRemote(id: string): Promise<{ success: boolean; error?: string }> {

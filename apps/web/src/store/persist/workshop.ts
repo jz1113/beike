@@ -1,7 +1,7 @@
 import type { ShotPrompt, PreviousGroupSignature } from '@beike/domain/vision';
 import type { OriginalLookParts } from '@beike/domain/drawing';
 import type { ProductImage } from '@/types';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { sanitizeTaskForStorage } from './generation';
 
 export const STUDIO_DRAFT_KEY = 'workshop_studio_draft';
@@ -104,7 +104,8 @@ export function persistStudioDraftToStorage(state: {
   persistWorkshopModeDraftToStorage('storyboard_generate', state);
 }
 
-function studioDraftStorageKey(mode: 'storyboard_generate') {
+function studioDraftStorageKey(_mode: 'storyboard_generate') {
+  void _mode;
   return STUDIO_DRAFT_ORIGINAL_KEY;
 }
 

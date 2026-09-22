@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { readJsonBody } from '../../core/validate';
+import { db } from '../../repositories/access';
 import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@beike/domain/drawing';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { deleteObjectsFromStorage } from '@beike/server-kit/storage';
@@ -12,8 +13,8 @@ export async function GET(req: Request) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10) || 50));
 
     const [total, products] = await Promise.all([
-      prisma.product.count(),
-      prisma.product.findMany({
+      db.product.count(),
+      db.product.findMany({
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
 // 创建或保存自定义/本地上传商品记录（只保存用户选中的图片链接）
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const { platform = 'local', itemId, title, picUrl, detailUrls, selectedImages } = body;
 
     if (!title || !itemId) {
@@ -70,13 +71,13 @@ export async function POST(req: Request) {
     const savedImages = rawSaved.map(normalizeImageUrlToStandardJpg).filter(Boolean);
     const cleanPicUrl = normalizeImageUrlToStandardJpg(picUrl) || savedImages[0] || '';
 
-    const existing = await prisma.product.findFirst({
+    const existing = await db.product.findFirst({
       where: { platform, itemId: itemId.toString() }
     });
 
     let product;
     if (existing) {
-      product = await prisma.product.update({
+      product = await db.product.update({
         where: { id: existing.id },
         data: {
           title,
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         }
       });
     } else {
-      product = await prisma.product.create({
+      product = await db.product.create({
         data: {
           platform,
           itemId: itemId.toString(),
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
 // 修改商品信息或同步已选中的图片
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const { id, title, itemId, picUrl, selectedImages } = body;
 
     if (!id) {
@@ -120,7 +121,7 @@ export async function PUT(req: Request) {
       updateData.detailUrls = JSON.stringify({ main: selectedImages.map(normalizeImageUrlToStandardJpg).filter(Boolean) });
     }
 
-    const updated = await prisma.product.update({
+    const updated = await db.product.update({
       where: { id },
       data: updateData
     });
@@ -141,7 +142,7 @@ export async function DELETE(req: Request) {
       return jsonResponse({ error: '缺少 id 参数' }, 400);
     }
 
-    const product = await prisma.product.findUnique({
+    const product = await db.product.findUnique({
       where: { id },
       select: { picUrl: true, detailUrls: true },
     });
@@ -164,7 +165,7 @@ export async function DELETE(req: Request) {
       }
     }
 
-    await prisma.product.delete({
+    await db.product.delete({
       where: { id },
     });
 

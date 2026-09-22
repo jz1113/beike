@@ -148,27 +148,23 @@ export default function BrandKitModal({ isOpen, onClose, showToast }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white border border-slate-200 w-full max-w-4xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-800 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-in fade-in duration-200">
+      <div className="w-full max-w-4xl max-h-[90vh] rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* 顶部 Header */}
-        <div className="h-14 px-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 flex-shrink-0">
+        <div className="flex shrink-0 items-center justify-between gap-5 border-b border-slate-100 px-5 pb-3 pt-4 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center text-white shadow-sm">
-              <Building2 className="w-4 h-4" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100">
+              <Building2 className="h-3.5 w-3.5 text-rose-500" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                Brand Kit · 品牌资产与专属模特记忆库
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                  视觉长程一致性
-                </span>
-              </h3>
+              <h3 className="text-sm font-black tracking-tight">品牌资产管理</h3>
+              <p className="mt-0.5 text-[11px] text-slate-400">统一管理品牌视觉资产与专属模特记忆。</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -333,7 +329,7 @@ export default function BrandKitModal({ isOpen, onClose, showToast }: Props) {
                       rows={2}
                       value={formData.brandTone}
                       onChange={e => setFormData({ ...formData, brandTone: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none"
+                      className="soft-textarea w-full px-3 py-2 text-xs"
                       placeholder="如: 现代极简商务科技风，硬朗细腻光泽，冷暖光影对比，高端克制美学"
                     />
                   </div>

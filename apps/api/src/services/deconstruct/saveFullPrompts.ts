@@ -1,4 +1,4 @@
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { ensurePromptAlbum } from '@beike/server-kit/assetOrganization';
 import type { ContentPromptGroup, PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
 
@@ -121,14 +121,14 @@ export async function persistFullPromptRecords(params: {
   const { parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey, sampleImagesJson, thumbForUrl, defaultCoverUrl } = params;
   let albumId: string | null = null;
   if (sourceKey) {
-    const rows = await prisma.$queryRaw<{ albumId: string | null }[]>`SELECT "albumId" FROM "PromptImportSource" WHERE "sourceKey" = ${sourceKey}`;
+    const rows = await db.$queryRaw<{ albumId: string | null }[]>`SELECT "albumId" FROM "PromptImportSource" WHERE "sourceKey" = ${sourceKey}`;
     albumId = rows[0]?.albumId || null;
   }
   const album = albumId
-    ? await prisma.promptAlbum.findUnique({ where: { id: albumId } })
-    : await ensurePromptAlbum(prisma, { albumName, sourceImages: JSON.stringify(imageUrls), productCategoryIds: productCategoryId ? JSON.stringify([productCategoryId]) : '[]' });
+    ? await db.promptAlbum.findUnique({ where: { id: albumId } })
+    : await ensurePromptAlbum(db, { albumName, sourceImages: JSON.stringify(imageUrls), productCategoryIds: productCategoryId ? JSON.stringify([productCategoryId]) : '[]' });
   if (!album) throw new Error('图集不存在');
-  if (album.name !== albumName) await prisma.promptAlbum.update({ where: { id: album.id }, data: { name: albumName } });
+  if (album.name !== albumName) await db.promptAlbum.update({ where: { id: album.id }, data: { name: albumName } });
 
   const productCategoryIds = JSON.stringify(album.productCategoryId ? [album.productCategoryId] : (productCategoryId ? [productCategoryId] : []));
   const contentSummary = text(parsedResult.content_summary ?? parsedResult.contentSummary) || `${albumName}：按连续图组复用的种草内容架构。`;
@@ -150,7 +150,7 @@ export async function persistFullPromptRecords(params: {
     });
     const firstImageIndex = group.indices[0];
     const coverUrl = await thumbForUrl(imageUrls[firstImageIndex - 1] || defaultCoverUrl);
-    const existing = await prisma.fullPromptAsset.findFirst({ where: { albumId: album.id, groupIndex } });
+    const existing = await db.fullPromptAsset.findFirst({ where: { albumId: album.id, groupIndex } });
     const shared = {
       title: text(group.declared?.title) || `${albumName} · 图组 ${groupIndex}`,
       albumName, albumId: album.id,
@@ -167,8 +167,8 @@ export async function persistFullPromptRecords(params: {
       category, productCategoryIds, provenance: 'deconstructed' as const,
     };
     saved.push(existing
-      ? await prisma.fullPromptAsset.update({ where: { id: existing.id }, data: shared })
-      : await prisma.fullPromptAsset.create({ data: shared }));
+      ? await db.fullPromptAsset.update({ where: { id: existing.id }, data: shared })
+      : await db.fullPromptAsset.create({ data: shared }));
   }
   return { album, fullPrompts: saved };
 }

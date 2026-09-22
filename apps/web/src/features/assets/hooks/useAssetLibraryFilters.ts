@@ -98,6 +98,7 @@ export function useAssetLibraryFilters(
   const [actionShotScale, setActionShotScale] = useState<ActionShotScale>('all');
   const [actionAnchor, setActionAnchor] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'default' | 'usage' | 'favorite'>('default');
+  const [lifecycleFilter, setLifecycleFilter] = useState<'all' | 'pending_review' | 'needs_fix' | 'published'>('all');
   const [subCategoriesVersion, setSubCategoriesVersion] = useState(0);
 
   useEffect(() => {
@@ -319,6 +320,7 @@ export function useAssetLibraryFilters(
     () =>
       Boolean(
         onlyFavorite ||
+          lifecycleFilter !== 'all' ||
           searchKeyword.trim() ||
           selectedTag ||
           (activeSubTab === 'action' &&
@@ -327,7 +329,7 @@ export function useAssetLibraryFilters(
               actionShotScale !== 'all' ||
               actionAnchor !== null))
       ),
-    [onlyFavorite, searchKeyword, selectedTag, activeSubTab, actionCategory, actionSubCategory, actionShotScale, actionAnchor]
+    [onlyFavorite, lifecycleFilter, searchKeyword, selectedTag, activeSubTab, actionCategory, actionSubCategory, actionShotScale, actionAnchor]
   );
 
   const displayedItems = useMemo<any[]>(() => {
@@ -335,7 +337,10 @@ export function useAssetLibraryFilters(
     if (!baseList || baseList.length === 0) return items;
 
     let filtered = baseList.filter((item) => {
-      if (onlyFavorite && !item.isFavorite) return false;
+      if (lifecycleFilter !== 'all') {
+        const status = String(item.registry?.status || item.lifecycleStatus || '');
+        if (status !== lifecycleFilter) return false;
+      }
 
       // 动作 Tab 下的品类过滤
       if (activeSubTab === 'action' && actionCategory !== 'all') {
@@ -418,6 +423,7 @@ export function useAssetLibraryFilters(
     setActionSubCategory('all');
     setActionShotScale('all');
     setActionAnchor(null);
+    setLifecycleFilter('all');
   };
 
   return {
@@ -442,6 +448,8 @@ export function useAssetLibraryFilters(
     availableAnchors,
     sortBy,
     setSortBy,
+    lifecycleFilter,
+    setLifecycleFilter,
     dynamicTagList,
     isAnyFilterActive,
     displayedItems,

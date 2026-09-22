@@ -1,4 +1,4 @@
-import type { AssistantMessage, MediaAttachment } from '@/types/app-store';
+import type { AssistantMessage, MediaAttachment } from '@/store/appStoreTypes';
 
 /** Numbering is local to the most recent user attachment batch before this reply. */
 export function getReplyReferenceMedia(messages: AssistantMessage[], replyId: string): MediaAttachment[] {

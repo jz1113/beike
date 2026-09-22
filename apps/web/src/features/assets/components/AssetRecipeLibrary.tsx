@@ -315,7 +315,7 @@ export default function AssetRecipeLibrary({
                   value={editingRecipe.promptSnippet}
                   onChange={e => setEditingRecipe({ ...editingRecipe, promptSnippet: e.target.value })}
                   placeholder="输入完整提示词大架构规范..."
-                  className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs leading-relaxed outline-none focus:bg-white focus:border-indigo-500 text-slate-900 select-text"
+                  className="soft-textarea w-full p-3 font-mono text-xs leading-relaxed text-slate-900 select-text"
                 />
               </div>
             </div>

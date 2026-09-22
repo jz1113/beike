@@ -1,4 +1,4 @@
-export { default, type SubjectItem } from '@/features/home/components/prompt-bar/PromptActionBar';
+export { default, type SubjectItem } from './PromptActionBar';
 export { RichPromptInput } from './RichPromptInput';
 export type { RichPromptInputRef } from './richPromptInputTypes';
 export { resolveSubjectByMention } from './promptMentions';

@@ -385,6 +385,13 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 handleSaveApiConfig={config.handleSaveApiConfig}
                 handleTestPing={config.handleTestPing}
                 isTesting={config.isTesting}
+                deepSeekApiKey={config.deepSeekApiKey}
+                setDeepSeekApiKey={config.setDeepSeekApiKey}
+                showDeepSeekKey={config.showDeepSeekKey}
+                setShowDeepSeekKey={config.setShowDeepSeekKey}
+                isTestingDeepSeek={config.isTestingDeepSeek}
+                handleTestDeepSeek={config.handleTestDeepSeek}
+                handleSaveDeepSeekConfig={config.handleSaveDeepSeekConfig}
                 handleOpenGatewayDiscovery={models.handleOpenGatewayDiscovery}
                 isFetchingGateway={models.isFetchingGateway}
                 allGatewayModels={models.allGatewayModels}

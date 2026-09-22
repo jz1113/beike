@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../../core/http';
+import { readJsonBody } from '../../../core/validate';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { parseSocialLinkViaApia } from '@beike/server-kit/apiaScraper';
 import { parseSocialLinkViaQiyun } from '@beike/server-kit/qiyunScraper';
@@ -35,7 +36,7 @@ async function tryProvider(name: string, run: () => Promise<ParseResult>, attemp
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const {
       url, text, link, query, scraperId, customScraperId, scraperSecret, customApiKey,
       qiyunAppId, qiyunAppKey, customQiyunAppId, customQiyunAppKey, preferredScraper,

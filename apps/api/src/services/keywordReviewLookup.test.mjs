@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict';
+import { afterEach, test } from 'node:test';
+import {
+  applyCachedLookupCategories,
+  extractResponsesText,
+  parseLookupCategory,
+  recalledLookupCategory,
+  rememberLookupCategory,
+  resetLookupCacheForTests,
+  selectLookupRows,
+} from './keywordReviewLookup.ts';
+
+afterEach(() => {
+  resetLookupCacheForTests();
+});
+
+const allowed = new Set(['民俗文化', '游戏', '其他', '3C数码']);
+
+function row(id, query) {
+  return { id, query };
+}
+
+function result(id, category, needsLookup = false) {
+  return { id, category, producible: '制作', needsLookup };
+}
+
+test('selectLookupRows keeps unique uncertain queries and caps at 5', () => {
+  const rows = [
+    row('1', '乌天狗'),
+    row('2', '未知品牌A'),
+    row('3', '未知品牌A'),
+    row('4', '花菜焯水多久好吃'),
+    row('5', '游戏手机推荐'),
+    row('6', '陌生机构'),
+    row('7', '外文词X'),
+    row('8', '作品Y'),
+    row('9', '品牌Z'),
+  ];
+  const results = [
+    result('1', '其他', true),
+    result('2', '其他'),
+    result('3', '其他'),
+    result('4', '美食', false),
+    result('5', '3C数码', false),
+    result('6', '其他', true),
+    result('7', '其他', true),
+    result('8', '其他', true),
+    result('9', '其他', true),
+  ];
+  const picked = selectLookupRows(results, rows, 5);
+  assert.deepEqual(picked.map((item) => item.query), ['乌天狗', '未知品牌A', '陌生机构', '外文词X', '作品Y']);
+});
+
+test('selectLookupRows skips cached queries so retries do not search again', () => {
+  rememberLookupCategory('乌天狗', '民俗文化');
+  const picked = selectLookupRows(
+    [result('1', '其他', true), result('2', '其他', true)],
+    [row('1', '乌天狗'), row('2', '未知品牌A')],
+  );
+  assert.deepEqual(picked.map((item) => item.query), ['未知品牌A']);
+});
+
+test('applyCachedLookupCategories only rewrites the vertical', () => {
+  rememberLookupCategory('乌天狗', '民俗文化');
+  const next = applyCachedLookupCategories(
+    [{ id: '1', category: '其他', producible: '不制作', needsLookup: true }],
+    [row('1', '乌天狗')],
+  );
+  assert.equal(next[0].category, '民俗文化');
+  assert.equal(next[0].producible, '不制作');
+});
+
+test('extractResponsesText reads output_text and message blocks', () => {
+  assert.equal(extractResponsesText({ output_text: '{"category":"游戏"}' }), '{"category":"游戏"}');
+  assert.equal(
+    extractResponsesText({
+      output: [{
+        type: 'message',
+        content: [{ type: 'output_text', text: '{"category":"民俗文化"}' }],
+      }],
+    }),
+    '{"category":"民俗文化"}',
+  );
+});
+
+test('parseLookupCategory accepts only allowed verticals', () => {
+  assert.equal(parseLookupCategory('{"category":"民俗文化"}', allowed), '民俗文化');
+  assert.equal(parseLookupCategory('```json\n{"category":"游戏"}\n```', allowed), '游戏');
+  assert.equal(parseLookupCategory('{"category":"不存在"}', allowed), undefined);
+  assert.equal(parseLookupCategory('not json', allowed), undefined);
+});
+
+test('lookup cache stores trimmed queries', () => {
+  rememberLookupCategory('  乌天狗  ', '民俗文化');
+  assert.equal(recalledLookupCategory('乌天狗'), '民俗文化');
+});

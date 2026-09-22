@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { mountJson } from '../../core/handler';
 import * as proxyImage from '../system/proxy-image';
 import * as systemConfig from '../system/config';
 import * as desktopEnv from '../system/desktop-env';
@@ -12,17 +13,18 @@ import * as mediaReview from '../system/media-review';
 
 const system = new Hono();
 
+// 二进制图片代理，不走 JSON envelope。
 system.get('/proxy-image', (c) => proxyImage.GET(c.req.raw));
-system.get('/config', () => systemConfig.GET());
-system.post('/config', (c) => systemConfig.POST(c.req.raw));
-system.post('/desktop-env', (c) => desktopEnv.POST(c.req.raw));
-system.get('/local-storage/stats', () => localStorageStats.GET());
-system.post('/local-storage/clear-derived', (c) => localStorageStats.POST(c.req.raw));
-system.get('/depth-env', () => depthEnv.GET());
-system.post('/models/fetch', (c) => modelsFetch.POST(c.req.raw));
-system.post('/gateway-user', (c) => gatewayUser.POST(c.req.raw));
-system.post('/dev-log', (c) => devLog.POST(c.req.raw));
-system.post('/memory-cleanup', () => memoryCleanup.POST());
-system.get('/media-review', () => mediaReview.GET());
+system.get('/config', mountJson(() => systemConfig.GET()));
+system.post('/config', mountJson((req) => systemConfig.POST(req)));
+system.post('/desktop-env', mountJson((req) => desktopEnv.POST(req)));
+system.get('/local-storage/stats', mountJson(() => localStorageStats.GET()));
+system.post('/local-storage/clear-derived', mountJson((req) => localStorageStats.POST(req)));
+system.get('/depth-env', mountJson(() => depthEnv.GET()));
+system.post('/models/fetch', mountJson((req) => modelsFetch.POST(req)));
+system.post('/gateway-user', mountJson((req) => gatewayUser.POST(req)));
+system.post('/dev-log', mountJson((req) => devLog.POST(req)));
+system.post('/memory-cleanup', mountJson(() => memoryCleanup.POST()));
+system.get('/media-review', mountJson(() => mediaReview.GET()));
 
 export default system;

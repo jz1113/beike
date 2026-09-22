@@ -223,10 +223,10 @@ export default function GatewayModelModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-0 md:p-3 xl:p-4 animate-fade-in select-none font-sans">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-3 backdrop-blur-[2px] xl:p-4 animate-fade-in select-none font-sans">
       <div
         data-settings-modal
-        className={`${settingsModalShell} max-w-[min(92vw,900px)] bg-white shadow-2xl border border-slate-100 flex flex-col overflow-hidden`}
+        className={`${settingsModalShell} max-w-[min(92vw,900px)] bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] border border-slate-200/80 flex flex-col overflow-hidden`}
       >
         
         {/* 🌟 1. 顶部标题栏 */}

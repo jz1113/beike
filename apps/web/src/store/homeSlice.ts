@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { AppState, HomeSlice } from '@/types/store';
+import type { AppState, HomeSlice } from '@/store/types';
 
 export const createHomeSlice: StateCreator<AppState, [], [], HomeSlice> = (set) => ({
   quickGenMode: 'image',

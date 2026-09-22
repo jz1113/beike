@@ -1,9 +1,9 @@
 import React from 'react';
-import type { WorkshopTab } from '@/types/store';
+import type { WorkshopTab } from '@/store/types';
 import { 
   Sparkles, 
   Type, 
-  Camera, 
+  Camera,
   Package, 
   Settings2 
 } from 'lucide-react';
@@ -44,14 +44,14 @@ export function WorkshopSideCapsuleBar({
     },
     {
       id: 'recipes',
-      label: '类目拍摄架构',
-      desc: '珠宝/服饰/数码镜头模版',
+      label: '拍摄架构',
+      desc: '按行业品类管理拍摄架构',
       icon: Camera,
     },
     {
-      id: 'products',
-      label: '商品主体库',
-      desc: '已采编入库商品资产',
+      id: 'categories',
+      label: '商品类目',
+      desc: '一级品类与二级类目设置',
       icon: Package,
     },
   ];

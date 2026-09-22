@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { AppState, ViewSlice } from '@/types/store';
+import type { AppState, ViewSlice } from '@/store/types';
 
 export const createViewSlice: StateCreator<AppState, [], [], ViewSlice> = (set, get) => ({
   currentView: 'home',

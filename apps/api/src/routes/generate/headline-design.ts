@@ -1,4 +1,5 @@
 import { gatewayFetch } from '../../gateways/http';
+import { readJsonBody } from '../../core/validate';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { jsonResponse } from '../../core/http';
 import { parseJsonBody } from '../../core/validate';
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   try {
     let rawBody: unknown;
     try {
-      rawBody = await req.json();
+      rawBody = await readJsonBody(req);
     } catch {
       return jsonResponse({ success: false, error: '请求数据格式异常' }, 400);
     }

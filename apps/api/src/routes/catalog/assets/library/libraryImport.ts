@@ -1,4 +1,4 @@
-import { prisma } from '../../../../repositories/db';
+import { db } from '../../../../repositories/access';
 import { organizationData } from '@beike/server-kit/assetOrganization';
 import { randomUUID } from 'node:crypto';
 
@@ -12,14 +12,14 @@ export async function importLibraryBackup(body: Record<string, any>, _created: u
   const children = categories.filter((c: any) => c.parentId);
   for (const cat of [...parents, ...children]) {
     const parentId = cat.parentId ? categoryMap.get(cat.parentId) || null : null;
-    const row = await prisma.assetProductCategory.create({
+    const row = await db.assetProductCategory.create({
       data: { name: cat.name, parentId, position: Number(cat.position) || 0 },
     });
     if (typeof cat.id === 'string') categoryMap.set(cat.id, row.id);
   }
   for (const album of albums) {
     const productCategoryId = album.productCategoryId ? categoryMap.get(album.productCategoryId) || null : null;
-    const row = await prisma.promptAlbum.create({
+    const row = await db.promptAlbum.create({
       data: { name: album.name, sourceKey: randomUUID(), productCategoryId },
     });
     if (typeof album.id === 'string') albumMap.set(album.id, row.id);
@@ -42,5 +42,5 @@ export function remapItemData(data: Record<string, unknown>, maps: { categoryMap
 }
 
 export async function withOrganization(type: string, data: Record<string, unknown>) {
-  return { ...data, ...(await organizationData(prisma, type, data)) };
+  return { ...data, ...(await organizationData(db, type, data)) };
 }

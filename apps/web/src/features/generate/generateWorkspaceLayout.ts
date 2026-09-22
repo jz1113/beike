@@ -1,4 +1,4 @@
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { groupTasksIntoBatches as groupTasksCore } from '@/shared/utils/taskBatchGrouping';
 
 export type TimeFilter = 'all' | 'today' | '7days' | '30days' | '90days' | 'custom';

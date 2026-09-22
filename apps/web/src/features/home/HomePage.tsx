@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useAppStore } from '@/store';
 import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
 import { useQuickRefMediaDrop } from '@/shared/hooks/useQuickRefMediaDrop';
-import PromptActionBar from './components/prompt-bar/PromptActionBar';
+import PromptActionBar from '@/shared/prompt-bar';
 import FeatureCapsules from './components/FeatureCapsules';
 import InspirationFeed from './components/inspiration/InspirationFeed';
 import { type InspirationUseOptions } from './components/inspiration/InspirationModal';
@@ -10,6 +10,7 @@ import { type InspirationUseOptions } from './components/inspiration/Inspiration
 interface Props {
   onEnterWorkshop: () => void;
   onOpenHeadlinePoster: () => void;
+  onOpenKeywordReview: () => void;
   onOpenCollectorHub?: () => void;
   recentProjects?: ReactNode;
 }
@@ -17,6 +18,7 @@ interface Props {
 export default function HomePage({
   onEnterWorkshop,
   onOpenHeadlinePoster,
+  onOpenKeywordReview,
   onOpenCollectorHub,
   recentProjects,
 }: Props) {
@@ -116,6 +118,7 @@ export default function HomePage({
                 <FeatureCapsules
                   onEnterWorkshop={onEnterWorkshop}
                   onOpenHeadlinePoster={onOpenHeadlinePoster}
+                  onOpenKeywordReview={onOpenKeywordReview}
                   onOpenCollectorHub={onOpenCollectorHub}
                 />
               </div>

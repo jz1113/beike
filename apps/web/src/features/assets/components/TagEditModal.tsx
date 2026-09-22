@@ -245,33 +245,33 @@ export function TagEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+        className="w-full max-w-[680px] max-h-[90vh] overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] flex flex-col animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 顶栏：标题 + 资产代号 + 关闭按钮 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex shrink-0 items-center justify-between gap-5 px-5 pb-3 pt-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center justify-center font-bold">
-              <Tag className="w-4 h-4" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100">
+              <Tag className="h-3.5 w-3.5 text-rose-500" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-800">修改标签分类</h2>
+                <h2 className="text-sm font-black tracking-tight">修改标签分类</h2>
                 <span className="font-mono text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 font-semibold">
                   {assetCode}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 truncate max-w-sm mt-0.5">{assetTitle}</p>
+              <p className="mt-0.5 max-w-sm truncate text-[11px] text-slate-400">{assetTitle}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
             title="关闭 (Esc)"
           >
             <X className="w-4 h-4" />
@@ -279,7 +279,7 @@ export function TagEditModal({
         </div>
 
         {/* 实时卡片徽标预览条 */}
-        <div className="px-6 py-2.5 bg-slate-50/90 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between border-y border-slate-100 px-5 py-2.5 sm:px-6">
           <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-purple-600" />
             <span>卡片徽标预览:</span>
@@ -301,7 +301,7 @@ export function TagEditModal({
         </div>
 
         {/* 内容主体滚动区 */}
-        <div className="p-6 space-y-5 max-h-[68vh] overflow-y-auto">
+        <div className="max-h-[68vh] flex-1 space-y-5 overflow-y-auto px-5 py-4 sm:px-6">
           {activeSubTab === 'action' ? (
             <>
               {/* 1. 构图景别与姿态细分（统一使用精致 Segmented Radio Card） */}
@@ -400,12 +400,12 @@ export function TagEditModal({
         </div>
 
         {/* 底栏操作区 */}
-        <div className="flex items-center justify-end gap-2.5 px-6 py-3.5 border-t border-slate-100 bg-slate-50/70">
+        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3 sm:px-6">
           <button
             type="button"
             onClick={onClose}
             disabled={isUpdating}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200/70 transition-colors cursor-pointer"
+            className="rounded-xl px-3.5 py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-white hover:text-slate-800 cursor-pointer"
           >
             取消
           </button>
@@ -413,7 +413,7 @@ export function TagEditModal({
             type="button"
             onClick={handleConfirm}
             disabled={isUpdating}
-            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800 cursor-pointer disabled:opacity-50"
           >
             {isUpdating ? (
               <>
@@ -427,7 +427,7 @@ export function TagEditModal({
               </>
             )}
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

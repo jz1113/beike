@@ -43,6 +43,12 @@ for (const absolute of files) {
       const edge = `${from} -> ${to}`;
       if (from.startsWith('packages/domain/') && to.includes('server-kit')) added.push(edge);
       if (from.startsWith('apps/web/') && to.includes('server-kit')) added.push(edge);
+      if (
+        (from.startsWith('apps/api/src/routes/') || from.startsWith('apps/api/src/services/'))
+        && (to.endsWith('repositories/db.ts') || /packages\/server-kit\/.*prisma/.test(to))
+      ) {
+        added.push(`prisma-boundary ${from} -> ${to}`);
+      }
       const fromFeature = featureOf(absolute);
       const toFeature = featureOf(resolved);
       if (fromFeature && toFeature && fromFeature !== toFeature && !allowed.has(`${fromFeature}->${toFeature}`)) {

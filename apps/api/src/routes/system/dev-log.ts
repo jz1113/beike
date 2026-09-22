@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../core/http';
+import { readJsonBody, safeErrorMessage } from '../../core/validate';
 
 const isDevLogEnabled =
   process.env.NODE_ENV !== 'production' && process.env.DESKTOP_SHELL === '1';
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => null);
+    const body = await readJsonBody(req, null);
     if (!body || !Array.isArray(body.entries) || body.entries.length === 0) {
       return jsonResponse({ success: true });
     }
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
 
     return jsonResponse({ success: true });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'dev-log failed';
+    const msg = safeErrorMessage(err, 'dev-log failed');
     return jsonResponse({ success: false, error: msg }, 500);
   }
 }

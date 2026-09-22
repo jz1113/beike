@@ -1,5 +1,6 @@
 import { workshopWorkspaceSql } from './workshopWorkspace';
 import { workshopBatchesSql } from './workshopBatches';
+import { workshopPipelineAssetsSql } from './workshopPipelineAssets';
 import { promptImportSourceSql } from './promptImportSource';
 import { deconstructReviewSql } from './deconstructReview';
 import { organizationSql, applyAssetOrganization, previewAssetOrganization } from './assetOrganization';
@@ -193,6 +194,19 @@ export const desktopMigrations: readonly DatabaseMigration[] = [{
       await db.$executeRawUnsafe(statement);
     }
     await backfillLegacyContentGroups(db);
+  },
+}, {
+  version: '20260922_01_workshop_pipeline_assets',
+  checksum: createHash('sha256').update(workshopPipelineAssetsSql).digest('hex'),
+  apply: async db => {
+    for (const statement of workshopPipelineAssetsSql.split(';').map(s => s.trim()).filter(Boolean)) {
+      const alter = /^ALTER TABLE "(\w+)" ADD COLUMN "(\w+)"/.exec(statement);
+      if (alter) {
+        const columns = await db.$queryRawUnsafe<Column[]>(`PRAGMA table_info("${alter[1]}")`);
+        if (columns.some(column => column.name === alter[2])) continue;
+      }
+      await db.$executeRawUnsafe(statement);
+    }
   },
 }];
 

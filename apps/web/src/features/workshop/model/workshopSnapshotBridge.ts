@@ -1,0 +1,93 @@
+import { useCallback, useMemo } from 'react';
+import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
+import type { PreviousGroupSignature } from '@beike/domain/vision';
+import type { BatchProductItem, GenerationStrategy } from './batchTypes';
+import { useWorkshopBatchWorkspace } from '../hooks/useWorkshopBatchWorkspace';
+
+export interface WorkshopLiveState {
+  currentStage: number;
+  batchInputText: string;
+  items: BatchProductItem[];
+  selectedVisionModel: string;
+  selectedImageGenModel: string;
+  selectedArchId: string;
+  selectedQuality: 'high' | 'medium' | 'low';
+  selectedAspect: '3:4' | '1:1' | '9:16' | '16:9';
+  selectedShotCount: number;
+  useAssetLibrary: boolean;
+  lockedPersonaId: string;
+  lockedSceneId: string;
+  lockedOutfitId: string;
+  lockedActionId: string;
+  lockedFullPromptId?: string;
+  generationStrategy: GenerationStrategy;
+  autoGenerateCopywriting: boolean;
+  personaMode?: 'asset_driven' | 'none';
+  pipelineStatus?: string;
+  planRevision?: number;
+  storyboardRevision?: number;
+  pausedFrom?: string;
+  diversityContext?: {
+    groupSignatures: PreviousGroupSignature[];
+    actionIds: string[];
+    sceneIds: string[];
+  };
+}
+
+export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
+  const pipelineStatus = (state.pipelineStatus || 'draft') as WorkshopSnapshot['pipeline']['status'];
+  return {
+    version: 2,
+    mode: 'original',
+    currentStage: Math.min(4, Math.max(1, state.currentStage)),
+    batchInputText: state.batchInputText,
+    items: state.items as WorkshopSnapshot['items'],
+    settings: {
+      selectedVisionModel: state.selectedVisionModel,
+      selectedImageGenModel: state.selectedImageGenModel,
+      selectedArchId: state.selectedArchId,
+      hasHumanPersona: true,
+      personaMode: state.personaMode || 'asset_driven',
+      selectedQuality: state.selectedQuality,
+      selectedAspect: state.selectedAspect,
+      selectedShotCount: state.selectedShotCount,
+      useAssetLibrary: state.useAssetLibrary,
+      lockedPersonaId: state.lockedPersonaId || 'auto',
+      lockedSceneId: state.lockedSceneId || 'auto',
+      lockedOutfitId: state.lockedOutfitId || 'auto',
+      lockedActionId: state.lockedActionId || 'auto',
+      lockedFullPromptId: state.lockedFullPromptId || 'auto',
+      generationStrategy: state.generationStrategy,
+      autoGenerateCopywriting: state.autoGenerateCopywriting,
+    },
+    pipeline: {
+      status: pipelineStatus,
+      pausedFrom: state.pausedFrom as WorkshopSnapshot['pipeline']['pausedFrom'],
+      planRevision: state.planRevision || 0,
+      storyboardRevision: state.storyboardRevision || 0,
+      diversityContext: {
+        groupSignatures: state.diversityContext?.groupSignatures || [],
+        actionIds: state.diversityContext?.actionIds || [],
+        sceneIds: state.diversityContext?.sceneIds || [],
+      },
+      runs: [],
+    },
+  };
+}
+
+export function useLiveWorkshopWorkspace(
+  state: WorkshopLiveState,
+  apply: (snapshot: WorkshopSnapshot) => void,
+) {
+  const snapshot = useMemo(() => toWorkshopSnapshot(state), [
+    state.currentStage, state.batchInputText, state.items,
+    state.selectedVisionModel, state.selectedImageGenModel, state.selectedArchId,
+    state.selectedQuality, state.selectedAspect, state.selectedShotCount,
+    state.useAssetLibrary, state.lockedPersonaId, state.lockedSceneId, state.lockedOutfitId,
+    state.lockedActionId, state.lockedFullPromptId, state.generationStrategy, state.autoGenerateCopywriting,
+    state.personaMode, state.pipelineStatus, state.planRevision, state.storyboardRevision,
+    state.pausedFrom, state.diversityContext,
+  ]);
+  const restore = useCallback((value: WorkshopSnapshot) => { apply(value); }, [apply]);
+  return useWorkshopBatchWorkspace(snapshot, restore);
+}

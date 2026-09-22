@@ -20,7 +20,7 @@ import {
   extractWorkshopModeSession,
   hydrateWorkshopSessionFromDraft,
 } from './workshopSession';
-import type { AppState } from '@/types/store';
+import type { AppState } from '@/store/types';
 
 if (typeof window !== 'undefined') {
   loadGenerationTombstones();
@@ -115,7 +115,7 @@ export type {
   ProductWidgetData,
   AssistantMessage,
   AssistantSession,
-} from '@/types/store';
+} from '@/store/types';
 
 export {
   sanitizeAssistantSessions,

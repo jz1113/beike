@@ -1,6 +1,6 @@
 import { Image as ImageIcon, MousePointer2, Sparkles, Upload, Video as VideoIcon } from 'lucide-react';
 import { CanvasNodeMenu, type CanvasQuickNodeType } from './CanvasNodeMenu';
-import CanvasDotGrid from './CanvasDotGrid';
+import { DotGrid } from '@/shared/media/DotGrid';
 import { CanvasConnections } from './CanvasConnections';
 import { CanvasStageNode } from './CanvasStageNode';
 import { CanvasLayersPanel } from './CanvasLayersPanel';
@@ -80,7 +80,8 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
         }`}
       >
         {/* 🌟 动态点阵背景 (参考图 2 主页水波光影流动与鼠标交互质感，与画布坐标绝对锚定) */}
-        <CanvasDotGrid
+        <DotGrid
+          variant="canvas"
           pan={pan}
           zoom={zoom}
           isPanning={isPanning}

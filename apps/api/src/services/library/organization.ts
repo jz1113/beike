@@ -1,17 +1,17 @@
-import { prisma } from '../../repositories/db';
+import { db } from '../../repositories/access';
 import { assetModels, organizationData, validateProductIds } from '@beike/server-kit/assetOrganization';
 import { jsonResponse } from '../../core/http';
 
 export async function readOrganization() {
   const [categories, albums] = await Promise.all([
-    prisma.assetProductCategory.findMany({ orderBy: [{ position: 'asc' }, { id: 'asc' }] }),
-    prisma.promptAlbum.findMany({ orderBy: { createdAt: 'desc' } }),
+    db.assetProductCategory.findMany({ orderBy: [{ position: 'asc' }, { id: 'asc' }] }),
+    db.promptAlbum.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
   return jsonResponse({ success: true, categories, albums });
 }
 export async function mutateOrganization(body: Record<string, any>) {
   try {
-    await prisma.$transaction(async tx => {
+    await db.$transaction(async tx => {
       if (body.action === 'save-product-category') {
         const name = typeof body.name === 'string' ? body.name.trim() : '';
         if (!name || name.length > 40) throw new Error('品类名称需为 1–40 个字');

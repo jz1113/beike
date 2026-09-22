@@ -2,7 +2,7 @@ import type {
   AssistantMessage,
   AssistantSession,
   MediaAttachment,
-} from '@/types/app-store';
+} from '@/store/appStoreTypes';
 import { putAssistantSessionsRemote } from '@/features/assistant/api/sessions';
 import { isProjectAutosaveEnabled } from '@/shared/utils/localStoragePrefs';
 

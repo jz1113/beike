@@ -2,7 +2,7 @@ import { AssistantImageBatch } from './AssistantBatchPanel';
 import React, { useState } from 'react';
 import { Copy, Check, Zap } from 'lucide-react';
 import { useAppStore } from '@/store';
-import type { MediaAttachment } from '@/types/app-store';
+import type { MediaAttachment } from '@/store/appStoreTypes';
 import { prepareAssistantImagePrompt } from '../utils/assistantPromptReferences';
 
 interface Props {

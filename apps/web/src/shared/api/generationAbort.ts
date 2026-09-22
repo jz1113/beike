@@ -17,11 +17,21 @@ export function isGenerationCancelled(error: unknown, signal?: AbortSignal): boo
   return error instanceof Error && error.message === GENERATION_CANCELLED_MESSAGE;
 }
 
-export async function sleepWhilePolling(ms: number, isAborted: () => boolean): Promise<void> {
+export async function sleepWhilePolling(
+  ms: number,
+  isAborted: () => boolean,
+  isPaused?: () => boolean,
+): Promise<void> {
   const step = 200;
   let elapsed = 0;
   while (elapsed < ms) {
     throwIfGenerationAborted(isAborted);
+    while (isPaused?.()) {
+      throwIfGenerationAborted(isAborted);
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, step);
+      });
+    }
     const chunk = Math.min(step, ms - elapsed);
     await new Promise<void>((resolve) => {
       setTimeout(resolve, chunk);
@@ -29,4 +39,13 @@ export async function sleepWhilePolling(ms: number, isAborted: () => boolean): P
     elapsed += chunk;
   }
   throwIfGenerationAborted(isAborted);
+}
+
+export async function waitWhilePaused(isPaused: () => boolean, isAborted: () => boolean): Promise<void> {
+  while (isPaused()) {
+    throwIfGenerationAborted(isAborted);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 200);
+    });
+  }
 }

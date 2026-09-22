@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../core/http';
-import { prisma } from '../../repositories/db';
+import { readJsonBody } from '../../core/validate';
+import { db } from '../../repositories/access';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 // 获取已保存的自定义风格配方列表（分页）
@@ -16,8 +17,8 @@ export async function GET(req: Request) {
     }
 
     const [total, recipes] = await Promise.all([
-      prisma.styleRecipe.count({ where }),
-      prisma.styleRecipe.findMany({
+      db.styleRecipe.count({ where }),
+      db.styleRecipe.findMany({
         where,
         orderBy: [
           { isFavorite: 'desc' },
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
       return jsonResponse({ success: true, message: '官方预置品类拍摄大架构已全面更新至 V6.0 资产库联动版' });
     }
 
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const {
       name,
       category = 'general',
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
       return jsonResponse({ error: '缺少风格名称或提示词配方内容' }, 400);
     }
 
-    const recipe = await prisma.styleRecipe.create({
+    const recipe = await db.styleRecipe.create({
       data: {
         name,
         category,
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
 // 修改风格配方 (重命名、调整类目、置顶收藏、微调提示词)
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJsonBody(req);
     const { id, name, category, tag, desc, promptSnippet, isFavorite, coverUrl } = body;
 
     if (!id) {
@@ -121,7 +122,7 @@ export async function PUT(req: Request) {
     if (isFavorite !== undefined) dataToUpdate.isFavorite = isFavorite;
     if (coverUrl !== undefined) dataToUpdate.coverUrl = coverUrl;
 
-    const updated = await prisma.styleRecipe.update({
+    const updated = await db.styleRecipe.update({
       where: { id },
       data: dataToUpdate
     });
@@ -143,7 +144,7 @@ export async function DELETE(req: Request) {
       return jsonResponse({ error: '缺少 id 参数' }, 400);
     }
 
-    await prisma.styleRecipe.delete({
+    await db.styleRecipe.delete({
       where: { id }
     });
 

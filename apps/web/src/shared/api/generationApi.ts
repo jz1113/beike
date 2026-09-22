@@ -1,7 +1,7 @@
 import { apiFetch } from '@/shared/api/apiClient';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/shared/api/gatewayClient';
 import { AssetTasksListResponseSchema } from '@beike/contracts/generate';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import { mapDbTaskToGenerationTask } from '@/shared/api/mapDbTask';
 import { compressImageToDataUrl } from '@/shared/media/image-utils';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
@@ -60,7 +60,8 @@ export async function compressProductImageIfNeeded(img: string): Promise<string>
 
 export async function pollSingleTask(
   taskId: string,
-  isAborted: () => boolean
+  isAborted: () => boolean,
+  isPaused?: () => boolean,
 ): Promise<string> {
   const timeoutMs = 360000;
   const start = Date.now();
@@ -69,7 +70,7 @@ export async function pollSingleTask(
 
   while (Date.now() - start < timeoutMs) {
     throwIfGenerationAborted(isAborted);
-    await sleepWhilePolling(2000, isAborted);
+    await sleepWhilePolling(2000, isAborted, isPaused);
     try {
       const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}`, {
         headers: {
@@ -105,6 +106,8 @@ export async function pollSingleTask(
 
 export interface SubmitImageGenTaskDeps {
   isAborted: () => boolean;
+  isPaused?: () => boolean;
+  idempotencyKey?: string;
 }
 
 const LOCAL_API_RETRY_DELAYS_MS = [800, 1600, 2600] as const;
@@ -133,6 +136,7 @@ export async function submitImageGenTask(
     headers: {
       'Content-Type': 'application/json',
       ...getGatewayClientHeaders(),
+      ...(deps.idempotencyKey ? { 'x-idempotency-key': deps.idempotencyKey } : {}),
     },
     body: JSON.stringify(finalPayload),
   });
@@ -141,7 +145,7 @@ export async function submitImageGenTask(
   for (const delayMs of LOCAL_API_RETRY_DELAYS_MS) {
     throwIfGenerationAborted(deps.isAborted);
     if (!(await isLocalApiUnavailable(res))) break;
-    await sleepWhilePolling(delayMs, deps.isAborted);
+    await sleepWhilePolling(delayMs, deps.isAborted, deps.isPaused);
     res = await submit();
   }
 
@@ -173,7 +177,7 @@ export async function submitImageGenTask(
 
   if (data.taskId) {
     throwIfGenerationAborted(deps.isAborted);
-    return await pollSingleTask(data.taskId, deps.isAborted);
+    return await pollSingleTask(data.taskId, deps.isAborted, deps.isPaused);
   }
 
   throw nonRetryableError(

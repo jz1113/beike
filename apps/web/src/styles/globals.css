@@ -120,6 +120,33 @@ select {
   font: inherit;
 }
 
+/* 独立的多行文本输入/输出区：统一为轻量虚线卡片。聊天编辑器、画布便签等专属组件不使用此类。 */
+.soft-textarea {
+  border: 2px dashed rgb(203 213 225 / 0.95);
+  border-radius: 1.5rem;
+  background-color: rgb(255 255 255 / 0.72);
+  box-shadow: none;
+  outline: none;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.soft-textarea:hover {
+  border-color: rgb(147 197 253 / 0.9);
+  background-color: rgb(255 255 255 / 0.9);
+}
+
+.soft-textarea:focus {
+  border-color: rgb(96 165 250 / 0.95);
+  background-color: rgb(255 255 255 / 0.96);
+  box-shadow: none;
+  outline: none;
+}
+
+.soft-textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 /* 禁用浏览器默认的图片拖拽幽灵（Logo / 图标 / UI 配图） */
 img {
   -webkit-user-drag: none;

@@ -1,5 +1,6 @@
 export type CredentialKey =
   | 'ai_api_key'
+  | 'deepseek_api_key'
   | 'image_api_key'
   | 'wanbang_api_key'
   | 'wanbang_api_secret'
@@ -13,6 +14,7 @@ export type CredentialKey =
 
 const LEGACY_LOCAL_KEYS: Record<CredentialKey, string> = {
   ai_api_key: 'ai_api_key',
+  deepseek_api_key: 'deepseek_api_key',
   image_api_key: 'image_api_key',
   wanbang_api_key: 'wanbang_api_key',
   wanbang_api_secret: 'wanbang_api_secret',

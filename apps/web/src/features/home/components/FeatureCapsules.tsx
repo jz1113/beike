@@ -1,15 +1,17 @@
 import workshopBackground from '@/assets/home/tool-workshop-background.jpg';
 import headlineBackground from '@/assets/home/tool-headline-background.jpg';
 import collectorBackground from '@/assets/home/tool-collector-background.jpg';
+import keywordReviewBackground from '@/assets/home/tool-keyword-review-background.jpg';
 import TiltedCard from '@/shared/ui/TiltedCard';
 
 interface Props {
   onEnterWorkshop: () => void;
   onOpenHeadlinePoster: () => void;
+  onOpenKeywordReview: () => void;
   onOpenCollectorHub?: () => void;
 }
 
-type VisualKind = 'workshop' | 'headline' | 'collector';
+type VisualKind = 'workshop' | 'headline' | 'collector' | 'keyword';
 
 type ToolCard = {
   id: string;
@@ -19,6 +21,7 @@ type ToolCard = {
   actionLabel: string;
   tone: string;
   titleClass: string;
+  titleSizeClass?: string;
   displayClass: string;
   subtitleClass: string;
   contentWidth: string;
@@ -30,6 +33,7 @@ const toolBackgrounds: Record<VisualKind, string> = {
   workshop: workshopBackground,
   headline: headlineBackground,
   collector: collectorBackground,
+  keyword: keywordReviewBackground,
 };
 
 /**
@@ -39,6 +43,7 @@ const toolBackgrounds: Record<VisualKind, string> = {
 export default function FeatureCapsules({
   onEnterWorkshop,
   onOpenHeadlinePoster,
+  onOpenKeywordReview,
   onOpenCollectorHub,
 }: Props) {
   const capsules: ToolCard[] = [
@@ -51,6 +56,10 @@ export default function FeatureCapsules({
       tone: 'from-[#06120f]/96 via-[#0d2922]/78 to-transparent', titleClass: 'font-bold tracking-[0.06em] text-[#fffaf0]', displayClass: 'text-[#f5e4be]', subtitleClass: 'text-[#eef7e8]/72', contentWidth: 'max-w-[65%]', visual: 'workshop', action: onEnterWorkshop,
     },
     {
+      id: 'keyword_review', title: '关键词分类及制作判断', displayName: 'SEMANTIC REVIEW', subtitle: '批量语义分类，审核内容是否值得制作', actionLabel: '导入表格',
+      tone: 'from-[#241309]/98 via-[#5f3414]/88 to-[#091d24]/20', titleClass: 'font-black tracking-[-0.025em] text-[#fffaf0]', titleSizeClass: 'text-[15px] sm:text-[16px] 2xl:text-[18px]', displayClass: 'text-[#ffc66d]', subtitleClass: 'text-[#fff4db]/72', contentWidth: 'max-w-[96%]', visual: 'keyword', action: onOpenKeywordReview,
+    },
+    {
       id: 'collector_hub', title: '全渠道智能采集', displayName: 'ASSET INTELLIGENCE', subtitle: '聚合商品与社媒内容，沉淀可用素材库', actionLabel: '浏览素材',
       tone: 'from-[#062029]/98 via-[#0d3a46]/84 to-transparent', titleClass: 'font-bold tracking-[0.015em] text-[#f2fffa]', displayClass: 'text-[#bce9db]', subtitleClass: 'text-[#d7f2ea]/70', contentWidth: 'max-w-[68%]', visual: 'collector', action: onOpenCollectorHub || (() => {}),
     },
@@ -58,7 +67,7 @@ export default function FeatureCapsules({
 
   return (
     <section aria-label="创作工具" className="relative z-10">
-      <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {capsules.map((item) => (
           <button key={item.id} type="button" onClick={item.action} className="group isolate block aspect-video min-w-0 w-full appearance-none border-0 bg-transparent p-0 text-left shadow-none outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2" aria-label={`${item.title}：${item.actionLabel}`}>
             <TiltedCard
@@ -79,7 +88,7 @@ export default function FeatureCapsules({
                   <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.13)_0%,transparent_34%,rgba(255,255,255,0.04)_68%,transparent_100%)]" />
                   <div className="relative flex h-full flex-col justify-end p-4 sm:p-5 lg:p-6">
                     <div className={item.contentWidth}>
-                      <h3 className={`text-[18px] leading-tight drop-shadow-sm sm:text-[19px] 2xl:text-[21px] ${item.titleClass}`}>{item.title}</h3>
+                      <h3 className={`${item.titleSizeClass || 'text-[18px] sm:text-[19px] 2xl:text-[21px]'} leading-tight drop-shadow-sm ${item.titleClass}`}>{item.title}</h3>
                       <p className={`mt-0.5 font-serif text-[18px] font-semibold italic leading-tight tracking-[-0.035em] sm:text-[19px] 2xl:text-[21px] ${item.displayClass}`}>{item.displayName}</p>
                       <p className={`mt-1.5 line-clamp-1 text-[11px] leading-relaxed sm:text-[12px] ${item.subtitleClass}`}>{item.subtitle}</p>
                     </div>

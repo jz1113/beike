@@ -3,9 +3,9 @@ import { buildLightingDerivedNode, buildMultiAngleDerivedNode } from '../utils/c
 import { isVideoMediaUrl } from '@/shared/media/mediaHelper';
 import { type CanvasQuickNodeType } from '../components/CanvasNodeMenu';
 import { type LightingParams } from '../components/CanvasLightingModal';
-import { type MultiAngleParams } from '../components/CanvasMultiAngleModal';
+import { type MultiAngleParams } from '@/shared/modals/multiAngle';
 import type { CanvasNode, CanvasProject, CanvasSubject } from '../types';
-import type { GenerationTask } from '@/types/app-store';
+import type { GenerationTask } from '@/store/appStoreTypes';
 import type { useCanvasStore } from '../store/useCanvasStore';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent, type RefObject } from 'react';
 

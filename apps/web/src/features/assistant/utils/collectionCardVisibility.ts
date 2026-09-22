@@ -1,4 +1,4 @@
-import type { AssistantMessage } from '@/types/app-store';
+import type { AssistantMessage } from '@/store/appStoreTypes';
 
 /** Presentation-only deduplication: keep original messages and reference numbering intact. */
 export function duplicateCollectionCards(messages: AssistantMessage[]): Set<string> {

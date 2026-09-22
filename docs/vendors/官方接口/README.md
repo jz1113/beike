@@ -6,6 +6,8 @@
 - `aggregator/` — 每个批准模型一份聚合入口
 - `vendor/` — 各厂商官网文档入口（链接索引）
 
+DeepSeek 官方接口的项目接入摘要见 [vendor/deepseek/README.md](vendor/deepseek/README.md)。该文档尚不代表其中所有远端模型已进入项目批准模型目录。
+
 文档映射配置：[`tools/configs/vendor-docs.map.json`](../../../tools/configs/vendor-docs.map.json)。
 
 运行时约定：
@@ -81,5 +83,5 @@ docs/vendors/官方接口/
   README.md
   aggregator/   # 每模型一份索引
   vendor/       # 厂商官网链接
+    deepseek/   # DeepSeek 官方 API 接入参考
 ```
-

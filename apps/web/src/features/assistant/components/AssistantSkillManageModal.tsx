@@ -81,8 +81,8 @@ export default function AssistantSkillManageModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in select-none">
-      <div className="w-full max-w-2xl bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col text-slate-800">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-fade-in select-none">
+      <div className="flex max-h-[90vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)]">
         {/* ================= 视图 2：技能详情视图 ================= */}
         {selectedSkill ? (
           <div className="flex flex-col flex-1 min-h-0">

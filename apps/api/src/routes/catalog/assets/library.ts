@@ -6,7 +6,7 @@ import {
   executeLibraryPut,
   executeLibraryDeleteByIds,
 } from './library/libraryMutations';
-import { purgeSeedAssets, clearAllAssets } from './library/libraryMaintenance';
+import { purgeSeedAssets, clearAllAssets, clearLocalDatabase } from './library/libraryMaintenance';
 import { executeLibraryDeduplication } from './library/libraryDeduplicate';
 import { mutateOrganization } from '../../../services/library/organization';
 
@@ -74,7 +74,19 @@ export async function DELETE(req: Request) {
     // 🌟 一键清空指定类型资产
     if (action === 'clear-all') {
       const targetType = searchParams.get('type') || 'all';
+      // Backward compatibility for an already-open, pre-update web page.
+      // Its "clear all" request must receive the same full-reset guarantee
+      // as the new explicit `clear-database` action.
+      if (targetType === 'all') {
+        return await clearLocalDatabase();
+      }
       return await clearAllAssets(targetType);
+    }
+
+    // Explicit, destructive local-database reset. The UI requires a separate
+    // confirmation and this also suppresses automatic official-seed recovery.
+    if (action === 'clear-database') {
+      return await clearLocalDatabase();
     }
 
     const idsToDelete = idsParam ? idsParam.split(',').filter(Boolean) : id ? [id] : [];

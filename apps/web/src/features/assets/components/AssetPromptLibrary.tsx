@@ -20,6 +20,9 @@ import { getAssetPreviewText as getAssetPreviewTextHelper } from '../utils/asset
 import { AssetEditModal } from './AssetEditModal';
 import { AssetDetailModal } from './AssetDetailModal';
 import { AssetPromptSpecModal } from './AssetPromptSpecModal';
+import { CategoryMigrationPanel } from './CategoryMigrationPanel';
+import { AssetLifecycleFilter } from './AssetLifecycleFilter';
+import { promptLibraryEmptyCopy } from '../utils/promptLibraryEmptyCopy';
 
 interface Props {
   toolbarTarget?: HTMLElement | null;
@@ -86,6 +89,8 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
     availableAnchors,
     sortBy,
     setSortBy,
+    lifecycleFilter,
+    setLifecycleFilter,
     dynamicTagList,
     isAnyFilterActive,
     displayedItems,
@@ -251,12 +256,16 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
 
       {/* 🌟 3. 资产卡片瀑布流区域 */}
       <div ref={assetScrollRef} data-asset-scroll className="flex-1 min-h-0 bg-transparent overflow-y-auto px-5 sm:px-7 xl:px-8 py-6">
+        <CategoryMigrationPanel />
+        <div className="mb-3">
+          <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} />
+        </div>
         {displayedItems.length > 0 ? (
           <VirtualAssetGrid
             items={displayedItems}
             scrollRef={assetScrollRef}
             openItemId={openCardMenuId}
-            resetKey={JSON.stringify([activeSubTab, searchKeyword, onlyFavorite, selectedTag, actionCategory, actionSubCategory, actionShotScale, actionAnchor, sortBy])}
+            resetKey={JSON.stringify([activeSubTab, searchKeyword, onlyFavorite, selectedTag, actionCategory, actionSubCategory, actionShotScale, actionAnchor, sortBy, lifecycleFilter])}
             renderItem={(item) => {
               const isSelected = selectedIds.includes(item.id);
               return (
@@ -326,12 +335,8 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
         ) : (
           <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
             <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-sm font-bold text-slate-700">暂无相关提示词资产</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              {searchKeyword || onlyFavorite || selectedTag
-                ? '未找到匹配的资产，请尝试清空筛选条件'
-                : '通过上方「批量图集反推」或「小红书一键采编」快速扩充你的爆款资产库'}
-            </p>
+            <h3 className="text-sm font-bold text-slate-700">{promptLibraryEmptyCopy(activeSubTab, Boolean(searchKeyword || onlyFavorite || selectedTag)).title}</h3>
+            <p className="text-xs text-slate-400 mt-1">{promptLibraryEmptyCopy(activeSubTab, Boolean(searchKeyword || onlyFavorite || selectedTag)).body}</p>
           </div>
         )}
       </div>

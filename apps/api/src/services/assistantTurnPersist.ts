@@ -7,7 +7,7 @@
  * - Snapshot 立即同步
  */
 
-import { prisma } from '@beike/server-kit/prisma';
+import { db } from '../repositories/access';
 import type { AgentRuntime } from '@beike/server-kit/assistant/agentRuntime';
 import type { AssistantItem } from '@beike/domain/assistant/types';
 import { fromAssistantTurnStatus } from '@beike/domain/taskStatus';
@@ -91,7 +91,7 @@ export function extractItemFields(item: AssistantItem): {
 
 /** 创建或更新 Turn 记录 */
 export async function upsertTurn(turnId: string, threadId: string, model?: string): Promise<void> {
-  await prisma.assistantTurn.upsert({
+  await db.assistantTurn.upsert({
     where: { id: turnId },
     create: {
       id: turnId,
@@ -124,7 +124,7 @@ export async function updateTurnStatus(
     update.usageOutputTokens = usage.outputTokens;
   }
 
-  await prisma.assistantTurn.update({
+  await db.assistantTurn.update({
     where: { id: turnId },
     data: update,
   });
@@ -134,7 +134,7 @@ export async function updateTurnStatus(
 export async function upsertItem(turnId: string, item: AssistantItem): Promise<void> {
   const fields = extractItemFields(item);
 
-  await prisma.assistantTurnItem.upsert({
+  await db.assistantTurnItem.upsert({
     where: { id: item.id },
     create: {
       id: item.id,
@@ -172,10 +172,10 @@ export async function upsertItem(turnId: string, item: AssistantItem): Promise<v
 export async function upsertItems(turnId: string, items: AssistantItem[]): Promise<void> {
   if (items.length === 0) return;
 
-  await prisma.$transaction(
+  await db.$transaction(
     items.map((item) => {
       const fields = extractItemFields(item);
-      return prisma.assistantTurnItem.upsert({
+      return db.assistantTurnItem.upsert({
         where: { id: item.id },
         create: {
           id: item.id,
@@ -213,7 +213,7 @@ export async function upsertItems(turnId: string, items: AssistantItem[]): Promi
 
 /** 立即同步 snapshot */
 export async function syncSnapshot(turnId: string, snapshot: unknown): Promise<void> {
-  await prisma.assistantTurn.update({
+  await db.assistantTurn.update({
     where: { id: turnId },
     data: {
       snapshotJson: JSON.stringify(snapshot),
@@ -226,7 +226,7 @@ export async function syncRuntimeToDb(runtime: AgentRuntime, turnId: string): Pr
   const snapshot = runtime.snapshot();
 
   // Update turn status and snapshot
-  await prisma.assistantTurn.update({
+  await db.assistantTurn.update({
     where: { id: turnId },
     data: {
       status: snapshot.status,

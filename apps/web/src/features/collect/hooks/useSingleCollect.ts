@@ -22,7 +22,6 @@ export function useSingleCollect({
   const [selectedSingleImages, setSelectedSingleImages] = useState<string[]>([]);
   const [selectedVideo, setSelectedVideo] = useState(false);
   const [singleImageFilter, setSingleImageFilter] = useState<'all' | 'main' | 'sku' | 'desc' | 'video'>('all');
-  const [forceRefresh, setForceRefresh] = useState(false);
   const [aiAssistantPrompt, setAiAssistantPrompt] = useState('');
   const socialRateLimiterRef = useRef(new RateLimiter(8.5));
 
@@ -94,7 +93,6 @@ export function useSingleCollect({
           body: JSON.stringify({
             url: query,
             platform: platform,
-            forceRefresh: forceRefresh,
           }),
         });
 
@@ -153,8 +151,6 @@ export function useSingleCollect({
     setSelectedVideo,
     singleImageFilter,
     setSingleImageFilter,
-    forceRefresh,
-    setForceRefresh,
     aiAssistantPrompt,
     setAiAssistantPrompt,
     handleSingleCollect,
