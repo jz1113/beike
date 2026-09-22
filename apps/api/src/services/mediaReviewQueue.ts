@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { getWorkspaceId, requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 
 export const MEDIA_REVIEW_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -11,8 +12,12 @@ export type MediaReviewRecord = {
   queuedAt: string;
 };
 
-function reviewDir(): string {
+function reviewRoot(): string {
   return path.join(process.env.AZHUO_DATA_DIR || path.resolve('.local'), 'media-review');
+}
+
+function reviewDir(): string {
+  return path.join(reviewRoot(), requireWorkspaceId());
 }
 
 /** Legacy canvas references are client-side: absence from SQL is not proof of non-use. */
@@ -48,22 +53,33 @@ export async function listMediaReviews(): Promise<MediaReviewRecord[]> {
   return items.sort((a, b) => String(a.queuedAt).localeCompare(String(b.queuedAt)));
 }
 
+async function reviewDirs(): Promise<string[]> {
+  const current = getWorkspaceId();
+  if (current) return [path.join(reviewRoot(), current)];
+  const root = reviewRoot();
+  const names = await fs.readdir(root).catch(() => [] as string[]);
+  const dirs = [root];
+  for (const name of names) dirs.push(path.join(root, name));
+  return dirs;
+}
+
 export async function purgeExpiredMediaReviews(now = Date.now()): Promise<number> {
-  const dir = reviewDir();
-  const names = await fs.readdir(dir).catch(() => [] as string[]);
   let purged = 0;
-  for (const name of names) {
-    if (!name.endsWith('.json')) continue;
-    const file = path.join(dir, name);
-    try {
-      const raw = JSON.parse(await fs.readFile(file, 'utf8')) as MediaReviewRecord;
-      const queuedAt = Date.parse(raw.queuedAt);
-      if (!Number.isFinite(queuedAt) || now - queuedAt >= MEDIA_REVIEW_TTL_MS) {
-        await fs.unlink(file);
-        purged += 1;
+  for (const dir of await reviewDirs()) {
+    const names = await fs.readdir(dir).catch(() => [] as string[]);
+    for (const name of names) {
+      if (!name.endsWith('.json')) continue;
+      const file = path.join(dir, name);
+      try {
+        const raw = JSON.parse(await fs.readFile(file, 'utf8')) as MediaReviewRecord;
+        const queuedAt = Date.parse(raw.queuedAt);
+        if (!Number.isFinite(queuedAt) || now - queuedAt >= MEDIA_REVIEW_TTL_MS) {
+          await fs.unlink(file);
+          purged += 1;
+        }
+      } catch {
+        /* ignore unreadable review files */
       }
-    } catch {
-      /* ignore unreadable review files */
     }
   }
   return purged;

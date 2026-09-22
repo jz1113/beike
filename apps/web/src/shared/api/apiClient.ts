@@ -1,6 +1,7 @@
 
 import { getGatewayClientHeaders } from '@/shared/api/gatewayClient';
 import { getClientAccessToken, syncAppTokenCookie } from '@/shared/api/apiToken';
+import { getWorkspaceSecret, syncWorkspaceCookie } from '@/shared/api/workspaceClient';
 import { getApiBase, isTauriDesktop, resolveApiUrl } from '@/shared/desktop/desktopRuntime';
 import { invokeTauriApi } from '@/shared/desktop/tauriApi';
 
@@ -31,6 +32,7 @@ export function proxyMediaUrl(
     return rawUrl;
   }
   syncAppTokenCookie();
+  syncWorkspaceCookie();
   const videoFlag = opts?.asVideo ? '&as=video' : '';
   const thumbFlag = opts?.thumb ? '&thumb=1' : '';
   const widthFlag = opts?.width ? `&w=${opts.width}` : '';
@@ -45,6 +47,10 @@ export function apiHeaders(extra?: HeadersInit): Headers {
   if (!headers.has('x-app-token')) {
     headers.set('x-app-token', getClientAccessToken());
   }
+  if (!headers.has('x-workspace-token')) {
+    const workspace = getWorkspaceSecret();
+    if (workspace) headers.set('x-workspace-token', workspace);
+  }
   const storage = getGatewayClientHeaders();
   Object.entries(storage).forEach(([k, v]) => {
     if (!headers.has(k)) headers.set(k, v);
@@ -55,6 +61,7 @@ export function apiHeaders(extra?: HeadersInit): Headers {
 /** 统一带鉴权的 fetch（桌面优先直连 sidecar HTTP，否则 Tauri invoke / 浏览器 fetch） */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   syncAppTokenCookie();
+  syncWorkspaceCookie();
 
   if (isTauriDesktop()) {
     const base = getApiBase();

@@ -10,6 +10,7 @@ datasource db {
 // 采集的商品记录
 model Product {
   id          String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   platform    String   // jd, taobao, external
   itemId      String?  // num_iid 或分享链接
   title       String?
@@ -20,7 +21,8 @@ model Product {
   // 关联的生图任务
   tasks       ImageTask[]
 
-  @@unique([platform, itemId])
+  @@unique([workspaceId, platform, itemId])
+  @@index([workspaceId])
   @@index([itemId])
   @@index([createdAt])
 }
@@ -28,6 +30,7 @@ model Product {
 // 生图任务记录
 model ImageTask {
   id          String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   
   // 关联商品（可选，也可能直接填提示词生成）
   productId   String?
@@ -37,7 +40,7 @@ model ImageTask {
   prompt      String
   
   // 第三方任务追踪
-  taskId      String?  @unique // 第三方平台返回的 async task_id
+  taskId      String?  // 第三方平台返回的 async task_id
   status      String   @default("PENDING") // PENDING, IN_PROGRESS, SUCCESS, FAILURE
   resultUrl   String?  // 成功生成的图片地址
   failReason  String?
@@ -52,6 +55,8 @@ model ImageTask {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([workspaceId, taskId])
+  @@index([workspaceId])
   @@index([status, createdAt])
   @@index([status])
   @@index([productId])
@@ -63,6 +68,7 @@ model ImageTask {
 // 提示词生成历史记录
 model PromptRecord {
   id                 String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   productId          String?
   productTitle       String?
   productFingerprint String?
@@ -71,6 +77,7 @@ model PromptRecord {
   promptsJson        String   // 存储生成的分镜 JSON 数组
   createdAt          DateTime @default(now())
 
+  @@index([workspaceId])
   @@index([productId])
   @@index([createdAt])
 }
@@ -78,6 +85,7 @@ model PromptRecord {
 // 电商多品类自定义爆款风格配方
 model StyleRecipe {
   id            String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   name          String   // 风格名称，如 "小红书爆款奶油风桌搭"
   category      String   @default("general") // digital_3c, beauty_care, fashion_apparel, home_living, food_beverage, mother_pets, jewelry_luxury, general 等
   tag           String?  // 标签，如 "暖光漫射 · 极简桌搭"
@@ -90,6 +98,7 @@ model StyleRecipe {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@index([workspaceId])
   @@index([category])
   @@index([isFavorite])
   @@index([createdAt])
@@ -98,6 +107,7 @@ model StyleRecipe {
 // AI 助手对话会话（权威持久化，防崩溃丢失）
 model AssistantThread {
   id           String   @id
+  workspaceId String   @default("legacy")
   title        String   @default("新对话")
   messagesJson  String   @default("[]")
   // 会话级自动批准的工具白名单（JSON 数组）
@@ -105,6 +115,7 @@ model AssistantThread {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([workspaceId])
   @@index([updatedAt])
   @@index([createdAt])
 }
@@ -112,6 +123,7 @@ model AssistantThread {
 // AI 助手 Turn 持久化（服务端权威状态）
 model AssistantTurn {
   id             String    @id  // turn_${timestamp}_${random}，与服务端生成一致
+  workspaceId String   @default("legacy")
   threadId       String
   model          String?
   status         String    @default("running")  // running|completed|interrupted|failed|awaiting_approval
@@ -122,6 +134,7 @@ model AssistantTurn {
   snapshotJson   String    @default("{}")  // AssistantTurn JSON
   items          AssistantTurnItem[]
 
+  @@index([workspaceId])
   @@index([threadId])
   @@index([status])
 }
@@ -129,6 +142,7 @@ model AssistantTurn {
 // AI 助手 Turn Item 持久化
 model AssistantTurnItem {
   id              String    @id
+  workspaceId String   @default("legacy")
   turnId         String
   turn           AssistantTurn @relation(fields: [turnId], references: [id], onDelete: Cascade)
   kind           String    // agentMessage|agentReasoning|toolCall|toolResult|approvalRequest
@@ -145,12 +159,14 @@ model AssistantTurnItem {
   visualImagesJson String?
   metaJson       String    @default("{}")
 
+  @@index([workspaceId])
   @@index([turnId])
 }
 
 // 1. 场景资产库
 model SceneAsset {
   id                 String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   title              String   // 场景标题，如 "苏式园林月亮门雕花木窗棂"
   description        String   // 场景空间与环境肌理详细中文描述
   lighting           String   // 采光系统与物理阴影描述
@@ -174,6 +190,7 @@ model SceneAsset {
   isUniversal        Boolean  @default(false)
   actions            ActionAsset[]
 
+  @@index([workspaceId])
   @@index([category])
   @@index([spatialType])
   @@index([isFavorite])
@@ -185,6 +202,7 @@ model SceneAsset {
 // 2. 穿搭 OOTD 资产库
 model OutfitAsset {
   id                 String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   title              String   // 穿搭标题，如 "温柔素雅奶白真丝盘扣开衫"
   top                String   // 上装描述
   bottom             String   // 下装描述
@@ -208,6 +226,7 @@ model OutfitAsset {
   productCategoryIds String   @default("[]")
   isUniversal        Boolean  @default(false)
 
+  @@index([workspaceId])
   @@index([category])
   @@index([isFavorite])
   @@index([createdAt])
@@ -218,6 +237,7 @@ model OutfitAsset {
 // 3. 动作姿态资产库
 model ActionAsset {
   id               String      @id @default(cuid())
+  workspaceId String   @default("legacy")
   title            String      // 动作标题，如 "45度侧颜发髻微风半身抓拍"
   action           String      // 具体人体动作、手势依托、物理接触点描述
   shotType         String      // 景别: half_body, profile_45, macro_detail, lifestyle_interaction 等
@@ -243,6 +263,7 @@ model ActionAsset {
   isUniversal        Boolean  @default(false)
   scene            SceneAsset? @relation(fields: [sceneId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([shotType])
   @@index([spatialType])
   @@index([sceneId])
@@ -255,6 +276,7 @@ model ActionAsset {
 // 4. 人物博主资产库
 model PersonaAsset {
   id          String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   name        String   // 如 "小红书顶流清纯名媛风博主"
   description String   // 详细外貌特征、五官骨相、发型发量、肤质毛孔描述
   tags             String   @default("") // 标签
@@ -273,6 +295,7 @@ model PersonaAsset {
   productCategoryIds String   @default("[]")
   isUniversal        Boolean  @default(false)
 
+  @@index([workspaceId])
   @@index([isFavorite])
   @@index([createdAt])
   @@index([albumId])
@@ -282,6 +305,7 @@ model PersonaAsset {
 // 6. 完整反推提示词资产库（以内容图组为母本；旧单图记录保持兼容）
 model FullPromptAsset {
   id                 String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   title              String   // 短标题
   albumName          String?  // 所属图集/套组名称，如 "PROD_454-小蛋糕的作用是通往幸福快乐"
   reversePromptZh    String   // 完整中文正向生图提示词
@@ -315,6 +339,7 @@ model FullPromptAsset {
   productCategoryIds String   @default("[]")
   isUniversal        Boolean  @default(false)
 
+  @@index([workspaceId])
   @@index([category])
   @@index([isFavorite])
   @@index([createdAt])
@@ -326,6 +351,7 @@ model FullPromptAsset {
 
 model AssetProductCategory {
   id       String  @id @default(cuid())
+  workspaceId String   @default("legacy")
   name     String
   parentId String?
   position Int     @default(0)
@@ -336,29 +362,37 @@ model AssetProductCategory {
   children AssetProductCategory[] @relation("CategoryTree")
   albums   PromptAlbum[]
 
+  @@index([workspaceId])
   @@index([parentId, position])
 }
 
 model PromptAlbum {
   id                String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   name              String
-  sourceKey         String   @unique
+  sourceKey         String
   productCategoryId String?
   createdAt         DateTime @default(now())
   productCategory   AssetProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: Restrict)
 
+  @@unique([workspaceId, sourceKey])
+  @@index([workspaceId])
   @@index([productCategoryId])
 }
 
 model WorkshopWorkspace {
   id           String @id
+  workspaceId String   @default("legacy")
   revision     Int    @default(1)
   snapshotJson String
   updatedAt    String
+
+  @@index([workspaceId])
 }
 
 model WorkshopBatch {
   id              String @id
+  workspaceId String   @default("legacy")
   name            String
   status          String
   revision        Int    @default(1)
@@ -367,34 +401,45 @@ model WorkshopBatch {
   updatedAt       String
   legacyRecovered Boolean @default(false)
 
+  @@index([workspaceId])
   @@index([updatedAt])
 }
 
 model WorkshopBatchState {
   id               String @id
+  workspaceId String   @default("legacy")
   activeBatchId    String?
   legacyMigratedAt String?
+
+  @@unique([workspaceId])
 }
 
 model DeconstructReview {
   id        String @id
+  workspaceId String   @default("legacy")
   albumName String
   payload   String
   status    String @default("pending")
   createdAt String
+
+  @@index([workspaceId])
 }
 
 model PromptImportSource {
-  sourceKey String  @id
-  requestId String
-  state     String
-  albumName String  @default("")
-  albumId   String?
-  updatedAt String
+  workspaceId String   @default("legacy")
+  sourceKey   String
+  requestId   String
+  state       String
+  albumName   String   @default("")
+  albumId     String?
+  updatedAt   String
+
+  @@id([workspaceId, sourceKey])
 }
 
 model PromptAssetRegistry {
   id              String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   assetType       String
   sourceAssetId   String
   status          String   @default("draft")
@@ -408,23 +453,27 @@ model PromptAssetRegistry {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([assetType, sourceAssetId])
+  @@unique([workspaceId, assetType, sourceAssetId])
+  @@index([workspaceId])
   @@index([assetType, status])
   @@index([qualityScore])
 }
 
 model PromptAssetCategoryLink {
   id         String @id @default(cuid())
+  workspaceId String   @default("legacy")
   assetId    String
   categoryId String
   scope      String @default("suitable")
 
-  @@unique([assetId, categoryId, scope])
+  @@unique([workspaceId, assetId, categoryId, scope])
+  @@index([workspaceId])
   @@index([categoryId])
 }
 
 model PromptAssetUsageEvent {
   id         String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   assetId    String
   batchId    String
   productId  String?
@@ -433,12 +482,14 @@ model PromptAssetUsageEvent {
   createdAt  DateTime @default(now())
   metadata   String   @default("{}")
 
+  @@index([workspaceId])
   @@index([assetId, eventType, createdAt])
   @@index([batchId])
 }
 
 model WorkshopOutputReview {
   id                   String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   batchId              String
   productId            String
   taskId               String
@@ -451,12 +502,14 @@ model WorkshopOutputReview {
   note                 String?
   createdAt            DateTime @default(now())
 
+  @@index([workspaceId])
   @@index([batchId, productId])
   @@index([taskId])
 }
 
 model WorkshopPipelineRun {
   id              String   @id @default(cuid())
+  workspaceId String   @default("legacy")
   batchId         String
   kind            String
   status          String
@@ -471,5 +524,6 @@ model WorkshopPipelineRun {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  @@index([workspaceId])
   @@index([batchId, status])
 }

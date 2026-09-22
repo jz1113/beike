@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { categoryIds, categoryScope } from '@beike/domain/assetOrganization';
 import { albumSourceKey } from './database/assetOrganization';
+import { requireWorkspaceId } from './workspaceContext';
 
 export const assetModels = { full_prompt: 'fullPromptAsset', persona: 'personaAsset', scene: 'sceneAsset', scene_bundle: 'sceneAsset', outfit: 'outfitAsset', action: 'actionAsset' } as const;
 export async function validateProductIds(db: Prisma.TransactionClient, ids: string[]) {
@@ -14,7 +15,8 @@ export async function ensurePromptAlbum(db: Prisma.TransactionClient, data: { al
   await validateProductIds(db, ids);
   const name = typeof data.albumName === 'string' && data.albumName.trim() ? data.albumName.trim() : '未命名图集';
   const sourceKey = albumSourceKey(name, data.sourceImages, fallback);
-  return db.promptAlbum.upsert({ where: { sourceKey }, update: {}, create: { name, sourceKey, productCategoryId: ids[0] || null } });
+  const workspaceId = requireWorkspaceId();
+  return db.promptAlbum.upsert({ where: { workspaceId_sourceKey: { workspaceId, sourceKey } }, update: {}, create: { name, sourceKey, productCategoryId: ids[0] || null, workspaceId } });
 }
 export async function organizationData(db: Prisma.TransactionClient, type: string, data: Record<string, unknown>) {
   if (data.productCategoryIds !== undefined) {

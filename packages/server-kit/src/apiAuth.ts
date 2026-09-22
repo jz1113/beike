@@ -1,3 +1,4 @@
+import { getWorkspaceStore, WORKSPACE_HEADER } from './workspaceContext';
 const DEV_DEFAULT_TOKEN = 'azhuo-local-dev';
 
 /** 本地/内网访问令牌；生产必须设置 LOCAL_ACCESS_TOKEN，禁止回落到开发默认值 */
@@ -76,6 +77,10 @@ export function getInternalApiHeaders(extra?: HeadersInit): Headers {
   const token = getAccessToken();
   if (token && !headers.has('x-app-token')) {
     headers.set('x-app-token', token);
+  }
+  const workspace = getWorkspaceStore();
+  if (workspace?.secret && !headers.has(WORKSPACE_HEADER)) {
+    headers.set(WORKSPACE_HEADER, workspace.secret);
   }
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');

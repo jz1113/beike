@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import {
   buildCategoryMigrationPreview,
   DEFAULT_SUBCATEGORIES_MAP,
@@ -76,10 +77,11 @@ export async function applyCategoryMigration(raw: unknown) {
     const anatomy = JSON.stringify(item.anatomy ? [item.anatomy] : []);
     if (duplicate) {
       await db.$executeRawUnsafe(
-        'UPDATE "AssetProductCategory" SET "keywords" = ?, "anatomy" = ? WHERE "id" = ?',
+        'UPDATE "AssetProductCategory" SET "keywords" = ?, "anatomy" = ? WHERE "id" = ? AND "workspaceId" = ?',
         keywords,
         anatomy,
         duplicate.id,
+        requireWorkspaceId(),
       ).catch(() => 0);
       continue;
     }
@@ -93,10 +95,11 @@ export async function applyCategoryMigration(raw: unknown) {
       },
     });
     await db.$executeRawUnsafe(
-      'UPDATE "AssetProductCategory" SET "keywords" = ?, "anatomy" = ? WHERE "id" = ?',
+      'UPDATE "AssetProductCategory" SET "keywords" = ?, "anatomy" = ? WHERE "id" = ? AND "workspaceId" = ?',
       keywords,
       anatomy,
       id,
+      requireWorkspaceId(),
     ).catch(() => 0);
     existing.push({ id, name: item.label, parentId: item.parentId, position: 0 } as typeof existing[number]);
   }

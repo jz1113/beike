@@ -73,6 +73,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
   const [isPromptExpanded, setIsPromptExpanded] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [videoLoadFailed, setVideoLoadFailed] = useState(false);
   const downloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const promptText = item?.prompt || '';
@@ -82,6 +83,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
   useEffect(() => {
     // 默认保持展开状态
     setIsPromptExpanded(true);
+    setVideoLoadFailed(false);
   }, [item?.id]);
 
   useEffect(() => {
@@ -221,18 +223,26 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
           {/* 中间媒体展示区 */}
           <div className="relative flex items-center justify-center flex-1 max-w-full h-full min-w-0 overflow-hidden pointer-events-none">
             {isVideo ? (
-              <video 
-                key={item.video || item.image}
-                src={item.video || item.image}
-                poster={item.poster}
-                controls 
-                autoPlay 
-                loop 
-                playsInline
-                preload="metadata"
-                onClick={(e) => e.stopPropagation()}
-                className={`max-h-[86vh] ${wideVideo ? 'w-full' : 'w-auto'} max-w-full object-contain rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.22)] border border-white/60 select-none transition-all duration-300 bg-black cursor-default pointer-events-auto`}
-              />
+              <div className="relative max-h-[86vh] max-w-full">
+                <video 
+                  key={item.video || item.image}
+                  src={videoLoadFailed ? undefined : (item.video || item.image)}
+                  poster={item.poster}
+                  controls={!videoLoadFailed}
+                  autoPlay
+                  loop 
+                  playsInline
+                  preload="metadata"
+                  onError={() => setVideoLoadFailed(true)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`max-h-[86vh] ${wideVideo ? 'w-full' : 'w-auto'} max-w-full object-contain rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.22)] border border-white/60 select-none transition-all duration-300 bg-black cursor-default pointer-events-auto`}
+                />
+                {videoLoadFailed && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-3xl bg-black/70 pointer-events-auto">
+                    <p className="text-sm text-white/90">视频文件缺失</p>
+                  </div>
+                )}
+              </div>
             ) : (
               <img 
                 key={item.image}

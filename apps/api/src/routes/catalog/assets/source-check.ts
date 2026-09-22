@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../../repositories/access';
 import { readJsonBody, safeErrorMessage } from '../../../core/validate';
 import { resolveShortUrlRedirect } from '@beike/server-kit/apiaScraper';
@@ -12,16 +13,16 @@ export const SOURCE_LEASE_MS = 5 * 60 * 1000;
 /** Release only unfinished work; a committed review or saved album is never discarded. */
 export async function releaseIncompleteSource(key: string, requestId: string, staleBefore?: string) {
   await db.$transaction(async tx => {
-    const rows = await tx.$queryRaw<SourceRecord[]>`SELECT * FROM "PromptImportSource" WHERE "sourceKey" = ${key} AND "requestId" = ${requestId}`;
+    const rows = await tx.$queryRaw<SourceRecord[]>`SELECT * FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key} AND "requestId" = ${requestId}`;
     const row = rows[0];
     if (!row || row.state !== 'processing' || (staleBefore && row.updatedAt > staleBefore)) return;
-    const reviews = await tx.$queryRaw<{ status: string }[]>`SELECT "status" FROM "DeconstructReview" WHERE "id" = ${requestId}`;
+    const reviews = await tx.$queryRaw<{ status: string }[]>`SELECT "status" FROM "DeconstructReview" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${requestId}`;
     if (reviews[0]) {
-      await tx.$executeRaw`UPDATE "PromptImportSource" SET "state" = ${reviews[0].status} WHERE "sourceKey" = ${key} AND "requestId" = ${requestId}`;
+      await tx.$executeRaw`UPDATE "PromptImportSource" SET "state" = ${reviews[0].status} WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key} AND "requestId" = ${requestId}`;
     } else if (row.albumId && await tx.fullPromptAsset.count({ where: { albumId: row.albumId } })) {
-      await tx.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved' WHERE "sourceKey" = ${key} AND "requestId" = ${requestId}`;
+      await tx.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved' WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key} AND "requestId" = ${requestId}`;
     } else {
-      await tx.$executeRaw`DELETE FROM "PromptImportSource" WHERE "sourceKey" = ${key} AND "requestId" = ${requestId} AND "state" = 'processing'`;
+      await tx.$executeRaw`DELETE FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key} AND "requestId" = ${requestId} AND "state" = 'processing'`;
     }
   });
 }
@@ -32,26 +33,26 @@ export async function claimProcessingSource(key: string, requestId: string, albu
     throw new AppError('该笔记正在分析或已入库，请勿重复提交', 409);
   }
   try {
-    await db.$executeRaw`INSERT INTO "PromptImportSource" ("sourceKey", "requestId", "state", "albumName", "updatedAt") VALUES (${key}, ${requestId}, 'processing', ${albumName}, ${new Date().toISOString()})`;
+    await db.$executeRaw`INSERT INTO "PromptImportSource" ("workspaceId", "sourceKey", "requestId", "state", "albumName", "updatedAt") VALUES (${requireWorkspaceId()}, ${key}, ${requestId}, 'processing', ${albumName}, ${new Date().toISOString()})`;
   } catch {
     throw new AppError('该笔记正在分析或已入库，请勿重复提交', 409);
   }
 }
 export async function findImportSource(key: string): Promise<SourceRecord | undefined> {
-  const rows = await db.$queryRaw<SourceRecord[]>`SELECT * FROM "PromptImportSource" WHERE "sourceKey" = ${key}`;
+  const rows = await db.$queryRaw<SourceRecord[]>`SELECT * FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key}`;
   const record = rows[0];
   if (record?.state === 'approved' && record.albumId && !(await db.fullPromptAsset.count({ where: { albumId: record.albumId } }))) {
     // The user deleted the saved assets; a future import may legitimately recreate them.
-    await db.$executeRaw`DELETE FROM "PromptImportSource" WHERE "sourceKey" = ${key} AND "requestId" = ${record.requestId} AND "state" = 'approved'`;
+    await db.$executeRaw`DELETE FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key} AND "requestId" = ${record.requestId} AND "state" = 'approved'`;
     return undefined;
   }
   if (record && record.state !== 'approved') {
-    const reviews = await db.$queryRaw<{ status: string }[]>`SELECT "status" FROM "DeconstructReview" WHERE "id" = ${record.requestId}`;
+    const reviews = await db.$queryRaw<{ status: string }[]>`SELECT "status" FROM "DeconstructReview" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${record.requestId}`;
     if (reviews[0]) return { ...record, state: reviews[0].status };
   }
   if (record?.state === 'processing' && Date.parse(record.updatedAt) <= Date.now() - SOURCE_LEASE_MS) {
     await releaseIncompleteSource(key, record.requestId, new Date(Date.now() - SOURCE_LEASE_MS).toISOString());
-    const refreshed = await db.$queryRaw<SourceRecord[]>`SELECT * FROM "PromptImportSource" WHERE "sourceKey" = ${key}`;
+    const refreshed = await db.$queryRaw<SourceRecord[]>`SELECT * FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${key}`;
     return refreshed[0];
   }
   return record;
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
 
 /** Historical data did not retain note IDs. Offer exact-image candidate groups for manual review only. */
 export async function GET() {
-  const rows = await db.$queryRaw<{ albumIds: string }[]>`SELECT GROUP_CONCAT(DISTINCT "albumId") AS "albumIds" FROM "FullPromptAsset" WHERE "albumId" IS NOT NULL AND "sourceImages" IS NOT NULL AND LENGTH("sourceImages") > 2 GROUP BY "sourceImages" HAVING COUNT(DISTINCT "albumId") > 1 LIMIT 50`;
+  const rows = await db.$queryRaw<{ albumIds: string }[]>`SELECT GROUP_CONCAT(DISTINCT "albumId") AS "albumIds" FROM "FullPromptAsset" WHERE "workspaceId" = ${requireWorkspaceId()} AND "albumId" IS NOT NULL AND "sourceImages" IS NOT NULL AND LENGTH("sourceImages") > 2 GROUP BY "sourceImages" HAVING COUNT(DISTINCT "albumId") > 1 LIMIT 50`;
   const groups = [];
   const seen = new Set<string>();
   for (const row of rows) {

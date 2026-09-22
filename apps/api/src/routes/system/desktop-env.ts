@@ -62,9 +62,9 @@ export async function POST(req: Request) {
       success: true,
       skipped: true,
       fileWritten: false,
-      hasApiKey: Boolean(process.env.AI_DRAWING_API_KEY),
+      hasApiKey: false,
       baseUrl: process.env.AI_DRAWING_BASE_URL || '',
-      hasWanbang: Boolean(process.env.WANBANG_API_KEY && process.env.WANBANG_API_SECRET),
+      hasWanbang: false,
       storageEnabled: process.env.STORAGE_ENABLED === 'true',
     });
   }
@@ -119,9 +119,9 @@ export async function POST(req: Request) {
       success: true,
       envPath: isDesktopShell ? undefined : envPath,
       fileWritten: !isDesktopShell,
-      hasApiKey: Boolean(process.env.AI_DRAWING_API_KEY),
+      hasApiKey: false,
       baseUrl: process.env.AI_DRAWING_BASE_URL || '',
-      hasWanbang: Boolean(process.env.WANBANG_API_KEY && process.env.WANBANG_API_SECRET),
+      hasWanbang: false,
       storageEnabled: process.env.STORAGE_ENABLED === 'true',
     });
   } catch (err: unknown) {

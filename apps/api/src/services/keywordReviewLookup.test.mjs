@@ -4,6 +4,7 @@ import {
   applyCachedLookupCategories,
   extractResponsesText,
   parseLookupCategory,
+  parseLookupResult,
   recalledLookupCategory,
   rememberLookupCategory,
   resetLookupCacheForTests,
@@ -21,7 +22,14 @@ function row(id, query) {
 }
 
 function result(id, category, needsLookup = false) {
-  return { id, category, producible: '制作', needsLookup };
+  return {
+    id,
+    category,
+    producible: '制作',
+    categoryReason: '测试主体，用于校验归类',
+    rejectReason: '',
+    needsLookup,
+  };
 }
 
 test('selectLookupRows keeps unique uncertain queries and caps at 5', () => {
@@ -60,14 +68,40 @@ test('selectLookupRows skips cached queries so retries do not search again', () 
   assert.deepEqual(picked.map((item) => item.query), ['未知品牌A']);
 });
 
-test('applyCachedLookupCategories only rewrites the vertical', () => {
-  rememberLookupCategory('乌天狗', '民俗文化');
+test('applyCachedLookupCategories rewrites vertical and reason when category changes', () => {
+  rememberLookupCategory('乌天狗', '民俗文化', '日本神话天狗');
   const next = applyCachedLookupCategories(
-    [{ id: '1', category: '其他', producible: '不制作', needsLookup: true }],
+    [{
+      id: '1',
+      category: '其他',
+      producible: '不制作',
+      categoryReason: '无法识别主体，暂归其他',
+      rejectReason: '简单问答：测试',
+      needsLookup: true,
+    }],
     [row('1', '乌天狗')],
   );
   assert.equal(next[0].category, '民俗文化');
   assert.equal(next[0].producible, '不制作');
+  assert.equal(next[0].categoryReason, '日本神话天狗，联网确认后归类');
+  assert.equal(next[0].rejectReason, '简单问答：测试');
+});
+
+test('applyCachedLookupCategories keeps original reason when category is unchanged', () => {
+  rememberLookupCategory('乌天狗', '民俗文化', '日本神话天狗');
+  const next = applyCachedLookupCategories(
+    [{
+      id: '1',
+      category: '民俗文化',
+      producible: '制作',
+      categoryReason: '神话实体，不是动物',
+      rejectReason: '',
+      needsLookup: true,
+    }],
+    [row('1', '乌天狗')],
+  );
+  assert.equal(next[0].category, '民俗文化');
+  assert.equal(next[0].categoryReason, '神话实体，不是动物');
 });
 
 test('extractResponsesText reads output_text and message blocks', () => {
@@ -88,6 +122,14 @@ test('parseLookupCategory accepts only allowed verticals', () => {
   assert.equal(parseLookupCategory('```json\n{"category":"游戏"}\n```', allowed), '游戏');
   assert.equal(parseLookupCategory('{"category":"不存在"}', allowed), undefined);
   assert.equal(parseLookupCategory('not json', allowed), undefined);
+});
+
+test('parseLookupResult reads optional subject phrases', () => {
+  assert.deepEqual(
+    parseLookupResult('{"category":"民俗文化","subject":"日本神话天狗"}', allowed),
+    { category: '民俗文化', subject: '日本神话天狗' },
+  );
+  assert.deepEqual(parseLookupResult('{"category":"游戏"}', allowed), { category: '游戏' });
 });
 
 test('lookup cache stores trimmed queries', () => {

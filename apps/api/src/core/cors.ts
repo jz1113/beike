@@ -38,6 +38,7 @@ export const apiCors = cors({
     'Content-Type',
     'Authorization',
     'x-app-token',
+    'x-workspace-token',
     'x-custom-base-url',
     'x-custom-api-key',
     'x-image-protocol',

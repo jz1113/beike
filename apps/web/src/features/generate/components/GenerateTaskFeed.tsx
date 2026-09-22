@@ -417,7 +417,7 @@ export function GenerateTaskFeed({
                         {/* 2. 媒体内容展示区域 */}
                         {isSingle ? (
                           /* 2.1 单张大图/视频卡片 (单图独立画幅，不限制上方标头宽度) */
-                          <div className="w-56 sm:w-64 md:w-72 compact:w-44 compact:sm:w-48">
+                          <div className="w-[280px] max-w-full">
                             <FeedSingleCard
                               primaryTask={primaryTask}
                               batchTasks={batch.tasks}

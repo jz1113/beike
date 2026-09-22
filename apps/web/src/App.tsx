@@ -4,6 +4,7 @@ import { useAppStore, clearWorkshopStudioDraft } from '@/store';
 import { GenerationEngineHost } from '@/features/generate/GenerationEngineHost';
 import { abortActiveGenerationEngine } from '@/features/generate/useGenerationEngine';
 import { syncAppTokenCookie } from '@/shared/api/apiClient';
+import { syncWorkspaceCookie } from '@/shared/api/workspaceClient';
 import { migrateLegacyCredentialsOnce } from '@/shared/api/credentialClient';
 import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@beike/domain/workflowModels';
 import { usePreventBrowserFileOpen } from '@/shared/hooks/useFileDropZone';
@@ -112,6 +113,7 @@ export default function App() {
 
   useEffect(() => {
     syncAppTokenCookie();
+    syncWorkspaceCookie();
     repairWorkflowModelsInStorage();
     resolveStoredMultimodalModelId();
     void migrateLegacyCredentialsOnce();

@@ -5,10 +5,11 @@ import {
   lookupUncertainCategories,
   type ReviewedKeywordRow,
 } from './keywordReviewLookup';
+import { normalizeCategoryReason, normalizeRejectReason } from './keywordReviewReasons';
 
 export const KEYWORD_REVIEW_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 export const KEYWORD_REVIEW_DEEPSEEK_MODEL = 'deepseek-flash';
-const KEYWORD_REVIEW_MAX_TOKENS = 8192;
+const KEYWORD_REVIEW_MAX_TOKENS = 12288;
 
 export const KEYWORD_REVIEW_CATEGORIES = [
   '政史军', '3C数码', '本地生活', '动漫', '动物', '法律', '购物消费', '互联网IT', '家居',
@@ -60,7 +61,12 @@ ${KEYWORD_REVIEW_CATEGORIES.join('、')}
 
 认不出作品、品牌、游戏、外文词、机构或陌生实体时，needsLookup 为 true；其余为 false。不要因为想更稳就把常识词标成 true。
 
-严格返回 JSON：{"results":[{"id":"原id","category":"唯一允许垂类","producible":"制作或不制作","needsLookup":false}]}。每个输入 id 恰好返回一次，不得遗漏。表里只使用 category 和 producible。`;
+依据只写决定性事实，不复述 query，不写「因为所以」「内容不适合」这类空话：
+- categoryReason 每行必填，16-28字。句式：{认出来的主体}，{为什么落在这个垂类}。相邻类易混时后半句点出排除项。
+- rejectReason 仅当 producible 为「不制作」时填写；「制作」必须是空字符串。句式：{否决类型}：{这一行命中的点}，12-24字。否决类型只能是：简单问答、低价值、金融决策、医疗诊疗、敏感热点、违法危险、算命迷信、工业硬广、非笔记需求、限制过细。只写第一条命中的。
+例子：游戏手机推荐 → categoryReason=被选的是手机，不是游戏内容，rejectReason=""；美国总统是谁 → rejectReason=简单问答：只确认一个身份；怎么判断他对我有好感 → rejectReason=低价值：个人恋爱好感判断；怎么在淘宝上添加银行卡 → rejectReason=非笔记需求：平台绑卡操作。
+
+严格返回 JSON：{"results":[{"id":"原id","category":"唯一允许垂类","producible":"制作或不制作","categoryReason":"垂类短依据","rejectReason":"不制作短依据或空字符串","needsLookup":false}]}。每个输入 id 恰好返回一次，不得遗漏。`;
 }
 
 function parseModelJson(raw: string): unknown {
@@ -83,10 +89,13 @@ function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeyw
     if (!CATEGORY_SET.has(category)) throw new SyntaxError(`模型返回了非法垂类：${category || '空值'}`);
     if (producible !== '制作' && producible !== '不制作') throw new SyntaxError('模型返回了非法制作结论');
     seen.add(id);
+    const nextProducible = producible as KeywordReviewResult['producible'];
     results.push({
       id,
       category,
-      producible: producible as KeywordReviewResult['producible'],
+      producible: nextProducible,
+      categoryReason: normalizeCategoryReason(candidate?.categoryReason),
+      rejectReason: normalizeRejectReason(nextProducible, candidate?.rejectReason),
       needsLookup: candidate?.needsLookup === true,
     });
   }
@@ -96,7 +105,13 @@ function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeyw
 }
 
 function stripLookupFlag(results: ReviewedKeywordRow[]): KeywordReviewResult[] {
-  return results.map(({ id, category, producible }) => ({ id, category, producible }));
+  return results.map(({ id, category, producible, categoryReason, rejectReason }) => ({
+    id,
+    category,
+    producible,
+    categoryReason,
+    rejectReason,
+  }));
 }
 
 export async function reviewKeywordRows(options: {

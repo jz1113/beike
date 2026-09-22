@@ -7,6 +7,7 @@ import {
   isAuthorized,
 } from '@beike/server-kit/apiAuth';
 import { verifyMediaSignature } from '@beike/server-kit/mediaSign';
+import { resolveWorkspaceFromRequest, runWithWorkspace } from '@beike/server-kit/workspaceContext';
 
 function isProxyMediaAuthorized(c: Context): boolean {
   const token = extractRequestToken(c.req.raw);
@@ -89,5 +90,9 @@ export async function apiAuthMiddleware(c: Context, next: Next) {
     }
   }
 
-  return next();
+  const workspace = resolveWorkspaceFromRequest(c.req.raw);
+  if (!workspace.ok) {
+    return c.json({ success: false, error: workspace.error }, workspace.status);
+  }
+  return runWithWorkspace(workspace.store.workspaceId, () => next(), workspace.store.secret);
 }

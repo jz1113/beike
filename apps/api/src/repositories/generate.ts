@@ -1,4 +1,4 @@
-import { prisma } from '../repositories/db';
+import { unscopedPrisma as prisma } from '../repositories/db';
 
 export const imageTasks = {
   failOrphanUnsubmitted: () =>

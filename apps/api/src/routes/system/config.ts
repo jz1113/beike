@@ -8,6 +8,7 @@ import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
 import { DEFAULT_IMAGE_MODEL_ID, DEFAULT_MULTIMODAL_MODEL_ID } from '@beike/domain/modelCatalog';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { normalizeGatewayBaseUrl } from '../../services/gatewayCredentials';
+import { allowServerSecretFallback } from '@beike/domain/gatewayCreds';
 import { testApiaConnection } from '@beike/server-kit/apiaScraper';
 import { testQiyunConnection } from '@beike/server-kit/qiyunScraper';
 import { parseWanbangResponse, withWanbangCredentials } from '../../gateways/wanbang';
@@ -15,14 +16,15 @@ import { parseWanbangResponse, withWanbangCredentials } from '../../gateways/wan
 // 获取系统当前模型与接口配置（密钥只返回是否已配置，不泄露明文/前后缀）
 export async function GET() {
   const baseUrl = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org';
-  const apiKey = process.env.AI_DRAWING_API_KEY || '';
+  const expose = allowServerSecretFallback();
+  const apiKey = expose ? (process.env.AI_DRAWING_API_KEY || '') : '';
   const normalizedBaseUrl = normalizeGatewayBaseUrl(baseUrl) || baseUrl;
-  const wanbangKey = process.env.WANBANG_API_KEY || '';
-  const wanbangSecret = process.env.WANBANG_API_SECRET || '';
-  const externalScraperId = process.env.EXTERNAL_SCRAPER_ID || '';
-  const externalScraperSecret = process.env.EXTERNAL_SCRAPER_SECRET || '';
-  const qiyunAppId = process.env.QIYUN_APP_ID || '';
-  const qiyunAppKey = process.env.QIYUN_APP_KEY || '';
+  const wanbangKey = expose ? (process.env.WANBANG_API_KEY || '') : '';
+  const wanbangSecret = expose ? (process.env.WANBANG_API_SECRET || '') : '';
+  const externalScraperId = expose ? (process.env.EXTERNAL_SCRAPER_ID || '') : '';
+  const externalScraperSecret = expose ? (process.env.EXTERNAL_SCRAPER_SECRET || '') : '';
+  const qiyunAppId = expose ? (process.env.QIYUN_APP_ID || '') : '';
+  const qiyunAppKey = expose ? (process.env.QIYUN_APP_KEY || '') : '';
 
   // ⚠️ 安全：响应中**禁止**返回 wanbangSecret 字段名，即便是"已配置"也会泄露
   // 字段存在性。仅返回布尔状态。
@@ -59,14 +61,14 @@ export async function POST(req: Request) {
     const { 
       type = 'ai',
       baseUrl = process.env.AI_DRAWING_BASE_URL || 'https://ai.comfly.org', 
-      apiKey = process.env.AI_DRAWING_API_KEY, 
+      apiKey = allowServerSecretFallback() ? process.env.AI_DRAWING_API_KEY : undefined, 
       model = DEFAULT_MULTIMODAL_MODEL_ID,
-      wanbangKey = process.env.WANBANG_API_KEY,
-      wanbangSecret = process.env.WANBANG_API_SECRET,
-      externalScraperId = process.env.EXTERNAL_SCRAPER_ID,
-      externalScraperSecret = process.env.EXTERNAL_SCRAPER_SECRET,
-      qiyunAppId = process.env.QIYUN_APP_ID,
-      qiyunAppKey = process.env.QIYUN_APP_KEY,
+      wanbangKey = allowServerSecretFallback() ? process.env.WANBANG_API_KEY : undefined,
+      wanbangSecret = allowServerSecretFallback() ? process.env.WANBANG_API_SECRET : undefined,
+      externalScraperId = allowServerSecretFallback() ? process.env.EXTERNAL_SCRAPER_ID : undefined,
+      externalScraperSecret = allowServerSecretFallback() ? process.env.EXTERNAL_SCRAPER_SECRET : undefined,
+      qiyunAppId = allowServerSecretFallback() ? process.env.QIYUN_APP_ID : undefined,
+      qiyunAppKey = allowServerSecretFallback() ? process.env.QIYUN_APP_KEY : undefined,
     } = body;
     const normalizedBaseUrl = normalizeGatewayBaseUrl(baseUrl);
 

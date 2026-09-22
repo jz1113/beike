@@ -1,3 +1,4 @@
+import { OFFICIAL_WORKSPACE_ID, requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import {
   getRegistry,
@@ -33,7 +34,9 @@ export async function backfillRegistry(assetType?: PromptAssetType) {
   const types = assetType ? [assetType] : (Object.keys(ASSET_TABLES) as PromptAssetType[]);
   for (const type of types) {
     const rows = await db.$queryRawUnsafe<Array<{ id: string; provenance: string | null }>>(
-      `SELECT "id", "provenance" FROM "${ASSET_TABLES[type]}"`,
+      `SELECT "id", "provenance" FROM "${ASSET_TABLES[type]}" WHERE "workspaceId" IN (?, ?)`,
+      requireWorkspaceId(),
+      OFFICIAL_WORKSPACE_ID,
     ).catch(() => []);
     for (const row of rows) {
       await ensureRegistryForAsset(type, row.id, row.provenance || 'manual');

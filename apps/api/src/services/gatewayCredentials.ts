@@ -1,6 +1,6 @@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
-import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
+import { allowServerSecretFallback, resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 
 const LEGACY_BASE_URL_KEYS = ['AI_DRAWING_API_BASE_URL', 'AI_API_BASE', 'AI_BASE_URL'] as const;
 let warnedLegacyGatewayEnv = false;
@@ -25,6 +25,7 @@ export function getDefaultBaseUrl(): string {
 }
 
 export function getDefaultApiKey(): string {
+  if (!allowServerSecretFallback()) return '';
   const primary = process.env.AI_DRAWING_API_KEY?.trim();
   if (primary) return primary;
   const fallback = process.env.AI_API_KEY?.trim();

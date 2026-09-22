@@ -18,12 +18,12 @@ const VERTICAL_BOUNDARIES = [
 ];
 
 const VERTICAL_EXAMPLES = [
-  { query: '游戏手机推荐', category: '3C数码', reason: '被选择的对象是手机' },
-  { query: '乌天狗的日本传说', category: '民俗文化', reason: '天狗是神话实体，不是动物' },
-  { query: '中华人民共和国教师法', category: '法律', reason: '内容是法律条文，不是教学实践' },
-  { query: '梦幻西游装备属性', category: '游戏', reason: '实体属于游戏' },
-  { query: '狗狗腹泻怎么用药', category: '医疗健康', reason: '宠物诊疗按医疗排除' },
-  { query: '狗狗训练方法', category: '动物', reason: '行为训练不是医疗' },
+  { query: '游戏手机推荐', category: '3C数码', reason: '被选的是手机，不是游戏内容' },
+  { query: '乌天狗的日本传说', category: '民俗文化', reason: '神话天狗，不是动物' },
+  { query: '中华人民共和国教师法', category: '法律', reason: '法律条文，不是教学实践' },
+  { query: '梦幻西游装备属性', category: '游戏', reason: '游戏内装备属性' },
+  { query: '狗狗腹泻怎么用药', category: '医疗健康', reason: '宠物用药诊疗，不是日常饲养' },
+  { query: '狗狗训练方法', category: '动物', reason: '行为训练，不是诊疗' },
 ];
 
 const EXCLUSIONS = [
@@ -87,7 +87,7 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
             </span>
             <div>
               <h2 id="keyword-review-rules-title" className="text-sm font-black tracking-tight">审核规则</h2>
-              <p className="mt-0.5 text-[11px] text-slate-400">完整口径。表里只追加「最终垂类」和「是否可制作」</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">完整口径。保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
@@ -101,7 +101,7 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
               <li>先只看 query 的主体、需求和场景；query 已经清晰时直接裁决。</li>
               <li>query 是简称、陌生实体、泛实体或多义词时，才用相关拓展 q 和实体拓展 q 消歧。</li>
               <li>仍不足时，才参考笔记内容类型。教程、攻略、推荐、价格、视频只是表达形式，不能抢占主体。</li>
-              <li>源表的「分类」列原样保留，不会当成最终垂类。</li>
+              <li>源表「分类」列整列为空则不进入结果表；有内容才保留，且不当成最终垂类。</li>
             </ol>
           </Section>
 
@@ -120,7 +120,7 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
                   <tr>
                     <th className="px-3 py-2 font-bold">Query</th>
                     <th className="px-3 py-2 font-bold">最终垂类</th>
-                    <th className="px-3 py-2 font-bold">原因</th>
+                    <th className="px-3 py-2 font-bold">垂类依据</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -165,9 +165,14 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
             <p>例如：U 盘、杭州电子科技大学、猫砂，都可以制作。</p>
           </Section>
 
-          <section className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-[12px] leading-6 text-amber-900">
-            表里只追加「最终垂类」和「是否可制作」。可做性状态、低价值关键词、强需生产方向、判定原因这次只展示规则，不写入表格。
-          </section>
+          <Section title="判断依据">
+            <p>两列都只写决定性事实，不复述 query，不写空话。制作行的「不制作依据」留空。</p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>垂类依据：每行必填。句式是「认出来的主体，为什么落在这个垂类」。相邻类易混时点出排除项。</li>
+              <li>不制作依据：仅「不制作」填写。句式是「否决类型：这一行命中的点」。否决类型只用：简单问答、低价值、金融决策、医疗诊疗、敏感热点、违法危险、算命迷信、工业硬广、非笔记需求、限制过细。</li>
+            </ul>
+            <p>例如：美国总统是谁 → 简单问答：只确认一个身份；怎么判断他对我有好感 → 低价值：个人恋爱好感判断；怎么在淘宝上添加银行卡 → 非笔记需求：平台绑卡操作。</p>
+          </Section>
         </div>
       </section>
     </div>

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createHmac } from 'node:crypto';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from './prisma';
+import { getWorkspaceId, runWithWorkspace } from './workspaceContext';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { supplementEnvFromFile } from './desktopEnvFile';
 
@@ -451,6 +452,7 @@ export async function persistMediaUrl(
   mediaType: 'image' | 'video' | StorageCategory,
   customConfig?: StorageConfig
 ): Promise<string | null> {
+  const workspaceId = getWorkspaceId();
   try {
     const config = resolveStorageConfig(customConfig);
     if (tempUrl.startsWith('/storage/')) return tempUrl;
@@ -488,10 +490,11 @@ export async function persistMediaUrl(
 
     // 自动更新数据库中的记录为永久链接
     if (permanentUrl && taskId) {
-      await prisma.imageTask.updateMany({
+      const persistMeta = () => prisma.imageTask.updateMany({
         where: { OR: [{ taskId }, { id: taskId }], resultUrl: tempUrl },
         data: { resultUrl: permanentUrl },
       }).catch(() => { /* Keep the durable file URL even if task metadata is temporarily unavailable. */ });
+      await (workspaceId ? runWithWorkspace(workspaceId, persistMeta) : persistMeta());
       console.log(`[对象存储-入库] 任务 ${taskId} 数据库链接已平滑切换为永久链接`);
     }
 

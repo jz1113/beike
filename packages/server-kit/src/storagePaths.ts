@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { isFixedLocalWorkspace, LOCAL_WORKSPACE_ID, requireWorkspaceId } from './workspaceContext';
 
 /**
  * 解析 storage 根目录。所有访问必须限制在此根下，realpath 后再校验前缀，
@@ -82,4 +83,23 @@ export function resolveStoredMediaPath(relative: string): string | null {
     if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   }
   return null;
+}
+
+
+export function toWorkspaceStorageKey(relKey: string, workspaceId = requireWorkspaceId()): string {
+  const prefix = workspaceId;
+  const clean = relKey.replace(/^\/+/, '');
+  if (clean === prefix || clean.startsWith(`${prefix}/`)) return clean;
+  return `${prefix}/${clean}`;
+}
+
+export function isWorkspaceStorageRel(rel: string, workspaceId: string): boolean {
+  const clean = rel.replace(/^\/+/, '');
+  if (clean === workspaceId || clean.startsWith(`${workspaceId}/`)) return true;
+  if (isFixedLocalWorkspace() && workspaceId === LOCAL_WORKSPACE_ID) {
+    const first = clean.split('/')[0] || '';
+    if (/^[a-f0-9]{64}$/.test(first) || first === 'official' || first === 'legacy') return false;
+    return true;
+  }
+  return false;
 }

@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OFFICIAL_MASTER_RECIPES } from '@beike/domain/masterRecipes';
-import { prisma } from './prisma';
+import { unscopedPrisma as prisma } from './prisma';
+import { OFFICIAL_WORKSPACE_ID } from './workspaceContext';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -74,11 +75,6 @@ const INT_KEYS = new Set([
   'position',
 ]);
 
-function officialNameAliases(name: string): string[] {
-  const shortName = name.replace(/\s*\(V6\.0\)\s*$/u, '').trim();
-  return shortName && shortName !== name ? [name, shortName] : [name];
-}
-
 function asBool(value: unknown, fallback = false): boolean {
   if (typeof value === 'boolean') return value;
   if (value === 1 || value === '1' || value === 'true') return true;
@@ -93,7 +89,7 @@ function asInt(value: unknown): number | null {
 }
 
 function pickRow(row: JsonRecord, keys: string[]): JsonRecord {
-  const out: JsonRecord = {};
+  const out: JsonRecord = { workspaceId: OFFICIAL_WORKSPACE_ID };
   for (const key of keys) {
     if (!(key in row) || row[key] === undefined) continue;
     if (BOOL_KEYS.has(key)) out[key] = asBool(row[key]);
@@ -132,13 +128,10 @@ async function insertMissing(
 export async function upsertOfficialMasterRecipes(): Promise<{ upserted: number }> {
   let upserted = 0;
   for (const item of OFFICIAL_MASTER_RECIPES) {
-    const names = officialNameAliases(item.name);
-    const exists =
-      (await prisma.styleRecipe.findUnique({ where: { id: item.id } })) ||
-      (await prisma.styleRecipe.findFirst({ where: { name: { in: names } } })) ||
-      (await prisma.styleRecipe.findFirst({ where: { category: item.category } }));
+    const exists = await prisma.styleRecipe.findUnique({ where: { id: item.id } });
 
     const data = {
+      workspaceId: OFFICIAL_WORKSPACE_ID,
       name: item.name,
       category: item.category,
       tag: item.tag,
@@ -149,10 +142,7 @@ export async function upsertOfficialMasterRecipes(): Promise<{ upserted: number 
       isFavorite: true,
     };
 
-    if (exists && exists.id !== item.id) {
-      await prisma.styleRecipe.delete({ where: { id: exists.id } });
-      await prisma.styleRecipe.create({ data: { id: item.id, ...data } });
-    } else if (exists) {
+    if (exists) {
       await prisma.styleRecipe.update({ where: { id: exists.id }, data });
     } else {
       await prisma.styleRecipe.create({ data: { id: item.id, ...data } });

@@ -1,5 +1,6 @@
 import { jsonResponse } from './http';
 import { safeErrorMessage } from './validate';
+import { WorkspaceRequiredError } from '@beike/server-kit/workspaceContext';
 
 export class AppError extends Error {
   constructor(
@@ -15,6 +16,9 @@ export class AppError extends Error {
 export function errorEnvelope(error: unknown, fallback = '服务器内部错误') {
   if (error instanceof AppError) {
     return { body: { success: false, error: error.message, code: error.code }, status: error.status };
+  }
+  if (error instanceof WorkspaceRequiredError) {
+    return { body: { success: false, error: error.message, code: 'workspace_required' }, status: error.status };
   }
   return { body: { success: false, error: safeErrorMessage(error, fallback), code: 'internal_error' }, status: 500 };
 }

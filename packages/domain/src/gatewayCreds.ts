@@ -40,6 +40,11 @@ export function allowClientCustomBaseUrl(): boolean {
   );
 }
 
+/** 生产网页不把服务器环境变量密钥当作所有人的默认密钥。 */
+export function allowServerSecretFallback(): boolean {
+  return domainEnv('DESKTOP_SHELL') === '1' || domainEnv('NODE_ENV') !== 'production';
+}
+
 function normalizeBase(url: string): string {
   return url.replace(/\/+$/, '');
 }
@@ -65,7 +70,7 @@ export function resolveGatewayCreds(
 
   const baseUrl = (customBaseUrl ? normalizeBase(customBaseUrl) : normalizeBase(defaults.baseUrl)) || defaults.baseUrl;
   const usingThirdParty = customBaseUrl && normalizeBase(customBaseUrl) !== normalizeBase(defaults.baseUrl);
-  const apiKey = customApiKey || (usingThirdParty ? '' : defaults.apiKey);
+  const apiKey = customApiKey || (usingThirdParty ? '' : (allowServerSecretFallback() ? defaults.apiKey : ''));
   const keyFrom = bodyKey ? 'body' : headerKey ? 'header' : 'server';
 
   return { baseUrl, apiKey, ignoredClientBase, keyFrom };

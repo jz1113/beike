@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { resolveTelemetryDir } from './agentTelemetry';
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { modelRequestError } from '@beike/server-kit/assistant/agentLoop/requestError';
 
 interface MemoryMessage { id: string; role: string; content: string; timestamp?: number }
@@ -18,7 +19,7 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 export class AssistantMemoryStore {
   private locks = new Map<string, Promise<unknown>>();
   constructor(private directory: string) {}
-  private file(id: string) { return path.join(this.directory, hash(id) + '.json'); }
+  private file(id: string) { return path.join(this.directory, requireWorkspaceId(), hash(id) + '.json'); }
   private async read(id: string): Promise<MemoryRecord> {
     try { return JSON.parse(await fs.readFile(this.file(id), 'utf8')); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return empty(); throw error; }

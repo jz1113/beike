@@ -1,4 +1,5 @@
 import { fetchWithRetry, extractUrls } from '../../gateways/wanbang';
+import { allowServerSecretFallback } from '@beike/domain/gatewayCreds';
 import { readJsonBody } from '../../core/validate';
 import { jsonResponse } from '../../core/http';
 import { db } from '../../repositories/access';
@@ -135,12 +136,12 @@ export async function POST(req: Request) {
     // 优先级：x-wanbang-key / x-wanbang-secret header > 环境变量。
     const apiKey = (
       req.headers.get('x-wanbang-key') ||
-      process.env.WANBANG_API_KEY ||
+      (allowServerSecretFallback() ? process.env.WANBANG_API_KEY : '') ||
       ''
     ).trim();
     const apiSecret = (
       req.headers.get('x-wanbang-secret') ||
-      process.env.WANBANG_API_SECRET ||
+      (allowServerSecretFallback() ? process.env.WANBANG_API_SECRET : '') ||
       ''
     ).trim();
 

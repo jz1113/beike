@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { resolveStorageRoot, safeResolveWithinRoot, resolveStoredMediaPath } from '@beike/server-kit/storagePaths';
+import { resolveStorageRoot, safeResolveWithinRoot, resolveStoredMediaPath, isWorkspaceStorageRel } from '@beike/server-kit/storagePaths';
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 export { resolveStorageRoot } from '@beike/server-kit/storagePaths';
 
 function guessContentType(filePath: string): string {
@@ -28,6 +29,10 @@ export async function GET(req: Request): Promise<Response> {
     return new Response('Bad Request', { status: 400 });
   }
 
+  const workspaceId = requireWorkspaceId();
+  if (!isWorkspaceStorageRel(rel, workspaceId)) {
+    return new Response('Forbidden', { status: 403 });
+  }
   const root = resolveStorageRoot();
   const safePath = safeResolveWithinRoot(root, rel);
   const absPath = safePath && (resolveStoredMediaPath(rel) || safePath);
@@ -39,7 +44,7 @@ export async function GET(req: Request): Promise<Response> {
     return new Response('Not Found', { status: 404 });
   }
 
-  const expiryMatch = /^assistant-attachments\/(\d{13})-[a-f0-9-]+\.jpg$/.exec(rel);
+  const expiryMatch = /(?:^|\/)assistant-attachments\/(\d{13})-[a-f0-9-]+\.jpg$/.exec(rel);
   if (expiryMatch && Number(expiryMatch[1]) <= Date.now()) {
     fs.unlinkSync(absPath);
     return new Response('附件已超过 7 天保存期限', { status: 410 });
@@ -49,7 +54,7 @@ export async function GET(req: Request): Promise<Response> {
     status: 200,
     headers: {
       'Content-Type': guessContentType(absPath),
-      'Cache-Control': expiryMatch ? 'private, no-store' : 'public, max-age=31536000, immutable',
+      'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },
   });

@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import { ensurePromptAlbum } from '@beike/server-kit/assetOrganization';
 import type { ContentPromptGroup, PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
@@ -121,7 +122,7 @@ export async function persistFullPromptRecords(params: {
   const { parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey, sampleImagesJson, thumbForUrl, defaultCoverUrl } = params;
   let albumId: string | null = null;
   if (sourceKey) {
-    const rows = await db.$queryRaw<{ albumId: string | null }[]>`SELECT "albumId" FROM "PromptImportSource" WHERE "sourceKey" = ${sourceKey}`;
+    const rows = await db.$queryRaw<{ albumId: string | null }[]>`SELECT "albumId" FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${sourceKey}`;
     albumId = rows[0]?.albumId || null;
   }
   const album = albumId

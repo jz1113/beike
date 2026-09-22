@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../../repositories/access';
 import { logLatencyAudit } from '@beike/domain/latencyAudit';
 import { formatUserError } from '@beike/domain/upstreamErrors';
@@ -258,7 +259,8 @@ export async function persistImageTaskRecord(options: {
   const tDb0 = Date.now();
   if (idempotencyKey) {
     const existing = await db.$queryRawUnsafe<Array<{ id: string; resultUrl: string | null }>>(
-      'SELECT "id", "resultUrl" FROM "ImageTask" WHERE "idempotencyKey" = ? AND "status" = ? ORDER BY "createdAt" DESC LIMIT 1',
+      'SELECT "id", "resultUrl" FROM "ImageTask" WHERE "workspaceId" = ? AND "idempotencyKey" = ? AND "status" = ? ORDER BY "createdAt" DESC LIMIT 1',
+      requireWorkspaceId(),
       idempotencyKey,
       'SUCCESS',
     ).catch(() => []);
@@ -289,8 +291,9 @@ export async function persistImageTaskRecord(options: {
   });
   if (idempotencyKey) {
     await db.$executeRawUnsafe(
-      'UPDATE "ImageTask" SET "idempotencyKey" = ? WHERE "id" = ?',
+      'UPDATE "ImageTask" SET "idempotencyKey" = ? WHERE "workspaceId" = ? AND "id" = ?',
       idempotencyKey,
+      requireWorkspaceId(),
       taskRecord.id,
     ).catch(() => 0);
   }

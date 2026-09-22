@@ -5,7 +5,7 @@ import { jsonResponse } from '../core/http';
 export const mutableGenerationStatuses = ['PENDING', 'IN_PROGRESS'];
 
 async function savedTerminalResponse(taskId: string): Promise<Response | null> {
-  const task = await db.imageTask.findUnique({
+  const task = await db.imageTask.findFirst({
     where: { taskId }, select: { status: true, resultUrl: true, failReason: true },
   });
   if (!task || !isImageTaskTerminal(task.status)) return null;

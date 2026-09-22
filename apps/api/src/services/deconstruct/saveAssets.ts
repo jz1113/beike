@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import {
   createCompactThumbnailDataUrl,
@@ -103,7 +104,7 @@ export async function persistDeconstructedAssets(params: {
   });
   savedRecords.fullPrompts = persisted.fullPrompts;
   if (sourceKey) {
-    await db.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved', "albumName" = ${albumName}, "albumId" = ${persisted.album.id}, "updatedAt" = ${new Date().toISOString()} WHERE "sourceKey" = ${sourceKey}`;
+    await db.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved', "albumName" = ${albumName}, "albumId" = ${persisted.album.id}, "updatedAt" = ${new Date().toISOString()} WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${sourceKey}`;
   }
 
   const rawScenes: any[] = Array.isArray(parsedResult.scenes)

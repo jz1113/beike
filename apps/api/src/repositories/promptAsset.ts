@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { randomUUID } from 'node:crypto';
 import { db } from './access';
 import type { PromptAssetStatus, PromptAssetType, UsageEventType } from '@beike/domain/promptAsset';
@@ -35,7 +36,8 @@ function nowIso() {
 
 export async function getRegistry(assetType: string, sourceAssetId: string): Promise<RegistryRow | null> {
   const rows = await db.$queryRawUnsafe<RegistryRow[]>(
-    'SELECT * FROM "PromptAssetRegistry" WHERE "assetType" = ? AND "sourceAssetId" = ? LIMIT 1',
+    'SELECT * FROM "PromptAssetRegistry" WHERE "workspaceId" = ? AND "assetType" = ? AND "sourceAssetId" = ? LIMIT 1',
+    requireWorkspaceId(),
     assetType,
     sourceAssetId,
   ).catch(() => []);
@@ -46,20 +48,23 @@ export async function listRegistryByType(assetType: string, sourceAssetIds?: str
   if (sourceAssetIds && sourceAssetIds.length > 0) {
     const placeholders = sourceAssetIds.map(() => '?').join(', ');
     return db.$queryRawUnsafe<RegistryRow[]>(
-      `SELECT * FROM "PromptAssetRegistry" WHERE "assetType" = ? AND "sourceAssetId" IN (${placeholders})`,
+      `SELECT * FROM "PromptAssetRegistry" WHERE "workspaceId" = ? AND "assetType" = ? AND "sourceAssetId" IN (${placeholders})`,
+      requireWorkspaceId(),
       assetType,
       ...sourceAssetIds,
     ).catch(() => []);
   }
   return db.$queryRawUnsafe<RegistryRow[]>(
-    'SELECT * FROM "PromptAssetRegistry" WHERE "assetType" = ?',
+    'SELECT * FROM "PromptAssetRegistry" WHERE "workspaceId" = ? AND "assetType" = ?',
+    requireWorkspaceId(),
     assetType,
   ).catch(() => []);
 }
 
 export async function listPublishedSourceIds(assetType: string): Promise<string[]> {
   const rows = await db.$queryRawUnsafe<Array<{ sourceAssetId: string }>>(
-    'SELECT "sourceAssetId" FROM "PromptAssetRegistry" WHERE "assetType" = ? AND "status" = ?',
+    'SELECT "sourceAssetId" FROM "PromptAssetRegistry" WHERE "workspaceId" = ? AND "assetType" = ? AND "status" = ?',
+    requireWorkspaceId(),
     assetType,
     'published',
   ).catch(() => []);
@@ -78,7 +83,7 @@ export async function upsertRegistry(input: {
   const updatedAt = nowIso();
   if (existing) {
     await db.$executeRawUnsafe(
-      'UPDATE "PromptAssetRegistry" SET "status" = ?, "provenance" = ?, "sourceRef" = ?, "version" = ?, "publishedAt" = ?, "disabledReason" = ?, "updatedAt" = ? WHERE "id" = ?',
+      'UPDATE "PromptAssetRegistry" SET "status" = ?, "provenance" = ?, "sourceRef" = ?, "version" = ?, "publishedAt" = ?, "disabledReason" = ?, "updatedAt" = ? WHERE "workspaceId" = ? AND "id" = ?',
       input.status,
       input.provenance ?? existing.provenance,
       input.sourceRef ?? existing.sourceRef,
@@ -86,14 +91,16 @@ export async function upsertRegistry(input: {
       input.status === 'published' ? (existing.publishedAt || updatedAt) : existing.publishedAt,
       input.status === 'disabled' ? existing.disabledReason : null,
       updatedAt,
+      requireWorkspaceId(),
       existing.id,
     );
     return (await getRegistry(input.assetType, input.sourceAssetId))!;
   }
   const id = `reg_${randomUUID().replace(/-/g, '')}`;
   await db.$executeRawUnsafe(
-    'INSERT INTO "PromptAssetRegistry" ("id", "assetType", "sourceAssetId", "status", "version", "provenance", "sourceRef", "qualityScore", "confidence", "publishedAt", "disabledReason", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO "PromptAssetRegistry" ("id", "workspaceId", "assetType", "sourceAssetId", "status", "version", "provenance", "sourceRef", "qualityScore", "confidence", "publishedAt", "disabledReason", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     id,
+    requireWorkspaceId(),
     input.assetType,
     input.sourceAssetId,
     input.status,
@@ -119,7 +126,7 @@ export async function updateRegistryStatus(id: string, patch: {
 }): Promise<void> {
   const updatedAt = nowIso();
   await db.$executeRawUnsafe(
-    'UPDATE "PromptAssetRegistry" SET "status" = ?, "version" = COALESCE(?, "version"), "disabledReason" = ?, "qualityScore" = COALESCE(?, "qualityScore"), "confidence" = COALESCE(?, "confidence"), "publishedAt" = CASE WHEN ? = \'published\' THEN COALESCE("publishedAt", ?) ELSE "publishedAt" END, "updatedAt" = ? WHERE "id" = ?',
+    'UPDATE "PromptAssetRegistry" SET "status" = ?, "version" = COALESCE(?, "version"), "disabledReason" = ?, "qualityScore" = COALESCE(?, "qualityScore"), "confidence" = COALESCE(?, "confidence"), "publishedAt" = CASE WHEN ? = \'published\' THEN COALESCE("publishedAt", ?) ELSE "publishedAt" END, "updatedAt" = ? WHERE "workspaceId" = ? AND "id" = ?',
     patch.status,
     patch.version ?? null,
     patch.disabledReason ?? null,
@@ -128,6 +135,7 @@ export async function updateRegistryStatus(id: string, patch: {
     patch.status,
     updatedAt,
     updatedAt,
+    requireWorkspaceId(),
     id,
   );
 }
@@ -141,8 +149,9 @@ export async function insertUsageEvent(input: {
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   await db.$executeRawUnsafe(
-    'INSERT INTO "PromptAssetUsageEvent" ("id", "assetId", "batchId", "productId", "taskId", "eventType", "createdAt", "metadata") VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO "PromptAssetUsageEvent" ("id", "workspaceId", "assetId", "batchId", "productId", "taskId", "eventType", "createdAt", "metadata") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     `uev_${randomUUID().replace(/-/g, '')}`,
+    requireWorkspaceId(),
     input.assetId,
     input.batchId,
     input.productId || null,
@@ -155,7 +164,8 @@ export async function insertUsageEvent(input: {
 
 export async function listUsageEvents(assetId: string): Promise<UsageEventRow[]> {
   return db.$queryRawUnsafe<UsageEventRow[]>(
-    'SELECT * FROM "PromptAssetUsageEvent" WHERE "assetId" = ? ORDER BY "createdAt" DESC LIMIT 500',
+    'SELECT * FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ? AND "assetId" = ? ORDER BY "createdAt" DESC LIMIT 500',
+    requireWorkspaceId(),
     assetId,
   ).catch(() => []);
 }
@@ -173,8 +183,9 @@ export async function insertOutputReview(input: {
   note?: string | null;
 }): Promise<void> {
   await db.$executeRawUnsafe(
-    'INSERT INTO "WorkshopOutputReview" ("id", "batchId", "productId", "taskId", "decision", "productFidelityScore", "compositionScore", "aestheticScore", "consistencyScore", "reasonCodesJson", "note", "createdAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO "WorkshopOutputReview" ("id", "workspaceId", "batchId", "productId", "taskId", "decision", "productFidelityScore", "compositionScore", "aestheticScore", "consistencyScore", "reasonCodesJson", "note", "createdAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     `wor_${randomUUID().replace(/-/g, '')}`,
+    requireWorkspaceId(),
     input.batchId,
     input.productId,
     input.taskId,
@@ -193,17 +204,19 @@ export async function listCategoryLinks(assetIds: string[]) {
   if (assetIds.length === 0) return [];
   const placeholders = assetIds.map(() => '?').join(', ');
   return db.$queryRawUnsafe<Array<{ assetId: string; categoryId: string; scope: string }>>(
-    `SELECT "assetId", "categoryId", "scope" FROM "PromptAssetCategoryLink" WHERE "assetId" IN (${placeholders})`,
+    `SELECT "assetId", "categoryId", "scope" FROM "PromptAssetCategoryLink" WHERE "workspaceId" = ? AND "assetId" IN (${placeholders})`,
+    requireWorkspaceId(),
     ...assetIds,
   ).catch(() => []);
 }
 
 export async function replaceCategoryLinks(assetId: string, categoryIds: string[], scope = 'suitable') {
-  await db.$executeRawUnsafe('DELETE FROM "PromptAssetCategoryLink" WHERE "assetId" = ? AND "scope" = ?', assetId, scope).catch(() => 0);
+  await db.$executeRawUnsafe('DELETE FROM "PromptAssetCategoryLink" WHERE "workspaceId" = ? AND "assetId" = ? AND "scope" = ?', requireWorkspaceId(), assetId, scope).catch(() => 0);
   for (const categoryId of categoryIds) {
     await db.$executeRawUnsafe(
-      'INSERT INTO "PromptAssetCategoryLink" ("id", "assetId", "categoryId", "scope") VALUES (?, ?, ?, ?)',
+      'INSERT INTO "PromptAssetCategoryLink" ("id", "workspaceId", "assetId", "categoryId", "scope") VALUES (?, ?, ?, ?, ?)',
       `clk_${randomUUID().replace(/-/g, '')}`,
+      requireWorkspaceId(),
       assetId,
       categoryId,
       scope,

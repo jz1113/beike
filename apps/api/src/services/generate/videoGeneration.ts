@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { gatewayFetch } from '../../gateways/http';
 import { readJsonBody } from '../../core/validate';
 import { guardSubmission } from '../submissionGuard';
@@ -238,7 +239,7 @@ async function submit(req: Request) {
       }
 
       const taskRecord = await db.imageTask.upsert({
-        where: { taskId: taskId },
+        where: { workspaceId_taskId: { workspaceId: requireWorkspaceId(), taskId } },
         update: {
           productId: validProductId,
           prompt: cleanedPrompt,

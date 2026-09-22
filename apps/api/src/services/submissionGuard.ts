@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { getWorkspaceId, requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 
 const inFlight = new Map<string, Promise<Response>>();
 export const SUBMISSION_RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -17,26 +18,41 @@ export function isExpiredReceipt(createdAt: number | undefined, now = Date.now()
   return !createdAt || now - createdAt >= SUBMISSION_RECEIPT_TTL_MS;
 }
 
-function receiptsDir(): string {
+function receiptsRoot(): string {
   const root = process.env.AZHUO_DATA_DIR || path.resolve('.local/submission-receipts');
   return path.join(root, 'submission-receipts');
 }
 
+function receiptsDir(): string {
+  return path.join(receiptsRoot(), requireWorkspaceId());
+}
+
+async function receiptDirs(): Promise<string[]> {
+  const current = getWorkspaceId();
+  if (current) return [path.join(receiptsRoot(), current)];
+  const root = receiptsRoot();
+  const names = await fs.readdir(root).catch(() => [] as string[]);
+  const dirs = [root];
+  for (const name of names) dirs.push(path.join(root, name));
+  return dirs;
+}
+
 export async function purgeExpiredSubmissionReceipts(now = Date.now()): Promise<number> {
-  const dir = receiptsDir();
-  const names = await fs.readdir(dir).catch(() => [] as string[]);
   let purged = 0;
-  for (const name of names) {
-    if (!name.endsWith('.json')) continue;
-    const file = path.join(dir, name);
-    try {
-      const saved = JSON.parse(await fs.readFile(file, 'utf8')) as Receipt;
-      if (isExpiredReceipt(saved.createdAt, now)) {
-        await fs.unlink(file);
-        purged += 1;
+  for (const dir of await receiptDirs()) {
+    const names = await fs.readdir(dir).catch(() => [] as string[]);
+    for (const name of names) {
+      if (!name.endsWith('.json')) continue;
+      const file = path.join(dir, name);
+      try {
+        const saved = JSON.parse(await fs.readFile(file, 'utf8')) as Receipt;
+        if (isExpiredReceipt(saved.createdAt, now)) {
+          await fs.unlink(file);
+          purged += 1;
+        }
+      } catch {
+        /* ignore unreadable receipts */
       }
-    } catch {
-      /* ignore unreadable receipts */
     }
   }
   return purged;
@@ -59,7 +75,7 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
   const scope = digest(`${kind}\0${credentials.baseUrl}\0${credentials.apiKey}`);
   const fingerprint = digest(canonical(input));
   // Without a client operation id each explicit request is a new generation.
-  const key = digest(`${scope}\0${operation || randomUUID()}`);
+  const key = digest(`${requireWorkspaceId()}\0${scope}\0${operation || randomUUID()}`);
   const existing = inFlight.get(key);
   if (existing) {
     const response = await existing;

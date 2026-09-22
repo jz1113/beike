@@ -20,9 +20,12 @@ import { applyRequestLogging } from './bootstrap/logging';
 import { requestIdMiddleware } from './core/requestId';
 import { installShutdown, recoverOnBoot, runPeriodicMaintenance } from './bootstrap/lifecycle';
 import { cleanupAssistantMedia } from './routes/assistant/media';
-import { initializeDatabase } from '@beike/server-kit/prisma';
+import { initializeDatabase, unscopedPrisma } from '@beike/server-kit/prisma';
+import { adoptLegacyWorkspaceRows } from '@beike/server-kit/database/workspaceIsolation';
 import { seedOfficialCatalog } from '@beike/server-kit/officialCatalogSeed';
 import { mountWebShell } from './core/webShell';
+import { isAuthorized, isAccessTokenConfigured } from '@beike/server-kit/apiAuth';
+import { isFixedLocalWorkspace, resolveWorkspaceFromRequest, runWithWorkspace } from '@beike/server-kit/workspaceContext';
 
 const app = new Hono();
 
@@ -38,7 +41,19 @@ app.route('/api/assets', assetsRoutes);
 app.route('/api/assistant', assistantRoutes);
 app.route('/api/system', systemRoutes);
 app.route('/api/workshop', workshopRoutes);
-app.get('/storage/*', (c) => localMedia.GET(c.req.raw));
+app.get('/storage/*', async (c) => {
+  if (!isAccessTokenConfigured()) {
+    return c.json({ success: false, error: '服务端未配置访问令牌，请联系管理员' }, 503);
+  }
+  if (!isAuthorized(c.req.raw) && !isFixedLocalWorkspace()) {
+    return c.json({ success: false, error: '未授权：访问令牌缺失或无效' }, 401);
+  }
+  const workspace = resolveWorkspaceFromRequest(c.req.raw);
+  if (!workspace.ok) {
+    return c.json({ success: false, error: workspace.error }, workspace.status);
+  }
+  return runWithWorkspace(workspace.store.workspaceId, () => localMedia.GET(c.req.raw), workspace.store.secret);
+});
 const webShellMounted = mountWebShell(app);
 
 export { app };
@@ -46,6 +61,7 @@ export { app };
 async function startServer() {
   await initializeDatabase();
   await seedOfficialCatalog();
+  await adoptLegacyWorkspaceRows(unscopedPrisma);
   const port = Number.parseInt(process.env.PORT || '3000', 10);
   const hostname = process.env.HOSTNAME || '127.0.0.1';
   console.log(`→ 贝壳云图 API 服务 http://${hostname}:${port}`);

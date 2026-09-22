@@ -10,6 +10,7 @@
 import { db } from '../repositories/access';
 import type { AssistantItem } from '@beike/domain/assistant/types';
 import { extractItemFields } from './assistantTurnPersist';
+import { requireWorkspaceId, runWithWorkspace } from '@beike/server-kit/workspaceContext';
 
 const QUEUE_MAX = 5000;
 const RETRY_LIMIT = 3;
@@ -18,6 +19,7 @@ interface PersistTask {
   turnId: string;
   item: AssistantItem;
   attempts: number;
+  workspaceId: string;
 }
 
 const queue: PersistTask[] = [];
@@ -46,11 +48,12 @@ export function enqueueItemPersist(turnId: string, item: AssistantItem): void {
   if (!turnId || !item?.id) return;
   // 去重：如果最新一条同 id 且 status 相同则跳过；否则替换
   const last = queue[queue.length - 1];
-  if (last && last.turnId === turnId && last.item.id === item.id) {
+  const workspaceId = requireWorkspaceId();
+  if (last && last.turnId === turnId && last.item.id === item.id && last.workspaceId === workspaceId) {
     queue[queue.length - 1] = { ...last, item };
     return;
   }
-  enqueue({ turnId, item, attempts: 0 });
+  enqueue({ turnId, item, attempts: 0, workspaceId });
 }
 
 async function persistOne(task: PersistTask): Promise<void> {
@@ -99,7 +102,7 @@ async function drainLoop(opts?: { throwOnError?: boolean }): Promise<void> {
       while (queue.length > 0) {
         const task = queue.shift()!;
         try {
-          await persistOne(task);
+          await runWithWorkspace(task.workspaceId, () => persistOne(task));
         } catch (err) {
           task.attempts += 1;
           const newerQueued = queue.some((queued) => queued.turnId === task.turnId && queued.item.id === task.item.id);

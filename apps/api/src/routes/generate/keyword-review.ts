@@ -13,16 +13,16 @@ import {
 function readDeepSeekKey(body: { customBaseUrl?: string; customApiKey?: string }) {
   const baseUrl = normalizeGatewayBaseUrl(body.customBaseUrl);
   if (baseUrl !== KEYWORD_REVIEW_DEEPSEEK_BASE_URL) {
-    return { error: jsonResponse({ success: false, error: '关键词审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key' }, 400) };
+    return { ok: false as const, response: jsonResponse({ success: false, error: '关键词审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key' }, 400) };
   }
   const apiKey = body.customApiKey?.trim() || '';
   if (!apiKey) {
-    return { error: jsonResponse({ success: false, error: '未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写' }, 400) };
+    return { ok: false as const, response: jsonResponse({ success: false, error: '未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写' }, 400) };
   }
-  return { baseUrl, apiKey };
+  return { ok: true as const, baseUrl, apiKey };
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   try {
     let rawBody: unknown;
     try {
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const parsedBody = parseJsonBody(rawBody, KeywordReviewRequestSchema);
     if (!parsedBody.success) return jsonResponse({ success: false, error: parsedBody.error }, 400);
     const credentials = readDeepSeekKey(parsedBody.data);
-    if ('error' in credentials) return credentials.error;
+    if (!credentials.ok) return credentials.response;
     const { baseUrl, apiKey } = credentials;
     const model = String(parsedBody.data.model || KEYWORD_REVIEW_DEEPSEEK_MODEL).trim() || KEYWORD_REVIEW_DEEPSEEK_MODEL;
     if (model !== KEYWORD_REVIEW_DEEPSEEK_MODEL) {
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function balancePOST(req: Request) {
+export async function balancePOST(req: Request): Promise<Response> {
   try {
     let rawBody: unknown;
     try {
@@ -70,7 +70,7 @@ export async function balancePOST(req: Request) {
     const parsedBody = parseJsonBody(rawBody, KeywordReviewBalanceRequestSchema);
     if (!parsedBody.success) return jsonResponse({ success: false, error: parsedBody.error }, 400);
     const credentials = readDeepSeekKey(parsedBody.data);
-    if ('error' in credentials) return credentials.error;
+    if (!credentials.ok) return credentials.response;
     const balance = await fetchDeepSeekBalance(credentials);
     return jsonResponse({ success: true, ...balance });
   } catch (error) {

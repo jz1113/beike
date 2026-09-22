@@ -1,6 +1,7 @@
 import type { KeywordReviewResult, KeywordReviewRow } from '@beike/contracts/generate';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { gatewayFetch } from '../gateways/http';
+import { clipReasonChars, LOOKUP_SUBJECT_MAX, rewriteLookupCategoryReason } from './keywordReviewReasons';
 
 export const KEYWORD_REVIEW_LOOKUP_LIMIT = 5;
 export const KEYWORD_REVIEW_LOOKUP_CONCURRENCY = 3;
@@ -8,24 +9,30 @@ export const KEYWORD_REVIEW_LOOKUP_TIMEOUT_MS = 20_000;
 const LOOKUP_CACHE_LIMIT = 2000;
 
 export type ReviewedKeywordRow = KeywordReviewResult & { needsLookup: boolean };
+type LookupHit = { category: string; subject?: string };
 
-const lookupCache = new Map<string, string>();
+const lookupCache = new Map<string, LookupHit>();
 
 export function resetLookupCacheForTests() {
   lookupCache.clear();
 }
 
-export function rememberLookupCategory(query: string, category: string) {
+export function rememberLookupCategory(query: string, category: string, subject?: string) {
   const key = query.trim();
   if (!key) return;
   if (lookupCache.size >= LOOKUP_CACHE_LIMIT) {
     const oldest = lookupCache.keys().next().value;
     if (oldest !== undefined) lookupCache.delete(oldest);
   }
-  lookupCache.set(key, category);
+  const clipped = clipReasonChars(subject || '', LOOKUP_SUBJECT_MAX) || undefined;
+  lookupCache.set(key, { category, subject: clipped });
 }
 
 export function recalledLookupCategory(query: string): string | undefined {
+  return lookupCache.get(query.trim())?.category;
+}
+
+function recalledLookupHit(query: string): LookupHit | undefined {
   return lookupCache.get(query.trim());
 }
 
@@ -50,6 +57,15 @@ export function selectLookupRows(
   return picked;
 }
 
+function applyLookupHit(result: ReviewedKeywordRow, hit?: LookupHit): ReviewedKeywordRow {
+  if (!hit) return result;
+  return {
+    ...result,
+    category: hit.category,
+    categoryReason: rewriteLookupCategoryReason(result, hit.category, hit.subject),
+  };
+}
+
 export function applyCachedLookupCategories(
   results: ReviewedKeywordRow[],
   rows: KeywordReviewRow[],
@@ -57,8 +73,7 @@ export function applyCachedLookupCategories(
   const byId = new Map(rows.map((row) => [row.id, row]));
   return results.map((result) => {
     const query = byId.get(result.id)?.query;
-    const cached = query ? recalledLookupCategory(query) : undefined;
-    return cached ? { ...result, category: cached } : result;
+    return applyLookupHit(result, query ? recalledLookupHit(query) : undefined);
   });
 }
 
@@ -79,15 +94,31 @@ export function extractResponsesText(data: unknown): string {
   return texts.join('\n').trim();
 }
 
-export function parseLookupCategory(raw: string, allowed: Set<string>): string | undefined {
+export function parseLookupResult(raw: string, allowed: Set<string>): LookupHit | undefined {
   const clean = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   try {
-    const parsed = JSON.parse(clean) as { category?: unknown };
+    const parsed = JSON.parse(clean) as { category?: unknown; subject?: unknown };
     const category = String(parsed?.category || '').trim();
-    return allowed.has(category) ? category : undefined;
+    if (!allowed.has(category)) return undefined;
+    const subject = clipReasonChars(String(parsed?.subject || '').replace(/[，,。；;：:、]/g, ''), LOOKUP_SUBJECT_MAX);
+    return subject ? { category, subject } : { category };
   } catch {
     return undefined;
   }
+}
+
+export function parseLookupCategory(raw: string, allowed: Set<string>): string | undefined {
+  return parseLookupResult(raw, allowed)?.category;
+}
+
+function toPublicResult(result: ReviewedKeywordRow): KeywordReviewResult {
+  return {
+    id: result.id,
+    category: result.category,
+    producible: result.producible,
+    categoryReason: result.categoryReason,
+    rejectReason: result.rejectReason,
+  };
 }
 
 function buildLookupPrompt(allowed: readonly string[]): string {
@@ -96,7 +127,7 @@ ${allowed.join('、')}
 
 只用搜索确认作品、品牌、游戏、外文词、机构或陌生实体是什么。query 已经清楚时，不要用网页改意图。不要输出网页内容。
 
-严格返回 JSON：{"category":"唯一允许垂类"}。`;
+严格返回 JSON：{"category":"唯一允许垂类","subject":"不超过12字的主体短语"}。`;
 }
 
 async function lookupOneRow(options: {
@@ -106,8 +137,8 @@ async function lookupOneRow(options: {
   row: KeywordReviewRow;
   allowed: Set<string>;
   categories: readonly string[];
-}): Promise<string | undefined> {
-  const cached = recalledLookupCategory(options.row.query);
+}): Promise<LookupHit | undefined> {
+  const cached = recalledLookupHit(options.row.query);
   if (cached) return cached;
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/responses`, {
     method: 'POST',
@@ -134,9 +165,9 @@ async function lookupOneRow(options: {
     signal: AbortSignal.timeout(KEYWORD_REVIEW_LOOKUP_TIMEOUT_MS),
   });
   if (!response.ok) return undefined;
-  const category = parseLookupCategory(extractResponsesText(await response.json()), options.allowed);
-  if (category) rememberLookupCategory(options.row.query, category);
-  return category;
+  const hit = parseLookupResult(extractResponsesText(await response.json()), options.allowed);
+  if (hit) rememberLookupCategory(options.row.query, hit.category, hit.subject);
+  return hit;
 }
 
 async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -165,16 +196,13 @@ export async function lookupUncertainCategories(options: {
   const withCache = applyCachedLookupCategories(options.results, options.rows);
   const targets = selectLookupRows(withCache, options.rows);
   if (targets.length === 0) {
-    return {
-      results: withCache.map(({ id, category, producible }) => ({ id, category, producible })),
-      lookedUp: 0,
-    };
+    return { results: withCache.map(toPublicResult), lookedUp: 0 };
   }
 
-  const found = new Map<string, string>();
+  const found = new Map<string, LookupHit>();
   await mapPool(targets, KEYWORD_REVIEW_LOOKUP_CONCURRENCY, async (row) => {
     try {
-      const category = await lookupOneRow({
+      const hit = await lookupOneRow({
         baseUrl: options.baseUrl,
         apiKey: options.apiKey,
         model: options.model,
@@ -182,7 +210,7 @@ export async function lookupUncertainCategories(options: {
         allowed: options.allowed,
         categories: options.categories,
       });
-      if (category) found.set(row.query.trim(), category);
+      if (hit) found.set(row.query.trim(), hit);
     } catch {
       // Keep the first-pass result when search times out or fails.
     }
@@ -192,8 +220,7 @@ export async function lookupUncertainCategories(options: {
   return {
     results: withCache.map((result) => {
       const query = byId.get(result.id)?.query.trim();
-      const category = query ? found.get(query) : undefined;
-      return { id: result.id, category: category || result.category, producible: result.producible };
+      return toPublicResult(applyLookupHit(result, query ? found.get(query) : undefined));
     }),
     lookedUp: found.size,
   };

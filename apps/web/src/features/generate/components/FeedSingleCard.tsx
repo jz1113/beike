@@ -103,11 +103,11 @@ export default function FeedSingleCard({
                 {primaryTask.failReason || '接口响应异常'}
               </p>
             </div>
-            <div className="flex items-center justify-center gap-2 pt-1">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
               {(isDepthImageTask(primaryTask) || isDepthVideoTask(primaryTask)) &&
               (primaryTask.failReason?.includes('无法读取上传文件') ||
                 !peekDepthSubmit(primaryTask.id)) ? (
-                <label className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs text-white font-bold transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5 active:scale-95">
+                <label className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs text-white font-bold transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 active:scale-95">
                   <Upload className="w-3.5 h-3.5 shrink-0" />
                   <span>重新选择文件并生成</span>
                   <input
@@ -150,14 +150,14 @@ export default function FeedSingleCard({
                 <>
                   <button
                     onClick={() => onRetry(primaryTask)}
-                    className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs text-white font-bold transition-colors cursor-pointer shadow-xs active:scale-95"
+                    className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs text-white font-bold transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0 active:scale-95"
                   >
                     立即重试
                   </button>
                   <button
                     type="button"
                     onClick={() => onDelete(primaryTask)}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-xs text-slate-700 hover:text-red-600 font-bold transition-colors cursor-pointer shadow-xs active:scale-95 flex items-center gap-1 border border-slate-200"
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-xs text-slate-700 hover:text-red-600 font-bold transition-colors cursor-pointer shadow-xs active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0 border border-slate-200"
                     title="清除此失败卡片"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

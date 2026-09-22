@@ -176,10 +176,25 @@ export const KeywordReviewRequestSchema = z.object({
   lookup: z.boolean().optional(),
 });
 
+export const KEYWORD_REVIEW_REJECT_PREFIXES = [
+  '简单问答',
+  '低价值',
+  '金融决策',
+  '医疗诊疗',
+  '敏感热点',
+  '违法危险',
+  '算命迷信',
+  '工业硬广',
+  '非笔记需求',
+  '限制过细',
+] as const;
+
 export const KeywordReviewResultSchema = z.object({
   id: z.string(),
   category: z.string(),
   producible: z.enum(['制作', '不制作']),
+  categoryReason: z.string().min(1).max(80),
+  rejectReason: z.string().max(80),
 });
 
 export const KeywordReviewBalanceRequestSchema = z.object({

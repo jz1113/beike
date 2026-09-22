@@ -10,6 +10,7 @@ import { chmod, mkdir, open, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { baselineSql } from './baseline';
 import { libraryIndexSql } from './libraryIndexes';
+import { applyWorkspaceIsolation, workspaceIsolationSql } from './workspaceIsolation';
 
 type Database = Prisma.TransactionClient;
 interface Column { name: string }
@@ -208,6 +209,10 @@ export const desktopMigrations: readonly DatabaseMigration[] = [{
       await db.$executeRawUnsafe(statement);
     }
   },
+}, {
+  version: '20260922_02_workspace_isolation',
+  checksum: createHash('sha256').update(workspaceIsolationSql).digest('hex'),
+  apply: applyWorkspaceIsolation,
 }];
 
 async function readApplied(db: Database): Promise<Applied[]> {

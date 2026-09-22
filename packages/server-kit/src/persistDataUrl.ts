@@ -1,4 +1,4 @@
-import { resolveStorageRoot } from './storagePaths';
+import { resolveStorageRoot, toWorkspaceStorageKey } from './storagePaths';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { StorageConfig, StorageCategory } from './storage';
@@ -26,7 +26,7 @@ function saveBufferToLocalStorage(
   else if (contentType.includes('webp')) ext = 'webp';
   else if (contentType.includes('mp4')) ext = 'mp4';
 
-  const relKey = buildStorageKey(category, ext, customFilename);
+  const relKey = toWorkspaceStorageKey(buildStorageKey(category, ext, customFilename));
   const absPath = path.join(root, relKey);
   fs.mkdirSync(path.dirname(absPath), { recursive: true });
   fs.writeFileSync(absPath, buffer);

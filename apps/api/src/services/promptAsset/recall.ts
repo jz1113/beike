@@ -1,3 +1,4 @@
+import { OFFICIAL_WORKSPACE_ID, requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import {
   categoryFitScore,
@@ -52,7 +53,9 @@ export async function listAssetsForCoverage(assetType: 'scene' | 'outfit' | 'act
     persona: 'PersonaAsset',
   }[assetType];
   return db.$queryRawUnsafe<Array<{ id: string; tags: string | null; shotType: string | null; productCategoryIds: string | null }>>(
-    `SELECT "id", "tags", ${assetType === 'action' ? '"shotType"' : 'NULL as "shotType"'}, "productCategoryIds" FROM "${table}"`,
+    `SELECT "id", "tags", ${assetType === 'action' ? '"shotType"' : 'NULL as "shotType"'}, "productCategoryIds" FROM "${table}" WHERE "workspaceId" IN (?, ?)`,
+    requireWorkspaceId(),
+    OFFICIAL_WORKSPACE_ID,
   ).catch(() => []);
 }
 

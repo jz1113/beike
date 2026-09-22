@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../../core/http';
+import { allowServerSecretFallback } from '@beike/domain/gatewayCreds';
 import { readJsonBody } from '../../../core/validate';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { parseSocialLinkViaApia } from '@beike/server-kit/apiaScraper';
@@ -52,10 +53,10 @@ export async function POST(req: Request) {
       });
     }
 
-    const qAppId = (qiyunAppId || customQiyunAppId || req.headers.get('x-qiyun-appid') || process.env.QIYUN_APP_ID || '').trim();
-    const qAppKey = (qiyunAppKey || customQiyunAppKey || req.headers.get('x-qiyun-appkey') || process.env.QIYUN_APP_KEY || '').trim();
-    const apiaSecret = (scraperSecret || customApiKey || req.headers.get('x-apia-secret-key') || process.env.EXTERNAL_SCRAPER_SECRET || '').trim();
-    const apiaClient = (scraperId || customScraperId || req.headers.get('x-apia-client-id') || process.env.EXTERNAL_SCRAPER_ID || '').trim();
+    const qAppId = (qiyunAppId || customQiyunAppId || req.headers.get('x-qiyun-appid') || (allowServerSecretFallback() ? process.env.QIYUN_APP_ID : '') || '').trim();
+    const qAppKey = (qiyunAppKey || customQiyunAppKey || req.headers.get('x-qiyun-appkey') || (allowServerSecretFallback() ? process.env.QIYUN_APP_KEY : '') || '').trim();
+    const apiaSecret = (scraperSecret || customApiKey || req.headers.get('x-apia-secret-key') || (allowServerSecretFallback() ? process.env.EXTERNAL_SCRAPER_SECRET : '') || '').trim();
+    const apiaClient = (scraperId || customScraperId || req.headers.get('x-apia-client-id') || (allowServerSecretFallback() ? process.env.EXTERNAL_SCRAPER_ID : '') || '').trim();
     const hasQiyun = Boolean(qAppId && qAppKey);
     const hasApia = Boolean(apiaSecret && apiaClient);
     if (!hasQiyun && !hasApia) {

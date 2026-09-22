@@ -6,6 +6,7 @@ import {
 import { ToolSuiteMark } from '@/shared/icons';
 import { KeywordReviewRulesDialog } from './KeywordReviewRulesDialog';
 import { useKeywordReview } from './hooks/useKeywordReview';
+import { splitRejectReason, type KeywordReviewRecord, type OutputColumn } from './model/keywordReviewWorkbook';
 
 interface Props {
   onBack: () => void;
@@ -21,6 +22,60 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
   );
 }
 
+function RejectReasonCell({ producible, reason }: { producible?: '制作' | '不制作'; reason?: string }) {
+  const reject = producible === '不制作' ? splitRejectReason(reason) : null;
+  if (!reject) return '—';
+  return (
+    <span className="inline-flex max-w-full items-start gap-1.5" title={reason}>
+      {reject.kind ? <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700">{reject.kind}</span> : null}
+      <span className="line-clamp-2 text-xs leading-5 text-slate-500">{reject.detail || '—'}</span>
+    </span>
+  );
+}
+
+function sourceValue(record: KeywordReviewRecord, column: OutputColumn): string {
+  if (column.key === 'query') return record.query;
+  if (column.key === 'expansion') return record.expansion || record.sourceValues[column.key] || '';
+  if (column.key === 'entityExpansion') return record.entityExpansion || record.sourceValues[column.key] || '';
+  if (column.key === 'contentType') return record.contentType || record.sourceValues[column.key] || '';
+  return record.sourceValues?.[column.key] || '';
+}
+
+function PreviewCell({ column, record }: { column: OutputColumn; record: KeywordReviewRecord }) {
+  if (column.kind === 'category') {
+    return <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-700">{record.category || '—'}</td>;
+  }
+  if (column.kind === 'categoryReason') {
+    return (
+      <td className="max-w-[220px] px-4 py-3 text-xs leading-5 text-slate-500">
+        <span className="line-clamp-2" title={record.categoryReason || undefined}>{record.categoryReason || '—'}</span>
+      </td>
+    );
+  }
+  if (column.kind === 'producible') {
+    return (
+      <td className="whitespace-nowrap px-4 py-3">
+        {record.producible ? <span className={`rounded-full px-2.5 py-1 text-xs font-black ${record.producible === '制作' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.producible}</span> : '—'}
+      </td>
+    );
+  }
+  if (column.kind === 'rejectReason') {
+    return (
+      <td className="max-w-[260px] px-4 py-3">
+        <RejectReasonCell producible={record.producible} reason={record.rejectReason} />
+      </td>
+    );
+  }
+  const value = sourceValue(record, column);
+  const isQuery = column.key === 'query' || column.sourceKind === 'query';
+  const compact = column.sourceKind === 'dispatchTime' || column.key.startsWith('source:');
+  return (
+    <td className={`${isQuery ? 'max-w-[220px] font-bold text-slate-800' : 'max-w-[240px] text-xs leading-5 text-slate-500'} ${compact ? 'whitespace-nowrap' : ''} px-4 py-3`}>
+      {isQuery ? value : (value || '—')}
+    </td>
+  );
+}
+
 export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const review = useKeywordReview();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -31,6 +86,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const trialLabel = review.counts.done > 0 || review.counts.failed > 0 ? '再试下一批' : `试跑 ${review.batchSize} 条`;
   const batchLabel = review.counts.done > 0 || review.counts.failed > 0 ? '继续批量' : '批量审核';
   const canRun = review.counts.pending > 0 || review.counts.failed > 0;
+  const displayColumns = review.parsed?.displayColumns ?? [];
 
   const receiveFile = (file?: File) => {
     if (file) void review.importFile(file);
@@ -73,13 +129,13 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-[1500px] space-y-5">
+        <div className="mx-auto w-full max-w-[1680px] space-y-5">
           {!review.parsed ? (
             <section className="mx-auto max-w-[980px] pt-8 sm:pt-14">
               <div className="mb-7 text-center">
                 <p className="text-xs font-black tracking-[0.22em] text-amber-600">SEMANTIC REVIEW</p>
                 <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-5xl">关键词分类及制作判断</h1>
-                <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">读取全部工作表的 query、相关拓展 q、实体拓展 q 和内容类型。可先试跑 {review.batchSize} 条，确认无误后再批量连续审核。走 DeepSeek 官方接口，不替换当前生图网关。</p>
+                <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">按原表头读取全部工作表。空的实体拓展 q 和分类列不会进入结果表，审核列接在下发时间后面。可先试跑 {review.batchSize} 条，确认无误后再批量连续审核。走 DeepSeek 官方接口，不替换当前生图网关。</p>
               </div>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => { receiveFile(event.target.files?.[0]); event.currentTarget.value = ''; }} />
               <button
@@ -148,21 +204,21 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
 
               <section className="overflow-hidden rounded-[26px] border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur">
                 <div className="overflow-auto">
-                  <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+                  <table className="w-full min-w-[1580px] border-collapse text-left text-sm">
                     <thead className="sticky top-0 z-10 bg-slate-950 text-white">
-                      <tr><th className="px-4 py-3 font-bold">行</th><th className="px-4 py-3 font-bold">Query</th><th className="px-4 py-3 font-bold">相关拓展</th><th className="px-4 py-3 font-bold">实体拓展</th><th className="px-4 py-3 font-bold">最终垂类</th><th className="px-4 py-3 font-bold">是否可制作</th><th className="px-4 py-3 font-bold">状态</th></tr>
+                      <tr>
+                        {displayColumns.map((column) => (
+                          <th key={column.key} className="px-4 py-3 font-bold">{column.label}</th>
+                        ))}
+                        <th className="px-4 py-3 font-bold">状态</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {review.previewRecords.map((record) => (
                         <tr key={record.id} className="border-b border-slate-100 align-top last:border-0 hover:bg-amber-50/35">
-                          <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">{record.sheetName} · {record.rowNumber}</td>
-                          <td className="max-w-[220px] px-4 py-3 font-bold text-slate-800">{record.query}</td>
-                          <td className="max-w-[240px] px-4 py-3 text-xs leading-5 text-slate-500">{record.expansion || '—'}</td>
-                          <td className="max-w-[240px] px-4 py-3 text-xs leading-5 text-slate-500">{record.entityExpansion || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-700">{record.category || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            {record.producible ? <span className={`rounded-full px-2.5 py-1 text-xs font-black ${record.producible === '制作' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.producible}</span> : '—'}
-                          </td>
+                          {displayColumns.map((column) => (
+                            <PreviewCell key={column.key} column={column} record={record} />
+                          ))}
                           <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold">
                             {record.status === 'done' ? <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />已完成</span>
                               : record.status === 'running' ? <span className="inline-flex items-center gap-1 text-blue-600"><Loader2 className="h-3.5 w-3.5 animate-spin" />审核中</span>
