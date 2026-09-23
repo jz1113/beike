@@ -1,4 +1,4 @@
-import type { KeywordReviewRuleEntry } from '@beike/contracts/generate';
+import type { KeywordReviewMode, KeywordReviewRuleEntry } from '@beike/contracts/generate';
 import { KeywordReviewRuleEntrySchema } from '@beike/contracts/generate';
 import { prisma } from '../repositories/db';
 
@@ -59,4 +59,8 @@ export function formatKeywordReviewRuleAdditions(entries: KeywordReviewRuleEntry
   if (!entries.length) return '';
   const lines = entries.map((entry, index) => `${index + 1}. [${entry.section}] ${entry.text}`);
   return `\n\n以下是后续发布的补充规则，与基础规则一起执行；不得改变允许垂类、制作结论、否决类型或 JSON 字段：\n${lines.join('\n')}`;
+}
+
+export function ruleEntriesForMode(entries: KeywordReviewRuleEntry[], mode: KeywordReviewMode): KeywordReviewRuleEntry[] {
+  return entries.filter((entry) => (entry.mode || 'image') === mode);
 }

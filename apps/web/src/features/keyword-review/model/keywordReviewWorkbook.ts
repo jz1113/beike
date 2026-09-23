@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { KEYWORD_REVIEW_REJECT_PREFIXES, type KeywordReviewResult, type KeywordReviewRow } from '@beike/contracts/generate';
+import { KEYWORD_REVIEW_REJECT_PREFIXES, KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode, type KeywordReviewResult, type KeywordReviewRow } from '@beike/contracts/generate';
 import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
 import { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';
 
@@ -17,9 +17,10 @@ export type FieldKind =
   | 'category'
   | 'categoryReason'
   | 'producible'
-  | 'rejectReason';
+  | 'rejectReason'
+  | 'lowValue';
 
-export type OutputColumnKind = 'source' | 'category' | 'categoryReason' | 'producible' | 'rejectReason';
+export type OutputColumnKind = 'source' | 'category' | 'categoryReason' | 'producible' | 'rejectReason' | 'lowValue';
 
 export interface OutputColumn {
   key: string;
@@ -37,6 +38,7 @@ export interface KeywordReviewRecord extends KeywordReviewRow {
   producible?: '制作' | '不制作';
   categoryReason?: string;
   rejectReason?: string;
+  lowValue?: '是' | '否';
   error?: string;
   submissionUncertain?: boolean;
   sourceValues: Record<string, string>;
@@ -53,6 +55,7 @@ export interface KeywordReviewSheet {
 export interface ParsedKeywordWorkbook {
   workbook: XLSX.WorkBook;
   fileName: string;
+  mode: KeywordReviewMode;
   records: KeywordReviewRecord[];
   sheets: KeywordReviewSheet[];
   displayColumns: OutputColumn[];
@@ -66,9 +69,11 @@ interface ReviewColumns {
   categoryReasonReadCol?: number;
   producibleReadCol: number;
   rejectReasonReadCol?: number;
+  lowValueCol?: number;
+  lowValueReadCol?: number;
 }
 
-const REVIEW_FIELD_KINDS = new Set<FieldKind>(['category', 'categoryReason', 'producible', 'rejectReason']);
+const REVIEW_FIELD_KINDS = new Set<FieldKind>(['category', 'categoryReason', 'producible', 'rejectReason', 'lowValue']);
 
 export const REVIEW_OUTPUT_COLUMNS: OutputColumn[] = [
   { key: 'category', label: '最终垂类', kind: 'category' },
@@ -76,6 +81,12 @@ export const REVIEW_OUTPUT_COLUMNS: OutputColumn[] = [
   { key: 'producible', label: '是否可制作', kind: 'producible' },
   { key: 'rejectReason', label: '不制作依据', kind: 'rejectReason' },
 ];
+export const VIDEO_REVIEW_OUTPUT_COLUMNS: OutputColumn[] = [
+  ...REVIEW_OUTPUT_COLUMNS,
+  { key: 'lowValue', label: '低价值关键词', kind: 'lowValue' },
+];
+
+const reviewColumns = (mode: KeywordReviewMode) => mode === 'video' ? VIDEO_REVIEW_OUTPUT_COLUMNS : REVIEW_OUTPUT_COLUMNS;
 
 function cellText(sheet: XLSX.WorkSheet, row: number, col: number): string {
   const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
@@ -99,6 +110,7 @@ export function fieldKind(value: string): FieldKind | null {
   if (header === '垂类依据') return 'categoryReason';
   if (header === '是否可制作') return 'producible';
   if (header === '不制作依据') return 'rejectReason';
+  if (header === '低价值关键词') return 'lowValue';
   return null;
 }
 
@@ -137,7 +149,11 @@ export function allocateReviewColumns(
   found: Partial<Record<FieldKind, number>>,
   lastCol: number,
   insertAfterCol?: number,
+  mode: KeywordReviewMode = 'image',
 ): ReviewColumns {
+  const lowValue = (rejectReasonCol: number): Pick<ReviewColumns, 'lowValueCol' | 'lowValueReadCol'> => mode === 'video'
+    ? { lowValueCol: found.lowValue ?? Math.max(lastCol + 1, rejectReasonCol + 1), lowValueReadCol: found.lowValue }
+    : {};
   if (
     found.category !== undefined
     && found.categoryReason !== undefined
@@ -152,6 +168,7 @@ export function allocateReviewColumns(
       categoryReasonReadCol: found.categoryReason,
       producibleReadCol: found.producible,
       rejectReasonReadCol: found.rejectReason,
+      ...lowValue(found.rejectReason),
     };
   }
 
@@ -168,6 +185,7 @@ export function allocateReviewColumns(
       producibleCol: found.category + 2,
       rejectReasonCol: found.category + 3,
       producibleReadCol: found.producible,
+      ...lowValue(found.category + 3),
     };
   }
 
@@ -190,6 +208,7 @@ export function allocateReviewColumns(
     categoryReasonReadCol: found.categoryReason,
     producibleReadCol: found.producible ?? producibleCol,
     rejectReasonReadCol: found.rejectReason,
+    ...lowValue(rejectReasonCol),
   };
 }
 
@@ -197,6 +216,7 @@ export function buildOutputColumns(
   headers: Array<{ col: number; label: string }>,
   emptyCols: Iterable<number> = [],
   found: Partial<Record<FieldKind, number>> = {},
+  mode: KeywordReviewMode = 'image',
 ): OutputColumn[] {
   const empty = new Set(emptyCols);
   const source: OutputColumn[] = [];
@@ -204,7 +224,7 @@ export function buildOutputColumns(
   for (const header of headers) {
     const kind = fieldKind(header.label);
     if (kind && REVIEW_FIELD_KINDS.has(kind)) continue;
-    if (isDroppableEmptyKind(kind) && empty.has(header.col)) continue;
+    if (mode === 'image' && isDroppableEmptyKind(kind) && empty.has(header.col)) continue;
     if (!header.label && empty.has(header.col)) continue;
     const column: OutputColumn = {
       key: sourceColumnKey(kind, header.label),
@@ -217,7 +237,7 @@ export function buildOutputColumns(
     if (kind === 'dispatchTime') dispatchIndex = source.length - 1;
   }
 
-  const review = REVIEW_OUTPUT_COLUMNS.map((column) => ({
+  const review = reviewColumns(mode).map((column) => ({
     ...column,
     sourceCol: found[column.kind as FieldKind],
   }));
@@ -228,7 +248,7 @@ export function buildOutputColumns(
   return [...source, ...review];
 }
 
-export function mergeOutputColumns(groups: OutputColumn[][]): OutputColumn[] {
+export function mergeOutputColumns(groups: OutputColumn[][], mode: KeywordReviewMode = 'image'): OutputColumn[] {
   const source: OutputColumn[] = [];
   const seen = new Set<string>();
   let dispatchIndex = -1;
@@ -246,9 +266,9 @@ export function mergeOutputColumns(groups: OutputColumn[][]): OutputColumn[] {
     }
   }
   if (dispatchIndex >= 0) {
-    return [...source.slice(0, dispatchIndex + 1), ...REVIEW_OUTPUT_COLUMNS, ...source.slice(dispatchIndex + 1)];
+    return [...source.slice(0, dispatchIndex + 1), ...reviewColumns(mode), ...source.slice(dispatchIndex + 1)];
   }
-  return [...source, ...REVIEW_OUTPUT_COLUMNS];
+  return [...source, ...reviewColumns(mode)];
 }
 
 function emptyDataColumns(sheet: XLSX.WorkSheet, headerRow: number, range: XLSX.Range): Set<number> {
@@ -346,7 +366,7 @@ function remapSheet(sheet: XLSX.WorkSheet, outputColumns: OutputColumn[], range:
   return next;
 }
 
-export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: string): ParsedKeywordWorkbook {
+export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: string, mode: KeywordReviewMode = 'image'): ParsedKeywordWorkbook {
   const records: KeywordReviewRecord[] = [];
   const sheets: KeywordReviewSheet[] = [];
 
@@ -357,11 +377,12 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
     const header = findHeader(sheet, range);
     if (!header) continue;
     const emptyCols = emptyDataColumns(sheet, header.row, range);
-    const outputColumns = buildOutputColumns(header.headers, emptyCols, header.found);
+    const outputColumns = buildOutputColumns(header.headers, emptyCols, header.found, mode);
     const reviewRead = allocateReviewColumns(
       header.found,
       range.e.c,
       header.found.dispatchTime,
+      mode,
     );
     let recordCount = 0;
     for (let row = header.row + 1; row <= range.e.r; row += 1) {
@@ -372,7 +393,11 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
       const producible = producibleRaw === '制作' || producibleRaw === '不制作' ? producibleRaw : undefined;
       const categoryReason = reviewRead.categoryReasonReadCol === undefined ? '' : cellText(sheet, row, reviewRead.categoryReasonReadCol);
       const rejectReason = reviewRead.rejectReasonReadCol === undefined ? '' : cellText(sheet, row, reviewRead.rejectReasonReadCol);
-      const alreadyReviewed = Boolean(category && producible);
+      const lowValue = reviewRead.lowValueReadCol === undefined ? '' : cellText(sheet, row, reviewRead.lowValueReadCol);
+      const alreadyReviewed = mode === 'video'
+        ? Boolean(KEYWORD_VIDEO_CATEGORIES.includes(category as typeof KEYWORD_VIDEO_CATEGORIES[number])
+          && producible && (lowValue === '是' || lowValue === '否'))
+        : Boolean(category && producible);
       const sourceValues: Record<string, string> = {};
       for (const column of outputColumns) {
         if (column.kind !== 'source' || column.sourceCol === undefined) continue;
@@ -393,6 +418,7 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
         producible,
         categoryReason: categoryReason || undefined,
         rejectReason: rejectReason || undefined,
+        lowValue: lowValue === '是' || lowValue === '否' ? lowValue : undefined,
         sourceValues,
       });
       recordCount += 1;
@@ -411,17 +437,27 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
   return {
     workbook,
     fileName,
+    mode,
     records,
     sheets,
-    displayColumns: mergeOutputColumns(sheets.map((sheet) => sheet.outputColumns)),
+    displayColumns: mergeOutputColumns(sheets.map((sheet) => sheet.outputColumns), mode),
   };
 }
 
-export async function parseKeywordWorkbook(file: File): Promise<ParsedKeywordWorkbook> {
+export async function parseKeywordWorkbook(file: File, mode: KeywordReviewMode = 'image'): Promise<ParsedKeywordWorkbook> {
   const workbook = /\.csv$/i.test(file.name)
     ? XLSX.read((await file.text()).replace(/^\uFEFF/, ''), { type: 'string', cellStyles: true, cellDates: true })
     : XLSX.read(await file.arrayBuffer(), { type: 'array', cellStyles: true, cellDates: true });
-  return parseKeywordWorkbookData(workbook, file.name);
+  const hasVideoHeader = workbook.SheetNames.some((name) => {
+    const sheet = workbook.Sheets[name];
+    if (!sheet?.['!ref']) return false;
+    const range = XLSX.utils.decode_range(sheet['!ref']);
+    const header = findHeader(sheet, range);
+    if (!header) return false;
+    const labels = new Set(header.headers.map((item) => normalizeHeader(item.label)));
+    return labels.has('需上传数量') && labels.has('已上传数量') && labels.has('相关拓展q');
+  });
+  return parseKeywordWorkbookData(workbook, file.name, hasVideoHeader ? 'video' : mode);
 }
 
 export function applyReviewResults(
@@ -459,11 +495,13 @@ export function buildReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: Ke
     const categoryReasonCol = reviewColumnIndex(meta.outputColumns, 'categoryReason');
     const producibleCol = reviewColumnIndex(meta.outputColumns, 'producible');
     const rejectReasonCol = reviewColumnIndex(meta.outputColumns, 'rejectReason');
+    const lowValueCol = reviewColumnIndex(meta.outputColumns, 'lowValue');
     const headerSource = sheet[XLSX.utils.encode_cell({ r: meta.headerRow, c: Math.max(0, categoryCol - 1) })];
     writeCell(sheet, meta.headerRow, categoryCol, '最终垂类', headerSource);
     writeCell(sheet, meta.headerRow, categoryReasonCol, '垂类依据', headerSource);
     writeCell(sheet, meta.headerRow, producibleCol, '是否可制作', headerSource);
     writeCell(sheet, meta.headerRow, rejectReasonCol, '不制作依据', headerSource);
+    if (lowValueCol >= 0) writeCell(sheet, meta.headerRow, lowValueCol, '低价值关键词', headerSource);
 
     for (const record of records) {
       if (record.sheetName !== meta.name || record.status !== 'done' || !record.category || !record.producible) continue;
@@ -473,6 +511,7 @@ export function buildReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: Ke
       writeCell(sheet, row, categoryReasonCol, record.categoryReason || '', styleSource);
       writeCell(sheet, row, producibleCol, record.producible, styleSource);
       writeCell(sheet, row, rejectReasonCol, record.producible === '制作' ? '' : (record.rejectReason || ''), styleSource);
+      if (lowValueCol >= 0) writeCell(sheet, row, lowValueCol, record.lowValue || '', styleSource);
     }
     workbook.Sheets[meta.name] = sheet;
   }
@@ -484,7 +523,7 @@ export async function exportReviewedWorkbook(parsed: ParsedKeywordWorkbook, reco
   const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const base = parsed.fileName.replace(/\.(xlsx|xls|csv)$/i, '') || '关键词表';
-  const fileName = `${base}_${partial ? '审核进度' : '已审核'}.xlsx`;
+  const fileName = `${base}_${parsed.mode === 'video' ? '视频' : '图文'}_${partial ? '审核进度' : '已审核'}.xlsx`;
   await saveToDownloadDir(fileName, blob);
   return fileName;
 }

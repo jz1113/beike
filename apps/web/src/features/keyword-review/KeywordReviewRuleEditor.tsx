@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { KeywordReviewRuleEntry } from '@beike/contracts/generate';
+import type { KeywordReviewMode, KeywordReviewRuleEntry } from '@beike/contracts/generate';
 import { apiFetch } from '@/shared/api/apiClient';
 
 type Revision = {
@@ -11,7 +11,7 @@ type Revision = {
 
 const SECTIONS = ['垂类边界', '不制作', '其他说明'] as const;
 
-export function KeywordReviewRuleEditor({ open }: { open: boolean }) {
+export function KeywordReviewRuleEditor({ open, mode }: { open: boolean; mode: KeywordReviewMode }) {
   const [current, setCurrent] = useState<Revision | null>(null);
   const [history, setHistory] = useState<Revision[]>([]);
   const [entries, setEntries] = useState<KeywordReviewRuleEntry[]>([]);
@@ -37,7 +37,7 @@ export function KeywordReviewRuleEditor({ open }: { open: boolean }) {
       })
       .catch((error: Error) => { if (active) setMessage(error.message); });
     return () => { active = false; };
-  }, [open]);
+  }, [open, mode]);
 
   const save = async () => {
     if (!current || saving) return;
@@ -69,11 +69,11 @@ export function KeywordReviewRuleEditor({ open }: { open: boolean }) {
   return (
     <section className="space-y-3 border-t border-slate-100 pt-5">
       <div>
-        <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">补充规则 · {current ? `v${current.version}` : '读取中'}</h3>
-        <p className="mt-2 text-[13px] leading-6 text-slate-600">发现误判后，在对应类别新增或修改一条具体规则。基础垂类、结果表字段和否决类型保持固定；发布后只影响新开始的审核。</p>
+        <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{mode === 'video' ? '视频' : '图文'}补充规则 · {current ? `v${current.version}` : '读取中'}</h3>
+        <p className="mt-2 text-[13px] leading-6 text-slate-600">发现误判后，在当前类型新增或修改具体规则。两种类型的补充规则分别应用；发布后只影响新开始的审核。</p>
       </div>
       {current && <>
-        {entries.map((entry, index) => (
+        {entries.map((entry, index) => (entry.mode || 'image') === mode ? (
           <div key={index} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row">
             <select aria-label={`第 ${index + 1} 条规则类别`} value={entry.section} onChange={(event) => setEntries((items) => items.map((item, i) => i === index ? { ...item, section: event.target.value as KeywordReviewRuleEntry['section'] } : item))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs sm:w-28">
               {SECTIONS.map((section) => <option key={section}>{section}</option>)}
@@ -81,8 +81,8 @@ export function KeywordReviewRuleEditor({ open }: { open: boolean }) {
             <textarea aria-label={`第 ${index + 1} 条补充规则`} value={entry.text} maxLength={300} rows={2} onChange={(event) => setEntries((items) => items.map((item, i) => i === index ? { ...item, text: event.target.value } : item))} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs leading-5" placeholder="写清触发条件、判断结论和边界例外" />
             <button type="button" onClick={() => setEntries((items) => items.filter((_, i) => i !== index))} className="self-start text-xs font-semibold text-rose-600">删除</button>
           </div>
-        ))}
-        <button type="button" disabled={entries.length >= 30} onClick={() => setEntries((items) => [...items, { section: '其他说明', text: '' }])} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-50">添加规则</button>
+        ) : null)}
+        <button type="button" disabled={entries.length >= 30} onClick={() => setEntries((items) => [...items, { section: '其他说明', text: '', mode }])} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-50">添加规则</button>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input aria-label="本次修改原因" value={note} maxLength={200} onChange={(event) => setNote(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs" placeholder="本次修改原因，例如：修正宠物训练误判" />
           <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? '保存中…' : '发布新版本'}</button>

@@ -63,9 +63,12 @@ export function selectPreviewRecords(
 }
 
 export function countReviewRecords(records: KeywordReviewRecord[]) {
-  const counts = { total: records.length, done: 0, failed: 0, uncertain: 0, pending: 0, producible: 0, rejected: 0 };
+  const counts = { total: records.length, done: 0, failed: 0, uncertain: 0, pending: 0, producible: 0, rejected: 0, lowValue: 0 };
   for (const record of records) {
-    if (record.status === 'done') counts.done += 1;
+    if (record.status === 'done') {
+      counts.done += 1;
+      if (record.lowValue === '是') counts.lowValue += 1;
+    }
     else if (record.status === 'error') {
       counts.failed += 1;
       if (record.submissionUncertain) counts.uncertain += 1;

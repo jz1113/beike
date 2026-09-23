@@ -124,6 +124,7 @@ function toPublicResult(result: ReviewedKeywordRow): KeywordReviewResult {
     producible: result.producible,
     categoryReason: result.categoryReason,
     rejectReason: result.rejectReason,
+    ...(result.lowValue ? { lowValue: result.lowValue } : {}),
   };
 }
 

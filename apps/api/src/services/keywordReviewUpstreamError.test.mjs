@@ -37,3 +37,9 @@ test('balance, parameter, rate limit and server errors have distinct suggestions
     assert.match(error.message, new RegExp(reason));
   }
 });
+
+test('gateway errors identify the selected provider', async () => {
+  const error = await deepSeekResponseError(new Response(null, { status: 429 }), '模型网关');
+  assert.equal(error.provider, '模型网关');
+  assert.match(error.message, /模型网关请求过于频繁/);
+});

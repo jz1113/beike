@@ -9,7 +9,7 @@ const DEEPSEEK_ERROR_HINTS: Record<number, string> = {
 };
 
 export class DeepSeekApiError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly provider = 'DeepSeek') {
     super(message);
     this.name = 'DeepSeekApiError';
   }
@@ -24,10 +24,11 @@ function upstreamMessage(body: unknown): string {
   return typeof message === 'string' ? message.trim().slice(0, 300) : '';
 }
 
-export async function deepSeekResponseError(response: Response): Promise<DeepSeekApiError> {
+export async function deepSeekResponseError(response: Response, provider = 'DeepSeek'): Promise<DeepSeekApiError> {
   let detail = '';
   try { detail = upstreamMessage(await response.json()); }
   catch { /* Some gateway errors do not contain JSON. */ }
-  const hint = DEEPSEEK_ERROR_HINTS[response.status] || 'DeepSeek 请求失败，请稍后重试';
-  return new DeepSeekApiError(response.status, detail ? `${hint}。接口原因：${detail}` : hint);
+  const baseHint = DEEPSEEK_ERROR_HINTS[response.status] || 'DeepSeek 请求失败，请稍后重试';
+  const hint = provider === 'DeepSeek' ? baseHint : baseHint.replaceAll('DeepSeek ', provider).replaceAll('DeepSeek', provider);
+  return new DeepSeekApiError(response.status, detail ? `${hint}。接口原因：${detail}` : hint, provider);
 }

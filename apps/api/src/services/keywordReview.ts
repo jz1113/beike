@@ -1,4 +1,4 @@
-import type { KeywordReviewResult, KeywordReviewRow } from '@beike/contracts/generate';
+import type { KeywordReviewMode, KeywordReviewResult, KeywordReviewRow } from '@beike/contracts/generate';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { gatewayFetch } from '../gateways/http';
 import {
@@ -6,8 +6,9 @@ import {
   type ReviewedKeywordRow,
 } from './keywordReviewLookup';
 import { normalizeCategoryReason, normalizeRejectReason } from './keywordReviewReasons';
-import { formatKeywordReviewRuleAdditions } from './keywordReviewRules';
+import { formatKeywordReviewRuleAdditions, ruleEntriesForMode } from './keywordReviewRules';
 import { deepSeekResponseError } from './keywordReviewUpstreamError';
+import { buildVideoReviewPrompt, VIDEO_CATEGORY_SET } from './keywordReviewVideo';
 import type { KeywordReviewRuleEntry } from '@beike/contracts/generate';
 
 export const KEYWORD_REVIEW_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
@@ -77,7 +78,7 @@ function parseModelJson(raw: string): unknown {
   return JSON.parse(clean);
 }
 
-function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeywordRow[] {
+export function validateResults(value: unknown, rows: KeywordReviewRow[], mode: KeywordReviewMode = 'image'): ReviewedKeywordRow[] {
   const items = (value as { results?: unknown[] } | null)?.results;
   if (!Array.isArray(items)) throw new SyntaxError('模型未返回 results 数组');
   const expected = new Map(rows.map((row) => [row.id, row]));
@@ -89,8 +90,11 @@ function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeyw
     const category = String(candidate?.category || '');
     const producible = String(candidate?.producible || '');
     if (!expected.has(id) || seen.has(id)) throw new SyntaxError('模型返回了未知或重复的行 ID');
-    if (!CATEGORY_SET.has(category)) throw new SyntaxError(`模型返回了非法垂类：${category || '空值'}`);
+    if (!(mode === 'video' ? VIDEO_CATEGORY_SET : CATEGORY_SET).has(category)) throw new SyntaxError(`模型返回了非法垂类：${category || '空值'}`);
     if (producible !== '制作' && producible !== '不制作') throw new SyntaxError('模型返回了非法制作结论');
+    const lowValue = candidate?.lowValue;
+    if (mode === 'video' && lowValue !== '是' && lowValue !== '否') throw new SyntaxError('视频审核结果缺少低价值标记');
+    if (mode === 'video' && lowValue === '是' && producible !== '不制作') throw new SyntaxError('低价值关键词不能标为制作');
     seen.add(id);
     const nextProducible = producible as KeywordReviewResult['producible'];
     let rejectReason: string;
@@ -106,6 +110,7 @@ function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeyw
       producible: nextProducible,
       categoryReason: normalizeCategoryReason(candidate?.categoryReason),
       rejectReason,
+      ...(mode === 'video' ? { lowValue } : {}),
       needsLookup: candidate?.needsLookup === true,
     });
   }
@@ -115,12 +120,13 @@ function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeyw
 }
 
 function stripLookupFlag(results: ReviewedKeywordRow[]): KeywordReviewResult[] {
-  return results.map(({ id, category, producible, categoryReason, rejectReason }) => ({
+  return results.map(({ id, category, producible, categoryReason, rejectReason, lowValue }) => ({
     id,
     category,
     producible,
     categoryReason,
     rejectReason,
+    ...(lowValue ? { lowValue } : {}),
   }));
 }
 
@@ -128,11 +134,15 @@ export async function reviewKeywordRows(options: {
   baseUrl: string;
   apiKey: string;
   model: string;
+  provider?: 'deepseek' | 'gateway';
   rows: KeywordReviewRow[];
   lookup?: boolean;
   ruleEntries?: KeywordReviewRuleEntry[];
   rulesVersion?: number;
+  reviewMode?: KeywordReviewMode;
 }): Promise<{ results: KeywordReviewResult[]; usage?: Record<string, number>; lookedUp: number }> {
+  const mode = options.reviewMode || 'image';
+  const additions = formatKeywordReviewRuleAdditions(ruleEntriesForMode(options.ruleEntries || [], mode));
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${options.apiKey}` },
@@ -140,23 +150,23 @@ export async function reviewKeywordRows(options: {
       model: options.model,
       temperature: 0.1,
       max_tokens: KEYWORD_REVIEW_MAX_TOKENS,
-      thinking: { type: 'disabled' },
-      reasoning_effort: 'none',
+      ...(options.provider !== 'gateway' ? { thinking: { type: 'disabled' }, reasoning_effort: 'none' } : {}),
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `${buildSystemPrompt()}${formatKeywordReviewRuleAdditions(options.ruleEntries || [])}` },
+        { role: 'system', content: `${mode === 'video' ? buildVideoReviewPrompt() : buildSystemPrompt()}${additions}` },
         { role: 'user', content: `请审核以下行：\n${JSON.stringify(options.rows)}` },
       ],
     }),
     signal: AbortSignal.timeout(10 * 60_000 + 30_000),
   });
-  if (!response.ok) throw await deepSeekResponseError(response);
+  if (!response.ok) throw await deepSeekResponseError(response, options.provider === 'gateway' ? '模型网关' : 'DeepSeek');
   const data = await response.json();
   // Record provider usage before validating the answer: malformed output can
   // still be billed, and successful-only accounting hides that expense.
   console.info('[KeywordReviewUsage]', JSON.stringify({
     providerRequestId: typeof data.id === 'string' ? data.id : undefined,
     model: options.model,
+    reviewMode: mode,
     rowCount: options.rows.length,
     usage: data.usage || null,
   }));
@@ -172,7 +182,7 @@ export async function reviewKeywordRows(options: {
   } catch {
     throw new SyntaxError(`关键词审核模型 ${options.model} 返回了不完整 JSON，本批结果未写入`);
   }
-  const firstPass = validateResults(parsed, options.rows);
+  const firstPass = validateResults(parsed, options.rows, mode);
   if (!options.lookup) {
     return { results: stripLookupFlag(firstPass), usage: data.usage, lookedUp: 0 };
   }
@@ -183,10 +193,10 @@ export async function reviewKeywordRows(options: {
       model: options.model,
       rows: options.rows,
       results: firstPass,
-      allowed: CATEGORY_SET,
-      categories: KEYWORD_REVIEW_CATEGORIES,
-      rulesVersion: options.rulesVersion,
-      ruleAdditions: formatKeywordReviewRuleAdditions(options.ruleEntries || []),
+      allowed: mode === 'video' ? VIDEO_CATEGORY_SET : CATEGORY_SET,
+      categories: mode === 'video' ? [...VIDEO_CATEGORY_SET] : KEYWORD_REVIEW_CATEGORIES,
+      rulesVersion: mode === 'video' ? -(options.rulesVersion ?? 0) - 1 : options.rulesVersion,
+      ruleAdditions: additions,
     });
     return { results: looked.results, usage: data.usage, lookedUp: looked.lookedUp };
   } catch {

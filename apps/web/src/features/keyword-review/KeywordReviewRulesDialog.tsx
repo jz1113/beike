@@ -1,5 +1,6 @@
 import { BookOpen, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode } from '@beike/contracts/generate';
 import { KeywordReviewRuleEditor } from './KeywordReviewRuleEditor';
 
 export const KEYWORD_REVIEW_CATEGORIES = [
@@ -64,6 +65,7 @@ const LOW_VALUE_NO = [
 interface Props {
   open: boolean;
   onClose: () => void;
+  mode: KeywordReviewMode;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -75,7 +77,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function KeywordReviewRulesDialog({ open, onClose }: Props) {
+export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
   if (!open) return null;
 
   return (
@@ -87,8 +89,8 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
               <BookOpen className="h-4 w-4 text-amber-600" />
             </span>
             <div>
-              <h2 id="keyword-review-rules-title" className="text-sm font-black tracking-tight">审核规则</h2>
-              <p className="mt-0.5 text-xs text-slate-600">完整口径。保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面</p>
+              <h2 id="keyword-review-rules-title" className="text-sm font-black tracking-tight">{mode === 'video' ? '视频关键词审核规则' : '图文关键词审核规则'}</h2>
+              <p className="mt-0.5 text-xs text-slate-600">{mode === 'video' ? '保留视频原表全部列，新增最终垂类、制作判断与低价值标记' : '保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面'}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
@@ -97,6 +99,21 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
         </header>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4 text-sm sm:px-6">
+          {mode === 'video' ? <>
+            <Section title="视频关键词表头">
+              <p>识别「序号、query、相关拓展q、分类、需上传数量、已上传数量、下发时间」。原列原值保留；旧「分类」只作参考，不作为最终垂类。审核结果增加「最终垂类、垂类依据、是否可制作、不制作依据、低价值关键词」。</p>
+            </Section>
+            <Section title={`允许垂类 · ${KEYWORD_VIDEO_CATEGORIES.length}`}>
+              <div className="flex flex-wrap gap-1.5">{KEYWORD_VIDEO_CATEGORIES.map((category) => <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{category}</span>)}</div>
+              <p className="pt-2">按完整语义归唯一垂类。狗狗日常健康、猫猫喂养及宠物基础护理归「动物」；电影、电视剧、动漫、漫画、综艺、小说分别归类。仅确实无法对应时用「其他」。</p>
+            </Section>
+            <Section title="低价值 · 标记是并判不制作">
+              <ul className="list-disc space-y-1.5 pl-5"><li>单纯个人梦境描述或为自己预测梦境吉凶。</li><li>个人情感咨询、恋爱婚姻决策。</li><li>私人社交回复话术、聊天模板。</li><li>给具体姓名打分、判吉凶或代替个人取名。</li><li>个人礼金金额、红包及随礼决策。</li></ul>
+            </Section>
+            <Section title="正常放行的题材">
+              <p>版权知识、游戏攻略、院校相关、旅游内容、企业评价、星座科普、解梦科普不因题材本身标低价值。仍按具体问法检查事实来源与安全性。视频可以使用讲解、屏幕录制、动作展示、图表或实拍，不套用图文模式的载体限制。</p>
+            </Section>
+          </> : <>
           <Section title="怎么读表">
             <ol className="list-decimal space-y-1.5 pl-5">
               <li>先只看 query 的主体、需求和场景；query 已经清晰时直接裁决。</li>
@@ -174,7 +191,8 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
             </ul>
             <p>例如：美国总统是谁 → 简单问答：只确认一个身份；怎么判断他对我有好感 → 低价值：个人恋爱好感判断；怎么在淘宝上添加银行卡 → 非笔记需求：平台绑卡操作。</p>
           </Section>
-          <KeywordReviewRuleEditor open={open} />
+          </>}
+          <KeywordReviewRuleEditor open={open} mode={mode} />
         </div>
       </section>
     </div>

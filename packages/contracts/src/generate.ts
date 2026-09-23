@@ -170,6 +170,8 @@ export const KeywordReviewRowSchema = z.object({
 
 export const KeywordReviewRequestSchema = z.object({
   model: z.string().max(160).optional(),
+  provider: z.enum(['deepseek', 'gateway']).optional(),
+  reviewMode: z.enum(['image', 'video']).optional(),
   rows: z.array(KeywordReviewRowSchema).min(1).max(60),
   customBaseUrl: z.string().optional(),
   customApiKey: z.string().optional(),
@@ -180,6 +182,7 @@ export const KeywordReviewRequestSchema = z.object({
 export const KeywordReviewRuleEntrySchema = z.object({
   section: z.enum(['垂类边界', '不制作', '其他说明']),
   text: z.string().trim().min(4).max(300),
+  mode: z.enum(['image', 'video']).optional(),
 });
 
 export const KeywordReviewRulesUpdateSchema = z.object({
@@ -192,6 +195,15 @@ export const KeywordReviewRulesUpdateSchema = z.object({
 });
 
 export type KeywordReviewRuleEntry = z.infer<typeof KeywordReviewRuleEntrySchema>;
+export type KeywordReviewMode = 'image' | 'video';
+
+export const KEYWORD_VIDEO_CATEGORIES = [
+  '财经', '健康', '法律', '教育', '宗教', '历史', '3C', '美食', '汽车', '时尚', '旅游',
+  '动物', '体育', '娱乐', '植物', '民俗文化', '求职招聘', '办公效率', '家居', '游戏',
+  '情感', '星座', '社会', '政务政策', '软件', '音乐', '房地产', '本地生活', '科学技术',
+  '互联网 it', '姓氏 / 取名', '解梦', '交通', '小说', '电影', '电视剧', '动漫', '漫画',
+  '综艺节目', '其他', '科技', '传统文化', '明星', '科普', '亲子', '职场', '摄影', '舞蹈',
+] as const;
 
 export const KEYWORD_REVIEW_REJECT_PREFIXES = [
   '简单问答',
@@ -212,6 +224,7 @@ export const KeywordReviewResultSchema = z.object({
   producible: z.enum(['制作', '不制作']),
   categoryReason: z.string().min(1).max(80),
   rejectReason: z.string().max(80),
+  lowValue: z.enum(['是', '否']).optional(),
 });
 
 export const KeywordReviewBalanceRequestSchema = z.object({

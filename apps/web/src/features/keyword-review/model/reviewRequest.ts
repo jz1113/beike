@@ -92,7 +92,7 @@ export async function requestReviewBatch(
     if (response.status === 409 && data.submissionUnknown) {
       throw Object.assign(error, { outcomeUncertain: true, infrastructureFailure: true });
     }
-    if (response.status === 429 && data.code === 'deepseek_api_error') {
+    if (response.status === 429 && (data.code === 'deepseek_api_error' || data.code === 'upstream_api_error')) {
       throw Object.assign(error, { rateLimited: true, infrastructureFailure: true });
     }
     if (isRecoverableModelOutputError(response.status, data.code)) {

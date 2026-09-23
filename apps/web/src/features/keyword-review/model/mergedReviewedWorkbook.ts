@@ -15,6 +15,7 @@ function columnWidth(column: OutputColumn): number {
   if (column.kind === 'categoryReason') return 28;
   if (column.kind === 'producible') return 14;
   if (column.kind === 'rejectReason') return 24;
+  if (column.kind === 'lowValue') return 15;
   if (column.sourceKind === 'query') return 18;
   if (column.sourceKind === 'expansion' || column.sourceKind === 'entityExpansion') return 28;
   if (column.sourceKind === 'contentType') return 16;
@@ -61,6 +62,7 @@ export function buildMergedReviewedWorkbook(parsed: ParsedKeywordWorkbook, recor
         const value = column.kind === 'category' ? record.category
           : column.kind === 'categoryReason' ? (record.categoryReason || '')
           : column.kind === 'producible' ? record.producible
+          : column.kind === 'lowValue' ? (record.lowValue || '')
           : record.producible === '制作' ? '' : (record.rejectReason || '');
         writeCell(sheet, outputRow, targetCol, value, styleSource);
       }

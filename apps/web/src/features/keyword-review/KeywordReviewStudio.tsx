@@ -64,6 +64,7 @@ function RecordDetails({ record, columns, onClose }: { record: KeywordReviewReco
             <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-500">垂类依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{record.categoryReason || '—'}</p></div>
             {record.producible === '不制作' && <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-500">不制作依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{reject ? `${reject.kind ? `${reject.kind}：` : ''}${reject.detail}` : record.rejectReason || '—'}</p></div>}
             {record.error && <div className="sm:col-span-2"><p className="text-xs font-bold text-rose-500">审核错误</p><p className="mt-1 break-words text-sm text-rose-700">{record.error}</p></div>}
+            {record.lowValue && <div><p className="text-xs font-bold text-slate-500">低价值关键词</p><p className="mt-1 font-bold text-slate-800">{record.lowValue}</p></div>}
           </div>
           {sourceColumns.length > 0 && <div>
             <h3 className="mb-3 text-sm font-black text-slate-900">原表内容</h3>
@@ -93,7 +94,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const canTrial = review.counts.pending > 0;
   const canRun = canTrial || review.records.some(isKnownModelOutputFailure);
   const displayColumns = review.parsed?.displayColumns ?? [];
-  const filterLabels: Record<KeywordReviewFilter, string> = { all: '全部', done: '已完成', producible: '可制作', rejected: '不制作' };
+  const filterLabels: Record<KeywordReviewFilter, string> = { all: '全部', done: '已完成', producible: '可制作', rejected: '不制作', low_value: '低价值' };
   const selectedRecord = review.records.find((record) => record.id === selectedRecordId);
   const selectedColumns = review.parsed?.sheets.find((sheet) => sheet.name === selectedRecord?.sheetName)?.outputColumns ?? displayColumns;
   const showBalanceAmount = Boolean(review.balance && review.balanceUpdatedAt);
@@ -114,13 +115,19 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             <BookOpen className="h-4 w-4" />
             审核规则
           </button>
-          <button
+          <label className="relative flex h-10 max-w-[240px] items-center rounded-xl border border-slate-200 bg-white/90 px-2 shadow-sm hover:border-amber-300">
+            <span className="sr-only">审核模型</span>
+            <select aria-label="审核模型" value={review.modelValue} onChange={(event) => review.selectModel(event.target.value)} disabled={review.isRunning} className="min-w-0 w-full cursor-pointer bg-transparent px-1 text-sm font-semibold text-slate-700 outline-none disabled:cursor-not-allowed disabled:opacity-60">
+              {review.modelOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          {review.modelProvider === 'deepseek' && <button
             type="button"
             onClick={() => review.refreshBalance(true)}
             className="hidden rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 sm:inline-flex sm:items-center sm:gap-1.5 hover:border-slate-300"
             title={`${review.balance ? `赠金 ${review.balance.granted} · 充值 ${review.balance.toppedUp} · ` : ''}${review.balanceUpdatedAt ? `上次同步 ${new Date(review.balanceUpdatedAt).toLocaleTimeString('zh-CN')}` : '尚未同步'}${review.balanceDirty ? ' · 正在审核的请求费用可能尚未计入' : ''}${review.balanceError ? ` · 查询失败：${review.balanceError}` : ''} · 点击刷新`}
           >
-            {review.model}
+            账户余额
             {showBalanceAmount && review.balance && (
               <>
                 <span className="text-slate-300">·</span>
@@ -132,9 +139,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             <span className={review.balanceError ? 'text-amber-600' : 'text-slate-400'}>
               {review.balanceDirty ? '有费用待同步' : review.balanceError ? '刷新失败' : review.balanceRefreshing ? '同步中' : showBalanceAmount ? `截至 ${new Date(review.balanceUpdatedAt!).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '余额待更新'}
             </span>
-          </button>
+          </button>}
           {onOpenSettings && (
-            <button type="button" onClick={onOpenSettings} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-600 shadow-sm transition hover:bg-white hover:text-slate-950" title="配置 DeepSeek API Key" aria-label="配置 DeepSeek API Key">
+            <button type="button" onClick={onOpenSettings} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-600 shadow-sm transition hover:bg-white hover:text-slate-950" title="配置审核模型 API Key" aria-label="配置审核模型 API Key">
               <Settings2 className="h-4 w-4" />
             </button>
           )}
@@ -143,12 +150,18 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-[1680px] space-y-5">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div role="group" aria-label="关键词审核类型" className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1">
+              {(['image', 'video'] as const).map((mode) => <button key={mode} type="button" aria-pressed={review.reviewMode === mode} disabled={Boolean(review.parsed) || review.isRunning || review.isImporting} onClick={() => review.selectReviewMode(mode)} className={`rounded-xl px-5 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${review.reviewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white disabled:opacity-50'}`}>{mode === 'image' ? '图文关键词' : '视频关键词'}</button>)}
+            </div>
+            {review.parsed && <span className="text-xs text-slate-500">切换类型请先导出进度，再点击“换表”</span>}
+          </div>
           {!review.parsed ? (
             <section className="mx-auto max-w-[980px] pt-8 sm:pt-14">
               <div className="mb-7 text-center">
                 <p className="text-xs font-black tracking-[0.22em] text-amber-600">SEMANTIC REVIEW</p>
-                <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-5xl">关键词分类及制作判断</h1>
-                <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">按原表头读取全部工作表。空的实体拓展 q 和分类列不会进入结果表，审核列接在下发时间后面。可先试跑 {review.batchSize} 条，确认无误后再批量连续审核。走 DeepSeek 官方接口，不替换当前生图网关。</p>
+                <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-5xl">{review.reviewMode === 'video' ? '视频关键词分类及制作判断' : '图文关键词分类及制作判断'}</h1>
+                <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">按原表头读取全部工作表。空的实体拓展 q 和分类列不会进入结果表，审核列接在下发时间后面。可先试跑 {review.batchSize} 条，确认无误后再批量连续审核。审核模型可在右上角切换。</p>
               </div>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => { receiveFile(event.target.files?.[0]); event.currentTarget.value = ''; }} />
               <button
@@ -169,11 +182,12 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             </section>
           ) : (
             <>
-              <section className="grid grid-cols-2 gap-3 pt-2 lg:grid-cols-4">
+              <section className={`grid grid-cols-2 gap-3 pt-2 ${review.reviewMode === 'video' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
                 <StatCard label="关键词总数" value={review.counts.total} tone="text-slate-950" active={review.filter === 'all'} onClick={() => review.setFilter('all')} />
                 <StatCard label="已完成" value={review.counts.done} tone="text-blue-600" active={review.filter === 'done'} onClick={() => review.setFilter('done')} />
                 <StatCard label="可制作" value={review.counts.producible} tone="text-emerald-600" active={review.filter === 'producible'} onClick={() => review.setFilter('producible')} />
                 <StatCard label="不制作" value={review.counts.rejected} tone="text-rose-600" active={review.filter === 'rejected'} onClick={() => review.setFilter('rejected')} />
+                {review.reviewMode === 'video' && <StatCard label="低价值" value={review.counts.lowValue} tone="text-amber-700" active={review.filter === 'low_value'} onClick={() => review.setFilter('low_value')} />}
               </section>
 
               <section className="rounded-[26px] border border-slate-200/80 bg-white/90 p-4 shadow-sm backdrop-blur sm:p-5">
@@ -188,8 +202,8 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                       role="switch"
                       aria-checked={review.lookupEnabled}
                       onClick={() => review.setLookupEnabled(!review.lookupEnabled)}
-                      disabled={review.isRunning}
-                      title="默认关闭。只补查认不出的作品、品牌、游戏、外文词和机构，每批最多 5 条。"
+                      disabled={review.isRunning || review.modelProvider !== 'deepseek'}
+                      title={review.modelProvider === 'deepseek' ? '默认关闭。只补查认不出的作品、品牌、游戏、外文词和机构，每批最多 5 条。' : '联网补查仅支持 DeepSeek 官方模型'}
                       className={`inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-bold transition disabled:opacity-40 ${review.lookupEnabled ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
                     >
                       不确定词联网补查
@@ -209,8 +223,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。服务异常会用原提交标识核对结果；无法确认的批次隔离，不自动重新收费，其他词继续处理。联网补查默认关闭，每批最多 5 条。</p>
-                {review.counts.uncertain > 0 && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{review.counts.uncertain} 条提交结果待核对：已隔离，避免重复扣费。请导出当前进度并核对 DeepSeek 用量。</p>}
+                <p className="mt-3 text-xs leading-5 text-slate-500">当前按{review.reviewMode === 'video' ? '视频' : '图文'}规则审核，使用 {review.model}。已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。服务异常会用原提交标识核对结果；无法确认的批次隔离，不自动重新收费，其他词继续处理。{review.modelProvider === 'deepseek' ? '联网补查默认关闭，每批最多 5 条。' : '联网补查仅适用于 DeepSeek 官方模型。'}</p>
+                {review.reviewMode === 'video' && <p className="mt-1 text-xs font-semibold text-rose-700">已标记低价值关键词 {review.counts.lowValue} 条；原表“分类”保留，新增“最终垂类”和“低价值关键词”结果列。</p>}
+                {review.counts.uncertain > 0 && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{review.counts.uncertain} 条提交结果待核对：已隔离，避免重复扣费。请导出当前进度并核对所用模型的用量。</p>}
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>
@@ -224,10 +239,10 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                 </div>
                 <div className="overflow-auto">
                   <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-sm">
-                    <colgroup><col className="w-[7%]" /><col className="w-[29%]" /><col className="w-[13%]" /><col className="w-[12%]" /><col className="w-[23%]" /><col className="w-[10%]" /><col className="w-[6%]" /></colgroup>
+                    <colgroup><col className="w-[7%]" /><col className="w-[27%]" /><col className="w-[13%]" /><col className="w-[12%]" />{review.reviewMode === 'video' && <col className="w-[9%]" />}<col className={review.reviewMode === 'video' ? 'w-[16%]' : 'w-[25%]'} /><col className="w-[10%]" /><col className="w-[6%]" /></colgroup>
                     <thead className="bg-slate-950 text-white">
                       <tr>
-                        {['行号', 'query', '最终垂类', '是否可制作', '判断依据', '状态', '详情'].map((label) => <th key={label} className="px-4 py-3 text-xs font-bold whitespace-nowrap">{label}</th>)}
+                        {['行号', 'query', '最终垂类', '是否可制作', ...(review.reviewMode === 'video' ? ['低价值'] : []), '判断依据', '状态', '详情'].map((label) => <th key={label} className="px-4 py-3 text-xs font-bold whitespace-nowrap">{label}</th>)}
                       </tr>
                     </thead>
                     <tbody>
@@ -237,12 +252,13 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                           <td className="px-4 py-3"><span className="line-clamp-2 break-words font-bold leading-5 text-slate-800" title={record.query}>{record.query}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{record.sheetName}</span></td>
                           <td className="px-4 py-3 font-bold text-slate-700"><span className="line-clamp-2 break-words">{record.category || '—'}</span></td>
                           <td className="px-4 py-3">{record.producible ? <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${record.producible === '制作' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.producible}</span> : <span className="text-slate-500">—</span>}</td>
+                          {review.reviewMode === 'video' && <td className="px-4 py-3 text-xs font-bold text-slate-700">{record.lowValue || '—'}</td>}
                           <td className="px-4 py-3 text-xs leading-5 text-slate-500"><span className="line-clamp-2 break-words" title={record.producible === '不制作' ? record.rejectReason : record.categoryReason}>{record.producible === '不制作' ? record.rejectReason || record.categoryReason || '—' : record.categoryReason || '—'}</span></td>
                           <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold"><ReviewStatus record={record} /></td>
                           <td className="px-3 py-3"><button type="button" onClick={() => setSelectedRecordId(record.id)} aria-label={`查看第 ${record.rowNumber} 行详情`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Eye className="h-4 w-4" /></button></td>
                         </tr>
                       ))}
-                      {review.previewRecords.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">暂无{filterLabels[review.filter]}记录</td></tr>}
+                      {review.previewRecords.length === 0 && <tr><td colSpan={review.reviewMode === 'video' ? 8 : 7} className="px-4 py-12 text-center text-sm text-slate-500">暂无{filterLabels[review.filter]}记录</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -253,7 +269,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
         </div>
       </main>
       {selectedRecord && <RecordDetails record={selectedRecord} columns={selectedColumns} onClose={() => setSelectedRecordId(null)} />}
-      <KeywordReviewRulesDialog open={showRules} onClose={() => setShowRules(false)} />
+      <KeywordReviewRulesDialog open={showRules} onClose={() => setShowRules(false)} mode={review.reviewMode} />
     </div>
   );
 }

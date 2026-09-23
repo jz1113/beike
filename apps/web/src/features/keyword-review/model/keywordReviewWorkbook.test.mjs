@@ -8,6 +8,7 @@ import {
   buildReviewedWorkbook,
   fieldKind,
   parseKeywordWorkbookData,
+  parseKeywordWorkbook,
   splitRejectReason,
 } from './keywordReviewWorkbook.ts';
 
@@ -197,6 +198,55 @@ test('partial export can be imported and resumes only unfinished rows', () => {
   assert.equal(resumed.records[0].category, '动物');
   assert.equal(resumed.records[1].status, 'idle');
   assert.equal(resumed.records[1].query, '汽车保养');
+});
+
+test('video workbook preserves its seven source columns and resumes only valid video reviews', () => {
+  const headers = ['序号', 'query', '相关拓展q', '分类', '需上传数量', '已上传数量', '下发时间'];
+  const sheet = XLSX.utils.aoa_to_sheet([
+    headers,
+    [1, '猫猫喂养注意事项', '幼猫喂食', '宠物健康', 3, 0, '2026-09-23'],
+    [2, '昨晚梦见前任', '', '', 2, 0, '2026-09-23'],
+  ]);
+  const parsed = parseKeywordWorkbookData({ SheetNames: ['视频词包'], Sheets: { 视频词包: sheet } }, '视频词包.xlsx', 'video');
+  assert.equal(parsed.records[0].status, 'idle');
+  assert.equal(parsed.records[0].sourceValues.sourceCategory, '宠物健康');
+  assert.deepEqual(parsed.displayColumns.map((column) => column.label), [
+    ...headers, '最终垂类', '垂类依据', '是否可制作', '不制作依据', '低价值关键词',
+  ]);
+  const reviewed = [
+    { ...parsed.records[0], status: 'done', category: '动物', categoryReason: '幼猫饲养内容', producible: '制作', rejectReason: '', lowValue: '否' },
+    parsed.records[1],
+  ];
+  const exported = buildReviewedWorkbook(parsed, reviewed);
+  const resumed = parseKeywordWorkbookData(exported, '视频词包_视频_审核进度.xlsx', 'video');
+  assert.equal(resumed.records[0].status, 'done');
+  assert.equal(resumed.records[0].category, '动物');
+  assert.equal(resumed.records[0].lowValue, '否');
+  assert.equal(resumed.records[0].sourceValues.sourceCategory, '宠物健康');
+  assert.equal(resumed.records[1].status, 'idle');
+  const finished = buildMergedReviewedWorkbook(parsed, reviewed);
+  assert.equal(cell(finished.Sheets['视频词包'], 1, 3), '宠物健康');
+  assert.equal(cell(finished.Sheets['视频词包'], 1, 11), '否');
+});
+
+test('video import requeues completed categories outside the requested list', () => {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['query', '最终垂类', '是否可制作', '低价值关键词'],
+    ['狗狗健康常识', '宠物健康', '制作', '否'],
+  ]);
+  const parsed = parseKeywordWorkbookData({ SheetNames: ['视频词包'], Sheets: { 视频词包: sheet } }, '旧结果.xlsx', 'video');
+  assert.equal(parsed.records[0].status, 'idle');
+});
+
+test('upload recognizes the exact video table header even when image mode was selected', async () => {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['序号', 'query', '相关拓展q', '分类', '需上传数量', '已上传数量', '下发时间'],
+    [1, '猫咪喂养', '', '', 2, 0, '2026-09-23'],
+  ]);
+  const bytes = XLSX.write({ SheetNames: ['视频'], Sheets: { 视频: sheet } }, { type: 'array', bookType: 'xlsx' });
+  const parsed = await parseKeywordWorkbook(new File([bytes], '视频词包.xlsx'), 'image');
+  assert.equal(parsed.mode, 'video');
+  assert.equal(parsed.records.length, 1);
 });
 
 test('completed export combines source sheets into one continuous table', () => {

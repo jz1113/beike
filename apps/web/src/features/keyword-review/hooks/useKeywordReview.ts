@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeywordReviewBalance } from '@beike/contracts/generate';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { KeywordReviewMode } from '@beike/contracts/generate';
 import { apiFetch } from '@/shared/api/apiClient';
 import { credentialGet } from '@/shared/api/credentialClient';
+import { getGatewayClientOverrides } from '@/shared/api/gatewayClient';
 import {
   exportReviewedWorkbook,
   parseKeywordWorkbook,
@@ -10,21 +11,26 @@ import {
 } from '../model/keywordReviewWorkbook';
 import { advanceKnownFailureVersions, applyBatchResults, countReviewRecords, isKnownModelOutputFailure, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
 import { reviewBatchWithRecovery } from '../model/reviewBatchRecovery';
-import { DEEPSEEK_BASE_URL, type BalanceResponse, type ReviewRequestError } from '../model/reviewRequest';
+import { DEEPSEEK_BASE_URL, type ReviewRequestError } from '../model/reviewRequest';
 import { MAX_REVIEW_CONCURRENCY, ReviewPacer } from '../model/reviewPacer';
 import { createReviewBatchSubmit } from '../model/reviewBatchSubmit';
+import { DEFAULT_KEYWORD_REVIEW_MODEL, KEYWORD_REVIEW_MODEL_STORAGE_KEY, loadKeywordReviewModels } from '../model/keywordReviewModels';
+import { useKeywordReviewBalance } from './useKeywordReviewBalance';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
 export const KEYWORD_REVIEW_CONCURRENCY = MAX_REVIEW_CONCURRENCY;
-export const KEYWORD_REVIEW_MODEL = 'deepseek-flash';
-export const KEYWORD_REVIEW_MODEL_LABEL = 'DeepSeek Flash';
-export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected';
+export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected' | 'low_value';
 const PREVIEW_LIMIT = 240;
-const BALANCE_REFRESH_INTERVAL_MS = 15_000;
-const BALANCE_REQUEST_TIMEOUT_MS = 12_000;
 
 export function useKeywordReview() {
+  const [modelOptions, setModelOptions] = useState(loadKeywordReviewModels);
+  const [modelValue, setModelValue] = useState(() => {
+    try { return localStorage.getItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY) || DEFAULT_KEYWORD_REVIEW_MODEL; }
+    catch { return DEFAULT_KEYWORD_REVIEW_MODEL; }
+  });
+  const selectedModel = modelOptions.find((option) => option.value === modelValue) || modelOptions[0];
   const [parsed, setParsed] = useState<ParsedKeywordWorkbook | null>(null);
+  const [reviewMode, setReviewMode] = useState<KeywordReviewMode>('image');
   const [records, setRecords] = useState<KeywordReviewRecord[]>([]);
   const [lastTrialIds, setLastTrialIds] = useState<string[]>([]);
   const [filter, setFilter] = useState<KeywordReviewFilter>('all');
@@ -34,11 +40,8 @@ export function useKeywordReview() {
   const [notice, setNotice] = useState('');
   const [runMode, setRunMode] = useState<'idle' | 'trial' | 'all'>('idle');
   const [lookupEnabled, setLookupEnabled] = useState(false);
-  const [balance, setBalance] = useState<KeywordReviewBalance | null>(null);
-  const [balanceError, setBalanceError] = useState('');
-  const [balanceUpdatedAt, setBalanceUpdatedAt] = useState<number | null>(null);
-  const [balanceRefreshing, setBalanceRefreshing] = useState(false);
-  const [balanceDirty, setBalanceDirty] = useState(false);
+  const { balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance, markDispatch } =
+    useKeywordReviewBalance(selectedModel.provider === 'deepseek');
   const abortRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
   const runStartingRef = useRef(false);
@@ -46,96 +49,19 @@ export function useKeywordReview() {
   const inputVersionRef = useRef(0);
   const rulesVersionRef = useRef<number | null>(null);
   const recordIndicesRef = useRef<Map<string, number>>(new Map());
-  const balanceInFlightRef = useRef<Promise<void> | null>(null);
-  const balancePendingRef = useRef(false);
-  const balancePendingForceRef = useRef(false);
-  const balanceLastAttemptRef = useRef(0);
-  const balanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const balanceKeyRef = useRef('');
-  const balanceSpendVersionRef = useRef(0);
-
-  const refreshBalance = useCallback(function refreshBalance(force = false): void {
-    if (balanceInFlightRef.current) {
-      balancePendingRef.current = true;
-      balancePendingForceRef.current ||= force;
-      return;
-    }
-    const delay = force ? 0 : Math.max(0, BALANCE_REFRESH_INTERVAL_MS - (Date.now() - balanceLastAttemptRef.current));
-    if (delay > 0) {
-      if (!balanceTimerRef.current) {
-        balanceTimerRef.current = setTimeout(() => {
-          balanceTimerRef.current = null;
-          refreshBalance(true);
-        }, delay);
-      }
-      return;
-    }
-    if (balanceTimerRef.current) clearTimeout(balanceTimerRef.current);
-    balanceTimerRef.current = null;
-    balanceLastAttemptRef.current = Date.now();
-    setBalanceRefreshing(true);
-    const requestedSpendVersion = balanceSpendVersionRef.current;
-    const request = (async () => {
-      try {
-        const apiKey = (await credentialGet('deepseek_api_key')).trim();
-        if (apiKey !== balanceKeyRef.current) {
-          balanceKeyRef.current = apiKey;
-          setBalance(null);
-          setBalanceUpdatedAt(null);
-        }
-        if (!apiKey) {
-          setBalanceError('');
-          return;
-        }
-        const response = await apiFetch('/api/generate/keyword-review/balance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey }),
-          signal: AbortSignal.timeout(BALANCE_REQUEST_TIMEOUT_MS),
-        });
-        const raw = await response.text();
-        let data: BalanceResponse;
-        try { data = JSON.parse(raw) as BalanceResponse; }
-        catch { throw new Error(`余额服务返回 HTTP ${response.status} 非 JSON 响应，请稍后刷新`); }
-        if (!response.ok || !data.success || (data.currency !== 'CNY' && data.currency !== 'USD')) {
-          setBalanceError(data.error || '余额查询失败');
-          return;
-        }
-        setBalance({
-          currency: data.currency,
-          total: String(data.total ?? '0'),
-          granted: String(data.granted ?? '0'),
-          toppedUp: String(data.toppedUp ?? '0'),
-          available: data.available === true,
-        });
-        setBalanceUpdatedAt(Date.now());
-        if (requestedSpendVersion === balanceSpendVersionRef.current) setBalanceDirty(false);
-        else balancePendingRef.current = true;
-        setBalanceError('');
-      } catch (error) {
-        setBalanceError(error instanceof Error ? error.message : '余额查询失败');
-      }
-    })().finally(() => {
-      balanceInFlightRef.current = null;
-      setBalanceRefreshing(false);
-      if (balancePendingRef.current) {
-        const forceNext = balancePendingForceRef.current;
-        balancePendingRef.current = false;
-        balancePendingForceRef.current = false;
-        refreshBalance(forceNext);
-      }
-    });
-    balanceInFlightRef.current = request;
-  }, []);
 
   useEffect(() => {
-    refreshBalance(true);
-    const interval = setInterval(() => refreshBalance(), 30_000);
-    return () => {
-      clearInterval(interval);
-      if (balanceTimerRef.current) clearTimeout(balanceTimerRef.current);
-    };
-  }, [refreshBalance]);
+    const reload = () => setModelOptions(loadKeywordReviewModels());
+    window.addEventListener('models_updated', reload);
+    return () => window.removeEventListener('models_updated', reload);
+  }, []);
+
+  const selectModel = (value: string) => {
+    if (isRunning || runStartingRef.current || !modelOptions.some((option) => option.value === value)) return;
+    setModelValue(value);
+    try { localStorage.setItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY, value); } catch { /* storage unavailable */ }
+    if (value !== DEFAULT_KEYWORD_REVIEW_MODEL) setLookupEnabled(false);
+  };
 
   const counts = useMemo(() => countReviewRecords(records), [records]);
 
@@ -148,6 +74,7 @@ export function useKeywordReview() {
     if (filter === 'done') return record.status === 'done';
     if (filter === 'producible') return record.status === 'done' && record.producible === '制作';
     if (filter === 'rejected') return record.status === 'done' && record.producible === '不制作';
+    if (filter === 'low_value') return record.status === 'done' && record.lowValue === '是';
     return true;
   }), [records, filter]);
 
@@ -167,14 +94,15 @@ export function useKeywordReview() {
     setLastTrialIds([]);
     setFilter('all');
     try {
-      const next = await parseKeywordWorkbook(file);
+      const next = await parseKeywordWorkbook(file, reviewMode);
+      setReviewMode(next.mode);
       rulesVersionRef.current = null;
       batchRetryVersionsRef.current.clear();
       recordIndicesRef.current = new Map(next.records.map((record, index) => [record.id, index]));
       setParsed(next);
       setRecords(next.records);
       const summary = next.sheets.map((sheet) => `${sheet.name} ${sheet.recordCount} 条`).join('、');
-      setNotice(`已识别 ${next.records.length} 条关键词：${summary}`);
+      setNotice(`已按${next.mode === 'video' ? '视频' : '图文'}规则识别 ${next.records.length} 条关键词：${summary}`);
     } catch (error) {
       recordIndicesRef.current = new Map();
       setParsed(null);
@@ -194,17 +122,23 @@ export function useKeywordReview() {
     }
     runStartingRef.current = true;
     const inputVersion = inputVersionRef.current;
+    const runModel = selectedModel;
+    const baseUrl = runModel.provider === 'deepseek'
+      ? DEEPSEEK_BASE_URL
+      : getGatewayClientOverrides().customBaseUrl || 'https://ai.comfly.org';
     let apiKey: string;
-    try { apiKey = (await credentialGet('deepseek_api_key')).trim(); }
+    try { apiKey = (await credentialGet(runModel.provider === 'deepseek' ? 'deepseek_api_key' : 'ai_api_key')).trim(); }
     catch {
       runStartingRef.current = false;
-      setNotice('读取 DeepSeek API Key 失败，未发起审核请求');
+      setNotice('读取所选模型的 API Key 失败，未发起审核请求');
       return;
     }
     if (inputVersion !== inputVersionRef.current) { runStartingRef.current = false; return; }
     if (!apiKey) {
       runStartingRef.current = false;
-      setNotice('未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写');
+      setNotice(runModel.provider === 'deepseek'
+        ? '未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写'
+        : '未配置模型网关 API Key，请到设置里的大模型网关填写');
       return;
     }
     let rulesVersion: number;
@@ -264,21 +198,23 @@ export function useKeywordReview() {
           setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
             (record) => ({ ...record, status: 'running', error: undefined })));
           const submit = createReviewBatchSubmit({
-            model: KEYWORD_REVIEW_MODEL, apiKey, lookup: lookupEnabled, rulesVersion,
+            model: runModel.model, provider: runModel.provider, baseUrl,
+            reviewMode, apiKey, lookup: runModel.provider === 'deepseek' && lookupEnabled, rulesVersion,
             signal: controller.signal, shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
             indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, pacer,
-            onDispatch: () => { balanceSpendVersionRef.current += 1; setBalanceDirty(true); },
+            onDispatch: () => { if (runModel.provider === 'deepseek') markDispatch(); },
             onSuccess: (chunk, results, lookedUp) => {
               setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
               chunk.forEach((record) => settledIds.add(record.id));
-              completedNow += chunk.length; lookedUpNow += lookedUp; refreshBalance();
+              completedNow += chunk.length; lookedUpNow += lookedUp;
+              if (runModel.provider === 'deepseek') refreshBalance();
               consecutiveInfrastructureFailures = 0;
             },
             onRateLimit: (concurrency) => {
               rateLimitRetries += 1;
-              setNotice(`DeepSeek 限流，已降至 ${concurrency} 个并行请求并等待重试…`);
+              setNotice(`${runModel.label} 限流，已降至 ${concurrency} 个并行请求并等待重试…`);
             },
-            onFailure: () => refreshBalance(true),
+            onFailure: () => { if (runModel.provider === 'deepseek') refreshBalance(true); },
           });
           try {
             const recovery = await reviewBatchWithRecovery({
@@ -322,7 +258,7 @@ export function useKeywordReview() {
         setNotice(`${runState.fatalError.message}。本次完成 ${completedNow} 条、失败 ${failedNow} 条${uncertainNow ? `（其中 ${uncertainNow} 条提交待核对）` : ''}；可导出当前进度。`);
         return;
       }
-      refreshBalance(true);
+      if (runModel.provider === 'deepseek') refreshBalance(true);
       const lookupNote = lookedUpNow > 0 ? `，联网补查 ${lookedUpNow} 条` : '';
       if (controller.signal.aborted || stopRequestedRef.current) {
         setNotice(`已停止，本次完成 ${completedNow} 条${lookupNote}，可继续未完成记录`);
@@ -354,14 +290,14 @@ export function useKeywordReview() {
   const stopReview = () => {
     if (!abortRef.current) return;
     stopRequestedRef.current = true;
-    setNotice('将在当前批次返回后停止，不取消已提交的 DeepSeek 请求');
+    setNotice('将在当前批次返回后停止，不取消已提交的模型请求');
   };
 
   const retryFailed = () => {
     if (isRunning) return;
     const failed = records.filter((record) => record.status === 'error' && !record.submissionUncertain);
     if (failed.length === 0) {
-      setNotice('失败记录的提交结果待核对，已阻止重新收费；请先导出当前进度并核对 DeepSeek 用量');
+      setNotice('失败记录的提交结果待核对，已阻止重新收费；请先导出当前进度并核对所用模型的用量');
       return;
     }
     for (const record of failed) {
@@ -401,9 +337,21 @@ export function useKeywordReview() {
     setRunMode('idle');
   };
 
+  const selectReviewMode = (next: KeywordReviewMode) => {
+    if (parsed || isRunning || isImporting) return;
+    setReviewMode(next);
+    setNotice('');
+  };
+
   return {
-    model: KEYWORD_REVIEW_MODEL_LABEL,
+    model: selectedModel.label,
+    modelOptions,
+    modelValue: selectedModel.value,
+    modelProvider: selectedModel.provider,
+    selectModel,
     parsed,
+    reviewMode,
+    selectReviewMode,
     records,
     filter,
     setFilter,

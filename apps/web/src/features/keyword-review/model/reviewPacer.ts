@@ -1,6 +1,6 @@
 export const MAX_REVIEW_CONCURRENCY = 12;
 
-/** Limits parallel requests and backs off when DeepSeek rejects a request for rate limiting. */
+/** Limits parallel requests and backs off when the selected provider rate limits a request. */
 export class ReviewPacer {
   private active = 0;
   private limit = 4;

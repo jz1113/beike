@@ -38,7 +38,7 @@ test('large review updates only the active batch and keeps earlier results', () 
   assert.equal(done[8_049].category, '动物');
   assert.equal(done[8_050], records[8_050]);
   assert.deepEqual(countReviewRecords(done), {
-    total: 50_000, done: 50, failed: 0, uncertain: 0, pending: 49_950, producible: 50, rejected: 0,
+    total: 50_000, done: 50, failed: 0, uncertain: 0, pending: 49_950, producible: 50, rejected: 0, lowValue: 0,
   });
 });
 
@@ -51,4 +51,12 @@ test('preview prioritizes running, failed and latest rows in source order', () =
     { id: 'e', status: 'idle' },
   ];
   assert.deepEqual(selectPreviewRecords(records, new Set(['d']), 4).map((record) => record.id), ['c', 'b', 'd', 'a']);
+});
+
+test('low-value totals count only completed video results', () => {
+  const counts = countReviewRecords([
+    { id: '1', status: 'done', producible: '不制作', lowValue: '是' },
+    { id: '2', status: 'idle', lowValue: '是' },
+  ]);
+  assert.equal(counts.lowValue, 1);
 });
