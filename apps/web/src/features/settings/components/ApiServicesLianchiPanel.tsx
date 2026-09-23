@@ -20,7 +20,7 @@ export function ApiServicesLianchiPanel({ apiKey, setApiKey, showKey, setShowKey
         <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Image className="w-5 h-5" /></div>
         <div>
           <h2 className="text-sm sm:text-base font-black text-slate-900">联池图像接口</h2>
-          <p className="text-xs text-slate-500 mt-1">GAPNET OpenAI Images 兼容接口。选择「联池 GPT Image 2」时自动使用此密钥。</p>
+          <p className="text-xs text-slate-500 mt-1">GAPNET OpenAI Images 兼容接口。选择「联池image2」时自动使用此密钥。</p>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">

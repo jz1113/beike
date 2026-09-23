@@ -1,16 +1,15 @@
 # 贝壳云图 (Beike Cloud Graph)
 
-> 面向电商视觉创作、多模态智能生图生视频与创意工作流的全栈桌面端应用。
+> 面向电商视觉创作、多模态智能生图生视频与创意工作流的 Web 应用，在浏览器中使用。
 
 ---
 
 ## 🌟 项目架构
 
-本项目采用现代化全栈 Monorepo 架构，全面支持 **macOS** 与 **Windows** 双平台：
+本项目采用全栈 Monorepo。产品在浏览器中使用，不再使用桌面端。
 
-- **桌面外壳**：[Tauri v2](https://tauri.app/) (Rust MSVC/Darwin)
 - **Web 前端**：React 19 + Vite + Tailwind CSS + Lucide Icons
-- **后端服务**：Hono API Server (Node.js 侧边进程 / Sidecar)
+- **后端服务**：Hono API Server (Node.js)
 - **数据持久化**：Prisma ORM + SQLite
 - **工程管理**：pnpm workspace 多包管理架构
 
@@ -18,7 +17,7 @@
 ├── apps/
 │   ├── api/       # 后端 API 服务 (Hono + TypeScript)
 │   ├── web/       # 前端应用 (React + Vite)
-│   └── desktop/   # Tauri 桌面端工程 (Rust 配置与窗口管理)
+│   └── desktop/   # 已停用，不再作为运行入口
 ├── packages/      # 共享库（contracts / domain / server-kit / prisma）
 ├── tools/         # 构建、校验与维护脚本
 └── docs/          # architecture/ 内部约定；vendors/ 厂商与聚合索引
@@ -38,9 +37,6 @@
   ```
 - **包管理器**：pnpm 10.13.1（与根目录 `packageManager` 字段一致）
 - **Git**：版本控制工具
-- **Rust 工具链**（仅在运行/打包 Tauri 桌面原生窗口时需要）：
-  - **Windows**：安装 [Rustup](https://rustup.rs/) (MSVC 工具链) 与 Visual Studio C++ 生成工具
-  - **macOS**：安装 Xcode Command Line Tools (`xcode-select --install`) 与 Rustup
 
 启用与仓库一致的 pnpm：
 
@@ -65,19 +61,9 @@ cp .env.example .env
 
 ---
 
-### 3. 一键启动（macOS）
+### 3. 启动 Web
 
-进入项目根目录，直接双击运行：
-```text
-启动桌面.command
-```
-*(或在终端中执行 `./启动桌面.command`)*
-
----
-
-### 4. 开发者模式（终端运行）
-
-如果你使用 VS Code、Cursor 或 WebStorm 进行代码编辑，可在根目录终端执行：
+进入项目根目录，在终端执行：
 
 ```bash
 # 安装依赖
@@ -122,7 +108,7 @@ pnpm run dev:api
 | `pnpm run typecheck` | 执行 TypeScript 全量静态类型检查 |
 | `pnpm run lint` | ESLint 代码质量检查 |
 | `pnpm run start:web` | 生产模式：托管 `apps/web/dist` 并启动 API（需先 `pnpm run build:ui`） |
-| `pnpm run seed:export` | 从本机桌面数据库导出官方提示词种子 |
+| `pnpm run seed:export` | 从本机数据库导出官方提示词种子 |
 | `pnpm run db:push` | 开发实验：把 Prisma schema 直接推到本地 SQLite，不写迁移历史 |
 | `pnpm run db:migrate` | 开发：`prisma migrate dev`，生成并应用迁移 |
 | `pnpm run db:deploy` | 生产：只允许 `prisma migrate deploy`，应用已有迁移 |

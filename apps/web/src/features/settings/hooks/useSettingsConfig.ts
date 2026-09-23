@@ -221,7 +221,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const handleSaveLianchiConfig = async () => {
     try {
       await persistLianchiConfig(lianchiApiKey);
-      showToast('✅ 联池 API Key 已保存；选择「联池 GPT Image 2」即可调用');
+      showToast('✅ 联池 API Key 已保存；选择「联池image2」即可调用');
     } catch (error) {
       showToast(`🔴 联池密钥保存失败：${formatUserError(error, '请重试')}`);
     }

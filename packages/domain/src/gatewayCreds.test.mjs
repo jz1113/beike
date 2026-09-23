@@ -28,3 +28,34 @@ test('production web uses only the request key and ignores the server default', 
   assert.equal(desktop.apiKey, 'server-key');
   configureDomainRuntime({ env: {} });
 });
+
+test('production web accepts the configured gateway with an OpenAI /v1 suffix', () => {
+  configureDomainRuntime({ env: { NODE_ENV: 'production' } });
+  try {
+    const credentials = resolveGatewayCreds(
+      new Request('https://app.example/api/catalog/assets/deconstruct', {
+        headers: {
+          'x-custom-base-url': 'https://ai.example/v1/',
+          'x-custom-api-key': 'user-key',
+        },
+      }),
+      {},
+      { baseUrl: 'https://ai.example', apiKey: 'server-key' },
+    );
+    assert.equal(credentials.baseUrl, 'https://ai.example');
+    assert.equal(credentials.apiKey, 'user-key');
+    assert.equal(credentials.ignoredClientBase, true);
+    assert.throws(() => resolveGatewayCreds(
+      new Request('https://app.example/api/catalog/assets/deconstruct', {
+        headers: {
+          'x-custom-base-url': 'https://other.example/v1',
+          'x-custom-api-key': 'user-key',
+        },
+      }),
+      {},
+      { baseUrl: 'https://ai.example', apiKey: 'server-key' },
+    ), /接口地址与服务器允许的视觉网关不一致/);
+  } finally {
+    configureDomainRuntime({ env: {} });
+  }
+});

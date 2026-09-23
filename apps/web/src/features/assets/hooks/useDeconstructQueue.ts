@@ -282,7 +282,8 @@ export function useDeconstructQueue({
           `⚠️ 处理 ${totalProcessed} 套：成功 ${doneCount + partialCount} 套，失败 ${errorCount} 套${csvTip}`
         );
       } else {
-        showToast(`❌ 全部 ${errorCount} 套反推失败，可点击重试`);
+        const firstError = workingQueue.find((item) => item.status === 'error')?.error;
+        showToast(`❌ 全部 ${errorCount} 套反推失败${firstError ? `：${firstError}` : ''}。请检查后重试`);
       }
     } finally {
       isDeconstructingRef.current = false;

@@ -56,8 +56,11 @@ export function useCustomModels({
       const models = needsLianchiMigration && !loaded.models.some(model => model.id === lianchiModel?.id)
         ? [...loaded.models, lianchiModel!]
         : loaded.models;
-      setCustomModels(models);
-      if (!loaded.invalid && persistCustomModels(models) && needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
+      const renamed = models.map(model => model.id === 'openai/gpt-image-2' && model.name === 'GPT Image 2（联池）'
+        ? { ...model, name: '联池image2', shortName: '联池image2' }
+        : model);
+      setCustomModels(renamed);
+      if (!loaded.invalid && persistCustomModels(renamed) && needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
       if (loaded.invalid) {
         showToast(loaded.recoveredFromBackup ? '自定义模型配置已损坏，已从备份恢复' : '自定义模型配置已损坏，已保留当前列表并备份原数据');
       }

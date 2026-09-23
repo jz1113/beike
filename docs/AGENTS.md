@@ -1,6 +1,6 @@
 # 贝壳云图 Agent / 工程约定
 
-产品名：**贝壳云图**（Beike Cloud Graph）。npm 根包名：`beike-cloud-graph`。桌面壳 Cargo/identifier 仍为历史名 `azhuo-workbench` / `com.azhuo.workbench`（不必一次改完）。
+产品名：**贝壳云图**（Beike Cloud Graph）。npm 根包名：`beike-cloud-graph`。产品在浏览器中运行，不再使用桌面端。`apps/desktop` 与根目录 `启动桌面.command` 已停用，不要把它们当作启动入口。
 
 ## 布局（单核扁平）
 
@@ -9,7 +9,7 @@ beike-main/
 ├── apps/
 │   ├── web/           # @beike/web — React + Vite UI
 │   ├── api/           # @beike/api — Hono Node sidecar
-│   └── desktop/       # Tauri v2 桌面壳
+│   └── desktop/       # 已停用，不要作为启动入口
 ├── packages/
 │   ├── contracts/     # @beike/contracts — Zod DTO（薄）
 │   ├── domain/        # @beike/domain — browser-safe 纯逻辑 / 类型
@@ -45,18 +45,18 @@ beike-main/
 
 ## 命名
 
-| 对外 / 文档 | 仓库 / npm | 桌面壳 |
-|-------------|------------|--------|
-| 贝壳云图 | `beike-cloud-graph` | `azhuo-workbench`（历史） |
+| 对外 / 文档 | 仓库 / npm |
+|-------------|------------|
+| 贝壳云图 | `beike-cloud-graph` |
 
-新代码与用户可见文案优先用「贝壳云图」/ `beike`；改 Cargo identifier 需单独发布协调，勿随意改。
+新代码与用户可见文案优先用「贝壳云图」/ `beike`。
 
 ## 文档分层
 
 - [`docs/architecture/`](architecture/) — 内部架构、包边界、目录分层与产品操作说明
 - [`docs/vendors/官方接口/`](vendors/官方接口/) — 批准模型的聚合索引 + 厂商官网索引
 - [`docs/vendors/external-parsing.md`](vendors/external-parsing.md) — 外站链接解析接口
-- 启动桌面：根目录 [`启动桌面.command`](../启动桌面.command)
+- 本地启动：仓库根目录 `pnpm run dev:web`，浏览器打开 `http://127.0.0.1:5173`
 - 不要在 `docs/` 根目录再放散落 markdown 或其它子目录
 
 ## 明确不做

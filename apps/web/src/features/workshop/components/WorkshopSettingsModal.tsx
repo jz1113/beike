@@ -181,7 +181,7 @@ export function WorkshopSettingsModal({
                 <label className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0">
                   <span className="shrink-0 text-xs font-bold text-slate-700">交付画质</span>
                   <select value={selectedQuality} onChange={e => setSelectedQuality(e.target.value as 'high' | 'medium' | 'low')} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
-                    <option value="high">4K 极清</option><option value="medium">1080P 高清</option><option value="low">极速草图</option>
+                    <option value="low">1K（low）</option><option value="medium">2K（medium）</option><option value="high">4K（high）</option>
                   </select>
                 </label>
               </div>

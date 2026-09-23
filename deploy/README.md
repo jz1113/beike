@@ -39,7 +39,7 @@ sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install && pnpm run build:ui'
 
 编辑 `/var/lib/beike/.env`：填入 `LOCAL_ACCESS_TOKEN`，并把 `PUBLIC_WEB_ORIGIN` 改成 `http://你的公网IP`。
 
-网页部署时，建议将 `AI_DRAWING_BASE_URL` 与 `AI_DRAWING_API_KEY` 保持为空。用户首次打开网页后，在「设置 → API 服务」输入自己的网关地址和 API Key 并保存；密钥只保存在该浏览器并随当前请求转发，不会写入服务器 `.env` 或影响其他用户。不要把本机桌面版的第三方 API Key 同步到服务器。
+网页部署时，建议将 `AI_DRAWING_BASE_URL` 与 `AI_DRAWING_API_KEY` 保持为空。用户首次打开网页后，在「设置 → API 服务」输入自己的网关地址和 API Key 并保存；密钥只保存在该浏览器并随当前请求转发，不会写入服务器 `.env` 或影响其他用户。不要把本机浏览器里保存的第三方 API Key 同步到服务器。产品不再使用桌面端。
 
 把本机数据库拷上去（封面大图 `storage/generated` 有 8G+，可先只拷库）：
 
@@ -63,7 +63,7 @@ sudo systemctl status beike --no-pager
 - `packages/domain/src/seeds/promptAssets.json`：已沉淀提示词资产
 - `deploy/env.production.example`、`deploy/beike.service`、`deploy/nginx.conf.example`
 - 启动：`pnpm run start:web`（先 `pnpm run build:ui`）
-- 重新从本机桌面库导出种子：`pnpm run seed:export`
+- 重新从本机数据库导出种子：`pnpm run seed:export`
 
 本机数据库备份在 `.local/deploy-backup/azhuo.db`（不进 Git）。本机 `storage/` 约 8.6G，其中生成图可按需再同步。
 

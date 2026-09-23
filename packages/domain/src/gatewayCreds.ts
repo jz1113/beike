@@ -1,4 +1,5 @@
 import { domainEnv } from './runtime';
+import { normalizeGatewayBaseUrl } from './gatewayUrl';
 
 function isPrivateHostname(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
@@ -46,7 +47,7 @@ export function allowServerSecretFallback(): boolean {
 }
 
 function normalizeBase(url: string): string {
-  return url.replace(/\/+$/, '');
+  return normalizeGatewayBaseUrl(url);
 }
 
 export function resolveGatewayCreds(
@@ -65,7 +66,7 @@ export function resolveGatewayCreds(
   const customBaseUrl = allowClientCustomBaseUrl() && isSafeCustomGatewayBaseUrl(clientBase) ? clientBase : '';
 
   if (!allowClientCustomBaseUrl() && customApiKey && clientBase && normalizeBase(clientBase) !== normalizeBase(defaults.baseUrl)) {
-    throw new Error('不会将该密钥发往未配置的独立网关');
+    throw new Error('当前接口地址与服务器允许的视觉网关不一致。请在设置 → 服务接口配置中改为服务器配置的网关地址，或联系管理员配置该网关；密钥未发送到其他网关。');
   }
 
   const baseUrl = (customBaseUrl ? normalizeBase(customBaseUrl) : normalizeBase(defaults.baseUrl)) || defaults.baseUrl;
@@ -75,4 +76,3 @@ export function resolveGatewayCreds(
 
   return { baseUrl, apiKey, ignoredClientBase, keyFrom };
 }
-
