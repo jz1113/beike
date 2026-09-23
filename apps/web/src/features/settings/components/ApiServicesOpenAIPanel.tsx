@@ -22,6 +22,8 @@ interface Props {
   isFetchingModels: boolean;
   modelCount: number;
   modelError: string;
+  suggestedBaseUrl: string;
+  onUseSuggestedBaseUrl: (baseUrl: string) => void;
   modelSource: 'gateway' | 'codex';
 }
 
@@ -30,6 +32,7 @@ export function ApiServicesOpenAIPanel({
   allowInsecureHttp, setAllowInsecureHttp,
   onSave, onTest, onFetchModels, onImportCodexCatalog, onAddManualModel,
   isTesting, isFetchingModels, modelCount, modelError, modelSource,
+  suggestedBaseUrl, onUseSuggestedBaseUrl,
 }: Props) {
   return <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
     <div className="flex items-start gap-3 pb-3 border-b border-slate-100">
@@ -95,7 +98,11 @@ export function ApiServicesOpenAIPanel({
       </div>
       <p className="text-[11px] text-slate-500">CC Switch 的 ChatGPT/Codex 登录账号使用独立模型目录。可在本机选择 <code>~/.codex/cc-switch-model-catalog.json</code> 导入；请先在 CC Switch 更新该目录。文件只在浏览器内读取，不会上传。目录仅用于选择模型，实际调用仍使用上方地址和 API Key。</p>
       <p className="text-[11px] text-slate-600">当前目录：{modelSource === 'codex' ? '本机 Codex 文件' : 'API Key 网关'} · {modelCount} 款</p>
-      {modelError && <p role="alert" className="text-[11px] text-rose-700 bg-rose-50 rounded-lg px-2.5 py-2">{modelError}</p>}
+      {modelError && (!suggestedBaseUrl || baseUrl.trim().replace(/\/+$/, '') !== suggestedBaseUrl) && <p role="alert" className="text-[11px] text-rose-700 bg-rose-50 rounded-lg px-2.5 py-2">{modelError}</p>}
+      {suggestedBaseUrl && /^https:\/\//i.test(baseUrl.trim()) && <button type="button" onClick={() => onUseSuggestedBaseUrl(suggestedBaseUrl)} className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-left">
+        改用 {suggestedBaseUrl} 并允许明文传输 API Key。请确认地址后保存配置，再重新获取模型。
+      </button>}
+      {suggestedBaseUrl && baseUrl.trim().replace(/\/+$/, '') === suggestedBaseUrl && <p className="text-[11px] text-amber-900 bg-amber-50 rounded-lg px-2.5 py-2">已切换到 HTTP 地址并勾选明文传输。请保存配置，再重新获取模型。</p>}
     </div>
     <div className="flex items-center justify-end gap-2 flex-wrap pt-1 border-t border-slate-100">
       <button type="button" onClick={onTest} disabled={isTesting || !apiKey.trim()} className="h-9 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">

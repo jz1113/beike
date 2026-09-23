@@ -51,12 +51,14 @@ export default function ApiServicesTab({
   setOpenAIEnabled,
   openAIAllowInsecureHttp,
   setOpenAIAllowInsecureHttp,
+  switchOpenAIToHttpGateway,
   isTestingOpenAI,
   handleTestOpenAI,
   handleSaveOpenAIConfig,
   handleOpenOpenAIDiscovery,
   handleImportCodexCatalog,
   openAIModelError,
+  openAIModelSuggestedBaseUrl,
   openAIModelSource,
   isFetchingOpenAI,
   openAIModelCount,
@@ -295,6 +297,7 @@ export default function ApiServicesTab({
               showKey={showOpenAIKey} setShowKey={setShowOpenAIKey}
               enabled={openAIEnabled} setEnabled={setOpenAIEnabled}
               allowInsecureHttp={openAIAllowInsecureHttp} setAllowInsecureHttp={setOpenAIAllowInsecureHttp}
+              suggestedBaseUrl={openAIModelSuggestedBaseUrl} onUseSuggestedBaseUrl={switchOpenAIToHttpGateway}
               onTest={handleTestOpenAI} onSave={handleSaveOpenAIConfig}
               onFetchModels={handleOpenOpenAIDiscovery}
               onImportCodexCatalog={handleImportCodexCatalog}

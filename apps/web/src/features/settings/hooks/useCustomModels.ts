@@ -51,6 +51,7 @@ export function useCustomModels({
   const [lianchiModels, setLianchiModels] = useState<GatewayModelItem[]>([]);
   const [openAIModels, setOpenAIModels] = useState<GatewayModelItem[]>([]);
   const [openAIModelError, setOpenAIModelError] = useState('');
+  const [openAIModelSuggestedBaseUrl, setOpenAIModelSuggestedBaseUrl] = useState('');
   const [openAIModelSource, setOpenAIModelSource] = useState<'gateway' | 'codex'>('gateway');
   const [isFetchingOpenAI, setIsFetchingOpenAI] = useState(false);
   const [gatewaySource, setGatewaySource] = useState<'comfly' | 'lianchi' | 'openai'>('comfly');
@@ -345,6 +346,7 @@ export function useCustomModels({
       return;
     }
     setOpenAIModelError('');
+    setOpenAIModelSuggestedBaseUrl('');
     setOpenAIModelSource('gateway');
     setIsGatewayModalOpen(true);
     setIsFetchingOpenAI(true);
@@ -358,6 +360,7 @@ export function useCustomModels({
         setOpenAIModels([]);
         const message = `获取模型失败 (${data.gatewayStatus || response.status})：${data.error || '模型目录无效'}`;
         setOpenAIModelError(message);
+        if (typeof data.suggestedBaseUrl === 'string') setOpenAIModelSuggestedBaseUrl(data.suggestedBaseUrl);
         showToast(message);
         return;
       }
@@ -381,6 +384,7 @@ export function useCustomModels({
       setGatewaySource('openai');
       setOpenAIModelSource('codex');
       setOpenAIModelError('');
+      setOpenAIModelSuggestedBaseUrl('');
       setOpenAIModels(models);
       setIsGatewayModalOpen(true);
       showToast(`已从本机目录读取 ${models.length} 款模型`);
@@ -451,6 +455,7 @@ export function useCustomModels({
     lianchiModels,
     openAIModels,
     openAIModelError,
+    openAIModelSuggestedBaseUrl,
     openAIModelSource,
     gatewaySource,
     isFetchingLianchi,

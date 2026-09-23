@@ -39,12 +39,14 @@ export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
   setOpenAIEnabled: (v: boolean) => void;
   openAIAllowInsecureHttp: boolean;
   setOpenAIAllowInsecureHttp: (v: boolean) => void;
+  switchOpenAIToHttpGateway: (baseUrl: string) => void;
   isTestingOpenAI: boolean;
   handleTestOpenAI: () => void;
   handleSaveOpenAIConfig: () => void;
   handleOpenOpenAIDiscovery: () => void;
   handleImportCodexCatalog: (file: File) => void;
   openAIModelError: string;
+  openAIModelSuggestedBaseUrl: string;
   openAIModelSource: 'gateway' | 'codex';
   isFetchingOpenAI: boolean;
   openAIModelCount: number;

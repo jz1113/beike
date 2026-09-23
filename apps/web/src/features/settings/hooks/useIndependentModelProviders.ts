@@ -17,6 +17,12 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
   const setOpenAIAllowInsecureHttp = (allowed: boolean) => {
     setOpenAIInsecureHttpConsentUrl(allowed ? normalizedOpenAIBaseUrl : '');
   };
+  const switchOpenAIToHttpGateway = (baseUrl: string) => {
+    const normalized = baseUrl.trim().replace(/\/+$/, '');
+    if (!isPublicHttpGatewayIpUrl(normalized)) return;
+    setOpenAIBaseUrl(normalized);
+    setOpenAIInsecureHttpConsentUrl(normalized);
+  };
   const [isTestingOpenAI, setIsTestingOpenAI] = useState(false);
   const [lianchiApiKey, setLianchiApiKey] = useState('');
   const [showLianchiKey, setShowLianchiKey] = useState(false);
@@ -93,6 +99,7 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
   return {
     openAIBaseUrl, setOpenAIBaseUrl, openAIApiKey, setOpenAIApiKey,
     openAIAllowInsecureHttp, setOpenAIAllowInsecureHttp,
+    switchOpenAIToHttpGateway,
     showOpenAIKey, setShowOpenAIKey, openAIEnabled, setOpenAIEnabled,
     isTestingOpenAI, handleTestOpenAI, handleSaveOpenAIConfig,
     lianchiApiKey, setLianchiApiKey, showLianchiKey, setShowLianchiKey,

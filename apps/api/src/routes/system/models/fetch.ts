@@ -136,6 +136,7 @@ export async function POST(req: Request) {
     let rawList: any[] = [];
     let gatewayStatus = 0;
     let gatewayErrorMsg = '';
+    let suggestedBaseUrl = '';
     try {
       const paths = isOpenAI ? ['/v1/models', '/models'] : ['/v1/models'];
       for (const path of paths) {
@@ -164,6 +165,24 @@ export async function POST(req: Request) {
     } catch (networkErr: any) {
       clearTimeout(timeout);
       gatewayErrorMsg = networkErr.name === 'AbortError' ? '请求网关超时' : (networkErr.message || '网络连接失败');
+      // Diagnose HTTPS-on-HTTP ports without ever sending the API key over HTTP.
+      const httpCandidate = isOpenAI && networkErr.name !== 'AbortError'
+        ? targetUrl.replace(/^https:/i, 'http:') : '';
+      if (httpCandidate !== targetUrl && isPublicHttpGatewayIpUrl(httpCandidate)) {
+        try {
+          const probe = await gatewayFetch(`${httpCandidate}/v1/models`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            redirect: 'manual',
+            signal: AbortSignal.timeout(4_000),
+          });
+          if (probe.status >= 500 || (probe.status >= 300 && probe.status < 400)) throw new Error('HTTP endpoint unavailable');
+          suggestedBaseUrl = httpCandidate;
+          gatewayErrorMsg = '此地址的 HTTPS 连接失败，但同一端口的 HTTP 接口有响应。请改用 HTTP 地址并明确允许明文传输，然后重试；或为网关配置有效的 HTTPS。';
+        } catch {
+          // Keep the original network error when the HTTP endpoint is also unreachable.
+        }
+      }
       console.warn('远程网关拉取失败或超时，自动启用高可用精选模型兜底:', gatewayErrorMsg);
     }
 
@@ -174,6 +193,9 @@ export async function POST(req: Request) {
 
     const httpFailed = [401, 403, 404, 500].includes(gatewayStatus);
     if (strict || isOpenAI || httpFailed || gatewayStatus === 200) {
+      if (suggestedBaseUrl) {
+        return jsonResponse({ success: false, models: [], gatewayStatus: 502, error: gatewayErrorMsg, suggestedBaseUrl }, 502);
+      }
       return emptyCatalog(gatewayStatus || 502, gatewayErrorMsg || '未发现可用模型');
     }
     if (isPing) {

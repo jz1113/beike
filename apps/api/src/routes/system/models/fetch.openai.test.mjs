@@ -119,3 +119,31 @@ test('production reads models from a consented public HTTP gateway', async () =>
     configureDomainRuntime({ env: {} });
   }
 });
+
+test('HTTPS handshake failure suggests a confirmed HTTP endpoint without exposing the key', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), authorization: init.headers?.Authorization });
+    if (requests.length === 1) {
+      const error = new TypeError('fetch failed');
+      error.cause = { code: 'ERR_SSL_WRONG_VERSION_NUMBER' };
+      throw error;
+    }
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  };
+  try {
+    const response = await POST(new Request('https://app.example/api/system/models/fetch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'openai', baseUrl: 'https://8.211.191.95:8080', apiKey: 'test-key', strict: true }),
+    }));
+    const body = await response.json();
+    assert.equal(response.status, 502);
+    assert.equal(body.suggestedBaseUrl, 'http://8.211.191.95:8080');
+    assert.match(body.error, /HTTPS.*HTTP/);
+    assert.deepEqual(requests, [
+      { url: 'https://8.211.191.95:8080/v1/models', authorization: 'Bearer test-key' },
+      { url: 'http://8.211.191.95:8080/v1/models', authorization: undefined },
+    ]);
+  } finally { globalThis.fetch = originalFetch; }
+});

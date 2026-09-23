@@ -402,12 +402,14 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 setOpenAIEnabled={config.setOpenAIEnabled}
                 openAIAllowInsecureHttp={config.openAIAllowInsecureHttp}
                 setOpenAIAllowInsecureHttp={config.setOpenAIAllowInsecureHttp}
+                switchOpenAIToHttpGateway={config.switchOpenAIToHttpGateway}
                 isTestingOpenAI={config.isTestingOpenAI}
                 handleTestOpenAI={config.handleTestOpenAI}
                 handleSaveOpenAIConfig={config.handleSaveOpenAIConfig}
                 handleOpenOpenAIDiscovery={() => models.handleOpenOpenAIDiscovery(config.openAIBaseUrl, config.openAIApiKey, config.openAIAllowInsecureHttp, true)}
                 handleImportCodexCatalog={models.handleImportCodexCatalog}
                 openAIModelError={models.openAIModelError}
+                openAIModelSuggestedBaseUrl={models.openAIModelSuggestedBaseUrl}
                 openAIModelSource={models.openAIModelSource}
                 isFetchingOpenAI={models.isFetchingOpenAI}
                 openAIModelCount={models.openAIModels.length}
