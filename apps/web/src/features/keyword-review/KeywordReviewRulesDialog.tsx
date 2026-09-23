@@ -1,5 +1,6 @@
 import { BookOpen, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { KeywordReviewRuleEditor } from './KeywordReviewRuleEditor';
 
 export const KEYWORD_REVIEW_CATEGORIES = [
   '政史军', '3C数码', '本地生活', '动漫', '动物', '法律', '购物消费', '互联网IT', '家居',
@@ -68,8 +69,8 @@ interface Props {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{title}</h3>
-      <div className="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-600">{children}</div>
+      <h3 className="text-xs font-bold tracking-[0.08em] text-slate-700">{title}</h3>
+      <div className="mt-2 space-y-1.5 text-sm leading-6 text-slate-700">{children}</div>
     </section>
   );
 }
@@ -87,7 +88,7 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
             </span>
             <div>
               <h2 id="keyword-review-rules-title" className="text-sm font-black tracking-tight">审核规则</h2>
-              <p className="mt-0.5 text-[11px] text-slate-400">完整口径。保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面</p>
+              <p className="mt-0.5 text-xs text-slate-600">完整口径。保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
@@ -108,15 +109,15 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
           <Section title="允许垂类 · 34">
             <div className="flex flex-wrap gap-1.5">
               {KEYWORD_REVIEW_CATEGORIES.map((category) => (
-                <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{category}</span>
+                <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{category}</span>
               ))}
             </div>
             <ul className="mt-3 list-disc space-y-1.5 pl-5">
               {VERTICAL_BOUNDARIES.map((item) => <li key={item}>{item}</li>)}
             </ul>
             <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">
-              <table className="w-full text-left text-[12px]">
-                <thead className="bg-slate-50 text-slate-500">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-700">
                   <tr>
                     <th className="px-3 py-2 font-bold">Query</th>
                     <th className="px-3 py-2 font-bold">最终垂类</th>
@@ -128,7 +129,7 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
                     <tr key={row.query} className="border-t border-slate-100">
                       <td className="px-3 py-2 font-semibold text-slate-800">{row.query}</td>
                       <td className="px-3 py-2 font-bold text-slate-700">{row.category}</td>
-                      <td className="px-3 py-2 text-slate-500">{row.reason}</td>
+                      <td className="px-3 py-2 text-slate-700">{row.reason}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -173,6 +174,7 @@ export function KeywordReviewRulesDialog({ open, onClose }: Props) {
             </ul>
             <p>例如：美国总统是谁 → 简单问答：只确认一个身份；怎么判断他对我有好感 → 低价值：个人恋爱好感判断；怎么在淘宝上添加银行卡 → 非笔记需求：平台绑卡操作。</p>
           </Section>
+          <KeywordReviewRuleEditor open={open} />
         </div>
       </section>
     </div>

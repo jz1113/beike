@@ -3,7 +3,7 @@ import { db } from '../../../repositories/access';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
 import { persistDataUrlToStorage } from '@beike/server-kit/persistDataUrl';
 import { formatUserError } from '@beike/domain/upstreamErrors';
-import { resolveCredentials } from '../../../services/gatewayCredentials';
+import { resolveCredentials, resolveImageCredentials } from '../../../services/gatewayCredentials';
 import { mutableGenerationStatuses, withPersistedGenerationStatus } from '../../../services/generationTerminalState';
 import { recordPollTelemetry } from '../../../services/agentTelemetry';
 import { decideDirectImagePoll, decideProbeMissPoll } from '../../../services/generate/pollStatus';
@@ -57,7 +57,8 @@ async function pollImageOnce(req: Request) {
     return jsonResponse(decision.body, decision.httpStatus);
   }
 
-  const { baseUrl, apiKey } = resolveCredentials(req);
+  const task = await db.imageTask.findFirst({ where: { taskId }, select: { model: true } }).catch(() => null);
+  const { baseUrl, apiKey } = resolveImageCredentials(req, { model: task?.model || undefined });
   const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
 
   // 🌟 1. 构造高优先级端点与候选端点池 (Comfly/New-API 异步生图标准首选 /v1/images/tasks)

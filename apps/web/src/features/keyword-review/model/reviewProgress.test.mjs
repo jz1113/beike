@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyBatchResults, countReviewRecords, selectPreviewRecords, updateReviewRecords } from './reviewProgress.ts';
+import { applyBatchResults, countReviewRecords, isRecoverableModelOutputError, selectPreviewRecords, updateReviewRecords } from './reviewProgress.ts';
+
+test('model output validation errors can be isolated without stopping the review', () => {
+  assert.equal(isRecoverableModelOutputError(502, '模型返回了非法垂类：职场'), true);
+  assert.equal(isRecoverableModelOutputError(502, '模型返回了非法制作结论'), true);
+  assert.equal(isRecoverableModelOutputError(502, '模型结果不完整：应有 50 条，实际 49 条'), true);
+  assert.equal(isRecoverableModelOutputError(502, '上游网关不可用'), false);
+  assert.equal(isRecoverableModelOutputError(409, '审核规则版本 v1 不存在'), false);
+});
 
 test('large review updates only the active batch and keeps earlier results', () => {
   const records = Array.from({ length: 50_000 }, (_, index) => ({

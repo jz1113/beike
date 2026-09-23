@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Database } from 'lucide-react';
+import { Database, Image } from 'lucide-react';
 import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@/shared/icons';
 import { ModelIcon } from '@/shared/ui/ModelIcons';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
@@ -83,6 +83,18 @@ export const API_SERVICES: ApiServiceItem[] = [
     defaultBaseUrl: 'https://api.deepseek.com',
     description: '使用 DeepSeek 官方 OpenAI 兼容接口；启用后会将当前文本/图像理解模型请求切换到 DeepSeek。',
     capabilities: ['Chat Completions', '图像理解', 'deepseek-flash', 'Bearer API Key']
+  },
+  {
+    id: 'lianchi_images',
+    name: '联池图像接口',
+    subTitle: 'GAPNET · OpenAI Images 兼容',
+    category: 'core',
+    renderLogo: (cls = 'w-5 h-5') => <Image className={cls} />,
+    isEnabled: true,
+    tag: '文生图 / 图像编辑',
+    defaultBaseUrl: 'https://api.gapnet.ai/endpoint',
+    description: '独立调用 openai/gpt-image-2；生成使用 JSON，编辑使用 multipart 图片上传。',
+    capabilities: ['Images Generations', 'Images Edits', 'Bearer API Key'],
   },
   {
     id: 'wanbang_ecommerce',

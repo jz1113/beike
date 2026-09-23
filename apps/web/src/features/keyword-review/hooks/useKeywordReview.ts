@@ -8,9 +8,10 @@ import {
   type KeywordReviewRecord,
   type ParsedKeywordWorkbook,
 } from '../model/keywordReviewWorkbook';
-import { applyBatchResults, countReviewRecords, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
+import { applyBatchResults, countReviewRecords, isRecoverableModelOutputError, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
+export const KEYWORD_REVIEW_CONCURRENCY = 32;
 export const KEYWORD_REVIEW_MODEL = 'deepseek-flash';
 export const KEYWORD_REVIEW_MODEL_LABEL = 'DeepSeek Flash';
 export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected';
@@ -61,7 +62,7 @@ async function requestReviewBatch(
       const data = await response.json() as ReviewResponse;
       if (response.ok && data.success && Array.isArray(data.results)) return data;
       const error = new Error(data.error || `审核请求失败（HTTP ${response.status}）`);
-      if (response.status === 502 && /输出被截断|结果不完整|不完整 JSON|未返回 results 数组/.test(error.message)) {
+      if (isRecoverableModelOutputError(response.status, error.message)) {
         throw Object.assign(error, { splitBatch: true });
       }
       if (response.status >= 400 && response.status < 500 && response.status !== 429) throw Object.assign(error, { retryable: false });
@@ -91,6 +92,7 @@ export function useKeywordReview() {
   const [balance, setBalance] = useState<KeywordReviewBalance | null>(null);
   const [balanceError, setBalanceError] = useState('');
   const abortRef = useRef<AbortController | null>(null);
+  const rulesVersionRef = useRef<number | null>(null);
   const recordIndicesRef = useRef<Map<string, number>>(new Map());
 
   const refreshBalance = useCallback(async () => {
@@ -160,6 +162,7 @@ export function useKeywordReview() {
     setFilter('all');
     try {
       const next = await parseKeywordWorkbook(file);
+      rulesVersionRef.current = null;
       recordIndicesRef.current = new Map(next.records.map((record, index) => [record.id, index]));
       setParsed(next);
       setRecords(next.records);
@@ -187,75 +190,114 @@ export function useKeywordReview() {
       setNotice('未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写');
       return;
     }
+    let rulesVersion: number;
+    try {
+      if (rulesVersionRef.current === null) {
+        const rulesResponse = await apiFetch('/api/generate/keyword-review/rules');
+        if (!rulesResponse.ok) throw new Error('读取审核规则失败');
+        const rules = await rulesResponse.json() as { current?: { version?: number } };
+        if (!Number.isInteger(rules.current?.version)) throw new Error('审核规则版本异常');
+        rulesVersionRef.current = rules.current!.version!;
+      }
+      rulesVersion = rulesVersionRef.current;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '读取审核规则失败');
+      return;
+    }
     const queue = mode === 'trial' ? candidates.slice(0, KEYWORD_REVIEW_BATCH_SIZE) : candidates;
     const controller = new AbortController();
     abortRef.current = controller;
     setIsRunning(true);
     setRunMode(mode);
     let completedNow = 0;
+    let failedNow = 0;
     let lookedUpNow = 0;
-    let lastBatchIds: string[] = [];
+    const runState: { fatalError: Error | null } = { fatalError: null };
     try {
-      for (let index = 0; index < queue.length; index += KEYWORD_REVIEW_BATCH_SIZE) {
-        if (controller.signal.aborted) break;
-        const batch = queue.slice(index, index + KEYWORD_REVIEW_BATCH_SIZE);
-        const ids = batch.map((record) => record.id);
-        lastBatchIds = ids;
-        setLastTrialIds(ids);
-        const remaining = queue.length - completedNow;
-        setNotice(mode === 'trial'
-          ? `正在试跑 ${batch.length} 条${lookupEnabled ? '，不确定词将联网补查' : ''}…`
-          : `正在批量审核 ${batch.length} 条，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
-        setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
-          (record) => ({ ...record, status: 'running', error: undefined })));
-        const pending: KeywordReviewRecord[][] = [batch];
-        while (pending.length > 0) {
-          if (controller.signal.aborted) break;
-          const chunk = pending.shift() as KeywordReviewRecord[];
-          try {
-            const data = await requestReviewBatch(JSON.stringify({
-              model: KEYWORD_REVIEW_MODEL,
-              customBaseUrl: DEEPSEEK_BASE_URL,
-              customApiKey: apiKey,
-              lookup: lookupEnabled,
-              rows: chunk.map(({ id, query, expansion, entityExpansion, contentType }) => ({
-                id, query, expansion, entityExpansion, contentType,
-              })),
-            }), controller.signal, (attempt, message) => {
-              setNotice(`本批请求异常（${message}），正在进行第 ${attempt}/${REVIEW_MAX_ATTEMPTS} 次尝试；本轮已完成 ${completedNow} 条`);
-            });
-            setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
-            completedNow += chunk.length;
-            lookedUpNow += Number(data.lookedUp || 0);
-            if (completedNow % (KEYWORD_REVIEW_BATCH_SIZE * 10) === 0) void refreshBalance();
-          } catch (error) {
-            if ((error as Error & { splitBatch?: boolean }).splitBatch && chunk.length > 1) {
-              const middle = Math.ceil(chunk.length / 2);
-              pending.unshift(chunk.slice(0, middle), chunk.slice(middle));
-              setNotice(`本批结果过长，改为较小批次继续审核；本轮已完成 ${completedNow} 条`);
-              continue;
+      let nextIndex = 0;
+      const runWorker = async () => {
+        while (!controller.signal.aborted && nextIndex < queue.length) {
+          const index = nextIndex;
+          nextIndex += KEYWORD_REVIEW_BATCH_SIZE;
+          const batch = queue.slice(index, index + KEYWORD_REVIEW_BATCH_SIZE);
+          const ids = batch.map((record) => record.id);
+          setLastTrialIds(ids);
+          const remaining = queue.length - completedNow - failedNow;
+          setNotice(mode === 'trial'
+            ? `按规则 v${rulesVersion} 正在试跑 ${batch.length} 条${lookupEnabled ? '，不确定词将联网补查' : ''}…`
+            : `按规则 v${rulesVersion} 并行审核中（最多 ${KEYWORD_REVIEW_CONCURRENCY} 路），本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
+          setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
+            (record) => ({ ...record, status: 'running', error: undefined })));
+          const pending: KeywordReviewRecord[][] = [batch];
+          while (pending.length > 0) {
+            if (controller.signal.aborted) break;
+            const chunk = pending.shift() as KeywordReviewRecord[];
+            try {
+              const data = await requestReviewBatch(JSON.stringify({
+                model: KEYWORD_REVIEW_MODEL,
+                customBaseUrl: DEEPSEEK_BASE_URL,
+                customApiKey: apiKey,
+                lookup: lookupEnabled,
+                rulesVersion,
+                rows: chunk.map(({ id, query, expansion, entityExpansion, contentType }) => ({
+                  id, query, expansion, entityExpansion, contentType,
+                })),
+              }), controller.signal, (attempt, message) => {
+                setNotice(`本批请求异常（${message}），正在进行第 ${attempt}/${REVIEW_MAX_ATTEMPTS} 次尝试；本轮已完成 ${completedNow} 条`);
+              });
+              setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
+              completedNow += chunk.length;
+              lookedUpNow += Number(data.lookedUp || 0);
+              if (Math.floor((completedNow - chunk.length) / (KEYWORD_REVIEW_BATCH_SIZE * 10)) < Math.floor(completedNow / (KEYWORD_REVIEW_BATCH_SIZE * 10))) void refreshBalance();
+            } catch (error) {
+              if (controller.signal.aborted) break;
+              if ((error as Error & { splitBatch?: boolean }).splitBatch && chunk.length > 1) {
+                const middle = Math.ceil(chunk.length / 2);
+                pending.unshift(chunk.slice(0, middle), chunk.slice(middle));
+                setNotice(`本批模型结果异常，改为较小批次继续审核；本轮已完成 ${completedNow} 条`);
+                continue;
+              }
+              if ((error as Error & { splitBatch?: boolean }).splitBatch) {
+                const message = error instanceof Error ? error.message : '模型结果异常';
+                setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, chunk.map((record) => record.id),
+                  (record) => ({ ...record, status: 'error', error: message })));
+                failedNow += chunk.length;
+                setNotice(`已跳过 ${failedNow} 条模型结果异常的记录，继续审核；本轮已完成 ${completedNow} 条`);
+                continue;
+              }
+              runState.fatalError = error instanceof Error ? error : new Error('审核失败');
+              setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, chunk.map((record) => record.id),
+                (record) => record.status === 'running' ? { ...record, status: 'error', error: runState.fatalError?.message } : record));
+              controller.abort();
+              break;
             }
-            throw error;
           }
         }
+      };
+      const workerCount = Math.min(mode === 'trial' ? 1 : KEYWORD_REVIEW_CONCURRENCY, Math.ceil(queue.length / KEYWORD_REVIEW_BATCH_SIZE));
+      await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, queue.map((record) => record.id),
+        (record) => record.status === 'running' ? { ...record, status: 'idle' } : record));
+      if (runState.fatalError) {
+        setNotice(`${runState.fatalError.message}。已保留完成的结果，修复后可继续。`);
+        return;
       }
       void refreshBalance();
       const lookupNote = lookedUpNow > 0 ? `，联网补查 ${lookedUpNow} 条` : '';
       if (controller.signal.aborted) {
-        setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, lastBatchIds,
-          (record) => record.status === 'running' ? { ...record, status: 'idle' } : record));
         setNotice(`已停止，本次完成 ${completedNow} 条${lookupNote}，可继续未完成记录`);
       } else if (mode === 'trial') {
-        const leftover = candidates.length - completedNow;
+        const leftover = candidates.length - completedNow - failedNow;
+        const failedNote = failedNow > 0 ? `，失败 ${failedNow} 条（可稍后重试）` : '';
         setNotice(leftover > 0
-          ? `本批试跑完成 ${completedNow} 条${lookupNote}，还剩 ${leftover} 条未审核`
-          : `本批试跑完成 ${completedNow} 条${lookupNote}`);
+          ? `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}，还剩 ${leftover} 条未审核`
+          : `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}`);
       } else {
-        setNotice(`批量审核完成，本次处理 ${completedNow} 条${lookupNote}`);
+        setNotice(`批量审核结束，本次完成 ${completedNow} 条${failedNow > 0 ? `，失败 ${failedNow} 条（可稍后重试）` : ''}${lookupNote}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '审核失败';
-      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, lastBatchIds,
+      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, queue.map((record) => record.id),
         (record) => record.status === 'running'
           ? { ...record, status: controller.signal.aborted ? 'idle' : 'error', error: message }
           : record));
@@ -287,6 +329,7 @@ export function useKeywordReview() {
   const reset = () => {
     stopReview();
     setParsed(null);
+    rulesVersionRef.current = null;
     recordIndicesRef.current = new Map();
     setRecords([]);
     setLastTrialIds([]);
@@ -307,6 +350,7 @@ export function useKeywordReview() {
     sheetSummary,
     counts,
     batchSize: KEYWORD_REVIEW_BATCH_SIZE,
+    concurrency: KEYWORD_REVIEW_CONCURRENCY,
     isImporting,
     isRunning,
     runMode,

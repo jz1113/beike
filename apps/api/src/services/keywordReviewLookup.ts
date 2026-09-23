@@ -13,12 +13,16 @@ type LookupHit = { category: string; subject?: string };
 
 const lookupCache = new Map<string, LookupHit>();
 
+function cacheKey(query: string, rulesVersion = 0): string {
+  return `${rulesVersion}:${query.trim()}`;
+}
+
 export function resetLookupCacheForTests() {
   lookupCache.clear();
 }
 
-export function rememberLookupCategory(query: string, category: string, subject?: string) {
-  const key = query.trim();
+export function rememberLookupCategory(query: string, category: string, subject?: string, rulesVersion = 0) {
+  const key = cacheKey(query, rulesVersion);
   if (!key) return;
   if (lookupCache.size >= LOOKUP_CACHE_LIMIT) {
     const oldest = lookupCache.keys().next().value;
@@ -28,18 +32,19 @@ export function rememberLookupCategory(query: string, category: string, subject?
   lookupCache.set(key, { category, subject: clipped });
 }
 
-export function recalledLookupCategory(query: string): string | undefined {
-  return lookupCache.get(query.trim())?.category;
+export function recalledLookupCategory(query: string, rulesVersion = 0): string | undefined {
+  return lookupCache.get(cacheKey(query, rulesVersion))?.category;
 }
 
-function recalledLookupHit(query: string): LookupHit | undefined {
-  return lookupCache.get(query.trim());
+function recalledLookupHit(query: string, rulesVersion = 0): LookupHit | undefined {
+  return lookupCache.get(cacheKey(query, rulesVersion));
 }
 
 export function selectLookupRows(
   results: ReviewedKeywordRow[],
   rows: KeywordReviewRow[],
   limit = KEYWORD_REVIEW_LOOKUP_LIMIT,
+  rulesVersion = 0,
 ): KeywordReviewRow[] {
   const byId = new Map(rows.map((row) => [row.id, row]));
   const seen = new Set<string>();
@@ -50,7 +55,7 @@ export function selectLookupRows(
     const row = byId.get(result.id);
     if (!row) continue;
     const key = row.query.trim();
-    if (!key || seen.has(key) || lookupCache.has(key)) continue;
+    if (!key || seen.has(key) || lookupCache.has(cacheKey(key, rulesVersion))) continue;
     seen.add(key);
     picked.push(row);
   }
@@ -69,11 +74,12 @@ function applyLookupHit(result: ReviewedKeywordRow, hit?: LookupHit): ReviewedKe
 export function applyCachedLookupCategories(
   results: ReviewedKeywordRow[],
   rows: KeywordReviewRow[],
+  rulesVersion = 0,
 ): ReviewedKeywordRow[] {
   const byId = new Map(rows.map((row) => [row.id, row]));
   return results.map((result) => {
     const query = byId.get(result.id)?.query;
-    return applyLookupHit(result, query ? recalledLookupHit(query) : undefined);
+    return applyLookupHit(result, query ? recalledLookupHit(query, rulesVersion) : undefined);
   });
 }
 
@@ -121,13 +127,13 @@ function toPublicResult(result: ReviewedKeywordRow): KeywordReviewResult {
   };
 }
 
-function buildLookupPrompt(allowed: readonly string[]): string {
+function buildLookupPrompt(allowed: readonly string[], additions = ''): string {
   return `你只确认这个中文内容关键词的主体是什么，并只从允许垂类里选一个：
 ${allowed.join('、')}
 
 只用搜索确认作品、品牌、游戏、外文词、机构或陌生实体是什么。query 已经清楚时，不要用网页改意图。不要输出网页内容。
 
-严格返回 JSON：{"category":"唯一允许垂类","subject":"不超过12字的主体短语"}。`;
+严格返回 JSON：{"category":"唯一允许垂类","subject":"不超过12字的主体短语"}。${additions}`;
 }
 
 async function lookupOneRow(options: {
@@ -137,8 +143,10 @@ async function lookupOneRow(options: {
   row: KeywordReviewRow;
   allowed: Set<string>;
   categories: readonly string[];
+  rulesVersion?: number;
+  ruleAdditions?: string;
 }): Promise<LookupHit | undefined> {
-  const cached = recalledLookupHit(options.row.query);
+  const cached = recalledLookupHit(options.row.query, options.rulesVersion);
   if (cached) return cached;
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/responses`, {
     method: 'POST',
@@ -150,7 +158,7 @@ async function lookupOneRow(options: {
       max_output_tokens: 256,
       tools: [{ type: 'web_search' }],
       input: [
-        { role: 'system', content: buildLookupPrompt(options.categories) },
+        { role: 'system', content: buildLookupPrompt(options.categories, options.ruleAdditions) },
         {
           role: 'user',
           content: JSON.stringify({
@@ -166,7 +174,7 @@ async function lookupOneRow(options: {
   });
   if (!response.ok) return undefined;
   const hit = parseLookupResult(extractResponsesText(await response.json()), options.allowed);
-  if (hit) rememberLookupCategory(options.row.query, hit.category, hit.subject);
+  if (hit) rememberLookupCategory(options.row.query, hit.category, hit.subject, options.rulesVersion);
   return hit;
 }
 
@@ -192,9 +200,11 @@ export async function lookupUncertainCategories(options: {
   results: ReviewedKeywordRow[];
   allowed: Set<string>;
   categories: readonly string[];
+  rulesVersion?: number;
+  ruleAdditions?: string;
 }): Promise<{ results: KeywordReviewResult[]; lookedUp: number }> {
-  const withCache = applyCachedLookupCategories(options.results, options.rows);
-  const targets = selectLookupRows(withCache, options.rows);
+  const withCache = applyCachedLookupCategories(options.results, options.rows, options.rulesVersion);
+  const targets = selectLookupRows(withCache, options.rows, KEYWORD_REVIEW_LOOKUP_LIMIT, options.rulesVersion);
   if (targets.length === 0) {
     return { results: withCache.map(toPublicResult), lookedUp: 0 };
   }
@@ -209,6 +219,8 @@ export async function lookupUncertainCategories(options: {
         row,
         allowed: options.allowed,
         categories: options.categories,
+        rulesVersion: options.rulesVersion,
+        ruleAdditions: options.ruleAdditions,
       });
       if (hit) found.set(row.query.trim(), hit);
     } catch {

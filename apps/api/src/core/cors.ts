@@ -41,6 +41,7 @@ export const apiCors = cors({
     'x-workspace-token',
     'x-custom-base-url',
     'x-custom-api-key',
+    'x-lianchi-api-key',
     'x-image-protocol',
     'x-wanbang-key',
     'x-wanbang-secret',

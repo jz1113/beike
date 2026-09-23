@@ -53,6 +53,8 @@ export function getGatewayClientHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   if (customBaseUrl) headers['x-custom-base-url'] = customBaseUrl;
   if (customApiKey) headers['x-custom-api-key'] = customApiKey;
+  const lianchiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('lianchi_api_key')?.trim() : '';
+  if (lianchiKey) headers['x-lianchi-api-key'] = lianchiKey;
   if (customWanbangKey) headers['x-wanbang-key'] = customWanbangKey;
   if (customWanbangSecret) headers['x-wanbang-secret'] = customWanbangSecret;
   return headers;

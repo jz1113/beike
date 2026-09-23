@@ -17,6 +17,8 @@ const generate = new Hono();
 
 generate.post('/layer-decomposition', mountJson((req) => layerDecomposition.POST(req)));
 generate.post('/keyword-review/balance', mountJson((req) => keywordReview.balancePOST(req)));
+generate.get('/keyword-review/rules', mountJson(() => keywordReview.rulesGET()));
+generate.put('/keyword-review/rules', mountJson((req) => keywordReview.rulesPUT(req)));
 generate.post('/keyword-review', mountJson((req) => keywordReview.POST(req)));
 generate.post('/image', mountJson((req) => imageGen.POST(req)));
 generate.get('/image', mountJson((req) => imageGen.GET(req)));

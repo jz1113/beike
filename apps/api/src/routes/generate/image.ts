@@ -9,7 +9,7 @@ import { normalizeOpenAiImageRequest } from '@beike/domain/modelAdapters/image/n
 import { logLatencyAudit } from '@beike/domain/latencyAudit';
 import { humanizeUpstreamError, formatUserError } from '@beike/domain/upstreamErrors';
 import {
-  resolveCredentials,
+  resolveImageCredentials,
   buildImageSubmitCandidates,
 } from '../../services/gatewayCredentials';
 import { executeImagePoll, ensurePersistableResultUrl } from './image/poll';
@@ -79,7 +79,7 @@ async function submit(req: Request) {
       return jsonResponse({ success: false, error: `模型 ${model} 不在当前生图白名单中` }, 400);
     }
 
-    const { baseUrl, apiKey } = resolveCredentials(req, body);
+    const { baseUrl, apiKey } = resolveImageCredentials(req, body);
     try {
       const host = new URL(baseUrl).hostname.toLowerCase();
       if (model === 'openai/gpt-image-2' && (host === 'comfly.org' || host.endsWith('.comfly.org'))) {
@@ -95,8 +95,9 @@ async function submit(req: Request) {
       return jsonResponse(
         {
           success: false,
-          error:
-            '未配置 AI 绘图接口密钥 (API Key)。请前往「⚙️ 设置 -> 服务接口配置」中填入您的 Comfly API 凭证后使用。',
+          error: model === 'openai/gpt-image-2'
+            ? '未配置联池 API Key。请前往「设置 -> 服务接口配置 -> 联池」填写密钥。'
+            : '未配置 AI 绘图接口密钥 (API Key)。请前往「⚙️ 设置 -> 服务接口配置」中填入您的 Comfly API 凭证后使用。',
           missingConfig: 'apiKey',
         },
         400
@@ -139,7 +140,9 @@ async function submit(req: Request) {
     });
 
     const genPayload = adapted.payload;
-    const submitCandidates = adapted.family === 'qwen-edit' ? adapted.endpoints(baseUrl).submit : buildImageSubmitCandidates(
+    const submitCandidates = model === 'openai/gpt-image-2'
+      ? [`${baseUrl}/v1/images/${adapted.useEdits ? 'edits' : 'generations'}`]
+      : adapted.family === 'qwen-edit' ? adapted.endpoints(baseUrl).submit : buildImageSubmitCandidates(
       adapted.endpoints(baseUrl).submit,
       adapted.useEdits,
       baseUrl
@@ -309,7 +312,7 @@ export async function POST(req: Request) {
   let body;
   try { body = await req.clone().json(); } catch { return jsonResponse({ success: false, error: '请求格式不正确' }, 400); }
   try {
-    return await guardSubmission(req, 'image', resolveCredentials(req, body), () => submit(req));
+    return await guardSubmission(req, 'image', resolveImageCredentials(req, body), () => submit(req));
   } catch {
     return jsonResponse({ success: false, error: '任务提交记录保存失败，请核对原任务状态后重试', submissionUnknown: true }, 503);
   }

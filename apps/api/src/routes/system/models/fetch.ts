@@ -1,7 +1,7 @@
 import { gatewayFetch } from '../../../gateways/http';
 import { readJsonBody } from '../../../core/validate';
 import { jsonResponse } from '../../../core/http';
-import { getDefaultApiKey, getDefaultBaseUrl } from '../../../services/gatewayCredentials';
+import { getDefaultApiKey, getDefaultBaseUrl, LIANCHI_IMAGE_BASE_URL } from '../../../services/gatewayCredentials';
 import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
 import {
   approvedModelDisplayName,
@@ -32,6 +32,33 @@ function parseDiscoveredModels(rawList: unknown[]) {
   return filterApprovedModels(parsed);
 }
 
+function parseLianchiModels(rawList: unknown[]) {
+  const seen = new Set<string>();
+  return rawList.flatMap((item: any) => {
+    const id = typeof item === 'string' ? item.trim() : String(item?.id || '').trim();
+    if (!id || seen.has(id)) return [];
+    seen.add(id);
+    const approved = getApprovedModel(id);
+    const caps = inferWorkflowCapabilitiesFromId(id);
+    const modelType = String(typeof item === 'object' && item ? item.model_type || '' : '').toLowerCase();
+    const category = modelType === 'image' || caps.isImage ? 'image'
+      : modelType === 'video' || caps.isVideo ? 'video'
+        : caps.isAudio ? 'audio' : caps.isEmbedding ? 'embedding' : 'text';
+    const supported = id === 'openai/gpt-image-2';
+    return [{
+      id,
+      name: approved?.id === id ? approved.name : (typeof item?.name === 'string' ? item.name : id),
+      shortName: approved?.id === id ? approved.shortName : id.split('/').at(-1),
+      category,
+      isMultimodal: caps.isMultimodal, isVision: caps.isVision, isThinking: caps.isThinking,
+      isImage: category === 'image', isVideo: category === 'video',
+      isAudio: category === 'audio', isEmbedding: category === 'embedding',
+      owned_by: typeof item?.owned_by === 'string' ? item.owned_by : id.split('/')[0],
+      isCustom: false, supported,
+    }];
+  });
+}
+
 function emptyCatalog(status: number, error?: string) {
   return jsonResponse({ success: false, models: [], gatewayStatus: status, error }, status >= 400 ? status : 502);
 }
@@ -40,17 +67,20 @@ export async function POST(req: Request) {
   try {
     const body = await readJsonBody(req, {});
     const { baseUrl, isPing, strict } = body;
-    const rawUrl = (baseUrl || req.headers.get('x-custom-base-url') || getDefaultBaseUrl());
+    const isLianchi = body.provider === 'lianchi';
+    const rawUrl = isLianchi ? LIANCHI_IMAGE_BASE_URL : (baseUrl || req.headers.get('x-custom-base-url') || getDefaultBaseUrl());
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
     const independentKey = Object.prototype.hasOwnProperty.call(body, 'apiKey');
-    const targetKey = (
-      independentKey
-        ? body.apiKey
-        : (req.headers.get('x-custom-api-key') || getDefaultApiKey())
-    ).toString().trim();
+    const rawKey = independentKey
+      ? body.apiKey
+      : isLianchi ? req.headers.get('x-lianchi-api-key') : (req.headers.get('x-custom-api-key') || getDefaultApiKey());
+    const targetKey = String(rawKey || '').trim();
 
     if (independentKey && !targetKey) {
       return jsonResponse({ success: false, error: '请填写独立接口 API Key', models: [] }, 400);
+    }
+    if (isLianchi && !targetKey) {
+      return jsonResponse({ success: false, error: '请先填写联池 API Key', models: [] }, 400);
     }
     if (!targetKey) {
       return jsonResponse({
@@ -92,8 +122,8 @@ export async function POST(req: Request) {
     }
 
     if (rawList.length > 0) {
-      const parsedModels = parseDiscoveredModels(rawList);
-      return jsonResponse({ success: true, gatewayStatus: 200, count: parsedModels.length, models: parsedModels });
+      const parsedModels = isLianchi ? parseLianchiModels(rawList) : parseDiscoveredModels(rawList);
+      return jsonResponse({ success: true, gatewayStatus: 200, count: parsedModels.length, models: parsedModels, provider: isLianchi ? 'lianchi' : 'comfly' });
     }
 
     const httpFailed = [401, 403, 404, 500].includes(gatewayStatus);

@@ -34,6 +34,9 @@ export function useCustomModels({
   const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
   const [isFetchingGateway, setIsFetchingGateway] = useState(false);
   const [allGatewayModels, setAllGatewayModels] = useState<GatewayModelItem[]>([]);
+  const [isFetchingLianchi, setIsFetchingLianchi] = useState(false);
+  const [lianchiModels, setLianchiModels] = useState<GatewayModelItem[]>([]);
+  const [gatewaySource, setGatewaySource] = useState<'comfly' | 'lianchi'>('comfly');
 
   // 安全触发模型更新事件通知
   const notifyModelsUpdated = () => {
@@ -48,8 +51,13 @@ export function useCustomModels({
   useEffect(() => {
     if (typeof window !== 'undefined' && isOpen) {
       const loaded = loadCustomModels(customModels);
-      setCustomModels(loaded.models);
-      if (!loaded.invalid) persistCustomModels(loaded.models);
+      const lianchiModel = DEFAULT_PRESET_MODELS.find(model => model.id === 'openai/gpt-image-2');
+      const needsLianchiMigration = !loaded.invalid && !localStorage.getItem('lianchi_model_added_v1') && Boolean(lianchiModel);
+      const models = needsLianchiMigration && !loaded.models.some(model => model.id === lianchiModel?.id)
+        ? [...loaded.models, lianchiModel!]
+        : loaded.models;
+      setCustomModels(models);
+      if (!loaded.invalid && persistCustomModels(models) && needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
       if (loaded.invalid) {
         showToast(loaded.recoveredFromBackup ? '自定义模型配置已损坏，已从备份恢复' : '自定义模型配置已损坏，已保留当前列表并备份原数据');
       }
@@ -175,6 +183,7 @@ export function useCustomModels({
 
   // 获取网关模型列表
   const handleOpenGatewayDiscovery = async (forceRefresh = false) => {
+    setGatewaySource('comfly');
     if (!forceRefresh && allGatewayModels.length > 0) {
       setIsGatewayModalOpen(true);
       return;
@@ -225,7 +234,41 @@ export function useCustomModels({
     }
   };
 
+  const handleOpenLianchiDiscovery = async (lianchiApiKey: string, forceRefresh = false) => {
+    setGatewaySource('lianchi');
+    if (!forceRefresh && lianchiModels.length > 0) {
+      setIsGatewayModalOpen(true);
+      return;
+    }
+    if (!lianchiApiKey.trim()) {
+      showToast('请先填写联池 API Key，再获取模型库');
+      return;
+    }
+    setIsGatewayModalOpen(true);
+    setIsFetchingLianchi(true);
+    try {
+      const res = await apiFetch('/api/system/models/fetch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'lianchi', apiKey: lianchiApiKey.trim(), strict: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || data.provider !== 'lianchi' || !Array.isArray(data.models)) {
+        setLianchiModels([]);
+        showToast(`获取联池模型失败 (${data.gatewayStatus || res.status})：${data.error || '网关未返回有效模型列表'}`);
+        return;
+      }
+      setLianchiModels(data.models);
+      if (data.models.length === 0) showToast('联池当前没有返回可用模型');
+    } catch (error) {
+      setLianchiModels([]);
+      showToast(`获取联池模型失败：${error instanceof Error ? error.message : '网络连接异常'}`);
+    } finally {
+      setIsFetchingLianchi(false);
+    }
+  };
+
   const handleToggleGatewayModel = (model: GatewayModelItem) => {
+    if (model.supported === false) return;
     setCustomModels((prev) => {
       const exists = prev.some((m) => m.id === model.id);
       const updated = exists
@@ -240,6 +283,7 @@ export function useCustomModels({
 
   const handleAddAllUsefulGatewayModels = (models: GatewayModelItem[]) => {
     const useful = models.filter((m) => {
+      if (m.supported === false) return false;
       const caps = inferWorkflowCapabilitiesFromId(m.id);
       return caps.isImage || caps.isVideo || caps.isMultimodal;
     });
@@ -276,7 +320,11 @@ export function useCustomModels({
     setIsGatewayModalOpen,
     isFetchingGateway,
     allGatewayModels,
+    lianchiModels,
+    gatewaySource,
+    isFetchingLianchi,
     handleOpenGatewayDiscovery,
+    handleOpenLianchiDiscovery,
     handleToggleGatewayModel,
     handleAddAllUsefulGatewayModels,
     notifyModelsUpdated,

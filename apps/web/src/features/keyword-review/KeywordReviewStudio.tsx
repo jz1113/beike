@@ -16,7 +16,7 @@ interface Props {
 function StatCard({ label, value, tone, active, onClick }: { label: string; value: number; tone: string; active: boolean; onClick: () => void }) {
   return (
     <button type="button" aria-pressed={active} onClick={onClick} className={`rounded-2xl border bg-white/85 px-4 py-3 text-left shadow-sm backdrop-blur transition hover:border-slate-300 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${active ? 'border-blue-400 ring-2 ring-blue-100' : 'border-white/80'}`}>
-      <p className="text-xs font-semibold text-slate-400">{label}</p>
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
       <p className={`mt-1 text-2xl font-black tabular-nums ${tone}`}>{value}</p>
     </button>
   );
@@ -34,7 +34,7 @@ function ReviewStatus({ record }: { record: KeywordReviewRecord }) {
   if (record.status === 'done') return <span className="inline-flex items-center gap-1.5 text-emerald-700"><CheckCircle2 className="h-4 w-4" />已完成</span>;
   if (record.status === 'running') return <span className="inline-flex items-center gap-1.5 text-blue-600"><Loader2 className="h-4 w-4 animate-spin" />审核中</span>;
   if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-600" title={record.error}><XCircle className="h-4 w-4" />失败</span>;
-  return <span className="text-slate-400">待审核</span>;
+  return <span className="text-slate-500">待审核</span>;
 }
 
 function RecordDetails({ record, columns, onClose }: { record: KeywordReviewRecord; columns: OutputColumn[]; onClose: () => void }) {
@@ -51,24 +51,24 @@ function RecordDetails({ record, columns, onClose }: { record: KeywordReviewReco
       <section role="dialog" aria-modal="true" aria-labelledby="keyword-record-title" className="flex max-h-[min(780px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-400">{record.sheetName} · 第 {record.rowNumber} 行</p>
+            <p className="text-xs font-semibold text-slate-500">{record.sheetName} · 第 {record.rowNumber} 行</p>
             <h2 id="keyword-record-title" className="mt-1 break-words text-lg font-black leading-7 text-slate-950">{record.query}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="关闭详情" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-6 overflow-y-auto px-6 py-5">
           <div className="grid gap-4 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">
-            <div><p className="text-xs font-bold text-slate-400">最终垂类</p><p className="mt-1 font-bold text-slate-800">{record.category || '—'}</p></div>
-            <div><p className="text-xs font-bold text-slate-400">是否可制作</p><p className="mt-1 font-bold text-slate-800">{record.producible || '—'}</p></div>
-            <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-400">垂类依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{record.categoryReason || '—'}</p></div>
-            {record.producible === '不制作' && <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-400">不制作依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{reject ? `${reject.kind ? `${reject.kind}：` : ''}${reject.detail}` : record.rejectReason || '—'}</p></div>}
+            <div><p className="text-xs font-bold text-slate-500">最终垂类</p><p className="mt-1 font-bold text-slate-800">{record.category || '—'}</p></div>
+            <div><p className="text-xs font-bold text-slate-500">是否可制作</p><p className="mt-1 font-bold text-slate-800">{record.producible || '—'}</p></div>
+            <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-500">垂类依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{record.categoryReason || '—'}</p></div>
+            {record.producible === '不制作' && <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-500">不制作依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{reject ? `${reject.kind ? `${reject.kind}：` : ''}${reject.detail}` : record.rejectReason || '—'}</p></div>}
             {record.error && <div className="sm:col-span-2"><p className="text-xs font-bold text-rose-500">审核错误</p><p className="mt-1 break-words text-sm text-rose-700">{record.error}</p></div>}
           </div>
           {sourceColumns.length > 0 && <div>
             <h3 className="mb-3 text-sm font-black text-slate-900">原表内容</h3>
             <dl className="grid gap-3 sm:grid-cols-2">
               {sourceColumns.map((column) => <div key={column.key} className={`min-w-0 rounded-xl border border-slate-200 p-4 ${column.sourceKind === 'expansion' || column.sourceKind === 'entityExpansion' ? 'sm:col-span-2' : ''}`}>
-                <dt className="text-xs font-bold text-slate-400">{column.label}</dt>
+                <dt className="text-xs font-bold text-slate-500">{column.label}</dt>
                 <dd className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{sourceValue(record, column) || '—'}</dd>
               </div>)}
             </dl>
@@ -157,7 +157,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                   {review.isImporting ? <Loader2 className="h-7 w-7 animate-spin" /> : <UploadCloud className="h-7 w-7" />}
                 </span>
                 <span className="mt-5 text-lg font-black text-slate-900">{review.isImporting ? '正在读取表格…' : '点击或拖拽上传关键词表'}</span>
-                <span className="mt-2 text-sm text-slate-400">支持 .xlsx、.xls 和 .csv，自动识别多个关键词工作表</span>
+                <span className="mt-2 text-sm text-slate-500">支持 .xlsx、.xls 和 .csv，自动识别多个关键词工作表</span>
               </button>
               {review.notice && <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">{review.notice}</p>}
             </section>
@@ -202,17 +202,17 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核会按同样批次连续跑完剩余记录。联网补查默认关闭，只补查认不出的实体，每批最多 5 条。</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条、最多 {review.concurrency} 个请求并行，直到跑完剩余记录。联网补查默认关闭，只补查认不出的实体，每批最多 5 条。</p>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs font-semibold text-slate-400"><span>{review.notice || '等待试跑'}</span><span>{progress}%</span></div>
+                <div className="mt-2 flex items-center justify-between text-xs font-semibold text-slate-500"><span>{review.notice || '等待试跑'}</span><span>{progress}%</span></div>
               </section>
 
               <section className="overflow-hidden rounded-[26px] border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
                   <div><h2 className="text-sm font-black text-slate-900">审核预览</h2><p className="mt-0.5 text-xs text-slate-500">列表显示关键信息，点击详情查看完整原表内容和审核依据</p></div>
-                  <span className="text-xs font-semibold text-slate-400">{filterLabels[review.filter]} · 显示 {review.previewRecords.length} / {review.filteredCount} 条</span>
+                  <span className="text-xs font-semibold text-slate-500">{filterLabels[review.filter]} · 显示 {review.previewRecords.length} / {review.filteredCount} 条</span>
                 </div>
                 <div className="overflow-auto">
                   <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-sm">
@@ -225,20 +225,20 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     <tbody>
                       {review.previewRecords.map((record) => (
                         <tr key={record.id} className="border-b border-slate-100 last:border-0 hover:bg-amber-50/35">
-                          <td className="px-4 py-3 text-xs tabular-nums text-slate-400">{record.rowNumber}</td>
-                          <td className="px-4 py-3"><span className="line-clamp-2 break-words font-bold leading-5 text-slate-800" title={record.query}>{record.query}</span><span className="mt-0.5 block truncate text-[11px] text-slate-400">{record.sheetName}</span></td>
+                          <td className="px-4 py-3 text-xs tabular-nums text-slate-500">{record.rowNumber}</td>
+                          <td className="px-4 py-3"><span className="line-clamp-2 break-words font-bold leading-5 text-slate-800" title={record.query}>{record.query}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{record.sheetName}</span></td>
                           <td className="px-4 py-3 font-bold text-slate-700"><span className="line-clamp-2 break-words">{record.category || '—'}</span></td>
-                          <td className="px-4 py-3">{record.producible ? <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${record.producible === '制作' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.producible}</span> : <span className="text-slate-400">—</span>}</td>
+                          <td className="px-4 py-3">{record.producible ? <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${record.producible === '制作' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.producible}</span> : <span className="text-slate-500">—</span>}</td>
                           <td className="px-4 py-3 text-xs leading-5 text-slate-500"><span className="line-clamp-2 break-words" title={record.producible === '不制作' ? record.rejectReason : record.categoryReason}>{record.producible === '不制作' ? record.rejectReason || record.categoryReason || '—' : record.categoryReason || '—'}</span></td>
                           <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold"><ReviewStatus record={record} /></td>
                           <td className="px-3 py-3"><button type="button" onClick={() => setSelectedRecordId(record.id)} aria-label={`查看第 ${record.rowNumber} 行详情`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Eye className="h-4 w-4" /></button></td>
                         </tr>
                       ))}
-                      {review.previewRecords.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">暂无{filterLabels[review.filter]}记录</td></tr>}
+                      {review.previewRecords.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">暂无{filterLabels[review.filter]}记录</td></tr>}
                     </tbody>
                   </table>
                 </div>
-                {review.filteredCount > review.previewRecords.length && <p className="border-t border-slate-100 px-4 py-3 text-center text-xs text-slate-400">当前筛选共 {review.filteredCount} 条，界面优先显示刚试跑和失败的记录，最多 {review.previewLimit} 条；全部 {review.records.length} 条都会保留在本次导入中。</p>}
+                {review.filteredCount > review.previewRecords.length && <p className="border-t border-slate-100 px-4 py-3 text-center text-xs text-slate-500">当前筛选共 {review.filteredCount} 条，界面优先显示刚试跑和失败的记录，最多 {review.previewLimit} 条；全部 {review.records.length} 条都会保留在本次导入中。</p>}
               </section>
             </>
           )}

@@ -392,6 +392,16 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 isTestingDeepSeek={config.isTestingDeepSeek}
                 handleTestDeepSeek={config.handleTestDeepSeek}
                 handleSaveDeepSeekConfig={config.handleSaveDeepSeekConfig}
+                lianchiApiKey={config.lianchiApiKey}
+                setLianchiApiKey={config.setLianchiApiKey}
+                showLianchiKey={config.showLianchiKey}
+                setShowLianchiKey={config.setShowLianchiKey}
+                isTestingLianchi={config.isTestingLianchi}
+                handleTestLianchi={config.handleTestLianchi}
+                handleSaveLianchiConfig={config.handleSaveLianchiConfig}
+                handleOpenLianchiDiscovery={() => models.handleOpenLianchiDiscovery(config.lianchiApiKey, true)}
+                isFetchingLianchi={models.isFetchingLianchi}
+                lianchiModelCount={models.lianchiModels.length}
                 handleOpenGatewayDiscovery={models.handleOpenGatewayDiscovery}
                 isFetchingGateway={models.isFetchingGateway}
                 allGatewayModels={models.allGatewayModels}
@@ -501,16 +511,17 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         <GatewayModelModal
           isOpen={models.isGatewayModalOpen}
           onClose={() => models.setIsGatewayModalOpen(false)}
-          allGatewayModels={models.allGatewayModels}
+          allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.allGatewayModels}
+          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : '网关'}
           activeModelIds={new Set(models.customModels.map((m) => m.id))}
-          isLoading={models.isFetchingGateway}
+          isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.isFetchingGateway}
           onToggleAddModel={(model) => {
             const exists = models.customModels.some((m) => m.id === model.id);
             models.handleToggleGatewayModel(model);
             showToast(exists ? `已移出模型 ${model.id}` : `✨ 已接入模型 ${model.id}`);
           }}
           onAddAllUsefulModels={() => {
-            const count = models.handleAddAllUsefulGatewayModels(models.allGatewayModels);
+            const count = models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'lianchi' ? models.lianchiModels : models.allGatewayModels);
             showToast(`🎉 成功接入 ${count} 款核心模型！`);
             models.setIsGatewayModalOpen(false);
           }}

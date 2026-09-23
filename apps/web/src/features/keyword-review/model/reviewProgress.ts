@@ -1,6 +1,10 @@
 import type { KeywordReviewResult } from '@beike/contracts/generate';
 import type { KeywordReviewRecord } from './keywordReviewWorkbook';
 
+export function isRecoverableModelOutputError(status: number, message: string): boolean {
+  return status === 502 && /输出被截断|结果不完整|不完整 JSON|未返回 results 数组|非法垂类|非法制作结论|未知或重复的行 ID/.test(message);
+}
+
 export function updateReviewRecords(
   records: KeywordReviewRecord[],
   indices: Map<string, number>,

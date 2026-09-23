@@ -4,6 +4,7 @@ import { apiFetch } from '@/shared/api/apiClient';
 import {
   persistAiGatewayConfig,
   persistDeepSeekConfig,
+  persistLianchiConfig,
   persistExternalScraperConfig,
   persistQiyunConfig,
   persistStorageConfig,
@@ -29,6 +30,9 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [deepSeekApiKey, setDeepSeekApiKey] = useState('');
   const [showDeepSeekKey, setShowDeepSeekKey] = useState(false);
   const [isTestingDeepSeek, setIsTestingDeepSeek] = useState(false);
+  const [lianchiApiKey, setLianchiApiKey] = useState('');
+  const [showLianchiKey, setShowLianchiKey] = useState(false);
+  const [isTestingLianchi, setIsTestingLianchi] = useState(false);
 
   // 万邦 (OneBound)
   const [wanbangKey, setWanbangKey] = useState('');
@@ -91,6 +95,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
 
         const savedDeepSeekKey = await credentialGet('deepseek_api_key');
         setDeepSeekApiKey(savedDeepSeekKey || localStorage.getItem('deepseek_api_key') || '');
+        setLianchiApiKey(await credentialGet('lianchi_api_key'));
 
         const savedWbKey = await credentialGet('wanbang_api_key');
         const savedWbSec = await credentialGet('wanbang_api_secret');
@@ -211,6 +216,30 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
       console.warn('[handleSaveDeepSeekConfig] 保存失败:', err);
       showToast('⚠️ DeepSeek API Key 保存异常，请稍后重试');
     }
+  };
+
+  const handleSaveLianchiConfig = async () => {
+    try {
+      await persistLianchiConfig(lianchiApiKey);
+      showToast('✅ 联池 API Key 已保存；选择「联池 GPT Image 2」即可调用');
+    } catch (error) {
+      showToast(`🔴 联池密钥保存失败：${formatUserError(error, '请重试')}`);
+    }
+  };
+
+  const handleTestLianchi = async () => {
+    if (!lianchiApiKey.trim()) { showToast('⚠️ 请先填写联池 API Key'); return; }
+    setIsTestingLianchi(true);
+    try {
+      const response = await apiFetch('/api/system/models/fetch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: 'https://api.gapnet.ai/endpoint', apiKey: lianchiApiKey.trim(), isPing: true, strict: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      showToast(response.ok && data.success ? '🟢 联池模型接口连通正常' : `🔴 联池接口异常：${data.error || response.status}`);
+    } catch (error) {
+      showToast(`🔴 联池连接失败：${formatUserError(error, '网络错误')}`);
+    } finally { setIsTestingLianchi(false); }
   };
 
   // 测试万邦电商数据采集接口连通性
@@ -397,6 +426,13 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     isTestingDeepSeek,
     handleTestDeepSeek,
     handleSaveDeepSeekConfig,
+    lianchiApiKey,
+    setLianchiApiKey,
+    showLianchiKey,
+    setShowLianchiKey,
+    isTestingLianchi,
+    handleTestLianchi,
+    handleSaveLianchiConfig,
     appAccessToken,
     setAppAccessToken,
     handleSaveApiConfig,

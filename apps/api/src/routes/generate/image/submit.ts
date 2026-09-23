@@ -86,7 +86,7 @@ export async function dispatchSubmitCandidates(options: {
         const { form, bytesApprox, imageAppended } = buildEditsMultipart(
           adapted.payload,
           editsImageUrls,
-          { allowDuplicateFace: Boolean(identityLockedSlots) }
+          { allowDuplicateFace: Boolean(identityLockedSlots), imageField: model === 'openai/gpt-image-2' ? 'image[]' : 'image' }
         );
         if (imageAppended === 0) {
           lastErrorMsg = 'Edits multipart 缺少有效参考图二进制';
@@ -106,7 +106,7 @@ export async function dispatchSubmitCandidates(options: {
           method: 'POST',
           headers,
           body: bodyInit,
-          signal: AbortSignal.timeout(IMAGE_SUBMIT_TIMEOUT_MS),
+          signal: AbortSignal.timeout(model === 'openai/gpt-image-2' ? 180_000 : IMAGE_SUBMIT_TIMEOUT_MS),
         },
         {
           maxAttempts: IMAGE_MAX_ATTEMPTS_PER_URL,

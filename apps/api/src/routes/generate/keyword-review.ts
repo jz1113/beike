@@ -1,4 +1,5 @@
-import { KeywordReviewBalanceRequestSchema, KeywordReviewRequestSchema } from '@beike/contracts/generate';
+import { KeywordReviewBalanceRequestSchema, KeywordReviewRequestSchema, KeywordReviewRulesUpdateSchema } from '@beike/contracts/generate';
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { jsonResponse } from '../../core/http';
@@ -9,6 +10,32 @@ import {
   KEYWORD_REVIEW_DEEPSEEK_MODEL,
   reviewKeywordRows,
 } from '../../services/keywordReview';
+import { getKeywordReviewRules, listKeywordReviewRules, publishKeywordReviewRules } from '../../services/keywordReviewRules';
+
+export async function rulesGET(): Promise<Response> {
+  const workspaceId = requireWorkspaceId();
+  const [current, history] = await Promise.all([
+    getKeywordReviewRules(workspaceId), listKeywordReviewRules(workspaceId),
+  ]);
+  return jsonResponse({ success: true, current, history });
+}
+
+export async function rulesPUT(req: Request): Promise<Response> {
+  let rawBody: unknown;
+  try { rawBody = await readJsonBody(req); }
+  catch { return jsonResponse({ success: false, error: '请求数据格式异常' }, 400); }
+  const parsed = parseJsonBody(rawBody, KeywordReviewRulesUpdateSchema);
+  if (!parsed.success) return jsonResponse({ success: false, error: parsed.error }, 400);
+  try {
+    const current = await publishKeywordReviewRules(requireWorkspaceId(), parsed.data);
+    return jsonResponse({ success: true, current });
+  } catch (error) {
+    if (error instanceof Error && /规则已被其他人更新/.test(error.message)) {
+      return jsonResponse({ success: false, error: error.message }, 409);
+    }
+    throw error;
+  }
+}
 
 function readDeepSeekKey(body: { customBaseUrl?: string; customApiKey?: string }) {
   const baseUrl = normalizeGatewayBaseUrl(body.customBaseUrl);
@@ -39,12 +66,15 @@ export async function POST(req: Request): Promise<Response> {
     if (model !== KEYWORD_REVIEW_DEEPSEEK_MODEL) {
       return jsonResponse({ success: false, error: `关键词审核仅支持 ${KEYWORD_REVIEW_DEEPSEEK_MODEL}` }, 400);
     }
+    const rules = await getKeywordReviewRules(requireWorkspaceId(), parsedBody.data.rulesVersion);
     const reviewed = await reviewKeywordRows({
       baseUrl,
       apiKey,
       model,
       rows: parsedBody.data.rows,
       lookup: parsedBody.data.lookup === true,
+      ruleEntries: rules.entries,
+      rulesVersion: rules.version,
     });
     return jsonResponse({
       success: true,
@@ -55,6 +85,7 @@ export async function POST(req: Request): Promise<Response> {
     });
   } catch (error) {
     const message = formatUserError(error, '关键词审核失败');
+    if (/审核规则版本 v\d+ 不存在/.test(message)) return jsonResponse({ success: false, error: message }, 409);
     return jsonResponse({ success: false, error: message }, error instanceof SyntaxError ? 502 : 500);
   }
 }

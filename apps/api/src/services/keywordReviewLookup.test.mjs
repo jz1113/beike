@@ -68,6 +68,15 @@ test('selectLookupRows skips cached queries so retries do not search again', () 
   assert.deepEqual(picked.map((item) => item.query), ['未知品牌A']);
 });
 
+test('lookup cache does not cross review rule versions', () => {
+  rememberLookupCategory('乌天狗', '民俗文化', '日本神话天狗', 1);
+  const rows = [row('1', '乌天狗')];
+  const results = [result('1', '其他', true)];
+  assert.equal(selectLookupRows(results, rows, 5, 1).length, 0);
+  assert.equal(selectLookupRows(results, rows, 5, 2).length, 1);
+  assert.equal(applyCachedLookupCategories(results, rows, 2)[0].category, '其他');
+});
+
 test('applyCachedLookupCategories rewrites vertical and reason when category changes', () => {
   rememberLookupCategory('乌天狗', '民俗文化', '日本神话天狗');
   const next = applyCachedLookupCategories(

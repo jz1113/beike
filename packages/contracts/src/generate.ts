@@ -174,7 +174,24 @@ export const KeywordReviewRequestSchema = z.object({
   customBaseUrl: z.string().optional(),
   customApiKey: z.string().optional(),
   lookup: z.boolean().optional(),
+  rulesVersion: z.number().int().nonnegative().optional(),
 });
+
+export const KeywordReviewRuleEntrySchema = z.object({
+  section: z.enum(['垂类边界', '不制作', '其他说明']),
+  text: z.string().trim().min(4).max(300),
+});
+
+export const KeywordReviewRulesUpdateSchema = z.object({
+  baseVersion: z.number().int().nonnegative(),
+  entries: z.array(KeywordReviewRuleEntrySchema).max(30).refine(
+    (entries) => entries.reduce((total, entry) => total + entry.text.length, 0) <= 6000,
+    '补充规则总长度不能超过 6000 字',
+  ),
+  note: z.string().trim().min(2).max(200),
+});
+
+export type KeywordReviewRuleEntry = z.infer<typeof KeywordReviewRuleEntrySchema>;
 
 export const KEYWORD_REVIEW_REJECT_PREFIXES = [
   '简单问答',

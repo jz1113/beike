@@ -75,6 +75,19 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     supportEdits: true,
   },
   {
+    id: 'openai/gpt-image-2',
+    capability: 'image',
+    vendor: 'openai',
+    name: 'GPT Image 2（联池）',
+    shortName: '联池 GPT Image 2',
+    adapter: 'openai-dalle',
+    docs: 'docs/vendors/官方接口/aggregator/openai/gpt-image-2.md',
+    description: '联池 OpenAI 兼容图像接口，支持文生图与多参考图编辑',
+    supportedQualities: [...IMAGE_QUALITIES],
+    defaultSize: '1024x1024',
+    supportEdits: true,
+  },
+  {
     id: 'gpt-image-2.5-sunburst',
     capability: 'image',
     vendor: 'openai',
@@ -901,7 +914,7 @@ export function buildMultimodalUpstreamFallbackChain(requestedModel?: string): s
 export function getApprovedModel(id: string): ApprovedModel | undefined {
   const canonical = canonicalModelId(id);
   if (!canonical) return undefined;
-  return BY_ID.get(canonical.toLowerCase()) || BY_ID.get(id.trim().toLowerCase());
+  return BY_ID.get(id.trim().toLowerCase()) || BY_ID.get(canonical.toLowerCase());
 }
 
 export function isApprovedModel(id: string, cap?: ModelCapability): boolean {

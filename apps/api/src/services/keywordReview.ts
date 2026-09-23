@@ -6,6 +6,8 @@ import {
   type ReviewedKeywordRow,
 } from './keywordReviewLookup';
 import { normalizeCategoryReason, normalizeRejectReason } from './keywordReviewReasons';
+import { formatKeywordReviewRuleAdditions } from './keywordReviewRules';
+import type { KeywordReviewRuleEntry } from '@beike/contracts/generate';
 
 export const KEYWORD_REVIEW_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 export const KEYWORD_REVIEW_DEEPSEEK_MODEL = 'deepseek-flash';
@@ -120,6 +122,8 @@ export async function reviewKeywordRows(options: {
   model: string;
   rows: KeywordReviewRow[];
   lookup?: boolean;
+  ruleEntries?: KeywordReviewRuleEntry[];
+  rulesVersion?: number;
 }): Promise<{ results: KeywordReviewResult[]; usage?: Record<string, number>; lookedUp: number }> {
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/v1/chat/completions`, {
     method: 'POST',
@@ -132,7 +136,7 @@ export async function reviewKeywordRows(options: {
       reasoning_effort: 'none',
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: buildSystemPrompt() },
+        { role: 'system', content: `${buildSystemPrompt()}${formatKeywordReviewRuleAdditions(options.ruleEntries || [])}` },
         { role: 'user', content: `请审核以下行：\n${JSON.stringify(options.rows)}` },
       ],
     }),
@@ -165,6 +169,8 @@ export async function reviewKeywordRows(options: {
       results: firstPass,
       allowed: CATEGORY_SET,
       categories: KEYWORD_REVIEW_CATEGORIES,
+      rulesVersion: options.rulesVersion,
+      ruleAdditions: formatKeywordReviewRuleAdditions(options.ruleEntries || []),
     });
     return { results: looked.results, usage: data.usage, lookedUp: looked.lookedUp };
   } catch {

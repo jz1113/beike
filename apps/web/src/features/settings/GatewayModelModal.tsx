@@ -38,6 +38,7 @@ export interface GatewayModelItem {
   isTool: boolean;
   owned_by?: string;
   isCustom?: boolean;
+  supported?: boolean;
 }
 
 interface Props {
@@ -48,6 +49,7 @@ interface Props {
   onToggleAddModel: (model: GatewayModelItem) => void;
   onAddAllUsefulModels: () => void;
   isLoading?: boolean;
+  gatewayName?: string;
 }
 
 export default function GatewayModelModal({
@@ -57,7 +59,8 @@ export default function GatewayModelModal({
   activeModelIds,
   onToggleAddModel,
   onAddAllUsefulModels,
-  isLoading = false
+  isLoading = false,
+  gatewayName = '网关',
 }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeTab, setSelectedTypeTab] = useState<'all' | 'image' | 'multimodal' | 'video'>('all');
@@ -214,7 +217,7 @@ export default function GatewayModelModal({
   // 一键接入该厂商全部匹配模型
   const handleAddAllFromVendor = (models: GatewayModelItem[]) => {
     models.forEach(m => {
-      if (!activeModelIds.has(m.id)) {
+      if (m.supported !== false && !activeModelIds.has(m.id)) {
         onToggleAddModel(m);
       }
     });
@@ -236,7 +239,7 @@ export default function GatewayModelModal({
               <Building2 className="w-5 h-5" />
             </div>
             <h2 className="text-base md:text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap min-w-0">
-              <span>网关模型库 (按厂商分组)</span>
+              <span>{gatewayName}模型库 (按厂商分组)</span>
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-mono font-bold border border-indigo-200">
                 {allGatewayModels.length} 款模型
               </span>
@@ -263,6 +266,12 @@ export default function GatewayModelModal({
             </button>
           </div>
         </div>
+
+        {gatewayName === '联池' && (
+          <p className="px-5 py-2 text-xs text-indigo-800 bg-indigo-50 border-b border-indigo-100">
+            {isLoading ? '正在读取联池账户可用模型。' : '下列模型由联池实时返回。当前应用仅支持接入已适配的图像模型；其他模型可查看，暂不能加入工作流。'}
+          </p>
+        )}
 
         <div className={`${settingsPanelPad} bg-slate-50/70 border-b border-slate-100 space-y-3.5 flex-shrink-0`}>
           {/* 搜索框 */}
@@ -396,7 +405,7 @@ export default function GatewayModelModal({
           {isLoading ? (
             <div className="py-28 flex flex-col items-center justify-center gap-3 text-slate-400">
               <Loader2 className="w-9 h-9 animate-spin text-indigo-600" />
-              <span className="text-sm font-bold text-slate-600">正在从网关拉取 850+ 全量模型列表...</span>
+              <span className="text-sm font-bold text-slate-600">正在从{gatewayName}拉取模型列表...</span>
             </div>
           ) : filteredVendorGroups.length === 0 ? (
             <div className="py-24 text-center text-slate-400 space-y-2">
@@ -443,7 +452,7 @@ export default function GatewayModelModal({
                             handleAddAllFromVendor(models);
                           }}
                           className="text-xs font-bold text-slate-700 hover:text-indigo-600 hover:bg-white px-3 py-1.5 rounded-xl border border-slate-200 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                          title="一键接入此厂商下的所有模型"
+                          title="接入此厂商下已适配的模型"
                         >
                           <FolderPlus className="w-3.5 h-3.5 text-indigo-500" />
                           <span>接入此厂商全部</span>
@@ -528,13 +537,15 @@ export default function GatewayModelModal({
                               <div className="flex items-center gap-2 flex-shrink-0 pl-10 lg:pl-0">
                                 <button
                                   onClick={() => onToggleAddModel(model)}
-                                  className={`${settingsTouchBtn} px-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                  disabled={model.supported === false}
+                                  title={model.supported === false ? '该模型尚未接入工作流调用' : undefined}
+                                  className={`${settingsTouchBtn} px-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                                     isAdded
                                       ? 'bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 border border-slate-200'
                                       : 'bg-slate-900 hover:bg-indigo-600 text-white shadow-2xs'
                                   }`}
                                 >
-                                  {isAdded ? (
+                                  {model.supported === false ? <span>暂未适配</span> : isAdded ? (
                                     <>
                                       <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
                                       <span>已接入</span>

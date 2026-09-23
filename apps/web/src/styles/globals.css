@@ -19,8 +19,9 @@
 :root {
   --background: #FAFAFC;
   --foreground: #0F172A;
-  /* 以首页主视觉使用的马善政作为全站文字基调；后备字体保证离线或字体加载前
-   * 仍能正确呈现中文。 */
+  /* 正文使用系统无衬线字体，保证小字号中文在桌面端清晰可读。 */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  /* 手写字体仅用于少量品牌展示文字。 */
   --font-handwritten: "Ma Shan Zheng", "STKaiti", "KaiTi", "Kaiti SC", cursive;
   --ui-density: 1;
   --ui-space: 1;
@@ -70,8 +71,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ui);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* 将圆角 CSS 变量映射到 Tailwind */
   --radius-panel: var(--radius-panel);
@@ -98,7 +99,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-handwritten);
+  font-family: var(--font-ui);
   overflow-x: hidden;
   font-size: 0.9375rem;
   line-height: 1.5;

@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model KeywordReviewRuleRevision {
+  id          String   @id @default(cuid())
+  workspaceId String
+  version     Int
+  entriesJson String   @default("[]")
+  note        String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, version])
+  @@index([workspaceId, createdAt])
+}
+
 // 采集的商品记录
 model Product {
   id          String   @id @default(cuid())

@@ -51,6 +51,19 @@ export function resolveCredentials(req: Request, body?: any) {
   return { baseUrl: normalizeGatewayBaseUrl(baseUrl), apiKey };
 }
 
+export const LIANCHI_IMAGE_BASE_URL = 'https://api.gapnet.ai/endpoint';
+
+/** 联池只承接其专用模型，凭证与 Comfly 主网关相互隔离。 */
+export function resolveImageCredentials(req: Request, body?: { model?: string; customApiKey?: string }) {
+  if (body?.model === 'openai/gpt-image-2') {
+    return {
+      baseUrl: LIANCHI_IMAGE_BASE_URL,
+      apiKey: req.headers.get('x-lianchi-api-key')?.trim() || '',
+    };
+  }
+  return resolveCredentials(req, body);
+}
+
 export function isNetworkLikeError(err: unknown): boolean {
   if (!err) return false;
   const parts: string[] = [];
@@ -158,7 +171,7 @@ export function dataUrlToBlobFile(dataUrl: string, index: number): { blob: Blob;
   return { blob: new Blob([buf], { type: mime }), filename: `image_${index}.${ext}` };
 }
 
-export function buildEditsMultipart(payload: Record<string, unknown>, imageDataUrls: string[], opts?: { allowDuplicateFace?: boolean }) {
+export function buildEditsMultipart(payload: Record<string, unknown>, imageDataUrls: string[], opts?: { allowDuplicateFace?: boolean; imageField?: 'image' | 'image[]' }) {
   const form = new FormData();
   let bytesApprox = 0;
   let imageAppended = 0;
@@ -184,7 +197,7 @@ export function buildEditsMultipart(payload: Record<string, unknown>, imageDataU
     }
     const file = dataUrlToBlobFile(raw, imageAppended);
     if (!file) continue;
-    form.append('image', file.blob, file.filename);
+    form.append(opts?.imageField || 'image', file.blob, file.filename);
     bytesApprox += file.blob.size;
     imageAppended += 1;
   }
