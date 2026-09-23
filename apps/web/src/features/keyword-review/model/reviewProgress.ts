@@ -42,7 +42,7 @@ export function applyBatchResults(
   const next = records.slice();
   for (const result of results) {
     const index = indices.get(result.id);
-    if (index !== undefined) next[index] = { ...next[index], ...result, status: 'done', error: undefined };
+    if (index !== undefined) next[index] = { ...next[index], ...result, status: 'done', error: undefined, submissionUncertain: false };
   }
   return next;
 }
@@ -63,10 +63,13 @@ export function selectPreviewRecords(
 }
 
 export function countReviewRecords(records: KeywordReviewRecord[]) {
-  const counts = { total: records.length, done: 0, failed: 0, pending: 0, producible: 0, rejected: 0 };
+  const counts = { total: records.length, done: 0, failed: 0, uncertain: 0, pending: 0, producible: 0, rejected: 0 };
   for (const record of records) {
     if (record.status === 'done') counts.done += 1;
-    else if (record.status === 'error') counts.failed += 1;
+    else if (record.status === 'error') {
+      counts.failed += 1;
+      if (record.submissionUncertain) counts.uncertain += 1;
+    }
     else if (record.status === 'idle') counts.pending += 1;
     if (record.producible === '制作') counts.producible += 1;
     else if (record.producible === '不制作') counts.rejected += 1;

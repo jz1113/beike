@@ -38,7 +38,7 @@ test('large review updates only the active batch and keeps earlier results', () 
   assert.equal(done[8_049].category, '动物');
   assert.equal(done[8_050], records[8_050]);
   assert.deepEqual(countReviewRecords(done), {
-    total: 50_000, done: 50, failed: 0, pending: 49_950, producible: 50, rejected: 0,
+    total: 50_000, done: 50, failed: 0, uncertain: 0, pending: 49_950, producible: 50, rejected: 0,
   });
 });
 

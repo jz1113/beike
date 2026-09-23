@@ -34,7 +34,7 @@ function sourceValue(record: KeywordReviewRecord, column: OutputColumn): string 
 function ReviewStatus({ record }: { record: KeywordReviewRecord }) {
   if (record.status === 'done') return <span className="inline-flex items-center gap-1.5 text-emerald-700"><CheckCircle2 className="h-4 w-4" />已完成</span>;
   if (record.status === 'running') return <span className="inline-flex items-center gap-1.5 text-blue-600"><Loader2 className="h-4 w-4 animate-spin" />审核中</span>;
-  if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-600" title={record.error}><XCircle className="h-4 w-4" />失败</span>;
+  if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-600" title={record.error}><XCircle className="h-4 w-4" />{record.submissionUncertain ? '待核对' : '失败'}</span>;
   return <span className="text-slate-500">待审核</span>;
 }
 
@@ -201,7 +201,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                       <>
                         <button type="button" onClick={() => void review.runReview('trial')} disabled={!canTrial} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"><Play className="h-4 w-4 fill-current" />{trialLabel}</button>
                         <button type="button" onClick={() => void review.runReview('all')} disabled={!canRun} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"><Layers className="h-4 w-4" />{batchLabel}</button>
-                        {review.counts.failed > 0 && <button type="button" onClick={review.retryFailed} title="单条持续返回异常时可手动重审；重审可能再次产生费用" className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-rose-200 bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100">重审失败 {review.counts.failed} 条</button>}
+                        {review.counts.failed > review.counts.uncertain && <button type="button" onClick={review.retryFailed} title="仅重新审核已确认失败的记录；可能再次产生费用" className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-rose-200 bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100">重审失败 {review.counts.failed - review.counts.uncertain} 条</button>}
                       </>
                     )}
                     <button type="button" onClick={() => void review.exportWorkbook()} disabled={!canExport || review.isExporting} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300">
@@ -209,7 +209,8 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。模型格式异常会自动重试并拆分定位；持续异常的单条会标为失败，其他词继续处理。重试可能再次收费。联网补查默认关闭，每批最多 5 条。</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。服务异常会用原提交标识核对结果；无法确认的批次隔离，不自动重新收费，其他词继续处理。联网补查默认关闭，每批最多 5 条。</p>
+                {review.counts.uncertain > 0 && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{review.counts.uncertain} 条提交结果待核对：已隔离，避免重复扣费。请导出当前进度并核对 DeepSeek 用量。</p>}
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>

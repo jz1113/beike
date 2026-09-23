@@ -10,7 +10,7 @@ import {
 } from '../model/keywordReviewWorkbook';
 import { advanceKnownFailureVersions, applyBatchResults, countReviewRecords, isKnownModelOutputFailure, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
 import { reviewBatchWithRecovery } from '../model/reviewBatchRecovery';
-import { DEEPSEEK_BASE_URL, type BalanceResponse } from '../model/reviewRequest';
+import { DEEPSEEK_BASE_URL, type BalanceResponse, type ReviewRequestError } from '../model/reviewRequest';
 import { MAX_REVIEW_CONCURRENCY, ReviewPacer } from '../model/reviewPacer';
 import { createReviewBatchSubmit } from '../model/reviewBatchSubmit';
 
@@ -93,7 +93,10 @@ export function useKeywordReview() {
           body: JSON.stringify({ customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey }),
           signal: AbortSignal.timeout(BALANCE_REQUEST_TIMEOUT_MS),
         });
-        const data = await response.json() as BalanceResponse;
+        const raw = await response.text();
+        let data: BalanceResponse;
+        try { data = JSON.parse(raw) as BalanceResponse; }
+        catch { throw new Error(`余额服务返回 HTTP ${response.status} 非 JSON 响应，请稍后刷新`); }
         if (!response.ok || !data.success || (data.currency !== 'CNY' && data.currency !== 'USD')) {
           setBalanceError(data.error || '余额查询失败');
           return;
@@ -232,13 +235,10 @@ export function useKeywordReview() {
     let lookedUpNow = 0;
     let rateLimitRetries = 0;
     let consecutiveBudgetExhausted = 0;
+    let consecutiveInfrastructureFailures = 0;
+    let uncertainNow = 0;
     const pacer = new ReviewPacer();
     const runState: { fatalError: Error | null } = { fatalError: null };
-    const markFailed = (ids: string[], message: string) => {
-      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
-        (record) => ({ ...record, status: 'error', error: message })));
-      failedNow += ids.length;
-    };
     try {
       let nextIndex = 0;
       const runWorker = async () => {
@@ -247,6 +247,15 @@ export function useKeywordReview() {
           nextIndex += KEYWORD_REVIEW_BATCH_SIZE;
           const batch = queue.slice(index, index + KEYWORD_REVIEW_BATCH_SIZE);
           const ids = batch.map((record) => record.id);
+          const settledIds = new Set<string>();
+          const markFailed = (failedIds: string[], message: string, submissionUncertain = false) => {
+            const freshIds = failedIds.filter((id) => !settledIds.has(id));
+            freshIds.forEach((id) => settledIds.add(id));
+            setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, freshIds,
+              (record) => ({ ...record, status: 'error', error: message, submissionUncertain })));
+            failedNow += freshIds.length;
+            if (submissionUncertain) uncertainNow += freshIds.length;
+          };
           setLastTrialIds(ids);
           const remaining = queue.length - completedNow - failedNow;
           setNotice(mode === 'trial'
@@ -261,7 +270,9 @@ export function useKeywordReview() {
             onDispatch: () => { balanceSpendVersionRef.current += 1; setBalanceDirty(true); },
             onSuccess: (chunk, results, lookedUp) => {
               setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
+              chunk.forEach((record) => settledIds.add(record.id));
               completedNow += chunk.length; lookedUpNow += lookedUp; refreshBalance();
+              consecutiveInfrastructureFailures = 0;
             },
             onRateLimit: (concurrency) => {
               rateLimitRetries += 1;
@@ -286,11 +297,20 @@ export function useKeywordReview() {
             }
           } catch (error) {
             if (controller.signal.aborted) break;
-            runState.fatalError = error instanceof Error ? error : new Error('审核失败');
-            setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
-              (record) => record.status === 'running' ? { ...record, status: 'error', error: runState.fatalError?.message } : record));
-            stopRequestedRef.current = true;
-            break;
+            const failure = error instanceof Error ? error as ReviewRequestError : new Error('审核失败') as ReviewRequestError;
+            markFailed(ids, failure.message, failure.outcomeUncertain === true);
+            if (failure.fatalConfig) {
+              runState.fatalError = failure;
+              stopRequestedRef.current = true;
+              break;
+            }
+            consecutiveInfrastructureFailures = failure.infrastructureFailure
+              ? consecutiveInfrastructureFailures + 1 : 0;
+            if (consecutiveInfrastructureFailures >= 6) {
+              runState.fatalError = new Error('审核服务连续 6 批不可用，已暂停提交以控制费用；完成的结果均已保留');
+              stopRequestedRef.current = true;
+              break;
+            }
           }
         }
       };
@@ -299,7 +319,7 @@ export function useKeywordReview() {
       setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, queue.map((record) => record.id),
         (record) => record.status === 'running' ? { ...record, status: 'idle' } : record));
       if (runState.fatalError) {
-        setNotice(`${runState.fatalError.message}。已保留完成的结果，请处理该异常后继续。`);
+        setNotice(`${runState.fatalError.message}。本次完成 ${completedNow} 条、失败 ${failedNow} 条${uncertainNow ? `（其中 ${uncertainNow} 条提交待核对）` : ''}；可导出当前进度。`);
         return;
       }
       refreshBalance(true);
@@ -313,7 +333,7 @@ export function useKeywordReview() {
           ? `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}，还剩 ${leftover} 条未审核`
           : `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}`);
       } else {
-        setNotice(`批量审核已处理到最后一个词：完成 ${completedNow} 条${failedNow > 0 ? `，仍失败 ${failedNow} 条（可手动重审）` : ''}${lookupNote}${rateLimitRetries > 0 ? `，限流后重试 ${rateLimitRetries} 次` : ''}`);
+        setNotice(`批量审核已处理到最后一个词：完成 ${completedNow} 条${failedNow > 0 ? `，失败 ${failedNow} 条` : ''}${uncertainNow ? `（其中 ${uncertainNow} 条提交待核对，暂不重新收费）` : ''}${lookupNote}${rateLimitRetries > 0 ? `，限流后重试 ${rateLimitRetries} 次` : ''}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '审核失败';
@@ -339,14 +359,18 @@ export function useKeywordReview() {
 
   const retryFailed = () => {
     if (isRunning) return;
-    const failed = records.filter((record) => record.status === 'error');
-    if (failed.length === 0) return;
+    const failed = records.filter((record) => record.status === 'error' && !record.submissionUncertain);
+    if (failed.length === 0) {
+      setNotice('失败记录的提交结果待核对，已阻止重新收费；请先导出当前进度并核对 DeepSeek 用量');
+      return;
+    }
     for (const record of failed) {
       const index = recordIndicesRef.current.get(record.id);
       if (index !== undefined) batchRetryVersionsRef.current.set(index, (batchRetryVersionsRef.current.get(index) ?? 0) + 1);
     }
-    setRecords((current) => current.map((record) => record.status === 'error' ? { ...record, status: 'idle', error: undefined } : record));
-    setNotice(`已将 ${failed.length} 条失败记录放回待审核队列；再次提交这些记录可能产生新费用`);
+    setRecords((current) => current.map((record) => record.status === 'error' && !record.submissionUncertain
+      ? { ...record, status: 'idle', error: undefined } : record));
+    setNotice(`已将 ${failed.length} 条已确认失败的记录放回待审核队列；重新审核可能产生新费用。提交结果待核对的记录仍被隔离。`);
   };
 
   const exportWorkbook = async () => {

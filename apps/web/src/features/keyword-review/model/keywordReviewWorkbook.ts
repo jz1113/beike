@@ -38,6 +38,7 @@ export interface KeywordReviewRecord extends KeywordReviewRow {
   categoryReason?: string;
   rejectReason?: string;
   error?: string;
+  submissionUncertain?: boolean;
   sourceValues: Record<string, string>;
 }
 
