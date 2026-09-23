@@ -4,20 +4,12 @@ import {
   getCategoryTailoredPersonas,
   buildSuitableCategoriesOr,
 } from '@beike/domain/jewelryArch';
-import { resolveShotsForScene } from '@beike/domain/sceneBundle';
 import {
   pickWeightedRandom,
   computeSamplingSeed,
-  pickActionSet,
   stableAssetCode,
 } from '@beike/domain/assetSampling';
-import {
-  extractPureActionFromPrompt,
-  stripGarmentsFromAction,
-} from '@beike/domain/drawing';
 import { inferProductCategoryAndAnatomy } from '@beike/domain/productCategory';
-import { ANATOMY_ACTION_PRESETS } from '../../routes/generate/analyze/anatomyPresets';
-import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
 import { parseGroupShotSkeleton } from '@beike/domain/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
@@ -51,7 +43,6 @@ export async function loadStoryboardLibrary(input: {
   const targetPersonaId = locked.personaId || allocated.personaId;
   const targetSceneId = locked.sceneId || allocated.sceneId;
   const targetOutfitId = locked.outfitId || allocated.outfitId;
-  const targetActionIds = (locked.actionId ? [locked.actionId] : undefined) || allocated.actionIds;
 
   let personaItems: any[] = targetPersonaId
     ? compact(await db.personaAsset.findFirst({ where: { id: String(targetPersonaId), ...PROVENANCE } }))
@@ -92,43 +83,7 @@ export async function loadStoryboardLibrary(input: {
     outfitItems = getCategoryTailoredOutfits(titleStr, categoryInfo.targetAnatomy);
   }
 
-  let actionItems: any[] = [];
-  if (Array.isArray(targetActionIds) && targetActionIds.length > 0) {
-    const found = await db.actionAsset.findMany({ where: { id: { in: targetActionIds.map(String) }, ...PROVENANCE } });
-    actionItems = targetActionIds.map((id) => found.find((item) => String(item.id) === String(id))).filter(Boolean);
-  } else if (locked.actionId) {
-    actionItems = compact(await db.actionAsset.findFirst({ where: { id: String(locked.actionId), ...PROVENANCE } }));
-  } else if (sceneItems[0]) {
-    const linked = await db.actionAsset.findMany({
-      where: { sceneId: sceneItems[0].id, ...PROVENANCE },
-      orderBy: [{ shotOrder: 'asc' }, { createdAt: 'asc' }],
-      take: 4,
-    });
-    actionItems = linked.length ? linked : resolveShotsForScene(sceneItems[0], []).map((shot, index) => ({
-      ...shot, shotOrder: shot.shotOrder || index + 1, suitableAnatomy: '["all"]',
-    }));
-  }
-  if (actionItems.length === 0) {
-    const match = [...(categoryInfo.categoryTags || []).map((tag) => ({ suitableAnatomy: { contains: tag } })), { suitableAnatomy: { contains: 'all' } }];
-    let candidates = await db.actionAsset.findMany({ where: await poolWhere('action', { OR: match }), orderBy: assetOrder, take: 100 });
-    if (candidates.length < 10) {
-      const general = await db.actionAsset.findMany({ where: await poolWhere('action'), orderBy: assetOrder, take: 100 });
-      candidates = [...candidates, ...general.filter((item) => !candidates.some((row) => row.id === item.id))];
-    }
-    if (candidates.length > 0) {
-      const used = new Set((input.previousActionIds || []).map(String));
-      actionItems = pickActionSet(candidates, computeSamplingSeed(input.productIndex, input.productTitle || '') + 11, used, 4).map((item, index) => ({
-        ...item,
-        code: stableAssetCode('A', String(item.id)),
-        action: stripGarmentsFromAction(item.action, index),
-        reversePrompt: item.reversePrompt ? stripGarmentsFromAction(item.reversePrompt, index) : null,
-      }));
-    }
-  }
-  if (actionItems.length === 0 && categoryInfo.targetAnatomy) {
-    const presets = ANATOMY_ACTION_PRESETS[categoryInfo.targetAnatomy];
-    if (presets) actionItems = presets.slice(0, 4);
-  }
+  const actionItems: any[] = [];
 
   const samplingSeed = computeSamplingSeed(input.productIndex, input.productTitle || '');
   if (!locked.sceneId && !allocated.sceneId && sceneItems.length > 1) {
@@ -156,17 +111,7 @@ export async function loadStoryboardLibrary(input: {
     id: item.id, code: stableAssetCode('O', String(item.id)), title: item.title, top: item.top, bottom: item.bottom,
     colorPalette: item.colorPalette, reversePrompt: item.reversePrompt || null,
   }));
-  const actions = actionItems.map((item, index) => {
-    const raw = item.action || item.reversePrompt || '';
-    const subject = resolveAssetShotSubject(item);
-    return {
-      id: item.id, code: item.code || stableAssetCode('A', String(item.id)), title: item.title,
-      action: stripGarmentsFromAction(extractPureActionFromPrompt(raw) || raw, index),
-      camera: item.camera, shotType: subject?.shot_type || item.shotType, has_human: subject?.has_human,
-      suitableAnatomy: item.suitableAnatomy,
-      reversePrompt: item.reversePrompt ? stripGarmentsFromAction(extractPureActionFromPrompt(item.reversePrompt), index) : null,
-    };
-  });
+  const actions: any[] = [];
 
   if (input.batchId) {
     await recordAssetUsageEvents({
@@ -174,8 +119,7 @@ export async function loadStoryboardLibrary(input: {
       sceneId: scenes[0]?.id,
       outfitId: outfits[0]?.id,
       personaId: personas[0]?.id,
-      actionIds: actions.map((item) => item.id),
-      eventType: locked.personaId || locked.sceneId || locked.outfitId || locked.actionId ? 'locked' : 'recommended',
+      eventType: locked.personaId || locked.sceneId || locked.outfitId ? 'locked' : 'recommended',
     });
   }
 
@@ -185,7 +129,6 @@ export async function loadStoryboardLibrary(input: {
     usedAssetLibrary: [personas[0], scenes[0], outfits[0], ...actions].some((item) => item?.id && !String(item.id).startsWith('preset-')),
     assetPickTrace: {
       sceneId: scenes[0]?.id, outfitId: outfits[0]?.id, personaId: personas[0]?.id,
-      actionIds: actions.map((item) => item.id).filter(Boolean),
     },
   };
 }

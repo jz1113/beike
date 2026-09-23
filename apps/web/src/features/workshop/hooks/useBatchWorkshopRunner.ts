@@ -96,7 +96,7 @@ export function useBatchWorkshopRunner() {
   });
 
   const [generationStrategy, setGenerationStrategy] = usePersistentEnum<GenerationStrategy>('workshop_generation_strategy', {
-    fallback: 'grid_first',
+    fallback: 'single_shot',
     isValid: (v): v is GenerationStrategy => v === 'grid_first' || v === 'single_shot',
   });
   // 文案自动生成是批次配置：关闭后仍可在交付页手动写作或按需生成。
@@ -239,7 +239,7 @@ export function useBatchWorkshopRunner() {
       setSelectedArchId(jewelryArch.id);
     }
     setUseAssetLibrary(true);
-    setGenerationStrategy('grid_first');
+    setGenerationStrategy('single_shot');
   }, [items, recipes, selectedArchId, setSelectedArchId, setGenerationStrategy]);
 
   const handleRemoveItem = (itemId: string) => {

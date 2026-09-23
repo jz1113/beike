@@ -5,16 +5,10 @@ import {
   createCompactSourceImagesJson,
 } from '@beike/server-kit/imageConverter';
 import {
-  sanitizeActionPrompt,
-  sanitizeActionTitle,
   sanitizeScenePrompt,
   isActionTitle,
   dedupeOutfitCandidates,
 } from '@beike/domain/assetDeconstruct/validate';
-import {
-  extractActionCategories,
-  extractActionFocusAnchors,
-} from '@beike/domain/productCategory';
 import type { PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
 import { persistFullPromptRecords } from './saveFullPrompts';
 
@@ -114,7 +108,6 @@ export async function persistDeconstructedAssets(params: {
     : [];
 
   const scenesToProcess = isSingleImage && rawScenes.length > 1 ? [rawScenes[0]] : rawScenes.slice(0, imageUrls.length);
-  const sceneIdBySourceIndex = new Map<number, string>();
 
   for (const sc of scenesToProcess) {
     if (!sc) continue;
@@ -170,10 +163,6 @@ export async function persistDeconstructedAssets(params: {
         },
       });
       savedRecords.scenes.push(updated);
-      if (primaryIndex !== null) sceneIdBySourceIndex.set(primaryIndex, updated.id);
-      for (const idx of clusterIndices) {
-        sceneIdBySourceIndex.set(idx, updated.id);
-      }
     } else {
       const created = await db.sceneAsset.create({
         data: {
@@ -196,10 +185,6 @@ export async function persistDeconstructedAssets(params: {
         },
       });
       savedRecords.scenes.push(created);
-      if (primaryIndex !== null) sceneIdBySourceIndex.set(primaryIndex, created.id);
-      for (const idx of clusterIndices) {
-        sceneIdBySourceIndex.set(idx, created.id);
-      }
     }
   }
 
@@ -279,138 +264,6 @@ export async function persistDeconstructedAssets(params: {
         },
       });
       savedRecords.outfits.push(created);
-    }
-  }
-
-  const rawActions: any[] = Array.isArray(parsedResult.actions)
-    ? parsedResult.actions
-    : parsedResult.action
-    ? [parsedResult.action]
-    : [];
-
-  const actionsToProcess = isSingleImage && rawActions.length > 1 ? [rawActions[0]] : rawActions.slice(0, imageUrls.length);
-  const shotOrderByScene = new Map<string, number>();
-
-  for (const act of actionsToProcess) {
-    if (!act) continue;
-    const rawActTitle = (act.title || '抓拍动作').trim();
-    const shotType = act.shot_type || act.shot_framing || 'half_body';
-    const meta = extractAssetMeta(act);
-    const rawActionCover = meta.sourceImageIndex !== null && meta.sourceImageIndex !== undefined && imageUrls[meta.sourceImageIndex - 1]
-      ? imageUrls[meta.sourceImageIndex - 1]
-      : (defaultCoverUrl || '');
-    const actionCoverUrl = await thumbForUrl(rawActionCover);
-
-    let actSpatial = 'general';
-    const actFull = `${rawActTitle} ${act.action || ''}`.toLowerCase();
-    if (actFull.includes('车') || actFull.includes('副驾')) actSpatial = 'car_seated';
-    else if (actFull.includes('微距') || shotType === 'macro_detail') actSpatial = 'macro';
-    else if (actFull.includes('坐') || actFull.includes('椅') || actFull.includes('卡座')) actSpatial = 'sitting';
-    else if (actFull.includes('走') || actFull.includes('漫步')) actSpatial = 'walking';
-
-    const cleanActionDesc = sanitizeActionPrompt(act.action || meta.reversePrompt || '');
-    const cleanActionReverse = meta.reversePrompt ? sanitizeActionPrompt(meta.reversePrompt) : undefined;
-    const actTitle = sanitizeActionTitle(rawActTitle, shotType, cleanActionDesc);
-
-    const existingAction =
-      meta.sourceImageIndex !== null
-        ? await db.actionAsset.findFirst({
-            where: { sourceImageIndex: meta.sourceImageIndex, title: actTitle },
-          })
-        : await db.actionAsset.findFirst({
-            where: {
-              OR: [
-                { title: actTitle },
-                { AND: [{ shotType }, { action: cleanActionDesc }] },
-              ],
-            },
-          });
-
-    const linkedSceneId =
-      meta.sourceImageIndex !== null && meta.sourceImageIndex !== undefined
-        ? sceneIdBySourceIndex.get(meta.sourceImageIndex) ?? savedRecords.scenes[0]?.id ?? null
-        : savedRecords.scenes[0]?.id ?? null;
-    let shotOrder = 0;
-    if (linkedSceneId) {
-      const next = (shotOrderByScene.get(linkedSceneId) ?? 0) + 1;
-      shotOrderByScene.set(linkedSceneId, next);
-      shotOrder = next;
-    }
-
-    if (existingAction) {
-      const updated = await db.actionAsset.update({
-        where: { id: existingAction.id },
-        data: {
-          usageCount: existingAction.usageCount + 1,
-          coverUrl: actionCoverUrl || existingAction.coverUrl,
-          sourceImages: sampleImagesJson,
-          ...(cleanActionReverse ? { reversePrompt: cleanActionReverse } : {}),
-          ...(meta.dimensions ? { dimensions: meta.dimensions } : {}),
-          ...(meta.sourceImageIndex ? { sourceImageIndex: meta.sourceImageIndex } : {}),
-          ...(linkedSceneId ? { sceneId: linkedSceneId, shotOrder } : {}),
-          updatedAt: new Date(),
-        },
-      });
-      savedRecords.actions.push(updated);
-    } else {
-      const rawAnatomy = Array.isArray(act.suitable_anatomy) ? [...act.suitable_anatomy] : [];
-      if (act.focus_anatomy && !rawAnatomy.includes(act.focus_anatomy)) {
-        rawAnatomy.push(act.focus_anatomy);
-      }
-      const cats = extractActionCategories({
-        title: actTitle,
-        action: cleanActionDesc,
-        suitableAnatomy: JSON.stringify(rawAnatomy),
-        tags: rawAnatomy.join(', '),
-      });
-      const anchors = extractActionFocusAnchors({
-        title: actTitle,
-        action: cleanActionDesc,
-        shotType,
-        suitableAnatomy: JSON.stringify(rawAnatomy),
-        tags: rawAnatomy.join(', '),
-      });
-
-      let targetList: string[] = [];
-      if (anchors.length > 0) {
-        targetList = [
-          ...cats.map((c) => c.id),
-          ...anchors.map((anc) => anc.id),
-          ...(anchors.some((a) => a.id === 'wrist') ? ['bracelet'] : []),
-          ...(anchors.some((a) => a.id === 'collarbone') ? ['necklace'] : []),
-          ...(anchors.some((a) => a.id === 'fingers') ? ['ring'] : []),
-          ...(anchors.some((a) => a.id === 'ear') ? ['earring'] : []),
-          ...(anchors.some((a) => a.id === 'hair') ? ['hairpin'] : []),
-          ...(anchors.some((a) => a.id === 'brooch') ? ['brooch'] : []),
-        ];
-      } else {
-        targetList = cats.map((c) => c.id);
-      }
-      const uniqueList = Array.from(new Set(targetList));
-      const targetAnatomyJson = JSON.stringify(uniqueList);
-      const targetTags = Array.from(new Set([
-        ...cats.map((c) => c.label),
-        ...anchors.map((a) => a.label),
-      ])).join(', ');
-
-      const created = await db.actionAsset.create({
-        data: {
-          title: actTitle,
-          action: cleanActionDesc,
-          shotType,
-          spatialType: actSpatial,
-          camera: act.camera || 'iPhone 50mm 生活镜头',
-          suitableAnatomy: targetAnatomyJson,
-          tags: targetTags,
-          coverUrl: actionCoverUrl,
-          sourceImages: sampleImagesJson,
-          ...meta,
-          ...(cleanActionReverse ? { reversePrompt: cleanActionReverse } : {}),
-          provenance: 'deconstructed',
-          ...(linkedSceneId ? { sceneId: linkedSceneId, shotOrder } : {}),
-        },
-      });
-      savedRecords.actions.push(created);
     }
   }
 

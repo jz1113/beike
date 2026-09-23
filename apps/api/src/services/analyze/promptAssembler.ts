@@ -253,7 +253,8 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     || (selectedSceneAsset?.description
       ? `${selectedSceneAsset.title}，${selectedSceneAsset.description}`
       : masterScene || '干净有质感的真实生活空间');
-  const effectiveMasterScene =
+  const groupLocked = filledSlots?.source === 'group_skeleton';
+  const effectiveMasterScene = groupLocked ? baseScene :
     baseScene.includes('环境光') ||
     baseScene.includes('光线') ||
     baseScene.includes('晨光') ||
@@ -314,18 +315,22 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     const effectiveAngle = framed.angle;
 
     const shotLighting = getShotLightingVariation(productIndex, pIdx);
-    const effectiveShotLighting = selectedSceneAsset?.lighting
+    const effectiveShotLighting = slot?.source === 'group_skeleton' && slot.lighting
+      ? slot.lighting
+      : selectedSceneAsset?.lighting
       ? `${selectedSceneAsset.lighting}；本镜采光：${shotLighting}`
       : shotLighting;
 
     const effectiveSceneConcept = `${effectiveMasterScene}，本镜机位：${effectiveAngle}`;
-    const effectiveProp = p.prop || '随身手袋与生活小道具';
+    const effectiveProp = p.prop || (slot?.source === 'group_skeleton' ? '' : '随身手袋与生活小道具');
 
     const isMacroShot =
       /微距|超清微距|局部特写|手腕特写|锁骨特写|手指特写|耳际特写|局部近景|细节特写|试色特写/i.test(
         `${effectiveAngle} ${effectiveAction} ${effectiveCamera}`
       );
-    const effectiveOptics = isMacroShot
+    const effectiveOptics = slot?.source === 'group_skeleton' && slot.optics
+      ? slot.optics
+      : isMacroShot
       ? buildCategoryCloseUpOptics(
           inferProductCategoryAndAnatomy(productTitle, productProps).primaryCategory,
           inferProductCategoryAndAnatomy(productTitle, productProps).targetAnatomy,

@@ -71,6 +71,7 @@ export interface FilledShotSlot {
   scene: string;
   action: string;
   camera: string;
+  optics: string;
   angle: string;
   lighting: string;
   shotType?: string;
@@ -133,6 +134,30 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
   return shots;
 }
 
+/** 四张原图是不可改写的主线；延展镜头只从同组机位/动作派生。 */
+export function expandGroupShotSkeleton(shots: GroupShotSkeleton[], requestedCount: number): GroupShotSkeleton[] {
+  const originals = shots.slice(0, 4);
+  if (originals.length !== 4 || requestedCount <= 4) return originals;
+  const variations = [
+    { title: '主体细节补镜', action: '保持原动作和商品位置，补拍主体与商品的细节关系', angle: '在原机位收紧景别，突出商品与人物或承托面的接触细节' },
+    { title: '交互过程补镜', action: '延续原动作的下一瞬间，不新增人物、商品或道具', angle: '原机位小幅侧移，保留同一空间关系' },
+    { title: '质感特写补镜', action: '保持商品外观和摆放方向，记录材质、受光与局部结构', angle: '在原构图内向商品局部推进，不改变商品形态' },
+    { title: '内容收束补镜', action: '延续原图组的最终动作或静物陈列，形成自然收束', angle: '沿用原组收尾机位，保留场景与主体的相对位置' },
+  ];
+  const extra = variations.map((variation, index) => {
+    const source = originals[index];
+    return {
+      ...source,
+      shot_no: index + 5,
+      title: `${source.title || `镜头 ${index + 1}`} · ${variation.title}`,
+      action: `${source.action || ''}；${variation.action}`,
+      angle: `${source.angle || ''}；${variation.angle}`,
+      prompt: '',
+    };
+  });
+  return [...originals, ...extra].slice(0, Math.min(8, requestedCount));
+}
+
 export function clipProductSentence(textValue: string): string {
   const cleaned = String(textValue || '').replace(/\s+/g, ' ').trim();
   if (!cleaned) return '';
@@ -178,6 +203,7 @@ export function assembleStoryboardSlots(input: AssembleSlotsInput): AssembleSlot
       scene: sceneText(scene, group),
       action: text(group?.action) || text(action?.action) || text(action?.reversePrompt),
       camera,
+      optics: text(group?.optics),
       angle: text(group?.angle) || text(action?.title),
       lighting: text(group?.lighting_type) || text(scene?.lighting),
       shotType: text(group?.shot_type) || text(action?.shotType) || undefined,

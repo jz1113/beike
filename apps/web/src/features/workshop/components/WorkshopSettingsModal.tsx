@@ -175,7 +175,7 @@ export function WorkshopSettingsModal({
                 <label className="flex items-center justify-between gap-3 py-2 sm:px-4 sm:py-0">
                   <span className="shrink-0 text-xs font-bold text-slate-700">分镜数量</span>
                   <select value={selectedShotCount} onChange={e => setSelectedShotCount(parseInt(e.target.value, 10))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
-                    {[1, 4].map(cnt => <option key={cnt} value={cnt}>{cnt} 镜</option>)}
+                    {[4, 8].map(cnt => <option key={cnt} value={cnt}>{cnt === 8 ? '8 镜（原组扩写）' : '4 镜（原组）'}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0">
@@ -198,13 +198,13 @@ export function WorkshopSettingsModal({
               <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                 <label className="flex items-center justify-between gap-3 py-2 sm:py-0 sm:pr-4"><span className="text-xs font-bold text-slate-700">分析并发</span><select value={analyzeConcurrency} onChange={e => setAnalyzeConcurrency?.(Number(e.target.value))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value={1}>1 并发</option><option value={2}>2 并发</option><option value={3}>3 并发</option><option value={4}>4 并发</option></select></label>
                 <label className="flex items-center justify-between gap-3 py-2 sm:px-4 sm:py-0"><span className="text-xs font-bold text-slate-700">生图并发</span><select value={imageGenConcurrency} onChange={e => setImageGenConcurrency?.(Number(e.target.value))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value={4}>4 并发</option><option value={8}>8 并发</option><option value={16}>16 并发</option><option value={32}>32 并发</option><option value={50}>50 并发</option></select></label>
-                <label className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0"><span className="text-xs font-bold text-slate-700">执行策略</span><select value={generationStrategy} onChange={e => setGenerationStrategy?.(e.target.value as 'grid_first' | 'single_shot')} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value="grid_first">四宫格拼图</option><option value="single_shot">单张分镜</option></select></label>
+                <label className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0"><span className="text-xs font-bold text-slate-700">执行策略</span><select value={generationStrategy} onChange={e => setGenerationStrategy?.(e.target.value as 'grid_first' | 'single_shot')} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value="single_shot">单张分镜（推荐）</option><option value="grid_first">四宫格拼图（速度优先）</option></select></label>
               </div>
             </section>
 
             <section className="border-t border-slate-100 pt-3">
               <div className="flex items-center justify-between gap-4">
-                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">选定四图母本后沿用镜头、场景、人物与穿搭；单独锁定的资产才会替换对应槽位。未选母本时自动组合原子资产。</p></div>
+                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">先选完整四图母本；4 镜忠于原组，8 镜追加同一场景的延展。人物、穿搭、场景可按组替换。</p></div>
                 <label className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-indigo-700 cursor-pointer hover:border-indigo-300">
                   <input type="checkbox" checked={useAssetLibrary} onChange={e => setUseAssetLibrary?.(e.target.checked)} className="h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500" />启用联动
                 </label>
@@ -214,15 +214,11 @@ export function WorkshopSettingsModal({
                   <WorkshopAssetLockRow label="图组母本" prefix="R" value={lockedFullPromptId} onChange={(id) => {
                     setLockedFullPromptId?.(id);
                     const group = availableFullPrompts.find((item) => item.id === id);
-                    try {
-                      const shots = JSON.parse(String(group?.shotPromptsJson || '[]'));
-                      if (Array.isArray(shots) && shots.length > 0) setSelectedShotCount(shots.length);
-                    } catch { /* keep current shot count */ }
+                    if (group && selectedShotCount !== 8) setSelectedShotCount(4);
                   }} options={availableFullPrompts} />
                   <WorkshopAssetLockRow label="人设 #P" prefix="P" value={lockedPersonaId} onChange={(id) => setLockedPersonaId?.(id)} options={availablePersonas} />
                   <WorkshopAssetLockRow label="场景 #S" prefix="S" value={lockedSceneId} onChange={(id) => setLockedSceneId?.(id)} options={availableScenes} />
                   <WorkshopAssetLockRow label="穿搭 #O" prefix="O" value={lockedOutfitId} onChange={(id) => setLockedOutfitId?.(id)} options={availableOutfits} />
-                  <WorkshopAssetLockRow label="动作 #A" prefix="A" value={lockedActionId} onChange={(id) => setLockedActionId?.(id)} options={availableActions} />
                 </div>
               )}
               <label className="mt-3 flex items-center justify-between gap-3">

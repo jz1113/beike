@@ -5,17 +5,17 @@ import { usePersistentNumber } from '@/shared/hooks/usePersistentState';
 export function useWorkshopShotCount() {
   const [fallback] = useState(() => {
     try {
-      return restoreStoredStoryboardPreset()?.shotCount === 1 ? 1 : 4;
+      return restoreStoredStoryboardPreset()?.shotCount === 8 ? 8 : 4;
     } catch {
       return 4;
     }
   });
   const [stored, setStored] = usePersistentNumber('workshop_shot_count', { fallback, min: 1, max: 8 });
-  const count = stored === 1 ? 1 : 4;
-  // Migrate legacy 2/3/5–8 shot settings to the supported four-shot preset.
+  const count = stored === 8 ? 8 : 4;
+  // Migrate legacy single-shot presets to complete four-shot groups.
   useEffect(() => {
     if (stored !== count) setStored(count);
   }, [stored, count, setStored]);
-  const setCount = useCallback((value: number) => setStored(value === 1 ? 1 : 4), [setStored]);
+  const setCount = useCallback((value: number) => setStored(value === 8 ? 8 : 4), [setStored]);
   return [count, setCount] as const;
 }

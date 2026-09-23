@@ -146,8 +146,6 @@ export default function AssetLibraryToolbar({
         {tabBtn('persona', '人物')}
         {tabBtn('outfit', '穿搭')}
         {tabBtn('scene', '场景')}
-        <span className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden="true" />
-        {tabBtn('action', '镜头动作')}
       </div>
       <span className="text-[11px] text-slate-400">{ASSET_TAB_HINT[activeSubTab]}</span>
     </div>

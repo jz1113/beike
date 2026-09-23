@@ -43,7 +43,7 @@ test('keeps asset camera when jewelry fallback would rewrite wide lens', () => {
 
 test('locked four-shot group keeps order, camera and source scene', () => {
   const group = parseGroupShotSkeleton(JSON.stringify([
-    { shot_no: 1, title: '镜1', scene: '图组原场景', action: '插簪', camera_focal_length: '100mm 微距', angle: '发髻特写', has_human: true },
+    { shot_no: 1, title: '镜1', scene: '图组原场景', action: '插簪', optics: '柔焦背景', lighting_type: '窗边侧光', camera_focal_length: '100mm 微距', angle: '发髻特写', has_human: true },
     { shot_no: 2, title: '镜2', action: '回眸', camera_focal_length: '35mm', angle: '侧后 45°', has_human: true },
     { shot_no: 3, title: '镜3', action: '近景', camera_focal_length: '50mm', has_human: true },
     { shot_no: 4, title: '镜4', action: '特写', camera_focal_length: '85mm', has_human: true },
@@ -53,6 +53,8 @@ test('locked four-shot group keeps order, camera and source scene', () => {
   assert.equal(slots.shotCount, 4);
   assert.equal(slots.shots[0].camera, '100mm 微距');
   assert.equal(slots.shots[0].scene, '图组原场景');
+  assert.equal(slots.shots[0].optics, '柔焦背景');
+  assert.equal(slots.shots[0].lighting, '窗边侧光');
   assert.equal(slots.shots[1].action, '回眸');
   assert.equal(slots.shots[0].sceneAsset?.id, 's1');
   assert.equal(slots.shots[0].persona?.id, 'p1');
