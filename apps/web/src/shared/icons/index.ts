@@ -28,6 +28,7 @@ export {
   ApiaLogo,
   QiyunLogo,
   ComflyLogo,
+  LianchiLogo,
   CollectorHubIcon,
   TaobaoIcon,
   ShellTechLogo,

@@ -118,6 +118,20 @@ export function ComflyLogo({ className = "w-5 h-5" }: { className?: string }) {
 }
 
 /**
+ * 联池图像接口品牌标志
+ */
+export function LianchiLogo({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <img
+      src="/brand/lianchi_logo.jpg"
+      alt="联池"
+      draggable={false}
+      className={`${className} object-contain flex-shrink-0 select-none pointer-events-none`}
+    />
+  );
+}
+
+/**
  * 全渠道智能采集中心双核微标 (万邦电商 + APIA 社媒)
  */
 export function CollectorHubIcon({ className = "w-10 h-10" }: { className?: string }) {

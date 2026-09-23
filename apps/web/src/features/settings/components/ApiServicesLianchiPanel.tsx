@@ -1,4 +1,5 @@
-import { Activity, Eye, EyeOff, Image, Loader2, RefreshCw, Save } from 'lucide-react';
+import { Activity, Eye, EyeOff, Loader2, RefreshCw, Save } from 'lucide-react';
+import { LianchiLogo } from '@/shared/icons';
 
 interface Props {
   apiKey: string;
@@ -17,7 +18,7 @@ export function ApiServicesLianchiPanel({ apiKey, setApiKey, showKey, setShowKey
   return (
     <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
-        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Image className="w-5 h-5" /></div>
+        <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center"><LianchiLogo className="w-8 h-8" /></div>
         <div>
           <h2 className="text-sm sm:text-base font-black text-slate-900">联池图像接口</h2>
           <p className="text-xs text-slate-500 mt-1">GAPNET OpenAI Images 兼容接口。选择「联池image2」时自动使用此密钥。</p>

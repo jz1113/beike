@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Database, Image } from 'lucide-react';
-import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@/shared/icons';
+import { Database } from 'lucide-react';
+import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo, LianchiLogo } from '@/shared/icons';
 import { ModelIcon } from '@/shared/ui/ModelIcons';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
 import { sortMultimodalModelsByPrice } from './multimodalPriceSort';
@@ -105,7 +105,7 @@ export const API_SERVICES: ApiServiceItem[] = [
     name: '联池图像接口',
     subTitle: 'GAPNET · OpenAI Images 兼容',
     category: 'core',
-    renderLogo: (cls = 'w-5 h-5') => <Image className={cls} />,
+    renderLogo: (cls = 'w-5 h-5') => <LianchiLogo className={cls} />,
     isEnabled: true,
     tag: '文生图 / 图像编辑',
     defaultBaseUrl: 'https://api.gapnet.ai/endpoint',
