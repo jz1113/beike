@@ -227,8 +227,15 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
   const storage = domainStorage();
   const migrateLegacyOpenAI = storage?.getItem('openai_responses_enabled') === 'true'
     && storage.getItem('openai_channel_split_v1') !== 'true';
+  const legacySelectedIds = new Set(
+    ['ai_multimodal_model', 'ai_vision_model']
+      .map(key => storage?.getItem(key))
+      .filter((id): id is string => Boolean(id))
+  );
   const legacyOpenAIModels = migrateLegacyOpenAI
-    ? raw.filter(item => /^gpt-(?:5\.6|6)(?:-|$)/i.test(item.id) && isApprovedModel(item.id, 'multimodal'))
+    ? raw.filter(item => legacySelectedIds.has(item.id)
+        && /^gpt-(?:5\.6|6)(?:-|$)/i.test(item.id)
+        && isApprovedModel(item.id, 'multimodal'))
       .map(item => ({ ...item, channel: 'openai' as const, routeId: openAIModelRouteId(item.id) }))
     : [];
   const source = [...raw, ...legacyOpenAIModels];

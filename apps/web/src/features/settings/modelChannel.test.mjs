@@ -41,17 +41,20 @@ test('identical upstream IDs have independent Comfly and OpenAI identities', () 
 
 test('legacy automatic OpenAI routing migrates to a separate selectable channel once', () => {
   const storage = memoryStorage([
-    ['custom_models', JSON.stringify([{ id: 'gpt-6-luna', name: 'GPT 6 Luna', isMultimodal: true }])],
+    ['custom_models', JSON.stringify([
+      { id: 'gpt-6-luna', name: 'GPT 6 Luna', isMultimodal: true },
+      { id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol', isMultimodal: true },
+    ])],
     ['openai_responses_enabled', 'true'],
     ['ai_multimodal_model', 'gpt-6-luna'],
   ]);
   configureDomainRuntime({ storage });
   try {
     assert.deepEqual(repairWorkflowModelsInStorage().map(workflowModelRouteId), [
-      'gpt-6-luna', openAIModelRouteId('gpt-6-luna'),
+      'gpt-6-luna', 'gpt-5.6-sol', openAIModelRouteId('gpt-6-luna'),
     ]);
     assert.equal(storage.getItem('ai_multimodal_model'), openAIModelRouteId('gpt-6-luna'));
     assert.equal(storage.getItem('openai_channel_split_v1'), 'true');
-    assert.equal(repairWorkflowModelsInStorage().length, 2);
+    assert.equal(repairWorkflowModelsInStorage().length, 3);
   } finally { configureDomainRuntime({ storage: null }); }
 });
