@@ -51,7 +51,6 @@ export interface GroupShotSkeleton {
   lighting_type?: string;
   has_human?: boolean;
   shot_type?: string;
-  compositionReferenceImageUrl?: string;
 }
 
 export interface SlotAssets {
@@ -82,10 +81,10 @@ export interface FilledShotSlot {
   sceneAsset?: SlotScene;
   actionAsset?: SlotAction;
   productSentence: string;
+  sourcePrompt: string;
   usedAssetLibrary: boolean;
   cameraFromAsset: boolean;
   cameraRewritten: boolean;
-  compositionReferenceImageUrl?: string;
   source: SlotSource;
 }
 
@@ -127,8 +126,8 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
       action: text(shot.action),
       optics: text(shot.optics),
       camera_focal_length: text(shot.camera_focal_length),
-      angle: text(shot.angle),
-      lighting_type: text(shot.lighting_type),
+      angle: text(shot.angle) || sourcePromptSection(text(shot.prompt), '构图镜头'),
+      lighting_type: text(shot.lighting_type) || sourcePromptSection(text(shot.prompt), '光影'),
       has_human: typeof shot.has_human === 'boolean' ? shot.has_human : undefined,
       shot_type: text(shot.shot_type) || undefined,
     });
@@ -154,7 +153,7 @@ export function expandGroupShotSkeleton(shots: GroupShotSkeleton[], requestedCou
       title: `${source.title || `镜头 ${index + 1}`} · ${variation.title}`,
       action: `${source.action || ''}；${variation.action}`,
       angle: `${source.angle || ''}；${variation.angle}`,
-      prompt: '',
+      prompt: source.prompt,
     };
   });
   return [...originals, ...extra].slice(0, Math.min(8, requestedCount));
@@ -215,15 +214,33 @@ export function assembleStoryboardSlots(input: AssembleSlotsInput): AssembleSlot
       sceneAsset: scene,
       actionAsset: action,
       productSentence: sentences.get(index + 1) || '',
+      sourcePrompt: text(group?.prompt),
       usedAssetLibrary,
       cameraFromAsset: Boolean(camera || action?.shotType),
       cameraRewritten: false,
-      compositionReferenceImageUrl: group?.compositionReferenceImageUrl,
       source,
     } satisfies FilledShotSlot;
   });
 
   return { shots, usedAssetLibrary, source, shotCount };
+}
+
+/** Extract physical shot structure from the reverse prompt; product identity stays bound to @图片1. */
+export function sourcePromptSection(prompt: string, heading: string): string {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = prompt.match(new RegExp(`【${escaped}】\\s*([\\s\\S]*?)(?=\\n?【[^】]+】|$)`));
+  return match?.[1]?.trim() || '';
+}
+
+export function buildTransferableGroupDetails(prompt: string, replaceScene = false): string {
+  const headings = replaceScene
+    ? ['动作或摆放', '构图镜头']
+    : ['动作或摆放', '场景结构', '光影', '构图镜头'];
+  const details = headings.map((heading) => {
+    const value = sourcePromptSection(prompt, heading);
+    return value ? `【${heading}】${value}` : '';
+  }).filter(Boolean);
+  return details.join('\n');
 }
 
 export function fillProductSentences(

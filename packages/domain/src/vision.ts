@@ -79,7 +79,6 @@ export interface ShotPrompt {
   has_human?: boolean; // 🌟 是否有人物/模特出镜 (true: 有模特/人像; false: 纯商品静物/屏幕UI/背壳特写)
   shot_type?: 'model_shot' | 'hand_held_only' | 'pure_product'; // 🌟 分镜类型
   productImageUrl?: string; // 🌟 该分镜绑定的具体商品素材图（正面/背面/侧面实物图）
-  compositionReferenceImageUrl?: string; // 图组原图只用于构图和光线，商品身份仍以 productImageUrl 为准
   selected?: boolean;
   applied_scene?: string;
   applied_outfit?: string;

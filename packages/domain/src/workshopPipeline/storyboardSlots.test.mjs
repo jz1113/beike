@@ -8,6 +8,7 @@ import {
   maybeApplyJewelryCameraFallback,
   parseGroupShotSkeleton,
   expandGroupShotSkeleton,
+  buildTransferableGroupDetails,
 } from './storyboardSlots.ts';
 import { evaluateStoryboardQuality } from '../promptAsset/qualityChecks.ts';
 
@@ -45,14 +46,25 @@ test('keeps asset camera when jewelry fallback would rewrite wide lens', () => {
 test('four-shot group expands to eight without changing its original shots or scene', () => {
   const originals = Array.from({ length: 4 }, (_, index) => ({
     shot_no: index + 1, title: `原镜${index + 1}`, scene: '同一间室内',
-    action: `动作${index + 1}`, compositionReferenceImageUrl: `image-${index + 1}`,
+    action: `动作${index + 1}`, prompt: `【动作或摆放】动作${index + 1}\n【场景结构】窗边桌面\n【光影】左侧自然光\n【构图镜头】近距离俯拍`,
   }));
   const expanded = expandGroupShotSkeleton(originals, 8);
   assert.equal(expanded.length, 8);
   assert.deepEqual(expanded.slice(0, 4), originals);
   assert.equal(expanded[4].scene, '同一间室内');
-  assert.equal(expanded[4].compositionReferenceImageUrl, 'image-1');
+  assert.equal(expanded[4].prompt, originals[0].prompt);
   assert.equal(expanded[7].shot_no, 8);
+});
+
+test('uses reverse prompt structure while omitting the old scene when replaced', () => {
+  const source = '【主体】蓝色旧商品\n【动作或摆放】平放在桌面中央\n【场景结构】窗边木桌\n【光影】左侧自然光\n【构图镜头】竖幅俯拍';
+  const full = buildTransferableGroupDetails(source);
+  const replacedScene = buildTransferableGroupDetails(source, true);
+  assert.match(full, /竖幅俯拍/);
+  assert.match(full, /窗边木桌/);
+  assert.doesNotMatch(full, /蓝色旧商品/);
+  assert.doesNotMatch(replacedScene, /窗边木桌|左侧自然光/);
+  assert.match(replacedScene, /平放在桌面中央/);
 });
 
 test('locked four-shot group keeps order, camera and source scene', () => {

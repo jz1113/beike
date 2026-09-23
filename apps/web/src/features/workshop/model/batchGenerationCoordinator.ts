@@ -3,7 +3,6 @@ import type { BatchProductItem, BatchTaskItem, GenerationStrategy } from './batc
 import { runBatchGenerationWorkers, runRetryFailedGenerationWorkers } from './batchImageGeneration';
 import {
   executeSingleImageTask,
-  generateItemViaGrid,
   type TaskExecutionConfig,
 } from './batchTaskExecution';
 import { mergeGenerationTasks, needsGenerationSubmit } from './mergeGenerationTasks';
@@ -98,7 +97,6 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
 
   const {
     config,
-    generationStrategy,
     imageGenConcurrency,
     itemsRef,
     setItems,
@@ -193,11 +191,6 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
         });
         if (pendingShots.length === 0) {
           bumpProgress(true, shots.length);
-          return;
-        }
-        if (generationStrategy === 'grid_first' && shots.length === 4 && pendingShots.length === 4
-          && shots.every((shot) => !shot.compositionReferenceImageUrl)) {
-          await generateItemViaGrid(live, live.id, taskConfig, setItems, bumpProgress);
           return;
         }
         await runSelectedShots(live, pendingShots, {

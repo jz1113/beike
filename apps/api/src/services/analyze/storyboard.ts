@@ -94,7 +94,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     shotCount,
     assets: assetLibraryData,
     lockedGroupShots: expandGroupShotSkeleton(lockedGroup.shots, shotCount)
-      .map((shot) => lockedAssets?.sceneId ? { ...shot, scene: '' } : shot),
+      .map((shot) => lockedAssets?.sceneId ? { ...shot, scene: '', lighting_type: '' } : shot),
     personaMode,
   });
   const usedLibrary = usedPublishedLibrary || Boolean(lockedGroup);

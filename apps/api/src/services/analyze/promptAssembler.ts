@@ -23,7 +23,7 @@ import {
   buildCategoryCloseUpOptics,
 } from '@beike/domain/productCategory';
 import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
-import { maybeApplyJewelryCameraFallback, type AssembleSlotsResult } from '@beike/domain/workshopPipeline';
+import { buildTransferableGroupDetails, maybeApplyJewelryCameraFallback, type AssembleSlotsResult } from '@beike/domain/workshopPipeline';
 
 // 🌟 辅助工具：提取或绑定标准资产编号 (如 [#P-01], [#S-01], [#O-01], [#A-01])
 function formatAssetWithCode(
@@ -383,6 +383,12 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       appliedPersona: hasHuman === false ? undefined : appliedPersonaName,
       appliedAction: shotAppliedAction,
     });
+    const sourceDetails = slot?.source === 'group_skeleton'
+      ? buildTransferableGroupDetails(slot.sourcePrompt, Boolean(lockedAssets?.sceneId))
+      : '';
+    const finalPrompt = sourceDetails
+      ? `${harmonized.prompt}；【母本反推的可迁移镜头细节】${sourceDetails}；母本中的商品颜色、外观、品牌、型号和文字仅属于旧商品，全部以 @图片1 所示实物替换；人物、穿搭与场景以当前选定资产为准。`
+      : harmonized.prompt;
 
     return {
       shot_no: p.shot_no,
@@ -397,8 +403,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       lighting_type: effectiveShotLighting,
       has_human: hasHuman,
       shot_type: shotType,
-      prompt: harmonized.prompt,
-      compositionReferenceImageUrl: slot?.compositionReferenceImageUrl,
+      prompt: finalPrompt,
       applied_scene: hasHuman === false ? undefined : appliedSceneTitle,
       applied_outfit: hasHuman === false ? undefined : appliedOutfitTitle,
       applied_persona: hasHuman === false ? undefined : appliedPersonaName,
