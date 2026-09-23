@@ -53,6 +53,9 @@ export default function ApiServicesTab({
   handleTestOpenAI,
   handleSaveOpenAIConfig,
   handleOpenOpenAIDiscovery,
+  handleImportCodexCatalog,
+  openAIModelError,
+  openAIModelSource,
   isFetchingOpenAI,
   openAIModelCount,
   lianchiApiKey,
@@ -291,8 +294,12 @@ export default function ApiServicesTab({
               enabled={openAIEnabled} setEnabled={setOpenAIEnabled}
               onTest={handleTestOpenAI} onSave={handleSaveOpenAIConfig}
               onFetchModels={handleOpenOpenAIDiscovery}
+              onImportCodexCatalog={handleImportCodexCatalog}
+              onAddManualModel={() => setIsAddingModelModalOpen(true)}
               isTesting={isTestingOpenAI} isFetchingModels={isFetchingOpenAI}
               modelCount={openAIModelCount}
+              modelError={openAIModelError}
+              modelSource={openAIModelSource}
             />
           )}
 

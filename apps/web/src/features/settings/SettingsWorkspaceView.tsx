@@ -404,6 +404,9 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 handleTestOpenAI={config.handleTestOpenAI}
                 handleSaveOpenAIConfig={config.handleSaveOpenAIConfig}
                 handleOpenOpenAIDiscovery={() => models.handleOpenOpenAIDiscovery(config.openAIBaseUrl, config.openAIApiKey, true)}
+                handleImportCodexCatalog={models.handleImportCodexCatalog}
+                openAIModelError={models.openAIModelError}
+                openAIModelSource={models.openAIModelSource}
                 isFetchingOpenAI={models.isFetchingOpenAI}
                 openAIModelCount={models.openAIModels.length}
                 lianchiApiKey={config.lianchiApiKey}
@@ -529,7 +532,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           isOpen={models.isGatewayModalOpen}
           onClose={() => models.setIsGatewayModalOpen(false)}
           allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels}
-          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? 'OpenAI' : '网关'}
+          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? (models.openAIModelSource === 'codex' ? 'Codex' : 'OpenAI') : '网关'}
           activeModelIds={new Set(models.customModels.map((m) => m.id))}
           isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.gatewaySource === 'openai' ? models.isFetchingOpenAI : models.isFetchingGateway}
           onToggleAddModel={(model) => {

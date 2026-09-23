@@ -63,7 +63,7 @@ function parseLianchiModels(rawList: unknown[]) {
 function parseOpenAIModels(rawList: unknown[]) {
   const seen = new Set<string>();
   return rawList.flatMap((item: any) => {
-    const id = typeof item === 'string' ? item.trim() : String(item?.id || '').trim();
+    const id = typeof item === 'string' ? item.trim() : String(item?.id || item?.slug || '').trim();
     if (!id || seen.has(id)) return [];
     seen.add(id);
     const approved = getApprovedModel(id);
@@ -71,7 +71,7 @@ function parseOpenAIModels(rawList: unknown[]) {
     const supported = Boolean(approved?.capability === 'multimodal' && /^gpt-(?:5\.6|6)(?:-|$)/i.test(id));
     return [{
       id,
-      name: approved?.name || id,
+      name: approved?.name || (typeof item?.display_name === 'string' ? item.display_name : id),
       shortName: approved?.shortName || id,
       category: caps.isImage ? 'image' : caps.isVideo ? 'video' : caps.isAudio ? 'audio' : caps.isEmbedding ? 'embedding' : 'text',
       isMultimodal: caps.isMultimodal, isVision: caps.isVision, isThinking: caps.isThinking,
@@ -79,6 +79,14 @@ function parseOpenAIModels(rawList: unknown[]) {
       owned_by: typeof item?.owned_by === 'string' ? item.owned_by : 'openai', isCustom: false, supported,
     }];
   });
+}
+
+function extractModelList(data: any): unknown[] {
+  if (Array.isArray(data)) return data;
+  for (const candidate of [data?.data, data?.models, data?.result?.data, data?.result?.models]) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return [];
 }
 
 function emptyCatalog(status: number, error?: string) {
@@ -94,7 +102,7 @@ export async function POST(req: Request) {
     const rawUrl = isLianchi ? LIANCHI_IMAGE_BASE_URL : (baseUrl || (isOpenAI ? 'https://api.openai.com' : req.headers.get('x-custom-base-url') || getDefaultBaseUrl()));
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
     if (isOpenAI && !allowClientCustomBaseUrl() && !isSafeCustomGatewayBaseUrl(targetUrl)) {
-      return jsonResponse({ success: false, models: [], error: '请填写安全的 HTTPS 模型接口地址' }, 400);
+      return jsonResponse({ success: false, models: [], error: '此部署仅允许 HTTPS 公网接口地址。当前 HTTP 地址无法安全传输 API Key；请给网关配置 HTTPS 域名后重试。' }, 400);
     }
     const independentKey = Object.prototype.hasOwnProperty.call(body, 'apiKey');
     if (isOpenAI && !independentKey) {
@@ -122,27 +130,35 @@ export async function POST(req: Request) {
       });
     }
 
-    const endpoint = `${targetUrl}/v1/models`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), isPing ? 15000 : 40000);
     let rawList: any[] = [];
     let gatewayStatus = 0;
     let gatewayErrorMsg = '';
     try {
-      const res = await gatewayFetch(endpoint, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${targetKey}`, 'Content-Type': 'application/json' },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      gatewayStatus = res.status;
-      if (res.ok) {
+      const paths = isOpenAI ? ['/v1/models', '/models'] : ['/v1/models'];
+      for (const path of paths) {
+        const res = await gatewayFetch(`${targetUrl}${path}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${targetKey}`, Accept: 'application/json' },
+          signal: controller.signal,
+        });
+        gatewayStatus = res.status;
         const data = await res.json().catch(() => ({}));
-        rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data?.models) ? data.models : (Array.isArray(data) ? data : []));
-      } else {
-        const errJson = await res.json().catch(() => ({}));
-        gatewayErrorMsg = errJson?.error?.message || errJson?.message || `HTTP ${res.status}`;
-        console.warn(`网关返回状态码 ${res.status} (${gatewayErrorMsg})，准备启动高可用精选模型兜底`);
+        if (res.ok) {
+          rawList = extractModelList(data);
+          gatewayErrorMsg = rawList.length === 0
+            ? '模型目录返回空列表或不兼容格式；可导入 CC Switch/Codex 目录，或手动填写模型 ID'
+            : '';
+          if (rawList.length > 0 || path === paths.at(-1)) break;
+        } else {
+          gatewayErrorMsg = data?.error?.message || data?.message || `HTTP ${res.status}`;
+          if (![404, 405].includes(res.status) || path === paths.at(-1)) break;
+        }
+      }
+      clearTimeout(timeout);
+      if (isOpenAI && [404, 405].includes(gatewayStatus)) {
+        gatewayErrorMsg = '该网关未提供模型目录接口（/v1/models 或 /models）；可导入 CC Switch/Codex 目录，或手动添加模型 ID';
       }
     } catch (networkErr: any) {
       clearTimeout(timeout);

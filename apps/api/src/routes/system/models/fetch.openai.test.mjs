@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { POST } from './fetch.ts';
+import { configureDomainRuntime } from '@beike/domain/runtime';
 
 test('OpenAI model discovery uses independent key and shows the complete returned directory', async () => {
   const originalFetch = globalThis.fetch;
@@ -39,4 +40,54 @@ test('OpenAI model discovery never uses Comfly key or fallback catalog', async (
   const body = await response.json();
   assert.equal(response.status, 400);
   assert.deepEqual(body.models, []);
+});
+
+test('OpenAI model discovery tries the same gateway /models path and accepts Codex slugs', async () => {
+  const originalFetch = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (input) => {
+    urls.push(String(input));
+    return urls.length === 1
+      ? Response.json({ message: 'not found' }, { status: 404 })
+      : Response.json({ models: [{ slug: 'gpt-6-sol', display_name: 'GPT 6 Sol' }] });
+  };
+  try {
+    const response = await POST(new Request('http://localhost/api/system/models/fetch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'openai', baseUrl: 'https://example.com/v1', apiKey: 'test-key', strict: true }),
+    }));
+    const body = await response.json();
+    assert.deepEqual(urls, ['https://example.com/v1/models', 'https://example.com/models']);
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.models.map(model => model.id), ['gpt-6-sol']);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('OpenAI model discovery reports an empty incompatible directory', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ result: { unexpected: [] } });
+  try {
+    const response = await POST(new Request('http://localhost/api/system/models/fetch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'openai', baseUrl: 'https://example.com', apiKey: 'test-key', strict: true }),
+    }));
+    const body = await response.json();
+    assert.equal(response.status, 502);
+    assert.match(body.error, /不兼容格式/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('production does not send an API key to a public HTTP gateway', async () => {
+  configureDomainRuntime({ env: { NODE_ENV: 'production', DESKTOP_SHELL: '0', ALLOW_CUSTOM_BASE_URL: 'false' } });
+  try {
+    const response = await POST(new Request('http://localhost/api/system/models/fetch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'openai', baseUrl: 'http://8.211.191.95:8080/', apiKey: 'test-key', strict: true }),
+    }));
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.match(body.error, /HTTPS/);
+  } finally {
+    configureDomainRuntime({ env: {} });
+  }
 });

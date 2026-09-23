@@ -1,4 +1,4 @@
-import { Activity, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Save } from 'lucide-react';
+import { Activity, ExternalLink, Eye, EyeOff, Loader2, Plus, RefreshCw, Save, Upload } from 'lucide-react';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { ModelIcon } from '@/shared/ui/ModelIcons';
 
@@ -14,14 +14,19 @@ interface Props {
   onSave: () => void;
   onTest: () => void;
   onFetchModels: () => void;
+  onImportCodexCatalog: (file: File) => void;
+  onAddManualModel: () => void;
   isTesting: boolean;
   isFetchingModels: boolean;
   modelCount: number;
+  modelError: string;
+  modelSource: 'gateway' | 'codex';
 }
 
 export function ApiServicesOpenAIPanel({
   baseUrl, setBaseUrl, apiKey, setApiKey, showKey, setShowKey, enabled, setEnabled,
-  onSave, onTest, onFetchModels, isTesting, isFetchingModels, modelCount,
+  onSave, onTest, onFetchModels, onImportCodexCatalog, onAddManualModel,
+  isTesting, isFetchingModels, modelCount, modelError, modelSource,
 }: Props) {
   return <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
     <div className="flex items-start gap-3 pb-3 border-b border-slate-100">
@@ -38,7 +43,7 @@ export function ApiServicesOpenAIPanel({
             官方文档 <ExternalLink className="w-3 h-3" />
           </ExternalLinkAnchor>
         </div>
-        <p className="text-[11.5px] text-slate-500 mt-1 leading-relaxed">GPT 5.6 / GPT 6 图片分析使用 <code>/v1/responses</code>，模型目录使用 <code>/v1/models</code>。</p>
+        <p className="text-[11.5px] text-slate-500 mt-1 leading-relaxed">GPT 5.6 / GPT 6 图片分析使用 <code>/v1/responses</code>；API Key 网关优先从 <code>/v1/models</code> 读取模型。</p>
       </div>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -56,17 +61,41 @@ export function ApiServicesOpenAIPanel({
         </div>
       </div>
     </div>
+    {/^http:\/\//i.test(baseUrl.trim()) && (
+      <p role="alert" className="text-[11px] text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
+        当前使用 HTTP 网关。网页部署要求 HTTPS 地址，以免 API Key 明文传输；请为该网关配置 HTTPS 域名。
+      </p>
+    )}
     <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
       <input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)} className="accent-indigo-600" />
       GPT 5.6 / GPT 6 多模态视觉任务使用此接口
     </label>
     <p className="text-[11px] text-slate-500">可填写 OpenAI 官方地址或支持 Responses API 的自有网关。启用后只影响这些模型的图像理解请求；模型需要在默认业务模型中选择。</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+      <p className="text-xs font-bold text-slate-800">模型目录来源</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onFetchModels} disabled={isFetchingModels || !apiKey.trim()} className="h-9 px-3 rounded-xl border border-indigo-200 bg-white text-indigo-700 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
+          <RefreshCw className={`w-3.5 h-3.5 ${isFetchingModels ? 'animate-spin' : ''}`} /> 从 API Key 网关获取
+        </button>
+        <label className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+          <Upload className="w-3.5 h-3.5" /> 导入 CC Switch/Codex 目录
+          <input type="file" accept=".json,application/json" className="sr-only" onChange={event => {
+            const file = event.target.files?.[0];
+            if (file) onImportCodexCatalog(file);
+            event.target.value = '';
+          }} />
+        </label>
+        <button type="button" onClick={onAddManualModel} className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold flex items-center gap-1.5">
+          <Plus className="w-3.5 h-3.5" /> 手动添加模型 ID
+        </button>
+      </div>
+      <p className="text-[11px] text-slate-500">CC Switch 的 ChatGPT/Codex 登录账号使用独立模型目录。可在本机选择 <code>~/.codex/cc-switch-model-catalog.json</code> 导入；请先在 CC Switch 更新该目录。文件只在浏览器内读取，不会上传。目录仅用于选择模型，实际调用仍使用上方地址和 API Key。</p>
+      <p className="text-[11px] text-slate-600">当前目录：{modelSource === 'codex' ? '本机 Codex 文件' : 'API Key 网关'} · {modelCount} 款</p>
+      {modelError && <p role="alert" className="text-[11px] text-rose-700 bg-rose-50 rounded-lg px-2.5 py-2">{modelError}</p>}
+    </div>
     <div className="flex items-center justify-end gap-2 flex-wrap pt-1 border-t border-slate-100">
       <button type="button" onClick={onTest} disabled={isTesting || !apiKey.trim()} className="h-9 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
         {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />} 测试目录
-      </button>
-      <button type="button" onClick={onFetchModels} disabled={isFetchingModels || !apiKey.trim()} className="h-9 px-3 rounded-xl border border-indigo-200 text-indigo-700 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
-        <RefreshCw className={`w-3.5 h-3.5 ${isFetchingModels ? 'animate-spin' : ''}`} /> 获取模型 ({modelCount})
       </button>
       <button type="button" onClick={onSave} className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold flex items-center gap-1.5">
         <Save className="w-3.5 h-3.5" /> 保存配置

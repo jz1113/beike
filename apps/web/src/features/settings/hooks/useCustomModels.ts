@@ -13,6 +13,7 @@ import {
 } from '@beike/domain/workflowModels';
 import { loadCustomModels, persistCustomModels } from '../customModelsStorage';
 import { sortMultimodalModelsByPrice, type ComflyPriceMap } from '../multimodalPriceSort';
+import { parseCodexCatalog } from '../codexCatalog';
 
 async function fetchComflyPrices(): Promise<ComflyPriceMap> {
   const response = await apiFetch('/api/system/models/pricing');
@@ -49,6 +50,8 @@ export function useCustomModels({
   const [isFetchingLianchi, setIsFetchingLianchi] = useState(false);
   const [lianchiModels, setLianchiModels] = useState<GatewayModelItem[]>([]);
   const [openAIModels, setOpenAIModels] = useState<GatewayModelItem[]>([]);
+  const [openAIModelError, setOpenAIModelError] = useState('');
+  const [openAIModelSource, setOpenAIModelSource] = useState<'gateway' | 'codex'>('gateway');
   const [isFetchingOpenAI, setIsFetchingOpenAI] = useState(false);
   const [gatewaySource, setGatewaySource] = useState<'comfly' | 'lianchi' | 'openai'>('comfly');
 
@@ -336,7 +339,13 @@ export function useCustomModels({
   const handleOpenOpenAIDiscovery = async (openAIBaseUrl: string, openAIApiKey: string, forceRefresh = false) => {
     setGatewaySource('openai');
     if (!forceRefresh && openAIModels.length > 0) { setIsGatewayModalOpen(true); return; }
-    if (!openAIApiKey.trim()) { showToast('请先填写 OpenAI API Key'); return; }
+    if (!openAIApiKey.trim()) {
+      setOpenAIModelError('请先填写网关 API Key；也可导入本机 CC Switch/Codex 模型目录');
+      showToast('请先填写 OpenAI API Key');
+      return;
+    }
+    setOpenAIModelError('');
+    setOpenAIModelSource('gateway');
     setIsGatewayModalOpen(true);
     setIsFetchingOpenAI(true);
     try {
@@ -347,15 +356,40 @@ export function useCustomModels({
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success || data.provider !== 'openai' || !Array.isArray(data.models)) {
         setOpenAIModels([]);
-        showToast(`获取 OpenAI 模型失败 (${data.gatewayStatus || response.status})：${data.error || '模型目录无效'}`);
+        const message = `获取模型失败 (${data.gatewayStatus || response.status})：${data.error || '模型目录无效'}`;
+        setOpenAIModelError(message);
+        showToast(message);
         return;
       }
       setOpenAIModels(data.models);
-      if (data.models.length === 0) showToast('当前接口没有返回模型');
+      if (data.models.length === 0) {
+        setOpenAIModelError('当前接口没有返回模型；可导入 CC Switch/Codex 目录，或手动添加模型 ID');
+        showToast('当前接口没有返回模型');
+      }
     } catch (error) {
       setOpenAIModels([]);
-      showToast(`获取 OpenAI 模型失败：${error instanceof Error ? error.message : '网络错误'}`);
+      const message = `获取模型失败：${error instanceof Error ? error.message : '网络错误'}`;
+      setOpenAIModelError(message);
+      showToast(message);
     } finally { setIsFetchingOpenAI(false); }
+  };
+
+  const handleImportCodexCatalog = async (file: File) => {
+    try {
+      if (file.size > 5_000_000) throw new Error('模型目录文件不能超过 5 MB');
+      const models = parseCodexCatalog(JSON.parse(await file.text()));
+      setGatewaySource('openai');
+      setOpenAIModelSource('codex');
+      setOpenAIModelError('');
+      setOpenAIModels(models);
+      setIsGatewayModalOpen(true);
+      showToast(`已从本机目录读取 ${models.length} 款模型`);
+    } catch (error) {
+      const message = error instanceof SyntaxError ? '模型目录不是有效的 JSON 文件'
+        : error instanceof Error ? error.message : '无法读取模型目录';
+      setOpenAIModelError(message);
+      showToast(message);
+    }
   };
 
   const handleToggleGatewayModel = (model: GatewayModelItem) => {
@@ -416,12 +450,15 @@ export function useCustomModels({
     allGatewayModels,
     lianchiModels,
     openAIModels,
+    openAIModelError,
+    openAIModelSource,
     gatewaySource,
     isFetchingLianchi,
     isFetchingOpenAI,
     handleOpenGatewayDiscovery,
     handleOpenLianchiDiscovery,
     handleOpenOpenAIDiscovery,
+    handleImportCodexCatalog,
     handleToggleGatewayModel,
     handleAddAllUsefulGatewayModels,
     notifyModelsUpdated,

@@ -41,6 +41,9 @@ export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
   handleTestOpenAI: () => void;
   handleSaveOpenAIConfig: () => void;
   handleOpenOpenAIDiscovery: () => void;
+  handleImportCodexCatalog: (file: File) => void;
+  openAIModelError: string;
+  openAIModelSource: 'gateway' | 'codex';
   isFetchingOpenAI: boolean;
   openAIModelCount: number;
   lianchiApiKey: string;
@@ -99,4 +102,3 @@ export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
   isTestingQiyun: boolean;
 
 }
-
