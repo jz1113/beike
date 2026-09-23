@@ -15,6 +15,7 @@ import type { WorkflowModel } from './settingsShared';
 
 export interface WorkflowModelRowProps {
   model: WorkflowModel;
+  price?: { promptPer1k: number; completionPer1k: number };
   index: number;
   isFirst: boolean;
   isLast: boolean;
@@ -33,6 +34,7 @@ export interface WorkflowModelRowProps {
 
 export default function WorkflowModelRow({
   model: m,
+  price,
   index,
   isFirst,
   isLast,
@@ -88,6 +90,14 @@ export default function WorkflowModelRow({
           {m.badge && (
             <span className="text-[9px] px-1 py-0.2 rounded bg-slate-100 text-slate-500 font-medium shrink-0 hidden @[520px]/settings-panel:inline">
               {m.badge}
+            </span>
+          )}
+          {isMultimodal && price && (
+            <span
+              className="text-[10px] text-indigo-600 font-mono whitespace-nowrap shrink-0 hidden @[600px]/settings-panel:inline"
+              title="Comfly 默认分组报价：每 1K token 输入 / 输出"
+            >
+              ฿{price.promptPer1k} / ฿{price.completionPer1k}
             </span>
           )}
         </div>

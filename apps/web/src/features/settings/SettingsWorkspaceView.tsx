@@ -415,6 +415,9 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 handleMoveModel={models.handleMoveModel}
                 handleReorderModels={models.handleReorderModels}
                 handleResetDefaultModels={models.handleResetDefaultModels}
+                comflyPrices={models.comflyPrices}
+                isFetchingPrices={models.isFetchingPrices}
+                handleSortByComflyPrice={models.handleSortByComflyPrice}
                 setIsAddingModelModalOpen={setIsAddingModelModalOpen}
                 wanbangKey={config.wanbangKey}
                 setWanbangKey={config.setWanbangKey}

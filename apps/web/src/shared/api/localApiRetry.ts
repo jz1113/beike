@@ -1,10 +1,5 @@
 const DEFAULT_RETRY_DELAYS_MS = [800, 1600, 2600] as const;
 
-function isTransientNetworkError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /failed to fetch|networkerror|network request failed|load failed|econnreset|econnrefused|enotfound|etimedout|eai_again|socket hang up/i.test(message);
-}
-
 async function isLocalApiUnavailable(response: Response): Promise<boolean> {
   if (response.status !== 502) return false;
   const data = await response.clone().json().catch(() => null);
@@ -17,9 +12,9 @@ function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
   const abortSignal = signal;
 
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(finish, delayMs);
+    const timer = setTimeout(finish, delayMs);
     const abort = () => {
-      window.clearTimeout(timer);
+      clearTimeout(timer);
       finish(new DOMException('The operation was aborted', 'AbortError'));
     };
     function finish(error?: Error) {
@@ -41,26 +36,20 @@ export async function retryWhenLocalApiUnavailable<T extends Response>(
 ): Promise<T> {
   const { signal, delays = DEFAULT_RETRY_DELAYS_MS } = options;
   let response: T | undefined;
-  let networkError: unknown;
 
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
     if (signal?.aborted) throw new DOMException('The operation was aborted', 'AbortError');
-    try {
-      response = await request();
-      if (!(await isLocalApiUnavailable(response))) return response;
-    } catch (error) {
-      if (signal?.aborted || !isTransientNetworkError(error)) throw error;
-      networkError = error;
-    }
+    // A transport error may happen after the model accepted the POST.
+    response = await request();
+    if (!(await isLocalApiUnavailable(response))) return response;
 
     const delayMs = delays[attempt];
     if (delayMs === undefined) {
-      if (response) return response;
-      throw networkError;
+      return response;
     }
     await waitForRetry(delayMs, signal);
   }
 
   // The loop always returns or throws, but this satisfies TypeScript's control-flow analysis.
-  throw networkError || new Error('本地后台服务未连接');
+  throw new Error('本地后台服务未连接');
 }

@@ -11,6 +11,8 @@ import {
   reviewKeywordRows,
 } from '../../services/keywordReview';
 import { getKeywordReviewRules, listKeywordReviewRules, publishKeywordReviewRules } from '../../services/keywordReviewRules';
+import { DeepSeekApiError } from '../../services/keywordReviewUpstreamError';
+import { guardSubmission } from '../../services/submissionGuard';
 
 export async function rulesGET(): Promise<Response> {
   const workspaceId = requireWorkspaceId();
@@ -49,6 +51,14 @@ function readDeepSeekKey(body: { customBaseUrl?: string; customApiKey?: string }
   return { ok: true as const, baseUrl, apiKey };
 }
 
+function keywordReviewFailure(error: unknown): Response {
+  const message = formatUserError(error, '关键词审核失败');
+  if (error instanceof DeepSeekApiError) return jsonResponse({ success: false, error: message, code: 'deepseek_api_error' }, error.status);
+  if (/审核规则版本 v\d+ 不存在/.test(message)) return jsonResponse({ success: false, error: message }, 409);
+  if (error instanceof SyntaxError) return jsonResponse({ success: false, error: message, code: 'model_output_invalid' }, 502);
+  return jsonResponse({ success: false, error: message }, 500);
+}
+
 export async function POST(req: Request): Promise<Response> {
   try {
     let rawBody: unknown;
@@ -66,27 +76,32 @@ export async function POST(req: Request): Promise<Response> {
     if (model !== KEYWORD_REVIEW_DEEPSEEK_MODEL) {
       return jsonResponse({ success: false, error: `关键词审核仅支持 ${KEYWORD_REVIEW_DEEPSEEK_MODEL}` }, 400);
     }
-    const rules = await getKeywordReviewRules(requireWorkspaceId(), parsedBody.data.rulesVersion);
-    const reviewed = await reviewKeywordRows({
-      baseUrl,
-      apiKey,
-      model,
-      rows: parsedBody.data.rows,
-      lookup: parsedBody.data.lookup === true,
-      ruleEntries: rules.entries,
-      rulesVersion: rules.version,
-    });
-    return jsonResponse({
-      success: true,
-      results: reviewed.results,
-      model,
-      usage: reviewed.usage,
-      lookedUp: reviewed.lookedUp,
+    const replay = new Request(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(parsedBody.data) });
+    return await guardSubmission(replay, 'keyword-review', credentials, async () => {
+      try {
+        const rules = await getKeywordReviewRules(requireWorkspaceId(), parsedBody.data.rulesVersion);
+        const reviewed = await reviewKeywordRows({
+          baseUrl,
+          apiKey,
+          model,
+          rows: parsedBody.data.rows,
+          lookup: parsedBody.data.lookup === true,
+          ruleEntries: rules.entries,
+          rulesVersion: rules.version,
+        });
+        return jsonResponse({
+          success: true,
+          results: reviewed.results,
+          model,
+          usage: reviewed.usage,
+          lookedUp: reviewed.lookedUp,
+        });
+      } catch (error) {
+        return keywordReviewFailure(error);
+      }
     });
   } catch (error) {
-    const message = formatUserError(error, '关键词审核失败');
-    if (/审核规则版本 v\d+ 不存在/.test(message)) return jsonResponse({ success: false, error: message }, 409);
-    return jsonResponse({ success: false, error: message }, error instanceof SyntaxError ? 502 : 500);
+    return keywordReviewFailure(error);
   }
 }
 
@@ -106,6 +121,7 @@ export async function balancePOST(req: Request): Promise<Response> {
     return jsonResponse({ success: true, ...balance });
   } catch (error) {
     const message = formatUserError(error, '余额查询失败');
+    if (error instanceof DeepSeekApiError) return jsonResponse({ success: false, error: message, code: 'deepseek_api_error' }, error.status);
     return jsonResponse({ success: false, error: message }, 502);
   }
 }

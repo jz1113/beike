@@ -226,17 +226,11 @@ export async function generateItemViaGrid(
   let masterGridUrl: string | undefined;
   let gridError: string | undefined;
 
-  for (let gridAttempt = 0; gridAttempt < 2; gridAttempt++) {
-    try {
-      masterGridUrl = await executeGridImageTask(currentItem, config);
-      if (masterGridUrl) break;
-    } catch (err: unknown) {
-      gridError = err instanceof Error ? err.message : '四宫格生图失败';
-      console.warn(`[generateItemViaGrid] 四宫格第 ${gridAttempt + 1} 次尝试未成功:`, currentItem.title, err);
-      if (gridAttempt === 0 && !config.isAborted()) {
-        await new Promise((r) => setTimeout(r, 1500));
-      }
-    }
+  try {
+    masterGridUrl = await executeGridImageTask(currentItem, config);
+  } catch (err: unknown) {
+    gridError = err instanceof Error ? err.message : '四宫格生图失败';
+    console.warn('[generateItemViaGrid] 四宫格提交结果不确定，停止自动重发:', currentItem.title, err);
   }
 
   if (!masterGridUrl) {

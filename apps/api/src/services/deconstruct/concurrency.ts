@@ -16,7 +16,7 @@ export function resolveDeconstructConcurrency(): number {
 
 export function resolveMaxInflight(): number {
   const raw = Number(process.env.ASSET_DECONSTRUCT_MAX_INFLIGHT);
-  return Number.isFinite(raw) && raw > 0 ? Math.min(100, Math.floor(raw)) : 1;
+  return Number.isFinite(raw) && raw > 0 ? Math.min(100, Math.floor(raw)) : 8;
 }
 
 export const visionInflightSemaphore = new Semaphore(resolveMaxInflight());
@@ -63,12 +63,9 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function isRateLimitResponse(status: number, bodyText: string): boolean {
-  if (status === 429) return true;
-  if (status === 400 || status === 500) {
-    return /rate[_\s]?limit|too many requests|quota|tpm|rpm/i.test(bodyText);
-  }
-  return false;
+export function isRateLimitResponse(status: number): boolean {
+  // A 500 carrying the words "rate limit" may still follow an accepted request.
+  return status === 429;
 }
 
 /** Balance/quota exhaustion will not recover by waiting and must not trigger a fallback. */

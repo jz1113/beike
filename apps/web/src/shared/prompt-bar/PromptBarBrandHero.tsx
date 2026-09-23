@@ -32,7 +32,7 @@ export default function PromptBarBrandHero() {
             pauseBetweenAnimations={1}
             style={{
               fontSize: 'clamp(28px, calc(3.9vw * var(--ui-density, 1)), 48px)',
-              fontFamily: '"Smiley Sans", "Outfit", "Plus Jakarta Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+              fontFamily: '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
               letterSpacing: '-0.02em',
             }}
           />

@@ -4,6 +4,7 @@ import { Database, Image } from 'lucide-react';
 import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@/shared/icons';
 import { ModelIcon } from '@/shared/ui/ModelIcons';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
+import { sortMultimodalModelsByPrice } from './multimodalPriceSort';
 
 export interface WorkflowModel {
   id: string;
@@ -21,7 +22,7 @@ export interface WorkflowModel {
   isCustom?: boolean;
 }
 
-export const DEFAULT_PRESET_MODELS: WorkflowModel[] = APPROVED_MODELS.map((m) => ({
+export const DEFAULT_PRESET_MODELS: WorkflowModel[] = sortMultimodalModelsByPrice(APPROVED_MODELS.map((m) => ({
   id: m.id,
   name: m.name,
   shortName: m.shortName,
@@ -35,7 +36,7 @@ export const DEFAULT_PRESET_MODELS: WorkflowModel[] = APPROVED_MODELS.map((m) =>
   isDistill: m.capability === 'multimodal',
   isThinking: Boolean(m.isThinking),
   isCustom: false,
-}));
+})));
 
 export interface ApiServiceItem {
   id: string;

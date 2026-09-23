@@ -31,6 +31,12 @@ function loadMultimodalModels(): WorkflowCapability[] {
   return getEnabledMultimodalModelsFromSettings();
 }
 
+function defaultDeconstructModelId(models: WorkflowCapability[]): string {
+  return models.find((model) => model.id === 'gemini-3.7-flash')?.id
+    || models.find((model) => /flash/i.test(model.id) && !model.isThinking)?.id
+    || resolveStoredMultimodalModelId(models);
+}
+
 export type UseDeconstructQueueOptions = {
   showToast: (msg: string) => void;
   onRefreshAssets: () => void;
@@ -47,7 +53,7 @@ export function useDeconstructQueue({
   const [showDeconstructModal, setShowDeconstructModal] = useState(false);
   const [multimodalModels, setMultimodalModels] = useState<WorkflowCapability[]>(() => loadMultimodalModels());
   const [selectedVisionModel, setSelectedVisionModel] = useState<string>(() =>
-    resolveStoredMultimodalModelId(loadMultimodalModels())
+    defaultDeconstructModelId(loadMultimodalModels())
   );
   const [targetCategory, setTargetCategory] = useState<ActionCategoryId>(() =>
     resolveActionCategory(defaultProductCategoryId, productCategories)
@@ -59,6 +65,9 @@ export function useDeconstructQueue({
   const [isDeconstructing, setIsDeconstructing] = useState(false);
   const [queueConcurrency, setQueueConcurrency] = useState<number>(() => readQueueConcurrency());
   const [processingQueueCount, setProcessingQueueCount] = useState(0);
+  const [progressById, setProgressById] = useState<Record<string, { stage: string; message: string; startedAt: number; updatedAt: number }>>({});
+  const [deconstructStartedAt, setDeconstructStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [deconstructRecordRows, setDeconstructRecordRows] = useState<DeconstructedRecordRow[]>([]);
   const [lastExportedCsvFilename, setLastExportedCsvFilename] = useState<string | null>(null);
 
@@ -68,6 +77,15 @@ export function useDeconstructQueue({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const isDeconstructingRef = useRef(false);
+  const queueConcurrencyRef = useRef(queueConcurrency);
+
+  useEffect(() => {
+    if (!isDeconstructing || deconstructStartedAt === null) return;
+    const tick = () => setElapsedSeconds(Math.floor((Date.now() - deconstructStartedAt) / 1000));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [isDeconstructing, deconstructStartedAt]);
 
   useEffect(() => {
     const draft = readDeconstructQueueDraft();
@@ -99,7 +117,7 @@ export function useDeconstructQueue({
     setMultimodalModels(models);
     setSelectedVisionModel((prev) => {
       if (models.some((m) => m.id === prev)) return prev;
-      return resolveStoredMultimodalModelId(models);
+      return defaultDeconstructModelId(models);
     });
   }, [showDeconstructModal]);
 
@@ -124,7 +142,8 @@ export function useDeconstructQueue({
   }, [isDeconstructing]);
 
   const handleQueueConcurrencyChange = useCallback((value: number) => {
-    const next = Math.min(1, Math.max(1, value));
+    const next = Math.min(8, Math.max(1, value));
+    queueConcurrencyRef.current = next;
     setQueueConcurrency(next);
     persistQueueConcurrency(next);
   }, []);
@@ -167,6 +186,9 @@ export function useDeconstructQueue({
 
     isDeconstructingRef.current = true;
     setIsDeconstructing(true);
+    setDeconstructStartedAt(Date.now());
+    setElapsedSeconds(0);
+    setProgressById({});
 
     const modelIds = multimodalModels.map((m) => m.id).filter(Boolean);
     if (modelIds.length === 0) {
@@ -176,7 +198,7 @@ export function useDeconstructQueue({
       return;
     }
 
-    const concurrency = Math.min(queueConcurrency, pendingIndices.length);
+    const maxWorkers = Math.min(8, pendingIndices.length);
     let doneCount = 0;
     let partialCount = 0;
     let errorCount = 0;
@@ -218,6 +240,7 @@ export function useDeconstructQueue({
         targetCategory: itemCategory,
         customSubCategories,
         reviewBeforeSave: options?.reviewBeforeSave,
+        onProgress: (progress) => setProgressById((prev) => ({ ...prev, [targetItem.id]: progress })),
       });
 
       if (result.ok) {
@@ -247,8 +270,12 @@ export function useDeconstructQueue({
     };
 
     try {
-      const workers = Array.from({ length: concurrency }, async () => {
+      const workers = Array.from({ length: maxWorkers }, async (_, workerIndex) => {
         while (workQueue.length > 0) {
+          if (workerIndex >= queueConcurrencyRef.current) {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            continue;
+          }
           const idx = workQueue.shift();
           if (idx === undefined) break;
           await processQueueItem(idx);
@@ -333,6 +360,11 @@ export function useDeconstructQueue({
     handleQueueConcurrencyChange,
     processingQueueCount,
     setProcessingQueueCount,
+    progressById,
+    setProgressById,
+    deconstructStartedAt,
+    setDeconstructStartedAt,
+    elapsedSeconds,
     deconstructRecordRows,
     setDeconstructRecordRows,
     lastExportedCsvFilename,

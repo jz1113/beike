@@ -1,18 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap");
 @import "tailwindcss";
 
 /*
- * 封面主标题必须由可控的真实中文字体绘制，不能依赖每台机器恰好安装的
- * 苹方字重。Smiley Sans 是可免费使用的中文展示字体；无法加载时，画布会在
- * HeadlinePosterStudio 中显式退回系统中文粗体。
+ * 封面主标题使用系统里已有的中文粗体，不从外站加载字体。
+ * 无法匹配时，画布会在 HeadlinePosterStudio 中显式退回系统中文粗体。
  */
-@font-face {
-  font-family: "Smiley Sans";
-  src: url("https://cdn.jsdelivr.net/npm/smiley-sans@2.0.1/build/SmileySans-Oblique.woff2") format("woff2");
-  font-weight: 800 900;
-  font-style: normal;
-  font-display: swap;
-}
 
 @custom-variant compact (&:is(:where(html[data-layout="compact"]) *));
 
@@ -22,7 +13,7 @@
   /* 正文使用系统无衬线字体，保证小字号中文在桌面端清晰可读。 */
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   /* 手写字体仅用于少量品牌展示文字。 */
-  --font-handwritten: "Ma Shan Zheng", "STKaiti", "KaiTi", "Kaiti SC", cursive;
+  --font-handwritten: "STKaiti", "KaiTi", "Kaiti SC", cursive;
   --ui-density: 1;
   --ui-space: 1;
 

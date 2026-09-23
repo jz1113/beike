@@ -4,6 +4,7 @@ import { getClientAccessToken, syncAppTokenCookie } from '@/shared/api/apiToken'
 import { getWorkspaceSecret, syncWorkspaceCookie } from '@/shared/api/workspaceClient';
 import { getApiBase, isTauriDesktop, resolveApiUrl } from '@/shared/desktop/desktopRuntime';
 import { invokeTauriApi } from '@/shared/desktop/tauriApi';
+import { mayReplayAfterTransportFailure } from './requestReplay';
 
 export { getClientAccessToken, setClientAccessToken, syncAppTokenCookie } from '@/shared/api/apiToken';
 
@@ -73,6 +74,10 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
       try {
         return await fetch(resolveApiUrl(input), { ...init, headers });
       } catch (directErr) {
+        // A failed transport does not prove a model POST was rejected. Replaying
+        // it through IPC can submit and bill the same operation twice.
+        const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+        if (!mayReplayAfterTransportFailure(method)) throw directErr;
         console.warn('[apiFetch] 直连 API 遇到网络异常，自动降级切换至 Tauri IPC 备用通道:', directErr);
         const tauriRes = await invokeTauriApi(input, init);
         if (tauriRes) return tauriRes;

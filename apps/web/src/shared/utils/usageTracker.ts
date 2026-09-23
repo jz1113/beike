@@ -44,7 +44,7 @@ export interface UsageLogItem {
 const STORAGE_KEY = 'app_real_usage_logs';
 
 /**
- * 🌟 严格依据 Comfly 官方报价单与扣费公式计算调用成本 ($USD)
+ * 🌟 根据本地参考单价估算调用成本 ($USD)；实际扣费以网关账单为准。
  * 
  * 扣费公式:
  * - 文本类: (Prompt Tokens / 1000) * Prompt 单价 + (Completion Tokens / 1000) * Completion 单价

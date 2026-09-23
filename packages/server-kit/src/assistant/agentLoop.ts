@@ -136,6 +136,9 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentLoopRes
       if (streamingSupported && !streamResp) {
         throw requestError instanceof Error ? requestError : new Error('模型请求失败，未获得有效响应');
       }
+      if (streamResp && !streamResp.body) {
+        throw new Error('模型已接受请求但未返回流式响应体；结果可能已计费，已停止自动补发');
+      }
 
       if (streamResp?.body && streamingSupported) {
         const agentMsgId = runtime.startItem('agentMessage');

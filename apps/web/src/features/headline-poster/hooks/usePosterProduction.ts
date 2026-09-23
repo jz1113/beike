@@ -22,7 +22,6 @@ import {
 import {
   POSTER_CONCURRENCY_OPTIONS,
   buildDesignPlan,
-  buildPosterTitleModelFallbackChain,
   normalizeConcurrency,
   normalizeCoverTitle,
   makeId,
@@ -452,34 +451,14 @@ export function usePosterProduction() {
         preferredModel: string,
         request: (modelId: string) => Promise<T>,
       ): Promise<{ value: T; modelId: string; fallbackNote?: string }> => {
-        const candidates = buildPosterTitleModelFallbackChain(
-          preferredModel,
-          availableTitleModelsRef.current.map((model) => model.id),
-        );
-        let lastError: unknown;
-        for (let attempt = 0; attempt < candidates.length; attempt += 1) {
-          const modelId = candidates[attempt];
-          try {
-            return {
-              value: await request(modelId),
-              modelId,
-              fallbackNote: attempt > 0 ? `${stage}已自动切换至 ${modelLabel(modelId)}` : undefined,
-            };
-          } catch (error) {
-            if (itemAborted()) throw error;
-            lastError = error;
-            const nextModel = candidates[attempt + 1];
-            if (nextModel) {
-              updateItem(item.id, {
-                status,
-                modelFallbackNote: `${stage}请求失败，正在切换至 ${modelLabel(nextModel)}（${attempt + 2}/${candidates.length}）`,
-              });
-            }
-          }
+        try {
+          return { value: await request(preferredModel), modelId: preferredModel };
+        } catch (error) {
+          if (itemAborted()) throw error;
+          updateItem(item.id, { status });
+          const reason = error instanceof Error ? error.message : '未知错误';
+          throw new Error(`${stage}模型 ${modelLabel(preferredModel)} 请求结果不确定，已停止自动切换：${reason}`);
         }
-        const triedModels = candidates.map(modelLabel).join(' → ');
-        const reason = lastError instanceof Error ? lastError.message : '未知错误';
-        throw new Error(`${stage}模型均不可用（已依次尝试：${triedModels}）：${reason}`);
       };
 
       const titleResult = shouldRewriteTitle

@@ -58,6 +58,9 @@ DeepSeek 官方接口的项目接入摘要见 [vendor/deepseek/README.md](vendor
 | 生视频 | `viduq3-mix` Vidu Q3 Mix | vidu | `vidu` | [aggregator/vidu/viduq3-mix.md](aggregator/vidu/viduq3-mix.md) | [vendor/vidu/viduq3-mix.md](vendor/vidu/viduq3-mix.md) |
 | 生视频 | `viduq3-turbo` Vidu Q3 Turbo | vidu | `vidu` | [aggregator/vidu/viduq3-turbo.md](aggregator/vidu/viduq3-turbo.md) | [vendor/vidu/viduq3-turbo.md](vendor/vidu/viduq3-turbo.md) |
 | 生视频 | `viduq3-pro` Vidu Q3 Pro | vidu | `vidu` | [aggregator/vidu/viduq3-pro.md](aggregator/vidu/viduq3-pro.md) | [vendor/vidu/viduq3-pro.md](vendor/vidu/viduq3-pro.md) |
+| 多模态 | `gpt-6-luna` GPT 6 Luna | openai | `openai-chat` | [aggregator/chat/openai-chat.md](aggregator/chat/openai-chat.md) | [vendor/chat/multimodal-chat.md](vendor/chat/multimodal-chat.md) |
+| 多模态 | `grok-4.7` Grok 4.7 | xai | `openai-chat` | [aggregator/chat/openai-chat.md](aggregator/chat/openai-chat.md) | [vendor/chat/multimodal-chat.md](vendor/chat/multimodal-chat.md) |
+| 多模态 | `gpt-6-sol` GPT 6 Sol | openai | `openai-chat` | [aggregator/chat/openai-chat.md](aggregator/chat/openai-chat.md) | [vendor/chat/multimodal-chat.md](vendor/chat/multimodal-chat.md) |
 | 多模态 | `gpt-5.6-luna` GPT 5.6 Luna | openai | `openai-chat` | [aggregator/chat/openai-chat.md](aggregator/chat/openai-chat.md) | [vendor/chat/multimodal-chat.md](vendor/chat/multimodal-chat.md) |
 | 多模态 | `gpt-5.6-sol` GPT 5.6 Sol | openai | `openai-chat` | [aggregator/chat/openai-chat.md](aggregator/chat/openai-chat.md) | [vendor/chat/multimodal-chat.md](vendor/chat/multimodal-chat.md) |
 | 多模态 | `gpt-5.6-terra` GPT 5.6 Terra | openai | `openai-chat` | [aggregator/chat/openai-chat.md](aggregator/chat/openai-chat.md) | [vendor/chat/multimodal-chat.md](vendor/chat/multimodal-chat.md) |

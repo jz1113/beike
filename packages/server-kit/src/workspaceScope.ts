@@ -21,6 +21,16 @@ function andWhere(where: unknown, extra: Record<string, unknown>): Record<string
   return { AND: [where, extra] };
 }
 
+function scopedFindFirstWhere(where: unknown, workspaceId: string): Record<string, unknown> {
+  const unique = where && typeof where === 'object'
+    ? (where as Record<string, unknown>).workspaceId_sourceKey
+    : undefined;
+  // Prisma's compound unique selector is valid in findUnique/upsert, but not
+  // findFirst. The workspace extension probes upserts with findFirst first.
+  const filter = unique && typeof unique === 'object' ? unique : where;
+  return andWhere(filter, writeFilter(workspaceId));
+}
+
 function readFilter(model: string, workspaceId: string): Record<string, unknown> {
   if (SHARED_READ_MODELS.has(model)) {
     return { workspaceId: { in: [workspaceId, OFFICIAL_WORKSPACE_ID] } };
@@ -105,7 +115,7 @@ export function extendPrismaWithWorkspace(client: PrismaClient): PrismaClient {
             case 'update':
             case 'delete': {
               const existing = await delegate.findFirst({
-                where: andWhere((args as { where?: unknown }).where, writeFilter(workspaceId)),
+                where: scopedFindFirstWhere((args as { where?: unknown }).where, workspaceId),
                 select: model === 'PromptImportSource' ? { sourceKey: true } : { id: true },
               }) as { id?: string; sourceKey?: string } | null;
               if (!existing) throw notFound();
@@ -118,7 +128,7 @@ export function extendPrismaWithWorkspace(client: PrismaClient): PrismaClient {
             case 'upsert': {
               const typed = args as { where?: unknown; create: Record<string, unknown>; update: Record<string, unknown>; include?: unknown; select?: unknown };
               const existing = await delegate.findFirst({
-                where: andWhere(typed.where, writeFilter(workspaceId)),
+                where: scopedFindFirstWhere(typed.where, workspaceId),
                 select: model === 'PromptImportSource' ? { sourceKey: true } : { id: true },
               }) as { id?: string; sourceKey?: string } | null;
               if (!existing) {

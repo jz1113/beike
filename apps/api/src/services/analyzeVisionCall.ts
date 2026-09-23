@@ -244,8 +244,8 @@ export async function callVisionModel(
       if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message || ''))) {
         const timeoutSec = Math.round(timeoutMs / 1000);
         lastError = new Error(`视觉模型 [${model}] 响应超时（已等待约 ${timeoutSec} 秒）`);
-        console.warn(`[Vision API] 模型 [${model}] 响应超时（${timeoutSec}s），准备按统一顺序尝试下一模型...`);
-        continue;
+        console.warn(`[Vision API] 模型 [${model}] 响应超时（${timeoutSec}s），结果可能已计费，停止自动切换`);
+        throw lastError;
       }
       if (!isRetryableUpstreamError(e)) throw e;
       console.warn(`[Vision API] 模型 [${model}] 请求异常: ${e.message}，准备尝试下一个...`);

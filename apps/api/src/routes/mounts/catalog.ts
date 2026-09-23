@@ -38,6 +38,7 @@ catalog.post('/prompts', mountJson((req) => prompts.POST(req)));
 catalog.delete('/prompts', mountJson((req) => prompts.DELETE(req)));
 
 catalog.post('/assets/deconstruct', mountJson((req) => assetDeconstruct.POST(req)));
+catalog.get('/assets/deconstruct/progress', mountJson((req) => assetDeconstruct.GET_PROGRESS(req)));
 catalog.post('/assets/seed', mountJson((req) => assetSeed.POST(req)));
 catalog.get('/assets/library', mountJson((req) => assetLibrary.GET(req)));
 catalog.post('/assets/library', mountJson((req) => assetLibrary.POST(req)));

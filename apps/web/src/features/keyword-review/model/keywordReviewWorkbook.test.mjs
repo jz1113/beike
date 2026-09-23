@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import {
   allocateReviewColumns,
   buildOutputColumns,
+  buildMergedReviewedWorkbook,
   buildReviewedWorkbook,
   fieldKind,
   parseKeywordWorkbookData,
@@ -196,4 +197,49 @@ test('partial export can be imported and resumes only unfinished rows', () => {
   assert.equal(resumed.records[0].category, '动物');
   assert.equal(resumed.records[1].status, 'idle');
   assert.equal(resumed.records[1].query, '汽车保养');
+});
+
+test('completed export combines source sheets into one continuous table', () => {
+  const first = XLSX.utils.aoa_to_sheet([
+    ['序号', 'query', '相关拓展', '下发时间'],
+    [1, '猫砂', '膨润土', '2026-09-01'],
+    [null, null, null, null],
+    [2, '狗粮', '幼犬粮', '2026-09-01'],
+  ]);
+  const second = XLSX.utils.aoa_to_sheet([
+    ['序号', 'query', '笔记内容'],
+    [1, '机油', '攻略'],
+  ]);
+  const unrelated = XLSX.utils.aoa_to_sheet([['说明'], ['无需审核']]);
+  const parsed = parseKeywordWorkbookData({
+    SheetNames: ['Sheet1', '说明', 'Sheet2'],
+    Sheets: { Sheet1: first, 说明: unrelated, Sheet2: second },
+  }, '词包.xlsx');
+  const records = parsed.records.map((record, index) => ({
+    ...record,
+    status: 'done',
+    category: index === 2 ? '汽车' : '动物',
+    categoryReason: '按关键词归类',
+    producible: index === 1 ? '不制作' : '制作',
+    rejectReason: index === 1 ? '简单问答：信息量不足' : '',
+  }));
+  const workbook = buildMergedReviewedWorkbook(parsed, records);
+  assert.deepEqual(workbook.SheetNames, ['审核结果']);
+  const sheet = workbook.Sheets['审核结果'];
+  assert.deepEqual(Array.from({ length: 10 }, (_, col) => cell(sheet, 0, col)), [
+    '来源工作表', '序号', 'query', '相关拓展', '下发时间',
+    '最终垂类', '垂类依据', '是否可制作', '不制作依据', '笔记内容',
+  ]);
+  assert.deepEqual([1, 2, 3].map((row) => cell(sheet, row, 0)), ['Sheet1', 'Sheet1', 'Sheet2']);
+  assert.deepEqual([1, 2, 3].map((row) => cell(sheet, row, 2)), ['猫砂', '狗粮', '机油']);
+  assert.equal(cell(sheet, 3, 9), '攻略');
+  assert.equal(cell(sheet, 2, 8), '简单问答：信息量不足');
+  assert.equal(sheet['!ref'], 'A1:J4');
+  assert.equal(sheet['!autofilter'].ref, 'A1:J4');
+  const saved = XLSX.read(XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }), { type: 'buffer' });
+  assert.deepEqual(saved.SheetNames, ['审核结果']);
+  assert.equal(cell(saved.Sheets['审核结果'], 3, 2), '机油');
+  const resumed = parseKeywordWorkbookData(saved, '词包_已审核.xlsx');
+  assert.equal(resumed.records.length, 3);
+  assert.equal(resumed.records.every((record) => record.status === 'done'), true);
 });

@@ -129,6 +129,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { message: toastMsg, show: showToast } = useToast(2600);
 
@@ -165,13 +166,17 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     }
   }, [assistantInputDraft]);
 
-  // 🌟 当抽屉打开时，自动聚焦输入框
+  // 打开时聚焦输入框；关闭前先移走焦点，再让容器不可交互。
   useEffect(() => {
     if (isAssistantOpen) {
       const timer = setTimeout(() => {
         textareaRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
+    }
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && drawerRef.current?.contains(active)) {
+      active.blur();
     }
   }, [isAssistantOpen]);
 
@@ -357,10 +362,11 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
 
   return (
     <div
+      ref={drawerRef}
       className={`fixed inset-0 z-50 flex justify-end select-none pointer-events-none ${
         isAssistantOpen ? '' : 'invisible opacity-0'
       }`}
-      aria-hidden={!isAssistantOpen}
+      inert={isAssistantOpen ? undefined : true}
     >
       {/* 遮罩背景（宽屏纯视觉淡化，不拦截主界面点击） */}
       <div

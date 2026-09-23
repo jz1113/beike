@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { allowServerSecretFallback, resolveGatewayCreds } from './gatewayCreds.ts';
+import { allowServerSecretFallback, GatewayBaseUrlError, resolveGatewayCreds } from './gatewayCreds.ts';
 import { configureDomainRuntime } from './runtime.ts';
 
 test('production web uses only the request key and ignores the server default', () => {
@@ -44,8 +44,8 @@ test('production web accepts the configured gateway with an OpenAI /v1 suffix', 
     );
     assert.equal(credentials.baseUrl, 'https://ai.example');
     assert.equal(credentials.apiKey, 'user-key');
-    assert.equal(credentials.ignoredClientBase, true);
-    assert.throws(() => resolveGatewayCreds(
+    assert.equal(credentials.ignoredClientBase, false);
+    const otherGateway = resolveGatewayCreds(
       new Request('https://app.example/api/catalog/assets/deconstruct', {
         headers: {
           'x-custom-base-url': 'https://other.example/v1',
@@ -54,7 +54,19 @@ test('production web accepts the configured gateway with an OpenAI /v1 suffix', 
       }),
       {},
       { baseUrl: 'https://ai.example', apiKey: 'server-key' },
-    ), /接口地址与服务器允许的视觉网关不一致/);
+    );
+    assert.equal(otherGateway.baseUrl, 'https://other.example');
+    assert.equal(otherGateway.apiKey, 'user-key');
+    assert.throws(() => resolveGatewayCreds(
+      new Request('https://app.example/api/catalog/assets/deconstruct', {
+        headers: {
+          'x-custom-base-url': 'http://127.0.0.1:3000',
+          'x-custom-api-key': 'user-key',
+        },
+      }),
+      {},
+      { baseUrl: 'https://ai.example', apiKey: 'server-key' },
+    ), (error) => error instanceof GatewayBaseUrlError && error.status === 400);
   } finally {
     configureDomainRuntime({ env: {} });
   }

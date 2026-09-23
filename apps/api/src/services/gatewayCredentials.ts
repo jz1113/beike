@@ -127,7 +127,10 @@ export async function fetchWithRetry(
     onRetry?: (attempt: number, delayMs: number, error: unknown) => void | Promise<void>;
   }
 ): Promise<Response> {
-  const maxAttempts = Math.max(1, opts?.maxAttempts ?? 2);
+  // A failed response to a POST does not prove the upstream did not accept it.
+  const method = (init.method || 'GET').toUpperCase();
+  const replaySafe = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+  const maxAttempts = replaySafe ? Math.max(1, opts?.maxAttempts ?? 2) : 1;
   let lastError: unknown;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {

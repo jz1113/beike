@@ -5,7 +5,9 @@ import {
   type PerImageResult,
 } from '@beike/domain/assetDeconstruct/prompts';
 import type { SubCategoryDef } from '@beike/domain/productCategory';
+import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { callVisionJson } from './visionCall';
+import type { DeconstructProgress } from './progress';
 import { parseUnifiedFromResponse } from './jsonHealer';
 import type { VisionCallDiagnostics, VisionCallTracker } from './diagnostics';
 
@@ -24,6 +26,54 @@ export function resolveEnablePass2(): boolean {
   return process.env.ASSET_DECONSTRUCT_ENABLE_PASS2 === 'true';
 }
 
+/** 同一套图集最多同时反推两片，避免重新变成一个长达数分钟的请求。 */
+export function resolveUnifiedShardConcurrency(): number {
+  const raw = Number(process.env.ASSET_DECONSTRUCT_SHARD_CONCURRENCY);
+  return Number.isFinite(raw) && raw > 0 ? Math.min(3, Math.floor(raw)) : 2;
+}
+
+function offsetShardMetadata(parsed: Record<string, unknown>, offset: number): Record<string, unknown> {
+  const shift = (value: unknown) =>
+    typeof value === 'number' && Number.isInteger(value) ? value + offset : value;
+  const shiftIndices = (value: unknown) =>
+    Array.isArray(value) ? value.map(shift) : value;
+  const shiftEntries = (value: unknown) =>
+    Array.isArray(value) ? value.map((entry) => {
+      if (!entry || typeof entry !== 'object') return entry;
+      const item = entry as Record<string, unknown>;
+      return {
+        ...item,
+        source_image_index: shift(item.source_image_index),
+        source_image_indices: shiftIndices(item.source_image_indices),
+      };
+    }) : [];
+  return {
+    ...parsed,
+    content_groups: shiftEntries(parsed.content_groups),
+    scenes: shiftEntries(parsed.scenes),
+    outfits: shiftEntries(parsed.outfits),
+    actions: shiftEntries(parsed.actions),
+  };
+}
+
+export function mergeUnifiedShardMetadata(
+  shards: Array<{ parsedResult: Record<string, unknown>; offset: number }>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const { parsedResult, offset } of shards) {
+    const shifted = offsetShardMetadata(parsedResult, offset);
+    for (const key of ['content_groups', 'scenes', 'outfits', 'actions']) {
+      merged[key] = [...(Array.isArray(merged[key]) ? merged[key] as unknown[] : []),
+        ...(Array.isArray(shifted[key]) ? shifted[key] as unknown[] : [])];
+    }
+    if (!merged.theme_category && shifted.theme_category) merged.theme_category = shifted.theme_category;
+    if (!merged.persona && shifted.persona) merged.persona = shifted.persona;
+    const summary = typeof shifted.content_summary === 'string' ? shifted.content_summary.trim() : '';
+    if (summary) merged.content_summary = [merged.content_summary, summary].filter(Boolean).join('；');
+  }
+  return merged;
+}
+
 export async function runUnifiedDeconstructBatch(params: {
   safeImgs: string[];
   modelsToTry: string[];
@@ -38,6 +88,7 @@ export async function runUnifiedDeconstructBatch(params: {
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
   operationId?: string;
+  onProgress?: (stage: DeconstructProgress['stage'], message: string) => void;
 }): Promise<{
   perImageResults: PerImageResult[];
   failedIndices: number[];
@@ -58,6 +109,7 @@ export async function runUnifiedDeconstructBatch(params: {
     tracker,
     diagnostics,
     operationId,
+    onProgress,
   } = params;
 
   const total = safeImgs.length;
@@ -96,6 +148,7 @@ export async function runUnifiedDeconstructBatch(params: {
     operationId: operationId ? `${operationId}:unified:${shardIndex ?? 0}` : undefined,
     tracker,
     diagnostics,
+    onProgress,
   });
 
   if (!visionRes) return null;
@@ -128,6 +181,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
   operationId?: string;
+  onProgress?: (stage: DeconstructProgress['stage'], message: string) => void;
 }): Promise<{ result: PerImageResult | null; usedModel: string }> {
   const {
     safeImgs,
@@ -140,6 +194,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
     tracker,
     diagnostics,
     operationId,
+    onProgress,
   } = params;
 
   const url = safeImgs[0];
@@ -166,6 +221,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
     operationId: operationId ? `${operationId}:image:${globalIndex}` : undefined,
     tracker,
     diagnostics,
+    onProgress,
   });
 
   if (!visionRes) return { result: null, usedModel: '' };
@@ -197,6 +253,7 @@ export async function runUnifiedDeconstruct(params: {
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
   operationId?: string;
+  onProgress?: (stage: DeconstructProgress['stage'], message: string) => void;
 }): Promise<{
   perImageResults: PerImageResult[];
   failedIndices: number[];
@@ -205,10 +262,10 @@ export async function runUnifiedDeconstruct(params: {
   pipelineMode: PipelineMode;
   shardCount: number;
 } | null> {
-  const { safeImgs, modelsToTry, targetBaseUrl, targetApiKey, userHint, targetCategory, customSubCategories, albumName, tracker, diagnostics, operationId } =
+  const { safeImgs, modelsToTry, targetBaseUrl, targetApiKey, userHint, targetCategory, customSubCategories, albumName, tracker, diagnostics, operationId, onProgress } =
     params;
 
-  const shardSize = resolveUnifiedShardSize(safeImgs.length);
+  const shardSize = resolveUnifiedShardSize();
   const isSharded = shardSize < safeImgs.length;
 
   if (!isSharded) {
@@ -224,36 +281,13 @@ export async function runUnifiedDeconstruct(params: {
       tracker,
       diagnostics,
       operationId,
+      onProgress,
     });
 
     if (!single) return null;
 
-    if (single.failedIndices.length > 0) {
-      console.log(
-        `[AssetDeconstruct] 单批反推完成，${single.failedIndices.length} 张需补调: [${single.failedIndices.join(', ')}]`
-      );
-      for (const failedIdx of single.failedIndices) {
-        const url = safeImgs[failedIdx - 1];
-        if (!url) continue;
-        const retry = await runUnifiedDeconstructSingleImage({
-          safeImgs: [url],
-          modelsToTry,
-          targetBaseUrl,
-          targetApiKey,
-          userHint,
-          globalIndex: failedIdx,
-          albumName,
-          tracker,
-          diagnostics,
-          operationId,
-        });
-        if (retry.result) {
-          single.perImageResults.push(retry.result);
-          single.failedIndices = single.failedIndices.filter((idx) => idx !== failedIdx);
-        }
-      }
-      single.perImageResults.sort((a, b) => a.image_index - b.image_index);
-    }
+    // A missing row may have been included in the already billed batch.
+    // Preserve partial results and let the user decide whether to reprocess it.
 
     return {
       ...single,
@@ -273,14 +307,9 @@ export async function runUnifiedDeconstruct(params: {
   );
 
   const allResults: PerImageResult[] = [];
-  const failedIndices: number[] = [];
-  let mergedParsed: Record<string, unknown> = {};
   let usedModel = '';
-
-  for (let shardIndex = 0; shardIndex < shardTotal; shardIndex++) {
-    const shard = shards[shardIndex];
-    const offset = shardIndex * shardSize;
-
+  let completedShards = 0;
+  const batches = await mapWithConcurrency(shards, resolveUnifiedShardConcurrency(), async (shard, shardIndex) => {
     const batch = await runUnifiedDeconstructBatch({
       safeImgs: shard,
       modelsToTry,
@@ -295,49 +324,28 @@ export async function runUnifiedDeconstruct(params: {
       tracker,
       diagnostics,
       operationId,
+      onProgress: (stage, message) => {
+        if (stage !== 'reconciling') onProgress?.(stage, `分片 ${shardIndex + 1}/${shardTotal}：${message}`);
+      },
     });
+    completedShards++;
+    onProgress?.('analyzing', `已完成 ${completedShards}/${shardTotal} 个分片，正在分析剩余图片`);
+    return batch;
+  });
 
-    if (!batch) {
-      for (let i = 0; i < shard.length; i++) {
-        failedIndices.push(offset + i + 1);
-      }
-      continue;
-    }
-
+  const parsedShards: Array<{ parsedResult: Record<string, unknown>; offset: number }> = [];
+  for (let shardIndex = 0; shardIndex < shardTotal; shardIndex++) {
+    const batch = batches[shardIndex];
+    if (!batch) continue;
+    const offset = shardIndex * shardSize;
     usedModel = batch.usedModel || usedModel;
     for (const r of batch.perImageResults) {
       const localIdx = (r.image_index || 1) - 1;
       allResults.push({ ...r, image_index: offset + localIdx + 1 });
     }
-    mergedParsed = { ...mergedParsed, ...batch.parsedResult };
-    for (const localFailed of batch.failedIndices) {
-      failedIndices.push(offset + localFailed);
-    }
+    parsedShards.push({ parsedResult: batch.parsedResult, offset });
   }
-
-  const succeeded = new Set(allResults.map((r) => r.image_index));
-  const uniqueFailed = [...new Set(failedIndices)].filter((idx) => !succeeded.has(idx));
-
-  for (const globalIdx of uniqueFailed) {
-    const url = safeImgs[globalIdx - 1];
-    if (!url) continue;
-    const retry = await runUnifiedDeconstructSingleImage({
-      safeImgs: [url],
-      modelsToTry,
-      targetBaseUrl,
-      targetApiKey,
-      userHint,
-      globalIndex: globalIdx,
-      albumName,
-      tracker,
-      diagnostics,
-      operationId,
-    });
-    if (retry.result) {
-      allResults.push(retry.result);
-      usedModel = retry.usedModel || usedModel;
-    }
-  }
+  const mergedParsed = mergeUnifiedShardMetadata(parsedShards);
 
   allResults.sort((a, b) => a.image_index - b.image_index);
   const finalFailed = safeImgs

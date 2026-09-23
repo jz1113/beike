@@ -173,7 +173,13 @@ async function lookupOneRow(options: {
     signal: AbortSignal.timeout(KEYWORD_REVIEW_LOOKUP_TIMEOUT_MS),
   });
   if (!response.ok) return undefined;
-  const hit = parseLookupResult(extractResponsesText(await response.json()), options.allowed);
+  const data = await response.json();
+  console.info('[KeywordReviewLookupUsage]', JSON.stringify({
+    providerRequestId: typeof data.id === 'string' ? data.id : undefined,
+    model: options.model,
+    usage: data.usage || null,
+  }));
+  const hit = parseLookupResult(extractResponsesText(data), options.allowed);
   if (hit) rememberLookupCategory(options.row.query, hit.category, hit.subject, options.rulesVersion);
   return hit;
 }

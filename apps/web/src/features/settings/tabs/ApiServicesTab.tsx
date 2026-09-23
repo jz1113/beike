@@ -12,6 +12,7 @@ import { ApiServicesLianchiPanel } from '../components/ApiServicesLianchiPanel';
 import { ApiServicesStoragePanel, type ApiServicesStoragePanelProps } from '../components/ApiServicesStoragePanel';
 import { ApiServicesNavList } from '../components/ApiServicesNavList';
 import { useModelDragSort } from '../hooks/useModelDragSort';
+import type { ComflyPriceMap } from '../multimodalPriceSort';
 import { settingsPanelPad, settingsPanelContainer } from '@/shared/ui/layoutClasses';
 
 export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
@@ -63,6 +64,9 @@ export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
   handleMoveModel?: (modelId: string, direction: 'up' | 'down' | 'top') => void;
   handleReorderModels?: (newOrder: WorkflowModel[]) => void;
   handleResetDefaultModels: () => void;
+  comflyPrices: ComflyPriceMap | null;
+  isFetchingPrices: boolean;
+  handleSortByComflyPrice: () => void;
   setIsAddingModelModalOpen: (v: boolean) => void;
   wanbangKey: string;
   setWanbangKey: (v: string) => void;
@@ -143,6 +147,9 @@ export default function ApiServicesTab({
   handleMoveModel,
   handleReorderModels,
   handleResetDefaultModels,
+  comflyPrices,
+  isFetchingPrices,
+  handleSortByComflyPrice,
   setIsAddingModelModalOpen,
   wanbangKey,
   setWanbangKey,
@@ -317,6 +324,9 @@ export default function ApiServicesTab({
               handleDeleteModel={handleDeleteModel}
               handleMoveModel={handleMoveModel || onMoveModel}
               handleResetDefaultModels={handleResetDefaultModels}
+              comflyPrices={comflyPrices}
+              isFetchingPrices={isFetchingPrices}
+              handleSortByComflyPrice={handleSortByComflyPrice}
               handleOpenGatewayDiscovery={handleOpenGatewayDiscovery}
               isFetchingGateway={isFetchingGateway}
               allGatewayModels={allGatewayModels}

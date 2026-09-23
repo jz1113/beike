@@ -7,10 +7,12 @@ export interface ModelPricingRule {
   perSecPrice?: number;
 }
 
-/** 仅收录当前白名单模型的报价，避免过时模型污染用量统计 */
+/** 文本模型使用 Comfly 默认分组报价快照（฿/K token）；实际扣费以所用分组账单为准。 */
 export const COMFY_MODEL_PRICING: Record<string, ModelPricingRule> = {
-  'gpt-5.6-luna': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.0025, completionPer1k: 0.015 },
-  'gpt-5.6-sol': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.0025, completionPer1k: 0.015 },
+  'gpt-6-luna': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.0001, completionPer1k: 0.0005 },
+  'gpt-6-sol': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.002, completionPer1k: 0.01 },
+  'gpt-5.6-luna': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.001, completionPer1k: 0.006 },
+  'gpt-5.6-sol': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.005, completionPer1k: 0.03 },
   'gpt-5.6-terra': { vendor: 'OpenAI', type: 'vision', promptPer1k: 0.0025, completionPer1k: 0.015 },
   'gpt-5.4-mini': { vendor: 'OpenAI', type: 'chat', promptPer1k: 0.00075, completionPer1k: 0.0045 },
   'gpt-image-2': { vendor: 'OpenAI', type: 'image', fixedPerUnit: 0.06 },
@@ -25,9 +27,9 @@ export const COMFY_MODEL_PRICING: Record<string, ModelPricingRule> = {
   'claude-haiku-4-5-20251001-thinking': { vendor: 'Anthropic', type: 'chat', promptPer1k: 0.001, completionPer1k: 0.005 },
   'claude-sonnet-5': { vendor: 'Anthropic', type: 'chat', promptPer1k: 0.002, completionPer1k: 0.01 },
 
-  'gemini-3.8-flash': { vendor: 'Google', type: 'vision', promptPer1k: 0.0015, completionPer1k: 0.0075 },
-  'gemini-3.7-flash': { vendor: 'Google', type: 'vision', promptPer1k: 0.0015, completionPer1k: 0.0075 },
-  'gemini-3.1-pro-preview': { vendor: 'Google', type: 'vision', promptPer1k: 0.004, completionPer1k: 0.024 },
+  'gemini-3.8-flash': { vendor: 'Google', type: 'vision', promptPer1k: 0.00075, completionPer1k: 0.00375 },
+  'gemini-3.7-flash': { vendor: 'Google', type: 'vision', promptPer1k: 0.00075, completionPer1k: 0.00375 },
+  'gemini-3.1-pro-preview': { vendor: 'Google', type: 'vision', promptPer1k: 0.002, completionPer1k: 0.012 },
   'nano-banana': { vendor: 'Google', type: 'image', fixedPerUnit: 0.08 },
   'nano-banana-pro': { vendor: 'Google', type: 'image', fixedPerUnit: 0.12 },
   'veo3.1': { vendor: 'Google', type: 'video', fixedPerUnit: 7.00 },
@@ -47,7 +49,7 @@ export const COMFY_MODEL_PRICING: Record<string, ModelPricingRule> = {
   'z-image-turbo': { vendor: '阿里百炼', type: 'image', fixedPerUnit: 0.08 },
   'qwen-image': { vendor: '阿里百炼', type: 'image', fixedPerUnit: 0.25 },
   'qwen-image-edit': { vendor: '阿里百炼', type: 'image', fixedPerUnit: 0.30 },
-  'qwen3.8-max': { vendor: '阿里百炼', type: 'chat', promptPer1k: 0.0025, completionPer1k: 0.025 },
+  'qwen3.8-max': { vendor: '阿里百炼', type: 'chat', promptPer1k: 0.012, completionPer1k: 0.036 },
   'wan3.0-video': { vendor: '阿里百炼', type: 'video', perSecPrice: 0.40 },
 
   'midjourney': { vendor: 'Midjourney', type: 'image', fixedPerUnit: 0.22 },
@@ -60,15 +62,16 @@ export const COMFY_MODEL_PRICING: Record<string, ModelPricingRule> = {
   'kling-video-v2-6': { vendor: '快手可灵', type: 'video', fixedPerUnit: 2.50 },
 
   'grok-4.6': { vendor: 'xAI', type: 'chat', promptPer1k: 0.002, completionPer1k: 0.006 },
+  'grok-4.7': { vendor: 'xAI', type: 'chat', promptPer1k: 0.002, completionPer1k: 0.006 },
   'grok-4.1-image': { vendor: 'xAI', type: 'image', fixedPerUnit: 0.10 },
   'grok-4.2-image': { vendor: 'xAI', type: 'image', fixedPerUnit: 0.12 },
   'grok-imagine-image-quality': { vendor: 'xAI', type: 'image', fixedPerUnit: 0.12 },
   'grok-imagine-video-1.5': { vendor: 'xAI', type: 'video', perSecPrice: 0.24 },
 
   'MiniMax-H3': { vendor: 'MiniMax', type: 'video', fixedPerUnit: 2.00 },
-  'deepseek-v4.1-flash': { vendor: 'DeepSeek', type: 'chat', promptPer1k: 0.001, completionPer1k: 0.002 },
+  'deepseek-v4.1-flash': { vendor: 'DeepSeek', type: 'chat', promptPer1k: 0.002, completionPer1k: 0.008 },
   'deepseek-v4-flash': { vendor: 'DeepSeek', type: 'chat', promptPer1k: 0.001, completionPer1k: 0.002 },
-  'kimi-k3': { vendor: '月之暗面', type: 'chat', promptPer1k: 0.004, completionPer1k: 0.021 },
+  'kimi-k3': { vendor: '月之暗面', type: 'chat', promptPer1k: 0.02, completionPer1k: 0.1 },
   'viduq3': { vendor: '生数科技', type: 'video', fixedPerUnit: 1.50 },
   'viduq3-mix': { vendor: '生数科技', type: 'video', fixedPerUnit: 1.50 },
   'viduq3-turbo': { vendor: '生数科技', type: 'video', fixedPerUnit: 1.20 },

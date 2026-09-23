@@ -752,13 +752,14 @@ export const MIN_IMAGES_PER_SET = 3;
 /** 批量导入时，每套图集最多反推图片数（超出截断） */
 export const MAX_IMAGES_PER_SET = 10;
 
-/** Unified 多模态分片默认大小（单套图集一次性单模态全维反推） */
-export const DEFAULT_UNIFIED_SHARD_SIZE = 10;
+/** 每个视觉请求最多处理一个完整的四图内容组，避免长 JSON 超时或截断。 */
+export const DEFAULT_UNIFIED_SHARD_SIZE = 4;
 
 /** 解析 Unified 分片大小（可通过环境变量 ASSET_DECONSTRUCT_SHARD_SIZE 调低） */
 export function resolveUnifiedShardSize(rawEnv?: number): number {
-  if (Number.isFinite(rawEnv) && rawEnv! > 0) {
-    return Math.min(MAX_IMAGES_PER_SET, Math.floor(rawEnv!));
+  const value = rawEnv ?? Number(process.env.ASSET_DECONSTRUCT_SHARD_SIZE);
+  if (Number.isFinite(value) && value > 0) {
+    return Math.min(MAX_IMAGES_PER_SET, Math.floor(value));
   }
   return DEFAULT_UNIFIED_SHARD_SIZE;
 }

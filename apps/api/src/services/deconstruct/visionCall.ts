@@ -1,4 +1,5 @@
-import { gatewayFetch } from '../../gateways/http';
+import { postVisionJson } from './visionTransport';
+import type { DeconstructProgress } from './progress';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
@@ -40,14 +41,16 @@ export async function callVisionJson(params: {
   maxTokens?: number;
   tracker?: VisionCallTracker;
   diagnostics?: VisionCallDiagnostics;
+  onProgress?: (stage: DeconstructProgress['stage'], message: string) => void;
 }): Promise<{ rawJsonText: string; usedModel: string } | null> {
-  const { modelsToTry, targetBaseUrl, targetApiKey, contentArray, label, operationId, maxTokens, tracker, diagnostics } =
+  const { modelsToTry, targetBaseUrl, targetApiKey, contentArray, label, operationId, maxTokens, tracker, diagnostics, onProgress } =
     params;
 
   let hadSuccess = false;
   let hadHttpFailure = false;
   let hadNetworkFailure = false;
 
+  onProgress?.('queued', '正在等待视觉模型调用空位');
   const result = await visionInflightSemaphore.run(async () => {
     console.log(
       `[AssetDeconstruct] ${label} 在飞请求=${visionInflightSemaphore.inFlight}/${resolveMaxInflight()}`
@@ -59,6 +62,7 @@ export async function callVisionJson(params: {
 
       try {
         console.log(`[AssetDeconstruct] ${label} 尝试模型: ${targetModel}`);
+        onProgress?.('analyzing', `正在等待 ${targetModel} 分析图片`);
         const timeoutMs = Math.max(
           resolveVisionTimeoutMs(targetModel, true),
           VISION_EXTRACT_MASTER_TIMEOUT_MS
@@ -69,8 +73,7 @@ export async function callVisionJson(params: {
             const timer = setTimeout(() => controller.abort(), timeoutMs);
 
             try {
-              const resp = await gatewayFetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
-                method: 'POST',
+              const resp = await postVisionJson(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
                 headers: {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${targetApiKey}`,
@@ -91,7 +94,7 @@ export async function callVisionJson(params: {
                 const errText = await resp.text();
                 if (diagnostics) diagnostics.lastError = `HTTP ${resp.status}: ${errText.slice(0, 200)}`;
 
-                if (isRateLimitResponse(resp.status, errText)) {
+                if (isRateLimitResponse(resp.status)) {
                   noteRateLimitHit();
                   if (isQuotaExhausted(errText)) {
                     if (diagnostics) {
@@ -108,6 +111,7 @@ export async function callVisionJson(params: {
                   }
                   const retryAfterMs = parseRetryAfterMs(resp);
                   const waitMs = retryAfterMs ?? RATE_LIMIT_BACKOFF_MS[rateAttempt];
+                  onProgress?.('retry_wait', `${targetModel} 限流，${Math.ceil(waitMs / 1000)} 秒后重试`);
                   console.warn(
                     `[AssetDeconstruct] ${label} 模型 ${targetModel} 限流 (${resp.status})，${Math.ceil(waitMs / 1000)} 秒后重试同一模型 (${rateAttempt + 1}/${MAX_RATE_LIMIT_RETRIES})`
                   );
@@ -131,6 +135,7 @@ export async function callVisionJson(params: {
               const data = await resp.json();
               const content = data.choices?.[0]?.message?.content || '';
               if (content) {
+                onProgress?.('reconciling', '模型已返回，正在解析内容');
                 hadSuccess = true;
                 noteRateLimitSuccess();
                 if (tracker) noteVisionCall(tracker, targetModel);

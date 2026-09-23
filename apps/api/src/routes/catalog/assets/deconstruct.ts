@@ -1,7 +1,7 @@
 import { jsonResponse } from '../../../core/http';
 import { readJsonBody } from '../../../core/validate';
 import { buildPass1VisionModelsToTry, filterVisionCapableModels } from '@beike/domain/vision';
-import { resolveGatewayCreds } from '@beike/domain/gatewayCreds';
+import { GatewayBaseUrlError, resolveGatewayCreds } from '@beike/domain/gatewayCreds';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import {
   normalizeGatewayBaseUrl,
@@ -24,6 +24,16 @@ import { persistDeconstructedAssets, type SavedRecords } from '../../../services
 import { xhsSourceKey } from '@beike/domain/xhsSource';
 import { AppError, errorResponse } from '../../../core/errors';
 import { claimProcessingSource, releaseIncompleteSource } from './source-check';
+import { getDeconstructProgress, updateDeconstructProgress } from '../../../services/deconstruct/progress';
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
+
+const activeDeconstructRequests = new Map<string, Promise<Response>>();
+
+export function GET_PROGRESS(req: Request) {
+  const taskId = new URL(req.url).searchParams.get('clientTaskId') || '';
+  if (!taskId || taskId.length > 160) return jsonResponse({ error: '缺少有效的任务 ID' }, 400);
+  return jsonResponse({ success: true, progress: getDeconstructProgress(taskId) });
+}
 
 // 向后兼容导出（供单元测试与其他调用方使用）
 export {
@@ -58,10 +68,34 @@ export {
 } from '../../../services/deconstruct/concurrency';
 
 export async function POST(req: Request) {
+  let body: Record<string, any>;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return errorResponse(error);
+  }
+  const clientTaskId = typeof body.clientTaskId === 'string' && body.clientTaskId.length <= 160
+    ? body.clientTaskId
+    : '';
+  if (!clientTaskId) return processDeconstructRequest(req, body);
+  const key = `${requireWorkspaceId()}:${clientTaskId}`;
+  const existing = activeDeconstructRequests.get(key);
+  if (existing) return (await existing).clone();
+  const pending = processDeconstructRequest(req, body);
+  activeDeconstructRequests.set(key, pending);
+  try {
+    return (await pending).clone();
+  } finally {
+    activeDeconstructRequests.delete(key);
+  }
+}
+
+async function processDeconstructRequest(req: Request, body: Record<string, any>) {
   let claimedKey: string | undefined;
   let claimedRequestId: string | undefined;
+  let progressId: string | undefined;
+  let completed = false;
   try {
-    const body = await readJsonBody(req);
     const {
       imageUrls = [],
       userHint = '',
@@ -78,6 +112,7 @@ export async function POST(req: Request) {
       reviewRequestId,
       clientTaskId,
     } = body;
+    progressId = typeof clientTaskId === 'string' && clientTaskId.length <= 160 ? clientTaskId : undefined;
 
     const targetCategory =
       (typeof bodyTargetCategory === 'string' && bodyTargetCategory.trim()) ||
@@ -113,7 +148,7 @@ export async function POST(req: Request) {
     }
 
     if (!targetApiKey) {
-      return jsonResponse({ error: '系统尚未配置 AI 视觉接口密钥，请在设置中填入' }, 500);
+      return jsonResponse({ error: '系统尚未配置 AI 视觉接口密钥，请在设置中填入' }, 400);
     }
 
     const primaryModel = typeof model === 'string' ? model : undefined;
@@ -130,6 +165,7 @@ export async function POST(req: Request) {
     const visionTracker = createVisionCallTracker();
     const visionDiagnostics = createVisionCallDiagnostics('unified');
     const pipelineStart = Date.now();
+    updateDeconstructProgress(progressId, 'preparing', `正在准备 ${Math.min(imageUrls.length, MAX_IMAGES_PER_SET)} 张图片`);
 
     console.log(
       `[AssetDeconstruct]${albumName ? ` 套组「${albumName}」` : ''} 收到图集反推请求: 总图片数=${imageUrls.length}，模型链=${pass1Models.join(' → ')}，网关=${targetBaseUrl}`
@@ -138,6 +174,7 @@ export async function POST(req: Request) {
     const convertStart = Date.now();
     const targetImgs = imageUrls.slice(0, MAX_IMAGES_PER_SET);
     const safeImgs = await convertImagesInBatches(targetImgs);
+    updateDeconstructProgress(progressId, 'queued', `图片准备完成 ${safeImgs.length}/${targetImgs.length}，等待视觉模型`);
     const isSingleImage = safeImgs.length === 1;
     console.log(`[AssetDeconstruct] 图片预处理耗时 ${Date.now() - convertStart}ms (有效成功: ${safeImgs.length}/${targetImgs.length})`);
 
@@ -181,7 +218,9 @@ export async function POST(req: Request) {
       tracker: visionTracker,
       diagnostics: visionDiagnostics,
       operationId: typeof clientTaskId === 'string' ? clientTaskId : undefined,
+      onProgress: (stage, message) => updateDeconstructProgress(progressId, stage, message),
     });
+    updateDeconstructProgress(progressId, 'reconciling', '正在整理反推结果');
     console.log(`[AssetDeconstruct] Unified 阶段耗时 ${Date.now() - unifiedStart}ms`);
 
     const unifiedFailed =
@@ -240,6 +279,7 @@ export async function POST(req: Request) {
     };
 
     if (autoSave && parsedResult) {
+      updateDeconstructProgress(progressId, 'saving', '正在保存提示词资产');
       const dbSaveStart = Date.now();
       const category = (parsedResult.theme_category as string) || 'general';
       savedRecords = await persistDeconstructedAssets({
@@ -258,6 +298,8 @@ export async function POST(req: Request) {
       `[AssetDeconstruct]${albumName ? ` 套组「${albumName}」` : ''} 管线总耗时 ${Date.now() - pipelineStart}ms，多模调用 ${visionTracker.callCount} 次（分片 ${shardCount}），模型=${visionTracker.modelsUsed.join(' → ') || usedModel}`
     );
 
+    updateDeconstructProgress(progressId, 'completed', '反推完成');
+    completed = true;
     return jsonResponse({
       success: true,
       partial,
@@ -288,8 +330,10 @@ export async function POST(req: Request) {
     });
   } catch (error: unknown) {
     if (claimedKey && claimedRequestId) await releaseIncompleteSource(claimedKey, claimedRequestId).catch(() => {});
-    if (error instanceof AppError) return errorResponse(error);
+    if (error instanceof AppError || error instanceof GatewayBaseUrlError) return errorResponse(error);
     console.error('[AssetDeconstruct] 异常:', error);
     return jsonResponse({ error: formatUserError(error) }, 500);
+  } finally {
+    if (!completed) updateDeconstructProgress(progressId, 'failed', '反推未完成，请查看任务错误信息');
   }
 }

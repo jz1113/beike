@@ -258,13 +258,10 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
     let usedModel = '';
     let copyUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null = null;
 
-    for (const model of modelsToTry) {
+    modelAttempts: for (const model of modelsToTry) {
       // 尝试调用模型（先尝试多模态，若因模型不支持 image_url 报 400 则自动降级为纯文本）
       for (const attemptContent of [userMessageContent, userPrompt]) {
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 18000);
-
           const upstreamRes = await gatewayFetch(`${normalizeGatewayBaseUrl(baseUrl)}/v1/chat/completions`, {
             method: 'POST',
             headers: {
@@ -280,10 +277,8 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
               temperature: 0.7,
               response_format: { type: 'json_object' }
             }),
-            signal: controller.signal
+            signal: AbortSignal.timeout(18000)
           });
-
-          clearTimeout(timeoutId);
 
           if (!upstreamRes.ok) {
             const errText = await upstreamRes.text().catch(() => '');
@@ -292,7 +287,8 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
             if (attemptContent !== userPrompt && upstreamRes.status === 400) {
               continue;
             }
-            break;
+            if (upstreamRes.status === 404) continue modelAttempts;
+            break modelAttempts;
           }
 
           const data = await upstreamRes.json();
@@ -310,8 +306,11 @@ ${extraRequirements ? `- 补充要求：${extraRequirements}` : ''}
               break;
             }
           }
+          lastError = new Error(`模型 ${model} 已返回但文案格式无效；为避免重复计费，未自动切换模型`);
+          break modelAttempts;
         } catch (err) {
           lastError = err;
+          break modelAttempts;
         }
       }
 

@@ -22,6 +22,7 @@ import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
 import WorkflowModelRow from '../WorkflowModelRow';
 import type { WorkflowModel } from '../settingsShared';
+import type { ComflyPriceMap } from '../multimodalPriceSort';
 
 export interface ApiServicesGatewayPanelProps {
   isGatewayEnabled: boolean;
@@ -48,6 +49,9 @@ export interface ApiServicesGatewayPanelProps {
   handleDeleteModel: (modelId: string) => void;
   handleMoveModel?: (modelId: string, direction: 'up' | 'down' | 'top') => void;
   handleResetDefaultModels: () => void;
+  comflyPrices: ComflyPriceMap | null;
+  isFetchingPrices: boolean;
+  handleSortByComflyPrice: () => void;
   handleOpenGatewayDiscovery: () => void;
   isFetchingGateway: boolean;
   allGatewayModels: unknown[];
@@ -81,6 +85,9 @@ export function ApiServicesGatewayPanel({
   handleDeleteModel,
   handleMoveModel,
   handleResetDefaultModels,
+  comflyPrices,
+  isFetchingPrices,
+  handleSortByComflyPrice,
   handleOpenGatewayDiscovery,
   isFetchingGateway,
   allGatewayModels,
@@ -258,6 +265,16 @@ export function ApiServicesGatewayPanel({
 
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
+              type="button"
+              onClick={handleSortByComflyPrice}
+              disabled={isFetchingPrices}
+              className="px-2.5 py-1.5 rounded-xl border border-indigo-200/70 hover:bg-indigo-50 text-indigo-700 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+              title="获取 Comfly 默认分组当前报价，按各 1K 输入和输出 token 的价格之和升序排列多模态模型"
+            >
+              <RefreshCw className={`w-3 h-3 ${isFetchingPrices ? 'animate-spin' : ''}`} />
+              按 Comfly 价格排序
+            </button>
+            <button
               onClick={handleResetDefaultModels}
               className="px-2.5 py-1.5 rounded-xl border border-slate-200/80 hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
               title="恢复系统出厂预设模型列表"
@@ -392,7 +409,9 @@ export function ApiServicesGatewayPanel({
           <div className="px-3.5 py-2 bg-slate-50/70 border-b border-slate-100 text-[11px] text-slate-500 font-medium flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>自上而下决定主调与降级优先级，支持拖拽行或上下箭头调序</span>
+              <span>{modelCapabilityFilter === 'multimodal'
+                ? '按 Comfly 默认分组各 1K 输入与输出 token 报价之和升序；可手动调序，实际扣费以所用分组账单为准'
+                : '自上而下决定主调与降级优先级，支持拖拽行或上下箭头调序'}</span>
             </div>
             <span className="text-[10px] text-slate-400 font-mono shrink-0 hidden sm:inline">
               {modelCapabilityFilter === 'all' ? '全局综合排序' : '分类独立排序'}
@@ -411,6 +430,7 @@ export function ApiServicesGatewayPanel({
               <WorkflowModelRow
                 key={m.id}
                 model={m}
+                price={comflyPrices?.[m.id.toLowerCase()]}
                 index={index}
                 isFirst={index === 0}
                 isLast={index === filteredModels.length - 1}

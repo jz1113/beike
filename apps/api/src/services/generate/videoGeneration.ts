@@ -12,6 +12,7 @@ import { formatUserError } from '@beike/domain/upstreamErrors';
 import { cleanPromptText } from '@beike/domain/drawing';
 import { resolveCredentials } from '../gatewayCredentials';
 import { videoTaskEndpointCache } from './videoGenerationTypes';
+import { canTryAnotherSubmissionEndpoint } from './submissionPolicy';
 
 /**
  * POST /api/generate/video
@@ -174,17 +175,25 @@ async function submit(req: Request) {
             `HTTP ${res.status}`;
           lastErrorMsg = errDetail;
           console.warn(`[AI视频-提交] 端点 ${submitUrl} 未被接受 (HTTP ${res.status}):`, JSON.stringify(data || errDetail));
+          if (res.ok || res.status >= 500) {
+            return jsonResponse({
+              success: false,
+              error: '视频提交结果不确定，请核对上游任务记录后再决定是否重试',
+              submissionUnknown: true,
+            }, 503);
+          }
+          // Only an explicit missing endpoint or unsupported media type permits
+          // another submission URL. Other responses may follow a billable task.
+          if (!canTryAnotherSubmissionEndpoint(res.status)) break;
         }
       } catch (err: any) {
         lastErrorMsg = err.message || String(err);
         console.warn(`[AI视频-提交] 连接 ${submitUrl} 异常: ${err.message}`);
-        if (/timeout|timed out|aborted/i.test(lastErrorMsg)) {
-          return jsonResponse({
-            success: false,
-            error: formatUserError(err, '视频任务提交超时，请查询原任务状态后再决定是否重试'),
-            submissionUnknown: true,
-          }, 503);
-        }
+        return jsonResponse({
+          success: false,
+          error: formatUserError(err, '视频任务提交结果不确定，请核对上游任务记录后再决定是否重试'),
+          submissionUnknown: true,
+        }, 503);
       }
     }
     gatewayMs = Date.now() - tGw0;

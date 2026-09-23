@@ -1,6 +1,9 @@
 import * as XLSX from 'xlsx';
 import { KEYWORD_REVIEW_REJECT_PREFIXES, type KeywordReviewResult, type KeywordReviewRow } from '@beike/contracts/generate';
 import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';
+
+export { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';
 
 export type KeywordReviewStatus = 'idle' | 'running' | 'done' | 'error';
 
@@ -476,7 +479,7 @@ export function buildReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: Ke
 }
 
 export async function exportReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: KeywordReviewRecord[], partial = false) {
-  const workbook = buildReviewedWorkbook(parsed, records);
+  const workbook = partial ? buildReviewedWorkbook(parsed, records) : buildMergedReviewedWorkbook(parsed, records);
   const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const base = parsed.fileName.replace(/\.(xlsx|xls|csv)$/i, '') || '关键词表';

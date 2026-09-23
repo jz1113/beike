@@ -1,5 +1,4 @@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
-import { setTimeout as delay } from 'node:timers/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -76,7 +75,7 @@ export async function shortlistImages(options: {
     }
     onProgress(`正在筛选素材 ${offset+1}–${offset+batch.length}，已保存 ${saved.size}/${images.length} 张`);
     let valid: RatedImage[] | undefined;
-    for (let attempt = 0; attempt < 2 && !valid; attempt++) {
+    for (let attempt = 0; attempt < 1 && !valid; attempt++) {
       const response = await (options.fetcher || fetch)(`${normalizeGatewayBaseUrl(baseUrl)}/v1/chat/completions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000),
@@ -94,24 +93,20 @@ export async function shortlistImages(options: {
           await evaluate(offset + middle, batch.slice(middle));
           return;
         }
-        if ((response.status === 429 || response.status >= 500) && attempt === 0) {
-          await delay(1000, undefined, { signal });
-          continue;
-        }
         throw new Error(`素材 ${offset+1}–${offset+batch.length} 视觉请求失败（HTTP ${response.status}）。${response.status === 400 ? '可能是图片无法读取或模型请求不兼容；可更换视觉模型后重试。' : ''}已保存 ${saved.size}/${images.length} 张进度，点击“继续重试”可复用已完成结果。`);
       }
       const data = await response.json();
       try {
         const raw = String(data.choices?.[0]?.message?.content || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed) || parsed.length !== batch.length) continue;
+        if (!Array.isArray(parsed) || parsed.length !== batch.length) break;
         const ids = new Set<number>();
         if (parsed.every((entry) => Number.isInteger(entry.id) && entry.id > offset && entry.id <= offset + batch.length &&
           !ids.has(entry.id) && Boolean(ids.add(entry.id)) && typeof entry.score === 'number' && Number.isFinite(entry.score) && entry.score >= 0 && entry.score <= 100 &&
           typeof entry.readable === 'boolean' && typeof entry.reason === 'string')) {
           valid = parsed.map((entry) => ({ id: entry.id, score: entry.readable ? entry.score : 0, readable: entry.readable, reason: entry.reason.slice(0,160) }));
         }
-      } catch { /* 重试一次，避免丢失未返回的素材 */ }
+      } catch { /* A malformed paid response must not be replayed automatically. */ }
     }
     if (!valid) throw new Error('模型未返回完整的逐图筛选结果，请重试；没有把缺失的结果当作已分析。');
     for (const row of valid) saved.set(row.id, row);

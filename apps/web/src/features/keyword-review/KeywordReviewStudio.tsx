@@ -94,6 +94,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const filterLabels: Record<KeywordReviewFilter, string> = { all: '全部', done: '已完成', producible: '可制作', rejected: '不制作' };
   const selectedRecord = review.records.find((record) => record.id === selectedRecordId);
   const selectedColumns = review.parsed?.sheets.find((sheet) => sheet.name === selectedRecord?.sheetName)?.outputColumns ?? displayColumns;
+  const showBalanceAmount = Boolean(review.balance && review.balanceUpdatedAt && !review.balanceDirty && !review.balanceError && Date.now() - review.balanceUpdatedAt < 45_000);
 
   const receiveFile = (file?: File) => {
     if (file) void review.importFile(file);
@@ -111,14 +112,14 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             <BookOpen className="h-4 w-4" />
             审核规则
           </button>
-          <span
-            className="hidden rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 sm:inline-flex sm:items-center sm:gap-1.5"
-            title={review.balance
-              ? `赠金 ${review.balance.granted} · 充值 ${review.balance.toppedUp}`
-              : review.balanceError || `当前模型：${review.model}`}
+          <button
+            type="button"
+            onClick={() => review.refreshBalance(true)}
+            className="hidden rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 sm:inline-flex sm:items-center sm:gap-1.5 hover:border-slate-300"
+            title={`${review.balance ? `赠金 ${review.balance.granted} · 充值 ${review.balance.toppedUp} · ` : ''}${review.balanceUpdatedAt ? `上次同步 ${new Date(review.balanceUpdatedAt).toLocaleTimeString('zh-CN')}` : '尚未同步'}${review.balanceError ? ` · 查询失败：${review.balanceError}` : ''} · 点击刷新`}
           >
             {review.model}
-            {review.balance && (
+            {showBalanceAmount && review.balance && (
               <>
                 <span className="text-slate-300">·</span>
                 <span className={`tabular-nums ${!review.balance.available || Number(review.balance.total) <= 0 ? 'text-amber-600' : ''}`}>
@@ -126,7 +127,10 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                 </span>
               </>
             )}
-          </span>
+            <span className={review.balanceError ? 'text-amber-600' : 'text-slate-400'}>
+              {review.balanceRefreshing ? '同步中' : review.balanceError || !showBalanceAmount ? '余额待更新' : `截至 ${new Date(review.balanceUpdatedAt!).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`}
+            </span>
+          </button>
           {onOpenSettings && (
             <button type="button" onClick={onOpenSettings} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-600 shadow-sm transition hover:bg-white hover:text-slate-950" title="配置 DeepSeek API Key" aria-label="配置 DeepSeek API Key">
               <Settings2 className="h-4 w-4" />

@@ -177,7 +177,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
         accept=".csv,.txt,.tsv,.xlsx,.xls"
         onChange={batch.handleFileUpload}
         className="hidden"
-        aria-hidden="true"
       />
 
       <div

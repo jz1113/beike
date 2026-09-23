@@ -7,6 +7,7 @@ import {
 } from './keywordReviewLookup';
 import { normalizeCategoryReason, normalizeRejectReason } from './keywordReviewReasons';
 import { formatKeywordReviewRuleAdditions } from './keywordReviewRules';
+import { deepSeekResponseError } from './keywordReviewUpstreamError';
 import type { KeywordReviewRuleEntry } from '@beike/contracts/generate';
 
 export const KEYWORD_REVIEW_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
@@ -142,8 +143,16 @@ export async function reviewKeywordRows(options: {
     }),
     signal: AbortSignal.timeout(120_000),
   });
-  if (!response.ok) throw new Error(`关键词审核模型 ${options.model} 返回 HTTP ${response.status}`);
+  if (!response.ok) throw await deepSeekResponseError(response);
   const data = await response.json();
+  // Record provider usage before validating the answer: malformed output can
+  // still be billed, and successful-only accounting hides that expense.
+  console.info('[KeywordReviewUsage]', JSON.stringify({
+    providerRequestId: typeof data.id === 'string' ? data.id : undefined,
+    model: options.model,
+    rowCount: options.rows.length,
+    usage: data.usage || null,
+  }));
   const finishReason = String(data.choices?.[0]?.finish_reason || '');
   if (finishReason === 'length') {
     throw new SyntaxError(`关键词审核模型 ${options.model} 输出被截断，本批结果未写入`);
@@ -217,7 +226,8 @@ export async function fetchDeepSeekBalance(options: {
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/user/balance`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${options.apiKey}` },
+    signal: AbortSignal.timeout(8_000),
   });
-  if (!response.ok) throw new Error(`DeepSeek 余额查询返回 HTTP ${response.status}`);
+  if (!response.ok) throw await deepSeekResponseError(response);
   return pickDeepSeekBalance(await response.json());
 }

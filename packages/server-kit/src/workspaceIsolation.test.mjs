@@ -14,6 +14,7 @@ test('two workspaces cannot read each other rows, files, or mutate official cata
   const { PrismaClient } = await import('@prisma/client');
   const { migrateDatabase } = await import('./database/migrations.ts');
   const { extendPrismaWithWorkspace } = await import('./workspaceScope.ts');
+  const { ensurePromptAlbum } = await import('./assetOrganization.ts');
   const { OFFICIAL_WORKSPACE_ID, runWithWorkspace, WorkspaceRequiredError } = await import('./workspaceContext.ts');
   const { persistBufferToStorage } = await import('./persistDataUrl.ts');
   const { isWorkspaceStorageRel } = await import('./storagePaths.ts');
@@ -42,6 +43,18 @@ test('two workspaces cannot read each other rows, files, or mutate official cata
   assert.equal(listA.length, 1);
   assert.equal(listA[0].id, productA.id);
   assert.equal(await runWithWorkspace('ws-a', async () => db.product.findUnique({ where: { id: productB.id } })), null);
+
+  const albumA = await runWithWorkspace('ws-a', () => ensurePromptAlbum(db, {
+    albumName: '反推测试图集', sourceImages: '["image-a"]',
+  }));
+  const albumAAgain = await runWithWorkspace('ws-a', () => ensurePromptAlbum(db, {
+    albumName: '反推测试图集', sourceImages: '["image-a"]',
+  }));
+  const albumB = await runWithWorkspace('ws-b', () => ensurePromptAlbum(db, {
+    albumName: '反推测试图集', sourceImages: '["image-a"]',
+  }));
+  assert.equal(albumAAgain.id, albumA.id);
+  assert.notEqual(albumB.id, albumA.id);
 
   await assert.rejects(
     async () => db.product.findMany(),

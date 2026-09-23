@@ -30,8 +30,8 @@ export function isSafeCustomGatewayBaseUrl(raw: string): boolean {
 }
 
 /**
- * 绘图/视觉网关凭证：生产默认忽略客户端 customBaseUrl，防止 SSRF。
- * 需要例外时设置 ALLOW_CUSTOM_BASE_URL=true。
+ * 非生产环境，或显式打开 ALLOW_CUSTOM_BASE_URL 时，调用方可以放宽地址检查。
+ * 生产网页是否采用浏览器传来的地址，由 isSafeCustomGatewayBaseUrl 决定。
  */
 export function allowClientCustomBaseUrl(): boolean {
   return (
@@ -39,6 +39,14 @@ export function allowClientCustomBaseUrl(): boolean {
     domainEnv('NODE_ENV') !== 'production' ||
     domainEnv('ALLOW_CUSTOM_BASE_URL') === 'true'
   );
+}
+
+export class GatewayBaseUrlError extends Error {
+  readonly status = 400;
+  constructor(message = '当前接口地址与服务器允许的视觉网关不一致。请在设置 → 服务接口配置中改为服务器配置的网关地址，或联系管理员配置该网关；密钥未发送到其他网关。') {
+    super(message);
+    this.name = 'GatewayBaseUrlError';
+  }
 }
 
 /** 生产网页不把服务器环境变量密钥当作所有人的默认密钥。 */
@@ -62,12 +70,10 @@ export function resolveGatewayCreds(
   const headerBase = req.headers.get('x-custom-base-url')?.trim() || '';
   const bodyBase = body?.customBaseUrl?.trim() || '';
   const clientBase = bodyBase || headerBase;
-  const ignoredClientBase = Boolean(clientBase) && (!allowClientCustomBaseUrl() || !isSafeCustomGatewayBaseUrl(clientBase));
-  const customBaseUrl = allowClientCustomBaseUrl() && isSafeCustomGatewayBaseUrl(clientBase) ? clientBase : '';
-
-  if (!allowClientCustomBaseUrl() && customApiKey && clientBase && normalizeBase(clientBase) !== normalizeBase(defaults.baseUrl)) {
-    throw new Error('当前接口地址与服务器允许的视觉网关不一致。请在设置 → 服务接口配置中改为服务器配置的网关地址，或联系管理员配置该网关；密钥未发送到其他网关。');
-  }
+  const clientBaseSafe = Boolean(clientBase) && (allowClientCustomBaseUrl() || isSafeCustomGatewayBaseUrl(clientBase));
+  if (clientBase && !clientBaseSafe) throw new GatewayBaseUrlError();
+  const ignoredClientBase = false;
+  const customBaseUrl = clientBaseSafe ? clientBase : '';
 
   const baseUrl = (customBaseUrl ? normalizeBase(customBaseUrl) : normalizeBase(defaults.baseUrl)) || defaults.baseUrl;
   const usingThirdParty = customBaseUrl && normalizeBase(customBaseUrl) !== normalizeBase(defaults.baseUrl);

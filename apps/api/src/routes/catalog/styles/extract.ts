@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     console.log(`[StyleExtract] 收到全量逆向请求: 总图片数=${imageUrls.length}`);
 
     // 🌟 1. 全量多图分片并发感知理解 (支持 10~100+ 张图片，彻底吃透整批图集的多样性)
-    let shardSummaries: string[] = [];
+    const shardSummaries: string[] = [];
     const SHARD_SIZE = 15;
     
     if (imageUrls.length > 8) {
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
       console.log(`[StyleExtract] 启动全量分片并发分析: 共 ${shards.length} 个分片（总图数 ${imageUrls.length}）`);
 
-      const shardPromises = shards.map(async (shardImgs, shardIdx) => {
+      const runShard = async (shardImgs: string[], shardIdx: number) => {
         const shardPrompt = `你是一位顶级商业视觉美学总监与摄影置景架构师。请仔细观察本批次包含的 ${shardImgs.length} 张参考图片，深度解构该图集所属品类的视觉风格与拍摄置景特征：
 1. 【品类与画面主体定位】：识别图集中展示的商品品类（如：数码3C、服饰穿搭、美妆个护、家居日用、美食饮品、鞋包配饰等）及主体呈现方式；
 2. 【空间置景与材质美感】：空间环境调性（如极简微水泥/温暖原木阳光角/轻奢大理石/现代奶油风/清透飘窗/户外自然等）、台面或背景材质质感；
@@ -119,12 +119,13 @@ export async function POST(req: Request) {
           }
         }
         return '';
-      });
+      };
 
-      const shardResults = await Promise.allSettled(shardPromises);
-      shardSummaries = shardResults
-        .filter(r => r.status === 'fulfilled' && r.value)
-        .map(r => (r as PromiseFulfilledResult<string>).value);
+      // Stop launching new paid shards when one request has an uncertain result.
+      for (const [shardIdx, shardImgs] of shards.entries()) {
+        const summary = await runShard(shardImgs, shardIdx);
+        if (summary) shardSummaries.push(summary);
+      }
       
       console.log(`[StyleExtract] 全部分片处理完毕: 成功汇总 ${shardSummaries.length}/${shards.length} 个分片分析报告`);
     }

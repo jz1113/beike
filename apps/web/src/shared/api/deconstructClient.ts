@@ -29,6 +29,7 @@ export interface ProcessDeconstructItemInput {
   targetCategory?: string;
   customSubCategories?: SubCategoryDef[];
   reviewBeforeSave?: boolean;
+  onProgress?: (progress: { stage: string; message: string; startedAt: number; updatedAt: number }) => void;
 }
 
 export type ProcessDeconstructItemResult =
@@ -39,7 +40,25 @@ export type ProcessDeconstructItemResult =
 export async function processDeconstructQueueItem(
   input: ProcessDeconstructItemInput
 ): Promise<ProcessDeconstructItemResult> {
-  const { item, userHint, selectedVisionModel, modelIds, targetCategory, customSubCategories, reviewBeforeSave } = input;
+  const { item, userHint, selectedVisionModel, modelIds, targetCategory, customSubCategories, reviewBeforeSave, onProgress } = input;
+
+  let polling = false;
+  const pollProgress = async () => {
+    if (!onProgress || polling) return;
+    polling = true;
+    try {
+      const response = await apiFetch(`/api/catalog/assets/deconstruct/progress?clientTaskId=${encodeURIComponent(item.id)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.progress) onProgress(data.progress);
+      }
+    } catch {
+      /* The main POST still owns the task outcome. */
+    } finally {
+      polling = false;
+    }
+  };
+  const progressTimer = onProgress ? window.setInterval(() => { void pollProgress(); }, 1500) : null;
 
   try {
     const res = await fetchDeconstructWithRetry({
@@ -98,5 +117,7 @@ export async function processDeconstructQueueItem(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '反推异常';
     return { ok: false, error: message };
+  } finally {
+    if (progressTimer !== null) window.clearInterval(progressTimer);
   }
 }

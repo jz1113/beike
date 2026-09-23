@@ -41,6 +41,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
     queueConcurrency,
     handleQueueConcurrencyChange,
     processingQueueCount,
+    progressById,
+    elapsedSeconds,
     lastExportedCsvFilename,
     fileInputRef,
     folderInputRef,
@@ -71,6 +73,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
   const isBusy = isParsingXhsLinks || isDeconstructing;
   // 首次采集和追加采集时显示编辑器；采集完成后把空间完全让给图集选择。
   const shouldShowXhsLinkInput = showXhsLinkInput || queue.length === 0 || isParsingXhsLinks;
+  const completedCount = queue.filter((item) => item.status === 'done' || item.status === 'error').length;
+  const activeProgress = queue.find((item) => item.status === 'processing' && progressById[item.id]);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const gutterRef = React.useRef<HTMLDivElement>(null);
@@ -386,6 +390,21 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
           {/* 待反推图集清单（Queue List，仅在队列有项时展开） */}
           {queue.length > 0 && (
             <div className="space-y-4 pt-1">
+              {isDeconstructing && (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3" role="status" aria-live="polite">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-indigo-800">
+                    <span>反推进度：已完成 {completedCount}/{queue.length} 套 · 正在处理 {processingQueueCount} 套</span>
+                    <span>已用时 {Math.floor(elapsedSeconds / 60)} 分 {elapsedSeconds % 60} 秒</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-indigo-100" role="progressbar" aria-valuemin={0} aria-valuemax={queue.length} aria-valuenow={completedCount}>
+                    <div className="h-full bg-indigo-500 transition-all" style={{ width: `${queue.length ? completedCount / queue.length * 100 : 0}%` }} />
+                  </div>
+                  <p className="mt-2 text-[11px] text-indigo-700">
+                    {activeProgress ? progressById[activeProgress.id].message : '正在提交或等待当前图集任务'}
+                    {processingQueueCount > 0 ? ' · 单套视觉分析可能需要数分钟' : ''}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-slate-800">
                   <Layers className="w-4 h-4 text-indigo-500" />
@@ -439,10 +458,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
                             共 {item.images.length} 张图片
-                            {item.status === 'processing' &&
-                              (idx === currentQueueIndex
-                                ? ` · 正在逐图反推 ${item.images.length} 张...`
-                                : ' · 排队等待中...')}
+                            {item.status === 'processing' && ` · ${progressById[item.id]?.message || '请求已提交，等待服务端处理'}`}
+                            {item.status === 'pending' && isDeconstructing && ' · 等待开始'}
                             {item.status === 'done' && formatDeconstructSummary(item)}
                             {item.status === 'error' && ` · 失败: ${item.error}`}
                           </div>
@@ -552,9 +569,9 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
               <span className="text-[11px] font-medium text-slate-500 shrink-0">并发</span>
               <select
                 value={queueConcurrency}
-                disabled={isDeconstructing}
                 onChange={(e) => handleQueueConcurrencyChange(Number(e.target.value) || 4)}
                 className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                title="运行中调整会影响尚未开始的图集；已发出的请求会继续完成"
               >
                 <option value={1}>1</option>
                 <option value={2}>2</option>

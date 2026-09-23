@@ -14,7 +14,7 @@ export function readQueueConcurrency(): number {
   try {
     const raw = localStorage.getItem(DECONSTRUCT_QUEUE_CONCURRENCY_KEY);
     const n = Number(raw);
-    if (Number.isFinite(n) && n >= 1) return 1;
+    if (Number.isFinite(n) && n >= 1) return Math.min(8, Math.floor(n));
   } catch {
     /* ignore */
   }

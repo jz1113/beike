@@ -15,7 +15,7 @@ test('normalizeCategoryReason trims and clips to 28 characters', () => {
 test('normalizeRejectReason keeps empty string for producible rows', () => {
   assert.equal(normalizeRejectReason('制作', ''), '');
   assert.equal(normalizeRejectReason('制作', '   '), '');
-  assert.throws(() => normalizeRejectReason('制作', '简单问答：只确认一个身份'), /可制作行/);
+  assert.equal(normalizeRejectReason('制作', '简单问答：只确认一个身份'), '');
 });
 
 test('normalizeRejectReason requires a known prefix and a hit', () => {

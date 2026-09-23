@@ -7,6 +7,7 @@ import {
   fetchWithRetry,
   shouldUseEditsSubmit,
 } from '../../../services/gatewayCredentials';
+import { canTryAnotherSubmissionEndpoint } from '../../../services/generate/submissionPolicy';
 import './poll';
 
 const IMAGE_SUBMIT_TIMEOUT_MS = 45_000;
@@ -159,7 +160,7 @@ export async function dispatchSubmitCandidates(options: {
       console.warn(`[AI生图-提交] 端点 ${url} 未被接受 (${submitMode}): ${lastErrorMsg}`);
       // Only explicit endpoint/format rejection permits another submission endpoint.
       // Quota errors, server failures, and unrecognized 2xx may already have side effects.
-      if (![404, 405, 415].includes(res.status)) break;
+      if (!canTryAnotherSubmissionEndpoint(res.status)) break;
     } catch (err: any) {
       lastErrorMsg = err?.message || String(err);
       const errName = err?.name || 'Error';

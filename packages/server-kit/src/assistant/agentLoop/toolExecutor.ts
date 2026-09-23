@@ -168,7 +168,9 @@ export async function runNonStreamingToolRound(
       const choiceMsg = data?.choices?.[0]?.message;
       const toolCalls = choiceMsg?.tool_calls;
       if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-        return { toolCalls: [], modelUsed: tryModel, content: typeof choiceMsg?.content === 'string' ? choiceMsg.content : undefined };
+        const content = typeof choiceMsg?.content === 'string' ? choiceMsg.content : undefined;
+        if (!content?.trim()) throw new Error('模型已返回但内容为空，结果可能已计费，已停止自动补发');
+        return { toolCalls: [], modelUsed: tryModel, content };
       }
       return { toolCalls, modelUsed: tryModel, content: typeof choiceMsg?.content === 'string' ? choiceMsg.content : undefined };
     } catch (error) {

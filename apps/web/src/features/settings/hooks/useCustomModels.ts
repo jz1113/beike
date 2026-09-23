@@ -12,6 +12,16 @@ import {
   sortModelsByMultimodalPriority,
 } from '@beike/domain/workflowModels';
 import { loadCustomModels, persistCustomModels } from '../customModelsStorage';
+import { sortMultimodalModelsByPrice, type ComflyPriceMap } from '../multimodalPriceSort';
+
+async function fetchComflyPrices(): Promise<ComflyPriceMap> {
+  const response = await apiFetch('/api/system/models/pricing');
+  const data = await response.json();
+  if (!response.ok || !data?.success || !data.prices || typeof data.prices !== 'object') {
+    throw new Error(data?.error || '无法获取 Comfly 默认分组报价');
+  }
+  return data.prices as ComflyPriceMap;
+}
 
 interface UseCustomModelsOptions {
   isOpen: boolean;
@@ -29,6 +39,8 @@ export function useCustomModels({
   const [customModels, setCustomModels] = useState<WorkflowModel[]>([]);
   const [modelSearch, setModelSearch] = useState('');
   const [modelCapabilityFilter, setModelCapabilityFilter] = useState<'all' | 'multimodal' | 'image' | 'video'>('all');
+  const [comflyPrices, setComflyPrices] = useState<ComflyPriceMap | null>(null);
+  const [isFetchingPrices, setIsFetchingPrices] = useState(false);
 
   // 网关发现模态窗状态
   const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
@@ -56,16 +68,65 @@ export function useCustomModels({
       const models = needsLianchiMigration && !loaded.models.some(model => model.id === lianchiModel?.id)
         ? [...loaded.models, lianchiModel!]
         : loaded.models;
-      const renamed = models.map(model => model.id === 'openai/gpt-image-2' && model.name === 'GPT Image 2（联池）'
+      const needsGpt6Migration = !loaded.invalid && !localStorage.getItem('gpt6_multimodal_models_added_v1');
+      const gpt6Models = needsGpt6Migration
+        ? DEFAULT_PRESET_MODELS.filter(model => ['gpt-6-luna', 'gpt-6-sol'].includes(model.id) && !models.some(existing => existing.id === model.id))
+        : [];
+      const needsGrok47Migration = !loaded.invalid && !localStorage.getItem('grok47_multimodal_model_added_v1');
+      const grok47Model = needsGrok47Migration
+        ? DEFAULT_PRESET_MODELS.find(model => model.id === 'grok-4.7' && ![...models, ...gpt6Models].some(existing => existing.id === model.id))
+        : undefined;
+      const renamed = [...models, ...gpt6Models, ...(grok47Model ? [grok47Model] : [])].map(model => model.id === 'openai/gpt-image-2' && model.name === 'GPT Image 2（联池）'
         ? { ...model, name: '联池image2', shortName: '联池image2' }
         : model);
-      setCustomModels(renamed);
-      if (!loaded.invalid && persistCustomModels(renamed) && needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
+      const needsPriceOrderMigration = !loaded.invalid && !localStorage.getItem('multimodal_price_order_v3');
+      const ordered = needsPriceOrderMigration
+        ? sortMultimodalModelsByPrice(renamed)
+        : renamed;
+      setCustomModels(ordered);
+      if (!loaded.invalid && persistCustomModels(ordered)) {
+        if (needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
+        if (needsGpt6Migration) localStorage.setItem('gpt6_multimodal_models_added_v1', 'true');
+        if (needsGrok47Migration) localStorage.setItem('grok47_multimodal_model_added_v1', 'true');
+        if (needsPriceOrderMigration) localStorage.setItem('multimodal_price_order_v3', 'true');
+      }
+      void fetchComflyPrices().then((prices) => {
+        setComflyPrices(prices);
+        if (needsPriceOrderMigration) {
+          setCustomModels((previous) => {
+            const sorted = sortMultimodalModelsByPrice(previous, prices);
+            persistCustomModels(sorted);
+            return sorted;
+          });
+          notifyModelsUpdated();
+        }
+      }).catch(() => {
+        // 离线时保留 PDF 报价快照；用户可随时主动刷新价格排序。
+      });
       if (loaded.invalid) {
         showToast(loaded.recoveredFromBackup ? '自定义模型配置已损坏，已从备份恢复' : '自定义模型配置已损坏，已保留当前列表并备份原数据');
       }
     }
   }, [isOpen]);
+
+  const handleSortByComflyPrice = async () => {
+    setIsFetchingPrices(true);
+    try {
+      const prices = await fetchComflyPrices();
+      setComflyPrices(prices);
+      setCustomModels((previous) => {
+        const sorted = sortMultimodalModelsByPrice(previous, prices);
+        persistCustomModels(sorted);
+        return sorted;
+      });
+      notifyModelsUpdated();
+      showToast('已按 Comfly 默认分组最新报价重新排序');
+    } catch (error) {
+      showToast(`获取 Comfly 报价失败：${error instanceof Error ? error.message : '网络连接异常'}`);
+    } finally {
+      setIsFetchingPrices(false);
+    }
+  };
 
   // 单个模型切换能力标签
   const handleToggleCapability = (
@@ -313,6 +374,9 @@ export function useCustomModels({
     setModelSearch,
     modelCapabilityFilter,
     setModelCapabilityFilter,
+    comflyPrices,
+    isFetchingPrices,
+    handleSortByComflyPrice,
     handleToggleCapability,
     handleDeleteModel,
     handleMoveModel,

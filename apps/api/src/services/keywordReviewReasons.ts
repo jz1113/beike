@@ -18,7 +18,6 @@ export function normalizeCategoryReason(value: unknown): string {
 export function normalizeRejectReason(producible: '制作' | '不制作', value: unknown): string {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   if (producible === '制作') {
-    if (text) throw new SyntaxError('可制作行不应返回不制作依据');
     return '';
   }
   const prefix = KEYWORD_REVIEW_REJECT_PREFIXES.find((item) => text.startsWith(`${item}：`) || text.startsWith(`${item}:`));

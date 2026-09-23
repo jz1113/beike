@@ -11,20 +11,22 @@ import {
 import { applyBatchResults, countReviewRecords, isRecoverableModelOutputError, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
-export const KEYWORD_REVIEW_CONCURRENCY = 32;
+export const KEYWORD_REVIEW_CONCURRENCY = 1;
 export const KEYWORD_REVIEW_MODEL = 'deepseek-flash';
 export const KEYWORD_REVIEW_MODEL_LABEL = 'DeepSeek Flash';
 export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected';
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const PREVIEW_LIMIT = 240;
 const REVIEW_REQUEST_TIMEOUT_MS = 150_000;
-const REVIEW_MAX_ATTEMPTS = 3;
+const BALANCE_REFRESH_INTERVAL_MS = 15_000;
+const BALANCE_REQUEST_TIMEOUT_MS = 12_000;
 
 type ReviewResponse = {
   success?: boolean;
   results?: KeywordReviewResult[];
   lookedUp?: number;
   error?: string;
+  code?: string;
 };
 
 type BalanceResponse = {
@@ -37,45 +39,31 @@ type BalanceResponse = {
   error?: string;
 };
 
-async function waitForRetry(ms: number, signal: AbortSignal) {
-  await new Promise<void>((resolve, reject) => {
-    if (signal.aborted) { reject(signal.reason); return; }
-    const onAbort = () => { clearTimeout(timer); reject(signal.reason); };
-    const timer = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve(); }, ms);
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-}
-
 async function requestReviewBatch(
   body: string,
   signal: AbortSignal,
-  onRetry: (attempt: number, message: string) => void,
+  idempotencyKey: string,
 ): Promise<ReviewResponse> {
-  for (let attempt = 1; attempt <= REVIEW_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await apiFetch('/api/generate/keyword-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        signal: AbortSignal.any([signal, AbortSignal.timeout(REVIEW_REQUEST_TIMEOUT_MS)]),
-      });
-      const data = await response.json() as ReviewResponse;
-      if (response.ok && data.success && Array.isArray(data.results)) return data;
-      const error = new Error(data.error || `审核请求失败（HTTP ${response.status}）`);
-      if (isRecoverableModelOutputError(response.status, error.message)) {
-        throw Object.assign(error, { splitBatch: true });
-      }
-      if (response.status >= 400 && response.status < 500 && response.status !== 429) throw Object.assign(error, { retryable: false });
-      throw error;
-    } catch (error) {
-      if (signal.aborted) throw error;
-      const requestError = error as Error & { retryable?: boolean; splitBatch?: boolean };
-      if (requestError.retryable === false || requestError.splitBatch || attempt === REVIEW_MAX_ATTEMPTS) throw error;
-      onRetry(attempt + 1, requestError.message || '网络响应超时');
-      await waitForRetry(1000 * 2 ** (attempt - 1), signal);
-    }
+  let response: Response;
+  try {
+    response = await apiFetch('/api/generate/keyword-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-idempotency-key': idempotencyKey },
+      body,
+      signal: AbortSignal.any([signal, AbortSignal.timeout(REVIEW_REQUEST_TIMEOUT_MS)]),
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    const reason = error instanceof Error ? error.message : '网络响应中断';
+    throw new Error(`本批提交结果不确定，可能已产生费用；请先核对 DeepSeek 用量后再决定是否重试。${reason}`);
   }
-  throw new Error('审核请求失败');
+  const data = await response.json() as ReviewResponse;
+  if (response.ok && data.success && Array.isArray(data.results)) return data;
+  const error = new Error(data.error || `审核请求失败（HTTP ${response.status}）`);
+  if (isRecoverableModelOutputError(response.status, data.code)) {
+    throw Object.assign(error, { modelOutputInvalid: true });
+  }
+  throw error;
 }
 
 export function useKeywordReview() {
@@ -91,45 +79,103 @@ export function useKeywordReview() {
   const [lookupEnabled, setLookupEnabled] = useState(false);
   const [balance, setBalance] = useState<KeywordReviewBalance | null>(null);
   const [balanceError, setBalanceError] = useState('');
+  const [balanceUpdatedAt, setBalanceUpdatedAt] = useState<number | null>(null);
+  const [balanceRefreshing, setBalanceRefreshing] = useState(false);
+  const [balanceDirty, setBalanceDirty] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const stopRequestedRef = useRef(false);
+  const runStartingRef = useRef(false);
+  const reviewRunIdRef = useRef(crypto.randomUUID());
+  const batchRetryVersionsRef = useRef(new Map<number, number>());
+  const inputVersionRef = useRef(0);
   const rulesVersionRef = useRef<number | null>(null);
   const recordIndicesRef = useRef<Map<string, number>>(new Map());
+  const balanceInFlightRef = useRef<Promise<void> | null>(null);
+  const balancePendingRef = useRef(false);
+  const balancePendingForceRef = useRef(false);
+  const balanceLastAttemptRef = useRef(0);
+  const balanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const balanceKeyRef = useRef('');
+  const balanceSpendVersionRef = useRef(0);
 
-  const refreshBalance = useCallback(async () => {
-    const apiKey = (await credentialGet('deepseek_api_key')).trim();
-    if (!apiKey) {
-      setBalance(null);
-      setBalanceError('');
+  const refreshBalance = useCallback(function refreshBalance(force = false): void {
+    if (balanceInFlightRef.current) {
+      balancePendingRef.current = true;
+      balancePendingForceRef.current ||= force;
       return;
     }
-    try {
-      const response = await apiFetch('/api/generate/keyword-review/balance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey }),
-      });
-      const data = await response.json() as BalanceResponse;
-      if (!response.ok || !data.success || (data.currency !== 'CNY' && data.currency !== 'USD')) {
-        setBalance(null);
-        setBalanceError(data.error || '余额查询失败');
-        return;
+    const delay = force ? 0 : Math.max(0, BALANCE_REFRESH_INTERVAL_MS - (Date.now() - balanceLastAttemptRef.current));
+    if (delay > 0) {
+      if (!balanceTimerRef.current) {
+        balanceTimerRef.current = setTimeout(() => {
+          balanceTimerRef.current = null;
+          refreshBalance(true);
+        }, delay);
       }
-      setBalance({
-        currency: data.currency,
-        total: String(data.total ?? '0'),
-        granted: String(data.granted ?? '0'),
-        toppedUp: String(data.toppedUp ?? '0'),
-        available: data.available === true,
-      });
-      setBalanceError('');
-    } catch (error) {
-      setBalance(null);
-      setBalanceError(error instanceof Error ? error.message : '余额查询失败');
+      return;
     }
+    if (balanceTimerRef.current) clearTimeout(balanceTimerRef.current);
+    balanceTimerRef.current = null;
+    balanceLastAttemptRef.current = Date.now();
+    setBalanceRefreshing(true);
+    const requestedSpendVersion = balanceSpendVersionRef.current;
+    const request = (async () => {
+      try {
+        const apiKey = (await credentialGet('deepseek_api_key')).trim();
+        if (apiKey !== balanceKeyRef.current) {
+          balanceKeyRef.current = apiKey;
+          setBalance(null);
+          setBalanceUpdatedAt(null);
+        }
+        if (!apiKey) {
+          setBalanceError('');
+          return;
+        }
+        const response = await apiFetch('/api/generate/keyword-review/balance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey }),
+          signal: AbortSignal.timeout(BALANCE_REQUEST_TIMEOUT_MS),
+        });
+        const data = await response.json() as BalanceResponse;
+        if (!response.ok || !data.success || (data.currency !== 'CNY' && data.currency !== 'USD')) {
+          setBalanceError(data.error || '余额查询失败');
+          return;
+        }
+        setBalance({
+          currency: data.currency,
+          total: String(data.total ?? '0'),
+          granted: String(data.granted ?? '0'),
+          toppedUp: String(data.toppedUp ?? '0'),
+          available: data.available === true,
+        });
+        setBalanceUpdatedAt(Date.now());
+        if (requestedSpendVersion === balanceSpendVersionRef.current) setBalanceDirty(false);
+        else balancePendingRef.current = true;
+        setBalanceError('');
+      } catch (error) {
+        setBalanceError(error instanceof Error ? error.message : '余额查询失败');
+      }
+    })().finally(() => {
+      balanceInFlightRef.current = null;
+      setBalanceRefreshing(false);
+      if (balancePendingRef.current) {
+        const forceNext = balancePendingForceRef.current;
+        balancePendingRef.current = false;
+        balancePendingForceRef.current = false;
+        refreshBalance(forceNext);
+      }
+    });
+    balanceInFlightRef.current = request;
   }, []);
 
   useEffect(() => {
-    void refreshBalance();
+    refreshBalance(true);
+    const interval = setInterval(() => refreshBalance(), 30_000);
+    return () => {
+      clearInterval(interval);
+      if (balanceTimerRef.current) clearTimeout(balanceTimerRef.current);
+    };
   }, [refreshBalance]);
 
   const counts = useMemo(() => countReviewRecords(records), [records]);
@@ -157,12 +203,15 @@ export function useKeywordReview() {
       return;
     }
     setIsImporting(true);
+    inputVersionRef.current += 1;
     setNotice('');
     setLastTrialIds([]);
     setFilter('all');
     try {
       const next = await parseKeywordWorkbook(file);
       rulesVersionRef.current = null;
+      reviewRunIdRef.current = crypto.randomUUID();
+      batchRetryVersionsRef.current.clear();
       recordIndicesRef.current = new Map(next.records.map((record, index) => [record.id, index]));
       setParsed(next);
       setRecords(next.records);
@@ -179,14 +228,24 @@ export function useKeywordReview() {
   };
 
   const runReview = async (mode: 'trial' | 'all' = 'trial') => {
-    if (isRunning || records.length === 0) return;
+    if (isRunning || runStartingRef.current || records.length === 0) return;
     const candidates = records.filter((record) => record.status === 'idle' || record.status === 'error');
     if (candidates.length === 0) {
       setNotice('所有记录都已完成审核');
       return;
     }
-    const apiKey = (await credentialGet('deepseek_api_key')).trim();
+    runStartingRef.current = true;
+    const inputVersion = inputVersionRef.current;
+    let apiKey: string;
+    try { apiKey = (await credentialGet('deepseek_api_key')).trim(); }
+    catch {
+      runStartingRef.current = false;
+      setNotice('读取 DeepSeek API Key 失败，未发起审核请求');
+      return;
+    }
+    if (inputVersion !== inputVersionRef.current) { runStartingRef.current = false; return; }
     if (!apiKey) {
+      runStartingRef.current = false;
       setNotice('未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写');
       return;
     }
@@ -200,12 +259,15 @@ export function useKeywordReview() {
         rulesVersionRef.current = rules.current!.version!;
       }
       rulesVersion = rulesVersionRef.current;
+      if (inputVersion !== inputVersionRef.current) { runStartingRef.current = false; return; }
     } catch (error) {
+      runStartingRef.current = false;
       setNotice(error instanceof Error ? error.message : '读取审核规则失败');
       return;
     }
     const queue = mode === 'trial' ? candidates.slice(0, KEYWORD_REVIEW_BATCH_SIZE) : candidates;
     const controller = new AbortController();
+    stopRequestedRef.current = false;
     abortRef.current = controller;
     setIsRunning(true);
     setRunMode(mode);
@@ -216,7 +278,7 @@ export function useKeywordReview() {
     try {
       let nextIndex = 0;
       const runWorker = async () => {
-        while (!controller.signal.aborted && nextIndex < queue.length) {
+        while (!controller.signal.aborted && !stopRequestedRef.current && nextIndex < queue.length) {
           const index = nextIndex;
           nextIndex += KEYWORD_REVIEW_BATCH_SIZE;
           const batch = queue.slice(index, index + KEYWORD_REVIEW_BATCH_SIZE);
@@ -225,13 +287,17 @@ export function useKeywordReview() {
           const remaining = queue.length - completedNow - failedNow;
           setNotice(mode === 'trial'
             ? `按规则 v${rulesVersion} 正在试跑 ${batch.length} 条${lookupEnabled ? '，不确定词将联网补查' : ''}…`
-            : `按规则 v${rulesVersion} 并行审核中（最多 ${KEYWORD_REVIEW_CONCURRENCY} 路），本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
+            : `按规则 v${rulesVersion} 顺序审核中，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
           setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
             (record) => ({ ...record, status: 'running', error: undefined })));
-          const pending: KeywordReviewRecord[][] = [batch];
-          while (pending.length > 0) {
+          {
             if (controller.signal.aborted) break;
-            const chunk = pending.shift() as KeywordReviewRecord[];
+            const chunk = batch;
+            const sourceIndex = recordIndicesRef.current.get(chunk[0].id) ?? index;
+            const retryVersion = batchRetryVersionsRef.current.get(sourceIndex) ?? 0;
+            const idempotencyKey = `keyword:${reviewRunIdRef.current}:${rulesVersion}:${sourceIndex}:${retryVersion}`;
+            balanceSpendVersionRef.current += 1;
+            setBalanceDirty(true);
             try {
               const data = await requestReviewBatch(JSON.stringify({
                 model: KEYWORD_REVIEW_MODEL,
@@ -242,28 +308,23 @@ export function useKeywordReview() {
                 rows: chunk.map(({ id, query, expansion, entityExpansion, contentType }) => ({
                   id, query, expansion, entityExpansion, contentType,
                 })),
-              }), controller.signal, (attempt, message) => {
-                setNotice(`本批请求异常（${message}），正在进行第 ${attempt}/${REVIEW_MAX_ATTEMPTS} 次尝试；本轮已完成 ${completedNow} 条`);
-              });
+              }), controller.signal, idempotencyKey);
               setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
               completedNow += chunk.length;
               lookedUpNow += Number(data.lookedUp || 0);
-              if (Math.floor((completedNow - chunk.length) / (KEYWORD_REVIEW_BATCH_SIZE * 10)) < Math.floor(completedNow / (KEYWORD_REVIEW_BATCH_SIZE * 10))) void refreshBalance();
+              refreshBalance();
             } catch (error) {
               if (controller.signal.aborted) break;
-              if ((error as Error & { splitBatch?: boolean }).splitBatch && chunk.length > 1) {
-                const middle = Math.ceil(chunk.length / 2);
-                pending.unshift(chunk.slice(0, middle), chunk.slice(middle));
-                setNotice(`本批模型结果异常，改为较小批次继续审核；本轮已完成 ${completedNow} 条`);
-                continue;
-              }
-              if ((error as Error & { splitBatch?: boolean }).splitBatch) {
+              refreshBalance(true);
+              if ((error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid) {
+                batchRetryVersionsRef.current.set(sourceIndex, retryVersion + 1);
                 const message = error instanceof Error ? error.message : '模型结果异常';
                 setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, chunk.map((record) => record.id),
                   (record) => ({ ...record, status: 'error', error: message })));
                 failedNow += chunk.length;
-                setNotice(`已跳过 ${failedNow} 条模型结果异常的记录，继续审核；本轮已完成 ${completedNow} 条`);
-                continue;
+                runState.fatalError = new Error(`本批模型结果异常，已停止后续审核与自动重发：${message}`);
+                controller.abort();
+                break;
               }
               runState.fatalError = error instanceof Error ? error : new Error('审核失败');
               setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, chunk.map((record) => record.id),
@@ -282,9 +343,9 @@ export function useKeywordReview() {
         setNotice(`${runState.fatalError.message}。已保留完成的结果，修复后可继续。`);
         return;
       }
-      void refreshBalance();
+      refreshBalance(true);
       const lookupNote = lookedUpNow > 0 ? `，联网补查 ${lookedUpNow} 条` : '';
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted || stopRequestedRef.current) {
         setNotice(`已停止，本次完成 ${completedNow} 条${lookupNote}，可继续未完成记录`);
       } else if (mode === 'trial') {
         const leftover = candidates.length - completedNow - failedNow;
@@ -305,12 +366,17 @@ export function useKeywordReview() {
       else setNotice(`${message}。已保留完成的结果，修复后可继续。`);
     } finally {
       abortRef.current = null;
+      runStartingRef.current = false;
       setIsRunning(false);
       setRunMode('idle');
     }
   };
 
-  const stopReview = () => abortRef.current?.abort();
+  const stopReview = () => {
+    if (!abortRef.current) return;
+    stopRequestedRef.current = true;
+    setNotice('将在当前批次返回后停止，不取消已提交的 DeepSeek 请求');
+  };
 
   const exportWorkbook = async () => {
     if (!parsed || counts.done === 0 || isRunning) return;
@@ -327,9 +393,12 @@ export function useKeywordReview() {
   };
 
   const reset = () => {
-    stopReview();
+    inputVersionRef.current += 1;
+    abortRef.current?.abort();
     setParsed(null);
     rulesVersionRef.current = null;
+    reviewRunIdRef.current = crypto.randomUUID();
+    batchRetryVersionsRef.current.clear();
     recordIndicesRef.current = new Map();
     setRecords([]);
     setLastTrialIds([]);
@@ -360,6 +429,10 @@ export function useKeywordReview() {
     setLookupEnabled,
     balance,
     balanceError,
+    balanceUpdatedAt,
+    balanceRefreshing,
+    balanceDirty,
+    refreshBalance,
     importFile,
     runReview,
     stopReview,

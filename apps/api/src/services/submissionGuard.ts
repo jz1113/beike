@@ -62,8 +62,13 @@ export async function purgeExpiredSubmissionReceipts(now = Date.now()): Promise<
 export async function guardSubmission(req: Request, kind: string, credentials: { baseUrl: string; apiKey: string }, submit: () => Promise<Response>): Promise<Response> {
   let body: Record<string, unknown>;
   try { body = await req.clone().json(); } catch { return Response.json({ success: false, error: '请求必须为 JSON 对象' }, { status: 400 }); }
-  if (!body || Array.isArray(body) || typeof body !== 'object' || typeof body.prompt !== 'string' || !body.prompt.trim()) {
-    return Response.json({ success: false, error: kind === 'video' ? '视频提示词不能为空，且必须为字符串' : '提示词必须为非空字符串' }, { status: 400 });
+  const validInput = kind === 'keyword-review'
+    ? Array.isArray(body?.rows) && body.rows.length > 0
+    : typeof body?.prompt === 'string' && body.prompt.trim().length > 0;
+  if (!body || Array.isArray(body) || typeof body !== 'object' || !validInput) {
+    const error = kind === 'keyword-review' ? '关键词审核行不能为空'
+      : kind === 'video' ? '视频提示词不能为空，且必须为字符串' : '提示词必须为非空字符串';
+    return Response.json({ success: false, error }, { status: 400 });
   }
   const operation = req.headers.get('x-idempotency-key')?.trim() || body.clientTaskId;
   if (operation !== undefined && (typeof operation !== 'string' || operation.length > 256)) {
