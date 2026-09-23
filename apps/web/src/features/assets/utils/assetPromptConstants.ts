@@ -274,10 +274,6 @@ export function formatDeconstructSummary(item: ImageSetQueueItem): string {
     stats?.scenesAfterDedup ??
     stats?.scenesCount ??
     (Array.isArray(item.result?.scenes) ? item.result.scenes.length : 1);
-  const actionCount =
-    stats?.actionsAfterDedup ??
-    stats?.actionsCount ??
-    (Array.isArray(item.result?.actions) ? item.result.actions.length : 0);
 
   const fallbackHint =
     stats?.pipelineMode === 'fallback' ? '（降级补调）' : '';
@@ -299,7 +295,7 @@ export function formatDeconstructSummary(item: ImageSetQueueItem): string {
   const groupHint = typeof stats?.fullPromptsCount === 'number' ? ` · 完整四图母本 ${stats.fullPromptsCount} 组` : '';
   const partialIcon = (stats?.pass1Failed && stats.pass1Failed > 0) || skipped ? '⚠️' : '✅';
 
-  return ` · ${partialIcon} 成功解构入库 (单次反推 ${pass1Ok}/${imageCount}${failedHint}${skippedHint}${fallbackHint}${visionHint}${groupHint} · 去重后 ${sceneCount} 个置景分镜包（含 ${actionCount} 个抓拍姿态）)`;
+  return ` · ${partialIcon} 成功解构入库 (单次反推 ${pass1Ok}/${imageCount}${failedHint}${skippedHint}${fallbackHint}${visionHint}${groupHint} · ${sceneCount} 个场景资产)`;
 }
 
 /** 人物博主 5 层原子结构 */

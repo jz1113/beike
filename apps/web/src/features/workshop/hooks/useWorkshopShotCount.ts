@@ -5,7 +5,7 @@ import { usePersistentNumber } from '@/shared/hooks/usePersistentState';
 export function useWorkshopShotCount() {
   const [fallback] = useState(() => {
     try {
-      return restoreStoredStoryboardPreset()?.shotCount === 8 ? 8 : 4;
+      return 4;
     } catch {
       return 4;
     }

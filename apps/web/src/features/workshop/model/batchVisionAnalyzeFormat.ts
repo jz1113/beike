@@ -63,6 +63,7 @@ export function formatAnalyzedStoryboard(opts: {
       has_human: isHumanShot,
       shot_type: p.shot_type || (isHumanShot ? 'model_shot' : 'pure_product'),
       productImageUrl: assignedImg,
+      compositionReferenceImageUrl: p.compositionReferenceImageUrl,
       prompt: p.prompt || finalPrompt,
       applied_scene: p.applied_scene || data?.applied_scene || data?.appliedScene,
       applied_outfit: p.applied_outfit || data?.applied_outfit || data?.appliedOutfit,

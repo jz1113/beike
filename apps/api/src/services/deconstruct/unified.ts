@@ -79,6 +79,7 @@ export async function runUnifiedDeconstructBatch(params: {
   modelsToTry: string[];
   targetBaseUrl: string;
   targetApiKey: string;
+  apiFormat?: 'openai-responses';
   userHint: string;
   targetCategory?: string;
   customSubCategories?: SubCategoryDef[];
@@ -100,6 +101,7 @@ export async function runUnifiedDeconstructBatch(params: {
     modelsToTry,
     targetBaseUrl,
     targetApiKey,
+    apiFormat,
     userHint,
     targetCategory,
     customSubCategories,
@@ -142,6 +144,7 @@ export async function runUnifiedDeconstructBatch(params: {
     modelsToTry,
     targetBaseUrl,
     targetApiKey,
+    apiFormat,
     contentArray,
     label,
     maxTokens: dynamicMaxTokens,
@@ -175,6 +178,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
   modelsToTry: string[];
   targetBaseUrl: string;
   targetApiKey: string;
+  apiFormat?: 'openai-responses';
   userHint: string;
   globalIndex: number;
   albumName?: string;
@@ -188,6 +192,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
     modelsToTry,
     targetBaseUrl,
     targetApiKey,
+    apiFormat,
     userHint,
     globalIndex,
     albumName,
@@ -215,6 +220,7 @@ export async function runUnifiedDeconstructSingleImage(params: {
     modelsToTry,
     targetBaseUrl,
     targetApiKey,
+    apiFormat,
     contentArray,
     label,
     maxTokens: 4096,
@@ -246,6 +252,7 @@ export async function runUnifiedDeconstruct(params: {
   modelsToTry: string[];
   targetBaseUrl: string;
   targetApiKey: string;
+  apiFormat?: 'openai-responses';
   userHint: string;
   targetCategory?: string;
   customSubCategories?: SubCategoryDef[];
@@ -262,7 +269,7 @@ export async function runUnifiedDeconstruct(params: {
   pipelineMode: PipelineMode;
   shardCount: number;
 } | null> {
-  const { safeImgs, modelsToTry, targetBaseUrl, targetApiKey, userHint, targetCategory, customSubCategories, albumName, tracker, diagnostics, operationId, onProgress } =
+  const { safeImgs, modelsToTry, targetBaseUrl, targetApiKey, apiFormat, userHint, targetCategory, customSubCategories, albumName, tracker, diagnostics, operationId, onProgress } =
     params;
 
   const shardSize = resolveUnifiedShardSize();
@@ -274,6 +281,7 @@ export async function runUnifiedDeconstruct(params: {
       modelsToTry,
       targetBaseUrl,
       targetApiKey,
+      apiFormat,
       userHint,
       targetCategory,
       customSubCategories,
@@ -315,6 +323,7 @@ export async function runUnifiedDeconstruct(params: {
       modelsToTry,
       targetBaseUrl,
       targetApiKey,
+      apiFormat,
       userHint,
       targetCategory,
       customSubCategories,

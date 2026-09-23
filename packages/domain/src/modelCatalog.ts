@@ -654,6 +654,17 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
 
   // —— 多模态 ——
   {
+    id: 'gpt-6-astra',
+    capability: 'multimodal',
+    vendor: 'openai',
+    name: 'GPT 6 Astra',
+    shortName: 'GPT 6 Astra',
+    adapter: 'openai-chat',
+    docs: 'docs/vendors/官方接口/aggregator/chat/openai-chat.md',
+    badge: '多模态',
+    description: 'OpenAI GPT 6 Astra 多模态模型',
+  },
+  {
     id: 'gpt-6-luna',
     capability: 'multimodal',
     vendor: 'openai',
@@ -708,6 +719,16 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
     docs: 'docs/vendors/官方接口/aggregator/chat/openai-chat.md',
     badge: '多模态',
     description: 'OpenAI GPT 5.6 Sol',
+  },
+  {
+    id: 'gpt-5.6',
+    capability: 'multimodal',
+    vendor: 'openai',
+    name: 'GPT 5.6',
+    shortName: 'GPT 5.6',
+    adapter: 'openai-chat',
+    docs: 'docs/vendors/官方接口/aggregator/chat/openai-chat.md',
+    description: 'OpenAI GPT 5.6 Sol 的官方别名',
   },
   {
     id: 'gpt-5.6-terra',

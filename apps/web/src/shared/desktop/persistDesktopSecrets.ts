@@ -107,6 +107,12 @@ export async function persistDeepSeekConfig(apiKey: string): Promise<void> {
   await persistCredentialStrict('deepseek_api_key', apiKey.trim());
 }
 
+/** OpenAI Responses 凭证独立于 Comfly 主网关。 */
+export async function persistOpenAIConfig(baseUrl: string, apiKey: string): Promise<void> {
+  await persistCredentialStrict('openai_api_key', apiKey.trim());
+  localStorage.setItem('openai_base_url', baseUrl.trim().replace(/\/+$/, '') || 'https://api.openai.com');
+}
+
 export async function persistLianchiConfig(apiKey: string): Promise<void> {
   await persistCredentialStrict('lianchi_api_key', apiKey.trim());
 }

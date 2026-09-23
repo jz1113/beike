@@ -392,6 +392,20 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 isTestingDeepSeek={config.isTestingDeepSeek}
                 handleTestDeepSeek={config.handleTestDeepSeek}
                 handleSaveDeepSeekConfig={config.handleSaveDeepSeekConfig}
+                openAIBaseUrl={config.openAIBaseUrl}
+                setOpenAIBaseUrl={config.setOpenAIBaseUrl}
+                openAIApiKey={config.openAIApiKey}
+                setOpenAIApiKey={config.setOpenAIApiKey}
+                showOpenAIKey={config.showOpenAIKey}
+                setShowOpenAIKey={config.setShowOpenAIKey}
+                openAIEnabled={config.openAIEnabled}
+                setOpenAIEnabled={config.setOpenAIEnabled}
+                isTestingOpenAI={config.isTestingOpenAI}
+                handleTestOpenAI={config.handleTestOpenAI}
+                handleSaveOpenAIConfig={config.handleSaveOpenAIConfig}
+                handleOpenOpenAIDiscovery={() => models.handleOpenOpenAIDiscovery(config.openAIBaseUrl, config.openAIApiKey, true)}
+                isFetchingOpenAI={models.isFetchingOpenAI}
+                openAIModelCount={models.openAIModels.length}
                 lianchiApiKey={config.lianchiApiKey}
                 setLianchiApiKey={config.setLianchiApiKey}
                 showLianchiKey={config.showLianchiKey}
@@ -514,17 +528,17 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         <GatewayModelModal
           isOpen={models.isGatewayModalOpen}
           onClose={() => models.setIsGatewayModalOpen(false)}
-          allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.allGatewayModels}
-          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : '网关'}
+          allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels}
+          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? 'OpenAI' : '网关'}
           activeModelIds={new Set(models.customModels.map((m) => m.id))}
-          isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.isFetchingGateway}
+          isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.gatewaySource === 'openai' ? models.isFetchingOpenAI : models.isFetchingGateway}
           onToggleAddModel={(model) => {
             const exists = models.customModels.some((m) => m.id === model.id);
             models.handleToggleGatewayModel(model);
             showToast(exists ? `已移出模型 ${model.id}` : `✨ 已接入模型 ${model.id}`);
           }}
           onAddAllUsefulModels={() => {
-            const count = models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'lianchi' ? models.lianchiModels : models.allGatewayModels);
+            const count = models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels);
             showToast(`🎉 成功接入 ${count} 款核心模型！`);
             models.setIsGatewayModalOpen(false);
           }}

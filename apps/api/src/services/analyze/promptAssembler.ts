@@ -398,6 +398,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       has_human: hasHuman,
       shot_type: shotType,
       prompt: harmonized.prompt,
+      compositionReferenceImageUrl: slot?.compositionReferenceImageUrl,
       applied_scene: hasHuman === false ? undefined : appliedSceneTitle,
       applied_outfit: hasHuman === false ? undefined : appliedOutfitTitle,
       applied_persona: hasHuman === false ? undefined : appliedPersonaName,

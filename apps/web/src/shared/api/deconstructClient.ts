@@ -1,4 +1,5 @@
 import { apiFetch } from '@/shared/api/apiClient';
+import { getMultimodalClientOverrides } from '@/shared/api/gatewayClient';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import type { ImageSetQueueItem } from '@/features/assets/utils/assetPromptConstants';
 import { resolveQueueItemPartial } from '@/features/assets/utils/assetDeconstructCsvExport';
@@ -68,6 +69,7 @@ export async function processDeconstructQueueItem(
       targetCategory,
       customSubCategories,
       model: selectedVisionModel,
+      ...getMultimodalClientOverrides(selectedVisionModel),
       // The server only switches this ordered chain for a definitive “model
       // unavailable” reply; rate limits wait on the current model instead.
       fallbackModels: modelIds,

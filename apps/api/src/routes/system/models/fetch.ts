@@ -9,6 +9,7 @@ import {
   getApprovedModel,
 } from '@beike/domain/modelCatalog';
 import { FALLBACK_FLAGSHIP_MODELS } from './fallbackModels';
+import { allowClientCustomBaseUrl, isSafeCustomGatewayBaseUrl } from '@beike/domain/gatewayCreds';
 
 function parseDiscoveredModels(rawList: unknown[]) {
   const parsed = rawList.map((item: any) => {
@@ -59,6 +60,27 @@ function parseLianchiModels(rawList: unknown[]) {
   });
 }
 
+function parseOpenAIModels(rawList: unknown[]) {
+  const seen = new Set<string>();
+  return rawList.flatMap((item: any) => {
+    const id = typeof item === 'string' ? item.trim() : String(item?.id || '').trim();
+    if (!id || seen.has(id)) return [];
+    seen.add(id);
+    const approved = getApprovedModel(id);
+    const caps = inferWorkflowCapabilitiesFromId(id);
+    const supported = Boolean(approved?.capability === 'multimodal' && /^gpt-(?:5\.6|6)(?:-|$)/i.test(id));
+    return [{
+      id,
+      name: approved?.name || id,
+      shortName: approved?.shortName || id,
+      category: caps.isImage ? 'image' : caps.isVideo ? 'video' : caps.isAudio ? 'audio' : caps.isEmbedding ? 'embedding' : 'text',
+      isMultimodal: caps.isMultimodal, isVision: caps.isVision, isThinking: caps.isThinking,
+      isImage: caps.isImage, isVideo: caps.isVideo, isAudio: caps.isAudio, isEmbedding: caps.isEmbedding,
+      owned_by: typeof item?.owned_by === 'string' ? item.owned_by : 'openai', isCustom: false, supported,
+    }];
+  });
+}
+
 function emptyCatalog(status: number, error?: string) {
   return jsonResponse({ success: false, models: [], gatewayStatus: status, error }, status >= 400 ? status : 502);
 }
@@ -68,9 +90,16 @@ export async function POST(req: Request) {
     const body = await readJsonBody(req, {});
     const { baseUrl, isPing, strict } = body;
     const isLianchi = body.provider === 'lianchi';
-    const rawUrl = isLianchi ? LIANCHI_IMAGE_BASE_URL : (baseUrl || req.headers.get('x-custom-base-url') || getDefaultBaseUrl());
+    const isOpenAI = body.provider === 'openai';
+    const rawUrl = isLianchi ? LIANCHI_IMAGE_BASE_URL : (baseUrl || (isOpenAI ? 'https://api.openai.com' : req.headers.get('x-custom-base-url') || getDefaultBaseUrl()));
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
+    if (isOpenAI && !allowClientCustomBaseUrl() && !isSafeCustomGatewayBaseUrl(targetUrl)) {
+      return jsonResponse({ success: false, models: [], error: '请填写安全的 HTTPS 模型接口地址' }, 400);
+    }
     const independentKey = Object.prototype.hasOwnProperty.call(body, 'apiKey');
+    if (isOpenAI && !independentKey) {
+      return jsonResponse({ success: false, models: [], error: '请填写独立的 OpenAI API Key' }, 400);
+    }
     const rawKey = independentKey
       ? body.apiKey
       : isLianchi ? req.headers.get('x-lianchi-api-key') : (req.headers.get('x-custom-api-key') || getDefaultApiKey());
@@ -122,12 +151,12 @@ export async function POST(req: Request) {
     }
 
     if (rawList.length > 0) {
-      const parsedModels = isLianchi ? parseLianchiModels(rawList) : parseDiscoveredModels(rawList);
-      return jsonResponse({ success: true, gatewayStatus: 200, count: parsedModels.length, models: parsedModels, provider: isLianchi ? 'lianchi' : 'comfly' });
+      const parsedModels = isLianchi ? parseLianchiModels(rawList) : isOpenAI ? parseOpenAIModels(rawList) : parseDiscoveredModels(rawList);
+      return jsonResponse({ success: true, gatewayStatus: 200, count: parsedModels.length, models: parsedModels, provider: isLianchi ? 'lianchi' : isOpenAI ? 'openai' : 'comfly' });
     }
 
     const httpFailed = [401, 403, 404, 500].includes(gatewayStatus);
-    if (strict || httpFailed || gatewayStatus === 200) {
+    if (strict || isOpenAI || httpFailed || gatewayStatus === 200) {
       return emptyCatalog(gatewayStatus || 502, gatewayErrorMsg || '未发现可用模型');
     }
     if (isPing) {

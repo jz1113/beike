@@ -46,10 +46,7 @@ export function ensureItemPromptsPad(
     const idx = padded.length;
     const t = harmonizedTemplates[idx % harmonizedTemplates.length];
     const isHumanShot = t.hasHuman;
-    const assignedImg =
-      (item.selectedProductImages &&
-        item.selectedProductImages[idx % item.selectedProductImages.length]) ||
-      item.coverImage;
+    const assignedImg = item.selectedProductImages?.[0] || item.coverImage;
 
     const fallbackPrompt = assembleOriginalShotPrompt(
           {

@@ -144,10 +144,17 @@ export async function loadLockedGroupSkeleton(fullPromptId?: unknown) {
   if (!Array.isArray(indices) || indices.length !== 4 || shots.length !== 4) {
     throw new Error('选定的图组母本不是完整的四图组，请重新选择');
   }
+  let sourceImages: unknown = null;
+  try { sourceImages = JSON.parse(row.sourceImages || '[]'); } catch { /* legacy group without images */ }
+  const images = Array.isArray(sourceImages) ? sourceImages : [];
   return {
     id: row.id,
     title: row.title,
-    shots,
+    shots: shots.map((shot, index) => ({
+      ...shot,
+      compositionReferenceImageUrl: typeof images[Number(indices[index]) - 1] === 'string'
+        ? images[Number(indices[index]) - 1] as string : undefined,
+    })),
     architectureSummary: row.architectureSummary,
     hasHuman: row.hasHuman,
     sceneSummary: row.sceneSummary,

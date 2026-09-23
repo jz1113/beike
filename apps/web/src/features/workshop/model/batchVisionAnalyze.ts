@@ -2,7 +2,7 @@ import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import { apiFetch } from '@/shared/api/apiClient';
 import { pickVisionAnalyzeFallbacks, PreviousGroupSignature } from '@beike/domain/vision';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
-import { getGatewayClientOverrides } from '@/shared/api/gatewayClient';
+import { getMultimodalClientOverrides } from '@/shared/api/gatewayClient';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@beike/domain/jewelryArch';
 import type { BatchProductItem } from './batchTypes';
@@ -55,19 +55,26 @@ export async function analyzeBatchProduct(
       : [item.coverImage];
     const imagePayload = chosenProductImgs.map(normalizeImageUrlToStandardJpg);
 
-    const effectivePersona = deps.personaMode === 'none' ? 'none' : 'asset_driven';
+    const effectivePersona = 'asset_driven';
 
-    const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
+    const { customBaseUrl: localUrl, customApiKey: localApiKey, apiFormat } = getMultimodalClientOverrides(deps.selectedVisionModel);
     const targetShotCount = deps.selectedShotCount || 4;
+
+    if (!deps.lockedFullPromptId || deps.lockedFullPromptId === 'auto') {
+      const message = '请先在生产设置中选择完整四图母本，再分析商品';
+      deps.setItems?.(prev => prev.map(p => p.id === item.id
+        ? { ...p, isAnalyzing: false, analyzedSuccess: false, analysisError: message, prompts: [] }
+        : p));
+      throw new Error(message);
+    }
 
     let data: any = null;
     let apiError: string | null = null;
 
-    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || deps.lockedActionId !== 'auto' || (deps.lockedFullPromptId && deps.lockedFullPromptId !== 'auto')) ? {
+    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || (deps.lockedFullPromptId && deps.lockedFullPromptId !== 'auto')) ? {
       personaId: deps.lockedPersonaId !== 'auto' ? deps.lockedPersonaId : undefined,
       sceneId: deps.lockedSceneId !== 'auto' ? deps.lockedSceneId : undefined,
       outfitId: deps.lockedOutfitId !== 'auto' ? deps.lockedOutfitId : undefined,
-      actionId: deps.lockedActionId !== 'auto' ? deps.lockedActionId : undefined,
       fullPromptId: deps.lockedFullPromptId && deps.lockedFullPromptId !== 'auto' ? deps.lockedFullPromptId : undefined,
     } : undefined;
 
@@ -101,13 +108,12 @@ export async function analyzeBatchProduct(
           imageUrls: imagePayload,
           modelPersona: effectivePersona,
           templateStyle,
-          useAssetLibrary: deps.useAssetLibrary,
+          useAssetLibrary: true,
           lockedAssets,
           allocatedAssets: allocatedAsset ? {
             sceneId: allocatedAsset.scene?.id,
             outfitId: allocatedAsset.outfit?.id,
             personaId: allocatedAsset.persona?.id,
-            actionIds: allocatedAsset.actions?.map((a: any) => a.id),
           } : undefined,
           extraRequirements: `- 🚨【分镜数量严格保证】：必须输出完整的 ${targetShotCount} 个分镜，数组 prompts 长度必须严格等于 ${targetShotCount}！\n- 🚨【商品外观唯一锚定 @图片1】：美学置景与构图写入文字，生图只垫商品图。`,
           shotCount: targetShotCount,
@@ -118,6 +124,7 @@ export async function analyzeBatchProduct(
           ),
           customBaseUrl: localUrl,
           customApiKey: localApiKey,
+          apiFormat,
           previousGroupSignatures: deps.batchGroupSignaturesRef?.current?.slice(-4) || [],
           previousActionIds: deps.batchActionIdsRef?.current?.slice(-16) || [],
           previousSceneIds: deps.batchSceneIdsRef?.current?.slice(-20) || [],
@@ -126,8 +133,8 @@ export async function analyzeBatchProduct(
       });
 
       data = await res.json().catch(() => ({ error: `视觉分析接口响应解析异常 (HTTP ${res.status})` }));
-      if (!res.ok || data?.error || !data?.prompts || data.prompts.length === 0) {
-        apiError = data?.error || `视觉大模型响应异常 (HTTP ${res.status})`;
+      if (!res.ok || data?.error || !Array.isArray(data?.prompts) || data.prompts.length !== targetShotCount) {
+        apiError = data?.error || `分镜不完整：需要 ${targetShotCount} 镜，实际得到 ${Array.isArray(data?.prompts) ? data.prompts.length : 0} 镜`;
       }
     } catch (err: any) {
       apiError = err.message || '视觉分析请求超时或网络异常';

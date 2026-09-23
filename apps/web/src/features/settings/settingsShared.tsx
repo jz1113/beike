@@ -71,6 +71,21 @@ export const API_SERVICES: ApiServiceItem[] = [
     capabilities: ['白名单模型', '高并发负载均衡', '自动容灾切换', '官方原生流式响应']
   },
   {
+    id: 'openai_official',
+    name: 'OpenAI 官方 Responses 接口',
+    subTitle: 'GPT 5.6 / GPT 6 · 多模态图像理解',
+    category: 'core',
+    renderLogo: (cls = 'w-5 h-5') => <ModelIcon modelId="gpt-6-luna" className={cls} />,
+    isEnabled: true,
+    tag: 'Responses API',
+    docsUrl: 'https://developers.openai.com/api/docs/guides/images-vision',
+    registerUrl: 'https://platform.openai.com/api-keys',
+    registerName: '前往 OpenAI Platform 获取 API Key',
+    defaultBaseUrl: 'https://api.openai.com',
+    description: '使用 OpenAI Responses API 分析图片；支持独立网关地址和 GET /v1/models 模型发现。',
+    capabilities: ['Responses API', '图像理解', 'GPT 5.6 / GPT 6', '模型目录'],
+  },
+  {
     id: 'deepseek_official',
     name: 'DeepSeek 官方接口',
     subTitle: 'OpenAI Compatible · 图像理解 / 对话',

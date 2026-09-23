@@ -51,6 +51,7 @@ export interface GroupShotSkeleton {
   lighting_type?: string;
   has_human?: boolean;
   shot_type?: string;
+  compositionReferenceImageUrl?: string;
 }
 
 export interface SlotAssets {
@@ -84,6 +85,7 @@ export interface FilledShotSlot {
   usedAssetLibrary: boolean;
   cameraFromAsset: boolean;
   cameraRewritten: boolean;
+  compositionReferenceImageUrl?: string;
   source: SlotSource;
 }
 
@@ -216,6 +218,7 @@ export function assembleStoryboardSlots(input: AssembleSlotsInput): AssembleSlot
       usedAssetLibrary,
       cameraFromAsset: Boolean(camera || action?.shotType),
       cameraRewritten: false,
+      compositionReferenceImageUrl: group?.compositionReferenceImageUrl,
       source,
     } satisfies FilledShotSlot;
   });

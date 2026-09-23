@@ -48,7 +48,9 @@ export function useCustomModels({
   const [allGatewayModels, setAllGatewayModels] = useState<GatewayModelItem[]>([]);
   const [isFetchingLianchi, setIsFetchingLianchi] = useState(false);
   const [lianchiModels, setLianchiModels] = useState<GatewayModelItem[]>([]);
-  const [gatewaySource, setGatewaySource] = useState<'comfly' | 'lianchi'>('comfly');
+  const [openAIModels, setOpenAIModels] = useState<GatewayModelItem[]>([]);
+  const [isFetchingOpenAI, setIsFetchingOpenAI] = useState(false);
+  const [gatewaySource, setGatewaySource] = useState<'comfly' | 'lianchi' | 'openai'>('comfly');
 
   // 安全触发模型更新事件通知
   const notifyModelsUpdated = () => {
@@ -331,6 +333,31 @@ export function useCustomModels({
     }
   };
 
+  const handleOpenOpenAIDiscovery = async (openAIBaseUrl: string, openAIApiKey: string, forceRefresh = false) => {
+    setGatewaySource('openai');
+    if (!forceRefresh && openAIModels.length > 0) { setIsGatewayModalOpen(true); return; }
+    if (!openAIApiKey.trim()) { showToast('请先填写 OpenAI API Key'); return; }
+    setIsGatewayModalOpen(true);
+    setIsFetchingOpenAI(true);
+    try {
+      const response = await apiFetch('/api/system/models/fetch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), strict: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success || data.provider !== 'openai' || !Array.isArray(data.models)) {
+        setOpenAIModels([]);
+        showToast(`获取 OpenAI 模型失败 (${data.gatewayStatus || response.status})：${data.error || '模型目录无效'}`);
+        return;
+      }
+      setOpenAIModels(data.models);
+      if (data.models.length === 0) showToast('当前接口没有返回模型');
+    } catch (error) {
+      setOpenAIModels([]);
+      showToast(`获取 OpenAI 模型失败：${error instanceof Error ? error.message : '网络错误'}`);
+    } finally { setIsFetchingOpenAI(false); }
+  };
+
   const handleToggleGatewayModel = (model: GatewayModelItem) => {
     if (model.supported === false) return;
     setCustomModels((prev) => {
@@ -388,10 +415,13 @@ export function useCustomModels({
     isFetchingGateway,
     allGatewayModels,
     lianchiModels,
+    openAIModels,
     gatewaySource,
     isFetchingLianchi,
+    isFetchingOpenAI,
     handleOpenGatewayDiscovery,
     handleOpenLianchiDiscovery,
+    handleOpenOpenAIDiscovery,
     handleToggleGatewayModel,
     handleAddAllUsefulGatewayModels,
     notifyModelsUpdated,

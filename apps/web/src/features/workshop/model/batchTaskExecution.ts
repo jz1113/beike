@@ -61,6 +61,10 @@ export async function executeSingleImageTask(
 
   const skipFace = shot.has_human === false || shot.shot_type === 'pure_product' || shot.shot_type === 'hand_held_only';
   const safeProductImg = await compressProductImageIfNeeded(chosenProductImg);
+  const compositionRef = shot.compositionReferenceImageUrl;
+  if (compositionRef) {
+    promptText += '；原图组参考图只用于复刻构图、机位、景别和动作节奏。人物、穿搭、场景以当前分镜提示词中的设定为准；如与参考图不同，必须替换。严禁复制参考图里的商品品牌、型号、文字或 logo；商品外观和身份必须完全以 @图片1 为准。';
+  }
   const qualityTier = (config.selectedQuality || 'high') as 'high' | 'medium' | 'low';
   const pixelSize = resolveGptImageSizeForModel(
     config.selectedAspect,
@@ -77,6 +81,7 @@ export async function executeSingleImageTask(
       quality: config.selectedQuality,
       productImageUrl: safeProductImg,
       anchorFaceImageUrl: skipFace ? undefined : anchorFaceUrl || undefined,
+      sceneAnchorImageUrl: compositionRef,
       padSocialRef: false,
       referenceImageUrl: safeProductImg,
       useReferenceImage: true,

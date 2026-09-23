@@ -1,102 +1,19 @@
-import type { ReactNode } from 'react';
 import { Cpu } from 'lucide-react';
 import { useMemo, useCallback } from 'react';
-import { API_SERVICES, type WorkflowModel } from '../settingsShared';
+import { API_SERVICES } from '../settingsShared';
 import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 import { ApiServicesWanbangPanel } from '../components/ApiServicesWanbangPanel';
 import { ApiServicesApiaPanel } from '../components/ApiServicesApiaPanel';
 import { ApiServicesQiyunPanel } from '../components/ApiServicesQiyunPanel';
 import { ApiServicesGatewayPanel } from '../components/ApiServicesGatewayPanel';
 import { ApiServicesDeepSeekPanel } from '../components/ApiServicesDeepSeekPanel';
+import { ApiServicesOpenAIPanel } from '../components/ApiServicesOpenAIPanel';
 import { ApiServicesLianchiPanel } from '../components/ApiServicesLianchiPanel';
-import { ApiServicesStoragePanel, type ApiServicesStoragePanelProps } from '../components/ApiServicesStoragePanel';
+import { ApiServicesStoragePanel } from '../components/ApiServicesStoragePanel';
 import { ApiServicesNavList } from '../components/ApiServicesNavList';
 import { useModelDragSort } from '../hooks/useModelDragSort';
-import type { ComflyPriceMap } from '../multimodalPriceSort';
 import { settingsPanelPad, settingsPanelContainer } from '@/shared/ui/layoutClasses';
-
-export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
-  defaultsPanel?: ReactNode;
-  selectedServiceId: string;
-  setSelectedServiceId: (id: string) => void;
-  serviceSearch: string;
-  setServiceSearch: (v: string) => void;
-  isGatewayEnabled: boolean;
-  setIsGatewayEnabled: (v: boolean) => void;
-  apiKey: string;
-  setApiKey: (v: string) => void;
-  baseUrl: string;
-  setBaseUrl: (v: string) => void;
-  showKey: boolean;
-  setShowKey: (v: boolean) => void;
-  appAccessToken: string;
-  setAppAccessToken: (v: string) => void;
-  handleSaveApiConfig: (url: string, key: string, notify?: boolean) => void;
-  handleTestPing: () => void;
-  isTesting: boolean;
-  deepSeekApiKey: string;
-  setDeepSeekApiKey: (v: string) => void;
-  showDeepSeekKey: boolean;
-  setShowDeepSeekKey: (v: boolean) => void;
-  isTestingDeepSeek: boolean;
-  handleTestDeepSeek: () => void;
-  handleSaveDeepSeekConfig: (activate?: boolean) => void;
-  lianchiApiKey: string;
-  setLianchiApiKey: (v: string) => void;
-  showLianchiKey: boolean;
-  setShowLianchiKey: (v: boolean) => void;
-  isTestingLianchi: boolean;
-  handleTestLianchi: () => void;
-  handleSaveLianchiConfig: () => void;
-  handleOpenLianchiDiscovery: () => void;
-  isFetchingLianchi: boolean;
-  lianchiModelCount: number;
-  handleOpenGatewayDiscovery: () => void;
-  isFetchingGateway: boolean;
-  allGatewayModels: unknown[];
-  customModels: WorkflowModel[];
-  modelSearch: string;
-  setModelSearch: (v: string) => void;
-  modelCapabilityFilter: 'all' | 'multimodal' | 'image' | 'video';
-  setModelCapabilityFilter: (v: 'all' | 'multimodal' | 'image' | 'video') => void;
-  handleToggleCapability: (modelId: string, field: 'isMultimodal' | 'isImage' | 'isVideo' | 'isVision' | 'isAssistant' | 'isDistill' | 'isThinking') => void;
-  handleDeleteModel: (modelId: string) => void;
-  handleMoveModel?: (modelId: string, direction: 'up' | 'down' | 'top') => void;
-  handleReorderModels?: (newOrder: WorkflowModel[]) => void;
-  handleResetDefaultModels: () => void;
-  comflyPrices: ComflyPriceMap | null;
-  isFetchingPrices: boolean;
-  handleSortByComflyPrice: () => void;
-  setIsAddingModelModalOpen: (v: boolean) => void;
-  wanbangKey: string;
-  setWanbangKey: (v: string) => void;
-  wanbangSecret: string;
-  setWanbangSecret: (v: string) => void;
-  isWanbangEnabled: boolean;
-  setIsWanbangEnabled: (v: boolean) => void;
-  handleTestWanbang: () => void;
-  isTestingWanbang: boolean;
-  handleSaveWanbangConfig: () => void;
-  scraperId: string;
-  setScraperId: (v: string) => void;
-  scraperSecret: string;
-  setScraperSecret: (v: string) => void;
-  handleSaveScraperConfig: () => void;
-  handleTestScraper: () => void;
-  isTestingScraper: boolean;
-  isApiaEnabled: boolean;
-  setIsApiaEnabled: (v: boolean) => void;
-  qiyunAppId: string;
-  setQiyunAppId: (v: string) => void;
-  qiyunAppKey: string;
-  setQiyunAppKey: (v: string) => void;
-  isQiyunEnabled: boolean;
-  setIsQiyunEnabled: (v: boolean) => void;
-  handleSaveQiyunConfig: () => void;
-  handleTestQiyun: () => void;
-  isTestingQiyun: boolean;
-
-}
+import type { ApiServicesTabProps } from './apiServicesTabTypes';
 
 export default function ApiServicesTab({
   defaultsPanel,
@@ -124,6 +41,20 @@ export default function ApiServicesTab({
   isTestingDeepSeek,
   handleTestDeepSeek,
   handleSaveDeepSeekConfig,
+  openAIBaseUrl,
+  setOpenAIBaseUrl,
+  openAIApiKey,
+  setOpenAIApiKey,
+  showOpenAIKey,
+  setShowOpenAIKey,
+  openAIEnabled,
+  setOpenAIEnabled,
+  isTestingOpenAI,
+  handleTestOpenAI,
+  handleSaveOpenAIConfig,
+  handleOpenOpenAIDiscovery,
+  isFetchingOpenAI,
+  openAIModelCount,
   lianchiApiKey,
   setLianchiApiKey,
   showLianchiKey,
@@ -259,13 +190,14 @@ export default function ApiServicesTab({
   const isServiceConfigured = useCallback((serviceId: string, defaultEnabled?: boolean) => {
     if (serviceId === 'comfly_gateway') return Boolean(apiKey.trim());
     if (serviceId === 'deepseek_official') return Boolean(deepSeekApiKey.trim());
+    if (serviceId === 'openai_official') return Boolean(openAIApiKey.trim());
     if (serviceId === 'lianchi_images') return Boolean(lianchiApiKey.trim());
     if (serviceId === 'wanbang_ecommerce') return Boolean(wanbangKey.trim() && wanbangSecret.trim());
     if (serviceId === 'apia_parser') return Boolean(scraperId.trim() && scraperSecret.trim());
     if (serviceId === 'qiyun_parser') return Boolean(qiyunAppId.trim() && qiyunAppKey.trim());
     if (serviceId === 'cloud_storage') return Boolean(storageEnabled && storageAccountId && storageAccessKeyId);
     return Boolean(defaultEnabled);
-  }, [apiKey, deepSeekApiKey, lianchiApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageEnabled, storageAccountId, storageAccessKeyId]);
+  }, [apiKey, deepSeekApiKey, openAIApiKey, lianchiApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageEnabled, storageAccountId, storageAccessKeyId]);
 
   return (
     <>
@@ -348,6 +280,19 @@ export default function ApiServicesTab({
               isTesting={isTestingDeepSeek}
               onTest={handleTestDeepSeek}
               onSave={handleSaveDeepSeekConfig}
+            />
+          )}
+
+          {selectedServiceId === 'openai_official' && (
+            <ApiServicesOpenAIPanel
+              baseUrl={openAIBaseUrl} setBaseUrl={setOpenAIBaseUrl}
+              apiKey={openAIApiKey} setApiKey={setOpenAIApiKey}
+              showKey={showOpenAIKey} setShowKey={setShowOpenAIKey}
+              enabled={openAIEnabled} setEnabled={setOpenAIEnabled}
+              onTest={handleTestOpenAI} onSave={handleSaveOpenAIConfig}
+              onFetchModels={handleOpenOpenAIDiscovery}
+              isTesting={isTestingOpenAI} isFetchingModels={isFetchingOpenAI}
+              modelCount={openAIModelCount}
             />
           )}
 

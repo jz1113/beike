@@ -7,6 +7,7 @@ import {
   fillProductSentences,
   maybeApplyJewelryCameraFallback,
   parseGroupShotSkeleton,
+  expandGroupShotSkeleton,
 } from './storyboardSlots.ts';
 import { evaluateStoryboardQuality } from '../promptAsset/qualityChecks.ts';
 
@@ -39,6 +40,19 @@ test('keeps asset camera when jewelry fallback would rewrite wide lens', () => {
   assert.match(prompt, /木窗和室/);
   assert.match(prompt, /俯身展示发簪/);
   assert.doesNotMatch(prompt, /锁骨光影很长的一段场景描写/);
+});
+
+test('four-shot group expands to eight without changing its original shots or scene', () => {
+  const originals = Array.from({ length: 4 }, (_, index) => ({
+    shot_no: index + 1, title: `原镜${index + 1}`, scene: '同一间室内',
+    action: `动作${index + 1}`, compositionReferenceImageUrl: `image-${index + 1}`,
+  }));
+  const expanded = expandGroupShotSkeleton(originals, 8);
+  assert.equal(expanded.length, 8);
+  assert.deepEqual(expanded.slice(0, 4), originals);
+  assert.equal(expanded[4].scene, '同一间室内');
+  assert.equal(expanded[4].compositionReferenceImageUrl, 'image-1');
+  assert.equal(expanded[7].shot_no, 8);
 });
 
 test('locked four-shot group keeps order, camera and source scene', () => {

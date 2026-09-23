@@ -11,6 +11,7 @@ import { inspectVisionPayload } from './analyzeVisionResponse';
 import { getDefaultBaseUrl, getDefaultApiKey } from './gatewayCredentials';
 import { buildMultimodalUpstreamFallbackChain, isApprovedModel } from '@beike/domain/modelCatalog';
 import { isRetryableUpstreamError, isRetryableUpstreamStatus } from '@beike/domain/upstreamErrors';
+import { buildOpenAIVisionRequest, extractOpenAIResponseText, openAIResponsesUrl } from './openaiResponses';
 export { getDefaultBaseUrl, getDefaultApiKey };
 
 const ANALYZE_IMAGE_MAX_DIMENSION = 640;
@@ -161,6 +162,7 @@ export async function callVisionModel(
   _fallbackModels: string[] = [],
   shotCount: number = 4,
   independent = false,
+  apiFormat?: 'openai-responses',
 ): Promise<{ 
   rawText: string; 
   actualModel: string; 
@@ -171,7 +173,7 @@ export async function callVisionModel(
   const effectiveBaseUrl = (baseUrl && baseUrl.trim()) ? baseUrl.trim() : getDefaultBaseUrl();
   const effectiveApiKey = (apiKey && apiKey.trim()) ? apiKey.trim() : getDefaultApiKey();
   const normalized = independent ? requestedModel : normalizeVisionModelId(requestedModel);
-  const modelsToTry = (independent ? [normalized] : buildMultimodalUpstreamFallbackChain(normalized))
+  const modelsToTry = (independent || apiFormat === 'openai-responses' ? [normalized] : buildMultimodalUpstreamFallbackChain(normalized))
     .filter((id) => isApprovedModel(id, 'multimodal'));
   const triedModels: string[] = [];
   let lastError: any = null;
@@ -191,13 +193,15 @@ export async function callVisionModel(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetch(`${normalizeGatewayBaseUrl(effectiveBaseUrl)}/v1/chat/completions`, {
+        const response = await fetch(apiFormat === 'openai-responses' ? openAIResponsesUrl(effectiveBaseUrl) : `${normalizeGatewayBaseUrl(effectiveBaseUrl)}/v1/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${effectiveApiKey}`
           },
-          body: JSON.stringify({
+          body: JSON.stringify(apiFormat === 'openai-responses'
+            ? buildOpenAIVisionRequest(model, contentArray, resolveVisionAnalyzeMaxTokens(shotCount))
+            : {
             model: model,
             messages: [{ role: 'user', content: contentArray }],
             temperature: 0.7,
@@ -218,12 +222,12 @@ export async function callVisionModel(
         }
 
         const data = await response.json();
-        const { rawText } = inspectVisionPayload(data);
+        const rawText = apiFormat === 'openai-responses' ? extractOpenAIResponseText(data) : inspectVisionPayload(data).rawText;
         if (model !== normalized) {
           console.log(`[Vision API] 主模型不可用，已按统一优先级切换至: ${model}`);
         }
-        let promptTokens = Number(data.usage?.prompt_tokens || data.usage?.promptTokens || 0);
-        let completionTokens = Number(data.usage?.completion_tokens || data.usage?.completionTokens || 0);
+        let promptTokens = Number(data.usage?.input_tokens || data.usage?.prompt_tokens || data.usage?.promptTokens || 0);
+        let completionTokens = Number(data.usage?.output_tokens || data.usage?.completion_tokens || data.usage?.completionTokens || 0);
         let totalTokens = Number(data.usage?.total_tokens || data.usage?.totalTokens || 0);
         if (totalTokens === 0) {
           const contentText = Array.isArray(contentArray)

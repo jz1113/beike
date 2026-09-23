@@ -1,6 +1,7 @@
 import { postVisionJson } from './visionTransport';
 import type { DeconstructProgress } from './progress';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { buildOpenAIVisionRequest, extractOpenAIResponseText, openAIResponsesUrl } from '../openaiResponses';
 import { mapWithConcurrency } from '@beike/domain/asyncPool';
 import { convertToStandardJpegDataUrl } from '@beike/server-kit/imageConverter';
 import { resolveVisionTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS } from '@beike/domain/visionTimeouts';
@@ -35,6 +36,7 @@ export async function callVisionJson(params: {
   modelsToTry: string[];
   targetBaseUrl: string;
   targetApiKey: string;
+  apiFormat?: 'openai-responses';
   contentArray: Array<{ type: string; text?: string; image_url?: { url: string } }>;
   label: string;
   operationId?: string;
@@ -43,7 +45,7 @@ export async function callVisionJson(params: {
   diagnostics?: VisionCallDiagnostics;
   onProgress?: (stage: DeconstructProgress['stage'], message: string) => void;
 }): Promise<{ rawJsonText: string; usedModel: string } | null> {
-  const { modelsToTry, targetBaseUrl, targetApiKey, contentArray, label, operationId, maxTokens, tracker, diagnostics, onProgress } =
+  const { modelsToTry, targetBaseUrl, targetApiKey, apiFormat, contentArray, label, operationId, maxTokens, tracker, diagnostics, onProgress } =
     params;
 
   let hadSuccess = false;
@@ -73,13 +75,15 @@ export async function callVisionJson(params: {
             const timer = setTimeout(() => controller.abort(), timeoutMs);
 
             try {
-              const resp = await postVisionJson(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
+              const resp = await postVisionJson(apiFormat === 'openai-responses' ? openAIResponsesUrl(targetBaseUrl) : `${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
                 headers: {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${targetApiKey}`,
                   ...(operationId ? { 'x-idempotency-key': operationId } : {}),
                 },
-                body: JSON.stringify({
+                body: JSON.stringify(apiFormat === 'openai-responses'
+                  ? buildOpenAIVisionRequest(targetModel, contentArray, maxTokens ?? 8192, true)
+                  : {
                   model: targetModel,
                   messages: [{ role: 'user', content: contentArray }],
                   temperature: 0.2,
@@ -133,7 +137,9 @@ export async function callVisionJson(params: {
               }
 
               const data = await resp.json();
-              const content = data.choices?.[0]?.message?.content || '';
+              const content = apiFormat === 'openai-responses'
+                ? extractOpenAIResponseText(data)
+                : data.choices?.[0]?.message?.content || '';
               if (content) {
                 onProgress?.('reconciling', '模型已返回，正在解析内容');
                 hadSuccess = true;

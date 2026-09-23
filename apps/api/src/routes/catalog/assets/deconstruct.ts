@@ -105,6 +105,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       fallbackModels = [],
       customBaseUrl,
       customApiKey,
+      apiFormat,
       autoSave = true,
       albumName: bodyAlbumName,
       productTitle,
@@ -159,7 +160,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
     // The gateway policy decides whether a fallback is safe. The full configured
     // chain is retained only for an explicit “model unavailable” response.
     const pass1Models = filterVisionCapableModels(
-      buildPass1VisionModelsToTry(primaryModel, fallbackList)
+      apiFormat === 'openai-responses' && primaryModel ? [primaryModel] : buildPass1VisionModelsToTry(primaryModel, fallbackList)
     );
     if (pass1Models.length === 0) {
       return jsonResponse({ error: '请先在设置中配置支持图像输入的多模态模型' }, 400);
@@ -228,6 +229,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       modelsToTry: pass1Models,
       targetBaseUrl,
       targetApiKey,
+      apiFormat: apiFormat === 'openai-responses' ? 'openai-responses' : undefined,
       userHint,
       targetCategory,
       customSubCategories,

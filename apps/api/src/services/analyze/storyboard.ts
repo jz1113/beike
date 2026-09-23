@@ -3,6 +3,7 @@ import {
   buildProductOnlyVisionPrompt,
   extractProductSentences,
   fillProductSentences,
+  expandGroupShotSkeleton,
 } from '@beike/domain/workshopPipeline';
 import { evaluateStoryboardQuality } from '@beike/domain/promptAsset';
 import {
@@ -28,6 +29,7 @@ export interface ExecuteStoryboardParams {
   fallbackModels: string[];
   targetBaseUrl: string;
   targetApiKey: string;
+  apiFormat?: 'openai-responses';
   hasAnchorFace: boolean;
   previousMasterScenes?: any[];
   previousGroupSignatures?: any[];
@@ -44,7 +46,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   const {
     productTitle, productProps, imageUrls = [], anchorFaceImageUrl, modelPersona,
     resolvedTemplateStyle, shotCount, extraRequirements, model, fallbackModels = [],
-    targetBaseUrl, targetApiKey, hasAnchorFace, previousActionIds = [], previousSceneIds = [],
+    targetBaseUrl, targetApiKey, apiFormat, hasAnchorFace, previousActionIds = [], previousSceneIds = [],
     allocatedAssets, lockedAssets, productIndex, useAssetLibrary, batchId,
   } = params;
 
@@ -71,11 +73,12 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     }
   }
 
-  const lockedGroup = useAssetLibrary === false ? null : await loadLockedGroupSkeleton(lockedAssets?.fullPromptId);
+  const lockedGroup = await loadLockedGroupSkeleton(lockedAssets?.fullPromptId);
+  if (!lockedGroup) throw new Error('请先在生成设置中选择完整的四图母本，再分析商品');
   if (lockedGroup) {
     // 载入图组时沿用该组的场景、人物与穿搭；仅用户明确锁定的槽位才覆盖。
     assetLibraryData ||= { personas: [], scenes: [], outfits: [], actions: [] };
-    if (!lockedAssets?.actionId) assetLibraryData.actions = [];
+    assetLibraryData.actions = [];
     if (!lockedAssets?.sceneId && lockedGroup.sceneSummary) {
       assetLibraryData.scenes = [{ title: '图组原场景', description: lockedGroup.sceneSummary }];
     }
@@ -90,7 +93,8 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   let filledSlots = assembleStoryboardSlots({
     shotCount,
     assets: assetLibraryData,
-    lockedGroupShots: lockedGroup?.shots.map((shot) => lockedAssets?.sceneId ? { ...shot, scene: '' } : shot),
+    lockedGroupShots: expandGroupShotSkeleton(lockedGroup.shots, shotCount)
+      .map((shot) => lockedAssets?.sceneId ? { ...shot, scene: '' } : shot),
     personaMode,
   });
   const usedLibrary = usedPublishedLibrary || Boolean(lockedGroup);
@@ -122,7 +126,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
 
   const preparedImages = await prepareAnalyzeImages(imagesToInspect);
   const visionResult = await callVisionModel(
-    model, buildVisionContent(systemPrompt, preparedImages), targetBaseUrl, targetApiKey, fallbackModels, filledSlots.shotCount,
+    model, buildVisionContent(systemPrompt, preparedImages), targetBaseUrl, targetApiKey, fallbackModels, filledSlots.shotCount, false, apiFormat,
   );
   if (!visionResult.rawText) {
     throw new Error(`视觉模型 [${visionResult.actualModel}] 未返回任何内容，请检查模型可用性或切换其他模型`);

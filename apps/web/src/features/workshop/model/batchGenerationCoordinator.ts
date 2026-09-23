@@ -195,7 +195,8 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
           bumpProgress(true, shots.length);
           return;
         }
-        if (generationStrategy === 'grid_first' && shots.length === 4 && pendingShots.length === 4) {
+        if (generationStrategy === 'grid_first' && shots.length === 4 && pendingShots.length === 4
+          && shots.every((shot) => !shot.compositionReferenceImageUrl)) {
           await generateItemViaGrid(live, live.id, taskConfig, setItems, bumpProgress);
           return;
         }

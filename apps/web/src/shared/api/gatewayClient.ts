@@ -48,6 +48,24 @@ export function getGatewayClientOverrides(): {
   };
 }
 
+/** GPT 5.6 / GPT 6 的视觉请求可单独走 Responses API，不替换生图/视频主网关。 */
+export function getMultimodalClientOverrides(modelId: string): {
+  customBaseUrl?: string;
+  customApiKey?: string;
+  apiFormat?: 'openai-responses';
+} {
+  const primary = getGatewayClientOverrides();
+  if (typeof localStorage === 'undefined' || localStorage.getItem('openai_responses_enabled') !== 'true' ||
+      !/^gpt-(?:5\.6|6)(?:-|$)/i.test(modelId)) return primary;
+  const key = localStorage.getItem('openai_api_key')?.trim();
+  if (!key) return primary;
+  return {
+    customBaseUrl: localStorage.getItem('openai_base_url')?.trim() || 'https://api.openai.com',
+    customApiKey: key,
+    apiFormat: 'openai-responses',
+  };
+}
+
 export function getGatewayClientHeaders(): Record<string, string> {
   const { customBaseUrl, customApiKey, customWanbangKey, customWanbangSecret } = getGatewayClientOverrides();
   const headers: Record<string, string> = {};

@@ -4,7 +4,6 @@ import { apiFetch } from '@/shared/api/apiClient';
 import {
   persistAiGatewayConfig,
   persistDeepSeekConfig,
-  persistLianchiConfig,
   persistExternalScraperConfig,
   persistQiyunConfig,
   persistStorageConfig,
@@ -14,6 +13,8 @@ import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/shared/api/ga
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { credentialGet } from '@/shared/api/credentialClient';
 import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
+import { useIndependentModelProviders } from './useIndependentModelProviders';
+import { testScraperConnection, testQiyunConnection, testWanbangConnection } from '../settingsConnectionChecks';
 
 interface UseSettingsConfigOptions {
   isOpen: boolean;
@@ -30,9 +31,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [deepSeekApiKey, setDeepSeekApiKey] = useState('');
   const [showDeepSeekKey, setShowDeepSeekKey] = useState(false);
   const [isTestingDeepSeek, setIsTestingDeepSeek] = useState(false);
-  const [lianchiApiKey, setLianchiApiKey] = useState('');
-  const [showLianchiKey, setShowLianchiKey] = useState(false);
-  const [isTestingLianchi, setIsTestingLianchi] = useState(false);
+  const independentProviders = useIndependentModelProviders(isOpen, showToast);
 
   // 万邦 (OneBound)
   const [wanbangKey, setWanbangKey] = useState('');
@@ -95,7 +94,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
 
         const savedDeepSeekKey = await credentialGet('deepseek_api_key');
         setDeepSeekApiKey(savedDeepSeekKey || localStorage.getItem('deepseek_api_key') || '');
-        setLianchiApiKey(await credentialGet('lianchi_api_key'));
+
 
         const savedWbKey = await credentialGet('wanbang_api_key');
         const savedWbSec = await credentialGet('wanbang_api_secret');
@@ -218,65 +217,10 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     }
   };
 
-  const handleSaveLianchiConfig = async () => {
-    try {
-      await persistLianchiConfig(lianchiApiKey);
-      showToast('✅ 联池 API Key 已保存；选择「联池image2」即可调用');
-    } catch (error) {
-      showToast(`🔴 联池密钥保存失败：${formatUserError(error, '请重试')}`);
-    }
-  };
-
-  const handleTestLianchi = async () => {
-    if (!lianchiApiKey.trim()) { showToast('⚠️ 请先填写联池 API Key'); return; }
-    setIsTestingLianchi(true);
-    try {
-      const response = await apiFetch('/api/system/models/fetch', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: 'https://api.gapnet.ai/endpoint', apiKey: lianchiApiKey.trim(), isPing: true, strict: true }),
-      });
-      const data = await response.json().catch(() => ({}));
-      showToast(response.ok && data.success ? '🟢 联池模型接口连通正常' : `🔴 联池接口异常：${data.error || response.status}`);
-    } catch (error) {
-      showToast(`🔴 联池连接失败：${formatUserError(error, '网络错误')}`);
-    } finally { setIsTestingLianchi(false); }
-  };
-
-  // 测试万邦电商数据采集接口连通性
   const handleTestWanbang = async () => {
-    if (!wanbangKey.trim() || !wanbangSecret.trim()) {
-      showToast('⚠️ 请先填写万邦 API Key 和 API Secret');
-      return;
-    }
     setIsTestingWanbang(true);
-    try {
-      const res = await apiFetch('/api/system/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'wanbang',
-          wanbangKey: wanbangKey.trim() || undefined,
-          wanbangSecret: wanbangSecret.trim() || undefined,
-        }),
-      });
-      const raw = await res.text();
-      let data: { success?: boolean; message?: string; error?: string } = {};
-      try {
-        data = raw.trim() ? JSON.parse(raw) : {};
-      } catch {
-        showToast('🔴 万邦接口异常: 服务端返回空或非 JSON 响应，请确认应用服务正在运行后重试');
-        return;
-      }
-      if (res.ok && data.success) {
-        showToast(`🟢 ${data.message || '万邦电商接口连通正常！'}`);
-      } else {
-        showToast(`🔴 万邦接口异常: ${data.error || '无法连通万邦网关'}`);
-      }
-    } catch (err: any) {
-      showToast(`🔴 网络超时: ${formatUserError(err, '测试失败')}`);
-    } finally {
-      setIsTestingWanbang(false);
-    }
+    try { await testWanbangConnection(wanbangKey, wanbangSecret, showToast); }
+    finally { setIsTestingWanbang(false); }
   };
 
   // 自动保存 API 配置
@@ -324,36 +268,9 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   };
 
   const handleTestScraper = async () => {
-    if (!scraperId.trim() || !scraperSecret.trim()) {
-      showToast('⚠️ 请先填写 APIA Client ID 和 Secret Key');
-      return;
-    }
     setIsTestingScraper(true);
-    try {
-      const res = await apiFetch('/api/system/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'external_scraper',
-          externalScraperId: scraperId.trim(),
-          externalScraperSecret: scraperSecret.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.parseOk) {
-          showToast(`🟢 ${data.message || 'APIA 小红书解析测试通过！'}`);
-        } else {
-          showToast(`🟡 ${data.message || 'APIA 密钥有效，但测试笔记未能解析'}`);
-        }
-      } else {
-        showToast(`🔴 APIA 接口异常: ${data.error || '无法连通 APIA 网关'}`);
-      }
-    } catch (err: unknown) {
-      showToast(`🔴 网络超时: ${formatUserError(err, '测试失败')}`);
-    } finally {
-      setIsTestingScraper(false);
-    }
+    try { await testScraperConnection(scraperId, scraperSecret, showToast); }
+    finally { setIsTestingScraper(false); }
   };
 
   const handleSaveQiyunConfig = () => {
@@ -363,32 +280,9 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   };
 
   const handleTestQiyun = async () => {
-    if (!qiyunAppId.trim() || !qiyunAppKey.trim()) {
-      showToast('⚠️ 请先填写奇云 App ID 和 App Key');
-      return;
-    }
     setIsTestingQiyun(true);
-    try {
-      const res = await apiFetch('/api/system/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'qiyun',
-          qiyunAppId: qiyunAppId.trim(),
-          qiyunAppKey: qiyunAppKey.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        showToast(`🟢 ${data.message || '奇云解析接口测试通过！'}`);
-      } else {
-        showToast(`🔴 奇云接口异常: ${data.error || '无法连通奇云网关'}`);
-      }
-    } catch (err: unknown) {
-      showToast(`🔴 网络超时: ${formatUserError(err, '测试失败')}`);
-    } finally {
-      setIsTestingQiyun(false);
-    }
+    try { await testQiyunConnection(qiyunAppId, qiyunAppKey, showToast); }
+    finally { setIsTestingQiyun(false); }
   };
 
   const handleSaveStorageConfig = async () => {
@@ -426,13 +320,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     isTestingDeepSeek,
     handleTestDeepSeek,
     handleSaveDeepSeekConfig,
-    lianchiApiKey,
-    setLianchiApiKey,
-    showLianchiKey,
-    setShowLianchiKey,
-    isTestingLianchi,
-    handleTestLianchi,
-    handleSaveLianchiConfig,
+    ...independentProviders,
     appAccessToken,
     setAppAccessToken,
     handleSaveApiConfig,
