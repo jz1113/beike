@@ -11,9 +11,10 @@ import {
 import { advanceKnownFailureVersions, applyBatchResults, countReviewRecords, isKnownModelOutputFailure, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
 import { reviewBatchWithRecovery } from '../model/reviewBatchRecovery';
 import { DEEPSEEK_BASE_URL, requestReviewBatch, type BalanceResponse } from '../model/reviewRequest';
+import { MAX_REVIEW_CONCURRENCY, ReviewPacer } from '../model/reviewPacer';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
-export const KEYWORD_REVIEW_CONCURRENCY = 16;
+export const KEYWORD_REVIEW_CONCURRENCY = MAX_REVIEW_CONCURRENCY;
 export const KEYWORD_REVIEW_MODEL = 'deepseek-flash';
 export const KEYWORD_REVIEW_MODEL_LABEL = 'DeepSeek Flash';
 export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected';
@@ -228,6 +229,8 @@ export function useKeywordReview() {
     let completedNow = 0;
     let failedNow = 0;
     let lookedUpNow = 0;
+    let rateLimitRetries = 0;
+    const pacer = new ReviewPacer();
     const runState: { fatalError: Error | null } = { fatalError: null };
     try {
       let nextIndex = 0;
@@ -250,25 +253,37 @@ export function useKeywordReview() {
             const payload = JSON.stringify({ model: KEYWORD_REVIEW_MODEL, lookup: lookupEnabled, rulesVersion, rows });
             const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
             const fingerprint = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
-            const retryVersion = batchRetryVersionsRef.current.get(sourceIndex) ?? 0;
-            if (controller.signal.aborted || stopRequestedRef.current) return;
-            balanceSpendVersionRef.current += 1;
-            setBalanceDirty(true);
-            try {
-              const data = await requestReviewBatch(JSON.stringify({
-                model: KEYWORD_REVIEW_MODEL, customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey,
-                lookup: lookupEnabled, rulesVersion, rows,
-              }), controller.signal, `keyword:${fingerprint}:${retryVersion}`);
-              setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
-              completedNow += chunk.length;
-              lookedUpNow += Number(data.lookedUp || 0);
-              refreshBalance();
-            } catch (error) {
-              refreshBalance(true);
-              if ((error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid) {
-                batchRetryVersionsRef.current.set(sourceIndex, retryVersion + 1);
+            for (let retry = 0; retry < 5; retry += 1) {
+              if (!await pacer.acquire(() => controller.signal.aborted || stopRequestedRef.current)) return;
+              const retryVersion = batchRetryVersionsRef.current.get(sourceIndex) ?? 0;
+              balanceSpendVersionRef.current += 1;
+              setBalanceDirty(true);
+              try {
+                const data = await requestReviewBatch(JSON.stringify({
+                  model: KEYWORD_REVIEW_MODEL, customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey,
+                  lookup: lookupEnabled, rulesVersion, rows,
+                }), controller.signal, `keyword:${fingerprint}:${retryVersion}`);
+                pacer.succeeded();
+                setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
+                completedNow += chunk.length;
+                lookedUpNow += Number(data.lookedUp || 0);
+                refreshBalance();
+                return;
+              } catch (error) {
+                const limited = (error as Error & { rateLimited?: boolean }).rateLimited === true;
+                if (limited) pacer.rateLimited(retry);
+                else pacer.failed();
+                if (limited || (error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid) {
+                  batchRetryVersionsRef.current.set(sourceIndex, retryVersion + 1);
+                }
+                if (limited && retry < 4 && !controller.signal.aborted && !stopRequestedRef.current) {
+                  rateLimitRetries += 1;
+                  setNotice(`DeepSeek 限流，已降至 ${pacer.concurrency} 个并行请求并等待重试…`);
+                  continue;
+                }
+                refreshBalance(true);
+                throw error;
               }
-              throw error;
             }
           };
           try {
@@ -314,7 +329,7 @@ export function useKeywordReview() {
           ? `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}，还剩 ${leftover} 条未审核`
           : `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}`);
       } else {
-        setNotice(`批量审核已处理到最后一个词：完成 ${completedNow} 条${failedNow > 0 ? `，仍失败 ${failedNow} 条（可手动重审）` : ''}${lookupNote}`);
+        setNotice(`批量审核已处理到最后一个词：完成 ${completedNow} 条${failedNow > 0 ? `，仍失败 ${failedNow} 条（可手动重审）` : ''}${lookupNote}${rateLimitRetries > 0 ? `，限流后重试 ${rateLimitRetries} 次` : ''}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '审核失败';
