@@ -161,7 +161,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
               <div className="mb-7 text-center">
                 <p className="text-xs font-black tracking-[0.22em] text-amber-600">SEMANTIC REVIEW</p>
                 <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-5xl">{review.reviewMode === 'video' ? '视频关键词分类及制作判断' : '图文关键词分类及制作判断'}</h1>
-                <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">按原表头读取全部工作表。空的实体拓展 q 和分类列不会进入结果表，审核列接在下发时间后面。可先试跑 {review.batchSize} 条，确认无误后再批量连续审核。审核模型可在右上角切换。</p>
+                <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">{review.reviewMode === 'video'
+                  ? `读取视频词包的 query、相关拓展q 等原始列，保留原“分类”，逐行新增最终垂类和低价值标记。可先试跑 ${review.batchSize} 条，再批量连续审核。`
+                  : `按原表头读取全部工作表。空的实体拓展 q 和分类列不会进入结果表，审核列接在下发时间后面。可先试跑 ${review.batchSize} 条，确认无误后再批量连续审核。`}审核模型可在右上角切换。</p>
               </div>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => { receiveFile(event.target.files?.[0]); event.currentTarget.value = ''; }} />
               <button
