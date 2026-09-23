@@ -3,6 +3,7 @@ import { apiFetch } from '@/shared/api/apiClient';
 import { pickVisionAnalyzeFallbacks, PreviousGroupSignature } from '@beike/domain/vision';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { getMultimodalClientOverrides } from '@/shared/api/gatewayClient';
+import { isOpenAIModelRouteId, upstreamModelId } from '@beike/domain/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@beike/domain/jewelryArch';
 import type { BatchProductItem } from './batchTypes';
@@ -117,10 +118,10 @@ export async function analyzeBatchProduct(
           } : undefined,
           extraRequirements: `- 🚨【分镜数量严格保证】：必须输出完整的 ${targetShotCount} 个分镜，数组 prompts 长度必须严格等于 ${targetShotCount}！\n- 🚨【商品外观唯一锚定 @图片1】：美学置景与构图写入文字，生图只垫商品图。`,
           shotCount: targetShotCount,
-          model: deps.selectedVisionModel,
-          fallbackModels: pickVisionAnalyzeFallbacks(
+          model: upstreamModelId(deps.selectedVisionModel),
+          fallbackModels: isOpenAIModelRouteId(deps.selectedVisionModel) ? [] : pickVisionAnalyzeFallbacks(
             deps.selectedVisionModel,
-            (deps.availableVisionModels || []).map(m => m.id).filter(Boolean)
+            (deps.availableVisionModels || []).map(m => m.id).filter(id => Boolean(id) && !isOpenAIModelRouteId(id))
           ),
           customBaseUrl: localUrl,
           customApiKey: localApiKey,
@@ -184,8 +185,8 @@ export async function analyzeBatchProduct(
       const totalTokens = usageTokens.totalTokens || usageTokens.total_tokens || (promptTokens + completionTokens);
 
       recordModelUsage({
-        modelId: usedModel,
-        modelName: usedModel,
+        modelId: isOpenAIModelRouteId(deps.selectedVisionModel) ? deps.selectedVisionModel : usedModel,
+        modelName: isOpenAIModelRouteId(deps.selectedVisionModel) ? `${usedModel} · OpenAI 渠道` : usedModel,
         provider: resolveModelVendor(usedModel),
         type: 'vision',
         promptTokens,

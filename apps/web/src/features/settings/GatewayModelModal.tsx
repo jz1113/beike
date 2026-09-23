@@ -22,6 +22,7 @@ import {
 import { getModelIcon } from '@/shared/ui/ModelIcons';
 import { settingsModalShell, settingsPanelPad, settingsTouchBtn } from '@/shared/ui/layoutClasses';
 import { inferWorkflowCapabilitiesFromId } from '@beike/domain/workflowModels';
+import { openAIModelRouteId } from '@beike/domain/workflowModels';
 import { VENDORS, identifyVendor, type VendorMeta } from '@beike/domain/vendorRegistry';
 
 export interface GatewayModelItem {
@@ -50,6 +51,7 @@ interface Props {
   onAddAllUsefulModels: () => void;
   isLoading?: boolean;
   gatewayName?: string;
+  channel: 'comfly' | 'openai' | 'lianchi';
 }
 
 export default function GatewayModelModal({
@@ -61,7 +63,9 @@ export default function GatewayModelModal({
   onAddAllUsefulModels,
   isLoading = false,
   gatewayName = '网关',
+  channel,
 }: Props) {
+  const routeId = (id: string) => channel === 'openai' ? openAIModelRouteId(id) : id;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeTab, setSelectedTypeTab] = useState<'all' | 'image' | 'multimodal' | 'video'>('all');
   const [selectedVendorId, setSelectedVendorId] = useState<string>('all');
@@ -217,7 +221,7 @@ export default function GatewayModelModal({
   // 一键接入该厂商全部匹配模型
   const handleAddAllFromVendor = (models: GatewayModelItem[]) => {
     models.forEach(m => {
-      if (m.supported !== false && !activeModelIds.has(m.id)) {
+      if (m.supported !== false && !activeModelIds.has(routeId(m.id))) {
         onToggleAddModel(m);
       }
     });
@@ -270,6 +274,11 @@ export default function GatewayModelModal({
         {gatewayName === '联池' && (
           <p className="px-5 py-2 text-xs text-indigo-800 bg-indigo-50 border-b border-indigo-100">
             {isLoading ? '正在读取联池账户可用模型。' : '下列模型由联池实时返回。当前应用仅支持接入已适配的图像模型；其他模型可查看，暂不能加入工作流。'}
+          </p>
+        )}
+        {channel === 'openai' && (
+          <p className="px-5 py-2 text-xs text-indigo-800 bg-indigo-50 border-b border-indigo-100">
+            此处的 OpenAI 是调用渠道，列表内的 OpenAI 等名称是模型厂商。同名模型可分别从 OpenAI 与 Comfly 接入，并在视觉模型选择器中按渠道选择。
           </p>
         )}
 
@@ -417,7 +426,7 @@ export default function GatewayModelModal({
             <div className="space-y-4">
               {filteredVendorGroups.map(({ vendor, models }) => {
                 const isCollapsed = collapsedVendors[vendor.id];
-                const addedCountInVendor = models.filter(m => activeModelIds.has(m.id)).length;
+                const addedCountInVendor = models.filter(m => activeModelIds.has(routeId(m.id))).length;
 
                 return (
                   <div 
@@ -476,7 +485,7 @@ export default function GatewayModelModal({
                     {!isCollapsed && (
                       <div className="p-2.5 divide-y divide-slate-100">
                         {models.map(model => {
-                          const isAdded = activeModelIds.has(model.id);
+                          const isAdded = activeModelIds.has(routeId(model.id));
 
                           return (
                             <div
@@ -496,6 +505,9 @@ export default function GatewayModelModal({
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-mono text-slate-900 font-semibold text-sm truncate">
                                       {model.id}
+                                    </span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 ${channel === 'openai' ? 'bg-emerald-50 text-emerald-700' : channel === 'lianchi' ? 'bg-sky-50 text-sky-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                                      {channel === 'openai' ? 'OpenAI 渠道' : channel === 'lianchi' ? '联池渠道' : 'Comfly 渠道'}
                                     </span>
                                     {model.name && model.name !== model.id && (
                                       <span className="text-xs text-slate-400 truncate hidden sm:inline">
@@ -574,7 +586,7 @@ export default function GatewayModelModal({
         {/* 🌟 4. 底部固化操作栏 */}
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm text-slate-600 flex-shrink-0">
           <span>
-            共匹配 <strong className="text-slate-900 font-mono font-bold">{totalMatchedCount}</strong> 款模型 | 已接入 <strong className="text-indigo-600 font-mono font-bold">{activeModelIds.size}</strong> 款模型到系统
+            共匹配 <strong className="text-slate-900 font-mono font-bold">{totalMatchedCount}</strong> 款模型 | 此渠道已接入 <strong className="text-indigo-600 font-mono font-bold">{allGatewayModels.filter(model => activeModelIds.has(routeId(model.id))).length}</strong> 款
           </span>
           <button
             onClick={onClose}

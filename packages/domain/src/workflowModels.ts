@@ -14,6 +14,9 @@ import { domainStorage } from './runtime';
 
 export type WorkflowCapability = {
   id: string;
+  /** Upstream model ID stays bare; routeId distinguishes equal IDs on separate gateways. */
+  routeId?: string;
+  channel?: 'comfly' | 'openai' | 'lianchi';
   name?: string;
   shortName?: string;
   provider?: string;
@@ -29,6 +32,24 @@ export type WorkflowCapability = {
   isThinking?: boolean;
   isCustom?: boolean;
 };
+
+export const OPENAI_MODEL_ROUTE_PREFIX = 'openai-responses:';
+
+export function openAIModelRouteId(modelId: string): string {
+  return `${OPENAI_MODEL_ROUTE_PREFIX}${modelId}`;
+}
+
+export function isOpenAIModelRouteId(routeId: string): boolean {
+  return routeId.startsWith(OPENAI_MODEL_ROUTE_PREFIX);
+}
+
+export function upstreamModelId(routeId: string): string {
+  return isOpenAIModelRouteId(routeId) ? routeId.slice(OPENAI_MODEL_ROUTE_PREFIX.length) : routeId;
+}
+
+export function workflowModelRouteId(model: Pick<WorkflowCapability, 'id' | 'routeId' | 'channel'>): string {
+  return model.routeId || (model.channel === 'openai' ? openAIModelRouteId(model.id) : model.id);
+}
 
 export type InferredWorkflowCapabilities = {
   isImage: boolean;
@@ -203,20 +224,34 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
   const raw = readWorkflowModelsFromStorage();
   if (raw.length === 0) return raw;
 
+  const storage = domainStorage();
+  const migrateLegacyOpenAI = storage?.getItem('openai_responses_enabled') === 'true'
+    && storage.getItem('openai_channel_split_v1') !== 'true';
+  const legacyOpenAIModels = migrateLegacyOpenAI
+    ? raw.filter(item => /^gpt-(?:5\.6|6)(?:-|$)/i.test(item.id) && isApprovedModel(item.id, 'multimodal'))
+      .map(item => ({ ...item, channel: 'openai' as const, routeId: openAIModelRouteId(item.id) }))
+    : [];
+  const source = [...raw, ...legacyOpenAIModels];
+
   const seen = new Set<string>();
   const repaired: WorkflowCapability[] = [];
 
-  for (const item of raw) {
+  for (const item of source) {
     const canonicalId = repairWorkflowModelId(item.id);
     if (!isApprovedModel(canonicalId)) continue;
-    if (seen.has(canonicalId.toLowerCase())) continue;
-    seen.add(canonicalId.toLowerCase());
+    const routeId = item.channel === 'openai' || isOpenAIModelRouteId(item.routeId || '')
+      ? openAIModelRouteId(canonicalId) : canonicalId;
+    if (seen.has(routeId.toLowerCase())) continue;
+    seen.add(routeId.toLowerCase());
 
     const builtin = IMAGE_GEN_MODELS.find((m) => m.id === canonicalId);
     repaired.push(
       normalizeWorkflowModel({
         ...item,
         id: canonicalId,
+        routeId: routeId === canonicalId ? undefined : routeId,
+        channel: routeId === canonicalId ? (item.channel || (canonicalId === 'openai/gpt-image-2' ? 'lianchi' : 'comfly')) : 'openai',
+        isAssistant: routeId === canonicalId ? item.isAssistant : false,
         name: item.id !== canonicalId ? (builtin?.name || item.name || canonicalId) : (item.name || builtin?.name || canonicalId),
         shortName: item.id !== canonicalId ? (builtin?.shortName || item.shortName || canonicalId) : (item.shortName || builtin?.shortName || canonicalId),
         badge: item.badge || builtin?.badge,
@@ -227,11 +262,25 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
   }
 
   const changed = JSON.stringify(raw) !== JSON.stringify(repaired);
+  let persisted = true;
   if (changed) {
     try {
-      domainStorage()?.setItem('custom_models', JSON.stringify(repaired));
+      storage?.setItem('custom_models', JSON.stringify(repaired));
     } catch {
-      /* ignore quota errors */
+      persisted = false;
+    }
+  }
+  if (migrateLegacyOpenAI && storage && persisted) {
+    try {
+      for (const key of ['ai_multimodal_model', 'ai_vision_model']) {
+        const selected = storage.getItem(key);
+        if (selected && legacyOpenAIModels.some(model => model.id === selected)) {
+          storage.setItem(key, openAIModelRouteId(selected));
+        }
+      }
+      storage.setItem('openai_channel_split_v1', 'true');
+    } catch {
+      /* Keep the migration retryable if storage rejects the marker. */
     }
   }
   return repaired;
@@ -243,6 +292,8 @@ export function repairWorkflowModelsForSettings() {
     const caps = inferWorkflowCapabilitiesFromId(m.id);
     return {
       id: m.id,
+      routeId: m.routeId,
+      channel: m.channel,
       name: m.name || m.id,
       shortName: m.shortName || m.id.split(/[-_]/)[0] || m.id,
       badge: m.badge,
@@ -320,7 +371,7 @@ export function setStoredMultimodalModelId(id: string): void {
   try {
     storage.setItem('ai_multimodal_model', id);
     storage.setItem('ai_vision_model', id);
-    storage.setItem('ai_assistant_model', id);
+    if (!isOpenAIModelRouteId(id)) storage.setItem('ai_assistant_model', id);
   } catch {
     /* ignore quota errors */
   }
@@ -352,15 +403,18 @@ export function gatewayModelToWorkflowModel(model: {
   isMultimodal?: boolean;
   isThinking?: boolean;
   category?: string;
-}): WorkflowCapability {
+}, channel: WorkflowCapability['channel'] = 'comfly'): WorkflowCapability {
   return normalizeWorkflowModel({
     id: model.id,
+    routeId: channel === 'openai' ? openAIModelRouteId(model.id) : undefined,
+    channel,
     name: model.name || model.id,
     shortName: model.shortName || model.id.split(/[-_]/)[0] || model.name || model.id,
     isVision: model.isVision,
     isImage: model.isImage,
     isVideo: model.isVideo || model.category === 'video',
     isMultimodal: model.isMultimodal,
+    isAssistant: channel === 'openai' ? false : undefined,
     isThinking: model.isThinking,
     isCustom: false,
   });
@@ -433,7 +487,12 @@ export function getEnabledMultimodalModelsFromSettings(
 ): WorkflowCapability[] {
   const list = models ?? repairWorkflowModelsInStorage();
   return sortModelsByMultimodalPriority(
-    list.filter((m) => isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal')),
+    list.filter((m) => isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal'))
+      .map((m) => ({ ...m, id: workflowModelRouteId(m),
+        name: `${m.name || m.id} · ${m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道'}`,
+        shortName: `${m.shortName || m.id} · ${m.channel === 'openai' ? 'OpenAI' : 'Comfly'}`,
+        provider: m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道',
+      })),
   );
 }
 

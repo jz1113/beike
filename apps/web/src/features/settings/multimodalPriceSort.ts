@@ -14,8 +14,8 @@ export function multimodalPriceScore(modelId: string, prices: SortPriceMap = COM
 /** Reorder only multimodal slots. Keep image/video placement and unknown-price ties stable. */
 export function sortMultimodalModelsByPrice<T extends WorkflowCapability>(models: readonly T[], prices?: SortPriceMap): T[] {
   const priced = models.filter(isMultimodalWorkflowModel).sort((a, b) => {
-    const aPrice = multimodalPriceScore(a.id, prices);
-    const bPrice = multimodalPriceScore(b.id, prices);
+    const aPrice = a.channel === 'openai' ? null : multimodalPriceScore(a.id, prices);
+    const bPrice = b.channel === 'openai' ? null : multimodalPriceScore(b.id, prices);
     if (aPrice === null) return bPrice === null ? 0 : 1;
     if (bPrice === null) return -1;
     return aPrice - bPrice;

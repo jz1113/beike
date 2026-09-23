@@ -1,4 +1,5 @@
 import { apiFetch } from '@/shared/api/apiClient';
+import { getEnabledMultimodalModelsFromSettings, isOpenAIModelRouteId, upstreamModelId } from '@beike/domain/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import type { BatchProductItem } from './batchTypes';
 
@@ -37,11 +38,14 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
       : [item.coverImage];
 
   try {
+    const copyModel = isOpenAIModelRouteId(ctx.selectedVisionModel)
+      ? getEnabledMultimodalModelsFromSettings().find(model => model.channel !== 'openai')?.id || 'gpt-5.4-mini'
+      : upstreamModelId(ctx.selectedVisionModel);
     const res = await apiFetch('/api/generate/copywriting', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: ctx.selectedVisionModel || undefined,
+        model: copyModel || undefined,
         productTitle: item.title,
         productCategory: item.category,
         productRole: item.productRole || 'held_object',

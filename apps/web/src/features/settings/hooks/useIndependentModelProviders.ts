@@ -64,6 +64,7 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
       if (openAIEnabled && !openAIApiKey.trim()) throw new Error('启用前请填写 OpenAI API Key');
       await persistOpenAIConfig(url.toString().replace(/\/+$/, ''), openAIApiKey);
       localStorage.setItem('openai_responses_enabled', String(openAIEnabled));
+      localStorage.setItem('openai_channel_split_v1', 'true');
       if (openAIAllowInsecureHttp) localStorage.setItem('openai_insecure_http_consent_url', normalizedOpenAIBaseUrl);
       else localStorage.removeItem('openai_insecure_http_consent_url');
       showToast('OpenAI Responses 接口配置已保存');

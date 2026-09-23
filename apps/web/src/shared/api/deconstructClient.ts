@@ -1,5 +1,6 @@
 import { apiFetch } from '@/shared/api/apiClient';
 import { getMultimodalClientOverrides } from '@/shared/api/gatewayClient';
+import { isOpenAIModelRouteId, upstreamModelId } from '@beike/domain/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import type { ImageSetQueueItem } from '@/features/assets/utils/assetPromptConstants';
 import { resolveQueueItemPartial } from '@/features/assets/utils/assetDeconstructCsvExport';
@@ -68,11 +69,12 @@ export async function processDeconstructQueueItem(
       albumName: item.name,
       targetCategory,
       customSubCategories,
-      model: selectedVisionModel,
+      model: upstreamModelId(selectedVisionModel),
       ...getMultimodalClientOverrides(selectedVisionModel),
       // The server only switches this ordered chain for a definitive “model
       // unavailable” reply; rate limits wait on the current model instead.
-      fallbackModels: modelIds,
+      fallbackModels: isOpenAIModelRouteId(selectedVisionModel) ? []
+        : modelIds.filter(modelId => !isOpenAIModelRouteId(modelId)).map(upstreamModelId),
       clientTaskId: item.id,
       autoSave: !reviewBeforeSave,
       reviewBeforeSave: Boolean(reviewBeforeSave),
@@ -89,8 +91,8 @@ export async function processDeconstructQueueItem(
           const totalTokens = usageTokens.totalTokens || usageTokens.total_tokens || (promptTokens + completionTokens);
 
           recordModelUsage({
-            modelId: usedModel,
-            modelName: usedModel,
+            modelId: isOpenAIModelRouteId(selectedVisionModel) ? selectedVisionModel : usedModel,
+            modelName: isOpenAIModelRouteId(selectedVisionModel) ? `${usedModel} · OpenAI 渠道` : usedModel,
             provider: resolveModelVendor(usedModel),
             type: 'vision',
             promptTokens,

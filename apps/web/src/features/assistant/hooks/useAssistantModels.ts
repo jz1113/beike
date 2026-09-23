@@ -7,7 +7,6 @@ import {
 import {
   getEnabledMultimodalModelsFromSettings,
   repairWorkflowModelsInStorage,
-  resolveStoredMultimodalModelId,
 } from '@beike/domain/workflowModels';
 
 interface UseAssistantModelsOptions {
@@ -28,7 +27,7 @@ export function useAssistantModels({
       repairWorkflowModelsInStorage();
 
       let modelsList = DEFAULT_ASSISTANT_MODELS.map(enrichAssistantModelDisplay);
-      const multimodalFromSettings = getEnabledMultimodalModelsFromSettings();
+      const multimodalFromSettings = getEnabledMultimodalModelsFromSettings().filter(m => m.channel !== 'openai');
       if (multimodalFromSettings.length > 0) {
         modelsList = multimodalFromSettings.map((m) =>
           enrichAssistantModelDisplay({
@@ -43,7 +42,9 @@ export function useAssistantModels({
 
       setAvailableAssistantModels(modelsList);
 
-      const resolvedModel = resolveStoredMultimodalModelId(multimodalFromSettings);
+      const savedAssistantModel = localStorage.getItem('ai_assistant_model') || '';
+      const resolvedModel = modelsList.some(m => m.id === savedAssistantModel)
+        ? savedAssistantModel : modelsList[0]?.id || 'gemini-3.7-flash';
       if (useAppStore.getState().assistantModel !== resolvedModel) {
         setAssistantModel(resolvedModel);
       }

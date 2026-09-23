@@ -6,7 +6,7 @@ import { fetchMediaBlob } from '@/shared/media/downloadMedia';
 import { deleteDerived, getDerived, putDerived } from '@/shared/media/idbMediaCache';
 import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
 import { loadSystemConfiguredModels } from '@/shared/models/configuredModels';
-import { setStoredMultimodalModelId } from '@beike/domain/workflowModels';
+import { isOpenAIModelRouteId } from '@beike/domain/workflowModels';
 import { reservedArtDirectionFor, sourceKey } from '../reservedArtDirections';
 import { directCoverDesign, generateFinalCover, rewriteCoverTitle } from '../api/posterApi';
 import { parseTable } from '../model/parsePosterTable';
@@ -173,11 +173,12 @@ export function usePosterProduction() {
   useEffect(() => {
     const configured = loadSystemConfiguredModels();
     const saved = loadPosterProductionSettings();
+    const titleModels = configured.availableVisionModels.filter(model => !isOpenAIModelRouteId(model.id));
     setHistoryBatches(loadPosterBatchHistory());
     setAvailableImageModels(configured.availableImageModels);
-    setAvailableTitleModels(configured.availableVisionModels);
+    setAvailableTitleModels(titleModels);
     setImageModel(saved.imageModel || configured.selectedImageGenModel);
-    setTitleModel(saved.titleModel || configured.selectedVisionModel);
+    setTitleModel(titleModels.find(model => model.id === saved.titleModel)?.id || titleModels[0]?.id || 'gemini-3.7-flash');
     setTitleHandling(saved.titleHandling || 'rewrite');
     setImageQuality(saved.imageQuality || 'high');
     setConcurrency(normalizeConcurrency(saved.concurrency));
@@ -186,14 +187,15 @@ export function usePosterProduction() {
   useEffect(() => {
     const refreshConfiguredModels = () => {
       const configured = loadSystemConfiguredModels();
+      const titleModels = configured.availableVisionModels.filter(model => !isOpenAIModelRouteId(model.id));
       setAvailableImageModels(configured.availableImageModels);
-      setAvailableTitleModels(configured.availableVisionModels);
+      setAvailableTitleModels(titleModels);
       setImageModel((current) => configured.availableImageModels.some((model) => model.id === current)
         ? current
         : configured.selectedImageGenModel);
-      setTitleModel((current) => configured.availableVisionModels.some((model) => model.id === current)
+      setTitleModel((current) => titleModels.some((model) => model.id === current)
         ? current
-        : configured.selectedVisionModel);
+        : titleModels[0]?.id || 'gemini-3.7-flash');
     };
     window.addEventListener('models_updated', refreshConfiguredModels);
     return () => window.removeEventListener('models_updated', refreshConfiguredModels);
@@ -239,7 +241,6 @@ export function usePosterProduction() {
     setConcurrency(next.concurrency);
     const persisted = persistPosterProductionSettings(next);
     if (persisted) {
-      setStoredMultimodalModelId(next.titleModel);
       setNoticeIfAlive(`生产设置已保存：${next.titleHandling === 'original' ? '保留原标题' : 'AI 优化标题'}，并行任务 ${next.concurrency} 条。`);
     } else {
       setNoticeIfAlive('设置已应用到当前任务，但浏览器无法保存本地配置。');

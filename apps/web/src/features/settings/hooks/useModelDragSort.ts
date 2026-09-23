@@ -1,6 +1,6 @@
 import { useState, type DragEvent } from 'react';
 import { type WorkflowModel } from '../settingsShared';
-import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
+import { isMultimodalWorkflowModel, workflowModelRouteId } from '@beike/domain/workflowModels';
 
 interface UseModelDragSortProps {
   customModels: WorkflowModel[];
@@ -60,7 +60,7 @@ export function useModelDragSort({
     const newCategoryItems = [...categoryItems];
 
     if (action.type === 'move') {
-      const idx = newCategoryItems.findIndex((m) => m.id === action.modelId);
+      const idx = newCategoryItems.findIndex((m) => workflowModelRouteId(m) === action.modelId);
       if (idx === -1) return allModels;
 
       if (action.direction === 'top') {
@@ -79,8 +79,8 @@ export function useModelDragSort({
         newCategoryItems[idx + 1] = temp;
       }
     } else if (action.type === 'reorder') {
-      const sourceIdx = newCategoryItems.findIndex((m) => m.id === action.sourceId);
-      const targetIdx = newCategoryItems.findIndex((m) => m.id === action.targetId);
+      const sourceIdx = newCategoryItems.findIndex((m) => workflowModelRouteId(m) === action.sourceId);
+      const targetIdx = newCategoryItems.findIndex((m) => workflowModelRouteId(m) === action.targetId);
       if (sourceIdx === -1 || targetIdx === -1 || sourceIdx === targetIdx) return allModels;
 
       const [moved] = newCategoryItems.splice(sourceIdx, 1);
@@ -117,8 +117,8 @@ export function useModelDragSort({
     if (!sourceId || sourceId === targetId) return;
 
     if (modelCapabilityFilter === 'all') {
-      const sourceIdx = customModels.findIndex(m => m.id === sourceId);
-      const targetIdx = customModels.findIndex(m => m.id === targetId);
+      const sourceIdx = customModels.findIndex(m => workflowModelRouteId(m) === sourceId);
+      const targetIdx = customModels.findIndex(m => workflowModelRouteId(m) === targetId);
       if (sourceIdx === -1 || targetIdx === -1) return;
 
       const updated = [...customModels];

@@ -85,7 +85,7 @@ export function useStyleExtractWorkflow({
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
             list = parsed
-              .filter((m: any) => m.isMultimodal || m.isVision || (!m.isImage && !m.isVideo))
+              .filter((m: any) => m.channel !== 'openai' && (m.isMultimodal || m.isVision || (!m.isImage && !m.isVideo)))
               .map((m: any) => ({ id: m.id, name: m.name || m.id }));
             if (list.length > 0) {
               setMultimodalModels(list);
@@ -94,7 +94,7 @@ export function useStyleExtractWorkflow({
         } catch {}
       }
       const defaultM = localStorage.getItem('ai_multimodal_model') || localStorage.getItem('ai_vision_model');
-      if (defaultM) {
+      if (defaultM && list.some(model => model.id === defaultM)) {
         setExtractModel(defaultM);
       } else if (list.length > 0) {
         setExtractModel(list[0].id);

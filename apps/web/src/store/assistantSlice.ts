@@ -1,7 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { AssistantSession } from '@/store/appStoreTypes';
 import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@/features/assistant/api/sessions';
-import { setStoredMultimodalModelId } from '@beike/domain/workflowModels';
 import {
   assistantDeletedIds,
   clearAssistantPersistTimer,
@@ -43,7 +42,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
   },
   setAssistantModel: (assistantModel) => {
     if (get().assistantModel === assistantModel) return;
-    setStoredMultimodalModelId(assistantModel);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('ai_assistant_model', assistantModel);
     set({ assistantModel });
   },
   setAssistantHistoryLimit: (assistantHistoryLimit) => {

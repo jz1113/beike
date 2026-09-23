@@ -9,7 +9,7 @@ import {
   Video,
 } from 'lucide-react';
 import { getModelIcon } from '@/shared/ui/ModelIcons';
-import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
+import { isMultimodalWorkflowModel, workflowModelRouteId } from '@beike/domain/workflowModels';
 import { settingsCapabilityPill } from '@/shared/ui/layoutClasses';
 import type { WorkflowModel } from './settingsShared';
 
@@ -48,13 +48,14 @@ export default function WorkflowModelRow({
   onDeleteModel,
 }: WorkflowModelRowProps) {
   const isMultimodal = isMultimodalWorkflowModel(m);
+  const routeId = workflowModelRouteId(m);
 
   return (
     <div
       draggable
-      onDragStart={(e) => onDragStart(e, m.id)}
-      onDragOver={(e) => onDragOver(e, m.id)}
-      onDrop={(e) => onDrop(e, m.id)}
+      onDragStart={(e) => onDragStart(e, routeId)}
+      onDragOver={(e) => onDragOver(e, routeId)}
+      onDrop={(e) => onDrop(e, routeId)}
       className={`px-3 py-2 hover:bg-slate-50/90 transition-all flex flex-col @[480px]/settings-panel:flex-row @[480px]/settings-panel:items-center justify-between gap-1.5 @[480px]/settings-panel:gap-2 group select-none ${
         isDragged ? 'opacity-40 bg-slate-100' : ''
       } ${isDragOver ? 'border-t-2 border-indigo-500 bg-indigo-50/30' : ''}`}
@@ -82,6 +83,9 @@ export default function WorkflowModelRow({
           >
             {m.id}
           </span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 ${m.channel === 'openai' ? 'bg-emerald-50 text-emerald-700' : m.channel === 'lianchi' ? 'bg-sky-50 text-sky-700' : 'bg-indigo-50 text-indigo-700'}`}>
+            {m.channel === 'openai' ? 'OpenAI 渠道' : m.channel === 'lianchi' ? '联池渠道' : 'Comfly 渠道'}
+          </span>
           {m.name && m.name !== m.id && (
             <span className="text-[11px] text-slate-400 truncate hidden @[520px]/settings-panel:inline" title={m.name}>
               ({m.name})
@@ -92,7 +96,7 @@ export default function WorkflowModelRow({
               {m.badge}
             </span>
           )}
-          {isMultimodal && price && (
+          {isMultimodal && m.channel !== 'openai' && price && (
             <span
               className="text-[10px] text-indigo-600 font-mono whitespace-nowrap shrink-0 hidden @[600px]/settings-panel:inline"
               title="Comfly 默认分组报价：每 1K token 输入 / 输出"
@@ -109,7 +113,7 @@ export default function WorkflowModelRow({
           <button
             type="button"
             disabled={isFirst}
-            onClick={() => onMoveModel(m.id, 'top')}
+            onClick={() => onMoveModel(routeId, 'top')}
             className="w-5.5 h-5.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
             title="置顶（设为第 1 优先级）"
           >
@@ -118,7 +122,7 @@ export default function WorkflowModelRow({
           <button
             type="button"
             disabled={isFirst}
-            onClick={() => onMoveModel(m.id, 'up')}
+            onClick={() => onMoveModel(routeId, 'up')}
             className="w-5.5 h-5.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
             title="上移一位"
           >
@@ -127,7 +131,7 @@ export default function WorkflowModelRow({
           <button
             type="button"
             disabled={isLast}
-            onClick={() => onMoveModel(m.id, 'down')}
+            onClick={() => onMoveModel(routeId, 'down')}
             className="w-5.5 h-5.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
             title="下移一位"
           >
@@ -137,13 +141,13 @@ export default function WorkflowModelRow({
 
         <button
           type="button"
-          onClick={() => onToggleCapability(m.id, 'isMultimodal')}
+          onClick={() => onToggleCapability(routeId, 'isMultimodal')}
           className={`${settingsCapabilityPill} ${
             isMultimodal
               ? 'bg-indigo-50 text-indigo-700 border-indigo-300 shadow-2xs font-bold'
               : 'bg-transparent text-slate-300 border-transparent hover:bg-slate-100 hover:text-slate-600 hover:border-slate-200'
           }`}
-          title="多模态大模型 (涵盖视觉审图、逆向提炼、分镜策划与AI对话)"
+          title={m.channel === 'openai' ? 'OpenAI Responses 视觉审图与分镜策划' : '多模态大模型（视觉审图、逆向提炼、分镜策划与 AI 对话）'}
         >
           <Bot className={`w-3 h-3 ${isMultimodal ? 'text-indigo-600' : 'text-slate-300'}`} />
           <span className="hidden @[600px]/settings-panel:inline">多模态</span>
@@ -151,7 +155,7 @@ export default function WorkflowModelRow({
 
         <button
           type="button"
-          onClick={() => onToggleCapability(m.id, 'isImage')}
+          onClick={() => onToggleCapability(routeId, 'isImage')}
           className={`${settingsCapabilityPill} ${
             m.isImage
               ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-2xs font-bold'
@@ -165,7 +169,7 @@ export default function WorkflowModelRow({
 
         <button
           type="button"
-          onClick={() => onToggleCapability(m.id, 'isVideo')}
+          onClick={() => onToggleCapability(routeId, 'isVideo')}
           className={`${settingsCapabilityPill} ${
             m.isVideo
               ? 'bg-sky-50 text-sky-700 border-sky-300 shadow-2xs font-bold'
@@ -179,7 +183,7 @@ export default function WorkflowModelRow({
 
         <button
           type="button"
-          onClick={() => onDeleteModel(m.id)}
+          onClick={() => onDeleteModel(routeId)}
           className="w-5.5 h-5.5 rounded text-slate-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors cursor-pointer"
           title="移出此模型"
         >

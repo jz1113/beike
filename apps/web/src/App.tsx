@@ -115,7 +115,10 @@ export default function App() {
     syncAppTokenCookie();
     syncWorkspaceCookie();
     repairWorkflowModelsInStorage();
-    resolveStoredMultimodalModelId();
+    const selectedModel = resolveStoredMultimodalModelId();
+    if (useAppStore.getState().selectedVisionModel !== selectedModel) {
+      useAppStore.getState().setSelectedVisionModel(selectedModel);
+    }
     void migrateLegacyCredentialsOnce();
   }, []);
 

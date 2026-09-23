@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getMultimodalClientOverrides } from './gatewayClient.ts';
 
-test('OpenAI Responses setting routes only GPT 5.6/6 visual models through its independent key', () => {
+test('the same GPT model ID stays on its selected Comfly or OpenAI route', () => {
   const previousStorage = globalThis.localStorage;
   const previousWindow = globalThis.window;
   const values = new Map([
@@ -15,11 +15,15 @@ test('OpenAI Responses setting routes only GPT 5.6/6 visual models through its i
   globalThis.localStorage = { getItem: (key) => values.get(key) || null };
   globalThis.window = {};
   try {
-    assert.deepEqual(getMultimodalClientOverrides('gpt-6-astra'), {
+    assert.deepEqual(getMultimodalClientOverrides('openai-responses:gpt-6-astra'), {
       customBaseUrl: 'https://api.openai.com/v1', customApiKey: 'openai-key', apiFormat: 'openai-responses',
     });
-    assert.deepEqual(getMultimodalClientOverrides('gpt-5.6'), {
+    assert.deepEqual(getMultimodalClientOverrides('openai-responses:gpt-5.6'), {
       customBaseUrl: 'https://api.openai.com/v1', customApiKey: 'openai-key', apiFormat: 'openai-responses',
+    });
+    assert.deepEqual(getMultimodalClientOverrides('gpt-6-astra'), {
+      customBaseUrl: 'https://ai.comfly.org', customApiKey: 'comfly-key',
+      customWanbangKey: undefined, customWanbangSecret: undefined,
     });
     assert.deepEqual(getMultimodalClientOverrides('gpt-image-2'), {
       customBaseUrl: 'https://ai.comfly.org', customApiKey: 'comfly-key',
@@ -41,10 +45,29 @@ test('HTTP consent is tied to the exact saved OpenAI gateway address', () => {
   ]);
   globalThis.localStorage = { getItem: (key) => values.get(key) || null };
   try {
-    assert.equal(getMultimodalClientOverrides('gpt-6-luna').allowInsecureHttp, true);
+    assert.equal(getMultimodalClientOverrides('openai-responses:gpt-6-luna').allowInsecureHttp, true);
     values.set('openai_base_url', 'http://8.211.191.96:8080');
-    assert.equal(getMultimodalClientOverrides('gpt-6-luna').allowInsecureHttp, undefined);
+    assert.equal(getMultimodalClientOverrides('openai-responses:gpt-6-luna').allowInsecureHttp, undefined);
   } finally {
     globalThis.localStorage = previousStorage;
+  }
+});
+
+test('a selected OpenAI route never falls back to the Comfly key', () => {
+  const previousStorage = globalThis.localStorage;
+  const previousWindow = globalThis.window;
+  const values = new Map([
+    ['openai_responses_enabled', 'true'],
+    ['ai_base_url', 'https://ai.comfly.org'],
+    ['ai_api_key', 'comfly-key'],
+  ]);
+  globalThis.localStorage = { getItem: key => values.get(key) || null };
+  globalThis.window = {};
+  try {
+    assert.throws(() => getMultimodalClientOverrides('openai-responses:gpt-6-luna'), /OpenAI 渠道 API Key/);
+    assert.equal(getMultimodalClientOverrides('gpt-6-luna').customApiKey, 'comfly-key');
+  } finally {
+    globalThis.localStorage = previousStorage;
+    globalThis.window = previousWindow;
   }
 });

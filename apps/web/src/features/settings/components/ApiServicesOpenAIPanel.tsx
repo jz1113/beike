@@ -75,9 +75,9 @@ export function ApiServicesOpenAIPanel({
     )}
     <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
       <input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)} className="accent-indigo-600" />
-      GPT 5.6 / GPT 6 多模态视觉任务使用此接口
+      启用 OpenAI 渠道视觉调用
     </label>
-    <p className="text-[11px] text-slate-500">可填写 OpenAI 官方地址或支持 Responses API 的自有网关。启用后只影响这些模型的图像理解请求；模型需要在默认业务模型中选择。</p>
+    <p className="text-[11px] text-slate-500">可填写 OpenAI 官方地址或支持 Responses API 的自有网关。只有从此渠道接入并选中的视觉模型会使用此地址与 API Key；Comfly 同名模型继续使用 Comfly 网关。</p>
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
       <p className="text-xs font-bold text-slate-800">模型目录来源</p>
       <div className="flex flex-wrap items-center gap-2">

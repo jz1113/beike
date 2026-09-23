@@ -12,7 +12,7 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store';
 import { getUsageSummary, type UsageSummary } from '@/shared/utils/usageTracker';
-import { getStoredMultimodalModelId } from '@beike/domain/workflowModels';
+import { getStoredMultimodalModelId, openAIModelRouteId, workflowModelRouteId } from '@beike/domain/workflowModels';
 import GatewayModelModal from './GatewayModelModal';
 import ApiServicesTab from './tabs/ApiServicesTab';
 import DefaultsTab from './tabs/DefaultsTab';
@@ -536,11 +536,13 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           isOpen={models.isGatewayModalOpen}
           onClose={() => models.setIsGatewayModalOpen(false)}
           allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels}
-          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? (models.openAIModelSource === 'codex' ? 'Codex' : 'OpenAI') : '网关'}
-          activeModelIds={new Set(models.customModels.map((m) => m.id))}
+          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? (models.openAIModelSource === 'codex' ? 'Codex' : 'OpenAI') : 'Comfly'}
+          channel={models.gatewaySource}
+          activeModelIds={new Set(models.customModels.map(workflowModelRouteId))}
           isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.gatewaySource === 'openai' ? models.isFetchingOpenAI : models.isFetchingGateway}
           onToggleAddModel={(model) => {
-            const exists = models.customModels.some((m) => m.id === model.id);
+            const routeId = models.gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id;
+            const exists = models.customModels.some((m) => workflowModelRouteId(m) === routeId);
             models.handleToggleGatewayModel(model);
             showToast(exists ? `已移出模型 ${model.id}` : `✨ 已接入模型 ${model.id}`);
           }}

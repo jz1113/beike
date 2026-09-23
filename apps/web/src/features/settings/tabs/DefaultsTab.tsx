@@ -60,7 +60,7 @@ export default function DefaultsTab({
                 <span className="text-xs font-bold text-slate-900">默认多模态大模型</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100/80">Vision & LLM</span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5 truncate">负责审图分析、提示词分镜策划与 AI 导演对话助手</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 truncate">负责审图分析与分镜策划；OpenAI 渠道仅用于视觉任务</p>
             </div>
           </div>
 

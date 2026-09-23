@@ -8,6 +8,8 @@ import { sortMultimodalModelsByPrice } from './multimodalPriceSort';
 
 export interface WorkflowModel {
   id: string;
+  routeId?: string;
+  channel?: 'comfly' | 'openai' | 'lianchi';
   name: string;
   shortName: string;
   badge?: string;
@@ -24,6 +26,7 @@ export interface WorkflowModel {
 
 export const DEFAULT_PRESET_MODELS: WorkflowModel[] = sortMultimodalModelsByPrice(APPROVED_MODELS.map((m) => ({
   id: m.id,
+  channel: m.id === 'openai/gpt-image-2' ? 'lianchi' : 'comfly',
   name: m.name,
   shortName: m.shortName,
   badge: m.badge,

@@ -12,7 +12,7 @@ export const DEFAULT_KEYWORD_REVIEW_MODEL = 'deepseek:deepseek-flash';
 export const KEYWORD_REVIEW_MODEL_STORAGE_KEY = 'keyword_review_model';
 
 export function loadKeywordReviewModels(): KeywordReviewModelOption[] {
-  const configured = getEnabledMultimodalModelsFromSettings();
+  const configured = getEnabledMultimodalModelsFromSettings().filter(model => model.channel !== 'openai');
   const gatewayModels = configured.length > 0 ? configured : listApprovedModels('multimodal');
   return [
     { value: DEFAULT_KEYWORD_REVIEW_MODEL, model: 'deepseek-flash', label: 'DeepSeek Flash · 官方', provider: 'deepseek' },

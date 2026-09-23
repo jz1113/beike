@@ -1,3 +1,5 @@
+import { isOpenAIModelRouteId } from '@beike/domain/workflowModels';
+
 // 三态缓存：undefined=未显式设置（允许初始兼容加载），null=显式清空（严格禁止回退 localStorage），string=有效密钥
 let cachedApiKey: string | null | undefined = undefined;
 let cachedBaseUrl: string | undefined = undefined;
@@ -48,7 +50,7 @@ export function getGatewayClientOverrides(): {
   };
 }
 
-/** GPT 5.6 / GPT 6 的视觉请求可单独走 Responses API，不替换生图/视频主网关。 */
+/** Visual requests follow the selected model route, never the vendor name or bare model ID. */
 export function getMultimodalClientOverrides(modelId: string): {
   customBaseUrl?: string;
   customApiKey?: string;
@@ -56,10 +58,12 @@ export function getMultimodalClientOverrides(modelId: string): {
   allowInsecureHttp?: boolean;
 } {
   const primary = getGatewayClientOverrides();
-  if (typeof localStorage === 'undefined' || localStorage.getItem('openai_responses_enabled') !== 'true' ||
-      !/^gpt-(?:5\.6|6)(?:-|$)/i.test(modelId)) return primary;
+  if (!isOpenAIModelRouteId(modelId)) return primary;
+  if (typeof localStorage === 'undefined' || localStorage.getItem('openai_responses_enabled') !== 'true') {
+    throw new Error('请先在 OpenAI 服务设置中启用 Responses 接口');
+  }
   const key = localStorage.getItem('openai_api_key')?.trim();
-  if (!key) return primary;
+  if (!key) throw new Error('请先配置 OpenAI 渠道 API Key');
   const baseUrl = localStorage.getItem('openai_base_url')?.trim() || 'https://api.openai.com';
   const consentUrl = localStorage.getItem('openai_insecure_http_consent_url')?.trim() || '';
   const allowInsecureHttp = /^http:\/\//i.test(baseUrl) && baseUrl.replace(/\/+$/, '') === consentUrl;

@@ -10,6 +10,9 @@ import {
   gatewayModelToWorkflowModel,
   inferWorkflowCapabilitiesFromId,
   sortModelsByMultimodalPriority,
+  workflowModelRouteId,
+  openAIModelRouteId,
+  repairWorkflowModelsInStorage,
 } from '@beike/domain/workflowModels';
 import { loadCustomModels, persistCustomModels } from '../customModelsStorage';
 import { sortMultimodalModelsByPrice, type ComflyPriceMap } from '../multimodalPriceSort';
@@ -68,6 +71,7 @@ export function useCustomModels({
   // 初始化加载模型：损坏数据备份后保留内存中的旧值，绝不覆盖写成 []
   useEffect(() => {
     if (typeof window !== 'undefined' && isOpen) {
+      repairWorkflowModelsInStorage();
       const loaded = loadCustomModels(customModels);
       const lianchiModel = DEFAULT_PRESET_MODELS.find(model => model.id === 'openai/gpt-image-2');
       const needsLianchiMigration = !loaded.invalid && !localStorage.getItem('lianchi_model_added_v1') && Boolean(lianchiModel);
@@ -76,11 +80,11 @@ export function useCustomModels({
         : loaded.models;
       const needsGpt6Migration = !loaded.invalid && !localStorage.getItem('gpt6_multimodal_models_added_v1');
       const gpt6Models = needsGpt6Migration
-        ? DEFAULT_PRESET_MODELS.filter(model => ['gpt-6-luna', 'gpt-6-sol'].includes(model.id) && !models.some(existing => existing.id === model.id))
+        ? DEFAULT_PRESET_MODELS.filter(model => ['gpt-6-luna', 'gpt-6-sol'].includes(model.id) && !models.some(existing => workflowModelRouteId(existing) === model.id))
         : [];
       const needsGrok47Migration = !loaded.invalid && !localStorage.getItem('grok47_multimodal_model_added_v1');
       const grok47Model = needsGrok47Migration
-        ? DEFAULT_PRESET_MODELS.find(model => model.id === 'grok-4.7' && ![...models, ...gpt6Models].some(existing => existing.id === model.id))
+        ? DEFAULT_PRESET_MODELS.find(model => model.id === 'grok-4.7' && ![...models, ...gpt6Models].some(existing => workflowModelRouteId(existing) === model.id))
         : undefined;
       const renamed = [...models, ...gpt6Models, ...(grok47Model ? [grok47Model] : [])].map(model => model.id === 'openai/gpt-image-2' && model.name === 'GPT Image 2（联池）'
         ? { ...model, name: '联池image2', shortName: '联池image2' }
@@ -148,7 +152,7 @@ export function useCustomModels({
   ) => {
     setCustomModels((prev) => {
       const updated = prev.map((m) => {
-        if (m.id === modelId) {
+        if (workflowModelRouteId(m) === modelId) {
           if (
             field === 'isMultimodal' ||
             field === 'isVision' ||
@@ -162,7 +166,7 @@ export function useCustomModels({
               ...m,
               isMultimodal: nextVal,
               isVision: nextVal,
-              isAssistant: nextVal,
+              isAssistant: m.channel === 'openai' ? false : nextVal,
               isDistill: nextVal,
               isThinking: nextVal,
             };
@@ -181,7 +185,7 @@ export function useCustomModels({
   // 单个模型移出/删除
   const handleDeleteModel = (modelId: string) => {
     setCustomModels((prev) => {
-      const updated = prev.filter((m) => m.id !== modelId);
+      const updated = prev.filter((m) => workflowModelRouteId(m) !== modelId);
       const sorted = sortModelsByMultimodalPriority(updated);
       persistCustomModels(sorted);
       return sorted;
@@ -193,7 +197,7 @@ export function useCustomModels({
   // 单个模型调整顺序（置顶 / 上移 / 下移）
   const handleMoveModel = (modelId: string, direction: 'up' | 'down' | 'top') => {
     setCustomModels((prev) => {
-      const idx = prev.findIndex((m) => m.id === modelId);
+      const idx = prev.findIndex((m) => workflowModelRouteId(m) === modelId);
       if (idx === -1) return prev;
       const updated = [...prev];
       if (direction === 'top') {
@@ -242,7 +246,8 @@ export function useCustomModels({
   // 手动添加模型
   const handleAddCustomModel = (modelObj: WorkflowModel) => {
     setCustomModels((prev) => {
-      const updated = [modelObj, ...prev.filter((m) => m.id !== modelObj.id)];
+      const key = workflowModelRouteId(modelObj);
+      const updated = [modelObj, ...prev.filter((m) => workflowModelRouteId(m) !== key)];
       const sorted = sortModelsByMultimodalPriority(updated);
       persistCustomModels(sorted);
       return sorted;
@@ -398,16 +403,18 @@ export function useCustomModels({
 
   const handleToggleGatewayModel = (model: GatewayModelItem) => {
     if (model.supported === false) return;
+    const routeId = gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id;
     setCustomModels((prev) => {
-      const exists = prev.some((m) => m.id === model.id);
+      const exists = prev.some((m) => workflowModelRouteId(m) === routeId);
       const updated = exists
-        ? prev.filter((m) => m.id !== model.id)
-        : [...prev, gatewayModelToWorkflowModel(model) as WorkflowModel];
+        ? prev.filter((m) => workflowModelRouteId(m) !== routeId)
+        : [...prev, gatewayModelToWorkflowModel(model, gatewaySource) as WorkflowModel];
       const sorted = sortModelsByMultimodalPriority(updated);
       persistCustomModels(sorted);
       return sorted;
     });
     notifyModelsUpdated();
+    if (gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
   };
 
   const handleAddAllUsefulGatewayModels = (models: GatewayModelItem[]) => {
@@ -416,11 +423,16 @@ export function useCustomModels({
       const caps = inferWorkflowCapabilitiesFromId(m.id);
       return caps.isImage || caps.isVideo || caps.isMultimodal;
     });
+    const existingRouteIds = new Set(customModels.map(workflowModelRouteId));
+    const addedCount = useful.filter(model => !existingRouteIds.has(
+      gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id
+    )).length;
     setCustomModels((prev) => {
-      const existingMap = new Map(prev.map((m) => [m.id, m]));
+      const existingMap = new Map(prev.map((m) => [workflowModelRouteId(m), m]));
       useful.forEach((m) => {
-        if (!existingMap.has(m.id)) {
-          existingMap.set(m.id, gatewayModelToWorkflowModel(m) as WorkflowModel);
+        const routeId = gatewaySource === 'openai' ? openAIModelRouteId(m.id) : m.id;
+        if (!existingMap.has(routeId)) {
+          existingMap.set(routeId, gatewayModelToWorkflowModel(m, gatewaySource) as WorkflowModel);
         }
       });
       const updated = Array.from(existingMap.values());
@@ -429,7 +441,8 @@ export function useCustomModels({
       return sorted;
     });
     notifyModelsUpdated();
-    return useful.length;
+    if (gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
+    return addedCount;
   };
 
   return {

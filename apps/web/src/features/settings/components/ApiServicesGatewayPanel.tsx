@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { ComflyLogo } from '@/shared/icons';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
-import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
+import { isMultimodalWorkflowModel, workflowModelRouteId } from '@beike/domain/workflowModels';
 import { APPROVED_MODELS } from '@beike/domain/modelCatalog';
 import WorkflowModelRow from '../WorkflowModelRow';
 import type { WorkflowModel } from '../settingsShared';
@@ -417,6 +417,11 @@ export function ApiServicesGatewayPanel({
               {modelCapabilityFilter === 'all' ? '全局综合排序' : '分类独立排序'}
             </span>
           </div>
+          <div className="px-3.5 py-1.5 border-b border-slate-100 text-[11px] text-slate-600 flex gap-3">
+            <span>Comfly 渠道 {customModels.filter(model => model.channel !== 'openai' && model.channel !== 'lianchi').length}</span>
+            <span>OpenAI 渠道 {customModels.filter(model => model.channel === 'openai').length}</span>
+            <span>联池渠道 {customModels.filter(model => model.channel === 'lianchi').length}</span>
+          </div>
 
           <div className="divide-y divide-slate-100/90 max-h-[min(48vh,420px)] overflow-y-auto overflow-x-auto">
             {filteredModels.length === 0 ? (
@@ -428,14 +433,14 @@ export function ApiServicesGatewayPanel({
               </div>
             ) : filteredModels.map((m, index) => (
               <WorkflowModelRow
-                key={m.id}
+                key={workflowModelRouteId(m)}
                 model={m}
                 price={comflyPrices?.[m.id.toLowerCase()]}
                 index={index}
                 isFirst={index === 0}
                 isLast={index === filteredModels.length - 1}
-                isDragged={draggedModelId === m.id}
-                isDragOver={dragOverModelId === m.id}
+                isDragged={draggedModelId === workflowModelRouteId(m)}
+                isDragOver={dragOverModelId === workflowModelRouteId(m)}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
