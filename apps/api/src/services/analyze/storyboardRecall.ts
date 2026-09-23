@@ -194,13 +194,22 @@ export async function loadLockedGroupSkeleton(fullPromptId?: unknown) {
   const id = String(fullPromptId || '').trim();
   if (!id || id === 'auto') return null;
   const row = await db.fullPromptAsset.findFirst({ where: { id, ...PROVENANCE } });
-  if (!row) return null;
+  if (!row) throw new Error('选定的图组母本不存在，请重新选择');
+  const shots = parseGroupShotSkeleton(row.shotPromptsJson);
+  let indices: unknown = null;
+  try { indices = JSON.parse(row.sourceImageIndices || '[]'); } catch { /* invalid legacy record */ }
+  if (!Array.isArray(indices) || indices.length !== 4 || shots.length !== 4) {
+    throw new Error('选定的图组母本不是完整的四图组，请重新选择');
+  }
   return {
     id: row.id,
     title: row.title,
-    shots: parseGroupShotSkeleton(row.shotPromptsJson),
+    shots,
     architectureSummary: row.architectureSummary,
     hasHuman: row.hasHuman,
+    sceneSummary: row.sceneSummary,
+    outfitSummary: row.outfitSummary,
+    personaSummary: row.personaSummary,
   };
 }
 

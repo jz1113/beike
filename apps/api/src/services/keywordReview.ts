@@ -52,15 +52,15 @@ ${KEYWORD_REVIEW_CATEGORIES.join('、')}
 4. 违法、色情、暴恐、涉毒、危险、反科学。
 5. 八字、风水、占卜、运势预测、生肖运气、起名打分、改命改运。
 6. 工业硬广、厂家排名、供应商推荐、工业采购推销。
-7. 在线观看、下载资源、破解软件、实时查询、纯工具操作，或必须依赖视频演示。
+7. 在线观看、下载资源、破解软件、实时查询、纯工具操作（如界面点击、账号或设备设置、访问共享文件夹），或必须依赖视频演示。讲原理、方案对比、故障排查时不能只因涉及工具就否决。
 8. 红包礼金、人情随礼、灰色利益决策。
 9. 尺寸、数量、年限、颜色、型号、狭窄地点等条件层层叠加，生产空间过窄。
 10. 简单问答：自然回答只是一个事实、固定数字、身份、日期、距离、价格、尺寸或一两句话。例如「美国总统是谁」「iPhone 15多少钱」。出现数字不等于简单问答，「花菜焯水多久好吃」可制作。
 11. 低价值：恋爱婚姻决策、社交话术模板、起名打分、红包礼金、算命风水、无意义内容。梦境描述、解梦文化说明、星座科普、版权、游戏攻略、校园、旅游、公司评价不算低价值。星座教育可制作；个人命运、财运、桃花、幸运色预测不制作。
 
-无方向的泛实体（如 U盘、杭州电子科技大学、猫砂）只要不触碰否决，填「制作」，不要改写 query。
+只有完全没有提问、动作或层层限制的泛实体（如 U盘、杭州电子科技大学、猫砂），只要不触碰否决，填「制作」，不要改写 query。带具体问题的词必须按该问题独立判断，不得套用泛实体规则。
 
-其余能形成经验、教程、对比、评测、攻略或实质说明的内容，填「制作」。
+其余确实能形成经验、教程、对比、评测、攻略或实质说明的内容，填「制作」；每一行先检查上述否决项，不得因同批多数行可制作而沿用结论。
 
 认不出作品、品牌、游戏、外文词、机构或陌生实体时，needsLookup 为 true；其余为 false。不要因为想更稳就把常识词标成 true。
 
@@ -93,12 +93,19 @@ function validateResults(value: unknown, rows: KeywordReviewRow[]): ReviewedKeyw
     if (producible !== '制作' && producible !== '不制作') throw new SyntaxError('模型返回了非法制作结论');
     seen.add(id);
     const nextProducible = producible as KeywordReviewResult['producible'];
+    let rejectReason: string;
+    try {
+      rejectReason = normalizeRejectReason(nextProducible, candidate?.rejectReason);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '不制作依据格式异常';
+      throw new SyntaxError(`模型返回的「${expected.get(id)?.query.slice(0, 40)}」：${message}`);
+    }
     results.push({
       id,
       category,
       producible: nextProducible,
       categoryReason: normalizeCategoryReason(candidate?.categoryReason),
-      rejectReason: normalizeRejectReason(nextProducible, candidate?.rejectReason),
+      rejectReason,
       needsLookup: candidate?.needsLookup === true,
     });
   }
@@ -141,7 +148,7 @@ export async function reviewKeywordRows(options: {
         { role: 'user', content: `请审核以下行：\n${JSON.stringify(options.rows)}` },
       ],
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(10 * 60_000 + 30_000),
   });
   if (!response.ok) throw await deepSeekResponseError(response);
   const data = await response.json();

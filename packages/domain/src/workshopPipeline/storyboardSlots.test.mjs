@@ -41,15 +41,18 @@ test('keeps asset camera when jewelry fallback would rewrite wide lens', () => {
   assert.doesNotMatch(prompt, /锁骨光影很长的一段场景描写/);
 });
 
-test('locked group keeps shot order and camera, replacing persona outfit scene', () => {
+test('locked four-shot group keeps order, camera and source scene', () => {
   const group = parseGroupShotSkeleton(JSON.stringify([
-    { shot_no: 1, title: '镜1', action: '插簪', camera_focal_length: '100mm 微距', angle: '发髻特写', has_human: true },
+    { shot_no: 1, title: '镜1', scene: '图组原场景', action: '插簪', camera_focal_length: '100mm 微距', angle: '发髻特写', has_human: true },
     { shot_no: 2, title: '镜2', action: '回眸', camera_focal_length: '35mm', angle: '侧后 45°', has_human: true },
+    { shot_no: 3, title: '镜3', action: '近景', camera_focal_length: '50mm', has_human: true },
+    { shot_no: 4, title: '镜4', action: '特写', camera_focal_length: '85mm', has_human: true },
   ]));
   const slots = assembleStoryboardSlots({ assets, lockedGroupShots: group, shotCount: 8 });
   assert.equal(slots.source, 'group_skeleton');
-  assert.equal(slots.shotCount, 2);
+  assert.equal(slots.shotCount, 4);
   assert.equal(slots.shots[0].camera, '100mm 微距');
+  assert.equal(slots.shots[0].scene, '图组原场景');
   assert.equal(slots.shots[1].action, '回眸');
   assert.equal(slots.shots[0].sceneAsset?.id, 's1');
   assert.equal(slots.shots[0].persona?.id, 'p1');

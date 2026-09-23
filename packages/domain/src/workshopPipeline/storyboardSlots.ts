@@ -287,6 +287,7 @@ function safeParse(value: string): unknown {
 }
 
 function sceneText(scene?: SlotScene, group?: GroupShotSkeleton): string {
+  if (text(group?.scene)) return text(group?.scene);
   if (scene?.reversePrompt || scene?.description) {
     return [scene.title, scene.reversePrompt || scene.description].filter(Boolean).join('，');
   }

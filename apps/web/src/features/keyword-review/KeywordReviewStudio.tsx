@@ -6,6 +6,7 @@ import {
 import { ToolSuiteMark } from '@/shared/icons';
 import { KeywordReviewRulesDialog } from './KeywordReviewRulesDialog';
 import { useKeywordReview, type KeywordReviewFilter } from './hooks/useKeywordReview';
+import { isKnownModelOutputFailure } from './model/reviewProgress';
 import { splitRejectReason, type KeywordReviewRecord, type OutputColumn } from './model/keywordReviewWorkbook';
 
 interface Props {
@@ -89,7 +90,8 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const canExport = review.counts.done > 0 && !review.isRunning;
   const trialLabel = review.counts.done > 0 || review.counts.failed > 0 ? '再试下一批' : `试跑 ${review.batchSize} 条`;
   const batchLabel = review.counts.done > 0 || review.counts.failed > 0 ? '继续批量' : '批量审核';
-  const canRun = review.counts.pending > 0 || review.counts.failed > 0;
+  const canTrial = review.counts.pending > 0;
+  const canRun = canTrial || review.records.some(isKnownModelOutputFailure);
   const displayColumns = review.parsed?.displayColumns ?? [];
   const filterLabels: Record<KeywordReviewFilter, string> = { all: '全部', done: '已完成', producible: '可制作', rejected: '不制作' };
   const selectedRecord = review.records.find((record) => record.id === selectedRecordId);
@@ -197,8 +199,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                       <button type="button" onClick={review.stopReview} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-slate-800"><Square className="h-4 w-4 fill-current" />{review.runMode === 'all' ? '停止批量' : '停止试跑'}</button>
                     ) : (
                       <>
-                        <button type="button" onClick={() => void review.runReview('trial')} disabled={!canRun} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"><Play className="h-4 w-4 fill-current" />{trialLabel}</button>
+                        <button type="button" onClick={() => void review.runReview('trial')} disabled={!canTrial} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"><Play className="h-4 w-4 fill-current" />{trialLabel}</button>
                         <button type="button" onClick={() => void review.runReview('all')} disabled={!canRun} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"><Layers className="h-4 w-4" />{batchLabel}</button>
+                        {review.counts.failed > 0 && <button type="button" onClick={review.retryFailed} title="单条持续返回异常时可手动重审；重审可能再次产生费用" className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-rose-200 bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100">重审失败 {review.counts.failed} 条</button>}
                       </>
                     )}
                     <button type="button" onClick={() => void review.exportWorkbook()} disabled={!canExport || review.isExporting} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300">
@@ -206,7 +209,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条、最多 {review.concurrency} 个请求并行，直到跑完剩余记录。联网补查默认关闭，只补查认不出的实体，每批最多 5 条。</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条、最多 {review.concurrency} 个请求并行，自动处理全部待审核词。模型格式异常会自动重试并拆分批次定位问题；持续异常的单条会标为失败，其他词继续处理。重试可能再次收费。联网补查默认关闭，每批最多 5 条。</p>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>

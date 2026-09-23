@@ -12,7 +12,7 @@ function canonical(value: unknown): string {
   if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
   return JSON.stringify(value) ?? 'null';
 }
-interface Receipt { fingerprint: string; status?: number; body?: string; createdAt: number }
+interface Receipt { fingerprint: string; kind?: string; status?: number; body?: string; createdAt: number }
 
 export function isExpiredReceipt(createdAt: number | undefined, now = Date.now()): boolean {
   return !createdAt || now - createdAt >= SUBMISSION_RECEIPT_TTL_MS;
@@ -46,7 +46,7 @@ export async function purgeExpiredSubmissionReceipts(now = Date.now()): Promise<
       const file = path.join(dir, name);
       try {
         const saved = JSON.parse(await fs.readFile(file, 'utf8')) as Receipt;
-        if (isExpiredReceipt(saved.createdAt, now)) {
+        if (saved.kind !== 'keyword-review' && isExpiredReceipt(saved.createdAt, now)) {
           await fs.unlink(file);
           purged += 1;
         }
@@ -91,7 +91,7 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
     const dir = receiptsDir();
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
     const file = path.join(dir, `${key}.json`);
-    const receipt: Receipt = { fingerprint, createdAt: Date.now() };
+    const receipt: Receipt = { fingerprint, kind, createdAt: Date.now() };
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         await fs.writeFile(file, JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
@@ -99,7 +99,7 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
         const saved: Receipt = JSON.parse(await fs.readFile(file, 'utf8'));
-        if (isExpiredReceipt(saved.createdAt)) {
+        if (kind !== 'keyword-review' && isExpiredReceipt(saved.createdAt)) {
           await fs.unlink(file).catch(() => {});
           continue;
         }

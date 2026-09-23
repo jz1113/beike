@@ -21,7 +21,11 @@ export function useWorkshopAssetLocks() {
     setAvailableScenes(scenes);
     setAvailableOutfits(outfits);
     setAvailableActions(actions);
-    setAvailableFullPrompts(fullPrompts);
+    setAvailableFullPrompts(fullPrompts.filter((group: any) => {
+      try { return JSON.parse(String(group.sourceImageIndices || '[]')).length === 4
+        && JSON.parse(String(group.shotPromptsJson || '[]')).length === 4; }
+      catch { return false; }
+    }));
   }, []);
 
   useEffect(() => { void load(); }, [load]);

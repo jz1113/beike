@@ -35,7 +35,8 @@ export function formatAnalyzedStoryboard(opts: {
   const fingerprintFromApi = data?.productFingerprint || data?.product_fingerprint || '';
 
   const formattedPrompts: ShotPrompt[] = (data.prompts || []).map((p: any, idx: number) => {
-    const assignedImg = imagePayload[idx % imagePayload.length] || item.coverImage;
+    // 四镜共用同一商品实物锚图；轮换不同商品照片会导致型号和品牌漂移。
+    const assignedImg = imagePayload[0] || item.coverImage;
     const rawPrompt = cleanPromptText(p.prompt || p.description || '');
     const isHumanShot = typeof p.has_human === 'boolean' ? p.has_human : true;
     const finalPrompt = assembleOriginalShotPrompt({

@@ -38,7 +38,7 @@ export async function executeSingleImageTask(
   config: TaskExecutionConfig
 ): Promise<string> {
   const chosenProductImg =
-    shot.productImageUrl || item.selectedProductImages[0] || item.coverImage;
+    item.selectedProductImages[0] || item.coverImage || shot.productImageUrl;
   let promptText = (shot.prompt || '').trim();
   if (item.lookParts?.top && !isGenericLook(item.lookParts.top) && shot.has_human !== false) {
     promptText = enforceLookConsistency(

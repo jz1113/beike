@@ -8,63 +8,18 @@ import {
   type KeywordReviewRecord,
   type ParsedKeywordWorkbook,
 } from '../model/keywordReviewWorkbook';
-import { applyBatchResults, countReviewRecords, isRecoverableModelOutputError, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
+import { advanceKnownFailureVersions, applyBatchResults, countReviewRecords, isKnownModelOutputFailure, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
+import { reviewBatchWithRecovery } from '../model/reviewBatchRecovery';
+import { DEEPSEEK_BASE_URL, requestReviewBatch, type BalanceResponse } from '../model/reviewRequest';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
-export const KEYWORD_REVIEW_CONCURRENCY = 1;
+export const KEYWORD_REVIEW_CONCURRENCY = 16;
 export const KEYWORD_REVIEW_MODEL = 'deepseek-flash';
 export const KEYWORD_REVIEW_MODEL_LABEL = 'DeepSeek Flash';
 export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected';
-const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const PREVIEW_LIMIT = 240;
-const REVIEW_REQUEST_TIMEOUT_MS = 150_000;
 const BALANCE_REFRESH_INTERVAL_MS = 15_000;
 const BALANCE_REQUEST_TIMEOUT_MS = 12_000;
-
-type ReviewResponse = {
-  success?: boolean;
-  results?: KeywordReviewResult[];
-  lookedUp?: number;
-  error?: string;
-  code?: string;
-};
-
-type BalanceResponse = {
-  success?: boolean;
-  currency?: KeywordReviewBalance['currency'];
-  total?: string;
-  granted?: string;
-  toppedUp?: string;
-  available?: boolean;
-  error?: string;
-};
-
-async function requestReviewBatch(
-  body: string,
-  signal: AbortSignal,
-  idempotencyKey: string,
-): Promise<ReviewResponse> {
-  let response: Response;
-  try {
-    response = await apiFetch('/api/generate/keyword-review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-idempotency-key': idempotencyKey },
-      body,
-      signal: AbortSignal.any([signal, AbortSignal.timeout(REVIEW_REQUEST_TIMEOUT_MS)]),
-    });
-  } catch (error) {
-    if (signal.aborted) throw error;
-    const reason = error instanceof Error ? error.message : '网络响应中断';
-    throw new Error(`本批提交结果不确定，可能已产生费用；请先核对 DeepSeek 用量后再决定是否重试。${reason}`);
-  }
-  const data = await response.json() as ReviewResponse;
-  if (response.ok && data.success && Array.isArray(data.results)) return data;
-  const error = new Error(data.error || `审核请求失败（HTTP ${response.status}）`);
-  if (isRecoverableModelOutputError(response.status, data.code)) {
-    throw Object.assign(error, { modelOutputInvalid: true });
-  }
-  throw error;
-}
 
 export function useKeywordReview() {
   const [parsed, setParsed] = useState<ParsedKeywordWorkbook | null>(null);
@@ -85,7 +40,6 @@ export function useKeywordReview() {
   const abortRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
   const runStartingRef = useRef(false);
-  const reviewRunIdRef = useRef(crypto.randomUUID());
   const batchRetryVersionsRef = useRef(new Map<number, number>());
   const inputVersionRef = useRef(0);
   const rulesVersionRef = useRef<number | null>(null);
@@ -210,7 +164,6 @@ export function useKeywordReview() {
     try {
       const next = await parseKeywordWorkbook(file);
       rulesVersionRef.current = null;
-      reviewRunIdRef.current = crypto.randomUUID();
       batchRetryVersionsRef.current.clear();
       recordIndicesRef.current = new Map(next.records.map((record, index) => [record.id, index]));
       setParsed(next);
@@ -229,9 +182,9 @@ export function useKeywordReview() {
 
   const runReview = async (mode: 'trial' | 'all' = 'trial') => {
     if (isRunning || runStartingRef.current || records.length === 0) return;
-    const candidates = records.filter((record) => record.status === 'idle' || record.status === 'error');
+    const candidates = records.filter((record) => record.status === 'idle' || (mode === 'all' && isKnownModelOutputFailure(record)));
     if (candidates.length === 0) {
-      setNotice('所有记录都已完成审核');
+      setNotice(counts.failed > 0 ? '没有待审核记录；失败批次需单独选择重新审核，可能再次产生费用' : '所有记录都已完成审核');
       return;
     }
     runStartingRef.current = true;
@@ -266,6 +219,7 @@ export function useKeywordReview() {
       return;
     }
     const queue = mode === 'trial' ? candidates.slice(0, KEYWORD_REVIEW_BATCH_SIZE) : candidates;
+    advanceKnownFailureVersions(queue, recordIndicesRef.current, batchRetryVersionsRef.current);
     const controller = new AbortController();
     stopRequestedRef.current = false;
     abortRef.current = controller;
@@ -287,51 +241,57 @@ export function useKeywordReview() {
           const remaining = queue.length - completedNow - failedNow;
           setNotice(mode === 'trial'
             ? `按规则 v${rulesVersion} 正在试跑 ${batch.length} 条${lookupEnabled ? '，不确定词将联网补查' : ''}…`
-            : `按规则 v${rulesVersion} 顺序审核中，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
+            : `按规则 v${rulesVersion} 并行审核中，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
           setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
             (record) => ({ ...record, status: 'running', error: undefined })));
-          {
-            if (controller.signal.aborted) break;
-            const chunk = batch;
+          const submit = async (chunk: KeywordReviewRecord[]) => {
             const sourceIndex = recordIndicesRef.current.get(chunk[0].id) ?? index;
+            const rows = chunk.map(({ id, query, expansion, entityExpansion, contentType }) => ({ id, query, expansion, entityExpansion, contentType }));
+            const payload = JSON.stringify({ model: KEYWORD_REVIEW_MODEL, lookup: lookupEnabled, rulesVersion, rows });
+            const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+            const fingerprint = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
             const retryVersion = batchRetryVersionsRef.current.get(sourceIndex) ?? 0;
-            const idempotencyKey = `keyword:${reviewRunIdRef.current}:${rulesVersion}:${sourceIndex}:${retryVersion}`;
+            if (controller.signal.aborted || stopRequestedRef.current) return;
             balanceSpendVersionRef.current += 1;
             setBalanceDirty(true);
             try {
               const data = await requestReviewBatch(JSON.stringify({
-                model: KEYWORD_REVIEW_MODEL,
-                customBaseUrl: DEEPSEEK_BASE_URL,
-                customApiKey: apiKey,
-                lookup: lookupEnabled,
-                rulesVersion,
-                rows: chunk.map(({ id, query, expansion, entityExpansion, contentType }) => ({
-                  id, query, expansion, entityExpansion, contentType,
-                })),
-              }), controller.signal, idempotencyKey);
+                model: KEYWORD_REVIEW_MODEL, customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey,
+                lookup: lookupEnabled, rulesVersion, rows,
+              }), controller.signal, `keyword:${fingerprint}:${retryVersion}`);
               setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
               completedNow += chunk.length;
               lookedUpNow += Number(data.lookedUp || 0);
               refreshBalance();
             } catch (error) {
-              if (controller.signal.aborted) break;
               refreshBalance(true);
               if ((error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid) {
                 batchRetryVersionsRef.current.set(sourceIndex, retryVersion + 1);
-                const message = error instanceof Error ? error.message : '模型结果异常';
-                setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, chunk.map((record) => record.id),
-                  (record) => ({ ...record, status: 'error', error: message })));
-                failedNow += chunk.length;
-                runState.fatalError = new Error(`本批模型结果异常，已停止后续审核与自动重发：${message}`);
-                controller.abort();
-                break;
               }
-              runState.fatalError = error instanceof Error ? error : new Error('审核失败');
-              setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, chunk.map((record) => record.id),
-                (record) => record.status === 'running' ? { ...record, status: 'error', error: runState.fatalError?.message } : record));
-              controller.abort();
-              break;
+              throw error;
             }
+          };
+          try {
+            await reviewBatchWithRecovery({
+              rows: batch,
+              submit,
+              isModelOutputError: (error) => (error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid === true,
+              shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
+              onRetry: (chunk) => setNotice(`模型格式异常，正在自动重试 ${chunk.length} 条…`),
+              onSingleRowFailure: (record, error) => {
+                const message = error instanceof Error ? error.message : '模型结果异常';
+                setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, [record.id],
+                  (item) => ({ ...item, status: 'error', error: message })));
+                failedNow += 1;
+              },
+            });
+          } catch (error) {
+            if (controller.signal.aborted) break;
+            runState.fatalError = error instanceof Error ? error : new Error('审核失败');
+            setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
+              (record) => record.status === 'running' ? { ...record, status: 'error', error: runState.fatalError?.message } : record));
+            stopRequestedRef.current = true;
+            break;
           }
         }
       };
@@ -340,7 +300,7 @@ export function useKeywordReview() {
       setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, queue.map((record) => record.id),
         (record) => record.status === 'running' ? { ...record, status: 'idle' } : record));
       if (runState.fatalError) {
-        setNotice(`${runState.fatalError.message}。已保留完成的结果，修复后可继续。`);
+        setNotice(`${runState.fatalError.message}。已保留完成的结果，请处理该异常后继续。`);
         return;
       }
       refreshBalance(true);
@@ -354,7 +314,7 @@ export function useKeywordReview() {
           ? `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}，还剩 ${leftover} 条未审核`
           : `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}`);
       } else {
-        setNotice(`批量审核结束，本次完成 ${completedNow} 条${failedNow > 0 ? `，失败 ${failedNow} 条（可稍后重试）` : ''}${lookupNote}`);
+        setNotice(`批量审核已处理到最后一个词：完成 ${completedNow} 条${failedNow > 0 ? `，仍失败 ${failedNow} 条（可手动重审）` : ''}${lookupNote}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '审核失败';
@@ -378,6 +338,18 @@ export function useKeywordReview() {
     setNotice('将在当前批次返回后停止，不取消已提交的 DeepSeek 请求');
   };
 
+  const retryFailed = () => {
+    if (isRunning) return;
+    const failed = records.filter((record) => record.status === 'error');
+    if (failed.length === 0) return;
+    for (const record of failed) {
+      const index = recordIndicesRef.current.get(record.id);
+      if (index !== undefined) batchRetryVersionsRef.current.set(index, (batchRetryVersionsRef.current.get(index) ?? 0) + 1);
+    }
+    setRecords((current) => current.map((record) => record.status === 'error' ? { ...record, status: 'idle', error: undefined } : record));
+    setNotice(`已将 ${failed.length} 条失败记录放回待审核队列；再次提交这些记录可能产生新费用`);
+  };
+
   const exportWorkbook = async () => {
     if (!parsed || counts.done === 0 || isRunning) return;
     setIsExporting(true);
@@ -397,7 +369,6 @@ export function useKeywordReview() {
     abortRef.current?.abort();
     setParsed(null);
     rulesVersionRef.current = null;
-    reviewRunIdRef.current = crypto.randomUUID();
     batchRetryVersionsRef.current.clear();
     recordIndicesRef.current = new Map();
     setRecords([]);
@@ -436,6 +407,7 @@ export function useKeywordReview() {
     importFile,
     runReview,
     stopReview,
+    retryFailed,
     exportWorkbook,
     reset,
   };

@@ -45,7 +45,7 @@ function buildArchitecture(images: PerImageResult[], declared?: RawGroup): strin
   }).join('\n');
 }
 
-/** 先采用视觉模型的语义分组；异常时按连续顺序兜底，永远不超过四图一组。 */
+/** 图组母本必须恰好四张；模型拆出的残组直接丢弃，不与其他场景拼接。 */
 function normalizeContentGroups(perImageResults: PerImageResult[], rawGroups: unknown) {
   const imageIndices = perImageResults.map((image) => image.image_index).sort((a, b) => a - b);
   const available = new Set(imageIndices);
@@ -63,13 +63,14 @@ function normalizeContentGroups(perImageResults: PerImageResult[], rawGroups: un
       for (let start = 0; start < indices.length; start += MAX_IMAGES_PER_CONTENT_GROUP) {
         const chunk = indices.slice(start, start + MAX_IMAGES_PER_CONTENT_GROUP);
         chunk.forEach((index) => used.add(index));
-        if (chunk.length > 0) groups.push({ indices: chunk, declared });
+        if (chunk.length === MAX_IMAGES_PER_CONTENT_GROUP) groups.push({ indices: chunk, declared });
       }
     }
   }
   const remaining = imageIndices.filter((index) => !used.has(index));
   for (let start = 0; start < remaining.length; start += MAX_IMAGES_PER_CONTENT_GROUP) {
-    groups.push({ indices: remaining.slice(start, start + MAX_IMAGES_PER_CONTENT_GROUP) });
+    const chunk = remaining.slice(start, start + MAX_IMAGES_PER_CONTENT_GROUP);
+    if (chunk.length === MAX_IMAGES_PER_CONTENT_GROUP) groups.push({ indices: chunk });
   }
   return groups.sort((a, b) => a.indices[0] - b.indices[0]);
 }
@@ -139,7 +140,7 @@ export async function persistFullPromptRecords(params: {
   for (const [offset, group] of normalizedGroups.entries()) {
     const groupIndex = offset + 1;
     const images = group.indices.map((index) => perImageResults.find((image) => image.image_index === index)).filter((image): image is PerImageResult => Boolean(image));
-    if (images.length === 0) continue;
+    if (images.length !== MAX_IMAGES_PER_CONTENT_GROUP) continue;
     const sceneSummary = summarizeScene(images, group.declared);
     const architectureSummary = buildArchitecture(images, group.declared);
     const hasHuman = group.declared?.has_human === false ? false : images.some((image) => image.has_human !== false);
@@ -171,5 +172,15 @@ export async function persistFullPromptRecords(params: {
       ? await db.fullPromptAsset.update({ where: { id: existing.id }, data: shared })
       : await db.fullPromptAsset.create({ data: shared }));
   }
+  // 旧版遗留的残组在重跑时清除；不触碰同一图集的其他完整组。
+  const previous = await db.fullPromptAsset.findMany({
+    where: { albumId: album.id, provenance: 'deconstructed', groupIndex: { not: null } },
+    select: { id: true, sourceImageIndices: true },
+  });
+  const invalidIds = previous.filter((item) => {
+    try { return JSON.parse(item.sourceImageIndices || '[]').length !== MAX_IMAGES_PER_CONTENT_GROUP; }
+    catch { return true; }
+  }).map((item) => item.id);
+  if (invalidIds.length) await db.fullPromptAsset.deleteMany({ where: { id: { in: invalidIds } } });
   return { album, fullPrompts: saved };
 }

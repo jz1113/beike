@@ -71,12 +71,26 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     }
   }
 
-  const lockedGroup = await loadLockedGroupSkeleton(lockedAssets?.fullPromptId).catch(() => null);
+  const lockedGroup = useAssetLibrary === false ? null : await loadLockedGroupSkeleton(lockedAssets?.fullPromptId);
+  if (lockedGroup) {
+    // 载入图组时沿用该组的场景、人物与穿搭；仅用户明确锁定的槽位才覆盖。
+    assetLibraryData ||= { personas: [], scenes: [], outfits: [], actions: [] };
+    if (!lockedAssets?.actionId) assetLibraryData.actions = [];
+    if (!lockedAssets?.sceneId && lockedGroup.sceneSummary) {
+      assetLibraryData.scenes = [{ title: '图组原场景', description: lockedGroup.sceneSummary }];
+    }
+    if (!lockedAssets?.personaId && lockedGroup.personaSummary && lockedGroup.hasHuman) {
+      assetLibraryData.personas = [{ name: '图组原人物', description: lockedGroup.personaSummary }];
+    }
+    if (!lockedAssets?.outfitId && lockedGroup.outfitSummary && lockedGroup.hasHuman) {
+      assetLibraryData.outfits = [{ title: '图组原穿搭', top: lockedGroup.outfitSummary, bottom: '' }];
+    }
+  }
   const personaMode = modelPersona === 'none' || lockedGroup?.hasHuman === false ? 'none' : 'asset_driven';
   let filledSlots = assembleStoryboardSlots({
     shotCount,
     assets: assetLibraryData,
-    lockedGroupShots: lockedGroup?.shots,
+    lockedGroupShots: lockedGroup?.shots.map((shot) => lockedAssets?.sceneId ? { ...shot, scene: '' } : shot),
     personaMode,
   });
   const usedLibrary = usedPublishedLibrary || Boolean(lockedGroup);

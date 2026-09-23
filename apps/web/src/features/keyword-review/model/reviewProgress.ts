@@ -6,6 +6,20 @@ export function isRecoverableModelOutputError(status: number, code?: string): bo
   return status === 502 && code === 'model_output_invalid';
 }
 
+export function isKnownModelOutputFailure(record: { status: string; error?: string }): boolean {
+  return record.status === 'error' && /不制作依据缺少|模型(未返回|返回了|结果不完整)|输出被截断|不完整 JSON|垂类依据/.test(record.error || '');
+}
+
+export function advanceKnownFailureVersions(
+  records: KeywordReviewRecord[], indices: Map<string, number>, versions: Map<number, number>,
+): void {
+  for (const record of records) {
+    if (!isKnownModelOutputFailure(record)) continue;
+    const index = indices.get(record.id);
+    if (index !== undefined) versions.set(index, (versions.get(index) ?? 0) + 1);
+  }
+}
+
 export function updateReviewRecords(
   records: KeywordReviewRecord[],
   indices: Map<string, number>,

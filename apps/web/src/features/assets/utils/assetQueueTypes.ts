@@ -12,6 +12,8 @@ export interface ImageSetQueueItem {
   result?: Record<string, unknown>;
   deconstructStats?: {
     imageCount?: number;
+    skippedIncompleteImages?: number;
+    fullPromptsCount?: number;
     pass1Succeeded?: number;
     pass1Failed?: number;
     pass1FailedIndices?: number[];

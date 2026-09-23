@@ -1,12 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyBatchResults, countReviewRecords, isRecoverableModelOutputError, selectPreviewRecords, updateReviewRecords } from './reviewProgress.ts';
+import { advanceKnownFailureVersions, applyBatchResults, countReviewRecords, isKnownModelOutputFailure, isRecoverableModelOutputError, selectPreviewRecords, updateReviewRecords } from './reviewProgress.ts';
 
 test('model output validation errors can be isolated without stopping the review', () => {
   assert.equal(isRecoverableModelOutputError(502, 'model_output_invalid'), true);
   assert.equal(isRecoverableModelOutputError(502, 'deepseek_api_error'), false);
   assert.equal(isRecoverableModelOutputError(500, 'deepseek_api_error'), false);
   assert.equal(isRecoverableModelOutputError(409), false);
+});
+
+test('only known model format failures can rejoin a later bulk run automatically', () => {
+  assert.equal(isKnownModelOutputFailure({ status: 'error', error: '不制作依据缺少合法否决类型' }), true);
+  assert.equal(isKnownModelOutputFailure({ status: 'error', error: '模型返回的「测试词」：不制作依据缺少命中点' }), true);
+  assert.equal(isKnownModelOutputFailure({ status: 'error', error: '本批提交结果不确定' }), false);
+  const versions = new Map([[0, 2]]);
+  advanceKnownFailureVersions([
+    { id: 'a', status: 'error', error: '不制作依据缺少合法否决类型' },
+    { id: 'b', status: 'error', error: '本批提交结果不确定' },
+  ], new Map([['a', 0], ['b', 1]]), versions);
+  assert.deepEqual([...versions], [[0, 3]]);
 });
 
 test('large review updates only the active batch and keeps earlier results', () => {

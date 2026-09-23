@@ -139,6 +139,9 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
       return jsonResponse({ error: '请至少提供 1 张参考风格或买家秀图片' }, 400);
     }
+    if (imageUrls.length > 1 && imageUrls.length < 4) {
+      return jsonResponse({ error: '图组母本必须恰好 4 张；当前不足 4 张，不会反推或入库', code: 'INCOMPLETE_CONTENT_GROUP' }, 400);
+    }
 
     const sourceKey = typeof sourceUrl === 'string' ? xhsSourceKey(sourceUrl) : null;
     if (sourceKey) {
@@ -165,15 +168,28 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
     const visionTracker = createVisionCallTracker();
     const visionDiagnostics = createVisionCallDiagnostics('unified');
     const pipelineStart = Date.now();
-    updateDeconstructProgress(progressId, 'preparing', `正在准备 ${Math.min(imageUrls.length, MAX_IMAGES_PER_SET)} 张图片`);
+    const selectedCount = imageUrls.length === 1 ? 1 : Math.floor(Math.min(imageUrls.length, MAX_IMAGES_PER_SET) / 4) * 4;
+    const skippedCount = imageUrls.length - selectedCount;
+    updateDeconstructProgress(progressId, 'preparing', `正在准备 ${selectedCount} 张图片${skippedCount ? `，不足四张的 ${skippedCount} 张跳过` : ''}`);
 
     console.log(
       `[AssetDeconstruct]${albumName ? ` 套组「${albumName}」` : ''} 收到图集反推请求: 总图片数=${imageUrls.length}，模型链=${pass1Models.join(' → ')}，网关=${targetBaseUrl}`
     );
 
     const convertStart = Date.now();
-    const targetImgs = imageUrls.slice(0, MAX_IMAGES_PER_SET);
-    const safeImgs = await convertImagesInBatches(targetImgs);
+    const targetImgs = imageUrls.slice(0, selectedCount);
+    const safeImgs: string[] = [];
+    const processedImageUrls: string[] = [];
+    for (let start = 0; start < targetImgs.length; start += 4) {
+      const groupUrls = targetImgs.slice(start, start + 4);
+      const converted = await convertImagesInBatches(groupUrls);
+      if (converted.length === groupUrls.length) {
+        safeImgs.push(...converted);
+        processedImageUrls.push(...groupUrls);
+      } else {
+        console.warn(`[AssetDeconstruct] 图组 ${start / 4 + 1} 下载不完整，整组跳过（${converted.length}/4）`);
+      }
+    }
     updateDeconstructProgress(progressId, 'queued', `图片准备完成 ${safeImgs.length}/${targetImgs.length}，等待视觉模型`);
     const isSingleImage = safeImgs.length === 1;
     console.log(`[AssetDeconstruct] 图片预处理耗时 ${Date.now() - convertStart}ms (有效成功: ${safeImgs.length}/${targetImgs.length})`);
@@ -203,6 +219,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
     };
     let pass2Skipped = true;
     let shardCount = 1;
+    let discardedFailedGroupImages = 0;
 
     // 主路径：多模态全维反推
     const unifiedStart = Date.now();
@@ -234,11 +251,22 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
 
     if (unified) {
       perImageResults = unified.perImageResults;
+      if (!isSingleImage) {
+        const available = new Set(perImageResults.map((image) => image.image_index));
+        const complete = new Set<number>();
+        for (let first = 1; first <= safeImgs.length; first += 4) {
+          if ([first, first + 1, first + 2, first + 3].every((index) => available.has(index))) {
+            for (let index = first; index < first + 4; index++) complete.add(index);
+          }
+        }
+        discardedFailedGroupImages = perImageResults.length - complete.size;
+        perImageResults = perImageResults.filter((image) => complete.has(image.image_index));
+      }
       pipelineMode = unified.pipelineMode;
       shardCount = unified.shardCount;
       pass1Stats = {
         total: safeImgs.length,
-        succeeded: perImageResults.length,
+        succeeded: unified.perImageResults.length,
         failed: unified.failedIndices.length,
         failedIndices: unified.failedIndices,
       };
@@ -269,7 +297,18 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       return buildDeconstructFailureResponse(visionDiagnostics);
     }
 
-    const partial = pass1Stats.failed > 0 || pass2Skipped;
+    if (!isSingleImage) {
+      const declared = Array.isArray(parsedResult.content_groups) ? parsedResult.content_groups as Array<Record<string, unknown>> : [];
+      const valid = new Set(perImageResults.map((image) => image.image_index));
+      parsedResult.content_groups = Array.from({ length: safeImgs.length / 4 }, (_, group) => {
+        const indices = [group * 4 + 1, group * 4 + 2, group * 4 + 3, group * 4 + 4];
+        if (!indices.every((index) => valid.has(index))) return null;
+        const matching = declared.find((entry) => JSON.stringify(entry.source_image_indices) === JSON.stringify(indices));
+        return matching || { source_image_indices: indices, title: `${albumName} · 图组 ${group + 1}` };
+      }).filter(Boolean);
+    }
+
+    const partial = pass1Stats.failed > 0 || discardedFailedGroupImages > 0;
 
     let savedRecords: SavedRecords = {
       scenes: [],
@@ -285,7 +324,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       savedRecords = await persistDeconstructedAssets({
         parsedResult,
         perImageResults,
-        imageUrls,
+        imageUrls: processedImageUrls,
         albumName,
         isSingleImage,
         category,
@@ -302,13 +341,14 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
     completed = true;
     return jsonResponse({
       success: true,
-      partial,
+      partial: partial || skippedCount > 0 || safeImgs.length < targetImgs.length,
       usedModel,
       pipelineMode,
       data: parsedResult,
       savedRecords,
       stats: {
         imageCount: safeImgs.length,
+        skippedIncompleteImages: skippedCount + targetImgs.length - perImageResults.length,
         pass1Succeeded: pass1Stats.succeeded,
         pass1Failed: pass1Stats.failed,
         pass1FailedIndices: pass1Stats.failedIndices,

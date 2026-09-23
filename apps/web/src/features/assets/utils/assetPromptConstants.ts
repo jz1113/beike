@@ -294,9 +294,12 @@ export function formatDeconstructSummary(item: ImageSetQueueItem): string {
       ? `（图 ${(stats.pass1FailedIndices ?? []).join(',')} 失败）`
       : '';
 
-  const partialIcon = stats?.pass1Failed && stats.pass1Failed > 0 ? '⚠️' : '✅';
+  const skipped = stats?.skippedIncompleteImages || 0;
+  const skippedHint = skipped ? `；${skipped} 张不足四图/下载不完整，未反推入库` : '';
+  const groupHint = typeof stats?.fullPromptsCount === 'number' ? ` · 完整四图母本 ${stats.fullPromptsCount} 组` : '';
+  const partialIcon = (stats?.pass1Failed && stats.pass1Failed > 0) || skipped ? '⚠️' : '✅';
 
-  return ` · ${partialIcon} 成功解构入库 (单次反推 ${pass1Ok}/${imageCount}${failedHint}${fallbackHint}${visionHint} · 去重后 ${sceneCount} 个置景分镜包（含 ${actionCount} 个抓拍姿态）)`;
+  return ` · ${partialIcon} 成功解构入库 (单次反推 ${pass1Ok}/${imageCount}${failedHint}${skippedHint}${fallbackHint}${visionHint}${groupHint} · 去重后 ${sceneCount} 个置景分镜包（含 ${actionCount} 个抓拍姿态）)`;
 }
 
 /** 人物博主 5 层原子结构 */

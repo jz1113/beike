@@ -121,7 +121,8 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     parsedResult.model_anchor_features ||
     '';
   const masterScene = parsedResult.master_scene || '';
-  const productFingerprintRaw = parsedResult.product_fingerprint || '';
+  // 商品身份以用户选定商品为准，不能让视觉模型返回的泛品类词覆盖品牌/型号。
+  const productFingerprintRaw = String(productTitle || '').trim() || parsedResult.product_fingerprint || '';
   const productRole = normalizeOriginalProductRole(
     (parsedResult as any).product_role || (parsedResult as any).productRole,
     productFingerprintRaw

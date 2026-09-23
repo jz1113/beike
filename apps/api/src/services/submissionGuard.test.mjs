@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runWithWorkspace } from '@beike/server-kit/workspaceContext';
-import { guardSubmission, isExpiredReceipt, SUBMISSION_RECEIPT_TTL_MS } from './submissionGuard.ts';
+import { guardSubmission, isExpiredReceipt, purgeExpiredSubmissionReceipts, SUBMISSION_RECEIPT_TTL_MS } from './submissionGuard.ts';
 
 test('submission receipts expire after 24 hours', () => {
   const now = Date.now();
@@ -33,6 +33,15 @@ test('the same keyword batch returns its receipt without another model submissio
       const first = await guardSubmission(request(), 'keyword-review', { baseUrl: 'https://api.deepseek.com', apiKey: 'test' }, submit);
       const second = await guardSubmission(request(), 'keyword-review', { baseUrl: 'https://api.deepseek.com', apiKey: 'test' }, submit);
       assert.deepEqual(await first.json(), await second.json());
+      assert.equal(submits, 1);
+      const receiptDir = join(dir, 'submission-receipts', 'receipt-test');
+      const [name] = await readdir(receiptDir);
+      const receiptFile = join(receiptDir, name);
+      const saved = JSON.parse(await readFile(receiptFile, 'utf8'));
+      await writeFile(receiptFile, JSON.stringify({ ...saved, createdAt: Date.now() - SUBMISSION_RECEIPT_TTL_MS - 1000 }));
+      assert.equal(await purgeExpiredSubmissionReceipts(), 0);
+      const afterExpiry = await guardSubmission(request(), 'keyword-review', { baseUrl: 'https://api.deepseek.com', apiKey: 'test' }, submit);
+      assert.equal((await afterExpiry.json()).success, true);
       assert.equal(submits, 1);
     });
   } finally {

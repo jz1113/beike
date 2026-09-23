@@ -471,7 +471,7 @@ function buildMachineJsonLayer(params: {
 
   const singleImageGuard = isSingleImage
     ? `\n🚨【单图铁律】只输出第 ${focusIndex} 张图片的分析；per_image 仅 1 条且 image_index=${focusIndex}；scenes/outfits/actions 各仅 1 条。`
-    : `\n🚨【多图铁律】必须输出恰好 ${imageCount} 条 per_image（image_index 从 1 到 ${imageCount} 连续不遗漏）；actions 数量 ≤ ${imageCount}；scenes 聚类去重后 1~3 个，严禁每张图各建 1 场景。必须额外输出 content_summary 与 content_groups：每个图组连续、最多 4 图、且一个图组只能有一个场景。`;
+    : `\n🚨【多图铁律】必须输出恰好 ${imageCount} 条 per_image（image_index 从 1 到 ${imageCount} 连续不遗漏）；actions 数量 ≤ ${imageCount}；scenes 聚类去重后 1~3 个，严禁每张图各建 1 场景。必须额外输出 content_summary 与 content_groups：每个图组连续、恰好 4 图、且一个图组只能有一个场景。不足 4 张的图片不要建立图组。`;
 
   const perImageExamples = singleImageOnly
     ? PER_IMAGE_JSON_TEMPLATE(focusIndex)
@@ -571,7 +571,7 @@ ${singleImageGuard}
 - 严格遵循标准合法 JSON 语法：字符串值中严禁包含未转义的原生回车换行符，多行文本分段必须使用 \\n 转义，字符串与键名一律使用英文双引号
 ${isSingleImage ? `- 只输出第 ${focusIndex} 张图片的分析，不要输出其它 image_index` : `- 必须完整输出全部 ${imageCount} 张图片的分析，各图描述保持高密度精炼，确保输出的单个 JSON 语法完整闭合`}
 - 无人物时 has_human=false
-- content_groups 必须覆盖每一张图且不重复；图组按原图顺序连续划分，单组最多 4 张。若 8 张为同一内容，可输出两个 4 图组；不要将不同场景混在同一组。
+- content_groups 必须由恰好 4 张图构成且不重复；图组按原图顺序连续划分。若 8 张为同一内容，可输出两个 4 图组；不要将不同场景混在同一组。无法组成完整四图的图片不得输出图组。
 - 每个 content_group 固定一个场景、固定动作/摆放和构图节奏；人物、穿搭、场景只能作为整组可替换槽位，绝不能让每张图自由混搭。
 - JSON 键名和枚举保留模板中的英文
 

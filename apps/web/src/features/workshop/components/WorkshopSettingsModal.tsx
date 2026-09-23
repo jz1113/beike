@@ -204,7 +204,7 @@ export function WorkshopSettingsModal({
 
             <section className="border-t border-slate-100 pt-3">
               <div className="flex items-center justify-between gap-4">
-                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">图组母本锁定镜头顺序与机位；人物、穿搭、场景整组替换。</p></div>
+                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">选定四图母本后沿用镜头、场景、人物与穿搭；单独锁定的资产才会替换对应槽位。未选母本时自动组合原子资产。</p></div>
                 <label className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-indigo-700 cursor-pointer hover:border-indigo-300">
                   <input type="checkbox" checked={useAssetLibrary} onChange={e => setUseAssetLibrary?.(e.target.checked)} className="h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500" />启用联动
                 </label>
