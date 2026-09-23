@@ -24,6 +24,18 @@ export interface DatabaseMigration {
 }
 
 const statements = baselineSql.replace(/^--.*$/gm, '').split(';').map(s => s.trim()).filter(Boolean);
+const keywordReviewRuleSql = `
+CREATE TABLE IF NOT EXISTS "KeywordReviewRuleRevision" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "workspaceId" TEXT NOT NULL,
+  "version" INTEGER NOT NULL,
+  "entriesJson" TEXT NOT NULL DEFAULT '[]',
+  "note" TEXT NOT NULL DEFAULT '',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "KeywordReviewRuleRevision_workspaceId_version_key" ON "KeywordReviewRuleRevision"("workspaceId", "version");
+CREATE INDEX IF NOT EXISTS "KeywordReviewRuleRevision_workspaceId_createdAt_idx" ON "KeywordReviewRuleRevision"("workspaceId", "createdAt");
+`;
 const contentPromptGroupSql = `
 ALTER TABLE "FullPromptAsset" ADD COLUMN "sourceImageIndices" TEXT;
 ALTER TABLE "FullPromptAsset" ADD COLUMN "groupIndex" INTEGER;
@@ -213,6 +225,14 @@ export const desktopMigrations: readonly DatabaseMigration[] = [{
   version: '20260922_02_workspace_isolation',
   checksum: createHash('sha256').update(workspaceIsolationSql).digest('hex'),
   apply: applyWorkspaceIsolation,
+}, {
+  version: '20260923_01_keyword_review_rule_revisions',
+  checksum: createHash('sha256').update(keywordReviewRuleSql).digest('hex'),
+  apply: async db => {
+    for (const statement of keywordReviewRuleSql.split(';').map(s => s.trim()).filter(Boolean)) {
+      await db.$executeRawUnsafe(statement);
+    }
+  },
 }];
 
 async function readApplied(db: Database): Promise<Applied[]> {
