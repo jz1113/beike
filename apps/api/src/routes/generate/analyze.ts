@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       customBaseUrl,
       customApiKey,
       apiFormat,
+      allowInsecureHttp,
       previousMasterScenes = [],
       previousGroupSignatures = [],
       previousActionIds = [],
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
 
     const { baseUrl: targetBaseUrl, apiKey: targetApiKey } = resolveGatewayCreds(
       req,
-      { customBaseUrl, customApiKey },
+      { customBaseUrl, customApiKey, apiFormat, allowInsecureHttp },
       { baseUrl: getDefaultBaseUrl(), apiKey: getDefaultApiKey() }
     );
 

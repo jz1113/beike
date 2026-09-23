@@ -48,7 +48,7 @@ export interface WorkshopSettingsModalProps {
   availableActions?: Array<{ id: string; title?: string; code?: string }>;
   lockedFullPromptId?: string;
   setLockedFullPromptId?: (id: string) => void;
-  availableFullPrompts?: Array<{ id: string; title?: string; name?: string; code?: string; shotPromptsJson?: string }>;
+  availableFullPrompts?: Array<{ id: string; title?: string; name?: string; code?: string; shotPromptsJson?: string; hasHuman?: boolean }>;
   personaMode?: 'asset_driven' | 'none';
   setPersonaMode?: (mode: 'asset_driven' | 'none') => void;
 }
@@ -100,6 +100,8 @@ export function WorkshopSettingsModal({
   setPersonaMode,
 }: WorkshopSettingsModalProps) {
   if (!isOpen) return null;
+  const selectedGroup = availableFullPrompts.find((item) => item.id === lockedFullPromptId);
+  const hasHumanInGroup = Boolean(selectedGroup && selectedGroup.hasHuman !== false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] select-none animate-in fade-in duration-200">
@@ -213,9 +215,9 @@ export function WorkshopSettingsModal({
                     const group = availableFullPrompts.find((item) => item.id === id);
                     if (group && selectedShotCount !== 8) setSelectedShotCount(4);
                   }} options={availableFullPrompts} />
-                  <WorkshopAssetLockRow label="人设 #P" prefix="P" value={lockedPersonaId} onChange={(id) => setLockedPersonaId?.(id)} options={availablePersonas} />
+                  {hasHumanInGroup && <WorkshopAssetLockRow label="人设 #P" prefix="P" value={lockedPersonaId} onChange={(id) => setLockedPersonaId?.(id)} options={availablePersonas} />}
                   <WorkshopAssetLockRow label="场景 #S" prefix="S" value={lockedSceneId} onChange={(id) => setLockedSceneId?.(id)} options={availableScenes} />
-                  <WorkshopAssetLockRow label="穿搭 #O" prefix="O" value={lockedOutfitId} onChange={(id) => setLockedOutfitId?.(id)} options={availableOutfits} />
+                  {hasHumanInGroup && <WorkshopAssetLockRow label="穿搭 #O" prefix="O" value={lockedOutfitId} onChange={(id) => setLockedOutfitId?.(id)} options={availableOutfits} />}
                 </div>
               )}
             </section>

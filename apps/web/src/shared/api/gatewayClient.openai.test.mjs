@@ -30,3 +30,21 @@ test('OpenAI Responses setting routes only GPT 5.6/6 visual models through its i
     globalThis.window = previousWindow;
   }
 });
+
+test('HTTP consent is tied to the exact saved OpenAI gateway address', () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map([
+    ['openai_responses_enabled', 'true'],
+    ['openai_base_url', 'http://8.211.191.95:8080'],
+    ['openai_api_key', 'openai-key'],
+    ['openai_insecure_http_consent_url', 'http://8.211.191.95:8080'],
+  ]);
+  globalThis.localStorage = { getItem: (key) => values.get(key) || null };
+  try {
+    assert.equal(getMultimodalClientOverrides('gpt-6-luna').allowInsecureHttp, true);
+    values.set('openai_base_url', 'http://8.211.191.96:8080');
+    assert.equal(getMultimodalClientOverrides('gpt-6-luna').allowInsecureHttp, undefined);
+  } finally {
+    globalThis.localStorage = previousStorage;
+  }
+});

@@ -49,6 +49,8 @@ export default function ApiServicesTab({
   setShowOpenAIKey,
   openAIEnabled,
   setOpenAIEnabled,
+  openAIAllowInsecureHttp,
+  setOpenAIAllowInsecureHttp,
   isTestingOpenAI,
   handleTestOpenAI,
   handleSaveOpenAIConfig,
@@ -292,6 +294,7 @@ export default function ApiServicesTab({
               apiKey={openAIApiKey} setApiKey={setOpenAIApiKey}
               showKey={showOpenAIKey} setShowKey={setShowOpenAIKey}
               enabled={openAIEnabled} setEnabled={setOpenAIEnabled}
+              allowInsecureHttp={openAIAllowInsecureHttp} setAllowInsecureHttp={setOpenAIAllowInsecureHttp}
               onTest={handleTestOpenAI} onSave={handleSaveOpenAIConfig}
               onFetchModels={handleOpenOpenAIDiscovery}
               onImportCodexCatalog={handleImportCodexCatalog}

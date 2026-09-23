@@ -91,3 +91,31 @@ test('production does not send an API key to a public HTTP gateway', async () =>
     configureDomainRuntime({ env: {} });
   }
 });
+
+test('production reads models from a consented public HTTP gateway', async () => {
+  const originalFetch = globalThis.fetch;
+  configureDomainRuntime({ env: { NODE_ENV: 'production', DESKTOP_SHELL: '0', ALLOW_CUSTOM_BASE_URL: 'false' } });
+  let requestedUrl = '';
+  let authorization = '';
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    authorization = init.headers.Authorization;
+    return Response.json({ data: [{ id: 'gpt-6-luna' }] });
+  };
+  try {
+    const response = await POST(new Request('https://app.example/api/system/models/fetch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'openai', baseUrl: 'http://8.211.191.95:8080/',
+        apiKey: 'test-key', allowInsecureHttp: true, strict: true,
+      }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(requestedUrl, 'http://8.211.191.95:8080/v1/models');
+    assert.equal(authorization, 'Bearer test-key');
+    assert.deepEqual((await response.json()).models.map(model => model.id), ['gpt-6-luna']);
+  } finally {
+    globalThis.fetch = originalFetch;
+    configureDomainRuntime({ env: {} });
+  }
+});

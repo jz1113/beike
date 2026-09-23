@@ -336,7 +336,7 @@ export function useCustomModels({
     }
   };
 
-  const handleOpenOpenAIDiscovery = async (openAIBaseUrl: string, openAIApiKey: string, forceRefresh = false) => {
+  const handleOpenOpenAIDiscovery = async (openAIBaseUrl: string, openAIApiKey: string, allowInsecureHttp = false, forceRefresh = false) => {
     setGatewaySource('openai');
     if (!forceRefresh && openAIModels.length > 0) { setIsGatewayModalOpen(true); return; }
     if (!openAIApiKey.trim()) {
@@ -351,7 +351,7 @@ export function useCustomModels({
     try {
       const response = await apiFetch('/api/system/models/fetch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), strict: true }),
+        body: JSON.stringify({ provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), allowInsecureHttp, strict: true }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success || data.provider !== 'openai' || !Array.isArray(data.models)) {

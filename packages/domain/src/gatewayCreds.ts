@@ -29,6 +29,27 @@ export function isSafeCustomGatewayBaseUrl(raw: string): boolean {
   }
 }
 
+/** Explicitly approved HTTP bridge: only a literal, globally routable IPv4 address. */
+export function isPublicHttpGatewayIpUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' || url.username || url.password || url.search || url.hash) return false;
+    const parts = url.hostname.split('.').map(Number);
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+    const [a, b, c] = parts;
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && (b === 168 || b === 0 || b === 88)) return false;
+    if (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) return false;
+    if (a === 203 && b === 0 && c === 113) return false;
+    return !(a === 192 && b === 0 && c === 2);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 非生产环境，或显式打开 ALLOW_CUSTOM_BASE_URL 时，调用方可以放宽地址检查。
  * 生产网页是否采用浏览器传来的地址，由 isSafeCustomGatewayBaseUrl 决定。
@@ -60,7 +81,7 @@ function normalizeBase(url: string): string {
 
 export function resolveGatewayCreds(
   req: Request,
-  body: { customBaseUrl?: string; customApiKey?: string } | undefined,
+  body: { customBaseUrl?: string; customApiKey?: string; apiFormat?: string; allowInsecureHttp?: boolean } | undefined,
   defaults: { baseUrl: string; apiKey: string }
 ): { baseUrl: string; apiKey: string; ignoredClientBase: boolean; keyFrom: 'header' | 'body' | 'server' } {
   const headerKey = req.headers.get('x-custom-api-key')?.trim() || '';
@@ -70,14 +91,18 @@ export function resolveGatewayCreds(
   const headerBase = req.headers.get('x-custom-base-url')?.trim() || '';
   const bodyBase = body?.customBaseUrl?.trim() || '';
   const clientBase = bodyBase || headerBase;
-  const clientBaseSafe = Boolean(clientBase) && (allowClientCustomBaseUrl() || isSafeCustomGatewayBaseUrl(clientBase));
+  const insecureApproved = body?.apiFormat === 'openai-responses'
+    && body.allowInsecureHttp === true
+    && isPublicHttpGatewayIpUrl(clientBase);
+  const clientBaseSafe = Boolean(clientBase) && (allowClientCustomBaseUrl() || isSafeCustomGatewayBaseUrl(clientBase) || insecureApproved);
   if (clientBase && !clientBaseSafe) throw new GatewayBaseUrlError();
   const ignoredClientBase = false;
   const customBaseUrl = clientBaseSafe ? clientBase : '';
 
   const baseUrl = (customBaseUrl ? normalizeBase(customBaseUrl) : normalizeBase(defaults.baseUrl)) || defaults.baseUrl;
   const usingThirdParty = customBaseUrl && normalizeBase(customBaseUrl) !== normalizeBase(defaults.baseUrl);
-  const apiKey = customApiKey || (usingThirdParty ? '' : (allowServerSecretFallback() ? defaults.apiKey : ''));
+  const apiKey = insecureApproved ? customApiKey
+    : customApiKey || (usingThirdParty ? '' : (allowServerSecretFallback() ? defaults.apiKey : ''));
   const keyFrom = bodyKey ? 'body' : headerKey ? 'header' : 'server';
 
   return { baseUrl, apiKey, ignoredClientBase, keyFrom };

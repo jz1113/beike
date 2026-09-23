@@ -9,7 +9,7 @@ import {
   getApprovedModel,
 } from '@beike/domain/modelCatalog';
 import { FALLBACK_FLAGSHIP_MODELS } from './fallbackModels';
-import { allowClientCustomBaseUrl, isSafeCustomGatewayBaseUrl } from '@beike/domain/gatewayCreds';
+import { allowClientCustomBaseUrl, isPublicHttpGatewayIpUrl, isSafeCustomGatewayBaseUrl } from '@beike/domain/gatewayCreds';
 
 function parseDiscoveredModels(rawList: unknown[]) {
   const parsed = rawList.map((item: any) => {
@@ -101,8 +101,9 @@ export async function POST(req: Request) {
     const isOpenAI = body.provider === 'openai';
     const rawUrl = isLianchi ? LIANCHI_IMAGE_BASE_URL : (baseUrl || (isOpenAI ? 'https://api.openai.com' : req.headers.get('x-custom-base-url') || getDefaultBaseUrl()));
     const targetUrl = String(rawUrl).trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
-    if (isOpenAI && !allowClientCustomBaseUrl() && !isSafeCustomGatewayBaseUrl(targetUrl)) {
-      return jsonResponse({ success: false, models: [], error: '此部署仅允许 HTTPS 公网接口地址。当前 HTTP 地址无法安全传输 API Key；请给网关配置 HTTPS 域名后重试。' }, 400);
+    const insecureApproved = body.allowInsecureHttp === true && isPublicHttpGatewayIpUrl(targetUrl);
+    if (isOpenAI && !allowClientCustomBaseUrl() && !isSafeCustomGatewayBaseUrl(targetUrl) && !insecureApproved) {
+      return jsonResponse({ success: false, models: [], error: '此部署仅允许 HTTPS 地址；如需使用公网 IPv4 的 HTTP 网关，请先在设置中勾选明文传输选项。内网地址和 HTTP 域名不受支持。' }, 400);
     }
     const independentKey = Object.prototype.hasOwnProperty.call(body, 'apiKey');
     if (isOpenAI && !independentKey) {

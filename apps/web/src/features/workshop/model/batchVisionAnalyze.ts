@@ -57,7 +57,7 @@ export async function analyzeBatchProduct(
 
     const effectivePersona = 'asset_driven';
 
-    const { customBaseUrl: localUrl, customApiKey: localApiKey, apiFormat } = getMultimodalClientOverrides(deps.selectedVisionModel);
+    const { customBaseUrl: localUrl, customApiKey: localApiKey, apiFormat, allowInsecureHttp } = getMultimodalClientOverrides(deps.selectedVisionModel);
     const targetShotCount = deps.selectedShotCount || 4;
 
     if (!deps.lockedFullPromptId || deps.lockedFullPromptId === 'auto') {
@@ -125,6 +125,7 @@ export async function analyzeBatchProduct(
           customBaseUrl: localUrl,
           customApiKey: localApiKey,
           apiFormat,
+          allowInsecureHttp,
           previousGroupSignatures: deps.batchGroupSignaturesRef?.current?.slice(-4) || [],
           previousActionIds: deps.batchActionIdsRef?.current?.slice(-16) || [],
           previousSceneIds: deps.batchSceneIdsRef?.current?.slice(-20) || [],

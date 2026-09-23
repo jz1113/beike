@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { allowServerSecretFallback, GatewayBaseUrlError, resolveGatewayCreds } from './gatewayCreds.ts';
+import { allowServerSecretFallback, GatewayBaseUrlError, isPublicHttpGatewayIpUrl, resolveGatewayCreds } from './gatewayCreds.ts';
 import { configureDomainRuntime } from './runtime.ts';
 
 test('production web uses only the request key and ignores the server default', () => {
@@ -27,6 +27,27 @@ test('production web uses only the request key and ignores the server default', 
   );
   assert.equal(desktop.apiKey, 'server-key');
   configureDomainRuntime({ env: {} });
+});
+
+test('explicit Responses HTTP consent accepts only a public IPv4 address and a request key', () => {
+  configureDomainRuntime({ env: { NODE_ENV: 'production', DESKTOP_SHELL: '0', ALLOW_CUSTOM_BASE_URL: 'false' } });
+  try {
+    assert.equal(isPublicHttpGatewayIpUrl('http://8.211.191.95:8080/v1'), true);
+    for (const url of ['http://127.0.0.1:8080', 'http://192.168.1.5:8080', 'http://example.com', 'http://198.51.100.1']) {
+      assert.equal(isPublicHttpGatewayIpUrl(url), false, url);
+    }
+    const request = new Request('https://app.example/api/generate/analyze');
+    const options = { customBaseUrl: 'http://8.211.191.95:8080', customApiKey: 'user-key', apiFormat: 'openai-responses', allowInsecureHttp: true };
+    const accepted = resolveGatewayCreds(request, options, { baseUrl: 'https://ai.example', apiKey: 'server-key' });
+    assert.equal(accepted.baseUrl, 'http://8.211.191.95:8080');
+    assert.equal(accepted.apiKey, 'user-key');
+    assert.equal(resolveGatewayCreds(request, { ...options, customApiKey: '' }, { baseUrl: 'https://ai.example', apiKey: 'server-key' }).apiKey, '');
+    assert.throws(() => resolveGatewayCreds(request, { ...options, allowInsecureHttp: false }, { baseUrl: 'https://ai.example', apiKey: 'server-key' }), GatewayBaseUrlError);
+    assert.throws(() => resolveGatewayCreds(request, { ...options, apiFormat: undefined }, { baseUrl: 'https://ai.example', apiKey: 'server-key' }), GatewayBaseUrlError);
+    assert.throws(() => resolveGatewayCreds(request, { ...options, customBaseUrl: 'http://127.0.0.1:8080' }, { baseUrl: 'https://ai.example', apiKey: 'server-key' }), GatewayBaseUrlError);
+  } finally {
+    configureDomainRuntime({ env: {} });
+  }
 });
 
 test('production web accepts the configured gateway with an OpenAI /v1 suffix', () => {

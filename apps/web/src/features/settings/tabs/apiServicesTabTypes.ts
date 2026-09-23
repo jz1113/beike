@@ -37,6 +37,8 @@ export interface ApiServicesTabProps extends ApiServicesStoragePanelProps {
   setShowOpenAIKey: (v: boolean) => void;
   openAIEnabled: boolean;
   setOpenAIEnabled: (v: boolean) => void;
+  openAIAllowInsecureHttp: boolean;
+  setOpenAIAllowInsecureHttp: (v: boolean) => void;
   isTestingOpenAI: boolean;
   handleTestOpenAI: () => void;
   handleSaveOpenAIConfig: () => void;

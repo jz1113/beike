@@ -3,12 +3,20 @@ import { apiFetch } from '@/shared/api/apiClient';
 import { credentialGet } from '@/shared/api/credentialClient';
 import { persistLianchiConfig, persistOpenAIConfig } from '@/shared/desktop/persistDesktopSecrets';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { isPublicHttpGatewayIpUrl } from '@beike/domain/gatewayCreds';
 
 export function useIndependentModelProviders(isOpen: boolean, showToast: (message: string) => void) {
   const [openAIBaseUrl, setOpenAIBaseUrl] = useState('https://api.openai.com');
   const [openAIApiKey, setOpenAIApiKey] = useState('');
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
   const [openAIEnabled, setOpenAIEnabled] = useState(false);
+  const [openAIInsecureHttpConsentUrl, setOpenAIInsecureHttpConsentUrl] = useState('');
+  const normalizedOpenAIBaseUrl = openAIBaseUrl.trim().replace(/\/+$/, '');
+  const openAIAllowInsecureHttp = /^http:\/\//i.test(normalizedOpenAIBaseUrl)
+    && openAIInsecureHttpConsentUrl === normalizedOpenAIBaseUrl;
+  const setOpenAIAllowInsecureHttp = (allowed: boolean) => {
+    setOpenAIInsecureHttpConsentUrl(allowed ? normalizedOpenAIBaseUrl : '');
+  };
   const [isTestingOpenAI, setIsTestingOpenAI] = useState(false);
   const [lianchiApiKey, setLianchiApiKey] = useState('');
   const [showLianchiKey, setShowLianchiKey] = useState(false);
@@ -20,6 +28,7 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     void credentialGet('lianchi_api_key').then(setLianchiApiKey);
     setOpenAIBaseUrl(localStorage.getItem('openai_base_url') || 'https://api.openai.com');
     setOpenAIEnabled(localStorage.getItem('openai_responses_enabled') === 'true');
+    setOpenAIInsecureHttpConsentUrl(localStorage.getItem('openai_insecure_http_consent_url') || '');
   }, [isOpen]);
 
   const handleTestOpenAI = async () => {
@@ -29,7 +38,7 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     try {
       const response = await apiFetch('/api/system/models/fetch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), isPing: true, strict: true }),
+        body: JSON.stringify({ provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), allowInsecureHttp: openAIAllowInsecureHttp, isPing: true, strict: true }),
       });
       const data = await response.json().catch(() => ({}));
       showToast(response.ok && data.success
@@ -44,9 +53,13 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     try {
       const url = new URL(openAIBaseUrl.trim());
       if (!['https:', 'http:'].includes(url.protocol)) throw new Error('接口地址须以 http 或 https 开头');
+      if (url.protocol === 'http:' && !openAIAllowInsecureHttp) throw new Error('HTTP 网关需先勾选明文传输选项');
+      if (url.protocol === 'http:' && !isPublicHttpGatewayIpUrl(url.toString())) throw new Error('HTTP 网关只支持公网 IPv4 地址，不支持内网地址或域名');
       if (openAIEnabled && !openAIApiKey.trim()) throw new Error('启用前请填写 OpenAI API Key');
       await persistOpenAIConfig(url.toString().replace(/\/+$/, ''), openAIApiKey);
       localStorage.setItem('openai_responses_enabled', String(openAIEnabled));
+      if (openAIAllowInsecureHttp) localStorage.setItem('openai_insecure_http_consent_url', normalizedOpenAIBaseUrl);
+      else localStorage.removeItem('openai_insecure_http_consent_url');
       showToast('OpenAI Responses 接口配置已保存');
     } catch (error) {
       showToast(`OpenAI 配置保存失败：${formatUserError(error, '请检查接口地址')}`);
@@ -79,6 +92,7 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
 
   return {
     openAIBaseUrl, setOpenAIBaseUrl, openAIApiKey, setOpenAIApiKey,
+    openAIAllowInsecureHttp, setOpenAIAllowInsecureHttp,
     showOpenAIKey, setShowOpenAIKey, openAIEnabled, setOpenAIEnabled,
     isTestingOpenAI, handleTestOpenAI, handleSaveOpenAIConfig,
     lianchiApiKey, setLianchiApiKey, showLianchiKey, setShowLianchiKey,

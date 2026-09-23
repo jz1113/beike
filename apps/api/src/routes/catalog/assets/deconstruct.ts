@@ -106,6 +106,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       customBaseUrl,
       customApiKey,
       apiFormat,
+      allowInsecureHttp,
       autoSave = true,
       albumName: bodyAlbumName,
       productTitle,
@@ -132,7 +133,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
 
     const { baseUrl: rawBaseUrl, apiKey: targetApiKey } = resolveGatewayCreds(
       req,
-      { customBaseUrl, customApiKey },
+      { customBaseUrl, customApiKey, apiFormat, allowInsecureHttp },
       { baseUrl: getDefaultBaseUrl(), apiKey: getDefaultApiKey() }
     );
     const targetBaseUrl = normalizeGatewayBaseUrl(rawBaseUrl) || normalizeGatewayBaseUrl(getDefaultBaseUrl());

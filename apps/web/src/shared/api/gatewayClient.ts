@@ -53,16 +53,21 @@ export function getMultimodalClientOverrides(modelId: string): {
   customBaseUrl?: string;
   customApiKey?: string;
   apiFormat?: 'openai-responses';
+  allowInsecureHttp?: boolean;
 } {
   const primary = getGatewayClientOverrides();
   if (typeof localStorage === 'undefined' || localStorage.getItem('openai_responses_enabled') !== 'true' ||
       !/^gpt-(?:5\.6|6)(?:-|$)/i.test(modelId)) return primary;
   const key = localStorage.getItem('openai_api_key')?.trim();
   if (!key) return primary;
+  const baseUrl = localStorage.getItem('openai_base_url')?.trim() || 'https://api.openai.com';
+  const consentUrl = localStorage.getItem('openai_insecure_http_consent_url')?.trim() || '';
+  const allowInsecureHttp = /^http:\/\//i.test(baseUrl) && baseUrl.replace(/\/+$/, '') === consentUrl;
   return {
-    customBaseUrl: localStorage.getItem('openai_base_url')?.trim() || 'https://api.openai.com',
+    customBaseUrl: baseUrl,
     customApiKey: key,
     apiFormat: 'openai-responses',
+    ...(allowInsecureHttp ? { allowInsecureHttp: true } : {}),
   };
 }
 

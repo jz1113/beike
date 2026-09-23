@@ -11,6 +11,8 @@ interface Props {
   setShowKey: (value: boolean) => void;
   enabled: boolean;
   setEnabled: (value: boolean) => void;
+  allowInsecureHttp: boolean;
+  setAllowInsecureHttp: (value: boolean) => void;
   onSave: () => void;
   onTest: () => void;
   onFetchModels: () => void;
@@ -25,6 +27,7 @@ interface Props {
 
 export function ApiServicesOpenAIPanel({
   baseUrl, setBaseUrl, apiKey, setApiKey, showKey, setShowKey, enabled, setEnabled,
+  allowInsecureHttp, setAllowInsecureHttp,
   onSave, onTest, onFetchModels, onImportCodexCatalog, onAddManualModel,
   isTesting, isFetchingModels, modelCount, modelError, modelSource,
 }: Props) {
@@ -62,9 +65,10 @@ export function ApiServicesOpenAIPanel({
       </div>
     </div>
     {/^http:\/\//i.test(baseUrl.trim()) && (
-      <p role="alert" className="text-[11px] text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
-        当前使用 HTTP 网关。网页部署要求 HTTPS 地址，以免 API Key 明文传输；请为该网关配置 HTTPS 域名。
-      </p>
+      <label className="flex items-start gap-2 text-[11px] text-amber-900 bg-amber-50 rounded-xl px-3 py-2 cursor-pointer">
+        <input type="checkbox" checked={allowInsecureHttp} onChange={event => setAllowInsecureHttp(event.target.checked)} className="mt-0.5 accent-amber-700" />
+        <span>允许此公网 IP 的 HTTP 网关。勾选后，API Key 会在服务器到网关之间以明文传输；仅对此地址生效。建议优先配置 HTTPS。</span>
+      </label>
     )}
     <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
       <input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)} className="accent-indigo-600" />
