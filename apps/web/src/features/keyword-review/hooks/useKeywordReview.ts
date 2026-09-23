@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeywordReviewBalance, KeywordReviewResult } from '@beike/contracts/generate';
+import type { KeywordReviewBalance } from '@beike/contracts/generate';
 import { apiFetch } from '@/shared/api/apiClient';
 import { credentialGet } from '@/shared/api/credentialClient';
 import {
@@ -10,8 +10,9 @@ import {
 } from '../model/keywordReviewWorkbook';
 import { advanceKnownFailureVersions, applyBatchResults, countReviewRecords, isKnownModelOutputFailure, selectPreviewRecords, updateReviewRecords } from '../model/reviewProgress';
 import { reviewBatchWithRecovery } from '../model/reviewBatchRecovery';
-import { DEEPSEEK_BASE_URL, requestReviewBatch, type BalanceResponse } from '../model/reviewRequest';
+import { DEEPSEEK_BASE_URL, type BalanceResponse } from '../model/reviewRequest';
 import { MAX_REVIEW_CONCURRENCY, ReviewPacer } from '../model/reviewPacer';
+import { createReviewBatchSubmit } from '../model/reviewBatchSubmit';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
 export const KEYWORD_REVIEW_CONCURRENCY = MAX_REVIEW_CONCURRENCY;
@@ -230,8 +231,14 @@ export function useKeywordReview() {
     let failedNow = 0;
     let lookedUpNow = 0;
     let rateLimitRetries = 0;
+    let consecutiveBudgetExhausted = 0;
     const pacer = new ReviewPacer();
     const runState: { fatalError: Error | null } = { fatalError: null };
+    const markFailed = (ids: string[], message: string) => {
+      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
+        (record) => ({ ...record, status: 'error', error: message })));
+      failedNow += ids.length;
+    };
     try {
       let nextIndex = 0;
       const runWorker = async () => {
@@ -247,59 +254,36 @@ export function useKeywordReview() {
             : `按规则 v${rulesVersion} 并行审核中，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
           setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
             (record) => ({ ...record, status: 'running', error: undefined })));
-          const submit = async (chunk: KeywordReviewRecord[]) => {
-            const sourceIndex = recordIndicesRef.current.get(chunk[0].id) ?? index;
-            const rows = chunk.map(({ id, query, expansion, entityExpansion, contentType }) => ({ id, query, expansion, entityExpansion, contentType }));
-            const payload = JSON.stringify({ model: KEYWORD_REVIEW_MODEL, lookup: lookupEnabled, rulesVersion, rows });
-            const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
-            const fingerprint = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
-            for (let retry = 0; retry < 5; retry += 1) {
-              if (!await pacer.acquire(() => controller.signal.aborted || stopRequestedRef.current)) return;
-              const retryVersion = batchRetryVersionsRef.current.get(sourceIndex) ?? 0;
-              balanceSpendVersionRef.current += 1;
-              setBalanceDirty(true);
-              try {
-                const data = await requestReviewBatch(JSON.stringify({
-                  model: KEYWORD_REVIEW_MODEL, customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey,
-                  lookup: lookupEnabled, rulesVersion, rows,
-                }), controller.signal, `keyword:${fingerprint}:${retryVersion}`);
-                pacer.succeeded();
-                setRecords((current) => applyBatchResults(current, recordIndicesRef.current, data.results as KeywordReviewResult[]));
-                completedNow += chunk.length;
-                lookedUpNow += Number(data.lookedUp || 0);
-                refreshBalance();
-                return;
-              } catch (error) {
-                const limited = (error as Error & { rateLimited?: boolean }).rateLimited === true;
-                if (limited) pacer.rateLimited(retry);
-                else pacer.failed();
-                if (limited || (error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid) {
-                  batchRetryVersionsRef.current.set(sourceIndex, retryVersion + 1);
-                }
-                if (limited && retry < 4 && !controller.signal.aborted && !stopRequestedRef.current) {
-                  rateLimitRetries += 1;
-                  setNotice(`DeepSeek 限流，已降至 ${pacer.concurrency} 个并行请求并等待重试…`);
-                  continue;
-                }
-                refreshBalance(true);
-                throw error;
-              }
-            }
-          };
+          const submit = createReviewBatchSubmit({
+            model: KEYWORD_REVIEW_MODEL, apiKey, lookup: lookupEnabled, rulesVersion,
+            signal: controller.signal, shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
+            indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, pacer,
+            onDispatch: () => { balanceSpendVersionRef.current += 1; setBalanceDirty(true); },
+            onSuccess: (chunk, results, lookedUp) => {
+              setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
+              completedNow += chunk.length; lookedUpNow += lookedUp; refreshBalance();
+            },
+            onRateLimit: (concurrency) => {
+              rateLimitRetries += 1;
+              setNotice(`DeepSeek 限流，已降至 ${concurrency} 个并行请求并等待重试…`);
+            },
+            onFailure: () => refreshBalance(true),
+          });
           try {
-            await reviewBatchWithRecovery({
+            const recovery = await reviewBatchWithRecovery({
               rows: batch,
               submit,
               isModelOutputError: (error) => (error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid === true,
               shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
               onRetry: (chunk) => setNotice(`模型格式异常，正在自动重试 ${chunk.length} 条…`),
-              onSingleRowFailure: (record, error) => {
-                const message = error instanceof Error ? error.message : '模型结果异常';
-                setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, [record.id],
-                  (item) => ({ ...item, status: 'error', error: message })));
-                failedNow += 1;
-              },
+              onSingleRowFailure: (record, error) => markFailed([record.id], error instanceof Error ? error.message : '模型结果异常'),
+              onUnresolvedRows: (rows) => markFailed(rows.map((record) => record.id), '模型格式异常，本批自动重试已达费用保护上限'),
             });
+            consecutiveBudgetExhausted = recovery.exhausted ? consecutiveBudgetExhausted + 1 : 0;
+            if (consecutiveBudgetExhausted >= 2) {
+              runState.fatalError = new Error('连续两批模型格式异常达到自动重试费用保护上限');
+              stopRequestedRef.current = true;
+            }
           } catch (error) {
             if (controller.signal.aborted) break;
             runState.fatalError = error instanceof Error ? error : new Error('审核失败');

@@ -96,7 +96,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const filterLabels: Record<KeywordReviewFilter, string> = { all: '全部', done: '已完成', producible: '可制作', rejected: '不制作' };
   const selectedRecord = review.records.find((record) => record.id === selectedRecordId);
   const selectedColumns = review.parsed?.sheets.find((sheet) => sheet.name === selectedRecord?.sheetName)?.outputColumns ?? displayColumns;
-  const showBalanceAmount = Boolean(review.balance && review.balanceUpdatedAt && !review.balanceDirty && !review.balanceError && Date.now() - review.balanceUpdatedAt < 45_000);
+  const showBalanceAmount = Boolean(review.balance && review.balanceUpdatedAt);
 
   const receiveFile = (file?: File) => {
     if (file) void review.importFile(file);
@@ -118,7 +118,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             type="button"
             onClick={() => review.refreshBalance(true)}
             className="hidden rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 sm:inline-flex sm:items-center sm:gap-1.5 hover:border-slate-300"
-            title={`${review.balance ? `赠金 ${review.balance.granted} · 充值 ${review.balance.toppedUp} · ` : ''}${review.balanceUpdatedAt ? `上次同步 ${new Date(review.balanceUpdatedAt).toLocaleTimeString('zh-CN')}` : '尚未同步'}${review.balanceError ? ` · 查询失败：${review.balanceError}` : ''} · 点击刷新`}
+            title={`${review.balance ? `赠金 ${review.balance.granted} · 充值 ${review.balance.toppedUp} · ` : ''}${review.balanceUpdatedAt ? `上次同步 ${new Date(review.balanceUpdatedAt).toLocaleTimeString('zh-CN')}` : '尚未同步'}${review.balanceDirty ? ' · 正在审核的请求费用可能尚未计入' : ''}${review.balanceError ? ` · 查询失败：${review.balanceError}` : ''} · 点击刷新`}
           >
             {review.model}
             {showBalanceAmount && review.balance && (
@@ -130,7 +130,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
               </>
             )}
             <span className={review.balanceError ? 'text-amber-600' : 'text-slate-400'}>
-              {review.balanceRefreshing ? '同步中' : review.balanceError || !showBalanceAmount ? '余额待更新' : `截至 ${new Date(review.balanceUpdatedAt!).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`}
+              {review.balanceDirty ? '有费用待同步' : review.balanceError ? '刷新失败' : review.balanceRefreshing ? '同步中' : showBalanceAmount ? `截至 ${new Date(review.balanceUpdatedAt!).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '余额待更新'}
             </span>
           </button>
           {onOpenSettings && (
@@ -209,7 +209,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条、最多 {review.concurrency} 个请求并行，自动处理全部待审核词。模型格式异常会自动重试并拆分批次定位问题；持续异常的单条会标为失败，其他词继续处理。重试可能再次收费。联网补查默认关闭，每批最多 5 条。</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。模型格式异常会自动重试并拆分定位；持续异常的单条会标为失败，其他词继续处理。重试可能再次收费。联网补查默认关闭，每批最多 5 条。</p>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>

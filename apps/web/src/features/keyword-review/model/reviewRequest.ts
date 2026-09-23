@@ -1,5 +1,4 @@
 import type { KeywordReviewBalance, KeywordReviewResult } from '@beike/contracts/generate';
-import { apiFetch } from '@/shared/api/apiClient';
 import { isRecoverableModelOutputError } from './reviewProgress';
 
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
@@ -24,6 +23,7 @@ export type BalanceResponse = {
 };
 
 export async function requestReviewBatch(body: string, signal: AbortSignal, idempotencyKey: string): Promise<ReviewResponse> {
+  const { apiFetch } = await import('@/shared/api/apiClient');
   let response: Response;
   try {
     response = await apiFetch('/api/generate/keyword-review', {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { reviewBatchWithRecovery } from './reviewBatchRecovery.ts';
+import { MAX_RECOVERY_REQUESTS, reviewBatchWithRecovery } from './reviewBatchRecovery.ts';
 
 test('retries malformed output and finishes a batch', async () => {
   let calls = 0;
@@ -47,4 +47,20 @@ test('does not retry uncertain submission errors', async () => {
     shouldStop: () => false,
   }), /提交结果不确定/);
   assert.equal(calls, 1);
+});
+
+test('caps charged malformed-output attempts for a persistently bad batch', async () => {
+  let calls = 0;
+  const failed = [];
+  const result = await reviewBatchWithRecovery({
+    rows: Array.from({ length: 50 }, (_, index) => index),
+    submit: async () => { calls += 1; throw { modelOutputInvalid: true }; },
+    isModelOutputError: (error) => error?.modelOutputInvalid === true,
+    onSingleRowFailure: (row) => failed.push(row),
+    onUnresolvedRows: (rows) => failed.push(...rows),
+    shouldStop: () => false,
+  });
+  assert.equal(calls, MAX_RECOVERY_REQUESTS);
+  assert.equal(result.exhausted, true);
+  assert.deepEqual(failed.sort((a, b) => a - b), Array.from({ length: 50 }, (_, index) => index));
 });
