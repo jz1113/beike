@@ -178,3 +178,22 @@ test('parse keeps 实体拓展q and 分类 when they have values', () => {
   const dispatchIndex = parsed.displayColumns.findIndex((column) => column.key === 'dispatchTime');
   assert.equal(parsed.displayColumns[dispatchIndex + 1].label, '最终垂类');
 });
+
+test('partial export can be imported and resumes only unfinished rows', () => {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['query', '相关拓展'],
+    ['猫砂', '膨润土'],
+    ['汽车保养', '机油'],
+  ]);
+  const parsed = parseKeywordWorkbookData({ SheetNames: ['词包'], Sheets: { 词包: sheet } }, '词包.xlsx');
+  const records = [
+    { ...parsed.records[0], status: 'done', category: '动物', categoryReason: '宠物用品内容', producible: '制作', rejectReason: '' },
+    parsed.records[1],
+  ];
+  const exported = buildReviewedWorkbook(parsed, records);
+  const resumed = parseKeywordWorkbookData(exported, '词包_审核进度.xlsx');
+  assert.equal(resumed.records[0].status, 'done');
+  assert.equal(resumed.records[0].category, '动物');
+  assert.equal(resumed.records[1].status, 'idle');
+  assert.equal(resumed.records[1].query, '汽车保养');
+});

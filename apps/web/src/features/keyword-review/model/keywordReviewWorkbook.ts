@@ -475,12 +475,12 @@ export function buildReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: Ke
   return workbook;
 }
 
-export async function exportReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: KeywordReviewRecord[]) {
+export async function exportReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: KeywordReviewRecord[], partial = false) {
   const workbook = buildReviewedWorkbook(parsed, records);
   const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const base = parsed.fileName.replace(/\.(xlsx|xls|csv)$/i, '') || '关键词表';
-  const fileName = `${base}_已审核.xlsx`;
+  const fileName = `${base}_${partial ? '审核进度' : '已审核'}.xlsx`;
   await saveToDownloadDir(fileName, blob);
   return fileName;
 }
