@@ -11,8 +11,8 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(scriptDir, '../..');
 
 const REQUIRED_DIRS = ['apps', 'packages', 'tools', 'docs'];
-const FORBIDDEN_DIRS = ['工程', '依赖', 'docs/API文档', 'docs/打包', 'app', 'db', 'desktop', 'works'];
-const ROOT_CHINESE_ALLOWLIST = new Set(['启动桌面.command']);
+const FORBIDDEN_DIRS = ['工程', '依赖', 'docs/API文档', 'docs/打包', 'app', 'db', 'desktop', 'works', 'apps/desktop'];
+const ROOT_CHINESE_ALLOWLIST = new Set();
 
 const errors = [];
 
@@ -31,7 +31,7 @@ for (const rel of FORBIDDEN_DIRS) {
   }
 }
 
-const appsExpected = ['web', 'api', 'desktop'];
+const appsExpected = ['web', 'api'];
 for (const name of appsExpected) {
   const dir = path.join(workspaceRoot, 'apps', name);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {

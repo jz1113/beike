@@ -39,14 +39,6 @@ export async function apiAuthMiddleware(c: Context, next: Next) {
     return next();
   }
 
-  if (
-    path === '/api/system/dev-log' &&
-    process.env.DESKTOP_SHELL === '1' &&
-    process.env.NODE_ENV !== 'production'
-  ) {
-    return next();
-  }
-
   if (!isAccessTokenConfigured()) {
     return c.json(
       { success: false, error: '服务端未配置访问令牌，请联系管理员' },
@@ -78,7 +70,7 @@ export async function apiAuthMiddleware(c: Context, next: Next) {
     path.startsWith('/api/assets/storage/migrate') ||
     path.startsWith('/api/assets/storage/test');
 
-  if (isDanger && !isDev && process.env.DESKTOP_SHELL !== '1') {
+  if (isDanger && !isDev) {
     if (!admin) {
       return c.json(
         { success: false, error: '管理员令牌未配置，无法执行此操作' },

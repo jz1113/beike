@@ -1,4 +1,4 @@
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 
 export interface DeconstructedRecordRow {
   sourceUrl?: string;

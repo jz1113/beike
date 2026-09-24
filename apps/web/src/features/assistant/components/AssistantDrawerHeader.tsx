@@ -7,7 +7,6 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 
 interface AssistantDrawerHeaderProps {
   sessionTitle: string;
@@ -34,9 +33,6 @@ export default function AssistantDrawerHeader({
 }: AssistantDrawerHeaderProps) {
   return (
     <div
-      data-tauri-drag-region
-      onMouseDown={handleWindowDrag}
-      onDoubleClick={handleWindowDoubleClick}
       className="h-14 px-4 sm:px-5 border-b border-slate-100 bg-slate-50/90 flex items-center justify-between flex-shrink-0 cursor-default relative z-10"
     >
       <div className="flex items-center gap-2 min-w-0">

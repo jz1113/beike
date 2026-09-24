@@ -1,20 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import path from 'node:path';
-import os from 'node:os';
 import fs from 'node:fs';
 import { sanitizeActionPrompt, sanitizeActionTitle } from '@beike/domain/assetDeconstruct/validate';
 import { extractActionCategories, extractActionFocusAnchors } from '@beike/domain/productCategory';
 
 async function main() {
-  const desktopDbPath = path.join(
-    os.homedir(),
-    'Library/Application Support/com.azhuo.workbench/azhuo.db'
-  );
-
   const devDbPath = path.resolve(process.cwd(), 'packages/prisma/dev.db');
   const dbUrls = [
     process.env.DATABASE_URL,
-    fs.existsSync(desktopDbPath) ? `file:${desktopDbPath}` : null,
     fs.existsSync(devDbPath) ? `file:${devDbPath}` : null,
   ].filter(Boolean) as string[];
 

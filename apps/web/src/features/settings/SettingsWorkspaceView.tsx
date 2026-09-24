@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useToast } from '@/shared/hooks/useToast';
 import {
   ArrowLeft,
@@ -215,16 +214,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           data-settings-sidebar
           className="w-64 sm:w-72 xl:w-80 shrink-0 h-full bg-[#F5F6F8] border-r border-slate-200/90 flex flex-col justify-between overflow-hidden relative z-20"
         >
-          {/* 顶栏可拖拽区与「← 返回应用」主入口（严格对标图 2 红框） */}
           <div className="flex flex-col pt-3 sm:pt-4 px-3 sm:px-4">
-            <div
-              data-tauri-drag-region
-              onMouseDown={handleWindowDrag}
-              onDoubleClick={handleWindowDoubleClick}
-              className="h-7 w-full mb-1 cursor-default"
-            />
-
-            {/* 图 2 红框核心控件：「← 返回应用」 */}
             <button
               type="button"
               onClick={handleBackToApp}
@@ -334,9 +324,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         <main className="flex-1 min-w-0 h-full flex flex-col bg-white overflow-hidden relative z-10">
           {/* 顶栏控制条：包含窗口拖拽与标题 */}
           <div
-            data-tauri-drag-region
-            onMouseDown={handleWindowDrag}
-            onDoubleClick={handleWindowDoubleClick}
             className="h-14 px-6 md:px-8 border-b border-slate-100 bg-white/95 backdrop-blur-md flex items-center justify-between shrink-0 select-none cursor-default"
           >
             <div className="flex items-center gap-3 min-w-0">

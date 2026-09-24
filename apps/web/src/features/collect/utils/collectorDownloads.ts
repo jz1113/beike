@@ -1,5 +1,5 @@
 import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import { openExternalUrl } from '@/shared/media/downloadMedia';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { collectedVideos, type BatchTaskItem } from './collectorTypes';

@@ -182,7 +182,7 @@ export async function assertSafeRemoteUrl(
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     throw new Error('Only http(s) URLs allowed');
   }
-  if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:' && process.env.DESKTOP_SHELL !== '1') {
+  if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
     throw new Error('Only https URLs allowed in production');
   }
   const hostname = parsed.hostname.toLowerCase();

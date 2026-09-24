@@ -2,15 +2,24 @@
 import { getGatewayClientHeaders } from '@/shared/api/gatewayClient';
 import { getClientAccessToken, syncAppTokenCookie } from '@/shared/api/apiToken';
 import { getWorkspaceSecret, syncWorkspaceCookie } from '@/shared/api/workspaceClient';
-import { getApiBase, isTauriDesktop, resolveApiUrl } from '@/shared/desktop/desktopRuntime';
-import { invokeTauriApi } from '@/shared/desktop/tauriApi';
-import { mayReplayAfterTransportFailure } from './requestReplay';
+import { getApiBase, resolveApiUrl } from '@/shared/api/apiBase';
 
 export { getClientAccessToken, setClientAccessToken, syncAppTokenCookie } from '@/shared/api/apiToken';
 
 let mediaSession: { exp: number; sig: string } | null = null;
+const mediaSessionListeners = new Set<() => void>();
+export function hasMediaSession() {
+  return Boolean(mediaSession);
+}
+export function subscribeMediaSession(listener: () => void) {
+  mediaSessionListeners.add(listener);
+  return () => { mediaSessionListeners.delete(listener); };
+}
 export function setMediaSession(value: { exp: number; sig: string } | undefined) {
-  if (value) mediaSession = value;
+  if (value) {
+    mediaSession = value;
+    mediaSessionListeners.forEach((listener) => listener());
+  }
 }
 
 /**
@@ -59,34 +68,10 @@ export function apiHeaders(extra?: HeadersInit): Headers {
   return headers;
 }
 
-/** 统一带鉴权的 fetch（桌面优先直连 sidecar HTTP，否则 Tauri invoke / 浏览器 fetch） */
+/** 统一带鉴权的浏览器 fetch。 */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   syncAppTokenCookie();
   syncWorkspaceCookie();
-
-  if (isTauriDesktop()) {
-    const base = getApiBase();
-    if (base) {
-      const headers = apiHeaders(init?.headers);
-      if (init?.body instanceof FormData && headers.has('Content-Type')) {
-        headers.delete('Content-Type');
-      }
-      try {
-        return await fetch(resolveApiUrl(input), { ...init, headers });
-      } catch (directErr) {
-        // A failed transport does not prove a model POST was rejected. Replaying
-        // it through IPC can submit and bill the same operation twice.
-        const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-        if (!mayReplayAfterTransportFailure(method)) throw directErr;
-        console.warn('[apiFetch] 直连 API 遇到网络异常，自动降级切换至 Tauri IPC 备用通道:', directErr);
-        const tauriRes = await invokeTauriApi(input, init);
-        if (tauriRes) return tauriRes;
-        throw directErr;
-      }
-    }
-    const tauriRes = await invokeTauriApi(input, init);
-    if (tauriRes) return tauriRes;
-  }
 
   const headers = apiHeaders(init?.headers);
   if (init?.body instanceof FormData && headers.has('Content-Type')) {

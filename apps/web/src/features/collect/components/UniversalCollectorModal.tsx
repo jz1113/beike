@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { ScanSearch, Sparkles, FileSpreadsheet } from 'lucide-react';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store';
 import StyleExtractModal from '@/shared/modals/StyleExtractModal';
@@ -185,14 +184,10 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
       >
         {/* 轻量顶部操作条：与大字报页面保持一致 */}
         <header
-          data-tauri-drag-region
-          onMouseDown={handleWindowDrag}
-          onDoubleClick={handleWindowDoubleClick}
           className="relative z-10 flex min-h-11 shrink-0 items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8 cursor-default"
         >
           <button
             type="button"
-            onMouseDown={(event) => event.stopPropagation()}
             onClick={handleBackHome}
             className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
             aria-label="返回首页"

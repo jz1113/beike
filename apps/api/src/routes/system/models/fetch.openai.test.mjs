@@ -78,7 +78,7 @@ test('OpenAI model discovery reports an empty incompatible directory', async () 
 });
 
 test('production does not send an API key to a public HTTP gateway', async () => {
-  configureDomainRuntime({ env: { NODE_ENV: 'production', DESKTOP_SHELL: '0', ALLOW_CUSTOM_BASE_URL: 'false' } });
+  configureDomainRuntime({ env: { NODE_ENV: 'production', ALLOW_CUSTOM_BASE_URL: 'false' } });
   try {
     const response = await POST(new Request('http://localhost/api/system/models/fetch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -94,7 +94,7 @@ test('production does not send an API key to a public HTTP gateway', async () =>
 
 test('production reads models from a consented public HTTP gateway', async () => {
   const originalFetch = globalThis.fetch;
-  configureDomainRuntime({ env: { NODE_ENV: 'production', DESKTOP_SHELL: '0', ALLOW_CUSTOM_BASE_URL: 'false' } });
+  configureDomainRuntime({ env: { NODE_ENV: 'production', ALLOW_CUSTOM_BASE_URL: 'false' } });
   let requestedUrl = '';
   let authorization = '';
   globalThis.fetch = async (input, init) => {

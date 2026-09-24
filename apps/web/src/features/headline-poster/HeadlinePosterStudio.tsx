@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { WandSparkles } from 'lucide-react';
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import { BatchPreviewLightbox } from '@/shared/modals/lightbox/BatchPreviewLightbox';
 import { PosterImportPanel } from './components/PosterImportPanel';
 import { PosterCoverGallery } from './components/PosterCoverGallery';

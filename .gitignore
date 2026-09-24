@@ -13,18 +13,7 @@ apps/web/dist/
 # Release artifacts (do not commit)
 release/
 
-# Tauri Desktop
-apps/desktop/target/
-apps/desktop/gen/
-apps/desktop/resources/api-server/**
-!apps/desktop/resources/api-server/.gitkeep
-apps/desktop/resources/server/
-apps/desktop/binaries/node-*
-.desktop-dev-port
-.desktop-dev-token
-.desktop-dev-pids.json
 .local-api-port
-apps/desktop/tauri.conf.dev.json
 
 # Local Environment Variables
 .env

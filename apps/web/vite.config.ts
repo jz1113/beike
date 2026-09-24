@@ -9,13 +9,10 @@ import type { ServerResponse } from 'node:http';
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(webRoot, '../..');
-// Web 与桌面开发启动器曾分别写入不同的端口文件：前者是
-// `.local-api-port`，后者是 `.desktop-dev-port`。代理只读后者时，API
-// 实际跑在 3001–3099 的场景仍会被错误转发至 3000，整批生图便会在提交前
-// 直接收到 502。优先读取 Web 启动器的文件；桌面开发没有该文件时再回退。
+// 开发启动器把实际 API 端口写在 `.local-api-port`。API 跑在 3001–3099 时
+// 仍读死 3000，整批生图会在提交前直接收到 502。
 const portFilePaths = [
   resolve(workspaceRoot, '.local-api-port'),
-  resolve(workspaceRoot, '.desktop-dev-port'),
 ];
 let apiPort = 3000;
 try {
@@ -45,7 +42,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     headers: {
-      // 防御性响应头：仅开发服务器配置，生产构建由部署网关/桌面壳负责
+      // 防御性响应头：仅开发服务器配置，生产由部署网关负责
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
       'X-Frame-Options': 'DENY',
@@ -95,7 +92,6 @@ export default defineConfig({
           if (id.includes('node_modules/xlsx/')) return 'vendor-xlsx';
           if (id.includes('node_modules/jszip/')) return 'vendor-jszip';
           if (id.includes('node_modules/lucide-react/')) return 'vendor-icons';
-          if (id.includes('node_modules/@tauri-apps/')) return 'vendor-tauri';
         },
       },
     },

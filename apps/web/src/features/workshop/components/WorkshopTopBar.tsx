@@ -1,9 +1,7 @@
 import React from 'react';
 import { WandSparkles } from 'lucide-react';
 import type { WorkshopTab } from '@/store/types';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useAppStore } from '@/store';
-import { isMacOs, isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 import { ToolSuiteMark } from '@/shared/icons';
 
 export interface WorkshopTopBarProps {
@@ -21,14 +19,10 @@ export interface WorkshopTopBarProps {
 
 export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarProps) {
   const setCurrentView = useAppStore((s) => s.setCurrentView);
-  const macOverlayPad = isTauriDesktop() && isMacOs();
   const studioTitle = '原创种草工坊';
   return (
     <header
-      data-tauri-drag-region
-      onMouseDown={handleWindowDrag}
-      onDoubleClick={handleWindowDoubleClick}
-      className={`relative w-full min-h-14 ${macOverlayPad ? 'pt-14' : 'pt-3'} pb-2 px-4 sm:px-6 xl:pr-8 bg-transparent flex items-center justify-between gap-3 shrink-0 z-30 select-none cursor-default transition-all`}
+      className="relative w-full min-h-14 pt-3 pb-2 px-4 sm:px-6 xl:pr-8 bg-transparent flex items-center justify-between gap-3 shrink-0 z-30 select-none cursor-default transition-all"
     >
       {activeTab === 'prompt_assets' && (
         <div

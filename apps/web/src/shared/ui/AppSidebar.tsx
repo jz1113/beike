@@ -1,6 +1,5 @@
 import { Settings } from 'lucide-react';
 import type { AppView } from '@/store/appView';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { NavHomeIcon, NavGenerateIcon } from '@/shared/icons';
 
 interface Props {
@@ -28,23 +27,14 @@ export default function AppSidebar({
 }: Props) {
   return (
     <aside
-      data-tauri-drag-region
-      onMouseDown={handleWindowDrag}
-      onDoubleClick={handleWindowDoubleClick}
       className="w-12 xl:w-[78px] flex-shrink-0 h-full bg-transparent flex flex-col items-center justify-between pt-3 pb-3 xl:pt-4 xl:pb-5 select-none z-20 relative cursor-default"
     >
       {/* 🌟 1. 顶部：窗口拖拽区域 + 系统品牌 LOGO */}
       <div
-        data-tauri-drag-region
-        onMouseDown={handleWindowDrag}
-        onDoubleClick={handleWindowDoubleClick}
         className="w-full flex flex-col items-center pt-0.5"
       >
         <button
           onClick={onNavigateHub}
-          onMouseDown={(e) => e.stopPropagation()}
-          data-no-drag
-          data-tauri-drag-region="false"
           aria-label="贝壳云图首页"
           className="group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25"
         >
@@ -60,13 +50,10 @@ export default function AppSidebar({
       </div>
 
       {/* 🌟 2. 中间导航按钮组 */}
-      <nav data-no-drag data-tauri-drag-region="false" className="flex w-full flex-col items-center gap-3 py-2">
+      <nav className="flex w-full flex-col items-center gap-3 py-2">
         {/* 1. 首页 */}
         <button
           onClick={onNavigateHub}
-          onMouseDown={(e) => e.stopPropagation()}
-          data-no-drag
-          data-tauri-drag-region="false"
           aria-label="首页"
           className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'home'
@@ -85,9 +72,6 @@ export default function AppSidebar({
         {/* 2. 生成工作区 */}
         <button
           onClick={onNavigateGenerate}
-          onMouseDown={(e) => e.stopPropagation()}
-          data-no-drag
-          data-tauri-drag-region="false"
           aria-label="生成"
           className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'generate'
@@ -106,9 +90,6 @@ export default function AppSidebar({
         {/* 3. 资产中心 */}
         <button
           onClick={onNavigateAssets}
-          onMouseDown={(e) => e.stopPropagation()}
-          data-no-drag
-          data-tauri-drag-region="false"
           aria-label="资产"
           className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'assets'
@@ -142,12 +123,9 @@ export default function AppSidebar({
       </nav>
 
       {/* 🌟 3. 底部操作区：系统设置 */}
-      <div data-no-drag data-tauri-drag-region="false" className="flex w-full flex-col items-center border-t border-slate-200/70 pt-3">
+      <div className="flex w-full flex-col items-center border-t border-slate-200/70 pt-3">
         <button
           onClick={onOpenSettings}
-          onMouseDown={(e) => e.stopPropagation()}
-          data-no-drag
-          data-tauri-drag-region="false"
           aria-label="设置"
           className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-100 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
             currentView === 'settings'

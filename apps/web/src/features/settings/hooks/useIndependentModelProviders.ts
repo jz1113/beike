@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/shared/api/apiClient';
 import { credentialGet } from '@/shared/api/credentialClient';
-import { persistLianchiConfig, persistOpenAIConfig } from '@/shared/desktop/persistDesktopSecrets';
+import { persistLianchiConfig, persistOpenAIConfig } from '@/shared/api/persistCredentials';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { isPublicHttpGatewayIpUrl } from '@beike/domain/gatewayCreds';
 

@@ -1,5 +1,5 @@
 import { apiFetch } from './apiClient';
-import { saveToDownloadDir } from '../desktop/desktopDownload';
+import { saveToDownloadDir } from '../media/saveDownload';
 
 export interface ExportProgress { phase: 'packing' | 'saving' | 'done'; downloaded: number; total?: number }
 

@@ -58,7 +58,7 @@ export function isAuthorized(req: Request): boolean {
 }
 
 export function isAdminAuthorized(req: Request): boolean {
-  if (process.env.NODE_ENV !== 'production' || process.env.DESKTOP_SHELL === '1') {
+  if (process.env.NODE_ENV !== 'production') {
     return isAuthorized(req);
   }
   const admin = getAdminToken();

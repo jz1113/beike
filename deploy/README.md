@@ -77,7 +77,6 @@ sudo systemctl status beike --no-pager
 rsync -a --delete --progress \
   --exclude node_modules --exclude .git --exclude .env --exclude .env.production \
   --exclude .local --exclude apps/web/dist --exclude apps/web/public/inspirations \
-  --exclude apps/desktop \
   -e 'ssh -i .local/beike-deploy-key -o IdentitiesOnly=yes' \
   ./ root@103.108.66.184:/opt/beike/
 ```
@@ -85,7 +84,6 @@ rsync -a --delete --progress \
 然后 SSH 登录服务器执行：
 
 ```bash
-mkdir -p /opt/beike/apps/desktop
 chown -R beike:beike /opt/beike
 sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install && pnpm run build:ui'
 systemctl restart beike

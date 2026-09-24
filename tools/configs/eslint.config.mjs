@@ -9,8 +9,6 @@ export default defineConfig([
     'dist/**',
     'apps/web/dist/**',
     'node_modules/**',
-    'apps/desktop/target/**',
-    'apps/desktop/resources/**',
   ]),
   {
     files: ['apps/web/src/**/*.{ts,tsx}'],

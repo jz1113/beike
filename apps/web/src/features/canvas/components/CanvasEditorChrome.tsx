@@ -1,11 +1,9 @@
 import { ChevronDown, Compass, FolderOpen, FolderPlus, Image as ImageIcon, Layout, Minus, Play, Plus, SquarePen, Video as VideoIcon } from 'lucide-react';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { CanvasUploadIcon, CanvasAssetFolderIcon } from '@/shared/icons';
 import type { CanvasNode, CanvasProject } from '../types';
 import type { RefObject } from 'react';
 
 export interface CanvasEditorChromeProps {
-  macOverlayPad: boolean;
   handleBackToHome: () => void;
   isEditingTitle: boolean;
   titleInputRef: RefObject<HTMLInputElement | null>;
@@ -40,7 +38,7 @@ export interface CanvasEditorChromeProps {
 
 export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
   const {
-    macOverlayPad, handleBackToHome, isEditingTitle, titleInputRef, tempTitle, titleError,
+    handleBackToHome, isEditingTitle, titleInputRef, tempTitle, titleError,
     setTempTitle, setTitleError, skipTitleSaveOnBlurRef, handleSaveTitle, handleCancelTitleEdit,
     displayProjectTitle, setIsEditingTitle, isTitleMenuOpen, setIsTitleMenuOpen, createProject,
     projects, currentProject, selectProject, nodes, handleResetView,
@@ -51,12 +49,7 @@ export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
     <>
       {/* 顶栏：左上角贝壳 logo + 画板标题下拉 */}
       <header
-        data-tauri-drag-region
-        onMouseDown={handleWindowDrag}
-        onDoubleClick={handleWindowDoubleClick}
-        className={`canvas-fixed-ui relative w-full h-16 shrink-0 pr-4 sm:pr-6 bg-[#f6f8fc]/82 backdrop-blur-xl flex items-center justify-between z-30 select-none ${
-          macOverlayPad ? 'pl-20' : 'pl-4 sm:pl-6'
-        }`}
+        className="canvas-fixed-ui relative w-full h-16 shrink-0 pr-4 sm:pr-6 pl-4 sm:pl-6 bg-[#f6f8fc]/82 backdrop-blur-xl flex items-center justify-between z-30 select-none"
       >
         <div className="flex items-center gap-2 min-w-0">
           <button

@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 
-/**
- * HTML5 文件拖放 zone。
- * 桌面端要求 `apps/desktop/tauri.conf.json` 中 `dragDropEnabled: false`：
- * Tauri 默认 `true` 会拦截 OS 拖放并发自家事件，DOM 收不到 drop，全站 HTML5 拖放失效。
- */
+/** HTML5 文件拖放 zone。 */
 export interface UseFileDropZoneOptions {
   onFiles: (files: File[]) => void;
   accept?: (file: File) => boolean;

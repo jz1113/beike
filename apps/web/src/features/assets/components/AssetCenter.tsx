@@ -9,10 +9,9 @@ import {
   filterDbTasksFromTombstones,
   permanentDeleteGeneration,
 } from '@/shared/api/permanentDeleteGeneration';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { isImageTaskActive, isImageTaskFailed } from '@beike/domain/taskStatus';
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -528,9 +527,6 @@ export default function AssetCenter() {
     <div className={`${pageRoot} bg-transparent select-none`}>
       {/* 🌟 1. 现代顶栏 (行 1: 标题 + 时间筛选 + 搜索框; 行 2: 媒体分类胶囊 + 批量操作/清理失败) */}
       <header
-        data-tauri-drag-region
-        onMouseDown={handleWindowDrag}
-        onDoubleClick={handleWindowDoubleClick}
         className="shrink-0 cursor-default bg-transparent flex flex-col gap-2 pt-3 pb-2 px-4 sm:px-6 lg:px-8"
       >
         {/* Row 1: 资产中心标题 + 统计 | 时间筛选 + 搜索框 */}

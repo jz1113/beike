@@ -18,19 +18,19 @@ test('production web uses only the request key and ignores the server default', 
     { baseUrl: 'https://ai.example', apiKey: 'server-key' },
   );
   assert.equal(fallback.apiKey, '');
-  configureDomainRuntime({ env: { NODE_ENV: 'development', DESKTOP_SHELL: '1' } });
+  configureDomainRuntime({ env: { NODE_ENV: 'development' } });
   assert.equal(allowServerSecretFallback(), true);
-  const desktop = resolveGatewayCreds(
+  const local = resolveGatewayCreds(
     new Request('http://127.0.0.1/api/generate/image'),
     {},
     { baseUrl: 'https://ai.example', apiKey: 'server-key' },
   );
-  assert.equal(desktop.apiKey, 'server-key');
+  assert.equal(local.apiKey, 'server-key');
   configureDomainRuntime({ env: {} });
 });
 
 test('explicit Responses HTTP consent accepts only a public IPv4 address and a request key', () => {
-  configureDomainRuntime({ env: { NODE_ENV: 'production', DESKTOP_SHELL: '0', ALLOW_CUSTOM_BASE_URL: 'false' } });
+  configureDomainRuntime({ env: { NODE_ENV: 'production', ALLOW_CUSTOM_BASE_URL: 'false' } });
   try {
     assert.equal(isPublicHttpGatewayIpUrl('http://8.211.191.95:8080/v1'), true);
     for (const url of ['http://127.0.0.1:8080', 'http://192.168.1.5:8080', 'http://example.com', 'http://198.51.100.1']) {

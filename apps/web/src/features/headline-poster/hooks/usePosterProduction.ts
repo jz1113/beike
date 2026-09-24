@@ -4,7 +4,7 @@ import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
 import { deleteDerived, getDerived, putDerived } from '@/shared/media/idbMediaCache';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import { loadSystemConfiguredModels } from '@/shared/models/configuredModels';
 import { isOpenAIModelRouteId } from '@beike/domain/workflowModels';
 import { reservedArtDirectionFor, sourceKey } from '../reservedArtDirections';
@@ -575,8 +575,8 @@ export function usePosterProduction() {
         imagePrompt: item.prompt, promptVersion: item.promptVersion || 'legacy-unknown',
       })), null, 2));
       const archive = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-      const saved = await saveToDownloadDir(`大字报封面_${new Date().toISOString().slice(0, 10)}.zip`, archive);
-      setNoticeIfAlive(saved === 'desktop' ? '成果包已保存到下载目录，图片均按原标题命名。' : '成果包已开始下载，图片均按原标题命名。');
+      await saveToDownloadDir(`大字报封面_${new Date().toISOString().slice(0, 10)}.zip`, archive);
+      setNoticeIfAlive('成果包已开始下载，图片均按原标题命名。');
     } catch (error) {
       setNoticeIfAlive(`打包失败：${error instanceof Error ? error.message : '未知错误'}`);
     } finally {

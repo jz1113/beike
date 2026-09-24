@@ -1,5 +1,5 @@
 import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import { fetchWithDerivedCache, getDerived, putDerived } from '@/shared/media/idbMediaCache';
 
 /** 在新标签页打开外链 */
@@ -195,11 +195,10 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
   return fetchPromise;
 }
 
-/** 桌面原生写入下载目录 */
 export async function downloadMedia(
   url: string,
   filename: string,
-): Promise<'desktop' | 'browser'> {
+): Promise<'browser'> {
   const blob = await fetchMediaBlob(url);
   const correctedName = fixFilenameExtension(filename, blob.type);
   return saveToDownloadDir(correctedName, blob);
@@ -209,7 +208,7 @@ export async function downloadMedia(
 export async function downloadMediaOrOpen(
   url: string,
   filename: string,
-): Promise<'desktop' | 'browser'> {
+): Promise<'browser'> {
   try {
     return await downloadMedia(url, filename);
   } catch (err) {

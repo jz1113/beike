@@ -1,12 +1,8 @@
-import { handleWindowDrag, handleWindowDoubleClick } from '@/shared/desktop/windowDrag';
 import { TrueFocus } from '@/shared/ui/TrueFocus';
 
 export default function PromptBarBrandHero() {
   return (
     <div
-      data-tauri-drag-region
-      onMouseDown={handleWindowDrag}
-      onDoubleClick={handleWindowDoubleClick}
       className="flex flex-col items-center justify-center pt-1 pb-4 sm:pt-2 sm:pb-5 lg:pt-3 lg:pb-5 xl:pt-4 xl:pb-6 select-none animate-fade-in text-center relative cursor-default"
     >
       <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 relative z-10">

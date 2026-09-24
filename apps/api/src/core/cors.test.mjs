@@ -16,11 +16,11 @@ test('does not treat hostname-only env values as a match for another origin', ()
   assert.equal(isAllowedOrigin('https://cdn.example.com', ['https://cdn.example.com'], { allowLoopback: false }), true);
 });
 
-test('loopback and tauri origins stay allowed when the flag is on', () => {
+test('loopback origins stay allowed when the flag is on', () => {
   assert.equal(isLoopbackOrigin('http://localhost:5173'), true);
   assert.equal(isLoopbackOrigin('http://127.0.0.1:3000'), true);
   assert.equal(isLoopbackOrigin('http://[::1]:3000'), true);
-  assert.equal(isLoopbackOrigin('tauri://localhost'), true);
+  assert.equal(isLoopbackOrigin('tauri://localhost'), false);
   assert.equal(isAllowedOrigin('http://localhost:5173', [], { allowLoopback: true }), true);
   assert.equal(isAllowedOrigin('http://localhost:5173', [], { allowLoopback: false }), false);
 });

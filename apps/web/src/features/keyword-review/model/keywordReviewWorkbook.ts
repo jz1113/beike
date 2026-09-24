@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { KEYWORD_REVIEW_REJECT_PREFIXES, KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode, type KeywordReviewResult, type KeywordReviewRow } from '@beike/contracts/generate';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';
 
 export { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';

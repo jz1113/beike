@@ -132,18 +132,12 @@ async function compactDatabase(dbPath: string) {
 }
 
 async function main() {
-  const os = await import('os');
   const path = await import('path');
   const fs = await import('fs');
 
   const devDb = path.resolve(process.cwd(), 'packages/prisma/dev.db');
-  const desktopDb = path.join(os.homedir(), 'Library/Application Support/com.azhuo.workbench/azhuo.db');
-
   if (fs.existsSync(devDb)) {
     await compactDatabase(devDb);
-  }
-  if (fs.existsSync(desktopDb)) {
-    await compactDatabase(desktopDb);
   }
 }
 

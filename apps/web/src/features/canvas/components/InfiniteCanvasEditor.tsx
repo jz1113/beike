@@ -11,8 +11,6 @@ import { useCanvasGenerationSync } from '../hooks/useCanvasGenerationSync';
 import React, { useState, useRef, useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useAppStore } from '@/store';
-import { isMacOs, isTauriDesktop } from '@/shared/desktop/desktopRuntime';
-
 interface InfiniteCanvasEditorProps {
   projectId: string;
 }
@@ -103,7 +101,6 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
       )}
       <input ref={actions.fileInputRef} type="file" accept="image/*,video/*" onChange={actions.handleFileChange} className="hidden" />
       <CanvasEditorChrome
-        macOverlayPad={isTauriDesktop() && isMacOs()}
         handleBackToHome={handleBackToHome}
         isEditingTitle={isEditingTitle}
         titleInputRef={titleInputRef}

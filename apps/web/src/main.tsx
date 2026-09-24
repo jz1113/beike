@@ -4,8 +4,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AppProviders } from '@/app/providers';
 import AppErrorBoundary from '@/shared/ui/AppErrorBoundary';
-import DesktopTokenSync from '@/shared/ui/DesktopTokenSync';
-import { installDevConsoleBridge } from '@/shared/utils/devConsoleBridge';
 import './styles/globals.css';
 import { applyViewportDensity, getViewportDensity } from '@/shared/hooks/useMediaQuery';
 
@@ -29,15 +27,11 @@ configureDomainRuntime({
   fetch: window.fetch.bind(window),
 });
 
-installDevConsoleBridge();
-
 const appTree = (
   <AppErrorBoundary>
-    <DesktopTokenSync>
-      <AppProviders>
-        <App />
-      </AppProviders>
-    </DesktopTokenSync>
+    <AppProviders>
+      <App />
+    </AppProviders>
   </AppErrorBoundary>
 );
 

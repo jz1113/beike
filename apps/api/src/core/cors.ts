@@ -6,11 +6,12 @@ export function extraOriginsFromEnv(raw = process.env.PUBLIC_WEB_ORIGIN || proce
 
 export function isLoopbackOrigin(origin: string): boolean {
   try {
-    if (origin.startsWith('tauri://')) return true;
-    const host = new URL(origin).hostname.toLowerCase();
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]' || host === 'tauri.localhost';
+    const url = new URL(origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    const host = url.hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
   } catch {
-    return origin.startsWith('tauri://');
+    return false;
   }
 }
 
@@ -26,7 +27,7 @@ export function isAllowedOrigin(
 }
 
 export function allowLoopbackOrigins(): boolean {
-  return process.env.NODE_ENV !== 'production' || process.env.DESKTOP_SHELL === '1';
+  return process.env.NODE_ENV !== 'production';
 }
 
 export const apiCors = cors({

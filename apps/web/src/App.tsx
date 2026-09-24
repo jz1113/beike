@@ -13,7 +13,6 @@ import { useCompactLayout } from '@/shared/hooks/useCompactLayout';
 import AppSidebar from '@/shared/ui/AppSidebar';
 import AIAssistantButton from '@/features/assistant/components/AIAssistantButton';
 import AppErrorBoundary from '@/shared/ui/AppErrorBoundary';
-import MacTitleBar from '@/shared/ui/MacTitleBar';
 import GlobalContextMenu from '@/shared/ui/GlobalContextMenu';
 import { GeneratingEffectsProvider } from '@/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@/shared/ui/ViewKeepAlive';
@@ -85,6 +84,7 @@ export default function App() {
     currentView,
     setCurrentView,
     currentStep,
+    batchStage,
     setStep,
     navigateToSettings,
     backFromSettings,
@@ -93,6 +93,7 @@ export default function App() {
       currentView: s.currentView,
       setCurrentView: s.setCurrentView,
       currentStep: s.currentStep,
+      batchStage: s.batchStage,
       setStep: s.setStep,
       navigateToSettings: s.navigateToSettings,
       backFromSettings: s.backFromSettings,
@@ -133,7 +134,10 @@ export default function App() {
     if (view === 'canvas' && project) {
       useCanvasStore.getState().selectProject(project);
     }
-    if (step) {
+    if (view === 'workshop' && step) {
+      const n = parseInt(step, 10);
+      if (n >= 1 && n <= 4) useAppStore.getState().setBatchStage(n);
+    } else if (step) {
       const n = parseInt(step, 10);
       if (n >= 1 && n <= 5) {
         const s = useAppStore.getState();
@@ -142,7 +146,6 @@ export default function App() {
           s.generatedPrompts.length > 0 ||
           s.clonedSocialImages.length > 0 ||
           s.generationTasks.length > 0;
-        // 无进行中的工坊内容时不跳进历史 step（避免打开就停在空的 Step3）
         setStep(hasWork ? n : 1);
       }
     }
@@ -161,7 +164,7 @@ export default function App() {
     if (typeof window === 'undefined') return;
     const extra: Record<string, string> = {};
     if (currentView === 'workshop') {
-      extra.step = String(currentStep);
+      extra.step = String(batchStage);
     } else if (currentView === 'canvas' && activeCanvasProjectId) {
       extra.project = activeCanvasProjectId;
     }
@@ -169,7 +172,7 @@ export default function App() {
       currentView,
       Object.keys(extra).length > 0 ? extra : undefined,
     );
-  }, [currentView, currentStep, activeCanvasProjectId]);
+  }, [currentView, currentStep, batchStage, activeCanvasProjectId]);
 
   const enterOriginalWorkshop = () => {
     const store = useAppStore.getState();
@@ -186,10 +189,7 @@ export default function App() {
     <GeneratingEffectsProvider>
     <GenerationEngineHost />
     <div className="h-screen w-screen bg-[#FAFAFC] text-slate-900 flex flex-col overflow-hidden selection:bg-blue-100 selection:text-blue-900" data-density={density}>
-      {/* 🌟 0. 顶部 macOS 专属全宽拖拽控制条 (画板、全屏设置与种草工坊时隐藏，由各页面头部接管) */}
-      {!isDedicatedFullscreen && <MacTitleBar />}
-
-      {/* 🌟 1. 设置全屏独立视图 (对标 Codex 桌面端，无弹窗遮罩，专属双栏架构) */}
+      {/* 设置全屏独立视图 */}
       {isSettingsFullscreen ? (
         <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative z-20">
           <Suspense fallback={

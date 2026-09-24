@@ -8,11 +8,10 @@ import {
   persistQiyunConfig,
   persistStorageConfig,
   persistWanbangConfig,
-} from '@/shared/desktop/persistDesktopSecrets';
+} from '@/shared/api/persistCredentials';
 import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/shared/api/gatewayClient';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { credentialGet } from '@/shared/api/credentialClient';
-import { isTauriDesktop } from '@/shared/desktop/desktopRuntime';
 import { useIndependentModelProviders } from './useIndependentModelProviders';
 import { testScraperConnection, testQiyunConnection, testWanbangConnection } from '../settingsConnectionChecks';
 
@@ -85,9 +84,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
         const savedUrl = localStorage.getItem('ai_base_url') || 'https://ai.comfly.org';
         const savedApiKey = await credentialGet('ai_api_key');
         const finalKey = savedApiKey || localStorage.getItem('ai_api_key') || '';
-        if (isTauriDesktop() && savedApiKey && localStorage.getItem('ai_api_key')) {
-          localStorage.removeItem('ai_api_key');
-        }
         setApiKey(finalKey);
         setClientGatewayApiKey(finalKey);
         setClientGatewayBaseUrl(savedUrl);

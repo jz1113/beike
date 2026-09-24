@@ -24,11 +24,11 @@ export type WorkspaceStore = {
 const storage = new AsyncLocalStorage<WorkspaceStore>();
 
 export function isFixedLocalWorkspace(): boolean {
-  return process.env.DESKTOP_SHELL === '1' || process.env.NODE_ENV !== 'production';
+  return process.env.NODE_ENV !== 'production';
 }
 
 export function isSharedWebDeployment(): boolean {
-  return process.env.NODE_ENV === 'production' && process.env.DESKTOP_SHELL !== '1';
+  return process.env.NODE_ENV === 'production';
 }
 
 export function hashWorkspaceSecret(secret: string): string {

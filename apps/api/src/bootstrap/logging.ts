@@ -16,7 +16,6 @@ export function applyRequestLogging(app: Hono): void {
     const requestId = getRequestId(c.req.raw);
     const line = `[HTTP] ${method} ${path} → ${status} (${duration}ms) requestId=${requestId || '-'}`;
 
-    if (path === '/api/system/dev-log') return;
     if (path === '/api/health' && status === 200) return;
 
     if (status >= 400) {

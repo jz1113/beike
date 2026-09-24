@@ -145,7 +145,7 @@ export function recordAgentEvent(evt: Omit<AgentTelemetryEvent, 'ts'>): void {
 }
 
 function canWriteLocalTelemetry(): boolean {
-  return process.env.DESKTOP_SHELL === '1' || process.env.NODE_ENV !== 'production';
+  return process.env.NODE_ENV !== 'production';
 }
 
 function sanitizeTelemetry<T extends Record<string, unknown>>(evt: T): T {

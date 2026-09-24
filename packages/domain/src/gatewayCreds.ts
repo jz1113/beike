@@ -56,7 +56,6 @@ export function isPublicHttpGatewayIpUrl(raw: string): boolean {
  */
 export function allowClientCustomBaseUrl(): boolean {
   return (
-    domainEnv('DESKTOP_SHELL') === '1' ||
     domainEnv('NODE_ENV') !== 'production' ||
     domainEnv('ALLOW_CUSTOM_BASE_URL') === 'true'
   );
@@ -72,7 +71,7 @@ export class GatewayBaseUrlError extends Error {
 
 /** 生产网页不把服务器环境变量密钥当作所有人的默认密钥。 */
 export function allowServerSecretFallback(): boolean {
-  return domainEnv('DESKTOP_SHELL') === '1' || domainEnv('NODE_ENV') !== 'production';
+  return domainEnv('NODE_ENV') !== 'production';
 }
 
 function normalizeBase(url: string): string {

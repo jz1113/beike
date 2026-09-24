@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
-import { saveToDownloadDir } from '@/shared/desktop/desktopDownload';
+import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import type { BatchProductItem } from './batchTypes';
 import { blobExtFromMime, sanitizeShotTitle } from './batchRunnerIo';
 import { buildMatrixExportRows } from './batchMatrixExport';
@@ -56,9 +56,8 @@ async function saveGeneratedZip(zip: JSZip, filename: string, deps: BatchExportD
   const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, (metadata) => {
     deps.setToastMsg(`正在完成极速无损归档写入 (${Math.round(metadata.percent)}%)...`);
   });
-  const saveRes = await saveToDownloadDir(filename, zipBlob);
-  if (saveRes === 'desktop') deps.showToast(`已成功保存至桌面下载目录！（${stats}）`);
-  else deps.showToast(`批量成果包已极速触发下载！（${stats}）`);
+  await saveToDownloadDir(filename, zipBlob);
+  deps.showToast(`批量成果包已极速触发下载！（${stats}）`);
 }
 
 async function exportClientZip(items: BatchProductItem[], deps: BatchExportDeps) {
@@ -164,8 +163,8 @@ export async function exportBatchExcel(items: BatchProductItem[], deps: BatchExp
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const fileName = `贝壳云图_矩阵生产清单_${new Date().toISOString().slice(0, 10)}_${Date.now().toString().slice(-4)}.xlsx`;
-    const saveRes = await saveToDownloadDir(fileName, excelBlob);
-    deps.showToast(saveRes === 'desktop' ? '已将生产记录表格保存至下载目录！' : '已触发生产记录表格下载！');
+    await saveToDownloadDir(fileName, excelBlob);
+    deps.showToast('已触发生产记录表格下载！');
   } catch (err: unknown) {
     deps.showToast(`导出表格失败: ${err instanceof Error ? err.message : '未知异常'}`);
   } finally {
@@ -210,8 +209,8 @@ export async function exportSingleProductZip(item: BatchProductItem, deps: Batch
       zip.file(`AI种草文案_${item.itemId}.txt`, `【种草标题】：${item.copywriting.title}\n\n【笔记正文】：\n${item.copywriting.content}\n\n【热门标签】：${(item.copywriting.tags || []).map(t => `#${t}`).join(' ')}`);
     }
     const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-    const saveRes = await saveToDownloadDir(`贝壳云图_${item.itemId}_${(item.title || '未命名').replace(/[\\/:*?"<>|]/g, '_').slice(0, 30)}.zip`, zipBlob);
-    deps.showToast(`${saveRes === 'desktop' ? '已保存' : '已触发下载'}【${item.title || item.itemId}】：图片 ${imageOk} 张${imageFail ? `，失败 ${imageFail} 张` : ''}`);
+    await saveToDownloadDir(`贝壳云图_${item.itemId}_${(item.title || '未命名').replace(/[\\/:*?"<>|]/g, '_').slice(0, 30)}.zip`, zipBlob);
+    deps.showToast(`已触发下载【${item.title || item.itemId}】：图片 ${imageOk} 张${imageFail ? `，失败 ${imageFail} 张` : ''}`);
   } catch (err: unknown) {
     deps.showToast(`单款打包失败: ${err instanceof Error ? err.message : '未知错误'}`);
   } finally {
@@ -228,8 +227,8 @@ export async function downloadSingleTaskImage(url: string, filename: string | un
   try {
     const blob = await fetchGeneratedImage(url);
     const safeName = (filename || `image_${Date.now()}`).replace(/[\\/:*?"<>|]/g, '_');
-    const res = await saveToDownloadDir(`${safeName}.${blobExtFromMime(blob.type)}`, blob);
-    showToast(res === 'desktop' ? '已保存至本地下载目录！' : '已触发浏览器下载！');
+    await saveToDownloadDir(`${safeName}.${blobExtFromMime(blob.type)}`, blob);
+    showToast('已触发浏览器下载！');
   } catch (err: unknown) {
     showToast(`下载失败: ${err instanceof Error ? err.message : '网络异常'}`);
   }

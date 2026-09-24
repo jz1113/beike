@@ -1,6 +1,6 @@
 import { gsap } from 'gsap';
 
-export const INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, option, [role="button"], [role="tab"], [contenteditable="true"], [data-no-drag]';
+export const INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, option, [role="button"], [role="tab"], [contenteditable="true"]';
 
 export function throttle<Args extends unknown[]>(func: (...args: Args) => void, limit: number) {
   let lastCall = 0;
