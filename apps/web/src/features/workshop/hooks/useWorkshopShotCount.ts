@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { restoreStoredStoryboardPreset } from '@beike/domain/prompt-engine/storyboardPreset';
 import { usePersistentNumber } from '@/shared/hooks/usePersistentState';
 
 export function useWorkshopShotCount() {

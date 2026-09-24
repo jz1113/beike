@@ -2,7 +2,7 @@ import type { KeywordReviewResult, KeywordReviewRow } from '@beike/contracts/gen
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { getWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { gatewayFetch } from '../gateways/http';
-import { prisma } from '../repositories/db';
+import { readKeywordLookupCache, writeKeywordLookupCache } from '../repositories/keywordReview';
 import { clipReasonChars, LOOKUP_SUBJECT_MAX, rewriteLookupCategoryReason } from './keywordReviewReasons';
 
 export const KEYWORD_REVIEW_LOOKUP_LIMIT = 2;
@@ -31,19 +31,8 @@ type LookupPersistence = {
 };
 
 const prismaPersistence: LookupPersistence = {
-  async read(workspaceId, rulesVersion, queries) {
-    const rows = await prisma.keywordLookupCache.findMany({
-      where: { workspaceId, rulesVersion, query: { in: queries } },
-    });
-    return rows.map((row) => ({ query: row.query, category: row.category, subject: row.subject }));
-  },
-  async write(workspaceId, rulesVersion, query, hit) {
-    await prisma.keywordLookupCache.upsert({
-      where: { workspaceId_rulesVersion_query: { workspaceId, rulesVersion, query } },
-      create: { workspaceId, rulesVersion, query, category: hit.category, subject: hit.subject || '' },
-      update: { category: hit.category, subject: hit.subject || '' },
-    });
-  },
+  read: readKeywordLookupCache,
+  write: writeKeywordLookupCache,
 };
 
 let persistence: LookupPersistence = prismaPersistence;

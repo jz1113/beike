@@ -162,5 +162,3 @@ export interface TurnStartOptions {
   /** Session-scoped auto-approved tools */
   sessionApprovals?: string[];
 }
-
-export type { AssistantSSEEvent } from './events';

@@ -21,6 +21,7 @@ import { usePerformanceMode } from '@/shared/utils/performancePreference';
 import { useDesktopShortcuts } from '@/shared/hooks/useDesktopShortcuts';
 import { parseViewFromSearchParams, syncViewToUrl } from '@/app/routes';
 import { useCanvasStore } from '@/features/canvas/store/useCanvasStore';
+import '@/features/canvas/store/registerCanvasWorkspace';
 
 import HomePage from '@/features/home/HomePage';
 
@@ -83,7 +84,6 @@ export default function App() {
   const {
     currentView,
     setCurrentView,
-    currentStep,
     batchStage,
     setStep,
     navigateToSettings,
@@ -92,7 +92,6 @@ export default function App() {
     useShallow((s) => ({
       currentView: s.currentView,
       setCurrentView: s.setCurrentView,
-      currentStep: s.currentStep,
       batchStage: s.batchStage,
       setStep: s.setStep,
       navigateToSettings: s.navigateToSettings,
@@ -172,7 +171,7 @@ export default function App() {
       currentView,
       Object.keys(extra).length > 0 ? extra : undefined,
     );
-  }, [currentView, currentStep, batchStage, activeCanvasProjectId]);
+  }, [currentView, batchStage, activeCanvasProjectId]);
 
   const enterOriginalWorkshop = () => {
     const store = useAppStore.getState();

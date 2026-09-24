@@ -1,6 +1,11 @@
 import type { KeywordReviewMode, KeywordReviewRuleEntry } from '@beike/contracts/generate';
 import { KeywordReviewRuleEntrySchema } from '@beike/contracts/generate';
-import { prisma } from '../repositories/db';
+import {
+  createKeywordReviewRuleRevision,
+  findKeywordReviewRule,
+  findLatestKeywordReviewRule,
+  listKeywordReviewRuleRecords,
+} from '../repositories/keywordReview';
 
 export type RuleRevision = {
   version: number;
@@ -19,8 +24,8 @@ function fromRecord(record: { version: number; entriesJson: string; note: string
 export async function getKeywordReviewRules(workspaceId: string, version?: number): Promise<RuleRevision> {
   if (version === 0) return initial;
   const record = version === undefined
-    ? await prisma.keywordReviewRuleRevision.findFirst({ where: { workspaceId }, orderBy: { version: 'desc' } })
-    : await prisma.keywordReviewRuleRevision.findUnique({ where: { workspaceId_version: { workspaceId, version } } });
+    ? await findLatestKeywordReviewRule(workspaceId)
+    : await findKeywordReviewRule(workspaceId, version);
   if (!record) {
     if (version === undefined) return initial;
     throw new Error(`审核规则版本 v${version} 不存在`);
@@ -29,9 +34,7 @@ export async function getKeywordReviewRules(workspaceId: string, version?: numbe
 }
 
 export async function listKeywordReviewRules(workspaceId: string): Promise<RuleRevision[]> {
-  const records = await prisma.keywordReviewRuleRevision.findMany({
-    where: { workspaceId }, orderBy: { version: 'desc' }, take: 30,
-  });
+  const records = await listKeywordReviewRuleRecords(workspaceId);
   return [...records.map(fromRecord), initial];
 }
 
@@ -43,8 +46,8 @@ export async function publishKeywordReviewRules(workspaceId: string, input: {
   const entries = input.entries;
   let record;
   try {
-    record = await prisma.keywordReviewRuleRevision.create({
-      data: { workspaceId, version: current.version + 1, entriesJson: JSON.stringify(entries), note: input.note },
+    record = await createKeywordReviewRuleRevision({
+      workspaceId, version: current.version + 1, entriesJson: JSON.stringify(entries), note: input.note,
     });
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {

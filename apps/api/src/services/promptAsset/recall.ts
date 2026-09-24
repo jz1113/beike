@@ -4,7 +4,6 @@ import {
   categoryFitScore,
   rankPromptAssets,
   type RankableAsset,
-  emptyUsageCounts,
 } from '@beike/domain/promptAsset';
 import { listCategoryLinks, listRegistryByType, listUsageEvents } from '../../repositories/promptAsset';
 import { publishedIdsOrNone } from './registry';

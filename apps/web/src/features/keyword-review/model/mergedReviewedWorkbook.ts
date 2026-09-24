@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { KeywordReviewRecord, OutputColumn, ParsedKeywordWorkbook } from './keywordReviewWorkbook';
+import type { KeywordReviewRecord, OutputColumn, ParsedKeywordWorkbook } from './keywordReviewWorkbookTypes';
 
 function cloneCell(cell: XLSX.CellObject | undefined): XLSX.CellObject | undefined {
   if (!cell) return undefined;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { processDeconstructQueueItem } from '@/shared/api/deconstructClient';
+import { processDeconstructQueueItem } from '@/features/assets/api/deconstructClient';
 import {
   getEnabledMultimodalModelsFromSettings,
   resolveStoredMultimodalModelId,

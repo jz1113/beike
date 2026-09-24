@@ -2,7 +2,7 @@
 import React from 'react';
 import { useFileDropZone } from '@/shared/hooks/useFileDropZone';
 import { confirmAction } from '@/shared/utils/confirmAction';
-import { ArrowUp, Plus, Loader2, Download, Trash2, Upload, UploadCloud, FileSpreadsheet, ListPlus, Play, Pause, FolderDown } from 'lucide-react';
+import { ArrowUp, Loader2, Download, Trash2, Upload, UploadCloud, ListPlus, Play, Pause, FolderDown } from 'lucide-react';
 import {
   BatchTaskItem,
 } from '@/features/collect/utils/collectorTypes';

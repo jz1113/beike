@@ -10,7 +10,7 @@ import {
   Check,
 } from 'lucide-react';
 import { LightboxGenConfigToolbar } from '@/shared/modals/lightbox/LightboxGenConfigToolbar';
-import { useCanvasToolConfig } from '@/features/canvas/hooks/useCanvasToolConfig';
+import { useCanvasToolConfig } from '@/shared/hooks/useCanvasToolConfig';
 
 export interface MultiAngleSource {
   imageUrl?: string;

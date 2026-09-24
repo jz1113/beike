@@ -24,8 +24,6 @@ export interface WorkshopSettingsModalProps {
   selectedImageGenModel: string;
   setSelectedImageGenModel: (m: string) => void;
   availableImageModels: Array<{ id: string; name?: string; shortName?: string }>;
-  generationStrategy: 'grid_first' | 'single_shot';
-  setGenerationStrategy?: (s: 'grid_first' | 'single_shot') => void;
   autoGenerateCopywriting: boolean;
   setAutoGenerateCopywriting: (enabled: boolean) => void;
   imageGenConcurrency: number;
@@ -71,16 +69,12 @@ export function WorkshopSettingsModal({
   selectedImageGenModel,
   setSelectedImageGenModel,
   availableImageModels,
-  generationStrategy,
-  setGenerationStrategy,
   autoGenerateCopywriting,
   setAutoGenerateCopywriting,
   imageGenConcurrency,
   setImageGenConcurrency,
   analyzeConcurrency,
   setAnalyzeConcurrency,
-  useAssetLibrary = true,
-  setUseAssetLibrary,
   lockedPersonaId = 'auto',
   setLockedPersonaId,
   availablePersonas = [],
@@ -90,14 +84,9 @@ export function WorkshopSettingsModal({
   lockedOutfitId = 'auto',
   setLockedOutfitId,
   availableOutfits = [],
-  lockedActionId = 'auto',
-  setLockedActionId,
-  availableActions = [],
   lockedFullPromptId = 'auto',
   setLockedFullPromptId,
   availableFullPrompts = [],
-  personaMode = 'asset_driven',
-  setPersonaMode,
 }: WorkshopSettingsModalProps) {
   if (!isOpen) return null;
   const selectedGroup = availableFullPrompts.find((item) => item.id === lockedFullPromptId);

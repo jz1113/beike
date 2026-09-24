@@ -5,8 +5,8 @@ import {
   MIN_IMAGES_PER_SET,
 } from '@beike/domain/assetDeconstruct/prompts';
 import { RateLimiter } from '@/shared/utils/rateLimiter';
-import type { ImageSetQueueItem } from '@/features/assets/utils/assetPromptConstants';
-import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from './xhsLinkFormatting';
+import type { ImageSetQueueItem } from '@/shared/types/imageSetQueue';
+import { parseXhsUrlsFromText } from './xhsLinkFormatting';
 
 export { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from './xhsLinkFormatting';
 

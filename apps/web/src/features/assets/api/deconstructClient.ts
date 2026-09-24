@@ -12,7 +12,6 @@ import { resolveQueueItemPartial } from '@/features/assets/utils/assetDeconstruc
  */
 export async function fetchDeconstructWithRetry(
   body: Record<string, unknown>,
-  _retries = 0
 ): Promise<Response> {
   return apiFetch('/api/catalog/assets/deconstruct', {
     method: 'POST',

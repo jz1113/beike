@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import type { CanvasNode } from '../store/useCanvasStore';
 import { LightboxGenConfigToolbar } from '@/shared/modals/lightbox/LightboxGenConfigToolbar';
-import { useCanvasToolConfig } from '../hooks/useCanvasToolConfig';
+import { useCanvasToolConfig } from '@/shared/hooks/useCanvasToolConfig';
 
 export type MainLightDirection = 'left' | 'top' | 'right' | 'front' | 'bottom' | 'back';
 

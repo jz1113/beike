@@ -9,7 +9,7 @@ import {
   parseXhsUrlsFromText,
   toXhsQueueItem,
 } from '@/shared/utils/xhsLinkBatch';
-import { processDeconstructQueueItem } from '@/shared/api/deconstructClient';
+import { processDeconstructQueueItem } from '@/features/assets/api/deconstructClient';
 import { RateLimiter } from '@/shared/utils/rateLimiter';
 import {
   exportDeconstructRecordsToCsv,
