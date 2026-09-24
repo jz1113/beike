@@ -14,6 +14,7 @@ interface Props {
   refreshHistory: () => Promise<WorkshopBatchSummary[]>;
   duplicateBatch: (id: string) => Promise<void>;
   clearHistory: () => Promise<number>;
+  deleteHistoryBatch: (id: string) => Promise<void>;
   renameBatch: (id: string, name: string) => Promise<void>;
   readBatch: (id: string) => Promise<WorkshopBatch>;
   onOpenGenerationView: (batch: WorkshopBatch) => void;
@@ -22,7 +23,7 @@ interface Props {
 
 export function BatchWorkspaceBatchControls({
   activeBatch, historyBatches, itemsCount, currentStage, ready,
-  createNewBatch, refreshHistory, duplicateBatch, clearHistory, renameBatch, readBatch, onOpenGenerationView, showToast,
+  createNewBatch, refreshHistory, duplicateBatch, clearHistory, deleteHistoryBatch, renameBatch, readBatch, onOpenGenerationView, showToast,
 }: Props) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -92,11 +93,12 @@ export function BatchWorkspaceBatchControls({
           onClose={() => setIsHistoryOpen(false)}
           onReadBatch={readBatch}
           onOpenGenerationView={onOpenGenerationView}
-          onDuplicateBatch={(id) => run(() => duplicateBatch(id))}
+          onDuplicateBatch={duplicateBatch}
           onClearHistory={async () => {
             const deleted = await clearHistory();
             showToast(deleted > 0 ? `已清空 ${deleted} 个历史批次` : '没有可清空的历史批次');
           }}
+          onDeleteBatch={async id => { await deleteHistoryBatch(id); showToast('已删除该条历史记录'); }}
           onRenameBatch={renameBatch}
           onError={showToast}
         />

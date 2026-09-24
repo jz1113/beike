@@ -194,6 +194,13 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     return Number(data.deleted) || 0;
   }, [refreshHistory]);
 
+  const deleteHistoryBatch = useCallback(async (id: string) => {
+    const response = await apiFetch(`/api/catalog/workshop-batches/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '历史记录删除失败');
+    await refreshHistory();
+  }, [refreshHistory]);
+
   const renameBatch = useCallback(async (id: string, name: string) => {
     const response = await apiFetch(`/api/catalog/workshop-batches/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
@@ -223,6 +230,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     duplicateBatch,
     archiveCurrentBatch,
     clearHistory,
+    deleteHistoryBatch,
     renameBatch,
     readBatch,
     reload: () => loadActive(),

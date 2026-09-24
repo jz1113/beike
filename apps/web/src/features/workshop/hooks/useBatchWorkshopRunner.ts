@@ -733,6 +733,7 @@ export function useBatchWorkshopRunner() {
     duplicateBatch: workspace.duplicateBatch,
     archiveCurrentBatch: workspace.archiveCurrentBatch,
     clearHistory: workspace.clearHistory,
+    deleteHistoryBatch: workspace.deleteHistoryBatch,
     renameBatch: workspace.renameBatch,
     readBatch: workspace.readBatch,
   };

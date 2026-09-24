@@ -109,3 +109,10 @@ export async function CLEAR_HISTORY() {
   try { return jsonOk(await repository.clearHistory()); }
   catch (error) { return mapBatchError(error); }
 }
+
+export async function DELETE(id: string) {
+  const parsedId = workshopBatchIdSchema.safeParse(id);
+  if (!parsedId.success) return jsonFail('批次标识不正确', 400);
+  try { return jsonOk(await repository.deleteHistory(parsedId.data)); }
+  catch (error) { return mapBatchError(error); }
+}

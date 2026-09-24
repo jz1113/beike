@@ -235,6 +235,20 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
         return { deleted };
       });
     },
+    async deleteHistory(id: string) {
+      const workspaceId = requireWorkspaceId();
+      return db.$transaction(async (tx) => {
+        const states = await tx.$queryRaw<StateRow[]>`SELECT "activeBatchId", "legacyMigratedAt" FROM "WorkshopBatchState" WHERE "workspaceId" = ${workspaceId}`;
+        if (states[0]?.activeBatchId === id) throw new WorkshopBatchConflict('当前批次不能在历史记录中删除');
+        const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "WorkshopBatch" WHERE "workspaceId" = ${workspaceId} AND "id" = ${id}`;
+        if (!rows.length) throw new WorkshopBatchNotFound();
+        await tx.$executeRaw`DELETE FROM "WorkshopOutputReview" WHERE "workspaceId" = ${workspaceId} AND "batchId" = ${id}`;
+        await tx.$executeRaw`DELETE FROM "WorkshopPipelineRun" WHERE "workspaceId" = ${workspaceId} AND "batchId" = ${id}`;
+        await tx.$executeRaw`DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ${workspaceId} AND "batchId" = ${id}`;
+        const deleted = await tx.$executeRaw`DELETE FROM "WorkshopBatch" WHERE "workspaceId" = ${workspaceId} AND "id" = ${id}`;
+        return { deleted };
+      });
+    },
     async rename(id: string, name: string) {
       await this.get(id);
       const updatedAt = new Date().toISOString();

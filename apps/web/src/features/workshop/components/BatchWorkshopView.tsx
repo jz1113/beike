@@ -131,6 +131,7 @@ export default function BatchWorkshopView() {
     createNewBatch,
     duplicateBatch,
     clearHistory,
+    deleteHistoryBatch,
     renameBatch,
     readBatch,
   } = runner;
@@ -289,7 +290,8 @@ export default function BatchWorkshopView() {
         createNewBatch={createNewBatch}
         refreshHistory={refreshBatchHistory}
         duplicateBatch={duplicateBatch}
-        clearHistory={clearHistory}
+        clearHistory={async () => { const count = await clearHistory(); setHistoryGenerationBatch(null); return count; }}
+        deleteHistoryBatch={async id => { await deleteHistoryBatch(id); setHistoryGenerationBatch(previous => previous?.id === id ? null : previous); }}
         renameBatch={renameBatch}
         readBatch={readBatch}
         onOpenGenerationView={setHistoryGenerationBatch}

@@ -57,6 +57,7 @@ catalog.post('/workshop-batches/active/archive', mountJson((req) => workshopBatc
 catalog.delete('/workshop-batches/history', mountJson(() => workshopBatches.CLEAR_HISTORY()));
 catalog.get('/workshop-batches/:id', (c) => asJsonRoute(() => workshopBatches.GET(c.req.param('id')))(c.req.raw));
 catalog.put('/workshop-batches/:id', (c) => asJsonRoute((req) => workshopBatches.PUT(req, c.req.param('id')))(c.req.raw));
+catalog.delete('/workshop-batches/:id', (c) => asJsonRoute(() => workshopBatches.DELETE(c.req.param('id')))(c.req.raw));
 catalog.patch('/workshop-batches/:id', (c) => asJsonRoute((req) => workshopBatches.RENAME(req, c.req.param('id')))(c.req.raw));
 catalog.post('/workshop-batches/:id/duplicate', (c) => asJsonRoute(() => workshopBatches.DUPLICATE(c.req.param('id')))(c.req.raw));
 catalog.post('/workshop-batches/:id/events', (c) => asJsonRoute((req) => workshopBatches.EVENTS(req, c.req.param('id')))(c.req.raw));
