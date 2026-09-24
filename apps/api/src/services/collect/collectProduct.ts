@@ -8,6 +8,27 @@ import { buildComprehensiveProductProps } from '@beike/domain/props';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { parseJsonBody, collectBodySchema } from '../../core/validate';
 
+export function identifyCollectPlatform(platformInput: string, rawInput: string): string {
+  let platform = (platformInput || 'auto').toLowerCase();
+  if (platform === 'auto' || !['jd', 'taobao', 'tmall', '1688', 'pinduoduo'].includes(platform)) {
+    if (/jd\.com|360buy/i.test(rawInput)) platform = 'jd';
+    else if (/taobao\.com|tmall\.com/i.test(rawInput)) platform = 'taobao';
+    else if (/1688\.com/i.test(rawInput)) platform = '1688';
+    else if (/yangkeduo\.com|pinduoduo\.com|pdd/i.test(rawInput)) platform = 'pinduoduo';
+    else platform = 'jd';
+  }
+  return platform;
+}
+
+export function extractCollectItemId(rawInput: string): string {
+  const numMatch =
+    rawInput.match(/(?:item\.jd\.com\/|item\.htm\?.*id=|detail\.tmall\.com\/item\.htm\?.*id=|detail\.1688\.com\/offer\/|goods_id=|itemId=|item_id=|\/)(\d+)/i) ||
+    rawInput.match(/\b\d{7,16}\b/) ||
+    rawInput.match(/\d+/);
+  if (!numMatch) return rawInput;
+  return numMatch[1] || numMatch[0];
+}
+
 export async function collectProduct(req: Request) {
   try {
     const rawBody: unknown = await readJsonBody(req);
@@ -16,35 +37,10 @@ export async function collectProduct(req: Request) {
       return jsonResponse({ success: false, error: parsed.error }, 400);
     }
     const body: any = parsed.data;
-    let platform = (body.platform || 'auto').toLowerCase();
     const rawInput = (body.url || body.num_iid || body.itemId || body.id || '').toString().trim();
     const force_refresh = body.force_refresh ?? body.forceRefresh ?? false;
-
-    // 1. 智能平台自动识别
-    if (platform === 'auto' || !['jd', 'taobao', 'tmall', '1688', 'pinduoduo'].includes(platform)) {
-      if (/jd\.com|360buy/i.test(rawInput)) {
-        platform = 'jd';
-      } else if (/taobao\.com|tmall\.com/i.test(rawInput)) {
-        platform = 'taobao';
-      } else if (/1688\.com/i.test(rawInput)) {
-        platform = '1688';
-      } else if (/yangkeduo\.com|pinduoduo\.com|pdd/i.test(rawInput)) {
-        platform = 'pinduoduo';
-      } else {
-        platform = 'jd'; // 默认回退平台
-      }
-    }
-
-    // 2. 智能提取数字 SKU / 商品 ID
-    let itemIdStr = rawInput;
-    const numMatch = 
-      rawInput.match(/(?:item\.jd\.com\/|item\.htm\?.*id=|detail\.tmall\.com\/item\.htm\?.*id=|detail\.1688\.com\/offer\/|goods_id=|itemId=|item_id=|\/)(\d+)/i) ||
-      rawInput.match(/\b\d{7,16}\b/) ||
-      rawInput.match(/\d+/);
-
-    if (numMatch) {
-      itemIdStr = numMatch[1] || numMatch[0];
-    }
+    const platform = identifyCollectPlatform(body.platform || 'auto', rawInput);
+    const itemIdStr = extractCollectItemId(rawInput);
 
     if (!itemIdStr) {
       return jsonResponse({ error: '请输入有效的商品 ID 或商品详情链接' }, 400);
