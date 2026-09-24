@@ -1,118 +1,107 @@
-# 贝壳云图 (Beike Cloud Graph)
+# 贝壳云图
 
-> 面向电商视觉创作、多模态智能生图生视频与创意工作流的 Web 应用，在浏览器中使用。
+面向电商视觉创作的浏览器应用：商品采集、视觉反推、分镜生成、大字报封面、关键词审核和画布编辑都在同一套 Web 工作台里完成。
 
----
+## 技术栈
 
-## 🌟 项目架构
+- 前端：React 19、Vite、Tailwind CSS
+- 后端：Hono（Node.js）
+- 数据：Prisma 5 + SQLite
+- 仓库：pnpm workspace monorepo
 
-本项目采用全栈 Monorepo。产品在浏览器中使用，不再使用桌面端。
-
-- **Web 前端**：React 19 + Vite + Tailwind CSS + Lucide Icons
-- **后端服务**：Hono API Server (Node.js)
-- **数据持久化**：Prisma ORM + SQLite
-- **工程管理**：pnpm workspace 多包管理架构
+## 目录
 
 ```text
-├── apps/
-│   ├── api/       # 后端 API 服务 (Hono + TypeScript)
-│   ├── web/       # 前端应用 (React + Vite)
-│   └── desktop/   # 已停用，不再作为运行入口
-├── packages/      # 共享库（contracts / domain / server-kit / prisma）
-├── tools/         # 构建、校验与维护脚本
-└── docs/          # architecture/ 内部约定；vendors/ 厂商与聚合索引
+apps/web          浏览器界面
+apps/api          HTTP API
+packages/contracts  Zod 契约
+packages/domain     浏览器可运行的纯逻辑
+packages/server-kit Node 侧存储、鉴权和爬虫
+packages/prisma     schema 与迁移
+tools               校验脚本和工程配置
+docs                架构约定与厂商模型索引
+deploy              Ubuntu 部署说明
 ```
 
----
+依赖方向：`web` 只依赖 `contracts` 和 `domain`；`api` 再依赖 `server-kit` 和 `prisma`；`domain` 不依赖 Node、Prisma 或对象存储。`apps/web/src/shared` 不引用 `features`。
 
-## 🚀 快速开始与跨平台运行
+## 环境
 
-### 1. 环境准备
-
-- **Node.js**：22 LTS（仓库 `.nvmrc` 已钉死；`engines.node` 为 `^22`）。本机若只有 20，请先切到 22：
-  ```bash
-  nvm install 22
-  nvm use
-  node --version   # v22.x
-  ```
-- **包管理器**：pnpm 10.13.1（与根目录 `packageManager` 字段一致）
-- **Git**：版本控制工具
-
-启用与仓库一致的 pnpm：
+- Node.js 22（见 `.nvmrc`）
+- pnpm 10.13.1（见根目录 `packageManager`）
 
 ```bash
+nvm use
 corepack enable
 corepack prepare pnpm@10.13.1 --activate
-node --version   # v22.x
-pnpm --version   # 10.13.1
 ```
 
----
-
-### 2. 环境变量配置
-
-首次克隆项目后，在根目录创建 `.env` 文件：
+## 配置
 
 ```bash
 cp .env.example .env
 ```
 
-在 `.env` 中填入必要的第三方模型与平台接口凭证（如万邦、奇云、API Hub等对应密钥）。不要提交 `.env`、`.env.production` 或任何真实密钥。Windows 安装包流水线从 GitHub Environment `windows-release` 读取 Secrets；缺失时构建必须失败，禁止在工作流中写回退凭据。若历史提交曾暴露过密钥，请在供应商控制台轮换后作废旧值。
+在 `.env` 里填写模型网关和采集接口密钥。不要提交 `.env` 或 `.env.production`。浏览器里保存的密钥跟随当前请求发送，生产环境不会写回服务器的 `.env`。
 
----
-
-### 3. 启动 Web
-
-进入项目根目录，在终端执行：
+## 本地开发
 
 ```bash
-# 安装依赖
 pnpm install
-
-# 本机 Web：同时启动 API + Vite，并打开浏览器
 pnpm run dev:web
-# 打开浏览器访问：http://127.0.0.1:5173
-
-# 也可分开启动
-pnpm run dev:ui
-pnpm run dev:api
 ```
 
----
+浏览器打开 http://127.0.0.1:5173。也可以分开启动：
 
-## 🔄 双端/多设备协同开发指南
+```bash
+pnpm run dev:api
+pnpm run dev:ui
+```
 
-如果你在 **Mac 电脑** 与 **Windows 电脑** 之间切换编辑，请遵循以下同步规则：
+## 生产
 
-1. **改动完成，准备换电脑前（推送代码）**：
-   ```bash
-   git add .
-   git commit -m "更新说明"
-   git push
-   ```
-2. **在另一台电脑开始编辑前（拉取最新）**：
-   ```bash
-   git pull
-   ```
+```bash
+pnpm run build:ui
+pnpm run start:web
+```
 
-> ⚠️ **注意**：`.env`（密钥）与 `packages/prisma/dev.db`（本地 SQLite 数据库）未包含在 Git 仓库中。首次在另一台电脑配置时，请手动从常用电脑拷贝一次 `.env` 配置文件。类目拍摄架构与提示词资产已固化在 `packages/domain/src/masterRecipes.ts` 与 `packages/domain/src/seeds/`，不要删除。
+服务器步骤见 [deploy/README.md](deploy/README.md)。生产数据库只使用 `pnpm run db:deploy`。
 
-云服务器部署（新手逐步）见 [`deploy/README.md`](deploy/README.md)。生产启动：`pnpm run build:ui && pnpm run start:web`。
+## 数据库
 
----
+| 命令 | 用途 |
+| --- | --- |
+| `pnpm run db:push` | 开发时把 schema 直接推到本地 SQLite |
+| `pnpm run db:migrate` | 开发时生成并应用迁移 |
+| `pnpm run db:deploy` | 生产环境只应用已有迁移 |
+| `pnpm run db:backup` | 按 `DATABASE_URL` 做 SQLite 文件备份 |
+| `pnpm run db:restore:verify` | 对当前库或备份做完整性检查 |
 
-## 🛠️ 常用开发脚本
+备份默认写到 `packages/prisma/backups/`，这些文件不进 Git。
 
-| 命令 | 说明 |
-| :--- | :--- |
-| `pnpm run typecheck` | 执行 TypeScript 全量静态类型检查 |
-| `pnpm run lint` | ESLint 代码质量检查 |
-| `pnpm run start:web` | 生产模式：托管 `apps/web/dist` 并启动 API（需先 `pnpm run build:ui`） |
-| `pnpm run seed:export` | 从本机数据库导出官方提示词种子 |
-| `pnpm run db:push` | 开发实验：把 Prisma schema 直接推到本地 SQLite，不写迁移历史 |
-| `pnpm run db:migrate` | 开发：`prisma migrate dev`，生成并应用迁移 |
-| `pnpm run db:deploy` | 生产：只允许 `prisma migrate deploy`，应用已有迁移 |
-| `pnpm run db:backup` | 按 `DATABASE_URL` 复制一份 SQLite 文件级备份 |
-| `pnpm run db:restore:verify` | 对当前库或指定备份文件做 `PRAGMA integrity_check` |
+## 质量门禁
 
-开发可以用 `db:push` 做实验；生产只允许 `db:deploy`。备份文件默认写到 `packages/prisma/backups/`（`*.db` 已被 gitignore）。
+`pnpm run check` 依次执行：
+
+- 根目录布局
+- 批准模型清单与文档是否对齐
+- TypeScript
+- ESLint
+- 新增未使用绑定
+- 新增超长文件
+- 依赖边界
+- 密钥扫描
+- 测试
+- 前端生产构建
+
+单独测试：`pnpm test`。
+
+## 换电脑
+
+提交并推送后，在另一台机器 `git pull`。`.env` 和 `packages/prisma/dev.db` 不在仓库里，需要自行拷贝。类目拍摄结构和提示词资产在 `packages/domain` 的配方与 `seeds/` 中，不要删。
+
+## 文档
+
+- [docs/AGENTS.md](docs/AGENTS.md)：工程约定
+- [docs/architecture/](docs/architecture/)：目录分层与代码健康
+- [docs/vendors/](docs/vendors/)：批准模型的厂商和聚合索引

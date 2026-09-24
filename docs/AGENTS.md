@@ -1,6 +1,6 @@
 # 贝壳云图 Agent / 工程约定
 
-产品名：**贝壳云图**（Beike Cloud Graph）。npm 根包名：`beike-cloud-graph`。产品在浏览器中运行，不再使用桌面端。`apps/desktop` 与根目录 `启动桌面.command` 已停用，不要把它们当作启动入口。
+产品名：**贝壳云图**（Beike Cloud Graph）。npm 根包名：`beike-cloud-graph`。产品只在浏览器中运行。桌面端 Tauri 壳已经从仓库移除。
 
 ## 布局（单核扁平）
 
@@ -8,8 +8,7 @@
 beike-main/
 ├── apps/
 │   ├── web/           # @beike/web — React + Vite UI
-│   ├── api/           # @beike/api — Hono Node sidecar
-│   └── desktop/       # 已停用，不要作为启动入口
+│   └── api/           # @beike/api — Hono API
 ├── packages/
 │   ├── contracts/     # @beike/contracts — Zod DTO（薄）
 │   ├── domain/        # @beike/domain — browser-safe 纯逻辑 / 类型

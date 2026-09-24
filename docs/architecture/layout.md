@@ -13,7 +13,7 @@ apps/
     bootstrap/    启动、日志、生命周期
     core/         HTTP 基础设施（handler / validate / errors / cors）
     routes/       HTTP 适配；不直接访问 Prisma
-    services/     业务逻辑；通过 repositories 访问数据
+    services/     业务逻辑；通过 repositories 访问数据，不直接 import `repositories/db.ts`
     repositories/ 唯一允许 import Prisma 的层（`db` 从 `repositories/access.ts` 导出）
     gateways/     外部 HTTP
 packages/         contracts / domain / server-kit / prisma
@@ -24,6 +24,7 @@ docs/             architecture/ 内部约定；vendors/ 厂商与解析说明
 ## Web
 
 - 单 feature 专属请求放 `features/<f>/api/`，跨 feature 放 `shared/api/`。
+- `shared/` 不得 import `features/`。画布状态由 `features/canvas/store/registerCanvasWorkspace.ts` 注册进 `shared/workspace/canvasWorkspace.ts`。
 - 提示条 UI 与逻辑统一在 `shared/prompt-bar/`。
 - 多角度弹窗统一在 `shared/modals/multiAngle/`；点阵背景统一在 `shared/media/DotGrid`（`variant: 'ambient' | 'canvas'`）。
 - `features/canvas/store/` 仅服务画布局部状态，不要把全局切片放进去。
