@@ -1,19 +1,11 @@
 {
   "files": [
     {
-      "file": "apps/api/src/routes/catalog/collect.ts",
-      "lines": 401
-    },
-    {
       "file": "apps/api/src/routes/generate/video.ts",
       "lines": 401
     },
     {
       "file": "apps/api/src/routes/system/models/fetch.ts",
-      "lines": 401
-    },
-    {
-      "file": "apps/api/src/services/analyze/promptAssembler.ts",
       "lines": 401
     },
     {
@@ -266,10 +258,6 @@
     },
     {
       "file": "packages/server-kit/src/storage.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/modelCatalog.ts",
       "lines": 401
     }
   ]

@@ -9,7 +9,11 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(scriptDir, '../..');
 
-const catalogSrc = fs.readFileSync(path.join(workspaceRoot, 'packages/domain/src/modelCatalog.ts'), 'utf8');
+const catalogDir = path.join(workspaceRoot, 'packages/domain/src/modelCatalog');
+const catalogSrc = [
+  fs.readFileSync(path.join(workspaceRoot, 'packages/domain/src/modelCatalog.ts'), 'utf8'),
+  ...fs.readdirSync(catalogDir).filter((name) => name.endsWith('.ts')).map((name) => fs.readFileSync(path.join(catalogDir, name), 'utf8')),
+].join('\n');
 const imageAdaptersSrc = fs.readFileSync(
   path.join(workspaceRoot, 'packages/domain/src/modelAdapters/image/adapters.ts'),
   'utf8',
