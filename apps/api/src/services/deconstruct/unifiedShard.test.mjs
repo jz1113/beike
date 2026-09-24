@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { test } from 'node:test';
+import { configureDomainRuntime } from '@beike/domain/runtime';
 import { resolveUnifiedShardSize } from '@beike/domain/assetDeconstruct/prompts';
+
+configureDomainRuntime({
+  env: new Proxy({}, { get: (_target, key) => process.env[String(key)] }),
+});
 import { mergeUnifiedShardMetadata, resolveUnifiedShardConcurrency, runUnifiedDeconstruct } from './unified.ts';
 
 test('default deconstruction shards fit a four-image prompt group', () => {

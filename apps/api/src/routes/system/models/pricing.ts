@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../../core/http';
+import { gatewayFetch } from '../../../gateways/http';
 
 const COMFLY_PRICING_URL = 'https://ai.comfly.org/api/pricing';
 const CACHE_MS = 5 * 60_000;
@@ -32,7 +33,7 @@ export async function GET() {
     return jsonResponse({ success: true, group: 'default', prices: cached.prices });
   }
   try {
-    const response = await fetch(COMFLY_PRICING_URL, { signal: AbortSignal.timeout(10_000) });
+    const response = await gatewayFetch(COMFLY_PRICING_URL, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error(`Comfly HTTP ${response.status}`);
     const raw = await response.json();
     const prices = parseDefaultGroupPrices(raw);

@@ -1,3 +1,4 @@
+import { domainEnv } from '../runtime';
 import type { SubCategoryDef } from '../productCategory';
 import { PHONE_REVERSE_POLICY } from '../phoneProductPolicy';
 import { categoryArchitectureGuidance } from '../assetCategoryArchitecture';
@@ -757,7 +758,7 @@ export const DEFAULT_UNIFIED_SHARD_SIZE = 4;
 
 /** 解析 Unified 分片大小（可通过环境变量 ASSET_DECONSTRUCT_SHARD_SIZE 调低） */
 export function resolveUnifiedShardSize(rawEnv?: number): number {
-  const value = rawEnv ?? Number(process.env.ASSET_DECONSTRUCT_SHARD_SIZE);
+  const value = rawEnv ?? Number(domainEnv('ASSET_DECONSTRUCT_SHARD_SIZE'));
   if (Number.isFinite(value) && value > 0) {
     return Math.min(MAX_IMAGES_PER_SET, Math.floor(value));
   }
