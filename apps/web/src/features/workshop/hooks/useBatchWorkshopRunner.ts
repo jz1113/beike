@@ -690,7 +690,9 @@ export function useBatchWorkshopRunner() {
     startBatchGeneration,
     retryFailedImageTasks,
     retrySingleShotTask,
-    recheckTask: (itemId: string, taskId: string) => recheckWorkshopTask(itemId, taskId, itemsRef.current, setItems, showToast),
+    recheckTask: (itemId: string, taskId: string) => recheckWorkshopTask(itemId, taskId, itemsRef.current, setItems, showToast, {
+      selectedAspect, selectedQuality, selectedImageGenModel,
+    }),
     generateCopywritingForProduct,
     updateItemCopywriting,
     generateAllCopywriting,

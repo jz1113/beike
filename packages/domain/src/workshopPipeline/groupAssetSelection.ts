@@ -35,16 +35,15 @@ export function isCompletePromptGroup(group: PromptGroupCandidate): boolean {
     && shots.every((shot) => Boolean(shot.prompt || shot.action || shot.scene));
 }
 
-/** Preserve database order as the quality preference; rotate equally matched groups across products. */
-export function selectPromptGroupForProduct<T extends PromptGroupCandidate>(
+/** Rank all category-compatible complete groups; use generic groups only as fallback. */
+export function eligiblePromptGroups<T extends PromptGroupCandidate>(
   groups: T[],
   productTitle: string,
   productProps: Record<string, unknown> | null | undefined,
-  productIndex: number,
-): T | null {
+): T[] {
   const productCategory = inferProductCategoryAndAnatomy(productTitle, productProps).primaryCategory;
   const eligible = groups.filter(isCompletePromptGroup);
-  if (!eligible.length) return null;
+  if (!eligible.length) return [];
   const scored = eligible.map((group) => {
     const categories = parseArray(group.productCategoryIds).map(String);
     const summaryCategory = inferProductCategoryAndAnatomy(group.contentSummary).primaryCategory;
@@ -58,8 +57,12 @@ export function selectPromptGroupForProduct<T extends PromptGroupCandidate>(
       : 0;
     return { group, score };
   });
-  const bestScore = Math.max(...scored.map((entry) => entry.score));
-  if (productCategory !== 'all' && bestScore === 0) return null;
-  const best = scored.filter((entry) => entry.score === bestScore);
-  return best[Math.abs(productIndex) % best.length].group;
+  const matching = scored.filter(entry => entry.score >= 80);
+  const fallback = scored.filter(entry => entry.score > 0);
+  return (matching.length ? matching : fallback).sort((a,b) => b.score - a.score || a.group.id.localeCompare(b.group.id)).map(entry => entry.group);
+}
+
+export function selectPromptGroupForProduct<T extends PromptGroupCandidate>(groups: T[], productTitle: string, productProps: Record<string, unknown> | null | undefined, productIndex: number): T | null {
+  const eligible = eligiblePromptGroups(groups, productTitle, productProps);
+  return eligible.length ? eligible[Math.abs(productIndex) % eligible.length] : null;
 }

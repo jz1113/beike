@@ -31,6 +31,7 @@ export function WorkshopAssetLockRow({
         className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"
       >
         <option value="auto">{autoLabel}</option>
+        {value !== 'auto' && !options.some(option => option.id === value) && <option value={value} disabled>原选择已失效，请重新选择</option>}
         {options.map((option, idx) => (
           <option key={option.id} value={option.id}>
             {option.code ? `[#${option.code.replace(/^#/, '')}]` : `[#${prefix}-${String(idx + 1).padStart(2, '0')}]`}{' '}

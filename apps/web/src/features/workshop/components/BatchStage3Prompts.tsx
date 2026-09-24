@@ -135,7 +135,7 @@ export default function BatchStage3Prompts({
       <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 p-3 text-xs text-indigo-800">
           <div className="space-y-1">
             <p className="font-semibold">{generationStrategy === 'grid_first' ? '四宫格生成 4 镜 · 整组提示词生成，再拆分为 4 张' : '单张逐镜生成 · 每镜使用独立提示词生成完整图片'}</p>
-            {autoMatchMotherTemplate && <p>分析时将按商品类目自动匹配完整四图母本；也可在生产设置中固定同一组。</p>}
+            {autoMatchMotherTemplate && <p>同类完整四图母本依次轮换，用完一轮后再重复；也可在生产设置中手动固定图组。</p>}
           </div>
           <button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 rounded-lg bg-white px-3 py-2 font-bold">生产设置</button>
         </div>

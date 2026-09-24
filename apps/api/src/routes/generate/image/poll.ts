@@ -1,3 +1,4 @@
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { parseImagePollPayload } from '../../../services/generate/imagePollPayload';
 import { jsonResponse } from '../../../core/http';
 import { db } from '../../../repositories/access';
@@ -26,6 +27,18 @@ export async function ensurePersistableResultUrl(url: string, req: Request): Pro
  * 查询异步生图任务状态 (多端点高可用智能探测)
  */
 export async function executeImagePoll(req: Request) {
+  const lookup = new URL(req.url);
+  if (!lookup.searchParams.get('taskId') && lookup.searchParams.get('taskKey')) {
+    const key = lookup.searchParams.get('taskKey')!;
+    if (key.length > 1024) return jsonResponse({ status: 'QUERY_FAILED', error: '任务标识无效' }, 400);
+    const record = await db.imageTask.findFirst({ where: { workspaceId: requireWorkspaceId(), idempotencyKey: key }, orderBy: { createdAt: 'desc' }, select: { taskId: true } });
+    if (!record?.taskId) return jsonResponse({ status: 'QUERY_FAILED', error: '尚未找到原任务记录，请稍后核对；不会自动重新提交' }, 200);
+    lookup.searchParams.set('taskId', record.taskId);
+    const response = await executeImagePoll(new Request(lookup, { headers: req.headers }));
+    const data = await response.json();
+    return jsonResponse({ ...data, taskId: record.taskId }, response.status);
+  }
+
   let provider: string | undefined;
   try {
     provider = new URL(resolveCredentials(req).baseUrl).hostname;

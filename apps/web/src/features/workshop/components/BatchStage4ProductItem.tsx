@@ -149,6 +149,7 @@ export function BatchStage4ProductItem({
             {tasks.map((task, shotIdx) => {
               const hasImage = isUsableWorkshopResult(task);
               const isGenFailure = task.status === 'FAILURE' || (task.status === 'SUCCESS' && !hasImage);
+              const canRecover = Boolean(task.upstreamTaskId || task.gridTaskKey || task.gridSourceUrl || item.masterGridUrl);
               const currentPreviewIdx = hasImage && task.resultUrl ? previewUrls.indexOf(task.resultUrl) : 0;
 
               return (
@@ -161,7 +162,7 @@ export function BatchStage4ProductItem({
                         } else {
                           setPreviewImageUrl(task.resultUrl);
                         }
-                      } else if (!readOnly && isGenFailure && retrySingleShotTask && !recheckingId && !task.upstreamTaskId) {
+                      } else if (!readOnly && isGenFailure && retrySingleShotTask && !recheckingId && !canRecover) {
                         retrySingleShotTask(item.id, shotIdx);
                       }
                     }}
@@ -226,10 +227,10 @@ export function BatchStage4ProductItem({
                     ) : isGenFailure ? (
                       <div className="p-4 text-center space-y-2">
                         <XCircle className="w-8 h-8 text-rose-500 mx-auto" />
-                        <div className="text-xs font-bold text-rose-700">{task.status === 'SUCCESS' ? '图片需重新生成' : '生成失败'}</div>
+                        <div className="text-xs font-bold text-rose-700">{task.status === 'SUCCESS' ? '图片需重新生成' : task.recoveryRequired ? '结果待恢复' : '生成失败'}</div>
                         {task.error && <p className="max-h-24 overflow-y-auto break-words text-[11px] leading-5 text-rose-600 select-text">{task.error}</p>}
                         {task.upstreamTaskId && <p className="break-all text-[10px] text-slate-400 select-text">任务 ID：{task.upstreamTaskId}</p>}
-                        {!readOnly && task.upstreamTaskId && onRecheckTask && <button type="button" disabled={recheckingId !== null}
+                        {!readOnly && canRecover && onRecheckTask && <button type="button" disabled={recheckingId !== null}
                           onClick={async (event) => { event.stopPropagation(); setRecheckingId(task.id); try { await onRecheckTask(item.id, task.id); } finally { setRecheckingId(null); } }}
                           className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-600 disabled:opacity-40">{recheckingId === task.id ? '核对中…' : '核对原任务'}</button>}
                         {!readOnly && retrySingleShotTask && <button

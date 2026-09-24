@@ -96,6 +96,7 @@ export interface AssembleSlotsInput {
   lockedGroupShots?: GroupShotSkeleton[] | null;
   visionProductSentences?: ProductSentence[];
   personaMode?: 'asset_driven' | 'none';
+  replaceScene?: boolean;
 }
 
 export interface AssembleSlotsResult {
@@ -206,12 +207,12 @@ export function assembleStoryboardSlots(input: AssembleSlotsInput): AssembleSlot
     return {
       shotNo: index + 1,
       title: text(group?.title) || text(action?.title) || `分镜 ${index + 1}`,
-      scene: sceneText(scene, group),
+      scene: sceneText(scene, group, input.replaceScene),
       action: text(group?.action) || text(action?.action) || text(action?.reversePrompt),
       camera,
       optics: text(group?.optics),
       angle: text(group?.angle) || text(action?.title),
-      lighting: text(group?.lighting_type) || text(scene?.lighting),
+      lighting: scene?.id && input.replaceScene ? text(scene.lighting) : text(group?.lighting_type) || text(scene?.lighting),
       shotType: text(group?.shot_type) || text(action?.shotType) || undefined,
       hasHuman,
       persona: hasHuman ? persona : undefined,
@@ -339,8 +340,8 @@ function safeParse(value: string): unknown {
   }
 }
 
-function sceneText(scene?: SlotScene, group?: GroupShotSkeleton): string {
-  if (scene?.id && !text(group?.scene)) return [scene.title, scene.reversePrompt || scene.description].filter(Boolean).join('，');
+function sceneText(scene?: SlotScene, group?: GroupShotSkeleton, replaceScene = false): string {
+  if (scene?.id && (replaceScene || !text(group?.scene))) return [scene.title, scene.reversePrompt || scene.description].filter(Boolean).join('，');
   const sourceScene = sourcePromptSection(text(group?.prompt), '场景结构');
   if (sourceScene) return sourceScene;
   if (text(group?.scene)) return text(group?.scene);

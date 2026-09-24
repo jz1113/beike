@@ -37,6 +37,9 @@ export interface BatchTaskItem {
   resultStatus?: 'current' | 'superseded';
   idempotencyKey?: string;
   upstreamTaskId?: string;
+  gridTaskKey?: string;
+  gridSourceUrl?: string;
+  gridSize?: string;
   attempt?: number;
   outputReview?: 'unreviewed' | 'accepted' | 'retry_requested' | 'rejected';
 }

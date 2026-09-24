@@ -41,3 +41,24 @@ test('explicit scene override removes original scene and original lighting', () 
   assert.match(prompt, /侧窗光/);
   assert.doesNotMatch(prompt, /旧房间|旧灯光/);
 });
+
+import { buildBoundGroupGridPrompt } from './boundGroupPrompt.ts';
+
+test('scene replacement wins even when the source has structured scene and light',()=>{
+ const slot=assembleStoryboardSlots({replaceScene:true,lockedGroupShots:[{scene:'旧房间',lighting_type:'旧灯光',has_human:false}],assets:{scenes:[{id:'new',description:'新台面',lighting:'新窗光'}]}}).shots[0];
+ const prompt=buildBoundGroupPrompt(slot,'手机');assert.match(prompt,/新台面/);assert.match(prompt,/新窗光/);assert.doesNotMatch(prompt,/旧房间|旧灯光/);
+});
+test('retained outfit uses source details; explicit replacements do not fall back to old identities',()=>{
+ const shots=[{has_human:true,shot_type:'model_shot',prompt:'【发型与面部】旧人物\n【穿搭】旧衬衫'}];
+ const retained=assembleStoryboardSlots({lockedGroupShots:shots}).shots[0];
+ assert.match(buildBoundGroupPrompt({...retained,hasHuman:true},'手机'),/旧衬衫/);
+ const replaced=assembleStoryboardSlots({lockedGroupShots:shots,assets:{personas:[{id:'p',name:'新人物'}],outfits:[{id:'o',title:'新套装'}]}}).shots[0];
+ const prompt=buildBoundGroupPrompt(replaced,'手机');assert.match(prompt,/新人物/);assert.match(prompt,/新套装/);assert.doesNotMatch(prompt,/旧人物|旧衬衫/);
+});
+test('grid preserves all resolved per-shot bindings without a global portrait or scene rewrite',()=>{
+ const shots=['【人物】新人物\n【穿搭】新衣服','仅商品与必要手部出镜','纯商品静物\n【场景结构】窗边桌面','纯商品静物\n【场景结构】石台'].map((prompt,index)=>({prompt,shot_no:index+1}));
+ const grid=buildBoundGroupGridPrompt(shots);
+ for(const shot of shots) assert.ok(grid.includes(shot.prompt));
+ assert.match(grid,/左上格·分镜1/);assert.match(grid,/右下格·分镜4/);
+ assert.throws(()=>buildBoundGroupGridPrompt(shots.slice(1)),/四个完整/);
+});

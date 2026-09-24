@@ -3,7 +3,7 @@
  * 将单张 2×2 拼图大图快速、无损均分为 4 张独立分镜高清图片 (左上、右上、左下、右下)
  */
 
-import { fetchMediaBlob } from '@/shared/media/downloadMedia';
+import { dataUrlToBlob, fetchMediaBlob } from '@/shared/media/downloadMedia';
 
 export interface SlicedShots {
   shot1Url: string; // 左上
@@ -262,7 +262,7 @@ export interface SliceGridOptions {
 }
 
 /**
- * 核心切片函数：将 2×2 大图切为 4 张独立的高清图片 (Blob URL)
+ * 核心切片函数：将 2×2 大图切为 4 张独立的高清图片 Blob
  * 具备智能白边/十字分割线自动检测与切除功能，并统一裁剪缩放至 1440×1920 高清 3:4 比例
  * 顺序固定为：
  * 0: 左上 (Top-Left) -> 分镜 1 (生活肖像)
@@ -270,10 +270,10 @@ export interface SliceGridOptions {
  * 2: 左下 (Bottom-Left) -> 分镜 3 (部位超清微距)
  * 3: 右下 (Bottom-Right) -> 分镜 4 (松弛生活瞬间)
  */
-export async function sliceGridImage2x2(
+export async function sliceGridImage2x2Blobs(
   imageUrl: string,
   options?: SliceGridOptions
-): Promise<[string, string, string, string]> {
+): Promise<[Blob, Blob, Blob, Blob]> {
   const format = options?.outputFormat || 'image/jpeg';
   const quality = options?.quality ?? 0.95;
   const autoTrim = options?.autoTrimBorders ?? true;
@@ -352,7 +352,7 @@ export async function sliceGridImage2x2(
     },
   ];
 
-  const slicedUrls: string[] = [];
+  const slicedBlobs: Blob[] = [];
 
   for (let i = 0; i < quadrants.length; i++) {
     const q = quadrants[i];
@@ -407,14 +407,7 @@ export async function sliceGridImage2x2(
       canvas.toBlob((b) => res(b), format, quality);
     });
 
-    if (blob) {
-      const sliceUrl = URL.createObjectURL(blob);
-      slicedUrls.push(sliceUrl);
-    } else {
-      // 降级为 data URL
-      const dataUrl = canvas.toDataURL(format, quality);
-      slicedUrls.push(dataUrl);
-    }
+    slicedBlobs.push(blob || dataUrlToBlob(canvas.toDataURL(format, quality)));
 
     // 及时清理 canvas 引用，辅助垃圾回收
     canvas.width = 0;
@@ -423,6 +416,15 @@ export async function sliceGridImage2x2(
 
   cleanup?.();
 
-  return [slicedUrls[0], slicedUrls[1], slicedUrls[2], slicedUrls[3]];
+  return [slicedBlobs[0], slicedBlobs[1], slicedBlobs[2], slicedBlobs[3]];
+}
+
+/** 兼容旧调用：把切片 Blob 包成可预览的对象 URL。 */
+export async function sliceGridImage2x2(
+  imageUrl: string,
+  options?: SliceGridOptions
+): Promise<[string, string, string, string]> {
+  const blobs = await sliceGridImage2x2Blobs(imageUrl, options);
+  return blobs.map((blob) => URL.createObjectURL(blob)) as [string, string, string, string];
 }
 

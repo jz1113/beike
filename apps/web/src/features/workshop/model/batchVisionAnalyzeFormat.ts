@@ -1,3 +1,4 @@
+import { buildBoundGroupGridPrompt } from '@beike/domain/workshopPipeline';
 import type { ShotPrompt } from '@beike/domain/vision';
 import {
   assembleOriginalShotPrompt,
@@ -66,9 +67,9 @@ export function formatAnalyzedStoryboard(opts: {
       productImageUrl: assignedImg,
       prompt: p.prompt || finalPrompt,
       applied_scene: p.applied_scene || data?.applied_scene || data?.appliedScene,
-      applied_outfit: p.applied_outfit || data?.applied_outfit || data?.appliedOutfit,
+      applied_outfit: isHumanShot && p.shot_type !== 'hand_held_only' ? p.applied_outfit || data?.applied_outfit || data?.appliedOutfit : undefined,
       applied_action: p.applied_action,
-      applied_persona: p.applied_persona || data?.applied_persona || data?.appliedPersona,
+      applied_persona: isHumanShot && p.shot_type !== 'hand_held_only' ? p.applied_persona || data?.applied_persona || data?.appliedPersona : undefined,
       selected: true,
     };
   });
@@ -106,7 +107,9 @@ export function formatAnalyzedStoryboard(opts: {
     optics: p.optics, camera_focal_length: p.camera_focal_length, angle: p.angle, lighting_type: p.lighting_type,
     scene: p.scene, has_human: p.has_human,
   }));
-  const gridPrompt = assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
+  const gridPrompt = formattedPrompts.length === 4 && formattedPrompts.every(p => p.assembly_source === 'group_skeleton')
+    ? buildBoundGroupGridPrompt(formattedPrompts)
+    : assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
 
   return {
     formattedPrompts, gridPrompt, lookBible, lookParts, identityBible: identityFromApi,

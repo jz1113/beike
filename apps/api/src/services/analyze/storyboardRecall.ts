@@ -10,9 +10,11 @@ import {
   stableAssetCode,
 } from '@beike/domain/assetSampling';
 import { inferProductCategoryAndAnatomy } from '@beike/domain/productCategory';
-import { isCompletePromptGroup, parseGroupShotSkeleton, selectPromptGroupForProduct } from '@beike/domain/workshopPipeline';
+import { isCompletePromptGroup, parseGroupShotSkeleton } from '@beike/domain/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
+
+import { reservePromptGroup } from './groupRotation';
 
 const PROVENANCE = { provenance: { not: 'reference_import' as const } };
 const assetOrder = [
@@ -145,6 +147,7 @@ export async function loadStoryboardLibrary(input: {
 
 export async function loadLockedGroupSkeleton(input: {
   fullPromptId?: unknown;
+  batchId?: string;
   productTitle?: string;
   productProps?: Record<string, unknown> | null;
   productIndex: number;
@@ -153,13 +156,13 @@ export async function loadLockedGroupSkeleton(input: {
   const manuallyLocked = Boolean(id && id !== 'auto');
   const row = manuallyLocked
     ? await db.fullPromptAsset.findFirst({ where: { id, ...PROVENANCE } })
-    : selectPromptGroupForProduct(
+    : await reservePromptGroup(
+        db,
         await db.fullPromptAsset.findMany({
           where: { ...PROVENANCE, sourceImageIndices: { not: null }, shotPromptsJson: { not: null } },
           orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
-          take: 500,
         }),
-        input.productTitle || '', input.productProps, input.productIndex,
+        input.productTitle || '', input.productProps, input.batchId,
       );
   if (!row) throw new Error(manuallyLocked
     ? '选定的图组母本不存在，请重新选择'

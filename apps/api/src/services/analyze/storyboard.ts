@@ -56,6 +56,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
 
   const lockedGroup = await loadLockedGroupSkeleton({
     fullPromptId: lockedAssets?.fullPromptId,
+    batchId,
     productTitle,
     productProps,
     productIndex,
@@ -103,6 +104,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   const assembledSlots = assembleStoryboardSlots({
     shotCount,
     assets: assetLibraryData,
+    replaceScene: Boolean(effectiveLockedAssets.sceneId),
     lockedGroupShots: expandGroupShotSkeleton(lockedGroup.shots, shotCount)
       .map((shot) => effectiveLockedAssets.sceneId ? { ...shot, scene: '', lighting_type: '' } : shot),
     personaMode,

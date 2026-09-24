@@ -24,6 +24,9 @@ const task = z.object({
   resultStatus: resultRevisionStatus.default('current'),
   idempotencyKey: z.string().optional(),
   upstreamTaskId: z.string().optional(),
+  gridTaskKey: z.string().optional(),
+  gridSourceUrl: z.string().optional(),
+  gridSize: z.string().optional(),
   attempt: z.number().int().min(0).optional(),
   outputReview: z.enum(['unreviewed', 'accepted', 'retry_requested', 'rejected']).default('unreviewed'),
 });

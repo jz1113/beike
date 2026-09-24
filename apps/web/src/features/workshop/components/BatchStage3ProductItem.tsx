@@ -121,7 +121,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
                 <>
                   <span>·</span>
                   <span title={`图组母本 ${item.appliedFullPromptId || ''}`}>
-                    {item.appliedFullPromptSelectionMode === 'auto' ? '自动匹配' : '已锁定'}图组：{item.appliedFullPromptTitle}
+                    {item.appliedFullPromptSelectionMode === 'auto' ? '自动轮换' : '已锁定'}图组：{item.appliedFullPromptTitle}
                   </span>
                 </>
               )}
