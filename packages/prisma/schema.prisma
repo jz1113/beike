@@ -19,6 +19,18 @@ model KeywordReviewRuleRevision {
   @@index([workspaceId, createdAt])
 }
 
+model KeywordLookupCache {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  rulesVersion Int
+  query        String
+  category     String
+  subject      String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@unique([workspaceId, rulesVersion, query])
+}
+
 // 采集的商品记录
 model Product {
   id          String   @id @default(cuid())

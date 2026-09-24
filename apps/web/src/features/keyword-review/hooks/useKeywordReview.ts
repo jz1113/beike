@@ -15,12 +15,16 @@ import { DEEPSEEK_BASE_URL, type ReviewRequestError } from '../model/reviewReque
 import { MAX_REVIEW_CONCURRENCY, ReviewPacer } from '../model/reviewPacer';
 import { createReviewBatchSubmit } from '../model/reviewBatchSubmit';
 import { DEFAULT_KEYWORD_REVIEW_MODEL, KEYWORD_REVIEW_MODEL_STORAGE_KEY, loadKeywordReviewModels } from '../model/keywordReviewModels';
+import { addTokenUsage, estimateReviewYuan, formatReviewYuan, isDeepSeekPeakHour, readTokenUsage, type ReviewTokenUsage } from '../model/reviewCost';
 import { useKeywordReviewBalance } from './useKeywordReviewBalance';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = 50;
 export const KEYWORD_REVIEW_CONCURRENCY = MAX_REVIEW_CONCURRENCY;
 export type KeywordReviewFilter = 'all' | 'done' | 'producible' | 'rejected' | 'low_value';
 const PREVIEW_LIMIT = 240;
+const LOOKUP_BATCH_LIMIT = 2;
+const LOOKUP_RUN_LIMIT = 100;
+const EMPTY_USAGE: ReviewTokenUsage = { cacheHit: 0, cacheMiss: 0, completion: 0 };
 
 export function useKeywordReview() {
   const [modelOptions, setModelOptions] = useState(loadKeywordReviewModels);
@@ -40,6 +44,7 @@ export function useKeywordReview() {
   const [notice, setNotice] = useState('');
   const [runMode, setRunMode] = useState<'idle' | 'trial' | 'all'>('idle');
   const [lookupEnabled, setLookupEnabled] = useState(false);
+  const [tokenUsage, setTokenUsage] = useState<ReviewTokenUsage>(EMPTY_USAGE);
   const { balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance, markDispatch } =
     useKeywordReviewBalance(selectedModel.provider === 'deepseek');
   const abortRef = useRef<AbortController | null>(null);
@@ -49,6 +54,7 @@ export function useKeywordReview() {
   const inputVersionRef = useRef(0);
   const rulesVersionRef = useRef<number | null>(null);
   const recordIndicesRef = useRef<Map<string, number>>(new Map());
+  const lookupRemainingRef = useRef(LOOKUP_RUN_LIMIT);
 
   useEffect(() => {
     const reload = () => setModelOptions(loadKeywordReviewModels());
@@ -158,6 +164,8 @@ export function useKeywordReview() {
       return;
     }
     const queue = mode === 'trial' ? candidates.slice(0, KEYWORD_REVIEW_BATCH_SIZE) : candidates;
+    lookupRemainingRef.current = LOOKUP_RUN_LIMIT;
+    setTokenUsage(EMPTY_USAGE);
     advanceKnownFailureVersions(queue, recordIndicesRef.current, batchRetryVersionsRef.current);
     const controller = new AbortController();
     stopRequestedRef.current = false;
@@ -197,16 +205,21 @@ export function useKeywordReview() {
             : `按规则 v${rulesVersion} 并行审核中，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
           setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
             (record) => ({ ...record, status: 'running', error: undefined })));
+          const lookupBudget = runModel.provider === 'deepseek' && lookupEnabled
+            ? Math.min(LOOKUP_BATCH_LIMIT, lookupRemainingRef.current)
+            : 0;
           const submit = createReviewBatchSubmit({
             model: runModel.model, provider: runModel.provider, baseUrl,
-            reviewMode, apiKey, lookup: runModel.provider === 'deepseek' && lookupEnabled, rulesVersion,
+            reviewMode, apiKey, lookup: lookupBudget > 0, lookupBudget, rulesVersion,
             signal: controller.signal, shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
             indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, pacer,
             onDispatch: () => { if (runModel.provider === 'deepseek') markDispatch(); },
-            onSuccess: (chunk, results, lookedUp) => {
+            onSuccess: (chunk, results, lookedUp, usage, lookupUsage) => {
               setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
               chunk.forEach((record) => settledIds.add(record.id));
               completedNow += chunk.length; lookedUpNow += lookedUp;
+              lookupRemainingRef.current = Math.max(0, lookupRemainingRef.current - lookedUp);
+              setTokenUsage((current) => addTokenUsage(current, readTokenUsage(usage), readTokenUsage(lookupUsage)));
               if (runModel.provider === 'deepseek') refreshBalance();
               consecutiveInfrastructureFailures = 0;
             },
@@ -368,7 +381,14 @@ export function useKeywordReview() {
     isExporting,
     notice,
     lookupEnabled,
-    setLookupEnabled,
+    setLookupEnabled: (enabled: boolean) => {
+      setLookupEnabled(enabled);
+      if (enabled) setNotice('联网补查按搜索网页计费，高峰时段成本显著上升');
+    },
+    tokenUsage,
+    estimatedCost: estimateReviewYuan(tokenUsage),
+    estimatedCostLabel: formatReviewYuan(estimateReviewYuan(tokenUsage).yuan),
+    peakHour: isDeepSeekPeakHour(),
     balance,
     balanceError,
     balanceUpdatedAt,

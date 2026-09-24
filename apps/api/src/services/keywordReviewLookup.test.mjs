@@ -9,6 +9,9 @@ import {
   rememberLookupCategory,
   resetLookupCacheForTests,
   selectLookupRows,
+  setLookupPersistenceForTests,
+  hydrateLookupCache,
+  storeLookupHit,
 } from './keywordReviewLookup.ts';
 
 afterEach(() => {
@@ -32,7 +35,7 @@ function result(id, category, needsLookup = false) {
   };
 }
 
-test('selectLookupRows keeps unique uncertain queries and caps at 5', () => {
+test('selectLookupRows searches only needsLookup rows and caps at 2', () => {
   const rows = [
     row('1', '乌天狗'),
     row('2', '未知品牌A'),
@@ -55,8 +58,8 @@ test('selectLookupRows keeps unique uncertain queries and caps at 5', () => {
     result('8', '其他', true),
     result('9', '其他', true),
   ];
-  const picked = selectLookupRows(results, rows, 5);
-  assert.deepEqual(picked.map((item) => item.query), ['乌天狗', '未知品牌A', '陌生机构', '外文词X', '作品Y']);
+  const picked = selectLookupRows(results, rows);
+  assert.deepEqual(picked.map((item) => item.query), ['乌天狗', '陌生机构']);
 });
 
 test('selectLookupRows skips cached queries so retries do not search again', () => {
@@ -139,6 +142,28 @@ test('parseLookupResult reads optional subject phrases', () => {
     { category: '民俗文化', subject: '日本神话天狗' },
   );
   assert.deepEqual(parseLookupResult('{"category":"游戏"}', allowed), { category: '游戏' });
+});
+
+test('persistent lookup cache survives an in-memory reset', async () => {
+  const saved = [];
+  setLookupPersistenceForTests({
+    async read(_workspaceId, rulesVersion, queries) {
+      return saved.filter((item) => item.rulesVersion === rulesVersion && queries.includes(item.query));
+    },
+    async write(_workspaceId, rulesVersion, query, hit) {
+      saved.push({ rulesVersion, query, category: hit.category, subject: hit.subject || '' });
+    },
+  });
+  await storeLookupHit('乌天狗', '民俗文化', '日本神话天狗', 3, 'workspace');
+  resetLookupCacheForTests();
+  setLookupPersistenceForTests({
+    async read(_workspaceId, rulesVersion, queries) {
+      return saved.filter((item) => item.rulesVersion === rulesVersion && queries.includes(item.query));
+    },
+    async write() {},
+  });
+  await hydrateLookupCache(['乌天狗'], 3, 'workspace');
+  assert.equal(recalledLookupCategory('乌天狗', 3), '民俗文化');
 });
 
 test('lookup cache stores trimmed queries', () => {

@@ -303,7 +303,7 @@ export function BatchStage4ProductItem({
                                 e.stopPropagation();
                                 handleDownloadSingleTaskImage(
                                   task.resultUrl!,
-                                  `${item.itemId || item.id}_分镜${task.shot_no}.jpg`
+                                  `${item.itemId || item.id}_分镜${task.shot_no}`
                                 );
                               }}
                               className="w-10 h-10 rounded-full bg-white/95 text-slate-800 flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 cursor-pointer"

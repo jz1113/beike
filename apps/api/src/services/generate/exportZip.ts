@@ -80,6 +80,7 @@ export async function POST(req: Request) {
     }
     const {
       batchTitle = '全渠道采集批量导出',
+      offlineMatrix = false,
       downloadConcurrency: requestedConcurrency,
       products,
       productTitle = '采集素材图集',
@@ -245,19 +246,22 @@ export async function POST(req: Request) {
     };
 
     const runPendingDownloads = async (tasks: PendingDownloadTask[]) => {
-      if (tasks.length === 0) return;
+      if (tasks.length === 0) return 0;
+      let completed = 0;
 
       await mapConcurrent(tasks, downloadConcurrency, async (task) => {
         const buf = await fetchMediaBuffer(task.url);
         if (buf) {
           task.folder.file(task.filename, buf, MEDIA_FILE_OPTS);
+          completed++;
         } else {
           task.folder.file(task.errorFilename, task.errorMessage, TXT_FILE_OPTS);
         }
       });
+      return completed;
     };
 
-    const buildZipResponse = async (zipFileName: string) => {
+    const buildZipResponse = async (zipFileName: string, counts?: { completed: number; total: number }) => {
       const zipBuffer = await zip.generateAsync({
         type: 'nodebuffer',
         compression: 'STORE',
@@ -268,7 +272,8 @@ export async function POST(req: Request) {
         headers: {
           'Content-Type': 'application/zip',
           'Content-Disposition': `attachment; filename="${encodeURIComponent(zipFileName)}.zip"; filename*=UTF-8''${encodedFilename}`,
-          'Content-Length': zipBuffer.length.toString()
+          'Content-Length': zipBuffer.length.toString(),
+          ...(counts ? { 'X-Export-Completed': String(counts.completed), 'X-Export-Total': String(counts.total) } : {}),
         }
       });
     };
@@ -319,7 +324,7 @@ export async function POST(req: Request) {
           const u = typeof item === 'string' ? item.trim() : item?.url?.trim();
           if (!u) continue;
           const canonical = u.split('?')[0].toLowerCase();
-          if (!seenUrls.has(canonical)) {
+          if (offlineMatrix || !seenUrls.has(canonical)) {
             seenUrls.add(canonical);
             uniqueList.push(item);
           }
@@ -354,8 +359,11 @@ export async function POST(req: Request) {
       }
 
       addExportManifest(rootFolder, manifestRows);
-      await runPendingDownloads(pendingTasks);
-      return buildZipResponse(cleanBatchName);
+      const completed = await runPendingDownloads(pendingTasks);
+      if (offlineMatrix && completed === 0) {
+        return jsonResponse({ success: false, error: '生成文件均无法读取，请刷新任务后重试' }, 404);
+      }
+      return buildZipResponse(cleanBatchName, { completed, total: pendingTasks.length });
     }
 
     // -------------------------------------------------------------

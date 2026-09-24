@@ -8,7 +8,10 @@ const SAME_KEY_ATTEMPTS = 3;
 type ReviewResponse = {
   success?: boolean;
   results?: KeywordReviewResult[];
+  failedIds?: string[];
   lookedUp?: number;
+  usage?: unknown;
+  lookupUsage?: unknown;
   error?: string;
   code?: string;
   submissionUnknown?: boolean;

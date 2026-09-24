@@ -100,6 +100,7 @@ export async function POST(req: Request): Promise<Response> {
           provider,
           rows: parsedBody.data.rows,
           lookup: parsedBody.data.lookup === true,
+          lookupBudget: parsedBody.data.lookupBudget,
           ruleEntries: rules.entries,
           rulesVersion: rules.version,
           reviewMode: parsedBody.data.reviewMode,
@@ -107,8 +108,10 @@ export async function POST(req: Request): Promise<Response> {
         return jsonResponse({
           success: true,
           results: reviewed.results,
+          failedIds: reviewed.failedIds,
           model,
           usage: reviewed.usage,
+          lookupUsage: reviewed.lookupUsage,
           lookedUp: reviewed.lookedUp,
         });
       } catch (error) {

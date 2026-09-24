@@ -1,6 +1,6 @@
 import { KEYWORD_REVIEW_REJECT_PREFIXES } from '@beike/contracts/generate';
 
-export const CATEGORY_REASON_MAX = 28;
+export const CATEGORY_REASON_MAX = 18;
 export const REJECT_REASON_MAX = 24;
 export const LOOKUP_SUBJECT_MAX = 12;
 
@@ -20,9 +20,12 @@ export function normalizeRejectReason(producible: '制作' | '不制作', value:
   if (producible === '制作') {
     return '';
   }
-  const prefix = KEYWORD_REVIEW_REJECT_PREFIXES.find((item) => text.startsWith(`${item}：`) || text.startsWith(`${item}:`));
+  const prefix = KEYWORD_REVIEW_REJECT_PREFIXES.find((item) => text.includes(item));
   if (!prefix) throw new SyntaxError('不制作依据缺少合法否决类型');
-  const detail = clipReasonChars(text.slice(prefix.length).replace(/^[：:]\s*/, ''), REJECT_REASON_MAX - prefix.length - 1);
+  const at = text.indexOf(prefix);
+  const after = text.slice(at + prefix.length).replace(/^[：:\s，,。；;]+/, '');
+  const before = text.slice(0, at).replace(/[：:\s，,。；;]+$/, '');
+  const detail = clipReasonChars(after || before, REJECT_REASON_MAX - prefix.length - 1);
   if (!detail) throw new SyntaxError('不制作依据缺少命中点');
   return clipReasonChars(`${prefix}：${detail}`, REJECT_REASON_MAX);
 }

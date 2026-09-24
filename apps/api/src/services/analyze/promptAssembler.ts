@@ -384,7 +384,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       appliedAction: shotAppliedAction,
     });
     const sourceDetails = slot?.source === 'group_skeleton'
-      ? buildTransferableGroupDetails(slot.sourcePrompt, Boolean(lockedAssets?.sceneId))
+      ? buildTransferableGroupDetails(slot.sourcePrompt, Boolean(lockedAssets?.sceneId), slot.shotNo > 4)
       : '';
     const finalPrompt = sourceDetails
       ? `${harmonized.prompt}；【母本反推的可迁移镜头细节】${sourceDetails}；母本中的商品颜色、外观、品牌、型号和文字仅属于旧商品，全部以 @图片1 所示实物替换；人物、穿搭与场景以当前选定资产为准。`

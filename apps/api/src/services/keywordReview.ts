@@ -2,6 +2,7 @@ import type { KeywordReviewMode, KeywordReviewResult, KeywordReviewRow } from '@
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
 import { gatewayFetch } from '../gateways/http';
 import {
+  KEYWORD_REVIEW_LOOKUP_LIMIT,
   lookupUncertainCategories,
   type ReviewedKeywordRow,
 } from './keywordReviewLookup';
@@ -24,7 +25,43 @@ export const KEYWORD_REVIEW_CATEGORIES = [
 
 const CATEGORY_SET = new Set<string>(KEYWORD_REVIEW_CATEGORIES);
 
-function buildSystemPrompt(): string {
+export const REVIEW_EXPANSION_MAX = 120;
+
+export function clipReviewText(value: string | undefined, max = REVIEW_EXPANSION_MAX): string | undefined {
+  if (!value) return value;
+  const chars = Array.from(value);
+  return chars.length <= max ? value : chars.slice(0, max).join('');
+}
+
+export function buildModelRows(rows: KeywordReviewRow[]): KeywordReviewRow[] {
+  return rows.map((row, index) => ({
+    id: String(index + 1),
+    query: row.query,
+    expansion: clipReviewText(row.expansion),
+    entityExpansion: clipReviewText(row.entityExpansion),
+    contentType: clipReviewText(row.contentType, 40),
+  }));
+}
+
+export function remapModelIds(value: unknown, rows: KeywordReviewRow[]): unknown {
+  const items = (value as { results?: unknown[] } | null)?.results;
+  if (!Array.isArray(items)) return value;
+  const byShort = new Map(rows.map((row, index) => [String(index + 1), row.id]));
+  return {
+    ...(value as object),
+    results: items.map((item) => {
+      const candidate = item as { id?: unknown };
+      const mapped = byShort.get(String(candidate?.id ?? ''));
+      return mapped ? { ...(candidate as object), id: mapped } : item;
+    }),
+  };
+}
+
+function buildSystemPrompt(lookup: boolean): string {
+  const lookupRule = lookup
+    ? '认不出作品、品牌、游戏、外文词、机构或陌生实体时，needsLookup 为 true；其余为 false。不要因为想更稳就把常识词标成 true。'
+    : '';
+  const lookupField = lookup ? ',"needsLookup":false' : '';
   return `你是中文内容关键词的资深语义审核员。必须逐行理解真实意图，不得使用关键词命中、正则或“未命中即其他”。
 
 输出只允许这 34 个垂类：
@@ -63,14 +100,14 @@ ${KEYWORD_REVIEW_CATEGORIES.join('、')}
 
 其余确实能形成经验、教程、对比、评测、攻略或实质说明的内容，填「制作」；每一行先检查上述否决项，不得因同批多数行可制作而沿用结论。
 
-认不出作品、品牌、游戏、外文词、机构或陌生实体时，needsLookup 为 true；其余为 false。不要因为想更稳就把常识词标成 true。
+${lookupRule}
 
 依据只写决定性事实，不复述 query，不写「因为所以」「内容不适合」这类空话：
-- categoryReason 每行必填，16-28字。句式：{认出来的主体}，{为什么落在这个垂类}。相邻类易混时后半句点出排除项。
+- categoryReason 每行必填，10-18字。句式：{认出来的主体}，{为什么落在这个垂类}。相邻类易混时后半句点出排除项。
 - rejectReason 仅当 producible 为「不制作」时填写；「制作」必须是空字符串。句式：{否决类型}：{这一行命中的点}，12-24字。否决类型只能是：简单问答、低价值、金融决策、医疗诊疗、敏感热点、违法危险、算命迷信、工业硬广、非笔记需求、限制过细。只写第一条命中的。
 例子：游戏手机推荐 → categoryReason=被选的是手机，不是游戏内容，rejectReason=""；美国总统是谁 → rejectReason=简单问答：只确认一个身份；怎么判断他对我有好感 → rejectReason=低价值：个人恋爱好感判断；怎么在淘宝上添加银行卡 → rejectReason=非笔记需求：平台绑卡操作。
 
-严格返回 JSON：{"results":[{"id":"原id","category":"唯一允许垂类","producible":"制作或不制作","categoryReason":"垂类短依据","rejectReason":"不制作短依据或空字符串","needsLookup":false}]}。每个输入 id 恰好返回一次，不得遗漏。`;
+id 是本批序号，必须原样返回。严格返回 JSON：{"results":[{"id":"序号","category":"唯一允许垂类","producible":"制作或不制作","categoryReason":"垂类短依据","rejectReason":"不制作短依据或空字符串"${lookupField}}]}。每个输入 id 恰好返回一次，不得遗漏。`;
 }
 
 function parseModelJson(raw: string): unknown {
@@ -78,45 +115,66 @@ function parseModelJson(raw: string): unknown {
   return JSON.parse(clean);
 }
 
-export function validateResults(value: unknown, rows: KeywordReviewRow[], mode: KeywordReviewMode = 'image'): ReviewedKeywordRow[] {
+export type KeywordReviewValidation = { results: ReviewedKeywordRow[]; failedIds: string[] };
+
+function canonicalCategory(raw: string, allowed: Set<string>): string | undefined {
+  const trimmed = raw.trim();
+  if (allowed.has(trimmed)) return trimmed;
+  const compact = trimmed.replace(/\s+/g, '').replace(/／/g, '/');
+  for (const name of allowed) {
+    if (name.replace(/\s+/g, '') === compact) return name;
+  }
+  return undefined;
+}
+
+function repairRow(candidate: Partial<ReviewedKeywordRow>, mode: KeywordReviewMode): ReviewedKeywordRow {
+  const allowed = mode === 'video' ? VIDEO_CATEGORY_SET : CATEGORY_SET;
+  const category = canonicalCategory(String(candidate?.category || ''), allowed);
+  const producible = String(candidate?.producible || '');
+  if (!category) throw new SyntaxError('非法垂类');
+  if (producible !== '制作' && producible !== '不制作') throw new SyntaxError('非法制作结论');
+  const lowValue = candidate?.lowValue;
+  if (mode === 'video' && lowValue !== '是' && lowValue !== '否') throw new SyntaxError('缺少低价值标记');
+  if (mode === 'video' && lowValue === '是' && producible !== '不制作') throw new SyntaxError('低价值不能制作');
+  const nextProducible = producible as KeywordReviewResult['producible'];
+  return {
+    id: String(candidate.id),
+    category,
+    producible: nextProducible,
+    categoryReason: normalizeCategoryReason(String(candidate?.categoryReason || '').trim() || `${category}相关内容`),
+    rejectReason: normalizeRejectReason(nextProducible, candidate?.rejectReason),
+    ...(mode === 'video' ? { lowValue } : {}),
+    needsLookup: candidate?.needsLookup === true,
+  };
+}
+
+export function validateResults(value: unknown, rows: KeywordReviewRow[], mode: KeywordReviewMode = 'image'): KeywordReviewValidation {
   const items = (value as { results?: unknown[] } | null)?.results;
   if (!Array.isArray(items)) throw new SyntaxError('模型未返回 results 数组');
-  const expected = new Map(rows.map((row) => [row.id, row]));
+  const expected = new Set(rows.map((row) => row.id));
   const seen = new Set<string>();
   const results: ReviewedKeywordRow[] = [];
+  const failed = new Set<string>();
   for (const item of items) {
     const candidate = item as Partial<ReviewedKeywordRow>;
     const id = String(candidate?.id || '');
-    const category = String(candidate?.category || '');
-    const producible = String(candidate?.producible || '');
-    if (!expected.has(id) || seen.has(id)) throw new SyntaxError('模型返回了未知或重复的行 ID');
-    if (!(mode === 'video' ? VIDEO_CATEGORY_SET : CATEGORY_SET).has(category)) throw new SyntaxError(`模型返回了非法垂类：${category || '空值'}`);
-    if (producible !== '制作' && producible !== '不制作') throw new SyntaxError('模型返回了非法制作结论');
-    const lowValue = candidate?.lowValue;
-    if (mode === 'video' && lowValue !== '是' && lowValue !== '否') throw new SyntaxError('视频审核结果缺少低价值标记');
-    if (mode === 'video' && lowValue === '是' && producible !== '不制作') throw new SyntaxError('低价值关键词不能标为制作');
+    if (!expected.has(id) || seen.has(id)) continue;
     seen.add(id);
-    const nextProducible = producible as KeywordReviewResult['producible'];
-    let rejectReason: string;
     try {
-      rejectReason = normalizeRejectReason(nextProducible, candidate?.rejectReason);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '不制作依据格式异常';
-      throw new SyntaxError(`模型返回的「${expected.get(id)?.query.slice(0, 40)}」：${message}`);
+      results.push(repairRow({ ...candidate, id }, mode));
+    } catch {
+      failed.add(id);
     }
-    results.push({
-      id,
-      category,
-      producible: nextProducible,
-      categoryReason: normalizeCategoryReason(candidate?.categoryReason),
-      rejectReason,
-      ...(mode === 'video' ? { lowValue } : {}),
-      needsLookup: candidate?.needsLookup === true,
-    });
   }
-  if (seen.size !== rows.length) throw new SyntaxError(`模型结果不完整：应有 ${rows.length} 条，实际 ${seen.size} 条`);
+  for (const row of rows) if (!seen.has(row.id)) failed.add(row.id);
   const byId = new Map(results.map((item) => [item.id, item]));
-  return rows.map((row) => byId.get(row.id) as ReviewedKeywordRow);
+  return {
+    results: rows.flatMap((row) => {
+      const item = byId.get(row.id);
+      return item ? [item] : [];
+    }),
+    failedIds: rows.map((row) => row.id).filter((id) => failed.has(id)),
+  };
 }
 
 function stripLookupFlag(results: ReviewedKeywordRow[]): KeywordReviewResult[] {
@@ -137,11 +195,13 @@ export async function reviewKeywordRows(options: {
   provider?: 'deepseek' | 'gateway';
   rows: KeywordReviewRow[];
   lookup?: boolean;
+  lookupBudget?: number;
   ruleEntries?: KeywordReviewRuleEntry[];
   rulesVersion?: number;
   reviewMode?: KeywordReviewMode;
-}): Promise<{ results: KeywordReviewResult[]; usage?: Record<string, number>; lookedUp: number }> {
+}): Promise<{ results: KeywordReviewResult[]; failedIds: string[]; usage?: Record<string, number>; lookupUsage?: Record<string, number>; lookedUp: number }> {
   const mode = options.reviewMode || 'image';
+  const lookup = options.lookup === true && (options.lookupBudget === undefined || options.lookupBudget > 0);
   const additions = formatKeywordReviewRuleAdditions(ruleEntriesForMode(options.ruleEntries || [], mode));
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/v1/chat/completions`, {
     method: 'POST',
@@ -150,11 +210,11 @@ export async function reviewKeywordRows(options: {
       model: options.model,
       temperature: 0.1,
       max_tokens: KEYWORD_REVIEW_MAX_TOKENS,
-      ...(options.provider !== 'gateway' ? { thinking: { type: 'disabled' }, reasoning_effort: 'none' } : {}),
+      ...(options.provider !== 'gateway' ? { thinking: { type: 'disabled' } } : {}),
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `${mode === 'video' ? buildVideoReviewPrompt() : buildSystemPrompt()}${additions}` },
-        { role: 'user', content: `请审核以下行：\n${JSON.stringify(options.rows)}` },
+        { role: 'system', content: `${mode === 'video' ? buildVideoReviewPrompt(lookup) : buildSystemPrompt(lookup)}${additions}` },
+        { role: 'user', content: `请审核以下行：\n${JSON.stringify(buildModelRows(options.rows))}` },
       ],
     }),
     signal: AbortSignal.timeout(10 * 60_000 + 30_000),
@@ -163,6 +223,8 @@ export async function reviewKeywordRows(options: {
   const data = await response.json();
   // Record provider usage before validating the answer: malformed output can
   // still be billed, and successful-only accounting hides that expense.
+  const reasoningTokens = Number(data.usage?.completion_tokens_details?.reasoning_tokens || 0);
+  if (reasoningTokens > 0) console.warn('[KeywordReviewUsage] thinking tokens were billed', reasoningTokens);
   console.info('[KeywordReviewUsage]', JSON.stringify({
     providerRequestId: typeof data.id === 'string' ? data.id : undefined,
     model: options.model,
@@ -182,9 +244,10 @@ export async function reviewKeywordRows(options: {
   } catch {
     throw new SyntaxError(`关键词审核模型 ${options.model} 返回了不完整 JSON，本批结果未写入`);
   }
-  const firstPass = validateResults(parsed, options.rows, mode);
-  if (!options.lookup) {
-    return { results: stripLookupFlag(firstPass), usage: data.usage, lookedUp: 0 };
+  const firstPass = validateResults(remapModelIds(parsed, options.rows), options.rows, mode);
+  const failedIds = firstPass.failedIds;
+  if (!lookup || firstPass.results.length === 0) {
+    return { results: stripLookupFlag(firstPass.results), failedIds, usage: data.usage, lookedUp: 0 };
   }
   try {
     const looked = await lookupUncertainCategories({
@@ -192,15 +255,16 @@ export async function reviewKeywordRows(options: {
       apiKey: options.apiKey,
       model: options.model,
       rows: options.rows,
-      results: firstPass,
+      results: firstPass.results,
       allowed: mode === 'video' ? VIDEO_CATEGORY_SET : CATEGORY_SET,
       categories: mode === 'video' ? [...VIDEO_CATEGORY_SET] : KEYWORD_REVIEW_CATEGORIES,
       rulesVersion: mode === 'video' ? -(options.rulesVersion ?? 0) - 1 : options.rulesVersion,
       ruleAdditions: additions,
+      maxLookups: Math.min(KEYWORD_REVIEW_LOOKUP_LIMIT, options.lookupBudget ?? KEYWORD_REVIEW_LOOKUP_LIMIT),
     });
-    return { results: looked.results, usage: data.usage, lookedUp: looked.lookedUp };
+    return { results: looked.results, failedIds, usage: data.usage, lookupUsage: looked.usage, lookedUp: looked.lookedUp };
   } catch {
-    return { results: stripLookupFlag(firstPass), usage: data.usage, lookedUp: 0 };
+    return { results: stripLookupFlag(firstPass.results), failedIds, usage: data.usage, lookedUp: 0 };
   }
 }
 

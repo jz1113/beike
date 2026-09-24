@@ -3,7 +3,7 @@ import { KEYWORD_VIDEO_CATEGORIES } from '@beike/contracts/generate';
 export const VIDEO_CATEGORY_SET = new Set<string>(KEYWORD_VIDEO_CATEGORIES);
 
 /** Video rules are independent of the existing image-and-text review contract. */
-export function buildVideoReviewPrompt(): string {
+export function buildVideoReviewPrompt(lookup = false): string {
   return `你是中文科普视频关键词的逐行审核员。理解每一行的真实语义，再判断唯一垂类、视频可制作性和低价值。不得只用关键词字面命中、旧「分类」列或同批多数结果代替逐行判断。
 
 最终垂类只能从以下 ${KEYWORD_VIDEO_CATEGORIES.length} 个原样选择一个：
@@ -30,7 +30,7 @@ ${KEYWORD_VIDEO_CATEGORIES.join('、')}
 
 视频可用讲解、屏幕录制、动作展示、图表和实拍承接；不得套用图文模式的「必须视频演示所以不制作」规则。只有低价值、违法危险、个体化诊疗/投资决策、无法核实的断言或确实缺乏有用信息增量时才判不制作。视频制作结论与垂类分别判断，不要因为归入情感、解梦或姓氏 / 取名就自动否决。
 
-categoryReason 用不超过 28 字说明主体与归类依据。rejectReason 仅「不制作」填写，使用「低价值、医疗诊疗、金融决策、违法危险、算命迷信、敏感热点、简单问答、工业硬广、限制过细」之一作前缀，加冒号和该行具体命中点；「制作」必须为空字符串。认不出专有作品、机构、品牌或外文实体时 needsLookup=true，其余 false。
+categoryReason 用 10-18 字说明主体与归类依据。rejectReason 仅「不制作」填写，使用「低价值、医疗诊疗、金融决策、违法危险、算命迷信、敏感热点、简单问答、工业硬广、限制过细」之一作前缀，加冒号和该行具体命中点；「制作」必须为空字符串。${lookup ? '认不出专有作品、机构、品牌或外文实体时 needsLookup=true，其余 false。' : ''}
 
-严格返回 JSON：{"results":[{"id":"原id","category":"唯一允许垂类","producible":"制作或不制作","lowValue":"是或否","categoryReason":"垂类短依据","rejectReason":"不制作依据或空字符串","needsLookup":false}]}。每个输入 id 恰好一次，不得遗漏。`;
+id 是本批序号，必须原样返回。严格返回 JSON：{"results":[{"id":"序号","category":"唯一允许垂类","producible":"制作或不制作","lowValue":"是或否","categoryReason":"垂类短依据","rejectReason":"不制作依据或空字符串"${lookup ? ',"needsLookup":false' : ''}}]}。每个输入 id 恰好一次，不得遗漏。`;
 }

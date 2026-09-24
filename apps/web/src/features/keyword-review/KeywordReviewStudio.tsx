@@ -205,7 +205,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                       aria-checked={review.lookupEnabled}
                       onClick={() => review.setLookupEnabled(!review.lookupEnabled)}
                       disabled={review.isRunning || review.modelProvider !== 'deepseek'}
-                      title={review.modelProvider === 'deepseek' ? '默认关闭。只补查认不出的作品、品牌、游戏、外文词和机构，每批最多 5 条。' : '联网补查仅支持 DeepSeek 官方模型'}
+                      title={review.modelProvider === 'deepseek' ? '默认关闭。只补查模型标成 needsLookup 的词，每批最多 2 条、每轮最多 100 条。按搜索网页计费，高峰时段更贵。' : '联网补查仅支持 DeepSeek 官方模型'}
                       className={`inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-bold transition disabled:opacity-40 ${review.lookupEnabled ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
                     >
                       不确定词联网补查
@@ -216,7 +216,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     ) : (
                       <>
                         <button type="button" onClick={() => void review.runReview('trial')} disabled={!canTrial} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"><Play className="h-4 w-4 fill-current" />{trialLabel}</button>
-                        <button type="button" onClick={() => void review.runReview('all')} disabled={!canRun} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"><Layers className="h-4 w-4" />{batchLabel}</button>
+                        <button type="button" onClick={() => void review.runReview('all')} disabled={!canRun} title={review.peakHour ? '当前是 DeepSeek 高峰时段，同样的词空闲时段大约便宜一半' : undefined} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"><Layers className="h-4 w-4" />{batchLabel}</button>
                         {review.counts.failed > review.counts.uncertain && <button type="button" onClick={review.retryFailed} title="仅重新审核已确认失败的记录；可能再次产生费用" className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-rose-200 bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100">重审失败 {review.counts.failed - review.counts.uncertain} 条</button>}
                       </>
                     )}
@@ -225,7 +225,8 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">当前按{review.reviewMode === 'video' ? '视频' : '图文'}规则审核，使用 {review.model}。已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。服务异常会用原提交标识核对结果；无法确认的批次隔离，不自动重新收费，其他词继续处理。{review.modelProvider === 'deepseek' ? '联网补查默认关闭，每批最多 5 条。' : '联网补查仅适用于 DeepSeek 官方模型。'}</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">当前按{review.reviewMode === 'video' ? '视频' : '图文'}规则审核，使用 {review.model}。已识别 {review.parsed.sheets.length} 个关键词工作表：{review.sheetSummary}。试跑每次 {review.batchSize} 条；批量审核每批 {review.batchSize} 条，从 4 个并行请求逐步加速，最多 {review.concurrency} 个，遇限流自动降速重试。服务异常会用原提交标识核对结果；无法确认的批次隔离，不自动重新收费，其他词继续处理。{review.modelProvider === 'deepseek' ? '联网补查默认关闭，只查 needsLookup，每批最多 2 条、每轮最多 100 条。' : '联网补查仅适用于 DeepSeek 官方模型。'}{review.peakHour ? ' 当前是高峰时段，空闲时段价格大约减半。' : ''}</p>
+                {(review.tokenUsage.cacheHit + review.tokenUsage.cacheMiss + review.tokenUsage.completion) > 0 && <p className="mt-1 text-xs font-semibold text-slate-600">本轮估算费用 ¥{review.estimatedCostLabel}{review.estimatedCost.peak ? '（高峰价）' : '（空闲价）'}，含缓存命中 {review.tokenUsage.cacheHit}、未命中 {review.tokenUsage.cacheMiss}、输出 {review.tokenUsage.completion} token。</p>}
                 {review.reviewMode === 'video' && <p className="mt-1 text-xs font-semibold text-rose-700">已标记低价值关键词 {review.counts.lowValue} 条；原表“分类”保留，新增“最终垂类”和“低价值关键词”结果列。</p>}
                 {review.counts.uncertain > 0 && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{review.counts.uncertain} 条提交结果待核对：已隔离，避免重复扣费。请导出当前进度并核对所用模型的用量。</p>}
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">

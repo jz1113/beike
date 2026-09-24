@@ -25,13 +25,13 @@ export function BatchStage4CopyPanel({
   const cw = item.copywriting || { title: '', content: '', tags: [] };
   return (
     <div className="lg:col-start-2 min-w-0 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 space-y-3">
-      {!readOnly && <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-        <button type="button" onClick={() => generateCopywritingForProduct(item)} disabled={item.isCopywritingGenerating}
+      <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+        {!readOnly && <button type="button" onClick={() => generateCopywritingForProduct(item)} disabled={item.isCopywritingGenerating}
           className="flex-1 py-2 px-2 rounded-xl text-xs font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
           title="重新为当前款生成小红书种草文案">
           <RefreshCw className={`w-3.5 h-3.5 ${item.isCopywritingGenerating ? 'animate-spin' : ''}`} />
           <span>{item.isCopywritingGenerating ? '生成中...' : '重写文案'}</span>
-        </button>
+        </button>}
         {handleExportSingleProductZip && (
           <button type="button" onClick={() => handleExportSingleProductZip(item)} disabled={isExportingZip || successCount === 0}
             className="flex-1 py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
@@ -40,7 +40,7 @@ export function BatchStage4CopyPanel({
             <span>导出本款</span>
           </button>
         )}
-      </div>}
+      </div>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

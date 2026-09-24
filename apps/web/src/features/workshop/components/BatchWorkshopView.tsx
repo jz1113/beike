@@ -13,6 +13,7 @@ import { BatchArchitectureConfirmDialog } from './BatchArchitectureConfirmDialog
 import { useAppStore } from '@/store';
 import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
 import type { WorkshopBatch } from '@beike/contracts/workshopBatches';
+import { exportBatchZip, exportBatchExcel, exportSingleProductZip, downloadSingleTaskImage } from '../model/batchRunnerExport';
 export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
 export default function BatchWorkshopView() {
@@ -22,6 +23,8 @@ export default function BatchWorkshopView() {
   const activeWorkshopTab = useAppStore(s => s.activeWorkshopTab);
   const setActiveWorkshopTab = useAppStore(s => s.setActiveWorkshopTab);
   const [historyGenerationBatch, setHistoryGenerationBatch] = useState<WorkshopBatch | null>(null);
+  const [isHistoryExporting, setIsHistoryExporting] = useState(false);
+  const [historyExportItemId, setHistoryExportItemId] = useState<string | null>(null);
   const [isArchitectureConfirmOpen, setIsArchitectureConfirmOpen] = useState(false);
   const {
     currentStage,
@@ -98,6 +101,7 @@ export default function BatchWorkshopView() {
     isExportingZip,
     exportingSingleItemId,
     handleExportZip,
+    handleExportExcel,
     handleExportSingleProductZip,
     handleDownloadSingleTaskImage,
     previewImageUrl,
@@ -127,6 +131,12 @@ export default function BatchWorkshopView() {
     renameBatch,
     readBatch,
   } = runner;
+  const historyExportDeps = {
+    setIsExportingZip: setIsHistoryExporting,
+    setExportingSingleItemId: setHistoryExportItemId,
+    setToastMsg: (msg: string | null) => { if (msg) showToast(msg); },
+    showToast,
+  };
   const readyProductCount = successfulItems.filter(i => i.selectedProductImages && i.selectedProductImages.length > 0).length;
   const stage2ConfigValue = useMemo((): BatchConfigContextValue => ({
     currentStage,
@@ -318,8 +328,12 @@ export default function BatchWorkshopView() {
                 successTaskCount={0}
                 failTaskCount={0}
               generateCopywritingForProduct={async () => {}}
-                isExportingZip={false}
-                handleExportZip={async () => {}}
+                isExportingZip={isHistoryExporting}
+                exportingSingleItemId={historyExportItemId}
+                handleExportZip={() => exportBatchZip(historyGenerationBatch.snapshot.items as BatchProductItem[], historyExportDeps)}
+                handleExportExcel={() => exportBatchExcel(historyGenerationBatch.snapshot.items as BatchProductItem[], historyExportDeps)}
+                handleExportSingleProductZip={(item) => exportSingleProductZip(item, historyExportDeps)}
+                handleDownloadSingleTaskImage={(url, filename) => downloadSingleTaskImage(url, filename, showToast)}
                 setPreviewImageUrl={setPreviewImageUrl}
                 onPreviewGallery={openGalleryPreview}
                 readOnly
@@ -397,6 +411,7 @@ export default function BatchWorkshopView() {
               isExportingZip={isExportingZip}
               exportingSingleItemId={exportingSingleItemId}
               handleExportZip={handleExportZip}
+              handleExportExcel={handleExportExcel}
               handleExportSingleProductZip={handleExportSingleProductZip}
               handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
               setPreviewImageUrl={setPreviewImageUrl}

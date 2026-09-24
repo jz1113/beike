@@ -1,6 +1,7 @@
 import {
   Loader2,
   FileSpreadsheet,
+  Download,
   Sparkles,
   Columns3,
   Image as ImageIcon,
@@ -32,6 +33,7 @@ export interface BatchStage4HeaderProps {
   setViewMode: (m: 'single' | 'gallery') => void;
   generateAllCopywriting?: () => Promise<void>;
   handleExportZip: () => Promise<void>;
+  handleExportExcel: () => Promise<void>;
   isExportingZip: boolean;
   successfulItems: BatchProductItem[];
   safeIndex: number;
@@ -51,6 +53,7 @@ export function BatchStage4Header({
   setViewMode,
   generateAllCopywriting,
   handleExportZip,
+  handleExportExcel,
   isExportingZip,
   readOnly = false,
   runControlStatus = 'idle',
@@ -121,16 +124,26 @@ export function BatchStage4Header({
             </button>
           )}
 
-          {!readOnly && <button
+          <button
             type="button"
             onClick={handleExportZip}
             disabled={isExportingZip || !hasExportableSuccess}
+            className="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 disabled:opacity-40"
+            title="打包下载已生成的图片和文案"
+          >
+            {isExportingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span>下载图片包</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExportingZip || !hasExportableSuccess}
             className="px-4 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-all shadow-xs hover:shadow-emerald-500/25 active:scale-98"
-            title="导出包含任务标题、任务文案、商品名称、商品ID与拆分后图链接1-4的 Excel 表格"
+            title="导出包含任务文案和分镜图片链接的 Excel 表格"
           >
             {isExportingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
             <span>导出 Excel</span>
-          </button>}
+          </button>
         </div>
       </div>
 

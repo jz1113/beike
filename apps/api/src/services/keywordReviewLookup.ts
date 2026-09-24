@@ -1,9 +1,12 @@
 import type { KeywordReviewResult, KeywordReviewRow } from '@beike/contracts/generate';
 import { normalizeGatewayBaseUrl } from '@beike/domain/gatewayUrl';
+import { getWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { gatewayFetch } from '../gateways/http';
+import { prisma } from '../repositories/db';
 import { clipReasonChars, LOOKUP_SUBJECT_MAX, rewriteLookupCategoryReason } from './keywordReviewReasons';
 
-export const KEYWORD_REVIEW_LOOKUP_LIMIT = 5;
+export const KEYWORD_REVIEW_LOOKUP_LIMIT = 2;
+export const KEYWORD_REVIEW_LOOKUP_RUN_LIMIT = 100;
 export const KEYWORD_REVIEW_LOOKUP_CONCURRENCY = 3;
 export const KEYWORD_REVIEW_LOOKUP_TIMEOUT_MS = 20_000;
 const LOOKUP_CACHE_LIMIT = 2000;
@@ -19,9 +22,37 @@ function cacheKey(query: string, rulesVersion = 0): string {
 
 export function resetLookupCacheForTests() {
   lookupCache.clear();
+  persistence = prismaPersistence;
 }
 
-export function rememberLookupCategory(query: string, category: string, subject?: string, rulesVersion = 0) {
+type LookupPersistence = {
+  read: (workspaceId: string, rulesVersion: number, queries: string[]) => Promise<Array<{ query: string; category: string; subject: string }>>;
+  write: (workspaceId: string, rulesVersion: number, query: string, hit: LookupHit) => Promise<void>;
+};
+
+const prismaPersistence: LookupPersistence = {
+  async read(workspaceId, rulesVersion, queries) {
+    const rows = await prisma.keywordLookupCache.findMany({
+      where: { workspaceId, rulesVersion, query: { in: queries } },
+    });
+    return rows.map((row) => ({ query: row.query, category: row.category, subject: row.subject }));
+  },
+  async write(workspaceId, rulesVersion, query, hit) {
+    await prisma.keywordLookupCache.upsert({
+      where: { workspaceId_rulesVersion_query: { workspaceId, rulesVersion, query } },
+      create: { workspaceId, rulesVersion, query, category: hit.category, subject: hit.subject || '' },
+      update: { category: hit.category, subject: hit.subject || '' },
+    });
+  },
+};
+
+let persistence: LookupPersistence = prismaPersistence;
+
+export function setLookupPersistenceForTests(store: LookupPersistence | null) {
+  persistence = store || prismaPersistence;
+}
+
+function rememberInMemory(query: string, category: string, subject?: string, rulesVersion = 0) {
   const key = cacheKey(query, rulesVersion);
   if (!key) return;
   if (lookupCache.size >= LOOKUP_CACHE_LIMIT) {
@@ -30,6 +61,29 @@ export function rememberLookupCategory(query: string, category: string, subject?
   }
   const clipped = clipReasonChars(subject || '', LOOKUP_SUBJECT_MAX) || undefined;
   lookupCache.set(key, { category, subject: clipped });
+}
+
+export async function storeLookupHit(query: string, category: string, subject?: string, rulesVersion = 0, workspaceId = getWorkspaceId()) {
+  rememberInMemory(query, category, subject, rulesVersion);
+  const key = query.trim();
+  const hit = key ? recalledLookupHit(key, rulesVersion) : undefined;
+  if (!workspaceId || !key || !hit) return;
+  await persistence.write(workspaceId, rulesVersion, key, hit);
+}
+
+export function rememberLookupCategory(query: string, category: string, subject?: string, rulesVersion = 0) {
+  void storeLookupHit(query, category, subject, rulesVersion).catch(() => undefined);
+}
+
+export async function hydrateLookupCache(queries: string[], rulesVersion = 0, workspaceId = getWorkspaceId()) {
+  const missing = [...new Set(queries.map((query) => query.trim()).filter((query) => query && !lookupCache.has(cacheKey(query, rulesVersion))))];
+  if (!workspaceId || missing.length === 0) return;
+  try {
+    const rows = await persistence.read(workspaceId, rulesVersion, missing);
+    for (const row of rows) rememberInMemory(row.query, row.category, row.subject, rulesVersion);
+  } catch {
+    /* A missing table must not block the first-pass review. */
+  }
 }
 
 export function recalledLookupCategory(query: string, rulesVersion = 0): string | undefined {
@@ -51,7 +105,7 @@ export function selectLookupRows(
   const picked: KeywordReviewRow[] = [];
   for (const result of results) {
     if (picked.length >= limit) break;
-    if (!result.needsLookup && result.category !== '其他') continue;
+    if (!result.needsLookup) continue;
     const row = byId.get(result.id);
     if (!row) continue;
     const key = row.query.trim();
@@ -146,6 +200,7 @@ async function lookupOneRow(options: {
   categories: readonly string[];
   rulesVersion?: number;
   ruleAdditions?: string;
+  usage?: Record<string, number>;
 }): Promise<LookupHit | undefined> {
   const cached = recalledLookupHit(options.row.query, options.rulesVersion);
   if (cached) return cached;
@@ -155,7 +210,6 @@ async function lookupOneRow(options: {
     body: JSON.stringify({
       model: options.model,
       thinking: { type: 'disabled' },
-      reasoning: { effort: 'none' },
       max_output_tokens: 256,
       tools: [{ type: 'web_search' }],
       input: [
@@ -175,6 +229,12 @@ async function lookupOneRow(options: {
   });
   if (!response.ok) return undefined;
   const data = await response.json();
+  const callUsage = (data.usage || {}) as Record<string, number>;
+  if (options.usage) {
+    options.usage.input_tokens += Number(callUsage.input_tokens || 0);
+    options.usage.output_tokens += Number(callUsage.output_tokens || 0);
+    options.usage.total_tokens += Number(callUsage.total_tokens || 0);
+  }
   console.info('[KeywordReviewLookupUsage]', JSON.stringify({
     providerRequestId: typeof data.id === 'string' ? data.id : undefined,
     model: options.model,
@@ -209,11 +269,15 @@ export async function lookupUncertainCategories(options: {
   categories: readonly string[];
   rulesVersion?: number;
   ruleAdditions?: string;
-}): Promise<{ results: KeywordReviewResult[]; lookedUp: number }> {
+  maxLookups?: number;
+}): Promise<{ results: KeywordReviewResult[]; lookedUp: number; usage: Record<string, number> }> {
+  const usage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
+  await hydrateLookupCache(options.rows.map((row) => row.query), options.rulesVersion);
   const withCache = applyCachedLookupCategories(options.results, options.rows, options.rulesVersion);
-  const targets = selectLookupRows(withCache, options.rows, KEYWORD_REVIEW_LOOKUP_LIMIT, options.rulesVersion);
+  const limit = Math.max(0, Math.min(options.maxLookups ?? KEYWORD_REVIEW_LOOKUP_LIMIT, KEYWORD_REVIEW_LOOKUP_LIMIT));
+  const targets = selectLookupRows(withCache, options.rows, limit, options.rulesVersion);
   if (targets.length === 0) {
-    return { results: withCache.map(toPublicResult), lookedUp: 0 };
+    return { results: withCache.map(toPublicResult), lookedUp: 0, usage };
   }
 
   const found = new Map<string, LookupHit>();
@@ -228,6 +292,7 @@ export async function lookupUncertainCategories(options: {
         categories: options.categories,
         rulesVersion: options.rulesVersion,
         ruleAdditions: options.ruleAdditions,
+        usage,
       });
       if (hit) found.set(row.query.trim(), hit);
     } catch {
@@ -242,5 +307,6 @@ export async function lookupUncertainCategories(options: {
       return toPublicResult(applyLookupHit(result, query ? found.get(query) : undefined));
     }),
     lookedUp: found.size,
+    usage,
   };
 }

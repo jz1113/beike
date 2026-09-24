@@ -65,6 +65,9 @@ test('uses reverse prompt structure while omitting the old scene when replaced',
   assert.doesNotMatch(full, /蓝色旧商品/);
   assert.doesNotMatch(replacedScene, /窗边木桌|左侧自然光/);
   assert.match(replacedScene, /平放在桌面中央/);
+  const expanded = buildTransferableGroupDetails(source, false, true);
+  assert.match(expanded, /窗边木桌/);
+  assert.doesNotMatch(expanded, /竖幅俯拍/);
 });
 
 test('locked four-shot group keeps order, camera and source scene', () => {

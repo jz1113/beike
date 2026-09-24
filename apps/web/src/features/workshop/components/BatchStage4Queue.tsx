@@ -28,6 +28,7 @@ interface Props {
   isExportingZip: boolean;
   exportingSingleItemId?: string | null;
   handleExportZip: () => Promise<void>;
+  handleExportExcel: () => Promise<void>;
   handleExportSingleProductZip?: (item: BatchProductItem) => Promise<void>;
   handleDownloadSingleTaskImage?: (url: string, filename?: string) => Promise<void>;
   setPreviewImageUrl: (url: string | null) => void;
@@ -63,6 +64,7 @@ export default function BatchStage4Queue({
   retrySingleShotTask,
   isExportingZip,
   handleExportZip,
+  handleExportExcel,
   handleExportSingleProductZip,
   handleDownloadSingleTaskImage,
   setPreviewImageUrl,
@@ -145,6 +147,7 @@ export default function BatchStage4Queue({
         setViewMode={setViewMode}
         generateAllCopywriting={generateAllCopywriting}
         handleExportZip={handleExportZip}
+        handleExportExcel={handleExportExcel}
         isExportingZip={isExportingZip}
         successfulItems={successfulItems}
         safeIndex={safeIndex}

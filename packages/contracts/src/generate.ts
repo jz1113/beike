@@ -176,6 +176,7 @@ export const KeywordReviewRequestSchema = z.object({
   customBaseUrl: z.string().optional(),
   customApiKey: z.string().optional(),
   lookup: z.boolean().optional(),
+  lookupBudget: z.number().int().min(0).max(100).optional(),
   rulesVersion: z.number().int().nonnegative().optional(),
 });
 

@@ -21,17 +21,20 @@ export async function tryNativeOfflineZip(
   items: BatchProductItem[],
   filename: string,
   onProgress: (msg: string) => void,
-): Promise<void> {
-  await exportZipDownload({
+): Promise<{ completed: number; total: number } | null> {
+  return exportZipDownload({
     offlineMatrix: true,
+    batchTitle: '贝壳云图_批量生图矩阵',
     products: items.map(item => ({
-      id: item.id,
-      itemId: item.itemId,
+      skuId: item.itemId || item.id,
+      currentName: item.itemId || item.id,
       title: item.title,
-      copywriting: item.copywriting,
+      copywritingTitle: item.copywriting?.title,
+      copywritingContent: item.copywriting?.content,
+      copywritingTags: item.copywriting?.tags,
       images: (item.tasks || [])
         .filter(task => task.status === 'SUCCESS' && task.resultUrl)
-        .map(task => ({ url: toStoragePath(task.resultUrl!), shotNo: task.shot_no })),
+        .map(task => ({ url: toStoragePath(task.resultUrl!), shotNo: task.shot_no, filename: `分镜${task.shot_no}.${task.resultUrl!.split('?')[0].split('.').pop() || 'png'}` })),
     })),
   }, filename, (progress) => {
     onProgress(progress.phase === 'saving' ? '正在保存' : '正在打包');

@@ -1,5 +1,5 @@
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
 import type { BatchProductItem } from './batchTypes';
 
 export interface MatrixExportRow {
@@ -11,10 +11,16 @@ export interface MatrixExportRow {
   '图链接2': string;
   '图链接3': string;
   '图链接4': string;
+  '图链接5': string;
+  '图链接6': string;
+  '图链接7': string;
+  '图链接8': string;
 }
 
 export async function ensurePermanentImageUrl(url: string, filename: string): Promise<string> {
   if (!url) return url;
+  // 已保存的工作区文件无需再次上传；直接导出可在当前站点访问的绝对地址。
+  if (url.startsWith('/storage/')) return new URL(proxyMediaUrl(url), window.location.origin).href;
   const looksAlreadyPermanent = /^(https?:)?\/\//i.test(url)
     && !url.startsWith('blob:')
     && !url.startsWith('data:')
@@ -55,10 +61,10 @@ export async function ensurePermanentImageUrl(url: string, filename: string): Pr
 }
 
 function slotUrls(item: BatchProductItem): string[] {
-  const slots = ['', '', '', ''];
+  const slots = Array<string>(8).fill('');
   for (const task of item.tasks || []) {
     const index = (task.shot_no ?? 0) - 1;
-    if (index < 0 || index > 3) continue;
+    if (index < 0 || index >= slots.length) continue;
     if (task.status === 'SUCCESS' && task.resultUrl) slots[index] = task.resultUrl;
   }
   return slots;
@@ -85,7 +91,7 @@ export async function buildMatrixExportRows(
     if (!opts?.offline) {
       finalUrls.forEach((permanentUrl, idx) => {
         const task = (item.tasks || []).find(entry => entry.shot_no === idx + 1);
-        if (task && permanentUrl && task.resultUrl !== permanentUrl) task.resultUrl = permanentUrl;
+        if (task && permanentUrl && task.resultUrl !== permanentUrl && !task.resultUrl?.startsWith('/storage/')) task.resultUrl = permanentUrl;
       });
     }
 
@@ -98,6 +104,10 @@ export async function buildMatrixExportRows(
       '图链接2': finalUrls[1] || '',
       '图链接3': finalUrls[2] || '',
       '图链接4': finalUrls[3] || '',
+      '图链接5': finalUrls[4] || '',
+      '图链接6': finalUrls[5] || '',
+      '图链接7': finalUrls[6] || '',
+      '图链接8': finalUrls[7] || '',
     });
     onProgress?.(i + 1, items.length);
   }

@@ -36,6 +36,18 @@ CREATE TABLE IF NOT EXISTS "KeywordReviewRuleRevision" (
 CREATE UNIQUE INDEX IF NOT EXISTS "KeywordReviewRuleRevision_workspaceId_version_key" ON "KeywordReviewRuleRevision"("workspaceId", "version");
 CREATE INDEX IF NOT EXISTS "KeywordReviewRuleRevision_workspaceId_createdAt_idx" ON "KeywordReviewRuleRevision"("workspaceId", "createdAt");
 `;
+const keywordLookupCacheSql = `
+CREATE TABLE IF NOT EXISTS "KeywordLookupCache" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "workspaceId" TEXT NOT NULL,
+  "rulesVersion" INTEGER NOT NULL,
+  "query" TEXT NOT NULL,
+  "category" TEXT NOT NULL,
+  "subject" TEXT NOT NULL DEFAULT '',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "KeywordLookupCache_workspaceId_rulesVersion_query_key" ON "KeywordLookupCache"("workspaceId", "rulesVersion", "query");
+`;
 const contentPromptGroupSql = `
 ALTER TABLE "FullPromptAsset" ADD COLUMN "sourceImageIndices" TEXT;
 ALTER TABLE "FullPromptAsset" ADD COLUMN "groupIndex" INTEGER;
@@ -230,6 +242,14 @@ export const desktopMigrations: readonly DatabaseMigration[] = [{
   checksum: createHash('sha256').update(keywordReviewRuleSql).digest('hex'),
   apply: async db => {
     for (const statement of keywordReviewRuleSql.split(';').map(s => s.trim()).filter(Boolean)) {
+      await db.$executeRawUnsafe(statement);
+    }
+  },
+}, {
+  version: '20260924_01_keyword_lookup_cache',
+  checksum: createHash('sha256').update(keywordLookupCacheSql).digest('hex'),
+  apply: async db => {
+    for (const statement of keywordLookupCacheSql.split(';').map(s => s.trim()).filter(Boolean)) {
       await db.$executeRawUnsafe(statement);
     }
   },

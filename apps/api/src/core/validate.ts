@@ -96,6 +96,7 @@ interface ExportImageItem {
 
 export interface ExportZipBody {
   batchTitle?: string;
+  offlineMatrix?: boolean;
   /** 图片/视频下载并发数，默认 16（最高），上限 16 */
   downloadConcurrency?: number;
   products?: Array<{
@@ -220,6 +221,7 @@ export function parseExportZipBody(body: unknown):
 
     const data: ExportZipBody = {
       batchTitle: safeOptionalString(body.batchTitle, 200) || '全渠道采集批量导出',
+      offlineMatrix: body.offlineMatrix === true,
       downloadConcurrency,
       skuId: safeOptionalString(body.skuId, 128),
       folderName: safeOptionalString(body.folderName, 300),

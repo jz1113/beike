@@ -18,15 +18,15 @@ test('video category list is exact and its prompt handles personal dreams separa
 });
 
 test('video result requires low-value marking and a category from its own list', () => {
-  assert.equal(validateResults({ results: [candidate] }, rows, 'video')[0].lowValue, '否');
-  assert.throws(() => validateResults({ results: [{ ...candidate, category: '宠物健康' }] }, rows, 'video'), /非法垂类/);
-  assert.throws(() => validateResults({ results: [{ ...candidate, lowValue: undefined }] }, rows, 'video'), /低价值标记/);
-  assert.throws(() => validateResults({ results: [{ ...candidate, lowValue: '是' }] }, rows, 'video'), /不能标为制作/);
+  assert.equal(validateResults({ results: [candidate] }, rows, 'video').results[0].lowValue, '否');
+  assert.deepEqual(validateResults({ results: [{ ...candidate, category: '宠物健康' }] }, rows, 'video').failedIds, ['row:2']);
+  assert.deepEqual(validateResults({ results: [{ ...candidate, lowValue: undefined }] }, rows, 'video').failedIds, ['row:2']);
+  assert.deepEqual(validateResults({ results: [{ ...candidate, lowValue: '是' }] }, rows, 'video').failedIds, ['row:2']);
 });
 
 test('low-value video result is rejected for production and retains its mark', () => {
   const low = { ...candidate, category: '解梦', producible: '不制作', lowValue: '是', rejectReason: '低价值：单纯个人梦境描述' };
-  const result = validateResults({ results: [low] }, rows, 'video')[0];
+  const result = validateResults({ results: [low] }, rows, 'video').results[0];
   assert.equal(result.producible, '不制作');
   assert.equal(result.lowValue, '是');
 });

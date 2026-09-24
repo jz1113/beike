@@ -14,6 +14,7 @@ import {
   shouldAutoSelectJewelryArch,
 } from '@beike/domain/jewelryArch';
 import {
+  exportBatchZip,
   exportBatchExcel,
   exportSingleProductZip,
   downloadSingleTaskImage,
@@ -480,7 +481,7 @@ export function useBatchWorkshopRunner() {
 
   // 导出
   const handleExportZip = async () => {
-    await exportBatchExcel(itemsRef.current, {
+    await exportBatchZip(itemsRef.current, {
       setIsExportingZip,
       setExportingSingleItemId,
       setToastMsg: () => {},

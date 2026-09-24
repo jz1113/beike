@@ -232,10 +232,12 @@ export function sourcePromptSection(prompt: string, heading: string): string {
   return match?.[1]?.trim() || '';
 }
 
-export function buildTransferableGroupDetails(prompt: string, replaceScene = false): string {
-  const headings = replaceScene
-    ? ['动作或摆放', '构图镜头']
-    : ['动作或摆放', '场景结构', '光影', '构图镜头'];
+export function buildTransferableGroupDetails(prompt: string, replaceScene = false, isExpansion = false): string {
+  const headings = [
+    '动作或摆放',
+    ...replaceScene ? [] : ['场景结构', '光影'],
+    ...isExpansion ? [] : ['构图镜头'],
+  ];
   const details = headings.map((heading) => {
     const value = sourcePromptSection(prompt, heading);
     return value ? `【${heading}】${value}` : '';

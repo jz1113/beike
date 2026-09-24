@@ -6,9 +6,9 @@ import {
   rewriteLookupCategoryReason,
 } from './keywordReviewReasons.ts';
 
-test('normalizeCategoryReason trims and clips to 28 characters', () => {
+test('normalizeCategoryReason trims and clips to 18 characters', () => {
   assert.equal(normalizeCategoryReason('  被选的是手机，不是游戏内容  '), '被选的是手机，不是游戏内容');
-  assert.equal(normalizeCategoryReason('一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十'), '一二三四五六七八九十一二三四五六七八九十一二三四五六七八');
+  assert.equal(normalizeCategoryReason('一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十'), '一二三四五六七八九十一二三四五六七八');
   assert.throws(() => normalizeCategoryReason('  '), /垂类依据/);
 });
 
@@ -21,6 +21,7 @@ test('normalizeRejectReason keeps empty string for producible rows', () => {
 test('normalizeRejectReason requires a known prefix and a hit', () => {
   assert.equal(normalizeRejectReason('不制作', '简单问答：只确认一个身份'), '简单问答：只确认一个身份');
   assert.equal(normalizeRejectReason('不制作', '非笔记需求: 平台绑卡操作'), '非笔记需求：平台绑卡操作');
+  assert.equal(normalizeRejectReason('不制作', '这是简单问答，只确认一个身份'), '简单问答：只确认一个身份');
   assert.throws(() => normalizeRejectReason('不制作', '不适合做成笔记'), /否决类型/);
   assert.throws(() => normalizeRejectReason('不制作', '低价值：'), /命中点/);
 });
