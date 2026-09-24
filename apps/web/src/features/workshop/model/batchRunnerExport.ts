@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
 import { saveToDownloadDir } from '@/shared/media/saveDownload';
 import type { BatchProductItem } from './batchTypes';
+import { isUsableWorkshopResult } from './workshopReadiness';
 import { blobExtFromMime, sanitizeShotTitle } from './batchRunnerIo';
 import { buildMatrixExportRows } from './batchMatrixExport';
 import { canNativeOfflineExport, tryNativeOfflineZip } from './batchZipNative';
@@ -18,7 +19,7 @@ export interface BatchExportDeps {
 }
 
 function productsWithTasks(items: BatchProductItem[]) {
-  return items.filter(item => item.selected && (item.tasks || []).some(task => task.status === 'SUCCESS' || task.status === 'FAILURE'));
+  return items.filter(item => item.selected && (item.tasks || []).some(task => task.resultStatus !== 'superseded' && (isUsableWorkshopResult(task) || task.status === 'FAILURE')));
 }
 
 function zipFileName(prefix: string) {
@@ -72,10 +73,10 @@ async function exportClientZip(items: BatchProductItem[], deps: BatchExportDeps)
     const folderName = `${item.itemId}_${safeTitle}`;
     const productFolder = zip.folder(folderName);
     if (!productFolder) continue;
-    for (const task of (item.tasks || []).filter(entry => entry.status === 'SUCCESS' || entry.status === 'FAILURE')) {
+    for (const task of (item.tasks || []).filter(entry => entry.resultStatus !== 'superseded' && (isUsableWorkshopResult(entry) || entry.status === 'FAILURE'))) {
       const baseName = `分镜${task.shot_no}_${sanitizeShotTitle(task.title, `镜头${task.shot_no}`)}`;
-      if (task.status === 'SUCCESS' && task.resultUrl) {
-        pending.push({ url: task.resultUrl, folder: productFolder, folderName, baseName, shotNo: task.shot_no, itemId: item.id });
+      if (isUsableWorkshopResult(task)) {
+        pending.push({ url: task.resultUrl!, folder: productFolder, folderName, baseName, shotNo: task.shot_no, itemId: item.id });
       } else imageFail++;
     }
     if (item.copywriting) {
@@ -112,7 +113,7 @@ async function exportClientZip(items: BatchProductItem[], deps: BatchExportDeps)
 
 export async function exportBatchZip(items: BatchProductItem[], deps: BatchExportDeps) {
   const ready = productsWithTasks(items);
-  if (!ready.some(item => (item.tasks || []).some(task => task.status === 'SUCCESS' && task.resultUrl))) {
+  if (!ready.some(item => (item.tasks || []).some(isUsableWorkshopResult))) {
     deps.showToast('当前没有已成功生成的图片可供打包导出');
     return;
   }
@@ -173,7 +174,7 @@ export async function exportBatchExcel(items: BatchProductItem[], deps: BatchExp
 }
 
 export async function exportSingleProductZip(item: BatchProductItem, deps: BatchExportDeps) {
-  const successTasks = (item.tasks || []).filter(task => task.status === 'SUCCESS' && task.resultUrl);
+  const successTasks = (item.tasks || []).filter(isUsableWorkshopResult);
   if (successTasks.length === 0) {
     deps.showToast('该商品暂无已成功的生成图片可供导出');
     return;

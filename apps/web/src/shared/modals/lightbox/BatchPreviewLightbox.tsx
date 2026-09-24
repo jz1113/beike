@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { proxyMediaUrl } from '@/shared/api/apiClient';
 import {
   X,
@@ -23,11 +24,34 @@ export function BatchPreviewLightbox({
   setGalleryIndex,
   handleDownloadSingleTaskImage,
 }: BatchPreviewLightboxProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const isOpen = Boolean(previewImageUrl || previewGallery);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [isOpen]);
   // 键盘事件快捷切换或关闭大图预览
   useEffect(() => {
     if (!previewImageUrl && !previewGallery) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (['Escape', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+      if (e.key === 'Tab') {
+        const buttons = dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+        if (buttons?.length) {
+          const first = buttons[0];
+          const last = buttons[buttons.length - 1];
+          if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { e.preventDefault(); first.focus(); }
+        }
+      } else if (e.key === 'Escape') {
         closeGalleryPreview();
       } else if (e.key === 'ArrowLeft') {
         if (previewGallery && previewGallery.images.length > 1) {
@@ -49,19 +73,24 @@ export function BatchPreviewLightbox({
     ? previewGallery.images[previewGallery.currentIndex]
     : previewImageUrl;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-60 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-between p-4 sm:p-6 animate-in fade-in duration-200 select-none"
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      className="fixed inset-0 z-[200] outline-none bg-black/90 backdrop-blur-sm flex flex-col items-center justify-between p-4 sm:p-6 animate-in fade-in duration-200 select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) closeGalleryPreview();
       }}
     >
       {/* 顶栏操作条 */}
-      <div className="w-full max-w-6xl flex items-center justify-between text-white/90 py-2 z-10">
-        <div className="flex items-center gap-3">
-          <span className="text-xs sm:text-sm font-bold bg-white/10 px-3 py-1 rounded-full backdrop-blur-md">
+      <div className="w-full max-w-6xl shrink-0 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 text-white/90 pb-3 z-10">
+        <div className="min-w-0 flex flex-col items-start gap-2">
+          <h2 id={titleId} className="max-h-[25dvh] w-full overflow-y-auto whitespace-normal break-words [overflow-wrap:anywhere] text-xs sm:text-sm font-semibold leading-6 text-white select-text">
             {previewGallery?.title || '图片高清大图预览'}
-          </span>
+          </h2>
           {previewGallery && previewGallery.images.length > 1 && (
             <span className="text-xs font-mono bg-indigo-600/80 text-white px-2.5 py-0.5 rounded-full font-bold">
               {previewGallery.currentIndex + 1} / {previewGallery.images.length}
@@ -69,7 +98,7 @@ export function BatchPreviewLightbox({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={() => {
@@ -159,6 +188,8 @@ export function BatchPreviewLightbox({
           {previewGallery.images.map((img, idx) => (
             <button
               key={idx}
+              aria-label={`查看第 ${idx + 1} 张图片`}
+              aria-pressed={idx === previewGallery.currentIndex}
               type="button"
               onClick={() => setGalleryIndex(idx)}
               className={`w-12 h-12 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
@@ -167,11 +198,12 @@ export function BatchPreviewLightbox({
                   : 'border-transparent opacity-40 hover:opacity-80'
               }`}
             >
-              <img src={proxyMediaUrl(img)} className="w-full h-full object-cover" />
+              <img src={proxyMediaUrl(img)} alt="" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -4,6 +4,7 @@ import {
   Settings2, 
   CheckCircle2,
 } from 'lucide-react';
+import type { GenerationStrategy } from '../model/batchTypes';
 import { WorkshopAssetBindings } from './WorkshopAssetBindings';
 
 export interface WorkshopSettingsModalProps {
@@ -24,6 +25,8 @@ export interface WorkshopSettingsModalProps {
   selectedImageGenModel: string;
   setSelectedImageGenModel: (m: string) => void;
   availableImageModels: Array<{ id: string; name?: string; shortName?: string }>;
+  generationStrategy: GenerationStrategy;
+  setGenerationStrategy: (strategy: GenerationStrategy) => void;
   autoGenerateCopywriting: boolean;
   setAutoGenerateCopywriting: (enabled: boolean) => void;
   imageGenConcurrency: number;
@@ -69,6 +72,8 @@ export function WorkshopSettingsModal({
   selectedImageGenModel,
   setSelectedImageGenModel,
   availableImageModels,
+  generationStrategy,
+  setGenerationStrategy,
   autoGenerateCopywriting,
   setAutoGenerateCopywriting,
   imageGenConcurrency,
@@ -152,6 +157,20 @@ export function WorkshopSettingsModal({
                   {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </label>
+              <fieldset className="mt-3">
+                <legend className="mb-2 text-xs font-bold text-slate-700">生图策略</legend>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {([
+                    ['grid_first', '四宫格生成 4 镜', '一次生成四宫格后拆为 4 张；画质设置用于整图。'],
+                    ['single_shot', '单张逐镜生成', '每镜独立生成一张完整图片，支持 4 镜或 8 镜。'],
+                  ] as const).map(([value, title, description]) => (
+                    <label key={value} className={`flex cursor-pointer gap-2 rounded-xl border p-3 ${generationStrategy === value ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-white'}`}>
+                      <input type="radio" name="workshop-generation-strategy" value={value} checked={generationStrategy === value} onChange={() => { if (value === 'grid_first' && selectedShotCount !== 4) setSelectedShotCount(4); setGenerationStrategy(value); }} className="mt-0.5 accent-indigo-600" />
+                      <span><span className="block text-xs font-bold">{title}</span><span className="mt-1 block text-[11px] text-slate-500">{description}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <div className="mt-3 grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                 <div className="py-2 sm:py-0 sm:pr-4">
                   <span className="mb-1.5 block text-xs font-bold text-slate-700">出图画幅</span>
@@ -164,7 +183,7 @@ export function WorkshopSettingsModal({
                 <label className="flex items-center justify-between gap-3 py-2 sm:px-4 sm:py-0">
                   <span className="shrink-0 text-xs font-bold text-slate-700">分镜数量</span>
                   <select value={selectedShotCount} onChange={e => setSelectedShotCount(parseInt(e.target.value, 10))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500">
-                    {[4, 8].map(cnt => <option key={cnt} value={cnt}>{cnt === 8 ? '8 镜（原组扩写）' : '4 镜（原组）'}</option>)}
+                    {(generationStrategy === 'grid_first' ? [4] : [4, 8]).map(cnt => <option key={cnt} value={cnt}>{cnt === 8 ? '8 镜（原组扩写）' : '4 镜（原组）'}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0">

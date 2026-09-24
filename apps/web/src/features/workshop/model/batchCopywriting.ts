@@ -2,6 +2,7 @@ import { apiFetch } from '@/shared/api/apiClient';
 import { getEnabledMultimodalModelsFromSettings, isOpenAIModelRouteId, upstreamModelId } from '@beike/domain/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracker';
 import type { BatchProductItem } from './batchTypes';
+import { isUsableWorkshopResult } from './workshopReadiness';
 
 export interface CopywritingContext {
   getItems: () => BatchProductItem[];
@@ -31,7 +32,7 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
     .filter(product => product.id !== item.id && product.copywriting?.title)
     .map(product => product.copywriting!.title);
   const generatedImages = (item.tasks || [])
-    .filter(task => task.status === 'SUCCESS' && task.resultUrl)
+    .filter(isUsableWorkshopResult)
     .map(task => task.resultUrl!);
   const effectiveImages = generatedImages.length > 0
     ? generatedImages.slice(0, 2)
@@ -58,14 +59,12 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
       }),
     });
     const data = await res.json().catch(() => ({}));
-    const latest = ctx.getItems().find(product => product.id === item.id);
-    const preserved = latest?.copywriting;
 
     if (!res.ok || !data.success || data.fromFallback || !isCompleteCopy(data.data)) {
       const error = data.fromFallback
         ? '模型未返回有效文案，禁止使用本地模板冒充成功'
         : data.error || (!data.data || !isCompleteCopy(data.data) ? '需要完整标题和正文' : '文案生成失败');
-      patchItem(ctx, item.id, { isCopywritingGenerating: false, copywriting: preserved, copywritingError: error });
+      patchItem(ctx, item.id, { isCopywritingGenerating: false, copywritingError: error });
       return false;
     }
 
@@ -80,25 +79,20 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
       totalTokens: usage.totalTokens ?? usage.total_tokens ?? 0,
       success: true,
     });
-    if (!ctx.force && JSON.stringify(latest?.copywriting || null) !== startedCopy) {
-      patchItem(ctx, item.id, { isCopywritingGenerating: false });
-      return true;
-    }
-    patchItem(ctx, item.id, {
-      isCopywritingGenerating: false,
-      copywritingError: undefined,
-      copywriting: {
-        title: data.data.title,
-        content: data.data.content,
-        tags: data.data.tags || [],
-      },
-    });
+    // A requested rewrite may replace the starting copy, but never edits made
+    // while the request was in flight. Compare inside the state update itself.
+    ctx.setItems(previous => previous.map(current => {
+      if (current.id !== item.id) return current;
+      if (JSON.stringify(current.copywriting || null) !== startedCopy) {
+        return { ...current, isCopywritingGenerating: false };
+      }
+      return { ...current, isCopywritingGenerating: false, copywritingError: undefined,
+        copywriting: { title: data.data.title, content: data.data.content, tags: data.data.tags || [] } };
+    }));
     return true;
   } catch (err) {
-    const latest = ctx.getItems().find(product => product.id === item.id);
     patchItem(ctx, item.id, {
       isCopywritingGenerating: false,
-      copywriting: latest?.copywriting,
       copywritingError: err instanceof Error ? err.message : '文案生成异常',
     });
     return false;
@@ -132,27 +126,31 @@ export function updateItemCopywriting(
 
 async function runCopywritingBatch(ctx: CopywritingContext): Promise<void> {
   const pendingItems = ctx.getItems().filter(item =>
-    (item.tasks || []).some(task => task.status === 'SUCCESS' && task.resultUrl) && (ctx.force || !item.copywriting?.content)
+    item.selected && (item.tasks || []).some(isUsableWorkshopResult) && (ctx.force || !isCompleteCopy(item.copywriting))
   );
   if (pendingItems.length === 0) {
-    ctx.showToast(ctx.force ? '没有可重写文案的商品' : '所有商品都已有文案');
+    ctx.showToast(ctx.force ? '没有可重写文案的商品' : '所选商品暂无需要补全文案的有效成图');
     return;
   }
   ctx.showToast(`正在为 ${pendingItems.length} 款商品批量生成小红书种草文案...`);
-  const concurrency = Math.min(ctx.analyzeConcurrency || 2, pendingItems.length);
+  const concurrency = Math.min(Math.max(1, Math.floor(ctx.analyzeConcurrency || 2)), pendingItems.length);
   const queue = [...pendingItems];
   let success = 0;
   let failed = 0;
+  let skipped = 0;
   await Promise.all(Array.from({ length: concurrency }, async () => {
     while (queue.length > 0) {
       if (ctx.isAborted?.()) break;
       const item = queue.shift();
       if (!item) break;
-      if (await generateCopywritingForProduct(item, ctx)) success += 1;
+      const latest = ctx.getItems().find(product => product.id === item.id);
+      if (!latest?.selected || !(latest.tasks || []).some(isUsableWorkshopResult)
+        || (!ctx.force && isCompleteCopy(latest.copywriting))) { skipped += 1; continue; }
+      if (await generateCopywritingForProduct(latest, ctx)) success += 1;
       else failed += 1;
     }
   }));
-  const suffix = failed > 0 ? `，失败 ${failed} 款，可重试` : '';
+  const suffix = (failed > 0 ? `，失败 ${failed} 款，可重试` : '') + (queue.length + skipped ? `，未执行 ${queue.length + skipped} 款` : '');
   ctx.showToast(`文案生成结束：成功 ${success} 款${suffix}`);
 }
 

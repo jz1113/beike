@@ -1,7 +1,10 @@
+import { checkWorkshopReadiness } from './workshopReadiness';
+import { runGridImageTask } from './batchGridGeneration';
 import { waitWhilePaused } from '@/shared/api/generationAbort';
 import type { ShotPrompt } from '@beike/domain/vision';
 import type { BatchProductItem, BatchTaskItem, GenerationStrategy } from './batchTypes';
-import { runBatchGenerationWorkers, runRetryFailedGenerationWorkers } from './batchImageGeneration';
+import { runGenerationJobs } from './batchImageGeneration';
+import { buildBatchGenerationJobs } from './batchGenerationJobs';
 import {
   executeSingleImageTask,
   type TaskExecutionConfig,
@@ -60,9 +63,11 @@ async function runSelectedShots(
   bumpProgress: (ok: boolean, n?: number) => void
 ) {
   for (const shot of shots) {
+    if (config.isAborted()) break;
     if (config.isPaused) await waitWhilePaused(config.isPaused, config.isAborted);
+    if (config.isAborted()) break;
     const liveTask = (item.tasks || []).find((task) => task.shot_no === shot.shot_no);
-    if (liveTask && !needsGenerationSubmit(liveTask)) {
+    if (liveTask?.status === 'SUCCESS' && liveTask.resultUrl) {
       bumpProgress(true, 1);
       continue;
     }
@@ -73,6 +78,7 @@ async function runSelectedShots(
       const generated = await executeSingleImageTask(item, shot, undefined, {
         ...config,
         idempotencyKey: liveTask?.idempotencyKey || config.idempotencyKey,
+        onTaskSubmitted: (upstreamTaskId) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no ? { ...task, upstreamTaskId } : task)),
       });
       patchItemTasks(setItems, item.id, (tasks) =>
         tasks.map((task) =>
@@ -126,18 +132,10 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
     return;
   }
 
-  const notReady = latestSuccessful.filter(
-    (item) => !item.analyzedSuccess || !item.prompts || item.prompts.length === 0
-  );
-  const shotCountMismatch = latestSuccessful.filter(
-    (item) => item.analyzedSuccess && (item.prompts || []).filter((shot) => shot.selected !== false).length !== config.selectedShotCount
-  );
-  if (notReady.length > 0) {
-    showToast(`🚨 生产安全阻断：有 ${notReady.length} 款商品尚未完成「AI 提示词分析」，严禁启动生图队列！请先在步骤3完成分析`);
-    return;
-  }
-  if (shotCountMismatch.length > 0) {
-    showToast(`有 ${shotCountMismatch.length} 款商品的分镜数与当前镜数不一致，请重新分析后再生图`);
+  const readiness = checkWorkshopReadiness(latestSuccessful, { generationStrategy: deps.generationStrategy, selectedShotCount: config.selectedShotCount });
+  if (!readiness.canGenerate) {
+    const issue = readiness.issues[0];
+    showToast(`${issue.title}：${issue.reason}`);
     return;
   }
 
@@ -157,6 +155,7 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
           model: config.selectedImageGenModel,
           aspectRatio: config.selectedAspect,
           quality: config.selectedQuality,
+          generationStrategy: deps.generationStrategy,
         }),
       };
     });
@@ -192,23 +191,16 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
     const isPaused = () => runControlRef.current.status === 'paused';
     const taskConfig = { ...config, isAborted, isPaused };
 
-    const concurrency = Math.min(imageGenConcurrency || 4, latestSuccessful.length);
-    await runBatchGenerationWorkers({
-      items: latestSuccessful,
-      concurrency,
-      isAborted,
-      isPaused,
-      generateItem: async (currentItem) => {
-        const live = itemsRef.current.find((item) => item.id === currentItem.id) || currentItem;
-        const shots = selectedShots(live);
-        const pendingShots = shots.filter((shot) => {
-          const task = (live.tasks || []).find((entry) => entry.shot_no === shot.shot_no);
-          return !task || needsGenerationSubmit(task);
-        });
-        if (pendingShots.length === 0) return;
-        await runSelectedShots(live, pendingShots, {
+    const jobs = buildBatchGenerationJobs(
+      mergedItems.filter((item) => item.selected && item.status === 'success'), deps.generationStrategy,
+    );
+    await runGenerationJobs({
+      jobs, concurrency: imageGenConcurrency || 4, isAborted, isPaused,
+      execute: async ({ item, shots }) => {
+        const execute = deps.generationStrategy === 'grid_first' ? runGridImageTask : runSelectedShots;
+        await execute(item, shots, {
           ...taskConfig,
-          idempotencyKey: live.tasks.find((task) => pendingShots.some((shot) => shot.shot_no === task.shot_no))?.idempotencyKey,
+          idempotencyKey: item.tasks.find((task) => shots.some((shot) => shot.shot_no === task.shot_no))?.idempotencyKey,
         }, setItems, bumpProgress);
       },
     });
@@ -284,7 +276,7 @@ export async function retryFailedImageTasksCoordinator(
       if (task.status !== 'FAILURE') return task;
       const attempt = (task.attempt || 0) + 1;
       const base = (task.idempotencyKey || `${task.id}`).replace(/:a\d+$/, '');
-      return { ...task, status: 'IN_PROGRESS' as const, error: undefined, recoveryRequired: false, attempt, idempotencyKey: `${base}:a${attempt}` };
+      return { ...task, status: 'PENDING' as const, error: undefined, recoveryRequired: false, attempt, idempotencyKey: `${base}:a${attempt}` };
     });
     const preparedItems = failedItems.map((item) => ({ ...item, tasks: bumpFailed(item.tasks || []) }));
     const preparedById = new Map(preparedItems.map((item) => [item.id, item]));
@@ -294,24 +286,27 @@ export async function retryFailedImageTasksCoordinator(
 
     const isAborted = () => runControlRef.current.status === 'cancelled';
     const isPaused = () => runControlRef.current.status === 'paused';
-    await runRetryFailedGenerationWorkers({
-      items: failedItems,
-      concurrency: Math.min(imageGenConcurrency || 4, failedItems.length),
-      isAborted,
-      isPaused,
-      retryItem: async (currentItem) => {
-        const live = preparedById.get(currentItem.id) || currentItem;
-        const failedShots = (live.tasks || [])
-          .filter((task) => task.status === 'FAILURE' || task.status === 'IN_PROGRESS')
-          .map((task) => findShotByNo(currentItem, task.shot_no))
-          .filter((shot): shot is ShotPrompt => Boolean(shot));
-        await runSelectedShots(live, failedShots, {
-          ...config,
-          isAborted,
-          isPaused: () => runControlRef.current.status === 'paused',
+    // 只调度本次选中的失败镜头，避免顺带提交其他未运行任务。
+    const jobs = buildBatchGenerationJobs(preparedItems.map((item) => {
+      const failed = failedItems.find((entry) => entry.id === item.id)!;
+      const failedShotNumbers = new Set(failed.tasks.filter((task) => task.status === 'FAILURE').map((task) => task.shot_no));
+      return { ...item, prompts: item.prompts.filter((shot) => failedShotNumbers.has(shot.shot_no)) };
+    }), deps.generationStrategy);
+    await runGenerationJobs({
+      jobs, concurrency: imageGenConcurrency || 4, isAborted, isPaused,
+      execute: async ({ item, shots }) => {
+        const live = preparedById.get(item.id) || item;
+        const execute = deps.generationStrategy === 'grid_first' ? runGridImageTask : runSelectedShots;
+        await execute(live, shots, {
+          ...config, isAborted, isPaused,
+          idempotencyKey: live.tasks.find((task) => shots.some((shot) => shot.shot_no === task.shot_no))?.idempotencyKey,
         }, setItems, bumpProgress);
       },
     });
+    if (isAborted()) {
+      showToast('已停止重试，已经提交的任务仍可能完成并计费');
+      return;
+    }
 
     if (failCount === 0) showToast(`失败分镜重试完成：全部成功 ${successCount} 张`);
     else if (successCount === 0) showToast(`失败分镜重试仍全部失败（${failCount} 张）`);
@@ -333,7 +328,7 @@ export async function retrySingleShotTaskCoordinator(
   showToast: (msg: string) => void
 ): Promise<void> {
   if (generationLock) {
-    showToast('批量生图进行中，请先暂停或等队列结束后再重试单镜');
+    showToast('已有生图任务进行中，请等当前生成结束后再重试单镜');
     return;
   }
   const targetItem = items.find((item) => item.id === itemId);
@@ -345,25 +340,34 @@ export async function retrySingleShotTaskCoordinator(
     return;
   }
 
+  if (task.status === 'IN_PROGRESS') {
+    showToast('该分镜正在生成，请勿重复提交');
+    return;
+  }
+  generationLock = true;
   const attempt = (task.attempt || 0) + 1;
   const idempotencyKey = `${(task.idempotencyKey || `${itemId}:${shot.shot_no}`).replace(/:a\d+$/, '')}:a${attempt}`;
   patchItemTasks(setItems, itemId, (tasks) =>
-    tasks.map((entry, idx) => (idx === shotIndex ? { ...entry, status: 'IN_PROGRESS', error: undefined, attempt, idempotencyKey, recoveryRequired: false } : entry))
+    tasks.map((entry, idx) => (idx === shotIndex ? { ...entry, status: 'IN_PROGRESS', error: undefined, upstreamTaskId: undefined, resultUrl: undefined, resultStatus: 'current', attempt, idempotencyKey, recoveryRequired: false } : entry))
   );
 
   try {
-    const generated = await executeSingleImageTask(targetItem, shot, undefined, { ...config, idempotencyKey });
+    const generated = await executeSingleImageTask(targetItem, shot, undefined, { ...config, idempotencyKey,
+      onTaskSubmitted: (upstreamTaskId) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, upstreamTaskId } : entry)),
+    });
     patchItemTasks(setItems, itemId, (tasks) =>
-      tasks.map((entry, idx) =>
-        idx === shotIndex ? { ...entry, status: 'SUCCESS', resultUrl: generated.url, temporaryUrl: generated.temporary, error: undefined, recoveryRequired: false, attempt, idempotencyKey } : entry
+      tasks.map((entry) =>
+        entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, status: 'SUCCESS', resultUrl: generated.url, temporaryUrl: generated.temporary, error: undefined, recoveryRequired: false, attempt, idempotencyKey } : entry
       )
     );
     showToast(`分镜 ${shot.shot_no} 重新生成成功！`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '重试失败';
     patchItemTasks(setItems, itemId, (tasks) =>
-      tasks.map((entry, idx) => (idx === shotIndex ? { ...entry, status: 'FAILURE', error: message } : entry))
+      tasks.map((entry) => (entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, status: 'FAILURE', error: message } : entry))
     );
     showToast(`分镜 ${shot.shot_no} 重试失败: ${message}`);
+  } finally {
+    generationLock = false;
   }
 }

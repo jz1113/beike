@@ -1,3 +1,4 @@
+import { checkWorkshopReadiness } from '../model/workshopReadiness';
 import React, { useState, useMemo } from 'react';
 import { BatchProductItem } from '../model/batchTypes';
 import BatchStageFooter from './BatchStageFooter';
@@ -8,6 +9,7 @@ import { useAppStore } from '@/store';
 import type { AppState } from '@/store/types';
 
 interface Props {
+  selectedShotCount?: number;
   generationStrategy?: 'grid_first' | 'single_shot';
   autoMatchMotherTemplate?: boolean;
   successfulItems: BatchProductItem[];
@@ -29,6 +31,7 @@ const PRODUCTS_PER_PAGE = 4;
 
 export default function BatchStage3Prompts({
   generationStrategy = 'single_shot',
+  selectedShotCount = 4,
   autoMatchMotherTemplate = false,
   successfulItems,
   setItems,
@@ -58,12 +61,9 @@ export default function BatchStage3Prompts({
     [successfulItems, pageStart],
   );
 
-  const readyCount = successfulItems.filter(
-    (p) => p.analyzedSuccess && p.prompts && p.prompts.length > 0 &&
-      !(generationStrategy === 'grid_first' && p.gridPrompt !== undefined && !p.gridPrompt.trim()),
-  ).length;
-
-  const hasUnanalyzed = readyCount < successfulItems.length;
+  const readiness = checkWorkshopReadiness(successfulItems, { generationStrategy, selectedShotCount });
+  const readyCount = readiness.readyCount;
+  const hasUnanalyzed = !readiness.canGenerate;
   const showAnalyzeButton = !isAnalyzingAll && successfulItems.length > 0;
 
   const toggleShotExpand = (key: string) => {
@@ -132,12 +132,13 @@ export default function BatchStage3Prompts({
         onOpenSettings={() => setIsWorkshopConfigOpen(true)}
       />
 
-      {autoMatchMotherTemplate && (
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 p-3 text-xs text-indigo-800">
-          <span>分析时将按商品类目自动匹配完整四图母本；也可在生产设置中固定同一组。</span>
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 p-3 text-xs text-indigo-800">
+          <div className="space-y-1">
+            <p className="font-semibold">{generationStrategy === 'grid_first' ? '四宫格生成 4 镜 · 整组提示词生成，再拆分为 4 张' : '单张逐镜生成 · 每镜使用独立提示词生成完整图片'}</p>
+            {autoMatchMotherTemplate && <p>分析时将按商品类目自动匹配完整四图母本；也可在生产设置中固定同一组。</p>}
+          </div>
           <button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 rounded-lg bg-white px-3 py-2 font-bold">生产设置</button>
         </div>
-      )}
       {/* 极简高密度商品分镜列表 */}
       <div className="space-y-3">
         {visibleItems.map((item, itemIdx) => (
@@ -173,6 +174,10 @@ export default function BatchStage3Prompts({
         </nav>
       )}
 
+      {readiness.issues.length > 0 && <details className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <summary className="cursor-pointer font-semibold">生图前检查：{successfulItems.length - readyCount} 款待完善，点击查看原因</summary>
+        <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto select-text">{readiness.issues.map((issue, index) => <li key={`${issue.productId}-${index}`}><span className="font-semibold">{issue.title}</span> · {issue.reason}</li>)}</ul>
+      </details>}
       {/* 底部操作门禁栏 */}
       <BatchStageFooter
         onPrev={onPrevStage}
@@ -180,13 +185,13 @@ export default function BatchStage3Prompts({
         hint={
           hasUnanalyzed ? (
             <span className="text-xs text-amber-600 font-medium">
-              还有 {successfulItems.length - readyCount} 款待完成分析
+              还有 {successfulItems.length - readyCount} 款待完善
             </span>
           ) : undefined
         }
         primaryAction={{
           label: hasUnanalyzed
-            ? `完成分析后可生图 (${readyCount}/${successfulItems.length})`
+            ? `完成检查后可生图 (${readyCount}/${successfulItems.length})`
             : `确认提示词，启动批量生图 (${readyCount} 款)`,
           onClick: startBatchGeneration,
           disabled:

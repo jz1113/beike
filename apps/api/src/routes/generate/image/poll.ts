@@ -1,3 +1,4 @@
+import { parseImagePollPayload } from '../../../services/generate/imagePollPayload';
 import { jsonResponse } from '../../../core/http';
 import { db } from '../../../repositories/access';
 import { persistMediaUrl, extractStorageConfigFromRequest } from '@beike/server-kit/storage';
@@ -29,7 +30,7 @@ export async function executeImagePoll(req: Request) {
   try {
     provider = new URL(resolveCredentials(req).baseUrl).hostname;
   } catch { /* ignore */ }
-  return recordPollTelemetry('image-poll', req, () => withPersistedGenerationStatus(req, () => pollImageOnce(req)), provider);
+  return recordPollTelemetry('image-poll', req, () => withPersistedGenerationStatus(req, () => pollImageOnce(req), new URL(req.url).searchParams.get('recheck_failed') === '1'), provider);
 }
 
 async function pollImageOnce(req: Request) {
@@ -83,7 +84,6 @@ async function pollImageOnce(req: Request) {
 
   let res: Response | null = null;
   let resData: any = null;
-  let detectedFailureReason = '';
 
   // 单端点安全探测函数
   const probeUrl = async (qUrl: string) => {
@@ -93,62 +93,9 @@ async function pollImageOnce(req: Request) {
       const r = probed.response;
       const d = probed.data as Record<string, any>;
 
-      // 提取原始状态与潜在错误原因
-      const innerInfo = d.data || d;
-      const rawStatus = String(innerInfo.status || d.status || '').toUpperCase();
-      const failReason =
-        innerInfo.fail_reason ||
-        d.fail_reason ||
-        innerInfo.error?.message ||
-        d.error?.message ||
-        innerInfo.error ||
-        d.error ||
-        (r.status >= 400 ? d.message : '');
+      const parsed = parseImagePollPayload(d, r.ok);
+      return parsed ? { res: r, resData: d, url: qUrl } : null;
 
-      const isFinished =
-        rawStatus === 'SUCCESS' ||
-        rawStatus === 'SUCCEEDED' ||
-        rawStatus === 'COMPLETED' ||
-        Boolean(innerInfo.url || innerInfo.output || (Array.isArray(innerInfo.data) && innerInfo.data[0]?.url));
-
-      const isFailed =
-        rawStatus === 'FAILURE' ||
-        rawStatus === 'FAILED' ||
-        rawStatus === 'ERROR' ||
-        (Boolean(failReason) && rawStatus !== 'SUCCESS');
-
-      const isOngoing =
-        rawStatus === 'NOT_START' ||
-        rawStatus === 'SUBMITTED' ||
-        rawStatus === 'IN_PROGRESS' ||
-        rawStatus === 'PENDING' ||
-        rawStatus === 'PROCESSING' ||
-        rawStatus === 'QUEUED';
-
-      // 过滤路由级 404/Invalid URL（说明当前候选端点 URL 并非合法的查询接口，忽略此端点）
-      const lowerReason = String(failReason || '').toLowerCase();
-      const isRouteNotFound =
-        lowerReason.includes('invalid url') ||
-        lowerReason.includes('route not found') ||
-        lowerReason.includes('page not found') ||
-        lowerReason.includes('cannot get') ||
-        (r.status === 404 && lowerReason.includes('not found'));
-
-      if (isRouteNotFound) {
-        return null;
-      }
-
-      // 只要返回了明确的业务状态或错误描述
-      if (isFinished || isFailed || isOngoing || d.code === 'success') {
-        return { res: r, resData: d, url: qUrl, isFailed, failReason };
-      }
-
-      // 若状态码为 4xx/5xx 且含有明确业务错误信息（非路由不存在）
-      if (r.status >= 400 && failReason) {
-        return { res: r, resData: d, url: qUrl, isFailed: true, failReason };
-      }
-
-      return null;
     } catch {
       return null;
     }
@@ -162,14 +109,12 @@ async function pollImageOnce(req: Request) {
   if (quickResult) {
     res = quickResult.res;
     resData = quickResult.resData;
-    if (quickResult.isFailed && quickResult.failReason) {
-      detectedFailureReason = String(quickResult.failReason);
-    }
+
     rememberMatchedEndpoint(taskEndpointCache, cacheKey, cleanBaseUrl, primaryUrl, taskId);
   } else {
     // 并发请求所有候选端点，谁最先返回有效状态就采用谁
     const probePromises = candidateUrls.map((u) =>
-      probeUrl(u).then((result) => {
+      (u === primaryUrl ? primaryPromise : probeUrl(u)).then((result) => {
         if (result) return result;
         throw new Error('not matched');
       })
@@ -179,37 +124,11 @@ async function pollImageOnce(req: Request) {
       const winner = await Promise.any(probePromises);
       res = winner.res;
       resData = winner.resData;
-      if (winner.isFailed && winner.failReason) {
-        detectedFailureReason = String(winner.failReason);
-      }
+
       rememberMatchedEndpoint(taskEndpointCache, cacheKey, cleanBaseUrl, winner.url, taskId);
     } catch {
       // 所有端点均未返回有效状态（可能仍未同步或已被清理）
     }
-  }
-
-  // 若上游明确探测到了失败原因
-  if (detectedFailureReason && (!resData || !resData.status || !resData.data?.status)) {
-    try {
-      await db.imageTask.updateMany({
-        where: { taskId, status: { in: [...mutableGenerationStatuses] } },
-        data: {
-          status: 'FAILURE',
-          failReason: detectedFailureReason,
-        },
-      });
-    } catch (error) {
-      console.warn('[image-poll] 写入失败状态失败:', error);
-    }
-
-    return jsonResponse({
-      success: true,
-      taskId,
-      status: 'FAILURE',
-      progress: '0%',
-      resultUrl: '',
-      failReason: formatUserError(detectedFailureReason, '绘图任务执行失败'),
-    });
   }
 
   if (!res || !resData) {
@@ -224,69 +143,17 @@ async function pollImageOnce(req: Request) {
       dbError = true;
       console.warn('[image-poll] 探测失败后回查数据库异常:', error);
     }
-    const decision = decideProbeMissPoll(taskId, record, dbError);
+    const decision = decideProbeMissPoll(taskId, searchParams.get('recheck_failed') === '1' && record?.status === 'FAILURE' ? null : record, dbError);
     if (decision.body.failReason) {
       decision.body.failReason = formatUserError(decision.body.failReason, '生图任务失败');
     }
     return jsonResponse(decision.body, decision.httpStatus);
   }
 
-  const taskInfo = resData.data || resData;
-
-  const rawStatus = (taskInfo.status || resData.status || 'PENDING').toUpperCase();
-  const progress =
-    taskInfo.progress !== undefined
-      ? String(taskInfo.progress).endsWith('%')
-        ? String(taskInfo.progress)
-        : `${taskInfo.progress}%`
-      : resData.progress !== undefined
-        ? String(resData.progress).endsWith('%')
-          ? String(resData.progress)
-          : `${resData.progress}%`
-        : rawStatus === 'SUCCESS' ||
-            rawStatus === 'SUCCEEDED' ||
-            rawStatus === 'COMPLETED'
-          ? '100%'
-          : '50%';
-  const rawFailReason =
-    taskInfo.fail_reason ||
-    resData.fail_reason ||
-    resData.message ||
-    taskInfo.error?.message ||
-    taskInfo.error ||
-    '';
-  const failReason = rawFailReason ? formatUserError(String(rawFailReason), '生图任务失败') : '';
-
-  // 提取结果图片 URL (深度解析全格式)
-  let resultUrl = '';
-  if (taskInfo.data?.data && Array.isArray(taskInfo.data.data) && taskInfo.data.data.length > 0) {
-    const first = taskInfo.data.data[0];
-    resultUrl = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : '');
-  } else if (taskInfo.data && Array.isArray(taskInfo.data) && taskInfo.data.length > 0) {
-    const first = taskInfo.data[0];
-    resultUrl = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : '');
-  } else if (Array.isArray(resData.data) && resData.data.length > 0) {
-    const first = resData.data[0];
-    resultUrl = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : '');
-  } else if (typeof taskInfo.data?.url === 'string') {
-    resultUrl = taskInfo.data.url;
-  } else if (typeof taskInfo.url === 'string') {
-    resultUrl = taskInfo.url;
-  } else if (typeof taskInfo.image_url === 'string') {
-    resultUrl = taskInfo.image_url;
-  } else if (typeof taskInfo.output === 'string') {
-    resultUrl = taskInfo.output;
-  } else if (
-    Array.isArray(taskInfo.outputs) &&
-    taskInfo.outputs.length > 0 &&
-    typeof taskInfo.outputs[0] === 'string'
-  ) {
-    resultUrl = taskInfo.outputs[0];
-  } else if (typeof resData.url === 'string') {
-    resultUrl = resData.url;
-  } else if (typeof resData.output === 'string') {
-    resultUrl = resData.output;
-  }
+  const parsed = parseImagePollPayload(resData, res.ok)!;
+  let resultUrl = parsed.resultUrl;
+  const status = parsed.status;
+  const failReason = parsed.failReason ? formatUserError(parsed.failReason, '生图任务失败') : '';
 
   let temporaryUrl = false;
   if (resultUrl) {
@@ -295,39 +162,17 @@ async function pollImageOnce(req: Request) {
     temporaryUrl = /^https?:\/\//.test(resultUrl) && resultUrl === upstreamUrl;
   }
 
-  // 🌟 状态映射为规范枚举 (优先拦截明确失败，只要存在失败原因且无图直接判定为 FAILURE)
-  let status = 'IN_PROGRESS';
-  if (
-    rawStatus === 'FAILURE' ||
-    rawStatus === 'FAILED' ||
-    rawStatus === 'ERROR' ||
-    Boolean(rawFailReason && !resultUrl)
-  ) {
-    status = 'FAILURE';
-  } else if (resultUrl) {
-    status = 'SUCCESS';
-  } else if (
-    rawStatus === 'SUCCESS' ||
-    rawStatus === 'SUCCEEDED' ||
-    rawStatus === 'COMPLETED' ||
-    rawStatus === 'FINISHED'
-  ) {
-    status = resultUrl ? 'SUCCESS' : 'IN_PROGRESS';
-  } else {
-    status = 'IN_PROGRESS';
-  }
-
-  const finalProgress = status === 'FAILURE' ? '0%' : status === 'SUCCESS' ? '100%' : progress;
+  const finalProgress = parsed.progress;
 
   // 任务状态完成时更新数据库记录
   if (status === 'SUCCESS' || status === 'FAILURE') {
     try {
       await db.imageTask.updateMany({
-        where: { taskId, status: { in: [...mutableGenerationStatuses] } },
+        where: { taskId, status: { in: [...mutableGenerationStatuses, ...(status === 'SUCCESS' && searchParams.get('recheck_failed') === '1' ? ['FAILURE'] : [])] } },
         data: {
           status,
           resultUrl: resultUrl || undefined,
-          failReason: failReason || undefined,
+          failReason: status === 'SUCCESS' ? null : failReason || undefined,
         },
       });
     } catch (error) {

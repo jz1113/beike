@@ -1,15 +1,15 @@
 import { useState } from 'react';
+import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
 import {
-  Loader2,
+  Clock3,
   XCircle,
-  RefreshCw,
   Download,
   ZoomIn,
   LayoutGrid,
 } from 'lucide-react';
 import { BatchProductItem } from '../model/batchTypes';
-import { isEphemeralResultUrl } from '../model/workspaceRecovery';
+import { isUsableWorkshopResult } from '../model/workshopReadiness';
 import { BatchStage4ProductInfo } from './BatchStage4ProductInfo';
 import { BatchStage4CopyPanel } from './BatchStage4CopyPanel';
 import { OutputReviewButtons } from './OutputReviewButtons';
@@ -19,13 +19,13 @@ export interface BatchStage4ProductItemProps {
   item: BatchProductItem;
   generateCopywritingForProduct: (item: BatchProductItem) => Promise<void>;
   updateItemCopywriting?: (itemId: string, copywriting: { title: string; content: string; tags?: string[] }) => void;
-  retryFailedImageTasks?: () => Promise<void>;
   retrySingleShotTask?: (itemId: string, shotIndex: number) => Promise<void>;
   isExportingZip: boolean;
   handleExportSingleProductZip?: (item: BatchProductItem) => Promise<void>;
   handleDownloadSingleTaskImage?: (url: string, filename?: string) => Promise<void>;
   setPreviewImageUrl: (url: string | null) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
+  onRecheckTask?: (itemId: string, taskId: string) => Promise<void>;
   readOnly?: boolean;
   onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => void;
 }
@@ -35,16 +35,17 @@ export function BatchStage4ProductItem({
   item,
   generateCopywritingForProduct,
   updateItemCopywriting,
-  retryFailedImageTasks,
   retrySingleShotTask,
   isExportingZip,
   handleExportSingleProductZip,
   handleDownloadSingleTaskImage,
   setPreviewImageUrl,
   onPreviewGallery,
+  onRecheckTask,
   readOnly = false,
   onReviewTask,
 }: BatchStage4ProductItemProps) {
+  const [recheckingId, setRecheckingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, text: string) => {
@@ -73,8 +74,8 @@ export function BatchStage4ProductItem({
   };
 
   const tasks = item.tasks || [];
-  const successTasks = tasks.filter(t => t.status === 'SUCCESS' && t.resultUrl && !isEphemeralResultUrl(t.resultUrl));
-  const coverUrl = item.selectedProductImages?.[0] || item.coverImage;
+  const successTasks = tasks.filter(isUsableWorkshopResult);
+  const selectedImages = [...new Set((item.selectedProductImages || []).filter(Boolean))];
   const cw = item.copywriting || { title: '', content: '', tags: [] };
   const titleText = cw.title || '';
   const contentText = cw.content || '';
@@ -94,13 +95,12 @@ export function BatchStage4ProductItem({
       <div className="lg:row-span-2 min-w-0 space-y-4">
       <BatchStage4ProductInfo
         item={item}
-        coverUrl={coverUrl}
         jdUrl={jdUrl}
         cleanId={cleanId}
         copiedId={copiedId}
         onCopy={handleCopy}
         onPreview={(url) => {
-          if (onPreviewGallery) onPreviewGallery([url], 0, `${item.title} - 商品原图`);
+          if (onPreviewGallery) onPreviewGallery(selectedImages, Math.max(0, selectedImages.indexOf(url)), `${item.title} - 已选商品图`);
           else setPreviewImageUrl(url);
         }}
       />
@@ -135,16 +135,6 @@ export function BatchStage4ProductItem({
               </button>
             )}
 
-            {!readOnly && retryFailedImageTasks && tasks.some(t => t.status === 'FAILURE') && (
-              <button
-                type="button"
-                onClick={() => void retryFailedImageTasks()}
-                className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>重试失败</span>
-              </button>
-            )}
           </div>
 
           {/* 4 栏等高大图网格 */}
@@ -157,8 +147,8 @@ export function BatchStage4ProductItem({
           )}
           <div className={`grid grid-cols-1 sm:grid-cols-2 ${tasks.length >= 4 ? 'lg:grid-cols-4' : tasks.length === 3 ? 'lg:grid-cols-3' : ''} gap-3`}>
             {tasks.map((task, shotIdx) => {
-              const hasImage = task.status === 'SUCCESS' && !!task.resultUrl;
-              const isGenFailure = task.status === 'FAILURE';
+              const hasImage = isUsableWorkshopResult(task);
+              const isGenFailure = task.status === 'FAILURE' || (task.status === 'SUCCESS' && !hasImage);
               const currentPreviewIdx = hasImage && task.resultUrl ? previewUrls.indexOf(task.resultUrl) : 0;
 
               return (
@@ -171,11 +161,11 @@ export function BatchStage4ProductItem({
                         } else {
                           setPreviewImageUrl(task.resultUrl);
                         }
-                      } else if (!readOnly && isGenFailure && retrySingleShotTask) {
+                      } else if (!readOnly && isGenFailure && retrySingleShotTask && !recheckingId && !task.upstreamTaskId) {
                         retrySingleShotTask(item.id, shotIdx);
                       }
                     }}
-                    className={`aspect-[3/4] rounded-xl border overflow-hidden relative flex items-center justify-center cursor-pointer transition-colors group ${
+                    className={`aspect-[3/4] rounded-xl border overflow-hidden relative flex items-center justify-center transition-colors group ${hasImage || (!readOnly && isGenFailure) ? 'cursor-pointer' : 'cursor-default'} ${
                       hasImage
                         ? 'border-slate-200 hover:border-indigo-400 bg-slate-50'
                         : isGenFailure
@@ -236,22 +226,35 @@ export function BatchStage4ProductItem({
                     ) : isGenFailure ? (
                       <div className="p-4 text-center space-y-2">
                         <XCircle className="w-8 h-8 text-rose-500 mx-auto" />
-                        <div className="text-xs font-bold text-rose-700">生成失败</div>
-                        {!readOnly && <button
+                        <div className="text-xs font-bold text-rose-700">{task.status === 'SUCCESS' ? '图片需重新生成' : '生成失败'}</div>
+                        {task.error && <p className="max-h-24 overflow-y-auto break-words text-[11px] leading-5 text-rose-600 select-text">{task.error}</p>}
+                        {task.upstreamTaskId && <p className="break-all text-[10px] text-slate-400 select-text">任务 ID：{task.upstreamTaskId}</p>}
+                        {!readOnly && task.upstreamTaskId && onRecheckTask && <button type="button" disabled={recheckingId !== null}
+                          onClick={async (event) => { event.stopPropagation(); setRecheckingId(task.id); try { await onRecheckTask(item.id, task.id); } finally { setRecheckingId(null); } }}
+                          className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-600 disabled:opacity-40">{recheckingId === task.id ? '核对中…' : '核对原任务'}</button>}
+                        {!readOnly && retrySingleShotTask && <button
                           type="button"
+                          disabled={recheckingId !== null}
                           onClick={(e) => {
                             e.stopPropagation();
                             retrySingleShotTask?.(item.id, shotIdx);
                           }}
                           className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm"
                         >
-                          重试
+                          重新生成
                         </button>}
                       </div>
+                    ) : task.status === 'PENDING' ? (
+                      <div role="status" className="p-4 text-center space-y-2">
+                        <Clock3 className="w-6 h-6 mx-auto text-slate-300" />
+                        <div className="text-xs font-medium text-slate-500">排队中</div>
+                      </div>
                     ) : (
-                      <div className="p-4 text-center space-y-2">
-                        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-                        <div className="text-xs font-bold text-slate-600">渲染中...</div>
+                      <div role="status" aria-label={`分镜 ${task.shot_no} 生成中`} className="absolute inset-0 motion-reduce:[&_*]:animate-none">
+                        <AIGeneratingCard task={task} showProgressBadge={false} className="!rounded-none !border-0" />
+                        <div aria-hidden="true" className="absolute inset-x-0 bottom-5 flex justify-center">
+                          <span className="rounded-full border border-white/70 bg-white/60 px-3 py-1 text-[11px] font-medium tracking-wide text-slate-600 backdrop-blur-sm">生成中…</span>
+                        </div>
                       </div>
                     )}
 

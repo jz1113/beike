@@ -1,3 +1,4 @@
+import { isUsableWorkshopResult } from '../model/workshopReadiness';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
 import { BatchProductItem } from '../model/batchTypes';
 
@@ -18,7 +19,7 @@ export function BatchStage4GalleryView({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {successfulItems.map((item) => {
         const tasks = item.tasks || [];
-        const successTasks = tasks.filter(t => t.status === 'SUCCESS' && t.resultUrl);
+        const successTasks = tasks.filter(isUsableWorkshopResult);
         const previewUrls = successTasks.map(t => t.resultUrl).filter((url): url is string => !!url);
 
         return (
@@ -46,7 +47,7 @@ export function BatchStage4GalleryView({
             {/* 图片画廊网格 */}
             {previewUrls.length > 0 ? (
               <div className="grid grid-cols-2 gap-1 p-1">
-                {previewUrls.slice(0, 4).map((url, idx) => (
+                {previewUrls.map((url, idx) => (
                   <button
                     key={idx}
                     type="button"

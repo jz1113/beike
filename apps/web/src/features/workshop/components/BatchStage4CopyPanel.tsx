@@ -25,24 +25,8 @@ export function BatchStage4CopyPanel({
   const cw = item.copywriting || { title: '', content: '', tags: [] };
   return (
     <div className="lg:col-start-2 min-w-0 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 space-y-3">
-      <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-        {!readOnly && <button type="button" onClick={() => generateCopywritingForProduct(item)} disabled={item.isCopywritingGenerating}
-          className="flex-1 py-2 px-2 rounded-xl text-xs font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
-          title="重新为当前款生成小红书种草文案">
-          <RefreshCw className={`w-3.5 h-3.5 ${item.isCopywritingGenerating ? 'animate-spin' : ''}`} />
-          <span>{item.isCopywritingGenerating ? '生成中...' : '重写文案'}</span>
-        </button>}
-        {handleExportSingleProductZip && (
-          <button type="button" onClick={() => handleExportSingleProductZip(item)} disabled={isExportingZip || successCount === 0}
-            className="flex-1 py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
-            title="打包下载当前款所有图片与文案">
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>导出本款</span>
-          </button>
-        )}
-      </div>
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-3 bg-amber-500 rounded-full" />
             <h3 className="text-sm font-semibold text-slate-800">文案交付</h3>
@@ -53,10 +37,17 @@ export function BatchStage4CopyPanel({
               {!readOnly && <button type="button" onClick={() => generateCopywritingForProduct(item)} className="font-bold underline">重试文案</button>}
             </div>
           )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {!readOnly && <button type="button" onClick={() => generateCopywritingForProduct(item)} disabled={item.isCopywritingGenerating || successCount === 0}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-40">
+              <RefreshCw className={`h-3.5 w-3.5 ${item.isCopywritingGenerating ? 'animate-spin' : ''}`} />
+              {item.isCopywritingGenerating ? '生成中…' : contentText ? '重写文案' : '生成文案'}
+            </button>}
           <button type="button" onClick={() => onCopyAll(item)} disabled={!titleText && !contentText && !tags.length}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
             {copiedId === `all_${item.id}` ? <><Check className="w-3.5 h-3.5" /><span className="font-bold">已复制</span></> : <><Copy className="w-3.5 h-3.5" /><span>一键复制</span></>}
           </button>
+          </div>
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -89,6 +80,12 @@ export function BatchStage4CopyPanel({
           </div>
         )}
       </div>
+      {handleExportSingleProductZip && <div className="flex justify-end border-t border-slate-100 pt-3">
+        <button type="button" onClick={() => handleExportSingleProductZip(item)} disabled={isExportingZip || successCount === 0}
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-40" title="下载当前商品的图片与文案">
+          <Download className="h-3.5 w-3.5" />下载本款图片与文案
+        </button>
+      </div>}
     </div>
   );
 }

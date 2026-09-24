@@ -1,3 +1,5 @@
+import { BatchDeliveryStatus } from './BatchDeliveryStatus';
+import { isUsableWorkshopResult, summarizeWorkshopResults } from '../model/workshopReadiness';
 import { useState } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
@@ -5,15 +7,15 @@ import { BatchProductItem } from '../model/batchTypes';
 import { BatchStage4Header } from './BatchStage4Header';
 import { BatchStage4ProductItem } from './BatchStage4ProductItem';
 import { BatchStage4GalleryView } from './BatchStage4GalleryView';
-import { isEphemeralResultUrl } from '../model/workspaceRecovery';
 
 function describeImageStatus(product: BatchProductItem): { label: string; failed: boolean } {
-  const tasks = product.tasks || [];
-  const usable = tasks.filter((task) => task.status === 'SUCCESS' && task.resultUrl && !isEphemeralResultUrl(task.resultUrl)).length;
+  const tasks = (product.tasks || []).filter((task) => task.resultStatus !== 'superseded');
+  const usable = tasks.filter(isUsableWorkshopResult).length;
   const failed = tasks.filter((task) => task.status === 'FAILURE').length;
-  const running = tasks.filter((task) => task.status === 'IN_PROGRESS' || task.status === 'PENDING').length;
+  const running = tasks.filter((task) => task.status === 'IN_PROGRESS').length;
+  const pending = tasks.filter((task) => task.status === 'PENDING').length;
   if (tasks.length === 0) return { label: '图片待生成', failed: false };
-  if (running > 0) return { label: `生成中 ${usable}/${tasks.length}`, failed: false };
+  if (running > 0 || pending > 0) return { label: `${failed ? `失败 ${failed} 张 · ` : ''}${running ? '生成中' : '待继续'} ${usable}/${tasks.length}`, failed: failed > 0 };
   if (failed > 0 && usable === 0) return { label: '图片生成失败', failed: true };
   if (failed > 0) return { label: `部分失败 ${usable}/${tasks.length}`, failed: true };
   if (usable === tasks.length) return { label: '图片已完成', failed: false };
@@ -47,6 +49,7 @@ interface Props {
   handleDownloadSingleTaskImage?: (url: string, filename?: string) => Promise<void>;
   setPreviewImageUrl: (url: string | null) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
+  onRecheckTask?: (itemId: string, taskId: string) => Promise<void>;
   readOnly?: boolean;
   runControlStatus?: 'idle' | 'running' | 'paused';
   onPauseRun?: () => void;
@@ -54,6 +57,7 @@ interface Props {
   onCancelRun?: () => void;
   onCompleteBatch?: () => void;
   onBackToPrompts?: () => void;
+  onContinueGeneration?: () => Promise<void>;
   pipelineStatus?: string;
   onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => void;
   onAcknowledgeRecovery?: () => void;
@@ -71,8 +75,6 @@ export default function BatchStage4Queue({
   isGeneratingBatch,
   totalTaskCount,
   completedTaskCount,
-  successTaskCount,
-  failTaskCount,
   generateCopywritingForProduct,
   updateItemCopywriting,
   generateAllCopywriting,
@@ -85,6 +87,7 @@ export default function BatchStage4Queue({
   handleDownloadSingleTaskImage,
   setPreviewImageUrl,
   onPreviewGallery,
+  onRecheckTask,
   readOnly = false,
   runControlStatus = 'idle',
   onPauseRun,
@@ -92,6 +95,7 @@ export default function BatchStage4Queue({
   onCancelRun,
   onCompleteBatch,
   onBackToPrompts,
+  onContinueGeneration,
   pipelineStatus,
   onReviewTask,
   onAcknowledgeRecovery,
@@ -104,22 +108,11 @@ export default function BatchStage4Queue({
   const safeIndex = Math.min(Math.max(0, activeItemIndex), Math.max(0, successfulItems.length - 1));
   const currentItem = successfulItems[safeIndex];
 
-  const hasExportableSuccess = successfulItems.some(item =>
-    (item.tasks || []).some(t => t.status === 'SUCCESS' && !!t.resultUrl),
-  );
-
-  const liveFailCount = successfulItems.reduce(
-    (n, item) => n + (item.tasks || []).filter(t => t.status === 'FAILURE' && !t.resultUrl).length,
-    0,
-  );
-
-  const displayFailCount = isGeneratingBatch ? failTaskCount : Math.max(failTaskCount, liveFailCount);
-  const displaySuccessCount = isGeneratingBatch
-    ? successTaskCount
-    : successfulItems.reduce(
-        (n, item) => n + (item.tasks || []).filter(t => t.status === 'SUCCESS' && !!t.resultUrl).length,
-        0,
-      );
+  const summary = summarizeWorkshopResults(successfulItems);
+  const hasExportableSuccess = summary.success > 0;
+  const displayFailCount = summary.failed;
+  const displaySuccessCount = summary.success;
+  const busy = isGeneratingBatch || summary.running > 0;
 
   const currentModelName =
     availableImageModels.find(m => m.id === selectedImageGenModel)?.shortName
@@ -150,6 +143,7 @@ export default function BatchStage4Queue({
         completedTaskCount={completedTaskCount}
         displaySuccessCount={displaySuccessCount}
         displayFailCount={displayFailCount}
+        pendingTaskCount={summary.pending}
         hasExportableSuccess={hasExportableSuccess}
         currentModelName={currentModelName}
         showEngineSettings={showEngineSettings}
@@ -179,6 +173,12 @@ export default function BatchStage4Queue({
         onBackToPrompts={onBackToPrompts}
         pipelineStatus={pipelineStatus}
       />
+      <BatchDeliveryStatus items={successfulItems} busy={busy} readOnly={readOnly} onRetryFailed={retryFailedImageTasks} onContinue={onContinueGeneration}
+        onLocateFailure={() => {
+          const failedIndices = successfulItems.flatMap((item, index) => item.tasks.some((task) => task.status === 'FAILURE' && task.resultStatus !== 'superseded') ? [index] : []);
+          const next = failedIndices.find((index) => index > safeIndex) ?? failedIndices[0];
+          if (next !== undefined) { setActiveItemIndex(next); setViewMode('single'); }
+        }} />
       {!readOnly && onAcknowledgeRecovery && successfulItems.some((item) => (item.tasks || []).some((task) => task.recoveryRequired)) && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           <span>有任务在刷新前未完成，结果待核实。确认后可以重新生成，不会自动重提旧任务。</span>
@@ -198,7 +198,7 @@ export default function BatchStage4Queue({
                 <h3 className="px-2 py-2 text-xs font-semibold text-slate-600">商品列表 · {successfulItems.length} 款</h3>
                 <div className="max-h-80 overflow-y-auto space-y-1.5">
                   {successfulItems.map((product, index) => {
-                    const cover = product.selectedProductImages?.[0] || product.coverImage;
+                    const cover = product.selectedProductImages?.find(Boolean);
                     const copyFailed = Boolean(product.copywritingError);
                     const copyReady = Boolean(product.copywriting?.title && product.copywriting?.content);
                     const imageStatus = describeImageStatus(product);
@@ -222,13 +222,13 @@ export default function BatchStage4Queue({
             ) : undefined}
             generateCopywritingForProduct={generateCopywritingForProduct}
             updateItemCopywriting={updateItemCopywriting}
-            retryFailedImageTasks={retryFailedImageTasks}
-            retrySingleShotTask={retrySingleShotTask}
+            retrySingleShotTask={busy ? undefined : retrySingleShotTask}
             isExportingZip={isExportingZip}
             handleExportSingleProductZip={handleExportSingleProductZip}
             handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
             setPreviewImageUrl={setPreviewImageUrl}
             onPreviewGallery={onPreviewGallery}
+            onRecheckTask={busy ? undefined : onRecheckTask}
             readOnly={readOnly}
           />
         ) : (
@@ -238,7 +238,7 @@ export default function BatchStage4Queue({
         /* 画廊模式：一行 2 张大图快速审阅 */
         <BatchStage4GalleryView
           successfulItems={successfulItems}
-          setActiveItemIndex={setActiveItemIndex}
+          setActiveItemIndex={(index) => { setActiveItemIndex(index); setViewMode('single'); }}
           onPreviewGallery={onPreviewGallery}
           setPreviewImageUrl={setPreviewImageUrl}
         />

@@ -1,3 +1,4 @@
+import { WorkshopProductionOverview } from './WorkshopProductionOverview';
 import { useMemo, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
 import BatchStage1Collect from './BatchStage1Collect';
@@ -301,6 +302,9 @@ export default function BatchWorkshopView() {
             ? "max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto w-full flex-1 flex flex-col justify-between"
             : "w-full space-y-4"
         }>
+          {!historyGenerationBatch && items.length > 0 && <WorkshopProductionOverview items={items} currentStage={currentStage} onStageChange={setCurrentStage}
+            busy={isCollecting || isAnalyzingAll || isGeneratingBatch || isAutoPilotRunning || items.some((item) => item.isAnalyzing)}
+            strategy={generationStrategy} shotCount={selectedShotCount} aspect={selectedAspect} concurrency={imageGenConcurrency} onSettings={() => setIsWorkshopConfigOpen(true)} />}
           {historyGenerationBatch ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
@@ -361,16 +365,17 @@ export default function BatchWorkshopView() {
             />
           )}
 
-          {currentStage === 2 && (
+          {!historyGenerationBatch && currentStage === 2 && (
             <BatchConfigProvider value={stage2ConfigValue}>
               <BatchStage2Config />
             </BatchConfigProvider>
           )}
 
-          {currentStage === 3 && (
+          {!historyGenerationBatch && currentStage === 3 && (
             <BatchStage3Prompts
               autoMatchMotherTemplate={!runner.lockedFullPromptId || runner.lockedFullPromptId === 'auto'}
               generationStrategy={generationStrategy}
+              selectedShotCount={selectedShotCount}
               successfulItems={successfulItems}
               setItems={setItems}
               isAnalyzingAll={isAnalyzingAll}
@@ -386,7 +391,7 @@ export default function BatchWorkshopView() {
             />
           )}
 
-          {currentStage === 4 && (
+          {!historyGenerationBatch && currentStage === 4 && (
             <BatchStage4Queue
               successfulItems={successfulItems}
               availableImageModels={availableImageModels}
@@ -420,6 +425,8 @@ export default function BatchWorkshopView() {
               onCancelRun={cancelRun}
               onCompleteBatch={completeCurrentBatch}
               onBackToPrompts={() => setCurrentStage(3)}
+              onContinueGeneration={startBatchGeneration}
+              onRecheckTask={runner.recheckTask}
               pipelineStatus={pipelineStatus}
               onReviewTask={reviewTask}
               onAcknowledgeRecovery={acknowledgeRecovery}
@@ -455,6 +462,8 @@ export default function BatchWorkshopView() {
         selectedImageGenModel={selectedImageGenModel}
         setSelectedImageGenModel={setSelectedImageGenModel}
         availableImageModels={availableImageModels}
+        generationStrategy={generationStrategy}
+        setGenerationStrategy={setGenerationStrategy}
         autoGenerateCopywriting={autoGenerateCopywriting}
         setAutoGenerateCopywriting={setAutoGenerateCopywriting}
         imageGenConcurrency={imageGenConcurrency}

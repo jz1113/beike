@@ -7,6 +7,7 @@ export interface MergeTaskContext {
   model: string;
   aspectRatio: string;
   quality: string;
+  generationStrategy?: 'grid_first' | 'single_shot';
 }
 
 export function mergeGenerationTasks(
@@ -26,7 +27,7 @@ export function mergeGenerationTasks(
       productId: item.id,
       storyboardRevision: context.storyboardRevision,
       shotNo: shot.shot_no,
-      prompt: shot.prompt || '',
+      prompt: context.generationStrategy === 'grid_first' ? `grid_first:${item.gridPrompt || ''}` : shot.prompt || '',
       selectedImageUrls: item.selectedProductImages || [],
       model: context.model,
       aspectRatio: context.aspectRatio,
@@ -43,7 +44,7 @@ export function mergeGenerationTasks(
       productId: item.id,
       storyboardRevision: context.storyboardRevision,
       shotNo: shot.shot_no,
-      prompt: shot.prompt || '',
+      prompt: context.generationStrategy === 'grid_first' ? `grid_first:${item.gridPrompt || ''}` : shot.prompt || '',
       selectedImageUrls: item.selectedProductImages || [],
       model: context.model,
       aspectRatio: context.aspectRatio,

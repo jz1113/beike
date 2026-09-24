@@ -1,3 +1,4 @@
+import { recheckWorkshopTask } from '../model/recheckWorkshopTask';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { PreviousGroupSignature } from '@beike/domain/vision';
 import { type WorkshopBatchStatus } from '@beike/domain/workshopPipeline';
@@ -247,8 +248,7 @@ export function useBatchWorkshopRunner() {
       setStoryboardRevision((revision) => revision + 1);
     }
     setUseAssetLibrary(true);
-    setGenerationStrategy('single_shot');
-  }, [items, recipes, selectedArchId, setSelectedArchId, setGenerationStrategy]);
+  }, [items, recipes, selectedArchId, setSelectedArchId, setUseAssetLibrary]);
 
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -559,6 +559,10 @@ export function useBatchWorkshopRunner() {
   };
 
   const completeCurrentBatch = async () => {
+    if (isGeneratingBatch || isAnalyzingAll || isCollecting || isAutoPilotRunning || itemsRef.current.some((item) => item.isAnalyzing || item.isCopywritingGenerating || item.tasks.some((task) => task.status === 'IN_PROGRESS'))) {
+      showToast('仍有任务执行中，请等待结束后再归档本批次');
+      return;
+    }
     if (!window.confirm('完成本批次后会归档当前内容，并开始一个空白新批次。历史内容可在批次历史中恢复。确定继续吗？')) return;
     try {
       await workspace.archiveCurrentBatch(true);
@@ -686,6 +690,7 @@ export function useBatchWorkshopRunner() {
     startBatchGeneration,
     retryFailedImageTasks,
     retrySingleShotTask,
+    recheckTask: (itemId: string, taskId: string) => recheckWorkshopTask(itemId, taskId, itemsRef.current, setItems, showToast),
     generateCopywritingForProduct,
     updateItemCopywriting,
     generateAllCopywriting,

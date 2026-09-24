@@ -120,6 +120,7 @@ export interface SubmitImageGenTaskDeps {
   isAborted: () => boolean;
   isPaused?: () => boolean;
   idempotencyKey?: string;
+  onTaskSubmitted?: (taskId: string) => void;
 }
 
 const LOCAL_API_RETRY_DELAYS_MS = [800, 1600, 2600] as const;
@@ -198,6 +199,7 @@ export async function submitImageGenTaskResult(
   }
 
   if (data.taskId) {
+    deps.onTaskSubmitted?.(String(data.taskId));
     throwIfGenerationAborted(deps.isAborted);
     return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused);
   }

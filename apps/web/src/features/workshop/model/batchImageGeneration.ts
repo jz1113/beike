@@ -1,50 +1,23 @@
 import { waitWhilePaused } from '@/shared/api/generationAbort';
-import type { BatchProductItem } from './batchTypes';
 
-/** 批量生图队列 worker 池（按商品并发） */
-export async function runBatchGenerationWorkers(opts: {
-  items: BatchProductItem[];
+/** 并发槽位对应实际生图请求；每次完成立即补充下一任务。 */
+export async function runGenerationJobs<T>(opts: {
+  jobs: T[];
   concurrency: number;
   isAborted: () => boolean;
   isPaused?: () => boolean;
-  generateItem: (item: BatchProductItem) => Promise<void>;
+  execute: (job: T) => Promise<void>;
 }): Promise<void> {
-  let itemIdx = 0;
-  const concurrency = Math.min(opts.concurrency || 4, opts.items.length);
-
+  let nextIndex = 0;
+  const limit = Number.isFinite(opts.concurrency) ? Math.max(1, Math.floor(opts.concurrency)) : 4;
   const worker = async () => {
-    while (itemIdx < opts.items.length && !opts.isAborted()) {
+    while (nextIndex < opts.jobs.length && !opts.isAborted()) {
       if (opts.isPaused) await waitWhilePaused(opts.isPaused, opts.isAborted);
       if (opts.isAborted()) break;
-      const currentItem = opts.items[itemIdx++];
-      if (!currentItem) break;
-      await opts.generateItem(currentItem);
+      const job = opts.jobs[nextIndex++];
+      if (job === undefined) break;
+      await opts.execute(job);
     }
   };
-
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
-}
-
-/** 失败分镜重试 worker 池 */
-export async function runRetryFailedGenerationWorkers(opts: {
-  items: BatchProductItem[];
-  concurrency: number;
-  isAborted: () => boolean;
-  isPaused?: () => boolean;
-  retryItem: (item: BatchProductItem) => Promise<void>;
-}): Promise<void> {
-  let itemIdx = 0;
-  const concurrency = Math.min(opts.concurrency || 4, opts.items.length);
-
-  const worker = async () => {
-    while (itemIdx < opts.items.length && !opts.isAborted()) {
-      if (opts.isPaused) await waitWhilePaused(opts.isPaused, opts.isAborted);
-      if (opts.isAborted()) break;
-      const currentItem = opts.items[itemIdx++];
-      if (!currentItem) break;
-      await opts.retryItem(currentItem);
-    }
-  };
-
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(limit, opts.jobs.length) }, () => worker()));
 }

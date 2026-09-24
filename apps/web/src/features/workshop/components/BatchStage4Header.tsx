@@ -1,16 +1,6 @@
-import {
-  Loader2,
-  FileSpreadsheet,
-  Download,
-  Sparkles,
-  Columns3,
-  Image as ImageIcon,
-  Pause,
-  Play,
-  Square,
-  CheckCircle2,
-} from 'lucide-react';
+import { Loader2, FileSpreadsheet, Download, Sparkles, Columns3, Image as ImageIcon, Pause, Play, Square, CheckCircle2, ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { BatchProductItem } from '../model/batchTypes';
+import { WorkshopActionMenu, workshopMenuItemClass } from './WorkshopActionMenu';
 
 export interface BatchStage4HeaderProps {
   isGeneratingBatch: boolean;
@@ -18,6 +8,7 @@ export interface BatchStage4HeaderProps {
   completedTaskCount: number;
   displaySuccessCount: number;
   displayFailCount: number;
+  pendingTaskCount?: number;
   hasExportableSuccess: boolean;
   currentModelName: string;
   showEngineSettings: boolean;
@@ -54,6 +45,7 @@ export function BatchStage4Header({
   completedTaskCount,
   displaySuccessCount,
   displayFailCount,
+  pendingTaskCount = 0,
   hasExportableSuccess,
   viewMode,
   setViewMode,
@@ -71,105 +63,57 @@ export function BatchStage4Header({
   onBackToPrompts,
   pipelineStatus,
 }: BatchStage4HeaderProps) {
+  const busy = isGeneratingBatch || runControlStatus !== 'idle';
+  const copyBusy = successfulItems.some((item) => item.isCopywritingGenerating);
+  const progress = totalTaskCount > 0 ? Math.min(100, Math.round(completedTaskCount / totalTaskCount * 100)) : 0;
+  const status = readOnly ? '历史批次' : runControlStatus === 'paused' ? '已暂停' : busy ? '正在生成' : displayFailCount > 0 ? '部分生成失败' : pendingTaskCount > 0 ? '待继续生成' : hasExportableSuccess ? '成图已就绪' : '等待生成';
+  const generateCopy = () => {
+    const withImages = successfulItems.filter((item) => item.tasks.some((task) => task.status === 'SUCCESS' && task.resultUrl));
+    const allHaveCopy = withImages.length > 0 && withImages.every((item) => Boolean(item.copywriting?.content));
+    if (allHaveCopy && !window.confirm('所有商品都已有文案。要全部重写吗？')) return;
+    void generateAllCopywriting?.(allHaveCopy ? { force: true } : undefined);
+  };
   return (
-    <div className="py-1">
-      {isGeneratingBatch && totalTaskCount > 0 && (
-        <p className="mb-2 text-right text-xs font-medium text-slate-500">
-          生图进度 {completedTaskCount}/{totalTaskCount}，成功 {displaySuccessCount}，失败 {displayFailCount}
-        </p>
-      )}
-      <div className="flex items-center justify-end gap-3 flex-wrap">
-        {/* 右侧：核心交付动作（导出表格、打包ZIP、批量文案） */}
-        <div className="flex flex-wrap justify-end items-center gap-2">
-          <div className="flex items-center bg-slate-100/90 p-1 rounded-2xl text-xs mr-1 shadow-inner border border-slate-200/60">
-            <button
-              type="button"
-              onClick={() => setViewMode('single')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                viewMode === 'single' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-              }`}
-            >
-              <Columns3 className="w-3.5 h-3.5" />
-              <span>单品</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('gallery')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                viewMode === 'gallery' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-              }`}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>画廊</span>
-            </button>
-          </div>
-
-          {!readOnly && runControlStatus === 'running' && onPauseRun && (
-            <button type="button" onClick={onPauseRun} className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 flex items-center gap-1.5">
-              <Pause className="w-3.5 h-3.5" /><span>暂停</span>
-            </button>
-          )}
-          {!readOnly && runControlStatus === 'paused' && onResumeRun && (
-            <button type="button" onClick={onResumeRun} className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-indigo-200 bg-indigo-50 text-indigo-700 flex items-center gap-1.5">
-              <Play className="w-3.5 h-3.5" /><span>继续</span>
-            </button>
-          )}
-          {!readOnly && runControlStatus !== 'idle' && onCancelRun && (
-            <button type="button" onClick={onCancelRun} className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-rose-200 bg-white text-rose-700 flex items-center gap-1.5">
-              <Square className="w-3.5 h-3.5" /><span>取消</span>
-            </button>
-          )}
-          {!readOnly && onBackToPrompts && (
-            <button type="button" onClick={onBackToPrompts} disabled={isGeneratingBatch} className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-40">
-              返回提示词
-            </button>
-          )}
-          {!readOnly && onCompleteBatch && (
-            <button type="button" onClick={onCompleteBatch} disabled={pipelineStatus === 'completed'} className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white flex items-center gap-1.5 disabled:opacity-40">
-              <CheckCircle2 className="w-3.5 h-3.5" /><span>完成本批次</span>
-            </button>
-          )}
-          {!readOnly && generateAllCopywriting && (
-            <button
-              type="button"
-              onClick={() => {
-                const withImages = successfulItems.filter((item) => (item.tasks || []).some((task) => task.status === 'SUCCESS' && task.resultUrl));
-                const allHaveCopy = withImages.length > 0 && withImages.every((item) => Boolean(item.copywriting?.content));
-                if (allHaveCopy && !window.confirm('所有商品都已有文案。要全部重写吗？')) return;
-                void generateAllCopywriting?.(allHaveCopy ? { force: true } : undefined);
-              }}
-              disabled={!hasExportableSuccess}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200/80 hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-all bg-white shadow-2xs active:scale-98"
-              title="一键为所有商品批量生成/重写小红书文案"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              <span>批量文案</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleExportZip}
-            disabled={isExportingZip || !hasExportableSuccess}
-            className="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 disabled:opacity-40"
-            title="打包下载已生成的图片和文案"
-          >
-            {isExportingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            <span>下载图片包</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            disabled={isExportingZip || !hasExportableSuccess}
-            className="px-4 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-all shadow-xs hover:shadow-emerald-500/25 active:scale-98"
-            title="导出包含任务文案和分镜图片链接的 Excel 表格"
-          >
-            {isExportingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-            <span>导出 Excel</span>
-          </button>
+    <div className="flex flex-wrap items-center justify-between gap-4 py-2">
+      <div className="min-w-[180px] flex-1 space-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 className="text-sm font-semibold text-slate-900">{status}</h2>
+          <span className="text-xs text-slate-500">{successfulItems.length} 款商品 · 已出图 {displaySuccessCount} 张</span>
+          {displayFailCount > 0 && <span className="text-xs text-rose-600">失败 {displayFailCount} 张</span>}
         </div>
+        {busy && totalTaskCount > 0 && <div className="flex max-w-sm items-center gap-3">
+          <div role="progressbar" aria-label="生图进度" aria-valuemin={0} aria-valuemax={totalTaskCount} aria-valuenow={Math.min(completedTaskCount, totalTaskCount)} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="text-[11px] tabular-nums text-slate-500">{completedTaskCount}/{totalTaskCount}</span>
+        </div>}
       </div>
-
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="mr-1 flex rounded-xl border border-slate-200/60 bg-slate-100 p-1" role="group" aria-label="成图视图">
+          {([['single', '单品', Columns3], ['gallery', '画廊', ImageIcon]] as const).map(([value, label, Icon]) => (
+            <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${viewMode === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+              <Icon className="h-3.5 w-3.5" />{label}
+            </button>
+          ))}
+        </div>
+        {!readOnly && busy && (runControlStatus === 'paused' ? onResumeRun : onPauseRun) && (
+          <button type="button" onClick={runControlStatus === 'paused' ? onResumeRun : onPauseRun} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+            {runControlStatus === 'paused' ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+            {runControlStatus === 'paused' ? '继续生成' : '暂停'}
+          </button>
+        )}
+        <WorkshopActionMenu label={isExportingZip ? '正在导出' : '导出结果'} icon={isExportingZip ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} primary disabled={isExportingZip || !hasExportableSuccess}>
+          <p className="px-3 py-2 text-[11px] text-slate-400">导出当前批次已生成的内容</p>
+          <button type="button" className={workshopMenuItemClass} onClick={() => void handleExportZip()}><Download className="h-4 w-4" />下载图片与文案包</button>
+          <button type="button" className={workshopMenuItemClass} onClick={() => void handleExportExcel()}><FileSpreadsheet className="h-4 w-4" />导出 Excel 表格</button>
+        </WorkshopActionMenu>
+        {!readOnly && <WorkshopActionMenu label="更多" icon={<MoreHorizontal className="h-4 w-4" />}>
+          {generateAllCopywriting && <button type="button" className={workshopMenuItemClass} disabled={!hasExportableSuccess || copyBusy} onClick={generateCopy}><Sparkles className="h-4 w-4" />{copyBusy ? '文案生成中…' : '批量生成文案'}</button>}
+          {onBackToPrompts && <button type="button" className={workshopMenuItemClass} onClick={onBackToPrompts} disabled={busy}><ArrowLeft className="h-4 w-4" />返回修改提示词</button>}
+          {onCompleteBatch && <button type="button" className={workshopMenuItemClass} onClick={onCompleteBatch} disabled={busy || copyBusy || pipelineStatus === 'completed'} title={busy ? '请等待生成结束后归档' : '归档当前批次，并开始空白新批次'}><CheckCircle2 className="h-4 w-4" />完成并归档本批次</button>}
+          {busy && onCancelRun && <div className="mt-1 border-t border-slate-100 pt-1"><button type="button" className={`${workshopMenuItemClass} text-rose-600`} onClick={onCancelRun}><Square className="h-4 w-4" />停止生成</button></div>}
+        </WorkshopActionMenu>}
+      </div>
     </div>
   );
 }

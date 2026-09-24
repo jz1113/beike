@@ -1,6 +1,7 @@
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
 import { apiFetch, proxyMediaUrl, readClientStorageConfig, storageConfigHeaders } from '@/shared/api/apiClient';
 import type { BatchProductItem } from './batchTypes';
+import { isUsableWorkshopResult } from './workshopReadiness';
 
 export type MatrixExportRow = Record<string, string>;
 
@@ -48,14 +49,6 @@ export async function ensurePermanentImageUrl(url: string, filename: string): Pr
   return uploaded;
 }
 
-function slotUrls(item: BatchProductItem): string[] {
-  return (item.tasks || [])
-    .filter((task) => task.status === 'SUCCESS' && task.resultUrl && task.resultStatus !== 'superseded')
-    .slice()
-    .sort((a, b) => a.shot_no - b.shot_no)
-    .map((task) => task.resultUrl || '');
-}
-
 export async function buildMatrixExportRows(
   items: BatchProductItem[],
   onProgress?: (current: number, total: number) => void,
@@ -69,7 +62,12 @@ export async function buildMatrixExportRows(
     let taskCopywriting = content;
     if (tags && !content.includes('#')) taskCopywriting = content ? `${content}\n\n${tags}` : tags;
 
-    const rawUrls = slotUrls(item).map((url, idx) => opts?.linkForShot?.(item, idx + 1) ?? url);
+    const shots = (item.tasks || []).filter(isUsableWorkshopResult).slice().sort((a, b) => a.shot_no - b.shot_no);
+    // Keep the original shot number when resolving a file. A failed download must
+    // leave a blank cell, never silently fall back to a remote image in an offline ZIP.
+    const rawUrls = shots.map((task) => opts?.linkForShot
+      ? opts.linkForShot(item, task.shot_no) || ''
+      : task.resultUrl!);
     const finalUrls = opts?.offline
       ? rawUrls
       : await Promise.all(rawUrls.map((url, idx) => url ? ensurePermanentImageUrl(url, `slice_${item.itemId || item.id}_${idx + 1}`) : Promise.resolve('')));

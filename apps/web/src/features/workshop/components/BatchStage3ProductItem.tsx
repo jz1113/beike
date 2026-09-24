@@ -215,7 +215,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
               className="soft-textarea w-full min-h-64 p-4 text-sm leading-7" />
           ) : (
             <p className="text-sm leading-7 text-slate-600 whitespace-pre-wrap line-clamp-5">
-              {item.gridPrompt ? `${item.gridPrompt.slice(0, 600)}${item.gridPrompt.length > 600 ? '…' : ''}` : '此商品暂无整组提示词，请重新分析后编辑；生成时将按现有分镜组装。'}
+              {item.gridPrompt ? `${item.gridPrompt.slice(0, 600)}${item.gridPrompt.length > 600 ? '…' : ''}` : '此商品暂无整组提示词，请重新分析后再生成四宫格。'}
             </p>
           )}
           <div className="flex justify-between text-xs text-slate-500">

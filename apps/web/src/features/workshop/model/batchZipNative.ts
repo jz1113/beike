@@ -1,5 +1,6 @@
 import { exportZipDownload } from '@/shared/api/exportZipDownload';
 import type { BatchProductItem } from './batchTypes';
+import { isUsableWorkshopResult } from './workshopReadiness';
 
 export function toStoragePath(url: string): string {
   const match = url.match(/\/storage\/[^?#]+/);
@@ -12,7 +13,7 @@ export function isPersistedStorageUrl(url: string): boolean {
 
 export function canNativeOfflineExport(items: BatchProductItem[]): boolean {
   const urls = items.flatMap(item =>
-    (item.tasks || []).filter(task => task.status === 'SUCCESS' && task.resultUrl).map(task => task.resultUrl!)
+    (item.tasks || []).filter(isUsableWorkshopResult).map(task => task.resultUrl!)
   );
   return urls.length > 0 && urls.every(isPersistedStorageUrl);
 }
@@ -33,7 +34,7 @@ export async function tryNativeOfflineZip(
       copywritingContent: item.copywriting?.content,
       copywritingTags: item.copywriting?.tags,
       images: (item.tasks || [])
-        .filter(task => task.status === 'SUCCESS' && task.resultUrl)
+        .filter(isUsableWorkshopResult)
         .slice()
         .sort((a, b) => a.shot_no - b.shot_no)
         .map(task => ({ url: toStoragePath(task.resultUrl!), shotNo: task.shot_no, filename: `${item.title || item.itemId}_分镜${task.shot_no}.${task.resultUrl!.split('?')[0].split('.').pop() || 'png'}` })),

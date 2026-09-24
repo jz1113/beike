@@ -16,6 +16,7 @@ export interface TaskExecutionConfig {
   isAborted: () => boolean;
   isPaused?: () => boolean;
   idempotencyKey?: string;
+  onTaskSubmitted?: (taskId: string) => void;
 }
 
 export async function executeSingleImageTask(
@@ -79,6 +80,7 @@ export async function executeSingleImageTask(
       isAborted: config.isAborted,
       isPaused: config.isPaused,
       idempotencyKey: config.idempotencyKey,
+      onTaskSubmitted: config.onTaskSubmitted,
     }
   );
 }
