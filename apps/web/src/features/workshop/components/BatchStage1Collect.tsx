@@ -129,14 +129,7 @@ export default function BatchStage1Collect({
         {/* 🌟 顶部全宽智能采编工作舱：仅在初始未采集状态展示，采集后隐藏 */}
         {items.length === 0 && (
           <div className="w-full">
-            <BatchStage1OverviewCard
-              batchInputText={batchInputText}
-              setBatchInputText={setBatchInputText}
-              parsedLineCount={parsedLineCount}
-              handlePasteClipboard={handlePasteClipboard}
-              sampleDataA={sampleDataA}
-              itemsCount={items.length}
-            />
+            <BatchStage1OverviewCard />
           </div>
         )}
 

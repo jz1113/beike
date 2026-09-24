@@ -5,6 +5,20 @@ import { BatchProductItem } from '../model/batchTypes';
 import { BatchStage4Header } from './BatchStage4Header';
 import { BatchStage4ProductItem } from './BatchStage4ProductItem';
 import { BatchStage4GalleryView } from './BatchStage4GalleryView';
+import { isEphemeralResultUrl } from '../model/workspaceRecovery';
+
+function describeImageStatus(product: BatchProductItem): { label: string; failed: boolean } {
+  const tasks = product.tasks || [];
+  const usable = tasks.filter((task) => task.status === 'SUCCESS' && task.resultUrl && !isEphemeralResultUrl(task.resultUrl)).length;
+  const failed = tasks.filter((task) => task.status === 'FAILURE').length;
+  const running = tasks.filter((task) => task.status === 'IN_PROGRESS' || task.status === 'PENDING').length;
+  if (tasks.length === 0) return { label: '图片待生成', failed: false };
+  if (running > 0) return { label: `生成中 ${usable}/${tasks.length}`, failed: false };
+  if (failed > 0 && usable === 0) return { label: '图片生成失败', failed: true };
+  if (failed > 0) return { label: `部分失败 ${usable}/${tasks.length}`, failed: true };
+  if (usable === tasks.length) return { label: '图片已完成', failed: false };
+  return { label: `图片 ${usable}/${tasks.length}`, failed: false };
+}
 
 interface Props {
   successfulItems: BatchProductItem[];
@@ -22,7 +36,7 @@ interface Props {
   failTaskCount: number;
   generateCopywritingForProduct: (item: BatchProductItem) => Promise<void>;
   updateItemCopywriting?: (itemId: string, copywriting: { title: string; content: string; tags?: string[] }) => void;
-  generateAllCopywriting?: () => Promise<void>;
+  generateAllCopywriting?: (options?: { force?: boolean }) => Promise<void>;
   retryFailedImageTasks?: () => Promise<void>;
   retrySingleShotTask?: (itemId: string, shotIndex: number) => Promise<void>;
   isExportingZip: boolean;
@@ -39,6 +53,7 @@ interface Props {
   onResumeRun?: () => void;
   onCancelRun?: () => void;
   onCompleteBatch?: () => void;
+  onBackToPrompts?: () => void;
   pipelineStatus?: string;
   onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => void;
 }
@@ -75,6 +90,7 @@ export default function BatchStage4Queue({
   onResumeRun,
   onCancelRun,
   onCompleteBatch,
+  onBackToPrompts,
   pipelineStatus,
   onReviewTask,
 }: Props) {
@@ -158,6 +174,7 @@ export default function BatchStage4Queue({
         onResumeRun={onResumeRun}
         onCancelRun={onCancelRun}
         onCompleteBatch={onCompleteBatch}
+        onBackToPrompts={onBackToPrompts}
         pipelineStatus={pipelineStatus}
       />
 
@@ -176,6 +193,7 @@ export default function BatchStage4Queue({
                     const cover = product.selectedProductImages?.[0] || product.coverImage;
                     const copyFailed = Boolean(product.copywritingError);
                     const copyReady = Boolean(product.copywriting?.title && product.copywriting?.content);
+                    const imageStatus = describeImageStatus(product);
                     return <button key={product.id} type="button" aria-current={index === safeIndex ? 'true' : undefined}
                       onClick={() => setActiveItemIndex(index)} title={product.title}
                       className={`w-full flex items-center gap-3 rounded-xl p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -184,7 +202,7 @@ export default function BatchStage4Queue({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-medium">{index + 1}. {product.title}</span>
-                        <span className="block mt-1 text-[11px] text-slate-500">图片已完成</span>
+                        <span className={`block mt-1 text-[11px] ${imageStatus.failed ? 'text-rose-600' : 'text-slate-500'}`}>{imageStatus.label}</span>
                         <span className={`block text-[11px] ${copyFailed ? 'text-rose-600' : 'text-slate-400'}`}>
                           {copyFailed ? '文案失败，待重试' : copyReady ? '文案已就绪' : '文案待生成'}
                         </span>

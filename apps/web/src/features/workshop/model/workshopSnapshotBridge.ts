@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 import type { PreviousGroupSignature } from '@beike/domain/vision';
 import type { BatchProductItem, GenerationStrategy } from './batchTypes';
+import { sanitizeBatchItem } from './snapshotSanitize';
 import { useWorkshopBatchWorkspace } from '../hooks/useWorkshopBatchWorkspace';
 
 export interface WorkshopLiveState {
@@ -41,7 +42,7 @@ export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
     mode: 'original',
     currentStage: Math.min(4, Math.max(1, state.currentStage)),
     batchInputText: state.batchInputText,
-    items: state.items as WorkshopSnapshot['items'],
+    items: state.items.map((item) => sanitizeBatchItem(item) as WorkshopSnapshot['items'][number]),
     settings: {
       selectedVisionModel: state.selectedVisionModel,
       selectedImageGenModel: state.selectedImageGenModel,

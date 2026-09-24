@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Archive, History, Plus } from 'lucide-react';
+import { History, Plus } from 'lucide-react';
 import type { WorkshopBatch, WorkshopBatchSummary } from '@beike/contracts/workshopBatches';
 import { BatchHistoryPanel } from './BatchHistoryPanel';
 
@@ -9,12 +9,10 @@ interface Props {
   historyBatches: WorkshopBatchSummary[];
   itemsCount: number;
   currentStage: number;
-  isGenerating: boolean;
   ready: boolean;
   createNewBatch: () => Promise<void>;
   refreshHistory: () => Promise<WorkshopBatchSummary[]>;
   duplicateBatch: (id: string) => Promise<void>;
-  archiveCurrentBatch: () => Promise<void>;
   clearHistory: () => Promise<number>;
   renameBatch: (id: string, name: string) => Promise<void>;
   readBatch: (id: string) => Promise<WorkshopBatch>;
@@ -23,8 +21,8 @@ interface Props {
 }
 
 export function BatchWorkspaceBatchControls({
-  activeBatch, historyBatches, itemsCount, currentStage, isGenerating, ready,
-  createNewBatch, refreshHistory, duplicateBatch, archiveCurrentBatch, clearHistory, renameBatch, readBatch, onOpenGenerationView, showToast,
+  activeBatch, historyBatches, itemsCount, currentStage, ready,
+  createNewBatch, refreshHistory, duplicateBatch, clearHistory, renameBatch, readBatch, onOpenGenerationView, showToast,
 }: Props) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -63,6 +61,7 @@ export function BatchWorkspaceBatchControls({
               showToast('当前已经是空白新批次，可以直接输入 SKU');
               return;
             }
+            if (!window.confirm('新建批次会保留当前内容到历史，并切换到空白批次。确定继续吗？')) return;
             void run(createNewBatch);
           }}
           aria-label="新建批次"
@@ -103,20 +102,6 @@ export function BatchWorkspaceBatchControls({
         />
       )}
 
-      {itemsCount > 0 && currentStage === 4 && !isGenerating && (
-        <button
-          type="button"
-          disabled={!ready || isRunning}
-          onClick={() => {
-            if (window.confirm('归档当前批次后会立即创建一个空白新批次。历史内容不会丢失，确定继续吗？')) {
-              void run(archiveCurrentBatch);
-            }
-          }}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 sm:right-8 xl:right-12"
-        >
-          <Archive className="h-4 w-4" /> 完成并新建批次
-        </button>
-      )}
     </>
   );
 }

@@ -4,7 +4,7 @@ import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 import { workshopBatchSchema, workshopBatchSummarySchema } from '@beike/contracts/workshopBatches';
 import { workshopSnapshotSchema } from '@beike/contracts/workshopWorkspace';
 import { apiFetch } from '@/shared/api/apiClient';
-import { recoverWorkspace } from '../model/workspaceRecovery';
+import { recoverWorkspace, shouldArchiveOccupiedBatch } from '../model/workspaceRecovery';
 
 function parseBatchResponse(data: unknown): WorkshopBatch {
   return workshopBatchSchema.parse((data as { batch?: unknown }).batch);
@@ -47,7 +47,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     setError('');
   }, []);
 
-  const loadActive = useCallback(async () => {
+  const loadActive = useCallback(async (options?: { archiveIfOccupied?: boolean }) => {
     setReady(false);
     blocked.current = false;
     setStatus('正在加载当前批次…');
@@ -55,7 +55,21 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       const response = await apiFetch('/api/catalog/workshop-batches/active');
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '当前批次读取失败');
-      adoptBatch(parseBatchResponse(data), '当前批次已就绪');
+      let batch = parseBatchResponse(data);
+      let message = '当前批次已就绪';
+      const occupied = workshopSnapshotSchema.parse(batch.snapshot).items.length;
+      if (shouldArchiveOccupiedBatch(occupied, Boolean(options?.archiveIfOccupied))) {
+        const archived = await apiFetch('/api/catalog/workshop-batches/active/archive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: true }),
+        });
+        const archivedData = await archived.json();
+        if (!archived.ok) throw new Error(archivedData.error || '上次批次归档失败');
+        batch = parseBatchResponse(archivedData);
+        message = '上次批次已自动归档，可在历史中查看';
+      }
+      adoptBatch(batch, message);
       if (alive.current) setReady(true);
       await refreshHistory();
     } catch (cause) {
@@ -67,7 +81,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
 
   useEffect(() => {
     alive.current = true;
-    void loadActive();
+    void loadActive({ archiveIfOccupied: true });
     return () => { alive.current = false; };
   }, [loadActive]);
 
@@ -186,6 +200,6 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     clearHistory,
     renameBatch,
     readBatch,
-    reload: loadActive,
+    reload: () => loadActive(),
   };
 }

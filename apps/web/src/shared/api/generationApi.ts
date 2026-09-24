@@ -63,6 +63,15 @@ export async function pollSingleTask(
   isAborted: () => boolean,
   isPaused?: () => boolean,
 ): Promise<string> {
+  const result = await pollSingleTaskResult(taskId, isAborted, isPaused);
+  return result.url;
+}
+
+export async function pollSingleTaskResult(
+  taskId: string,
+  isAborted: () => boolean,
+  isPaused?: () => boolean,
+): Promise<{ url: string; temporary: boolean }> {
   const timeoutMs = 360000;
   const start = Date.now();
   const gatewayHeaders = getGatewayClientHeaders();
@@ -90,7 +99,7 @@ export async function pollSingleTask(
 
       const outcome = classifyGenerationPollResult(pData, { httpOk: pRes.ok });
       if (outcome === 'success') {
-        return String(pData.resultUrl);
+        return { url: String(pData.resultUrl), temporary: Boolean(pData.temporaryUrl) };
       }
       if (outcome === 'failure') {
         throw imageGenBusinessError(pData.failReason || pData.error || '生图任务失败');
@@ -122,6 +131,14 @@ export async function submitImageGenTask(
   payload: Record<string, unknown>,
   deps: SubmitImageGenTaskDeps
 ): Promise<string> {
+  const result = await submitImageGenTaskResult(payload, deps);
+  return result.url;
+}
+
+export async function submitImageGenTaskResult(
+  payload: Record<string, unknown>,
+  deps: SubmitImageGenTaskDeps
+): Promise<{ url: string; temporary: boolean }> {
   throwIfGenerationAborted(deps.isAborted);
   const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
 
@@ -172,12 +189,12 @@ export async function submitImageGenTask(
   } catch {}
 
   if (data.status === 'SUCCESS' && data.resultUrl) {
-    return data.resultUrl;
+    return { url: String(data.resultUrl), temporary: Boolean(data.temporaryUrl) };
   }
 
   if (data.taskId) {
     throwIfGenerationAborted(deps.isAborted);
-    return await pollSingleTask(data.taskId, deps.isAborted, deps.isPaused);
+    return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused);
   }
 
   throw nonRetryableError(

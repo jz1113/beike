@@ -151,6 +151,8 @@ export interface WorkshopSlice {
   /** 原创生成模式独立会话缓存 */
   originalSessionCache: WorkshopModeSession;
   currentStep: number;
+  /** 种草工坊批次阶段，与 URL ?step= 同步。 */
+  batchStage: number;
   product: ProductWidgetData | ProductData | null;
   images: ProductImage[];
   apiUsed: string | null;
@@ -224,6 +226,7 @@ export interface WorkshopSlice {
   isSocialPromptSourceStale: () => boolean;
   getSelectedSocialPromptKey: () => string;
   setStep: (step: number) => void;
+  setBatchStage: (stage: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setProductData: (product: ProductWidgetData | ProductData | null, images: { main: string[]; details: string[]; skus: string[] }, apiUsed?: string) => void;

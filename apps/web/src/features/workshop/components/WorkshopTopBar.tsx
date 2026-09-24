@@ -8,13 +8,6 @@ export interface WorkshopTopBarProps {
   assetToolbarRef?: React.Ref<HTMLDivElement>;
   activeTab: WorkshopTab;
   onSelectTab: (tab: WorkshopTab) => void;
-  // 流水线步骤相关（当 activeTab === 'studio' 时呈现）
-  currentStage?: number;
-  setCurrentStage?: (stage: number) => void;
-  itemsCount?: number;
-  readyProductCount?: number;
-  successfulItemsCount?: number;
-  isAutoPilotRunning?: boolean;
 }
 
 export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarProps) {

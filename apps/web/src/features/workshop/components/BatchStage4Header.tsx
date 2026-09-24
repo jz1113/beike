@@ -31,7 +31,7 @@ export interface BatchStage4HeaderProps {
   setSelectedAspect: (a: '3:4' | '1:1' | '9:16' | '16:9') => void;
   viewMode: 'single' | 'gallery';
   setViewMode: (m: 'single' | 'gallery') => void;
-  generateAllCopywriting?: () => Promise<void>;
+  generateAllCopywriting?: (options?: { force?: boolean }) => Promise<void>;
   handleExportZip: () => Promise<void>;
   handleExportExcel: () => Promise<void>;
   isExportingZip: boolean;
@@ -44,10 +44,12 @@ export interface BatchStage4HeaderProps {
   onResumeRun?: () => void;
   onCancelRun?: () => void;
   onCompleteBatch?: () => void;
+  onBackToPrompts?: () => void;
   pipelineStatus?: string;
 }
 
 export function BatchStage4Header({
+  isGeneratingBatch,
   hasExportableSuccess,
   viewMode,
   setViewMode,
@@ -55,12 +57,14 @@ export function BatchStage4Header({
   handleExportZip,
   handleExportExcel,
   isExportingZip,
+  successfulItems,
   readOnly = false,
   runControlStatus = 'idle',
   onPauseRun,
   onResumeRun,
   onCancelRun,
   onCompleteBatch,
+  onBackToPrompts,
   pipelineStatus,
 }: BatchStage4HeaderProps) {
   return (
@@ -106,6 +110,11 @@ export function BatchStage4Header({
               <Square className="w-3.5 h-3.5" /><span>取消</span>
             </button>
           )}
+          {!readOnly && onBackToPrompts && (
+            <button type="button" onClick={onBackToPrompts} disabled={isGeneratingBatch} className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-40">
+              返回提示词
+            </button>
+          )}
           {!readOnly && onCompleteBatch && (
             <button type="button" onClick={onCompleteBatch} disabled={pipelineStatus === 'completed'} className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white flex items-center gap-1.5 disabled:opacity-40">
               <CheckCircle2 className="w-3.5 h-3.5" /><span>完成本批次</span>
@@ -114,7 +123,12 @@ export function BatchStage4Header({
           {!readOnly && generateAllCopywriting && (
             <button
               type="button"
-              onClick={generateAllCopywriting}
+              onClick={() => {
+                const withImages = successfulItems.filter((item) => (item.tasks || []).some((task) => task.status === 'SUCCESS' && task.resultUrl));
+                const allHaveCopy = withImages.length > 0 && withImages.every((item) => Boolean(item.copywriting?.content));
+                if (allHaveCopy && !window.confirm('所有商品都已有文案。要全部重写吗？')) return;
+                void generateAllCopywriting?.(allHaveCopy ? { force: true } : undefined);
+              }}
               disabled={!hasExportableSuccess}
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200/80 hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-all bg-white shadow-2xs active:scale-98"
               title="一键为所有商品批量生成/重写小红书文案"

@@ -288,8 +288,11 @@ async function pollImageOnce(req: Request) {
     resultUrl = resData.output;
   }
 
+  let temporaryUrl = false;
   if (resultUrl) {
+    const upstreamUrl = resultUrl;
     resultUrl = await ensurePersistableResultUrl(resultUrl, req);
+    temporaryUrl = /^https?:\/\//.test(resultUrl) && resultUrl === upstreamUrl;
   }
 
   // 🌟 状态映射为规范枚举 (优先拦截明确失败，只要存在失败原因且无图直接判定为 FAILURE)
@@ -338,6 +341,7 @@ async function pollImageOnce(req: Request) {
     status,
     progress: finalProgress,
     resultUrl,
+    temporaryUrl,
     failReason,
   });
 }

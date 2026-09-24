@@ -10,6 +10,7 @@ export interface CopywritingContext {
   showToast: (msg: string) => void;
   analyzeConcurrency?: number;
   isAborted?: () => boolean;
+  force?: boolean;
 }
 
 const inFlight = new Map<string, Promise<boolean>>();
@@ -126,9 +127,12 @@ export function updateItemCopywriting(
 
 async function runCopywritingBatch(ctx: CopywritingContext): Promise<void> {
   const pendingItems = ctx.getItems().filter(item =>
-    (item.tasks || []).some(task => task.status === 'SUCCESS' && task.resultUrl) && !item.copywriting?.content
+    (item.tasks || []).some(task => task.status === 'SUCCESS' && task.resultUrl) && (ctx.force || !item.copywriting?.content)
   );
-  if (pendingItems.length === 0) return;
+  if (pendingItems.length === 0) {
+    ctx.showToast(ctx.force ? '没有可重写文案的商品' : '所有商品都已有文案');
+    return;
+  }
   ctx.showToast(`正在为 ${pendingItems.length} 款商品批量生成小红书种草文案...`);
   const concurrency = Math.min(ctx.analyzeConcurrency || 2, pendingItems.length);
   const queue = [...pendingItems];

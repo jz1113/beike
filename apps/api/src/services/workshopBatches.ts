@@ -56,6 +56,15 @@ function emptySnapshot(): WorkshopSnapshot {
   };
 }
 
+export function stageForSnapshotContent(snapshot: WorkshopSnapshot): number {
+  const items = snapshot.items || [];
+  const hasImages = items.some((item) => (item.tasks || []).some((task) => task.status === 'SUCCESS' && Boolean(task.resultUrl) && !task.resultUrl?.startsWith('blob:')));
+  if (hasImages) return 4;
+  if (items.some((item) => (item.prompts || []).length > 0)) return 3;
+  if (items.some((item) => item.status === 'success')) return 2;
+  return 1;
+}
+
 export function statusForSnapshot(snapshot: WorkshopSnapshot): WorkshopBatchStatus {
   if (snapshot.pipeline?.status) return snapshot.pipeline.status;
   if (snapshot.items.length === 0) return 'draft';
@@ -164,7 +173,7 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
       const source = await this.get(id);
       const snapshot: WorkshopSnapshot = {
         ...source.snapshot,
-        currentStage: 1,
+        currentStage: stageForSnapshotContent(source.snapshot),
         batchInputText: '',
         pipeline: emptyPipelineState('draft'),
       };

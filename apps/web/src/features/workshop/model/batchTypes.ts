@@ -30,6 +30,7 @@ export interface BatchTaskItem {
   prompt: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
   resultUrl?: string;
+  temporaryUrl?: boolean;
   error?: string;
   recoveryRequired?: boolean;
   revision?: number;

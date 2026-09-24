@@ -63,19 +63,11 @@ const DEFAULT_CODE: Record<AssetSubTab, string> = {
 };
 
 const TAB_APPLY_BTN_CLASS: Record<AssetSubTab, string> = {
-  full_prompt: 'bg-indigo-50 hover:bg-indigo-100/90 text-indigo-900 border-indigo-200/80',
-  persona: 'bg-amber-50 hover:bg-amber-100/90 text-amber-900 border-amber-200/80',
-  outfit: 'bg-sky-50 hover:bg-sky-100/90 text-sky-900 border-sky-200/80',
-  scene: 'bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 border-emerald-200/80',
-  action: 'bg-purple-50 hover:bg-purple-100/90 text-purple-900 border-purple-200/80',
-};
-
-const TAB_HOVER_BORDER_CLASS: Record<AssetSubTab, string> = {
-  full_prompt: 'hover:border-indigo-400/90',
-  persona: 'hover:border-amber-400/90',
-  outfit: 'hover:border-sky-400/90',
-  scene: 'hover:border-emerald-400/90',
-  action: 'hover:border-purple-400/90',
+  full_prompt: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800',
+  persona: 'bg-amber-50 hover:bg-amber-100 text-amber-800',
+  outfit: 'bg-sky-50 hover:bg-sky-100 text-sky-800',
+  scene: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800',
+  action: 'bg-purple-50 hover:bg-purple-100 text-purple-800',
 };
 
 const TAB_HOVER_TITLE_CLASS: Record<AssetSubTab, string> = {
@@ -151,14 +143,14 @@ export default function PromptAssetCard({
   return (
     <div
       onClick={onCardClick}
-      className={`group relative flex flex-col bg-white rounded-[18px] p-4 min-h-[232px] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] cursor-pointer border ${
+      className={`group relative self-start flex flex-col rounded-[18px] bg-white/95 p-4 shadow-[0_2px_12px_rgba(30,41,59,0.055)] transition-[transform,box-shadow,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_30px_rgba(30,41,59,0.12)] cursor-pointer ${
         isSelected
-          ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20'
-          : `border-slate-200/70 ${TAB_HOVER_BORDER_CLASS[activeSubTab]}`
+          ? 'bg-indigo-50/80 ring-2 ring-indigo-400 shadow-[0_8px_24px_rgba(79,70,229,0.12)]'
+          : ''
       }`}
     >
-      {/* 顶部单行元信息栏：编号 + 来源图徽标 + 核心徽标 + 批量选择 + 收藏/更多（固定单行高度，绝不折行串行） */}
-      <div className="flex items-center justify-between gap-2 mb-2 select-none h-6">
+      {/* 顶部单行元信息栏：编号 + 来源图徽标 + 核心徽标 + 批量选择 + 收藏/更多 */}
+      <div className="flex items-center justify-between gap-2 mb-2 select-none min-h-6">
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
           {isBatchMode && (
             <div
@@ -182,7 +174,7 @@ export default function PromptAssetCard({
           {/* 📷 来源原图定位徽标 */}
           {sourceIndices.length > 0 ? (
             <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0 flex items-center gap-0.5"
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 shrink-0 flex items-center gap-0.5"
               title={activeSubTab === 'full_prompt'
                 ? `图组母本为 #${sourceIndex ?? sourceIndices[0]}；联动参考图 ${sourceIndices.map((index) => `#${index}`).join('、')}`
                 : `内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
@@ -192,7 +184,7 @@ export default function PromptAssetCard({
             </span>
           ) : sourceIndex !== null ? (
             <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shrink-0 flex items-center gap-0.5"
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 shrink-0 flex items-center gap-0.5"
               title={`此提示词资产提取自原图集的第 ${sourceIndex} 张图片`}
             >
               <ImageIcon className="w-2.5 h-2.5 text-slate-500" />
@@ -200,7 +192,7 @@ export default function PromptAssetCard({
             </span>
           ) : imageUrl ? (
             <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shrink-0 flex items-center gap-0.5"
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 shrink-0 flex items-center gap-0.5"
               title="含来源参考原图"
             >
               <ImageIcon className="w-2.5 h-2.5 text-slate-500" />
@@ -285,7 +277,7 @@ export default function PromptAssetCard({
       </h3>
 
       {/* 中部：来源原图缩略图 + 提示词摘要 */}
-      <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="flex items-start gap-3 min-w-0">
         {imageUrl ? (
           <div
             onClick={(e) => {
@@ -294,7 +286,7 @@ export default function PromptAssetCard({
                 onPreviewImage(imageUrl, e);
               }
             }}
-            className="group/thumb relative w-[72px] h-[72px] rounded-xl overflow-hidden shrink-0 border border-slate-200/90 bg-slate-100 shadow-2xs cursor-zoom-in"
+            className="group/thumb relative w-[88px] h-[88px] rounded-xl overflow-hidden shrink-0 bg-slate-100 cursor-zoom-in"
             title="点击放大查看来源参考原图"
           >
             <img
@@ -314,7 +306,7 @@ export default function PromptAssetCard({
             )}
           </div>
         ) : (
-          <div className="w-[72px] h-[72px] rounded-xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
+          <div className="w-[88px] h-[88px] rounded-xl bg-slate-50 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
             <ImageIcon className="w-5 h-5" />
             <span className="text-[10px]">文字资产</span>
           </div>
@@ -331,7 +323,8 @@ export default function PromptAssetCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 min-h-5 mt-2.5 mb-2.5">
+      {displayBadges.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-2.5">
           {/* 精炼合规的核心分类徽标 */}
           {displayBadges.map((b) => (
             <button
@@ -341,20 +334,21 @@ export default function PromptAssetCard({
                 e.stopPropagation();
                 if (onQuickEditTag) onQuickEditTag(item, e);
               }}
-              className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium border shrink-0 transition-all cursor-pointer hover:ring-1 hover:ring-purple-400/60 truncate max-w-[120px] flex items-center gap-0.5 bg-slate-50 text-slate-600 border-slate-200/70`}
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium shrink-0 transition-all cursor-pointer hover:bg-slate-100 truncate max-w-[120px] flex items-center gap-0.5 bg-slate-50 text-slate-600"
               title={`点击修改标签: ${b.label}`}
             >
               <span className="truncate">{b.label}</span>
               <Edit2 className="w-2 h-2 opacity-0 hover:opacity-70 transition-opacity shrink-0" />
             </button>
           ))}
-      </div>
+        </div>
+      )}
 
       {/* 底部操作栏 */}
-      <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
+      <div className="flex items-center justify-between gap-2 mt-3">
         <button
           onClick={onViewDetail}
-          className="flex items-center gap-0.5 text-[11px] text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer font-medium"
+          className="flex items-center gap-0.5 min-w-0 text-[11px] text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer font-medium"
         >
           <span>{activeSubTab === 'full_prompt' ? '查看图组与分镜' : '查看提示词与原图'}</span>
           <ChevronRight className="w-3 h-3" />
@@ -362,7 +356,7 @@ export default function PromptAssetCard({
 
         <button
           onClick={onApply}
-          className={`flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${TAB_APPLY_BTN_CLASS[activeSubTab]}`}
+          className={`flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${TAB_APPLY_BTN_CLASS[activeSubTab]}`}
           title="应用到工坊流水线"
         >
           <span>{TAB_APPLY_LABEL[activeSubTab]}</span>

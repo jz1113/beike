@@ -107,7 +107,7 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, onClose, onRead
                 <p className="text-base font-black text-slate-900">{selectedBatch.name}</p>
                 <p className="mt-1 text-xs text-slate-500">{selectedBatch.snapshot.items.length} 款商品 · {selectedBatch.status === 'archived' ? '已归档' : selectedBatch.status}</p>
               </div>
-              <button type="button" disabled={isBusy} onClick={() => void duplicate(selectedBatch.id)} className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50">复制为新批次</button>
+              <button type="button" disabled={isBusy} onClick={() => void duplicate(selectedBatch.id)} className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50">{selectedBatch.status === 'archived' ? '恢复为当前批次' : '复制为新批次'}</button>
             </div>
             <button type="button" disabled={isBusy} onClick={() => void openGenerationView(selectedBatch.id)} className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">进入生成界面查看</button>
             <div className="space-y-2">
@@ -151,7 +151,7 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, onClose, onRead
                   <button type="button" disabled={isBusy} onClick={() => void viewBatch(batch.id)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">查看</button>
                   <button type="button" disabled={isBusy} onClick={() => void openGenerationView(batch.id)} className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">查看生成</button>
                   {editingBatchId !== batch.id && <button type="button" disabled={isBusy} onClick={() => { setDraftName(batch.name.startsWith('未命名') ? '' : batch.name); setEditingBatchId(batch.id); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><Pencil className="h-3 w-3" /> 命名</button>}
-                  {batch.id !== activeBatch?.id && <button type="button" disabled={isBusy} onClick={() => void duplicate(batch.id)} className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">复制为新批次</button>}
+                  {batch.id !== activeBatch?.id && <button type="button" disabled={isBusy} onClick={() => void duplicate(batch.id)} className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">{batch.status === 'archived' ? '恢复为当前批次' : '复制为新批次'}</button>}
                 </div>
               </article>
             ))}

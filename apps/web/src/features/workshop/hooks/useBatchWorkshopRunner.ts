@@ -3,7 +3,9 @@ import { PreviousGroupSignature } from '@beike/domain/vision';
 import { type WorkshopBatchStatus } from '@beike/domain/workshopPipeline';
 import { applyInvalidationToItems } from '../model/applyInvalidation';
 import { createRunControl, type RunControl } from '../model/runControl';
-import { dispatchBatchEvent, reviewWorkshopTask } from '../api/batchCommands';
+import { useBatchExport } from './useBatchExport';
+import { useBatchReview } from './useBatchReview';
+import { useWorkspaceSnapshotSync } from './useWorkspaceSnapshotSync';
 import { useWorkshopShotCount } from './useWorkshopShotCount';
 import { 
   BatchProductItem, 
@@ -13,12 +15,6 @@ import {
 import {
   shouldAutoSelectJewelryArch,
 } from '@beike/domain/jewelryArch';
-import {
-  exportBatchZip,
-  exportBatchExcel,
-  exportSingleProductZip,
-  downloadSingleTaskImage,
-} from '../model/batchRunnerExport';
 import { analyzeBatchProduct, runBatchVisionAnalyze, type VisionAnalyzeDeps } from '../model/batchVisionAnalyze';
 import { useAppStore } from '@/store';
 
@@ -171,16 +167,17 @@ export function useBatchWorkshopRunner() {
   const setPendingBatchStage = useAppStore((s) => s.setPendingBatchStage);
   const pendingBatchPromptImport = useAppStore((s) => s.pendingBatchPromptImport);
   const setPendingBatchPromptImport = useAppStore((s) => s.setPendingBatchPromptImport);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
 
   useEffect(() => {
-    if (pendingBatchStage == null) return;
+    if (!workspaceReady || pendingBatchStage == null) return;
     const stage = Math.max(1, Math.min(4, pendingBatchStage));
     setCurrentStage(stage);
     setPendingBatchStage(null);
-  }, [pendingBatchStage, setPendingBatchStage]);
+  }, [workspaceReady, pendingBatchStage, setPendingBatchStage]);
 
   useEffect(() => {
-    if (!pendingBatchPromptImport?.prompts?.length) return;
+    if (!workspaceReady || !pendingBatchPromptImport?.prompts?.length) return;
     const { productTitle, productFingerprint, prompts, referenceImages = [], masterImageIndex } = pendingBatchPromptImport;
     const importId = `hist_${Date.now()}`;
 
@@ -219,7 +216,7 @@ export function useBatchWorkshopRunner() {
     setCurrentStage(3);
     setPendingBatchPromptImport(null);
     showToast(`已载入 ${prompts.length} 条图组分镜${masterImageIndex ? `（母本图 #${masterImageIndex}）` : ''}；场景、镜头动作与同组参考图已联动，可直接确认后生图。`);
-  }, [pendingBatchPromptImport, setPendingBatchPromptImport, showToast]);
+  }, [workspaceReady, pendingBatchPromptImport, setPendingBatchPromptImport, showToast]);
 
   const successfulItems = items.filter((i) => i.status === 'success' && i.selected);
 
@@ -469,47 +466,23 @@ export function useBatchWorkshopRunner() {
     updateItemCopywritingUtil(setItems, itemId, copywriting);
   };
 
-  const generateAllCopywriting = async () => {
+  const generateAllCopywriting = async (options?: { force?: boolean }) => {
     await generateAllCopywritingUtil({
       getItems: () => itemsRef.current,
       setItems,
       selectedVisionModel,
       showToast,
       analyzeConcurrency,
+      force: options?.force,
     });
   };
 
-  // 导出
-  const handleExportZip = async () => {
-    await exportBatchZip(itemsRef.current, {
-      setIsExportingZip,
-      setExportingSingleItemId,
-      setToastMsg: () => {},
-      showToast,
-    });
-  };
-
-  const handleExportExcel = async () => {
-    await exportBatchExcel(itemsRef.current, {
-      setIsExportingZip,
-      setExportingSingleItemId,
-      setToastMsg: () => {},
-      showToast,
-    });
-  };
-
-  const handleExportSingleProductZip = async (item: BatchProductItem) => {
-    await exportSingleProductZip(item, {
-      setIsExportingZip,
-      setExportingSingleItemId,
-      setToastMsg: () => {},
-      showToast,
-    });
-  };
-
-  const handleDownloadSingleTaskImage = async (url: string, filename?: string) => {
-    await downloadSingleTaskImage(url, filename, showToast);
-  };
+  const {
+    handleExportZip,
+    handleExportExcel,
+    handleExportSingleProductZip,
+    handleDownloadSingleTaskImage,
+  } = useBatchExport(itemsRef, showToast, setIsExportingZip, setExportingSingleItemId);
 
   // 全自动生产流水线
   const startAutoPilotPipeline = async () => {
@@ -518,7 +491,6 @@ export function useBatchWorkshopRunner() {
       getItems: () => itemsRef.current,
       setItems,
       startBatchVisionAnalyze,
-      startBatchGeneration,
       setCurrentStage,
       showToast,
       setIsAutoPilotRunning,
@@ -531,25 +503,16 @@ export function useBatchWorkshopRunner() {
   const cancelRun = () => { runControlRef.current = { status: 'cancelled' }; };
 
   const completeCurrentBatch = async () => {
-    const batch = workspace.activeBatch;
-    if (!batch) return;
-    await dispatchBatchEvent(batch.id, batch.revision, { type: 'COMPLETE_BATCH' });
-    setPipelineStatus('completed');
-    showToast('本批次已完成，当前为只读。修改请复制为新批次');
+    if (!window.confirm('完成本批次后会归档当前内容，并开始一个空白新批次。历史内容可在批次历史中恢复。确定继续吗？')) return;
+    try {
+      await workspace.archiveCurrentBatch(true);
+      showToast('本批次已归档，已开始新的空白批次');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '完成本批次失败');
+    }
   };
 
-  const reviewTask = (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => {
-    setItems((prev) => prev.map((item) => {
-      if (item.id !== itemId) return item;
-      return {
-        ...item,
-        tasks: (item.tasks || []).map((task) => task.id === taskId ? { ...task, outputReview: decision } : task),
-      };
-    }));
-    void reviewWorkshopTask(taskId, { decision }).catch((error) => {
-      showToast(error instanceof Error ? error.message : '审核提交失败');
-    });
-  };
+  const { reviewTask } = useBatchReview(itemsRef, setItems, retrySingleShotTask, showToast);
 
   const applyWorkspaceSnapshot = useCallback((value: WorkshopSnapshot) => {
     setCurrentStage(value.currentStage);
@@ -592,6 +555,12 @@ export function useBatchWorkshopRunner() {
     },
   }, applyWorkspaceSnapshot);
   activeBatchIdRef.current = workspace.activeBatch?.id || 'draft';
+
+  useEffect(() => {
+    if (workspace.ready) setWorkspaceReady(true);
+  }, [workspace.ready]);
+
+  useWorkspaceSnapshotSync(workspace.ready, currentStage, setCurrentStage, itemsRef);
 
   return {
     currentStage,
@@ -690,6 +659,8 @@ export function useBatchWorkshopRunner() {
     toastMsg,
     showToast,
     workspaceError: workspace.error,
+    workspaceStatus: workspace.status,
+    reloadWorkspace: workspace.reload,
     workspaceReady: workspace.ready,
     activeBatch: workspace.activeBatch,
     historyBatches: workspace.historyBatches,

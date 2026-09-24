@@ -68,14 +68,14 @@ async function runSelectedShots(
       tasks.map((task) => (task.shot_no === shot.shot_no ? { ...task, status: 'IN_PROGRESS', error: undefined } : task))
     );
     try {
-      const url = await executeSingleImageTask(item, shot, undefined, {
+      const generated = await executeSingleImageTask(item, shot, undefined, {
         ...config,
         idempotencyKey: liveTask?.idempotencyKey || config.idempotencyKey,
       });
       patchItemTasks(setItems, item.id, (tasks) =>
         tasks.map((task) =>
           task.shot_no === shot.shot_no
-            ? { ...task, status: 'SUCCESS', resultUrl: url, error: undefined }
+            ? { ...task, status: 'SUCCESS', resultUrl: generated.url, temporaryUrl: generated.temporary, error: undefined }
             : task
         )
       );
@@ -330,10 +330,10 @@ export async function retrySingleShotTaskCoordinator(
   );
 
   try {
-    const shotUrl = await executeSingleImageTask(targetItem, shot, undefined, config);
+    const generated = await executeSingleImageTask(targetItem, shot, undefined, config);
     patchItemTasks(setItems, itemId, (tasks) =>
       tasks.map((entry, idx) =>
-        idx === shotIndex ? { ...entry, status: 'SUCCESS', resultUrl: shotUrl, error: undefined } : entry
+        idx === shotIndex ? { ...entry, status: 'SUCCESS', resultUrl: generated.url, temporaryUrl: generated.temporary, error: undefined } : entry
       )
     );
     showToast(`分镜 ${shot.shot_no} 重新生成成功！`);

@@ -17,6 +17,7 @@ const task = z.object({
   prompt: z.string(),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'SUCCESS', 'FAILURE']),
   resultUrl: z.string().optional(),
+  temporaryUrl: z.boolean().optional(),
   error: z.string().optional(),
   recoveryRequired: z.boolean().optional(),
   revision: z.number().int().min(0).default(0),

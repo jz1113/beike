@@ -5,7 +5,6 @@ export interface AutoPilotDeps {
   getItems: () => BatchProductItem[];
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
   startBatchVisionAnalyze: () => Promise<number>;
-  startBatchGeneration: () => Promise<void>;
   setCurrentStage: (stage: number) => void;
   showToast: (msg: string) => void;
   setIsAutoPilotRunning: (running: boolean) => void;
@@ -13,8 +12,7 @@ export interface AutoPilotDeps {
 }
 
 /**
- * 启动全自动生产流水线（自动垫图 → 批量视觉分析 → 严格阻断门禁 → 批量生图）。
- * 文案是否自动生成由生图调度器依据当前批次预设决定，避免重复提交。
+ * 自动选图并完成分镜分析，停在提示词审核，不自动生图。
  */
 export async function startAutoPilotPipeline(deps: AutoPilotDeps): Promise<void> {
   if (deps.successfulItems.length === 0) {

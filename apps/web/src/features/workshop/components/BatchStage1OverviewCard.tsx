@@ -1,15 +1,6 @@
 import React from 'react';
 
-export interface BatchStage1OverviewCardProps {
-  batchInputText: string;
-  setBatchInputText: (val: string) => void;
-  parsedLineCount?: number;
-  handlePasteClipboard?: () => Promise<void>;
-  sampleDataA?: string;
-  itemsCount?: number;
-}
-
-export const BatchStage1OverviewCard: React.FC<BatchStage1OverviewCardProps> = () => {
+export const BatchStage1OverviewCard: React.FC = () => {
   return (
     <div className="relative w-full max-w-2xl mx-auto py-8 sm:py-12 px-4 flex flex-col items-center select-none animate-in fade-in zoom-in-98 duration-300">
       {/* 居中大标题与种草业务副标题 */}

@@ -93,6 +93,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   originalIsAnchorFaceConfirmed: false,
   socialPromptSourceKey: '',
   pendingBatchPromptImport: null,
+  batchStage: 1,
   pendingBatchStage: null,
   pendingBatchLockedAssets: null,
   getEffectiveAnchorFaceImageUrl: () => pickEffectiveAnchorFaceImageUrl(get()),
@@ -240,6 +241,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   },
 
   setStep: (currentStep) => set({ currentStep }),
+  setBatchStage: (batchStage) => set({ batchStage: Math.max(1, Math.min(4, batchStage)) }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
 

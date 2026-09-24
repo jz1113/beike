@@ -120,13 +120,14 @@ export default function BatchWorkshopView() {
     toastMsg,
     showToast,
     workspaceError,
+    workspaceStatus,
+    reloadWorkspace,
     workspaceReady,
     activeBatch,
     historyBatches,
     refreshBatchHistory,
     createNewBatch,
     duplicateBatch,
-    archiveCurrentBatch,
     clearHistory,
     renameBatch,
     readBatch,
@@ -137,7 +138,6 @@ export default function BatchWorkshopView() {
     setToastMsg: (msg: string | null) => { if (msg) showToast(msg); },
     showToast,
   };
-  const readyProductCount = successfulItems.filter(i => i.selectedProductImages && i.selectedProductImages.length > 0).length;
   const stage2ConfigValue = useMemo((): BatchConfigContextValue => ({
     currentStage,
     successfulItems,
@@ -268,29 +268,25 @@ export default function BatchWorkshopView() {
       <WorkshopTopBar
         activeTab={activeWorkshopTab}
         onSelectTab={setActiveWorkshopTab}
-        currentStage={currentStage}
-        setCurrentStage={setCurrentStage}
-        itemsCount={items.length}
-        readyProductCount={readyProductCount}
-        successfulItemsCount={successfulItems.length}
-        isAutoPilotRunning={isAutoPilotRunning}
       />
+      {workspaceStatus && workspaceStatus !== '当前批次已就绪' && workspaceStatus !== '当前批次已保存' && !workspaceError ? (
+        <p className="px-4 sm:px-6 text-xs text-slate-500">{workspaceStatus}</p>
+      ) : null}
       {workspaceError ? (
-        <p role="alert" className="px-4 sm:px-6 text-xs text-amber-800">
-          {workspaceError}
-        </p>
+        <div role="alert" className="mx-4 sm:mx-6 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <span>{workspaceError}{workspaceStatus ? ` · ${workspaceStatus}` : ''}</span>
+          <button type="button" onClick={() => void reloadWorkspace()} className="rounded-lg bg-white px-2.5 py-1 font-bold text-amber-800 ring-1 ring-amber-200">重新加载</button>
+        </div>
       ) : null}
       <BatchWorkspaceBatchControls
         activeBatch={activeBatch}
         historyBatches={historyBatches}
         itemsCount={items.length}
         currentStage={currentStage}
-        isGenerating={isGeneratingBatch}
         ready={workspaceReady}
         createNewBatch={createNewBatch}
         refreshHistory={refreshBatchHistory}
         duplicateBatch={duplicateBatch}
-        archiveCurrentBatch={archiveCurrentBatch}
         clearHistory={clearHistory}
         renameBatch={renameBatch}
         readBatch={readBatch}
@@ -421,6 +417,7 @@ export default function BatchWorkshopView() {
               onResumeRun={resumeRun}
               onCancelRun={cancelRun}
               onCompleteBatch={completeCurrentBatch}
+              onBackToPrompts={() => setCurrentStage(3)}
               pipelineStatus={pipelineStatus}
               onReviewTask={reviewTask}
             />
@@ -455,8 +452,6 @@ export default function BatchWorkshopView() {
         selectedImageGenModel={selectedImageGenModel}
         setSelectedImageGenModel={setSelectedImageGenModel}
         availableImageModels={availableImageModels}
-        generationStrategy={generationStrategy}
-        setGenerationStrategy={setGenerationStrategy}
         autoGenerateCopywriting={autoGenerateCopywriting}
         setAutoGenerateCopywriting={setAutoGenerateCopywriting}
         imageGenConcurrency={imageGenConcurrency}

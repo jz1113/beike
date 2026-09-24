@@ -16,6 +16,12 @@ const STATUS_CLASS: Record<string, string> = {
   archived: 'bg-slate-100 text-slate-400',
 };
 
+const PROVENANCE_LABEL: Record<string, string> = {
+  deconstructed: '拆解入库',
+  seed: '内置素材',
+  manual: '手动创建',
+};
+
 export function PromptAssetLifecycleBadges({ item }: { item: Record<string, unknown> }) {
   const registry = (item.registry || {}) as Record<string, unknown>;
   const status = String(registry.status || item.lifecycleStatus || '');
@@ -26,7 +32,7 @@ export function PromptAssetLifecycleBadges({ item }: { item: Record<string, unkn
   const retry = registry.retryRate as number | undefined;
   if (!status && quality == null && !provenance) return null;
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1">
+    <div className="flex items-center gap-1 min-w-0 overflow-hidden">
       {status ? (
         <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${STATUS_CLASS[status] || 'bg-slate-100 text-slate-600'}`}>
           {STATUS_LABEL[status] || status}
@@ -45,7 +51,7 @@ export function PromptAssetLifecycleBadges({ item }: { item: Record<string, unkn
         <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">分析不召回</span>
       ) : null}
       {version ? <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">v{version}</span> : null}
-      {provenance ? <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{provenance}</span> : null}
+      {provenance ? <span className="shrink-0 rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500" title={provenance}>{PROVENANCE_LABEL[provenance] || provenance}</span> : null}
     </div>
   );
 }

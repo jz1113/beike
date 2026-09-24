@@ -61,7 +61,7 @@ export function BatchStage4CopyPanel({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-slate-700"><span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold">标题</span></label>
-            <span className={`text-[11px] font-mono ${titleLength > 20 ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>{titleLength}/20 字</span>
+            <span className={`text-[11px] font-mono ${titleLength > 0 && (titleLength < 5 || titleLength > 20) ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>{titleLength}/20 字{titleLength > 0 && titleLength < 5 ? ' · 至少 5 字' : ''}</span>
           </div>
           <input aria-label="文案标题" type="text" value={titleText}
             disabled={readOnly}

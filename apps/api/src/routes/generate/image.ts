@@ -172,9 +172,12 @@ async function submit(req: Request) {
     gatewayMs = submitResult.gatewayMs;
     payloadBytes = submitResult.payloadBytes;
     let directResultUrl = submitResult.directResultUrl;
+    let temporaryUrl = false;
 
     if (directResultUrl) {
+      const upstreamUrl = directResultUrl;
       directResultUrl = await ensurePersistableResultUrl(directResultUrl, req);
+      temporaryUrl = /^https?:\/\//.test(directResultUrl) && directResultUrl === upstreamUrl;
     }
 
     if (!submitResult.genRes.ok || (!submitResult.taskId && !directResultUrl)) {
@@ -271,6 +274,7 @@ async function submit(req: Request) {
       usedEndpoint: submitResult.usedEndpoint,
       status: directResultUrl ? 'SUCCESS' : 'IN_PROGRESS',
       resultUrl: directResultUrl || undefined,
+      temporaryUrl: Boolean(directResultUrl && temporaryUrl),
       prompt: String(genPayload.prompt || slotResolution.cleanedPrompt),
       timing,
     };
