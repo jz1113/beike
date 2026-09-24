@@ -1,4 +1,12 @@
-import { prisma } from './db';
+import { prisma, unscopedPrisma } from './db';
+
+export async function listImageTaskWorkspaceIdsByResultUrl(resultUrl: string): Promise<string[]> {
+  const tasks = await unscopedPrisma.imageTask.findMany({
+    where: { resultUrl },
+    select: { workspaceId: true },
+  });
+  return tasks.map((task) => task.workspaceId);
+}
 
 export async function countLocalRecords() {
   const [

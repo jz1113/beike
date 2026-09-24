@@ -36,6 +36,13 @@ test('stableHash is deterministic', () => {
   assert.notEqual(stableHash('hello'), stableHash('world'));
 });
 
+test('retry attempt changes the idempotency key', () => {
+  const original = buildImageTaskKey(base);
+  assert.equal(buildImageTaskKey({ ...base, attempt: 0 }), original);
+  assert.notEqual(buildImageTaskKey({ ...base, attempt: 1 }), original);
+  assert.equal(buildImageTaskKey({ ...base, attempt: 2 }).endsWith(':a2'), true);
+});
+
 test('merge action reuses success, attaches running, recreates failure', () => {
   assert.equal(resolveTaskMergeAction(undefined), 'create');
   assert.equal(resolveTaskMergeAction({ key: 'k', status: 'SUCCESS' }), 'reuse_success');

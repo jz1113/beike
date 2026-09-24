@@ -62,8 +62,7 @@ export default function BatchStage3Prompts({
   ).length;
 
   const hasUnanalyzed = readyCount < successfulItems.length;
-  const showAnalyzeButton =
-    !isAnalyzingAll && (hasUnanalyzed || successfulItems.some((p) => p.analysisError));
+  const showAnalyzeButton = !isAnalyzingAll && successfulItems.length > 0;
 
   const toggleShotExpand = (key: string) => {
     setExpandedShots((prev) => ({ ...prev, [key]: !prev[key] }));

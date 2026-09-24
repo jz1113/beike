@@ -25,6 +25,7 @@ function isCompleteCopy(data: { title?: string; content?: string } | null | unde
 }
 
 async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContext): Promise<boolean> {
+  const startedCopy = JSON.stringify(item.copywriting || null);
   patchItem(ctx, item.id, { isCopywritingGenerating: true, copywritingError: undefined });
   const existingTitles = ctx.getItems()
     .filter(product => product.id !== item.id && product.copywriting?.title)
@@ -79,6 +80,10 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
       totalTokens: usage.totalTokens ?? usage.total_tokens ?? 0,
       success: true,
     });
+    if (!ctx.force && JSON.stringify(latest?.copywriting || null) !== startedCopy) {
+      patchItem(ctx, item.id, { isCopywritingGenerating: false });
+      return true;
+    }
     patchItem(ctx, item.id, {
       isCopywritingGenerating: false,
       copywritingError: undefined,

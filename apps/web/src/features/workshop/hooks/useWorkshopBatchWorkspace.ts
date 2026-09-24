@@ -23,8 +23,11 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   const busy = useRef(false);
   const blocked = useRef(false);
   const alive = useRef(true);
+  const activeBatchRef = useRef<WorkshopBatch | null>(null);
+  const flushChain = useRef(Promise.resolve());
   latest.current = snapshot;
   restoreRef.current = restore;
+  activeBatchRef.current = activeBatch;
   const serialized = useMemo(() => JSON.stringify(snapshot), [snapshot]);
 
   const refreshHistory = useCallback(async () => {
@@ -81,39 +84,48 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
 
   useEffect(() => {
     alive.current = true;
-    void loadActive({ archiveIfOccupied: true });
+    void loadActive();
     return () => { alive.current = false; };
   }, [loadActive]);
 
-  const flush = useCallback(async () => {
-    if (!ready || !activeBatch || busy.current || blocked.current) return;
+  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean }) => {
+    if (!ready || blocked.current) return;
+    const batch = activeBatchRef.current;
+    if (!batch) return;
     const json = JSON.stringify(latest.current);
     if (json === saved.current) return;
+    const targetBatchId = batch.id;
+    const targetRevision = revision.current;
     busy.current = true;
-    setStatus('正在保存当前批次…');
+    if (alive.current) setStatus('正在保存当前批次…');
     try {
-      const response = await apiFetch(`/api/catalog/workshop-batches/${activeBatch.id}`, {
+      const response = await apiFetch(`/api/catalog/workshop-batches/${targetBatchId}`, {
         method: 'PUT',
+        keepalive: options?.keepalive,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ revision: revision.current, snapshot: JSON.parse(json) }),
+        body: JSON.stringify({ revision: targetRevision, snapshot: JSON.parse(json) }),
       });
       const data = await response.json();
+      if (activeBatchRef.current?.id !== targetBatchId) return;
       if (!response.ok) {
         if (response.status === 409) blocked.current = true;
         throw new Error(data.error || '当前批次保存失败');
       }
-      if (!Number.isInteger(data.revision) || data.revision !== revision.current + 1) {
+      if (!Number.isInteger(data.revision) || data.revision !== targetRevision + 1) {
         blocked.current = true;
         throw new Error('批次版本未确认，请重新加载核实');
       }
       revision.current = data.revision;
       saved.current = json;
       if (alive.current) {
-        setActiveBatch(previous => previous ? { ...previous, revision: data.revision, updatedAt: data.updatedAt } : previous);
+        setActiveBatch(previous => previous && previous.id === targetBatchId
+          ? { ...previous, revision: data.revision, updatedAt: data.updatedAt }
+          : previous);
         setStatus('当前批次已保存');
         setError('');
       }
     } catch (cause) {
+      if (activeBatchRef.current?.id !== targetBatchId) return;
       blocked.current = true;
       if (alive.current) {
         setError(cause instanceof Error ? cause.message : '当前批次保存失败');
@@ -122,14 +134,27 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     } finally {
       busy.current = false;
     }
-  }, [activeBatch, ready]);
+  }, [ready]);
+
+  const flush = useCallback((options?: { keepalive?: boolean }) => {
+    const run = flushChain.current.then(() => persistSnapshot(options), () => persistSnapshot(options));
+    flushChain.current = run.then(() => undefined, () => undefined);
+    return run;
+  }, [persistSnapshot]);
 
   useEffect(() => {
     if (!ready) return;
     const timer = window.setInterval(() => { void flush(); }, 1200);
     const onVisibility = () => { if (document.visibilityState === 'hidden') void flush(); };
+    const onPageHide = () => { void flush({ keepalive: true }); };
     window.addEventListener('visibilitychange', onVisibility);
-    return () => { window.clearInterval(timer); window.removeEventListener('visibilitychange', onVisibility); };
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      void flush({ keepalive: true });
+    };
   }, [flush, ready]);
 
   const requestBatch = useCallback(async (url: string, init: RequestInit, successMessage: string) => {

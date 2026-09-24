@@ -12,6 +12,7 @@ interface Props {
   onProductFilterChange: (f: 'all' | 'pending' | 'completed') => void;
   setFocusedIndex: React.Dispatch<React.SetStateAction<number>>;
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
+  onToggleImage?: (itemId: string, imgUrl: string) => void;
   batchSetProductImages: (itemId: string, mode: 'all_main' | 'all' | 'first' | 'clear') => void;
   handleRemoveItem: (id: string) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
@@ -28,6 +29,7 @@ export default function BatchImageSelectionPanel({
   onFilterChange,
   setFocusedIndex,
   setItems,
+  onToggleImage,
   batchSetProductImages,
   handleRemoveItem,
   onPreviewGallery,
@@ -39,6 +41,12 @@ export default function BatchImageSelectionPanel({
   const [galleryReady, setGalleryReady] = useState(true);
 
   const currentItem = displayedItems[focusedIndex] || displayedItems[0];
+
+  useEffect(() => {
+    if (!currentItem || activeImgFilter === 'all') return;
+    const count = currentItem.allTypedImages.filter((image) => image.type === activeImgFilter).length;
+    if (count === 0) onFilterChange('all');
+  }, [currentItem?.id]);
 
   useEffect(() => {
     setGalleryReady(false);
@@ -83,8 +91,9 @@ export default function BatchImageSelectionPanel({
   // 当前商品选图
   const handleSelect = useCallback((url: string) => {
     if (!currentItem) return;
-    setItems(prev => toggleProductImageSelection(prev, currentItem.id, url));
-  }, [currentItem, setItems]);
+    if (onToggleImage) onToggleImage(currentItem.id, url);
+    else setItems(prev => toggleProductImageSelection(prev, currentItem.id, url));
+  }, [currentItem, onToggleImage, setItems]);
 
   const handlePreview = useCallback((imgIdx: number) => {
     if (onPreviewGallery && allUrls.length > 0) {

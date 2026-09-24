@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { resolveStorageRoot, safeResolveWithinRoot, resolveStoredMediaPath, isWorkspaceStorageRel } from '@beike/server-kit/storagePaths';
 import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
+import { listImageTaskWorkspaceIdsByResultUrl } from '../../repositories/system';
 export { resolveStorageRoot } from '@beike/server-kit/storagePaths';
 
 function guessContentType(filePath: string): string {
@@ -31,7 +32,17 @@ export async function GET(req: Request): Promise<Response> {
 
   const workspaceId = requireWorkspaceId();
   if (!isWorkspaceStorageRel(rel, workspaceId)) {
-    return new Response('Forbidden', { status: 403 });
+    // Old generated media was saved without a workspace prefix. Only its owning
+    // workspace may read the exact URL already recorded on an image task.
+    const legacyGeneratedMedia = /^generated\/(images|videos)\/local\/[a-f0-9]{64}\.(png|jpg|jpeg|webp|gif|avif|mp4|webm|mov)$/i.test(rel);
+    if (!legacyGeneratedMedia) return new Response('Forbidden', { status: 403 });
+    const owners = await listImageTaskWorkspaceIdsByResultUrl(`/storage/${rel}`);
+    if (!owners.includes(workspaceId)) {
+      // Some older browser-only generation tasks never reached ImageTask. Their
+      // SHA-256 media URLs are opaque capabilities; keep them readable while
+      // refusing URLs that are recorded as belonging to another workspace.
+      if (owners.length > 0) return new Response('Forbidden', { status: 403 });
+    }
   }
   const root = resolveStorageRoot();
   const safePath = safeResolveWithinRoot(root, rel);

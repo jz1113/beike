@@ -115,6 +115,7 @@ export default function BatchWorkshopView() {
     pauseRun,
     resumeRun,
     cancelRun,
+    acknowledgeRecovery,
     completeCurrentBatch,
     reviewTask,
     toastMsg,
@@ -412,7 +413,7 @@ export default function BatchWorkshopView() {
               handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
               setPreviewImageUrl={setPreviewImageUrl}
               onPreviewGallery={openGalleryPreview}
-              runControlStatus={pipelineStatus === 'paused' ? 'paused' : isGeneratingBatch ? 'running' : 'idle'}
+              runControlStatus={isGeneratingBatch && pipelineStatus === 'paused' ? 'paused' : isGeneratingBatch ? 'running' : 'idle'}
               onPauseRun={pauseRun}
               onResumeRun={resumeRun}
               onCancelRun={cancelRun}
@@ -420,6 +421,7 @@ export default function BatchWorkshopView() {
               onBackToPrompts={() => setCurrentStage(3)}
               pipelineStatus={pipelineStatus}
               onReviewTask={reviewTask}
+              onAcknowledgeRecovery={acknowledgeRecovery}
             />
           )}
         </div>

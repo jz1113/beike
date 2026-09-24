@@ -19,6 +19,7 @@ export default function BatchStage2Config() {
     selectedShotCount,
     activeImgFilter,
     setActiveImgFilter,
+    toggleProductImageSelection,
     batchSetProductImages,
     handleRemoveItem,
     onPreviewGallery,
@@ -102,6 +103,7 @@ export default function BatchStage2Config() {
           onProductFilterChange={setProductFilter}
           setFocusedIndex={setFocusedIndex}
           setItems={setItems}
+          onToggleImage={toggleProductImageSelection}
           batchSetProductImages={batchSetProductImages}
           handleRemoveItem={handleRemoveItem}
           onPreviewGallery={onPreviewGallery}

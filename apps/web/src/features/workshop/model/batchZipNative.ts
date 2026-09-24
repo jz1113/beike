@@ -34,7 +34,9 @@ export async function tryNativeOfflineZip(
       copywritingTags: item.copywriting?.tags,
       images: (item.tasks || [])
         .filter(task => task.status === 'SUCCESS' && task.resultUrl)
-        .map(task => ({ url: toStoragePath(task.resultUrl!), shotNo: task.shot_no, filename: `分镜${task.shot_no}.${task.resultUrl!.split('?')[0].split('.').pop() || 'png'}` })),
+        .slice()
+        .sort((a, b) => a.shot_no - b.shot_no)
+        .map(task => ({ url: toStoragePath(task.resultUrl!), shotNo: task.shot_no, filename: `${item.title || item.itemId}_分镜${task.shot_no}.${task.resultUrl!.split('?')[0].split('.').pop() || 'png'}` })),
     })),
   }, filename, (progress) => {
     onProgress(progress.phase === 'saving' ? '正在保存' : '正在打包');

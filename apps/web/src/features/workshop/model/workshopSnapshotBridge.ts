@@ -33,6 +33,7 @@ export interface WorkshopLiveState {
     actionIds: string[];
     sceneIds: string[];
   };
+  pipelineRuns?: WorkshopSnapshot['pipeline']['runs'];
 }
 
 export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
@@ -71,7 +72,7 @@ export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
         actionIds: state.diversityContext?.actionIds || [],
         sceneIds: state.diversityContext?.sceneIds || [],
       },
-      runs: [],
+      runs: state.pipelineRuns || [],
     },
   };
 }
@@ -87,7 +88,7 @@ export function useLiveWorkshopWorkspace(
     state.useAssetLibrary, state.lockedPersonaId, state.lockedSceneId, state.lockedOutfitId,
     state.lockedActionId, state.lockedFullPromptId, state.generationStrategy, state.autoGenerateCopywriting,
     state.personaMode, state.pipelineStatus, state.planRevision, state.storyboardRevision,
-    state.pausedFrom, state.diversityContext,
+    state.pausedFrom, state.diversityContext, state.pipelineRuns,
   ]);
   const restore = useCallback((value: WorkshopSnapshot) => { apply(value); }, [apply]);
   return useWorkshopBatchWorkspace(snapshot, restore);

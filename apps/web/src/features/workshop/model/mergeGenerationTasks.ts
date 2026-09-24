@@ -21,6 +21,23 @@ export function mergeGenerationTasks(
   );
 
   return shots.map((shot, idx) => {
+    const previousKey = buildImageTaskKey({
+      batchId: context.batchId,
+      productId: item.id,
+      storyboardRevision: context.storyboardRevision,
+      shotNo: shot.shot_no,
+      prompt: shot.prompt || '',
+      selectedImageUrls: item.selectedProductImages || [],
+      model: context.model,
+      aspectRatio: context.aspectRatio,
+      quality: context.quality,
+      attempt: undefined,
+    });
+    const previous = [...existing.values()].find((task) => {
+      const stored = task.idempotencyKey || '';
+      return stored === previousKey || stored.startsWith(`${previousKey}:a`);
+    });
+    const attempt = previous?.status === 'FAILURE' ? (previous.attempt || 0) + 1 : (previous?.attempt || 0);
     const key = buildImageTaskKey({
       batchId: context.batchId,
       productId: item.id,
@@ -31,8 +48,8 @@ export function mergeGenerationTasks(
       model: context.model,
       aspectRatio: context.aspectRatio,
       quality: context.quality,
+      attempt,
     });
-    const previous = existing.get(key);
     const action = resolveTaskMergeAction(previous ? { key, status: previous.status } : undefined);
     if (previous && (action === 'reuse_success' || action === 'attach_running')) {
       return { ...previous, idempotencyKey: key, resultStatus: 'current' };
@@ -44,6 +61,7 @@ export function mergeGenerationTasks(
       prompt: shot.prompt || '',
       status: 'PENDING' as const,
       idempotencyKey: key,
+      attempt,
       resultStatus: 'current' as const,
       revision: (shot as { revision?: number }).revision || 0,
       outputReview: 'unreviewed' as const,

@@ -117,7 +117,10 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     const state = states[0];
     if (state?.activeBatchId) {
       const activeRows = await tx.$queryRaw<BatchRow[]>`SELECT * FROM "WorkshopBatch" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${state.activeBatchId}`;
-      if (activeRows[0]) return parseRow(activeRows[0]);
+      if (activeRows[0]) {
+        const active = parseRow(activeRows[0]);
+        if (active.status !== 'archived') return active;
+      }
     }
 
     const now = new Date().toISOString();
@@ -147,6 +150,22 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     return parseRow((await tx.$queryRaw<BatchRow[]>`SELECT * FROM "WorkshopBatch" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${activeId}`)[0]);
   });
 
+  const retireActive = async (active: WorkshopBatch) => {
+    if (active.status === 'archived') return;
+    if (active.status === 'draft' && active.snapshot.items.length === 0) return;
+    const now = new Date().toISOString();
+    const snapshot: WorkshopSnapshot = {
+      ...active.snapshot,
+      currentStage: statusToViewStage('archived'),
+      pipeline: { ...active.snapshot.pipeline, status: 'archived' },
+    };
+    await db.$executeRaw`
+      UPDATE "WorkshopBatch"
+      SET "status" = 'archived', "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
+      WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${active.id} AND "status" <> 'archived'
+    `;
+  };
+
   return {
     async getActive() { return initialize(); },
     async list() {
@@ -165,12 +184,14 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     async create(name?: string) {
       const active = await initialize();
       if (active.status === 'draft' && active.snapshot.items.length === 0 && !name) return active;
+      await retireActive(active);
       const batch = await insert(makeId(), name || '未命名新批次', 'draft', emptySnapshot());
       await db.$executeRaw`UPDATE "WorkshopBatchState" SET "activeBatchId" = ${batch.id} WHERE "workspaceId" = ${requireWorkspaceId()}`;
       return batch;
     },
     async duplicate(id: string) {
       const source = await this.get(id);
+      await retireActive(await initialize());
       const snapshot: WorkshopSnapshot = {
         ...source.snapshot,
         currentStage: stageForSnapshotContent(source.snapshot),
@@ -201,12 +222,18 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
         SET "status" = 'archived', "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
         WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${active.id}
       `;
-      return this.create('未命名新批次');
+      return initialize();
     },
     async clearHistory() {
       const active = await initialize();
-      const deleted = await db.$executeRaw`DELETE FROM "WorkshopBatch" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" <> ${active.id}`;
-      return { deleted };
+      const workspaceId = requireWorkspaceId();
+      return db.$transaction(async (tx) => {
+        await tx.$executeRaw`DELETE FROM "WorkshopOutputReview" WHERE "workspaceId" = ${workspaceId} AND "batchId" <> ${active.id}`;
+        await tx.$executeRaw`DELETE FROM "WorkshopPipelineRun" WHERE "workspaceId" = ${workspaceId} AND "batchId" <> ${active.id}`;
+        await tx.$executeRaw`DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ${workspaceId} AND "batchId" <> ${active.id}`;
+        const deleted = await tx.$executeRaw`DELETE FROM "WorkshopBatch" WHERE "workspaceId" = ${workspaceId} AND "id" <> ${active.id}`;
+        return { deleted };
+      });
     },
     async rename(id: string, name: string) {
       await this.get(id);
@@ -216,6 +243,8 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     },
     async write(id: string, revision: number, snapshot: WorkshopSnapshot) {
       workshopSnapshotSchema.parse(snapshot);
+      const active = await initialize();
+      if (active.id !== id) throw new WorkshopBatchConflict('只能保存当前活跃批次，历史批次请复制为新批次后再编辑');
       const current = await this.get(id);
       if (current.status === 'archived') throw new WorkshopBatchConflict('历史批次为只读内容，请复制为新批次后再编辑');
       const now = new Date().toISOString();

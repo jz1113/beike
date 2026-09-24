@@ -18,8 +18,9 @@ export function useBatchExport(
     setToastMsg: () => {},
     showToast,
   };
-  const handleExportZip = async () => { await exportBatchZip(itemsRef.current, deps); };
-  const handleExportExcel = async () => { await exportBatchExcel(itemsRef.current, deps); };
+  const selectedItems = () => itemsRef.current.filter((item) => item.selected);
+  const handleExportZip = async () => { await exportBatchZip(selectedItems(), deps); };
+  const handleExportExcel = async () => { await exportBatchExcel(selectedItems(), deps); };
   const handleExportSingleProductZip = async (item: BatchProductItem) => { await exportSingleProductZip(item, deps); };
   const handleDownloadSingleTaskImage = async (url: string, filename?: string) => { await downloadSingleTaskImage(url, filename, showToast); };
   return { handleExportZip, handleExportExcel, handleExportSingleProductZip, handleDownloadSingleTaskImage };

@@ -1,6 +1,6 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import { apiFetch } from '@/shared/api/apiClient';
-import { pickVisionAnalyzeFallbacks, PreviousGroupSignature } from '@beike/domain/vision';
+import { PreviousGroupSignature } from '@beike/domain/vision';
 import { normalizeImageUrlToStandardJpg } from '@beike/domain/drawing';
 import { getMultimodalClientOverrides } from '@/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, upstreamModelId } from '@beike/domain/workflowModels';
@@ -34,6 +34,18 @@ export type VisionAnalyzeDeps = {
   batchId?: string;
 };
 
+const analyzeEpochs = new Map<string, number>();
+const analyzeControllers = new Map<string, AbortController>();
+
+function beginProductAnalyze(itemId: string) {
+  const epoch = (analyzeEpochs.get(itemId) || 0) + 1;
+  analyzeEpochs.set(itemId, epoch);
+  analyzeControllers.get(itemId)?.abort();
+  const controller = new AbortController();
+  analyzeControllers.set(itemId, controller);
+  return { epoch, signal: controller.signal };
+}
+
 export async function analyzeBatchProduct(
   deps: VisionAnalyzeDeps,
   item: BatchProductItem,
@@ -56,7 +68,7 @@ export async function analyzeBatchProduct(
       : [item.coverImage];
     const imagePayload = chosenProductImgs.map(normalizeImageUrlToStandardJpg);
 
-    const effectivePersona = 'asset_driven';
+    const effectivePersona = deps.personaMode || 'asset_driven';
 
     const { customBaseUrl: localUrl, customApiKey: localApiKey, apiFormat, allowInsecureHttp } = getMultimodalClientOverrides(deps.selectedVisionModel);
     const targetShotCount = deps.selectedShotCount || 4;
@@ -93,6 +105,16 @@ export async function analyzeBatchProduct(
       ? buildJewelryTemplateStyle(archObj.name, archObj.promptSnippet || '', item.title, item.props)
       : `${archObj.name} \n${archObj.promptSnippet || ''}`;
 
+    const analyzeRun = beginProductAnalyze(item.id);
+    const configSignature = JSON.stringify({
+      arch: deps.selectedArchId,
+      shots: targetShotCount,
+      persona: deps.lockedPersonaId,
+      scene: deps.lockedSceneId,
+      outfit: deps.lockedOutfitId,
+      fullPrompt: deps.lockedFullPromptId || 'auto',
+      images: item.selectedProductImages || [],
+    });
     deps.setItems?.(prev => prev.map(p => (
       p.id === item.id ? { ...p, isAnalyzing: true, analysisError: undefined } : p
     )));
@@ -100,6 +122,7 @@ export async function analyzeBatchProduct(
     try {
       const res = await apiFetch('/api/generate/analyze', {
         method: 'POST',
+        signal: analyzeRun.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
@@ -109,7 +132,7 @@ export async function analyzeBatchProduct(
           imageUrls: imagePayload,
           modelPersona: effectivePersona,
           templateStyle,
-          useAssetLibrary: true,
+          useAssetLibrary: deps.useAssetLibrary !== false,
           lockedAssets,
           allocatedAssets: allocatedAsset ? {
             sceneId: allocatedAsset.scene?.id,
@@ -119,10 +142,6 @@ export async function analyzeBatchProduct(
           extraRequirements: `- 🚨【分镜数量严格保证】：必须输出完整的 ${targetShotCount} 个分镜，数组 prompts 长度必须严格等于 ${targetShotCount}！\n- 🚨【商品外观唯一锚定 @图片1】：美学置景与构图写入文字，生图只垫商品图。`,
           shotCount: targetShotCount,
           model: upstreamModelId(deps.selectedVisionModel),
-          fallbackModels: isOpenAIModelRouteId(deps.selectedVisionModel) ? [] : pickVisionAnalyzeFallbacks(
-            deps.selectedVisionModel,
-            (deps.availableVisionModels || []).map(m => m.id).filter(id => Boolean(id) && !isOpenAIModelRouteId(id))
-          ),
           customBaseUrl: localUrl,
           customApiKey: localApiKey,
           apiFormat,
@@ -135,7 +154,7 @@ export async function analyzeBatchProduct(
       });
 
       data = await res.json().catch(() => ({ error: `视觉分析接口响应解析异常 (HTTP ${res.status})` }));
-      if (!res.ok || data?.error || !Array.isArray(data?.prompts) || data.prompts.length !== targetShotCount) {
+      if (!res.ok || data?.error || !Array.isArray(data?.prompts) || data.prompts.length !== targetShotCount || Number(data?.paddedCount) > targetShotCount / 2) {
         apiError = data?.error || `分镜不完整：需要 ${targetShotCount} 镜，实际得到 ${Array.isArray(data?.prompts) ? data.prompts.length : 0} 镜`;
       }
     } catch (err: any) {
@@ -143,6 +162,7 @@ export async function analyzeBatchProduct(
     }
 
     if (apiError || !data?.prompts || data.prompts.length === 0) {
+      if (analyzeEpochs.get(item.id) !== analyzeRun.epoch) return false;
       deps.setItems?.(prev => prev.map(p => {
         if (p.id !== item.id) return p;
         return {
@@ -156,13 +176,20 @@ export async function analyzeBatchProduct(
       throw new Error(apiError || '视觉模型未返回有效分镜');
     }
 
-    const returnedCount = Array.isArray(data.prompts) ? data.prompts.length : 0;
-    if (returnedCount < targetShotCount) {
-      const analysisError = `仅返回 ${returnedCount} 个分镜，需要 ${targetShotCount} 个，请重新分析`;
+    if (analyzeEpochs.get(item.id) !== analyzeRun.epoch) return false;
+    const latestSignature = JSON.stringify({
+      arch: deps.selectedArchId,
+      shots: deps.selectedShotCount || 4,
+      persona: deps.lockedPersonaId,
+      scene: deps.lockedSceneId,
+      outfit: deps.lockedOutfitId,
+      fullPrompt: deps.lockedFullPromptId || 'auto',
+      images: (deps.getItems?.().find(p => p.id === item.id)?.selectedProductImages) || item.selectedProductImages || [],
+    });
+    if (latestSignature !== configSignature) {
+      const analysisError = '配置或选图已变化，本次分析结果已丢弃，请重新分析';
       deps.setItems?.(prev => prev.map(p => (
-        p.id === item.id
-          ? { ...p, isAnalyzing: false, analyzedSuccess: false, analysisError, prompts: [] }
-          : p
+        p.id === item.id ? { ...p, isAnalyzing: false, analyzedSuccess: false, analysisError } : p
       )));
       throw new Error(analysisError);
     }
@@ -229,6 +256,7 @@ export async function analyzeBatchProduct(
       imagePayload,
     });
 
+    if (analyzeEpochs.get(item.id) !== analyzeRun.epoch) return false;
     deps.setItems?.(prev => prev.map(p => {
       if (p.id !== item.id) return p;
       return {

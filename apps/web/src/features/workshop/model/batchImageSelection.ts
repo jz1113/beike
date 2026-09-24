@@ -14,7 +14,8 @@ export function toggleProductImageSelection(
     const next = current.includes(imgUrl)
       ? current.filter(u => u !== imgUrl)
       : [...current, imgUrl];
-    return { ...p, selectedProductImages: next, coverImage: next[0] || p.coverImage };
+    const collectedCover = p.allTypedImages.find((image) => image.type === 'main')?.url || p.mainImages[0] || '';
+    return { ...p, selectedProductImages: next, coverImage: next[0] || collectedCover };
   });
 }
 
@@ -33,6 +34,7 @@ export function batchSetProductImages(
     if (mode === 'all') next = p.allTypedImages.map(t => t.url);
     if (mode === 'first') next = p.allTypedImages.slice(0, 1).map(t => t.url);
     if (mode === 'clear') next = [];
-    return { ...p, selectedProductImages: next, coverImage: next[0] || p.coverImage };
+    const collectedCover = p.allTypedImages.find((image) => image.type === 'main')?.url || p.mainImages[0] || '';
+    return { ...p, selectedProductImages: next, coverImage: next[0] || collectedCover };
   });
 }

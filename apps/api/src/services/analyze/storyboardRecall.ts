@@ -47,6 +47,9 @@ export async function loadStoryboardLibrary(input: {
   let personaItems: any[] = targetPersonaId
     ? compact(await db.personaAsset.findFirst({ where: { id: String(targetPersonaId), ...PROVENANCE } }))
     : [];
+  if (locked.personaId && personaItems.length === 0) {
+    throw new Error('锁定的人物资产不存在或已删除，请重新选择');
+  }
   if (personaItems.length === 0) {
     personaItems = await sortByQuality('persona', await db.personaAsset.findMany({ where: await poolWhere('persona'), orderBy: assetOrder, take: 12 }));
   }
@@ -57,6 +60,9 @@ export async function loadStoryboardLibrary(input: {
   let sceneItems: any[] = targetSceneId
     ? compact(await db.sceneAsset.findFirst({ where: { id: String(targetSceneId), ...PROVENANCE } }))
     : [];
+  if (locked.sceneId && sceneItems.length === 0) {
+    throw new Error('锁定的场景资产不存在或已删除，请重新选择');
+  }
   if (sceneItems.length === 0) {
     let allScenes: any[] = categoryOr.length
       ? await sortByQuality('scene', await db.sceneAsset.findMany({ where: await poolWhere('scene', { OR: categoryOr }), orderBy: assetOrder, take: 100 }))
@@ -73,6 +79,9 @@ export async function loadStoryboardLibrary(input: {
   let outfitItems: any[] = targetOutfitId
     ? compact(await db.outfitAsset.findFirst({ where: { id: String(targetOutfitId), ...PROVENANCE } }))
     : [];
+  if (locked.outfitId && outfitItems.length === 0) {
+    throw new Error('锁定的穿搭资产不存在或已删除，请重新选择');
+  }
   if (outfitItems.length === 0 && categoryOr.length > 0) {
     outfitItems = await db.outfitAsset.findMany({ where: await poolWhere('outfit', { OR: categoryOr }), orderBy: assetOrder, take: 50 });
   }

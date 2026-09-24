@@ -14,12 +14,14 @@ import { extractActionCategories } from '@beike/domain/productCategory';
 export interface BatchStage1ItemCardProps {
   item: BatchProductItem;
   handleRemoveItem: (id: string) => void;
+  removeDisabled?: boolean;
   onPreviewImage?: (url: string) => void;
 }
 
 export const BatchStage1ItemCard: React.FC<BatchStage1ItemCardProps> = ({
   item,
   handleRemoveItem,
+  removeDisabled = false,
   onPreviewImage,
 }) => {
   return (
@@ -124,7 +126,8 @@ export const BatchStage1ItemCard: React.FC<BatchStage1ItemCardProps> = ({
         <button
           type="button"
           onClick={() => handleRemoveItem(item.id)}
-          className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+          disabled={removeDisabled || item.status === 'collecting'}
+          className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
           title="放弃/剔除此商品"
         >
           <Trash2 className="w-3.5 h-3.5" />

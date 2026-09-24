@@ -4,6 +4,7 @@ import { BatchProductItem, MasterRecipe } from '../model/batchTypes';
 import { BatchStage1OverviewCard } from './BatchStage1OverviewCard';
 import { BatchStage1InputCard } from './BatchStage1InputCard';
 import { BatchStage1ItemCard } from './BatchStage1ItemCard';
+import { countBatchInputLines } from '../model/batchCollect';
 
 
 interface Props {
@@ -56,9 +57,10 @@ export default function BatchStage1Collect({
   const handleSmartBatchCollect = async () => {
     if (batchInputText.trim()) {
       const newItems = handleParseInput();
-      if (newItems.length === 0) return;
+      if (newItems.length === 0 && items.every((item) => item.status !== 'failed' && item.status !== 'pending')) return;
       setIsAddingProducts(false);
-      await startBatchCollect(newItems);
+      const retryItems = items.filter((item) => item.status === 'failed' || item.status === 'pending');
+      await startBatchCollect([...newItems, ...retryItems]);
       return;
     }
     await startBatchCollect();
@@ -67,12 +69,7 @@ export default function BatchStage1Collect({
   const hasInputs = Boolean(batchInputText.trim() || items.length > 0);
 
   // 统计已输入的有效链接/ID行数
-  const parsedLineCount = useMemo(() => {
-    return batchInputText
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean).length;
-  }, [batchInputText]);
+  const parsedLineCount = useMemo(() => countBatchInputLines(batchInputText), [batchInputText]);
 
   // 粘贴剪贴板
   const handlePasteClipboard = async () => {
@@ -113,10 +110,11 @@ export default function BatchStage1Collect({
           {successfulItems.length > 0 && (
             <button
               type="button"
+              disabled={isCollecting}
               onClick={onNextStage}
               title={`下一步：人工批量选图与提示词架构（${successfulItems.length} 款已就绪商品）`}
               aria-label={`下一步：人工批量选图与提示词架构（${successfulItems.length} 款已就绪商品）`}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-black text-white shadow-md transition-all hover:bg-black hover:shadow-xl active:scale-98"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-black text-white shadow-md transition-all hover:bg-black hover:shadow-xl active:scale-98 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span>下一步</span>
               <ArrowRight className="h-4 w-4" />
@@ -162,6 +160,7 @@ export default function BatchStage1Collect({
                 key={item.id}
                 item={item}
                 handleRemoveItem={handleRemoveItem}
+                removeDisabled={isCollecting}
                 onPreviewImage={onPreviewImage}
               />
             ))}

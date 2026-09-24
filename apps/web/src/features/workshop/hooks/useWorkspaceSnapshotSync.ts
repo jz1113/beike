@@ -23,7 +23,8 @@ export function useWorkspaceSnapshotSync(
   useEffect(() => {
     if (!ready || appliedUrlStep.current) return;
     appliedUrlStep.current = true;
-    const requested = useAppStore.getState().batchStage;
+    const requested = Number(new URLSearchParams(window.location.search).get('step'));
+    if (!Number.isInteger(requested)) return;
     const allowed = maxStageForItems(itemsRef.current);
     const next = requested >= 1 && requested <= allowed ? requested : 1;
     setCurrentStage(next);

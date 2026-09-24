@@ -55,6 +55,10 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
   // 🌟 原创生成：严格保证返回分镜数量 100% 等于用户指定的 shotCount (如4分镜)
   const targetCount = Math.max(1, Math.min(12, Number(shotCount) || 4));
   let rawPrompts = parsedResult.prompts || [];
+  const parsedCount = rawPrompts.filter((shot: { prompt?: string }) => String(shot?.prompt || '').trim()).length;
+  if (parsedCount < Math.ceil(targetCount * 0.5)) {
+    throw new Error(`视觉分析只解析出 ${parsedCount}/${targetCount} 个有效分镜，请重试`);
+  }
   rawPrompts = padMissingOriginalShots(rawPrompts, targetCount, {
     productTitle,
     isNoModel,
@@ -303,6 +307,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
       ? { scene: effectiveMasterScene || masterScene, actionDigest }
       : null,
     prompts: formattedPrompts,
+    paddedCount: Math.max(0, targetCount - parsedCount),
     actualModelUsed,
     triedModels,
     rawOutput,

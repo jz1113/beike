@@ -36,6 +36,7 @@ export interface BatchTaskItem {
   revision?: number;
   resultStatus?: 'current' | 'superseded';
   idempotencyKey?: string;
+  attempt?: number;
   outputReview?: 'unreviewed' | 'accepted' | 'retry_requested' | 'rejected';
 }
 

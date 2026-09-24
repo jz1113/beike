@@ -12,7 +12,7 @@ export function applyInvalidationToItems(
   const effect = computeInvalidation(change);
   return items.map((item) => {
     if (change.productId && item.id !== change.productId) return item;
-    const prompts = item.prompts.map((prompt) => {
+    const prompts = (item.prompts || []).map((prompt) => {
       if (!shouldInvalidateTarget(effect.storyboard, { shotNo: prompt.shot_no }, change)) return prompt;
       return {
         ...prompt,
@@ -33,9 +33,10 @@ export function applyInvalidationToItems(
       ? undefined
       : item.copywriting;
     const analyzedSuccess = effect.storyboard === 'all' ? false : item.analyzedSuccess;
+    const nextPrompts = effect.storyboard === 'all' ? [] : prompts;
     return {
       ...item,
-      prompts,
+      prompts: nextPrompts,
       tasks,
       copywriting,
       analyzedSuccess,

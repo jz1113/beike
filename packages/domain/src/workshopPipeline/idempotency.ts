@@ -8,6 +8,7 @@ export interface ImageTaskKeyInput {
   model: string;
   aspectRatio: string;
   quality: string;
+  attempt?: number;
 }
 
 /** FNV-1a 32-bit, stable across Node and browsers. */
@@ -27,7 +28,7 @@ export function normalizePromptForKey(prompt: string): string {
 export function buildImageTaskKey(input: ImageTaskKeyInput): string {
   const promptHash = stableHash(normalizePromptForKey(input.prompt));
   const selectedImageHash = stableHash([...input.selectedImageUrls].sort().join('\n'));
-  return [
+  const base = [
     input.batchId,
     input.productId,
     String(input.storyboardRevision),
@@ -38,6 +39,7 @@ export function buildImageTaskKey(input: ImageTaskKeyInput): string {
     input.aspectRatio,
     input.quality,
   ].join(':');
+  return input.attempt && input.attempt > 0 ? `${base}:a${input.attempt}` : base;
 }
 
 export type MergedTaskAction = 'reuse_success' | 'attach_running' | 'create';

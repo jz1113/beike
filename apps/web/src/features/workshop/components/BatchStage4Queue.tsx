@@ -56,6 +56,7 @@ interface Props {
   onBackToPrompts?: () => void;
   pipelineStatus?: string;
   onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => void;
+  onAcknowledgeRecovery?: () => void;
 }
 
 export default function BatchStage4Queue({
@@ -93,6 +94,7 @@ export default function BatchStage4Queue({
   onBackToPrompts,
   pipelineStatus,
   onReviewTask,
+  onAcknowledgeRecovery,
 }: Props) {
   const [showEngineSettings, setShowEngineSettings] = useState(false);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
@@ -177,6 +179,12 @@ export default function BatchStage4Queue({
         onBackToPrompts={onBackToPrompts}
         pipelineStatus={pipelineStatus}
       />
+      {!readOnly && onAcknowledgeRecovery && successfulItems.some((item) => (item.tasks || []).some((task) => task.recoveryRequired)) && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <span>有任务在刷新前未完成，结果待核实。确认后可以重新生成，不会自动重提旧任务。</span>
+          <button type="button" onClick={onAcknowledgeRecovery} className="shrink-0 rounded-xl bg-amber-900 px-3 py-1.5 font-bold text-white">确认并重做</button>
+        </div>
+      )}
 
       {/* 视图展现 */}
       {viewMode === 'single' ? (

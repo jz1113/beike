@@ -70,6 +70,7 @@ export function useBatchWorkshopRunner() {
   const [pipelineStatus, setPipelineStatus] = useState<WorkshopBatchStatus>('draft');
   const [planRevision, setPlanRevision] = useState(0);
   const [storyboardRevision, setStoryboardRevision] = useState(0);
+  const [pipelineRuns, setPipelineRuns] = useState<WorkshopSnapshot['pipeline']['runs']>([]);
   const [selectedQuality, setSelectedQuality] = useState<'high' | 'medium' | 'low'>('high');
   const [selectedAspect, setSelectedAspect] = useState<'3:4' | '1:1' | '9:16' | '16:9'>('3:4');
 
@@ -235,6 +236,8 @@ export function useBatchWorkshopRunner() {
     );
     if (jewelryArch && (!selectedArchId || selectedArchId === 'auto' || selectedArchId === 'arch_jewelry_master' || selectedArchId === SYSTEM_MASTER_RECIPES[0]?.id)) {
       setSelectedArchId(jewelryArch.id);
+      setItems((prev) => applyInvalidationToItems(prev, { type: 'architecture' }));
+      setStoryboardRevision((revision) => revision + 1);
     }
     setUseAssetLibrary(true);
     setGenerationStrategy('single_shot');
@@ -245,33 +248,47 @@ export function useBatchWorkshopRunner() {
   };
 
   // 采编与链接解析
+  const collectInFlight = useRef(false);
+
   const handleParseInput = () => {
-    const res = parseBatchInputLines(batchInputText, new Set(items.map((i) => i.itemId)));
-    if (res.error === 'EMPTY_INPUT') {
+    if (collectInFlight.current) return [];
+    let created: BatchProductItem[] = [];
+    let error: string | undefined;
+    setItems((prev) => {
+      const res = parseBatchInputLines(batchInputText, new Set(prev.map((i) => `${i.platform}:${i.itemId}`)));
+      error = res.error;
+      created = res.newItems;
+      if (res.newItems.length === 0) return prev;
+      return [...prev, ...res.newItems];
+    });
+    if (error === 'EMPTY_INPUT') {
       showToast('请输入至少一条商品链接或 SKU');
       return [];
     }
-    if (res.error === 'NO_NEW_ITEMS' || res.newItems.length === 0) {
+    if (error === 'NO_NEW_ITEMS' || created.length === 0) {
       showToast('没有识别到新的不重复商品');
       return [];
     }
-    setItems((prev) => [...prev, ...res.newItems]);
     setBatchInputText('');
-    showToast(`成功加入 ${res.newItems.length} 个待采商品`);
-    return res.newItems;
+    showToast(`成功加入 ${created.length} 个待采商品`);
+    return created;
   };
 
   const startBatchCollect = async (itemsToCollect = items) => {
+    if (collectInFlight.current) return;
     const pendingItems = itemsToCollect.filter((i) => i.status === 'pending' || i.status === 'failed');
     if (pendingItems.length === 0) {
       showToast('没有待采集或需要重试的商品');
       return;
     }
 
+    collectInFlight.current = true;
     setIsCollecting(true);
     setCollectProgress({ total: pendingItems.length, current: 0, success: 0, failed: 0 });
 
-    const res = await runBatchCollect(pendingItems, {
+    let res = { success: 0, failed: 0 };
+    try {
+    res = await runBatchCollect(pendingItems, {
       onItemUpdate: (id, patch) => {
         setItems((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
       },
@@ -280,9 +297,11 @@ export function useBatchWorkshopRunner() {
       },
       concurrency: 3,
     });
-
-    setIsCollecting(false);
-    showToast(`批量采编完成：已就绪 ${res.success} 款商品`);
+    showToast(`批量采编完成：已就绪 ${res.success} 款${res.failed ? `，失败 ${res.failed} 款` : ''}`);
+    } finally {
+      collectInFlight.current = false;
+      setIsCollecting(false);
+    }
   };
 
   // 选图纯函数绑定
@@ -291,6 +310,26 @@ export function useBatchWorkshopRunner() {
       toggleProductImageSelectionPure(prev, itemId, imgUrl),
       { type: 'product_images', productId: itemId },
     ));
+  };
+
+  const invalidateWorkshopConfig = (type: 'architecture' | 'shot_count' | 'locked_assets') => {
+    setItems((prev) => applyInvalidationToItems(prev, { type }));
+    setStoryboardRevision((revision) => revision + 1);
+  };
+  const changeSelectedArchId = (id: string) => {
+    if (id === selectedArchId) return;
+    setSelectedArchId(id);
+    invalidateWorkshopConfig('architecture');
+  };
+  const changeSelectedShotCount = (count: number) => {
+    if (count === selectedShotCount) return;
+    setSelectedShotCount(count);
+    invalidateWorkshopConfig('shot_count');
+  };
+  const changeLockedAsset = (apply: (value: string) => void, current: string) => (value: string) => {
+    if (value === current) return;
+    apply(value);
+    invalidateWorkshopConfig('locked_assets');
   };
 
   const batchSetProductImages = (itemId: string, mode: 'all_main' | 'all' | 'first' | 'clear') => {
@@ -331,7 +370,9 @@ export function useBatchWorkshopRunner() {
     itemIndexOrSig?: number | PreviousGroupSignature
   ): Promise<boolean> => {
     const itemIndex = typeof itemIndexOrSig === 'number' ? itemIndexOrSig : undefined;
-    return analyzeBatchProduct(visionAnalyzeDeps, item, itemIndex);
+    const ok = await analyzeBatchProduct(visionAnalyzeDeps, item, itemIndex);
+    if (ok) setStoryboardRevision((revision) => revision + 1);
+    return ok;
   };
 
   const startBatchVisionAnalyze = async (architectureId = selectedArchId): Promise<number> => {
@@ -500,7 +541,16 @@ export function useBatchWorkshopRunner() {
 
   const pauseRun = () => { runControlRef.current = { status: 'paused' }; setPipelineStatus('paused'); };
   const resumeRun = () => { runControlRef.current = { status: 'running' }; setPipelineStatus('generating'); };
-  const cancelRun = () => { runControlRef.current = { status: 'cancelled' }; };
+  const cancelRun = () => {
+    runControlRef.current = { status: 'cancelled' };
+    setPipelineStatus((status) => (status === 'paused' || status === 'generating' ? 'cancelled' : status));
+  };
+  const acknowledgeRecovery = () => {
+    setItems((prev) => prev.map((item) => ({
+      ...item,
+      tasks: (item.tasks || []).map((task) => (task.recoveryRequired ? { ...task, recoveryRequired: false } : task)),
+    })));
+  };
 
   const completeCurrentBatch = async () => {
     if (!window.confirm('完成本批次后会归档当前内容，并开始一个空白新批次。历史内容可在批次历史中恢复。确定继续吗？')) return;
@@ -539,6 +589,7 @@ export function useBatchWorkshopRunner() {
     batchGroupSignaturesRef.current = value.pipeline?.diversityContext?.groupSignatures || [];
     batchActionIdsRef.current = value.pipeline?.diversityContext?.actionIds || [];
     batchSceneIdsRef.current = value.pipeline?.diversityContext?.sceneIds || [];
+    setPipelineRuns(value.pipeline?.runs || []);
   }, [setSelectedArchId, setSelectedShotCount, setGenerationStrategy, setLockedFullPromptId]);
 
   const workspace = useLiveWorkshopWorkspace({
@@ -548,6 +599,7 @@ export function useBatchWorkshopRunner() {
     useAssetLibrary, lockedPersonaId, lockedSceneId, lockedOutfitId, lockedActionId, lockedFullPromptId,
     generationStrategy, autoGenerateCopywriting,
     personaMode, pipelineStatus, planRevision, storyboardRevision,
+    pipelineRuns,
     diversityContext: {
       groupSignatures: batchGroupSignaturesRef.current,
       actionIds: batchActionIdsRef.current,
@@ -577,7 +629,7 @@ export function useBatchWorkshopRunner() {
     startBatchCollect,
     recipes,
     selectedArchId,
-    setSelectedArchId,
+    setSelectedArchId: changeSelectedArchId,
     availableVisionModels,
     selectedVisionModel,
     setSelectedVisionModel,
@@ -590,15 +642,15 @@ export function useBatchWorkshopRunner() {
     useAssetLibrary,
     setUseAssetLibrary,
     lockedPersonaId,
-    setLockedPersonaId,
+    setLockedPersonaId: changeLockedAsset(setLockedPersonaId, lockedPersonaId),
     lockedSceneId,
-    setLockedSceneId,
+    setLockedSceneId: changeLockedAsset(setLockedSceneId, lockedSceneId),
     lockedOutfitId,
-    setLockedOutfitId,
+    setLockedOutfitId: changeLockedAsset(setLockedOutfitId, lockedOutfitId),
     lockedActionId,
-    setLockedActionId,
+    setLockedActionId: changeLockedAsset(setLockedActionId, lockedActionId),
     lockedFullPromptId,
-    setLockedFullPromptId,
+    setLockedFullPromptId: changeLockedAsset(setLockedFullPromptId, lockedFullPromptId),
     availablePersonas,
     availableScenes,
     availableOutfits,
@@ -609,7 +661,7 @@ export function useBatchWorkshopRunner() {
     selectedAspect,
     setSelectedAspect,
     selectedShotCount,
-    setSelectedShotCount,
+    setSelectedShotCount: changeSelectedShotCount,
     isAnalyzingAll,
     analyzeProgress,
     activeImgFilter,
@@ -654,6 +706,7 @@ export function useBatchWorkshopRunner() {
     pauseRun,
     resumeRun,
     cancelRun,
+    acknowledgeRecovery,
     completeCurrentBatch,
     reviewTask,
     toastMsg,

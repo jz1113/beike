@@ -9,6 +9,10 @@ export interface ParseBatchInputResult {
 /**
  * 解析多行链接/SKU文本为 BatchProductItem 列表（纯函数）
  */
+export function countBatchInputLines(text: string): number {
+  return text.split(/[\n,;]+/).map((line) => line.trim()).filter(Boolean).length;
+}
+
 export function parseBatchInputLines(
   text: string,
   existingItemIds: Set<string>
@@ -36,14 +40,14 @@ export function parseBatchInputLines(
       line.match(/\d+/);
     const itemId = numMatch ? (numMatch[1] || numMatch[0]) : line;
     const dedupeKey = `${platform}:${itemId}`;
-    if (seenIds.has(dedupeKey) || seenIds.has(itemId)) {
-      return;
-    }
+    if (seenIds.has(dedupeKey)) return;
+    if (seenIds.size >= 20) return;
     seenIds.add(dedupeKey);
     newItems.push({
       id: `batch_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       itemId,
       platform,
+      url: /^https?:\/\//i.test(line) ? line : undefined,
       title: `待采编商品 (${itemId})`,
       price: 0,
       category: '待采编',
@@ -148,18 +152,13 @@ export async function runBatchCollect(
       deps.onItemUpdate(item.id, { status: 'collecting' });
 
       try {
-        const customWbKey = (localStorage.getItem('wanbang_api_key') || '').trim() || undefined;
-        const customWbSecret = (localStorage.getItem('wanbang_api_secret') || '').trim() || undefined;
-
         const res = await apiFetch('/api/catalog/collect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            url: item.itemId,
-            platform: item.platform,
-            forceRefresh: false,
-            customWanbangKey: customWbKey,
-            customWanbangSecret: customWbSecret,
+            url: item.url || item.itemId,
+            platform: 'auto',
+            forceRefresh: item.status === 'failed',
           }),
         });
 
@@ -168,6 +167,11 @@ export async function runBatchCollect(
         if (res.ok && data.success && data.product) {
           const prod = data.product;
           const { typedList, cleanCover, mainImgs, skuImgs, detailImgs } = buildTypedList(prod);
+          if (typedList.length === 0) {
+            deps.onItemUpdate(item.id, { status: 'failed', errorMsg: '采集成功但没有可用图片', selected: false });
+            failedCount++;
+            continue;
+          }
 
           deps.onItemUpdate(item.id, {
             title: prod.title || item.title,

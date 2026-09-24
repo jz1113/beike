@@ -2,20 +2,7 @@ import { fetchMediaBlob } from '@/shared/media/downloadMedia';
 import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
 import type { BatchProductItem } from './batchTypes';
 
-export interface MatrixExportRow {
-  '任务标题': string;
-  '任务文案': string;
-  '商品名称': string;
-  '商品ID': string;
-  '图链接1': string;
-  '图链接2': string;
-  '图链接3': string;
-  '图链接4': string;
-  '图链接5': string;
-  '图链接6': string;
-  '图链接7': string;
-  '图链接8': string;
-}
+export type MatrixExportRow = Record<string, string>;
 
 export async function ensurePermanentImageUrl(url: string, filename: string): Promise<string> {
   if (!url) return url;
@@ -61,13 +48,11 @@ export async function ensurePermanentImageUrl(url: string, filename: string): Pr
 }
 
 function slotUrls(item: BatchProductItem): string[] {
-  const slots = Array<string>(8).fill('');
-  for (const task of item.tasks || []) {
-    const index = (task.shot_no ?? 0) - 1;
-    if (index < 0 || index >= slots.length) continue;
-    if (task.status === 'SUCCESS' && task.resultUrl) slots[index] = task.resultUrl;
-  }
-  return slots;
+  return (item.tasks || [])
+    .filter((task) => task.status === 'SUCCESS' && task.resultUrl && task.resultStatus !== 'superseded')
+    .slice()
+    .sort((a, b) => a.shot_no - b.shot_no)
+    .map((task) => task.resultUrl || '');
 }
 
 export async function buildMatrixExportRows(
@@ -88,27 +73,24 @@ export async function buildMatrixExportRows(
       ? rawUrls
       : await Promise.all(rawUrls.map((url, idx) => url ? ensurePermanentImageUrl(url, `slice_${item.itemId || item.id}_${idx + 1}`) : Promise.resolve('')));
 
-    if (!opts?.offline) {
-      finalUrls.forEach((permanentUrl, idx) => {
-        const task = (item.tasks || []).find(entry => entry.shot_no === idx + 1);
-        if (task && permanentUrl && task.resultUrl !== permanentUrl && !task.resultUrl?.startsWith('/storage/')) task.resultUrl = permanentUrl;
-      });
-    }
-
-    rows.push({
+    const row: MatrixExportRow = {
       '任务标题': item.copywriting?.title?.trim() || item.title?.trim() || item.itemId || '未命名任务',
       '任务文案': taskCopywriting,
       '商品名称': item.title?.trim() || '',
       '商品ID': item.itemId?.trim() || item.id || '',
-      '图链接1': finalUrls[0] || '',
-      '图链接2': finalUrls[1] || '',
-      '图链接3': finalUrls[2] || '',
-      '图链接4': finalUrls[3] || '',
-      '图链接5': finalUrls[4] || '',
-      '图链接6': finalUrls[5] || '',
-      '图链接7': finalUrls[6] || '',
-      '图链接8': finalUrls[7] || '',
+      '图链接1': '',
+      '图链接2': '',
+      '图链接3': '',
+      '图链接4': '',
+      '图链接5': '',
+      '图链接6': '',
+      '图链接7': '',
+      '图链接8': '',
+    };
+    finalUrls.forEach((url, idx) => {
+      row[`图链接${idx + 1}`] = url || '';
     });
+    rows.push(row);
     onProgress?.(i + 1, items.length);
   }
   return rows;

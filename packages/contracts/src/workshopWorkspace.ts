@@ -23,6 +23,7 @@ const task = z.object({
   revision: z.number().int().min(0).default(0),
   resultStatus: resultRevisionStatus.default('current'),
   idempotencyKey: z.string().optional(),
+  attempt: z.number().int().min(0).optional(),
   outputReview: z.enum(['unreviewed', 'accepted', 'retry_requested', 'rejected']).default('unreviewed'),
 });
 

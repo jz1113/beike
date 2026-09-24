@@ -52,6 +52,45 @@ test('recovery marks dead success images as retryable failures', () => {
   assert.equal(recovered.items[0].tasks[2].recoveryRequired, true);
 });
 
+test('recovery settles an interrupted generating pipeline', () => {
+  const recovered = recoverWorkspace({
+    version: 2,
+    mode: 'original',
+    currentStage: 4,
+    batchInputText: '',
+    settings: {
+      selectedVisionModel: 'gemini-3.7-flash',
+      selectedImageGenModel: 'gpt-image-2',
+      selectedArchId: 'recipe_jewelry_master',
+      hasHumanPersona: true,
+      personaMode: 'asset_driven',
+      selectedQuality: 'high',
+      selectedAspect: '3:4',
+      selectedShotCount: 4,
+      useAssetLibrary: true,
+      lockedPersonaId: 'auto',
+      lockedSceneId: 'auto',
+      lockedOutfitId: 'auto',
+      lockedActionId: 'auto',
+      lockedFullPromptId: 'auto',
+      generationStrategy: 'single_shot',
+      autoGenerateCopywriting: true,
+    },
+    pipeline: { status: 'generating', planRevision: 0, storyboardRevision: 0, diversityContext: { groupSignatures: [], actionIds: [], sceneIds: [] }, runs: [] },
+    items: [{
+      id: '1', itemId: '1', platform: 'jd', title: '手机', price: 1, category: '', brand: '', coverImage: '',
+      mainImages: [], skuImages: [], detailImages: [], props: {}, status: 'success', selected: true,
+      allTypedImages: [], selectedProductImages: [], prompts: [],
+      tasks: [
+        { id: 't1', shot_no: 1, title: '1', prompt: 'p', status: 'SUCCESS', resultUrl: '', outputReview: 'unreviewed', revision: 0, resultStatus: 'current' },
+        { id: 't2', shot_no: 2, title: '2', prompt: 'p', status: 'SUCCESS', resultUrl: '/storage/images/ok.png', outputReview: 'unreviewed', revision: 0, resultStatus: 'current' },
+      ],
+    }],
+  });
+  assert.equal(recovered.items[0].tasks[0].status, 'FAILURE');
+  assert.equal(recovered.pipeline.status, 'partial_failed');
+});
+
 test('snapshot save drops blob result urls', () => {
   const item = sanitizeBatchItem({
     id: '1', itemId: '1', platform: 'jd', title: '手机', price: 1, category: '', brand: '',
@@ -63,6 +102,7 @@ test('snapshot save drops blob result urls', () => {
   assert.equal(item.coverImage, '');
   assert.equal(item.mainImages[0], 'https://img.example/a.jpg');
   assert.equal(item.tasks[0].resultUrl, undefined);
+  assert.equal(item.tasks[0].status, 'FAILURE');
 });
 
 test('opening archives only an occupied active batch', () => {

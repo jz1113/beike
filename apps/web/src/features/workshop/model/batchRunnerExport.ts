@@ -18,7 +18,7 @@ export interface BatchExportDeps {
 }
 
 function productsWithTasks(items: BatchProductItem[]) {
-  return items.filter(item => (item.tasks || []).some(task => task.status === 'SUCCESS' || task.status === 'FAILURE'));
+  return items.filter(item => item.selected && (item.tasks || []).some(task => task.status === 'SUCCESS' || task.status === 'FAILURE'));
 }
 
 function zipFileName(prefix: string) {

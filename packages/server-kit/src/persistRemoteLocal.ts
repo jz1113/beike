@@ -1,19 +1,19 @@
 import {createHash,randomUUID} from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {resolveStorageRoot} from './storagePaths';
+import {resolveStorageRoot,toWorkspaceStorageKey} from './storagePaths';
 import {assertSafeRemoteUrl} from './safeUrl';
 const pending=new Map<string,Promise<string>>();
 /** Atomic, bounded local persistence; shared callers download the same URL only once. */
 export function persistRemoteLocal(url:string,video:boolean):Promise<string> {
   if(url.startsWith('/storage/'))return Promise.resolve(url);
-  const key=`${video?'video':'image'}:${url}`;
+  const directory=toWorkspaceStorageKey(`generated/${video?'videos':'images'}/local`);
+  const key=`${directory}:${url}`;
   const previous=pending.get(key);if(previous)return previous;
-  const work=download(url,video).finally(()=>pending.delete(key));pending.set(key,work);return work;
+  const work=download(url,video,directory).finally(()=>pending.delete(key));pending.set(key,work);return work;
 }
-async function download(url:string,video:boolean) {
+async function download(url:string,video:boolean,directory:string) {
   const digest=createHash('sha256').update(url).digest('hex');
-  const directory=`generated/${video?'videos':'images'}/local`;
   const root=resolveStorageRoot();
   await fs.mkdir(path.join(root,directory),{recursive:true});
   const existing=(await fs.readdir(path.join(root,directory))).find(name=>name.startsWith(digest+'.') && !name.endsWith('.part'));

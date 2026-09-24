@@ -50,6 +50,10 @@ export interface BatchStage4HeaderProps {
 
 export function BatchStage4Header({
   isGeneratingBatch,
+  totalTaskCount,
+  completedTaskCount,
+  displaySuccessCount,
+  displayFailCount,
   hasExportableSuccess,
   viewMode,
   setViewMode,
@@ -69,6 +73,11 @@ export function BatchStage4Header({
 }: BatchStage4HeaderProps) {
   return (
     <div className="py-1">
+      {isGeneratingBatch && totalTaskCount > 0 && (
+        <p className="mb-2 text-right text-xs font-medium text-slate-500">
+          生图进度 {completedTaskCount}/{totalTaskCount}，成功 {displaySuccessCount}，失败 {displayFailCount}
+        </p>
+      )}
       <div className="flex items-center justify-end gap-3 flex-wrap">
         {/* 右侧：核心交付动作（导出表格、打包ZIP、批量文案） */}
         <div className="flex flex-wrap justify-end items-center gap-2">

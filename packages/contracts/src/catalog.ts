@@ -19,8 +19,6 @@ export const collectBodySchema = z
     url: z.string().max(4096).optional(),
     platform: z.string().max(64).optional(),
     forceRefresh: z.boolean().optional(),
-    customWanbangKey: z.string().max(4096).optional(),
-    customWanbangSecret: z.string().max(4096).optional(),
   })
   .passthrough();
 

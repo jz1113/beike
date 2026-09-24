@@ -20,7 +20,15 @@ export function useBatchReview(
       const shotIndex = item?.tasks?.findIndex((task) => task.id === taskId) ?? -1;
       if (shotIndex >= 0) void retrySingleShotTask(itemId, shotIndex);
     }
+    const previous = itemsRef.current.find((entry) => entry.id === itemId)?.tasks?.find((task) => task.id === taskId)?.outputReview;
     void reviewWorkshopTask(taskId, { decision }).catch((error) => {
+      setItems((prev) => prev.map((item) => {
+        if (item.id !== itemId) return item;
+        return {
+          ...item,
+          tasks: (item.tasks || []).map((task) => task.id === taskId ? { ...task, outputReview: previous || 'unreviewed' } : task),
+        };
+      }));
       showToast(error instanceof Error ? error.message : '审核提交失败');
     });
   };
