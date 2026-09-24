@@ -15,7 +15,7 @@ import {
   buildCategoryCloseUpOptics,
 } from '@beike/domain/productCategory';
 import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
-import { buildTransferableGroupDetails, maybeApplyJewelryCameraFallback } from '@beike/domain/workshopPipeline';
+import { buildBoundGroupPrompt, buildTransferableGroupDetails, maybeApplyJewelryCameraFallback } from '@beike/domain/workshopPipeline';
 import { formatAssetWithCode, toPureProductPrompt } from './promptAssemblerFormat';
 
 export async function finishStoryboardAssembly(input: Record<string, any>) {
@@ -27,6 +27,20 @@ const formattedPrompts = diversified.map((p: any, pIdx: number) => {
   const assetSubject = resolveAssetShotSubject(selectedActionAsset || {});
   const hasHuman = slot?.hasHuman ?? assetSubject?.has_human ?? p.has_human;
   const shotType = slot?.shotType || assetSubject?.shot_type || p.shot_type;
+
+  if (slot?.source === 'group_skeleton') {
+    return {
+      shot_no: slot.shotNo, title: slot.title, scene: slot.scene,
+      action: slot.action, expression: '', prop: '', optics: slot.optics,
+      camera_focal_length: slot.camera, angle: slot.angle, lighting_type: slot.lighting,
+      has_human: slot.hasHuman, shot_type: slot.shotType || (slot.hasHuman ? 'model_shot' : 'pure_product'),
+      prompt: buildBoundGroupPrompt(slot, productFingerprintRaw || productTitle),
+      applied_scene: appliedSceneTitle,
+      applied_outfit: slot.hasHuman ? appliedOutfitTitle : undefined,
+      applied_persona: slot.hasHuman ? appliedPersonaName : undefined,
+      used_asset_library: true, assembly_source: 'group_skeleton',
+    };
+  }
 
   const shotAppliedAction = selectedActionAsset?.code
     ? `[#${selectedActionAsset.code.replace(/^#/, '')}] ${selectedActionAsset.title || ''}`
@@ -148,9 +162,10 @@ const formattedPrompts = diversified.map((p: any, pIdx: number) => {
 });
 
 // 🚨 组内穿搭与防穿帮后置强同步
-let finalCanonicalOutfit = sanitizedLookParts;
-let finalLookBible = lookBible;
-if (groupHasHuman) {
+const boundGroup = filledSlots?.source === 'group_skeleton';
+let finalCanonicalOutfit = boundGroup ? effectiveLookParts : sanitizedLookParts;
+let finalLookBible = boundGroup && groupHasHuman ? effectiveLookBible : lookBible;
+if (groupHasHuman && !boundGroup) {
   if (!finalCanonicalOutfit?.top || isGenericLook(finalCanonicalOutfit.top)) {
     const firstHuman = formattedPrompts.find((p: any) => p.has_human !== false);
     if (firstHuman) {

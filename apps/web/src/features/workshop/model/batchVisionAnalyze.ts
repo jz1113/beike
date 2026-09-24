@@ -8,6 +8,7 @@ import { recordModelUsage, resolveModelVendor } from '@/shared/utils/usageTracke
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@beike/domain/jewelryArch';
 import type { BatchProductItem } from './batchTypes';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
+export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';
 
 export type VisionAnalyzeDeps = {
   recipes: Array<{ id: string; name: string; category?: string; promptSnippet?: string }>;
@@ -28,6 +29,7 @@ export type VisionAnalyzeDeps = {
   personaMode?: 'asset_driven' | 'none';
   setItems?: Dispatch<SetStateAction<BatchProductItem[]>>;
   getItems?: () => BatchProductItem[];
+  getConfigRevision?: () => number;
   batchGroupSignaturesRef?: MutableRefObject<PreviousGroupSignature[]>;
   batchActionIdsRef?: MutableRefObject<string[]>;
   batchSceneIdsRef?: MutableRefObject<string[]>;
@@ -73,14 +75,6 @@ export async function analyzeBatchProduct(
     const { customBaseUrl: localUrl, customApiKey: localApiKey, apiFormat, allowInsecureHttp } = getMultimodalClientOverrides(deps.selectedVisionModel);
     const targetShotCount = deps.selectedShotCount || 4;
 
-    if (!deps.lockedFullPromptId || deps.lockedFullPromptId === 'auto') {
-      const message = '请先在生产设置中选择完整四图母本，再分析商品';
-      deps.setItems?.(prev => prev.map(p => p.id === item.id
-        ? { ...p, isAnalyzing: false, analyzedSuccess: false, analysisError: message, prompts: [] }
-        : p));
-      throw new Error(message);
-    }
-
     let data: any = null;
     let apiError: string | null = null;
 
@@ -107,6 +101,7 @@ export async function analyzeBatchProduct(
 
     const analyzeRun = beginProductAnalyze(item.id);
     const configSignature = JSON.stringify({
+      revision: deps.getConfigRevision?.(),
       arch: deps.selectedArchId,
       shots: targetShotCount,
       persona: deps.lockedPersonaId,
@@ -178,6 +173,7 @@ export async function analyzeBatchProduct(
 
     if (analyzeEpochs.get(item.id) !== analyzeRun.epoch) return false;
     const latestSignature = JSON.stringify({
+      revision: deps.getConfigRevision?.(),
       arch: deps.selectedArchId,
       shots: deps.selectedShotCount || 4,
       persona: deps.lockedPersonaId,
@@ -271,6 +267,9 @@ export async function analyzeBatchProduct(
         applied_scene: data?.applied_scene || data?.appliedScene,
         applied_outfit: data?.applied_outfit || data?.appliedOutfit,
         applied_persona: data?.applied_persona || data?.appliedPersona,
+        appliedFullPromptId: data?.assetTrace?.fullPromptId,
+        appliedFullPromptTitle: data?.assetTrace?.fullPromptTitle,
+        appliedFullPromptSelectionMode: data?.assetTrace?.fullPromptSelectionMode,
         productRole: formatted.productRole,
         productFingerprint: formatted.productFingerprint,
         lookParts: formatted.lookParts ?? lookPartsFromApi,
@@ -281,39 +280,3 @@ export async function analyzeBatchProduct(
 
     return true;
   }
-
-export async function runBatchVisionAnalyze(opts: {
-  items: BatchProductItem[];
-  concurrency: number;
-  isAborted: () => boolean;
-  analyzeOne: (item: BatchProductItem, index: number) => Promise<void>;
-  onItemStart: (item: BatchProductItem) => void;
-  onItemFinish: (finished: number, total: number) => void;
-  onItemError: (item: BatchProductItem, err: unknown) => void;
-}): Promise<number> {
-  let successAnalyzed = 0;
-  let finishedCount = 0;
-  let itemIdx = 0;
-  const concurrency = Math.min(opts.concurrency || 16, opts.items.length);
-
-  const worker = async () => {
-    while (itemIdx < opts.items.length && !opts.isAborted()) {
-      const currentItemIdx = itemIdx++;
-      const item = opts.items[currentItemIdx];
-      if (!item) break;
-      opts.onItemStart(item);
-      try {
-        await opts.analyzeOne(item, currentItemIdx);
-        successAnalyzed++;
-      } catch (err) {
-        opts.onItemError(item, err);
-      } finally {
-        finishedCount++;
-        opts.onItemFinish(finishedCount, opts.items.length);
-      }
-    }
-  };
-
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  return successAnalyzed;
-}

@@ -1,5 +1,5 @@
 import { useAppStore, type GenerationTask } from '@/store';
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, storageConfigHeaders } from '@/shared/api/apiClient';
 import { getGatewayClientHeaders } from '@/shared/api/gatewayClient';
 import {
   isDepthVideoTask,
@@ -80,6 +80,7 @@ export async function pollTasksOnce(
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
             ...gatewayHeaders,
+            ...storageConfigHeaders(),
             ...(localUrl && !depthVideo ? { 'x-custom-base-url': localUrl } : {}),
           },
         });
@@ -192,6 +193,7 @@ export async function probeFailedTasks(
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
             ...gatewayHeaders,
+            ...storageConfigHeaders(),
             ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
           },
         }).catch(() => null);

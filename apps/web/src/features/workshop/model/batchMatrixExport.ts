@@ -1,5 +1,5 @@
 import { fetchMediaBlob } from '@/shared/media/downloadMedia';
-import { apiFetch, proxyMediaUrl } from '@/shared/api/apiClient';
+import { apiFetch, proxyMediaUrl, readClientStorageConfig, storageConfigHeaders } from '@/shared/api/apiClient';
 import type { BatchProductItem } from './batchTypes';
 
 export type MatrixExportRow = Record<string, string>;
@@ -22,8 +22,9 @@ export async function ensurePermanentImageUrl(url: string, filename: string): Pr
   if (!blob.size || !blob.type.startsWith('image/')) throw new Error('未获取到有效图片，临时图片可能已失效');
   const formData = new FormData();
   formData.append('category', 'generated/images');
+  formData.append('customConfig', JSON.stringify(readClientStorageConfig()));
   formData.append('file', blob, `${filename}.jpg`);
-  const upRes = await apiFetch('/api/assets/storage/upload', { method: 'POST', body: formData });
+  const upRes = await apiFetch('/api/assets/storage/upload', { method: 'POST', headers: storageConfigHeaders(), body: formData });
   const upData = await upRes.json().catch(() => ({}));
   const uploaded = upData.urls?.[0] || upData.url;
   if (!upRes.ok || upData.success === false || !uploaded) {

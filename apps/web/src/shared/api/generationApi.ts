@@ -1,4 +1,4 @@
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@/shared/api/apiClient';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/shared/api/gatewayClient';
 import { AssetTasksListResponseSchema } from '@beike/contracts/generate';
 import type { GenerationTask } from '@/store/appStoreTypes';
@@ -40,7 +40,9 @@ export async function pollGenerationTask(
   mediaType: 'image' | 'video' = 'image',
 ) {
   const endpoint = mediaType === 'video' ? '/api/generate/video' : '/api/generate/image';
-  const res = await apiFetch(`${endpoint}?taskId=${encodeURIComponent(taskId)}`);
+  const res = await apiFetch(`${endpoint}?taskId=${encodeURIComponent(taskId)}`, {
+    headers: storageConfigHeaders(),
+  });
   if (!res.ok) {
     throw new Error(`轮询失败 (${res.status})`);
   }
@@ -84,6 +86,7 @@ export async function pollSingleTaskResult(
       const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}`, {
         headers: {
           ...gatewayHeaders,
+          ...storageConfigHeaders(),
           ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
         },
       });
@@ -146,6 +149,7 @@ export async function submitImageGenTaskResult(
     ...payload,
     customBaseUrl: localUrl,
     customApiKey: localApiKey,
+    storageConfig: readClientStorageConfig(),
   };
 
   const submit = () => apiFetch('/api/generate/image', {
@@ -153,6 +157,7 @@ export async function submitImageGenTaskResult(
     headers: {
       'Content-Type': 'application/json',
       ...getGatewayClientHeaders(),
+      ...storageConfigHeaders(),
       ...(deps.idempotencyKey ? { 'x-idempotency-key': deps.idempotencyKey } : {}),
     },
     body: JSON.stringify(finalPayload),

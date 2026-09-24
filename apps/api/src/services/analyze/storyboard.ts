@@ -54,58 +54,64 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     throw new Error('缺少商品标题或商品图片素材');
   }
 
+  const lockedGroup = await loadLockedGroupSkeleton({
+    fullPromptId: lockedAssets?.fullPromptId,
+    productTitle,
+    productProps,
+    productIndex,
+  });
+  const acceptsPeople = lockedGroup.hasHuman !== false && lockedGroup.shots.some(
+    (shot) => shot.has_human !== false && shot.shot_type !== 'hand_held_only' && shot.shot_type !== 'pure_product',
+  );
+  const effectiveLockedAssets = {
+    ...lockedAssets, fullPromptId: lockedGroup.id,
+    personaId: acceptsPeople ? lockedAssets?.personaId : undefined,
+    outfitId: acceptsPeople ? lockedAssets?.outfitId : undefined,
+  };
+
   let assetLibraryData: any;
   let assetPickTrace: Record<string, unknown> | undefined;
   let actionItems: any[] = [];
-  let usedPublishedLibrary = false;
-  if (useAssetLibrary !== false) {
+  if (useAssetLibrary !== false || effectiveLockedAssets.personaId || effectiveLockedAssets.sceneId || effectiveLockedAssets.outfitId) {
     try {
       const loaded = await loadStoryboardLibrary({
         productTitle, productProps, productIndex, previousActionIds, previousSceneIds,
-        allocatedAssets, lockedAssets, batchId,
+        allocatedAssets, lockedAssets: effectiveLockedAssets, batchId,
       });
       assetLibraryData = loaded.assetLibraryData;
       assetPickTrace = loaded.assetPickTrace;
       actionItems = loaded.actionItems;
-      usedPublishedLibrary = loaded.usedAssetLibrary;
     } catch (assetErr) {
+      if (lockedAssets?.personaId || lockedAssets?.sceneId || lockedAssets?.outfitId) throw assetErr;
       console.warn('[Analyze API] 读取提示词资产库失败，使用拍摄架构兜底:', assetErr);
     }
   }
 
-  const lockedGroup = await loadLockedGroupSkeleton(lockedAssets?.fullPromptId);
-  if (!lockedGroup) throw new Error('请先在生成设置中选择完整的四图母本，再分析商品');
-  if (lockedGroup) {
-    // 载入图组时沿用该组的场景、人物与穿搭；仅用户明确锁定的槽位才覆盖。
-    assetLibraryData ||= { personas: [], scenes: [], outfits: [], actions: [] };
-    assetLibraryData.actions = [];
-    if (!lockedAssets?.sceneId && lockedGroup.sceneSummary) {
-      assetLibraryData.scenes = [{ title: '图组原场景', description: lockedGroup.sceneSummary }];
-    }
-    if (!lockedAssets?.personaId && lockedGroup.personaSummary && lockedGroup.hasHuman) {
-      assetLibraryData.personas = [{ name: '图组原人物', description: lockedGroup.personaSummary }];
-    }
-    if (!lockedAssets?.outfitId && lockedGroup.outfitSummary && lockedGroup.hasHuman) {
-      assetLibraryData.outfits = [{ title: '图组原穿搭', top: lockedGroup.outfitSummary, bottom: '' }];
-    }
+  // 沿用图组的场景、人物与穿搭；仅用户明确锁定的槽位才覆盖。
+  assetLibraryData ||= { personas: [], scenes: [], outfits: [], actions: [] };
+  assetLibraryData.actions = [];
+  if (!effectiveLockedAssets.sceneId && lockedGroup.sceneSummary) {
+    assetLibraryData.scenes = [{ title: '图组原场景', description: lockedGroup.sceneSummary }];
+  }
+  if (!effectiveLockedAssets.personaId && lockedGroup.personaSummary && lockedGroup.hasHuman) {
+    assetLibraryData.personas = [{ name: '图组原人物', description: lockedGroup.personaSummary }];
+  }
+  if (!effectiveLockedAssets.outfitId && lockedGroup.outfitSummary && lockedGroup.hasHuman) {
+    assetLibraryData.outfits = [{ title: '图组原穿搭', top: lockedGroup.outfitSummary, bottom: '' }];
   }
   const personaMode = modelPersona === 'none' || lockedGroup?.hasHuman === false ? 'none' : 'asset_driven';
-  let filledSlots = assembleStoryboardSlots({
+  const assembledSlots = assembleStoryboardSlots({
     shotCount,
     assets: assetLibraryData,
     lockedGroupShots: expandGroupShotSkeleton(lockedGroup.shots, shotCount)
-      .map((shot) => lockedAssets?.sceneId ? { ...shot, scene: '', lighting_type: '' } : shot),
+      .map((shot) => effectiveLockedAssets.sceneId ? { ...shot, scene: '', lighting_type: '' } : shot),
     personaMode,
   });
-  const usedLibrary = usedPublishedLibrary || Boolean(lockedGroup);
-  if (!usedLibrary) {
-    filledSlots = {
-      ...filledSlots,
-      usedAssetLibrary: false,
-      source: 'fallback',
-      shots: filledSlots.shots.map((shot) => ({ ...shot, usedAssetLibrary: false, source: 'fallback' as const })),
-    };
-  }
+  let filledSlots = {
+    ...assembledSlots,
+    usedAssetLibrary: true,
+    shots: assembledSlots.shots.map((shot) => ({ ...shot, usedAssetLibrary: true })),
+  };
 
   const assetDrivenNoModel = filledSlots.shots.length > 0 && filledSlots.shots.every((shot) => shot.hasHuman === false);
   let systemPrompt = buildProductOnlyVisionPrompt({
@@ -137,7 +143,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     rawOutput: visionResult.rawText,
     shotCount: filledSlots.shotCount,
     productTitle, productProps, isNoModel: assetDrivenNoModel, hasAnchorFace, productIndex,
-    assetLibraryData, lockedAssets, assetPickTrace, actionItems,
+    assetLibraryData, lockedAssets: effectiveLockedAssets, assetPickTrace, actionItems,
     actualModelUsed: visionResult.actualModel, triedModels: visionResult.triedModels,
     visionUsage: visionResult.usage ? { ...visionResult.usage } : null,
     filledSlots,
@@ -160,5 +166,16 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
       cameraFromAsset: filledSlots.shots[index]?.cameraFromAsset,
     })),
   });
-  return { ...assembled, qualityChecks, usedAssetLibrary: filledSlots.usedAssetLibrary, assemblySource: filledSlots.source };
+  return {
+    ...assembled,
+    assetTrace: {
+      ...assembled.assetTrace,
+      fullPromptId: lockedGroup.id,
+      fullPromptTitle: lockedGroup.title,
+      fullPromptSelectionMode: lockedGroup.selectionMode,
+    },
+    qualityChecks,
+    usedAssetLibrary: filledSlots.usedAssetLibrary,
+    assemblySource: filledSlots.source,
+  };
 }

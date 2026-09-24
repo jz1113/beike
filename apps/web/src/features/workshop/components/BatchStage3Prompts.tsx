@@ -9,6 +9,7 @@ import type { AppState } from '@/store/types';
 
 interface Props {
   generationStrategy?: 'grid_first' | 'single_shot';
+  autoMatchMotherTemplate?: boolean;
   successfulItems: BatchProductItem[];
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
   isAnalyzingAll: boolean;
@@ -28,6 +29,7 @@ const PRODUCTS_PER_PAGE = 4;
 
 export default function BatchStage3Prompts({
   generationStrategy = 'single_shot',
+  autoMatchMotherTemplate = false,
   successfulItems,
   setItems,
   isAnalyzingAll,
@@ -107,12 +109,9 @@ export default function BatchStage3Prompts({
   };
 
   const handleAnalyzeSingleItem = (item: BatchProductItem) => {
-    setItems((prev) =>
-      prev.map((p) =>
-        p.id === item.id ? { ...p, isAnalyzing: true } : p,
-      ),
-    );
-    void analyzeSingleProduct(item, resolveItemIndex(item));
+    void analyzeSingleProduct(item, resolveItemIndex(item)).catch(() => {
+      // 分析执行层已将具体错误写入商品状态。
+    });
   };
 
   const setIsWorkshopConfigOpen = useAppStore((s: AppState) => s.setIsWorkshopConfigOpen);
@@ -133,6 +132,12 @@ export default function BatchStage3Prompts({
         onOpenSettings={() => setIsWorkshopConfigOpen(true)}
       />
 
+      {autoMatchMotherTemplate && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 p-3 text-xs text-indigo-800">
+          <span>分析时将按商品类目自动匹配完整四图母本；也可在生产设置中固定同一组。</span>
+          <button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 rounded-lg bg-white px-3 py-2 font-bold">生产设置</button>
+        </div>
+      )}
       {/* 极简高密度商品分镜列表 */}
       <div className="space-y-3">
         {visibleItems.map((item, itemIdx) => (

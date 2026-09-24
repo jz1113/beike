@@ -65,6 +65,7 @@ export interface VisionAnalyzeParams {
 }
 
 export interface ShotPrompt {
+  assembly_source?: 'group_skeleton' | 'architecture' | 'fallback';
   shot_no: number;
   title?: string;
   prompt: string;

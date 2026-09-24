@@ -7,8 +7,8 @@ import {
 } from '@beike/domain/drawing';
 import {
   parseResponseJson,
-  padMissingOriginalShots,
 } from '../analyzeVisionCall';
+import { prepareProductSentenceShots } from './productSentenceResponse';
 import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
 import type { AssembleSlotsResult } from '@beike/domain/workshopPipeline';
 import { formatAssetWithCode } from './promptAssemblerFormat';
@@ -54,12 +54,7 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
 
   // 🌟 原创生成：严格保证返回分镜数量 100% 等于用户指定的 shotCount (如4分镜)
   const targetCount = Math.max(1, Math.min(12, Number(shotCount) || 4));
-  let rawPrompts = parsedResult.prompts || [];
-  const parsedCount = rawPrompts.filter((shot: { prompt?: string }) => String(shot?.prompt || '').trim()).length;
-  if (parsedCount < Math.ceil(targetCount * 0.5)) {
-    throw new Error(`视觉分析只解析出 ${parsedCount}/${targetCount} 个有效分镜，请重试`);
-  }
-  rawPrompts = padMissingOriginalShots(rawPrompts, targetCount, {
+  const { prompts: rawPrompts, parsedCount } = prepareProductSentenceShots(parsedResult.prompts, targetCount, {
     productTitle,
     isNoModel,
     masterScene: parsedResult.master_scene,
@@ -155,7 +150,9 @@ export async function assembleStoryboardShots(params: AssembleStoryboardParams) 
     };
   });
 
-  const groupHasHuman = draftPrompts.some((p: any) => p.has_human !== false);
+  const groupHasHuman = filledSlots?.shots?.length
+    ? filledSlots.shots.some((shot) => shot.hasHuman)
+    : draftPrompts.some((p: any) => p.has_human !== false);
   const diversified = enforceOriginalShotDiversity(draftPrompts, groupHasHuman);
 
   const appliedPersonaName = formatAssetWithCode(

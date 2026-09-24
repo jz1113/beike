@@ -10,7 +10,7 @@ import {
   stableAssetCode,
 } from '@beike/domain/assetSampling';
 import { inferProductCategoryAndAnatomy } from '@beike/domain/productCategory';
-import { parseGroupShotSkeleton } from '@beike/domain/workshopPipeline';
+import { isCompletePromptGroup, parseGroupShotSkeleton, selectPromptGroupForProduct } from '@beike/domain/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
 
@@ -40,9 +40,10 @@ export async function loadStoryboardLibrary(input: {
   const categoryOr = buildSuitableCategoriesOr(categoryInfo.categoryTags);
   const locked = input.lockedAssets || {};
   const allocated = input.allocatedAssets || {};
-  const targetPersonaId = locked.personaId || allocated.personaId;
-  const targetSceneId = locked.sceneId || allocated.sceneId;
-  const targetOutfitId = locked.outfitId || allocated.outfitId;
+  const groupLocked = Boolean(locked.fullPromptId);
+  const targetPersonaId = locked.personaId || (!groupLocked && allocated.personaId);
+  const targetSceneId = locked.sceneId || (!groupLocked && allocated.sceneId);
+  const targetOutfitId = locked.outfitId || (!groupLocked && allocated.outfitId);
 
   let personaItems: any[] = targetPersonaId
     ? compact(await db.personaAsset.findFirst({ where: { id: String(targetPersonaId), ...PROVENANCE } }))
@@ -50,10 +51,10 @@ export async function loadStoryboardLibrary(input: {
   if (locked.personaId && personaItems.length === 0) {
     throw new Error('锁定的人物资产不存在或已删除，请重新选择');
   }
-  if (personaItems.length === 0) {
+  if (personaItems.length === 0 && !groupLocked) {
     personaItems = await sortByQuality('persona', await db.personaAsset.findMany({ where: await poolWhere('persona'), orderBy: assetOrder, take: 12 }));
   }
-  if (!targetPersonaId && personaItems.length === 0) {
+  if (!targetPersonaId && !groupLocked && personaItems.length === 0) {
     personaItems = getCategoryTailoredPersonas(titleStr, categoryInfo.targetAnatomy);
   }
 
@@ -63,7 +64,7 @@ export async function loadStoryboardLibrary(input: {
   if (locked.sceneId && sceneItems.length === 0) {
     throw new Error('锁定的场景资产不存在或已删除，请重新选择');
   }
-  if (sceneItems.length === 0) {
+  if (sceneItems.length === 0 && !groupLocked) {
     let allScenes: any[] = categoryOr.length
       ? await sortByQuality('scene', await db.sceneAsset.findMany({ where: await poolWhere('scene', { OR: categoryOr }), orderBy: assetOrder, take: 100 }))
       : [];
@@ -82,13 +83,13 @@ export async function loadStoryboardLibrary(input: {
   if (locked.outfitId && outfitItems.length === 0) {
     throw new Error('锁定的穿搭资产不存在或已删除，请重新选择');
   }
-  if (outfitItems.length === 0 && categoryOr.length > 0) {
+  if (outfitItems.length === 0 && !groupLocked && categoryOr.length > 0) {
     outfitItems = await db.outfitAsset.findMany({ where: await poolWhere('outfit', { OR: categoryOr }), orderBy: assetOrder, take: 50 });
   }
-  if (outfitItems.length === 0) {
+  if (outfitItems.length === 0 && !groupLocked) {
     outfitItems = await db.outfitAsset.findMany({ where: await poolWhere('outfit'), orderBy: assetOrder, take: 50 });
   }
-  if (!targetOutfitId && outfitItems.length === 0) {
+  if (!targetOutfitId && !groupLocked && outfitItems.length === 0) {
     outfitItems = getCategoryTailoredOutfits(titleStr, categoryInfo.targetAnatomy);
   }
 
@@ -142,20 +143,35 @@ export async function loadStoryboardLibrary(input: {
   };
 }
 
-export async function loadLockedGroupSkeleton(fullPromptId?: unknown) {
-  const id = String(fullPromptId || '').trim();
-  if (!id || id === 'auto') return null;
-  const row = await db.fullPromptAsset.findFirst({ where: { id, ...PROVENANCE } });
-  if (!row) throw new Error('选定的图组母本不存在，请重新选择');
-  const shots = parseGroupShotSkeleton(row.shotPromptsJson);
-  let indices: unknown = null;
-  try { indices = JSON.parse(row.sourceImageIndices || '[]'); } catch { /* invalid legacy record */ }
-  if (!Array.isArray(indices) || indices.length !== 4 || shots.length !== 4) {
+export async function loadLockedGroupSkeleton(input: {
+  fullPromptId?: unknown;
+  productTitle?: string;
+  productProps?: Record<string, unknown> | null;
+  productIndex: number;
+}) {
+  const id = String(input.fullPromptId || '').trim();
+  const manuallyLocked = Boolean(id && id !== 'auto');
+  const row = manuallyLocked
+    ? await db.fullPromptAsset.findFirst({ where: { id, ...PROVENANCE } })
+    : selectPromptGroupForProduct(
+        await db.fullPromptAsset.findMany({
+          where: { ...PROVENANCE, sourceImageIndices: { not: null }, shotPromptsJson: { not: null } },
+          orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
+          take: 500,
+        }),
+        input.productTitle || '', input.productProps, input.productIndex,
+      );
+  if (!row) throw new Error(manuallyLocked
+    ? '选定的图组母本不存在，请重新选择'
+    : '资产库暂无适配该商品类目的完整四图母本，请导入并解构对应类目的四图组');
+  if (!isCompletePromptGroup(row)) {
     throw new Error('选定的图组母本不是完整的四图组，请重新选择');
   }
+  const shots = parseGroupShotSkeleton(row.shotPromptsJson);
   return {
     id: row.id,
     title: row.title,
+    selectionMode: manuallyLocked ? 'manual' as const : 'auto' as const,
     shots,
     architectureSummary: row.architectureSummary,
     hasHuman: row.hasHuman,

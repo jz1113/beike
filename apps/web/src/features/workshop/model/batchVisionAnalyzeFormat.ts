@@ -50,6 +50,7 @@ export function formatAnalyzedStoryboard(opts: {
           title: p.title, has_human: isHumanShot, promptFallback: rawPrompt,
         }, { hasFace: false, skipRichPrompt: true });
     return {
+      assembly_source: p.assembly_source,
       shot_no: p.shot_no || idx + 1,
       title: p.title || `分镜 ${idx + 1}`,
       scene: p.scene || masterFromApi || '真实买家秀生活场景',
@@ -84,6 +85,7 @@ export function formatAnalyzedStoryboard(opts: {
       }
     }
     formattedPrompts.forEach((p) => {
+      if (p.assembly_source === 'group_skeleton') return;
       p.prompt = p.has_human !== false
         ? enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi, fingerprintFromApi)
         : preventJewelryGlitches(p.prompt, fingerprintFromApi);

@@ -130,6 +130,10 @@ export function getDynamicNegativePrompt(options?: {
   const physicsArtifacts =
     ', extra legs, three legs, fused limbs, disconnected limbs, floating objects, defying gravity, object hovering, spoon in mouth, invented props not in reference, window reflection selfie, car window reflection, glass reflection, double exposure, ghosting reflection, translucent reflection, floating reflection, surreal reflection, optical illusion, mirror glitch, transparent glass selfie, overlapping reflections, floating necklace, necklace on back, backwards necklace, necklace floating on shoulder blade, detached jewelry chain, floating pendant, floating strap';
 
+  if (options?.shotType === 'hand_held_only') {
+    return `${screenshotArtifacts}, human face, full person, portrait, extra hands, extra fingers, fused fingers, detached hands, malformed product, watermark, blurry, low resolution${physicsArtifacts}`;
+  }
+
   if (!hasHuman) {
     // 纯静物 / 商业实物特写专属负向词
     return `${screenshotArtifacts}, promotional poster, marketing banner, text overlay, typography, Chinese text watermark, spec icons, parameter table, commercial advertisement, billboard, graphic design poster, spec sheet, product brochure, extra arms, human limbs, extra hands, mutated fingers, human in background, floating object, anti-gravity, distorted geometry, malformed product, plastic fake reflection, cheap CGI, 3d render, blender render, unreal engine, clay material, fake specular highlights, multiple rings, extra bracelets, blurry, low resolution, watermark, ugly text artifact, oversaturated, unrealistic perspective, dark gloomy lighting, muddy black shadows, flat sterile lighting, plastic toy look, washed out colors, harsh flat light${physicsArtifacts}`;

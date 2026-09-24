@@ -1,5 +1,5 @@
 import type { GenerationTask } from '@/store';
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@/shared/api/apiClient';
 import { getGatewayClientHeaders } from '@/shared/api/gatewayClient';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@beike/domain/drawing';
 import { prepareImageSubmission } from './prepareImageSubmission';
@@ -120,9 +120,11 @@ export async function submitSingleGenerationTask(
             try {
               const formData = new FormData();
               formData.append('file', file);
+              formData.append('storageConfig', JSON.stringify(readClientStorageConfig()));
               const uploadRes = await apiFetch('/api/generate/upload-ref', {
                 method: 'POST',
                 body: formData,
+                headers: storageConfigHeaders(),
                 signal,
               });
               const uploadData = await uploadRes.json().catch(() => null);
@@ -145,6 +147,7 @@ export async function submitSingleGenerationTask(
           'Content-Type': 'application/json',
           'x-idempotency-key': t.id,
           ...gatewayHeaders,
+          ...storageConfigHeaders(),
         },
         body: JSON.stringify({
           clientTaskId: t.id,
@@ -165,6 +168,7 @@ export async function submitSingleGenerationTask(
           audio: (t as any).generateAudio,
           watermark: false,
           customBaseUrl: localUrl,
+          storageConfig: readClientStorageConfig(),
         }),
         signal,
       });
@@ -198,6 +202,7 @@ export async function submitSingleGenerationTask(
         // The server accepts images as the canonical array; do not send the same base64 list twice.
       }
       imgBody.clientTaskId = t.id;
+      imgBody.storageConfig = readClientStorageConfig();
       const imgBodyStr = await prepareImageSubmission(imgBody, signal);
       res = await apiFetch('/api/generate/image', {
         method: 'POST',
@@ -205,6 +210,7 @@ export async function submitSingleGenerationTask(
           'Content-Type': 'application/json',
           'x-idempotency-key': t.id,
           ...gatewayHeaders,
+          ...storageConfigHeaders(),
         },
         body: imgBodyStr,
         signal,

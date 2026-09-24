@@ -27,7 +27,7 @@ export async function executeSingleImageTask(
   const chosenProductImg =
     item.selectedProductImages[0] || item.coverImage || shot.productImageUrl;
   let promptText = (shot.prompt || '').trim();
-  if (item.lookParts?.top && !isGenericLook(item.lookParts.top) && shot.has_human !== false) {
+  if (shot.assembly_source !== 'group_skeleton' && item.lookParts?.top && !isGenericLook(item.lookParts.top) && shot.has_human !== false) {
     promptText = enforceLookConsistency(
       promptText,
       item.lookParts,

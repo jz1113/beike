@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Check, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { QueueImageTile } from './QueueImageTile';
 import { formatDeconstructSummary, type ImageSetQueueItem } from '../utils/assetPromptConstants';
 
 type Props = {
@@ -52,40 +53,17 @@ export const QueueImageSet = memo(function QueueImageSet({
         </div>
       </div>
       <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2 pr-1">
-        {item.images.map((img, imageIndex) => {
-          const selected = !excluded.has(imageIndex);
-          return (
-            <button
-              key={imageIndex}
-              type="button"
-              onClick={() => onToggleImage(item.id, imageIndex)}
-              disabled={isDeconstructing}
-              aria-pressed={selected}
-              title={selected ? '已选择，点击取消' : '未选择，点击加入'}
-              className={`group relative w-[124px] shrink-0 aspect-[3/4] overflow-hidden rounded-2xl bg-slate-100 transition-all sm:w-[132px] xl:w-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
-                selected
-                  ? 'ring-2 ring-indigo-500 ring-offset-2 shadow-md shadow-indigo-100/70'
-                  : 'opacity-40 grayscale hover:opacity-70'
-              }`}
-            >
-              <img
-                src={img}
-                alt={`图 ${imageIndex + 1}${selected ? '，已选' : '，未选'}`}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-              />
-              <span className="absolute bottom-2 left-2 rounded-lg bg-slate-950/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-                图 {imageIndex + 1}
-              </span>
-              {selected && (
-                <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md">
-                  <Check className="h-4 w-4" strokeWidth={3} />
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {item.images.map((img, imageIndex) => (
+          <QueueImageTile
+            key={imageIndex}
+            url={img}
+            itemId={item.id}
+            imageIndex={imageIndex}
+            selected={!excluded.has(imageIndex)}
+            disabled={isDeconstructing}
+            onToggle={onToggleImage}
+          />
+        ))}
       </div>
     </div>
   );

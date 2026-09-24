@@ -57,7 +57,7 @@ export async function fetchRecipes(
 /**
  * 异步拉取全局资产库选项（人像、场景、穿搭、动作）
  */
-export async function fetchAssetLibraryOptions(): Promise<{
+export async function fetchAssetLibraryOptions(force = false): Promise<{
   personas: any[];
   scenes: any[];
   outfits: any[];
@@ -65,7 +65,7 @@ export async function fetchAssetLibraryOptions(): Promise<{
   fullPrompts: any[];
 }> {
   try {
-    const store = await getGlobalAssetLibrary(false);
+    const store = await getGlobalAssetLibrary(force);
     return {
       personas: store.personas || [],
       scenes: store.scenes || [],

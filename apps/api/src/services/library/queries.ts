@@ -181,6 +181,7 @@ export async function executeLibraryGet(req: Request) {
           'architectureSummary',
           'replaceableSlots',
           'shotPromptsJson',
+          'hasHuman',
           'provenance',
         ]);
         const preview = buildPromptPreview(f.reversePromptZh);

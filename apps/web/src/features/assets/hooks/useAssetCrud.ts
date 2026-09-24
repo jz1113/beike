@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { apiFetch as rawApiFetch } from '@/shared/api/apiClient';
 import { pickAssetEditFields } from '@beike/domain/assetEdit';
+import { isCompletePromptGroup } from '@beike/domain/workshopPipeline';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
 async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Response> {
@@ -250,6 +251,10 @@ export function useAssetCrud({
   const handleApplyToWorkshop = (item: any, _shot?: SceneShot) => {
     let promptSnippet = '';
     if (activeSubTab === 'full_prompt') {
+      if (!isCompletePromptGroup(item)) {
+        showToast('该图组不是完整四图母本，请在资产库重新解构后再载入');
+        return;
+      }
       promptSnippet = [
         item.architectureSummary ? `【固定图组架构】${item.architectureSummary}` : '',
         item.contentSummary ? `【内容总结】${item.contentSummary}` : '',
@@ -291,7 +296,7 @@ export function useAssetCrud({
       setCurrentView('workshop');
     }
     showToast(activeSubTab === 'full_prompt'
-      ? '已锁定图组母本为镜头骨架，人物/穿搭/场景仍按资产库整组替换'
+      ? '已锁定图组母本；默认沿用原组人物、穿搭和场景，可在生产设置中单独替换'
       : '已载入种草工坊并锁定应用该提示词资产');
   };
 

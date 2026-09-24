@@ -170,6 +170,7 @@ export async function runBatchCollect(
           if (typedList.length === 0) {
             deps.onItemUpdate(item.id, { status: 'failed', errorMsg: '采集成功但没有可用图片', selected: false });
             failedCount++;
+            deps.onProgress({ total: pendingItems.length, current: successCount + failedCount, success: successCount, failed: failedCount });
             continue;
           }
 

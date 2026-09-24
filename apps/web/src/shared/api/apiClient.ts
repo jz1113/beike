@@ -31,6 +31,7 @@ export function proxyMediaUrl(
   opts?: { asVideo?: boolean; thumb?: boolean; width?: number }
 ): string {
   if (!rawUrl) return '';
+  if (rawUrl.startsWith('//')) rawUrl = `https:${rawUrl}`;
   if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
     return rawUrl;
   }
@@ -78,4 +79,39 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     headers.delete('Content-Type');
   }
   return fetch(resolveApiUrl(input), { ...init, headers });
+}
+
+export interface ClientStorageConfig {
+  enabled: boolean;
+  persistResults: boolean;
+  provider: 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase';
+  accountId: string;
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucketName: string;
+  publicDomain: string;
+}
+
+/** 读取设置页保存在本机的对象存储配置。storage_enabled 表示成品也上传 OSS。 */
+export function readClientStorageConfig(): ClientStorageConfig {
+  const read = (key: string) => {
+    try { return localStorage.getItem(key) || ''; } catch { return ''; }
+  };
+  const provider = read('storage_provider');
+  return {
+    enabled: true,
+    persistResults: read('storage_enabled') === 'true',
+    provider: provider === 'cos' ? 'cos' : 'oss',
+    accountId: read('storage_account_id'),
+    endpoint: read('storage_endpoint'),
+    accessKeyId: read('storage_access_key_id'),
+    secretAccessKey: read('storage_secret_access_key'),
+    bucketName: read('storage_bucket_name'),
+    publicDomain: read('storage_public_domain'),
+  };
+}
+
+export function storageConfigHeaders(): Record<string, string> {
+  return { 'x-storage-config': JSON.stringify(readClientStorageConfig()) };
 }

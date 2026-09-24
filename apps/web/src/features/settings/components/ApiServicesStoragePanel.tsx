@@ -67,7 +67,7 @@ export function ApiServicesStoragePanel({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                  云端永久对象存储 (阿里云 OSS / 腾讯云 COS)
+                  对象存储 (阿里云 OSS / 腾讯云 COS)
                 </h3>
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors ${
                   storageEnabled
@@ -75,11 +75,11 @@ export function ApiServicesStoragePanel({
                     : 'bg-slate-100 text-slate-500 border-slate-200'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${storageEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                  {storageEnabled ? '已启用转存' : '未开启'}
+                  {storageEnabled ? '成品上传已开启' : '成品留在本机'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                自动将生图与生视频任务的短期临时链接流式转存为您专属的永久 CDN 链接，0 本地硬盘占用，长期可靠。
+                关闭时，生图和生视频成品保存在本机。打开后，成片才会转存到对象存储。模型需要公网拉取的参考文件仍会单独上传，并使用短时签名地址。
               </p>
             </div>
           </div>
@@ -93,12 +93,12 @@ export function ApiServicesStoragePanel({
               const nextVal = !storageEnabled;
               setStorageEnabled(nextVal);
               localStorage.setItem('storage_enabled', String(nextVal));
-              showToast(nextVal ? '已开启媒体自动转存' : '已关闭自动转存');
+              showToast(nextVal ? '已开启成品上传到对象存储' : '成品改为保存在本机');
             }}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
               storageEnabled ? 'bg-emerald-500' : 'bg-slate-200'
             }`}
-            title={storageEnabled ? '点击关闭自动转存' : '点击开启自动转存'}
+            title={storageEnabled ? '点击后成品只保存在本机' : '点击后成品也上传到对象存储'}
           >
             <span
               className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
@@ -287,8 +287,13 @@ export function ApiServicesStoragePanel({
 
             <button
               type="button"
-              disabled={isMigratingStorage}
+              disabled={isMigratingStorage || !storageEnabled}
               onClick={async () => {
+                if (!storageEnabled) {
+                  showToast('请先开启成品上传');
+                  return;
+                }
+                if (!window.confirm('会把历史临时链接重新上传到对象存储，并产生流量费用。确定继续？')) return;
                 if (!storageAccessKeyId.trim() || !storageBucketName.trim()) {
                   showToast('请先填写 Access Key 与 存储桶名称');
                   return;
@@ -303,6 +308,7 @@ export function ApiServicesStoragePanel({
                     body: JSON.stringify({
                       config: {
                         enabled: true,
+                        persistResults: true,
                         provider: storageProvider,
                         accountId: storageAccountId,
                         endpoint: storageEndpoint,
@@ -328,7 +334,7 @@ export function ApiServicesStoragePanel({
               className="px-3.5 py-2 rounded-xl bg-amber-50/80 hover:bg-amber-100 text-amber-800 border border-amber-200/70 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
             >
               {isMigratingStorage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-              <span>一键批量迁移历史临时链接</span>
+              <span>迁移历史链接到对象存储</span>
             </button>
           </div>
 

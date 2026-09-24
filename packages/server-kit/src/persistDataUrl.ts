@@ -53,7 +53,7 @@ export async function persistBufferToStorage(
     (contentType.includes('video') ? 'generated/videos' : 'generated/images');
   const config = resolveStorageConfig(options.customConfig);
 
-  if (config?.enabled) {
+  if (config?.persistResults) {
     try {
       return await uploadBufferToStorage(buffer, contentType, {
         category,
@@ -91,7 +91,7 @@ export async function persistDataUrlToStorage(
     (parsed.contentType.includes('video') ? 'generated/videos' : 'generated/images');
   const config = resolveStorageConfig(options.customConfig);
 
-  if (config?.enabled) {
+  if (config?.persistResults) {
     try {
       return await uploadBufferToStorage(parsed.buffer, parsed.contentType, {
         category,

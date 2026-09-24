@@ -143,14 +143,14 @@ export default function PromptAssetCard({
   return (
     <div
       onClick={onCardClick}
-      className={`group relative self-start flex flex-col rounded-[18px] bg-white/95 p-4 shadow-[0_2px_12px_rgba(30,41,59,0.055)] transition-[transform,box-shadow,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_30px_rgba(30,41,59,0.12)] cursor-pointer ${
+      className={`group relative self-start flex flex-col rounded-2xl bg-white/90 p-3.5 shadow-[0_2px_10px_rgba(30,41,59,0.045)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_8px_24px_rgba(30,41,59,0.10)] cursor-pointer ${
         isSelected
           ? 'bg-indigo-50/80 ring-2 ring-indigo-400 shadow-[0_8px_24px_rgba(79,70,229,0.12)]'
           : ''
       }`}
     >
       {/* 顶部单行元信息栏：编号 + 来源图徽标 + 核心徽标 + 批量选择 + 收藏/更多 */}
-      <div className="flex items-center justify-between gap-2 mb-2 select-none min-h-6">
+      <div className="flex items-center justify-between gap-2 mb-1.5 select-none min-h-6">
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
           {isBatchMode && (
             <div
@@ -286,7 +286,7 @@ export default function PromptAssetCard({
                 onPreviewImage(imageUrl, e);
               }
             }}
-            className="group/thumb relative w-[88px] h-[88px] rounded-xl overflow-hidden shrink-0 bg-slate-100 cursor-zoom-in"
+            className="group/thumb relative w-[76px] h-[76px] rounded-xl overflow-hidden shrink-0 bg-slate-100 cursor-zoom-in"
             title="点击放大查看来源参考原图"
           >
             <img
@@ -306,7 +306,7 @@ export default function PromptAssetCard({
             )}
           </div>
         ) : (
-          <div className="w-[88px] h-[88px] rounded-xl bg-slate-50 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
+          <div className="w-[76px] h-[76px] rounded-xl bg-slate-50 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
             <ImageIcon className="w-5 h-5" />
             <span className="text-[10px]">文字资产</span>
           </div>
@@ -314,7 +314,7 @@ export default function PromptAssetCard({
 
         <div className="flex-1 min-w-0">
           {summary ? (
-            <p className="text-xs text-slate-600 line-clamp-3 leading-5 select-text">
+            <p className="text-xs text-slate-600 line-clamp-3 leading-[19px] select-text">
               {summary}
             </p>
           ) : (
@@ -345,7 +345,7 @@ export default function PromptAssetCard({
       )}
 
       {/* 底部操作栏 */}
-      <div className="flex items-center justify-between gap-2 mt-3">
+      <div className="flex items-center justify-between gap-2 mt-2.5">
         <button
           onClick={onViewDetail}
           className="flex items-center gap-0.5 min-w-0 text-[11px] text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer font-medium"

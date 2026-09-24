@@ -1,5 +1,5 @@
 import { jsonResponse } from '../../core/http';
-import { uploadBufferToStorage, extractStorageConfigFromRequest, resolveStorageConfig } from '@beike/server-kit/storage';
+import { uploadBufferToStorage, extractStorageConfigFromRequest, resolveStorageConfig, getPresignedStorageUrl } from '@beike/server-kit/storage';
 import { formatUserError } from '@beike/domain/upstreamErrors';
 
 /**
@@ -34,15 +34,21 @@ export async function POST(req: Request): Promise<Response> {
     // 1. 如果已配置对象存储，直接上传至云端并返回永久公网 URL
     if (resolved) {
       try {
-        const publicUrl = await uploadBufferToStorage(buffer, mime, {
-          category: isVideo ? 'generated/videos' : 'generated/images',
+        const storedUrl = await uploadBufferToStorage(buffer, mime, {
+          category: 'refs',
           customConfig: storageConfig,
           filename: file.name,
+          withThumb: false,
         });
+        const signedUrl = getPresignedStorageUrl(storedUrl, 6 * 60 * 60, storageConfig)
+          || (resolved.provider === 'oss' ? null : storedUrl);
+        if (!signedUrl) {
+          return jsonResponse({ success: false, error: '参考文件已上传，但无法生成临时访问签名' }, 500);
+        }
 
         return jsonResponse({
           success: true,
-          url: publicUrl,
+          url: signedUrl,
           mediaType: isVideo ? 'video' : 'image',
           filename: file.name,
         });

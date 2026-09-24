@@ -5,6 +5,7 @@ import { resolveDeletableStoragePath } from './safeStoragePath';
 import os from 'node:os';
 import path from 'node:path';
 import { createHmac } from 'node:crypto';
+import sharp from 'sharp';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from './prisma';
 import { getWorkspaceId, runWithWorkspace } from './workspaceContext';
@@ -18,10 +19,13 @@ export type StorageCategory =
   | 'generated/videos'   // 3. AI 生成视频 (azhuo/generated/videos/YYYYMM/azhuo_gen_vid_...)
   | 'images'             // 兼容别名 -> generated/images
   | 'videos'             // 兼容别名 -> generated/videos
-  | 'assets';            // 风格拆解素材 (azhuo/assets/YYYYMM/azhuo_asset_...)
+  | 'assets'             // 风格拆解素材 (azhuo/assets/YYYYMM/azhuo_asset_...)
+  | 'refs';              // 模型参考文件 (azhuo/refs/YYYYMM/azhuo_ref_...)，短期中转
 
 export interface StorageConfig {
   enabled?: boolean;
+  /** 为 true 时才把生图/生视频成品写入对象存储。默认只存本机。 */
+  persistResults?: boolean;
   provider?: 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase';
   accountId?: string;      // Cloudflare Account ID
   endpoint?: string;       // S3 / R2 / OSS 端点 URL
@@ -83,6 +87,9 @@ export function buildStorageKey(
   } else if (category === 'assets') {
     folder = 'assets';
     filePrefix = 'asset';
+  } else if (category === 'refs') {
+    folder = 'refs';
+    filePrefix = 'ref';
   }
 
   const filename = customFilename || `azhuo_${filePrefix}_${Date.now()}_${randomSuffix}.${ext}`;
@@ -90,11 +97,22 @@ export function buildStorageKey(
 }
 
 /**
- * 从 Request 或请求 Body 中提取存储配置（仅 body.storageConfig；不再读取 x-storage-config）
+ * 从请求体或 x-storage-config 读取存储配置。
+ * GET 轮询没有 body，客户端把同一份配置放在请求头里。
  */
-export function extractStorageConfigFromRequest(_req: unknown, body?: { storageConfig?: StorageConfig }): StorageConfig | undefined {
+export function extractStorageConfigFromRequest(req: unknown, body?: { storageConfig?: StorageConfig }): StorageConfig | undefined {
   if (body?.storageConfig) return body.storageConfig;
-  return undefined;
+  const headers = req && typeof req === 'object' && 'headers' in req
+    ? (req as { headers?: { get?: (name: string) => string | null } }).headers
+    : undefined;
+  const raw = headers?.get?.('x-storage-config');
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as StorageConfig;
+    return parsed && typeof parsed === 'object' ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -121,6 +139,9 @@ export function resolveStorageConfig(customConfig?: StorageConfig): StorageConfi
   ensureDesktopEnvLoaded();
 
   const enabled = customConfig?.enabled ?? (process.env.STORAGE_ENABLED === 'true' || Boolean(process.env.R2_ACCOUNT_ID || process.env.S3_ENDPOINT));
+  const persistResults = customConfig
+    ? customConfig.persistResults === true
+    : process.env.STORAGE_PERSIST_RESULTS === 'true';
   
   const provider = customConfig?.provider || (process.env.STORAGE_PROVIDER as any) || 'r2';
   const accountId = customConfig?.accountId || process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID || '';
@@ -155,6 +176,7 @@ export function resolveStorageConfig(customConfig?: StorageConfig): StorageConfi
 
   return {
     enabled,
+    persistResults,
     provider,
     accountId,
     endpoint: endpoint.trim().replace(/\/+$/, ''),
@@ -218,7 +240,8 @@ export function extractStorageKeyFromUrl(
  */
 export async function getObjectBufferFromStorage(
   key: string,
-  customConfig?: StorageConfig
+  customConfig?: StorageConfig,
+  options?: { quiet?: boolean },
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   const config = resolveStorageConfig(customConfig);
   if (!config || !config.bucketName) return null;
@@ -248,7 +271,7 @@ export async function getObjectBufferFromStorage(
 
     return { buffer, contentType };
   } catch (err: any) {
-    console.warn(`[对象存储-直读] 读取 ${key} 失败:`, err?.message || err);
+    if (!options?.quiet) console.warn(`[对象存储-直读] 读取 ${key} 失败:`, err?.message || err);
     return null;
   }
 }
@@ -287,8 +310,54 @@ export function isAlreadyPermanentUrl(url: string, publicDomain?: string): boole
   return false;
 }
 
+const OBJECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
+export function thumbStorageKey(key: string): string {
+  return key.replace(/(\.[^.\/]+)$/, '_thumb.webp');
+}
+
+function filenameWithExt(filename: string | undefined, ext: string): string | undefined {
+  if (!filename) return undefined;
+  const base = filename.replace(/\.[^.]+$/, '');
+  return `${base}.${ext}`;
+}
+
+async function prepareStoredImage(buffer: Buffer): Promise<{ buffer: Buffer; thumb: Buffer } | null> {
+  try {
+    const webp = await sharp(buffer, { failOn: 'none' })
+      .rotate()
+      .resize({ width: 2560, height: 2560, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toBuffer();
+    const thumb = await sharp(webp)
+      .resize({ width: 480, withoutEnlargement: true, fit: 'inside' })
+      .webp({ quality: 80 })
+      .toBuffer();
+    return { buffer: webp, thumb };
+  } catch (err) {
+    console.warn('[对象存储] 图片压缩失败，改为上传原文件:', err);
+    return null;
+  }
+}
+
+async function putPrivateObject(
+  config: StorageConfig,
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  const s3 = createS3Client(config);
+  await s3.send(new PutObjectCommand({
+    Bucket: config.bucketName,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+    CacheControl: OBJECT_CACHE_CONTROL,
+  }));
+}
+
 /**
- * 将 Buffer 上传至对象存储，返回永久公开链接
+ * 将 Buffer 上传至对象存储。对象保持私有，图片会压成 WebP 并另存缩略图。
  */
 export async function uploadBufferToStorage(
   buffer: Buffer,
@@ -298,6 +367,7 @@ export async function uploadBufferToStorage(
     keyPrefix?: 'images' | 'videos' | 'assets' | StorageCategory;
     customConfig?: StorageConfig;
     filename?: string;
+    withThumb?: boolean;
   } = {},
 ): Promise<string> {
   const config = resolveStorageConfig(options.customConfig);
@@ -305,39 +375,33 @@ export async function uploadBufferToStorage(
     throw new Error('未配置对象存储凭证或配置不完整');
   }
 
-  let ext = 'png';
-  if (options.category === 'generated/videos' || options.keyPrefix === 'videos' || contentType.includes('mp4')) {
-    ext = 'mp4';
-  } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
-    ext = 'jpg';
-  } else if (contentType.includes('webp')) {
-    ext = 'webp';
+  const isVideo = options.category === 'generated/videos' || options.keyPrefix === 'videos' || contentType.includes('video') || contentType.includes('mp4');
+  let body = buffer;
+  let storedType = contentType;
+  let ext = isVideo ? 'mp4' : 'png';
+  let thumb: Buffer | null = null;
+
+  if (!isVideo) {
+    const prepared = await prepareStoredImage(buffer);
+    if (prepared) {
+      body = prepared.buffer;
+      thumb = prepared.thumb;
+      storedType = 'image/webp';
+      ext = 'webp';
+    } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+      ext = 'jpg';
+    } else if (contentType.includes('webp')) {
+      ext = 'webp';
+    }
   }
 
-  const category = options.category || (options.keyPrefix as StorageCategory) || (ext === 'mp4' ? 'generated/videos' : 'generated/images');
-  const key = buildStorageKey(category, ext, options.filename);
-
-  const s3 = createS3Client(config);
-  try {
-    await s3.send(new PutObjectCommand({
-      Bucket: config.bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      ACL: 'public-read',
-    }));
-  } catch (aclErr: any) {
-    // 若存储桶禁用对象级 ACL（如设置了 Bucket Owner Enforced），降级为标准上传
-    if (/AccessControlListNotSupported|InvalidArgument|InvalidACL|NotImplemented/i.test(aclErr?.message || '')) {
-      await s3.send(new PutObjectCommand({
-        Bucket: config.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-      }));
-    } else {
-      throw aclErr;
-    }
+  const category = options.category || (options.keyPrefix as StorageCategory) || (isVideo ? 'generated/videos' : 'generated/images');
+  const key = buildStorageKey(category, ext, filenameWithExt(options.filename, ext));
+  await putPrivateObject(config, key, body, storedType);
+  if (thumb && options.withThumb !== false && category !== 'refs') {
+    await putPrivateObject(config, thumbStorageKey(key), thumb, 'image/webp').catch((err) => {
+      console.warn('[对象存储] 缩略图上传失败:', err);
+    });
   }
 
   return buildPermanentUrl(config, key);
@@ -398,46 +462,7 @@ export async function uploadRemoteMediaToStorage(
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   const contentType = response.headers.get('content-type') || (options.category === 'generated/videos' || options.keyPrefix === 'videos' ? 'video/mp4' : 'image/png');
-
-  // 2. 解析文件后缀
-  let ext = 'png';
-  if (options.category === 'generated/videos' || options.keyPrefix === 'videos' || contentType.includes('mp4') || tempUrl.includes('.mp4')) {
-    ext = 'mp4';
-  } else if (contentType.includes('jpeg') || contentType.includes('jpg') || tempUrl.includes('.jpg') || tempUrl.includes('.jpeg')) {
-    ext = 'jpg';
-  } else if (contentType.includes('webp') || tempUrl.includes('.webp')) {
-    ext = 'webp';
-  }
-
-  // 3. 构建时间戳与分类规范路径 (如 azhuo/generated/images/202609/azhuo_gen_img_1788xxx.jpg)
-  const category = options.category || (options.keyPrefix as StorageCategory) || (ext === 'mp4' ? 'generated/videos' : 'generated/images');
-  const key = buildStorageKey(category, ext, options.filename);
-
-  // 4. 上传至对象存储桶
-  const s3 = createS3Client(config);
-  try {
-    await s3.send(new PutObjectCommand({
-      Bucket: config.bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      ACL: 'public-read',
-    }));
-  } catch (aclErr: any) {
-    if (/AccessControlListNotSupported|InvalidArgument|InvalidACL|NotImplemented/i.test(aclErr?.message || '')) {
-      await s3.send(new PutObjectCommand({
-        Bucket: config.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType
-      }));
-    } else {
-      throw aclErr;
-    }
-  }
-
-  // 5. 组装永久公开访问链接
-  const permanentUrl = buildPermanentUrl(config, key);
+  const permanentUrl = await uploadBufferToStorage(buffer, contentType, options);
 
   console.log(`[对象存储-转存] 成功转存至永久链接: ${permanentUrl}`);
   return permanentUrl;
@@ -456,23 +481,26 @@ export async function persistMediaUrl(
   try {
     const config = resolveStorageConfig(customConfig);
     if (tempUrl.startsWith('/storage/')) return tempUrl;
-    if (config?.enabled && isAlreadyPermanentUrl(tempUrl, config.publicDomain)) {
-      return tempUrl;
-    }
 
-    // 用户规则：云端存储只保存 AI 生成的图视频内容，商品采集和外站采集都不保存
     let category: StorageCategory = 'generated/images';
-    if (mediaType === 'video' || mediaType === 'generated/videos' || mediaType === 'videos') {
+    const isVideo = mediaType === 'video' || mediaType === 'generated/videos' || mediaType === 'videos';
+    if (isVideo) {
       category = 'generated/videos';
     } else if (mediaType === 'image' || mediaType === 'generated/images' || mediaType === 'images') {
       category = 'generated/images';
     } else {
-      // 其它类型（如 products、external、assets）一律禁止转存到云端存储
       return null;
     }
 
+    if (!config?.persistResults) {
+      return persistRemoteLocal(tempUrl, isVideo);
+    }
+    if (isAlreadyPermanentUrl(tempUrl, config.publicDomain)) {
+      return tempUrl;
+    }
+
     let permanentUrl: string | null = null;
-    for (let attempt = 1; config?.enabled && attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         permanentUrl = await uploadRemoteMediaToStorage(tempUrl, {
           category,
@@ -527,8 +555,15 @@ export async function testStorageConnection(config: StorageConfig): Promise<{
       Bucket: resolved.bucketName,
       Key: testKey,
       Body: testBody,
-      ContentType: 'text/plain'
+      ContentType: 'text/plain',
+      CacheControl: OBJECT_CACHE_CONTROL,
     }));
+    await s3.send(new DeleteObjectCommand({
+      Bucket: resolved.bucketName,
+      Key: testKey,
+    })).catch((err) => {
+      console.warn('[对象存储] 测试文件删除失败:', err);
+    });
 
     let testUrl = '';
     if (resolved.publicDomain) {

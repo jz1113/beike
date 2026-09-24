@@ -23,6 +23,10 @@ export async function POST(req: Request) {
       recordAuditEvent({ operation: 'storage.migrate', requestId, success: false, reason: 'missing-storage-config' });
       return jsonResponse({ success: false, error: '未配置有效的对象存储凭证，请先在设置中填写并开启存储配置' }, 400);
     }
+    if (!config.persistResults) {
+      recordAuditEvent({ operation: 'storage.migrate', requestId, success: false, reason: 'persist-results-disabled' });
+      return jsonResponse({ success: false, error: '未开启成品上传。开启后才会把历史文件转存到对象存储。' }, 400);
+    }
 
     const tasks = await db.imageTask.findMany({
       where: { status: 'SUCCESS', resultUrl: { not: null }, ...(cursor ? { id: { gt: cursor } } : {}) },

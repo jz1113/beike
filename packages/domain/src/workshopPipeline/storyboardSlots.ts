@@ -1,3 +1,5 @@
+import { resolveAssetShotSubject } from '../workshopShotSubject';
+
 export type SlotSource = 'group_skeleton' | 'architecture' | 'fallback';
 
 export interface SlotPersona {
@@ -118,6 +120,9 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
   raw.forEach((item, index) => {
     if (!item || typeof item !== 'object') return;
     const shot = item as Record<string, unknown>;
+    const subject = resolveAssetShotSubject({
+      shot_type: text(shot.shot_type), title: text(shot.title), action: text(shot.action),
+    });
     shots.push({
       shot_no: Number(shot.shot_no) || index + 1,
       title: text(shot.title),
@@ -128,8 +133,8 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
       camera_focal_length: text(shot.camera_focal_length),
       angle: text(shot.angle) || sourcePromptSection(text(shot.prompt), '构图镜头'),
       lighting_type: text(shot.lighting_type) || sourcePromptSection(text(shot.prompt), '光影'),
-      has_human: typeof shot.has_human === 'boolean' ? shot.has_human : undefined,
-      shot_type: text(shot.shot_type) || undefined,
+      has_human: subject?.has_human ?? (typeof shot.has_human === 'boolean' ? shot.has_human : undefined),
+      shot_type: subject?.shot_type || text(shot.shot_type) || undefined,
     });
   });
   return shots;
@@ -335,6 +340,9 @@ function safeParse(value: string): unknown {
 }
 
 function sceneText(scene?: SlotScene, group?: GroupShotSkeleton): string {
+  if (scene?.id && !text(group?.scene)) return [scene.title, scene.reversePrompt || scene.description].filter(Boolean).join('，');
+  const sourceScene = sourcePromptSection(text(group?.prompt), '场景结构');
+  if (sourceScene) return sourceScene;
   if (text(group?.scene)) return text(group?.scene);
   if (scene?.reversePrompt || scene?.description) {
     return [scene.title, scene.reversePrompt || scene.description].filter(Boolean).join('，');
@@ -362,6 +370,7 @@ function resolveHasHuman(
   action?: SlotAction,
   persona?: SlotPersona,
 ): boolean {
+  if (group?.shot_type === 'hand_held_only' || group?.shot_type === 'pure_product') return false;
   if (typeof group?.has_human === 'boolean') return group.has_human;
   if (typeof action?.has_human === 'boolean') return action.has_human;
   if (personaMode === 'none') return false;

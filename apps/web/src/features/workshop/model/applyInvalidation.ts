@@ -40,6 +40,7 @@ export function applyInvalidationToItems(
       tasks,
       copywriting,
       analyzedSuccess,
+      analysisError: effect.storyboard === 'all' ? undefined : item.analysisError,
     };
   });
 }

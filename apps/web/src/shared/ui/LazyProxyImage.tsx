@@ -1,64 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import { hasMediaSession, proxyMediaUrl, subscribeMediaSession } from '@/shared/api/apiClient';
+import { useState } from 'react';
+import { proxyMediaUrl } from '@/shared/api/apiClient';
 
 interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   src?: string | null;
-  rootMargin?: string;
   thumb?: boolean;
   width?: number;
 }
 
-/** 进入视口前提前加载 proxy 图片，带双重降级容灾与平滑淡入 */
-export default function LazyProxyImage({
+/** 使用浏览器原生懒加载，源地址变化时独立重建加载状态。 */
+export default function LazyProxyImage(props: Props) {
+  return <ImageContent key={`${props.src || ''}|${props.thumb ?? true}|${props.width || ''}`} {...props} />;
+}
+
+function ImageContent({
   src,
-  rootMargin = '400px',
   thumb = true,
   width,
   className = '',
   onLoad,
   onError,
+  loading = 'lazy',
   ...rest
 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [shouldLoad, setShouldLoad] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [useFallbackDirectUrl, setUseFallbackDirectUrl] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [sessionReady, setSessionReady] = useState(hasMediaSession());
-
-  useEffect(() => subscribeMediaSession(() => setSessionReady(true)), []);
-
-  useEffect(() => {
-    setShouldLoad(false);
-    setLoaded(false);
-    setUseFallbackDirectUrl(false);
-    setLoadError(false);
-  }, [src]);
-
-  useEffect(() => {
-    const needsSignedProxy = Boolean(src && !src.startsWith('data:') && !src.startsWith('blob:') && !src.startsWith('/'));
-    if (needsSignedProxy && !sessionReady) return;
-    const el = containerRef.current;
-    if (!el || !src) return;
-
-    // 如果浏览器不支持 IntersectionObserver，直接加载
-    if (typeof IntersectionObserver === 'undefined') {
-      setShouldLoad(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShouldLoad(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [src, rootMargin, sessionReady]);
+  const originalUrl = src?.startsWith('//') ? `https:${src}` : src;
 
   if (!src) {
     return <div className={`bg-slate-100/80 ${className}`} />;
@@ -66,11 +33,11 @@ export default function LazyProxyImage({
 
   // 默认走后端轻量 WebP 代理，若代理请求失败，立即无感降级为原始直链
   const currentImgSrc = useFallbackDirectUrl
-    ? src
-    : proxyMediaUrl(src, { thumb, width });
+    ? originalUrl
+    : proxyMediaUrl(originalUrl, { thumb, width });
 
   return (
-    <div ref={containerRef} className="w-full h-full relative bg-slate-100/70 overflow-hidden select-none">
+    <div className="w-full h-full relative bg-slate-100/70 overflow-hidden select-none">
       {/* 优雅低对比度骨架加载动画 */}
       {!loaded && !loadError && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200/50 animate-pulse" />
@@ -86,10 +53,15 @@ export default function LazyProxyImage({
         </div>
       )}
 
-      {shouldLoad && !loadError && (
+      {!loadError && (
         <img
           {...rest}
-          src={currentImgSrc}
+          src={currentImgSrc || undefined}
+          loading={loading}
+          ref={(element) => {
+            // 命中缓存时 load 事件可能早于事件绑定；以浏览器实际解码状态兜底。
+            if (element?.complete && element.naturalWidth > 0) setLoaded(true);
+          }}
           decoding="async"
           referrerPolicy="no-referrer"
           className={`w-full h-full object-cover transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'} ${className}`}
@@ -98,7 +70,7 @@ export default function LazyProxyImage({
             onLoad?.(e);
           }}
           onError={(e) => {
-            if (!useFallbackDirectUrl && src) {
+            if (!useFallbackDirectUrl && originalUrl && currentImgSrc !== originalUrl) {
               // 代理失败，快速直连原图
               setUseFallbackDirectUrl(true);
             } else {

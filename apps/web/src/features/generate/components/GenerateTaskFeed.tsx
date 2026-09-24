@@ -11,7 +11,7 @@ import {
   cleanPromptText,
 } from '@beike/domain/drawing';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@/shared/api/gatewayClient';
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, storageConfigHeaders } from '@/shared/api/apiClient';
 import { isGenerateVideoTask, type FlatBatchItem } from '../generateWorkspaceLayout';
 import {
   cloneDepthSubmit,
@@ -229,6 +229,7 @@ export function GenerateTaskFeed({
           const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
             headers: {
               ...getGatewayClientHeaders(),
+              ...storageConfigHeaders(),
               ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
             },
           }).catch(() => null);

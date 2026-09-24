@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, storageConfigHeaders } from '@/shared/api/apiClient';
 import { recordModelUsage } from '@/shared/utils/usageTracker';
 import { DEPTH_MODEL_SETUP_COMMAND, type DepthQuality, type DepthVideoStyle } from '@beike/domain/depthVideo';
 import { formatUserError } from '@beike/domain/upstreamErrors';
@@ -277,6 +277,7 @@ export async function submitDepthImage(
   form.append('quality', quality);
   const res = await apiFetch('/api/generate/depth-image', {
     method: 'POST',
+    headers: storageConfigHeaders(),
     body: form,
   });
   const data = await res.json();
@@ -306,6 +307,7 @@ export async function submitDepthVideo(
   form.append('quality', quality);
   const res = await apiFetch('/api/generate/depth-video', {
     method: 'POST',
+    headers: storageConfigHeaders(),
     body: form,
   });
   const data = await res.json();

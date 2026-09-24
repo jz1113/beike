@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { readResponseBodyLimited } from '../../../core/readBodyLimited';
 import { assertSafeRemoteUrl, MAX_PROXY_BYTES } from '@beike/server-kit/safeUrl';
-import { extractStorageKeyFromUrl, getObjectBufferFromStorage } from '@beike/server-kit/storage';
+import { extractStorageKeyFromUrl, getObjectBufferFromStorage, thumbStorageKey } from '@beike/server-kit/storage';
 import { setCachedImage, inFlightImageFetches } from './cache';
 import { buildUpstreamHeaders, fetchRemote } from './fetcher';
 
@@ -44,7 +44,10 @@ export async function fetchAndProcessImage(
       const initialStorageKey =
         extractStorageKeyFromUrl(imageUrl) || extractStorageKeyFromUrl(trimmedUrl);
       if (initialStorageKey) {
-        const storageRes = await getObjectBufferFromStorage(initialStorageKey);
+        const preferThumb = targetWidth != null && targetWidth <= 640;
+        const storageRes = preferThumb
+          ? await getObjectBufferFromStorage(thumbStorageKey(initialStorageKey), undefined, { quiet: true }) || await getObjectBufferFromStorage(initialStorageKey)
+          : await getObjectBufferFromStorage(initialStorageKey);
         if (storageRes) {
           const { buffer, contentType } = storageRes;
           if (targetWidth) {
@@ -123,7 +126,10 @@ export async function fetchAndProcessImage(
         const fallbackStorageKey =
           extractStorageKeyFromUrl(trimmedUrl) || extractStorageKeyFromUrl(imageUrl);
         if (fallbackStorageKey) {
-          const storageRes = await getObjectBufferFromStorage(fallbackStorageKey);
+          const preferThumb = targetWidth != null && targetWidth <= 640;
+          const storageRes = preferThumb
+            ? await getObjectBufferFromStorage(thumbStorageKey(fallbackStorageKey), undefined, { quiet: true }) || await getObjectBufferFromStorage(fallbackStorageKey)
+            : await getObjectBufferFromStorage(fallbackStorageKey);
           if (storageRes) {
             const { buffer, contentType } = storageRes;
             if (targetWidth) {

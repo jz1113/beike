@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAppStore } from '@/store';
+import { isCompletePromptGroup } from '@beike/domain/workshopPipeline';
 import { fetchAssetLibraryOptions } from '../model/batchResourceLoader';
 
-export function useWorkshopAssetLocks() {
+export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?: () => void) {
   const [useAssetLibrary, setUseAssetLibrary] = useState(true);
   const [lockedPersonaId, setLockedPersonaId] = useState('auto');
   const [lockedSceneId, setLockedSceneId] = useState('auto');
@@ -15,17 +16,13 @@ export function useWorkshopAssetLocks() {
   const [availableActions, setAvailableActions] = useState<any[]>([]);
   const [availableFullPrompts, setAvailableFullPrompts] = useState<any[]>([]);
 
-  const load = useCallback(async () => {
-    const { personas, scenes, outfits, actions, fullPrompts } = await fetchAssetLibraryOptions();
+  const load = useCallback(async (force = false) => {
+    const { personas, scenes, outfits, actions, fullPrompts } = await fetchAssetLibraryOptions(force);
     setAvailablePersonas(personas);
     setAvailableScenes(scenes);
     setAvailableOutfits(outfits);
     setAvailableActions(actions);
-    setAvailableFullPrompts(fullPrompts.filter((group: any) => {
-      try { return JSON.parse(String(group.sourceImageIndices || '[]')).length === 4
-        && JSON.parse(String(group.shotPromptsJson || '[]')).length === 4; }
-      catch { return false; }
-    }));
+    setAvailableFullPrompts(fullPrompts.filter(isCompletePromptGroup));
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -33,15 +30,17 @@ export function useWorkshopAssetLocks() {
   const pending = useAppStore((state) => state.pendingBatchLockedAssets);
   const setPending = useAppStore((state) => state.setPendingBatchLockedAssets);
   useEffect(() => {
-    if (!pending) return;
+    if (!workspaceReady || !pending) return;
     setUseAssetLibrary(true);
     if (pending.sceneId) setLockedSceneId(pending.sceneId);
     if (pending.outfitId) setLockedOutfitId(pending.outfitId);
     if (pending.personaId) setLockedPersonaId(pending.personaId);
     if (pending.actionId) setLockedActionId(pending.actionId);
     if (pending.fullPromptId) setLockedFullPromptId(pending.fullPromptId);
+    onBindingApplied?.();
     setPending(null);
-  }, [pending, setPending]);
+    void load(true);
+  }, [workspaceReady, pending, setPending, load, onBindingApplied]);
 
   return {
     useAssetLibrary, setUseAssetLibrary,

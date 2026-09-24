@@ -2,6 +2,7 @@ import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import { ensurePromptAlbum } from '@beike/server-kit/assetOrganization';
 import type { ContentPromptGroup, PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
+import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
 
 const MAX_IMAGES_PER_CONTENT_GROUP = 4;
 type RawGroup = Partial<ContentPromptGroup> & Record<string, unknown>;
@@ -96,14 +97,15 @@ function buildGroupShots(images: PerImageResult[], sceneSummary: string) {
     shot_no: index + 1,
     title: image.title || `图组分镜 ${index + 1}`,
     prompt: image.reverse_prompt_zh || image.reverse_prompt || '',
-    scene: sceneSummary,
+    scene: image.scene?.description || sceneSummary,
     action: image.action?.action || image.dimensions?.action_pose || '',
     optics: image.dimensions?.camera_language || '',
     camera_focal_length: image.dimensions?.focal_length || '',
     angle: image.dimensions?.composition || '',
     lighting_type: image.dimensions?.lighting || '',
     has_human: image.has_human !== false,
-    shot_type: image.has_human === false ? 'pure_product' : 'model_shot',
+    shot_type: resolveAssetShotSubject({ title: image.title, action: image.action?.action, shot_type: image.action?.shot_type })?.shot_type
+      || (image.has_human === false ? 'pure_product' : 'model_shot'),
     selected: true,
   }));
 }

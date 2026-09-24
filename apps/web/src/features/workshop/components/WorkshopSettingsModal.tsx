@@ -4,7 +4,7 @@ import {
   Settings2, 
   CheckCircle2,
 } from 'lucide-react';
-import { WorkshopAssetLockRow } from './WorkshopAssetLockRow';
+import { WorkshopAssetBindings } from './WorkshopAssetBindings';
 
 export interface WorkshopSettingsModalProps {
   isOpen: boolean;
@@ -89,8 +89,6 @@ export function WorkshopSettingsModal({
   availableFullPrompts = [],
 }: WorkshopSettingsModalProps) {
   if (!isOpen) return null;
-  const selectedGroup = availableFullPrompts.find((item) => item.id === lockedFullPromptId);
-  const hasHumanInGroup = Boolean(selectedGroup && selectedGroup.hasHuman !== false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] select-none animate-in fade-in duration-200">
@@ -189,27 +187,17 @@ export function WorkshopSettingsModal({
               <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                 <label className="flex items-center justify-between gap-3 py-2 sm:py-0 sm:pr-4"><span className="text-xs font-bold text-slate-700">分析并发</span><select value={analyzeConcurrency} onChange={e => setAnalyzeConcurrency?.(Number(e.target.value))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value={1}>1 并发</option><option value={2}>2 并发</option><option value={3}>3 并发</option><option value={4}>4 并发</option></select></label>
                 <label className="flex items-center justify-between gap-3 py-2 sm:px-4 sm:py-0"><span className="text-xs font-bold text-slate-700">生图并发</span><select value={imageGenConcurrency} onChange={e => setImageGenConcurrency?.(Number(e.target.value))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"><option value={4}>4 并发</option><option value={8}>8 并发</option><option value={16}>16 并发</option><option value={32}>32 并发</option><option value={50}>50 并发</option></select></label>
-                <div className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0"><span className="text-xs font-bold text-slate-700">执行方式</span><span className="rounded-lg bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700">逐镜参照原图生成</span></div>
+                <div className="flex items-center justify-between gap-3 py-2 sm:pl-4 sm:py-0"><span className="text-xs font-bold text-slate-700">执行方式</span><span className="rounded-lg bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700">商品图 + 图组提示词</span></div>
               </div>
             </section>
 
-            <section className="border-t border-slate-100 pt-3">
-              <div className="flex items-center justify-between gap-4">
-                <div><h3 className="text-sm font-black">资产绑定</h3><p className="mt-1 text-[11px] text-slate-400">先选完整四图母本；4 镜忠于原组，8 镜追加同一场景的延展。人物、穿搭、场景可按组替换。</p></div>
-              </div>
-              {(
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-150">
-                  <WorkshopAssetLockRow label="图组母本" prefix="R" value={lockedFullPromptId} onChange={(id) => {
-                    setLockedFullPromptId?.(id);
-                    const group = availableFullPrompts.find((item) => item.id === id);
-                    if (group && selectedShotCount !== 8) setSelectedShotCount(4);
-                  }} options={availableFullPrompts} />
-                  {hasHumanInGroup && <WorkshopAssetLockRow label="人设 #P" prefix="P" value={lockedPersonaId} onChange={(id) => setLockedPersonaId?.(id)} options={availablePersonas} />}
-                  <WorkshopAssetLockRow label="场景 #S" prefix="S" value={lockedSceneId} onChange={(id) => setLockedSceneId?.(id)} options={availableScenes} />
-                  {hasHumanInGroup && <WorkshopAssetLockRow label="穿搭 #O" prefix="O" value={lockedOutfitId} onChange={(id) => setLockedOutfitId?.(id)} options={availableOutfits} />}
-                </div>
-              )}
-            </section>
+            <WorkshopAssetBindings
+              groupId={lockedFullPromptId} groups={availableFullPrompts}
+              onGroupChange={(id) => setLockedFullPromptId?.(id)}
+              personaId={lockedPersonaId} personas={availablePersonas} onPersonaChange={(id) => setLockedPersonaId?.(id)}
+              sceneId={lockedSceneId} scenes={availableScenes} onSceneChange={(id) => setLockedSceneId?.(id)}
+              outfitId={lockedOutfitId} outfits={availableOutfits} onOutfitChange={(id) => setLockedOutfitId?.(id)}
+            />
           </div>
         </div>
 

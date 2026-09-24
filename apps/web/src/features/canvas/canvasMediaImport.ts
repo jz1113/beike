@@ -1,4 +1,4 @@
-import { apiFetch } from '@/shared/api/apiClient';
+import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@/shared/api/apiClient';
 import { extractImageDimensionsFromFile, extractVideoMetadataFromFile } from '@/shared/media/mediaHelper';
 import type { CanvasNode } from './types';
 
@@ -38,7 +38,8 @@ export async function persistCanvasMedia(file: File, viewCenterX: number, viewCe
   const form = new FormData();
   form.append('file', file);
   form.append('category', isVideo ? 'generated/videos' : 'assets');
-  const res = await apiFetch('/api/assets/storage/upload', { method: 'POST', body: form });
+  form.append('customConfig', JSON.stringify(readClientStorageConfig()));
+  const res = await apiFetch('/api/assets/storage/upload', { method: 'POST', headers: storageConfigHeaders(), body: form });
   const data = await res.json();
   if (!res.ok || !data.success || !data.url || /^(data:|blob:)/.test(data.url)) throw new Error(data.error || '媒体保存失败');
   const display = resultWidth && resultHeight

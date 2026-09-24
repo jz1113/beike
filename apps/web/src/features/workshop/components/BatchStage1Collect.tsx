@@ -150,8 +150,14 @@ export default function BatchStage1Collect({
       {/* 🌟 采编清单与图库状态 (采集后成为大画幅核心主角) */}
       {items.length > 0 && !isAddingProducts && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center border-b border-slate-200/60 px-1 pb-2">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200/60 px-1 pb-2">
             <h3 className="text-base font-black tracking-tight text-slate-900">采编清单与图库状态</h3>
+            {(isCollecting || items.some(item => item.status === 'pending' || item.status === 'failed')) && (
+              <button type="button" disabled={isCollecting} onClick={() => void startBatchCollect()}
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                {isCollecting ? `采集中 ${collectProgress.current}/${collectProgress.total}` : '采集待处理商品 / 重试失败项'}
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 sm:gap-4">

@@ -1,4 +1,4 @@
-import {apiFetch} from '@/shared/api/apiClient';
+import {apiFetch, readClientStorageConfig, storageConfigHeaders} from '@/shared/api/apiClient';
 import {parseDecomposedLayers, type DecomposedLayer} from '@beike/domain/layerDecomposition';
 import {useCanvasStore} from './store/useCanvasStore';
 import type {CanvasNode} from './types';
@@ -11,7 +11,7 @@ export async function runLayerDecompositionTask(projectId:string, source:CanvasN
   store.addNode(projectId,{id,type:'image',title:`${source.title || '图片'} · 图层分离`,x:source.x+source.width+80,y:source.y,width:source.width,height:source.height,status:'generating',referenceNodeIds:[source.id],referenceImageUrl:source.imageUrl,model:'seedream-v5-pro/layer-decomposition',content:prompt,layerTask:true});
   try {
     const image=await prepare();
-    const response=await apiFetch('/api/generate/layer-decomposition',{method:'POST',headers:{'Content-Type':'application/json','x-idempotency-key':operation},body:JSON.stringify({model:'seedream-v5-pro/layer-decomposition',image,prompt,size:'auto'})});
+    const response=await apiFetch('/api/generate/layer-decomposition',{method:'POST',headers:{'Content-Type':'application/json','x-idempotency-key':operation,...storageConfigHeaders()},body:JSON.stringify({model:'seedream-v5-pro/layer-decomposition',image,prompt,size:'auto',storageConfig:readClientStorageConfig()})});
     const result=await response.json();
     if(!response.ok || !result.success)throw new Error(result.error || '图层拆分失败');
     const layers:DecomposedLayer[]=result.layers;

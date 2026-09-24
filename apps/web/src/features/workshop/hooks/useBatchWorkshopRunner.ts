@@ -100,7 +100,14 @@ export function useBatchWorkshopRunner() {
   // 文案自动生成是批次配置：关闭后仍可在交付页手动写作或按需生成。
   const [autoGenerateCopywriting, setAutoGenerateCopywriting] = useState(true);
   const [activeImgFilter, setActiveImgFilter] = useState<'all' | 'main' | 'sku' | 'detail'>('all');
-  const assetLocks = useWorkshopAssetLocks();
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const analyzeConfigRevisionRef = useRef(0);
+  const handleAppliedBinding = useCallback(() => {
+    analyzeConfigRevisionRef.current += 1;
+    setItems((previous) => applyInvalidationToItems(previous, { type: 'locked_assets' }));
+    setStoryboardRevision((revision) => revision + 1);
+  }, []);
+  const assetLocks = useWorkshopAssetLocks(workspaceReady, handleAppliedBinding);
   const {
     useAssetLibrary, setUseAssetLibrary, lockedPersonaId, setLockedPersonaId, lockedSceneId, setLockedSceneId,
     lockedOutfitId, setLockedOutfitId, lockedActionId, setLockedActionId, lockedFullPromptId, setLockedFullPromptId,
@@ -168,7 +175,6 @@ export function useBatchWorkshopRunner() {
   const setPendingBatchStage = useAppStore((s) => s.setPendingBatchStage);
   const pendingBatchPromptImport = useAppStore((s) => s.pendingBatchPromptImport);
   const setPendingBatchPromptImport = useAppStore((s) => s.setPendingBatchPromptImport);
-  const [workspaceReady, setWorkspaceReady] = useState(false);
 
   useEffect(() => {
     if (!workspaceReady || pendingBatchStage == null) return;
@@ -235,6 +241,7 @@ export function useBatchWorkshopRunner() {
         /珠宝首饰/.test(String(r.name))
     );
     if (jewelryArch && (!selectedArchId || selectedArchId === 'auto' || selectedArchId === 'arch_jewelry_master' || selectedArchId === SYSTEM_MASTER_RECIPES[0]?.id)) {
+      analyzeConfigRevisionRef.current += 1;
       setSelectedArchId(jewelryArch.id);
       setItems((prev) => applyInvalidationToItems(prev, { type: 'architecture' }));
       setStoryboardRevision((revision) => revision + 1);
@@ -252,15 +259,9 @@ export function useBatchWorkshopRunner() {
 
   const handleParseInput = () => {
     if (collectInFlight.current) return [];
-    let created: BatchProductItem[] = [];
-    let error: string | undefined;
-    setItems((prev) => {
-      const res = parseBatchInputLines(batchInputText, new Set(prev.map((i) => `${i.platform}:${i.itemId}`)));
-      error = res.error;
-      created = res.newItems;
-      if (res.newItems.length === 0) return prev;
-      return [...prev, ...res.newItems];
-    });
+    const { newItems: created, error } = parseBatchInputLines(
+      batchInputText, new Set(itemsRef.current.map((i) => `${i.platform}:${i.itemId}`)),
+    );
     if (error === 'EMPTY_INPUT') {
       showToast('请输入至少一条商品链接或 SKU');
       return [];
@@ -269,6 +270,9 @@ export function useBatchWorkshopRunner() {
       showToast('没有识别到新的不重复商品');
       return [];
     }
+    const nextItems = [...itemsRef.current, ...created];
+    itemsRef.current = nextItems;
+    setItems(nextItems);
     setBatchInputText('');
     showToast(`成功加入 ${created.length} 个待采商品`);
     return created;
@@ -313,6 +317,7 @@ export function useBatchWorkshopRunner() {
   };
 
   const invalidateWorkshopConfig = (type: 'architecture' | 'shot_count' | 'locked_assets') => {
+    analyzeConfigRevisionRef.current += 1;
     setItems((prev) => applyInvalidationToItems(prev, { type }));
     setStoryboardRevision((revision) => revision + 1);
   };
@@ -359,6 +364,7 @@ export function useBatchWorkshopRunner() {
     useAssetLibrary,
     setItems,
     getItems: () => itemsRef.current,
+    getConfigRevision: () => analyzeConfigRevisionRef.current,
     batchGroupSignaturesRef,
     batchActionIdsRef,
     batchSceneIdsRef,
@@ -399,7 +405,7 @@ export function useBatchWorkshopRunner() {
       concurrency: analyzeConcurrency || 2,
       isAborted: () => runControlRef.current.status === 'cancelled',
       analyzeOne: async (item, index) => {
-        await analyzeBatchProduct(analysisDeps, item, index);
+        return analyzeBatchProduct(analysisDeps, item, index);
       },
       onItemStart: () => {},
       onItemFinish: (finished, total) => {

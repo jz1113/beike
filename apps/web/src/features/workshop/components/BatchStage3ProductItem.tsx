@@ -117,6 +117,14 @@ const MemoizedProductItem = React.memo(function ProductItem({
                   <span>{item.prompts.length} 个镜头</span>
                 </>
               )}
+              {hasPrompts && item.appliedFullPromptTitle && (
+                <>
+                  <span>·</span>
+                  <span title={`图组母本 ${item.appliedFullPromptId || ''}`}>
+                    {item.appliedFullPromptSelectionMode === 'auto' ? '自动匹配' : '已锁定'}图组：{item.appliedFullPromptTitle}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

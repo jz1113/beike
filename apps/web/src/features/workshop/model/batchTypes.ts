@@ -91,6 +91,9 @@ export interface BatchProductItem {
   applied_scene?: string;
   applied_outfit?: string;
   applied_persona?: string;
+  appliedFullPromptId?: string;
+  appliedFullPromptTitle?: string;
+  appliedFullPromptSelectionMode?: 'manual' | 'auto';
 
   // 生图任务队列专属
   tasks: BatchTaskItem[];

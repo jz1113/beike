@@ -369,6 +369,7 @@ export default function BatchWorkshopView() {
 
           {currentStage === 3 && (
             <BatchStage3Prompts
+              autoMatchMotherTemplate={!runner.lockedFullPromptId || runner.lockedFullPromptId === 'auto'}
               generationStrategy={generationStrategy}
               successfulItems={successfulItems}
               setItems={setItems}
