@@ -95,6 +95,7 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   pendingBatchPromptImport: null,
   batchStage: 1,
   pendingBatchStage: null,
+  pendingFreshWorkshopEntry: false,
   pendingBatchLockedAssets: null,
   getEffectiveAnchorFaceImageUrl: () => pickEffectiveAnchorFaceImageUrl(get()),
   getEffectiveIsAnchorFaceConfirmed: () => pickEffectiveIsAnchorFaceConfirmed(get()),

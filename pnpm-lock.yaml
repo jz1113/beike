@@ -54,16 +54,16 @@ importers:
         specifier: ^3.1111.0
         version: 3.1127.0
       '@beike/contracts':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../packages/contracts
       '@beike/domain':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../packages/domain
       '@beike/prisma':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../packages/prisma
       '@beike/server-kit':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../packages/server-kit
       '@ffmpeg-installer/ffmpeg':
         specifier: ^1.1.0
@@ -105,10 +105,10 @@ importers:
   apps/web:
     dependencies:
       '@beike/contracts':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../packages/contracts
       '@beike/domain':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../packages/domain
       '@hugeicons/core-free-icons':
         specifier: ^4.3.4
@@ -196,10 +196,10 @@ importers:
         specifier: ^3.1111.0
         version: 3.1127.0
       '@beike/domain':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../domain
       '@beike/prisma':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../prisma
       '@prisma/client':
         specifier: ^5.22.0

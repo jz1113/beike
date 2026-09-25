@@ -25,6 +25,7 @@ export function BatchStage4CopyPanel({
   const cw = item.copywriting || { title: '', content: '', tags: [] };
   return (
     <div className="lg:col-start-2 min-w-0 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 space-y-3">
+      {!readOnly && successCount === 0 && <p className="text-xs text-slate-500">至少一张未被淘汰的有效成图后可生成文案；也可先在下方手动填写。</p>}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -34,7 +35,7 @@ export function BatchStage4CopyPanel({
           {item.copywritingError && (
             <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
               <span>{item.copywritingError}</span>
-              {!readOnly && <button type="button" onClick={() => generateCopywritingForProduct(item)} className="font-bold underline">重试文案</button>}
+              {!readOnly && <button type="button" onClick={() => generateCopywritingForProduct(item)} disabled={item.isCopywritingGenerating || successCount === 0} className="font-bold underline">重试文案</button>}
             </div>
           )}
           <div className="flex flex-wrap items-center justify-end gap-2">

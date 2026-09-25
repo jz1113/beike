@@ -4,8 +4,8 @@ import {
   getCachedAssetsSync,
   getCategoryAssetLibrary,
   invalidateGlobalAssetCache,
-  isAssetLibraryLoaded,
-} from '../utils/assetLibraryCache';
+  subscribeAssetInvalidation,
+} from '@/shared/api/assetLibraryCache';
 import { isNonHumanPlaceholderAsset } from '../utils/assetPromptConstants';
 
 export interface UseAssetListOptions {
@@ -26,9 +26,11 @@ export function useAssetList({
   activeTabRef.current = activeSubTab;
   const loadIdRef = useRef(0);
   const { setSafeTimeout } = useSafeTimeout();
-  const [isLoading, setIsLoading] = useState(() => !isAssetLibraryLoaded());
+  const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<any[]>(() => getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab)));
   const [totalCount, setTotalCount] = useState(() => getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab)).length);
+
+  const [loadError, setLoadError] = useState('');
 
   // 批量管理与选中状态
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -37,11 +39,10 @@ export function useAssetList({
   // 加载当前类型的资产列表（全局 SWR 缓存）
   const fetchAssets = useCallback(
     async (forceReload = false) => {
+      if (forceReload) invalidateGlobalAssetCache();
       const loadId = ++loadIdRef.current;
-      if (forceReload) {
-        invalidateGlobalAssetCache();
-        setIsLoading(true);
-      }
+      setLoadError('');
+      setIsLoading(true);
 
       try {
         await getCategoryAssetLibrary(activeSubTab, forceReload);
@@ -50,7 +51,10 @@ export function useAssetList({
         setItems(list);
         setTotalCount(list.length);
       } catch (err) {
-        showToast(`资产加载失败：${err instanceof Error ? err.message : '请重试'}`);
+        if (activeTabRef.current !== activeSubTab || loadIdRef.current !== loadId) return;
+        const message = err instanceof Error ? err.message : '请重试';
+        setLoadError(message);
+        showToast(`资产加载失败：${message}`);
       } finally {
         if (activeTabRef.current === activeSubTab && loadIdRef.current === loadId) setIsLoading(false);
       }
@@ -62,29 +66,13 @@ export function useAssetList({
     void fetchAssets(true);
   }, [fetchAssets]);
 
-  // Tab 切换时：0ms 瞬间本地秒开，静默刷新
+  // Cached rows can render immediately, but failure must not masquerade as an empty library.
   useEffect(() => {
-    let isMounted = true;
     const list = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
-    setItems(list);
-    setTotalCount(list.length);
-
-    if (isAssetLibraryLoaded()) {
-      getCategoryAssetLibrary(activeSubTab, false)
-        .then(() => {
-          if (!isMounted) return;
-          const freshList = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
-          setItems(freshList);
-          setTotalCount(freshList.length);
-        })
-        .catch(() => {});
-    } else {
-      void fetchAssets(false);
-    }
-
-    return () => {
-      isMounted = false;
-    };
+    setItems(list); setTotalCount(list.length);
+    void fetchAssets(false);
+    const unsubscribe = subscribeAssetInvalidation(() => { void fetchAssets(false); });
+    return () => { ++loadIdRef.current; unsubscribe(); };
   }, [activeSubTab, fetchAssets]);
 
   // 切换分类时重置批量勾选
@@ -120,6 +108,7 @@ export function useAssetList({
   };
 
   return {
+    loadError,
     isLoading,
     setIsLoading,
     items,

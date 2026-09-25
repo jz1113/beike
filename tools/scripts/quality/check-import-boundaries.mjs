@@ -1,67 +1,34 @@
-/** Static import boundaries. New edges must not appear; listed exceptions may only shrink. */
+/** Check static imports, exports and literal dynamic imports; exemptions may only shrink. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { boundaryViolations, featureOf } from './boundary-rules.mjs';
+import { isTestFile, moduleReferences, walkSourceFiles } from './source-files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const baselinePath = path.join(root, 'tools/configs/import-boundary-baseline.json');
-const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
-const allowed = new Set(baseline.edges);
-
-const files = [];
-function walk(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '__tests__') continue;
-    const absolute = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(absolute);
-    else if (/\.(ts|tsx)$/.test(entry.name) && !entry.name.includes('.test.')) files.push(absolute);
-  }
-}
-walk(path.join(root, 'apps/web/src'));
-walk(path.join(root, 'apps/api/src'));
-walk(path.join(root, 'packages'));
-
+const baseline = JSON.parse(fs.readFileSync(path.join(root, 'tools/configs/import-boundary-baseline.json'), 'utf8'));
+const allowed = new Set(baseline.edges), observed = new Set(), errors = [];
 const config = ts.readConfigFile(path.join(root, 'tsconfig.json'), ts.sys.readFile);
+if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
 const options = ts.parseJsonConfigFileContent(config.config, ts.sys, root).options;
-const added = [];
-
-function featureOf(file) {
-  const rel = path.relative(root, file).replace(/\\/g, '/');
-  const match = /^apps\/web\/src\/features\/([^/]+)/.exec(rel);
-  return match ? match[1] : null;
-}
-
+const files = ['apps/web/src', 'apps/api/src', 'packages'].flatMap(dir => walkSourceFiles(path.join(root, dir)))
+  .filter(file => /\.[cm]?[jt]sx?$/.test(file) && !isTestFile(file) && !file.endsWith('.d.ts'));
+const relative = file => path.relative(root, file).split(path.sep).join('/');
 for (const absolute of files) {
   const source = ts.createSourceFile(absolute, fs.readFileSync(absolute, 'utf8'), ts.ScriptTarget.Latest, true);
-  const from = path.relative(root, absolute).replace(/\\/g, '/');
-  source.forEachChild(function visit(node) {
-    if (ts.isImportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
-      const resolved = ts.resolveModuleName(node.moduleSpecifier.text, absolute, options, ts.sys).resolvedModule?.resolvedFileName;
-      if (!resolved) return;
-      const to = path.relative(root, resolved).replace(/\\/g, '/');
-      const edge = `${from} -> ${to}`;
-      if (from.startsWith('packages/domain/') && to.includes('server-kit')) added.push(edge);
-      if (from.startsWith('apps/web/') && to.includes('server-kit')) added.push(edge);
-      if (
-        (from.startsWith('apps/api/src/routes/') || from.startsWith('apps/api/src/services/'))
-        && (to.endsWith('repositories/db.ts') || /packages\/server-kit\/.*prisma/.test(to))
-      ) {
-        added.push(`prisma-boundary ${from} -> ${to}`);
-      }
-      const fromFeature = featureOf(absolute);
-      const toFeature = featureOf(resolved);
-      if (fromFeature && toFeature && fromFeature !== toFeature && !allowed.has(`${fromFeature}->${toFeature}`)) {
-        added.push(`${fromFeature}->${toFeature} (${from} -> ${to})`);
-      }
-    }
-    ts.forEachChild(node, visit);
-  });
+  const from = relative(absolute);
+  for (const specifier of moduleReferences(source)) {
+    const resolved = ts.resolveModuleName(specifier, absolute, options, ts.sys).resolvedModule?.resolvedFileName;
+    const to = resolved ? relative(resolved) : '';
+    const staticAsset = specifier.startsWith('@/') && fs.existsSync(path.join(root, 'apps/web/src', specifier.slice(2).split('?')[0]));
+    if (!resolved && !staticAsset && (specifier.startsWith('@beike/') || specifier.startsWith('@/'))) errors.push(`unresolved-workspace: ${from} -> ${specifier}`);
+    for (const rule of boundaryViolations(from, to, specifier, allowed)) errors.push(`${rule}: ${from} -> ${to || specifier}`);
+    if (featureOf(from) && featureOf(to) && featureOf(from) !== featureOf(to)) observed.add(`${featureOf(from)}->${featureOf(to)}`);
+  }
 }
-
-if (added.length) {
-  console.error('New import boundary violations:\n' + [...new Set(added)].join('\n'));
+for (const edge of allowed) if (!observed.has(edge)) errors.push(`stale exemption: remove ${edge} from import-boundary-baseline.json`);
+if (errors.length) {
+  console.error('Import boundary violations:\n' + [...new Set(errors)].join('\n'));
   process.exitCode = 1;
-} else {
-  console.log(`Import boundary gate passed; ${allowed.size} reviewed cross-feature edges remain.`);
-}
+} else console.log(`Import boundary gate passed; ${files.length} source files; ${allowed.size} reviewed cross-feature edges remain.`);

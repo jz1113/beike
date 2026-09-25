@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BatchProductItem } from '../model/batchTypes';
 import { BatchSelectionDetail } from './BatchSelectionDetail';
-import { toggleProductImageSelection } from '../model/batchImageSelection';
+import { toggleProductImageSelection } from '../model/collection/batchImageSelection';
 
 interface Props {
   displayedItems: BatchProductItem[];

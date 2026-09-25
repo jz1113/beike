@@ -10,7 +10,7 @@ import {
   stableAssetCode,
 } from '@beike/domain/assetSampling';
 import { inferProductCategoryAndAnatomy } from '@beike/domain/productCategory';
-import { isCompletePromptGroup, parseGroupShotSkeleton } from '@beike/domain/workshopPipeline';
+import { isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton } from '@beike/domain/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
 
@@ -48,10 +48,11 @@ export async function loadStoryboardLibrary(input: {
   const targetOutfitId = locked.outfitId || (!groupLocked && allocated.outfitId);
 
   let personaItems: any[] = targetPersonaId
-    ? compact(await db.personaAsset.findFirst({ where: { id: String(targetPersonaId), ...PROVENANCE } }))
+    ? compact(await db.personaAsset.findFirst({ where: { AND: [{ id: String(targetPersonaId) }, await poolWhere('persona')] } }))
     : [];
+  personaItems = personaItems.filter(row => isWorkshopAssetEligible(row, 'persona'));
   if (locked.personaId && personaItems.length === 0) {
-    throw new Error('锁定的人物资产不存在或已删除，请重新选择');
+    throw new Error('锁定的人物资产不可用（未发布、占位记录或已删除），请重新选择');
   }
   if (personaItems.length === 0 && !groupLocked) {
     personaItems = await sortByQuality('persona', await db.personaAsset.findMany({ where: await poolWhere('persona'), orderBy: assetOrder, take: 12 }));
@@ -61,10 +62,11 @@ export async function loadStoryboardLibrary(input: {
   }
 
   let sceneItems: any[] = targetSceneId
-    ? compact(await db.sceneAsset.findFirst({ where: { id: String(targetSceneId), ...PROVENANCE } }))
+    ? compact(await db.sceneAsset.findFirst({ where: { AND: [{ id: String(targetSceneId) }, await poolWhere('scene')] } }))
     : [];
+  sceneItems = sceneItems.filter(row => isWorkshopAssetEligible(row, 'scene'));
   if (locked.sceneId && sceneItems.length === 0) {
-    throw new Error('锁定的场景资产不存在或已删除，请重新选择');
+    throw new Error('锁定的场景资产不可用（未发布或已删除），请重新选择');
   }
   if (sceneItems.length === 0 && !groupLocked) {
     let allScenes: any[] = categoryOr.length
@@ -80,10 +82,11 @@ export async function loadStoryboardLibrary(input: {
   }
 
   let outfitItems: any[] = targetOutfitId
-    ? compact(await db.outfitAsset.findFirst({ where: { id: String(targetOutfitId), ...PROVENANCE } }))
+    ? compact(await db.outfitAsset.findFirst({ where: { AND: [{ id: String(targetOutfitId) }, await poolWhere('outfit')] } }))
     : [];
+  outfitItems = outfitItems.filter(row => isWorkshopAssetEligible(row, 'outfit'));
   if (locked.outfitId && outfitItems.length === 0) {
-    throw new Error('锁定的穿搭资产不存在或已删除，请重新选择');
+    throw new Error('锁定的穿搭资产不可用（未发布、占位记录或已删除），请重新选择');
   }
   if (outfitItems.length === 0 && !groupLocked && categoryOr.length > 0) {
     outfitItems = await db.outfitAsset.findMany({ where: await poolWhere('outfit', { OR: categoryOr }), orderBy: assetOrder, take: 50 });
@@ -96,6 +99,9 @@ export async function loadStoryboardLibrary(input: {
   }
 
   const actionItems: any[] = [];
+
+  personaItems = personaItems.filter(row => isWorkshopAssetEligible(row, 'persona'));
+  outfitItems = outfitItems.filter(row => isWorkshopAssetEligible(row, 'outfit'));
 
   const samplingSeed = computeSamplingSeed(input.productIndex, input.productTitle || '');
   if (!locked.sceneId && !allocated.sceneId && sceneItems.length > 1) {
@@ -155,19 +161,19 @@ export async function loadLockedGroupSkeleton(input: {
   const id = String(input.fullPromptId || '').trim();
   const manuallyLocked = Boolean(id && id !== 'auto');
   const row = manuallyLocked
-    ? await db.fullPromptAsset.findFirst({ where: { id, ...PROVENANCE } })
+    ? await db.fullPromptAsset.findFirst({ where: { AND: [{ id }, PROVENANCE, await publishedWhere('full_prompt')] } })
     : await reservePromptGroup(
         db,
-        await db.fullPromptAsset.findMany({
-          where: { ...PROVENANCE, sourceImageIndices: { not: null }, shotPromptsJson: { not: null } },
+        (await db.fullPromptAsset.findMany({
+          where: { AND: [PROVENANCE, await publishedWhere('full_prompt'), { sourceImageIndices: { not: null }, shotPromptsJson: { not: null } }] },
           orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
-        }),
+        })).filter(group => isWorkshopAssetEligible(group, 'full_prompt')),
         input.productTitle || '', input.productProps, input.batchId,
       );
   if (!row) throw new Error(manuallyLocked
-    ? '选定的图组母本不存在，请重新选择'
+    ? '选定的图组母本不存在、未发布或已停用，请重新选择'
     : '资产库暂无适配该商品类目的完整四图母本，请导入并解构对应类目的四图组');
-  if (!isCompletePromptGroup(row)) {
+  if (!isWorkshopAssetEligible(row, 'full_prompt') || !isCompletePromptGroup(row)) {
     throw new Error('选定的图组母本不是完整的四图组，请重新选择');
   }
   const shots = parseGroupShotSkeleton(row.shotPromptsJson);

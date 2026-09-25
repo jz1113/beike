@@ -8,3 +8,5 @@ export * from './idempotency';
 export * from './storyboardSlots';
 export * from './groupAssetSelection';
 export * from './boundGroupPrompt';
+
+export * from './assetEligibility';

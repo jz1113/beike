@@ -1,5 +1,5 @@
 import { WorkshopProductionOverview } from './WorkshopProductionOverview';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
 import BatchStage1Collect from './BatchStage1Collect';
 import BatchStage2Config from './BatchStage2Config';
@@ -14,11 +14,12 @@ import { BatchArchitectureConfirmDialog } from './BatchArchitectureConfirmDialog
 import { useAppStore } from '@/store';
 import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
 import type { WorkshopBatch } from '@beike/contracts/workshopBatches';
-import { exportBatchZip, exportBatchExcel, exportSingleProductZip, downloadSingleTaskImage } from '../model/batchRunnerExport';
+import { exportBatchZip, exportBatchExcel, exportSingleProductZip, downloadSingleTaskImage } from '../model/delivery/batchRunnerExport';
 export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
 export default function BatchWorkshopView() {
   const runner = useBatchWorkshopRunner();
+  const freshEntry = useAppStore(s => s.pendingFreshWorkshopEntry);
   const isWorkshopConfigOpen = useAppStore(s => s.isWorkshopConfigOpen);
   const setIsWorkshopConfigOpen = useAppStore(s => s.setIsWorkshopConfigOpen);
   const activeWorkshopTab = useAppStore(s => s.activeWorkshopTab);
@@ -141,6 +142,12 @@ export default function BatchWorkshopView() {
     setToastMsg: (msg: string | null) => { if (msg) showToast(msg); },
     showToast,
   };
+  useEffect(() => {
+    // A cached history preview must not hide the newly selected active batch.
+    setHistoryGenerationBatch(null);
+    setIsArchitectureConfirmOpen(false);
+  }, [runner.activeBatch?.id, freshEntry]);
+
   const stage2ConfigValue = useMemo((): BatchConfigContextValue => ({
     currentStage,
     successfulItems,
@@ -265,6 +272,15 @@ export default function BatchWorkshopView() {
     void startBatchVisionAnalyze(architectureId);
   };
 
+  if (!workspaceReady) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8" role={workspaceError ? 'alert' : 'status'}>
+        <p>{workspaceError || '正在准备工坊批次，请稍候…'}</p>
+        {workspaceError && <button type="button" onClick={() => void reloadWorkspace()} className="rounded-lg border px-4 py-2">重新加载</button>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-transparent relative">
       {/* 🌟 极简单层顶栏（完全对齐图1生成界面）：胶囊下拉菜单 + 步骤导轨 + 生产预设 */}
@@ -306,7 +322,7 @@ export default function BatchWorkshopView() {
         }>
           {!historyGenerationBatch && items.length > 0 && <WorkshopProductionOverview items={items} currentStage={currentStage} onStageChange={setCurrentStage}
             busy={isCollecting || isAnalyzingAll || isGeneratingBatch || isAutoPilotRunning || items.some((item) => item.isAnalyzing)}
-            strategy={generationStrategy} shotCount={selectedShotCount} aspect={selectedAspect} concurrency={imageGenConcurrency} onSettings={() => setIsWorkshopConfigOpen(true)} />}
+            analysisIssue={runner.analysisIssue} strategy={generationStrategy} shotCount={selectedShotCount} aspect={selectedAspect} concurrency={imageGenConcurrency} onSettings={() => setIsWorkshopConfigOpen(true)} />}
           {historyGenerationBatch ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
@@ -447,6 +463,10 @@ export default function BatchWorkshopView() {
       />
       {/* 🌟 种草工坊全局生产预设中心模态框 */}
       <WorkshopSettingsModal
+        workspaceStatus={runner.workspaceStatus} workspaceError={runner.workspaceError}
+        busy={isCollecting || isAnalyzingAll || isGeneratingBatch || runner.isAutoPilotRunning || items.some(item => item.isAnalyzing || item.isCopywritingGenerating)}
+        assetLoadState={runner.assetLoadState} assetLoadError={runner.assetLoadError} onReloadAssets={runner.reloadAssets}
+        onOpenAssets={() => { setIsWorkshopConfigOpen(false); setActiveWorkshopTab('prompt_assets'); }}
         isOpen={isWorkshopConfigOpen}
         onClose={() => setIsWorkshopConfigOpen(false)}
         selectedArchId={selectedArchId}

@@ -1,7 +1,7 @@
 import { configureDomainRuntime } from '@beike/domain/runtime';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
+import App from './app/App';
 import { AppProviders } from '@/app/providers';
 import AppErrorBoundary from '@/shared/ui/AppErrorBoundary';
 import './styles/globals.css';

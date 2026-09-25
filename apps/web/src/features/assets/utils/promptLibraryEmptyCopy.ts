@@ -15,14 +15,14 @@ export function promptLibraryEmptyCopy(
   }
   return {
     title: '暂无相关提示词资产',
-    body: '分析会召回已发布的人物、穿搭、场景和镜头动作；此处为空时会退回拍摄架构兜底。',
+    body: '人物、穿搭和场景为可选替换项，留空时沿用图组母本；创作必须有适配商品的已发布四图母本，不会仅靠拍摄架构兜底。',
   };
 }
 
 export const ASSET_TAB_HINT: Record<AssetSubTab, string> = {
   full_prompt: '镜头骨架，锁定后决定顺序与机位',
-  persona: '分析会召回',
-  outfit: '分析会召回',
-  scene: '分析会召回',
-  action: '分析会召回',
+  persona: '可选替换项',
+  outfit: '可选替换项',
+  scene: '可选替换项',
+  action: '可选替换项',
 };

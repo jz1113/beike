@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@/store';
-import { isCompletePromptGroup } from '@beike/domain/workshopPipeline';
-import { fetchAssetLibraryOptions } from '../model/batchResourceLoader';
+import { subscribeAssetInvalidation } from '@/shared/api/assetLibraryCache';
+import { fetchAssetLibraryOptions } from '../api/workshopResources';
 
 export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?: () => void) {
   const [useAssetLibrary, setUseAssetLibrary] = useState(true);
@@ -16,16 +16,33 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
   const [availableActions, setAvailableActions] = useState<any[]>([]);
   const [availableFullPrompts, setAvailableFullPrompts] = useState<any[]>([]);
 
+  const [assetLoadState, setAssetLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [assetLoadError, setAssetLoadError] = useState('');
+  const requestId = useRef(0);
   const load = useCallback(async (force = false) => {
-    const { personas, scenes, outfits, actions, fullPrompts } = await fetchAssetLibraryOptions(force);
-    setAvailablePersonas(personas);
-    setAvailableScenes(scenes);
-    setAvailableOutfits(outfits);
-    setAvailableActions(actions);
-    setAvailableFullPrompts(fullPrompts.filter(isCompletePromptGroup));
+    const id = ++requestId.current;
+    setAssetLoadState('loading');
+    setAssetLoadError('');
+    try {
+      const { personas, scenes, outfits, actions, fullPrompts } = await fetchAssetLibraryOptions(force);
+      if (id !== requestId.current) return;
+      setAvailablePersonas(personas); setAvailableScenes(scenes); setAvailableOutfits(outfits);
+      setAvailableActions(actions); setAvailableFullPrompts(fullPrompts);
+      setAssetLoadState('ready');
+    } catch (error) {
+      if (id !== requestId.current) return;
+      setAssetLoadState('error');
+      setAssetLoadError(error instanceof Error ? error.message : '资产加载失败');
+    }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const unsubscribe = subscribeAssetInvalidation(() => { void load(true); });
+    const refresh = () => { void load(); };
+    window.addEventListener('focus', refresh);
+    return () => { ++requestId.current; unsubscribe(); window.removeEventListener('focus', refresh); };
+  }, [load]);
 
   const pending = useAppStore((state) => state.pendingBatchLockedAssets);
   const setPending = useAppStore((state) => state.setPendingBatchLockedAssets);
@@ -43,6 +60,7 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
   }, [workspaceReady, pending, setPending, load, onBindingApplied]);
 
   return {
+    assetLoadState, assetLoadError, reloadAssets: () => load(true),
     useAssetLibrary, setUseAssetLibrary,
     lockedPersonaId, setLockedPersonaId,
     lockedSceneId, setLockedSceneId,

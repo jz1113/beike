@@ -1,6 +1,6 @@
 # 代码健康
 
-这次梳理对照的是浏览器产品。桌面端已经删除，质量门禁里的未使用绑定、超长文件和依赖边界在提交时是通过的。下面是仍然值得继续拆的部分。
+本页记录浏览器产品的持续治理状态。桌面端移除属于历史整改；2026-09-24 本轮工作区与工坊目录整改见 [核查报告](repository-architecture-audit-2026-09-24.md)。门禁通过不等于历史告警清零，以下技术债仍需继续治理。
 
 ## 已经处理
 
@@ -18,7 +18,7 @@
 
 优先顺序：
 
-1. `apps/web/src/features/workshop/hooks/useBatchWorkshopRunner.ts`：采集、分析、生图、导出还在一个 hook 里。适合按阶段拆 hook，并用一个 reducer 收拢状态。
+1. `apps/web/src/features/workshop/hooks/useBatchWorkshopRunner.ts`：阶段实现已分到 model 的五个职责目录，React 工作区快照连接也已抽离，但主 hook 仍承担较多状态与编排。后续按明确状态转换拆分，避免仅搬动行数或在一次迁移中同时重写所有行为。
 2. `apps/web/src/shared/modals/ImageLightboxModal.tsx` 和 `shared/modals/lightbox/SmartEditModal.tsx`：预览、工具栏和参数状态可以下沉成独立组件。
 3. `CanvasMultiAngleModal.tsx` 与 `LightboxMultiAngleModal.tsx`：预设和参数类型已经接近，组件本身仍然各写一套。
 4. `usePosterProduction.ts`、`useStyleExtractWorkflow.ts`：按导入、生成、导出拆出去。
@@ -34,12 +34,15 @@
 
 `packages/contracts` 和 `packages/domain` 的显式 `any` 很少。历史 `any` 集中在 `apps/web` 和 `apps/api`，尤其是提示词组装、资产编辑和助手流式响应。ESLint 对 `no-explicit-any` 仍是警告。
 
-测试覆盖关键词审核、大字报、网关凭证和部分生成策略。工坊 runner、助手回合、生图提交轮询几乎没有测试。采集平台识别有 `collectProduct.test.mjs`。
+测试覆盖关键词审核、大字报、网关凭证、采集和生成策略。工坊已补充分析预检、生成就绪、任务恢复、局部重试、快照与失效规则、交付等单元测试，以及模拟浏览器的入口、资源与流程回归；这不等于主 hook 的全部状态组合或真实厂商调用均已覆盖。助手复杂回合、跨设备冲突、服务重启后的持久编排仍需专项验证。
+
+本轮发现旧入口漏跑 7 个已有测试文件，已改为递归发现并加入发现器、边界规则和 workspace 规则测试。浏览器 QA 是显式独立脚本，不混入单元测试入口。
 
 ## 本地产物
 
-这些路径不在 Git 里，清理磁盘时可以删，但不要提交：
+**被 Git 忽略不代表可删除。** 旧版说明把数据库、备份和 `.local/` 一并列为可删产物，已纠正。
 
-- `apps/web/dist`
-- `.local/`（含部署私钥和数据库备份）
-- `packages/prisma/dev.db` 与 `packages/prisma/backups/`
+- 可重建：`apps/web/dist`、根 `dist`；确认没有运行任务依赖后，可用既有 clean 脚本清理。`node_modules` 可通过锁文件重装，但无需为了整理源码顺手删除。
+- 受保护：`.local/` 可能含部署私钥、操作回执和数据库备份；`.env*` 含配置；`packages/prisma/dev.db` 及其他 SQLite、WAL/SHM、`packages/prisma/backups/` 是真实数据，不自动删除。
+- 素材/上传/本地存储、种子与迁移、ops 脚本、公开资源可能有动态或外部入口，静态 import 少不是删除依据。
+- 只读盘点输出 `.local/source-audit.json`；候选必须人工确认。不得把 `rm -rf .local` 或数据库清理加入源码整理流程。

@@ -9,7 +9,7 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 import { BatchProductItem } from '../model/batchTypes';
-import { isUsableWorkshopResult } from '../model/workshopReadiness';
+import { isDeliverableWorkshopResult, isUsableWorkshopResult } from '../model/generation/workshopReadiness';
 import { BatchStage4ProductInfo } from './BatchStage4ProductInfo';
 import { BatchStage4CopyPanel } from './BatchStage4CopyPanel';
 import { OutputReviewButtons } from './OutputReviewButtons';
@@ -149,7 +149,7 @@ export function BatchStage4ProductItem({
             {tasks.map((task, shotIdx) => {
               const hasImage = isUsableWorkshopResult(task);
               const isGenFailure = task.status === 'FAILURE' || (task.status === 'SUCCESS' && !hasImage);
-              const canRecover = Boolean(task.upstreamTaskId || task.gridTaskKey || task.gridSourceUrl || item.masterGridUrl);
+              const canRecover = Boolean(task.upstreamTaskId || task.idempotencyKey || task.gridTaskKey || task.gridSourceUrl || item.masterGridUrl);
               const currentPreviewIdx = hasImage && task.resultUrl ? previewUrls.indexOf(task.resultUrl) : 0;
 
               return (
@@ -169,6 +169,8 @@ export function BatchStage4ProductItem({
                     className={`aspect-[3/4] rounded-xl border overflow-hidden relative flex items-center justify-center transition-colors group ${hasImage || (!readOnly && isGenFailure) ? 'cursor-pointer' : 'cursor-default'} ${
                       hasImage
                         ? 'border-slate-200 hover:border-indigo-400 bg-slate-50'
+                        : task.recoveryRequired
+                        ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-100/50'
                         : isGenFailure
                         ? 'border-rose-300 bg-rose-50/50 hover:bg-rose-100/50'
                         : 'border-slate-200 bg-slate-50/90'
@@ -226,9 +228,13 @@ export function BatchStage4ProductItem({
                       </>
                     ) : isGenFailure ? (
                       <div className="p-4 text-center space-y-2">
-                        <XCircle className="w-8 h-8 text-rose-500 mx-auto" />
-                        <div className="text-xs font-bold text-rose-700">{task.status === 'SUCCESS' ? '图片需重新生成' : task.recoveryRequired ? '结果待恢复' : '生成失败'}</div>
-                        {task.error && <p className="max-h-24 overflow-y-auto break-words text-[11px] leading-5 text-rose-600 select-text">{task.error}</p>}
+                        <span className="flex justify-center">{task.recoveryRequired ? <Clock3 className="w-8 h-8 text-amber-600" /> : <XCircle className="w-8 h-8 text-rose-500" />}</span>
+                        <div className={`text-xs font-bold ${task.recoveryRequired ? 'text-amber-800' : 'text-rose-700'}`}>{task.status === 'SUCCESS' ? '图片需重新生成' : task.recoveryRequired ? '结果待核对' : '生成失败'}</div>
+                        {task.error && <details className="text-left text-[11px] leading-5 text-rose-600 select-text">
+                          <summary className="cursor-pointer text-center">查看详细原因</summary>
+                          <p className="mt-1 max-h-32 overflow-y-auto break-words">{task.error}</p>
+                        </details>}
+                        {task.recoveryRequired && <p className="text-[11px] leading-5 text-amber-800">请先核对原任务。重新生成可能重复计费。</p>}
                         {task.upstreamTaskId && <p className="break-all text-[10px] text-slate-400 select-text">任务 ID：{task.upstreamTaskId}</p>}
                         {!readOnly && canRecover && onRecheckTask && <button type="button" disabled={recheckingId !== null}
                           onClick={async (event) => { event.stopPropagation(); setRecheckingId(task.id); try { await onRecheckTask(item.id, task.id); } finally { setRecheckingId(null); } }}
@@ -242,7 +248,7 @@ export function BatchStage4ProductItem({
                           }}
                           className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm"
                         >
-                          重新生成
+                          {task.recoveryRequired ? '放弃恢复并重做' : '重新生成'}
                         </button>}
                       </div>
                     ) : task.status === 'PENDING' ? (
@@ -291,7 +297,7 @@ export function BatchStage4ProductItem({
         titleLength={titleLength}
         contentLength={contentLength}
         tags={cw.tags || []}
-        successCount={successTasks.length}
+        successCount={tasks.filter(isDeliverableWorkshopResult).length}
         isExportingZip={isExportingZip}
         generateCopywritingForProduct={generateCopywritingForProduct}
         updateItemCopywriting={updateItemCopywriting}

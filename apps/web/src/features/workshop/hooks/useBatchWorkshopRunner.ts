@@ -1,9 +1,13 @@
-import { recheckWorkshopTask } from '../model/recheckWorkshopTask';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { workshopAnalysisBlockReason } from '../model/analysis/workshopAnalysisPreflight';
+import { useFreshWorkshopEntry } from './useFreshWorkshopEntry';
+import { deriveWorkshopPipelineStatus } from '../model/workspace/workshopPipelineStatus';
+import { acknowledgeUncertainTasks } from '../model/generation/taskRetry';
+import { useLiveItems } from './useLiveItems';
+import { recheckWorkshopTask } from '../model/generation/recheckWorkshopTask';
+import { useState, useRef, useEffect, useCallback, useReducer } from 'react';
 import { PreviousGroupSignature } from '@beike/domain/vision';
-import { type WorkshopBatchStatus } from '@beike/domain/workshopPipeline';
-import { applyInvalidationToItems } from '../model/applyInvalidation';
-import { createRunControl, type RunControl } from '../model/runControl';
+import { applyInvalidationToItems } from '../model/workspace/applyInvalidation';
+import { createRunControl, type RunControl } from '../model/workspace/runControl';
 import { useBatchExport } from './useBatchExport';
 import { useBatchReview } from './useBatchReview';
 import { useWorkspaceSnapshotSync } from './useWorkspaceSnapshotSync';
@@ -16,34 +20,34 @@ import {
 import {
   shouldAutoSelectJewelryArch,
 } from '@beike/domain/jewelryArch';
-import { analyzeBatchProduct, runBatchVisionAnalyze, type VisionAnalyzeDeps } from '../model/batchVisionAnalyze';
+import { analyzeBatchProduct, runBatchVisionAnalyze, type VisionAnalyzeDeps } from '../model/analysis/batchVisionAnalyze';
 import { useAppStore } from '@/store';
 
 // 🚀 模块化外抽能力
 import { usePersistentNumber, usePersistentEnum } from '@/shared/hooks/usePersistentState';
 import { useBatchPreviewGallery, useBatchToast } from './useBatchPreviewGallery';
-import { fetchRecipes, loadSystemConfiguredModels } from '../model/batchResourceLoader';
+import { fetchRecipes, loadSystemConfiguredModels } from '../api/workshopResources';
 import { useWorkshopAssetLocks } from './useWorkshopAssetLocks';
-import { parseBatchInputLines, runBatchCollect } from '../model/batchCollect';
+import { parseBatchInputLines, runBatchCollect } from '../model/collection/batchCollect';
 import {
   toggleProductImageSelection as toggleProductImageSelectionPure,
   batchSetProductImages as batchSetProductImagesPure,
-} from '../model/batchImageSelection';
+} from '../model/collection/batchImageSelection';
 import {
   generateCopywritingForProduct as generateCopywritingForProductUtil,
   updateItemCopywriting as updateItemCopywritingUtil,
   generateAllCopywriting as generateAllCopywritingUtil,
-} from '../model/batchCopywriting';
-import { startAutoPilotPipeline as runAutoPilotPipeline } from '../model/batchAutoPilot';
+} from '../model/delivery/batchCopywriting';
+import { startAutoPilotPipeline as runAutoPilotPipeline } from '../model/analysis/batchAutoPilot';
 import {
   type TaskExecutionConfig,
-} from '../model/batchTaskExecution';
+} from '../model/generation/batchTaskExecution';
 import {
   startBatchGenerationCoordinator,
   retryFailedImageTasksCoordinator,
   retrySingleShotTaskCoordinator,
-} from '../model/batchGenerationCoordinator';
-import { useLiveWorkshopWorkspace } from '../model/workshopSnapshotBridge';
+} from '../model/generation/batchGenerationCoordinator';
+import { useLiveWorkshopWorkspace } from './useLiveWorkshopWorkspace';
 import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 
 export function useBatchWorkshopRunner() {
@@ -51,7 +55,7 @@ export function useBatchWorkshopRunner() {
 
   // 阶段 1: 批量采编与清洗状态
   const [batchInputText, setBatchInputText] = useState('');
-  const [items, setItems] = useState<BatchProductItem[]>([]);
+  const { items, itemsRef, setItems } = useLiveItems();
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectProgress, setCollectProgress] = useState({ total: 0, current: 0, success: 0, failed: 0 });
 
@@ -68,7 +72,7 @@ export function useBatchWorkshopRunner() {
 
   // 人像与参数配置
   const [personaMode, setPersonaMode] = useState<'asset_driven' | 'none'>('asset_driven');
-  const [pipelineStatus, setPipelineStatus] = useState<WorkshopBatchStatus>('draft');
+  const [, notifyRunControlChange] = useReducer((revision: number) => revision + 1, 0);
   const [planRevision, setPlanRevision] = useState(0);
   const [storyboardRevision, setStoryboardRevision] = useState(0);
   const [pipelineRuns, setPipelineRuns] = useState<WorkshopSnapshot['pipeline']['runs']>([]);
@@ -137,10 +141,6 @@ export function useBatchWorkshopRunner() {
 
   const { toastMsg, showToast } = useBatchToast();
 
-  const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
 
   const runControlRef = useRef<RunControl>(createRunControl());
   const activeBatchIdRef = useRef('draft');
@@ -241,14 +241,13 @@ export function useBatchWorkshopRunner() {
         r.id === 'arch_jewelry_master' ||
         /珠宝首饰/.test(String(r.name))
     );
-    if (jewelryArch && (!selectedArchId || selectedArchId === 'auto' || selectedArchId === 'arch_jewelry_master' || selectedArchId === SYSTEM_MASTER_RECIPES[0]?.id)) {
+    if (jewelryArch && jewelryArch.id !== selectedArchId && (!selectedArchId || selectedArchId === 'auto' || selectedArchId === 'arch_jewelry_master' || selectedArchId === SYSTEM_MASTER_RECIPES[0]?.id)) {
       analyzeConfigRevisionRef.current += 1;
       setSelectedArchId(jewelryArch.id);
       setItems((prev) => applyInvalidationToItems(prev, { type: 'architecture' }));
       setStoryboardRevision((revision) => revision + 1);
     }
-    setUseAssetLibrary(true);
-  }, [items, recipes, selectedArchId, setSelectedArchId, setUseAssetLibrary]);
+  }, [items, recipes, selectedArchId, setSelectedArchId]);
 
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -346,6 +345,7 @@ export function useBatchWorkshopRunner() {
 
   // 视觉分析
   const visionAnalyzeDeps: VisionAnalyzeDeps = {
+    assetLoadState: assetLocks.assetLoadState, assetLoadError: assetLocks.assetLoadError, availableFullPrompts,
     recipes,
     selectedArchId,
     items,
@@ -376,11 +376,11 @@ export function useBatchWorkshopRunner() {
     itemIndexOrSig?: number | PreviousGroupSignature
   ): Promise<boolean> => {
     const itemIndex = typeof itemIndexOrSig === 'number' ? itemIndexOrSig : undefined;
-    const ok = await analyzeBatchProduct(visionAnalyzeDeps, item, itemIndex);
-    if (ok) setStoryboardRevision((revision) => revision + 1);
-    return ok;
+    try { return await analyzeBatchProduct(visionAnalyzeDeps, item, itemIndex); }
+    catch (error) { showToast(error instanceof Error ? error.message : '分析失败，请重试'); return false; }
   };
 
+  const analysisInFlight = useRef(false);
   const startBatchVisionAnalyze = async (architectureId = selectedArchId): Promise<number> => {
     if (!recipes.some((recipe) => recipe.id === architectureId)) {
       showToast('请先确认类目拍摄架构，再开始提示词分析');
@@ -397,9 +397,19 @@ export function useBatchWorkshopRunner() {
       return 0;
     }
 
+    const blocked = activeItems.map(item => ({ item, reason: workshopAnalysisBlockReason(analysisDeps, item) })).filter(row => row.reason);
+    if (blocked.length) {
+      setItems(prev => prev.map(item => { const issue = blocked.find(row => row.item.id === item.id); return issue ? { ...item, analysisError: issue.reason! } : item; }));
+      showToast(`${blocked.length} 款商品未通过分析检查：${blocked[0].reason}`);
+      return 0;
+    }
+    if (analysisInFlight.current) return 0;
+    analysisInFlight.current = true;
+    runControlRef.current = createRunControl();
     setIsAnalyzingAll(true);
     setAnalyzeProgress({ current: 0, total: activeItems.length });
 
+    try {
     const successCount = await runBatchVisionAnalyze({
       items: activeItems,
       concurrency: analyzeConcurrency || 2,
@@ -416,10 +426,10 @@ export function useBatchWorkshopRunner() {
       },
     });
 
-    setIsAnalyzingAll(false);
     const failedCount = activeItems.length - successCount;
     showToast(`AI 视觉分析完毕：${successCount} 款成功${failedCount > 0 ? `，${failedCount} 款待重试` : ''}`);
     return successCount;
+    } finally { analysisInFlight.current = false; setIsAnalyzingAll(false); }
   };
 
   // 任务执行配置
@@ -485,10 +495,20 @@ export function useBatchWorkshopRunner() {
   };
 
   const retrySingleShotTask = async (itemId: string, shotIndex: number) => {
+    if (isGeneratingBatch || itemsRef.current.some(item => item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+      showToast('已有任务执行中，请等待结束后再重新生成');
+      return;
+    }
+    const task = itemsRef.current.find(item => item.id === itemId)?.tasks[shotIndex];
+    if (task?.recoveryRequired) {
+      if (!window.confirm('原任务可能仍在生成并计费。建议先核对原任务。确定放弃本镜恢复并重新生成？这可能重复计费。')) return;
+      setItems(previous => previous.map(item => item.id === itemId ? { ...item, tasks: item.tasks.map(entry => entry.id === task.id ? { ...entry, recoveryRequired: false } : entry) } : item));
+    }
+    runControlRef.current = createRunControl();
     await retrySingleShotTaskCoordinator(
       itemId,
       shotIndex,
-      items,
+      itemsRef.current,
       setItems,
       taskExecutionConfig,
       showToast
@@ -545,17 +565,17 @@ export function useBatchWorkshopRunner() {
     });
   };
 
-  const pauseRun = () => { runControlRef.current = { status: 'paused' }; setPipelineStatus('paused'); };
-  const resumeRun = () => { runControlRef.current = { status: 'running' }; setPipelineStatus('generating'); };
+  const pauseRun = () => { runControlRef.current = { status: 'paused' }; notifyRunControlChange(); };
+  const resumeRun = () => { runControlRef.current = { status: 'running' }; notifyRunControlChange(); };
   const cancelRun = () => {
     runControlRef.current = { status: 'cancelled' };
-    setPipelineStatus((status) => (status === 'paused' || status === 'generating' ? 'cancelled' : status));
+    notifyRunControlChange();
   };
   const acknowledgeRecovery = () => {
-    setItems((prev) => prev.map((item) => ({
-      ...item,
-      tasks: (item.tasks || []).map((task) => (task.recoveryRequired ? { ...task, recoveryRequired: false } : task)),
-    })));
+    if (itemsRef.current.some(item => item.tasks.some(task => task.status === 'IN_PROGRESS'))) return;
+    if (!window.confirm('原任务可能仍在生成并计费。请优先核对原任务。确定放弃所选商品的待核对结果，允许手动重新生成？这可能重复计费；不会立即发起生图。')) return;
+    setItems(acknowledgeUncertainTasks);
+    showToast('已确认放弃恢复；可按需点击重新生成，不会自动提交');
   };
 
   const completeCurrentBatch = async () => {
@@ -572,7 +592,7 @@ export function useBatchWorkshopRunner() {
     }
   };
 
-  const { reviewTask } = useBatchReview(itemsRef, setItems, retrySingleShotTask, showToast);
+  const { reviewTask } = useBatchReview(itemsRef, setItems, retrySingleShotTask, showToast, () => workspace.flush());
 
   const applyWorkspaceSnapshot = useCallback((value: WorkshopSnapshot) => {
     setCurrentStage(value.currentStage);
@@ -582,7 +602,7 @@ export function useBatchWorkshopRunner() {
     setSelectedImageGenModel(value.settings.selectedImageGenModel);
     setSelectedArchId(value.settings.selectedArchId);
     setPersonaMode(value.settings.personaMode || 'asset_driven');
-    setPipelineStatus((value.pipeline?.status || 'draft') as WorkshopBatchStatus);
+    runControlRef.current = createRunControl();
     setPlanRevision(value.pipeline?.planRevision || 0);
     setStoryboardRevision(value.pipeline?.storyboardRevision || 0);
     setSelectedQuality(value.settings.selectedQuality);
@@ -602,13 +622,17 @@ export function useBatchWorkshopRunner() {
     setPipelineRuns(value.pipeline?.runs || []);
   }, [setSelectedArchId, setSelectedShotCount, setGenerationStrategy, setLockedFullPromptId]);
 
+  const effectivePipelineStatus = deriveWorkshopPipelineStatus(items, {
+    collecting: isCollecting, analyzing: isAnalyzingAll, generating: isGeneratingBatch,
+    control: runControlRef.current.status,
+  });
   const workspace = useLiveWorkshopWorkspace({
     currentStage, batchInputText, items,
     selectedVisionModel, selectedImageGenModel, selectedArchId,
     selectedQuality, selectedAspect, selectedShotCount,
     useAssetLibrary, lockedPersonaId, lockedSceneId, lockedOutfitId, lockedActionId, lockedFullPromptId,
     generationStrategy, autoGenerateCopywriting,
-    personaMode, pipelineStatus, planRevision, storyboardRevision,
+    personaMode, pipelineStatus: effectivePipelineStatus, planRevision, storyboardRevision,
     pipelineRuns,
     diversityContext: {
       groupSignatures: batchGroupSignaturesRef.current,
@@ -624,7 +648,18 @@ export function useBatchWorkshopRunner() {
 
   useWorkspaceSnapshotSync(workspace.ready, currentStage, setCurrentStage, itemsRef);
 
+  const whenIdle = async (action: () => Promise<void>) => {
+    if (collectInFlight.current || analysisInFlight.current || isGeneratingBatch || isAutoPilotRunning || itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+      throw new Error('仍有任务执行中，请等待结束后再切换批次');
+    }
+    await action();
+  };
+
+  const enteringFreshBatch = useFreshWorkshopEntry(workspace.ready, () => whenIdle(workspace.startFreshEntry), showToast);
+
   return {
+    assetLoadState: assetLocks.assetLoadState, assetLoadError: assetLocks.assetLoadError, reloadAssets: assetLocks.reloadAssets,
+    analysisIssue: successfulItems.map(item => workshopAnalysisBlockReason(visionAnalyzeDeps, item)).find(Boolean) || null,
     currentStage,
     setCurrentStage,
     batchInputText,
@@ -647,10 +682,10 @@ export function useBatchWorkshopRunner() {
     selectedImageGenModel,
     setSelectedImageGenModel,
     personaMode,
-    setPersonaMode,
-    pipelineStatus,
+    setPersonaMode: (value: 'asset_driven' | 'none') => { if (value !== personaMode) { setPersonaMode(value); invalidateWorkshopConfig('locked_assets'); } },
+    pipelineStatus: effectivePipelineStatus,
     useAssetLibrary,
-    setUseAssetLibrary,
+    setUseAssetLibrary: (value: boolean) => { if (value !== useAssetLibrary) { setUseAssetLibrary(value); invalidateWorkshopConfig('locked_assets'); } },
     lockedPersonaId,
     setLockedPersonaId: changeLockedAsset(setLockedPersonaId, lockedPersonaId),
     lockedSceneId,
@@ -726,14 +761,17 @@ export function useBatchWorkshopRunner() {
     showToast,
     workspaceError: workspace.error,
     workspaceStatus: workspace.status,
-    reloadWorkspace: workspace.reload,
-    workspaceReady: workspace.ready,
+    reloadWorkspace: async () => {
+      try { await whenIdle(workspace.reload); }
+      catch (error) { showToast(error instanceof Error ? error.message : '无法重新加载批次'); }
+    },
+    workspaceReady: workspace.ready && !enteringFreshBatch,
     activeBatch: workspace.activeBatch,
     historyBatches: workspace.historyBatches,
     refreshBatchHistory: workspace.refreshHistory,
-    createNewBatch: workspace.createNewBatch,
-    duplicateBatch: workspace.duplicateBatch,
-    archiveCurrentBatch: workspace.archiveCurrentBatch,
+    createNewBatch: () => whenIdle(() => workspace.createNewBatch()),
+    duplicateBatch: (id: string) => whenIdle(() => workspace.duplicateBatch(id)),
+    archiveCurrentBatch: () => whenIdle(() => workspace.archiveCurrentBatch()),
     clearHistory: workspace.clearHistory,
     deleteHistoryBatch: workspace.deleteHistoryBatch,
     renameBatch: workspace.renameBatch,

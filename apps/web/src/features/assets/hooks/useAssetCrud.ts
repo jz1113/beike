@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { apiFetch as rawApiFetch } from '@/shared/api/apiClient';
 import { pickAssetEditFields } from '@beike/domain/assetEdit';
-import { isCompletePromptGroup } from '@beike/domain/workshopPipeline';
+import { isCompletePromptGroup, workshopAssetBlockReason } from '@beike/domain/workshopPipeline';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
 async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Response> {
@@ -11,7 +11,7 @@ async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Respon
   return res;
 }
 import { useAppStore } from '@/store';
-import { invalidateGlobalAssetCache } from '../utils/assetLibraryCache';
+import { invalidateGlobalAssetCache } from '@/shared/api/assetLibraryCache';
 import { resolveAssetApiType } from '../utils/assetPromptConstants';
 import { buildBackupData, parseBackupDataToBulkItems } from '../utils/assetBackup';
 import { parsePersonaLayers, formatPersonaPrompt } from '../utils/assetPromptConstants';
@@ -249,6 +249,8 @@ export function useAssetCrud({
 
   // 一键应用并载入种草工坊
   const handleApplyToWorkshop = (item: any, _shot?: SceneShot) => {
+    const blocked = workshopAssetBlockReason(item, activeSubTab);
+    if (blocked) { showToast(blocked); return; }
     let promptSnippet = '';
     if (activeSubTab === 'full_prompt') {
       if (!isCompletePromptGroup(item)) {

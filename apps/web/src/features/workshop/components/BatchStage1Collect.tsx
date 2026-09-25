@@ -4,7 +4,7 @@ import { BatchProductItem, MasterRecipe } from '../model/batchTypes';
 import { BatchStage1OverviewCard } from './BatchStage1OverviewCard';
 import { BatchStage1InputCard } from './BatchStage1InputCard';
 import { BatchStage1ItemCard } from './BatchStage1ItemCard';
-import { countBatchInputLines } from '../model/batchCollect';
+import { countBatchInputLines } from '../model/collection/batchCollect';
 
 
 interface Props {

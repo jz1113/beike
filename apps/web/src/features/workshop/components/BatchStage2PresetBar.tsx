@@ -28,7 +28,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
   readyCount,
   totalCount,
 }) => {
-  const currentArchName = recipes.find(r => r.id === selectedArchId)?.name || recipes[0]?.name || '珠宝首饰全品类 (V6.0)';
+  const currentArchName = recipes.find(r => r.id === selectedArchId)?.name || '未确认拍摄架构';
   const currentVisionName = availableVisionModels.find(m => m.id === selectedVisionModel)?.shortName ||
     availableVisionModels.find(m => m.id === selectedVisionModel)?.name ||
     selectedVisionModel;
@@ -59,7 +59,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
         <span className="font-semibold text-slate-700 whitespace-nowrap">{selectedAspect}</span>
 
         <span className="text-slate-300">·</span>
-        <span className="font-semibold text-slate-700 whitespace-nowrap">出镜按资产库</span>
+        <span className="font-semibold text-slate-700 whitespace-nowrap">出镜按图组母本</span>
 
         <span className="text-slate-300 hidden md:inline">·</span>
         <span className="text-slate-400 font-medium hidden md:inline truncate max-w-[140px]" title={`视觉模型: ${currentVisionName}`}>
@@ -76,7 +76,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
       <div className="flex items-center gap-3 shrink-0">
         <div className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-          <span>已就绪 <strong className="text-slate-900 font-mono">{readyCount}/{totalCount}</strong> 款</span>
+          <span>已选图 <strong className="text-slate-900 font-mono">{readyCount}/{totalCount}</strong> 款</span>
         </div>
 
         <button

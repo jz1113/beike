@@ -1,8 +1,9 @@
 import { Check, Settings2 } from 'lucide-react';
 import type { BatchProductItem, GenerationStrategy } from '../model/batchTypes';
-import { checkWorkshopReadiness, summarizeWorkshopResults } from '../model/workshopReadiness';
+import { checkWorkshopReadiness, summarizeWorkshopResults } from '../model/generation/workshopReadiness';
 
-export function WorkshopProductionOverview({ items, currentStage, onStageChange, busy, strategy, shotCount, aspect, concurrency, onSettings }: {
+export function WorkshopProductionOverview({ items, currentStage, onStageChange, busy, strategy, shotCount, aspect, concurrency, onSettings, analysisIssue }: {
+  analysisIssue?: string | null;
   items: BatchProductItem[]; currentStage: number; onStageChange: (stage: number) => void; busy: boolean;
   strategy: GenerationStrategy; shotCount: number; aspect: string; concurrency: number; onSettings: () => void;
 }) {
@@ -24,6 +25,7 @@ export function WorkshopProductionOverview({ items, currentStage, onStageChange,
         <span className="min-w-0"><span className="block text-xs font-semibold text-slate-800">{step.title}</span><span className="mt-1 block text-[11px] text-slate-500">{step.detail}</span></span>
       </button>)}
     </nav>
+    {currentStage === 2 && analysisIssue && <p role="status" className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">分析前待处理：{analysisIssue}。选图问题在下方修正，资源问题可打开生产设置处理。</p>}
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-2 pt-3 text-[11px] text-slate-500">
       <span>{strategy === 'grid_first' ? '四宫格拆分' : '单张逐镜生成'} · 每款 {shotCount} 镜 · {aspect} · {concurrency} 并发{busy ? ' · 任务执行中' : ''}</span>
       <button type="button" onClick={onSettings} disabled={busy} className="flex items-center gap-1 text-indigo-600 disabled:opacity-40"><Settings2 className="h-3.5 w-3.5" />生产设置</button>

@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --tsconfig ../../tsconfig.json src/index.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node ../../tools/scripts/testing/run-tests.mjs api"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",
-    "@beike/contracts": "*",
+    "@beike/contracts": "workspace:*",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@hono/node-server": "^1.14.4",
     "ffprobe-static": "^3.1.0",
@@ -21,9 +22,9 @@
     "xlsx": "^0.18.5",
     "zod": "^3.25.76",
     "jszip": "^3.10.1",
-    "@beike/domain": "*",
-    "@beike/server-kit": "*",
-    "@beike/prisma": "*",
+    "@beike/domain": "workspace:*",
+    "@beike/server-kit": "workspace:*",
+    "@beike/prisma": "workspace:*",
     "@prisma/client": "5.22.0"
   }
 }

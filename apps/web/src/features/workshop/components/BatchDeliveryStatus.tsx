@@ -1,4 +1,4 @@
-import { summarizeWorkshopResults } from '../model/workshopReadiness';
+import { summarizeWorkshopResults } from '../model/generation/workshopReadiness';
 import type { BatchProductItem } from '../model/batchTypes';
 
 export function BatchDeliveryStatus({ items, busy, readOnly, onLocateFailure, onRetryFailed, onContinue }: {
@@ -10,7 +10,8 @@ export function BatchDeliveryStatus({ items, busy, readOnly, onLocateFailure, on
     <div className="flex flex-wrap gap-x-4 gap-y-2 text-slate-500">
       <span>成图 <b className="font-semibold text-slate-800">{stats.success}/{stats.total}</b></span>
       <span>生成中 {stats.running}</span><span>待生成 {stats.pending}</span>
-      <span className={stats.failed ? 'text-rose-600' : ''}>失败 {stats.failed}</span>
+      <span className={stats.failed > stats.recovery ? 'text-rose-600' : ''}>失败 {Math.max(0, stats.failed - stats.recovery)}</span>
+      {stats.recovery > 0 && <span className="text-amber-700">待核对 {stats.recovery}</span>}
       <span>文案 {stats.copyReady}/{items.length} 款</span>
     </div>
     <div className="flex flex-wrap items-center gap-3">

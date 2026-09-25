@@ -1,4 +1,4 @@
-import { checkWorkshopReadiness } from '../model/workshopReadiness';
+import { checkWorkshopReadiness } from '../model/generation/workshopReadiness';
 import React, { useState, useMemo } from 'react';
 import { BatchProductItem } from '../model/batchTypes';
 import BatchStageFooter from './BatchStageFooter';

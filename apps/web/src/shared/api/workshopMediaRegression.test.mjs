@@ -24,7 +24,7 @@ test('media URLs use the same-origin proxy without a signed session, including p
 });
 
 test('collection reports completion for successful, empty-image and failed responses, and retries failed items', async () => {
-  const { parseBatchInputLines, runBatchCollect } = await loadBrowserModule('../../features/workshop/model/batchCollect.ts');
+  const { parseBatchInputLines, runBatchCollect } = await loadBrowserModule('../../features/workshop/model/collection/batchCollect.ts');
   const { newItems } = parseBatchInputLines('100310741418\n10036043658\n1021932306223\n100310741418', new Set());
   assert.equal(newItems.length, 3);
   newItems[2].status = 'failed';

@@ -1,4 +1,4 @@
-import { isUsableWorkshopResult } from '../model/workshopReadiness';
+import { isUsableWorkshopResult } from '../model/generation/workshopReadiness';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
 import { BatchProductItem } from '../model/batchTypes';
 

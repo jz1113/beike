@@ -1,5 +1,6 @@
 import { Loader2, FileSpreadsheet, Download, Sparkles, Columns3, Image as ImageIcon, Pause, Play, Square, CheckCircle2, ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { BatchProductItem } from '../model/batchTypes';
+import { isDeliverableWorkshopResult } from '../model/generation/workshopReadiness';
 import { WorkshopActionMenu, workshopMenuItemClass } from './WorkshopActionMenu';
 
 export interface BatchStage4HeaderProps {
@@ -9,6 +10,7 @@ export interface BatchStage4HeaderProps {
   displaySuccessCount: number;
   displayFailCount: number;
   pendingTaskCount?: number;
+  recoveryTaskCount?: number;
   hasExportableSuccess: boolean;
   currentModelName: string;
   showEngineSettings: boolean;
@@ -46,6 +48,7 @@ export function BatchStage4Header({
   displaySuccessCount,
   displayFailCount,
   pendingTaskCount = 0,
+  recoveryTaskCount = 0,
   hasExportableSuccess,
   viewMode,
   setViewMode,
@@ -66,9 +69,9 @@ export function BatchStage4Header({
   const busy = isGeneratingBatch || runControlStatus !== 'idle';
   const copyBusy = successfulItems.some((item) => item.isCopywritingGenerating);
   const progress = totalTaskCount > 0 ? Math.min(100, Math.round(completedTaskCount / totalTaskCount * 100)) : 0;
-  const status = readOnly ? '历史批次' : runControlStatus === 'paused' ? '已暂停' : busy ? '正在生成' : displayFailCount > 0 ? '部分生成失败' : pendingTaskCount > 0 ? '待继续生成' : hasExportableSuccess ? '成图已就绪' : '等待生成';
+  const status = readOnly ? '历史批次' : runControlStatus === 'paused' ? '已暂停' : busy ? '正在生成' : recoveryTaskCount > 0 ? '生成结果待核对' : displayFailCount > 0 ? '部分生成失败' : pendingTaskCount > 0 ? '待继续生成' : hasExportableSuccess ? '成图已就绪' : '等待生成';
   const generateCopy = () => {
-    const withImages = successfulItems.filter((item) => item.tasks.some((task) => task.status === 'SUCCESS' && task.resultUrl));
+    const withImages = successfulItems.filter((item) => item.tasks.some(isDeliverableWorkshopResult));
     const allHaveCopy = withImages.length > 0 && withImages.every((item) => Boolean(item.copywriting?.content));
     if (allHaveCopy && !window.confirm('所有商品都已有文案。要全部重写吗？')) return;
     void generateAllCopywriting?.(allHaveCopy ? { force: true } : undefined);
@@ -79,6 +82,7 @@ export function BatchStage4Header({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h2 className="text-sm font-semibold text-slate-900">{status}</h2>
           <span className="text-xs text-slate-500">{successfulItems.length} 款商品 · 已出图 {displaySuccessCount} 张</span>
+          {recoveryTaskCount > 0 && <span className="text-xs text-amber-700">待核对 {recoveryTaskCount} 张</span>}
           {displayFailCount > 0 && <span className="text-xs text-rose-600">失败 {displayFailCount} 张</span>}
         </div>
         {busy && totalTaskCount > 0 && <div className="flex max-w-sm items-center gap-3">

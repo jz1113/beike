@@ -1,4 +1,4 @@
-import { fetchAssetDetail } from '../utils/assetLibraryCache';
+import { fetchAssetDetail } from '@/shared/api/assetLibraryCache';
 import { VirtualAssetGrid } from './VirtualAssetGrid';
 import { useState, useRef } from 'react';
 import { Trash2, Layers } from 'lucide-react';
@@ -49,6 +49,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
   // 资产列表与选择
   const {
     isLoading,
+    loadError,
     setIsLoading,
     items,
     setItems,
@@ -260,6 +261,10 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
         <div className="mb-3">
           <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} />
         </div>
+        {loadError && <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          资产加载失败：{loadError}。{items.length ? '当前显示缓存内容，可能已过期。' : '尚不能判断资产库是否为空。'}
+          <button type="button" onClick={refreshAssets} className="ml-3 underline">重新加载资产</button>
+        </div>}
         {displayedItems.length > 0 ? (
           <VirtualAssetGrid
             items={displayedItems}
@@ -332,7 +337,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
               <div key={n} className="h-44 bg-slate-100 rounded-2xl" />
             ))}
           </div>
-        ) : (
+        ) : loadError ? null : (
           <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
             <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-slate-700">{promptLibraryEmptyCopy(activeSubTab, Boolean(searchKeyword || onlyFavorite || selectedTag)).title}</h3>

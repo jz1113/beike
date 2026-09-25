@@ -149,7 +149,7 @@
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/model/batchVisionAnalyze.ts",
+      "file": "apps/web/src/features/workshop/model/analysis/batchVisionAnalyze.ts",
       "lines": 401
     },
     {

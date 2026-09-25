@@ -1,3 +1,4 @@
+import { workshopAssetBlockReason } from '@beike/domain/workshopPipeline';
 import { type MouseEvent, useMemo } from 'react';
 import {
   Star,
@@ -105,6 +106,7 @@ export default function PromptAssetCard({
   onDelete,
   onPreviewImage,
 }: PromptAssetCardProps) {
+  const productionBlockReason = workshopAssetBlockReason(item, activeSubTab);
   const summary = getAssetCardSummary(item, activeSubTab);
   const codeLabel = item.code
     ? `#${String(item.code).replace(/^#/, '')}`
@@ -356,10 +358,11 @@ export default function PromptAssetCard({
 
         <button
           onClick={onApply}
-          className={`flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${TAB_APPLY_BTN_CLASS[activeSubTab]}`}
-          title="应用到工坊流水线"
+          disabled={Boolean(productionBlockReason)}
+          className={`flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${TAB_APPLY_BTN_CLASS[activeSubTab]}`}
+          title={productionBlockReason || "应用到工坊流水线"}
         >
-          <span>{TAB_APPLY_LABEL[activeSubTab]}</span>
+          <span>{productionBlockReason ? "暂不可用于生产" : TAB_APPLY_LABEL[activeSubTab]}</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       </div>

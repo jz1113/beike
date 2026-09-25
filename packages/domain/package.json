@@ -13,6 +13,7 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node ../../tools/scripts/testing/run-tests.mjs domain"
   }
 }

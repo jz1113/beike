@@ -111,7 +111,7 @@
       "reason": "媒体入口与插入主体关系待专项核查，不改变现有生成输入行为。"
     },
     {
-      "file": "apps/web/src/features/workshop/model/batchVisionAnalyze.ts",
+      "file": "apps/web/src/features/workshop/model/analysis/batchVisionAnalyze.ts",
       "message": "'effectiveIndex' is assigned a value but never used.",
       "count": 1,
       "reason": "已列入残余清单；涉及参数签名、默认值或未接入交互，本次保留，禁止新增同类告警。"

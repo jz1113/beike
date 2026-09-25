@@ -36,6 +36,12 @@ export default function WorkshopStudio({
         />
       )}
 
+      {activeWorkshopTab !== 'studio' && <section aria-label="资源管理导航" className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-xs sm:mx-6">
+        <div><strong className="text-slate-800">资源管理 · {activeWorkshopTab === 'prompt_assets' ? '图组与替换资产' : activeWorkshopTab === 'recipes' ? '拍摄架构' : '商品类目'}</strong>
+          <p className="mt-1 text-slate-500">这是创作的准备区，不是生产步骤；返回后继续当前批次，不会新建或覆盖任务。</p></div>
+        <button type="button" onClick={() => setActiveWorkshopTab('studio')} className="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white">返回当前创作</button>
+      </section>}
+
       {/* 核心工作区内容渲染 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
         <div className={activeWorkshopTab === 'studio' ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>

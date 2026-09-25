@@ -26,7 +26,7 @@ export async function ensurePersistableResultUrl(url: string, req: Request): Pro
 /**
  * 查询异步生图任务状态 (多端点高可用智能探测)
  */
-export async function executeImagePoll(req: Request) {
+export async function executeImagePoll(req: Request): Promise<Response> {
   const lookup = new URL(req.url);
   if (!lookup.searchParams.get('taskId') && lookup.searchParams.get('taskKey')) {
     const key = lookup.searchParams.get('taskKey')!;

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowUpRight, Archive, Clock3, ImageIcon, MoreHorizontal, Pencil, Search, Trash2, X } from 'lucide-react';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
 import { WorkshopActionMenu, workshopMenuItemClass } from './WorkshopActionMenu';
-import { isUsableWorkshopResult } from '../model/workshopReadiness';
+import { isUsableWorkshopResult } from '../model/generation/workshopReadiness';
 import type { WorkshopBatch, WorkshopBatchSummary } from '@beike/contracts/workshopBatches';
 
 interface Props {

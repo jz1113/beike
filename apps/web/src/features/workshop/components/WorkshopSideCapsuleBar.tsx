@@ -99,7 +99,7 @@ export function WorkshopSideCapsuleBar({
       )}
       <button
         type="button"
-        onClick={() => setIsWorkshopConfigOpen(true)}
+        onClick={() => { onSelectTab('studio'); setIsWorkshopConfigOpen(true); }}
         aria-label="工坊生产预设"
         title="工坊生产预设"
         className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-950 shadow-sm transition-[transform,colors,box-shadow] duration-200 ease-out hover:scale-110 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:scale-95"

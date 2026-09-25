@@ -4,7 +4,7 @@ import type { WorkshopSnapshot } from '@beike/contracts/workshopWorkspace';
 import { workshopBatchSchema, workshopBatchSummarySchema } from '@beike/contracts/workshopBatches';
 import { workshopSnapshotSchema } from '@beike/contracts/workshopWorkspace';
 import { apiFetch } from '@/shared/api/apiClient';
-import { recoverWorkspace, shouldArchiveOccupiedBatch } from '../model/workspaceRecovery';
+import { recoverWorkspace, hasWorkspaceContent } from '../model/workspace/workspaceRecovery';
 
 function parseBatchResponse(data: unknown): WorkshopBatch {
   return workshopBatchSchema.parse((data as { batch?: unknown }).batch);
@@ -17,6 +17,9 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   const [activeBatch, setActiveBatch] = useState<WorkshopBatch | null>(null);
   const [historyBatches, setHistoryBatches] = useState<WorkshopBatchSummary[]>([]);
   const revision = useRef(0);
+  const loadSequence = useRef(0);
+  const switching = useRef(false);
+  const [isSwitching, setIsSwitching] = useState(false);
   const saved = useRef('');
   const latest = useRef(snapshot);
   const restoreRef = useRef(restore);
@@ -42,15 +45,17 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   const adoptBatch = useCallback((batch: WorkshopBatch, message: string) => {
     const restored = recoverWorkspace(workshopSnapshotSchema.parse(batch.snapshot));
     revision.current = batch.revision;
-    saved.current = JSON.stringify(restored);
+    saved.current = JSON.stringify(workshopSnapshotSchema.parse(batch.snapshot));
     latest.current = restored;
     restoreRef.current(restored);
+    activeBatchRef.current = batch;
     setActiveBatch(batch);
     setStatus(message);
     setError('');
   }, []);
 
-  const loadActive = useCallback(async (options?: { archiveIfOccupied?: boolean }) => {
+  const loadActive = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     setReady(false);
     blocked.current = false;
     setStatus('正在加载当前批次…');
@@ -58,25 +63,12 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       const response = await apiFetch('/api/catalog/workshop-batches/active');
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '当前批次读取失败');
-      let batch = parseBatchResponse(data);
-      let message = '当前批次已就绪';
-      const occupied = workshopSnapshotSchema.parse(batch.snapshot).items.length;
-      if (shouldArchiveOccupiedBatch(occupied, Boolean(options?.archiveIfOccupied))) {
-        const archived = await apiFetch('/api/catalog/workshop-batches/active/archive', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ force: true }),
-        });
-        const archivedData = await archived.json();
-        if (!archived.ok) throw new Error(archivedData.error || '上次批次归档失败');
-        batch = parseBatchResponse(archivedData);
-        message = '上次批次已自动归档，可在历史中查看';
-      }
-      adoptBatch(batch, message);
+      if (!alive.current || sequence !== loadSequence.current) return;
+      adoptBatch(parseBatchResponse(data), '当前批次已就绪');
       if (alive.current) setReady(true);
       await refreshHistory();
     } catch (cause) {
-      if (!alive.current) return;
+      if (!alive.current || sequence !== loadSequence.current) return;
       setError(cause instanceof Error ? cause.message : '当前批次读取失败');
       setStatus('批次加载失败，未覆盖本地内容');
     }
@@ -88,12 +80,12 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     return () => { alive.current = false; };
   }, [loadActive]);
 
-  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean }) => {
-    if (!ready || blocked.current) return;
+  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean; duringSwitch?: boolean }) => {
+    if (!ready || blocked.current || (switching.current && !options?.duringSwitch)) return false;
     const batch = activeBatchRef.current;
-    if (!batch) return;
+    if (!batch) return false;
     const json = JSON.stringify(latest.current);
-    if (json === saved.current) return;
+    if (json === saved.current) return true;
     const targetBatchId = batch.id;
     const targetRevision = revision.current;
     busy.current = true;
@@ -106,7 +98,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
         body: JSON.stringify({ revision: targetRevision, snapshot: JSON.parse(json) }),
       });
       const data = await response.json();
-      if (activeBatchRef.current?.id !== targetBatchId) return;
+      if (activeBatchRef.current?.id !== targetBatchId) return false;
       if (!response.ok) {
         if (response.status === 409) blocked.current = true;
         throw new Error(data.error || '当前批次保存失败');
@@ -124,19 +116,21 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
         setStatus('当前批次已保存');
         setError('');
       }
+      return true;
     } catch (cause) {
-      if (activeBatchRef.current?.id !== targetBatchId) return;
+      if (activeBatchRef.current?.id !== targetBatchId) return false;
       blocked.current = true;
       if (alive.current) {
         setError(cause instanceof Error ? cause.message : '当前批次保存失败');
         setStatus('当前批次尚未确认保存');
       }
+      return false;
     } finally {
       busy.current = false;
     }
   }, [ready]);
 
-  const flush = useCallback((options?: { keepalive?: boolean }) => {
+  const flush = useCallback((options?: { keepalive?: boolean; duringSwitch?: boolean }) => {
     const run = flushChain.current.then(() => persistSnapshot(options), () => persistSnapshot(options));
     flushChain.current = run.then(() => undefined, () => undefined);
     return run;
@@ -146,6 +140,12 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     if (!ready) return;
     const timer = window.setInterval(() => { void flush(); }, 1200);
     const onVisibility = () => { if (document.visibilityState === 'hidden') void flush(); };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (JSON.stringify(latest.current) === saved.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
     const onPageHide = () => { void flush({ keepalive: true }); };
     window.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
@@ -153,19 +153,36 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       window.clearInterval(timer);
       window.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
       void flush({ keepalive: true });
     };
   }, [flush, ready]);
 
   const requestBatch = useCallback(async (url: string, init: RequestInit, successMessage: string) => {
-    await flush();
-    const response = await apiFetch(url, init);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || '批次操作失败');
-    const batch = parseBatchResponse(data);
-    blocked.current = false;
-    adoptBatch(batch, successMessage);
-    await refreshHistory();
+    if (switching.current) throw new Error('正在切换批次，请稍候');
+    switching.current = true;
+    setIsSwitching(true);
+    try {
+      // Drain pending writes before freezing autosave for the archive/create request.
+      await flushChain.current;
+      const confirmed = await flush({ duringSwitch: true });
+      if (!confirmed) throw new Error('当前批次尚未确认保存，已阻止切换以保护未保存内容。请先处理保存错误');
+      const response = await apiFetch(url, init);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '批次操作失败');
+      const batch = parseBatchResponse(data);
+      blocked.current = false;
+      adoptBatch(batch, successMessage);
+      await refreshHistory().catch(cause => {
+        setError(`批次已切换，但历史列表读取失败：${cause instanceof Error ? cause.message : '请重试'}`);
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '批次操作失败');
+      throw cause;
+    } finally {
+      switching.current = false;
+      setIsSwitching(false);
+    }
   }, [adoptBatch, flush, refreshHistory]);
 
   const createNewBatch = useCallback(async (name?: string) => {
@@ -185,6 +202,18 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       body: JSON.stringify({ force }),
     }, '原批次已归档，新的空白批次已就绪');
   }, [requestBatch]);
+
+  const startFreshEntry = useCallback(async () => {
+    if (hasWorkspaceContent(latest.current)) {
+      await archiveCurrentBatch();
+    } else {
+      // Already empty: reuse it rather than creating meaningless history entries.
+      const empty = { ...latest.current, currentStage: 1, batchInputText: '' };
+      latest.current = empty;
+      restoreRef.current(empty);
+      setStatus('空白批次已就绪，可开始新的创作');
+    }
+  }, [archiveCurrentBatch]);
 
   const clearHistory = useCallback(async () => {
     const response = await apiFetch('/api/catalog/workshop-batches/history', { method: 'DELETE' });
@@ -220,8 +249,10 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   }, []);
 
   return {
-    ready,
-    status: ready && !error && status === '当前批次已保存' && serialized !== saved.current ? '等待保存当前批次…' : status,
+    ready: ready && !isSwitching,
+    startFreshEntry,
+    flush,
+    status: ready && !error && !isSwitching && status !== '正在保存当前批次…' && serialized !== saved.current ? '等待保存当前批次…' : status,
     error,
     activeBatch,
     historyBatches,
@@ -233,6 +264,9 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     deleteHistoryBatch,
     renameBatch,
     readBatch,
-    reload: () => loadActive(),
+    reload: async () => {
+      if (JSON.stringify(latest.current) !== saved.current && !window.confirm('重新加载将用服务器版本替换当前内容，未保存的修改可能丢失。确定继续吗？')) return;
+      await loadActive();
+    },
   };
 }

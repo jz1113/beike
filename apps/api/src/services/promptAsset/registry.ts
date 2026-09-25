@@ -1,3 +1,4 @@
+import { isPlaceholderIdentity, workshopAssetBlockReason } from '@beike/domain/workshopPipeline';
 import { OFFICIAL_WORKSPACE_ID, requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import {
@@ -53,9 +54,13 @@ export async function publishedIdsOrNone(assetType: PromptAssetType): Promise<st
 export async function attachRegistryMeta<T extends { id: string; provenance?: string | null }>(
   assetType: PromptAssetType,
   items: T[],
-): Promise<Array<T & { registry?: Awaited<ReturnType<typeof listRegistryByType>>[number] }>> {
-  if (items.length === 0) return items;
+): Promise<Array<T & { registry?: Awaited<ReturnType<typeof listRegistryByType>>[number]; contentEligible: boolean; productionBlockReason: string | null }>> {
+  if (items.length === 0) return [];
   const rows = await listRegistryByType(assetType, items.map((item) => item.id));
   const map = new Map(rows.map((row) => [row.sourceAssetId, row]));
-  return items.map((item) => ({ ...item, registry: map.get(item.id) }));
+  return items.map((item) => {
+    const row = { ...item, registry: map.get(item.id) };
+    return { ...row, contentEligible: !isPlaceholderIdentity(row, assetType),
+      productionBlockReason: workshopAssetBlockReason(row, assetType) };
+  });
 }

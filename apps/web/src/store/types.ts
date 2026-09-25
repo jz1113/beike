@@ -203,6 +203,8 @@ export interface WorkshopSlice {
   } | null;
   /** 资产中心/配方库载入后跳转批量工坊阶段（1–4），消费后清空 */
   pendingBatchStage: number | null;
+  /** 首页入口的一次性意图，不持久化；刷新仍恢复活跃批次。 */
+  pendingFreshWorkshopEntry: boolean;
   /** 资产中心「应用」一键桥接锁定到批量工坊原子资产（置景/穿搭/人设），消费后清空 */
   pendingBatchLockedAssets: {
     sceneId?: string;

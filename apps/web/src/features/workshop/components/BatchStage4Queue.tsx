@@ -1,5 +1,5 @@
 import { BatchDeliveryStatus } from './BatchDeliveryStatus';
-import { isUsableWorkshopResult, summarizeWorkshopResults } from '../model/workshopReadiness';
+import { isDeliverableWorkshopResult, isUsableWorkshopResult, summarizeWorkshopResults } from '../model/generation/workshopReadiness';
 import { useState } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
@@ -14,6 +14,7 @@ function describeImageStatus(product: BatchProductItem): { label: string; failed
   const failed = tasks.filter((task) => task.status === 'FAILURE').length;
   const running = tasks.filter((task) => task.status === 'IN_PROGRESS').length;
   const pending = tasks.filter((task) => task.status === 'PENDING').length;
+  if (tasks.some(task => task.recoveryRequired)) return { label: `结果待核对 · ${usable}/${tasks.length}`, failed: false };
   if (tasks.length === 0) return { label: '图片待生成', failed: false };
   if (running > 0 || pending > 0) return { label: `${failed ? `失败 ${failed} 张 · ` : ''}${running ? '生成中' : '待继续'} ${usable}/${tasks.length}`, failed: failed > 0 };
   if (failed > 0 && usable === 0) return { label: '图片生成失败', failed: true };
@@ -109,8 +110,8 @@ export default function BatchStage4Queue({
   const currentItem = successfulItems[safeIndex];
 
   const summary = summarizeWorkshopResults(successfulItems);
-  const hasExportableSuccess = summary.success > 0;
-  const displayFailCount = summary.failed;
+  const hasExportableSuccess = successfulItems.some(item => item.tasks.some(isDeliverableWorkshopResult));
+  const displayFailCount = successfulItems.flatMap(item => item.tasks || []).filter(task => task.resultStatus !== 'superseded' && task.status === 'FAILURE' && !task.recoveryRequired).length;
   const displaySuccessCount = summary.success;
   const busy = isGeneratingBatch || summary.running > 0;
 
@@ -143,6 +144,7 @@ export default function BatchStage4Queue({
         completedTaskCount={completedTaskCount}
         displaySuccessCount={displaySuccessCount}
         displayFailCount={displayFailCount}
+        recoveryTaskCount={summary.recovery}
         pendingTaskCount={summary.pending}
         hasExportableSuccess={hasExportableSuccess}
         currentModelName={currentModelName}
@@ -181,8 +183,8 @@ export default function BatchStage4Queue({
         }} />
       {!readOnly && onAcknowledgeRecovery && successfulItems.some((item) => (item.tasks || []).some((task) => task.recoveryRequired)) && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-          <span>有任务在刷新前未完成，结果待核实。确认后可以重新生成，不会自动重提旧任务。</span>
-          <button type="button" onClick={onAcknowledgeRecovery} className="shrink-0 rounded-xl bg-amber-900 px-3 py-1.5 font-bold text-white">确认并重做</button>
+          <span>部分任务的提交或生成结果尚未确认。请先核对原任务；放弃恢复后重做可能重复计费，不会自动重提。</span>
+          <button type="button" onClick={onAcknowledgeRecovery} disabled={busy} className="shrink-0 rounded-xl bg-amber-900 px-3 py-1.5 font-bold text-white">放弃恢复，允许重做</button>
         </div>
       )}
 

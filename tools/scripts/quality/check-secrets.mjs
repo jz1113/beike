@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scan tracked text files for credential-like patterns.
+ * Scan tracked and untracked, non-ignored text files for credential-like patterns.
  * Does not embed known leaked values; relies on structural signatures only.
  */
 import { execSync } from 'node:child_process';
@@ -37,7 +37,7 @@ const PATTERNS = [
 
 function listTrackedFiles() {
   try {
-    return execSync('git ls-files -z', { cwd: root, encoding: 'utf8' })
+    return execSync('git ls-files -z --cached --others --exclude-standard', { cwd: root, encoding: 'utf8' })
       .split('\0')
       .filter(Boolean);
   } catch {

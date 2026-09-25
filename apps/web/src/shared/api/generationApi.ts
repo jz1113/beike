@@ -11,7 +11,8 @@ import {
   nonRetryableError,
   classifyGenerationPollResult,
 } from '@/shared/api/generationErrors';
-import { sleepWhilePolling, throwIfGenerationAborted } from '@/shared/api/generationAbort';
+import { generationRecoveryError } from './generationRecovery';
+import { isGenerationCancelled, sleepWhilePolling, throwIfGenerationAborted } from '@/shared/api/generationAbort';
 
 export async function fetchAssetTasks(page = 1, pageSize = 40): Promise<{
   tasks: GenerationTask[];
@@ -100,6 +101,7 @@ export async function pollSingleTaskResult(
         continue;
       }
 
+      if (!pRes.ok) throw generationRecoveryError(pData.error || '原任务暂时无法查询');
       const outcome = classifyGenerationPollResult(pData, { httpOk: pRes.ok });
       if (outcome === 'success') {
         return { url: String(pData.resultUrl), temporary: Boolean(pData.temporaryUrl) };
@@ -113,7 +115,7 @@ export async function pollSingleTaskResult(
     }
   }
   throwIfGenerationAborted(isAborted);
-  throw nonRetryableError(`生图超时（已等待 6 分钟，任务 ${taskId}）`);
+  throw generationRecoveryError(`等待结果超时（任务 ${taskId}），请核对原任务，不要重复提交`);
 }
 
 export interface SubmitImageGenTaskDeps {
@@ -153,31 +155,41 @@ export async function submitImageGenTaskResult(
     storageConfig: readClientStorageConfig(),
   };
 
-  const submit = () => apiFetch('/api/generate/image', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getGatewayClientHeaders(),
-      ...storageConfigHeaders(),
-      ...(deps.idempotencyKey ? { 'x-idempotency-key': deps.idempotencyKey } : {}),
-    },
-    body: JSON.stringify(finalPayload),
-  });
+  const submit = async () => {
+    try {
+      return await apiFetch('/api/generate/image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getGatewayClientHeaders(),
+          ...storageConfigHeaders(),
+          ...(deps.idempotencyKey ? { 'x-idempotency-key': deps.idempotencyKey } : {}),
+        },
+        body: JSON.stringify(finalPayload),
+      });
+    } catch (error) {
+      throw generationRecoveryError(`提交结果未确认：${error instanceof Error ? error.message : '网络异常'}，请先核对原任务`);
+    }
+  };
 
   let res = await submit();
   for (const delayMs of LOCAL_API_RETRY_DELAYS_MS) {
-    throwIfGenerationAborted(deps.isAborted);
     if (!(await isLocalApiUnavailable(res))) break;
+    throwIfGenerationAborted(deps.isAborted);
     await sleepWhilePolling(delayMs, deps.isAborted, deps.isPaused);
     res = await submit();
   }
 
   const data = await res.json().catch(() => null);
   if (!data) {
-    throw nonRetryableError(payload.isGrid2x2 ? '四宫格生图响应解析失败' : '生图响应解析失败');
+    throw generationRecoveryError('生图响应解析失败，提交结果待核对');
   }
+  // Even a persistence-error response can carry a valid upstream task id.
+  if (data.taskId) deps.onTaskSubmitted?.(String(data.taskId));
   if (!res.ok || !data.success) {
-    throw nonRetryableError(
+    const errorFactory = data.submissionUnknown || data.taskId || res.status >= 500 || res.status === 408
+      ? generationRecoveryError : nonRetryableError;
+    throw errorFactory(
       data.error || (payload.isGrid2x2 ? '四宫格生图提交失败' : '生图任务提交失败')
     );
   }
@@ -199,12 +211,17 @@ export async function submitImageGenTaskResult(
   }
 
   if (data.taskId) {
-    deps.onTaskSubmitted?.(String(data.taskId));
-    throwIfGenerationAborted(deps.isAborted);
-    return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused);
+    try {
+      throwIfGenerationAborted(deps.isAborted);
+      return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused);
+    } catch (error) {
+      // Cancellation stops waiting, not the upstream generation or its billing.
+      if (error instanceof Error && error.name === 'ImageGenBusinessError' && !isGenerationCancelled(error)) throw error;
+      throw generationRecoveryError(error instanceof Error ? error.message : '原任务结果待核对');
+    }
   }
 
-  throw nonRetryableError(
+  throw generationRecoveryError(
     payload.isGrid2x2 ? '四宫格生图网关未返回有效任务 ID' : '生图网关未返回有效任务 ID'
   );
 }

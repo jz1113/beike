@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 校验单核扁平架构：核心目录、禁止目录、根目录中文杂项、未 ignore 的 junk。
+ * 校验轻量工作区 / 模块化单体架构：核心目录、禁止目录、根目录中文杂项、未 ignore 的 junk。
  */
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';

@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   Settings2, 
-  CheckCircle2,
 } from 'lucide-react';
 import type { GenerationStrategy } from '../model/batchTypes';
 import { WorkshopAssetBindings } from './WorkshopAssetBindings';
 
 export interface WorkshopSettingsModalProps {
   isOpen: boolean;
+  workspaceStatus?: string;
+  workspaceError?: string | null;
+  busy?: boolean;
+  assetLoadState?: 'loading' | 'ready' | 'error';
+  assetLoadError?: string;
+  onReloadAssets?: () => void;
+  onOpenAssets?: () => void;
   onClose: () => void;
   selectedArchId: string;
   setSelectedArchId: (id: string) => void;
@@ -55,7 +62,8 @@ export interface WorkshopSettingsModalProps {
 }
 
 export function WorkshopSettingsModal({
-  isOpen,
+  isOpen, workspaceStatus, workspaceError, busy = false,
+  assetLoadState = 'ready', assetLoadError, onReloadAssets, onOpenAssets,
   onClose,
   selectedArchId,
   setSelectedArchId,
@@ -93,9 +101,40 @@ export function WorkshopSettingsModal({
   setLockedFullPromptId,
   availableFullPrompts = [],
 }: WorkshopSettingsModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); }
+      if (event.key !== 'Tab') return;
+      const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, select, input, textarea, a[href], [tabindex="0"]',
+      ) || []).filter((el) => !el.matches(':disabled') && el.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first) { event.preventDefault(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isOpen]);
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] select-none animate-in fade-in duration-200">
       {/* 背景遮罩 */}
       <div
@@ -103,14 +142,14 @@ export function WorkshopSettingsModal({
         onClick={onClose}
       />
 
-      <div className="relative z-10 flex max-h-[90vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] animate-in zoom-in-95 duration-200">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="workshop-settings-title" tabIndex={-1} className="relative z-10 outline-none flex max-h-[90vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] animate-in zoom-in-95 duration-200">
         {/* 顶部标题栏 */}
         <div className="flex shrink-0 items-start justify-between gap-5 px-5 pb-3 pt-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-100">
               <Settings2 className="h-3.5 w-3.5 text-indigo-600" />
             </div>
-            <h2 className="text-sm font-black tracking-tight">生产设置</h2>
+            <h2 id="workshop-settings-title" className="text-sm font-black tracking-tight">生产设置</h2>
           </div>
 
           <button
@@ -124,7 +163,8 @@ export function WorkshopSettingsModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-4 pt-2 sm:px-6">
-          <div className="space-y-4">
+          {busy && <p role="status" className="mb-3 text-xs text-amber-700">任务执行中，生产设置暂时只读，避免同批次混用配置。</p>}
+          <fieldset disabled={busy} className="space-y-4 disabled:opacity-60">
             <section>
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-black">模型策略</h3>
@@ -210,6 +250,18 @@ export function WorkshopSettingsModal({
               </div>
             </section>
 
+            <section className="rounded-xl border border-slate-200 p-3 text-xs" aria-label="生产资源状态">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <strong>生产资源 · 仅可用且已发布的资产进入生成</strong>
+                <div className="flex gap-3"><button type="button" onClick={onReloadAssets} disabled={assetLoadState === 'loading'} className="text-indigo-600 disabled:opacity-50">重新加载资产</button>
+                  <button type="button" onClick={onOpenAssets} className="text-indigo-600">管理资产库</button></div>
+              </div>
+              <p role={assetLoadState === 'error' ? 'alert' : 'status'} className={`mt-2 ${assetLoadState === 'error' ? 'text-red-600' : 'text-slate-500'}`}>
+                {assetLoadState === 'loading' ? '正在核对资产，请稍候；此时不能启动分析。' : assetLoadState === 'error'
+                  ? `加载失败：${assetLoadError || '请重试'}。当前选项可能已过期，不能启动分析。`
+                  : `可用母本 ${availableFullPrompts.length} · 人物 ${availablePersonas.length} · 穿搭 ${availableOutfits.length} · 场景 ${availableScenes.length}。资源管理中的待审核、停用及占位记录不参与生产。`}
+              </p>
+            </section>
             <WorkshopAssetBindings
               groupId={lockedFullPromptId} groups={availableFullPrompts}
               onGroupChange={(id) => setLockedFullPromptId?.(id)}
@@ -217,15 +269,14 @@ export function WorkshopSettingsModal({
               sceneId={lockedSceneId} scenes={availableScenes} onSceneChange={(id) => setLockedSceneId?.(id)}
               outfitId={lockedOutfitId} outfits={availableOutfits} onOutfitChange={(id) => setLockedOutfitId?.(id)}
             />
-          </div>
+          </fieldset>
         </div>
 
         {/* 底部操作栏 */}
         <div className="px-5 sm:px-6 py-3 bg-slate-50/90 border-t border-slate-200/70 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>修改已实时自动持久化</span>
-          </div>
+          <p role="status" className={`text-xs ${workspaceError ? 'text-red-600' : 'text-slate-500'}`}>
+            {workspaceError ? `保存未确认：${workspaceError}` : workspaceStatus || '修改将随当前批次自动保存'}
+          </p>
 
           <button
             type="button"
@@ -236,7 +287,8 @@ export function WorkshopSettingsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

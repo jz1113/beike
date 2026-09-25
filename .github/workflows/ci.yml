@@ -25,26 +25,8 @@ jobs:
           cache: pnpm
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Root layout
-        run: pnpm run check:root-layout
-      - name: Model catalog
-        run: pnpm run check:model-catalog
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Lint
-        run: pnpm run lint
-      - name: Secret scan
-        run: pnpm run lint:secrets
-      - name: Unused
-        run: pnpm run lint:unused
-      - name: Max lines
-        run: pnpm run lint:max-lines
-      - name: Import boundaries
-        run: pnpm run lint:boundaries
-      - name: Test
-        run: pnpm test
-      - name: Build UI
-        run: pnpm run build:ui
+      - name: Full quality gate (same as local)
+        run: pnpm run check
       - name: Gitleaks
         run: |
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz" | tar -xz -C /tmp

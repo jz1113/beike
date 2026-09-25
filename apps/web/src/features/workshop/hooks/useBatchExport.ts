@@ -4,7 +4,7 @@ import {
   exportBatchExcel,
   exportBatchZip,
   exportSingleProductZip,
-} from '../model/batchRunnerExport';
+} from '../model/delivery/batchRunnerExport';
 
 export function useBatchExport(
   itemsRef: React.MutableRefObject<BatchProductItem[]>,

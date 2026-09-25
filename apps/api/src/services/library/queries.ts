@@ -28,6 +28,10 @@ const slimAsset = <T extends Record<string, unknown>>(row: T, extra: string[] = 
     suitableAnatomy: row.suitableAnatomy,
     shotType: row.shotType,
     albumName: row.albumName,
+    registry: row.registry,
+    provenance: row.provenance,
+    contentEligible: row.contentEligible,
+    productionBlockReason: row.productionBlockReason,
   };
   for (const key of extra) {
     if (row[key] !== undefined) base[key] = row[key];
@@ -56,7 +60,7 @@ export async function executeLibraryGet(req: Request) {
         success: true,
         assetType,
         item: {
-          ...item,
+          ...(await attachRegistryMeta('scene', [item]))[0],
           shots: resolveShotsForScene(item, linkedActions),
           shotCount: resolveShotsForScene(item, linkedActions).length,
         },
@@ -65,22 +69,22 @@ export async function executeLibraryGet(req: Request) {
     if (assetType === 'outfit') {
       const item = await db.outfitAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
-      return jsonResponse({ success: true, assetType, item });
+      return jsonResponse({ success: true, assetType, item: (await attachRegistryMeta(assetType, [item]))[0] });
     }
     if (assetType === 'action') {
       const item = await db.actionAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
-      return jsonResponse({ success: true, assetType, item });
+      return jsonResponse({ success: true, assetType, item: (await attachRegistryMeta(assetType, [item]))[0] });
     }
     if (assetType === 'persona') {
       const item = await db.personaAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
-      return jsonResponse({ success: true, assetType, item });
+      return jsonResponse({ success: true, assetType, item: (await attachRegistryMeta(assetType, [item]))[0] });
     }
     if (assetType === 'full_prompt') {
       const item = await db.fullPromptAsset.findUnique({ where: { id: detailId } });
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
-      return jsonResponse({ success: true, assetType, item });
+      return jsonResponse({ success: true, assetType, item: (await attachRegistryMeta(assetType, [item]))[0] });
     }
   }
 
@@ -100,7 +104,7 @@ export async function executeLibraryGet(req: Request) {
   }
 
   if (assetType === 'all') {
-    const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
+    const rawLists = await Promise.all([
       db.sceneAsset.findMany({
         orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { createdAt: 'desc' }],
         take: 1000,
@@ -133,6 +137,12 @@ export async function executeLibraryGet(req: Request) {
         take: 1000,
         skip: (page - 1) * 1000,
       }),
+    ]);
+
+    const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
+      attachRegistryMeta('scene', rawLists[0]), attachRegistryMeta('outfit', rawLists[1]),
+      attachRegistryMeta('action', rawLists[2]), attachRegistryMeta('persona', rawLists[3]),
+      attachRegistryMeta('full_prompt', rawLists[4]),
     ]);
 
     return jsonResponse({
@@ -170,6 +180,8 @@ export async function executeLibraryGet(req: Request) {
         if (!slim) return mapped;
         const slimmed = slimAsset(mapped as Record<string, unknown>, [
           'albumName',
+          'productCategoryIds',
+          'isUniversal',
           'sceneSummary',
           'outfitSummary',
           'actionSummary',
