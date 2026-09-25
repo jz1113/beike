@@ -1,7 +1,7 @@
 import { BatchDeliveryStatus } from './BatchDeliveryStatus';
 import { isDeliverableWorkshopResult, isUsableWorkshopResult, summarizeWorkshopResults } from '../model/generation/workshopReadiness';
 import { useState } from 'react';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
 import { BatchProductItem } from '../model/batchTypes';
 import { BatchStage4Header } from './BatchStage4Header';
@@ -121,22 +121,7 @@ export default function BatchStage4Queue({
     || selectedImageGenModel;
 
   return (
-    <div className={`relative w-full space-y-5 rounded-3xl bg-slate-50 border border-slate-200/70 p-3 sm:p-5 ${viewMode === 'single' && successfulItems.length > 1 ? 'pr-16 sm:pr-20' : ''}`}>
-      {viewMode === 'single' && successfulItems.length > 1 && (
-        <nav aria-label="快速切换商品" className="absolute right-2 sm:right-3 top-64 flex flex-col items-center gap-3">
-          <button type="button" aria-label="上一个商品" title="上一个商品" disabled={safeIndex === 0}
-            onClick={() => setActiveItemIndex(Math.max(0, safeIndex - 1))}
-            className="flex flex-col items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed">
-            <ChevronUp className="h-5 w-5" /><span className="text-[10px]">上一个</span>
-          </button>
-          <span className="text-[10px] text-slate-400 tabular-nums">{safeIndex + 1}/{successfulItems.length}</span>
-          <button type="button" aria-label="下一个商品" title="下一个商品" disabled={safeIndex === successfulItems.length - 1}
-            onClick={() => setActiveItemIndex(Math.min(successfulItems.length - 1, safeIndex + 1))}
-            className="flex flex-col items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed">
-            <ChevronDown className="h-5 w-5" /><span className="text-[10px]">下一个</span>
-          </button>
-        </nav>
-      )}
+    <div className="mx-auto w-full max-w-[1560px] space-y-4 rounded-2xl bg-slate-50 p-3 sm:p-4">
       {/* 🌟 顶层全景大盘 Header：整合生产大盘总览、商品切换条与交付导出动作 */}
       <BatchStage4Header
         isGeneratingBatch={isGeneratingBatch}
@@ -196,9 +181,24 @@ export default function BatchStage4Queue({
             item={currentItem}
             onReviewTask={onReviewTask}
             productNavigation={successfulItems.length > 1 ? (
-              <nav aria-label="切换交付商品" className="rounded-2xl border border-slate-200/80 bg-white p-3">
-                <h3 className="px-2 py-2 text-xs font-semibold text-slate-600">商品列表 · {successfulItems.length} 款</h3>
-                <div className="max-h-80 overflow-y-auto space-y-1.5">
+              <nav aria-label="切换交付商品" className="min-w-0 rounded-xl border border-slate-200/80 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                  <h3 className="text-sm font-semibold text-slate-800">商品列表 <span className="ml-1 text-xs font-normal text-slate-500">{successfulItems.length} 款</span></h3>
+                  <div className="flex items-center gap-1">
+                    <button type="button" aria-label="上一个商品" title="上一个商品" disabled={safeIndex === 0}
+                      onClick={() => setActiveItemIndex(safeIndex - 1)}
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300">
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="text-xs tabular-nums text-slate-500">{safeIndex + 1}/{successfulItems.length}</span>
+                    <button type="button" aria-label="下一个商品" title="下一个商品" disabled={safeIndex === successfulItems.length - 1}
+                      onClick={() => setActiveItemIndex(safeIndex + 1)}
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300">
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-80 overflow-y-auto space-y-1 [scrollbar-gutter:stable]">
                   {successfulItems.map((product, index) => {
                     const cover = product.selectedProductImages?.find(Boolean);
                     const copyFailed = Boolean(product.copywritingError);
@@ -206,12 +206,12 @@ export default function BatchStage4Queue({
                     const imageStatus = describeImageStatus(product);
                     return <button key={product.id} type="button" aria-current={index === safeIndex ? 'true' : undefined}
                       onClick={() => setActiveItemIndex(index)} title={product.title}
-                      className={`w-full flex items-center gap-3 rounded-xl p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}>
+                      className={`w-full min-w-0 flex items-center gap-2.5 rounded-lg p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}>
                       <span className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50">
                         {cover && <LazyProxyImage src={cover} alt="" thumb width={80} className="!object-contain" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-medium">{index + 1}. {product.title}</span>
+                        <span className="block truncate text-[13px] font-medium">{index + 1}. {product.title}</span>
                         <span className={`block mt-1 text-[11px] ${imageStatus.failed ? 'text-rose-600' : 'text-slate-500'}`}>{imageStatus.label}</span>
                         <span className={`block text-[11px] ${copyFailed ? 'text-rose-600' : 'text-slate-400'}`}>
                           {copyFailed ? '文案失败，待重试' : copyReady ? '文案已就绪' : '文案待生成'}

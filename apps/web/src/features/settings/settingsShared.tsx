@@ -9,6 +9,8 @@ import { sortMultimodalModelsByPrice } from './multimodalPriceSort';
 export interface WorkflowModel {
   id: string;
   routeId?: string;
+  /** Whether this route is offered in business model selectors; capabilities remain unchanged. */
+  enabled?: boolean;
   channel?: 'comfly' | 'openai' | 'lianchi';
   name: string;
   shortName: string;
@@ -75,7 +77,7 @@ export const API_SERVICES: ApiServiceItem[] = [
   },
   {
     id: 'openai_official',
-    name: 'OpenAI 官方 Responses 接口',
+    name: 'OpenAI / Responses 接口',
     subTitle: 'GPT 5.6 / GPT 6 · 多模态图像理解',
     category: 'core',
     renderLogo: (cls = 'w-5 h-5') => <ModelIcon modelId="gpt-6-luna" className={cls} />,
@@ -100,7 +102,7 @@ export const API_SERVICES: ApiServiceItem[] = [
     registerUrl: 'https://platform.deepseek.com',
     registerName: '前往 DeepSeek Platform 获取 API Key',
     defaultBaseUrl: 'https://api.deepseek.com',
-    description: '使用 DeepSeek 官方 OpenAI 兼容接口；启用后会将当前文本/图像理解模型请求切换到 DeepSeek。',
+    description: '独立保存 DeepSeek 凭证，供关键词审核等已支持的业务调用；不覆盖 Comfly 网关。',
     capabilities: ['Chat Completions', '图像理解', 'deepseek-flash', 'Bearer API Key']
   },
   {

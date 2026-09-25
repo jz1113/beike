@@ -1,6 +1,6 @@
 import { requiresGenerationRecovery } from '@/shared/api/generationRecovery';
 import type { ShotPrompt } from '@beike/domain/vision';
-import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
+import { resolveWorkshopImageSize, verifyWorkshopImageSize } from './workshopImageSize';
 import { submitImageGenTaskResult, compressProductImageIfNeeded } from '@/shared/api/generationApi';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@/shared/api/apiClient';
 import { sliceGridImage2x2Blobs } from '@/shared/media/imageGridSlicer';
@@ -33,7 +33,10 @@ export async function runGridImageTask(
   let slices: Blob[] = [];
   try {
     if (shots.length !== 4 || !item.gridPrompt?.trim()) throw new Error('四宫格需要完整的 4 镜和整组提示词，请重新分析');
-    const size = previous?.gridSize || resolveGptImageSizeForModel(config.selectedAspect, config.selectedImageGenModel, config.selectedQuality);
+    const size = previous?.gridSize || resolveWorkshopImageSize(config.selectedAspect, config.selectedImageGenModel, config.selectedQuality);
+    const [width, height] = size.split('x').map(Number);
+    const outputSize = `${Math.max(1, Math.floor(width / 2))}x${Math.max(1, Math.floor(height / 2))}`;
+    let verifySource = Boolean(previous?.outputSize);
     if (!sourceUrl && (previous?.gridTaskKey || recoveryOnly)) {
       const upstream = previous?.upstreamTaskId;
       const query = upstream ? `taskId=${encodeURIComponent(upstream)}` : `taskKey=${encodeURIComponent(taskKey || '')}`;
@@ -49,22 +52,37 @@ export async function runGridImageTask(
     if (!sourceUrl) {
       const reference = item.selectedProductImages[0] || item.coverImage;
       if (!reference) throw new Error('缺少商品垫图，请先勾选商品图');
-      const productImageUrl = await compressProductImageIfNeeded(reference);
-      patch({ gridTaskKey: taskKey, gridSize: size, upstreamTaskId: undefined });
+      const productReferenceCandidates = Array.from(new Set([
+        reference,
+        ...item.selectedProductImages,
+      ].filter((img): img is string => Boolean(img)))).slice(0, 4);
+      const productReferenceImages = await Promise.all(
+        productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
+      );
+      const productImageUrl = productReferenceImages[0];
+      const safeAnchorFaceUrl = config.anchorFaceUrl
+        ? await compressProductImageIfNeeded(config.anchorFaceUrl)
+        : undefined;
+      patch({ gridTaskKey: taskKey, gridSize: size, outputSize, upstreamTaskId: undefined });
+      verifySource = true;
       const generated = await submitImageGenTaskResult({
       prompt: item.gridPrompt.trim(), model: config.selectedImageGenModel, size,
       aspectRatio: config.selectedAspect, quality: config.selectedQuality,
-      productImageUrl, referenceImageUrl: productImageUrl, useReferenceImage: true,
+      productImageUrl, referenceImageUrl: productImageUrl,
+      referenceImages: productReferenceImages, productReferenceImages,
+      useReferenceImage: true,
       padSocialRef: false, isGrid2x2: true, workshopMode: 'storyboard_generate',
       productTitle: item.title, productFingerprint: item.productFingerprint || item.title,
-      productRole: item.productRole, has_human: shots.some((shot) => shot.has_human !== false),
+      productRole: item.productRole,
+      anchorFaceImageUrl: safeAnchorFaceUrl,
+      has_human: shots.some((shot) => shot.has_human !== false),
     }, { isAborted: config.isAborted, isPaused: config.isPaused, idempotencyKey: taskKey, onTaskSubmitted: upstreamTaskId => patch({ upstreamTaskId }) });
       sourceUrl = generated.url;
     }
     patch({ gridSourceUrl: sourceUrl, gridTaskKey: taskKey, gridSize: size });
     setItems((items) => items.map((entry) => entry.id === item.id ? { ...entry, masterGridUrl: sourceUrl } : entry));
     stage = '下载或拆分';
-    const [width, height] = size.split('x').map(Number);
+    if (verifySource) await verifyWorkshopImageSize(sourceUrl!, size);
     slices = await sliceGridImage2x2Blobs(sourceUrl!, {
       targetWidth: Math.max(1, Math.floor(width / 2)), targetHeight: Math.max(1, Math.floor(height / 2)),
     });

@@ -10,6 +10,7 @@ test('placeholder identities shown in production screenshots are excluded on bot
 });
 test('unknown incidental anatomy does not hide a valid partial outfit or person', () => {
   assert.equal(isPlaceholderIdentity({ title: '局部深色袖口', bottom: '无法确认', description: '无人物面部，仅见袖口' }, 'outfit'), false);
+  assert.equal(isWorkshopAssetEligible({ title: '局部深色袖口', bottom: '无法确认', description: '无人物面部，仅见袖口' }, 'outfit'), false);
   assert.equal(isPlaceholderIdentity({ name: '短发女性', description: '无法确认具体年龄' }, 'persona'), false);
   assert.equal(isPlaceholderIdentity({ title: '无人庭院' }, 'scene'), false);
 });

@@ -41,7 +41,7 @@ export function ApiServicesOpenAIPanel({
       </div>
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-sm sm:text-base font-black text-slate-900">OpenAI 官方 Responses 接口</h2>
+          <h2 className="text-sm sm:text-base font-black text-slate-900">OpenAI / Responses 接口</h2>
           <ExternalLinkAnchor href="https://platform.openai.com/api-keys" className="px-2.5 py-0.5 rounded-full bg-slate-50 border border-slate-200 text-[11px] font-bold flex items-center gap-1" title="获取 OpenAI API Key">
             获取 API Key <ExternalLink className="w-3 h-3" />
           </ExternalLinkAnchor>

@@ -1,7 +1,4 @@
-import { Cpu } from 'lucide-react';
-import { useMemo, useCallback } from 'react';
 import { API_SERVICES } from '../settingsShared';
-import { isMultimodalWorkflowModel } from '@beike/domain/workflowModels';
 import { ApiServicesWanbangPanel } from '../components/ApiServicesWanbangPanel';
 import { ApiServicesApiaPanel } from '../components/ApiServicesApiaPanel';
 import { ApiServicesQiyunPanel } from '../components/ApiServicesQiyunPanel';
@@ -10,396 +7,55 @@ import { ApiServicesDeepSeekPanel } from '../components/ApiServicesDeepSeekPanel
 import { ApiServicesOpenAIPanel } from '../components/ApiServicesOpenAIPanel';
 import { ApiServicesLianchiPanel } from '../components/ApiServicesLianchiPanel';
 import { ApiServicesStoragePanel } from '../components/ApiServicesStoragePanel';
-import { ApiServicesNavList } from '../components/ApiServicesNavList';
-import { useModelDragSort } from '../hooks/useModelDragSort';
-import { settingsPanelPad, settingsPanelContainer } from '@/shared/ui/layoutClasses';
+import { ApiServicesNavList, SERVICE_STATUS_COLORS } from '../components/ApiServicesNavList';
+import { ModelManagementPanel } from '../components/ModelManagementPanel';
+import { MODEL_CHANNELS, type ModelChannel } from '../modelManagement';
+import { serviceStatuses } from '../serviceStatuses';
 import type { ApiServicesTabProps } from './apiServicesTabTypes';
 
-export default function ApiServicesTab({
-  defaultsPanel,
-  selectedServiceId,
-  setSelectedServiceId,
-  serviceSearch,
-  setServiceSearch,
-  isGatewayEnabled,
-  setIsGatewayEnabled,
-  apiKey,
-  setApiKey,
-  baseUrl,
-  setBaseUrl,
-  showKey,
-  setShowKey,
-  appAccessToken,
-  setAppAccessToken,
-  handleSaveApiConfig,
-  handleTestPing,
-  isTesting,
-  deepSeekApiKey,
-  setDeepSeekApiKey,
-  showDeepSeekKey,
-  setShowDeepSeekKey,
-  isTestingDeepSeek,
-  handleTestDeepSeek,
-  handleSaveDeepSeekConfig,
-  openAIBaseUrl,
-  setOpenAIBaseUrl,
-  openAIApiKey,
-  setOpenAIApiKey,
-  showOpenAIKey,
-  setShowOpenAIKey,
-  openAIEnabled,
-  setOpenAIEnabled,
-  openAIAllowInsecureHttp,
-  setOpenAIAllowInsecureHttp,
-  switchOpenAIToHttpGateway,
-  isTestingOpenAI,
-  handleTestOpenAI,
-  handleSaveOpenAIConfig,
-  handleOpenOpenAIDiscovery,
-  handleImportCodexCatalog,
-  openAIModelError,
-  openAIModelSuggestedBaseUrl,
-  openAIModelSource,
-  isFetchingOpenAI,
-  openAIModelCount,
-  lianchiApiKey,
-  setLianchiApiKey,
-  showLianchiKey,
-  setShowLianchiKey,
-  isTestingLianchi,
-  handleTestLianchi,
-  handleSaveLianchiConfig,
-  handleOpenLianchiDiscovery,
-  isFetchingLianchi,
-  lianchiModelCount,
-  handleOpenGatewayDiscovery,
-  isFetchingGateway,
-  allGatewayModels,
-  customModels,
-  modelSearch,
-  setModelSearch,
-  modelCapabilityFilter,
-  setModelCapabilityFilter,
-  handleToggleCapability,
-  handleDeleteModel,
-  handleMoveModel,
-  handleReorderModels,
-  handleResetDefaultModels,
-  comflyPrices,
-  isFetchingPrices,
-  handleSortByComflyPrice,
-  setIsAddingModelModalOpen,
-  wanbangKey,
-  setWanbangKey,
-  wanbangSecret,
-  setWanbangSecret,
-  isWanbangEnabled,
-  setIsWanbangEnabled,
-  handleTestWanbang,
-  isTestingWanbang,
-  handleSaveWanbangConfig,
-  scraperId,
-  setScraperId,
-  scraperSecret,
-  setScraperSecret,
-  handleSaveScraperConfig,
-  handleTestScraper,
-  isTestingScraper,
-  isApiaEnabled,
-  setIsApiaEnabled,
-  qiyunAppId,
-  setQiyunAppId,
-  qiyunAppKey,
-  setQiyunAppKey,
-  isQiyunEnabled,
-  setIsQiyunEnabled,
-  handleSaveQiyunConfig,
-  handleTestQiyun,
-  isTestingQiyun,
-  storageEnabled,
-  setStorageEnabled,
-  storageProvider,
-  setStorageProvider,
-  storageAccountId,
-  setStorageAccountId,
-  storageEndpoint,
-  setStorageEndpoint,
-  storageAccessKeyId,
-  setStorageAccessKeyId,
-  storageSecretAccessKey,
-  setStorageSecretAccessKey,
-  showStorageSecret,
-  setShowStorageSecret,
-  storageBucketName,
-  setStorageBucketName,
-  storagePublicDomain,
-  setStoragePublicDomain,
-  isTestingStorage,
-  setIsTestingStorage,
-  isMigratingStorage,
-  setIsMigratingStorage,
-  handleSaveStorageConfig,
-  showToast,
-}: ApiServicesTabProps) {
-  void appAccessToken;
-  void setAppAccessToken;
-
-  // 拖拽排序逻辑 Hook
-  const {
-    draggedModelId,
-    dragOverModelId,
-    handleDragStart,
-    handleDragOver,
-    handleDrop,
-    onMoveModel,
-  } = useModelDragSort({
-    customModels,
-    modelCapabilityFilter,
-    handleMoveModel,
-    handleReorderModels,
-  });
-
-  const services = useMemo(() => defaultsPanel ? [...API_SERVICES, {
-    id: 'defaults', name: '默认业务模型', subTitle: '多模态 · 生图 · 视频',
-    category: 'core' as const, renderLogo: (cls?: string) => <Cpu className={cls} />,
-    isEnabled: true, tag: '默认调用模型',
-  }] : API_SERVICES, [defaultsPanel]);
-
-  const filteredServices = useMemo(() => {
-    const q = serviceSearch.toLowerCase().trim();
-    if (!q) return services;
-    return services.filter(s => {
-      const matchName = s.name.toLowerCase().includes(q);
-      const matchSub = s.subTitle.toLowerCase().includes(q);
-      const matchTag = (s.tag || '').toLowerCase().includes(q);
-      return matchName || matchSub || matchTag;
-    });
-  }, [serviceSearch, services]);
-
-  const filteredModels = useMemo(() => {
-    let list = customModels;
-    if (modelCapabilityFilter === 'video') {
-      list = list.filter(m => m.isVideo);
-    } else if (modelCapabilityFilter === 'image') {
-      list = list.filter(m => m.isImage);
-    } else if (modelCapabilityFilter === 'multimodal') {
-      list = list.filter(isMultimodalWorkflowModel);
-    }
-
-    if (!modelSearch.trim()) return list;
-    const q = modelSearch.toLowerCase().trim();
-    return list.filter(m =>
-      (m.name || '').toLowerCase().includes(q) ||
-      m.id.toLowerCase().includes(q)
-    );
-  }, [customModels, modelSearch, modelCapabilityFilter]);
-
-  const isServiceConfigured = useCallback((serviceId: string, defaultEnabled?: boolean) => {
-    if (serviceId === 'comfly_gateway') return Boolean(apiKey.trim());
-    if (serviceId === 'deepseek_official') return Boolean(deepSeekApiKey.trim());
-    if (serviceId === 'openai_official') return Boolean(openAIApiKey.trim());
-    if (serviceId === 'lianchi_images') return Boolean(lianchiApiKey.trim());
-    if (serviceId === 'wanbang_ecommerce') return Boolean(wanbangKey.trim() && wanbangSecret.trim());
-    if (serviceId === 'apia_parser') return Boolean(scraperId.trim() && scraperSecret.trim());
-    if (serviceId === 'qiyun_parser') return Boolean(qiyunAppId.trim() && qiyunAppKey.trim());
-    if (serviceId === 'cloud_storage') return Boolean(storageEnabled && storageAccountId && storageAccessKeyId);
-    return Boolean(defaultEnabled);
-  }, [apiKey, deepSeekApiKey, openAIApiKey, lianchiApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageEnabled, storageAccountId, storageAccessKeyId]);
-
-  return (
-    <>
-      {/* Middle service list column — 窄屏隐藏，改由详情区顶部下拉选择 */}
-      <ApiServicesNavList
-        services={filteredServices}
-        serviceSearch={serviceSearch}
-        setServiceSearch={setServiceSearch}
-        selectedServiceId={selectedServiceId}
-        setSelectedServiceId={setSelectedServiceId}
-        isServiceConfigured={isServiceConfigured}
-      />
-
-      {/* Right detail panel */}
-      <div className="flex-1 overflow-y-auto bg-white min-h-0 min-w-0 overflow-x-hidden">
-        <div className={`${settingsPanelContainer} ${settingsPanelPad} space-y-4 sm:space-y-5`}>
-          {/* 窄屏：服务切换下拉 */}
-          <div className="md:hidden @[640px]/settings-modal:hidden">
-            <label className="text-xs font-bold text-slate-600 mb-1.5 block">接口服务</label>
-            <select
-              value={selectedServiceId}
-              onChange={(e) => setSelectedServiceId(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 font-medium outline-none cursor-pointer truncate"
-            >
-              {services.map((service) => (
-                <option key={service.id} value={service.id} title={`${service.name} — ${service.subTitle}`}>
-                  {service.name.split(' ')[0]}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          {selectedServiceId === 'defaults' && defaultsPanel}
-
-          {/* 1. 🌟 Comfly AI 大模型网关接口 */}
-          {selectedServiceId === 'comfly_gateway' && (
-            <ApiServicesGatewayPanel
-              isGatewayEnabled={isGatewayEnabled}
-              setIsGatewayEnabled={setIsGatewayEnabled}
-              apiKey={apiKey}
-              setApiKey={setApiKey}
-              baseUrl={baseUrl}
-              setBaseUrl={setBaseUrl}
-              showKey={showKey}
-              setShowKey={setShowKey}
-              handleSaveApiConfig={handleSaveApiConfig}
-              handleTestPing={handleTestPing}
-              isTesting={isTesting}
-              filteredModels={filteredModels}
-              customModels={customModels}
-              modelSearch={modelSearch}
-              setModelSearch={setModelSearch}
-              modelCapabilityFilter={modelCapabilityFilter}
-              setModelCapabilityFilter={setModelCapabilityFilter}
-              handleToggleCapability={handleToggleCapability}
-              handleDeleteModel={handleDeleteModel}
-              handleMoveModel={handleMoveModel || onMoveModel}
-              handleResetDefaultModels={handleResetDefaultModels}
-              comflyPrices={comflyPrices}
-              isFetchingPrices={isFetchingPrices}
-              handleSortByComflyPrice={handleSortByComflyPrice}
-              handleOpenGatewayDiscovery={handleOpenGatewayDiscovery}
-              isFetchingGateway={isFetchingGateway}
-              allGatewayModels={allGatewayModels}
-              setIsAddingModelModalOpen={setIsAddingModelModalOpen}
-              draggedModelId={draggedModelId}
-              dragOverModelId={dragOverModelId}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            />
-          )}
-
-          {selectedServiceId === 'deepseek_official' && (
-            <ApiServicesDeepSeekPanel
-              apiKey={deepSeekApiKey}
-              setApiKey={setDeepSeekApiKey}
-              showKey={showDeepSeekKey}
-              setShowKey={setShowDeepSeekKey}
-              isTesting={isTestingDeepSeek}
-              onTest={handleTestDeepSeek}
-              onSave={handleSaveDeepSeekConfig}
-            />
-          )}
-
-          {selectedServiceId === 'openai_official' && (
-            <ApiServicesOpenAIPanel
-              baseUrl={openAIBaseUrl} setBaseUrl={setOpenAIBaseUrl}
-              apiKey={openAIApiKey} setApiKey={setOpenAIApiKey}
-              showKey={showOpenAIKey} setShowKey={setShowOpenAIKey}
-              enabled={openAIEnabled} setEnabled={setOpenAIEnabled}
-              allowInsecureHttp={openAIAllowInsecureHttp} setAllowInsecureHttp={setOpenAIAllowInsecureHttp}
-              suggestedBaseUrl={openAIModelSuggestedBaseUrl} onUseSuggestedBaseUrl={switchOpenAIToHttpGateway}
-              onTest={handleTestOpenAI} onSave={handleSaveOpenAIConfig}
-              onFetchModels={handleOpenOpenAIDiscovery}
-              onImportCodexCatalog={handleImportCodexCatalog}
-              onAddManualModel={() => setIsAddingModelModalOpen(true)}
-              isTesting={isTestingOpenAI} isFetchingModels={isFetchingOpenAI}
-              modelCount={openAIModelCount}
-              modelError={openAIModelError}
-              modelSource={openAIModelSource}
-            />
-          )}
-
-          {selectedServiceId === 'lianchi_images' && (
-            <ApiServicesLianchiPanel
-              apiKey={lianchiApiKey}
-              setApiKey={setLianchiApiKey}
-              showKey={showLianchiKey}
-              setShowKey={setShowLianchiKey}
-              isTesting={isTestingLianchi}
-              onTest={handleTestLianchi}
-              onSave={handleSaveLianchiConfig}
-              onFetchModels={handleOpenLianchiDiscovery}
-              isFetchingModels={isFetchingLianchi}
-              modelCount={lianchiModelCount}
-            />
-          )}
-
-          {/* 2. 🌟 万邦电商 */}
-          {selectedServiceId === 'wanbang_ecommerce' && (
-            <ApiServicesWanbangPanel
-              wanbangKey={wanbangKey}
-              setWanbangKey={setWanbangKey}
-              wanbangSecret={wanbangSecret}
-              setWanbangSecret={setWanbangSecret}
-              isWanbangEnabled={isWanbangEnabled}
-              setIsWanbangEnabled={setIsWanbangEnabled}
-              handleSaveWanbangConfig={handleSaveWanbangConfig}
-              handleTestWanbang={handleTestWanbang}
-              isTestingWanbang={isTestingWanbang}
-            />
-          )}
-
-          {/* 3. 🌟 APIA 解析 */}
-          {selectedServiceId === 'apia_parser' && (
-            <ApiServicesApiaPanel
-              scraperId={scraperId}
-              setScraperId={setScraperId}
-              scraperSecret={scraperSecret}
-              setScraperSecret={setScraperSecret}
-              isApiaEnabled={isApiaEnabled}
-              setIsApiaEnabled={setIsApiaEnabled}
-              handleSaveScraperConfig={handleSaveScraperConfig}
-              handleTestScraper={handleTestScraper}
-              isTestingScraper={isTestingScraper}
-            />
-          )}
-
-          {/* 4. 🌟 奇云解析 */}
-          {selectedServiceId === 'qiyun_parser' && (
-            <ApiServicesQiyunPanel
-              qiyunAppId={qiyunAppId}
-              setQiyunAppId={setQiyunAppId}
-              qiyunAppKey={qiyunAppKey}
-              setQiyunAppKey={setQiyunAppKey}
-              isQiyunEnabled={isQiyunEnabled}
-              setIsQiyunEnabled={setIsQiyunEnabled}
-              handleSaveQiyunConfig={handleSaveQiyunConfig}
-              handleTestQiyun={handleTestQiyun}
-              isTestingQiyun={isTestingQiyun}
-            />
-          )}
-
-          {/* 5. 🌟 云端永久对象存储配置 (Cloudflare R2 / OSS / COS / S3) */}
-          {selectedServiceId === 'cloud_storage' && (
-            <ApiServicesStoragePanel
-              storageEnabled={storageEnabled}
-              setStorageEnabled={setStorageEnabled}
-              storageProvider={storageProvider}
-              setStorageProvider={setStorageProvider}
-              storageAccountId={storageAccountId}
-              setStorageAccountId={setStorageAccountId}
-              storageEndpoint={storageEndpoint}
-              setStorageEndpoint={setStorageEndpoint}
-              storageAccessKeyId={storageAccessKeyId}
-              setStorageAccessKeyId={setStorageAccessKeyId}
-              storageSecretAccessKey={storageSecretAccessKey}
-              setStorageSecretAccessKey={setStorageSecretAccessKey}
-              showStorageSecret={showStorageSecret}
-              setShowStorageSecret={setShowStorageSecret}
-              storageBucketName={storageBucketName}
-              setStorageBucketName={setStorageBucketName}
-              storagePublicDomain={storagePublicDomain}
-              setStoragePublicDomain={setStoragePublicDomain}
-              isTestingStorage={isTestingStorage}
-              setIsTestingStorage={setIsTestingStorage}
-              isMigratingStorage={isMigratingStorage}
-              setIsMigratingStorage={setIsMigratingStorage}
-              handleSaveStorageConfig={handleSaveStorageConfig}
-              showToast={showToast}
-            />
-          )}
+export default function ApiServicesTab({ config: c, models: m, group, selectedServiceId, setSelectedServiceId, serviceSearch, setServiceSearch, onAddModel, onManageModels, defaultRouteIds, showToast }: ApiServicesTabProps) {
+  const services = API_SERVICES.filter(service => (service.category === 'core') === (group === 'models'));
+  const query = serviceSearch.trim().toLowerCase();
+  const filteredServices = services.filter(service => [service.name, service.subTitle, service.tag].some(text => text.toLowerCase().includes(query)));
+  const statuses = serviceStatuses(c);
+  const activeId = services.some(service => service.id === selectedServiceId) ? selectedServiceId : services[0].id;
+  const status = statuses[activeId];
+  const channel = MODEL_CHANNELS.find(item => item.serviceId === activeId)?.id;
+  const discover = (id: ModelChannel) => {
+    if (id === 'openai') void m.handleOpenOpenAIDiscovery(c.openAIBaseUrl, c.openAIApiKey, c.openAIAllowInsecureHttp, true);
+    else if (id === 'lianchi') void m.handleOpenLianchiDiscovery(c.lianchiApiKey, true);
+    else void m.handleOpenGatewayDiscovery();
+  };
+  return <>
+    <ApiServicesNavList services={filteredServices} serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} selectedServiceId={activeId} setSelectedServiceId={setSelectedServiceId} statuses={statuses} />
+    <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50/40">
+      <div className="mx-auto w-full max-w-6xl p-4 sm:p-6 space-y-5">
+        <label className="lg:hidden block text-xs text-slate-600">{group === 'models' ? '选择模型渠道' : '选择服务'}<select aria-label="选择接口服务" value={activeId} onChange={event => setSelectedServiceId(event.target.value)} className="block w-full mt-2 p-2.5 rounded-xl border border-slate-200 bg-white">{services.map(service => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
+        <div role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className={`text-xs font-semibold ${SERVICE_STATUS_COLORS[status.state]}`}>{status.label}</span><span className="text-[11px] text-slate-500 break-words">{status.detail}</span>
         </div>
+        {activeId === 'comfly_gateway' && <ApiServicesGatewayPanel {...c} />}
+        {activeId === 'deepseek_official' && <ApiServicesDeepSeekPanel apiKey={c.deepSeekApiKey} setApiKey={c.setDeepSeekApiKey} showKey={c.showDeepSeekKey} setShowKey={c.setShowDeepSeekKey} isTesting={c.isTestingDeepSeek} onTest={c.handleTestDeepSeek} onSave={c.handleSaveDeepSeekConfig} />}
+        {activeId === 'openai_official' && <ApiServicesOpenAIPanel
+          baseUrl={c.openAIBaseUrl} setBaseUrl={c.setOpenAIBaseUrl} apiKey={c.openAIApiKey} setApiKey={c.setOpenAIApiKey}
+          showKey={c.showOpenAIKey} setShowKey={c.setShowOpenAIKey} enabled={c.openAIEnabled} setEnabled={c.setOpenAIEnabled}
+          allowInsecureHttp={c.openAIAllowInsecureHttp} setAllowInsecureHttp={c.setOpenAIAllowInsecureHttp}
+          suggestedBaseUrl={m.openAIModelSuggestedBaseUrl} onUseSuggestedBaseUrl={c.switchOpenAIToHttpGateway}
+          onTest={c.handleTestOpenAI} onSave={c.handleSaveOpenAIConfig} onFetchModels={() => discover('openai')}
+          onImportCodexCatalog={m.handleImportCodexCatalog} onAddManualModel={() => onAddModel('openai')}
+          isTesting={c.isTestingOpenAI} isFetchingModels={m.isFetchingOpenAI} modelCount={m.openAIModels.length}
+          modelError={m.openAIModelError} modelSource={m.openAIModelSource}
+        />}
+        {activeId === 'lianchi_images' && <ApiServicesLianchiPanel apiKey={c.lianchiApiKey} setApiKey={c.setLianchiApiKey} showKey={c.showLianchiKey} setShowKey={c.setShowLianchiKey} isTesting={c.isTestingLianchi} onTest={c.handleTestLianchi} onSave={c.handleSaveLianchiConfig} onFetchModels={() => discover('lianchi')} isFetchingModels={m.isFetchingLianchi} modelCount={m.lianchiModels.length} />}
+        {activeId === 'wanbang_ecommerce' && <ApiServicesWanbangPanel {...c} />}
+        {activeId === 'apia_parser' && <ApiServicesApiaPanel {...c} />}
+        {activeId === 'qiyun_parser' && <ApiServicesQiyunPanel {...c} />}
+        {activeId === 'cloud_storage' && <ApiServicesStoragePanel {...c} showToast={showToast} />}
+        {channel && <>
+          <div className="flex justify-between items-center gap-3"><p className="text-xs text-slate-500">这里只管理本渠道；同名模型的其他渠道线路保持独立。</p><button type="button" onClick={onManageModels} className="text-xs text-indigo-600 shrink-0">查看全部渠道模型 →</button></div>
+          <ModelManagementPanel key={channel} models={m} scope={channel} onAdd={onAddModel} onConfigure={() => {}} onDiscover={discover} isDiscovering={m.isFetchingGateway || m.isFetchingOpenAI || m.isFetchingLianchi} defaultRouteIds={defaultRouteIds} />
+        </>}
       </div>
-    </>
-  );
+    </div>
+  </>;
 }

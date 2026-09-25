@@ -40,6 +40,8 @@ export interface BatchTaskItem {
   gridTaskKey?: string;
   gridSourceUrl?: string;
   gridSize?: string;
+  /** Frozen expected delivery dimensions for this attempt (not a measurement of the product). */
+  outputSize?: string;
   attempt?: number;
   outputReview?: 'unreviewed' | 'accepted' | 'retry_requested' | 'rejected';
 }

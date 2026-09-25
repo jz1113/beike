@@ -26,3 +26,5 @@ export * from './storyboard';
 export * from './assembler';
 export * from './multiAngle';
 export * from './smartEdit';
+
+export * from './fidelity';

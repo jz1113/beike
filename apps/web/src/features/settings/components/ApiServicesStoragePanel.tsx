@@ -23,7 +23,7 @@ export interface ApiServicesStoragePanelProps {
   storagePublicDomain: string;
   setStoragePublicDomain: (v: string) => void;
   isTestingStorage: boolean;
-  setIsTestingStorage: (v: boolean) => void;
+  handleTestStorage: () => Promise<void>;
   isMigratingStorage: boolean;
   setIsMigratingStorage: (v: boolean) => void;
   handleSaveStorageConfig: () => void;
@@ -49,7 +49,7 @@ export function ApiServicesStoragePanel({
   storagePublicDomain,
   setStoragePublicDomain,
   isTestingStorage,
-  setIsTestingStorage,
+  handleTestStorage,
   isMigratingStorage,
   setIsMigratingStorage,
   handleSaveStorageConfig,
@@ -246,39 +246,7 @@ export function ApiServicesStoragePanel({
             <button
               type="button"
               disabled={isTestingStorage}
-              onClick={async () => {
-                const error=storageProviderError(storageProvider,storageEndpoint);
-                if(error){showToast(error);return;}
-                setIsTestingStorage(true);
-                try {
-                  const res = await apiFetch('/api/assets/storage/test', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      config: {
-                        enabled: storageEnabled,
-                        provider: storageProvider,
-                        accountId: storageAccountId,
-                        endpoint: storageEndpoint,
-                        accessKeyId: storageAccessKeyId,
-                        secretAccessKey: storageSecretAccessKey,
-                        bucketName: storageBucketName,
-                        publicDomain: storagePublicDomain
-                      }
-                    })
-                  });
-                  const data = await res.json();
-                  if (data.success) {
-                    showToast('存储桶连接成功！');
-                  } else {
-                    showToast('存储桶连接失败: ' + (data.message || ''));
-                  }
-                } catch (e: any) {
-                  showToast('测试异常: ' + formatUserError(e));
-                } finally {
-                  setIsTestingStorage(false);
-                }
-              }}
+              onClick={() => void handleTestStorage()}
               className="px-3.5 py-2 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
             >
               {isTestingStorage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}

@@ -63,6 +63,11 @@ export function useBatchWorkshopRunner() {
   const [recipes, setRecipes] = useState<any[]>(SYSTEM_MASTER_RECIPES);
   const selectedArchId = useAppStore((s) => s.selectedArchId);
   const setSelectedArchId = useAppStore((s) => s.setSelectedArchId);
+  const originalAnchorFaceImageUrl = useAppStore((s) => (
+    s.workshopMode === 'storyboard_generate' && s.originalIsAnchorFaceConfirmed
+      ? s.originalAnchorFaceImageUrl
+      : undefined
+  ));
 
   // 模型配置
   const [availableVisionModels, setAvailableVisionModels] = useState<any[]>([]);
@@ -440,6 +445,7 @@ export function useBatchWorkshopRunner() {
     selectedShotCount,
     lockedSceneId,
     availableScenes,
+    anchorFaceUrl: originalAnchorFaceImageUrl,
     isAborted: () => runControlRef.current.status === 'cancelled',
     isPaused: () => runControlRef.current.status === 'paused',
   };
@@ -761,6 +767,7 @@ export function useBatchWorkshopRunner() {
     showToast,
     workspaceError: workspace.error,
     workspaceStatus: workspace.status,
+    workspaceSaveActions: { retry: workspace.retrySave, download: workspace.downloadDraft },
     reloadWorkspace: async () => {
       try { await whenIdle(workspace.reload); }
       catch (error) { showToast(error instanceof Error ? error.message : '无法重新加载批次'); }

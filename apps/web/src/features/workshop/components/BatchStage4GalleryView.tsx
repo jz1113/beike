@@ -63,7 +63,7 @@ export function BatchStage4GalleryView({
                     <LazyProxyImage
                       src={url}
                       alt={`成图 ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full !object-contain"
                       thumb={true}
                       width={600}
                     />

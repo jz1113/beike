@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '@/shared/api/apiClient';
 import { confirmAction } from '@/shared/utils/confirmAction';
 import {
@@ -9,13 +9,13 @@ import type { GatewayModelItem } from '../GatewayModelModal';
 import {
   gatewayModelToWorkflowModel,
   inferWorkflowCapabilitiesFromId,
-  sortModelsByMultimodalPriority,
   workflowModelRouteId,
   openAIModelRouteId,
   repairWorkflowModelsInStorage,
 } from '@beike/domain/workflowModels';
 import { loadCustomModels, persistCustomModels } from '../customModelsStorage';
-import { sortMultimodalModelsByPrice, type ComflyPriceMap } from '../multimodalPriceSort';
+import { type ComflyPriceMap } from '../multimodalPriceSort';
+import { channelName, restoreChannelPresets, type ModelChannel } from '../modelManagement';
 import { createGatewayCatalogActions } from './gatewayCatalogActions';
 
 async function fetchComflyPrices(): Promise<ComflyPriceMap> {
@@ -41,8 +41,8 @@ export function useCustomModels({
   showToast,
 }: UseCustomModelsOptions) {
   const [customModels, setCustomModels] = useState<WorkflowModel[]>([]);
-  const [modelSearch, setModelSearch] = useState('');
-  const [modelCapabilityFilter, setModelCapabilityFilter] = useState<'all' | 'multimodal' | 'image' | 'video'>('all');
+  const modelsRef = useRef(customModels);
+  modelsRef.current = customModels;
   const [comflyPrices, setComflyPrices] = useState<ComflyPriceMap | null>(null);
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
 
@@ -72,7 +72,7 @@ export function useCustomModels({
   useEffect(() => {
     if (typeof window !== 'undefined' && isOpen) {
       repairWorkflowModelsInStorage();
-      const loaded = loadCustomModels(customModels);
+      const loaded = loadCustomModels(modelsRef.current);
       const lianchiModel = DEFAULT_PRESET_MODELS.find(model => model.id === 'openai/gpt-image-2');
       const needsLianchiMigration = !loaded.invalid && !localStorage.getItem('lianchi_model_added_v1') && Boolean(lianchiModel);
       const models = needsLianchiMigration && !loaded.models.some(model => model.id === lianchiModel?.id)
@@ -89,171 +89,62 @@ export function useCustomModels({
       const renamed = [...models, ...gpt6Models, ...(grok47Model ? [grok47Model] : [])].map(model => model.id === 'openai/gpt-image-2' && model.name === 'GPT Image 2（联池）'
         ? { ...model, name: '联池image2', shortName: '联池image2' }
         : model);
-      const needsPriceOrderMigration = !loaded.invalid && !localStorage.getItem('multimodal_price_order_v3');
-      const ordered = needsPriceOrderMigration
-        ? sortMultimodalModelsByPrice(renamed)
-        : renamed;
-      setCustomModels(ordered);
-      if (!loaded.invalid && persistCustomModels(ordered)) {
+      setCustomModels(renamed);
+      if (!loaded.invalid && persistCustomModels(renamed)) {
         if (needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
         if (needsGpt6Migration) localStorage.setItem('gpt6_multimodal_models_added_v1', 'true');
         if (needsGrok47Migration) localStorage.setItem('grok47_multimodal_model_added_v1', 'true');
-        if (needsPriceOrderMigration) localStorage.setItem('multimodal_price_order_v3', 'true');
       }
-      void fetchComflyPrices().then((prices) => {
-        setComflyPrices(prices);
-        if (needsPriceOrderMigration) {
-          setCustomModels((previous) => {
-            const sorted = sortMultimodalModelsByPrice(previous, prices);
-            persistCustomModels(sorted);
-            return sorted;
-          });
-          notifyModelsUpdated();
-        }
-      }).catch(() => {
-        // 离线时保留 PDF 报价快照；用户可随时主动刷新价格排序。
-      });
+      // Prices are presentation metadata, never an automatic routing-order migration.
+      void fetchComflyPrices().then(setComflyPrices).catch(() => {});
       if (loaded.invalid) {
         showToast(loaded.recoveredFromBackup ? '自定义模型配置已损坏，已从备份恢复' : '自定义模型配置已损坏，已保留当前列表并备份原数据');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, showToast]);
 
-  const handleSortByComflyPrice = async () => {
+  const handleRefreshPrices = async () => {
     setIsFetchingPrices(true);
     try {
-      const prices = await fetchComflyPrices();
-      setComflyPrices(prices);
-      setCustomModels((previous) => {
-        const sorted = sortMultimodalModelsByPrice(previous, prices);
-        persistCustomModels(sorted);
-        return sorted;
-      });
-      notifyModelsUpdated();
-      showToast('已按 Comfly 默认分组最新报价重新排序');
+      setComflyPrices(await fetchComflyPrices());
+      showToast('已刷新 Comfly 报价；未修改默认模型或调用顺序');
     } catch (error) {
-      showToast(`获取 Comfly 报价失败：${error instanceof Error ? error.message : '网络连接异常'}`);
-    } finally {
-      setIsFetchingPrices(false);
+      showToast(`获取报价失败：${error instanceof Error ? error.message : '网络连接异常'}`);
+    } finally { setIsFetchingPrices(false); }
+  };
+
+  const commitModels = (updated: WorkflowModel[]): boolean => {
+    if (!persistCustomModels(updated)) {
+      showToast('模型配置保存失败，未应用变更；请检查浏览器存储空间后重试');
+      return false;
     }
-  };
-
-  // 单个模型切换能力标签
-  const handleToggleCapability = (
-    modelId: string,
-    field:
-      | 'isMultimodal'
-      | 'isImage'
-      | 'isVideo'
-      | 'isVision'
-      | 'isAssistant'
-      | 'isDistill'
-      | 'isThinking'
-  ) => {
-    setCustomModels((prev) => {
-      const updated = prev.map((m) => {
-        if (workflowModelRouteId(m) === modelId) {
-          if (
-            field === 'isMultimodal' ||
-            field === 'isVision' ||
-            field === 'isAssistant' ||
-            field === 'isDistill' ||
-            field === 'isThinking'
-          ) {
-            const currentMulti = m.isMultimodal ?? m.isVision ?? true;
-            const nextVal = !currentMulti;
-            return {
-              ...m,
-              isMultimodal: nextVal,
-              isVision: nextVal,
-              isAssistant: m.channel === 'openai' ? false : nextVal,
-              isDistill: nextVal,
-              isThinking: nextVal,
-            };
-          }
-          return { ...m, [field]: !m[field] };
-        }
-        return m;
-      });
-      const sorted = sortModelsByMultimodalPriority(updated);
-      persistCustomModels(sorted);
-      return sorted;
-    });
+    modelsRef.current = updated;
+    setCustomModels(updated);
     notifyModelsUpdated();
+    return true;
   };
 
-  // 单个模型移出/删除
-  const handleDeleteModel = (modelId: string) => {
-    setCustomModels((prev) => {
-      const updated = prev.filter((m) => workflowModelRouteId(m) !== modelId);
-      const sorted = sortModelsByMultimodalPriority(updated);
-      persistCustomModels(sorted);
-      return sorted;
-    });
-    notifyModelsUpdated();
-    showToast(`已移出模型 ${modelId}`);
+  const handleToggleEnabled = (routeId: string) => {
+    commitModels(modelsRef.current.map(model => workflowModelRouteId(model) === routeId
+      ? { ...model, enabled: model.enabled === false } : model));
   };
 
-  // 单个模型调整顺序（置顶 / 上移 / 下移）
-  const handleMoveModel = (modelId: string, direction: 'up' | 'down' | 'top') => {
-    setCustomModels((prev) => {
-      const idx = prev.findIndex((m) => workflowModelRouteId(m) === modelId);
-      if (idx === -1) return prev;
-      const updated = [...prev];
-      if (direction === 'top') {
-        if (idx === 0) return prev;
-        const [item] = updated.splice(idx, 1);
-        updated.unshift(item);
-      } else if (direction === 'up') {
-        if (idx === 0) return prev;
-        const temp = updated[idx];
-        updated[idx] = updated[idx - 1];
-        updated[idx - 1] = temp;
-      } else if (direction === 'down') {
-        if (idx === updated.length - 1) return prev;
-        const temp = updated[idx];
-        updated[idx] = updated[idx + 1];
-        updated[idx + 1] = temp;
-      }
-      const sorted = sortModelsByMultimodalPriority(updated);
-      persistCustomModels(sorted);
-      return sorted;
-    });
-    notifyModelsUpdated();
-    showToast(`已调整模型 ${modelId} 的优先级顺序`);
+  const handleDeleteModel = async (modelId: string) => {
+    const model = modelsRef.current.find(item => workflowModelRouteId(item) === modelId);
+    if (!model || !await confirmAction(`从${channelName(model.channel ?? 'comfly')}移出「${model.name || model.id}」？不会删除渠道凭证。若它是默认模型，请到默认模型页重新选择。`)) return;
+    if (commitModels(modelsRef.current.filter(model => workflowModelRouteId(model) !== modelId))) showToast(`已移出模型 ${modelId}`);
   };
 
-  // 拖拽全量重排序
-  const handleReorderModels = (newOrder: WorkflowModel[]) => {
-    const sorted = sortModelsByMultimodalPriority(newOrder);
-    setCustomModels(sorted);
-    persistCustomModels(sorted);
-    notifyModelsUpdated();
-    showToast('已更新模型列表优先级排序');
+  const handleResetDefaultModels = async (channel: ModelChannel) => {
+    if (!await confirmAction(`恢复${channelName(channel)}的内置模型？仅重置本渠道内置条目，保留自定义模型、其他渠道、密钥及默认选择。`)) return;
+    if (commitModels(restoreChannelPresets(modelsRef.current, DEFAULT_PRESET_MODELS, channel))) showToast(`已恢复${channelName(channel)}内置模型，其他渠道保持不变`);
   };
 
-  // 恢复系统默认预设模型列表
-  const handleResetDefaultModels = async () => {
-    if (await confirmAction('确定恢复系统默认预设模型列表吗？这将覆盖当前的模型修改。')) {
-      const sorted = sortModelsByMultimodalPriority(DEFAULT_PRESET_MODELS);
-      setCustomModels(sorted);
-      persistCustomModels(sorted);
-      notifyModelsUpdated();
-      showToast('已恢复系统默认预设模型');
-    }
-  };
-
-  // 手动添加模型
-  const handleAddCustomModel = (modelObj: WorkflowModel) => {
-    setCustomModels((prev) => {
-      const key = workflowModelRouteId(modelObj);
-      const updated = [modelObj, ...prev.filter((m) => workflowModelRouteId(m) !== key)];
-      const sorted = sortModelsByMultimodalPriority(updated);
-      persistCustomModels(sorted);
-      return sorted;
-    });
-    notifyModelsUpdated();
-    showToast(`✨ 成功添加模型【${modelObj.name}】`);
+  const handleAddCustomModel = (modelObj: WorkflowModel): boolean => {
+    if (modelsRef.current.some(model => workflowModelRouteId(model) === workflowModelRouteId(modelObj))) return false;
+    if (!commitModels([modelObj, ...modelsRef.current])) return false;
+    showToast(`成功添加模型【${modelObj.name}】`);
+    return true;
   };
 
   const {
@@ -284,43 +175,25 @@ export function useCustomModels({
   const handleToggleGatewayModel = (model: GatewayModelItem) => {
     if (model.supported === false) return;
     const routeId = gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id;
-    setCustomModels((prev) => {
-      const exists = prev.some((m) => workflowModelRouteId(m) === routeId);
-      const updated = exists
-        ? prev.filter((m) => workflowModelRouteId(m) !== routeId)
-        : [...prev, gatewayModelToWorkflowModel(model, gatewaySource) as WorkflowModel];
-      const sorted = sortModelsByMultimodalPriority(updated);
-      persistCustomModels(sorted);
-      return sorted;
-    });
-    notifyModelsUpdated();
-    if (gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
+    const previous = modelsRef.current;
+    const exists = previous.some(model => workflowModelRouteId(model) === routeId);
+    const updated = exists ? previous.filter(model => workflowModelRouteId(model) !== routeId)
+      : [...previous, gatewayModelToWorkflowModel(model, gatewaySource) as WorkflowModel];
+    if (commitModels(updated) && gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
   };
 
   const handleAddAllUsefulGatewayModels = (models: GatewayModelItem[]) => {
-    const useful = models.filter((m) => {
-      if (m.supported === false) return false;
-      const caps = inferWorkflowCapabilitiesFromId(m.id);
-      return caps.isImage || caps.isVideo || caps.isMultimodal;
+    const existingMap = new Map(modelsRef.current.map(model => [workflowModelRouteId(model), model]));
+    let addedCount = 0;
+    models.forEach(model => {
+      if (model.supported === false) return;
+      const caps = inferWorkflowCapabilitiesFromId(model.id);
+      if (!caps.isImage && !caps.isVideo && !caps.isMultimodal) return;
+      const entry = gatewayModelToWorkflowModel(model, gatewaySource) as WorkflowModel;
+      const routeId = workflowModelRouteId(entry);
+      if (!existingMap.has(routeId)) { existingMap.set(routeId, entry); addedCount++; }
     });
-    const existingRouteIds = new Set(customModels.map(workflowModelRouteId));
-    const addedCount = useful.filter(model => !existingRouteIds.has(
-      gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id
-    )).length;
-    setCustomModels((prev) => {
-      const existingMap = new Map(prev.map((m) => [workflowModelRouteId(m), m]));
-      useful.forEach((m) => {
-        const routeId = gatewaySource === 'openai' ? openAIModelRouteId(m.id) : m.id;
-        if (!existingMap.has(routeId)) {
-          existingMap.set(routeId, gatewayModelToWorkflowModel(m, gatewaySource) as WorkflowModel);
-        }
-      });
-      const updated = Array.from(existingMap.values());
-      const sorted = sortModelsByMultimodalPriority(updated);
-      persistCustomModels(sorted);
-      return sorted;
-    });
-    notifyModelsUpdated();
+    if (!commitModels(Array.from(existingMap.values()))) return 0;
     if (gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
     return addedCount;
   };
@@ -328,17 +201,11 @@ export function useCustomModels({
   return {
     customModels,
     setCustomModels,
-    modelSearch,
-    setModelSearch,
-    modelCapabilityFilter,
-    setModelCapabilityFilter,
     comflyPrices,
     isFetchingPrices,
-    handleSortByComflyPrice,
-    handleToggleCapability,
+    handleRefreshPrices,
+    handleToggleEnabled,
     handleDeleteModel,
-    handleMoveModel,
-    handleReorderModels,
     handleResetDefaultModels,
     handleAddCustomModel,
     isGatewayModalOpen,

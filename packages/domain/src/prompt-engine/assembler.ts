@@ -20,6 +20,7 @@ import { cleanPromptText, harmonizeOriginalPrompt } from './guards';
 import { sanitizeScenePrompt } from '../assetDeconstruct/sanitize';
 import { resolveJewelryShotOptics } from './jewelryFraming';
 import { buildGridCollagePrompt, type Grid2x2Options } from './gridPanels';
+import { appendFidelityGuidance } from './fidelity';
 
 export type { Grid2x2Options };
 
@@ -83,7 +84,7 @@ export function assembleOriginalShotPrompt(
   const scenePart = (bible.masterScene || '').trim() || '高质感真实生活美学空间';
   const cleanScene = sanitizeScenePrompt(scenePart);
 
-  let identityPart = (bible.identityBible || '').trim() || '高颅顶蓬松法式微卷发、清澈灵动眼眸与极富感染力自然笑颜的年轻东亚时尚博主（真实原生皮肤微肌理，细微毛孔呼吸感与自然微红润血色，原生野生眉毛流感清晰，唇色自然清透，发际线有真实微绒毛，神态松弛自然，绝无塑料磨皮与果冻假人感，极具生活温度）';
+  let identityPart = (bible.identityBible || '').trim() || '一位普通年轻东亚女性，五官自然且保留轻微左右不对称，发型有自然散落发丝，肤色与皮肤纹理真实，表情放松，不刻意摆拍';
   if (anatomy === 'hairpin' && !options?.preserveComposition) {
     identityPart = `${identityPart}，长发整齐挽起梳成优雅饱满的温婉古典低盘发髻/发包（严禁散乱披发，@图片1 发簪长杆横向紧密穿插在盘好的发髻内部）`;
   }
@@ -150,7 +151,7 @@ export function assembleOriginalShotPrompt(
   }
 
   // 光学与摄影质感
-  const stylePart = (bible.styleBible || '').trim() || 'Shot on iPhone 16 Pro 原相机抓拍（Unedited RAW 35mm photograph, natural candid snapshot），小红书真实博主生活随拍质感，零美颜零滤镜。真实环境漫射采光与自然物理接触阴影（Realistic Ambient Daylight, Soft Contact Shadows），人物皮肤呈现真实微观肌理与微毛孔呼吸感，渐进式真实光学自然景深（Progressive optical depth of field），首饰呈现真实物理金属高光与反光，严格杜绝 3D 渲染感、塑料磨皮与假人CG感（Strictly NO plastic skin, NO airbrushing, NO 3D CGI rendering, NO fake glow）';
+  const stylePart = (bible.styleBible || '').trim() || '手机后置主摄生活抓拍，自然环境光与真实接触阴影，保留皮肤、头发、衣料和商品材质纹理，曝光与白平衡稳定；不过度磨皮、锐化、HDR 或商业棚拍';
   segments.push(`摄影画质：${stylePart}`);
   segments.push('画面构图铁律：单张独立全画幅完整摄影（Single cohesive photograph, full-bleed），严禁拼图、严禁双格对比、严禁四宫格、严禁多面板（Strictly NO collage, NO multi-panel, NO split screen），主体完整饱满');
   if (hasHuman) {
@@ -198,6 +199,7 @@ export function ensureOriginalPromptSlots(
     lookBible?: string;
     productRole?: OriginalProductRole;
     productFingerprint?: string;
+    hasSupplementaryProductViews?: boolean;
   }
 ): string {
   if (!prompt) return prompt;
@@ -262,10 +264,16 @@ export function ensureOriginalPromptSlots(
   text = scrubOriginalPromptProductConflicts(text, role);
   text = text.replace(/__KEEP_ACTION_(\d+)__/g, (_, i) => actionHolders[Number(i)]);
 
-  return text
+  text = text
     .replace(/；+/g, '；')
     .replace(/^；+|；+$/g, '')
     .trim();
+  return appendFidelityGuidance(text, {
+    productRole: role,
+    productFingerprint: options?.productFingerprint,
+    hasHuman,
+    hasSupplementaryProductViews: options?.hasSupplementaryProductViews,
+  });
 }
 
 /** 提示词分段展示辅助函数 */

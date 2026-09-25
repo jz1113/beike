@@ -6,6 +6,14 @@ import { queueMediaReview } from '../../../../services/mediaReviewQueue';
 import { mutateOrganization } from '../../../../services/library/organization';
 import { importLibraryBackup, remapItemData, withOrganization } from './libraryImport';
 
+async function validateActionSceneReference(assetType: unknown, data: Record<string, unknown>): Promise<string | null> {
+  if (assetType !== 'action' || data.sceneId === undefined || data.sceneId === null || data.sceneId === '') return null;
+  if (typeof data.sceneId !== 'string') return '场景 ID 必须为字符串';
+  // Scoped reads allow own and official scenes, never another user's scene.
+  const scene = await db.sceneAsset.findUnique({ where: { id: data.sceneId }, select: { id: true } });
+  return scene ? null : '场景不存在或不属于当前工作区';
+}
+
 // 创建单项或批量导入原子资产
 export async function executeLibraryPost(req: Request) {
   const body = await readJsonBody(req);
@@ -58,6 +66,9 @@ export async function executeLibraryPost(req: Request) {
   if (!assetType || !data) {
     return jsonResponse({ error: '缺少 assetType 或 data' }, 400);
   }
+
+  const sceneError = await validateActionSceneReference(assetType, data);
+  if (sceneError) return jsonResponse({ success: false, error: sceneError }, 400);
 
   let created: any;
   if (assetType === 'scene') {
@@ -181,6 +192,9 @@ export async function executeLibraryPut(req: Request) {
 
   const validationError = validateAssetEdit(assetType, data);
   if (validationError) return jsonResponse({ success: false, error: validationError }, 400);
+
+  const sceneError = await validateActionSceneReference(assetType, data);
+  if (sceneError) return jsonResponse({ success: false, error: sceneError }, 400);
 
   let updated: any;
   if (assetType === 'scene') {

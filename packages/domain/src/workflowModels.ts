@@ -7,15 +7,18 @@ import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
 import { VIDEO_GEN_MODELS } from '@beike/domain/video';
 import {
   DEFAULT_MULTIMODAL_MODEL_ID,
-  getApprovedModel,
   isApprovedModel,
 } from '@beike/domain/modelCatalog';
 import { domainStorage } from './runtime';
+import { inferWorkflowCapabilitiesFromId } from './workflowCapabilities';
+export { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
+export type { InferredWorkflowCapabilities } from './workflowCapabilities';
 
 export type WorkflowCapability = {
   id: string;
   /** Upstream model ID stays bare; routeId distinguishes equal IDs on separate gateways. */
   routeId?: string;
+  enabled?: boolean;
   channel?: 'comfly' | 'openai' | 'lianchi';
   name?: string;
   shortName?: string;
@@ -49,122 +52,6 @@ export function upstreamModelId(routeId: string): string {
 
 export function workflowModelRouteId(model: Pick<WorkflowCapability, 'id' | 'routeId' | 'channel'>): string {
   return model.routeId || (model.channel === 'openai' ? openAIModelRouteId(model.id) : model.id);
-}
-
-export type InferredWorkflowCapabilities = {
-  isImage: boolean;
-  isVideo: boolean;
-  isMultimodal: boolean;
-  isVision: boolean;
-  isAssistant: boolean;
-  isThinking: boolean;
-  isEmbedding: boolean;
-  isAudio: boolean;
-};
-
-export function isKnownImageOnlyModel(id: string): boolean {
-  return getApprovedModel(id)?.capability === 'image';
-}
-
-export function isKnownVideoOnlyModel(id: string): boolean {
-  return getApprovedModel(id)?.capability === 'video';
-}
-
-/** 根据模型 ID 推断能力标签（网关拉取 / 接入 / 修复 localStorage 共用） */
-export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCapabilities {
-  const approved = getApprovedModel(id);
-  if (approved) {
-    const isImage = approved.capability === 'image';
-    const isVideo = approved.capability === 'video';
-    const isMultimodal = approved.capability === 'multimodal';
-    return {
-      isImage,
-      isVideo,
-      isMultimodal,
-      isVision: isMultimodal,
-      isAssistant: isMultimodal,
-      isThinking: Boolean(approved.isThinking),
-      isEmbedding: false,
-      isAudio: false,
-    };
-  }
-
-  const lower = id.toLowerCase();
-
-  const isEmbedding =
-    lower.includes('embedding') ||
-    lower.includes('embed') ||
-    lower.includes('bge') ||
-    lower.includes('rerank') ||
-    lower.includes('baai') ||
-    lower.includes('text-search') ||
-    lower.includes('similarity');
-
-  const isAudio =
-    !isEmbedding &&
-    (lower.includes('audio') ||
-      lower.includes('tts') ||
-      lower.includes('whisper') ||
-      lower.includes('suno') ||
-      lower.includes('speech') ||
-      lower.includes('voice') ||
-      lower.includes('music') ||
-      lower.includes('sound') ||
-      lower.includes('elevenlabs'));
-
-  const isVideo =
-    !isEmbedding &&
-    !isAudio &&
-    (lower.includes('video') ||
-      lower.includes('seedance') ||
-      lower.includes('veo') ||
-      lower.includes('kling') ||
-      lower.includes('sora') ||
-      lower.includes('vidu') ||
-      lower.includes('minimax') ||
-      isKnownVideoOnlyModel(id));
-
-  const isImage =
-    !isEmbedding &&
-    !isAudio &&
-    !isVideo &&
-    (lower.includes('image') ||
-      lower.includes('flux') ||
-      lower.includes('seedream') ||
-      lower.includes('midjourney') ||
-      lower.includes('mjv') ||
-      lower.includes('nano-banana') ||
-      isKnownImageOnlyModel(id));
-
-  const isThinking =
-    lower.includes('thinking') ||
-    lower.includes('reasoner') ||
-    lower.includes('luna');
-
-  const isMultimodal =
-    !isEmbedding &&
-    !isAudio &&
-    !isVideo &&
-    !isImage &&
-    (lower.includes('vision') ||
-      lower.includes('gemini') ||
-      lower.includes('claude') ||
-      /gpt-[45]/.test(lower) ||
-      lower.includes('grok-4') ||
-      lower.includes('qwen3') ||
-      lower.includes('deepseek') ||
-      lower.includes('kimi'));
-
-  return {
-    isImage,
-    isVideo,
-    isMultimodal,
-    isVision: isMultimodal,
-    isAssistant: isMultimodal,
-    isThinking,
-    isEmbedding,
-    isAudio,
-  };
 }
 
 /** 规范化 custom_models 单条：生图/生视频模型强制剥离多模态标签 */
@@ -301,6 +188,7 @@ export function repairWorkflowModelsForSettings() {
       id: m.id,
       routeId: m.routeId,
       channel: m.channel,
+      enabled: m.enabled,
       name: m.name || m.id,
       shortName: m.shortName || m.id.split(/[-_]/)[0] || m.id,
       badge: m.badge,
@@ -315,6 +203,14 @@ export function repairWorkflowModelsForSettings() {
       isCustom: m.isCustom ?? true,
     };
   });
+}
+
+/** An explicit empty list is a configured pool, not a request to restore built-ins. */
+export function hasWorkflowModelConfiguration(): boolean {
+  try {
+    const raw = domainStorage()?.getItem('custom_models');
+    return Boolean(raw && Array.isArray(JSON.parse(raw)));
+  } catch { return false; }
 }
 
 export function readWorkflowModelsFromStorage(): WorkflowCapability[] {
@@ -372,15 +268,16 @@ export function getStoredMultimodalModelId(
 }
 
 /** 写入全局默认多模态模型，同步全部 legacy key */
-export function setStoredMultimodalModelId(id: string): void {
+export function setStoredMultimodalModelId(id: string): boolean {
   const storage = domainStorage();
-  if (!storage) return;
+  if (!storage) return false;
   try {
     storage.setItem('ai_multimodal_model', id);
     storage.setItem('ai_vision_model', id);
     if (!isOpenAIModelRouteId(id)) storage.setItem('ai_assistant_model', id);
+    return true;
   } catch {
-    /* ignore quota errors */
+    return false;
   }
 }
 
@@ -439,7 +336,7 @@ export function getEnabledImageModelsFromSettings(
     })
   );
   return list
-    .filter((m) => m.isImage && isApprovedModel(m.id, 'image'))
+    .filter((m) => m.enabled !== false && m.isImage && isApprovedModel(m.id, 'image'))
     .filter((m) => {
       const key = m.id.toLowerCase();
       if (seen.has(key)) return false;
@@ -470,7 +367,7 @@ export function getEnabledVideoModelsFromSettings(
 ): Array<Record<string, unknown>> {
   const list = (models ?? repairWorkflowModelsInStorage()).map(normalizeWorkflowModel);
   return list
-    .filter((m) => m.isVideo && isApprovedModel(m.id, 'video'))
+    .filter((m) => m.enabled !== false && m.isVideo && isApprovedModel(m.id, 'video'))
     .map((m) => {
       const builtin = VIDEO_GEN_MODELS.find((x) => x.id === m.id);
       return {
@@ -494,7 +391,7 @@ export function getEnabledMultimodalModelsFromSettings(
 ): WorkflowCapability[] {
   const list = models ?? repairWorkflowModelsInStorage();
   return sortModelsByMultimodalPriority(
-    list.filter((m) => isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal'))
+    list.filter((m) => m.enabled !== false && isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal'))
       .map((m) => ({ ...m, id: workflowModelRouteId(m),
         name: `${m.name || m.id} · ${m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道'}`,
         shortName: `${m.shortName || m.id} · ${m.channel === 'openai' ? 'OpenAI' : 'Comfly'}`,
@@ -503,7 +400,7 @@ export function getEnabledMultimodalModelsFromSettings(
   );
 }
 
-/** Keep Model Management's stored order; it is the declared fallback priority. */
+/** Preserve stored order; display sorting must never change call configuration. */
 export function sortModelsByMultimodalPriority<T extends { id: string }>(models: readonly T[]): T[] { return [...models]; }
 
 /** 返回设置页顺序中的备用模型，主模型本身不会重复传入。 */

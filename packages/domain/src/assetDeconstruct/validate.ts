@@ -1,3 +1,4 @@
+import { canExtractOutfit, canExtractPersona, isObservedDetail } from './visualEvidence';
 import { assembleReversePrompt, MIN_REVERSE_PROMPT_LENGTH, type PerImageResult } from './prompts';
 import { sanitizeActionPrompt, sanitizeActionTitle, sanitizeScenePrompt } from './sanitize';
 import {
@@ -419,21 +420,21 @@ function buildSceneCandidate(
 }
 
 
-function buildOutfitFromPerImage(img: PerImageResult, pass2Outfit?: LooseRecord): LooseRecord {
+function buildOutfitFromPerImage(img: PerImageResult): LooseRecord {
   const o = img.outfit || ({} as Partial<NonNullable<PerImageResult['outfit']>>);
-  const title = String(o.title || pass2Outfit?.title || '时尚质感私服穿搭').trim();
-  const top = String(o.top || pass2Outfit?.top || '').trim();
-  const bottom = String(o.bottom || pass2Outfit?.bottom || '').trim();
-  const shoes = String(o.shoes || pass2Outfit?.shoes || '').trim();
-  const accessories = String(o.accessories || pass2Outfit?.accessories || '').trim();
-  const colorPalette = String(o.color_palette || pass2Outfit?.color_palette || '').trim();
+  const title = String(o.title || '服装参考').trim();
+  const top = isObservedDetail(o.top) ? String(o.top).trim() : '';
+  const bottom = isObservedDetail(o.bottom) ? String(o.bottom).trim() : '';
+  const shoes = isObservedDetail(o.shoes) ? String(o.shoes).trim() : '';
+  const accessories = isObservedDetail(o.accessories) ? String(o.accessories).trim() : '';
+  const colorPalette = isObservedDetail(o.color_palette) ? String(o.color_palette).trim() : '';
 
   const lookParts = [top, bottom, shoes].filter(Boolean).join('，');
   const reversePrompt = `【服装穿搭】：${lookParts || title}${colorPalette ? `，配色方案：${colorPalette}` : ''}${accessories ? `，细节配件：${accessories}` : ''}`;
 
   return {
     title,
-    top: top || title,
+    top: top || '',
     bottom: bottom || '',
     shoes,
     accessories,
@@ -444,46 +445,18 @@ function buildOutfitFromPerImage(img: PerImageResult, pass2Outfit?: LooseRecord)
   };
 }
 
-function isStubOutfitCandidate(outfit: LooseRecord): boolean {
-  const title = String(outfit.title || '').trim();
-  const top = String(outfit.top || '').trim();
-  const bottom = String(outfit.bottom || '').trim();
-  return (!top && !bottom) || title === '时尚质感私服穿搭';
-}
-
-
-function buildPersonaFromPerImage(
-  perImageResults: PerImageResult[],
-  pass2Persona?: LooseRecord
-): LooseRecord | undefined {
-  if (pass2Persona && (pass2Persona.hair || pass2Persona.name || pass2Persona.description)) {
-    return pass2Persona;
-  }
-  const firstWithPersona = perImageResults.find(
-    (img) => img.persona && (img.persona.hair || img.persona.name || img.persona.face)
-  );
-  if (!firstWithPersona || !firstWithPersona.persona) return undefined;
-  const p = firstWithPersona.persona;
-  const name = (p.name || '明媚松弛·清透系女生').trim();
-  const desc = [
-    p.hair ? `发型发色：${p.hair}` : '',
-    p.face ? `五官轮廓：${p.face}` : '',
-    p.skin ? `肤质特征：${p.skin}` : '',
-    p.vibe ? `神态气质：${p.vibe}` : '',
-  ]
-    .filter(Boolean)
-    .join('；');
-
-  return {
-    name,
-    hair: p.hair || '',
-    face: p.face || '',
-    skin: p.skin || '',
-    vibe: p.vibe || '',
-    description: desc || name,
-    reverse_prompt: `【模特博主】：${desc || name}`,
-    source_image_index: firstWithPersona.image_index,
-  };
+function buildPersonaFromPerImage(perImageResults: PerImageResult[]): LooseRecord | undefined {
+  const source = perImageResults.find(canExtractPersona);
+  if (!source?.persona) return undefined;
+  const p = source.persona;
+  const hair = isObservedDetail(p.hair) ? p.hair : '';
+  const face = isObservedDetail(p.face) ? p.face : '';
+  const skin = isObservedDetail(p.skin) ? p.skin : '';
+  const vibe = isObservedDetail(p.vibe) ? p.vibe : '';
+  const description = [hair && `发型发色：${hair}`, face && `五官轮廓：${face}`,
+    skin && `肤质特征：${skin}`, vibe && `神态气质：${vibe}`].filter(Boolean).join('；');
+  return { name: p.name || '人物参考', hair, face, skin, vibe, description,
+    reverse_prompt: `【模特博主】：${description}`, source_image_index: source.image_index };
 }
 
 /**
@@ -496,7 +469,6 @@ export function reconcileAssetsFromPerImage(
 ): { result: Record<string, unknown>; stats: ReconcileStats } {
   const pass2Actions = Array.isArray(parsedResult.actions) ? parsedResult.actions : [];
   const pass2Scenes = Array.isArray(parsedResult.scenes) ? parsedResult.scenes : [];
-  const pass2Outfits = Array.isArray(parsedResult.outfits) ? parsedResult.outfits : [];
 
   const pass2ActionByIndex = new Map<number, LooseRecord>();
   for (const act of pass2Actions) {
@@ -524,17 +496,10 @@ export function reconcileAssetsFromPerImage(
   );
   const reconciledScenes = dedupeSceneCandidates(sceneCandidates);
 
-  const outfitCandidates = perImageResults.map((img) => {
-    const p2 = pass2Outfits.find((o) => getSourceImageIndex(o as LooseRecord) === img.image_index);
-    return buildOutfitFromPerImage(img, p2 as LooseRecord);
-  });
+  const outfitCandidates = perImageResults.filter(canExtractOutfit).map((img) => buildOutfitFromPerImage(img));
   const reconciledOutfits = dedupeOutfitCandidates(outfitCandidates);
-  const nonStubOutfits = reconciledOutfits.filter((o) => !isStubOutfitCandidate(o));
 
-  const reconciledPersona = buildPersonaFromPerImage(
-    perImageResults,
-    parsedResult.persona as LooseRecord | undefined
-  );
+  const reconciledPersona = buildPersonaFromPerImage(perImageResults);
 
   const stats: ReconcileStats = {
     actionsBeforeDedup: pass2Actions.length,
@@ -549,14 +514,8 @@ export function reconcileAssetsFromPerImage(
       per_image: perImageResults,
       actions: reconciledActions,
       scenes: reconciledScenes,
-      outfits: dedupeOutfitCandidates(
-        nonStubOutfits.length > 0
-          ? nonStubOutfits
-          : pass2Outfits.length > 0
-            ? pass2Outfits
-            : reconciledOutfits
-      ),
-      persona: reconciledPersona || parsedResult.persona,
+      outfits: reconciledOutfits,
+      persona: reconciledPersona ?? null,
     },
     stats,
   };

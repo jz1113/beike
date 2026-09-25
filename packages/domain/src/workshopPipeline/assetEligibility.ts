@@ -1,4 +1,5 @@
 import { initialRegistryStatus, type PromptAssetType } from '../promptAsset/states';
+import { visualAssetIssue } from '../assetDeconstruct/visualEvidence';
 import { isCompletePromptGroup, type PromptGroupCandidate } from './groupAssetSelection';
 
 export interface WorkshopAssetCandidate extends PromptGroupCandidate {
@@ -26,6 +27,8 @@ export function isPlaceholderIdentity(asset: object, type: PromptAssetType): boo
 /** One production policy for full rows, slim options, and server-side recall. */
 export function workshopAssetBlockReason(asset: WorkshopAssetCandidate, type: PromptAssetType): string | null {
   if (isPlaceholderIdentity(asset, type)) return '占位记录，不是可用的人物或穿搭资产';
+  const visualIssue = visualAssetIssue(asset as unknown as Record<string, unknown>, type);
+  if (visualIssue) return visualIssue;
   if (asset.provenance === 'reference_import' || asset.provenance === 'legacy_single') return '参考素材尚未转为生产资产';
   // Mirrors the existing registry grandfather policy without writing during GET.
   const status = asset.registry?.status ?? initialRegistryStatus(asset.provenance, true);

@@ -12,23 +12,18 @@ const SHARED_READ_MODELS = new Set([
   'PromptAlbum',
 ]);
 
-function camelModel(model: string): string {
-  return model.charAt(0).toLowerCase() + model.slice(1);
+type QueryObject = Record<string, unknown>;
+
+function andWhere(where: unknown, extra: QueryObject): QueryObject {
+  return where && typeof where === 'object' ? { AND: [where, extra] } : extra;
 }
 
-function andWhere(where: unknown, extra: Record<string, unknown>): Record<string, unknown> {
-  if (!where || typeof where !== 'object') return extra;
-  return { AND: [where, extra] };
-}
-
-function scopedFindFirstWhere(where: unknown, workspaceId: string): Record<string, unknown> {
-  const unique = where && typeof where === 'object'
-    ? (where as Record<string, unknown>).workspaceId_sourceKey
-    : undefined;
-  // Prisma's compound unique selector is valid in findUnique/upsert, but not
-  // findFirst. The workspace extension probes upserts with findFirst first.
-  const filter = unique && typeof unique === 'object' ? unique : where;
-  return andWhere(filter, writeFilter(workspaceId));
+// Unique selectors must stay at the top level, including compound selectors.
+// Add permission checks to the original operation instead of probing through a
+// separate client: query(args) preserves interactive AND array transactions.
+function scopedUniqueWhere(where: unknown, extra: QueryObject): QueryObject {
+  const source = (where || {}) as QueryObject;
+  return { ...source, AND: [...(Array.isArray(source.AND) ? source.AND : source.AND ? [source.AND] : []), extra] };
 }
 
 function readFilter(model: string, workspaceId: string): Record<string, unknown> {
@@ -60,98 +55,89 @@ function withWorkspaceData(data: unknown, workspaceId: string): unknown {
   return out;
 }
 
+const relations = new Map(Prisma.dmmf.datamodel.models.map(model => [
+  model.name, model.fields.filter(field => field.kind === 'object'),
+]));
 
-function uniqueWhere(model: string, workspaceId: string, existing: { id?: string; sourceKey?: string }): Record<string, unknown> {
-  if (model === 'PromptImportSource') {
-    return { workspaceId_sourceKey: { workspaceId, sourceKey: existing.sourceKey } };
+/** Prisma does not run model query extensions for nested include/select reads. */
+function scopeReadSelections(model: string, args: QueryObject, workspaceId: string): void {
+  const fields = relations.get(model) || [];
+  for (const key of ['include', 'select']) {
+    const source = args[key];
+    if (!source || typeof source !== 'object') continue;
+    const selection = { ...source } as QueryObject;
+    args[key] = selection;
+    for (const field of fields) {
+      const value = selection[field.name];
+      if (!value) continue;
+      const nested: QueryObject = value === true ? {} : { ...value as QueryObject };
+      if (field.isList || !field.isRequired) {
+        nested.where = andWhere(nested.where, readFilter(field.type, workspaceId));
+      }
+      scopeReadSelections(field.type, nested, workspaceId);
+      selection[field.name] = nested;
+    }
+    if (selection._count) {
+      const count = selection._count as { select?: QueryObject } | true;
+      const selected = count === true
+        ? Object.fromEntries(fields.filter(field => field.isList).map(field => [field.name, true]))
+        : { ...count.select };
+      for (const field of fields.filter(field => field.isList)) {
+        if (!selected[field.name]) continue;
+        const value = selected[field.name];
+        const nested = value === true ? {} : value as QueryObject;
+        selected[field.name] = { ...nested, where: andWhere(nested.where, readFilter(field.type, workspaceId)) };
+      }
+      selection._count = { select: selected };
+    }
   }
-  return { id: existing.id };
-}
-
-function notFound(): Prisma.PrismaClientKnownRequestError {
-  return new Prisma.PrismaClientKnownRequestError('No record was found for an update.', {
-    code: 'P2025',
-    clientVersion: Prisma.prismaVersion.client,
-  });
-}
-
-function isReadable(model: string, rowWorkspaceId: unknown, workspaceId: string): boolean {
-  if (rowWorkspaceId === workspaceId) return true;
-  return SHARED_READ_MODELS.has(model) && rowWorkspaceId === OFFICIAL_WORKSPACE_ID;
 }
 
 export function extendPrismaWithWorkspace(client: PrismaClient): PrismaClient {
-  const unscoped = client as unknown as Record<string, { findFirst: (args: unknown) => Promise<{ id: string } | null>; create: (args: unknown) => Promise<unknown> }>;
   const extended = client.$extends({
     query: {
       $allModels: {
-        async $allOperations({ model, operation, args, query }) {
+        $allOperations({ model, operation, args, query }) {
           const workspaceId = requireWorkspaceId();
-          const delegate = unscoped[camelModel(model)];
+          const scoped = args as QueryObject;
+          scopeReadSelections(model, scoped, workspaceId);
           switch (operation) {
             case 'findUnique':
-            case 'findUniqueOrThrow': {
-              const row = await query(args) as { workspaceId?: string } | null;
-              if (!row) return row;
-              if (isReadable(model, row.workspaceId, workspaceId)) return row;
-              if (operation === 'findUniqueOrThrow') throw notFound();
-              return null;
-            }
+            case 'findUniqueOrThrow':
+              scoped.where = scopedUniqueWhere(scoped.where, readFilter(model, workspaceId));
+              break;
             case 'findFirst':
             case 'findFirstOrThrow':
             case 'findMany':
             case 'count':
             case 'aggregate':
             case 'groupBy':
-              (args as { where?: unknown }).where = andWhere((args as { where?: unknown }).where, readFilter(model, workspaceId));
-              return query(args);
+              scoped.where = andWhere(scoped.where, readFilter(model, workspaceId));
+              break;
             case 'create':
-              (args as { data: unknown }).data = withWorkspaceData((args as { data: unknown }).data, workspaceId);
-              return query(args);
             case 'createMany':
             case 'createManyAndReturn':
-              (args as { data: unknown }).data = withWorkspaceData((args as { data: unknown }).data, workspaceId);
-              return query(args);
+              scoped.data = withWorkspaceData(scoped.data, workspaceId);
+              break;
             case 'update':
-            case 'delete': {
-              const existing = await delegate.findFirst({
-                where: scopedFindFirstWhere((args as { where?: unknown }).where, workspaceId),
-                select: model === 'PromptImportSource' ? { sourceKey: true } : { id: true },
-              }) as { id?: string; sourceKey?: string } | null;
-              if (!existing) throw notFound();
-              (args as { where: unknown }).where = uniqueWhere(model, workspaceId, existing);
-              if (operation === 'update' && (args as { data?: unknown }).data) {
-                (args as { data: unknown }).data = withWorkspaceData((args as { data: unknown }).data, workspaceId);
-              }
-              return query(args);
-            }
-            case 'upsert': {
-              const typed = args as { where?: unknown; create: Record<string, unknown>; update: Record<string, unknown>; include?: unknown; select?: unknown };
-              const existing = await delegate.findFirst({
-                where: scopedFindFirstWhere(typed.where, workspaceId),
-                select: model === 'PromptImportSource' ? { sourceKey: true } : { id: true },
-              }) as { id?: string; sourceKey?: string } | null;
-              if (!existing) {
-                return delegate.create({
-                  data: withWorkspaceData(typed.create, workspaceId),
-                  include: typed.include,
-                  select: typed.select,
-                });
-              }
-              typed.where = uniqueWhere(model, workspaceId, existing) as never;
-              typed.update = withWorkspaceData(typed.update, workspaceId) as Record<string, unknown>;
-              return query(args);
-            }
+            case 'delete':
+              scoped.where = scopedUniqueWhere(scoped.where, writeFilter(workspaceId));
+              if (scoped.data) scoped.data = withWorkspaceData(scoped.data, workspaceId);
+              break;
+            case 'upsert':
+              scoped.where = scopedUniqueWhere(scoped.where, writeFilter(workspaceId));
+              scoped.create = withWorkspaceData(scoped.create, workspaceId);
+              scoped.update = withWorkspaceData(scoped.update, workspaceId);
+              break;
             case 'updateMany':
             case 'deleteMany':
-              (args as { where?: unknown }).where = andWhere((args as { where?: unknown }).where, writeFilter(workspaceId));
-              if ((args as { data?: unknown }).data) {
-                (args as { data: unknown }).data = withWorkspaceData((args as { data: unknown }).data, workspaceId);
-              }
-              return query(args);
+              scoped.where = andWhere(scoped.where, writeFilter(workspaceId));
+              if (scoped.data) scoped.data = withWorkspaceData(scoped.data, workspaceId);
+              break;
             default:
               throw new Error(`未隔离的 Prisma 操作: ${model}.${operation}`);
           }
+          return query(args);
         },
       },
     },

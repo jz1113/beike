@@ -15,16 +15,7 @@ interface Props {
   title?: string;
 }
 
-export function formatAssetBadgeText(text: string | undefined, defaultPrefix: string, index = 1): string {
-  if (!text) return '';
-  const trimmed = text.trim();
-  if (/^\[?#[PSOA]-[\w-]+\]?/i.test(trimmed)) {
-    const m = trimmed.match(/^\[?#?([PSOA]-[\w-]+)\]?\s*(.*)$/i);
-    if (m) return `[#${m[1].toUpperCase()}] ${m[2]}`.trim();
-    return trimmed;
-  }
-  return `[#${defaultPrefix}-${String(index).padStart(2, '0')}] ${trimmed}`;
-}
+export { formatAssetBadgeText } from '../model/assetPresentation';
 
 export default function BatchAssetTag({ type, text, title }: Props) {
   return (

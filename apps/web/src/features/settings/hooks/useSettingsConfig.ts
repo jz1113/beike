@@ -1,6 +1,6 @@
+import { apiFetch } from '@/shared/api/apiClient';
 import {storageProviderError} from '../storageValidation';
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch } from '@/shared/api/apiClient';
 import {
   persistAiGatewayConfig,
   persistDeepSeekConfig,
@@ -13,7 +13,8 @@ import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@/shared/api/ga
 import { formatUserError } from '@beike/domain/upstreamErrors';
 import { credentialGet } from '@/shared/api/credentialClient';
 import { useIndependentModelProviders } from './useIndependentModelProviders';
-import { testScraperConnection, testQiyunConnection, testWanbangConnection } from '../settingsConnectionChecks';
+import { useConnectionChecks } from './useConnectionChecks';
+import { testModelConnection, testScraperConnection, testQiyunConnection, testWanbangConnection } from '../settingsConnectionChecks';
 
 interface UseSettingsConfigOptions {
   isOpen: boolean;
@@ -25,31 +26,25 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('https://ai.comfly.org');
   const [showKey, setShowKey] = useState(false);
-  const [isGatewayEnabled, setIsGatewayEnabled] = useState(true);
-  const [isTesting, setIsTesting] = useState(false);
   const [deepSeekApiKey, setDeepSeekApiKey] = useState('');
   const [showDeepSeekKey, setShowDeepSeekKey] = useState(false);
-  const [isTestingDeepSeek, setIsTestingDeepSeek] = useState(false);
   const independentProviders = useIndependentModelProviders(isOpen, showToast);
 
   // 万邦 (OneBound)
   const [wanbangKey, setWanbangKey] = useState('');
   const [wanbangSecret, setWanbangSecret] = useState('');
   const [isWanbangEnabled, setIsWanbangEnabled] = useState(true);
-  const [isTestingWanbang, setIsTestingWanbang] = useState(false);
 
   // 社媒解析 (APIA)
   const [scraperId, setScraperId] = useState('');
   const [scraperSecret, setScraperSecret] = useState('');
   const [isApiaEnabled, setIsApiaEnabled] = useState(true);
-  const [isTestingScraper, setIsTestingScraper] = useState(false);
   const [appAccessToken, setAppAccessToken] = useState('');
 
   // 奇云多平台去水印解析
   const [qiyunAppId, setQiyunAppId] = useState('');
   const [qiyunAppKey, setQiyunAppKey] = useState('');
   const [isQiyunEnabled, setIsQiyunEnabled] = useState(true);
-  const [isTestingQiyun, setIsTestingQiyun] = useState(false);
 
   // 云端永久对象存储
   const [storageEnabled, setStorageEnabled] = useState(false);
@@ -63,7 +58,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [showStorageSecret, setShowStorageSecret] = useState(false);
   const [storageBucketName, setStorageBucketName] = useState('');
   const [storagePublicDomain, setStoragePublicDomain] = useState('');
-  const [isTestingStorage, setIsTestingStorage] = useState(false);
   const [isMigratingStorage, setIsMigratingStorage] = useState(false);
 
   const storageDrafts=useRef<Record<string,{endpoint:string;accountId:string;key:string;secret:string;bucket:string;domain:string}>>({});
@@ -82,6 +76,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     if (typeof window !== 'undefined' && isOpen) {
       void (async () => {
         const savedUrl = localStorage.getItem('ai_base_url') || 'https://ai.comfly.org';
+        setBaseUrl(savedUrl);
         const savedApiKey = await credentialGet('ai_api_key');
         const finalKey = savedApiKey || localStorage.getItem('ai_api_key') || '';
         setApiKey(finalKey);
@@ -136,88 +131,44 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   }, [isOpen]);
 
   // 测试 Comfly 网关延迟 Ping
-  const handleTestPing = async () => {
-    if (!apiKey.trim()) {
-      showToast('⚠️ 请先填写 API Key');
-      return;
-    }
-    setIsTesting(true);
-    const start = Date.now();
-    try {
-      const res = await apiFetch('/api/system/models/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: baseUrl.trim(),
-          apiKey: apiKey.trim(),
-          isPing: true,
-        }),
-      });
-      const latency = Date.now() - start;
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success && !data.isFallback) {
-        showToast(`🟢 连通正常！响应延迟: ${latency}ms (检测到 ${data.count || 0} 款可用模型)`);
-      } else if (data.isFallback && data.warning) {
-        showToast(`⚠️ 网关响应异常 (${data.gatewayStatus || res.status}): ${data.warning}`);
-      } else {
-        showToast(
-          `🔴 连接异常 (${data.gatewayStatus || res.status}): ${data.error || '无法访问 API 网关'}`
-        );
-      }
-    } catch (e: any) {
-      showToast(`🔴 网络超时: ${formatUserError(e, '网关连接失败')}`);
-    } finally {
-      setIsTesting(false);
-    }
-  };
+  const connectionChecks = useConnectionChecks({
+    cloud_storage: [storageEnabled, storageProvider, storageAccountId, storageEndpoint, storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain],
+    comfly_gateway: [baseUrl.trim(), apiKey.trim()],
+    deepseek_official: [deepSeekApiKey.trim()],
+    wanbang_ecommerce: [wanbangKey.trim(), wanbangSecret.trim(), isWanbangEnabled],
+    apia_parser: [scraperId.trim(), scraperSecret.trim(), isApiaEnabled],
+    qiyun_parser: [qiyunAppId.trim(), qiyunAppKey.trim(), isQiyunEnabled],
+  }, showToast);
+  const isTestingStorage = Boolean(connectionChecks.testing.cloud_storage);
+  const handleTestStorage = () => connectionChecks.run('cloud_storage', async () => {
+    const error = storageProviderError(storageProvider, storageEndpoint);
+    if (error) return { ok: false, message: error };
+    const response = await apiFetch('/api/assets/storage/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: { enabled: storageEnabled, provider: storageProvider, accountId: storageAccountId, endpoint: storageEndpoint, accessKeyId: storageAccessKeyId, secretAccessKey: storageSecretAccessKey, bucketName: storageBucketName, publicDomain: storagePublicDomain } }),
+    });
+    const data = await response.json();
+    const ok = Boolean(response.ok && data.success);
+    return { ok, message: ok ? '存储桶连接成功' : `存储桶连接失败：${data.message || data.error || response.status}` };
+  });
+  const isTesting = Boolean(connectionChecks.testing.comfly_gateway);
+  const isTestingDeepSeek = Boolean(connectionChecks.testing.deepseek_official);
+  const isTestingWanbang = Boolean(connectionChecks.testing.wanbang_ecommerce);
+  const isTestingScraper = Boolean(connectionChecks.testing.apia_parser);
+  const isTestingQiyun = Boolean(connectionChecks.testing.qiyun_parser);
+  const handleTestPing = () => connectionChecks.run('comfly_gateway', () => testModelConnection('Comfly', { baseUrl: baseUrl.trim(), apiKey: apiKey.trim() }));
+  const handleTestDeepSeek = () => connectionChecks.run('deepseek_official', () => testModelConnection('DeepSeek', {
+    baseUrl: 'https://api.deepseek.com', apiKey: deepSeekApiKey.trim(),
+  }));
 
-  const handleTestDeepSeek = async () => {
-    if (!deepSeekApiKey.trim()) {
-      showToast('⚠️ 请先填写 DeepSeek API Key');
-      return;
-    }
-    setIsTestingDeepSeek(true);
-    const start = Date.now();
-    try {
-      const res = await apiFetch('/api/system/models/fetch', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: 'https://api.deepseek.com', apiKey: deepSeekApiKey.trim(), isPing: true, strict: true }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
-        showToast(`🟢 DeepSeek 官方接口连通正常！响应延迟: ${Date.now() - start}ms`);
-      } else {
-        showToast(`🔴 DeepSeek 接口异常 (${data.gatewayStatus || res.status}): ${data.error || '无法访问官方接口'}`);
-      }
-    } catch (e: unknown) {
-      showToast(`🔴 网络超时: ${formatUserError(e, 'DeepSeek 连接失败')}`);
-    } finally {
-      setIsTestingDeepSeek(false);
-    }
-  };
-
-  const handleSaveDeepSeekConfig = async (activate = false) => {
+  const handleSaveDeepSeekConfig = async () => {
     try {
       await persistDeepSeekConfig(deepSeekApiKey);
-      if (activate) {
-        await handleSaveApiConfig('https://api.deepseek.com', deepSeekApiKey, false);
-        setBaseUrl('https://api.deepseek.com');
-        setApiKey(deepSeekApiKey.trim());
-        showToast('✅ 已启用 DeepSeek 官方接口；请在默认业务模型中选择 DeepSeek 模型');
-      } else {
-        showToast('✅ DeepSeek 官方 API Key 已安全保存');
-      }
-    } catch (err) {
-      console.warn('[handleSaveDeepSeekConfig] 保存失败:', err);
-      showToast('⚠️ DeepSeek API Key 保存异常，请稍后重试');
-    }
+      showToast('DeepSeek 独立凭证已保存；Comfly 配置保持不变');
+    } catch (error) { showToast(formatUserError(error, 'DeepSeek 凭证保存失败')); }
   };
 
-  const handleTestWanbang = async () => {
-    setIsTestingWanbang(true);
-    try { await testWanbangConnection(wanbangKey, wanbangSecret, showToast); }
-    finally { setIsTestingWanbang(false); }
-  };
+  const handleTestWanbang = () => connectionChecks.run('wanbang_ecommerce', () => testWanbangConnection(wanbangKey, wanbangSecret));
 
   // 自动保存 API 配置
   const handleSaveApiConfig = async (newUrl: string, newKey: string, notify = false) => {
@@ -263,11 +214,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     }
   };
 
-  const handleTestScraper = async () => {
-    setIsTestingScraper(true);
-    try { await testScraperConnection(scraperId, scraperSecret, showToast); }
-    finally { setIsTestingScraper(false); }
-  };
+  const handleTestScraper = () => connectionChecks.run('apia_parser', () => testScraperConnection(scraperId, scraperSecret));
 
   const handleSaveQiyunConfig = () => {
     void persistQiyunConfig(qiyunAppId, qiyunAppKey);
@@ -275,11 +222,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     showToast('✅ 奇云 30+ 平台去水印解析接口配置已保存');
   };
 
-  const handleTestQiyun = async () => {
-    setIsTestingQiyun(true);
-    try { await testQiyunConnection(qiyunAppId, qiyunAppKey, showToast); }
-    finally { setIsTestingQiyun(false); }
-  };
+  const handleTestQiyun = () => connectionChecks.run('qiyun_parser', () => testQiyunConnection(qiyunAppId, qiyunAppKey));
 
   const handleSaveStorageConfig = async () => {
     const error=storageEnabled ? storageProviderError(storageProvider,storageEndpoint) : '';
@@ -306,8 +249,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     setBaseUrl,
     showKey,
     setShowKey,
-    isGatewayEnabled,
-    setIsGatewayEnabled,
     isTesting,
     deepSeekApiKey,
     setDeepSeekApiKey,
@@ -317,6 +258,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     handleTestDeepSeek,
     handleSaveDeepSeekConfig,
     ...independentProviders,
+    connectionResults: { ...connectionChecks.results, ...independentProviders.connectionResults },
     appAccessToken,
     setAppAccessToken,
     handleSaveApiConfig,
@@ -367,7 +309,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     storagePublicDomain,
     setStoragePublicDomain,
     isTestingStorage,
-    setIsTestingStorage,
+    handleTestStorage,
     isMigratingStorage,
     setIsMigratingStorage,
     handleSaveStorageConfig,

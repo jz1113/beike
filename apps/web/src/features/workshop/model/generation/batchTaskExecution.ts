@@ -1,6 +1,6 @@
 import type { ShotPrompt } from '@beike/domain/vision';
-import { enforceLookConsistency, isGenericLook } from '@beike/domain/drawing';
-import { resolveGptImageSizeForModel } from '@beike/domain/modelAdapters/image/gptImageSafeSizes';
+import { enforceLookConsistency, isGenericLook, getAspectRatioFromSize } from '@beike/domain/drawing';
+import { resolveWorkshopImageSize, verifyWorkshopImageSize } from './workshopImageSize';
 import { isActionAllowedForProduct } from '@beike/domain/phoneProductPolicy';
 import { submitImageGenTaskResult } from '@/shared/api/generationApi';
 import type { BatchProductItem } from '../batchTypes';
@@ -16,7 +16,11 @@ export interface TaskExecutionConfig {
   isAborted: () => boolean;
   isPaused?: () => boolean;
   idempotencyKey?: string;
+  outputSize?: string;
+  onOutputSizeResolved?: (size: string) => void;
   onTaskSubmitted?: (taskId: string) => void;
+  /** Confirmed original-workshop face anchor; sent only for human shots. */
+  anchorFaceUrl?: string;
 }
 
 export async function executeSingleImageTask(
@@ -48,25 +52,44 @@ export async function executeSingleImageTask(
   }
 
   const skipFace = shot.has_human === false || shot.shot_type === 'pure_product' || shot.shot_type === 'hand_held_only';
-  const safeProductImg = await compressProductImageIfNeeded(chosenProductImg);
+  // Keep the chosen front/cover as the stable @图片1 slot, while forwarding a
+  // small set of additional views so the model can verify front/back/details.
+  // Four views keeps the request bounded and avoids turning a product collage
+  // into a noisy reference set.
+  const productReferenceCandidates = Array.from(new Set([
+    chosenProductImg,
+    ...item.selectedProductImages,
+  ].filter((img): img is string => Boolean(img)))).slice(0, 4);
+  const safeProductImages = await Promise.all(
+    productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
+  );
+  const safeProductImg = safeProductImages[0];
+  const safeAnchorFaceUrl = !skipFace && anchorFaceUrl
+    ? await compressProductImageIfNeeded(anchorFaceUrl)
+    : undefined;
   const qualityTier = (config.selectedQuality || 'high') as 'high' | 'medium' | 'low';
-  const pixelSize = resolveGptImageSizeForModel(
-    config.selectedAspect,
+  const aspect = config.outputSize ? getAspectRatioFromSize(config.outputSize) : config.selectedAspect;
+  const pixelSize = resolveWorkshopImageSize(
+    aspect,
     config.selectedImageGenModel,
-    qualityTier
+    qualityTier,
+    config.outputSize
   );
 
-  return await submitImageGenTaskResult(
+  config.onOutputSizeResolved?.(pixelSize);
+  const generated = await submitImageGenTaskResult(
     {
       prompt: promptText,
       model: config.selectedImageGenModel,
       size: pixelSize,
-      aspectRatio: config.selectedAspect,
+      aspectRatio: aspect,
       quality: config.selectedQuality,
       productImageUrl: safeProductImg,
-      anchorFaceImageUrl: skipFace ? undefined : anchorFaceUrl || undefined,
+      anchorFaceImageUrl: safeAnchorFaceUrl,
       padSocialRef: false,
       referenceImageUrl: safeProductImg,
+      referenceImages: safeProductImages,
+      productReferenceImages: safeProductImages,
       useReferenceImage: true,
       has_human: shot.has_human !== undefined ? shot.has_human : true,
       shot_type: shot.shot_type,
@@ -83,4 +106,6 @@ export async function executeSingleImageTask(
       onTaskSubmitted: config.onTaskSubmitted,
     }
   );
+  await verifyWorkshopImageSize(generated.url, pixelSize);
+  return generated;
 }

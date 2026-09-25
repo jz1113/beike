@@ -62,3 +62,28 @@ test('grid preserves all resolved per-shot bindings without a global portrait or
  assert.match(grid,/左上格·分镜1/);assert.match(grid,/右下格·分镜4/);
  assert.throws(()=>buildBoundGroupGridPrompt(shots.slice(1)),/四个完整/);
 });
+
+test('group-level appearance summaries cannot overwrite per-shot mother-group details', () => {
+  const shots = parseGroupShotSkeleton([1,2].map(i => ({ has_human: true, prompt:
+    `【发型与面部】镜${i}人物细节\n【穿搭】镜${i}服装细节\n【场景结构】镜${i}空间\n【动作或摆放】镜${i}摆放\n【光影】镜${i}窗光` })));
+  const slots = assembleStoryboardSlots({ lockedGroupShots: shots, assets: {
+    scenes: [{ title: '图组原场景', description: '全组场景摘要' }],
+    personas: [{ name: '图组原人物', description: '全组人物摘要' }],
+    outfits: [{ title: '图组原穿搭', top: '全组穿搭摘要' }],
+  } }).shots;
+  slots.forEach((slot, i) => {
+    const prompt = buildBoundGroupPrompt(slot, '手机');
+    for (const detail of ['人物细节', '服装细节', '空间', '摆放', '窗光']) assert.ok(prompt.includes(`镜${i+1}${detail}`));
+    assert.doesNotMatch(prompt, /全组.*摘要|图组原场景/);
+  });
+});
+
+test('mother-group summary remains a fallback when a shot has no finer details', () => {
+  const [slot] = assembleStoryboardSlots({ lockedGroupShots: [{ has_human: true }], assets: {
+    scenes: [{ title: '图组原场景', description: '窗边木桌' }],
+    personas: [{ description: '短发人物' }], outfits: [{ top: '米色外套' }],
+  } }).shots;
+  const prompt = buildBoundGroupPrompt(slot, '手机');
+  assert.match(prompt, /窗边木桌/); assert.match(prompt, /短发人物/); assert.match(prompt, /米色外套/);
+  assert.doesNotMatch(prompt, /图组原场景/);
+});

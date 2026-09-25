@@ -7,10 +7,7 @@ import {
   SEED_PERSONA_NAMES,
   SEED_PURGE_FILTER,
 } from './constants';
-import {
-  resumeOfficialCatalogSeedAfterFailedReset,
-  suppressOfficialCatalogSeedAfterReset,
-} from '@beike/server-kit/officialCatalogSeed';
+import { requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 
 // 清理官方预置种子资产（按标题白名单精确匹配，避免误删用户手动录入）
 export async function purgeSeedAssets() {
@@ -90,64 +87,58 @@ export async function clearAllAssets(targetType: string) {
 }
 
 /**
- * Deletes every application record held in the local SQLite database.
+ * Clears current-workspace data while preserving the shared official catalog.
  *
  * This is intentionally separate from `clearAllAssets`: clearing a library
  * tab should not erase generation history or conversations.  The caller is
  * responsible for presenting the explicit database-reset confirmation.
  */
 export async function clearLocalDatabase() {
-  // Set the marker before the transaction, so a completed wipe can never be
-  // undone by the startup seed.  If the transaction fails, remove it again.
-  const resetMarkerCreated = suppressOfficialCatalogSeedAfterReset();
-  try {
-    const deletedCount = await db.$transaction(async (tx) => {
-      const results = await Promise.all([
-        tx.assistantTurnItem.deleteMany(),
-        tx.assistantTurn.deleteMany(),
-        tx.assistantThread.deleteMany(),
-        tx.imageTask.deleteMany(),
-        tx.promptRecord.deleteMany(),
-        tx.product.deleteMany(),
-        tx.styleRecipe.deleteMany(),
-        tx.actionAsset.deleteMany(),
-        tx.sceneAsset.deleteMany(),
-        tx.outfitAsset.deleteMany(),
-        tx.personaAsset.deleteMany(),
-        tx.fullPromptAsset.deleteMany(),
-        tx.promptImportSource.deleteMany(),
-        tx.deconstructReview.deleteMany(),
-        tx.workshopBatchState.deleteMany(),
-        tx.workshopBatch.deleteMany(),
-        tx.workshopWorkspace.deleteMany(),
-        tx.promptAlbum.deleteMany(),
-      ]);
+  const workspaceId = requireWorkspaceId();
+  const deletedCount = await db.$transaction(async (tx) => {
+    const results = await Promise.all([
+      tx.assistantTurnItem.deleteMany(),
+      tx.assistantTurn.deleteMany(),
+      tx.assistantThread.deleteMany(),
+      tx.imageTask.deleteMany(),
+      tx.promptRecord.deleteMany(),
+      tx.product.deleteMany(),
+      tx.styleRecipe.deleteMany(),
+      tx.actionAsset.deleteMany(),
+      tx.sceneAsset.deleteMany(),
+      tx.outfitAsset.deleteMany(),
+      tx.personaAsset.deleteMany(),
+      tx.fullPromptAsset.deleteMany(),
+      tx.promptImportSource.deleteMany(),
+      tx.deconstructReview.deleteMany(),
+      tx.workshopBatchState.deleteMany(),
+      tx.workshopBatch.deleteMany(),
+      tx.workshopWorkspace.deleteMany(),
+      tx.promptAlbum.deleteMany(),
+    ]);
 
-      // AssetProductCategory has a self-referencing RESTRICT relation. Delete
-      // leaves first so this also works for arbitrarily nested category trees.
-      let categoriesDeleted = 0;
-      while (true) {
-        const leaves = await tx.assetProductCategory.findMany({
-          where: { children: { none: {} } },
-          select: { id: true },
-        });
-        if (leaves.length === 0) break;
-        const result = await tx.assetProductCategory.deleteMany({
-          where: { id: { in: leaves.map((category) => category.id) } },
-        });
-        categoriesDeleted += result.count;
-      }
+    // AssetProductCategory has a self-referencing RESTRICT relation. Delete
+    // leaves first so this also works for arbitrarily nested category trees.
+    let categoriesDeleted = 0;
+    while (true) {
+      const leaves = await tx.assetProductCategory.findMany({
+        where: { workspaceId, children: { none: {} } },
+        select: { id: true },
+      });
+      if (leaves.length === 0) break;
+      const result = await tx.assetProductCategory.deleteMany({
+        where: { id: { in: leaves.map((category) => category.id) } },
+      });
+      if (result.count === 0) throw new Error('分类清理未取得进展，已取消本次清理');
+      categoriesDeleted += result.count;
+    }
 
-      return results.reduce((sum, result) => sum + result.count, 0) + categoriesDeleted;
-    });
+    return results.reduce((sum, result) => sum + result.count, 0) + categoriesDeleted;
+  });
 
-    return jsonResponse({
-      success: true,
-      message: `已彻底清空数据库中的 ${deletedCount} 条记录`,
-      deletedCount,
-    });
-  } catch (error) {
-    if (resetMarkerCreated) resumeOfficialCatalogSeedAfterFailedReset();
-    throw error;
-  }
+  return jsonResponse({
+    success: true,
+    message: `已清空当前工作区的 ${deletedCount} 条记录，官方资产保留`,
+    deletedCount,
+  });
 }

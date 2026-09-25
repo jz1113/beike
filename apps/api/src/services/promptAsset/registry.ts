@@ -1,4 +1,5 @@
 import { isPlaceholderIdentity, workshopAssetBlockReason } from '@beike/domain/workshopPipeline';
+import { visualAssetIssue } from '@beike/domain/assetDeconstruct/visualEvidence';
 import { OFFICIAL_WORKSPACE_ID, requireWorkspaceId } from '@beike/server-kit/workspaceContext';
 import { db } from '../../repositories/access';
 import {
@@ -60,7 +61,8 @@ export async function attachRegistryMeta<T extends { id: string; provenance?: st
   const map = new Map(rows.map((row) => [row.sourceAssetId, row]));
   return items.map((item) => {
     const row = { ...item, registry: map.get(item.id) };
-    return { ...row, contentEligible: !isPlaceholderIdentity(row, assetType),
-      productionBlockReason: workshopAssetBlockReason(row, assetType) };
+    const issue = visualAssetIssue(row as Record<string, unknown>, assetType);
+    return { ...row, contentEligible: !isPlaceholderIdentity(row, assetType) && !issue,
+      productionBlockReason: issue || workshopAssetBlockReason(row, assetType) };
   });
 }

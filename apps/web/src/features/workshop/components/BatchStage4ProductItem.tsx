@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import AIGeneratingCard from '@/shared/ui/AIGeneratingCard';
+import './workshopDelivery.css';
 import LazyProxyImage from '@/shared/ui/LazyProxyImage';
 import {
   Clock3,
+  Loader2,
   XCircle,
   Download,
   ZoomIn,
@@ -90,7 +91,7 @@ export function BatchStage4ProductItem({
   const cleanId = String(item.itemId || item.id || '').replace(/[^\d]/g, '');
 
   return (
-    <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start animate-in fade-in duration-200">
+    <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)] gap-4 items-start animate-in fade-in duration-200">
       {/* ===================== 左侧栏 (3/12 宽度)：商品信息 ===================== */}
       <div className="lg:row-span-2 min-w-0 space-y-4">
       <BatchStage4ProductInfo
@@ -108,14 +109,13 @@ export function BatchStage4ProductItem({
       {/* ===================== 中间栏 (5/12 宽度)：成图展台 ===================== */}
       {productNavigation}
       </div>
-      <div className="lg:col-start-2 min-w-0 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 space-y-4">
+      <div className="workshop-image-gallery lg:col-start-2 min-w-0 bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 space-y-4">
         {/* 切片成图展台 (4 张大图) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-4 bg-indigo-600 rounded-full" />
               <h3 className="text-sm font-semibold text-slate-800">
-                图片 ({successTasks.length}/{tasks.length} 已完成)
+                生成图片 <span className="ml-2 text-xs font-normal tabular-nums text-slate-500">{successTasks.length}/{tasks.length} 已完成</span>
               </h3>
             </div>
 
@@ -128,7 +128,7 @@ export function BatchStage4ProductItem({
                     onPreviewGallery(previewUrls, 0, `${item.title} - 全部成图`);
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600/90 hover:bg-indigo-600 text-white transition-colors cursor-pointer shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>预览全部</span>
@@ -145,7 +145,7 @@ export function BatchStage4ProductItem({
               <p className="text-xs text-slate-400 mt-1">生成任务创建后，将在这里展示进度与成图。</p>
             </div>
           )}
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${tasks.length >= 4 ? 'lg:grid-cols-4' : tasks.length === 3 ? 'lg:grid-cols-3' : ''} gap-3`}>
+          <div className="workshop-image-grid" data-count={tasks.length}>
             {tasks.map((task, shotIdx) => {
               const hasImage = isUsableWorkshopResult(task);
               const isGenFailure = task.status === 'FAILURE' || (task.status === 'SUCCESS' && !hasImage);
@@ -153,7 +153,7 @@ export function BatchStage4ProductItem({
               const currentPreviewIdx = hasImage && task.resultUrl ? previewUrls.indexOf(task.resultUrl) : 0;
 
               return (
-                <div key={task.id || shotIdx} className="space-y-2 flex flex-col">
+                <div key={task.id || shotIdx} className="min-w-0 space-y-2 flex flex-col">
                   <div
                     onClick={() => {
                       if (hasImage && task.resultUrl) {
@@ -257,22 +257,23 @@ export function BatchStage4ProductItem({
                         <div className="text-xs font-medium text-slate-500">排队中</div>
                       </div>
                     ) : (
-                      <div role="status" aria-label={`分镜 ${task.shot_no} 生成中`} className="absolute inset-0 motion-reduce:[&_*]:animate-none">
-                        <AIGeneratingCard task={task} showProgressBadge={false} className="!rounded-none !border-0" />
-                        <div aria-hidden="true" className="absolute inset-x-0 bottom-5 flex justify-center">
-                          <span className="rounded-full border border-white/70 bg-white/60 px-3 py-1 text-[11px] font-medium tracking-wide text-slate-600 backdrop-blur-sm">生成中…</span>
-                        </div>
+                      <div role="status" aria-label={`分镜 ${task.shot_no} 生成中`} className="flex flex-col items-center gap-3 p-4 text-center">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+                          <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" />
+                        </span>
+                        <span className="text-xs font-medium text-slate-600">正在生成</span>
+                        <span className="text-[11px] text-slate-500">完成后自动显示</span>
                       </div>
                     )}
 
                     {/* 角标：分镜编号 */}
-                    <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-sm text-[10px] text-white font-mono font-bold pointer-events-none">
+                    <div className="absolute top-2.5 left-2.5 flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200/80 bg-white/90 px-1 text-[11px] font-medium tabular-nums text-slate-600 pointer-events-none">
                       {task.shot_no}
                     </div>
                   </div>
 
                   <div className="text-center space-y-1">
-                    <span className="text-[11px] font-bold text-slate-700 truncate block">
+                    <span className="text-xs font-medium text-slate-600 truncate block">
                       {task.title || `分镜 ${task.shot_no}`}
                     </span>
                     {!readOnly && hasImage && onReviewTask ? (

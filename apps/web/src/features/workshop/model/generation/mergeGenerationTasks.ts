@@ -1,3 +1,4 @@
+import { savedWorkshopOutputSize } from './workshopOutputSize';
 import { buildImageTaskKey, resolveTaskMergeAction } from '@beike/domain/workshopPipeline';
 import type { BatchProductItem, BatchTaskItem } from '../batchTypes';
 
@@ -66,6 +67,7 @@ export function mergeGenerationTasks(
       resultStatus: 'current' as const,
       revision: (shot as { revision?: number }).revision || 0,
       outputReview: 'unreviewed' as const,
+      outputSize: previous?.resultStatus === 'superseded' ? undefined : savedWorkshopOutputSize(previous),
     };
   });
 }

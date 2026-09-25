@@ -1,4 +1,5 @@
-import fs from 'node:fs';
+import { open, unlink } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import path from 'node:path';
 
 import { resolveStorageRoot, safeResolveWithinRoot, resolveStoredMediaPath, isWorkspaceStorageRel } from '@beike/server-kit/storagePaths';
@@ -14,6 +15,21 @@ function guessContentType(filePath: string): string {
   if (ext === '.png') return 'image/png';
   if (ext === '.webp') return 'image/webp';
   return 'application/octet-stream';
+}
+
+/** Only a single byte range is supported; malformed or unsatisfiable ranges return 416. */
+function parseRange(value: string, size: number): { start: number; end: number } | null {
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(value.trim());
+  if (!match || (!match[1] && !match[2]) || size === 0) return null;
+  const first = match[1] ? Number(match[1]) : null;
+  const last = match[2] ? Number(match[2]) : null;
+  if ((first !== null && !Number.isSafeInteger(first)) || (last !== null && !Number.isSafeInteger(last))) return null;
+  if (first === null) {
+    if (!last) return null;
+    return { start: Math.max(0, size - last), end: size - 1 };
+  }
+  if (first >= size || (last !== null && last < first)) return null;
+  return { start: first, end: Math.min(last ?? size - 1, size - 1) };
 }
 
 /**
@@ -51,22 +67,54 @@ export async function GET(req: Request): Promise<Response> {
     return new Response('Forbidden', { status: 403 });
   }
 
-  if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
-    return new Response('Not Found', { status: 404 });
+  let file;
+  try {
+    file = await open(absPath, 'r');
+  } catch (error) {
+    if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code || '')) {
+      return new Response('Not Found', { status: 404 });
+    }
+    throw error;
   }
-
-  const expiryMatch = /(?:^|\/)assistant-attachments\/(\d{13})-[a-f0-9-]+\.jpg$/.exec(rel);
-  if (expiryMatch && Number(expiryMatch[1]) <= Date.now()) {
-    fs.unlinkSync(absPath);
-    return new Response('附件已超过 7 天保存期限', { status: 410 });
-  }
-  const data = fs.readFileSync(absPath);
-  return new Response(data, {
-    status: 200,
-    headers: {
+  let streaming = false;
+  try {
+    const stat = await file.stat();
+    if (!stat.isFile()) return new Response('Not Found', { status: 404 });
+    const expiryMatch = /(?:^|\/)assistant-attachments\/(\d{13})-[a-f0-9-]+\.jpg$/.exec(rel);
+    if (expiryMatch && Number(expiryMatch[1]) <= Date.now()) {
+      await unlink(absPath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      return new Response('附件已超过 7 天保存期限', { status: 410 });
+    }
+    const headers = new Headers({
       'Content-Type': guessContentType(absPath),
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
-    },
-  });
+      'Accept-Ranges': 'bytes',
+    });
+    // No entity validator is issued, so If-Range cannot be matched: send the
+    // complete representation instead. Range applies only to GET, not HEAD.
+    const rangeHeader = req.method === 'GET' && !req.headers.has('if-range') ? req.headers.get('range') : null;
+    const range = rangeHeader === null ? undefined : parseRange(rangeHeader, stat.size);
+    if (range === null) {
+      headers.set('Content-Range', `bytes */${stat.size}`);
+      headers.set('Content-Length', '0');
+      return new Response(null, { status: 416, headers });
+    }
+    const length = range ? range.end - range.start + 1 : stat.size;
+    headers.set('Content-Length', String(length));
+    if (range) headers.set('Content-Range', `bytes ${range.start}-${range.end}/${stat.size}`);
+    const status = range ? 206 : 200;
+    if (req.method === 'HEAD' || length === 0) return new Response(null, { status, headers });
+    // autoClose and Readable.toWeb propagate completion/cancellation to the FD.
+    const stream = file.createReadStream({ ...range, autoClose: true });
+    const response = new Response(Readable.toWeb(stream, {
+      strategy: { highWaterMark: 64 * 1024, size: (chunk: Uint8Array) => chunk.byteLength },
+    }) as ReadableStream<Uint8Array>, { status, headers });
+    streaming = true;
+    return response;
+  } finally {
+    if (!streaming) await file.close();
+  }
 }

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@beike/domain/workflowModels';
+import { getEnabledImageModelsFromSettings, hasWorkflowModelConfiguration, readWorkflowModelsFromStorage } from '@beike/domain/workflowModels';
 
 export function useLightboxImageModels() {
   // 获取启用的生图模型列表
   const [availableImageModels, setAvailableImageModels] = useState<any[]>(() => {
     try {
       const list = getEnabledImageModelsFromSettings();
-      if (list && list.length > 0) return list;
+      if (list.length > 0 || hasWorkflowModelConfiguration()) return list;
     } catch {}
     return [
       { id: 'gpt-image-2', name: 'GPT Image 2', provider: 'OpenAI', isPrimary: true },
@@ -20,7 +20,7 @@ export function useLightboxImageModels() {
       try {
         const all = readWorkflowModelsFromStorage();
         const customImage = getEnabledImageModelsFromSettings(all);
-        if (customImage && customImage.length > 0) {
+        if (customImage.length > 0 || hasWorkflowModelConfiguration()) {
           setAvailableImageModels(customImage);
         }
       } catch {}

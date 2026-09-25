@@ -6,6 +6,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   globalIgnores([
+    '.local/**',
     'dist/**',
     'apps/web/dist/**',
     'node_modules/**',

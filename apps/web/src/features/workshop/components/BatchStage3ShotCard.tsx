@@ -9,9 +9,13 @@ import {
   User,
 } from 'lucide-react';
 import { formatAssetBadgeText } from './BatchAssetTag';
+import { getShotAssetLabels } from '../model/assetPresentation';
 
 export interface BatchStage3ShotCardProps {
   shot: {
+    assembly_source?: 'group_skeleton' | 'architecture' | 'fallback';
+    scene?: string;
+    shot_type?: 'model_shot' | 'hand_held_only' | 'pure_product';
     shot_no?: number;
     title?: string;
     camera_focal_length?: string;
@@ -46,10 +50,11 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
   productPersona,
   sharedAssets,
 }) => {
-  const sceneBadge = sharedAssets?.scene ? undefined : shot.applied_scene;
-  const outfitBadge = sharedAssets?.outfit ? undefined : shot.applied_outfit;
+  const labels = getShotAssetLabels(shot, productPersona);
+  const sceneBadge = sharedAssets?.scene ? undefined : labels.scene;
+  const outfitBadge = sharedAssets?.outfit ? undefined : labels.outfit;
   const actionBadge = shot.applied_action;
-  const personaBadge = sharedAssets?.persona ? undefined : shot.applied_persona || productPersona;
+  const personaBadge = sharedAssets?.persona ? undefined : labels.persona;
   const hasTags = sceneBadge || outfitBadge || actionBadge || personaBadge;
 
   return (
@@ -118,7 +123,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
                   场景
                 </span>
                 <span className="text-xs text-slate-600 truncate">
-                  {formatAssetBadgeText(sceneBadge, 'S', 1)}
+                  {formatAssetBadgeText(sceneBadge)}
                 </span>
               </div>
             )}
@@ -128,7 +133,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
                   穿搭
                 </span>
                 <span className="text-xs text-slate-600 truncate">
-                  {formatAssetBadgeText(outfitBadge, 'O', 1)}
+                  {formatAssetBadgeText(outfitBadge)}
                 </span>
               </div>
             )}
@@ -138,7 +143,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
                   动作
                 </span>
                 <span className="text-xs text-slate-600 truncate">
-                  {formatAssetBadgeText(actionBadge, 'A', shotIdx + 1)}
+                  {formatAssetBadgeText(actionBadge)}
                 </span>
               </div>
             )}
@@ -148,7 +153,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
                   人设
                 </span>
                 <span className="text-xs text-slate-600 truncate">
-                  {formatAssetBadgeText(personaBadge, 'P', 1)}
+                  {formatAssetBadgeText(personaBadge)}
                 </span>
               </div>
             )}

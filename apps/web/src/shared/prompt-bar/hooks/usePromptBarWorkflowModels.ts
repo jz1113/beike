@@ -20,6 +20,7 @@ export function usePromptBarWorkflowModels(
       const customVideo = getEnabledVideoModelsFromSettings(all);
 
       setAvailableImageModels(customImage);
+      if (!customImage.length) setQuickModel('');
       if (customImage.length > 0) {
         const activeModel = useAppStore.getState().quickModel;
         if (activeModel && customImage.some((m) => m.id === activeModel)) {
@@ -35,6 +36,7 @@ export function usePromptBarWorkflowModels(
       }
 
       setAvailableVideoModels(customVideo);
+      if (!customVideo.length) setQuickVideoModel('');
       if (customVideo.length > 0) {
         const activeVid = useAppStore.getState().quickVideoModel;
         if (activeVid && customVideo.some((m) => m.id === activeVid)) {

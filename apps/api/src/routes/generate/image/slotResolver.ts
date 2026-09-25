@@ -35,6 +35,7 @@ export async function resolveImageSlotsAndPrompt(body: any): Promise<ImageSlotRe
     productImageUrl,
     referenceImageUrl,
     referenceImages,
+    productReferenceImages,
     images,
     anchorFaceImageUrl,
     sceneAnchorImageUrl,
@@ -42,7 +43,6 @@ export async function resolveImageSlotsAndPrompt(body: any): Promise<ImageSlotRe
     hasHuman,
     shot_type,
     shotType,
-    useReferenceImage = false,
     productTitle,
     workshopMode,
     productRole,
@@ -56,11 +56,15 @@ export async function resolveImageSlotsAndPrompt(body: any): Promise<ImageSlotRe
   const isHumanShot = finalHasHuman === true || (finalHasHuman !== false && finalShotType === 'model_shot');
   const isWorkshopOriginal = workshopMode === 'storyboard_generate';
   const isPlainMode = source === 'hub' || source === 'home' || !isWorkshopOriginal;
+  const rawProductReferenceImages = Array.isArray(productReferenceImages)
+    ? productReferenceImages.filter((img: unknown): img is string => typeof img === 'string' && Boolean(img.trim())).slice(0, 4)
+    : [];
   const finalizePromptOptions = {
     workshopMode: isWorkshopOriginal ? ('storyboard_generate' as const) : ('hub' as const),
     hasHuman: isHumanShot,
     hasFace: Boolean(anchorFaceImageUrl) && isHumanShot,
     hasSceneAnchor: Boolean(sceneAnchorImageUrl),
+    hasSupplementaryProductViews: rawProductReferenceImages.length > 1,
     productRole,
     productFingerprint: productFingerprint || productTitle || undefined,
   };
@@ -77,19 +81,24 @@ export async function resolveImageSlotsAndPrompt(body: any): Promise<ImageSlotRe
   };
 
   const tConvert0 = Date.now();
-  const [targetProductUrl, rawFaceUrl, cleanSceneAnchorUrl, cleanRefUrl] = await Promise.all([
+  const [targetProductUrl, rawFaceUrl, cleanSceneAnchorUrl, cleanRefUrl, convertedProductRefs] = await Promise.all([
     convertTracked(productImageUrl),
     convertTracked(anchorFaceImageUrl),
     convertTracked(sceneAnchorImageUrl),
     convertTracked(referenceImageUrl),
+    Promise.all(rawProductReferenceImages.map((img) => convertTracked(img))),
   ]);
   const cleanFaceUrl = rawFaceUrl && isHumanShot
     ? (await emphasizeIdentityFacePlate(rawFaceUrl)) || rawFaceUrl
     : rawFaceUrl;
   const faceForSlots = isHumanShot ? cleanFaceUrl || undefined : undefined;
   const safeRef = cleanRefUrl || (typeof referenceImageUrl === 'string' ? referenceImageUrl.trim() : undefined);
+  const safeProductReferences = Array.from(new Set([
+    targetProductUrl,
+    ...convertedProductRefs,
+  ].filter((img): img is string => Boolean(img))));
 
-  if (isWorkshopOriginal && useReferenceImage && !targetProductUrl) {
+  if (isWorkshopOriginal && !targetProductUrl) {
     return {
       isHumanShot, isWorkshopOriginal, isPlainMode, targetProductUrl: null,
       orderedSlotImages: [], multiImages: [], editsImageUrls: [], cleanedPrompt: '', identityLockedSlots: null,
@@ -99,7 +108,12 @@ export async function resolveImageSlotsAndPrompt(body: any): Promise<ImageSlotRe
   }
 
   const originalOrderedSlots = isWorkshopOriginal
-    ? ([targetProductUrl, ...(faceForSlots ? [faceForSlots] : []), ...(cleanSceneAnchorUrl ? [cleanSceneAnchorUrl] : [])].filter(Boolean) as string[])
+    ? ([
+        targetProductUrl,
+        ...(faceForSlots ? [faceForSlots] : []),
+        ...(cleanSceneAnchorUrl ? [cleanSceneAnchorUrl] : []),
+        ...safeProductReferences.filter((img) => img !== targetProductUrl),
+      ].filter(Boolean) as string[])
     : [];
   const rawPassedImages = Array.isArray(images) && images.length > 0
     ? images
@@ -111,7 +125,7 @@ export async function resolveImageSlotsAndPrompt(body: any): Promise<ImageSlotRe
     return converted || (typeof img === 'string' && img.trim() ? img.trim() : undefined);
   }))).filter((img): img is string => Boolean(img));
   const orderedSlotImages = originalOrderedSlots.length > 0
-    ? originalOrderedSlots
+    ? Array.from(new Set([...originalOrderedSlots, ...safePassedImages]))
     : Array.from(new Set([targetProductUrl, safeRef, faceForSlots, cleanSceneAnchorUrl, ...safePassedImages].filter(Boolean) as string[]));
   const multiImages = orderedSlotImages.length > 0 ? orderedSlotImages : safePassedImages;
   const primaryImgUrl = multiImages[0];

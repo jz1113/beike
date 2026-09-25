@@ -1,6 +1,7 @@
 import { VISION_MODELS } from '@beike/domain/vision';
 import { IMAGE_GEN_MODELS } from '@beike/domain/drawing';
 import {
+  hasWorkflowModelConfiguration,
   getEnabledMultimodalModelsFromSettings,
   getEnabledImageModelsFromSettings,
   getStoredMultimodalModelId,
@@ -26,14 +27,14 @@ export function loadSystemConfiguredModels(): {
   let selectedVisionModel: string;
 
   const multimodalFromSettings = getEnabledMultimodalModelsFromSettings();
-  if (multimodalFromSettings.length > 0) {
+  if (multimodalFromSettings.length > 0 || hasWorkflowModelConfiguration()) {
     availableVisionModels = multimodalFromSettings.map((m) => ({
       id: m.id,
       name: m.name || m.id,
       shortName: m.shortName || (m.name || m.id).split(' ')[0],
       provider: m.provider || '多模态',
     }));
-    selectedVisionModel = getStoredMultimodalModelId(availableVisionModels[0].id);
+    selectedVisionModel = getStoredMultimodalModelId(availableVisionModels[0]?.id || '');
   } else {
     availableVisionModels = VISION_MODELS;
     selectedVisionModel = getStoredMultimodalModelId('gemini-3.7-flash');
@@ -43,7 +44,7 @@ export function loadSystemConfiguredModels(): {
   let selectedImageGenModel: string;
 
   const imageFromSettings = getEnabledImageModelsFromSettings();
-  if (imageFromSettings.length > 0) {
+  if (imageFromSettings.length > 0 || hasWorkflowModelConfiguration()) {
     availableImageModels = imageFromSettings.map((m) => ({
       id: String(m.id ?? ''),
       name: typeof m.name === 'string' ? m.name : undefined,
@@ -58,6 +59,9 @@ export function loadSystemConfiguredModels(): {
     availableImageModels = IMAGE_GEN_MODELS;
     selectedImageGenModel = localStorage.getItem('ai_image_gen_model') || 'gpt-image-2';
   }
+
+  if (!availableVisionModels.some(model => model.id === selectedVisionModel)) selectedVisionModel = availableVisionModels[0]?.id || '';
+  if (!availableImageModels.some(model => model.id === selectedImageGenModel)) selectedImageGenModel = availableImageModels[0]?.id || '';
 
   return {
     availableVisionModels,

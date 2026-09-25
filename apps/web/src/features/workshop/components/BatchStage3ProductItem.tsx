@@ -11,7 +11,8 @@ import BatchShotGrid from './BatchShotGrid';
 import BatchStatusBadge from './BatchStatusBadge';
 import { BatchStage3ShotCard } from './BatchStage3ShotCard';
 import { proxyMediaUrl } from '@/shared/api/apiClient';
-import { formatAssetBadgeText } from './BatchAssetTag';
+import { getSharedAssetLabels, getShotAssetLabels } from '../model/assetPresentation';
+import { stableAssetCode } from '@beike/domain/assetSampling';
 
 export interface BatchStage3ProductItemProps {
   isGridMode?: boolean;
@@ -50,17 +51,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
   const [showShotSummary, setShowShotSummary] = useState(false);
   const coverImg = item.selectedProductImages[0] || item.coverImage || '';
   const hasPrompts = item.prompts && item.prompts.length > 0;
-  const commonAsset = (field: 'applied_scene' | 'applied_outfit' | 'applied_persona', prefix: string) => {
-    const values = (item.prompts || []).map(shot => formatAssetBadgeText(
-      shot[field] || (field === 'applied_persona' ? item.applied_persona : undefined), prefix,
-    ));
-    return values.length > 1 && values[0] && values.every(value => value === values[0]) ? values[0] : undefined;
-  };
-  const sharedAssets = {
-    scene: commonAsset('applied_scene', 'S'),
-    outfit: commonAsset('applied_outfit', 'O'),
-    persona: commonAsset('applied_persona', 'P'),
-  };
+  const sharedAssets = getSharedAssetLabels(item.prompts || [], item.applied_persona);
 
   return (
     <div style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }} className="p-4 sm:p-5 space-y-4 bg-white border border-slate-200/80 rounded-2xl">
@@ -121,7 +112,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
                 <>
                   <span>·</span>
                   <span title={`图组母本 ${item.appliedFullPromptId || ''}`}>
-                    {item.appliedFullPromptSelectionMode === 'auto' ? '自动轮换' : '已锁定'}图组：{item.appliedFullPromptTitle}
+                    {item.appliedFullPromptSelectionMode === 'auto' ? '资产库轮询母组' : '已锁定母组'}：{item.appliedFullPromptId && `[#${stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}] `}{item.appliedFullPromptTitle}
                   </span>
                 </>
               )}
@@ -186,11 +177,15 @@ const MemoizedProductItem = React.memo(function ProductItem({
 
       {Object.values(sharedAssets).some(Boolean) && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-          <span className="font-semibold text-slate-800">本组共用</span>
-          {sharedAssets.scene && <span>场景 · {sharedAssets.scene}</span>}
-          {sharedAssets.outfit && <span>穿搭 · {sharedAssets.outfit}</span>}
-          {sharedAssets.persona && <span>人设 · {sharedAssets.persona}</span>}
+          <span className="font-semibold text-slate-800">实际共用内容</span>
+          {sharedAssets.scene && <span className="max-w-full truncate" title={sharedAssets.scene}>场景 · {sharedAssets.scene}</span>}
+          {sharedAssets.outfit && <span className="max-w-full truncate" title={sharedAssets.outfit}>穿搭 · {sharedAssets.outfit}</span>}
+          {sharedAssets.persona && <span className="max-w-full truncate" title={sharedAssets.persona}>人设 · {sharedAssets.persona}</span>}
         </div>
+      )}
+
+      {hasPrompts && item.appliedFullPromptId && !sharedAssets.scene && (
+        <p className="text-xs text-slate-500">每款商品使用上方母组，场景按镜头绑定；展开分镜结构可核对实际场景与光线。</p>
       )}
 
       {/* 共用资产只在商品级展示，分镜保留差异信息。 */}
@@ -223,7 +218,11 @@ const MemoizedProductItem = React.memo(function ProductItem({
             <button type="button" onClick={() => setShowShotSummary(!showShotSummary)}>{showShotSummary ? '收起分镜结构' : '查看分镜结构'}</button>
           </div>
           {showShotSummary && <div className="grid grid-cols-2 gap-2 border-t pt-3">
-            {item.prompts.map((shot, index) => <div key={index} className="text-xs text-slate-600 p-2 bg-white rounded-lg">{index + 1}. {shot.title || `分镜 ${index + 1}`} · {shot.camera_focal_length || '默认景别'}</div>)}
+            {item.prompts.map((shot, index) => <div key={index} className="text-xs text-slate-600 p-3 bg-white rounded-lg space-y-1">
+              <p className="font-medium">{index + 1}. {shot.title || `分镜 ${index + 1}`} · {shot.camera_focal_length || '母本机位'}</p>
+              <p className="line-clamp-3" title={getShotAssetLabels(shot).scene}>场景：{getShotAssetLabels(shot).scene || '未记录'}</p>
+              <p>光线：{shot.lighting_type || '未记录'}</p>
+            </div>)}
           </div>}
         </section>
       ) : hasPrompts ? (

@@ -130,3 +130,14 @@ test('product-only vision prompt forbids rewriting locked slots', () => {
   assert.match(prompt, /product_sentence/);
   assert.doesNotMatch(prompt, /自由构想/);
 });
+
+test('product vision sees each resolved scene and light instead of only the first scene', () => {
+  const slots = assembleStoryboardSlots({ lockedGroupShots: parseGroupShotSkeleton([1,2,3,4].map(i => ({
+    shot_no: i, has_human: false, prompt: `【场景结构】空间${i}\n【光影】光线${i}\n【动作或摆放】摆放${i}`,
+  }))) });
+  const prompt = buildProductOnlyVisionPrompt({ productTitle: '手机', shotCount: 4, slots: slots.shots });
+  for (let i = 1; i <= 4; i++) {
+    assert.match(prompt, new RegExp(`场景：空间${i}｜光线：光线${i}｜动作：摆放${i}`));
+  }
+  assert.match(prompt, /不得将第一镜场景套用于其他镜头/);
+});

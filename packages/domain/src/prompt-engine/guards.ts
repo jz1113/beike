@@ -3,6 +3,7 @@
  */
 import { preventJewelryGlitches, stripGarmentsFromAction, type OriginalProductRole } from './roles';
 import { ensureOriginalPromptSlots } from './assembler';
+import { enforceProductGeometry } from './productGeometry';
 
 /**
  * 清洗提示词文本，去除 Markdown 标题、分镜前缀、会话对话废话及外层包裹引号等残留字符
@@ -390,6 +391,7 @@ export function finalizeImagePrompt(
     hasHuman?: boolean;
     hasFace?: boolean;
     hasSceneAnchor?: boolean;
+    hasSupplementaryProductViews?: boolean;
     productRole?: OriginalProductRole;
     productFingerprint?: string;
   }
@@ -404,13 +406,14 @@ export function finalizeImagePrompt(
     return text;
   }
   if (options?.workshopMode === 'storyboard_generate') {
-    return ensureOriginalPromptSlots(text, {
+    return enforceProductGeometry(ensureOriginalPromptSlots(text, {
       hasHuman: options?.hasHuman !== false,
       hasFace: options?.hasFace,
       hasSceneAnchor: options?.hasSceneAnchor,
+      hasSupplementaryProductViews: options?.hasSupplementaryProductViews,
       productRole: options?.productRole,
       productFingerprint: options?.productFingerprint,
-    });
+    }));
   }
   return text;
 }

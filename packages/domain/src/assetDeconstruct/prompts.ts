@@ -353,7 +353,15 @@ const PROMPT_GOOD_BAD_EXAMPLES = `
 【材质与真实感】柔软半透明蕾丝、哑光皮革压纹、粗糙石砖路面、金属链条冷亮反光，皮肤保留真实细微毛孔与微弱汗毛，绝无过度平滑磨皮。
 【画质与限制】真实单反直出自然曝光，真实物理比例与透视，微弱自然空气颗粒感，严禁塑料磨皮、严禁3D渲染感、严禁过度锐化。"`;
 
-const PER_IMAGE_JSON_TEMPLATE = (imageIndex: number) => `{
+export const VISUAL_ASSET_EVIDENCE_RULES = `
+【逐图资产准入，优先于固定 JSON 示例】
+has_human 只说明存在人体，手部不代表有人脸。persona_visibility 为 none/partial/identifiable，outfit_visibility 为 none/fragment/upper_body/full_body。
+仅当本图面部和发型可辨识时提取 persona，否则 persona=null；只见手、背影、遮脸不得补造人物。
+仅当服装款式清晰可辨（上半身或全身）时提取 outfit，否则 outfit=null；局部袖口/衣角不算穿搭。未入镜部位填空，不要猜测。
+顶层 persona 允许 null、outfits 允许 []，不得为了填满字段制造资产。所有 source_image_index 必须指向真实证据图。`;
+
+const PER_IMAGE_JSON_TEMPLATE = (imageIndex: number) => `${VISUAL_ASSET_EVIDENCE_RULES}
+{
       "image_index": ${imageIndex},
       "image_type": "photography | landscape | product | typography | ui | general | mixed",
       "title": "短标题（中文，8字以内）",
@@ -361,6 +369,8 @@ const PER_IMAGE_JSON_TEMPLATE = (imageIndex: number) => `{
       "reverse_prompt_zh": "【主体】…\\n【发型与面部】…\\n【穿搭或物体细节】…\\n【动作或摆放】…\\n【场景结构】…\\n【光影】…\\n【构图镜头】…\\n【材质与真实感】…\\n【画质与限制】…（≥180字）",
       "negative_prompt_zh": "根据参考图生成的负面约束清单",
       "has_human": true,
+      "persona_visibility": "none | partial | identifiable",
+      "outfit_visibility": "none | fragment | upper_body | full_body",
       "shot_framing": "close_up | medium_full_body | low_angle_three_quarter_body | profile_half_body | profile_45 | macro_detail | high_angle_seated_full_body",
       "product_frame_ratio": 45,
       "scene": {
@@ -471,7 +481,7 @@ function buildMachineJsonLayer(params: {
   const focusIndex = imageIndex || (singleImageOnly ? imageCount : 1);
 
   const singleImageGuard = isSingleImage
-    ? `\n🚨【单图铁律】只输出第 ${focusIndex} 张图片的分析；per_image 仅 1 条且 image_index=${focusIndex}；scenes/outfits/actions 各仅 1 条。`
+    ? `\n🚨【单图铁律】只输出第 ${focusIndex} 张图片的分析；per_image 仅 1 条且 image_index=${focusIndex}；scenes/actions 各最多 1 条；outfits 仅在服装可辨识时输出 1 条，否则 []；persona 仅在面部与发型可辨识时输出，否则 null。`
     : `\n🚨【多图铁律】必须输出恰好 ${imageCount} 条 per_image（image_index 从 1 到 ${imageCount} 连续不遗漏）；actions 数量 ≤ ${imageCount}；scenes 聚类去重后 1~3 个，严禁每张图各建 1 场景。必须额外输出 content_summary 与 content_groups：每个图组连续、恰好 4 图、且一个图组只能有一个场景。不足 4 张的图片不要建立图组。`;
 
   const perImageExamples = singleImageOnly
@@ -571,7 +581,12 @@ ${singleImageGuard}
 - persona 不得包含服装、动作和背景
 - 严格遵循标准合法 JSON 语法：字符串值中严禁包含未转义的原生回车换行符，多行文本分段必须使用 \\n 转义，字符串与键名一律使用英文双引号
 ${isSingleImage ? `- 只输出第 ${focusIndex} 张图片的分析，不要输出其它 image_index` : `- 必须完整输出全部 ${imageCount} 张图片的分析，各图描述保持高密度精炼，确保输出的单个 JSON 语法完整闭合`}
-- 无人物时 has_human=false
+- has_human 仅表示是否出现人体（手部也算），不等于可提取人物人设或穿搭。
+- 每张图分别输出 persona_visibility（none/partial/identifiable）与 outfit_visibility（none/fragment/upper_body/full_body），禁止从同组其他图推测当前图内容。
+- 仅手、背影、遮脸、局部皮肤：persona=null。必须面部与发型均清晰可辨才允许 identifiable，并提取 persona；禁止补造五官、发型或肤质。
+- 仅袖口、衣角、领口、模糊衣料：outfit=null，outfit_visibility=fragment。上半身服装款式清楚可输出 upper_body，无须强求全身；未入镜的下装、鞋履填空字符串，禁止编写“无法确认”占位资产。
+- 顶层 outfits 只汇总有可复用服装的图片，允许 []；persona 允许 null。所有原子资产必须给出准确 source_image_index，指向真实证据图，不得默认第一张或借用他图人物。
+- 无人物时 has_human=false，persona=null，outfit=null；商品与衣物局部的观察保留在该图完整反推提示词中，不独立入人物/穿搭库。
 - content_groups 必须由恰好 4 张图构成且不重复；图组按原图顺序连续划分。若 8 张为同一内容，可输出两个 4 图组；不要将不同场景混在同一组。无法组成完整四图的图片不得输出图组。
 - 每个 content_group 固定一个场景、固定动作/摆放和构图节奏；人物、穿搭、场景只能作为整组可替换槽位，绝不能让每张图自由混搭。
 - JSON 键名和枚举保留模板中的英文
@@ -597,6 +612,8 @@ export interface PerImageResult {
   analysis_summary?: string;
   dimensions: Record<string, string>;
   has_human?: boolean;
+  persona_visibility?: 'none' | 'partial' | 'identifiable';
+  outfit_visibility?: 'none' | 'fragment' | 'upper_body' | 'full_body';
   shot_framing?: string;
   product_frame_ratio?: number | null;
   tags?: string[] | string;

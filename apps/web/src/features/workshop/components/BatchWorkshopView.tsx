@@ -1,4 +1,5 @@
 import { WorkshopProductionOverview } from './WorkshopProductionOverview';
+import { WorkspaceSaveNotice } from './WorkspaceSaveNotice';
 import { useEffect, useMemo, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
 import BatchStage1Collect from './BatchStage1Collect';
@@ -291,12 +292,7 @@ export default function BatchWorkshopView() {
       {workspaceStatus && workspaceStatus !== '当前批次已就绪' && workspaceStatus !== '当前批次已保存' && !workspaceError ? (
         <p className="px-4 sm:px-6 text-xs text-slate-500">{workspaceStatus}</p>
       ) : null}
-      {workspaceError ? (
-        <div role="alert" className="mx-4 sm:mx-6 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <span>{workspaceError}{workspaceStatus ? ` · ${workspaceStatus}` : ''}</span>
-          <button type="button" onClick={() => void reloadWorkspace()} className="rounded-lg bg-white px-2.5 py-1 font-bold text-amber-800 ring-1 ring-amber-200">重新加载</button>
-        </div>
-      ) : null}
+      <WorkspaceSaveNotice error={workspaceError} status={workspaceStatus} onRetry={runner.workspaceSaveActions.retry} onDownload={runner.workspaceSaveActions.download} onReload={reloadWorkspace} />
       <BatchWorkspaceBatchControls
         activeBatch={activeBatch}
         historyBatches={historyBatches}
@@ -318,7 +314,9 @@ export default function BatchWorkshopView() {
         <div className={
           !historyGenerationBatch && currentStage === 1 && items.length === 0
             ? "max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto w-full flex-1 flex flex-col justify-between"
-            : "w-full space-y-4"
+            : historyGenerationBatch || currentStage === 4
+              ? "mx-auto w-full max-w-[1560px] space-y-4"
+              : "w-full space-y-4"
         }>
           {!historyGenerationBatch && items.length > 0 && <WorkshopProductionOverview items={items} currentStage={currentStage} onStageChange={setCurrentStage}
             busy={isCollecting || isAnalyzingAll || isGeneratingBatch || isAutoPilotRunning || items.some((item) => item.isAnalyzing)}

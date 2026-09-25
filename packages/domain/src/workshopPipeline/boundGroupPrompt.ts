@@ -1,19 +1,31 @@
 import { sourcePromptSection, type FilledShotSlot } from './storyboardSlots';
+import { appendFidelityGuidance } from '../prompt-engine/fidelity';
+
+/** Explicit replacements win; otherwise preserve per-shot details before group summaries. */
+export function resolveBoundGroupAppearance(slot: FilledShotSlot) {
+  const personaAsset = slot.persona?.reversePrompt || slot.persona?.description || slot.persona?.name || '';
+  const outfitAsset = slot.outfit?.reversePrompt
+    || [slot.outfit?.top, slot.outfit?.bottom, slot.outfit?.shoes].filter(Boolean).join('；')
+    || slot.outfit?.title || '';
+  const portrait = slot.hasHuman && slot.shotType !== 'hand_held_only' && slot.shotType !== 'pure_product';
+  return {
+    persona: !portrait ? '' : slot.persona?.id ? personaAsset
+      : sourcePromptSection(slot.sourcePrompt, '人物') || sourcePromptSection(slot.sourcePrompt, '发型与面部') || personaAsset,
+    outfit: !portrait ? '' : slot.outfit?.id ? outfitAsset
+      : sourcePromptSection(slot.sourcePrompt, '穿搭') || sourcePromptSection(slot.sourcePrompt, '服装与配饰') || outfitAsset,
+  };
+}
 
 /** Compile the resolved binding once, without applying generic portrait/jewelry templates. */
 export function buildBoundGroupPrompt(slot: FilledShotSlot, productTitle: string) {
   const handOnly = slot.shotType === 'hand_held_only';
   const hasHuman = !handOnly && slot.hasHuman;
-  const persona = hasHuman ? slot.persona?.reversePrompt || slot.persona?.description
-    || (slot.persona?.id ? slot.persona.name : sourcePromptSection(slot.sourcePrompt, '发型与面部')) : '';
-  const outfit = hasHuman ? slot.outfit?.reversePrompt
-    || [slot.outfit?.top, slot.outfit?.bottom, slot.outfit?.shoes].filter(Boolean).join('；')
-    || (slot.outfit?.id ? slot.outfit.title : sourcePromptSection(slot.sourcePrompt, '穿搭') || sourcePromptSection(slot.sourcePrompt, '服装与配饰')) : '';
+  const { persona, outfit } = resolveBoundGroupAppearance(slot);
   const subjectRule = handOnly
     ? '仅商品与必要手部出镜，保留母本握持关系；不出现人脸、全身人像，不额外添加人物与穿搭'
     : hasHuman ? '保持本镜的人物出镜范围、人数和裁切关系，不扩展为额外人物或全身远景'
       : '纯商品静物，不添加人物、人脸、肢体或手部';
-  return [
+  const prompt = [
     `【商品】${productTitle || '当前商品'}；商品身份、型号、颜色、外观及文字全部以 @图片1 为准。母本中的旧商品不可复用。`,
     `【出镜规则】${subjectRule}`,
     persona && `【人物】${persona}`,
@@ -26,6 +38,10 @@ export function buildBoundGroupPrompt(slot: FilledShotSlot, productTitle: string
     slot.productSentence && `【商品接触与受光】${slot.productSentence}`,
     '【执行约束】保留上述镜头顺序、主体占比、机位、动作及空间关系；商品与环境形成真实接触阴影，不新增母本未要求的道具。',
   ].filter(Boolean).join('\n');
+  return appendFidelityGuidance(prompt, {
+    productFingerprint: productTitle,
+    hasHuman,
+  });
 }
 
 /** Grid and single-shot generation consume the exact same resolved shot bindings. */

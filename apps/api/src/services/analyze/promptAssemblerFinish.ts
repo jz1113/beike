@@ -17,6 +17,7 @@ import {
 import { resolveAssetShotSubject } from '@beike/domain/workshopShotSubject';
 import { buildBoundGroupPrompt, buildTransferableGroupDetails, maybeApplyJewelryCameraFallback } from '@beike/domain/workshopPipeline';
 import { formatAssetWithCode, toPureProductPrompt } from './promptAssemblerFormat';
+import { boundGroupAssetLabels } from './boundGroupAssetLabels';
 
 export async function finishStoryboardAssembly(input: Record<string, any>) {
   const { diversified, filledSlots, assetLibraryData, productRole, productFingerprintRaw, productIndex, productTitle, productProps, effectiveMasterScene, effectiveIdentityBible, effectiveLookBible, effectiveLookParts, effectiveStyleBible, appliedSceneTitle, appliedOutfitTitle, appliedPersonaName, hasAnchorFace, lockedAssets, sanitizedLookParts, lookBible, groupHasHuman, selectedSceneAsset, selectedOutfitAsset, selectedPersonaAsset, actionItems, assetPickTrace, actualModelUsed, triedModels, rawOutput, visionUsage, masterScene, styleBible, identityBible, lookParts } = input;
@@ -35,9 +36,7 @@ const formattedPrompts = diversified.map((p: any, pIdx: number) => {
       camera_focal_length: slot.camera, angle: slot.angle, lighting_type: slot.lighting,
       has_human: slot.hasHuman, shot_type: slot.shotType || (slot.hasHuman ? 'model_shot' : 'pure_product'),
       prompt: buildBoundGroupPrompt(slot, productFingerprintRaw || productTitle),
-      applied_scene: appliedSceneTitle,
-      applied_outfit: slot.hasHuman ? appliedOutfitTitle : undefined,
-      applied_persona: slot.hasHuman ? appliedPersonaName : undefined,
+      ...boundGroupAssetLabels(slot),
       used_asset_library: true, assembly_source: 'group_skeleton',
     };
   }
@@ -85,7 +84,7 @@ const formattedPrompts = diversified.map((p: any, pIdx: number) => {
         effectiveAngle
       )
     : isJewelry && !slot?.cameraFromAsset
-    ? `${effectiveCamera}，${effectiveAngle}，Shot on iPhone 16 Pro 原相机实拍（Unedited RAW photo），f/1.8 自然光学浅景深，胸部以上中近景生活抓拍构图（Tight Bust-Up Frame），佩戴首饰的手部/部位自然置于前景显著受光处清晰展现（占据画面 35%~50% 面积），生动展露博主自然生活神态、私服穿搭氛围与清晰首饰细节，严禁退后到全身远景，微弱自然传感器胶片微颗粒感`
+    ? `${effectiveCamera}，${effectiveAngle}，手机后置主摄自然生活抓拍，胸部以上中近景构图，佩戴首饰的手部/部位自然置于前景清晰展现（占据画面 35%~50% 面积），保留真实皮肤、衣料和首饰材质，不磨皮、不做商业棚拍，严禁退后到全身远景`
     : `${effectiveCamera}，${effectiveAngle}，Shot on iPhone 16 Pro 原相机实拍，自然手持或使用生活机位`;
 
   const assembled = assembleOriginalShotPrompt(

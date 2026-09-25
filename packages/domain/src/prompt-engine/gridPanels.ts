@@ -227,7 +227,7 @@ export function buildGridCollagePrompt(
   const look = joinLookSummary(bible.lookParts, bible.lookBible, role);
   const rawMasterScene = (bible.masterScene || '').trim() || '充满生活烟火气的真实美学空间，斜射自然日光';
   const cleanMasterScene = sanitizeScenePrompt(rawMasterScene);
-  const styleSeg = (bible.styleBible || '').trim() || 'Shot on iPhone 16 Pro 原相机抓拍（Unedited RAW 35mm photograph, natural candid snapshot），小红书真实博主生活随拍质感，零美颜零滤镜。真实环境漫射采光与自然物理接触阴影（Realistic Ambient Daylight, Soft Contact Shadows），人物皮肤呈现真实微观肌理与微毛孔呼吸感，渐进式真实光学自然景深（Progressive optical depth of field），首饰呈现真实物理金属高光与反光，严格杜绝 3D 渲染感、塑料磨皮与假人CG感（Strictly NO plastic skin, NO airbrushing, NO 3D CGI rendering, NO fake glow）';
+  const styleSeg = (bible.styleBible || '').trim() || '手机后置主摄生活抓拍，自然环境光与真实接触阴影，保留皮肤、头发、衣料和商品材质纹理，曝光与白平衡稳定；不过度磨皮、锐化、HDR 或商业棚拍';
   const anatomy = detectJewelryAnatomy(bible.productRole, bible.productFingerprint);
   const anatomyStmt = getJewelryAnatomyStatement(anatomy);
   const openComposition = isOpenCompositionGrid(role, anatomy, bible.productFingerprint);

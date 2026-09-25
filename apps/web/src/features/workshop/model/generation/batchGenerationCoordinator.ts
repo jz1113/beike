@@ -1,3 +1,4 @@
+import { savedWorkshopOutputSize } from './workshopOutputSize';
 import { prepareTaskRetry } from './taskRetry';
 import { requiresGenerationRecovery } from '@/shared/api/generationRecovery';
 import { checkWorkshopReadiness } from './workshopReadiness';
@@ -77,9 +78,11 @@ async function runSelectedShots(
       tasks.map((task) => (task.shot_no === shot.shot_no ? { ...task, status: 'IN_PROGRESS', error: undefined } : task))
     );
     try {
-      const generated = await executeSingleImageTask(item, shot, undefined, {
+      const generated = await executeSingleImageTask(item, shot, config.anchorFaceUrl, {
         ...config,
+        outputSize: savedWorkshopOutputSize(liveTask),
         idempotencyKey: liveTask?.idempotencyKey || config.idempotencyKey,
+        onOutputSizeResolved: (outputSize) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, outputSize } : task)),
         onTaskSubmitted: (upstreamTaskId) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, upstreamTaskId } : task)),
       });
       patchItemTasks(setItems, item.id, (tasks) =>
@@ -365,7 +368,8 @@ export async function retrySingleShotTaskCoordinator(
   );
 
   try {
-    const generated = await executeSingleImageTask(targetItem, shot, undefined, { ...config, idempotencyKey,
+    const generated = await executeSingleImageTask(targetItem, shot, config.anchorFaceUrl, { ...config, idempotencyKey, outputSize: savedWorkshopOutputSize(task),
+      onOutputSizeResolved: (outputSize) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, outputSize } : entry)),
       onTaskSubmitted: (upstreamTaskId) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, upstreamTaskId } : entry)),
     });
     patchItemTasks(setItems, itemId, (tasks) =>

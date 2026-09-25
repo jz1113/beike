@@ -1,4 +1,4 @@
-import { Activity, Check, ExternalLink, Eye, EyeOff, Image, Loader2, Save } from 'lucide-react';
+import { Activity, ExternalLink, Eye, EyeOff, Image, Loader2, Save } from 'lucide-react';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { ModelIcon } from '@/shared/ui/ModelIcons';
 
@@ -9,7 +9,7 @@ export interface ApiServicesDeepSeekPanelProps {
   setShowKey: (value: boolean) => void;
   isTesting: boolean;
   onTest: () => void;
-  onSave: (activate?: boolean) => void;
+  onSave: () => void;
 }
 
 /** DeepSeek uses the standard OpenAI-compatible Chat Completions API. */
@@ -54,15 +54,14 @@ export function ApiServicesDeepSeekPanel({
 
         <div className="rounded-xl bg-sky-50/70 border border-sky-100 px-3 py-2.5 text-[11.5px] text-sky-900 flex gap-2">
           <Image className="w-4 h-4 shrink-0 mt-0.5 text-sky-600" />
-          <span>官方接口调用路径为 <code className="font-mono">/v1/chat/completions</code>。启用后会将当前大模型接口切换为 DeepSeek；生图、视频等非 DeepSeek 模型请继续使用 Comfly 网关。</span>
+          <span>官方接口调用路径为 <code className="font-mono">/v1/chat/completions</code>。独立凭证供关键词审核等已支持的业务调用，不会覆盖 Comfly。通用模型池暂未接入 DeepSeek 独立线路，请勿将它当作 Comfly 的开关。</span>
         </div>
 
         <div className="flex items-center justify-end gap-2 flex-wrap pt-1 border-t border-slate-100">
           <button type="button" onClick={onTest} disabled={isTesting} className="h-9 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60 cursor-pointer">
             {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />} 测试接口
           </button>
-          <button type="button" onClick={() => onSave(false)} className="h-9 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Save className="w-3.5 h-3.5" />保存 Key</button>
-          <button type="button" onClick={() => onSave(true)} className="h-9 px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Check className="w-3.5 h-3.5" />启用官方接口</button>
+          <button type="button" onClick={onSave} className="h-9 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Save className="w-3.5 h-3.5" />保存 Key</button>
         </div>
       </div>
     </div>

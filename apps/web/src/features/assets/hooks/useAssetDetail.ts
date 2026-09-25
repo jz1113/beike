@@ -16,12 +16,20 @@ export function useAssetDetail({ activeSubTab }: UseAssetDetailOptions) {
 
   const openDetailItem = useCallback((item: Record<string, unknown>) => {
     setDetailItem(item);
-    setDetailActiveImageIndex(
-      typeof item.sourceImageIndex === 'number' ? Math.max(0, item.sourceImageIndex - 1) : 0
-    );
+    let initialIndex = typeof item.sourceImageIndex === 'number' ? Math.max(0, item.sourceImageIndex - 1) : 0;
+    if (activeSubTab === 'full_prompt' && typeof item.sourceImageIndex === 'number') {
+      try {
+        const indices = JSON.parse(String(item.sourceImageIndices || '[]'));
+        if (Array.isArray(indices)) {
+          const displayedIndex = indices.findIndex((index) => index === item.sourceImageIndex);
+          if (displayedIndex >= 0) initialIndex = displayedIndex;
+        }
+      } catch { /* malformed legacy metadata falls back to the source index */ }
+    }
+    setDetailActiveImageIndex(initialIndex);
     const hasPrompt = String(item.reversePromptZh || item.reversePrompt || item.description || '').trim();
     setDetailLoading(!hasPrompt && !fetchedEmptyIds.current.has(String(item.id || '')));
-  }, []);
+  }, [activeSubTab]);
 
   useEffect(() => {
     if (!detailItem?.id) return;
@@ -59,7 +67,7 @@ export function useAssetDetail({ activeSubTab }: UseAssetDetailOptions) {
     return () => {
       cancelled = true;
     };
-  }, [detailItem?.id, activeSubTab]);
+  }, [detailItem?.id, detailItem?.description, detailItem?.reversePrompt, detailItem?.reversePromptZh, activeSubTab]);
 
   return {
     detailItem,

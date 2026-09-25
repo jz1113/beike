@@ -11,6 +11,7 @@ import {
 } from '@beike/domain/assetDeconstruct/validate';
 import type { PerImageResult } from '@beike/domain/assetDeconstruct/prompts';
 import { persistFullPromptRecords } from './saveFullPrompts';
+import { hasReusableOutfitText, isObservedDetail } from '@beike/domain/assetDeconstruct/visualEvidence';
 
 export interface SavedRecords {
   scenes: any[];
@@ -73,7 +74,7 @@ export async function persistDeconstructedAssets(params: {
   };
   // 纯商品/静物图组没有可复用的人物或穿搭。绝不能把模型返回的
   // “无人物 / 无穿搭”占位文本写入对应资产库。
-  const hasHumanEvidence = perImageResults.some((image) => image.has_human !== false);
+  const hasHumanEvidence = perImageResults.some((image) => image.has_human === true);
 
   const [compactCoverUrl, compactSampleImagesJson] = await Promise.all([
     createCompactThumbnailDataUrl(imageUrls[0] || '', 320),
@@ -208,8 +209,11 @@ export async function persistDeconstructedAssets(params: {
     const shoes = String(ot.shoes || '').trim();
     const colorPalette = String(ot.color_palette || ot.colorPalette || '').trim();
     const meta = extractAssetMeta(ot);
+    if (!hasReusableOutfitText({ title, top, bottom })) continue;
     const clusterIndices: number[] = Array.isArray(ot.source_image_indices) ? ot.source_image_indices : [];
     const sourceIndex = meta.sourceImageIndex ?? clusterIndices[0] ?? ot.source_image_index;
+    // An atomic outfit must point at the image that visibly contains the clothing.
+    if (typeof sourceIndex !== 'number' || !imageUrls[sourceIndex - 1]) continue;
     const rawOutfitCover = sourceIndex !== null && sourceIndex !== undefined && imageUrls[sourceIndex - 1]
       ? imageUrls[sourceIndex - 1]
       : (defaultCoverUrl || '');
@@ -250,7 +254,7 @@ export async function persistDeconstructedAssets(params: {
       const created = await db.outfitAsset.create({
         data: {
           title,
-          top: top || title,
+          top: top || '',
           bottom: bottom || '',
           shoes,
           colorPalette,
@@ -269,11 +273,12 @@ export async function persistDeconstructedAssets(params: {
 
   if (hasHumanEvidence && parsedResult.persona) {
     const ps = parsedResult.persona as Record<string, unknown>;
+    if (!isObservedDetail(ps.face) || !isObservedDetail(ps.hair)) return savedRecords;
     const name = ((ps.name as string) || '气质博主').trim();
     const meta = extractAssetMeta(ps);
-    const rawPersonaAvatar = meta.sourceImageIndex !== null && meta.sourceImageIndex !== undefined && imageUrls[meta.sourceImageIndex - 1]
-      ? imageUrls[meta.sourceImageIndex - 1]
-      : (defaultCoverUrl || '');
+    // Never use image #1 as a persona avatar when the evidence image is missing.
+    if (meta.sourceImageIndex === null || meta.sourceImageIndex === undefined || !imageUrls[meta.sourceImageIndex - 1]) return savedRecords;
+    const rawPersonaAvatar = imageUrls[meta.sourceImageIndex - 1];
     const personaAvatarUrl = await thumbForUrl(rawPersonaAvatar);
 
     const hair = (ps.hair as string) || '';

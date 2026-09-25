@@ -1,3 +1,4 @@
+import { verifyWorkshopImageSize } from './workshopImageSize';
 import { apiFetch, storageConfigHeaders } from '@/shared/api/apiClient';
 import { runGridImageTask } from './batchGridGeneration';
 import type { BatchProductItem } from '../batchTypes';
@@ -43,6 +44,7 @@ export async function recheckWorkshopTask(itemId: string, taskId: string, items:
     const data = await response.json();
     if (!response.ok || data.status === 'QUERY_FAILED') throw new Error(data.error || '原任务暂时无法查询，请稍后再核对');
     const succeeded = data.status === 'SUCCESS' && typeof data.resultUrl === 'string' && data.resultUrl;
+    if (succeeded && task.outputSize) await verifyWorkshopImageSize(data.resultUrl, task.outputSize);
     const failed = data.status === 'FAILURE';
     setItems(previous => previous.map(product => product.id === itemId ? { ...product, tasks: product.tasks.map(entry => {
       if (entry.id !== taskId || entry.upstreamTaskId !== task.upstreamTaskId || entry.idempotencyKey !== task.idempotencyKey || entry.status !== 'FAILURE') return entry;

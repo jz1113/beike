@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/shared/api/apiClient';
 import { credentialGet } from '@/shared/api/credentialClient';
 import { persistLianchiConfig, persistOpenAIConfig } from '@/shared/api/persistCredentials';
 import { formatUserError } from '@beike/domain/upstreamErrors';
+import { useConnectionChecks } from './useConnectionChecks';
+import { testModelConnection } from '../settingsConnectionChecks';
 import { isPublicHttpGatewayIpUrl } from '@beike/domain/gatewayCreds';
 
 export function useIndependentModelProviders(isOpen: boolean, showToast: (message: string) => void) {
@@ -23,10 +24,14 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     setOpenAIBaseUrl(normalized);
     setOpenAIInsecureHttpConsentUrl(normalized);
   };
-  const [isTestingOpenAI, setIsTestingOpenAI] = useState(false);
   const [lianchiApiKey, setLianchiApiKey] = useState('');
   const [showLianchiKey, setShowLianchiKey] = useState(false);
-  const [isTestingLianchi, setIsTestingLianchi] = useState(false);
+  const connectionChecks = useConnectionChecks({
+    openai_official: [openAIBaseUrl.trim(), openAIApiKey.trim(), openAIAllowInsecureHttp, openAIEnabled],
+    lianchi_images: [lianchiApiKey.trim()],
+  }, showToast);
+  const isTestingOpenAI = Boolean(connectionChecks.testing.openai_official);
+  const isTestingLianchi = Boolean(connectionChecks.testing.lianchi_images);
 
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
@@ -37,23 +42,9 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     setOpenAIInsecureHttpConsentUrl(localStorage.getItem('openai_insecure_http_consent_url') || '');
   }, [isOpen]);
 
-  const handleTestOpenAI = async () => {
-    if (!openAIApiKey.trim()) { showToast('请先填写 OpenAI API Key'); return; }
-    setIsTestingOpenAI(true);
-    const start = Date.now();
-    try {
-      const response = await apiFetch('/api/system/models/fetch', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), allowInsecureHttp: openAIAllowInsecureHttp, isPing: true, strict: true }),
-      });
-      const data = await response.json().catch(() => ({}));
-      showToast(response.ok && data.success
-        ? `OpenAI 模型目录连通正常，${Date.now() - start}ms，返回 ${data.count} 款模型`
-        : `OpenAI 模型目录请求失败 (${data.gatewayStatus || response.status})：${data.error || '请检查地址与密钥'}`);
-    } catch (error) {
-      showToast(`OpenAI 连接失败：${formatUserError(error, '网络错误')}`);
-    } finally { setIsTestingOpenAI(false); }
-  };
+  const handleTestOpenAI = () => connectionChecks.run('openai_official', () => testModelConnection('Responses 接口', {
+    provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), allowInsecureHttp: openAIAllowInsecureHttp,
+  }));
 
   const handleSaveOpenAIConfig = async () => {
     try {
@@ -82,22 +73,12 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     }
   };
 
-  const handleTestLianchi = async () => {
-    if (!lianchiApiKey.trim()) { showToast('⚠️ 请先填写联池 API Key'); return; }
-    setIsTestingLianchi(true);
-    try {
-      const response = await apiFetch('/api/system/models/fetch', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: 'https://api.gapnet.ai/endpoint', apiKey: lianchiApiKey.trim(), isPing: true, strict: true }),
-      });
-      const data = await response.json().catch(() => ({}));
-      showToast(response.ok && data.success ? '🟢 联池模型接口连通正常' : `🔴 联池接口异常：${data.error || response.status}`);
-    } catch (error) {
-      showToast(`🔴 联池连接失败：${formatUserError(error, '网络错误')}`);
-    } finally { setIsTestingLianchi(false); }
-  };
+  const handleTestLianchi = () => connectionChecks.run('lianchi_images', () => testModelConnection('联池', {
+    provider: 'lianchi', apiKey: lianchiApiKey.trim(),
+  }));
 
   return {
+    connectionResults: connectionChecks.results,
     openAIBaseUrl, setOpenAIBaseUrl, openAIApiKey, setOpenAIApiKey,
     openAIAllowInsecureHttp, setOpenAIAllowInsecureHttp,
     switchOpenAIToHttpGateway,

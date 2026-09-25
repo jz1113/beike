@@ -122,14 +122,14 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
     if (!item || typeof item !== 'object') return;
     const shot = item as Record<string, unknown>;
     const subject = resolveAssetShotSubject({
-      shot_type: text(shot.shot_type), title: text(shot.title), action: text(shot.action),
+      shot_type: text(shot.shot_type), title: text(shot.title), action: text(shot.action) || sourcePromptSection(text(shot.prompt), '动作或摆放'),
     });
     shots.push({
       shot_no: Number(shot.shot_no) || index + 1,
       title: text(shot.title),
       prompt: text(shot.prompt),
       scene: text(shot.scene),
-      action: text(shot.action),
+      action: text(shot.action) || sourcePromptSection(text(shot.prompt), '动作或摆放'),
       optics: text(shot.optics),
       camera_focal_length: text(shot.camera_focal_length),
       angle: text(shot.angle) || sourcePromptSection(text(shot.prompt), '构图镜头'),
@@ -306,7 +306,7 @@ export function buildProductOnlyVisionPrompt(input: {
     : '';
   const locked = input.slots[0];
   const actions = input.slots
-    .map((shot) => `${shot.shotNo}. ${shot.title}｜动作：${shot.action || '（架构槽位）'}｜机位：${shot.camera || shot.angle || '保持资产机位'}`)
+    .map((shot) => `${shot.shotNo}. ${shot.title}｜场景：${shot.scene || '母本未描述'}｜光线：${shot.lighting || '母本未描述'}｜动作：${shot.action || '（架构槽位）'}｜机位：${shot.camera || shot.angle || '保持资产机位'}`)
     .join('\n');
   return `# Role: 商品外观校对员
 已选定场景、穿搭、人设与镜头槽位。你只看 @图片1，补「商品如何佩戴/摆放、受光落在哪」一句。
@@ -314,7 +314,7 @@ export function buildProductOnlyVisionPrompt(input: {
 ## 商品
 - 标题：${title}${props ? `\n- 规格：\n${props}` : ''}
 ## 已锁定槽位（只读）
-- 场景：${locked?.scene || '由拍摄架构决定'}
+- 场景与光线：逐镜独立绑定，以下方各镜描述为准，不得将第一镜场景套用于其他镜头。
 - 穿搭：${locked?.outfit?.reversePrompt || [locked?.outfit?.top, locked?.outfit?.bottom].filter(Boolean).join(' / ') || '由资产决定'}
 - 人设：${locked?.persona?.name || '由资产或纯商品规则决定'}
 ${actions}
@@ -346,7 +346,7 @@ function sceneText(scene?: SlotScene, group?: GroupShotSkeleton, replaceScene = 
   if (sourceScene) return sourceScene;
   if (text(group?.scene)) return text(group?.scene);
   if (scene?.reversePrompt || scene?.description) {
-    return [scene.title, scene.reversePrompt || scene.description].filter(Boolean).join('，');
+    return scene.reversePrompt || scene.description || '';
   }
   return text(group?.scene);
 }

@@ -1,11 +1,10 @@
+import { SETTINGS_NAV_GROUPS, type SettingsNavSection } from './settingsNavigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
 import {
   ArrowLeft,
   Search,
-  Layers,
-  Activity,
-  CheckCircle2,
+  Shield,
   X,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,6 +14,8 @@ import { getStoredMultimodalModelId, openAIModelRouteId, workflowModelRouteId } 
 import GatewayModelModal from './GatewayModelModal';
 import ApiServicesTab from './tabs/ApiServicesTab';
 import DefaultsTab from './tabs/DefaultsTab';
+import { ModelManagementPanel } from './components/ModelManagementPanel';
+import { MODEL_CHANNELS, type ModelChannel } from './modelManagement';
 import UsageTab from './tabs/UsageTab';
 import AddModelModal from './components/AddModelModal';
 import { useSystemConfigQuery } from './hooks/useSystemConfigQuery';
@@ -24,20 +25,6 @@ import { useGatewayUser } from './hooks/useGatewayUser';
 
 interface Props {
   onBack?: () => void;
-}
-
-type SettingsNavSection = 'api_services' | 'usage';
-
-interface NavGroupItem {
-  id: SettingsNavSection;
-  label: string;
-  icon: typeof Layers;
-  keywords: string[];
-}
-
-interface NavGroup {
-  groupTitle: string;
-  items: NavGroupItem[];
 }
 
 export default function SettingsWorkspaceView({ onBack }: Props) {
@@ -92,6 +79,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   // 2. 中间选中的 API 接口
   const [selectedServiceId, setSelectedServiceId] = useState<string>('comfly_gateway');
   const [serviceSearch, setServiceSearch] = useState('');
+  const [otherServiceId, setOtherServiceId] = useState('wanbang_ecommerce');
 
   // 3. 用量统计面板状态
   const [usageRange, setUsageRange] = useState<'30d' | '90d' | '1y'>('30d');
@@ -119,6 +107,18 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
 
   // 6. 手动添加模型模态窗
   const [isAddingModelModalOpen, setIsAddingModelModalOpen] = useState(false);
+  const [addingChannel, setAddingChannel] = useState<ModelChannel>('comfly');
+  const openAddModel = (channel: ModelChannel) => { setAddingChannel(channel); setIsAddingModelModalOpen(true); };
+  const configureChannel = (channel: ModelChannel) => {
+    setSelectedServiceId(MODEL_CHANNELS.find(item => item.id === channel)!.serviceId);
+    setServiceSearch('');
+    setNavSection('api_services');
+  };
+  const discoverModels = (channel: ModelChannel) => {
+    if (channel === 'openai') void models.handleOpenOpenAIDiscovery(config.openAIBaseUrl, config.openAIApiKey, config.openAIAllowInsecureHttp, true);
+    else if (channel === 'lianchi') void models.handleOpenLianchiDiscovery(config.lianchiApiKey, true);
+    else void models.handleOpenGatewayDiscovery();
+  };
 
   // 7. 业务默认模型路由状态
   const [activeVisionModel, setActiveVisionModel] = useState('gemini-3.1-pro-preview');
@@ -143,34 +143,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     }
   }, [quickVideoModel]);
 
-  // 分组导航配置（对标 Codex 图 2）
-  const navGroups: NavGroup[] = useMemo(
-    () => [
-      {
-        groupTitle: '模型与服务',
-        items: [
-          {
-            id: 'api_services',
-            label: '服务接口配置',
-            icon: Layers,
-            keywords: ['api', 'comfly', '网关', 'key', 'token', '接口', '服务', '电商', '万邦', '奇云', '存储', '默认', '模型', '路由'],
-          },
-        ],
-      },
-      {
-        groupTitle: '数据与统计',
-        items: [
-          {
-            id: 'usage',
-            label: '用量统计',
-            icon: Activity,
-            keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '花费', '账单'],
-          },
-        ],
-      },
-    ],
-    []
-  );
+  const navGroups = SETTINGS_NAV_GROUPS;
 
   // 搜索过滤匹配项
   const filteredGroups = useMemo(() => {
@@ -208,11 +181,11 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
       )}
 
       {/* 🌟 1. 独立双栏主舞台（左侧专有导航栏 + 右侧宽屏卡片内容区） */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         {/* ===================== COLUMN 1: 左侧专有侧边栏 ===================== */}
         <aside
           data-settings-sidebar
-          className="w-64 sm:w-72 xl:w-80 shrink-0 h-full bg-[#F5F6F8] border-r border-slate-200/90 flex flex-col justify-between overflow-hidden relative z-20"
+          className="hidden md:flex w-44 xl:w-52 shrink-0 h-full bg-[#F5F6F8] border-r border-slate-200/90 flex flex-col justify-between overflow-hidden relative z-20"
         >
           <div className="flex flex-col pt-3 sm:pt-4 px-3 sm:px-4">
             <button
@@ -283,7 +256,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                                 isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-700'
                               }`}
                             />
-                            <span className="truncate">{item.label}</span>
+                            <span className="text-left leading-5">{item.label}</span>
                           </div>
 
                           {isUsage && gatewayBalanceFormatted !== undefined && (
@@ -311,8 +284,8 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           {/* 底部信息：状态与安全提示 */}
           <div className="p-3 sm:p-4 border-t border-slate-200/80 bg-[#F0F2F5] shrink-0">
             <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="truncate">本地凭据已安全同步</span>
+              <Shield className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span className="truncate">凭证与模型线路独立管理</span>
             </div>
             <div className="text-[10px] text-slate-600 mt-0.5 truncate font-mono">
               贝壳云图工作台 · 设置中心
@@ -337,10 +310,29 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           </div>
 
           {/* 主内容展示区 */}
-          {navSection === 'api_services' ? (
+          <div className="md:hidden px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <button type="button" onClick={handleBackToApp} className="text-xs text-slate-600 shrink-0">返回应用</button>
+            <select aria-label="设置分类" value={navSection} onChange={event => setNavSection(event.target.value as SettingsNavSection)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">{navGroups.flatMap(group => group.items).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+          </div>
+          {navSection === 'api_services' || navSection === 'other_services' ? (
             <div className="flex-1 min-h-0 flex overflow-hidden @container/settings-modal bg-white">
-              <ApiServicesTab
-                defaultsPanel={<DefaultsTab
+              <ApiServicesTab config={config} models={models} group={navSection === 'api_services' ? 'models' : 'other'}
+                selectedServiceId={navSection === 'api_services' ? selectedServiceId : otherServiceId}
+                setSelectedServiceId={navSection === 'api_services' ? setSelectedServiceId : setOtherServiceId}
+                serviceSearch={serviceSearch} setServiceSearch={setServiceSearch}
+                onAddModel={openAddModel} onManageModels={() => setNavSection('models')}
+                defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} showToast={showToast} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto min-h-0 bg-[#F8F9FA] p-4 sm:p-6 lg:p-8">
+              <div className="w-full max-w-5xl 2xl:max-w-6xl mx-auto">
+
+
+
+              {navSection === 'models' && <ModelManagementPanel models={models} onAdd={openAddModel} onConfigure={configureChannel} onDiscover={discoverModels}
+                isDiscovering={models.isFetchingGateway || models.isFetchingOpenAI || models.isFetchingLianchi}
+                defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} />}
+              {navSection === 'defaults' && <DefaultsTab
                     customModels={models.customModels}
                     activeVisionModel={activeVisionModel}
                     setActiveVisionModel={setActiveVisionModel}
@@ -355,136 +347,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                     notifyModelsUpdated={models.notifyModelsUpdated}
                     showToast={showToast}
                   />}
-                selectedServiceId={selectedServiceId}
-                setSelectedServiceId={setSelectedServiceId}
-                serviceSearch={serviceSearch}
-                setServiceSearch={setServiceSearch}
-                isGatewayEnabled={config.isGatewayEnabled}
-                setIsGatewayEnabled={config.setIsGatewayEnabled}
-                apiKey={config.apiKey}
-                setApiKey={config.setApiKey}
-                baseUrl={config.baseUrl}
-                setBaseUrl={config.setBaseUrl}
-                showKey={config.showKey}
-                setShowKey={config.setShowKey}
-                appAccessToken={config.appAccessToken}
-                setAppAccessToken={config.setAppAccessToken}
-                handleSaveApiConfig={config.handleSaveApiConfig}
-                handleTestPing={config.handleTestPing}
-                isTesting={config.isTesting}
-                deepSeekApiKey={config.deepSeekApiKey}
-                setDeepSeekApiKey={config.setDeepSeekApiKey}
-                showDeepSeekKey={config.showDeepSeekKey}
-                setShowDeepSeekKey={config.setShowDeepSeekKey}
-                isTestingDeepSeek={config.isTestingDeepSeek}
-                handleTestDeepSeek={config.handleTestDeepSeek}
-                handleSaveDeepSeekConfig={config.handleSaveDeepSeekConfig}
-                openAIBaseUrl={config.openAIBaseUrl}
-                setOpenAIBaseUrl={config.setOpenAIBaseUrl}
-                openAIApiKey={config.openAIApiKey}
-                setOpenAIApiKey={config.setOpenAIApiKey}
-                showOpenAIKey={config.showOpenAIKey}
-                setShowOpenAIKey={config.setShowOpenAIKey}
-                openAIEnabled={config.openAIEnabled}
-                setOpenAIEnabled={config.setOpenAIEnabled}
-                openAIAllowInsecureHttp={config.openAIAllowInsecureHttp}
-                setOpenAIAllowInsecureHttp={config.setOpenAIAllowInsecureHttp}
-                switchOpenAIToHttpGateway={config.switchOpenAIToHttpGateway}
-                isTestingOpenAI={config.isTestingOpenAI}
-                handleTestOpenAI={config.handleTestOpenAI}
-                handleSaveOpenAIConfig={config.handleSaveOpenAIConfig}
-                handleOpenOpenAIDiscovery={() => models.handleOpenOpenAIDiscovery(config.openAIBaseUrl, config.openAIApiKey, config.openAIAllowInsecureHttp, true)}
-                handleImportCodexCatalog={models.handleImportCodexCatalog}
-                openAIModelError={models.openAIModelError}
-                openAIModelSuggestedBaseUrl={models.openAIModelSuggestedBaseUrl}
-                openAIModelSource={models.openAIModelSource}
-                isFetchingOpenAI={models.isFetchingOpenAI}
-                openAIModelCount={models.openAIModels.length}
-                lianchiApiKey={config.lianchiApiKey}
-                setLianchiApiKey={config.setLianchiApiKey}
-                showLianchiKey={config.showLianchiKey}
-                setShowLianchiKey={config.setShowLianchiKey}
-                isTestingLianchi={config.isTestingLianchi}
-                handleTestLianchi={config.handleTestLianchi}
-                handleSaveLianchiConfig={config.handleSaveLianchiConfig}
-                handleOpenLianchiDiscovery={() => models.handleOpenLianchiDiscovery(config.lianchiApiKey, true)}
-                isFetchingLianchi={models.isFetchingLianchi}
-                lianchiModelCount={models.lianchiModels.length}
-                handleOpenGatewayDiscovery={models.handleOpenGatewayDiscovery}
-                isFetchingGateway={models.isFetchingGateway}
-                allGatewayModels={models.allGatewayModels}
-                customModels={models.customModels}
-                modelSearch={models.modelSearch}
-                setModelSearch={models.setModelSearch}
-                modelCapabilityFilter={models.modelCapabilityFilter}
-                setModelCapabilityFilter={models.setModelCapabilityFilter}
-                handleToggleCapability={models.handleToggleCapability}
-                handleDeleteModel={models.handleDeleteModel}
-                handleMoveModel={models.handleMoveModel}
-                handleReorderModels={models.handleReorderModels}
-                handleResetDefaultModels={models.handleResetDefaultModels}
-                comflyPrices={models.comflyPrices}
-                isFetchingPrices={models.isFetchingPrices}
-                handleSortByComflyPrice={models.handleSortByComflyPrice}
-                setIsAddingModelModalOpen={setIsAddingModelModalOpen}
-                wanbangKey={config.wanbangKey}
-                setWanbangKey={config.setWanbangKey}
-                wanbangSecret={config.wanbangSecret}
-                setWanbangSecret={config.setWanbangSecret}
-                isWanbangEnabled={config.isWanbangEnabled}
-                setIsWanbangEnabled={config.setIsWanbangEnabled}
-                handleTestWanbang={config.handleTestWanbang}
-                isTestingWanbang={config.isTestingWanbang}
-                scraperId={config.scraperId}
-                setScraperId={config.setScraperId}
-                scraperSecret={config.scraperSecret}
-                setScraperSecret={config.setScraperSecret}
-                isApiaEnabled={config.isApiaEnabled}
-                setIsApiaEnabled={config.setIsApiaEnabled}
-                qiyunAppId={config.qiyunAppId}
-                setQiyunAppId={config.setQiyunAppId}
-                qiyunAppKey={config.qiyunAppKey}
-                setQiyunAppKey={config.setQiyunAppKey}
-                isQiyunEnabled={config.isQiyunEnabled}
-                setIsQiyunEnabled={config.setIsQiyunEnabled}
-                handleSaveQiyunConfig={config.handleSaveQiyunConfig}
-                handleTestQiyun={config.handleTestQiyun}
-                isTestingQiyun={config.isTestingQiyun}
-                storageEnabled={config.storageEnabled}
-                setStorageEnabled={config.setStorageEnabled}
-                storageProvider={config.storageProvider}
-                setStorageProvider={config.setStorageProvider}
-                storageAccountId={config.storageAccountId}
-                setStorageAccountId={config.setStorageAccountId}
-                storageEndpoint={config.storageEndpoint}
-                setStorageEndpoint={config.setStorageEndpoint}
-                storageAccessKeyId={config.storageAccessKeyId}
-                setStorageAccessKeyId={config.setStorageAccessKeyId}
-                storageSecretAccessKey={config.storageSecretAccessKey}
-                setStorageSecretAccessKey={config.setStorageSecretAccessKey}
-                showStorageSecret={config.showStorageSecret}
-                setShowStorageSecret={config.setShowStorageSecret}
-                storageBucketName={config.storageBucketName}
-                setStorageBucketName={config.setStorageBucketName}
-                storagePublicDomain={config.storagePublicDomain}
-                setStoragePublicDomain={config.setStoragePublicDomain}
-                isTestingStorage={config.isTestingStorage}
-                setIsTestingStorage={config.setIsTestingStorage}
-                isMigratingStorage={config.isMigratingStorage}
-                setIsMigratingStorage={config.setIsMigratingStorage}
-                handleSaveWanbangConfig={config.handleSaveWanbangConfig}
-                handleSaveScraperConfig={config.handleSaveScraperConfig}
-                handleTestScraper={config.handleTestScraper}
-                isTestingScraper={config.isTestingScraper}
-                handleSaveStorageConfig={config.handleSaveStorageConfig}
-                showToast={showToast}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto min-h-0 bg-[#F8F9FA] p-4 sm:p-6 lg:p-8">
-              <div className="w-full max-w-5xl 2xl:max-w-6xl mx-auto">
-
-
 
               {navSection === 'usage' && (
                 <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden p-6 sm:p-8">
@@ -542,11 +404,11 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
       )}
 
       {/* 🌟 3. 手动添加自定义模型模态窗 */}
-      <AddModelModal
-        isOpen={isAddingModelModalOpen}
+      {isAddingModelModalOpen && <AddModelModal
+        initialChannel={addingChannel}
         onClose={() => setIsAddingModelModalOpen(false)}
         onAdd={models.handleAddCustomModel}
-      />
+      />}
     </div>
   );
 }

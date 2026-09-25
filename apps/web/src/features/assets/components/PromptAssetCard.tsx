@@ -1,4 +1,5 @@
 import { workshopAssetBlockReason } from '@beike/domain/workshopPipeline';
+import { visualAssetIssue } from '@beike/domain/assetDeconstruct/visualEvidence';
 import { type MouseEvent, useMemo } from 'react';
 import {
   Star,
@@ -145,7 +146,7 @@ export default function PromptAssetCard({
   return (
     <div
       onClick={onCardClick}
-      className={`group relative self-start flex flex-col rounded-2xl bg-white/90 p-3.5 shadow-[0_2px_10px_rgba(30,41,59,0.045)] transition-[box-shadow,background-color] duration-200 hover:bg-white hover:shadow-[0_8px_24px_rgba(30,41,59,0.10)] cursor-pointer ${
+      className={`group relative self-start flex flex-col rounded-xl bg-transparent p-2 transition-colors duration-200 hover:bg-white/70 cursor-pointer ${
         isSelected
           ? 'bg-indigo-50/80 ring-2 ring-indigo-400 shadow-[0_8px_24px_rgba(79,70,229,0.12)]'
           : ''
@@ -271,6 +272,10 @@ export default function PromptAssetCard({
       </div>
 
       {/* 标题独立成行：单行截断，绝不串行折行 */}
+      {visualAssetIssue(item, activeSubTab) ? (
+        <p className="mb-1 text-[10px] font-medium text-rose-600">{visualAssetIssue(item, activeSubTab)}</p>
+      ) : null}
+
       <h3
         className={`text-sm font-semibold text-slate-900 truncate mb-2 leading-snug transition-colors block ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
         title={item.title || item.name}
@@ -288,7 +293,7 @@ export default function PromptAssetCard({
                 onPreviewImage(imageUrl, e);
               }
             }}
-            className="group/thumb relative w-[76px] h-[76px] rounded-xl overflow-hidden shrink-0 bg-slate-100 cursor-zoom-in"
+            className="group/thumb relative w-[88px] h-[88px] rounded-xl overflow-hidden shrink-0 bg-slate-100 cursor-zoom-in"
             title="点击放大查看来源参考原图"
           >
             <img
@@ -308,7 +313,7 @@ export default function PromptAssetCard({
             )}
           </div>
         ) : (
-          <div className="w-[76px] h-[76px] rounded-xl bg-slate-50 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
+          <div className="w-[88px] h-[88px] rounded-xl bg-slate-50 flex flex-col items-center justify-center gap-1.5 shrink-0 text-slate-400">
             <ImageIcon className="w-5 h-5" />
             <span className="text-[10px]">文字资产</span>
           </div>

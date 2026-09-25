@@ -1,7 +1,7 @@
 export function formatAssetWithCode(
   val: string | undefined,
   list: Array<{ title?: string; name?: string; code?: string }> | undefined,
-  prefix: string,
+  _prefix: string,
   fallbackIdx = 0,
 ): string | undefined {
   if (!val && (!list || list.length === 0)) return undefined;
@@ -21,7 +21,9 @@ export function formatAssetWithCode(
   if (matched?.code) {
     return `[#${matched.code.replace(/^#/, '')}] ${raw.replace(/^\[?#[PSOA]-[\w-]+\]?\s*/i, '')}`;
   }
-  const fallbackCode = list?.[fallbackIdx]?.code || `${prefix}-${String(fallbackIdx + 1).padStart(2, '0')}`;
+  const fallbackCode = list?.[fallbackIdx]?.code;
+  // Mother-group summaries are not standalone library assets. Never invent S-01/P-01/O-01.
+  if (!fallbackCode) return raw;
   return `[#${fallbackCode.replace(/^#/, '')}] ${raw.replace(/^\[?#[PSOA]-[\w-]+\]?\s*/i, '')}`;
 }
 

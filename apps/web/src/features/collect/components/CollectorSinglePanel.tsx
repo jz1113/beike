@@ -1,7 +1,7 @@
 
 import React from 'react';
 import {
-  X, Sparkles, Check, Loader2, Download, Maximize2, ArrowUp,
+  X, Sparkles, Check, Loader2, Download, Maximize2, ArrowUp, ChevronDown,
   Square, Film, Bot, Send, Compass
 } from 'lucide-react';
 import {
@@ -68,44 +68,13 @@ export default function CollectorSinglePanel({
   handleImportToAIAssistant,
 }: CollectorSinglePanelProps) {
   const collectedVideoList = collectedVideos(singleCollectedResult);
+  const platformSelectId = React.useId();
+  const canCollect = Boolean(singleInput.trim()) && !isCollectingSingle;
 
   return (
             <div className="mx-auto max-w-[980px] space-y-5">
-              {/* 输入控制卡片 */}
-              <div className="space-y-5 rounded-[32px] border border-slate-200/80 bg-white/80 p-6 sm:p-8">
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <h2 className="text-base font-black tracking-tight text-slate-900">粘贴链接，自动收集整套素材</h2>
-                    <p className="mt-1 text-xs text-slate-400">识别平台后，统一提取主图、SKU、详情图与原视频。</p>
-                  </div>
-                </div>
-
-                {/* 平台选择胶囊群 */}
-                <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-                  <span className="text-slate-500 mr-1 text-xs">来源平台:</span>
-                  {[
-                    { id: 'auto', name: '智能识别', color: 'text-blue-700 bg-blue-50 border-blue-200' },
-                    { id: 'jd', name: '京东', color: 'text-red-700 bg-red-50 border-red-200' },
-                    { id: 'taobao', name: '淘宝/天猫', color: 'text-orange-700 bg-orange-50 border-orange-200' },
-                    { id: '1688', name: '1688', color: 'text-amber-800 bg-amber-50 border-amber-200' },
-                    { id: 'pinduoduo', name: '拼多多', color: 'text-rose-700 bg-rose-50 border-rose-200' },
-                    { id: 'social', name: '社媒', color: 'text-pink-700 bg-pink-50 border-pink-200' }
-                  ].map(p => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSinglePlatform(p.id as any)}
-                      className={`px-3 py-1.5 rounded-xl border transition-all cursor-pointer text-xs ${singlePlatform === p.id
-                          ? `${p.color} font-bold shadow-2xs`
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                        }`}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-
-                {/* 大面积链接输入区：按 Ctrl/Cmd + Enter 采集 */}
+              {/* 将输入和操作合并，平台选项按需展开。 */}
+              <div className="mx-auto max-w-[800px] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_32px_-16px_rgba(15,23,42,0.12)] transition-colors focus-within:border-slate-400">
                 <div className="relative">
                   <textarea
                     rows={3}
@@ -119,46 +88,59 @@ export default function CollectorSinglePanel({
                       }
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
                         e.preventDefault();
-                        handleSingleCollect();
+                        if (canCollect) handleSingleCollect();
                       }
                     }}
-                    placeholder={'粘贴商品或社媒作品链接到这里\n支持商品链接、数字 ID 或社媒作品链接'}
-                    className="block min-h-[124px] w-full resize-y rounded-[24px] border-2 border-dashed border-slate-300 bg-white/70 px-6 py-5 pr-24 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-blue-300 hover:bg-white focus:border-blue-400 focus:bg-white focus:ring-0"
-                    aria-label="商品或社媒作品链接"
+                    placeholder={singlePlatform === 'auto' || singlePlatform === 'social'
+                      ? '粘贴商品或社媒链接…'
+                      : '粘贴商品链接或输入商品 ID…'}
+                    className="block min-h-[148px] w-full resize-y bg-transparent px-5 py-6 pr-14 text-base leading-7 text-slate-900 outline-none placeholder:text-slate-400 sm:px-7 sm:pr-16"
+                    aria-label="商品链接、商品 ID 或社媒作品链接"
                   />
                   {singleInput && (
                     <button
                       type="button"
                       onClick={() => setSingleInput('')}
-                      className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 cursor-pointer"
+                      className="absolute right-4 top-5 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 cursor-pointer"
                       title="清空输入"
+                      aria-label="清空输入"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
+                  <div className="relative min-w-0">
+                    <label htmlFor={platformSelectId} className="sr-only">来源平台</label>
+                    <select
+                      id={platformSelectId}
+                      value={singlePlatform}
+                      onChange={(e) => setSinglePlatform(e.target.value as CollectorSinglePanelProps['singlePlatform'])}
+                      className="h-10 max-w-full cursor-pointer appearance-none rounded-xl bg-transparent py-2 pl-3 pr-9 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                      title="默认自动识别；输入商品 ID 时可手动选择平台"
+                    >
+                      <option value="auto">自动识别平台</option>
+                      <option value="jd">京东</option>
+                      <option value="taobao">淘宝 / 天猫</option>
+                      <option value="1688">1688</option>
+                      <option value="pinduoduo">拼多多</option>
+                      <option value="social">社媒</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                  </div>
                   <button
                     type="button"
                     onClick={handleSingleCollect}
-                    disabled={isCollectingSingle || !singleInput.trim()}
-                    className={`absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer select-none ${isCollectingSingle || !singleInput.trim()
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-slate-900 text-white shadow-md shadow-slate-900/15 hover:bg-black active:scale-95'
-                      }`}
-                    title={isCollectingSingle ? '正在采集' : '开始采集'}
-                    aria-label={isCollectingSingle ? '正在采集' : '开始采集'}
+                    disabled={!canCollect}
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    title="开始采集（⌘ / Ctrl + Enter）"
                   >
-                    {isCollectingSingle ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                    {isCollectingSingle ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowUp className="h-4 w-4" aria-hidden="true" />}
+                    {isCollectingSingle ? '正在采集…' : '开始采集'}
                   </button>
-                </div>
-
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />自动识别平台</span>
-                    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />高清素材提取</span>
-                    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-500" />结果可入库</span>
-                  </div>
                 </div>
               </div>
 

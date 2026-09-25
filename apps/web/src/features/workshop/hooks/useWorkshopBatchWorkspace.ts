@@ -5,6 +5,7 @@ import { workshopBatchSchema, workshopBatchSummarySchema } from '@beike/contract
 import { workshopSnapshotSchema } from '@beike/contracts/workshopWorkspace';
 import { apiFetch } from '@/shared/api/apiClient';
 import { recoverWorkspace, hasWorkspaceContent } from '../model/workspace/workspaceRecovery';
+import { serializeWorkspaceSnapshot, WorkspaceSaveSession } from '../model/workspace/workspaceSave';
 
 function parseBatchResponse(data: unknown): WorkshopBatch {
   return workshopBatchSchema.parse((data as { batch?: unknown }).batch);
@@ -16,22 +17,20 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   const [error, setError] = useState('');
   const [activeBatch, setActiveBatch] = useState<WorkshopBatch | null>(null);
   const [historyBatches, setHistoryBatches] = useState<WorkshopBatchSummary[]>([]);
-  const revision = useRef(0);
+  const saveSession = useRef<WorkspaceSaveSession | null>(null);
   const loadSequence = useRef(0);
   const switching = useRef(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const saved = useRef('');
   const latest = useRef(snapshot);
   const restoreRef = useRef(restore);
-  const busy = useRef(false);
-  const blocked = useRef(false);
   const alive = useRef(true);
   const activeBatchRef = useRef<WorkshopBatch | null>(null);
   const flushChain = useRef(Promise.resolve());
   latest.current = snapshot;
   restoreRef.current = restore;
   activeBatchRef.current = activeBatch;
-  const serialized = useMemo(() => JSON.stringify(snapshot), [snapshot]);
+  const serialized = useMemo(() => serializeWorkspaceSnapshot(snapshot), [snapshot]);
 
   const refreshHistory = useCallback(async () => {
     const response = await apiFetch('/api/catalog/workshop-batches');
@@ -44,8 +43,8 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
 
   const adoptBatch = useCallback((batch: WorkshopBatch, message: string) => {
     const restored = recoverWorkspace(workshopSnapshotSchema.parse(batch.snapshot));
-    revision.current = batch.revision;
-    saved.current = JSON.stringify(workshopSnapshotSchema.parse(batch.snapshot));
+    saveSession.current = new WorkspaceSaveSession(batch);
+    saved.current = saveSession.current.savedJson;
     latest.current = restored;
     restoreRef.current(restored);
     activeBatchRef.current = batch;
@@ -57,7 +56,6 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   const loadActive = useCallback(async () => {
     const sequence = ++loadSequence.current;
     setReady(false);
-    blocked.current = false;
     setStatus('正在加载当前批次…');
     try {
       const response = await apiFetch('/api/catalog/workshop-batches/active');
@@ -80,57 +78,39 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     return () => { alive.current = false; };
   }, [loadActive]);
 
-  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean; duringSwitch?: boolean }) => {
-    if (!ready || blocked.current || (switching.current && !options?.duringSwitch)) return false;
-    const batch = activeBatchRef.current;
-    if (!batch) return false;
-    const json = JSON.stringify(latest.current);
-    if (json === saved.current) return true;
-    const targetBatchId = batch.id;
-    const targetRevision = revision.current;
-    busy.current = true;
+  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean; duringSwitch?: boolean; force?: boolean }) => {
+    if (!ready || (switching.current && !options?.duringSwitch)) return false;
+    const session = saveSession.current;
+    if (!session || (session.blocked && !options?.force)) return false;
+    const json = serializeWorkspaceSnapshot(latest.current);
+    if (json === saved.current && !session.hasPendingSave) return true;
+    if (!options?.force && Date.now() < session.retryAt) return false;
     if (alive.current) setStatus('正在保存当前批次…');
     try {
-      const response = await apiFetch(`/api/catalog/workshop-batches/${targetBatchId}`, {
-        method: 'PUT',
-        keepalive: options?.keepalive,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ revision: targetRevision, snapshot: JSON.parse(json) }),
-      });
-      const data = await response.json();
-      if (activeBatchRef.current?.id !== targetBatchId) return false;
-      if (!response.ok) {
-        if (response.status === 409) blocked.current = true;
-        throw new Error(data.error || '当前批次保存失败');
-      }
-      if (!Number.isInteger(data.revision) || data.revision !== targetRevision + 1) {
-        blocked.current = true;
-        throw new Error('批次版本未确认，请重新加载核实');
-      }
-      revision.current = data.revision;
-      saved.current = json;
+      const confirmed = await session.save(json, { ...options, fetch: apiFetch });
+      if (saveSession.current !== session || !confirmed) return false;
+      saved.current = session.savedJson;
       if (alive.current) {
-        setActiveBatch(previous => previous && previous.id === targetBatchId
-          ? { ...previous, revision: data.revision, updatedAt: data.updatedAt }
+        setActiveBatch(previous => previous && previous.id === session.batchId
+          ? { ...previous, revision: session.revision, updatedAt: session.updatedAt }
           : previous);
         setStatus('当前批次已保存');
         setError('');
       }
       return true;
     } catch (cause) {
-      if (activeBatchRef.current?.id !== targetBatchId) return false;
-      blocked.current = true;
+      if (saveSession.current !== session) return false;
+      // A recovered older write may be confirmed even if saving newer edits fails.
+      saved.current = session.savedJson;
       if (alive.current) {
         setError(cause instanceof Error ? cause.message : '当前批次保存失败');
-        setStatus('当前批次尚未确认保存');
+        setStatus(session.blocked ? '本地修改已保留，需处理保存冲突' : '本地修改已保留，网络恢复后自动核对并重试');
       }
       return false;
-    } finally {
-      busy.current = false;
     }
   }, [ready]);
 
-  const flush = useCallback((options?: { keepalive?: boolean; duringSwitch?: boolean }) => {
+  const flush = useCallback((options?: { keepalive?: boolean; duringSwitch?: boolean; force?: boolean }) => {
     const run = flushChain.current.then(() => persistSnapshot(options), () => persistSnapshot(options));
     flushChain.current = run.then(() => undefined, () => undefined);
     return run;
@@ -141,17 +121,20 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     const timer = window.setInterval(() => { void flush(); }, 1200);
     const onVisibility = () => { if (document.visibilityState === 'hidden') void flush(); };
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (JSON.stringify(latest.current) === saved.current) return;
+      if (serializeWorkspaceSnapshot(latest.current) === saved.current && !saveSession.current?.hasPendingSave) return;
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     const onPageHide = () => { void flush({ keepalive: true }); };
-    window.addEventListener('visibilitychange', onVisibility);
+    const onOnline = () => { void flush({ force: true }); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
     window.addEventListener('pagehide', onPageHide);
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener('visibilitychange', onVisibility);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
       window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('beforeunload', onBeforeUnload);
       void flush({ keepalive: true });
@@ -171,7 +154,6 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '批次操作失败');
       const batch = parseBatchResponse(data);
-      blocked.current = false;
       adoptBatch(batch, successMessage);
       await refreshHistory().catch(cause => {
         setError(`批次已切换，但历史列表读取失败：${cause instanceof Error ? cause.message : '请重试'}`);
@@ -252,6 +234,15 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     ready: ready && !isSwitching,
     startFreshEntry,
     flush,
+    retrySave: () => flush({ force: true }),
+    downloadDraft: () => {
+      const url = URL.createObjectURL(new Blob([serializeWorkspaceSnapshot(latest.current)], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `workshop-draft-${activeBatchRef.current?.id || 'unsaved'}.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
     status: ready && !error && !isSwitching && status !== '正在保存当前批次…' && serialized !== saved.current ? '等待保存当前批次…' : status,
     error,
     activeBatch,
@@ -265,7 +256,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     renameBatch,
     readBatch,
     reload: async () => {
-      if (JSON.stringify(latest.current) !== saved.current && !window.confirm('重新加载将用服务器版本替换当前内容，未保存的修改可能丢失。确定继续吗？')) return;
+      if (serializeWorkspaceSnapshot(latest.current) !== saved.current && !window.confirm('重新加载将用服务器版本替换当前内容，未保存的修改可能丢失。确定继续吗？')) return;
       await loadActive();
     },
   };

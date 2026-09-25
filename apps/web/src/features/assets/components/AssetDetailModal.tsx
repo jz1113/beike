@@ -241,7 +241,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     </div>
                     {sourceIdx !== null && (
                       <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs">
-                        #{detailActiveImageIndex !== 0 ? detailActiveImageIndex + 1 : sourceIdx}
+                        #{sourceImageIndices[detailActiveImageIndex] || sourceIdx}
                       </span>
                     )}
                   </div>
@@ -257,8 +257,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full">
                         {visibleSourceImages.map((imgUrl, i) => {
                           const isCurrent =
-                            i === detailActiveImageIndex ||
-                            (sourceIdx === i + 1 && detailActiveImageIndex === 0);
+                            i === detailActiveImageIndex;
                           return (
                             <button
                               key={i}

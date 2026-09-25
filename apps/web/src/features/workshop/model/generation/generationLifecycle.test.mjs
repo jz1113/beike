@@ -10,6 +10,7 @@ async function load(relativePath) {
   const bundle = await build({ entryPoints: [fileURLToPath(new URL(relativePath, import.meta.url))],
     bundle: true, write: false, platform: 'node', format: 'esm', define: { 'import.meta.env': '{}' },
     plugins: [{ name: 'grid-slicer', setup(build) {
+      build.onLoad({ filter: /workshopImageSize\.ts$/ }, () => ({ contents: `export function resolveWorkshopImageSize(_aspect, _model, _quality, lockedSize) { return lockedSize || '2496x3328'; } export async function verifyWorkshopImageSize(url) { if (url.includes('wrong-size')) throw Object.assign(new Error('成图尺寸不一致'), { recoveryRequired: true, retryable: false }); }` }));
       build.onLoad({ filter: /imageGridSlicer\.ts$/ }, () => ({ contents: 'export async function sliceGridImage2x2Blobs() { return [1,2,3,4].map(() => new Blob(["image"], {type:"image/jpeg"})); }' }));
     } }],
   });
@@ -177,4 +178,54 @@ test('failed-only retry validates current references and storyboard before submi
   await coordinator.retryFailedImageTasksCoordinator(ctx.deps, ctx.itemsRef.current, false);
   assert.match(ctx.messages.at(-1), /尚未完成分镜分析/);
   assert.equal(ctx.itemsRef.current[0].tasks[0].attempt, 0);
+});
+
+test('wrong-size single outputs cannot become successful through submission or recovery', async t => {
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    if (init.method === 'POST') posts++;
+    return reply({ success: true, status: 'SUCCESS', resultUrl: '/storage/wrong-size.jpg', taskId: 'size-task' });
+  });
+  const ctx = context([product()]);
+  await coordinator.startBatchGenerationCoordinator(ctx.deps);
+  assert.equal(posts, 4);
+  const tasks = ctx.itemsRef.current[0].tasks;
+  assert.ok(tasks.every(task => task.status === 'FAILURE' && task.recoveryRequired && task.outputSize === '2496x3328'));
+  assert.ok(tasks.every(task => task.upstreamTaskId === 'size-task'));
+  await recheckWorkshopTask('p', tasks[0].id, ctx.itemsRef.current, ctx.deps.setItems, ctx.deps.showToast);
+  assert.equal(posts, 4);
+  assert.equal(ctx.itemsRef.current[0].tasks[0].status, 'FAILURE');
+  assert.match(ctx.messages.at(-1), /尺寸不一致/);
+});
+
+test('wrong-size grids retain their source without uploading slices or generating again on recovery', async t => {
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.doesNotMatch(url, /upload/);
+    if (init.method === 'POST') posts++;
+    return reply({ success: true, status: 'SUCCESS', resultUrl: '/storage/wrong-size-grid.jpg', taskId: 'grid-size-task' });
+  });
+  const ctx = context([product({ gridPrompt: 'four views' })], { generationStrategy: 'grid_first' });
+  await coordinator.startBatchGenerationCoordinator(ctx.deps);
+  const tasks = ctx.itemsRef.current[0].tasks;
+  assert.equal(posts, 1);
+  assert.ok(tasks.every(task => task.status === 'FAILURE' && task.recoveryRequired && task.gridSourceUrl === '/storage/wrong-size-grid.jpg'));
+  await recheckWorkshopTask('p', tasks[0].id, ctx.itemsRef.current, ctx.deps.setItems, ctx.deps.showToast);
+  assert.equal(posts, 1);
+  assert.ok(ctx.itemsRef.current[0].tasks.every(task => task.status === 'FAILURE'));
+});
+
+test('individual redraw of a grid shot submits its original slice dimensions', async t => {
+  const p = product();
+  p.tasks = mergeGenerationTasks(p, mergeContext).map(task => ({ ...task, status: 'SUCCESS', resultUrl: '/storage/old.jpg', gridSize: '2496x3328', outputSize: '1248x1664' }));
+  const ctx = context([p]);
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    const payload = JSON.parse(init.body);
+    assert.equal(payload.size, '1248x1664');
+    assert.equal(payload.aspectRatio, '3:4');
+    return reply({ success: true, status: 'SUCCESS', resultUrl: '/storage/correct.jpg', taskId: 'redraw' });
+  });
+  await coordinator.retrySingleShotTaskCoordinator('p', 0, ctx.itemsRef.current, ctx.deps.setItems, { ...config, selectedAspect: '1:1' }, ctx.deps.showToast);
+  assert.equal(ctx.itemsRef.current[0].tasks[0].status, 'SUCCESS');
+  assert.ok(ctx.itemsRef.current[0].tasks.every(task => task.outputSize === '1248x1664'));
 });

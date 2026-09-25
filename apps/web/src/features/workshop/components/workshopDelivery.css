@@ -1,0 +1,34 @@
+/* Use the available panel width, not the viewport: the product rail and app
+   navigation can leave considerably less room for the generated images. */
+.workshop-image-gallery {
+  container-type: inline-size;
+}
+
+.workshop-image-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px 12px;
+}
+
+.workshop-image-grid > * {
+  width: 100%;
+  max-width: 280px;
+  justify-self: center;
+}
+
+@container (min-width: 360px) {
+  .workshop-image-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 760px) {
+  .workshop-image-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .workshop-image-grid[data-count='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 864px;
+  }
+}
