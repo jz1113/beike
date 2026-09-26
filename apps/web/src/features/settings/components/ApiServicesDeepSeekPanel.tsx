@@ -1,3 +1,4 @@
+import { DeepSeekModelDirectory } from './DeepSeekModelDirectory';
 import { Activity, ExternalLink, Eye, EyeOff, Image, Loader2, Save } from 'lucide-react';
 import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 import { ModelIcon } from '@/shared/ui/ModelIcons';
@@ -18,7 +19,7 @@ export function ApiServicesDeepSeekPanel({
 }: ApiServicesDeepSeekPanelProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="bg-transparent py-1 space-y-4">
         <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100">
           <div className="flex items-start gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-[#f3f6ff] border border-[#dbe4ff] flex items-center justify-center shrink-0 mt-0.5 p-1.5">
@@ -64,6 +65,7 @@ export function ApiServicesDeepSeekPanel({
           <button type="button" onClick={onSave} className="h-9 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Save className="w-3.5 h-3.5" />保存 Key</button>
         </div>
       </div>
+      <DeepSeekModelDirectory apiKey={apiKey} />
     </div>
   );
 }

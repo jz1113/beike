@@ -20,7 +20,15 @@ await page.route('**/api/**', async route => {
   assert.ok(!path.startsWith('/api/generate/'), 'settings must not generate billable content');
   const data = { success: true, items: [], models: [], recipes: [], personas: [], scenes: [], outfits: [], actions: [], fullPrompts: [] };
   if (path.endsWith('/pricing')) data.prices = { 'gpt-6-luna': { promptPer1k: 0.001, completionPer1k: 0.003 } };
-  if (path.endsWith('/models/fetch')) { await testGate; data.isFallback = fallback; }
+  if (path.endsWith('/models/fetch')) {
+    await testGate; data.isFallback = fallback;
+    const body = route.request().postDataJSON();
+    if (body.provider === 'deepseek') {
+      assert.equal(body.apiKey, 'test-deepseek-only');
+      data.provider = 'deepseek';
+      data.models = [{ id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] }, { id: 'deepseek-v4-pro', name: 'DeepSeek Pro', inputModalities: ['text'] }];
+    }
+  }
   await route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
 });
 await page.addInitScript(() => {
@@ -51,6 +59,8 @@ try {
   assert.deepEqual(await routes(), ['gpt-6-luna', 'openai-responses:gpt-6-luna']);
   assert.deepEqual(await stored(), initial, 'display operations must not persist order, defaults or credentials');
   await page.getByLabel('搜索模型', { exact: true }).fill('');
+  assert.ok((await page.locator('[data-model-route="gpt-image-2"]').innerText()).includes('฿0.06/次'));
+  assert.ok(!(await page.locator('[data-model-route="openai-responses:gpt-6-luna"]').innerText()).includes('1K token'));
   await page.screenshot({ path: join(evidenceDir, 'models-desktop.png') });
   await page.locator('[data-model-route="gpt-6-luna"]').getByRole('switch').click();
   assert.equal(await page.locator('[data-model-route="gpt-6-luna"]').getByRole('switch').getAttribute('aria-checked'), 'false');
@@ -98,6 +108,15 @@ try {
   assert.equal((await stored()).key, beforeDeepSeek.key, 'DeepSeek must not replace the Comfly key');
   assert.equal((await stored()).baseUrl, beforeDeepSeek.baseUrl, 'DeepSeek must not replace the Comfly URL');
 
+  await nav('拉取 DeepSeek 模型').click();
+  await page.getByText('DeepSeek Pro', { exact: true }).waitFor();
+  assert.ok((await page.getByRole('region', { name: 'DeepSeek 官方模型目录' }).innerText()).includes('文本 · 图像理解'));
+  await page.getByLabel('搜索 DeepSeek 模型').fill('pro');
+  assert.equal(await page.getByText('DeepSeek Flash', { exact: true }).count(), 0);
+  await page.getByLabel('搜索 DeepSeek 模型').fill('');
+  await page.screenshot({ path: join(evidenceDir, 'deepseek-desktop.png') });
+  await page.getByPlaceholder('sk-...').fill('changed-key');
+  assert.equal(await page.getByText('DeepSeek Pro', { exact: true }).count(), 0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByLabel('设置分类', { exact: true }).selectOption('models');
   await page.getByLabel('筛选渠道', { exact: true }).selectOption('openai');

@@ -12,7 +12,7 @@
 
 .workshop-image-grid > * {
   width: 100%;
-  max-width: 280px;
+  max-width: 360px;
   justify-self: center;
 }
 
@@ -29,6 +29,6 @@
 
   .workshop-image-grid[data-count='3'] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    max-width: 864px;
+    max-width: 1080px;
   }
 }

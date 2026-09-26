@@ -35,8 +35,8 @@ export function PosterImportPanel({
       <h1 className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px]">一键批量制作大字报封面</h1>
       <p className="mt-3 text-sm text-slate-500">导入图片链接、原标题、文字方向；商品名称/型号可选。可在生产设置中选择 AI 优化标题或保留原标题，再一次设计并生成主体、场景与准确艺术字。</p>
       <div className="mt-6 inline-flex rounded-full bg-slate-100 p-1 shadow-inner">
-        <button type="button" onClick={() => onImportMode('file')} className={`inline-flex min-w-[164px] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${importMode === 'file' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileSpreadsheet className="h-4 w-4" />导入文件</button>
         <button type="button" onClick={() => onImportMode('paste')} className={`inline-flex min-w-[164px] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${importMode === 'paste' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileText className="h-4 w-4" />粘贴表格</button>
+        <button type="button" onClick={() => onImportMode('file')} className={`inline-flex min-w-[164px] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${importMode === 'file' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileSpreadsheet className="h-4 w-4" />导入文件</button>
       </div>
       <section className={importMode === 'file' ? 'mt-8' : 'mt-8 min-h-[300px] overflow-hidden rounded-[32px] border-2 border-dashed border-slate-300 bg-white/80 text-left transition hover:border-rose-300 hover:bg-white'}>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onImportFile} />

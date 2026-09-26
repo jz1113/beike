@@ -35,10 +35,10 @@ export function PosterToolbar({
       ? { icon: <RotateCcw className="h-4 w-4" />, label: `重试失败（${failedCount} 条）`, onClick: onRetryFailed, className: dockButtonClass }
       : { icon: <Play className="h-4 w-4 fill-current" />, label: pendingCount > 0 ? `开始批量生成（${pendingCount} 条）` : '没有待生成任务', onClick: onStartBatch, className: dockButtonClass, disabled: pendingCount === 0 };
   const dockItems: DockItemData[] = [
-    { icon: <History className="h-4 w-4" />, label: historyCount > 0 ? `历史批次（${historyCount}）` : '历史批次', onClick: onOpenHistory, className: dockButtonClass },
     { icon: <Plus className="h-4 w-4" />, label: '新建批次', onClick: onRequestNewBatch, className: dockButtonClass, disabled: !hasItems },
     generationControl,
     { icon: isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />, label: completedCount > 0 ? `打包下载（${completedCount} 张）` : '暂无可下载成品', onClick: onExport, className: dockButtonClass, disabled: isExporting || completedCount === 0 },
+    { icon: <History className="h-4 w-4" />, label: historyCount > 0 ? `历史批次（${historyCount}）` : '历史批次', onClick: onOpenHistory, className: dockButtonClass },
     { icon: <Settings2 className="h-4 w-4" />, label: '生产设置', onClick: onOpenSettings, className: dockButtonClass },
   ];
 

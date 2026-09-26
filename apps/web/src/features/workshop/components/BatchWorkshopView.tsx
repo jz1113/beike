@@ -315,7 +315,7 @@ export default function BatchWorkshopView() {
           !historyGenerationBatch && currentStage === 1 && items.length === 0
             ? "max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto w-full flex-1 flex flex-col justify-between"
             : historyGenerationBatch || currentStage === 4
-              ? "mx-auto w-full max-w-[1560px] space-y-4"
+              ? "mx-auto w-full max-w-[1840px] space-y-4"
               : "w-full space-y-4"
         }>
           {!historyGenerationBatch && items.length > 0 && <WorkshopProductionOverview items={items} currentStage={currentStage} onStageChange={setCurrentStage}

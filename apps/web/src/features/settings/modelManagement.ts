@@ -1,6 +1,7 @@
+import { comflyTokenPrice } from './comflyReferencePrice';
 import { isMultimodalWorkflowModel, workflowModelRouteId } from '@beike/domain/workflowModels';
 import type { WorkflowModel } from './settingsShared';
-import { multimodalPriceScore, type ComflyPriceMap } from './multimodalPriceSort';
+import { type ComflyPriceMap } from './multimodalPriceSort';
 
 export type ModelChannel = NonNullable<WorkflowModel['channel']>;
 export type CapabilityFilter = 'all' | 'multimodal' | 'image' | 'video';
@@ -33,8 +34,10 @@ export function selectModelRows(models: readonly WorkflowModel[], options: {
   ).sort((a, b) => {
     if (options.sort === 'name') return (a.name || a.id).localeCompare(b.name || b.id, 'zh-CN');
     if (options.sort !== 'price') return 0;
-    const score = (m: WorkflowModel) => modelChannel(m) === 'comfly' && isMultimodalWorkflowModel(m)
-      ? multimodalPriceScore(m.id, options.prices ?? undefined) : null;
+    const score = (m: WorkflowModel) => {
+      const price = modelChannel(m) === 'comfly' && isMultimodalWorkflowModel(m) ? comflyTokenPrice(m.id, options.prices) : undefined;
+      return price ? price.promptPer1k + price.completionPer1k : null;
+    };
     const aPrice = score(a), bPrice = score(b);
     return aPrice === null ? (bPrice === null ? 0 : 1) : bPrice === null ? -1 : aPrice - bPrice;
   });

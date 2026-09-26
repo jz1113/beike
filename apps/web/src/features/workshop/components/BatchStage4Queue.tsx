@@ -121,7 +121,7 @@ export default function BatchStage4Queue({
     || selectedImageGenModel;
 
   return (
-    <div className="mx-auto w-full max-w-[1560px] space-y-4 rounded-2xl bg-slate-50 p-3 sm:p-4">
+    <div className="mx-auto w-full max-w-[1840px] space-y-4 rounded-2xl bg-slate-50 p-3 sm:p-4">
       {/* 🌟 顶层全景大盘 Header：整合生产大盘总览、商品切换条与交付导出动作 */}
       <BatchStage4Header
         isGeneratingBatch={isGeneratingBatch}

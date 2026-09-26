@@ -34,7 +34,7 @@ export function ApiServicesOpenAIPanel({
   isTesting, isFetchingModels, modelCount, modelError, modelSource,
   suggestedBaseUrl, onUseSuggestedBaseUrl,
 }: Props) {
-  return <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
+  return <div className="bg-transparent py-1 space-y-4">
     <div className="flex items-start gap-3 pb-3 border-b border-slate-100">
       <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 p-1.5">
         <ModelIcon modelId="gpt-6-luna" className="w-full h-full" />

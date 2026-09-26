@@ -16,7 +16,7 @@ interface Props {
 
 export function ApiServicesLianchiPanel({ apiKey, setApiKey, showKey, setShowKey, isTesting, onTest, onSave, onFetchModels, isFetchingModels, modelCount }: Props) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
+    <div className="bg-transparent py-1 space-y-4">
       <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
         <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center"><LianchiLogo className="w-8 h-8" /></div>
         <div>

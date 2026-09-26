@@ -1,3 +1,4 @@
+import { fetchDeepSeekCatalog } from './deepseekCatalog';
 import { gatewayFetch } from '../../../gateways/http';
 import { readJsonBody } from '../../../core/validate';
 import { jsonResponse } from '../../../core/http';
@@ -96,6 +97,7 @@ function emptyCatalog(status: number, error?: string) {
 export async function POST(req: Request) {
   try {
     const body = await readJsonBody(req, {});
+    if (body.provider === 'deepseek') return fetchDeepSeekCatalog(body.apiKey);
     const { baseUrl, isPing, strict } = body;
     const isLianchi = body.provider === 'lianchi';
     const isOpenAI = body.provider === 'openai';

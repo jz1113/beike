@@ -172,7 +172,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const gatewayBalanceFormatted = gatewayUser.userInfo?.quotaFormatted;
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#F9FAFB] text-slate-900 font-sans select-none overflow-hidden relative">
+    <div className="w-full h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-slate-900 font-sans select-none overflow-hidden relative">
       {/* Toast 提示条 */}
       {toastMsg && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fade-in">
@@ -185,7 +185,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         {/* ===================== COLUMN 1: 左侧专有侧边栏 ===================== */}
         <aside
           data-settings-sidebar
-          className="hidden md:flex w-44 xl:w-52 shrink-0 h-full bg-[#F5F6F8] border-r border-slate-200/90 flex flex-col justify-between overflow-hidden relative z-20"
+          className="hidden md:flex w-44 xl:w-52 shrink-0 h-full bg-white/30 border-r border-slate-200/60 flex flex-col justify-between overflow-hidden relative z-20"
         >
           <div className="flex flex-col pt-3 sm:pt-4 px-3 sm:px-4">
             <button
@@ -324,8 +324,8 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} showToast={showToast} />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto min-h-0 bg-[#F8F9FA] p-4 sm:p-6 lg:p-8">
-              <div className="w-full max-w-5xl 2xl:max-w-6xl mx-auto">
+            <div className="flex-1 overflow-y-auto min-h-0 bg-transparent p-4 sm:p-5 lg:p-6">
+              <div className="w-full min-w-0">
 
 
 

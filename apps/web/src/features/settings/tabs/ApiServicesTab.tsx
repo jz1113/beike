@@ -28,10 +28,10 @@ export default function ApiServicesTab({ config: c, models: m, group, selectedSe
   };
   return <>
     <ApiServicesNavList services={filteredServices} serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} selectedServiceId={activeId} setSelectedServiceId={setSelectedServiceId} statuses={statuses} />
-    <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50/40">
-      <div className="mx-auto w-full max-w-6xl p-4 sm:p-6 space-y-5">
+    <div className="flex-1 min-w-0 overflow-y-auto bg-transparent">
+      <div className="w-full p-4 sm:p-5 lg:p-6 space-y-6">
         <label className="lg:hidden block text-xs text-slate-600">{group === 'models' ? '选择模型渠道' : '选择服务'}<select aria-label="选择接口服务" value={activeId} onChange={event => setSelectedServiceId(event.target.value)} className="block w-full mt-2 p-2.5 rounded-xl border border-slate-200 bg-white">{services.map(service => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
-        <div role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div role="status" className="border-b border-slate-200/70 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className={`text-xs font-semibold ${SERVICE_STATUS_COLORS[status.state]}`}>{status.label}</span><span className="text-[11px] text-slate-500 break-words">{status.detail}</span>
         </div>
         {activeId === 'comfly_gateway' && <ApiServicesGatewayPanel {...c} />}

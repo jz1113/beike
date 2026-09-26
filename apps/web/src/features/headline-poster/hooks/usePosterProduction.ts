@@ -40,7 +40,7 @@ export function usePosterProduction() {
   const abortRef = useRef({ aborted: false });
   const itemAbortControllers = useRef(new Map<string, AbortController>());
   const [pasteText, setPasteText] = useState('');
-  const [importMode, setImportMode] = useState<'file' | 'paste'>('file');
+  const [importMode, setImportMode] = useState<'file' | 'paste'>('paste');
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [items, setItems] = useState<PosterItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);

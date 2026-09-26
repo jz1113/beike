@@ -40,13 +40,13 @@ export default function DefaultsTab(props: DefaultsTabProps) {
       value: props.activeVideoGenModel, models: options(videoIds),
       save: (id: string) => { localStorage.setItem('ai_video_gen_model', id); props.setActiveVideoGenModel(id); props.setQuickVideoModel(id); } },
   ];
-  return <div className="space-y-5 max-w-5xl mx-auto">
+  return <div className="space-y-6 w-full">
     <header><h2 className="text-base font-bold text-slate-900">默认模型与调用规则</h2><p className="text-xs text-slate-500 mt-2">默认线路与模型列表展示顺序独立。选择前请在渠道管理中保存凭证并测试接口。</p></header>
-    <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100 overflow-hidden">
+    <div className="divide-y divide-slate-200/70 border-y border-slate-200/70">
       {cards.map(card => {
         const valid = card.models.some(model => model.id === card.value);
         const Icon = card.icon;
-        return <section key={card.id} className="p-5 space-y-3">
+        return <section key={card.id} className="py-6 space-y-3">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div className="flex gap-3 items-start"><span className="p-2 rounded-xl bg-indigo-50 text-indigo-600"><Icon className="w-4 h-4" /></span><div><h3 className="text-sm font-semibold text-slate-800">{card.title}</h3><p className="text-xs text-slate-500 mt-1.5 leading-5">{card.desc}</p></div></div>
             <select aria-label={card.title} value={valid ? card.value : ''} disabled={!card.models.length}
@@ -60,7 +60,7 @@ export default function DefaultsTab(props: DefaultsTabProps) {
         </section>;
       })}
     </div>
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+    <section className="py-2 space-y-4">
       <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2"><Info className="w-4 h-4 text-indigo-600" />当前故障处理规则 <span className="text-[10px] font-normal text-slate-500">只读 · 由后端执行</span></h3>
       <div className="grid sm:grid-cols-2 gap-4 text-xs leading-6 text-slate-600">
         <div><h4 className="font-semibold text-slate-800">Comfly 多模态</h4><p>部分分析、助手与文案接口使用后端内置降级序列；从请求模型开始，是否重试由对应接口判断。该序列不等同于本地模型列表，停用选择器条目不修改后端降级池。</p></div>

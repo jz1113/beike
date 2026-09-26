@@ -28,7 +28,7 @@ export function ApiServicesGatewayPanel({
   return (
     <div className="space-y-4">
       {/* 🌟 1. 网关概览与接口凭证一体化卡片 */}
-      <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="bg-transparent py-1 space-y-4">
         {/* 卡片头部：Logo + 标题 + 状态徽章 + 官网申请链接 + 开关 */}
         <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100">
           <div className="flex items-start gap-3 min-w-0">

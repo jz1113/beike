@@ -1,0 +1,975 @@
+{
+  "gpt-6-luna": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.0001/K token\n补全:฿0.0005/K token\n缓存命中:฿0.01/M token\n缓存创建:฿0.125/M token",
+      "page": 1
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.00073/K token\n补全:฿0.00365/K token\n缓存命中:฿0.073/M token\n缓存创建:฿0.9125/M token",
+      "page": 1
+    }
+  ],
+  "gpt-6-sol": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.002/K token\n补全:฿0.01/K token\n缓存命中:฿0.2/M token\n缓存创建:฿2.5/M token",
+      "page": 1
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0146/K token\n补全:฿0.073/K token\n缓存命中:฿1.46/M token\n缓存创建:฿18.25/M token",
+      "page": 1
+    }
+  ],
+  "grok-4.7": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.002/K token\n补全:฿0.006/K token\n缓存命中:฿0.5/M token",
+      "page": 2
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.006/K token\n补全:฿0.018/K token\n缓存命中:฿1.5/M token",
+      "page": 2
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.008/K token\n补全:฿0.024/K token\n缓存命中:฿2/M token",
+      "page": 2
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0146/K token\n补全:฿0.0438/K token\n缓存命中:฿3.65/M token",
+      "page": 2
+    }
+  ],
+  "kling-video-v3": [
+    {
+      "group": "国产特价2",
+      "detail": "固定价格:฿0.8/credits",
+      "page": 4
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿1/credits",
+      "page": 4
+    }
+  ],
+  "kling-video-v3-omni": [
+    {
+      "group": "国产特价2",
+      "detail": "固定价格:฿0.8/credits",
+      "page": 4
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿1/credits",
+      "page": 4
+    }
+  ],
+  "deepseek-v4.1-flash": [
+    {
+      "group": "国产特价",
+      "detail": "提示:฿0.0014/K token\n补全:฿0.0056/K token\n缓存命中:฿0.028/M token",
+      "page": 9
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.002/K token\n补全:฿0.008/K token\n缓存命中:฿0.04/M token",
+      "page": 9
+    }
+  ],
+  "gpt-image-2.5-flare": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.15/次",
+      "page": 9
+    },
+    {
+      "group": "gpt-image-2-official-mix",
+      "detail": "固定价格:฿0.3/次",
+      "page": 9
+    },
+    {
+      "group": "image2-4k",
+      "detail": "固定价格:฿0.16/次",
+      "page": 9
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.015/K token\n补全:฿0.09/K token\n缓存命中:฿3/M token",
+      "page": 9
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.02/K token\n补全:฿0.12/K token\n缓存命中:฿4/M token",
+      "page": 9
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0365/K token\n补全:฿0.219/K token\n缓存命中:฿7.3/M token",
+      "page": 9
+    },
+    {
+      "group": "azure特价组",
+      "detail": "固定价格:฿0.3/次",
+      "page": 9
+    }
+  ],
+  "gpt-image-2.5-sunburst": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.15/次",
+      "page": 10
+    },
+    {
+      "group": "gpt-image-2-official-mix",
+      "detail": "固定价格:฿0.3/次",
+      "page": 10
+    },
+    {
+      "group": "image2-4k",
+      "detail": "固定价格:฿0.16/次",
+      "page": 10
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.015/K token\n补全:฿0.09/K token\n缓存命中:฿3/M token",
+      "page": 10
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.02/K token\n补全:฿0.12/K token\n缓存命中:฿4/M token",
+      "page": 11
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0365/K token\n补全:฿0.219/K token\n缓存命中:฿7.3/M token",
+      "page": 11
+    },
+    {
+      "group": "azure特价组",
+      "detail": "固定价格:฿0.3/次",
+      "page": 11
+    }
+  ],
+  "gpt-6-astra": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.01/K token\n补全:฿0.05/K token\n缓存命中:฿1/M token\n缓存创建:฿12.5/M token",
+      "page": 12
+    },
+    {
+      "group": "纯Azure",
+      "detail": "提示:฿0.01/K token\n补全:฿0.05/K token\n缓存命中:฿1/M token\n缓存创建:฿12.5/M token",
+      "page": 12
+    },
+    {
+      "group": "纯Azure-优质,支持o1、o3",
+      "detail": "提示:฿0.015/K token\n补全:฿0.075/K token\n缓存命中:฿1.5/M token\n缓存创建:฿18.75/M token",
+      "page": 12
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.03/K token\n补全:฿0.15/K token\n缓存命中:฿3/M token\n缓存创建:฿37.5/M token",
+      "page": 12
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.04/K token\n补全:฿0.2/K token\n缓存命中:฿4/M token\n缓存创建:฿50/M token",
+      "page": 12
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.073/K token\n补全:฿0.365/K token\n缓存命中:฿7.3/M token\n缓存创建:฿91.25/M token",
+      "page": 12
+    }
+  ],
+  "wan3.0-video": [
+    {
+      "group": "国产特价2",
+      "detail": "分辨率 价格\n480P ฿0.36/s\n720P ฿0.72/s\n1080P ฿1.44/s",
+      "page": 13
+    },
+    {
+      "group": "默认分组",
+      "detail": "分辨率 价格\n480P ฿0.45/s\n720P ฿0.9/s\n1080P ฿1.8/s",
+      "page": 14
+    }
+  ],
+  "deepseek-v4-flash": [
+    {
+      "group": "国产特价",
+      "detail": "提示:฿0.0007/K token\n补全:฿0.0014/K token\n缓存命中:฿0.02338/M token",
+      "page": 14
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.001/K token\n补全:฿0.002/K token\n缓存命中:฿0.0334/M token",
+      "page": 14
+    }
+  ],
+  "qwen3.8-max": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.012/K token\n补全:฿0.036/K token\n缓存命中:฿1.5/M token",
+      "page": 14
+    }
+  ],
+  "gemini-3.7-flash": [
+    {
+      "group": "Gemini优质",
+      "detail": "提示:฿0.0015/K token\n补全:฿0.0075/K token\n缓存命中:฿0.15/M token",
+      "page": 15
+    },
+    {
+      "group": "gemini-t3",
+      "detail": "提示:฿0.003/K token\n补全:฿0.015/K token\n缓存命中:฿0.3/M token",
+      "page": 15
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.00547/K token\n补全:฿0.02738/K token\n缓存命中:฿0.5475/M token",
+      "page": 15
+    }
+  ],
+  "gemini-3.8-flash": [
+    {
+      "group": "Gemini优质",
+      "detail": "提示:฿0.0015/K token\n补全:฿0.0075/K token\n缓存命中:฿0.15/M token",
+      "page": 16
+    },
+    {
+      "group": "gemini-t3",
+      "detail": "提示:฿0.003/K token\n补全:฿0.015/K token\n缓存命中:฿0.3/M token",
+      "page": 16
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.00547/K token\n补全:฿0.02738/K token\n缓存命中:฿0.5475/M token",
+      "page": 16
+    }
+  ],
+  "grok-4.6": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.002/K token\n补全:฿0.006/K token\n缓存命中:฿0.5/M token",
+      "page": 17
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.006/K token\n补全:฿0.018/K token\n缓存命中:฿1.5/M token",
+      "page": 17
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.008/K token\n补全:฿0.024/K token\n缓存命中:฿2/M token",
+      "page": 17
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0146/K token\n补全:฿0.0438/K token\n缓存命中:฿3.65/M token",
+      "page": 17
+    }
+  ],
+  "grok-imagine-image-quality": [
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "Media Input 分辨率 价格\n0.01/img 1K ฿0.15/img\n0.01/img 2K ฿0.21/img",
+      "page": 17
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "Media Input 分辨率 价格\n0.01/img 1K ฿0.2/img\nMedia Input 分辨率 价格\n0.01/img 2K ฿0.28/img",
+      "page": 17
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "Media Input 分辨率 价格\n0.01/img 1K ฿0.365/img\n0.01/img 2K ฿0.511/img",
+      "page": 18
+    }
+  ],
+  "doubao-seedance-2.5": [
+    {
+      "group": "默认分组",
+      "detail": "是否含视频输\n分辨率 价格\n入\n是 480p ฿77/1M token\n是 720p ฿77/1M token\n是 1080p ฿77/1M token\n2k(720p\n是 ฿77/1M token\nupscale)\n4k(720p\n是 ฿77/1M token\nupscale)\n฿46.2/1M\n否 480p\ntoken\n฿46.2/1M\n否 720p\ntoken\n฿46.2/1M\n否 1080p\ntoken\n2k(720p ฿46.2/1M\n否\nupscale) token\n4k(720p ฿46.2/1M\n否\nupscale) token",
+      "page": 18
+    },
+    {
+      "group": "sd-global",
+      "detail": "是否含视频输\n分辨率 价格\n入\n是 480p ฿77/1M token\n是 720p ฿77/1M token\n是 1080p ฿77/1M token\n2k(720p\n是 ฿77/1M token\nupscale)\n4k(720p\n是 ฿77/1M token\nupscale)\n฿46.2/1M\n否 480p\ntoken\n฿46.2/1M\n否 720p\ntoken\n฿46.2/1M\n否 1080p\ntoken\n2k(720p ฿46.2/1M\n否\nupscale) token\n4k(720p ฿46.2/1M\n否\nupscale) token",
+      "page": 19
+    }
+  ],
+  "grok-imagine-video-1.5": [
+    {
+      "group": "默认分组",
+      "detail": "Media Input 分辨率 价格\n0.03/img 480p ฿0.048/次\n0.03/img 720p ฿0.084/次\n0.03/img 1080p ฿0.15/次",
+      "page": 19
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "Media Input 分辨率 价格\n0.03/img 480p ฿0.24/秒\n0.03/img 720p ฿0.42/秒\n0.03/img 1080p ฿0.75/秒",
+      "page": 19
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "Media Input 分辨率 价格\n0.03/img 480p ฿0.32/秒\n0.03/img 720p ฿0.56/秒\n0.03/img 1080p ฿1/秒",
+      "page": 19
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "Media Input 分辨率 价格\n0.03/img 480p ฿0.584/秒\n0.03/img 720p ฿1.022/秒\n0.03/img 1080p ฿1.825/秒",
+      "page": 20
+    }
+  ],
+  "minimax-h3": [
+    {
+      "group": "默认分组",
+      "detail": "按输入视频分辨率秒数及\n参考图片 价格\n输出视频分辨率秒数计费\n超过5张的部分 ฿0.5/\n768P\n0.2/Image 秒\n超过5张的部分 ฿0.8/\n2K\n0.2/Image 秒",
+      "page": 20
+    }
+  ],
+  "claude-opus-5": [
+    {
+      "group": "cc",
+      "detail": "提示:฿0.004/K token\n补全:฿0.02/K token\n缓存命中:฿0.4/M token\n缓存创建:฿5/M token",
+      "page": 20
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.005/K token\n补全:฿0.025/K token\n缓存命中:฿0.5/M token\n缓存创建:฿6.25/M token",
+      "page": 20
+    },
+    {
+      "group": "cc优质",
+      "detail": "提示:฿0.01/K token\n补全:฿0.05/K token\n缓存命中:฿1/M token\n缓存创建:฿12.5/M token",
+      "page": 20
+    },
+    {
+      "group": "纯Claude官方,特价分组",
+      "detail": "提示:฿0.025/K token\n补全:฿0.125/K token\n缓存命中:฿2.5/M token\n缓存创建:฿31.25/M token",
+      "page": 20
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0365/K token\n补全:฿0.1825/K token\n缓存命中:฿3.65/M token\n缓存创建:฿45.625/M token",
+      "page": 20
+    },
+    {
+      "group": "claude正价",
+      "detail": "提示:฿0.04/K token\n补全:฿0.2/K token\n缓存命中:฿4/M token\n缓存创建:฿50/M token",
+      "page": 20
+    }
+  ],
+  "claude-fable-5": [
+    {
+      "group": "cc优质",
+      "detail": "提示:฿0.02/K token\n补全:฿0.1/K token\n缓存命中:฿2/M token\n缓存创建:฿25/M token",
+      "page": 21
+    },
+    {
+      "group": "纯Claude官方,特价分组",
+      "detail": "提示:฿0.05/K token\n补全:฿0.25/K token\n缓存命中:฿5/M token\n缓存创建:฿62.5/M token",
+      "page": 22
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.073/K token\n补全:฿0.365/K token\n缓存命中:฿7.3/M token\n缓存创建:฿91.25/M token",
+      "page": 22
+    },
+    {
+      "group": "claude正价",
+      "detail": "提示:฿0.08/K token\n补全:฿0.4/K token\n缓存命中:฿8/M token\n缓存创建:฿100/M token",
+      "page": 22
+    }
+  ],
+  "gpt-5.6-luna": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.001/K token\n补全:฿0.006/K token\n缓存命中:฿0.1/M token\n缓存创建:฿1.25/M token",
+      "page": 22
+    },
+    {
+      "group": "纯Azure",
+      "detail": "提示:฿0.001/K token\n补全:฿0.006/K token\n缓存命中:฿0.1/M token\n缓存创建:฿1.25/M token",
+      "page": 22
+    },
+    {
+      "group": "纯Azure-优质,支持o1、o3",
+      "detail": "提示:฿0.0015/K token\n补全:฿0.009/K token\n缓存命中:฿0.15/M token\n缓存创建:฿1.875/M token",
+      "page": 22
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.003/K token\n补全:฿0.018/K token\n缓存命中:฿0.3/M token\n缓存创建:฿3.75/M token",
+      "page": 23
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.004/K token\n补全:฿0.024/K token\n缓存命中:฿0.4/M token\n缓存创建:฿5/M token",
+      "page": 23
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0073/K token\n补全:฿0.0438/K token\n缓存命中:฿0.73/M token\n缓存创建:฿9.125/M token",
+      "page": 23
+    }
+  ],
+  "gpt-5.6-sol": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.005/K token\n补全:฿0.03/K token\n缓存命中:฿0.5/M token\n缓存创建:฿6.25/M token",
+      "page": 23
+    },
+    {
+      "group": "纯Azure",
+      "detail": "提示:฿0.005/K token\n补全:฿0.03/K token\n缓存命中:฿0.5/M token\n缓存创建:฿6.25/M token",
+      "page": 23
+    },
+    {
+      "group": "纯Azure-优质,支持o1、o3",
+      "detail": "提示:฿0.0075/K token\n补全:฿0.045/K token\n缓存命中:฿0.75/M token\n缓存创建:฿9.375/M token",
+      "page": 23
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.015/K token\n补全:฿0.09/K token\n缓存命中:฿1.5/M token\n缓存创建:฿18.75/M token",
+      "page": 23
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.02/K token\n补全:฿0.12/K token\n缓存命中:฿2/M token\n缓存创建:฿25/M token",
+      "page": 23
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0365/K token\n补全:฿0.219/K token\n缓存命中:฿3.65/M token\n缓存创建:฿45.625/M token",
+      "page": 23
+    }
+  ],
+  "gpt-5.6-terra": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.0025/K token\n补全:฿0.015/K token\n缓存命中:฿0.25/M token\n缓存创建:฿3.125/M token",
+      "page": 23
+    },
+    {
+      "group": "纯Azure",
+      "detail": "提示:฿0.0025/K token\n补全:฿0.015/K token\n缓存命中:฿0.25/M token\n缓存创建:฿3.125/M token",
+      "page": 24
+    },
+    {
+      "group": "纯Azure-优质,支持o1、o3",
+      "detail": "提示:฿0.00375/K token\n补全:฿0.0225/K token\n缓存命中:฿0.375/M token\n缓存创建:฿4.6875/M token",
+      "page": 24
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.0075/K token\n补全:฿0.045/K token\n缓存命中:฿0.75/M token\n缓存创建:฿9.375/M token",
+      "page": 24
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.01/K token\n补全:฿0.06/K token\n缓存命中:฿1/M token\n缓存创建:฿12.5/M token",
+      "page": 24
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.01825/K token\n补全:฿0.1095/K token\n缓存命中:฿1.825/M token\n缓存创建:฿22.8125/M token",
+      "page": 24
+    }
+  ],
+  "seedream-v5-pro": [
+    {
+      "group": "默认分组",
+      "detail": "input images num output px 价格\n0.018/image < 2360k px ฿0.27\n0.018/image > 2360k px ฿0.54",
+      "page": 24
+    },
+    {
+      "group": "sd-global",
+      "detail": "input images num output px 价格\n0.018/image < 2360k px ฿0.27\n0.018/image > 2360k px ฿0.54",
+      "page": 24
+    }
+  ],
+  "omni_flash-10s": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿1/次",
+      "page": 25
+    }
+  ],
+  "gpt-image-2": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.06/次",
+      "page": 26
+    },
+    {
+      "group": "gpt-image-2-official-mix",
+      "detail": "固定价格:฿0.3/次",
+      "page": 26
+    },
+    {
+      "group": "image2-4k",
+      "detail": "固定价格:฿0.08/次",
+      "page": 26
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.015/K token\n补全:฿0.09/K token\n缓存命中:฿3/M token",
+      "page": 26
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.02/K token\n补全:฿0.12/K token\n缓存命中:฿4/M token",
+      "page": 27
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0365/K token\n补全:฿0.219/K token\n缓存命中:฿7.3/M token",
+      "page": 27
+    },
+    {
+      "group": "azure特价组",
+      "detail": "固定价格:฿0.3/次",
+      "page": 27
+    }
+  ],
+  "claude-opus-4-7": [
+    {
+      "group": "cc",
+      "detail": "提示:฿0.004/K token\n补全:฿0.02/K token\n缓存命中:฿0.4/M token\n缓存创建:฿5/M token",
+      "page": 27
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.005/K token\n补全:฿0.025/K token\n缓存命中:฿0.5/M token\n缓存创建:฿6.25/M token",
+      "page": 27
+    },
+    {
+      "group": "cc优质",
+      "detail": "提示:฿0.01/K token\n补全:฿0.05/K token\n缓存命中:฿1/M token\n缓存创建:฿12.5/M token",
+      "page": 27
+    },
+    {
+      "group": "纯Claude官方,特价分组",
+      "detail": "提示:฿0.025/K token\n补全:฿0.125/K token\n缓存命中:฿2.5/M token\n缓存创建:฿31.25/M token",
+      "page": 27
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0365/K token\n补全:฿0.1825/K token\n缓存命中:฿3.65/M token\n缓存创建:฿45.625/M token",
+      "page": 27
+    },
+    {
+      "group": "claude正价",
+      "detail": "提示:฿0.04/K token\n补全:฿0.2/K token\n缓存命中:฿4/M token\n缓存创建:฿50/M token",
+      "page": 27
+    }
+  ],
+  "doubao-seedance-2-0-260128": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿1/秒",
+      "page": 28
+    },
+    {
+      "group": "sd-global",
+      "detail": "固定价格:฿1/秒",
+      "page": 28
+    }
+  ],
+  "doubao-seedance-2-0-fast-260128": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.9/秒",
+      "page": 28
+    },
+    {
+      "group": "sd-global",
+      "detail": "固定价格:฿0.9/秒",
+      "page": 28
+    }
+  ],
+  "doubao-seedance-2.0-mini": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.5/秒",
+      "page": 28
+    },
+    {
+      "group": "sd-global",
+      "detail": "固定价格:฿0.5/秒",
+      "page": 28
+    }
+  ],
+  "gpt-5.4-mini": [
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.00075/K token\n补全:฿0.0045/K token\n缓存命中:฿0.075/M token",
+      "page": 30
+    },
+    {
+      "group": "纯Azure",
+      "detail": "提示:฿0.00075/K token\n补全:฿0.0045/K token\n缓存命中:฿0.075/M token",
+      "page": 30
+    },
+    {
+      "group": "纯Azure-优质,支持o1、o3",
+      "detail": "提示:฿0.00113/K token\n补全:฿0.00675/K token\n缓存命中:฿0.1125/M token",
+      "page": 30
+    },
+    {
+      "group": "纯OpenAI,特价分组",
+      "detail": "提示:฿0.00225/K token\n补全:฿0.0135/K token\n缓存命中:฿0.225/M token",
+      "page": 30
+    },
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "提示:฿0.003/K token\n补全:฿0.018/K token\n缓存命中:฿0.3/M token",
+      "page": 30
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.00547/K token\n补全:฿0.03285/K token\n缓存命中:฿0.5475/M token",
+      "page": 30
+    }
+  ],
+  "grok-4.2-image": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.12/次",
+      "page": 31
+    }
+  ],
+  "grok-4.1-image": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.1/次",
+      "page": 31
+    }
+  ],
+  "doubao-seedream-5-0-260128": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.15/次",
+      "page": 36
+    }
+  ],
+  "gemini-3.1-pro-preview": [
+    {
+      "group": "Gemini优质",
+      "detail": "提示:฿0.004/K token\n补全:฿0.024/K token\n缓存命中:฿0.4/M token",
+      "page": 36
+    },
+    {
+      "group": "gemini-t3",
+      "detail": "提示:฿0.008/K token\n补全:฿0.048/K token\n缓存命中:฿0.8/M token",
+      "page": 36
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0146/K token\n补全:฿0.0876/K token\n缓存命中:฿1.46/M token",
+      "page": 37
+    }
+  ],
+  "veo3.1-fast": [
+    {
+      "group": "veo&grok-备用1",
+      "detail": "固定价格:฿1.2/次",
+      "page": 42
+    }
+  ],
+  "kling-video-v2-6": [
+    {
+      "group": "国产特价2",
+      "detail": "模式 声音 时⻓ 价格\npro 无声 5s ฿2/credits\npro 无声 10s ฿4/credits\npro 有声 5s ฿4/credits\npro 有声 10s ฿8/credits",
+      "page": 49
+    },
+    {
+      "group": "默认分组",
+      "detail": "模式 声音 时⻓ 价格\npro 无声 5s ฿2.5/credits\npro 无声 10s ฿5/credits\npro 有声 5s ฿5/credits\npro 有声 10s ฿10/credits",
+      "page": 49
+    }
+  ],
+  "doubao-seedream-4-5-251128": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.15/次",
+      "page": 50
+    }
+  ],
+  "z-image-turbo": [
+    {
+      "group": "国产特价",
+      "detail": "固定价格:฿0.07/次",
+      "page": 50
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.1/次",
+      "page": 50
+    }
+  ],
+  "nano-banana-pro": [
+    {
+      "group": "Gemini优质",
+      "detail": "固定价格:฿0.4/次",
+      "page": 52
+    },
+    {
+      "group": "gemini-t3",
+      "detail": "固定价格:฿0.8/次",
+      "page": 52
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "固定价格:฿1.46/次",
+      "page": 52
+    }
+  ],
+  "viduq3": [
+    {
+      "group": "国产特价2",
+      "detail": "固定价格:฿0.0225/积分",
+      "page": 54
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.02813/积分",
+      "page": 54
+    }
+  ],
+  "viduq3-mix": [
+    {
+      "group": "国产特价2",
+      "detail": "固定价格:฿0.0225/积分",
+      "page": 54
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.02813/积分",
+      "page": 54
+    }
+  ],
+  "viduq3-pro": [
+    {
+      "group": "国产特价2",
+      "detail": "固定价格:฿0.0225/积分",
+      "page": 54
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.02813/积分",
+      "page": 54
+    }
+  ],
+  "viduq3-turbo": [
+    {
+      "group": "国产特价2",
+      "detail": "固定价格:฿0.0225/积分",
+      "page": 54
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.02813/积分",
+      "page": 54
+    }
+  ],
+  "kling-video-v2-5-turbo": [
+    {
+      "group": "国产特价2",
+      "detail": "模式 时⻓ 价格\npro 5s ฿2/credits\npro 10s ฿4/credits\nstd 5s ฿1.2/credits\nstd 10s ฿2.4/credits",
+      "page": 61
+    },
+    {
+      "group": "默认分组",
+      "detail": "模式 时⻓ 价格\npro 5s ฿2.5/credits\npro 10s ฿5/credits\nstd 5s ฿1.5/credits\nstd 10s ฿3/credits",
+      "page": 61
+    }
+  ],
+  "claude-haiku-4-5-20251001-thinking": [
+    {
+      "group": "cc",
+      "detail": "提示:฿0.0008/K token\n补全:฿0.004/K token\n缓存命中:฿0.08/M token",
+      "page": 62
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.001/K token\n补全:฿0.005/K token\n缓存命中:฿0.1/M token",
+      "page": 62
+    },
+    {
+      "group": "cc优质",
+      "detail": "提示:฿0.002/K token\n补全:฿0.01/K token\n缓存命中:฿0.2/M token",
+      "page": 62
+    },
+    {
+      "group": "纯Claude官方,特价分组",
+      "detail": "提示:฿0.005/K token\n补全:฿0.025/K token\n缓存命中:฿0.5/M token",
+      "page": 62
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0073/K token\n补全:฿0.0365/K token\n缓存命中:฿0.73/M token",
+      "page": 62
+    },
+    {
+      "group": "claude正价",
+      "detail": "提示:฿0.008/K token\n补全:฿0.04/K token\n缓存命中:฿0.8/M token",
+      "page": 62
+    }
+  ],
+  "veo3.1": [
+    {
+      "group": "veo&grok-备用1",
+      "detail": "固定价格:฿1.2/次",
+      "page": 62
+    }
+  ],
+  "sora-2-pro": [
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "固定价格:฿1.2/秒",
+      "page": 63
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "固定价格:฿2.19/秒",
+      "page": 63
+    }
+  ],
+  "sora-2": [
+    {
+      "group": "纯OpenAI,特价优质分组",
+      "detail": "固定价格:฿0.4/秒",
+      "page": 63
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "固定价格:฿0.73/秒",
+      "page": 63
+    }
+  ],
+  "doubao-seedream-4-0-250828": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.14/次",
+      "page": 69
+    }
+  ],
+  "nano-banana": [
+    {
+      "group": "Gemini优质",
+      "detail": "固定价格:฿0.16/次",
+      "page": 71
+    },
+    {
+      "group": "gemini-t3",
+      "detail": "固定价格:฿0.32/次",
+      "page": 71
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "固定价格:฿0.584/次",
+      "page": 71
+    }
+  ],
+  "qwen-image-edit": [
+    {
+      "group": "国产特价",
+      "detail": "固定价格:฿0.21/次",
+      "page": 72
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.3/次",
+      "page": 72
+    }
+  ],
+  "qwen-image": [
+    {
+      "group": "国产特价",
+      "detail": "固定价格:฿0.175/次",
+      "page": 72
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.25/次",
+      "page": 72
+    }
+  ],
+  "flux": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.01/次",
+      "page": 84
+    }
+  ],
+  "flux-pro-max": [
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.1/次",
+      "page": 84
+    }
+  ],
+  "claude-sonnet-5": [
+    {
+      "group": "cc",
+      "detail": "提示:฿0.0016/K token\n补全:฿0.008/K token\n缓存命中:฿0.16/M token\n缓存创建:฿2/M token",
+      "page": 121
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.002/K token\n补全:฿0.01/K token\n缓存命中:฿0.2/M token\n缓存创建:฿2.5/M token",
+      "page": 121
+    },
+    {
+      "group": "cc优质",
+      "detail": "提示:฿0.004/K token\n补全:฿0.02/K token\n缓存命中:฿0.4/M token\n缓存创建:฿5/M token",
+      "page": 121
+    },
+    {
+      "group": "纯Claude官方,特价分组",
+      "detail": "提示:฿0.01/K token\n补全:฿0.05/K token\n缓存命中:฿1/M token\n缓存创建:฿12.5/M token",
+      "page": 121
+    },
+    {
+      "group": "企业分组(origin)-OpenAI&Claude官方原价",
+      "detail": "提示:฿0.0146/K token\n补全:฿0.073/K token\n缓存命中:฿1.46/M token\n缓存创建:฿18.25/M token",
+      "page": 121
+    },
+    {
+      "group": "claude正价",
+      "detail": "提示:฿0.016/K token\n补全:฿0.08/K token\n缓存命中:฿1.6/M token\n缓存创建:฿20/M token",
+      "page": 121
+    }
+  ],
+  "kimi-k3": [
+    {
+      "group": "国产特价",
+      "detail": "提示:฿0.014/K token\n补全:฿0.07/K token\n缓存命中:฿1.4/M token",
+      "page": 145
+    },
+    {
+      "group": "默认分组",
+      "detail": "提示:฿0.02/K token\n补全:฿0.1/K token\n缓存命中:฿2/M token",
+      "page": 145
+    }
+  ],
+  "qwen-image-max": [
+    {
+      "group": "国产特价",
+      "detail": "固定价格:฿0.35/次",
+      "page": 155
+    },
+    {
+      "group": "默认分组",
+      "detail": "固定价格:฿0.5/次",
+      "page": 155
+    }
+  ]
+}
