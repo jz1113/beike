@@ -1,6 +1,5 @@
-import { Settings, Loader2, Eye, EyeOff, Activity, ExternalLink } from 'lucide-react';
+import { Settings, Loader2, Eye, EyeOff, Activity } from 'lucide-react';
 import { ComflyLogo } from '@/shared/icons';
-import { ExternalLinkAnchor } from '@/shared/ui/ExternalLinkAnchor';
 export interface ApiServicesGatewayPanelProps {
   apiKey: string;
   setApiKey: (v: string) => void;
@@ -29,7 +28,7 @@ export function ApiServicesGatewayPanel({
     <div className="space-y-4">
       {/* 🌟 1. 网关概览与接口凭证一体化卡片 */}
       <div className="bg-transparent py-1 space-y-4">
-        {/* 卡片头部：Logo + 标题 + 状态徽章 + 官网申请链接 + 开关 */}
+        {/* 卡片头部：Logo + 标题 + 状态徽章 */}
         <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100">
           <div className="flex items-start gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shadow-2xs shrink-0 mt-0.5">
@@ -40,14 +39,6 @@ export function ApiServicesGatewayPanel({
                 <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
                   Comfly AI 智能大模型网关
                 </h2>
-                <ExternalLinkAnchor
-                  href="https://ai.comfly.org"
-                  className="px-2.5 py-0.5 rounded-full bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 text-[11px] font-bold flex items-center gap-1 transition-all shadow-2xs group"
-                  title="在新窗口打开 Comfly 官网注册账号并获取 API Key"
-                >
-                  <span>官网申请 Key</span>
-                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                </ExternalLinkAnchor>
               </div>
               <p className="text-[11.5px] text-slate-500 mt-1 leading-relaxed">
                 负责驱动全系统视觉分析 (Step 2)、商业生图 (Step 3)、AI 助手对话与 Skill 提炼

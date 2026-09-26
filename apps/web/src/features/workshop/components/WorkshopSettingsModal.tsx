@@ -104,19 +104,21 @@ export function WorkshopSettingsModal(props: WorkshopSettingsModalProps) {
             </fieldset>
           </div>
         </div>
-        <footer className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 sm:px-6">
-          <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500" aria-label="当前批次配置摘要">
-            <span className="font-semibold text-slate-700">当前配置</span><span className="max-w-[200px] truncate" title={recipeName}>{recipeName}</span><span aria-hidden="true">·</span>
-            <span>{props.generationStrategy === 'grid_first' ? '四宫格' : '单张逐镜'} / {props.selectedShotCount} 镜</span><span aria-hidden="true">·</span>
-            <span>{props.selectedAspect} / {quality}{props.generationStrategy === 'grid_first' ? ' 整图' : ''}</span>
-            {props.autoGenerateCopywriting && <><span aria-hidden="true">·</span><span>自动文案</span></>}
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <p role={workspaceError ? 'alert' : 'status'} className={`flex min-w-0 items-center gap-1.5 text-xs ${workspaceError ? 'text-red-600' : 'text-slate-500'}`}>
-              {!workspaceError && <Check size={14} className="shrink-0" />}
-              {workspaceError ? `保存未确认：${workspaceError}` : workspaceStatus || '修改将随当前批次自动保存'}
-            </p>
-            <button type="button" onClick={onClose} className="shrink-0 rounded-xl bg-slate-900 px-7 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-indigo-500">完成</button>
+        <footer className="shrink-0 border-t border-slate-200 bg-white px-5 py-2.5 sm:px-6">
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 md:flex-nowrap" aria-label="当前批次配置摘要">
+              <span className="shrink-0 font-semibold text-slate-700">当前配置</span><span className="max-w-[200px] truncate" title={recipeName}>{recipeName}</span><span aria-hidden="true">·</span>
+              <span className="shrink-0">{props.generationStrategy === 'grid_first' ? '四宫格' : '单张逐镜'} / {props.selectedShotCount} 镜</span><span aria-hidden="true">·</span>
+              <span className="shrink-0">{props.selectedAspect} / {quality}{props.generationStrategy === 'grid_first' ? ' 整图' : ''}</span>
+              {props.autoGenerateCopywriting && <><span aria-hidden="true">·</span><span className="shrink-0">自动文案</span></>}
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-3 md:justify-end">
+              <p role={workspaceError ? 'alert' : 'status'} title={workspaceError ? `保存未确认：${workspaceError}` : workspaceStatus || '修改将随当前批次自动保存'} className={`flex min-w-0 items-center gap-1.5 text-xs md:max-w-[220px] md:truncate ${workspaceError ? 'text-red-600' : 'text-slate-500'}`}>
+                {!workspaceError && <Check size={14} className="shrink-0" />}
+                <span className="truncate">{workspaceError ? `保存未确认：${workspaceError}` : workspaceStatus || '修改将随当前批次自动保存'}</span>
+              </p>
+              <button type="button" onClick={onClose} className="shrink-0 rounded-xl bg-slate-900 px-7 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-indigo-500">完成</button>
+            </div>
           </div>
         </footer>
       </div>

@@ -2,7 +2,7 @@ import { SETTINGS_NAV_GROUPS, type SettingsNavSection } from './settingsNavigati
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
 import {
-  ArrowLeft,
+  House,
   Search,
   Shield,
   X,
@@ -185,20 +185,17 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         {/* ===================== COLUMN 1: 左侧专有侧边栏 ===================== */}
         <aside
           data-settings-sidebar
-          className="hidden md:flex w-44 xl:w-52 shrink-0 h-full bg-white/30 border-r border-slate-200/60 flex flex-col justify-between overflow-hidden relative z-20"
+          className="hidden md:flex w-56 xl:w-60 shrink-0 h-full bg-white/30 border-r border-slate-200/60 flex flex-col justify-between overflow-hidden relative z-20"
         >
           <div className="flex flex-col pt-3 sm:pt-4 px-3 sm:px-4">
             <button
               type="button"
               onClick={handleBackToApp}
-              className="w-full h-10 px-3 rounded-xl bg-white hover:bg-slate-100/90 active:bg-slate-200/80 border border-slate-200/80 shadow-2xs flex items-center gap-2.5 text-slate-800 hover:text-slate-950 font-bold text-xs sm:text-[13px] transition-all cursor-pointer group"
-              title="返回应用 (Esc)"
+              aria-label="返回首页"
+              className="h-10 w-10 rounded-xl bg-white hover:bg-slate-100/90 active:bg-slate-200/80 border border-slate-200/80 shadow-2xs flex items-center justify-center text-slate-600 hover:text-slate-950 transition-all cursor-pointer"
+              title="返回首页"
             >
-              <ArrowLeft className="w-4 h-4 text-slate-600 group-hover:text-slate-900 transition-transform group-hover:-translate-x-0.5" />
-              <span>返回应用</span>
-              <span className="ml-auto text-[10px] text-slate-600 font-mono border border-slate-200/90 px-1.5 py-0.5 rounded-md bg-slate-50">
-                Esc
-              </span>
+              <House className="h-4 w-4" />
             </button>
 
             {/* 搜索框（对标图 2 搜索设置...） */}
@@ -256,7 +253,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                                 isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-700'
                               }`}
                             />
-                            <span className="text-left leading-5">{item.label}</span>
+                            <span className="text-left leading-5 whitespace-nowrap">{item.label}</span>
                           </div>
 
                           {isUsage && gatewayBalanceFormatted !== undefined && (

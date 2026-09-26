@@ -20,8 +20,8 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'api_services', label: '渠道管理', icon: Layers, keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', 'token', '接口'] },
       { id: 'models', label: '模型管理', icon: Boxes, keywords: ['模型', '渠道', '筛选', '价格', '启用'] },
-      { id: 'defaults', label: '默认模型与调用规则', icon: SlidersHorizontal, keywords: ['默认', '备用', '降级', '策略', '路由'] },
       { id: 'other_services', label: '其他服务', icon: Plug, keywords: ['电商', '万邦', '解析', '奇云', '存储', 'APIA'] },
+      { id: 'defaults', label: '默认模型与调用规则', icon: SlidersHorizontal, keywords: ['默认', '备用', '降级', '策略', '路由'] },
     ],
   },
   {

@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFileDropZone } from '@/shared/hooks/useFileDropZone';
 import { confirmAction } from '@/shared/utils/confirmAction';
-import { ArrowUp, Loader2, Download, Trash2, Upload, UploadCloud, ListPlus, Play, Pause, FolderDown } from 'lucide-react';
+import { ArrowUp, Loader2, Download, Trash2, Upload, UploadCloud, ListPlus, Play, Pause, FolderDown, X } from 'lucide-react';
 import {
   BatchTaskItem,
+  extractUrlsFromRawText,
 } from '@/features/collect/utils/collectorTypes';
 import BatchTaskCard from './BatchTaskCard';
 
@@ -61,6 +62,16 @@ export default function CollectorBatchPanel({
   executeSingleTask,
   setPreviewImageUrl,
 }: CollectorBatchPanelProps) {
+  const batchTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const detectedInputCount = useMemo(() => extractUrlsFromRawText(batchTextarea).length, [batchTextarea]);
+
+  useLayoutEffect(() => {
+    const textarea = batchTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 200), 288)}px`;
+  }, [batchTextarea]);
+
   const acceptBatchFile = (file: File) =>
     /\.(xlsx|xls|csv|txt)$/i.test(file.name) ||
     file.type.includes('spreadsheet') ||
@@ -76,7 +87,7 @@ export default function CollectorBatchPanel({
   });
 
   return (
-            <div className="mx-auto max-w-[980px] space-y-5">
+            <div className="mx-auto max-w-[1080px] space-y-5">
               {/* 与关键词审核一致的简洁批量导入入口 */}
               <div className="space-y-5">
                 <div className="flex flex-col items-center gap-3">
@@ -106,41 +117,69 @@ export default function CollectorBatchPanel({
                     </button>
                   </div>
 
-                  <span className="text-xs text-slate-400">支持 .csv / .xlsx / .txt / 多行粘贴，自动去重与平台识别</span>
+                  <span className="text-xs text-slate-400">支持 .csv / .xlsx / .txt / 多行粘贴，自动提取链接、去重并识别平台</span>
                 </div>
 
                 {/* 模式 A：多链接文本框粘贴 */}
                 {batchInputMode === 'text' ? (
-                  <div className="relative min-h-[300px] rounded-[32px] border-2 border-dashed border-slate-300 bg-white/80 p-6 pb-20 transition hover:border-blue-300 hover:bg-white sm:p-8 sm:pb-20">
+                  <div className="mx-auto flex min-h-[300px] w-full max-w-[980px] flex-col rounded-[32px] border-2 border-dashed border-slate-300 bg-white/85 px-6 pb-5 pt-6 shadow-[0_24px_64px_-52px_rgba(15,23,42,.48)] transition hover:border-rose-300 hover:bg-white focus-within:border-rose-300 sm:px-9 sm:pb-6 sm:pt-7">
                     <textarea
-                      rows={4}
+                      ref={batchTextareaRef}
+                      rows={1}
                       value={batchTextarea}
                       onChange={(e) => setBatchTextarea(e.target.value)}
-                      placeholder={`在此批量粘贴多行链接或商品 ID（支持回车换行或逗号分隔，一次可贴 10~50+ 条）：\nhttps://item.jd.com/1000123456.html\nhttps://detail.tmall.com/item.htm?id=68888888\nhttps://www.xiaohongshu.com/discovery/item/66a12b...`}
-                      className="min-h-[190px] w-full resize-none border-0 bg-transparent p-0 pr-14 font-mono text-xs leading-6 text-slate-800 outline-none placeholder:text-slate-400 focus:ring-0"
+                      onKeyDown={(event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && batchTextarea.trim()) {
+                          event.preventDefault();
+                          handleAddTasksFromText();
+                        }
+                      }}
+                      placeholder={`在此粘贴商品或社媒链接，也可以直接粘贴 Excel 中的一列链接\n支持多行、逗号分隔和混合文字，系统会自动提取有效链接与商品 ID\nhttps://item.jd.com/1000123456.html\nhttps://www.xiaohongshu.com/discovery/item/...`}
+                      aria-label="粘贴要批量采集的商品或社媒链接"
+                      spellCheck={false}
+                      className="max-h-72 min-h-[200px] w-full resize-none overflow-auto border-0 bg-transparent p-0 text-sm leading-[1.85] text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 [scrollbar-width:thin]"
                     />
-                    <div className="absolute inset-x-6 bottom-5 flex items-center justify-between gap-4 sm:inset-x-8">
-                      <span className="min-w-0 text-xs text-slate-400">
-                        提示：系统将智能嗅探每一行的 URL 和纯数字 ID，无需手动去除多余汉字
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleAddTasksFromText}
-                        disabled={!batchTextarea.trim()}
-                        aria-label="解析并加入任务队列"
-                        title="解析并加入任务队列"
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all ${!batchTextarea.trim()
-                            ? 'cursor-not-allowed bg-slate-100 text-slate-400'
-                            : 'bg-slate-950 text-white shadow-sm hover:bg-black active:scale-95'
-                          }`}
-                      >
-                        <ArrowUp className="h-4 w-4" strokeWidth={2.25} />
-                      </button>
+                    <div className="mt-3 flex min-h-9 items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3 text-xs text-slate-400">
+                        <span className={`shrink-0 font-medium ${detectedInputCount > 0 ? 'text-slate-600' : ''}`} aria-live="polite">
+                          {detectedInputCount > 0
+                            ? `已识别 ${detectedInputCount} 条`
+                            : batchTextarea.trim()
+                              ? '暂未识别到有效链接或商品 ID'
+                              : '每行一个链接，支持直接粘贴表格内容'}
+                        </span>
+                        <span className="hidden sm:inline">⌘ / Ctrl + Enter 快速加入</span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {batchTextarea && (
+                          <button
+                            type="button"
+                            onClick={() => setBatchTextarea('')}
+                            className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                            aria-label="清空批量链接输入框"
+                          >
+                            <X className="h-3.5 w-3.5" />清空
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleAddTasksFromText}
+                          disabled={!batchTextarea.trim()}
+                          aria-label={detectedInputCount > 0 ? `解析并加入 ${detectedInputCount} 条任务` : '解析并加入任务队列'}
+                          title={detectedInputCount > 0 ? `解析并加入 ${detectedInputCount} 条任务` : '粘贴链接后加入任务队列'}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all ${!batchTextarea.trim()
+                              ? 'cursor-not-allowed bg-slate-100 text-slate-400'
+                              : 'bg-slate-950 text-white shadow-sm hover:bg-black active:scale-95'
+                            }`}
+                        >
+                          <ArrowUp className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   /* 模式 B：文件拖拽上传 */
-                  <div className="space-y-3">
+                  <div className="mx-auto max-w-[980px] space-y-3">
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       {...batchFileDropProps}
