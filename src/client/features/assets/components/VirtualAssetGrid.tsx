@@ -31,7 +31,7 @@ export function VirtualAssetGrid<T extends { id: string }>({
   const virtualizer = useVirtualizer({
     count: Math.ceil(items.length / columns),
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 440,
+    estimateSize: () => 520,
     overscan: 2,
     getItemKey: (index) => items[index * columns]?.id ?? index,
   });
@@ -63,7 +63,7 @@ export function VirtualAssetGrid<T extends { id: string }>({
       ref={gridRef}
       data-asset-grid
       className="relative grid"
-      style={{ height: virtualizer.getTotalSize(), gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))' }}
+      style={{ height: virtualizer.getTotalSize(), gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}
     >
       {virtualizer.getVirtualItems().map((row) => {
         const rowItems = items.slice(row.index * columns, (row.index + 1) * columns);
@@ -72,7 +72,7 @@ export function VirtualAssetGrid<T extends { id: string }>({
             key={row.key}
             ref={virtualizer.measureElement}
             data-index={row.index}
-            className="absolute top-0 left-0 w-full grid items-start gap-4 pb-7"
+            className="absolute top-0 left-0 w-full grid items-start gap-4 pb-4"
             style={{
               gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
               transform: `translateY(${row.start}px)`,

@@ -31,27 +31,23 @@ export function PromptAssetLifecycleBadges({ item }: { item: Record<string, unkn
   const accept = registry.firstPassAcceptRate as number | undefined;
   const retry = registry.retryRate as number | undefined;
   if (!status && quality == null && !provenance) return null;
+  const details = [
+    quality != null ? `质量 ${Math.round(quality)}` : '',
+    typeof accept === 'number' ? `首轮 ${(accept * 100).toFixed(0)}%` : '',
+    typeof retry === 'number' ? `重试 ${(retry * 100).toFixed(0)}%` : '',
+    provenance ? PROVENANCE_LABEL[provenance] || provenance : '',
+  ].filter(Boolean).join(' · ');
   return (
-    <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+    <div className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap" title={details || undefined}>
       {status ? (
-        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${STATUS_CLASS[status] || 'bg-slate-100 text-slate-600'}`}>
+        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${STATUS_CLASS[status] || 'bg-slate-100 text-slate-600'}`}>
           {STATUS_LABEL[status] || status}
         </span>
       ) : null}
-      {quality != null ? (
-        <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">质量 {Math.round(quality)}</span>
-      ) : null}
-      {typeof accept === 'number' ? (
-        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">首轮 {(accept * 100).toFixed(0)}%</span>
-      ) : null}
-      {typeof retry === 'number' ? (
-        <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">重试 {(retry * 100).toFixed(0)}%</span>
-      ) : null}
       {status && status !== 'published' ? (
-        <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">分析不召回</span>
+        <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">分析不召回</span>
       ) : null}
-      {version ? <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">v{version}</span> : null}
-      {provenance ? <span className="shrink-0 rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500" title={provenance}>{PROVENANCE_LABEL[provenance] || provenance}</span> : null}
+      {version ? <span className="shrink-0 text-[10px] font-medium text-slate-400">v{version}</span> : null}
     </div>
   );
 }

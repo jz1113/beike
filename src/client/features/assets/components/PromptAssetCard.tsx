@@ -1,6 +1,6 @@
 import { audienceLabel } from '@shared/domain/assets/appearanceAudience';
 import { visualAssetIssue } from '@shared/domain/assets/assetDeconstruct/visualEvidence';
-import { type MouseEvent, useMemo } from 'react';
+import { type MouseEvent, useMemo, useState } from 'react';
 import {
   Star,
   Trash2,
@@ -14,7 +14,6 @@ import {
   Image as ImageIcon,
   ZoomIn,
   Tag,
-  Layers,
 } from 'lucide-react';
 import { getAssetCardSummary, isValidDisplayTag } from '../utils/assetPromptConstants';
 import { type AssetSubTab } from '../utils/assetPromptConstants';
@@ -95,6 +94,8 @@ export default function PromptAssetCard({
 
   // 提取来源原图 URL 与位置索引
   const imageUrl = (item.coverUrl || item.avatarUrl) as string | undefined;
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const visibleImageUrl = imageUrl && imageUrl !== failedImageUrl ? imageUrl : null;
   const sourceIndex = typeof item.sourceImageIndex === 'number' ? item.sourceImageIndex : null;
   const sourceIndices = useMemo(() => {
     try {
@@ -132,13 +133,19 @@ export default function PromptAssetCard({
           : ''
       }`}
     >
-      {/* 顶部单行元信息栏：编号 + 来源图徽标 + 核心徽标 + 批量选择 + 收藏/更多 */}
-      <div className="flex items-center justify-between gap-2 mt-2 select-none min-h-6 order-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+      {/* 图片下方先显示标题和常用操作 */}
+      <div className="order-2 mt-2 flex min-h-7 items-center gap-1.5 select-none">
+        <h3
+          className={`min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-slate-900 transition-colors ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
+          title={item.title || item.name || undefined}
+        >
+          {item.title || item.name || '未命名资产'}
+        </h3>
+        <div className="flex shrink-0 items-center gap-0.5">
           {isBatchMode && (
             <div
               onClick={onToggleSelect}
-              className="shrink-0 text-indigo-600 hover:scale-110 transition-transform cursor-pointer mr-0.5"
+              className="mr-0.5 shrink-0 cursor-pointer text-indigo-600 transition-transform hover:scale-110"
             >
               {isSelected ? (
                 <CheckSquare className="w-4 h-4 text-indigo-600" />
@@ -148,46 +155,6 @@ export default function PromptAssetCard({
             </div>
           )}
 
-          <span
-            className="text-[11px] font-mono font-medium tracking-wide text-slate-500 shrink-0"
-          >
-            {codeLabel}
-          </span>
-
-          {/* 📷 来源原图定位徽标 */}
-          {sourceIndices.length > 0 ? (
-            <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 shrink-0 flex items-center gap-0.5"
-              title={activeSubTab === 'full_prompt'
-                ? `图组母本为 #${sourceIndex ?? sourceIndices[0]}；联动参考图 ${sourceIndices.map((index) => `#${index}`).join('、')}`
-                : `内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
-            >
-              <Layers className="w-2.5 h-2.5" />
-              <span>{activeSubTab === 'full_prompt' ? `母本 #${sourceIndex ?? sourceIndices[0]}` : `图组 ${sourceIndices.map((index) => `#${index}`).join('·')}`}</span>
-            </span>
-          ) : sourceIndex !== null ? (
-            <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 shrink-0 flex items-center gap-0.5"
-              title={`此提示词资产提取自原图集的第 ${sourceIndex} 张图片`}
-            >
-              <ImageIcon className="w-2.5 h-2.5 text-slate-500" />
-              <span>图#{sourceIndex}</span>
-            </span>
-          ) : imageUrl ? (
-            <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 shrink-0 flex items-center gap-0.5"
-              title="含来源参考原图"
-            >
-              <ImageIcon className="w-2.5 h-2.5 text-slate-500" />
-              <span>原图</span>
-            </span>
-          ) : null}
-
-          <PromptAssetLifecycleBadges item={item} />
-
-        </div>
-
-        <div className="flex items-center gap-0.5 shrink-0">
           <button
             onClick={onToggleFavorite}
             className="p-1 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -251,38 +218,51 @@ export default function PromptAssetCard({
         </div>
       </div>
 
-      {/* 标题独立成行：单行截断，绝不串行折行 */}
+      <div className="order-3 mt-0.5 flex min-h-5 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] text-slate-500">
+        <span className="shrink-0 font-mono tracking-wide" title={codeLabel}>{codeLabel}</span>
+        {sourceIndices.length > 0 ? (
+          <span
+            className="shrink-0 font-medium text-slate-500"
+            title={activeSubTab === 'full_prompt'
+              ? `图组母本为 #${sourceIndex ?? sourceIndices[0]}；联动参考图 ${sourceIndices.map((index) => `#${index}`).join('、')}`
+              : `内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
+          >
+            {activeSubTab === 'full_prompt' ? `母本 #${sourceIndex ?? sourceIndices[0]}` : `图组 ${sourceIndices.map((index) => `#${index}`).join('·')}`}
+          </span>
+        ) : sourceIndex !== null ? (
+          <span className="shrink-0 font-medium" title={`此提示词资产提取自原图集的第 ${sourceIndex} 张图片`}>
+            图#{sourceIndex}
+          </span>
+        ) : imageUrl ? (
+          <span className="shrink-0 font-medium" title="含来源参考原图">原图</span>
+        ) : null}
+        <PromptAssetLifecycleBadges item={item} />
+      </div>
+
       {visualAssetIssue(item, activeSubTab) ? (
         <p className="order-4 mt-1 text-[10px] font-medium text-rose-600">{visualAssetIssue(item, activeSubTab)}</p>
       ) : null}
 
-      <h3
-        className={`text-sm font-semibold text-slate-900 truncate mt-1 order-3 leading-snug transition-colors block ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
-        title={item.title || item.name || undefined}
-      >
-        {item.title || item.name || '未命名资产'}
-      </h3>
-
-      {(activeSubTab === 'persona' || activeSubTab === 'outfit') && <span className="order-3 mt-1 text-[11px] text-indigo-600">{audienceLabel(item, activeSubTab === 'outfit')}</span>}
       {/* 中部：来源原图缩略图 + 提示词摘要 */}
       <div className="order-1 min-w-0">
-        {imageUrl ? (
+        {visibleImageUrl ? (
           <div
             onClick={(e) => {
               if (onPreviewImage) {
                 e.stopPropagation();
-                onPreviewImage(imageUrl, e);
+                onPreviewImage(visibleImageUrl, e);
               }
             }}
             className="group/thumb relative aspect-[3/4] w-full rounded-2xl overflow-hidden bg-white/40 ring-1 ring-slate-200/60 shadow-sm transition-shadow hover:shadow-lg cursor-zoom-in"
             title="点击放大查看来源参考原图"
           >
             <img
-              src={imageUrl}
+              src={visibleImageUrl}
               alt="来源参考原图"
               className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-[1.03]"
-              loading="lazy"
+              loading="eager"
               decoding="async"
+              onError={() => setFailedImageUrl(visibleImageUrl)}
             />
             <div className="absolute inset-0 bg-slate-900/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
               <ZoomIn className="w-3.5 h-3.5 text-white drop-shadow-sm" />
@@ -294,18 +274,21 @@ export default function PromptAssetCard({
             )}
           </div>
         ) : (
-          <div className="aspect-[3/4] w-full rounded-2xl bg-white/50 ring-1 ring-slate-200/60 flex flex-col items-center justify-center gap-4 p-6 text-slate-400">
+          <div className="aspect-[3/4] w-full rounded-2xl bg-slate-50/90 ring-1 ring-slate-200/60 flex flex-col items-center justify-center gap-3 p-6 text-slate-400">
             <ImageIcon className="w-5 h-5" />
-            <span className="text-[10px] tracking-widest">文字资产</span>
-            <p className="line-clamp-6 text-sm leading-7 text-slate-600">{summary || item.title || item.name || '暂无详细描述'}</p>
+            <span className="text-xs font-medium">{imageUrl ? '图片暂不可用' : '暂无参考图片'}</span>
+            <p className="line-clamp-4 text-center text-xs leading-5 text-slate-500">{summary || item.title || item.name || '暂无详细描述'}</p>
           </div>
         )}
 
 
       </div>
 
-      {displayBadges.length > 0 && (
-        <div className="order-5 flex items-center gap-1.5 mt-2">
+      {((activeSubTab === 'persona' || activeSubTab === 'outfit') || displayBadges.length > 0) && (
+        <div className="order-5 mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
+          {(activeSubTab === 'persona' || activeSubTab === 'outfit') && (
+            <span className="shrink-0 text-[11px] text-indigo-600">{audienceLabel(item, activeSubTab === 'outfit')}</span>
+          )}
           {/* 精炼合规的核心分类徽标 */}
           {displayBadges.map((b) => (
             <button
@@ -326,10 +309,10 @@ export default function PromptAssetCard({
       )}
 
       {/* 底部操作栏 */}
-      <div className="order-6 flex items-center justify-end mt-2">
+      <div className="order-6 mt-2 border-t border-slate-200/70 pt-2">
         <button
           onClick={onViewDetail}
-          className="flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 transition-colors hover:bg-indigo-100 cursor-pointer"
+          className="flex w-full items-center justify-between gap-1 text-xs font-medium text-indigo-700 transition-colors hover:text-indigo-900 cursor-pointer"
         >
           <span>{activeSubTab === 'full_prompt' ? '查看图组与分镜' : '查看提示词与原图'}</span>
           <ArrowRight className="w-3 h-3" />
