@@ -26,12 +26,15 @@ export async function POST(req: Request) {
     if (rows[0].status === 'approved') return jsonResponse({ success: true });
     if (rows[0].status !== 'pending') return jsonResponse({ error: '请先恢复此图集再审核' }, 409);
     const payload = JSON.parse(rows[0].payload);
+    const parent = payload.fullPromptOnly && payload.parentFullPromptId
+      ? await getRegistry('full_prompt', payload.parentFullPromptId)
+      : null;
+    if (payload.fullPromptOnly && payload.parentFullPromptId && !parent) {
+      return jsonResponse({ error: '来源母本记录不存在，请重新选择母本后提炼' }, 409);
+    }
     const saved = await persistDeconstructedAssets({ ...payload, reviewId: id, sourceKey: payload.sourceKey });
     if (payload.fullPromptOnly) {
       if (saved.fullPrompts.length !== 1) throw new Error('候选四图组不完整，未能生成母本');
-      const parent = payload.parentFullPromptId
-        ? await getRegistry('full_prompt', payload.parentFullPromptId)
-        : null;
       for (const asset of saved.fullPrompts) {
         await upsertRegistry({
           assetType: 'full_prompt', sourceAssetId: asset.id, status: 'published',

@@ -27,6 +27,7 @@ interface PromptAssetCardProps {
     code?: string;
     title?: string | null;
     name?: string | null;
+    albumName?: string | null;
     coverUrl?: string | null;
     avatarUrl?: string | null;
     sourceImages?: string | null;
@@ -34,6 +35,14 @@ interface PromptAssetCardProps {
     sourceImageIndices?: string | null;
     groupIndex?: number | null;
     provenance?: string | null;
+    sourceMother?: {
+      id: string;
+      code: string;
+      title: string | null;
+      groupIndex: number | null;
+      albumName: string | null;
+      available: boolean;
+    } | null;
     tags?: string | null;
   };
   activeSubTab: AssetSubTab;
@@ -91,6 +100,18 @@ export default function PromptAssetCard({
   const codeLabel = item.code
     ? `#${String(item.code).replace(/^#/, '')}`
     : DEFAULT_CODE[activeSubTab];
+  const groupNumber = Number.isInteger(item.groupIndex) && Number(item.groupIndex) > 0 ? item.groupIndex : null;
+  const displayTitle = activeSubTab === 'full_prompt' && groupNumber !== null
+    ? `组 ${groupNumber}`
+    : item.title || item.name || '未命名资产';
+  const registry = item.registry as { provenance?: string } | undefined;
+  const isDerivedGroup = activeSubTab === 'full_prompt' && (registry?.provenance === 'workshop_generated' || item.provenance === 'workshop_generated' || Boolean(item.sourceMother));
+  const mother = item.sourceMother;
+  const motherCode = mother?.code ? `#${mother.code.replace(/^#/, '')}` : '';
+  const motherLabel = mother
+    ? `来源母本 ${motherCode || '编号未知'}${mother.groupIndex ? ` · 组 ${mother.groupIndex}` : ''}${mother.available ? '' : ' · 已删除'}`
+    : '来源母本未记录';
+  const motherTooltip = mother?.available && mother.title ? `${motherLabel} · ${mother.title}` : motherLabel;
 
   // 提取来源原图 URL 与位置索引
   const imageUrl = (item.coverUrl || item.avatarUrl) as string | undefined;
@@ -137,9 +158,11 @@ export default function PromptAssetCard({
       <div className="order-2 mt-2 flex min-h-7 items-center gap-1.5 select-none">
         <h3
           className={`min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-slate-900 transition-colors ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
-          title={item.title || item.name || undefined}
+          title={activeSubTab === 'full_prompt' && groupNumber !== null
+            ? [displayTitle, item.albumName, item.title].filter(Boolean).join(' · ')
+            : displayTitle}
         >
-          {item.title || item.name || '未命名资产'}
+          {displayTitle}
         </h3>
         <div className="flex shrink-0 items-center gap-0.5">
           {isBatchMode && (
@@ -220,14 +243,16 @@ export default function PromptAssetCard({
 
       <div className="order-3 mt-0.5 flex min-h-5 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] text-slate-500">
         <span className="shrink-0 font-mono tracking-wide" title={codeLabel}>{codeLabel}</span>
-        {sourceIndices.length > 0 ? (
+        {activeSubTab === 'full_prompt' ? (
+          <span className="min-w-0 truncate font-medium" title={isDerivedGroup ? motherTooltip : `原始母本${sourceIndices.length ? ` · 原图 ${sourceIndices.map((index) => `#${index}`).join('、')}` : ''}`}>
+            {isDerivedGroup ? motherLabel : `原始母本${sourceIndices.length ? ` · 原图 ${sourceIndices.map((index) => `#${index}`).join('·')}` : sourceIndex !== null ? ` · 原图 #${sourceIndex}` : ''}`}
+          </span>
+        ) : sourceIndices.length > 0 ? (
           <span
             className="shrink-0 font-medium text-slate-500"
-            title={activeSubTab === 'full_prompt'
-              ? `图组母本为 #${sourceIndex ?? sourceIndices[0]}；联动参考图 ${sourceIndices.map((index) => `#${index}`).join('、')}`
-              : `内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
+            title={`内容图组包含原图 ${sourceIndices.map((index) => `#${index}`).join('、')}`}
           >
-            {activeSubTab === 'full_prompt' ? `母本 #${sourceIndex ?? sourceIndices[0]}` : `图组 ${sourceIndices.map((index) => `#${index}`).join('·')}`}
+            图组 {sourceIndices.map((index) => `#${index}`).join('·')}
           </span>
         ) : sourceIndex !== null ? (
           <span className="shrink-0 font-medium" title={`此提示词资产提取自原图集的第 ${sourceIndex} 张图片`}>
@@ -238,6 +263,12 @@ export default function PromptAssetCard({
         ) : null}
         <PromptAssetLifecycleBadges item={item} />
       </div>
+
+      {activeSubTab === 'full_prompt' && item.albumName && (
+        <div className="order-4 mt-0.5 min-w-0 truncate text-[10px] text-slate-500" title={`所属图集：${item.albumName}`}>
+          图集：{item.albumName}
+        </div>
+      )}
 
       {visualAssetIssue(item, activeSubTab) ? (
         <p className="order-4 mt-1 text-[10px] font-medium text-rose-600">{visualAssetIssue(item, activeSubTab)}</p>
@@ -269,7 +300,7 @@ export default function PromptAssetCard({
             </div>
             {sourceIndex !== null && (
               <span className="absolute bottom-0 right-0 px-1 py-0.2 text-[9px] font-bold bg-slate-900/75 text-white rounded-tl-md">
-                #{sourceIndex}
+                {activeSubTab === 'full_prompt' ? `原图 #${sourceIndex}` : `#${sourceIndex}`}
               </span>
             )}
           </div>

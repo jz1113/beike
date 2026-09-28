@@ -6,6 +6,7 @@ import {
   analyzePromotedGroup, approvePromotedGroup, type PromotedGroupCandidate,
 } from '../model/generation/promoteGroup';
 import { reviewedFourShotGroup, reviewedGroupSignature } from '../model/generation/reviewedGroup';
+import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 
 type Preview = { groupIndex: number; signature: string; candidate: PromotedGroupCandidate; images: string[] };
 
@@ -87,7 +88,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
     {preview && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && busyGroup === null) setPreview(null); }}>
       <section role="dialog" aria-modal="true" aria-label="确认衍生图组入库" className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-slate-50/95 p-5 shadow-2xl backdrop-blur-xl">
         <div className="flex items-start justify-between gap-3">
-          <div><h3 className="text-base font-semibold text-slate-900">确认衍生母本</h3><p className="mt-1 text-xs text-slate-500">来自 {item.appliedFullPromptTitle || '当前图组母本'} · 第 {preview.groupIndex + 1} 组。确认后才加入提示词资产库。</p></div>
+          <div><h3 className="text-base font-semibold text-slate-900">确认衍生母本</h3><p className="mt-1 text-xs text-slate-500">来自 {item.appliedFullPromptId ? `母本 #${stableAssetCode('R', item.appliedFullPromptId)}${item.appliedFullPromptGroupIndex ? ` · 组 ${item.appliedFullPromptGroupIndex}` : ''}` : '当前图组母本'} · 本次成图第 {preview.groupIndex + 1} 组。确认后才加入提示词资产库。</p></div>
           <button type="button" aria-label="关闭" disabled={busyGroup !== null} onClick={() => setPreview(null)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/70"><X className="h-4 w-4" /></button>
         </div>
         <div className="mt-4 grid grid-cols-4 gap-2">

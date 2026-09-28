@@ -108,11 +108,11 @@ const MemoizedProductItem = React.memo(function ProductItem({
                   <span>{item.prompts.length} 个镜头</span>
                 </>
               )}
-              {hasPrompts && item.appliedFullPromptTitle && (
+              {hasPrompts && item.appliedFullPromptId && (
                 <>
                   <span>·</span>
-                  <span title={`图组母本 ${item.appliedFullPromptId || ''}`}>
-                    {item.appliedFullPromptSelectionMode === 'auto' ? '资产库轮询母组' : '已锁定母组'}：{item.appliedFullPromptId && `[#${stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}] `}{item.appliedFullPromptTitle}
+                  <span title={`母本原名称：${item.appliedFullPromptTitle || '未命名'}；资产 ID：${item.appliedFullPromptId}`}>
+                    {item.appliedFullPromptSelectionMode === 'auto' ? '资产库轮询母组' : '已锁定母组'}：[#${stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}] {item.appliedFullPromptGroupIndex ? `组 ${item.appliedFullPromptGroupIndex}` : item.appliedFullPromptTitle || '图组母本'}{item.appliedFullPromptAlbumName ? ` · ${item.appliedFullPromptAlbumName}` : ''}
                   </span>
                   {item.appliedFullPromptAppearance && <span className={`rounded px-1.5 py-0.5 font-medium ${item.appliedFullPromptAppearance === 'human' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>
                     {item.appliedFullPromptAppearance === 'human' ? '有人物母版' : item.appliedFullPromptAppearance === 'product' ? '无人物母版' : '出镜待判定'}

@@ -19,6 +19,15 @@ export interface RegistryRow {
   updatedAt: string;
 }
 
+export interface FullPromptSourceMotherRow {
+  registryId: string;
+  id: string;
+  title: string | null;
+  groupIndex: number | null;
+  albumName: string | null;
+  available: number;
+}
+
 export interface UsageEventRow {
   id: string;
   assetId: string;
@@ -78,6 +87,23 @@ export async function listRegistryByType(assetType: string, sourceAssetIds?: str
     requireWorkspaceId(),
     assetType,
   ).catch(() => []);
+}
+
+export async function listFullPromptSourceMothers(registryIds: string[]): Promise<FullPromptSourceMotherRow[]> {
+  if (registryIds.length === 0) return [];
+  const placeholders = registryIds.map(() => '?').join(', ');
+  return db.$queryRawUnsafe<FullPromptSourceMotherRow[]>(
+    `SELECT registry."id" AS "registryId", registry."sourceAssetId" AS "id",
+      parent."title" AS "title", parent."groupIndex" AS "groupIndex",
+      parent."albumName" AS "albumName",
+      CASE WHEN parent."id" IS NULL THEN 0 ELSE 1 END AS "available"
+     FROM "PromptAssetRegistry" AS registry
+     LEFT JOIN "FullPromptAsset" AS parent
+       ON parent."id" = registry."sourceAssetId" AND parent."workspaceId" IN (?, ?)
+     WHERE registry."workspaceId" = ? AND registry."assetType" = 'full_prompt'
+       AND registry."id" IN (${placeholders})`,
+    requireWorkspaceId(), OFFICIAL_WORKSPACE_ID, requireWorkspaceId(), ...registryIds,
+  );
 }
 
 export async function listPublishedSourceIds(assetType: string): Promise<string[]> {

@@ -3,7 +3,7 @@ import { isAppearanceRotation } from '@shared/domain/assets/appearanceSelection'
 import { isAutoPromptGroupSelection, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import { WorkshopAssetLockRow, type WorkshopAssetLockOption } from './WorkshopAssetLockRow';
 
-type GroupOption = WorkshopAssetLockOption & { shotPromptsJson?: string; hasHuman?: boolean };
+type GroupOption = WorkshopAssetLockOption & { shotPromptsJson?: string; hasHuman?: boolean; groupIndex?: number | null; albumName?: string | null };
 export function WorkshopAssetBindings(props: {
   groupId: string; onGroupChange: (id: string) => void; groups: GroupOption[];
   personaId: string; onPersonaChange: (id: string) => void; personas: WorkshopAssetLockOption[];
@@ -29,6 +29,12 @@ export function WorkshopAssetBindings(props: {
           { id: 'auto:human', label: `自动轮换 · 仅有人物（${portraitCount} 组）` },
           { id: 'auto:product', label: `自动轮换 · 仅无人物（${productCount} 组）` },
         ]}
+        optionLabel={option => {
+          const candidate = option as GroupOption;
+          return candidate.groupIndex
+            ? `组 ${candidate.groupIndex}${candidate.albumName ? ` · ${candidate.albumName}` : ''}`
+            : candidate.title || '图组母本';
+        }}
         optionSuffix={item => ` · ${promptGroupAppearance(item as GroupOption) === 'human' ? '有人物' : promptGroupAppearance(item as GroupOption) === 'product' ? '无人物' : '待判定'}`}
       />
       {!automatic && !group

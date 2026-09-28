@@ -19,6 +19,7 @@ export function WorkshopAssetLockRow({
   autoLabel = '智能轮循',
   rotationLabel,
   specialOptions,
+  optionLabel,
   optionSuffix,
 }: {
   label: string;
@@ -29,6 +30,7 @@ export function WorkshopAssetLockRow({
   autoLabel?: string;
   rotationLabel?: string;
   specialOptions?: Array<{ id: string; label: string }>;
+  optionLabel?: (option: WorkshopAssetLockOption) => string;
   optionSuffix?: (option: WorkshopAssetLockOption) => string;
 }): ReactNode {
   const builtInOptions = specialOptions || [{ id: 'auto', label: autoLabel }, ...(rotationLabel ? [{ id: 'rotate', label: rotationLabel }] : [])];
@@ -46,7 +48,7 @@ export function WorkshopAssetLockRow({
         {options.map((option, idx) => (
           <option key={option.id} value={option.id}>
             {option.code ? `[#${option.code.replace(/^#/, '')}]` : `[#${prefix}-${String(idx + 1).padStart(2, '0')}]`}{' '}
-            {option.name || option.title}{(prefix === 'P' || prefix === 'O') ? ` · ${audienceLabel({ ...option }, prefix === 'O')}` : ''}{optionSuffix?.(option)}
+            {optionLabel?.(option) || option.name || option.title}{(prefix === 'P' || prefix === 'O') ? ` · ${audienceLabel({ ...option }, prefix === 'O')}` : ''}{optionSuffix?.(option)}
           </option>
         ))}
       </select>

@@ -275,6 +275,8 @@ export async function analyzeBatchProduct(
         applied_persona: data?.applied_persona || data?.appliedPersona,
         appliedFullPromptId: data?.assetTrace?.fullPromptId,
         appliedFullPromptTitle: data?.assetTrace?.fullPromptTitle,
+        appliedFullPromptGroupIndex: data?.assetTrace?.fullPromptGroupIndex,
+        appliedFullPromptAlbumName: data?.assetTrace?.fullPromptAlbumName,
         appliedFullPromptSelectionMode: data?.assetTrace?.fullPromptSelectionMode,
         appliedFullPromptAppearance: data?.assetTrace?.fullPromptAppearance,
         productRole: formatted.productRole,

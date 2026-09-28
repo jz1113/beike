@@ -210,6 +210,8 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
       ...assembled.assetTrace,
       fullPromptId: lockedGroup.id,
       fullPromptTitle: lockedGroup.title,
+      fullPromptGroupIndex: lockedGroup.groupIndex,
+      fullPromptAlbumName: lockedGroup.albumName,
       fullPromptSelectionMode: lockedGroup.selectionMode,
       fullPromptAppearance: lockedGroup.groupAppearance,
     },

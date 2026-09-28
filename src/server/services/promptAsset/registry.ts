@@ -2,10 +2,12 @@ import { isPlaceholderIdentity, workshopAssetBlockReason } from '@shared/domain/
 import { visualAssetIssue } from '@shared/domain/assets/assetDeconstruct/visualEvidence';
 import {
   ensureRegistryExists,
+  listFullPromptSourceMothers,
   listPublishedSourceIds,
   listRegistryByType,
   listAssetsForRegistryBackfill,
 } from '../../repositories/promptAsset';
+import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 import {
   initialRegistryStatus,
   type PromptAssetType,
@@ -48,5 +50,34 @@ export async function attachRegistryMeta<T extends { id: string; provenance?: st
     const issue = visualAssetIssue(row as Record<string, unknown>, assetType);
     return { ...row, contentEligible: !isPlaceholderIdentity(row, assetType) && !issue,
       productionBlockReason: issue || workshopAssetBlockReason(row, assetType) };
+  });
+}
+
+/** Resolve a promoted group's parent through its registry id, without confusing source image numbers with parent assets. */
+export async function attachFullPromptSource<T extends { id: string; provenance?: string | null }>(items: T[]) {
+  const withRegistry = await attachRegistryMeta('full_prompt', items);
+  const sourceRefs = [...new Set(withRegistry
+    .filter((item) => item.registry?.provenance === 'workshop_generated')
+    .map((item) => item.registry?.sourceRef)
+    .filter((ref): ref is string => Boolean(ref)))];
+  const sources = await listFullPromptSourceMothers(sourceRefs);
+  const sourceByRegistry = new Map(sources.map((source) => [source.registryId, source]));
+  return withRegistry.map((item) => {
+    const source = item.registry?.sourceRef && item.registry.sourceRef !== item.registry.id
+      ? sourceByRegistry.get(item.registry.sourceRef)
+      : null;
+    return {
+      ...item,
+      sourceMother: item.registry?.provenance === 'workshop_generated' && source
+        ? {
+          id: source.id,
+          code: stableAssetCode('R', source.id),
+          title: source.title,
+          groupIndex: source.groupIndex,
+          albumName: source.albumName,
+          available: Boolean(source.available),
+        }
+        : null,
+    };
   });
 }

@@ -75,6 +75,26 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const hasVisualContent = currentCover || visibleSourceImages.length > 0;
   const activeSrc = visibleSourceImages[detailActiveImageIndex] || currentCover || visibleSourceImages[0];
   const sourceIdx = typeof detailItem.sourceImageIndex === 'number' ? detailItem.sourceImageIndex : null;
+  const groupNumber = Number.isInteger(detailItem.groupIndex) && detailItem.groupIndex > 0 ? detailItem.groupIndex : null;
+  const displayTitle = activeSubTab === 'full_prompt' && groupNumber !== null
+    ? `组 ${groupNumber}`
+    : detailItem.title || detailItem.name || '未命名资产';
+  const isDerivedGroup = activeSubTab === 'full_prompt' && (
+    detailItem.registry?.provenance === 'workshop_generated' ||
+    detailItem.provenance === 'workshop_generated' ||
+    Boolean(detailItem.sourceMother)
+  );
+  const sourceMother = detailItem.sourceMother as {
+    code?: string;
+    title?: string | null;
+    groupIndex?: number | null;
+    albumName?: string | null;
+    available?: boolean;
+  } | null | undefined;
+  const sourceMotherCode = sourceMother?.code ? `#${sourceMother.code.replace(/^#/, '')}` : '';
+  const originalTitle = typeof detailItem.title === 'string' ? detailItem.title.trim() : '';
+  const showOriginalTitle = activeSubTab === 'full_prompt' && groupNumber !== null && originalTitle &&
+    originalTitle !== displayTitle && originalTitle !== `${detailItem.albumName || ''} · 图组 ${groupNumber}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
@@ -136,9 +156,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   ? '#A-01'
                   : '#O-01'}
               </span>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                {detailItem.title || detailItem.name}
-              </h2>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">{displayTitle}</h2>
+                {showOriginalTitle && <p className="max-w-[560px] break-words text-[11px] font-normal text-slate-500">原名称：{originalTitle}</p>}
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[11px]">
               {detailItem.albumName && (
@@ -148,7 +169,16 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               )}
               {activeSubTab === 'full_prompt' && detailItem.groupIndex && (
                 <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-semibold rounded-md border border-indigo-200">
-                  图组 {String(detailItem.groupIndex)} · {sourceImageIndices.length || 1} 张
+                  {sourceImageIndices.length || 1} 张原图
+                </span>
+              )}
+              {activeSubTab === 'full_prompt' && (
+                <span className="max-w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-semibold text-slate-600" title={sourceMother?.title || undefined}>
+                  {isDerivedGroup
+                    ? sourceMother
+                      ? `来源母本 ${sourceMotherCode || '编号未知'}${sourceMother.groupIndex ? ` · 组 ${sourceMother.groupIndex}` : ''}${sourceMother.available ? '' : ' · 已删除'}`
+                      : '来源母本未记录'
+                    : '原始母本'}
                 </span>
               )}
               {activeSubTab === 'action' ? (

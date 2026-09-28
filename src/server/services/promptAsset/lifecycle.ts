@@ -27,7 +27,7 @@ export async function applyLifecycleAction(
       sourceAssetId,
       status: 'pending_review',
       provenance: current.provenance,
-      sourceRef: current.id,
+      sourceRef: current.sourceRef,
       version: nextVersion,
     });
   }

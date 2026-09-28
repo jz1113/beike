@@ -5,7 +5,7 @@ import { resolveShotsForScene, type ActionLike } from '@shared/domain/assets/sce
 import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 import { readOrganization } from './organization';
 import { buildLibraryListWhere } from '../../../../services/library/listWhere';
-import { attachRegistryMeta } from '../../../../services/promptAsset/registry';
+import { attachFullPromptSource, attachRegistryMeta } from '../../../../services/promptAsset/registry';
 
 const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {
   const text = typeof reversePromptZh === 'string' ? reversePromptZh.trim() : '';
@@ -84,7 +84,7 @@ export async function executeLibraryGet(req: Request) {
     if (assetType === 'full_prompt') {
       const item = await assetLibraryQueries.groupDetail(detailId);
       if (!item) return jsonResponse({ success: false, error: '资产不存在' }, 404);
-      return jsonResponse({ success: true, assetType, item: (await attachRegistryMeta(assetType, [item]))[0] });
+      return jsonResponse({ success: true, assetType, item: (await attachFullPromptSource([item]))[0] });
     }
   }
 
@@ -100,7 +100,7 @@ export async function executeLibraryGet(req: Request) {
     const [scenes, outfits, actions, personas, fullPrompts] = await Promise.all([
       attachRegistryMeta('scene', rawLists[0]), attachRegistryMeta('outfit', rawLists[1]),
       attachRegistryMeta('action', rawLists[2]), attachRegistryMeta('persona', rawLists[3]),
-      attachRegistryMeta('full_prompt', rawLists[4]),
+      attachFullPromptSource(rawLists[4]),
     ]);
 
     return jsonResponse({
@@ -153,6 +153,7 @@ export async function executeLibraryGet(req: Request) {
           'shotPromptsJson',
           'hasHuman',
           'provenance',
+          'sourceMother',
         ]);
         const preview = buildPromptPreview(f.reversePromptZh);
         if (preview) slimmed.promptPreview = preview;
@@ -226,7 +227,7 @@ export async function executeLibraryGet(req: Request) {
       ...item,
       code: stableAssetCode('R', String(item.id)),
     }));
-    return jsonResponse({ success: true, assetType, total, page, pageSize, items: await attachRegistryMeta('full_prompt', mappedItems) });
+    return jsonResponse({ success: true, assetType, total, page, pageSize, items: await attachFullPromptSource(mappedItems) });
   }
 
   return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);

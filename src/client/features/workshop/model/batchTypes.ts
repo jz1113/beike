@@ -99,6 +99,8 @@ export interface BatchProductItem {
   applied_persona?: string;
   appliedFullPromptId?: string;
   appliedFullPromptTitle?: string;
+  appliedFullPromptGroupIndex?: number | null;
+  appliedFullPromptAlbumName?: string | null;
   appliedFullPromptSelectionMode?: 'manual' | 'auto';
   appliedFullPromptAppearance?: 'human' | 'product' | 'unknown';
 

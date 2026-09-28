@@ -174,6 +174,8 @@ export async function loadLockedGroupSkeleton(input: {
   return {
     id: row.id,
     title: row.title,
+    groupIndex: row.groupIndex,
+    albumName: row.albumName,
     selectionMode: manuallyLocked ? 'manual' as const : 'auto' as const,
     shots,
     architectureSummary: row.architectureSummary,
