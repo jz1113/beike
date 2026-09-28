@@ -302,10 +302,6 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget }: P
                     e.stopPropagation();
                     setZoomImageUrl(url);
                   }}
-                  onApply={(e) => {
-                    e.stopPropagation();
-                    void withAssetDetail(item, handleApplyToWorkshop);
-                  }}
                   onCopy={(e) => {
                     e.stopPropagation();
                     setOpenCardMenuId(null);

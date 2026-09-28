@@ -62,8 +62,8 @@ export function VirtualAssetGrid<T extends { id: string }>({
     <div
       ref={gridRef}
       data-asset-grid
-      className="relative grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-      style={{ height: virtualizer.getTotalSize() }}
+      className="relative grid"
+      style={{ height: virtualizer.getTotalSize(), gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))' }}
     >
       {virtualizer.getVirtualItems().map((row) => {
         const rowItems = items.slice(row.index * columns, (row.index + 1) * columns);

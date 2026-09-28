@@ -1,5 +1,4 @@
 import { audienceLabel } from '@shared/domain/assets/appearanceAudience';
-import { workshopAssetBlockReason } from '@shared/domain/workshop/workshopPipeline';
 import { visualAssetIssue } from '@shared/domain/assets/assetDeconstruct/visualEvidence';
 import { type MouseEvent, useMemo } from 'react';
 import {
@@ -9,7 +8,6 @@ import {
   Copy,
   Check,
   ArrowRight,
-  ChevronRight,
   MoreHorizontal,
   CheckSquare,
   Square,
@@ -49,7 +47,6 @@ interface PromptAssetCardProps {
   onToggleFavorite: (e: MouseEvent) => void;
   onToggleMenu: (e: MouseEvent) => void;
   onViewDetail: (e: MouseEvent) => void;
-  onApply: (e: MouseEvent) => void;
   onCopy: (e: MouseEvent) => void;
   onEdit: (e: MouseEvent) => void;
   onQuickEditTag?: (item: PromptAssetCardProps['item'], e: MouseEvent) => void;
@@ -65,28 +62,12 @@ const DEFAULT_CODE: Record<AssetSubTab, string> = {
   action: '#A-01',
 };
 
-const TAB_APPLY_BTN_CLASS: Record<AssetSubTab, string> = {
-  full_prompt: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800',
-  persona: 'bg-amber-50 hover:bg-amber-100 text-amber-800',
-  outfit: 'bg-sky-50 hover:bg-sky-100 text-sky-800',
-  scene: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800',
-  action: 'bg-purple-50 hover:bg-purple-100 text-purple-800',
-};
-
 const TAB_HOVER_TITLE_CLASS: Record<AssetSubTab, string> = {
   full_prompt: 'group-hover:text-indigo-600',
   persona: 'group-hover:text-amber-600',
   outfit: 'group-hover:text-sky-600',
   scene: 'group-hover:text-emerald-600',
   action: 'group-hover:text-purple-600',
-};
-
-const TAB_APPLY_LABEL: Record<AssetSubTab, string> = {
-  full_prompt: '载入图组',
-  persona: '锁定人设',
-  outfit: '锁定穿搭',
-  scene: '锁定场景',
-  action: '锁定镜头',
 };
 
 export default function PromptAssetCard({
@@ -101,14 +82,12 @@ export default function PromptAssetCard({
   onToggleFavorite,
   onToggleMenu,
   onViewDetail,
-  onApply,
   onCopy,
   onEdit,
   onQuickEditTag,
   onDelete,
   onPreviewImage,
 }: PromptAssetCardProps) {
-  const productionBlockReason = workshopAssetBlockReason(item, activeSubTab);
   const summary = getAssetCardSummary(item, activeSubTab);
   const codeLabel = item.code
     ? `#${String(item.code).replace(/^#/, '')}`
@@ -347,22 +326,12 @@ export default function PromptAssetCard({
       )}
 
       {/* 底部操作栏 */}
-      <div className="order-6 flex items-center justify-between gap-1 mt-2 flex-wrap">
+      <div className="order-6 flex items-center justify-end mt-2">
         <button
           onClick={onViewDetail}
-          className="flex items-center gap-0.5 min-w-0 text-[11px] text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer font-medium"
+          className="flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 transition-colors hover:bg-indigo-100 cursor-pointer"
         >
           <span>{activeSubTab === 'full_prompt' ? '查看图组与分镜' : '查看提示词与原图'}</span>
-          <ChevronRight className="w-3 h-3" />
-        </button>
-
-        <button
-          onClick={onApply}
-          disabled={Boolean(productionBlockReason)}
-          className={`flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${TAB_APPLY_BTN_CLASS[activeSubTab]}`}
-          title={productionBlockReason || "应用到工坊流水线"}
-        >
-          <span>{productionBlockReason ? "暂不可用于生产" : TAB_APPLY_LABEL[activeSubTab]}</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       </div>

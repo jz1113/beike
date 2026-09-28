@@ -620,7 +620,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               className="disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{productionBlockReason ? "暂不可用于生产" : "应用到工坊"}</span>
+              <span>{productionBlockReason ? "暂不可用于生产" : activeSubTab === 'full_prompt' ? '载入图组' : '应用到工坊'}</span>
             </button>
           </div>
         </div>
