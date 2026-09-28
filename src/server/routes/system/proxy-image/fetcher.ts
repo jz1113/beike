@@ -4,6 +4,7 @@ import {
   setCachedVideo,
 } from './cache';
 import { fetchRemote } from './fetchRemote';
+import { matchesDomainSuffix } from '@server/infrastructure/network/safeUrl';
 
 export function parseBytesRange(
   rangeHeader: string | null,
@@ -62,7 +63,7 @@ export function buildUpstreamHeaders(
   }
   if (hostname) {
     for (const rule of REFERER_RULES) {
-      if (rule.hosts.includes(hostname)) {
+      if (rule.hosts.some((host) => matchesDomainSuffix(hostname, host))) {
         headers.Referer = rule.referer;
         break;
       }

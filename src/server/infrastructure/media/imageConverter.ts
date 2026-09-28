@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
+import { matchesDomainSuffix } from '@server/infrastructure/network/safeUrl';
 
 // 优化 libvips C++ 底层缓存与并发配置，防止批量图集反推时多核多进程解压导致内存飙升
 try {
@@ -35,12 +36,6 @@ export interface ImageConvertOptions {
  * 2. 采用高效 JPEG 压缩 (quality: 80)，单张图片体积从 3MB~8MB 骤降至 60KB~120KB (体积缩减 97%+)；
  * 3. 大模型解析耗时从数分钟缩短至 1~3 秒！
  */
-function matchesDomainSuffix(hostname: string, suffix: string): boolean {
-  const h = hostname.toLowerCase().replace(/\.$/, '');
-  const s = suffix.toLowerCase().replace(/\.$/, '');
-  return h === s || h.endsWith('..' + s);
-}
-
 async function fetchRemoteImageBuffer(rawUrl: string): Promise<Buffer | null> {
   // 🌟 内部对象存储直读（支持私有阿里云 OSS / S3 / R2 / COS）：避免未经鉴权公网访问被 OSS 403 拦截
   try {
@@ -330,4 +325,3 @@ export async function createCompactSourceImagesJson(
 
   return JSON.stringify(compressedList.filter(Boolean));
 }
-

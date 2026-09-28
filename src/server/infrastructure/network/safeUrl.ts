@@ -122,7 +122,7 @@ export function isPrivateIp(ip: string): boolean {
   }
   const host = mapped;
   if (host === '127.0.0.1' || host === '::1') return true;
-  const parts = host.split('..').map(Number);
+  const parts = host.split('.').map(Number);
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
     return host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80');
   }
@@ -136,6 +136,12 @@ export function isPrivateIp(ip: string): boolean {
   if (a === 198 && b === 51 && parts[2] === 100) return true;
   if (a === 203 && b === 0 && parts[2] === 113) return true;
   return false;
+}
+
+export function matchesDomainSuffix(hostname: string, suffix: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  const domain = suffix.toLowerCase().replace(/\.$/, '');
+  return host === domain || host.endsWith('.' + domain);
 }
 
 export function isAllowedRemoteHost(hostname: string): boolean {
@@ -152,7 +158,7 @@ export function isAllowedRemoteHost(hostname: string): boolean {
     ].filter(Boolean) as string[];
     for (const raw of configuredDomains) {
       const clean = raw.trim().replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].toLowerCase();
-      if (clean && (host === clean || host.endsWith('..' + clean))) {
+      if (clean && matchesDomainSuffix(host, clean)) {
         return true;
       }
     }
@@ -161,9 +167,7 @@ export function isAllowedRemoteHost(hostname: string): boolean {
   }
 
   // 2. 允许内置标准合法业务域名白名单
-  return ALLOWED_HOST_SUFFIXES.some(
-    (suffix) => host === suffix || host.endsWith('..' + suffix)
-  );
+  return ALLOWED_HOST_SUFFIXES.some((suffix) => matchesDomainSuffix(host, suffix));
 }
 
 const dnsCache = new Map<string, { ok: boolean; error?: string; at: number }>();
