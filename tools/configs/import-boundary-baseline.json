@@ -1,7 +1,4 @@
 {
-  "comment": "Reviewed cross-feature edges. New feature-to-feature imports must not appear; remove an entry when the coupling is deleted.",
-  "edges": [
-    "workshop->assets",
-    "assets->canvas"
-  ]
+  "comment": "No feature-to-feature imports are allowed; new edges fail the boundary gate.",
+  "edges": []
 }

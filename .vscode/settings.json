@@ -1,5 +1,5 @@
 {
   "npm.autoDetect": "on",
   "npm.exclude": "**/{.next,out,dist,build,docs}/**",
-  "npm.packageManager": "npm"
+  "npm.packageManager": "pnpm"
 }

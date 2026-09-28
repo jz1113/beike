@@ -1,132 +1,84 @@
 # 贝壳云图
 
-面向电商视觉创作的浏览器应用：商品采集、视觉反推、分镜生成、大字报封面、关键词审核和画布编辑都在同一套 Web 工作台里完成。
+面向电商视觉创作的浏览器应用，包含商品采集、视觉反推、分镜生成、大字报封面、关键词审核、画布编辑和 AI 助手。
 
-## 技术栈
+采用单项目结构：一个 `package.json`、一个锁文件、一套安装和构建命令。前后端通过目录与依赖检查隔离，不使用 monorepo 或 workspace 包。
 
-- 前端：React 19、Vite、Tailwind CSS
-- 后端：Hono（Node.js）
-- 数据：Prisma 5 + SQLite
-- 仓库：pnpm workspace 轻量 monorepo；应用采用模块化单体，不引入额外编排框架
-
-## 目录
+## 目录导航
 
 ```text
-apps/web          浏览器界面
-apps/api          HTTP API
-packages/contracts  Zod 契约
-packages/domain     浏览器可运行的纯逻辑
-packages/server-kit Node 侧存储、鉴权和爬虫
-packages/prisma     schema 与迁移
-tools               校验脚本和工程配置
-docs                架构约定与厂商模型索引
-deploy              Ubuntu 部署说明
+贝壳/
+├── src/                 源码（前端、后端、共用代码）
+│   ├── client/          前端：页面、交互、样式
+│   │   └── public/      前端公开图片与品牌素材
+│   ├── server/          后端：接口、业务、数据访问
+│   └── shared/          前后端共用的接口定义与业务规则
+├── database/            数据库结构、迁移与本地开发库
+├── node_modules/        安装生成的依赖，不手工维护
+├── docs/                架构、产品、厂商接口与部署说明
+├── tools/               工程工具
+│   ├── configs/         质量检查与编译配置
+│   ├── scripts/         启动、检查、深度模型与数据维护脚本
+│   ├── deploy/          服务、Nginx 与部署环境模板
+│   └── build/ui/        自动生成的前端构建产物
+├── index.html           浏览器 HTML 入口
+├── 启动贝壳云图.command   macOS 双击启动浏览器版
+├── vite.config.ts       前端开发代理与构建
+├── tsconfig.json        类型检查与源码别名
+├── package.json         唯一依赖清单与命令入口
+└── pnpm-lock.yaml       唯一依赖锁文件
 ```
 
-依赖方向：`web` 只依赖 `contracts` 和 `domain`；`api` 再依赖 `server-kit` 和 `prisma`；`domain` 不依赖 Node、Prisma 或对象存储。`apps/web/src/shared` 不引用 `features`。
+日常修改界面看 `src/client`，修改接口看 `src/server`，修改数据结构看 `database`，使用方法看 `docs`。依赖由 `pnpm install` 管理；工程工具独立收纳，避免混入产品源码。根目录几个配置文件是工具入口，不必为了减少文件数再包一层。
 
-### 架构选择与文件归属
+详细归属和功能导航见 [目录与分层](docs/layout.md)，依赖限制见同页的模块职责与依赖边界。
 
-保留 **2 个应用 + 4 个共享/数据包**：Web 与 API 的运行环境不同，契约、纯业务规则、服务端能力和数据库迁移也需要独立边界。问题不在是否使用 monorepo，而在边界是否清晰、功能目录是否按职责组织。暂不合并成单包，也不拆成多仓库或 feature 微包。
+`node_modules/` 是安装依赖，`tools/build/ui/` 是构建产物；二者会在安装或构建时生成，不是额外子项目。`.local/` 只保存本机工具、运行记录、凭证与备份，不放产品源码。`.agents/skills/` 是可复用技能，`AGENTS.md` 与 `.cursor/rules/` 是工程规则，均不是临时计划文件。
 
-- Web 应用组合入口：`apps/web/src/app/App.tsx`，启动入口仍为 `src/main.tsx`。
-- 工坊：`features/workshop/{api,hooks,components,model}`；`model` 按 `collection / analysis / generation / delivery / workspace` 五类职责组织，测试与实现相邻。
-- 跨模块资产缓存：`apps/web/src/shared/api/assetLibraryCache.ts`；不得让 shared 反向依赖 features。
-- 具体放置规则见 [目录与分层](docs/architecture/layout.md)，整改依据、删除清单及限制见 [仓库架构核查报告](docs/architecture/repository-architecture-audit-2026-09-24.md)。
+## 安装与启动
 
-## 环境
-
-- Node.js 22（见 `.nvmrc`）
-- pnpm 10.13.1（见根目录 `packageManager`）
+环境：Node.js 22、pnpm 10.13.1。技术栈：React 19、Vite、Tailwind CSS、Hono、Prisma 5、SQLite。
 
 ```bash
 nvm use
 corepack enable
-corepack prepare pnpm@10.13.1 --activate
+cp .env.example .env          # 仅首次创建；已有配置不要覆盖
+pnpm install --frozen-lockfile
+pnpm dev                     # 同时启动前端和 API
 ```
 
-## 配置
+浏览器打开 http://127.0.0.1:5173。单独启动使用 `pnpm dev:api`、`pnpm dev:ui`；原有 `dev:web` / `start:web` 命令仍可用。
+
+macOS 也可在 Finder 中双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)：它选用 `.nvmrc` 的 Node.js 22，首次缺依赖时按锁文件安装，然后启动 API 与前端并打开浏览器。重复双击会打开已运行的页面；在启动器的终端窗口按 Ctrl+C 停止服务。现有 `.env` 和本机数据不会被启动器覆盖。
+
+在 `.env` 填写模型网关和采集配置；不要提交密钥。前端通过开发代理访问 API，生产由同一 Node 服务托管页面与 API。
+
+## 构建与检查
 
 ```bash
-cp .env.example .env
+pnpm build                   # 类型检查、生成 Prisma 客户端、构建前端
+pnpm start                   # 启动生产服务，读取 tools/build/ui/
+pnpm check                   # 静态质量检查与生产构建，与 CI 一致
+pnpm run check:structure     # 单项目结构与依赖声明
+pnpm run lint:boundaries     # 浏览器/服务端、公共/功能模块边界
 ```
 
-在 `.env` 里填写模型网关和采集接口密钥。不要提交 `.env` 或 `.env.production`。浏览器里保存的密钥跟随当前请求发送，生产环境不会写回服务器的 `.env`。
+当前目录按维护要求不保留测试源码、测试执行器和浏览器 QA 脚本，`pnpm check` 不包含自动化测试。它检查目录、依赖声明、模型文档、TypeScript、ESLint、未使用绑定、文件长度、依赖边界和密钥，并构建前端。既有质量基线只允许收紧。临时验证脚本、截图、报告和 Agent 计划应放在项目外的临时目录，验证后清理。
 
-## 本地开发
+## 数据与部署
 
-```bash
-pnpm install
-pnpm run dev:web
-```
+- `pnpm db:generate` 生成客户端，不修改数据。
+- `pnpm db:migrate` / `pnpm db:deploy` 都运行项目的版本化 SQLite 迁移；不使用 Prisma 的另一套迁移历史。
+- `pnpm db:backup` 对实际运行库做一致性快照；`pnpm db:restore:verify <文件>` 检查快照完整性及外键。
+- 本地启动器继续使用系统原有应用数据目录；`database/dev.db` 仅作为开发/首次启动后备数据。
+- [部署说明](docs/deployment.md)与 Nginx 模板使用 `tools/build/ui/`。
 
-浏览器打开 http://127.0.0.1:5173。也可以分开启动：
-
-```bash
-pnpm run dev:api
-pnpm run dev:ui
-```
-
-## 生产
-
-```bash
-pnpm run build:ui
-pnpm run start:web
-```
-
-服务器步骤见 [deploy/README.md](deploy/README.md)。生产数据库只使用 `pnpm run db:deploy`。
-
-## 数据库
-
-| 命令 | 用途 |
-| --- | --- |
-| `pnpm run db:push` | 开发时把 schema 直接推到本地 SQLite |
-| `pnpm run db:migrate` | 开发时生成并应用迁移 |
-| `pnpm run db:deploy` | 生产环境只应用已有迁移 |
-| `pnpm run db:backup` | 按 `DATABASE_URL` 做 SQLite 文件备份 |
-| `pnpm run db:restore:verify` | 对当前库或备份做完整性检查 |
-
-备份默认写到 `packages/prisma/backups/`，这些文件不进 Git。
-
-## 质量门禁
-
-`pnpm run check` 依次执行：
-
-- 根目录布局
-- 六个工作区的名称、私有性、依赖方向及 `workspace:*` 协议
-- 批准模型清单与文档是否对齐
-- TypeScript
-- ESLint
-- 新增未使用绑定
-- 新增超长文件
-- 依赖边界
-- 密钥扫描
-- 测试
-- 前端生产构建
-
-单独测试：`pnpm test`。测试入口递归发现 `apps/*/src`、`packages`、`tools/scripts` 下的 `.test.*` / `.spec.*`，不再手写测试目录清单。浏览器 QA 不混入单元测试，需另行运行。
-
-```bash
-pnpm run test:list                  # 检查实际发现的测试文件
-pnpm --filter @beike/web test       # 仅前端
-pnpm --filter @beike/api test       # 仅 API
-pnpm --filter @beike/domain test    # 仅纯业务包
-pnpm run check:workspaces           # 工作区边界
-pnpm run audit:source               # 只读盘点；生成 .local/source-audit.json
-```
-
-CI 与本地统一执行 `pnpm run check`。静态扫描候选必须再检查动态加载、公开导出和运行入口，不能直接批量删除。
-
-## 安全清理
-
-`pnpm run clean` 仅清除构建输出；`clean:all` 还删除可重新安装的 `node_modules`。**被 Git 忽略不等于可以删除**：`.local/`、`.env*`、SQLite 数据库及其 WAL/SHM、`packages/prisma/backups/`、上传素材与本地存储均可能包含真实数据或凭证，不在自动清理范围内。迁移、种子、部署脚本和公开资源也不能只凭前端引用次数删除。
-
-## 换电脑
-
-提交并推送后，在另一台机器 `git pull`。`.env` 和 `packages/prisma/dev.db` 不在仓库里，需要自行拷贝。类目拍摄结构和提示词资产在 `packages/domain` 的配方与 `seeds/` 中，不要删。
+`.env*`、本机凭证、数据库及 WAL/SHM、备份、上传素材不能作为源码垃圾清理。`pnpm clean` 只清除可重建的 `tools/build/ui`；`clean:all` 另清除可重装依赖。
 
 ## 文档
 
-- [docs/AGENTS.md](docs/AGENTS.md)：工程约定
-- [docs/architecture/](docs/architecture/)：目录分层与代码健康
-- [docs/vendors/](docs/vendors/)：批准模型的厂商和聚合索引
+- [工程约定](AGENTS.md)
+- [目录与分层](docs/layout.md)
+- [工坊资产绑定](docs/workshop-asset-binding.md)
+- [助手执行机制](docs/assistant-runtime.md)
+- [厂商接口与模型索引](docs/models.md)

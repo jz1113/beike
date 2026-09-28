@@ -13,6 +13,7 @@ const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const execFileAsync = promisify(execFile);
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const pythonScript = path.join(workspaceRoot, 'tools/scripts/depth/infer_video_depth.py');
+const python = process.env.DEPTH_VIDEO_PYTHON?.trim() || 'python3';
 
 async function main() {
   const ffmpeg = ffmpegPath;
@@ -27,7 +28,7 @@ async function main() {
 
   let pyEnv = '';
   try {
-    const { stdout } = await execFileAsync('python3', [pythonScript, '--check-env']);
+    const { stdout } = await execFileAsync(python, [pythonScript, '--check-env']);
     pyEnv = stdout.trim();
   } catch (error) {
     pyEnv = String(error?.stdout || '').trim() || String(error?.message || error);
@@ -47,7 +48,7 @@ async function main() {
   const framesOut = path.join(dir, 'depth');
   fs.mkdirSync(framesIn);
   await execFileAsync(ffmpeg, ['-y', '-i', input, '-vf', 'scale=320:-2', path.join(framesIn, '%06d.png')]);
-  await execFileAsync('python3', [
+  await execFileAsync(python, [
     pythonScript,
     '--input-dir', framesIn,
     '--output-dir', framesOut,

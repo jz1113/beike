@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 生产 Web：托管已构建的 apps/web/dist，并由同一 Node 进程提供 /api 与 /storage。
+ * 生产 Web：托管已构建的 tools/build/ui，并由同一 Node 进程提供 /api 与 /storage。
  * Nginx 应反代到 127.0.0.1:PORT，不要把 PORT 直接暴露公网。
  */
 import { existsSync } from 'node:fs';
@@ -14,7 +14,7 @@ import {
 } from './web-shared.mjs';
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const webDistDir = process.env.WEB_DIST_DIR || join(workspaceRoot, 'apps/web/dist');
+const webDistDir = process.env.WEB_DIST_DIR || join(workspaceRoot, 'tools/build/ui');
 const appDataDir = process.env.AZHUO_DATA_DIR || resolveAppDataDir();
 const apiPort = Number.parseInt(process.env.PORT || '3000', 10);
 

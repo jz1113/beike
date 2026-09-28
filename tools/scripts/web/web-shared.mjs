@@ -23,10 +23,10 @@ export function getWorkspaceRoot() {
   return join(scriptDir, '../../..');
 }
 
-/** 从依赖所属 workspace 解析 CLI，兼容 pnpm 隔离安装和 npm 提升安装。 */
-export function resolveCli(workspaceRoot, packageName, binName, workspace = '.') {
+/** 所有 CLI 从唯一的根依赖清单解析。 */
+export function resolveCli(workspaceRoot, packageName, binName) {
   try {
-    const require = createRequire(join(workspaceRoot, workspace, 'package.json'));
+    const require = createRequire(join(workspaceRoot, 'package.json'));
     const manifestPath = require.resolve(`${packageName}/package.json`);
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.[binName];
@@ -36,7 +36,7 @@ export function resolveCli(workspaceRoot, packageName, binName, workspace = '.')
     return cli;
   } catch (error) {
     throw new Error(
-      `无法加载 ${packageName} 启动依赖（${workspace}）。请在项目根目录运行 pnpm install --frozen-lockfile --prod=false 后重试。`,
+      `无法加载 ${packageName} 启动依赖。请在项目根目录运行 pnpm install --frozen-lockfile --prod=false 后重试。`,
       { cause: error },
     );
   }
@@ -59,7 +59,7 @@ export function ensureAppDatabase(workspaceRoot, appDataDir) {
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(join(appDataDir, 'storage'), { recursive: true });
   const targetDb = join(appDataDir, 'azhuo.db');
-  const devDb = join(workspaceRoot, 'packages', 'prisma', 'dev.db');
+  const devDb = join(workspaceRoot, 'database', 'dev.db');
   if (!existsSync(targetDb) && existsSync(devDb)) {
     copyFileSync(devDb, targetDb);
     console.log(`→ 已复制初始数据库：${targetDb}`);
@@ -173,8 +173,8 @@ export async function stopApiServer() {
     }
     return;
   }
-  spawnSync('pkill', ['-f', 'tsx.*apps/api/src/index.ts'], { stdio: 'ignore' });
-  spawnSync('pkill', ['-f', 'apps/api/src/index.ts'], { stdio: 'ignore' });
+  spawnSync('pkill', ['-f', 'tsx.*src/server/index.ts'], { stdio: 'ignore' });
+  spawnSync('pkill', ['-f', 'src/server/index.ts'], { stdio: 'ignore' });
   spawnSync('pkill', ['-f', 'infer_video_depth.py'], { stdio: 'ignore' });
   await new Promise((r) => setTimeout(r, 500));
 }
@@ -196,7 +196,7 @@ export function startApiServer({ workspaceRoot, apiPort, appDataDir, accessToken
   const tsxCli = resolveCli(workspaceRoot, 'tsx', 'tsx');
   const args = ['--max-old-space-size=2048', '--expose-gc', tsxCli];
   if (watch) args.push('watch');
-  args.push('--tsconfig', 'tsconfig.json', 'apps/api/src/index.ts');
+  args.push('--tsconfig', 'tsconfig.json', 'src/server/index.ts');
   return spawn(process.execPath, args, {
     cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
@@ -205,9 +205,9 @@ export function startApiServer({ workspaceRoot, apiPort, appDataDir, accessToken
 }
 
 export function startViteServer({ workspaceRoot, accessToken, vitePort = VITE_PORT }) {
-  const viteCli = resolveCli(workspaceRoot, 'vite', 'vite', 'apps/web');
+  const viteCli = resolveCli(workspaceRoot, 'vite', 'vite');
   return spawn(process.execPath, [viteCli, '--strictPort', '--host', '127.0.0.1', '--port', String(vitePort)], {
-    cwd: join(workspaceRoot, 'apps', 'web'),
+    cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: {
       ...process.env,

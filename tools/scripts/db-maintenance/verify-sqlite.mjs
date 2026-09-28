@@ -1,38 +1,24 @@
 #!/usr/bin/env node
 /** Verify SQLite integrity of DATABASE_URL or a backup path passed as argv[2]. */
 import fs from 'node:fs';
-import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { resolveSqliteFile } from './sqlite-path.mjs';
 
-if (typeof process.loadEnvFile === 'function') {
-  try { process.loadEnvFile(); } catch { /* missing .env is fine */ }
-}
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const schemaDir = path.join(root, 'packages/prisma');
-
-function resolveSqliteFile() {
-  const fromArg = process.argv[2];
-  if (fromArg) return path.resolve(fromArg);
-  const url = process.env.DATABASE_URL || 'file:./dev.db';
-  if (!url.startsWith('file:')) {
-    throw new Error(`db:restore:verify 仅支持 SQLite file: URL，当前为 ${url}`);
-  }
-  const raw = url.slice('file:'.length);
-  return path.isAbsolute(raw) ? raw : path.resolve(schemaDir, raw);
-}
-
-const dbFile = resolveSqliteFile();
+const dbFile = resolveSqliteFile(process.argv[2]);
 if (!fs.existsSync(dbFile)) {
   console.error(`数据库文件不存在: ${dbFile}`);
   process.exit(1);
 }
 
-const python = spawnSync('python3', ['-c', `
-import sqlite3, sys
-con = sqlite3.connect(sys.argv[1])
+const python = spawnSync(process.env.SQLITE_BACKUP_PYTHON || 'python3', ['-c', `
+import pathlib, sqlite3, sys
+file = pathlib.Path(sys.argv[1])
+# A WAL file must be included for a live database. A standalone snapshot can be
+# inspected immutably without creating sidecar files next to the backup.
+mode = '?mode=ro' if pathlib.Path(str(file) + '-wal').exists() else '?immutable=1'
+con = sqlite3.connect(file.as_uri() + mode, uri=True)
 print(con.execute('PRAGMA integrity_check').fetchone()[0])
+print('foreign_key_violations=' + str(len(con.execute('PRAGMA foreign_key_check').fetchall())))
 `, dbFile], { encoding: 'utf8' });
 
 if (python.error || python.status !== 0) {
@@ -41,8 +27,8 @@ if (python.error || python.status !== 0) {
 }
 
 const result = python.stdout.trim();
-if (result !== 'ok') {
-  console.error(`SQLite integrity_check failed: ${result}`);
+if (result !== 'ok\nforeign_key_violations=0') {
+  console.error(`SQLite verification failed: ${result}`);
   process.exit(1);
 }
 console.log(`SQLite integrity_check ok: ${dbFile}`);

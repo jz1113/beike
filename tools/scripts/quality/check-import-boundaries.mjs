@@ -12,7 +12,7 @@ const allowed = new Set(baseline.edges), observed = new Set(), errors = [];
 const config = ts.readConfigFile(path.join(root, 'tsconfig.json'), ts.sys.readFile);
 if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
 const options = ts.parseJsonConfigFileContent(config.config, ts.sys, root).options;
-const files = ['apps/web/src', 'apps/api/src', 'packages'].flatMap(dir => walkSourceFiles(path.join(root, dir)))
+const files = ['src'].flatMap(dir => walkSourceFiles(path.join(root, dir)))
   .filter(file => /\.[cm]?[jt]sx?$/.test(file) && !isTestFile(file) && !file.endsWith('.d.ts'));
 const relative = file => path.relative(root, file).split(path.sep).join('/');
 for (const absolute of files) {
@@ -21,8 +21,8 @@ for (const absolute of files) {
   for (const specifier of moduleReferences(source)) {
     const resolved = ts.resolveModuleName(specifier, absolute, options, ts.sys).resolvedModule?.resolvedFileName;
     const to = resolved ? relative(resolved) : '';
-    const staticAsset = specifier.startsWith('@/') && fs.existsSync(path.join(root, 'apps/web/src', specifier.slice(2).split('?')[0]));
-    if (!resolved && !staticAsset && (specifier.startsWith('@beike/') || specifier.startsWith('@/'))) errors.push(`unresolved-workspace: ${from} -> ${specifier}`);
+    const staticAsset = specifier.startsWith('@client/') && fs.existsSync(path.join(root, 'src/client', specifier.slice('@client/'.length).split('?')[0]));
+    if (!resolved && !staticAsset && (/^@(client|shared|server)\//.test(specifier))) errors.push(`unresolved-source: ${from} -> ${specifier}`);
     for (const rule of boundaryViolations(from, to, specifier, allowed)) errors.push(`${rule}: ${from} -> ${to || specifier}`);
     if (featureOf(from) && featureOf(to) && featureOf(from) !== featureOf(to)) observed.add(`${featureOf(from)}->${featureOf(to)}`);
   }

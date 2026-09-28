@@ -1,0 +1,168 @@
+import { assistantMemory } from '../../services/assistant/assistantMemory';
+import { readJsonBody } from '../../core/validate';
+import { jsonResponse } from '../../core/http';
+import { assistantSessionRepository } from '@server/repositories/assistantSessions';
+import { formatUserError } from '@shared/domain/models/upstreamErrors';
+
+function sanitizeAttachment(a: any) {
+  if (!a || typeof a !== 'object') return null;
+  const type = a.type === 'video' || a.type === 'document' ? a.type : 'image';
+  const persistableUrl = (u?: string) => {
+    if (!u || typeof u !== 'string') return undefined;
+    if (u.startsWith('data:') || u.startsWith('blob:')) return undefined;
+    return u;
+  };
+  if (type === 'document') {
+    const text = typeof a.extractedText === 'string' ? a.extractedText.slice(0, 80000) : undefined;
+    if (!text && !a.name) return null;
+    return {
+      type: 'document',
+      name: typeof a.name === 'string' ? a.name : undefined,
+      size: typeof a.size === 'number' ? a.size : undefined,
+      mime: typeof a.mime === 'string' ? a.mime : undefined,
+      extractedText: text,
+      url: '',
+    };
+  }
+  const url = persistableUrl(a.url);
+  const thumbnailUrl = persistableUrl(a.thumbnailUrl);
+  if (type === 'image' && !url) return null;
+  if (type === 'video' && !url && !thumbnailUrl) return null;
+  return {
+    type,
+    url: url || '',
+    thumbnailUrl,
+    mentionName: typeof a.mentionName === 'string' && /^图片\d+$/.test(a.mentionName) ? a.mentionName : undefined,
+    name: typeof a.name === 'string' ? a.name : undefined,
+    size: typeof a.size === 'number' ? a.size : undefined,
+  };
+}
+
+function sanitizeMessages(messages: any[]): any[] {
+  if (!Array.isArray(messages)) return [];
+  return messages.filter((m, index) => index >= messages.length - 100 || Number(m.timestamp) > Date.now() - 7 * 86400000).map((m) => ({
+    ...m,
+    attachments: Array.isArray(m.attachments)
+      ? m.attachments.map(sanitizeAttachment).filter((a: any) => a && (a.url || (a.type === 'document' && a.extractedText) || a.type === 'video'))
+      : undefined,
+  }));
+}
+
+function sanitizeSession(s: any) {
+  return {
+    id: String(s.id),
+    title: (s.title && String(s.title).trim()) || '新对话',
+    createdAt: typeof s.createdAt === 'number' ? s.createdAt : new Date(s.createdAt || Date.now()).getTime(),
+    updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : new Date(s.updatedAt || Date.now()).getTime(),
+    messages: sanitizeMessages(s.messages || []),
+    allowedTools: Array.isArray(s.allowedTools) ? s.allowedTools : [],
+  };
+}
+
+/**
+ * GET /api/assistant/sessions
+ */
+export async function GET() {
+  try {
+    const threads = await assistantSessionRepository.list();
+
+    const sessions = threads.map((t) => {
+      let messages: any[] = [];
+      let allowedTools: string[] = [];
+      try {
+        messages = JSON.parse(t.messagesJson || '[]');
+      } catch {
+        messages = [];
+      }
+      try {
+        allowedTools = JSON.parse(t.allowedToolsJson || '[]');
+      } catch {
+        allowedTools = [];
+      }
+      return {
+        id: t.id,
+        title: t.title,
+        createdAt: t.createdAt.getTime(),
+        updatedAt: t.updatedAt.getTime(),
+        messages: Array.isArray(messages) ? messages : [],
+        allowedTools,
+      };
+    });
+
+    return jsonResponse({ success: true, sessions });
+  } catch (error: unknown) {
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+  }
+}
+
+/**
+ * PUT /api/assistant/sessions
+ * body: { sessions: AssistantSession[], currentId?: string }
+ * 全量 upsert 客户端快照（权威落库）
+ */
+export async function PUT(req: Request) {
+  try {
+    const body = await readJsonBody(req);
+    const rawSessions = Array.isArray(body?.sessions) ? body.sessions : [];
+    const sessions = rawSessions.slice(0, 40).map(sanitizeSession).filter((s: any) => s.id);
+
+    if (sessions.length === 0) {
+      return jsonResponse({ success: false, error: 'sessions 不能为空' }, 400);
+    }
+
+    // 仅有空默认会话且标题为「新对话」且无消息时，不覆盖库中已有非空数据
+    const onlyEmptyDefault =
+      sessions.length === 1 &&
+      sessions[0].title === '新对话' &&
+      (!sessions[0].messages || sessions[0].messages.length === 0);
+
+    if (onlyEmptyDefault) {
+      const existingCount = await assistantSessionRepository.count();
+      if (existingCount > 0) {
+        const existing = await assistantSessionRepository.list();
+        const hasReal = existing.some((t) => {
+          try {
+            const msgs = JSON.parse(t.messagesJson || '[]');
+            return Array.isArray(msgs) && msgs.length > 0;
+          } catch {
+            return false;
+          }
+        });
+        if (hasReal) {
+          return jsonResponse({
+            success: true,
+            skipped: true,
+            reason: '拒绝用空默认会话覆盖已有对话',
+          });
+        }
+      }
+    }
+
+    await assistantSessionRepository.save(sessions);
+
+    return jsonResponse({
+      success: true,
+      count: sessions.length,
+      currentId: body?.currentId || null,
+    });
+  } catch (error: unknown) {
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+  }
+}
+
+/**
+ * DELETE /api/assistant/sessions?id=...
+ */
+export async function DELETE(req: Request) {
+  try {
+    const id = new URL(req.url).searchParams.get('id');
+    if (!id) {
+      return jsonResponse({ success: false, error: '缺少 id' }, 400);
+    }
+    await assistantSessionRepository.delete(id).catch(() => null);
+    await assistantMemory.remove(id);
+    return jsonResponse({ success: true });
+  } catch (error: unknown) {
+    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+  }
+}

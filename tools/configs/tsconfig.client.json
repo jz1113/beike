@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["vite/client", "react", "react-dom"],
+    "incremental": false
+  },
+  "include": ["../../src/client/**/*.ts", "../../src/client/**/*.tsx", "../../src/shared/**/*.ts", "../../src/shared/**/*.tsx"],
+  "exclude": ["../../node_modules", "../build", "../../.local"]
+}

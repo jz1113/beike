@@ -23,11 +23,11 @@ import {
 
 const workspaceRoot = getWorkspaceRoot();
 const apiPort = readApiPort(workspaceRoot);
-const appDataDir = resolveAppDataDir();
+const appDataDir = process.env.AZHUO_DATA_DIR || resolveAppDataDir();
 
 try {
   resolveCli(workspaceRoot, 'tsx', 'tsx');
-  resolveCli(workspaceRoot, 'vite', 'vite', 'apps/web');
+  resolveCli(workspaceRoot, 'vite', 'vite');
 } catch (error) {
   console.error(`✗ ${error.message}`);
   process.exit(1);

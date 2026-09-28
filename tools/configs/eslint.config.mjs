@@ -7,21 +7,20 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 export default defineConfig([
   globalIgnores([
     '.local/**',
-    'dist/**',
-    'apps/web/dist/**',
+    'tools/build/**',
     'node_modules/**',
   ]),
   {
-    files: ['apps/web/src/**/*.{ts,tsx}'],
+    files: ['src/client/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['node:*', '@prisma/client', '@beike/server-kit', '@beike/server-kit/*', '@beike/shared', '@beike/shared/*'] }],
+      'no-restricted-imports': ['error', { patterns: ['node:*', '@prisma/client', '@server', '@server/*'] }],
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
     },
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['apps/web/src/**/*.{ts,tsx}'],
+    files: ['src/client/**/*.{ts,tsx}'],
     languageOptions: {
       globals: globals.browser,
     },
@@ -61,10 +60,10 @@ export default defineConfig([
   },
   {
     files: [
-      'apps/api/src/**/*.{ts,tsx}',
-      'packages/server-kit/src/**/*.{ts,tsx}',
-      'packages/domain/src/**/*.{ts,tsx}',
-      'packages/contracts/src/**/*.{ts,tsx}',
+      'src/server/**/*.{ts,tsx}',
+      'src/server/infrastructure/**/*.{ts,tsx}',
+      'src/shared/domain/**/*.{ts,tsx}',
+      'src/shared/contracts/**/*.{ts,tsx}',
       'tools/scripts/**/*.{js,mjs,ts}',
     ],
     languageOptions: {
@@ -80,16 +79,16 @@ export default defineConfig([
     },
   },
   {
-    files: ['apps/api/src/routes/**/*.ts'],
+    files: ['src/server/routes/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
-        paths: [{ name: '@beike/server-kit/prisma', message: '路由层不得直接访问 Prisma，改走 repositories/' }],
+        paths: [{ name: '@server/infrastructure/database/prisma', message: '路由层不得直接访问 Prisma，改走 repositories/' }],
       }],
       'no-restricted-globals': ['error', { name: 'fetch', message: '外部 HTTP 调用移至 gateways/' }],
     },
   },
   {
-    files: ['packages/domain/src/**/*.ts'],
+    files: ['src/shared/domain/**/*.ts'],
     rules: {
       'no-restricted-globals': ['error',
         { name: 'localStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
@@ -100,7 +99,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['apps/api/src/**/*.ts', 'packages/server-kit/src/**/*.ts', 'packages/contracts/src/**/*.ts'],
+    files: ['src/server/**/*.ts', 'src/server/infrastructure/**/*.ts', 'src/shared/contracts/**/*.ts'],
     rules: {
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
     },

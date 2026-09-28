@@ -9,7 +9,7 @@ const baselinePath = path.join(root, 'tools/configs/max-lines-baseline.json');
 const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 const allowed = new Map(baseline.files.map((entry) => [entry.file, entry.lines]));
 const eslint = new ESLint({ cwd: root, overrideConfigFile: path.join(root, 'tools/configs/eslint.config.mjs') });
-const results = await eslint.lintFiles(['apps', 'packages']);
+const results = await eslint.lintFiles(['src']);
 const added = [];
 let remaining = 0;
 for (const result of results) {

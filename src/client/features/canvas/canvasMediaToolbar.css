@@ -1,0 +1,35 @@
+.canvas-media-toolbar > button {
+  border-radius: 999px;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.canvas-media-toolbar > button:hover {
+  background-color: #f1f5f9;
+  transform: translateY(-1px);
+}
+
+.canvas-media-toolbar > button:focus-visible {
+  outline: 2px solid #94a3b8;
+  outline-offset: 2px;
+}
+
+.canvas-media-toolbar > button:active {
+  transform: scale(.94);
+}
+
+.canvas-media-toolbar > button:focus-visible > span {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-media-toolbar,
+  .canvas-media-toolbar > button,
+  .canvas-media-toolbar > button > span {
+    transition: none;
+  }
+  .canvas-media-toolbar > button:hover,
+  .canvas-media-toolbar > button:active {
+    transform: none;
+  }
+}

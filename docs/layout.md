@@ -1,0 +1,168 @@
+# 目录与分层
+
+项目只使用根依赖清单；以下目录均为源码分层，不是独立包。
+
+## 一级职责
+
+| 目录 | 内容 |
+| --- | --- |
+| `src/client` | 浏览器端 React UI、业务交互与状态 |
+| `src/server` | API 入口、业务流程、数据访问和 Node 能力 |
+| `src/shared` | 前后端共享的契约、纯规则与数据 |
+| `database` | Prisma schema、保留的历史迁移 SQL；本地数据库与备份不提交 |
+| `src/client/public` | 按原路径提供的公开图片、品牌与灵感资源 |
+| `tools/configs` | TypeScript、ESLint、依赖边界和质量基线 |
+| `tools/scripts` | `web` 启动、`quality` 检查、`depth` 环境、`db-maintenance` 数据维护和种子导出 |
+| `tools/deploy` | 服务与反向代理模板、服务器安装入口 |
+| `tools/build/ui` | 自动生成的前端产物，不提交 |
+| `docs/deployment.md` | 部署与运维说明 |
+| `docs` | 当前架构、产品操作和厂商接口 |
+
+根目录仅保留入口和项目配置。依赖 `node_modules`、构建结果 `tools/build/ui` 由工具生成。
+
+macOS 根目录入口 `启动贝壳云图.command` 调用 `tools/scripts/web/dev-web.mjs`，由同一流程启动本地 API 与 Vite；已有服务健康时直接打开页面。它是浏览器版的入口，不依赖已停用的桌面端。
+
+`database` 保持浅层结构：`schema.prisma` 是 Prisma 模型入口，`migrations/` 留存历史 SQL；当前运行的版本化迁移由 `src/server/infrastructure/database/migrations.ts` 执行。`dev.db` 与同名的 `-wal`、`-shm` 是同一开发数据库的文件组，不能拆开整理。`database-backups/` 是当前备份和迁移快照的统一目录；旧的 `backups/` 已完整归档到其中的 `legacy-20260920/`，备份文件没有删除。生产数据库及其备份位于配置的数据目录，不要求搬入仓库。
+
+## 浏览器端
+
+```text
+client/
+  app/                       应用组装与 Provider
+  features/<功能>/
+    components/              业务组件与弹窗
+    hooks/                   React 状态、订阅与流程组合
+    api/                     当前功能专属请求
+    model/                   纯规则、转换、校验与类型
+    utils/                   已有功能私有辅助函数
+    store/                   画布局部状态
+    views/                   工坊视图
+    engine/                  生成引擎的阶段实现
+  shared/                    跨功能 UI、图标、请求、媒体、工具、提示词输入与弹窗
+  store/                     全局 Zustand 切片和持久化
+  assets/                    随构建打包的资源
+  public/                    原 URL 提供的公开素材，不改变访问链接
+  styles/                    全局样式
+  types/                     跨功能类型
+```
+
+功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。
+
+工坊 `model/` 再按 `collection / analysis / generation / delivery / workspace` 分组；React hook 不进入 model。采编、视觉分析和生图状态由 `workshop/hooks` 的独立 hook 协调。画布的导入、几何、图层和任务规则在 `canvas/model`；设置的模型目录、报价、存储和连接状态规则在 `settings/model`。
+
+## 服务端
+
+```text
+server/
+  index.ts                   服务入口
+  bootstrap/                 环境、CORS 与生命周期
+  core/                      HTTP handler、参数读取与错误处理
+  routes/                    assistant / assets / catalog / generate / system / workshop
+    mounts/                  路由注册
+  services/
+    assistant/               对话、审批、记忆与遥测
+    analyze/                 视觉分析与提示词组装
+    collect/                 采集业务
+    deconstruct/             反推分析与结果转换
+    depth/                   深度估计与 Python 执行
+    generate/                图片/视频提交、轮询与导出
+    keywordReview/           关键词审核、检索与错误解释
+    library/                 资产审核队列与筛选规则
+    catalog/                 分类与目录迁移业务
+    media/                   视频帧处理
+    models/                  模型凭证、连接检查与协议适配
+    promptAsset/             提示词检索、评分与生命周期
+    tasks/                   提交保护、终态与任务恢复
+    workshop/                工坊批次、工作区与输出审核
+      pipeline/              工坊流程、事件与阶段恢复
+  repositories/              数据查询、写入、迁移、资产组织与事务
+  gateways/                  外部 HTTP 接口
+  infrastructure/
+    assistant/               Agent 执行环境、工具、沙箱与 MCP
+    auth/                    API 鉴权和媒体签名
+    collection/              外站采集适配
+    config/                  环境配置读取
+    database/                Prisma 连接、底层迁移与种子导入
+    media/                   图片转换、视频解构与媒体路径安全
+    network/                 URL 安全
+    storage/                 存储位置、路径保护与持久化
+    workspace/               工作区上下文与隔离
+```
+
+`routes/assets/storage/test.ts` 是用户点击“测试存储连接”时调用的正式接口，不是测试用例，必须保留。HTTP 路径不因内部文件归类而改变。
+
+## 共享代码
+
+```text
+shared/
+  contracts/                 Zod DTO、请求响应校验
+  domain/
+    assistant/               助手类型、技能、强度与执行规则
+    assets/                  资产分类、编辑、采样、解构与场景组合
+    collection/              采集来源规则
+    core/                    运行环境注入、并发池、任务状态与耗时
+    media/                   绘图、视频与深度类型
+    models/                  模型目录、厂商、网关与调用适配器
+    products/                商品品类、属性、品牌和保真规则
+    prompts/                 提示词引擎、资产评分、视觉规则与业务技能
+    seeds/                   官方配方与提示词种子数据
+    workshop/                工坊状态机、事件、门禁与镜头规则
+```
+
+`client/shared` 只在浏览器使用；`src/shared` 同时服务前后端。共享业务规则不能依赖 Node、React 或某个前端功能。跨层使用 `@client/* / @server/* / @shared/*` 别名。
+
+## 功能导航
+
+路径相对于 `src`。
+
+| 功能 | 前端 | 后端主要实现 |
+| --- | --- | --- |
+| 首页与灵感 | client/features/home | server/routes/catalog |
+| 图片/视频生成 | client/features/generate | server/services/generate |
+| 无限画布 | client/features/canvas | server/routes/catalog |
+| 资产与反推 | client/features/assets | server/services/deconstruct、library |
+| 采集 | client/features/collect | server/services/collect、gateways |
+| 种草工坊 | client/features/workshop | server/services/workshop |
+| 大字报封面 | client/features/headline-poster | server/routes/generate/headline-* |
+| 关键词审核 | client/features/keyword-review | server/services/keywordReview |
+| AI 助手 | client/features/assistant | server/services/assistant、infrastructure/assistant |
+| 设置与模型 | client/features/settings | server/routes/system、services/models |
+
+## 文件生命周期
+
+- 长期源码、资源、接口文档和部署工具放入对应目录。
+- 当前项目不保留测试用例、QA fixture、截图、一次性核查结果和 Agent 计划；临时验证放项目外。
+- `.agents/skills`、`.cursor/rules`、`AGENTS.md` 是长期技能和工程规则，保留。
+- 数据库、迁移、种子、密钥、备份和用户素材具有运行或恢复用途，不能按“没有 import”删除。
+- 未引用源码先核查入口、动态加载和样式关联；只对确认不使用的模块做清理。
+- `pnpm check` 执行静态检查和构建；没有自动化测试步骤。既有质量基线只允许收紧。
+
+## 整理后的运行路径
+
+- 所有命令仍在根目录执行；不创建子 package，也不移动 node_modules。
+- Vite 从 `src/client/public` 读取公开素材，浏览器中的 `/app_logo.png`、`/inspirations/...` 等 URL 不变。
+- 构建输出到 `tools/build/ui`；生产启动器默认读取同一目录。`pnpm clean` 只清除该构建目录。
+- 已部署环境如显式配置 `WEB_DIST_DIR`，更新为部署根目录下的 `tools/build/ui`，并同步 Nginx 静态路径；重新构建后再重启服务。
+- 根目录不再放 `public`、`deploy`、`dist`，目录检查会阻止这些旧目录重新出现。
+- 数据库、备份、`.env*` 和 `.local` 保持原位；目录整理不执行数据迁移。
+
+## 模块职责与依赖边界
+
+贝壳云图使用一个根依赖清单与锁文件。以下都是源码目录，不是独立 npm 包，不拥有版本、安装或构建流程。
+
+| 模块 | 职责 | 可依赖的内部模块 |
+| --- | --- | --- |
+| client | React 界面、浏览器交互与状态 | shared/contracts、shared/domain |
+| server 应用层 | HTTP、业务编排、数据仓库、外部网关 | shared、server/infrastructure |
+| server/infrastructure | Node 专属能力：存储、鉴权、媒体、数据库连接、Agent 运行环境 | shared |
+| shared/contracts | 请求/响应契约、Zod 校验 | 无业务实现 |
+| shared/domain | 纯规则、模型适配、提示词、类型与种子 | 不依赖 UI、Node 或其他运行层 |
+| database | Prisma schema 与历史 SQL | 运行时版本迁移由 `src/server/infrastructure/database/migrations.ts` 执行 |
+
+根 tsconfig 和 Vite 映射 `@client/*`、`@server/*`、`@shared/*`。Node 由 tsx 加载同一套别名；Vite 只配置前端允许使用的别名。
+
+`pnpm run check:structure` 禁止嵌套 manifest、workspace 依赖和遗漏外部依赖声明。`pnpm run lint:boundaries` 检查静态 import、re-export、类型 import、字面量动态 import 和 require；`pnpm run lint:deps` 将依赖循环作为错误；ESLint 同时限制浏览器导入服务端依赖。`pnpm run typecheck:client` 不载入 Node 全局类型，`pnpm run typecheck:server` 不载入 React/Vite 全局类型，均由 `pnpm check` 执行。服务端仍使用标准 Fetch API 类型。非字面量动态路径仍需人工复核。
+
+前端公共代码不反向导入 features；功能之间不直接相互导入；跨功能组合由 app 负责。repositories 不反向依赖 services；routes 和 services 不直接持有 Prisma；数据库连接和底层迁移在 infrastructure/database。工坊契约只解析快照格式；`src/shared/workshopSnapshot.ts` 组合契约与纯业务状态规则，升级旧快照。`pnpm db:migrate` 与 `pnpm db:deploy` 共用运行时的 `_BeikeMigration` 迁移链，历史 Prisma SQL 不参与新库初始化。
+
+单项目不会自动消除巨型文件或历史耦合。文件长度、未使用绑定基线继续保持，后续按实际业务变更逐步收紧。

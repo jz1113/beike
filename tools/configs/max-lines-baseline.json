@@ -1,263 +1,163 @@
 {
   "files": [
     {
-      "file": "apps/api/src/routes/generate/video.ts",
+      "file": "src/server/services/assistant/assistantAgent.ts",
       "lines": 401
     },
     {
-      "file": "apps/api/src/routes/system/models/fetch.ts",
+      "file": "src/client/features/assets/components/AssetCenter.tsx",
       "lines": 401
     },
     {
-      "file": "apps/api/src/services/analyze/storyboard.ts",
+      "file": "src/client/features/assets/components/AssetGenerationHistory.tsx",
       "lines": 401
     },
     {
-      "file": "apps/api/src/services/assistantAgent.ts",
+      "file": "src/client/features/assets/components/AssetPromptLibrary.tsx",
       "lines": 401
     },
     {
-      "file": "apps/api/src/services/deconstruct/saveAssets.ts",
+      "file": "src/client/features/assets/components/AssetDetailModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/AssetCenter.tsx",
+      "file": "src/client/features/assets/components/AssetLibraryFilterBar.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/AssetGenerationHistory.tsx",
+      "file": "src/client/features/assets/components/DeconstructModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/AssetPromptLibrary.tsx",
+      "file": "src/client/shared/modals/SubCategoryManagerModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/AssetDetailModal.tsx",
+      "file": "src/client/features/assistant/components/AIAssistantDrawer.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/AssetLibraryFilterBar.tsx",
+      "file": "src/client/features/assistant/components/AssistantMessageList.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/DeconstructModal.tsx",
+      "file": "src/client/features/assistant/components/BrandKitModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assets/components/SubCategoryManagerModal.tsx",
+      "file": "src/client/features/assistant/components/FormattedMarkdown.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/AIAssistantDrawer.tsx",
+      "file": "src/client/features/assistant/hooks/useAssistantChatStream.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/AssistantInputArea.tsx",
+      "file": "src/client/features/assistant/components/ProductCardWidget.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/AssistantMessageList.tsx",
+      "file": "src/client/shared/modals/multiAngle/CanvasMultiAngleModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/AssistantSkillsMenu.tsx",
+      "file": "src/client/features/collect/components/CollectorSinglePanel.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/BrandKitModal.tsx",
+      "file": "src/client/features/generate/components/GenerateTaskFeed.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/FormattedMarkdown.tsx",
+      "file": "src/client/features/home/components/inspiration/InspirationModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/hooks/useAssistantChatStream.ts",
+      "file": "src/client/shared/prompt-bar/media/PromptBarRefMediaPanel.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/hooks/useAssistantTurn.ts",
+      "file": "src/client/shared/prompt-bar/PromptActionBar.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/assistant/components/ProductCardWidget.tsx",
+      "file": "src/client/features/settings/components/GatewayModelModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/canvas/components/CanvasDrawingNode.tsx",
+      "file": "src/client/features/settings/tabs/UsageTab.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/canvas/components/CanvasLightingModal.tsx",
+      "file": "src/client/features/workshop/components/BatchWorkshopView.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/modals/multiAngle/CanvasMultiAngleModal.tsx",
+      "file": "src/client/features/workshop/hooks/useBatchWorkshopRunner.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/canvas/components/InfiniteCanvasEditor.tsx",
+      "file": "src/client/shared/media/DepthCarousel.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/collect/components/CollectorSinglePanel.tsx",
+      "file": "src/client/app/ImageLightboxModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/generate/components/GenerateTaskFeed.tsx",
+      "file": "src/client/app/lightbox/LightboxMultiAngleModal.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/home/components/inspiration/InspirationModal.tsx",
+      "file": "src/client/shared/modals/styleExtract/useStyleExtractWorkflow.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/prompt-bar/media/PromptBarRefMediaPanel.tsx",
+      "file": "src/client/app/GlobalContextMenu.tsx",
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/prompt-bar/PromptActionBar.tsx",
+      "file": "src/client/store/workshopSlice.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/prompt-bar/RichPromptInput.tsx",
+      "file": "src/shared/domain/assets/assetDeconstruct/prompts.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/shared/prompt-bar/hooks/usePromptBarMedia.ts",
+      "file": "src/shared/domain/assets/assetDeconstruct/validate.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/settings/components/ApiServicesGatewayPanel.tsx",
+      "file": "src/shared/domain/assistant/tools/defs.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/settings/GatewayModelModal.tsx",
+      "file": "src/shared/domain/products/productCategory/anatomy.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/settings/settingsShared.tsx",
+      "file": "src/shared/domain/products/productCategory/subcategoryStore.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/settings/SettingsWorkspaceView.tsx",
+      "file": "src/shared/domain/prompts/prompt-engine/roles.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/settings/tabs/UsageTab.tsx",
+      "file": "src/shared/domain/prompts/vision.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/model/analysis/batchVisionAnalyze.ts",
+      "file": "src/server/infrastructure/collection/apiaScraper.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/components/BatchWorkshopView.tsx",
+      "file": "src/server/infrastructure/assistant/agentRuntime.ts",
       "lines": 401
     },
     {
-      "file": "apps/web/src/features/workshop/components/BatchStage4ProductItem.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/features/workshop/hooks/useBatchWorkshopRunner.ts",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/features/workshop/components/WorkshopSettingsModal.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/utils/usageTracker.ts",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/media/DepthCarousel.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/modals/ImageLightboxModal.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/modals/multiAngle/LightboxMultiAngleModal.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/modals/lightbox/SmartEditModal.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/modals/styleExtract/useStyleExtractWorkflow.ts",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/shared/ui/GlobalContextMenu.tsx",
-      "lines": 401
-    },
-    {
-      "file": "apps/web/src/store/workshopSlice.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/assetDeconstruct/prompts.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/assetDeconstruct/validate.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/assistant/tools/defs.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/drawing.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/modelAdapters/video/adapters.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/productCategory/anatomy.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/productCategory/subcategoryStore.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/prompt-engine/assembler.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/prompt-engine/guards.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/prompt-engine/roles.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/vision.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/domain/src/workflowModels.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/server-kit/src/apiaScraper.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/server-kit/src/assistant/agentRuntime.ts",
-      "lines": 401
-    },
-    {
-      "file": "packages/server-kit/src/storage.ts",
+      "file": "src/server/infrastructure/storage/storage.ts",
       "lines": 401
     }
   ]

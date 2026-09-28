@@ -7,7 +7,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..')
 const baseline=JSON.parse(fs.readFileSync(path.join(root,'tools/configs/unused-baseline.json'),'utf8'));
 const allowed=new Map(baseline.entries.map(entry=>[`${entry.file}\0${entry.message}`,entry.count]));
 const eslint=new ESLint({cwd:root,overrideConfigFile:path.join(root,'tools/configs/eslint.config.mjs')});
-const results=await eslint.lintFiles(['apps','tools']);const added=[];let remaining=0;
+const results=await eslint.lintFiles(['src/client','src/server','src/shared','tools']);const added=[];let remaining=0;
 for(const result of results) for(const message of result.messages) {
   if(message.ruleId!=='@typescript-eslint/no-unused-vars')continue;
   remaining++;
