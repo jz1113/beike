@@ -1,5 +1,5 @@
 import { isAppearanceRotation, matchesAppearanceSelection, parseAppearanceSelection } from '@shared/domain/assets/appearanceSelection';
-import { eligiblePromptGroups, isWorkshopAssetEligible, parseGroupShotSkeleton, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshopPipeline';
+import { eligiblePromptGroups, isAutoPromptGroupSelection, isWorkshopAssetEligible, promptGroupAppearance, promptGroupAppearanceFilter, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshopPipeline';
 import type { BatchProductItem } from '../batchTypes';
 
 export interface AnalysisPreflightConfig {
@@ -11,6 +11,7 @@ export interface AnalysisPreflightConfig {
   lockedPersonaId: string;
   lockedSceneId: string;
   lockedOutfitId: string;
+  personaMode?: 'asset_driven' | 'none';
   availableFullPrompts?: WorkshopAssetCandidate[];
   availablePersonas?: WorkshopAssetCandidate[];
   availableScenes?: WorkshopAssetCandidate[];
@@ -25,14 +26,22 @@ export function workshopAnalysisBlockReason(config: AnalysisPreflightConfig, ite
   if (config.assetLoadState === 'loading') return '正在加载生产资产，请稍后再分析';
   if (config.assetLoadState === 'error') return `生产资产加载失败，请在生产设置中重新加载：${config.assetLoadError || '请求失败'}`;
   const groups = (config.availableFullPrompts || []).filter(group => isWorkshopAssetEligible(group, 'full_prompt'));
-  const explicitGroup = config.lockedFullPromptId && config.lockedFullPromptId !== 'auto';
+  const explicitGroup = !isAutoPromptGroupSelection(config.lockedFullPromptId);
   const group = explicitGroup ? groups.find(row => row.id === config.lockedFullPromptId) : undefined;
   if (explicitGroup && !group) return '锁定的图组母本已失效、未发布或不完整，请重新选择';
-  if (!explicitGroup && eligiblePromptGroups(groups, item.title, item.props).length === 0) return '没有适配该商品的已发布四图母本，请到资产库导入并审核发布';
-  const shots = parseGroupShotSkeleton(group?.shotPromptsJson);
-  const acceptsPeople = !group || ((group as { hasHuman?: boolean }).hasHuman !== false && shots.some(
-    shot => shot.has_human !== false && shot.shot_type !== 'hand_held_only' && shot.shot_type !== 'pure_product',
-  ));
+  const requestedAppearance = promptGroupAppearanceFilter(config.lockedFullPromptId);
+  if (config.personaMode === 'none' && requestedAppearance === 'human') return '当前设置为无人物出镜，请将图组来源改为无人物或混合轮换';
+  if (config.personaMode === 'none' && group && promptGroupAppearance(group) !== 'product') return '当前设置为无人物出镜，不能使用有人物或出镜待判定的图组母本';
+  const appearanceFilter = config.personaMode === 'none' ? 'product' : requestedAppearance;
+  const candidates = explicitGroup ? [] : eligiblePromptGroups(groups, item.title, item.props, appearanceFilter);
+  if (!explicitGroup && candidates.length === 0) return appearanceFilter === 'human'
+    ? '没有适配该商品的已发布有人物四图母本，请切换出镜范围或补充素材'
+    : appearanceFilter === 'product'
+      ? '没有适配该商品的已发布无人物四图母本，请切换出镜范围或补充素材'
+      : '没有适配该商品的已发布四图母本，请到资产库导入并审核发布';
+  const acceptsPeople = group
+    ? promptGroupAppearance(group) === 'human'
+    : candidates.some(candidate => promptGroupAppearance(candidate) === 'human');
   const bindings = [
     { id: config.lockedSceneId, options: config.availableScenes, type: 'scene' as const, label: '场景', active: true },
     { id: config.lockedPersonaId, options: config.availablePersonas, type: 'persona' as const, label: '人物', active: acceptsPeople },

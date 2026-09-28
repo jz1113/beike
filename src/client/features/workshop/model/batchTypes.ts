@@ -100,6 +100,7 @@ export interface BatchProductItem {
   appliedFullPromptId?: string;
   appliedFullPromptTitle?: string;
   appliedFullPromptSelectionMode?: 'manual' | 'auto';
+  appliedFullPromptAppearance?: 'human' | 'product' | 'unknown';
 
   // 生图任务队列专属
   tasks: BatchTaskItem[];

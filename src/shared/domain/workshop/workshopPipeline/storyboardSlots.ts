@@ -126,7 +126,10 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
     if (!item || typeof item !== 'object') return;
     const shot = item as Record<string, unknown>;
     const subject = resolveAssetShotSubject({
-      shot_type: text(shot.shot_type), title: text(shot.title), action: text(shot.action) || sourcePromptSection(text(shot.prompt), '动作或摆放'),
+      shot_type: text(shot.shot_type),
+      has_human: typeof shot.has_human === 'boolean' ? shot.has_human : undefined,
+      title: text(shot.title),
+      action: text(shot.action) || sourcePromptSection(text(shot.prompt), '动作或摆放'),
     });
     shots.push({
       shot_no: Number(shot.shot_no) || index + 1,

@@ -6,6 +6,7 @@ import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
 import {
   exportReviewedWorkbook,
   parseKeywordWorkbook,
+  parseKeywordWorkbookData,
   type KeywordReviewRecord,
   type ParsedKeywordWorkbook,
 } from '../model/keywordReviewWorkbook';
@@ -55,6 +56,7 @@ export function useKeywordReview() {
   const runStartingRef = useRef(false);
   const batchRetryVersionsRef = useRef(new Map<number, number>());
   const inputVersionRef = useRef(0);
+  const reviewAttemptedRef = useRef(false);
   const rulesVersionRef = useRef<number | null>(null);
   const recordIndicesRef = useRef<Map<string, number>>(new Map());
   const lookupRemainingRef = useRef(LOOKUP_RUN_LIMIT);
@@ -85,6 +87,8 @@ export function useKeywordReview() {
   };
 
   const { counts, sheetSummary, filteredRecords, previewRecords } = useKeywordReviewPreview(records, parsed, filter, lastTrialIds);
+  const canSwitchMode = !isRunning && !isPreparing && !isImporting
+    && (!parsed || (!reviewAttemptedRef.current && counts.done === 0 && counts.failed === 0 && counts.pending === counts.total));
 
   const finishPreparing = () => {
     runStartingRef.current = false;
@@ -97,13 +101,15 @@ export function useKeywordReview() {
       return;
     }
     setIsImporting(true);
-    inputVersionRef.current += 1;
+    const inputVersion = ++inputVersionRef.current;
     setNotice('');
     setLastTrialIds([]);
     setFilter('all');
     try {
       const next = await parseKeywordWorkbook(file, reviewMode);
+      if (inputVersion !== inputVersionRef.current) return;
       setReviewMode(next.mode);
+      reviewAttemptedRef.current = false;
       rulesVersionRef.current = null;
       batchRetryVersionsRef.current.clear();
       recordIndicesRef.current = new Map(next.records.map((record, index) => [record.id, index]));
@@ -112,17 +118,18 @@ export function useKeywordReview() {
       const summary = next.sheets.map((sheet) => `${sheet.name} ${sheet.recordCount} 条`).join('、');
       setNotice(`已按${next.mode === 'video' ? '视频' : '图文'}规则识别 ${next.records.length} 条关键词：${summary}`);
     } catch (error) {
+      if (inputVersion !== inputVersionRef.current) return;
       recordIndicesRef.current = new Map();
       setParsed(null);
       setRecords([]);
       setNotice(error instanceof Error ? error.message : '表格解析失败');
     } finally {
-      setIsImporting(false);
+      if (inputVersion === inputVersionRef.current) setIsImporting(false);
     }
   };
 
   const runReview = async (mode: 'trial' | 'all' = 'trial') => {
-    if (isRunning || runStartingRef.current || records.length === 0) return;
+    if (isRunning || isImporting || runStartingRef.current || records.length === 0) return;
     const candidates = records.filter((record) => record.status === 'idle' || (mode === 'all' && isKnownModelOutputFailure(record)));
     if (candidates.length === 0) {
       setNotice(counts.failed > 0 ? '没有待审核记录；失败批次需单独选择重新审核，可能再次产生费用' : '所有记录都已完成审核');
@@ -217,7 +224,10 @@ export function useKeywordReview() {
             reviewMode, apiKey, lookup: lookupBudget > 0, lookupBudget, rulesVersion,
             signal: controller.signal, shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
             indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, pacer,
-            onDispatch: () => { if (runModel.provider === 'deepseek') markDispatch(); },
+            onDispatch: () => {
+              reviewAttemptedRef.current = true;
+              if (runModel.provider === 'deepseek') markDispatch();
+            },
             onSuccess: (chunk, results, lookedUp, usage, lookupUsage) => {
               setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
               chunk.forEach((record) => settledIds.add(record.id));
@@ -343,6 +353,7 @@ export function useKeywordReview() {
   const reset = () => {
     inputVersionRef.current += 1;
     abortRef.current?.abort();
+    reviewAttemptedRef.current = false;
     setParsed(null);
     rulesVersionRef.current = null;
     batchRetryVersionsRef.current.clear();
@@ -355,59 +366,49 @@ export function useKeywordReview() {
   };
 
   const selectReviewMode = (next: KeywordReviewMode) => {
-    if (parsed || isRunning || isImporting) return;
-    setReviewMode(next);
-    setNotice('');
+    if (next === reviewMode || !canSwitchMode || runStartingRef.current) return;
+    if (!parsed) {
+      setReviewMode(next);
+      setNotice('');
+      return;
+    }
+    try {
+      const updated = parseKeywordWorkbookData(parsed.workbook, parsed.fileName, next);
+      inputVersionRef.current += 1;
+      rulesVersionRef.current = null;
+      batchRetryVersionsRef.current.clear();
+      recordIndicesRef.current = new Map(updated.records.map((record, index) => [record.id, index]));
+      setParsed(updated);
+      setRecords(updated.records);
+      setReviewMode(next);
+      setLastTrialIds([]);
+      setFilter('all');
+      setNotice(`已切换为${next === 'video' ? '视频' : '图文'}规则，当前表格已重新识别。`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '切换审核类型失败');
+    }
   };
 
   return {
     model: selectedModel.label,
-    modelOptions,
-    modelValue: selectedModel.value,
-    modelProvider: selectedModel.provider,
-    selectModel,
-    parsed,
-    reviewMode,
-    selectReviewMode,
-    records,
-    filter,
-    setFilter,
-    filteredCount: filteredRecords.length,
-    previewRecords,
-    previewLimit: PREVIEW_LIMIT,
-    sheetSummary,
-    counts,
-    settings,
-    saveSettings,
-    trialSize: settings.trialSize,
-    batchSize: settings.batchSize,
-    concurrency: settings.maxConcurrency,
-    isImporting,
-    isPreparing,
-    isRunning,
-    runMode,
-    isExporting,
-    notice,
-    lookupEnabled,
+    modelOptions, modelValue: selectedModel.value,
+    modelProvider: selectedModel.provider, selectModel,
+    parsed, reviewMode, canSwitchMode, selectReviewMode,
+    records, filter, setFilter, filteredCount: filteredRecords.length,
+    previewRecords, previewLimit: PREVIEW_LIMIT,
+    sheetSummary, counts, settings, saveSettings,
+    trialSize: settings.trialSize, batchSize: settings.batchSize, concurrency: settings.maxConcurrency,
+    isImporting, isPreparing, isRunning, runMode, isExporting,
+    notice, lookupEnabled,
     setLookupEnabled: (enabled: boolean) => {
       setLookupEnabled(enabled);
       if (enabled) setNotice('联网补查按搜索网页计费，高峰时段成本显著上升');
     },
-    tokenUsage,
-    estimatedCost: estimateReviewYuan(tokenUsage),
+    tokenUsage, estimatedCost: estimateReviewYuan(tokenUsage),
     estimatedCostLabel: formatReviewYuan(estimateReviewYuan(tokenUsage).yuan),
     peakHour: isDeepSeekPeakHour(),
-    balance,
-    balanceError,
-    balanceUpdatedAt,
-    balanceRefreshing,
-    balanceDirty,
-    refreshBalance,
-    importFile,
-    runReview,
-    stopReview,
-    retryFailed,
-    exportWorkbook,
-    reset,
+    balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance,
+    importFile, runReview, stopReview, retryFailed,
+    exportWorkbook, reset,
   };
 }

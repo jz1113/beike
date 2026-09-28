@@ -15,6 +15,7 @@ import { BatchArchitectureConfirmDialog } from './BatchArchitectureConfirmDialog
 import { useAppStore } from '@client/store';
 import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
+import { isAutoPromptGroupSelection } from '@shared/domain/workshop/workshopPipeline';
 import { exportBatchZip, exportBatchExcel, exportSingleProductZip, downloadSingleTaskImage } from '../model/delivery/batchRunnerExport';
 export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
@@ -266,12 +267,14 @@ export default function BatchWorkshopView() {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-black text-slate-900">历史批次生成查看 · {historyGenerationBatch.name}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">只读模式：可查看成图与文案，不会修改当前批次或重新提交任务。</p>
+                  <p className="mt-0.5 text-xs text-slate-500">历史批次内容只读；此前已采用的完整四镜仍可提炼为新母本。</p>
                 </div>
                 <button type="button" onClick={() => setHistoryGenerationBatch(null)} className="shrink-0 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50">返回当前批次</button>
               </div>
               <BatchStage4Queue
                 successfulItems={historyGenerationBatch.snapshot.items.filter(item => item.status === 'success' && item.selected) as BatchProductItem[]}
+                selectedVisionModel={availableVisionModels.some((model) => model.id === historyGenerationBatch.snapshot.settings.selectedVisionModel)
+                  ? historyGenerationBatch.snapshot.settings.selectedVisionModel : selectedVisionModel}
                 availableImageModels={availableImageModels}
                 selectedImageGenModel={historyGenerationBatch.snapshot.settings.selectedImageGenModel}
                 setSelectedImageGenModel={() => {}}
@@ -329,7 +332,7 @@ export default function BatchWorkshopView() {
 
           {!historyGenerationBatch && currentStage === 3 && (
             <BatchStage3Prompts
-              autoMatchMotherTemplate={!runner.lockedFullPromptId || runner.lockedFullPromptId === 'auto'}
+              autoMatchMotherTemplate={isAutoPromptGroupSelection(runner.lockedFullPromptId)}
               generationStrategy={generationStrategy}
               selectedShotCount={selectedShotCount}
               successfulItems={successfulItems}
@@ -350,6 +353,7 @@ export default function BatchWorkshopView() {
           {!historyGenerationBatch && currentStage === 4 && (
             <BatchStage4Queue
               successfulItems={successfulItems}
+              selectedVisionModel={selectedVisionModel}
               availableImageModels={availableImageModels}
               selectedImageGenModel={selectedImageGenModel}
               setSelectedImageGenModel={setSelectedImageGenModel}

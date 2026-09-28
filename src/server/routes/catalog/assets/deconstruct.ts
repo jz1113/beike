@@ -26,6 +26,8 @@ import { AppError, errorResponse } from '../../../core/errors';
 import { claimProcessingSource, releaseIncompleteSource } from '@server/repositories/importSources';
 import { getDeconstructProgress, updateDeconstructProgress } from '../../../services/deconstruct/progress';
 import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
+import { createHash } from 'node:crypto';
+import { deconstructReviews } from '@server/repositories/catalog';
 
 const activeDeconstructRequests = new Map<string, Promise<Response>>();
 
@@ -108,6 +110,9 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       apiFormat,
       allowInsecureHttp,
       autoSave = true,
+      reviewBeforeSave = false,
+      fullPromptOnly = false,
+      parentFullPromptId,
       albumName: bodyAlbumName,
       productTitle,
       sourceUrl,
@@ -141,8 +146,21 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
       return jsonResponse({ error: '请至少提供 1 张参考风格或买家秀图片' }, 400);
     }
+    if (fullPromptOnly && (imageUrls.length !== 4 || !reviewBeforeSave)) {
+      return jsonResponse({ error: '衍生母本须由完整四图组先提炼候选，再确认入库' }, 400);
+    }
     if (imageUrls.length > 1 && imageUrls.length < 4) {
       return jsonResponse({ error: '图组母本必须恰好 4 张；当前不足 4 张，不会反推或入库', code: 'INCOMPLETE_CONTENT_GROUP' }, 400);
+    }
+    const reviewId = reviewBeforeSave
+      ? `review_${createHash('sha256').update(JSON.stringify([requireWorkspaceId(), imageUrls, Boolean(fullPromptOnly)])).digest('hex').slice(0, 40)}`
+      : '';
+    if (reviewId) {
+      const existing = (await deconstructReviews.getById(reviewId))[0];
+      if (existing) {
+        const payload = JSON.parse(existing.payload);
+        return jsonResponse({ success: true, data: payload.parsedResult, previewShots: payload.perImageResults, reviewId, reviewStatus: existing.status, reused: true });
+      }
     }
 
     const sourceKey = typeof sourceUrl === 'string' ? xhsSourceKey(sourceUrl) : null;
@@ -320,7 +338,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       fullPrompts: [],
     };
 
-    if (autoSave && parsedResult) {
+    if (autoSave && !reviewBeforeSave && parsedResult) {
       updateDeconstructProgress(progressId, 'saving', '正在保存提示词资产');
       const dbSaveStart = Date.now();
       const category = (parsedResult.theme_category as string) || 'general';
@@ -335,6 +353,18 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       });
       console.log(`[AssetDeconstruct] 入库耗时 ${Date.now() - dbSaveStart}ms`);
     }
+    if (reviewBeforeSave) {
+      if (fullPromptOnly && (safeImgs.length !== 4 || perImageResults.length !== 4 || !Array.isArray(parsedResult.content_groups) || parsedResult.content_groups.length !== 1)) {
+        return jsonResponse({ error: '四张成图未能提炼为完整母本，本次未入库，请检查后重试' }, 422);
+      }
+      await deconstructReviews.createPending(reviewId, albumName, {
+        parsedResult, perImageResults, imageUrls: processedImageUrls, albumName,
+        isSingleImage, category: (parsedResult.theme_category as string) || 'general',
+        sourceKey: claimedKey, fullPromptOnly: Boolean(fullPromptOnly),
+        provenance: fullPromptOnly ? 'workshop_generated' : 'deconstructed',
+        parentFullPromptId: typeof parentFullPromptId === 'string' ? parentFullPromptId.slice(0, 160) : null,
+      });
+    }
 
     console.log(
       `[AssetDeconstruct]${albumName ? ` 套组「${albumName}」` : ''} 管线总耗时 ${Date.now() - pipelineStart}ms，多模调用 ${visionTracker.callCount} 次（分片 ${shardCount}），模型=${visionTracker.modelsUsed.join(' → ') || usedModel}`
@@ -348,7 +378,9 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       usedModel,
       pipelineMode,
       data: parsedResult,
+      ...(reviewId ? { previewShots: perImageResults } : {}),
       savedRecords,
+      ...(reviewId ? { reviewId, reviewStatus: 'pending' } : {}),
       stats: {
         imageCount: safeImgs.length,
         skippedIncompleteImages: skippedCount + targetImgs.length - perImageResults.length,

@@ -11,6 +11,35 @@ export interface PromptGroupCandidate {
   isUniversal?: boolean;
   sourceImageIndices?: string | null;
   shotPromptsJson?: string | null;
+  hasHuman?: boolean | null;
+}
+
+export type PromptGroupAppearance = 'human' | 'product' | 'unknown';
+export type PromptGroupAppearanceFilter = Exclude<PromptGroupAppearance, 'unknown'>;
+
+/** The saved selection is either a real group ID or one of three auto modes. */
+export function isAutoPromptGroupSelection(selection?: string | null): boolean {
+  return !selection || selection === 'auto' || selection === 'auto:human' || selection === 'auto:product';
+}
+
+export function promptGroupAppearanceFilter(selection?: string | null): PromptGroupAppearanceFilter | undefined {
+  if (selection === 'auto:human') return 'human';
+  if (selection === 'auto:product') return 'product';
+  return undefined;
+}
+
+/** A group with any portrait shot uses the appearance slots; hand-only shots do not count. */
+export function promptGroupAppearance(group: PromptGroupCandidate): PromptGroupAppearance {
+  const shots = parseGroupShotSkeleton(group.shotPromptsJson);
+  const portrait = shots.some((shot) => shot.shot_type !== 'hand_held_only'
+    && shot.shot_type !== 'pure_product' && shot.has_human === true);
+  if (portrait) return 'human';
+  const allNonPortrait = shots.length > 0 && shots.every((shot) => shot.shot_type === 'hand_held_only'
+    || shot.shot_type === 'pure_product' || shot.has_human === false);
+  if (allNonPortrait) return 'product';
+  if (group.hasHuman === true) return 'human';
+  if (group.hasHuman === false) return 'product';
+  return 'unknown';
 }
 
 function parseArray(value: unknown): unknown[] {
@@ -40,9 +69,11 @@ export function eligiblePromptGroups<T extends PromptGroupCandidate>(
   groups: T[],
   productTitle: string,
   productProps: Record<string, unknown> | null | undefined,
+  appearance?: PromptGroupAppearanceFilter,
 ): T[] {
   const productCategory = inferProductCategoryAndAnatomy(productTitle, productProps).primaryCategory;
-  const eligible = groups.filter(isCompletePromptGroup);
+  const eligible = groups.filter(group => isCompletePromptGroup(group)
+    && (!appearance || promptGroupAppearance(group) === appearance));
   if (!eligible.length) return [];
   const scored = eligible.map((group) => {
     const categories = parseArray(group.productCategoryIds).map(String);

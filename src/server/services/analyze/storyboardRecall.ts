@@ -10,7 +10,7 @@ import {
   stableAssetCode,
 } from '@shared/domain/assets/assetSampling';
 import { inferProductCategoryAndAnatomy } from '@shared/domain/products/productCategory';
-import { isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton } from '@shared/domain/workshop/workshopPipeline';
+import { isAutoPromptGroupSelection, isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, type PromptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
 
@@ -147,33 +147,38 @@ export async function loadStoryboardLibrary(input: {
 
 export async function loadLockedGroupSkeleton(input: {
   fullPromptId?: unknown;
+  groupAppearance?: PromptGroupAppearanceFilter;
   batchId?: string;
+  productId?: string;
   productTitle?: string;
   productProps?: Record<string, unknown> | null;
   productIndex: number;
 }) {
   const id = String(input.fullPromptId || '').trim();
-  const manuallyLocked = Boolean(id && id !== 'auto');
+  const manuallyLocked = !isAutoPromptGroupSelection(id);
+  const appearance = input.groupAppearance || promptGroupAppearanceFilter(id);
   const row = manuallyLocked
     ? await storyboardAssetsRepository.findGroup({ AND: [{ id }, PROVENANCE, await publishedWhere('full_prompt')] })
     : await reservePromptGroup(
         (await storyboardAssetsRepository.listCompleteGroups({ AND: [PROVENANCE, await publishedWhere('full_prompt'), { sourceImageIndices: { not: null }, shotPromptsJson: { not: null } }] })).filter(group => isWorkshopAssetEligible(group, 'full_prompt')),
-        input.productTitle || '', input.productProps, input.batchId,
+        input.productTitle || '', input.productProps, input.batchId, appearance, input.productId,
       );
   if (!row) throw new Error(manuallyLocked
     ? '选定的图组母本不存在、未发布或已停用，请重新选择'
-    : '资产库暂无适配该商品类目的完整四图母本，请导入并解构对应类目的四图组');
+    : `资产库暂无适配该商品类目的${appearance === 'human' ? '有人物' : appearance === 'product' ? '无人物' : ''}完整四图母本，请调整出镜要求或导入并解构对应图组`);
   if (!isWorkshopAssetEligible(row, 'full_prompt') || !isCompletePromptGroup(row)) {
     throw new Error('选定的图组母本不是完整的四图组，请重新选择');
   }
   const shots = parseGroupShotSkeleton(row.shotPromptsJson);
+  const groupAppearance = promptGroupAppearance(row);
   return {
     id: row.id,
     title: row.title,
     selectionMode: manuallyLocked ? 'manual' as const : 'auto' as const,
     shots,
     architectureSummary: row.architectureSummary,
-    hasHuman: row.hasHuman,
+    hasHuman: groupAppearance === 'unknown' ? row.hasHuman : groupAppearance === 'human',
+    groupAppearance,
     sceneSummary: row.sceneSummary,
     outfitSummary: row.outfitSummary,
     personaSummary: row.personaSummary,

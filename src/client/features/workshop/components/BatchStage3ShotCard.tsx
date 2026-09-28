@@ -6,6 +6,7 @@ import {
   Pencil,
   ChevronUp,
   Image as ImageIcon,
+  Hand,
   User,
 } from 'lucide-react';
 import { formatAssetBadgeText } from './BatchAssetTag';
@@ -56,6 +57,9 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
   const actionBadge = shot.applied_action;
   const personaBadge = sharedAssets?.persona ? undefined : labels.persona;
   const hasTags = sceneBadge || outfitBadge || actionBadge || personaBadge;
+  const handOnly = shot.shot_type === 'hand_held_only';
+  const portrait = !handOnly && shot.shot_type !== 'pure_product' && (shot.shot_type === 'model_shot' || shot.has_human === true);
+  const undecided = !handOnly && shot.shot_type !== 'pure_product' && !portrait && shot.has_human !== false;
 
   return (
     <div
@@ -95,14 +99,24 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
               </span>
             )}
             <span className={`px-2 py-0.5 rounded-md text-xs font-semibold flex items-center gap-1 ${
-              shot.has_human 
+              portrait
                 ? 'bg-violet-50 text-violet-700' 
                 : 'bg-slate-100 text-slate-600'
             }`}>
-              {shot.has_human ? (
+              {portrait ? (
                 <>
                   <User className="w-3 h-3" />
                   模特
+                </>
+              ) : handOnly ? (
+                <>
+                  <Hand className="w-3 h-3" />
+                  仅手部
+                </>
+              ) : undecided ? (
+                <>
+                  <ImageIcon className="w-3 h-3" />
+                  待判定
                 </>
               ) : (
                 <>

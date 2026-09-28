@@ -3,6 +3,7 @@ import { readJsonBody } from '../../../core/validate';
 import { jsonResponse } from '../../../core/http';
 import { persistDeconstructedAssets } from '../../../repositories/deconstructAssets';
 import { errorEnvelope } from '../../../core/errors';
+import { getRegistry, upsertRegistry } from '../../../repositories/promptAsset';
 
 export async function GET(req: Request) {
   const status = new URL(req.url).searchParams.get('status') === 'rejected' ? 'rejected' : 'pending';
@@ -25,13 +26,25 @@ export async function POST(req: Request) {
     if (rows[0].status === 'approved') return jsonResponse({ success: true });
     if (rows[0].status !== 'pending') return jsonResponse({ error: '请先恢复此图集再审核' }, 409);
     const payload = JSON.parse(rows[0].payload);
-    await persistDeconstructedAssets({ ...payload, reviewId: id, sourceKey: payload.sourceKey });
+    const saved = await persistDeconstructedAssets({ ...payload, reviewId: id, sourceKey: payload.sourceKey });
+    if (payload.fullPromptOnly) {
+      if (saved.fullPrompts.length !== 1) throw new Error('候选四图组不完整，未能生成母本');
+      const parent = payload.parentFullPromptId
+        ? await getRegistry('full_prompt', payload.parentFullPromptId)
+        : null;
+      for (const asset of saved.fullPrompts) {
+        await upsertRegistry({
+          assetType: 'full_prompt', sourceAssetId: asset.id, status: 'published',
+          provenance: 'workshop_generated', sourceRef: parent?.id || null,
+        });
+      }
+    }
     await deconstructReviews.updateStatus(id, 'pending', 'approved');
     if (payload.sourceKey) {
       const album = await fullPromptAssets.findAlbumIdByName(payload.albumName);
       await promptImportSources.markApproved(payload.sourceKey, album?.albumId || null);
     }
-    return jsonResponse({ success: true });
+    return jsonResponse({ success: true, fullPromptIds: saved.fullPrompts.map((asset) => asset.id) });
   } catch (error) {
     const { body, status } = errorEnvelope(error, '审核失败');
     return jsonResponse(body, status);

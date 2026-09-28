@@ -64,6 +64,8 @@ export async function persistDeconstructedAssets(params: {
   productCategoryId?: string | null;
   sourceKey?: string;
   reviewId?: string;
+  fullPromptOnly?: boolean;
+  provenance?: string;
 }): Promise<SavedRecords> {
   const { parsedResult, perImageResults, imageUrls, albumName, isSingleImage, category, productCategoryId, sourceKey } = params;
 
@@ -96,12 +98,13 @@ export async function persistDeconstructedAssets(params: {
 
   const persisted = await persistFullPromptRecords({
     parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey,
-    sampleImagesJson, thumbForUrl, defaultCoverUrl,
+    sampleImagesJson, thumbForUrl, defaultCoverUrl, provenance: params.provenance,
   });
   savedRecords.fullPrompts = persisted.fullPrompts;
   if (sourceKey) {
     await db.$executeRaw`UPDATE "PromptImportSource" SET "state" = 'approved', "albumName" = ${albumName}, "albumId" = ${persisted.album.id}, "updatedAt" = ${new Date().toISOString()} WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${sourceKey}`;
   }
+  if (params.fullPromptOnly) return savedRecords;
 
   const rawScenes: any[] = Array.isArray(parsedResult.scenes)
     ? parsedResult.scenes

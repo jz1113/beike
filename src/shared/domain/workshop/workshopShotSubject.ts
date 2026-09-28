@@ -6,6 +6,7 @@ export function resolveAssetShotSubject(asset: {
   const type = asset.shotType || asset.shot_type;
   if (type === 'hand_held_only') return { has_human: false, shot_type: type };
   if (type === 'pure_product') return { has_human: false, shot_type: type };
+  if (type === 'model_shot') return { has_human: true, shot_type: type };
   const explicit = asset.has_human ?? asset.hasHuman;
   if (typeof explicit === 'boolean') return { has_human: explicit, shot_type: explicit ? 'model_shot' : 'pure_product' };
   // Use the action field rather than a full prompt whose negative section may mention people.

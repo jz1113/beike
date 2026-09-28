@@ -57,6 +57,10 @@ export function resolveVisionAnalyzeMaxTokens(): number {
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 
 export function formatVisionAnalyzeError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || '');
+  if (/prisma|SQLITE_|UNIQUE constraint failed|Raw query failed|\$executeRaw/i.test(raw)) {
+    return '分析素材处理失败，请重试；若持续发生，请检查数据库状态';
+  }
   const formatted = formatUserError(err, '视觉大模型分析失败，请重试');
   // callVisionModel 已带具体秒数与计费提示时原样返回，避免写死「约 N 分钟」冲掉细节
   if (formatted.includes('视觉模型响应超时')) {

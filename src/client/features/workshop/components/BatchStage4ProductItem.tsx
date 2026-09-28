@@ -14,10 +14,12 @@ import { isDeliverableWorkshopResult, isUsableWorkshopResult } from '../model/ge
 import { BatchStage4ProductInfo } from './BatchStage4ProductInfo';
 import { BatchStage4CopyPanel } from './BatchStage4CopyPanel';
 import { OutputReviewButtons } from './OutputReviewButtons';
+import { WorkshopPromoteGroup } from './WorkshopPromoteGroup';
 
 export interface BatchStage4ProductItemProps {
   productNavigation?: React.ReactNode;
   item: BatchProductItem;
+  selectedVisionModel: string;
   generateCopywritingForProduct: (item: BatchProductItem) => Promise<void>;
   updateItemCopywriting?: (itemId: string, copywriting: { title: string; content: string; tags?: string[] }) => void;
   retrySingleShotTask?: (itemId: string, shotIndex: number) => Promise<void>;
@@ -34,6 +36,7 @@ export interface BatchStage4ProductItemProps {
 export function BatchStage4ProductItem({
   productNavigation,
   item,
+  selectedVisionModel,
   generateCopywritingForProduct,
   updateItemCopywriting,
   retrySingleShotTask,
@@ -110,6 +113,7 @@ export function BatchStage4ProductItem({
       {productNavigation}
       </div>
       <div className="workshop-image-gallery lg:col-start-2 min-w-0 bg-transparent rounded-xl border border-slate-200/60 p-4 sm:p-5 space-y-4">
+        <WorkshopPromoteGroup item={item} visionModel={selectedVisionModel} />
         {/* 切片成图展台 (4 张大图) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">

@@ -127,6 +127,7 @@ export async function POST(req: Request) {
         productIndex,
         useAssetLibrary: body.useAssetLibrary,
         batchId: body.batchId || body.workshopBatchId,
+        productId: typeof body.productId === 'string' ? body.productId.slice(0, 200) : undefined,
       });
 
       productFingerprintRaw = storyboardResult.productFingerprintRaw;

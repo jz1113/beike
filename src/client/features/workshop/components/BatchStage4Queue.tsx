@@ -25,6 +25,7 @@ function describeImageStatus(product: BatchProductItem): { label: string; failed
 
 interface Props {
   successfulItems: BatchProductItem[];
+  selectedVisionModel: string;
   availableImageModels: any[];
   selectedImageGenModel: string;
   setSelectedImageGenModel: (m: string) => void;
@@ -66,6 +67,7 @@ interface Props {
 
 export default function BatchStage4Queue({
   successfulItems,
+  selectedVisionModel,
   availableImageModels,
   selectedImageGenModel,
   setSelectedImageGenModel,
@@ -179,6 +181,7 @@ export default function BatchStage4Queue({
           <BatchStage4ProductItem
             key={currentItem.id}
             item={currentItem}
+            selectedVisionModel={selectedVisionModel}
             onReviewTask={onReviewTask}
             productNavigation={successfulItems.length > 1 ? (
               <nav aria-label="切换交付商品" className="min-w-0 rounded-xl border border-slate-200/60 bg-transparent p-3">

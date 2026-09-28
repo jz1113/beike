@@ -93,7 +93,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const canExport = review.counts.done > 0 && !review.isRunning;
   const trialLabel = review.counts.done > 0 || review.counts.failed > 0 ? '再试下一批' : `试跑 ${review.batchSize} 条`;
   const batchLabel = review.counts.done > 0 || review.counts.failed > 0 ? '继续批量' : '批量审核';
-  const canTrial = review.counts.pending > 0 && !review.isPreparing;
+  const canTrial = review.counts.pending > 0 && !review.isPreparing && !review.isImporting;
   const canRun = !review.isPreparing && (canTrial || review.records.some(isKnownModelOutputFailure));
   const displayColumns = review.parsed?.displayColumns ?? [];
   const filterLabels: Record<KeywordReviewFilter, string> = { all: '全部', done: '已完成', producible: '可制作', rejected: '不制作', low_value: '低价值' };
@@ -102,7 +102,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const showBalanceAmount = Boolean(review.balance && review.balanceUpdatedAt);
 
   const receiveFile = (file?: File) => {
-    if (file) void review.importFile(file);
+    if (file && !review.isImporting) void review.importFile(file);
   };
 
   return (
@@ -152,9 +152,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
         <div className="mx-auto w-full max-w-[1680px] space-y-5">
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <div role="group" aria-label="关键词审核类型" className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1">
-              {(['image', 'video'] as const).map((mode) => <button key={mode} type="button" aria-pressed={review.reviewMode === mode} disabled={Boolean(review.parsed) || review.isRunning || review.isImporting} onClick={() => review.selectReviewMode(mode)} className={`rounded-xl px-5 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${review.reviewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white disabled:opacity-50'}`}>{mode === 'image' ? '图文关键词' : '视频关键词'}</button>)}
+              {(['image', 'video'] as const).map((mode) => <button key={mode} type="button" aria-pressed={review.reviewMode === mode} disabled={!review.canSwitchMode} onClick={() => void review.selectReviewMode(mode)} className={`rounded-xl px-5 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${review.reviewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white disabled:opacity-50'}`}>{mode === 'image' ? '图文关键词' : '视频关键词'}</button>)}
             </div>
-            {review.parsed && <span className="text-xs text-slate-500">切换类型请先导出进度，再点击“换表”</span>}
+            {review.parsed && <span className="text-xs text-slate-500">{review.isRunning || review.isPreparing ? '审核进行中，暂不可切换类型' : review.counts.done > 0 ? '已有审核结果；请先导出进度，再点击“换表”切换类型' : !review.canSwitchMode ? '本次已有审核尝试；请先处理当前任务，或点击“换表”后切换类型' : '尚未审核，可直接切换类型'}</span>}
           </div>
           {!review.parsed ? (
             <section className="mx-auto max-w-[980px] pt-8 sm:pt-14">
@@ -169,6 +169,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
+                disabled={review.isImporting}
                 onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(event) => { event.preventDefault(); setIsDragging(false); receiveFile(event.dataTransfer.files?.[0]); }}
@@ -210,7 +211,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                     >
                       不确定词联网补查
                     </button>
-                    <button type="button" onClick={review.reset} disabled={review.isRunning} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"><RefreshCcw className="h-4 w-4" />换表</button>
+                    <button type="button" onClick={review.reset} disabled={review.isRunning || review.isPreparing || review.isImporting} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"><RefreshCcw className="h-4 w-4" />换表</button>
                     {review.isRunning ? (
                       <button type="button" onClick={review.stopReview} className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-slate-800"><Square className="h-4 w-4 fill-current" />{review.runMode === 'all' ? '停止批量' : '停止试跑'}</button>
                     ) : (

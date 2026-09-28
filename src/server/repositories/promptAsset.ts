@@ -90,34 +90,20 @@ export async function listPublishedSourceIds(assetType: string): Promise<string[
   return rows.map((row) => row.sourceAssetId);
 }
 
-export async function upsertRegistry(input: {
+type RegistryWrite = {
   assetType: string;
   sourceAssetId: string;
   status: PromptAssetStatus;
   provenance?: string;
   sourceRef?: string | null;
   version?: number;
-}): Promise<RegistryRow> {
-  const existing = await getRegistry(input.assetType, input.sourceAssetId);
-  const updatedAt = nowIso();
-  if (existing) {
-    await db.$executeRawUnsafe(
-      'UPDATE "PromptAssetRegistry" SET "status" = ?, "provenance" = ?, "sourceRef" = ?, "version" = ?, "publishedAt" = ?, "disabledReason" = ?, "updatedAt" = ? WHERE "workspaceId" = ? AND "id" = ?',
-      input.status,
-      input.provenance ?? existing.provenance,
-      input.sourceRef ?? existing.sourceRef,
-      input.version ?? existing.version,
-      input.status === 'published' ? (existing.publishedAt || updatedAt) : existing.publishedAt,
-      input.status === 'disabled' ? existing.disabledReason : null,
-      updatedAt,
-      requireWorkspaceId(),
-      existing.id,
-    );
-    return (await getRegistry(input.assetType, input.sourceAssetId))!;
-  }
+};
+
+async function insertRegistryIfMissing(input: RegistryWrite): Promise<boolean> {
   const id = `reg_${randomUUID().replace(/-/g, '')}`;
-  await db.$executeRawUnsafe(
-    'INSERT INTO "PromptAssetRegistry" ("id", "workspaceId", "assetType", "sourceAssetId", "status", "version", "provenance", "sourceRef", "qualityScore", "confidence", "publishedAt", "disabledReason", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  const createdAt = nowIso();
+  const inserted = await db.$executeRawUnsafe(
+    'INSERT INTO "PromptAssetRegistry" ("id", "workspaceId", "assetType", "sourceAssetId", "status", "version", "provenance", "sourceRef", "qualityScore", "confidence", "publishedAt", "disabledReason", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT ("workspaceId", "assetType", "sourceAssetId") DO NOTHING',
     id,
     requireWorkspaceId(),
     input.assetType,
@@ -128,12 +114,45 @@ export async function upsertRegistry(input: {
     input.sourceRef || null,
     null,
     null,
-    input.status === 'published' ? updatedAt : null,
+    input.status === 'published' ? createdAt : null,
     null,
-    updatedAt,
-    updatedAt,
+    createdAt,
+    createdAt,
   );
-  return (await getRegistry(input.assetType, input.sourceAssetId))!;
+  return inserted > 0;
+}
+
+async function requireRegistry(input: RegistryWrite): Promise<RegistryRow> {
+  const row = await getRegistry(input.assetType, input.sourceAssetId);
+  if (!row) throw new Error(`Prompt asset registry entry missing: ${input.assetType}/${input.sourceAssetId}`);
+  return row;
+}
+
+export async function ensureRegistryExists(input: RegistryWrite): Promise<RegistryRow> {
+  const existing = await getRegistry(input.assetType, input.sourceAssetId);
+  if (existing) return existing;
+  await insertRegistryIfMissing(input);
+  return requireRegistry(input);
+}
+
+export async function upsertRegistry(input: RegistryWrite): Promise<RegistryRow> {
+  if (await insertRegistryIfMissing(input)) return requireRegistry(input);
+  const updatedAt = nowIso();
+  await db.$executeRawUnsafe(
+    'UPDATE "PromptAssetRegistry" SET "status" = ?, "provenance" = COALESCE(?, "provenance"), "sourceRef" = COALESCE(?, "sourceRef"), "version" = COALESCE(?, "version"), "publishedAt" = CASE WHEN ? = \'published\' THEN COALESCE("publishedAt", ?) ELSE "publishedAt" END, "disabledReason" = CASE WHEN ? = \'disabled\' THEN "disabledReason" ELSE NULL END, "updatedAt" = ? WHERE "workspaceId" = ? AND "assetType" = ? AND "sourceAssetId" = ?',
+    input.status,
+    input.provenance ?? null,
+    input.sourceRef ?? null,
+    input.version ?? null,
+    input.status,
+    updatedAt,
+    input.status,
+    updatedAt,
+    requireWorkspaceId(),
+    input.assetType,
+    input.sourceAssetId,
+  );
+  return requireRegistry(input);
 }
 
 export async function updateRegistryStatus(id: string, patch: {

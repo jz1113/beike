@@ -44,6 +44,7 @@ export interface ExecuteStoryboardParams {
   productIndex: number;
   useAssetLibrary?: boolean;
   batchId?: string;
+  productId?: string;
 }
 
 export async function executeStoryboard(params: ExecuteStoryboardParams) {
@@ -51,7 +52,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     productTitle, productProps, imageUrls = [], anchorFaceImageUrl, modelPersona,
     resolvedTemplateStyle, shotCount, extraRequirements, model, fallbackModels,
     targetBaseUrl, targetApiKey, apiFormat, hasAnchorFace, previousActionIds = [], previousSceneIds = [],
-    allocatedAssets, lockedAssets, productIndex, useAssetLibrary, batchId,
+    allocatedAssets, lockedAssets, productIndex, useAssetLibrary, batchId, productId,
   } = params;
 
   if (!productTitle && imageUrls.length === 0) {
@@ -60,12 +61,19 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
 
   const lockedGroup = await loadLockedGroupSkeleton({
     fullPromptId: lockedAssets?.fullPromptId,
+    groupAppearance: modelPersona === 'none' ? 'product'
+      : lockedAssets?.groupAppearance === 'human' || lockedAssets?.groupAppearance === 'product'
+        ? lockedAssets.groupAppearance : undefined,
     batchId,
+    productId,
     productTitle,
     productProps,
     productIndex,
   });
-  const acceptsPeople = modelPersona !== 'none' && lockedGroup.hasHuman !== false && lockedGroup.shots.some(
+  if (modelPersona === 'none' && lockedGroup.groupAppearance !== 'product') {
+    throw new Error('当前批次设置为无人物，但所选母版包含人物或出镜类型未确认，请选择无人物母版');
+  }
+  const acceptsPeople = modelPersona !== 'none' && lockedGroup.groupAppearance === 'human' && lockedGroup.shots.some(
     (shot) => shot.has_human !== false && shot.shot_type !== 'hand_held_only' && shot.shot_type !== 'pure_product',
   );
   const rotatePersona = acceptsPeople && modelPersona !== 'none' && isAppearanceRotation(lockedAssets?.personaId);
@@ -203,6 +211,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
       fullPromptId: lockedGroup.id,
       fullPromptTitle: lockedGroup.title,
       fullPromptSelectionMode: lockedGroup.selectionMode,
+      fullPromptAppearance: lockedGroup.groupAppearance,
     },
     qualityChecks,
     usedAssetLibrary: filledSlots.usedAssetLibrary,

@@ -114,6 +114,9 @@ const MemoizedProductItem = React.memo(function ProductItem({
                   <span title={`图组母本 ${item.appliedFullPromptId || ''}`}>
                     {item.appliedFullPromptSelectionMode === 'auto' ? '资产库轮询母组' : '已锁定母组'}：{item.appliedFullPromptId && `[#${stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}] `}{item.appliedFullPromptTitle}
                   </span>
+                  {item.appliedFullPromptAppearance && <span className={`rounded px-1.5 py-0.5 font-medium ${item.appliedFullPromptAppearance === 'human' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {item.appliedFullPromptAppearance === 'human' ? '有人物母版' : item.appliedFullPromptAppearance === 'product' ? '无人物母版' : '出镜待判定'}
+                  </span>}
                 </>
               )}
             </div>

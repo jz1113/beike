@@ -307,16 +307,7 @@ export async function parseKeywordWorkbook(file: File, mode: KeywordReviewMode =
   const workbook = /\.csv$/i.test(file.name)
     ? XLSX.read((await file.text()).replace(/^\uFEFF/, ''), { type: 'string', cellStyles: true, cellDates: true })
     : XLSX.read(await file.arrayBuffer(), { type: 'array', cellStyles: true, cellDates: true });
-  const hasVideoHeader = workbook.SheetNames.some((name) => {
-    const sheet = workbook.Sheets[name];
-    if (!sheet?.['!ref']) return false;
-    const range = XLSX.utils.decode_range(sheet['!ref']);
-    const header = findHeader(sheet, range);
-    if (!header) return false;
-    const labels = new Set(header.headers.map((item) => normalizeHeader(item.label)));
-    return labels.has('需上传数量') && labels.has('已上传数量') && labels.has('相关拓展q');
-  });
-  return parseKeywordWorkbookData(workbook, file.name, hasVideoHeader ? 'video' : mode);
+  return parseKeywordWorkbookData(workbook, file.name, mode);
 }
 
 export function applyReviewResults(

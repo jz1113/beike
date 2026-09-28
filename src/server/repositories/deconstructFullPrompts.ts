@@ -121,6 +121,7 @@ export async function persistFullPromptRecords(params: {
   sampleImagesJson: string;
   thumbForUrl: (url: string) => Promise<string>;
   defaultCoverUrl: string;
+  provenance?: string;
 }) {
   const { parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey, sampleImagesJson, thumbForUrl, defaultCoverUrl } = params;
   let albumId: string | null = null;
@@ -168,7 +169,7 @@ export async function persistFullPromptRecords(params: {
       hasHuman, sceneSummary, outfitSummary: summarizeOutfit(images),
       actionSummary: images.map((image) => image.action?.action).filter(Boolean).join('；'),
       personaSummary: hasHuman ? summarizePersona(images) : '本组无人物，不调用人物与穿搭槽位',
-      category, productCategoryIds, provenance: 'deconstructed' as const,
+      category, productCategoryIds, provenance: params.provenance || 'deconstructed',
     };
     saved.push(existing
       ? await db.fullPromptAsset.update({ where: { id: existing.id }, data: shared })

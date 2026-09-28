@@ -1,10 +1,9 @@
 import { isPlaceholderIdentity, workshopAssetBlockReason } from '@shared/domain/workshop/workshopPipeline';
 import { visualAssetIssue } from '@shared/domain/assets/assetDeconstruct/visualEvidence';
 import {
-  getRegistry,
+  ensureRegistryExists,
   listPublishedSourceIds,
   listRegistryByType,
-  upsertRegistry,
   listAssetsForRegistryBackfill,
 } from '../../repositories/promptAsset';
 import {
@@ -13,9 +12,7 @@ import {
 } from '@shared/domain/prompts/promptAsset';
 
 export async function ensureRegistryForAsset(assetType: PromptAssetType, sourceAssetId: string, provenance?: string) {
-  const existing = await getRegistry(assetType, sourceAssetId);
-  if (existing) return existing;
-  return upsertRegistry({
+  return ensureRegistryExists({
     assetType,
     sourceAssetId,
     status: initialRegistryStatus(provenance, true),

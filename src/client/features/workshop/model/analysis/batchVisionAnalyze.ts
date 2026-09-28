@@ -7,6 +7,7 @@ import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@shared/domain/products/jewelryArch';
+import { isAutoPromptGroupSelection, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import type { BatchProductItem } from '../batchTypes';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
 export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';
@@ -79,11 +80,14 @@ export async function analyzeBatchProduct(
     let data: any = null;
     let apiError: string | null = null;
 
-    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || (deps.lockedFullPromptId && deps.lockedFullPromptId !== 'auto')) ? {
+    const groupAppearance = promptGroupAppearanceFilter(deps.lockedFullPromptId);
+    const fullPromptId = !isAutoPromptGroupSelection(deps.lockedFullPromptId) ? deps.lockedFullPromptId : undefined;
+    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || fullPromptId || groupAppearance) ? {
       personaId: deps.lockedPersonaId !== 'auto' ? deps.lockedPersonaId : undefined,
       sceneId: deps.lockedSceneId !== 'auto' ? deps.lockedSceneId : undefined,
       outfitId: deps.lockedOutfitId !== 'auto' ? deps.lockedOutfitId : undefined,
-      fullPromptId: deps.lockedFullPromptId && deps.lockedFullPromptId !== 'auto' ? deps.lockedFullPromptId : undefined,
+      fullPromptId,
+      groupAppearance,
     } : undefined;
 
     const computedProductIdx = typeof itemIndex === 'number'
@@ -146,6 +150,7 @@ export async function analyzeBatchProduct(
           previousActionIds: deps.batchActionIdsRef?.current?.slice(-16) || [],
           previousSceneIds: deps.batchSceneIdsRef?.current?.slice(-20) || [],
           batchId: deps.batchId,
+          productId: item.id,
         })
       });
 
@@ -271,6 +276,7 @@ export async function analyzeBatchProduct(
         appliedFullPromptId: data?.assetTrace?.fullPromptId,
         appliedFullPromptTitle: data?.assetTrace?.fullPromptTitle,
         appliedFullPromptSelectionMode: data?.assetTrace?.fullPromptSelectionMode,
+        appliedFullPromptAppearance: data?.assetTrace?.fullPromptAppearance,
         productRole: formatted.productRole,
         productFingerprint: formatted.productFingerprint,
         lookParts: formatted.lookParts ?? lookPartsFromApi,
