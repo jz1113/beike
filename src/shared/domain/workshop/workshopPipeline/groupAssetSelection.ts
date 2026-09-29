@@ -1,5 +1,5 @@
-import { inferProductCategoryAndAnatomy } from '../../products/productCategory/infer';
 import { parseGroupShotSkeleton } from './storyboardSlots';
+import { promptGroupCategoryFit } from './groupCategoryFit';
 
 export interface PromptGroupCandidate {
   id: string;
@@ -71,23 +71,10 @@ export function eligiblePromptGroups<T extends PromptGroupCandidate>(
   productProps: Record<string, unknown> | null | undefined,
   appearance?: PromptGroupAppearanceFilter,
 ): T[] {
-  const productCategory = inferProductCategoryAndAnatomy(productTitle, productProps).primaryCategory;
   const eligible = groups.filter(group => isCompletePromptGroup(group)
     && (!appearance || promptGroupAppearance(group) === appearance));
   if (!eligible.length) return [];
-  const scored = eligible.map((group) => {
-    const categories = parseArray(group.productCategoryIds).map(String);
-    const summaryCategory = inferProductCategoryAndAnatomy(group.contentSummary).primaryCategory;
-    const inferred = summaryCategory !== 'all' ? summaryCategory : inferProductCategoryAndAnatomy(
-      [group.title, group.albumName, group.category].filter(Boolean).join(' '),
-    ).primaryCategory;
-    const score = productCategory !== 'all' && categories.includes(productCategory) ? 100
-      : productCategory !== 'all' && inferred === productCategory ? 80
-      : group.isUniversal || categories.includes('all') ? 40
-      : inferred === 'all' && categories.length === 0 ? 20
-      : 0;
-    return { group, score };
-  });
+  const scored = eligible.map(group => ({ group, score: promptGroupCategoryFit(group, productTitle, productProps) }));
   const matching = scored.filter(entry => entry.score >= 80);
   const fallback = scored.filter(entry => entry.score > 0);
   return (matching.length ? matching : fallback).sort((a,b) => b.score - a.score || a.group.id.localeCompare(b.group.id)).map(entry => entry.group);

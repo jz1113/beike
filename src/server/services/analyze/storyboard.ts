@@ -45,6 +45,7 @@ export interface ExecuteStoryboardParams {
   useAssetLibrary?: boolean;
   batchId?: string;
   productId?: string;
+  analysisRunId?: string;
 }
 
 export async function executeStoryboard(params: ExecuteStoryboardParams) {
@@ -52,7 +53,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     productTitle, productProps, imageUrls = [], anchorFaceImageUrl, modelPersona,
     resolvedTemplateStyle, shotCount, extraRequirements, model, fallbackModels,
     targetBaseUrl, targetApiKey, apiFormat, hasAnchorFace, previousActionIds = [], previousSceneIds = [],
-    allocatedAssets, lockedAssets, productIndex, useAssetLibrary, batchId, productId,
+    allocatedAssets, lockedAssets, productIndex, useAssetLibrary, batchId, productId, analysisRunId,
   } = params;
 
   if (!productTitle && imageUrls.length === 0) {
@@ -66,6 +67,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
         ? lockedAssets.groupAppearance : undefined,
     batchId,
     productId,
+    analysisRunId,
     productTitle,
     productProps,
     productIndex,
@@ -214,6 +216,8 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
       fullPromptAlbumName: lockedGroup.albumName,
       fullPromptSelectionMode: lockedGroup.selectionMode,
       fullPromptAppearance: lockedGroup.groupAppearance,
+      fullPromptEligibleCount: lockedGroup.eligibleCount,
+      fullPromptInventoryCount: lockedGroup.inventoryCount,
     },
     qualityChecks,
     usedAssetLibrary: filledSlots.usedAssetLibrary,

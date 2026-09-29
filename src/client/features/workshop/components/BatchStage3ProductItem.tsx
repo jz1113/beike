@@ -111,12 +111,18 @@ const MemoizedProductItem = React.memo(function ProductItem({
               {hasPrompts && item.appliedFullPromptId && (
                 <>
                   <span>·</span>
-                  <span title={`母本原名称：${item.appliedFullPromptTitle || '未命名'}；资产 ID：${item.appliedFullPromptId}`}>
-                    {item.appliedFullPromptSelectionMode === 'auto' ? '资产库轮询母组' : '已锁定母组'}：[#${stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}] {item.appliedFullPromptGroupIndex ? `组 ${item.appliedFullPromptGroupIndex}` : item.appliedFullPromptTitle || '图组母本'}{item.appliedFullPromptAlbumName ? ` · ${item.appliedFullPromptAlbumName}` : ''}
+                  <span className="inline-flex max-w-full flex-wrap items-center gap-1.5" title={`母本原名称：${item.appliedFullPromptTitle || '未命名'}；资产 ID：${item.appliedFullPromptId}`}>
+                    <span>{item.appliedFullPromptSelectionMode === 'auto' ? '轮询使用' : '锁定使用'}</span>
+                    <strong className="font-mono text-indigo-700">#{stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}</strong>
+                    <span className="max-w-[240px] truncate" title={item.appliedFullPromptAlbumName || item.appliedFullPromptTitle || ''}>{item.appliedFullPromptAlbumName || item.appliedFullPromptTitle || '未命名图集'}</span>
+                    {item.appliedFullPromptGroupIndex && <span className="text-slate-400">图集内组 {item.appliedFullPromptGroupIndex}</span>}
                   </span>
                   {item.appliedFullPromptAppearance && <span className={`rounded px-1.5 py-0.5 font-medium ${item.appliedFullPromptAppearance === 'human' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>
                     {item.appliedFullPromptAppearance === 'human' ? '有人物母版' : item.appliedFullPromptAppearance === 'product' ? '无人物母版' : '出镜待判定'}
                   </span>}
+                  {item.appliedFullPromptSelectionMode === 'auto' && typeof item.appliedFullPromptEligibleCount === 'number' && typeof item.appliedFullPromptInventoryCount === 'number' && (
+                    <span className="text-slate-500">本商品可轮询 {item.appliedFullPromptEligibleCount} / 库存 {item.appliedFullPromptInventoryCount} 母版</span>
+                  )}
                 </>
               )}
             </div>
@@ -205,6 +211,17 @@ const MemoizedProductItem = React.memo(function ProductItem({
               </button>
               <button type="button" disabled={item.isAnalyzing || isAnalyzingAll || !item.gridPrompt} onClick={() => setEditingGrid(!editingGrid)}>{editingGrid ? '完成编辑' : '编辑提示词'}</button>
             </div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="本组四镜场景与动作概要">
+            {item.prompts.slice(0, 4).map((shot, index) => {
+              const scene = getShotAssetLabels(shot).scene || shot.scene || '未标注场景';
+              const action = shot.action || shot.applied_action || '未标注动作';
+              return <div key={index} className="min-w-0 rounded-lg border border-indigo-100/70 bg-transparent p-2.5 text-[11px] leading-5 text-slate-600">
+                <p className="truncate font-semibold text-slate-800" title={shot.title || ''}>{index + 1}. {shot.title || `镜头 ${index + 1}`}</p>
+                <p className="line-clamp-2" title={scene}>场景：{scene}</p>
+                <p className="line-clamp-2" title={action}>动作：{action}</p>
+              </div>;
+            })}
           </div>
           {editingGrid ? (
             <textarea aria-label="整组生成提示词" value={item.gridPrompt || ''}

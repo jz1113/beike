@@ -451,6 +451,7 @@ export default function BatchWorkshopView() {
         lockedFullPromptId={runner.lockedFullPromptId}
         setLockedFullPromptId={runner.setLockedFullPromptId}
         availableFullPrompts={runner.availableFullPrompts}
+        products={successfulItems.map(item => ({ title: item.title, props: item.props }))}
         personaMode={personaMode}
         setPersonaMode={setPersonaMode}
       />

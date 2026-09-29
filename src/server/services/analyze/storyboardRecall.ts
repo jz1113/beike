@@ -10,7 +10,7 @@ import {
   stableAssetCode,
 } from '@shared/domain/assets/assetSampling';
 import { inferProductCategoryAndAnatomy } from '@shared/domain/products/productCategory';
-import { isAutoPromptGroupSelection, isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, type PromptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
+import { eligiblePromptGroups, isAutoPromptGroupSelection, isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, type PromptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
 
@@ -150,6 +150,7 @@ export async function loadLockedGroupSkeleton(input: {
   groupAppearance?: PromptGroupAppearanceFilter;
   batchId?: string;
   productId?: string;
+  analysisRunId?: string;
   productTitle?: string;
   productProps?: Record<string, unknown> | null;
   productIndex: number;
@@ -157,11 +158,16 @@ export async function loadLockedGroupSkeleton(input: {
   const id = String(input.fullPromptId || '').trim();
   const manuallyLocked = !isAutoPromptGroupSelection(id);
   const appearance = input.groupAppearance || promptGroupAppearanceFilter(id);
+  const availableGroups = manuallyLocked ? []
+    : (await storyboardAssetsRepository.listCompleteGroups({ AND: [PROVENANCE, await publishedWhere('full_prompt'), { sourceImageIndices: { not: null }, shotPromptsJson: { not: null } }] }))
+      .filter(group => isWorkshopAssetEligible(group, 'full_prompt'));
+  const eligibleCount = manuallyLocked ? 1
+    : eligiblePromptGroups(availableGroups, input.productTitle || '', input.productProps, appearance).length;
   const row = manuallyLocked
     ? await storyboardAssetsRepository.findGroup({ AND: [{ id }, PROVENANCE, await publishedWhere('full_prompt')] })
     : await reservePromptGroup(
-        (await storyboardAssetsRepository.listCompleteGroups({ AND: [PROVENANCE, await publishedWhere('full_prompt'), { sourceImageIndices: { not: null }, shotPromptsJson: { not: null } }] })).filter(group => isWorkshopAssetEligible(group, 'full_prompt')),
-        input.productTitle || '', input.productProps, input.batchId, appearance, input.productId,
+        availableGroups,
+        input.productTitle || '', input.productProps, input.batchId, appearance, input.productId, input.analysisRunId,
       );
   if (!row) throw new Error(manuallyLocked
     ? '选定的图组母本不存在、未发布或已停用，请重新选择'
@@ -181,6 +187,8 @@ export async function loadLockedGroupSkeleton(input: {
     architectureSummary: row.architectureSummary,
     hasHuman: groupAppearance === 'unknown' ? row.hasHuman : groupAppearance === 'human',
     groupAppearance,
+    eligibleCount,
+    inventoryCount: manuallyLocked ? 1 : availableGroups.length,
     sceneSummary: row.sceneSummary,
     outfitSummary: row.outfitSummary,
     personaSummary: row.personaSummary,

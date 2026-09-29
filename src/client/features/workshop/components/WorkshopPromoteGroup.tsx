@@ -7,6 +7,7 @@ import {
 } from '../model/generation/promoteGroup';
 import { reviewedFourShotGroup, reviewedGroupSignature } from '../model/generation/reviewedGroup';
 import { stableAssetCode } from '@shared/domain/assets/assetSampling';
+import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
 
 type Preview = { groupIndex: number; signature: string; candidate: PromotedGroupCandidate; images: string[] };
 
@@ -29,6 +30,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
       const candidate = await analyzePromotedGroup({ item, groupIndex, tasks, visionModel });
       const signature = reviewedGroupSignature(tasks);
       if (candidate.reviewStatus === 'approved') {
+        invalidateGlobalAssetCache();
         setSavedGroups((groups) => [...new Set([...groups, signature])]);
       } else {
         setPreview({ groupIndex, signature, candidate, images: tasks.map((task) => task.resultUrl!) });
@@ -51,6 +53,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
     setError('');
     try {
       await approvePromotedGroup(preview.candidate);
+      invalidateGlobalAssetCache();
       setSavedGroups((groups) => [...new Set([...groups, preview.signature])]);
       setPreview(null);
     } catch (cause) {

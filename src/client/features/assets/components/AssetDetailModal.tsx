@@ -19,6 +19,7 @@ import {
   parsePersonaLayers,
 } from '../utils/assetPromptConstants';
 import { resolveActionCardDisplayBadges } from '@shared/domain/products/productCategory';
+import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 
 export interface AssetDetailModalProps {
   detailItem: any | null;
@@ -76,8 +77,9 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const activeSrc = visibleSourceImages[detailActiveImageIndex] || currentCover || visibleSourceImages[0];
   const sourceIdx = typeof detailItem.sourceImageIndex === 'number' ? detailItem.sourceImageIndex : null;
   const groupNumber = Number.isInteger(detailItem.groupIndex) && detailItem.groupIndex > 0 ? detailItem.groupIndex : null;
-  const displayTitle = activeSubTab === 'full_prompt' && groupNumber !== null
-    ? `组 ${groupNumber}`
+  const assetCode = detailItem.code || (detailItem.id ? stableAssetCode('R', String(detailItem.id)) : 'R-01');
+  const displayTitle = activeSubTab === 'full_prompt'
+    ? String(detailItem.albumName || '').trim() || String(detailItem.title || '').trim() || `#${assetCode}`
     : detailItem.title || detailItem.name || '未命名资产';
   const isDerivedGroup = activeSubTab === 'full_prompt' && (
     detailItem.registry?.provenance === 'workshop_generated' ||
@@ -93,7 +95,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   } | null | undefined;
   const sourceMotherCode = sourceMother?.code ? `#${sourceMother.code.replace(/^#/, '')}` : '';
   const originalTitle = typeof detailItem.title === 'string' ? detailItem.title.trim() : '';
-  const showOriginalTitle = activeSubTab === 'full_prompt' && groupNumber !== null && originalTitle &&
+  const showOriginalTitle = activeSubTab === 'full_prompt' && originalTitle &&
     originalTitle !== displayTitle && originalTitle !== `${detailItem.albumName || ''} · 图组 ${groupNumber}`;
 
   return (
@@ -144,10 +146,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     : 'bg-slate-50 text-slate-800 border-slate-300/80'
                 }`}
               >
-                {detailItem.code
+                {activeSubTab === 'full_prompt'
+                  ? `#${String(assetCode).replace(/^#/, '')}`
+                  : detailItem.code
                   ? `#${detailItem.code.replace(/^#/, '')}`
-                  : activeSubTab === 'full_prompt'
-                  ? '#R-01'
                   : activeSubTab === 'persona'
                   ? '#P-01'
                   : activeSubTab === 'scene'
@@ -169,14 +171,14 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               )}
               {activeSubTab === 'full_prompt' && detailItem.groupIndex && (
                 <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-semibold rounded-md border border-indigo-200">
-                  {sourceImageIndices.length || 1} 张原图
+                  图集内组 {String(detailItem.groupIndex)} · {sourceImageIndices.length || 1} 张原图
                 </span>
               )}
               {activeSubTab === 'full_prompt' && (
                 <span className="max-w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-semibold text-slate-600" title={sourceMother?.title || undefined}>
                   {isDerivedGroup
                     ? sourceMother
-                      ? `来源母本 ${sourceMotherCode || '编号未知'}${sourceMother.groupIndex ? ` · 组 ${sourceMother.groupIndex}` : ''}${sourceMother.available ? '' : ' · 已删除'}`
+                      ? `来源母本 ${sourceMotherCode || '编号未知'}${sourceMother.groupIndex ? ` · 图集内组 ${sourceMother.groupIndex}` : ''}${sourceMother.available ? '' : ' · 已删除'}`
                       : '来源母本未记录'
                     : '原始母本'}
                 </span>

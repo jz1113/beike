@@ -16,7 +16,7 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
     <section className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5" aria-label="生产资源状态">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p role={assetLoadState === 'error' ? 'alert' : 'status'} className={`text-xs ${assetLoadState === 'error' ? 'text-red-600' : 'text-slate-500'}`}>
-          {assetLoadState === 'loading' ? '正在加载素材…' : assetLoadState === 'error' ? `加载失败：${props.assetLoadError || '请重试'}` : availableFullPrompts.length ? `${availableFullPrompts.length} 组可用母本` : '暂无可用四图母本，请到资产库导入并解构图组。'}
+          {assetLoadState === 'loading' ? '正在加载素材…' : assetLoadState === 'error' ? `加载失败：${props.assetLoadError || '请重试'}` : availableFullPrompts.length ? `库存 ${availableFullPrompts.length} 组可用母本` : '暂无可用四图母本，请到资产库导入并解构图组。'}
         </p>
         <div className="flex gap-3 text-xs font-medium">
           <button type="button" onClick={props.onReloadAssets} disabled={assetLoadState === 'loading' || !props.onReloadAssets} className="text-slate-500 hover:text-indigo-600 disabled:opacity-50">刷新</button>
@@ -26,6 +26,8 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
     </section>
     <WorkshopAssetBindings
       groupId={props.lockedFullPromptId || 'auto'} groups={availableFullPrompts} onGroupChange={id => props.setLockedFullPromptId?.(id)}
+      products={props.products}
+      personaMode={props.personaMode}
       personaId={props.lockedPersonaId || 'auto'} personas={availablePersonas} onPersonaChange={id => props.setLockedPersonaId?.(id)}
       sceneId={props.lockedSceneId || 'auto'} scenes={availableScenes} onSceneChange={id => props.setLockedSceneId?.(id)}
       outfitId={props.lockedOutfitId || 'auto'} outfits={availableOutfits} onOutfitChange={id => props.setLockedOutfitId?.(id)}

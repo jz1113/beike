@@ -5,6 +5,7 @@ import type { ContentPromptGroup, PerImageResult } from '@shared/domain/assets/a
 import { resolveAssetShotSubject } from '@shared/domain/workshop/workshopShotSubject';
 
 const MAX_IMAGES_PER_CONTENT_GROUP = 4;
+const IMPORT_CATEGORY_IDS = new Set(['jewelry', 'digital', 'digital_3c', 'apparel', 'bag', 'shoes', 'beauty', 'eyewear', 'hat_accessory']);
 type RawGroup = Partial<ContentPromptGroup> & Record<string, unknown>;
 
 function asImageIndices(value: unknown, max: number): number[] {
@@ -124,6 +125,12 @@ export async function persistFullPromptRecords(params: {
   provenance?: string;
 }) {
   const { parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey, sampleImagesJson, thumbForUrl, defaultCoverUrl } = params;
+  const requestedId = text(productCategoryId);
+  const databaseCategory = requestedId ? await db.assetProductCategory.findFirst({
+    where: { id: requestedId, workspaceId: requireWorkspaceId() },
+    select: { id: true },
+  }) : null;
+  const requestedCategory = databaseCategory || IMPORT_CATEGORY_IDS.has(requestedId) ? requestedId : '';
   let albumId: string | null = null;
   if (sourceKey) {
     const rows = await db.$queryRaw<{ albumId: string | null }[]>`SELECT "albumId" FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${sourceKey}`;
@@ -131,11 +138,13 @@ export async function persistFullPromptRecords(params: {
   }
   const album = albumId
     ? await db.promptAlbum.findUnique({ where: { id: albumId } })
-    : await ensurePromptAlbum(db, { albumName, sourceImages: JSON.stringify(imageUrls), productCategoryIds: productCategoryId ? JSON.stringify([productCategoryId]) : '[]' });
+    : await ensurePromptAlbum(db, { albumName, sourceImages: JSON.stringify(imageUrls), productCategoryIds: databaseCategory ? JSON.stringify([requestedId]) : '[]' });
   if (!album) throw new Error('图集不存在');
   if (album.name !== albumName) await db.promptAlbum.update({ where: { id: album.id }, data: { name: albumName } });
 
-  const productCategoryIds = JSON.stringify(album.productCategoryId ? [album.productCategoryId] : (productCategoryId ? [productCategoryId] : []));
+  // The deconstruction category is a semantic product tag even when that
+  // category has no organization row yet (for example digital_3c).
+  const productCategoryIds = JSON.stringify(requestedCategory ? [requestedCategory] : (album.productCategoryId ? [album.productCategoryId] : []));
   const contentSummary = text(parsedResult.content_summary ?? parsedResult.contentSummary) || `${albumName}：按连续图组复用的种草内容架构。`;
   const normalizedGroups = normalizeContentGroups(perImageResults, parsedResult.content_groups ?? parsedResult.contentGroups);
   const saved: any[] = [];

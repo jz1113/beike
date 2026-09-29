@@ -349,6 +349,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
         albumName,
         isSingleImage,
         category,
+        productCategoryId: targetCategory,
         sourceKey: claimedKey,
       });
       console.log(`[AssetDeconstruct] 入库耗时 ${Date.now() - dbSaveStart}ms`);
@@ -360,6 +361,7 @@ async function processDeconstructRequest(req: Request, body: Record<string, any>
       await deconstructReviews.createPending(reviewId, albumName, {
         parsedResult, perImageResults, imageUrls: processedImageUrls, albumName,
         isSingleImage, category: (parsedResult.theme_category as string) || 'general',
+        productCategoryId: targetCategory,
         sourceKey: claimedKey, fullPromptOnly: Boolean(fullPromptOnly),
         provenance: fullPromptOnly ? 'workshop_generated' : 'deconstructed',
         parentFullPromptId: typeof parentFullPromptId === 'string' ? parentFullPromptId.slice(0, 160) : null,

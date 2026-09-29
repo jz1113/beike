@@ -9,12 +9,13 @@ async function reserveInTransaction<T extends PromptGroupCandidate>(
   groups: T[], title: string, props: Record<string, unknown> | null | undefined, batchId?: string,
   appearance?: PromptGroupAppearanceFilter,
   productId?: string,
+  analysisRunId?: string,
 ): Promise<T | null> {
   const candidates = eligiblePromptGroups(groups, title, props, appearance);
   if (!candidates.length) return null;
   const category = inferProductCategoryAndAnatomy(title, props).primaryCategory;
   const eventType = `group_rotation:${category}${appearance ? `:${appearance}` : ''}`;
-  return reservePromptGroupRecord(candidates, eventType, batchId, productId);
+  return reservePromptGroupRecord(candidates, eventType, batchId, productId, analysisRunId);
 }
 
 const reservations = new Map<string, Promise<unknown>>();
@@ -23,10 +24,11 @@ export async function reservePromptGroup<T extends PromptGroupCandidate>(
   groups: T[], title: string, props: Record<string, unknown> | null | undefined, batchId?: string,
   appearance?: PromptGroupAppearanceFilter,
   productId?: string,
+  analysisRunId?: string,
 ): Promise<T | null> {
   const key = requireWorkspaceId();
   const previous = reservations.get(key) || Promise.resolve();
-  const pending = previous.catch(() => undefined).then(() => reserveInTransaction(groups, title, props, batchId, appearance, productId));
+  const pending = previous.catch(() => undefined).then(() => reserveInTransaction(groups, title, props, batchId, appearance, productId, analysisRunId));
   reservations.set(key, pending);
   try { return await pending; }
   finally { if (reservations.get(key) === pending) reservations.delete(key); }

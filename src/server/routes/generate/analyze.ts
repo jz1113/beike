@@ -128,6 +128,8 @@ export async function POST(req: Request) {
         useAssetLibrary: body.useAssetLibrary,
         batchId: body.batchId || body.workshopBatchId,
         productId: typeof body.productId === 'string' ? body.productId.slice(0, 200) : undefined,
+        analysisRunId: typeof body.analysisRunId === 'string' && /^[\w-]{8,80}$/.test(body.analysisRunId)
+          ? body.analysisRunId : undefined,
       });
 
       productFingerprintRaw = storyboardResult.productFingerprintRaw;

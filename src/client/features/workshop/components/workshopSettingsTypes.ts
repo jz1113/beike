@@ -50,6 +50,7 @@ export interface WorkshopSettingsModalProps {
   lockedFullPromptId?: string;
   setLockedFullPromptId?: (id: string) => void;
   availableFullPrompts?: Array<{ id: string; title?: string; name?: string; code?: string; shotPromptsJson?: string; hasHuman?: boolean; groupIndex?: number | null; albumName?: string | null }>;
+  products?: Array<{ title: string; props?: Record<string, string> }>;
   personaMode?: 'asset_driven' | 'none';
   setPersonaMode?: (mode: 'asset_driven' | 'none') => void;
 }

@@ -1,6 +1,6 @@
 import { WorkshopAppearanceSelection } from './WorkshopAppearanceSelection';
 import { isAppearanceRotation } from '@shared/domain/assets/appearanceSelection';
-import { isAutoPromptGroupSelection, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
+import { eligiblePromptGroups, isAutoPromptGroupSelection, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import { WorkshopAssetLockRow, type WorkshopAssetLockOption } from './WorkshopAssetLockRow';
 
 type GroupOption = WorkshopAssetLockOption & { shotPromptsJson?: string; hasHuman?: boolean; groupIndex?: number | null; albumName?: string | null };
@@ -9,15 +9,24 @@ export function WorkshopAssetBindings(props: {
   personaId: string; onPersonaChange: (id: string) => void; personas: WorkshopAssetLockOption[];
   sceneId: string; onSceneChange: (id: string) => void; scenes: WorkshopAssetLockOption[];
   outfitId: string; onOutfitChange: (id: string) => void; outfits: WorkshopAssetLockOption[];
+  products?: Array<{ title: string; props?: Record<string, string> }>;
+  personaMode?: 'asset_driven' | 'none';
 }) {
   const group = props.groups.find((item) => item.id === props.groupId);
   const shots = parseGroupShotSkeleton(group?.shotPromptsJson);
   const automatic = isAutoPromptGroupSelection(props.groupId);
   const appearance = group ? promptGroupAppearance(group) : undefined;
-  const filter = promptGroupAppearanceFilter(props.groupId);
+  const filter = props.personaMode === 'none' ? 'product' : promptGroupAppearanceFilter(props.groupId);
   const portraitCount = props.groups.filter(item => promptGroupAppearance(item) === 'human').length;
   const productCount = props.groups.filter(item => promptGroupAppearance(item) === 'product').length;
   const unknownCount = props.groups.length - portraitCount - productCount;
+  const candidateCounts = automatic ? (props.products || []).map(product =>
+    eligiblePromptGroups(props.groups, product.title, product.props, filter).length) : [];
+  const candidateSummary = candidateCounts.length === 1
+    ? `当前商品可轮询 ${candidateCounts[0]} 组`
+    : candidateCounts.length > 1
+      ? `当前批次 ${candidateCounts.length} 款商品各有 ${Math.min(...candidateCounts)}–${Math.max(...candidateCounts)} 组候选`
+      : '';
   const hasPortrait = automatic ? filter !== 'product' : appearance === 'human';
   const appearanceSelected = props.personaId !== 'auto' || props.outfitId !== 'auto';
   const replacementCount = Number(props.sceneId !== 'auto') + (hasPortrait ? Number(props.personaId !== 'auto') + Number(props.outfitId !== 'auto') : 0);
@@ -25,14 +34,14 @@ export function WorkshopAssetBindings(props: {
     <div className="rounded-lg bg-slate-50/70 p-3">
       <WorkshopAssetLockRow label="图组来源" prefix="R" value={props.groupId} onChange={props.onGroupChange} options={props.groups}
         specialOptions={[
-          { id: 'auto', label: `自动轮换 · 混合（${props.groups.length} 组）` },
-          { id: 'auto:human', label: `自动轮换 · 仅有人物（${portraitCount} 组）` },
-          { id: 'auto:product', label: `自动轮换 · 仅无人物（${productCount} 组）` },
+          { id: 'auto', label: `自动轮换 · 混合（库存 ${props.groups.length} 组）` },
+          { id: 'auto:human', label: `自动轮换 · 仅有人物（库存 ${portraitCount} 组）` },
+          { id: 'auto:product', label: `自动轮换 · 仅无人物（库存 ${productCount} 组）` },
         ]}
         optionLabel={option => {
           const candidate = option as GroupOption;
           return candidate.groupIndex
-            ? `组 ${candidate.groupIndex}${candidate.albumName ? ` · ${candidate.albumName}` : ''}`
+            ? `${candidate.albumName || candidate.title || '图组母本'} · 图集内组 ${candidate.groupIndex}`
             : candidate.title || '图组母本';
         }}
         optionSuffix={item => ` · ${promptGroupAppearance(item as GroupOption) === 'human' ? '有人物' : promptGroupAppearance(item as GroupOption) === 'product' ? '无人物' : '待判定'}`}
@@ -41,7 +50,7 @@ export function WorkshopAssetBindings(props: {
         ? <p className="mt-2 text-xs text-amber-700">选定图组已失效或尚未加载，请重新选择。</p>
         : <p className="mt-2 text-[11px] leading-5 text-slate-500">{group
           ? `本批次全部商品使用此${appearance === 'human' ? '有人物' : appearance === 'product' ? '无人物' : '待判定'}图组。保留逐镜顺序、构图、动作和出镜范围。`
-          : `每款商品按类目轮换${filter === 'human' ? '有人物' : filter === 'product' ? '无人物' : '全部'}四图母本，用完一轮后再重复。素材库内：有人物 ${portraitCount} 组、无人物 ${productCount} 组${unknownCount ? `、待判定 ${unknownCount} 组` : ''}。`}</p>}
+          : `每款商品按类目轮换${filter === 'human' ? '有人物' : filter === 'product' ? '无人物' : '全部'}四图母本，用完一轮后再重复。库存：有人物 ${portraitCount} 组、无人物 ${productCount} 组${unknownCount ? `、待判定 ${unknownCount} 组` : ''}。${candidateSummary ? ` ${candidateSummary}。` : ''}`}</p>}
       {automatic && filter && (filter === 'human' ? portraitCount : productCount) === 0 && <p className="mt-2 text-xs text-amber-700">当前出镜类型没有可用母本，请更换范围或在素材库发布完整四图组。</p>}
       {automatic && !filter && <p className="mt-2 rounded-md bg-indigo-50 px-2.5 py-2 text-[11px] leading-5 text-indigo-700">混合轮换时，仅明确标为有人物的母本会应用人物与穿搭替换；无人物或待判定母本保留原出镜范围，不会添加模特。若每款都需人物，请选“仅有人物”。{appearanceSelected && portraitCount === 0 ? ' 当前没有可应用人物替换的已标注母本。' : ''}</p>}
       {!automatic && appearance === 'unknown' && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-[11px] leading-5 text-amber-700">此母本出镜类型待判定，人物与穿搭暂不应用。请先在素材库修正母版标注。</p>}

@@ -105,6 +105,9 @@ export async function analyzeBatchProduct(
       : `${archObj.name} \n${archObj.promptSnippet || ''}`;
 
     const analyzeRun = beginProductAnalyze(item.id);
+    // One user-triggered analysis may be retried with the same ID, while a
+    // later "重新分析" should reserve the next mother in auto-rotation.
+    const analysisRunId = globalThis.crypto.randomUUID();
     const configSignature = JSON.stringify({
       revision: deps.getConfigRevision?.(),
       arch: deps.selectedArchId,
@@ -151,6 +154,7 @@ export async function analyzeBatchProduct(
           previousSceneIds: deps.batchSceneIdsRef?.current?.slice(-20) || [],
           batchId: deps.batchId,
           productId: item.id,
+          analysisRunId,
         })
       });
 
@@ -279,6 +283,8 @@ export async function analyzeBatchProduct(
         appliedFullPromptAlbumName: data?.assetTrace?.fullPromptAlbumName,
         appliedFullPromptSelectionMode: data?.assetTrace?.fullPromptSelectionMode,
         appliedFullPromptAppearance: data?.assetTrace?.fullPromptAppearance,
+        appliedFullPromptEligibleCount: data?.assetTrace?.fullPromptEligibleCount,
+        appliedFullPromptInventoryCount: data?.assetTrace?.fullPromptInventoryCount,
         productRole: formatted.productRole,
         productFingerprint: formatted.productFingerprint,
         lookParts: formatted.lookParts ?? lookPartsFromApi,
