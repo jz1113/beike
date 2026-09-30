@@ -1,5 +1,20 @@
 import { z } from 'zod';
 
+const assistantIdSchema = z.string().trim().min(1).max(255);
+
+export const assistantAttachmentSchema = z.object({
+  type: z.enum(['image', 'video', 'document']),
+  url: z.string().max(12_000_000).optional(),
+  name: z.string().max(1024).optional(),
+  extractedText: z.string().max(100_000).optional(),
+}).passthrough();
+
+export const assistantMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().max(100_000),
+  attachments: z.array(assistantAttachmentSchema).max(50).optional(),
+}).passthrough();
+
 export const workspaceSnapshotSchema = z.object({
   /** 仅用于理解当前可见工作区；不传原始媒体、完整提示词或画布坐标。 */
   workspaceType: z.enum(['canvas', 'workshop', 'generate', 'assets', 'home', 'other']).optional(),
@@ -47,9 +62,12 @@ export const mcpServerConfigSchema = z.object({
 
 export const turnStartBodySchema = z
   .object({
-    threadId: z.string().nullish(),
-    turnId: z.string().nullish(),
-    messages: z.array(z.unknown()).nullish(),
+    threadId: assistantIdSchema.nullish(),
+    turnId: assistantIdSchema.nullish(),
+    messages: z.array(assistantMessageSchema).min(1).max(500).refine(
+      (messages) => messages.some((message) => message.role === 'user' && (message.content.trim() || message.attachments?.length)),
+      '缺少用户消息或附件',
+    ),
     model: z.string().max(200).nullish(),
     reasoningEffort: z.enum(['auto', 'low', 'medium', 'high', 'xhigh']).optional().default('medium'),
     runMode: z.enum(['auto', 'plan', 'act']).optional().default('auto'),
@@ -79,13 +97,13 @@ export const turnStartBodySchema = z
   .passthrough();
 
 export const turnApproveBodySchema = z.object({
-  turnId: z.string().min(1),
-  approvalId: z.string().min(1),
+  turnId: assistantIdSchema,
+  approvalId: assistantIdSchema,
   decision: z.enum(['accept', 'decline', 'acceptForSession', 'cancel']),
 });
 
 export const turnInterruptBodySchema = z.object({
-  turnId: z.string().min(1),
+  turnId: assistantIdSchema,
 });
 
 export type TurnStartBody = z.infer<typeof turnStartBodySchema>;

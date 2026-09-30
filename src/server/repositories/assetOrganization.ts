@@ -6,8 +6,41 @@ import { requireWorkspaceId } from '../infrastructure/workspace/workspaceContext
 import { db } from './access';
 
 export const assetModels = { full_prompt: 'fullPromptAsset', persona: 'personaAsset', scene: 'sceneAsset', scene_bundle: 'sceneAsset', outfit: 'outfitAsset', action: 'actionAsset' } as const;
+export class AssetCategoryError extends Error {
+  readonly status = 400;
+}
 export async function validateProductIds(db: Prisma.TransactionClient, ids: string[]) {
   if ((await db.assetProductCategory.count({ where: { id: { in: ids } } })) !== ids.length) throw new Error('商品品类不存在');
+}
+
+/** A mother group belongs to one major product category, shared by every group in its album. */
+export async function validateMajorCategory(db: Prisma.TransactionClient, raw: unknown): Promise<string | null> {
+  if (typeof raw !== 'string') throw new AssetCategoryError('商品大类必须为 JSON 数组');
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new AssetCategoryError('商品大类必须为 JSON 数组'); }
+  if (!Array.isArray(parsed) || parsed.length > 1 || parsed.some(id => typeof id !== 'string' || !id.trim())) {
+    throw new AssetCategoryError('图组只能选择一个商品大类');
+  }
+  if (!parsed.length) return null;
+  const category = await db.assetProductCategory.findUnique({ where: { id: parsed[0] } });
+  if (!category) throw new AssetCategoryError('商品大类不存在');
+  if (category.parentId || category.isArchived) throw new AssetCategoryError('请选择可用的商品大类');
+  return category.id;
+}
+
+export async function setPromptAlbumMajorCategory(db: Prisma.TransactionClient, albumId: string, categoryId: string | null) {
+  const album = await db.promptAlbum.findUnique({ where: { id: albumId } });
+  if (!album) throw new AssetCategoryError('图集不存在');
+  if (album.workspaceId !== requireWorkspaceId()) throw new AssetCategoryError('官方图集不可修改');
+  await db.promptAlbum.update({ where: { id: albumId }, data: { productCategoryId: categoryId } });
+  await db.fullPromptAsset.updateMany({
+    where: { albumId },
+    data: {
+      productCategoryIds: JSON.stringify(categoryId ? [categoryId] : []),
+      productSubcategory: album.productCategoryId === categoryId ? undefined : null,
+      isUniversal: false,
+    },
+  });
 }
 export async function ensurePromptAlbum(db: Prisma.TransactionClient, data: { albumId?: unknown; albumName?: unknown; sourceImages?: unknown; productCategoryIds?: unknown }, fallback = randomUUID()) {
   if (data.albumId) return db.promptAlbum.findUniqueOrThrow({ where: { id: String(data.albumId) } });

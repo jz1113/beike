@@ -1,29 +1,35 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { compressImageToDataUrl } from '@client/shared/media/image-utils';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { DEFAULT_CATEGORIES, getMergedCategories, CategoryItem } from '@shared/domain/prompts/vision';
-import { pickOrderedMultimodalFallbacks, getEnabledMultimodalModelsFromSettings } from '@shared/domain/models/workflowModels';
-import '@shared/domain/media/drawing';
-import { getExternalScraperCredentials } from '@client/shared/utils/externalScraperCredentials';
+import { getEnabledMultimodalModelsFromSettings } from '@shared/domain/models/workflowModels';
+import { normalizeImageSource } from '@shared/domain/media/drawing';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 import type { ExtractedRecipeData } from './types';
+import { useStyleExtractSession } from './useStyleExtractSession';
+import { extractStyleRecipe, parseStyleReferences } from './styleExtractRequests';
 
 export interface UseStyleExtractWorkflowOptions {
   isOpen: boolean;
   onClose: () => void;
   onRecipeCreated?: (recipe: any) => void;
+  initialImages?: string[];
+  initialTitle?: string;
 }
 
 export function useStyleExtractWorkflow({
   isOpen,
   onClose,
   onRecipeCreated,
+  initialImages,
+  initialTitle,
 }: UseStyleExtractWorkflowOptions) {
   const { setSafeTimeout, clearSafeTimeout } = useSafeTimeout();
+  const initialImageKey = JSON.stringify(initialImages);
+  const sessionKey = JSON.stringify([isOpen, initialImageKey, initialTitle]);
+  const { active, capture, begin, isCurrent, finish } = useStyleExtractSession(sessionKey, isOpen);
 
   // 图源选择 Tab
   const [sourceType, setSourceType] = useState<'link' | 'upload' | 'url'>('link');
@@ -65,10 +71,32 @@ export function useStyleExtractWorkflow({
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // The collector hands over exactly the selected sources whenever this dialog opens.
+  useEffect(() => {
+    setIsCategoryManagerOpen(false);
+    setIsCreatingCategory(false);
+    setIsParsingLink(false);
+    setIsExtracting(false);
+    setIsSaving(false);
+    setToastMsg(null);
+    if (!isOpen || initialImageKey === undefined) return;
+    const images = [...new Set((JSON.parse(initialImageKey) as string[]).map(normalizeImageSource).filter(Boolean))];
+    setSourceType('link');
+    setParsedImages(images);
+    setParsedPostTitle(initialTitle || '已选采集素材');
+    setSelectedImages(images);
+    setVisibleCount(24);
+    setLinkInput('');
+    setExtractedRecipe(null);
+    setUserHint('');
+  }, [isOpen, initialImageKey, initialTitle]);
+
   const showToast = useCallback((msg: string) => {
+    const token = capture();
+    if (!token) return;
     setToastMsg(msg);
-    setSafeTimeout(() => setToastMsg(null), 2500);
-  }, [setSafeTimeout]);
+    setSafeTimeout(() => { if (active(token)) setToastMsg(null); }, 2500);
+  }, [active, capture, setSafeTimeout]);
 
   // 高性能轻量化本地图片压缩工具 (限制最大边长 1024px)
   const compressImageFile = useCallback((file: File): Promise<string> => {
@@ -103,8 +131,9 @@ export function useStyleExtractWorkflow({
         if (item.type.startsWith('image/')) {
           const file = item.getAsFile();
           if (file) {
+            const token = capture();
             compressImageFile(file).then((url) => {
-              if (url) {
+              if (url && active(token)) {
                 setSelectedImages((prev) => Array.from(new Set([...prev, url])));
                 showToast('🎉 已成功从剪贴板粘贴图片素材！');
               }
@@ -116,7 +145,7 @@ export function useStyleExtractWorkflow({
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isOpen, compressImageFile, showToast]);
+  }, [active, capture, isOpen, compressImageFile, showToast]);
 
   const handleCreateNewCategory = useCallback(() => {
     if (!newCategoryName.trim()) {
@@ -184,70 +213,13 @@ export function useStyleExtractWorkflow({
       return;
     }
 
+    const operation = begin('parse');
+    if (!operation) return;
     setIsParsingLink(true);
     try {
-      const { scraperId, scraperSecret } = await getExternalScraperCredentials();
-
-      const parseOneLine = (line: string) =>
-        apiFetch('/api/catalog/styles/parse-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: line,
-            text: line,
-            scraperId,
-            customScraperId: scraperId,
-            scraperSecret,
-            customApiKey: scraperSecret,
-          }),
-        }).then((res) => res.json());
-
-      const concurrency = 3;
-      const results: PromiseSettledResult<Record<string, unknown>>[] = new Array(lines.length);
-      let nextIdx = 0;
-
-      const worker = async () => {
-        while (true) {
-          const i = nextIdx++;
-          if (i >= lines.length) break;
-          try {
-            const value = await parseOneLine(lines[i]);
-            results[i] = { status: 'fulfilled', value };
-          } catch (reason) {
-            results[i] = { status: 'rejected', reason };
-          }
-        }
-      };
-
-      await Promise.all(Array.from({ length: Math.min(concurrency, lines.length) }, () => worker()));
-      const allExtractedImages: string[] = [];
-      const successfulTitles: string[] = [];
-      let failCount = 0;
-      let lastErr = '';
-
-      results.forEach((res) => {
-        if (res.status === 'fulfilled' && res.value?.success) {
-          const imgs =
-            Array.isArray(res.value.images) && res.value.images.length > 0
-              ? (res.value.images as string[])
-              : (res.value.cover ? [res.value.cover as string] : []);
-          if (imgs.length > 0) {
-            allExtractedImages.push(...imgs);
-          }
-          if (res.value.title) {
-            successfulTitles.push(String(res.value.title));
-          }
-        } else {
-          failCount++;
-          if (res.status === 'fulfilled' && res.value?.error) {
-            lastErr = String(res.value.error);
-          } else if (res.status === 'rejected' && res.reason?.message) {
-            lastErr = String(res.reason.message);
-          }
-        }
-      });
-
-      const uniqueExtractedImages = Array.from(new Set(allExtractedImages));
+      const { images: uniqueExtractedImages, titles: successfulTitles, failCount, lastError } =
+        await parseStyleReferences(lines, operation.controller.signal, () => isCurrent(operation));
+      if (!isCurrent(operation)) return;
 
       if (uniqueExtractedImages.length > 0) {
         setParsedImages(uniqueExtractedImages);
@@ -262,18 +234,20 @@ export function useStyleExtractWorkflow({
           showToast(`🎉 成功解析 ${uniqueExtractedImages.length} 张高清图片素材！`);
         }
       } else {
-        showToast(lastErr || '未能提取到图片，请确认链接有效');
+        showToast(lastError || '未能提取到图片，请确认链接有效');
       }
     } catch (e: unknown) {
-      alert(formatUserError(e, '解析失败，请检查网络或配置'));
+      if (isCurrent(operation)) alert(formatUserError(e, '解析失败，请检查网络或配置'));
     } finally {
-      setIsParsingLink(false);
+      if (finish(operation)) setIsParsingLink(false);
     }
-  }, [handleAutoSelectKeyShots, linkInput, showToast]);
+  }, [begin, finish, handleAutoSelectKeyShots, isCurrent, linkInput, showToast]);
 
   // 本地图片批量上传与压缩入库
   const ingestStyleImages = useCallback(
     async (files: File[]) => {
+      const token = capture();
+      if (!token) return;
       const validFiles = files.filter(
         (f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp|gif)$/i.test(f.name),
       );
@@ -284,13 +258,14 @@ export function useStyleExtractWorkflow({
 
       showToast(`正在批量压缩解析 ${validFiles.length} 张本地图片...`);
       const compressedResults = await Promise.all(validFiles.map((file) => compressImageFile(file)));
+      if (!active(token)) return;
       const validUrls = compressedResults.filter(Boolean);
       if (validUrls.length > 0) {
         setSelectedImages((prev) => Array.from(new Set([...prev, ...validUrls])));
         showToast(`🎉 成功添加 ${validUrls.length} 张高清参考图！`);
       }
     },
-    [compressImageFile, showToast],
+    [active, capture, compressImageFile, showToast],
   );
 
   const handleFileUpload = useCallback(
@@ -332,64 +307,32 @@ export function useStyleExtractWorkflow({
       return;
     }
 
+    const operation = begin('extract');
+    if (!operation) return;
     setIsExtracting(true);
     setExtractStepText('⚡ 正在提取并对齐图集特征...');
-    const t1 = setSafeTimeout(() => setExtractStepText('🎨 正在解构空间置景与光影色调...'), 1200);
-    const t2 = setSafeTimeout(() => setExtractStepText('✨ 正在封装品类专属生图配方...'), 2800);
-
-    const imagesToSend = selectedImages;
-    const { customBaseUrl: localUrl } = getGatewayClientOverrides();
+    const t1 = setSafeTimeout(() => { if (isCurrent(operation)) setExtractStepText('🎨 正在解构空间置景与光影色调...'); }, 1200);
+    const t2 = setSafeTimeout(() => { if (isCurrent(operation)) setExtractStepText('✨ 正在封装品类专属生图配方...'); }, 2800);
 
     try {
-      const res = await apiFetch('/api/catalog/styles/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrls: imagesToSend,
-          userHint: userHint.trim(),
-          model: extractModel,
-          fallbackModels: pickOrderedMultimodalFallbacks(
-            extractModel,
-            multimodalModels.map((m) => m.id).filter(Boolean),
-          ),
-          customBaseUrl: localUrl,
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || '风格提炼失败');
-      }
-
-      try {
-        const usedModel = data.model || extractModel;
-        const usage = data.usage || {};
-        const promptTokens = usage.promptTokens || 500;
-        const completionTokens = usage.completionTokens || 300;
-        recordModelUsage({
-          modelId: usedModel,
-          modelName: usedModel,
-          provider: resolveModelVendor(usedModel),
-          type: 'vision',
-          promptTokens,
-          completionTokens,
-          totalTokens: promptTokens + completionTokens,
-          mediaCount: imagesToSend.length,
-          success: true,
-        });
-      } catch {}
-
-      setExtractedRecipe(data.recipe);
+      if (!isCurrent(operation)) return;
+      const recipe = await extractStyleRecipe({ images: selectedImages, userHint, model: extractModel,
+        modelIds: multimodalModels.map((model) => model.id).filter(Boolean) }, operation.controller.signal, () => isCurrent(operation));
+      if (!isCurrent(operation)) return;
+      setExtractedRecipe(recipe);
       showToast('🎉 AI 风格逆向解构完成！');
     } catch (e: unknown) {
-      alert(formatUserError(e, 'AI 逆向提炼超时，请重试'));
+      if (isCurrent(operation)) alert(formatUserError(e, 'AI 逆向提炼超时，请重试'));
     } finally {
       clearSafeTimeout(t1);
       clearSafeTimeout(t2);
-      setIsExtracting(false);
+      if (finish(operation)) setIsExtracting(false);
     }
   }, [
     clearSafeTimeout,
+    begin,
+    finish,
+    isCurrent,
     extractModel,
     multimodalModels,
     selectedImages,
@@ -400,6 +343,8 @@ export function useStyleExtractWorkflow({
 
   // 保存至品类配方库
   const handleSaveRecipe = useCallback(async () => {
+    const token = capture();
+    if (!token) return;
     if (!extractedRecipe || !extractedRecipe.name || !extractedRecipe.promptSnippet) {
       showToast('请完善配方名称与提示词内容');
       return;
@@ -430,20 +375,22 @@ export function useStyleExtractWorkflow({
         throw new Error(data.error || '保存失败');
       }
 
-      showToast('🎉 配方已成功存入本地资产库！');
+      if (active(token)) showToast('🎉 配方已成功存入本地资产库！');
       if (onRecipeCreated) {
         onRecipeCreated(data.recipe);
       }
       setSafeTimeout(() => {
-        onClose();
+        if (active(token)) onClose();
       }, 600);
     } catch (e: unknown) {
-      alert(formatUserError(e, '保存配方失败'));
+      if (active(token)) alert(formatUserError(e, '保存配方失败'));
     } finally {
-      setIsSaving(false);
+      if (active(token)) setIsSaving(false);
     }
   }, [
     extractedRecipe,
+    active,
+    capture,
     linkInput,
     onClose,
     onRecipeCreated,
@@ -461,37 +408,26 @@ export function useStyleExtractWorkflow({
   }, [linkInput]);
 
   return {
-    sourceType,
-    setSourceType,
-    linkInput,
-    setLinkInput,
+    sourceType, setSourceType,
+    linkInput, setLinkInput,
     isParsingLink,
     parsedPostTitle,
     parsedImages,
-    urlInput,
-    setUrlInput,
-    selectedImages,
-    setSelectedImages,
+    urlInput, setUrlInput,
+    selectedImages, setSelectedImages,
     selectedSet,
-    visibleCount,
-    setVisibleCount,
-    extractModel,
-    setExtractModel,
+    visibleCount, setVisibleCount,
+    extractModel, setExtractModel,
     multimodalModels,
-    userHint,
-    setUserHint,
+    userHint, setUserHint,
     extractStepText,
     toastMsg,
     isExtracting,
-    extractedRecipe,
-    setExtractedRecipe,
+    extractedRecipe, setExtractedRecipe,
     categories,
-    isCreatingCategory,
-    setIsCreatingCategory,
-    isCategoryManagerOpen,
-    setIsCategoryManagerOpen,
-    newCategoryName,
-    setNewCategoryName,
+    isCreatingCategory, setIsCreatingCategory,
+    isCategoryManagerOpen, setIsCategoryManagerOpen,
+    newCategoryName, setNewCategoryName,
     isSaving,
     detectedLinkCount,
     showToast,

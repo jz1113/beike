@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const limit = Math.min(500, Math.max(1, Number(body?.limit) || 100));
     const cursor = typeof body?.cursor === 'string' && body.cursor ? body.cursor : undefined;
     const config = resolveStorageConfig(customConfig);
-    if (!config) {
+    if (!config?.enabled) {
       recordAuditEvent({ operation: 'storage.migrate', requestId, success: false, reason: 'missing-storage-config' });
       return jsonResponse({ success: false, error: '未配置有效的对象存储凭证，请先在设置中填写并开启存储配置' }, 400);
     }
@@ -45,6 +45,7 @@ export async function POST(req: Request) {
           category: isVideo ? 'generated/videos' : 'generated/images',
           customConfig: config,
         });
+        if (!permanentUrl) throw new Error('转存未返回可访问链接，已保留原链接');
         if (permanentUrl) {
           await imageTaskMigrationRepository.updateResultUrl(task.id, permanentUrl);
           migratedCount++;
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
       success: true,
       message: needMigrate.length === 0 && !hasMore
         ? '当前所有历史任务均为永久链接，无需迁移！'
-        : `🎉 批量迁移完成！成功转存 ${migratedCount} 条，失败 ${failedCount} 条`,
+        : `本批迁移完成，成功转存 ${migratedCount} 条，失败 ${failedCount} 条`,
       total: page.length,
       needMigrate: needMigrate.length,
       migrated: migratedCount,

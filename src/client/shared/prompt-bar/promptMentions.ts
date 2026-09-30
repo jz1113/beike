@@ -1,6 +1,7 @@
 import type { SubjectItem } from './promptBarConstants';
 import { mediaReferenceSlots } from '@client/shared/media/videoReferences';
-import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
+import { mentionTokenToName, parseSubjectMention } from '@shared/domain/prompts/prompt-engine/mentions';
+import { resolveRefMediaIdentity } from '@client/shared/media/refMediaRegistry';
 
 /** 🌟 核心主体与提及解析器 (支持 @主体、@主体1、图片原名、去除后缀、数字标号、{{Mixed 1}} 等全方位识别) */
 export function resolveSubjectByMention(
@@ -9,16 +10,23 @@ export function resolveSubjectByMention(
   quickRefImages: string[] = []
 ): SubjectItem | null {
   if (!mention) return null;
-  const clean = mention.replace(/^@/, '').replace(/[{}]/g, '').trim();
+  const selected = parseSubjectMention(mention);
+  if (selected) {
+    const url = resolveRefMediaIdentity(selected.id);
+    return allSubjects.find(subject => subject.url === url) ||
+      (url && quickRefImages.includes(url) ? { id: selected.id, name: selected.name, url } : null);
+  }
+  const clean = mentionTokenToName(mention);
   if (!clean) return null;
 
   const cleanLower = clean.toLowerCase();
   const cleanNoExt = clean.replace(/\.[^/.]+$/, '').toLowerCase();
   const cleanNormalized = clean.replace(/[\s_\-.]+/g, '').toLowerCase();
 
-  if (/^(图片|视频)\d+$/.test(clean) && (clean.startsWith('视频') || quickRefImages.some(isVideoMediaUrl))) {
+  if (/^(图片|视频)\d+$/.test(clean) && quickRefImages.length > 0) {
     const media = mediaReferenceSlots(quickRefImages).find(item => item.name === clean);
-    if (media) return { id: `ref-${clean}`, ...media };
+    if (media) return allSubjects.find(subject => subject.url === media.url) || { id: `ref-${clean}`, ...media };
+    return null;
   }
 
   // 1. 特殊全局关键词：@主体 / @模特 / @参考图 / @主图 / @商品图 -> 默认对应第 1 个主体
@@ -36,14 +44,15 @@ export function resolveSubjectByMention(
   if (seqMatch) {
     const idx = parseInt(seqMatch[1], 10) - 1;
     if (idx >= 0) {
-      if (allSubjects[idx]) return allSubjects[idx];
       if (quickRefImages[idx]) {
-        return {
+        return allSubjects.find(subject => subject.url === quickRefImages[idx]) || {
           id: `ref-${idx}`,
           name: `insp_${idx + 1}`,
           url: quickRefImages[idx],
         };
       }
+      if (quickRefImages.length > 0) return null;
+      if (allSubjects[idx]) return allSubjects[idx];
     }
   }
 

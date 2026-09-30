@@ -16,6 +16,7 @@ export interface BatchTaskCardProps {
   onRemove: (taskId: string) => void;
   onPreview: (url: string) => void;
   onDownloadZip?: (task: BatchTaskItem) => void;
+  retryDisabled?: boolean;
 }
 
 const BatchTaskCard = memo(function BatchTaskCard({
@@ -25,6 +26,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
   onRemove,
   onPreview,
   onDownloadZip,
+  retryDisabled = false,
 }: BatchTaskCardProps) {
   const videoCount = collectedVideos(task).length;
   const handleRetry = useCallback(async () => {
@@ -44,20 +46,21 @@ const BatchTaskCard = memo(function BatchTaskCard({
   }, [onDownloadZip, task]);
 
   return (
-    <div className="pt-2.5 first:pt-0 flex items-center justify-between gap-3 text-xs">
+    <div className="pt-2.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs" role="listitem">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <span className="w-5 text-slate-400 font-mono text-center flex-shrink-0">{index + 1}</span>
 
         {/* 封面或平台图标 */}
         {displayMediaSrc(task.coverImage) ? (
+          <button type="button" onClick={handlePreview} aria-label={`预览 ${task.title || '采集条目'} 的封面`} className="shrink-0">
           <img
             src={displayMediaSrc(task.coverImage)}
             alt=""
             referrerPolicy="no-referrer"
             onError={(e) => handleImgError(e, task.coverImage)}
             className="w-9 h-9 rounded-xl object-cover border border-slate-200 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={handlePreview}
           />
+          </button>
         ) : (
           <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 uppercase flex-shrink-0 text-[10px]">
             {task.platform}
@@ -76,7 +79,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
             )}
           </div>
           {task.status === 'failed' && task.error && (
-            <p className="text-[11px] text-rose-600 truncate mt-0.5" role="alert">
+            <p className="text-[11px] text-rose-600 break-words mt-0.5" role="alert">
               失败原因: {task.error}
             </p>
           )}
@@ -106,7 +109,9 @@ const BatchTaskCard = memo(function BatchTaskCard({
           <button
             type="button"
             onClick={handleRetry}
-            className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 hover:bg-rose-100 transition-colors cursor-pointer"
+            disabled={retryDisabled}
+            title={retryDisabled ? '请等待本轮采集结束后重试' : '重新采集此任务'}
+            className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={`重新采集任务 ${task.title || task.url}`}
           >
             <RefreshCw className="w-3 h-3" aria-hidden="true" />

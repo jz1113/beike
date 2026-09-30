@@ -1,158 +1,101 @@
-import { normalizeCollectedImages } from '../utils/normalizeCollectedImages';
-import { useState, useRef } from 'react';
-import { apiFetch } from '@client/shared/api/apiClient';
+import { useState, useRef, useEffect } from 'react';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { getExternalScraperCredentials } from '@client/shared/utils/externalScraperCredentials';
-import { parseSocialLinkWithRateLimit } from '@client/shared/utils/xhsLinkBatch';
-import { RateLimiter } from '@client/shared/utils/rateLimiter';
-import { detectPlatformFromText } from '../utils/collectorTypes';
-import { sanitizeCollectedItem } from '../utils/collectorUrls';
+import { getCollectorRateLimiter } from '../utils/collectorRateLimiter';
+import { detectPlatformFromText, extractUrlsFromRawText, type BatchTaskItem } from '../utils/collectorTypes';
+import { collectSourceMedia, type CollectedSourceItem } from '../utils/collectSourceMedia';
 
 interface UseSingleCollectOptions {
+  isOpen?: boolean;
   showToast: (msg: string) => void;
+  saveToCollectorHistory?: (item: CollectedSourceItem) => void;
 }
 
-export function useSingleCollect({
-  showToast,
-}: UseSingleCollectOptions) {
-  const [singlePlatform, setSinglePlatform] = useState<'auto' | 'jd' | 'taobao' | '1688' | 'pinduoduo' | 'social'>('auto');
+export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHistory }: UseSingleCollectOptions) {
+  const [singlePlatform, setSinglePlatform] = useState<BatchTaskItem['platform']>('auto');
   const [singleInput, setSingleInput] = useState('');
   const [isCollectingSingle, setIsCollectingSingle] = useState(false);
-  const [singleCollectedResult, setSingleCollectedResult] = useState<any | null>(null);
+  const [singleCollectedResult, setSingleCollectedResult] = useState<CollectedSourceItem | null>(null);
   const [selectedSingleImages, setSelectedSingleImages] = useState<string[]>([]);
   const [selectedVideo, setSelectedVideo] = useState(false);
   const [singleImageFilter, setSingleImageFilter] = useState<'all' | 'main' | 'sku' | 'desc' | 'video'>('all');
+  const [forceRefresh, setForceRefresh] = useState(false);
   const [aiAssistantPrompt, setAiAssistantPrompt] = useState('');
-  const socialRateLimiterRef = useRef(new RateLimiter(8.5));
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const isOpenRef = useRef(isOpen);
+  const aliveRef = useRef(true);
+  const submittedRef = useRef(false);
+  const socialRateLimiterRef = useRef(getCollectorRateLimiter());
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+    aliveRef.current = false;
+    isOpenRef.current = false;
+    if (!submittedRef.current) activeRequestRef.current?.abort();
+    };
+  }, []);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+    if (!isOpen && !submittedRef.current) activeRequestRef.current?.abort();
+  }, [isOpen]);
 
   const handleSingleCollect = async () => {
-    const query = singleInput.trim();
-    if (!query) {
-      showToast('⚠️ 请输入商品链接、数字 ID 或小红书/抖音等社媒作品链接');
+    if (activeRequestRef.current || !isOpenRef.current) return;
+    const candidates = extractUrlsFromRawText(singleInput.trim());
+    if (candidates.length !== 1) {
+      showToast(candidates.length > 1 ? '识别到多条链接或 ID，请使用批量采集' : '请输入有效的商品链接、商品 ID 或社媒作品链接');
+      return;
+    }
+    const query = candidates[0];
+    const detectedPlatform = detectPlatformFromText(query);
+    if (detectedPlatform === 'auto') {
+      showToast('暂不支持该链接平台，请使用京东、淘宝、1688、拼多多或支持的社媒作品链接');
+      return;
+    }
+    const platform = singlePlatform === 'auto' ? detectedPlatform : singlePlatform;
+    if (/^\d+$/.test(query) && platform === 'social') {
+      showToast('社媒采集需要作品链接，请粘贴完整分享链接');
+      return;
+    }
+    if (!/^\d+$/.test(query) && singlePlatform !== 'auto' && platform !== detectedPlatform) {
+      showToast('链接与所选平台不匹配，请切换为智能识别或选择对应平台');
       return;
     }
 
-    const platform = singlePlatform === 'auto' ? detectPlatformFromText(query) : singlePlatform;
+    const request = new AbortController();
+    activeRequestRef.current = request;
+    submittedRef.current = false;
     setIsCollectingSingle(true);
-
+    setSingleInput(query);
+    const isCurrent = () => activeRequestRef.current === request && !request.signal.aborted && aliveRef.current;
     try {
-      if (platform === 'social') {
-        const { scraperId, scraperSecret } = await getExternalScraperCredentials();
-        const parsed = await parseSocialLinkWithRateLimit(
-          query,
-          scraperId,
-          scraperSecret,
-          socialRateLimiterRef.current,
-        );
-
-        if (parsed.success) {
-          const result = parsed.data;
-          const images = Array.isArray(result.images) ? result.images : [];
-          const videos = Array.from(new Set([
-            ...(Array.isArray(result.videos) ? result.videos : []),
-            result.video,
-          ].filter((url): url is string => typeof url === 'string' && Boolean(url))));
-
-          const parsedItem = {
-            id: `social_${Date.now()}`,
-            type: 'social',
-            title: result.title || '社媒爆款图集素材',
-            description: result.description || '',
-            author: result.author || '社媒达人',
-            coverImage: result.cover || images[0] || '',
-            images: images,
-            video: videos[0] || null,
-            videos,
-            sourceUrl: query,
-            importOrder: Date.now(),
-            time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-          };
-
-          const sanitized = sanitizeCollectedItem(parsedItem);
-          setSingleCollectedResult(sanitized);
-          setSelectedSingleImages(sanitized.images || []);
-          setSelectedVideo(Boolean(sanitized.video));
-          setSingleImageFilter('all');
-          const imgN = sanitized.images?.length || 0;
-          const videoN = Array.isArray(sanitized.videos) ? sanitized.videos.length : 0;
-          const hasVid = videoN > 0;
-          showToast(
-            hasVid
-              ? `🎉 成功解析${imgN > 0 ? ` ${imgN} 张图` : ''} + ${videoN} 条视频/动态！`
-              : `🎉 成功解析 ${imgN} 张高清无水印社媒图集！`,
-          );
-        } else {
-          showToast(`❌ 社媒解析失败: ${parsed.error || '未能提取到图片内容'}`);
-        }
-      } else {
-        // 电商商品采集专线 (带 30s 请求超时)
-        const res = await apiFetch('/api/catalog/collect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(30_000),
-          body: JSON.stringify({
-            url: query,
-            platform: platform,
-          }),
-        });
-
-        const data = await res.json();
-        if (data.success && data.product) {
-          const prod = data.product;
-          const { mainImgs, skuImgs, descImgs, allImgs, coverImg } = normalizeCollectedImages(data);
-
-          const parsedItem = {
-            id: `ecom_${prod.skuId || prod.itemId || Date.now()}`,
-            type: 'ecommerce',
-            platform: prod.platform || platform,
-            title: prod.title || '电商精选商品素材',
-            price: prod.price || 0,
-            category: prod.category || '数码家电/服饰美妆',
-            skuId: prod.skuId || prod.itemId || query,
-            coverImage: coverImg,
-            images: allImgs,
-            mainImages: mainImgs,
-            skuImages: skuImgs,
-            descImages: descImgs,
-            props: prod.props || data.images?.props || {},
-            sourceUrl: query,
-            importOrder: Date.now(),
-            time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-          };
-
-          const sanitized = sanitizeCollectedItem(parsedItem);
-          setSingleCollectedResult(sanitized);
-          setSelectedSingleImages(sanitized.images || []);
-          setSelectedVideo(false);
-          setSingleImageFilter('all');
-          showToast(`🎉 成功解析商品「${sanitized.title}」，共 ${sanitized.images.length} 张高清无水印素材！`);
-        } else {
-          showToast(`❌ 采集失败: ${data.error || '未能获取到商品主图'}`);
-        }
-      }
-    } catch (err: unknown) {
-      showToast(`❌ 采集网络异常: ${formatUserError(err, '请检查接口与网络')}`);
+      const result = await collectSourceMedia(query, platform, forceRefresh, socialRateLimiterRef.current, request.signal, {
+        shouldStop: () => !isOpenRef.current || !aliveRef.current,
+        onSubmitted: () => { submittedRef.current = true; },
+      });
+      if (!isCurrent()) return;
+      setSingleCollectedResult(result);
+      setSelectedSingleImages(result.images);
+      setSelectedVideo(Boolean(result.video));
+      setSingleImageFilter('all');
+      setAiAssistantPrompt('');
+      saveToCollectorHistory?.(result);
+      if (isOpenRef.current) showToast(`已采集「${result.title}」：${result.images.length} 张图片${result.videos?.length ? ` + ${result.videos.length} 条原视频/动态` : ''}`);
+    } catch (error) {
+      if (isCurrent() && isOpenRef.current) showToast(`采集失败：${formatUserError(error, '请检查链接与网络')}`);
     } finally {
-      setIsCollectingSingle(false);
+      if (activeRequestRef.current === request) {
+        activeRequestRef.current = null;
+        submittedRef.current = false;
+        if (aliveRef.current) setIsCollectingSingle(false);
+      }
     }
   };
 
   return {
-    singlePlatform,
-    setSinglePlatform,
-    singleInput,
-    setSingleInput,
-    isCollectingSingle,
-    singleCollectedResult,
-    setSingleCollectedResult,
-    selectedSingleImages,
-    setSelectedSingleImages,
-    selectedVideo,
-    setSelectedVideo,
-    singleImageFilter,
-    setSingleImageFilter,
-    aiAssistantPrompt,
-    setAiAssistantPrompt,
-    handleSingleCollect,
+    singlePlatform, setSinglePlatform, singleInput, setSingleInput, isCollectingSingle,
+    singleCollectedResult, setSingleCollectedResult, selectedSingleImages, setSelectedSingleImages,
+    selectedVideo, setSelectedVideo, singleImageFilter, setSingleImageFilter, forceRefresh, setForceRefresh,
+    aiAssistantPrompt, setAiAssistantPrompt, handleSingleCollect,
   };
 }

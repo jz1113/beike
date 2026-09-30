@@ -2,6 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import { lookup } from 'dns/promises';
 import net from 'net';
+import { getWorkspaceId } from '../workspace/workspaceContext';
+import { isWorkspaceStorageRel } from '../storage/storagePaths';
 
 const ALLOWED_HOST_SUFFIXES = [
   'alicdn.com',
@@ -114,6 +116,21 @@ const BLOCKED_HOSTS = new Set([
 
 export function isPrivateIp(ip: string): boolean {
   const raw = ip.replace(/^\[|\]$/g, '').toLowerCase();
+  if (net.isIP(raw) === 6) {
+    // WHATWG URLs canonicalize IPv4-mapped IPv6 to hex, e.g. ::ffff:7f00:1.
+    const canonical = new URL(`http://[${raw}]/`).hostname.slice(1, -1);
+    const [left, right = ''] = canonical.split('::');
+    const before = left ? left.split(':') : [];
+    const after = right ? right.split(':') : [];
+    const parts = [...before, ...Array(Math.max(0, 8 - before.length - after.length)).fill('0'), ...after].map((part) => Number.parseInt(part, 16));
+    if (parts.every((part) => part === 0) || parts.slice(0, 7).every((part) => part === 0) && parts[7] === 1) return true;
+    if ((parts[0] & 0xfe00) === 0xfc00 || (parts[0] & 0xffc0) === 0xfe80 || (parts[0] & 0xffc0) === 0xfec0 || (parts[0] & 0xff00) === 0xff00) return true;
+    const translated = parts[0] === 0x64 && parts[1] === 0xff9b && parts.slice(2, 6).every((part) => part === 0);
+    if (translated || parts.slice(0, 5).every((part) => part === 0) && (parts[5] === 0xffff || parts[5] === 0)) {
+      return isPrivateIp(`${parts[6] >> 8}.${parts[6] & 255}.${parts[7] >> 8}.${parts[7] & 255}`);
+    }
+    return parts[0] === 0x2001 && parts[1] === 0xdb8;
+  }
   const mapped = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
   if (mapped === '::1' || mapped === '0.0.0.0') return true;
   if (mapped.startsWith('fe80:') || mapped.startsWith('fc') || mapped.startsWith('fd')) return true;
@@ -135,6 +152,8 @@ export function isPrivateIp(ip: string): boolean {
   if (a === 192 && b === 0 && parts[2] <= 2) return true;
   if (a === 198 && b === 51 && parts[2] === 100) return true;
   if (a === 203 && b === 0 && parts[2] === 113) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  if (a >= 224) return true;
   return false;
 }
 
@@ -189,13 +208,16 @@ export async function assertSafeRemoteUrl(
   if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
     throw new Error('Only https URLs allowed in production');
   }
-  const hostname = parsed.hostname.toLowerCase();
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (BLOCKED_HOSTS.has(hostname) || isPrivateIp(hostname)) {
     throw new Error('Host not allowed');
   }
   if (opts.requireAllowlist && !isAllowedRemoteHost(hostname)) {
     throw new Error(`Host not allowed: ${hostname}`);
   }
+
+  if (parsed.username || parsed.password) throw new Error('地址不得包含账号或密码');
+  if (net.isIP(hostname)) return parsed;
 
   // 检查 DNS 高速缓存
   const cachedDns = dnsCache.get(hostname);
@@ -231,11 +253,18 @@ function resolveUnderRoot(root: string, relative: string): string | null {
     return null;
   }
   if (!fs.existsSync(resolved)) return null;
-  return resolved;
+  try {
+    const canonicalRoot = fs.realpathSync(root);
+    const canonicalFile = fs.realpathSync(resolved);
+    if (!canonicalFile.startsWith(canonicalRoot + path.sep) || !fs.statSync(canonicalFile).isFile()) return null;
+    return canonicalFile;
+  } catch { return null; }
 }
 
 /** 将相对路径安全解析到 public 或桌面数据目录内，阻止路径穿越 */
 export function resolvePublicPath(relUrl: string): string | null {
+  const workspaceId = getWorkspaceId();
+  if (workspaceId && relUrl.startsWith('/storage/') && !isWorkspaceStorageRel(relUrl.slice('/storage/'.length).split(/[?#]/)[0], workspaceId)) return null;
   const cleanPath = relUrl.split('?')[0].split('#')[0];
   const relative = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
   const publicRoots = [

@@ -7,10 +7,11 @@
  * - 高峰期自动丢弃最新事件（队列上限 5000），优先保证流式响应
  */
 
-import { upsertAssistantTurnItem } from '@server/repositories/assistantPersistence';
 import type { AssistantItem } from '@shared/domain/assistant/types';
-import { extractItemFields } from '@server/repositories/assistantTurnPersist';
+import { upsertItem } from '@server/repositories/assistantTurnPersist';
+
 import { requireWorkspaceId, runWithWorkspace } from '@server/infrastructure/workspace/workspaceContext';
+const scopedKey = (workspaceId: string, turnId: string) => JSON.stringify([workspaceId, turnId]);
 
 const QUEUE_MAX = 5000;
 const RETRY_LIMIT = 3;
@@ -25,6 +26,14 @@ interface PersistTask {
 const queue: PersistTask[] = [];
 let drainPromise: Promise<void> | null = null;
 let droppedCount = 0;
+const discardedTurns = new Set<string>();
+
+/** Deletion discards queued and future writes for its turns; unrelated threads keep running. */
+export function discardQueuedTurnItems(turnIds: string[]): void {
+  const workspaceId = requireWorkspaceId();
+  for (const turnId of turnIds) discardedTurns.add(scopedKey(workspaceId, turnId));
+  for (let index = queue.length - 1; index >= 0; index--) if (discardedTurns.has(scopedKey(queue[index].workspaceId, queue[index].turnId))) queue.splice(index, 1);
+}
 
 export function getDroppedItemCount(): number {
   return droppedCount;
@@ -33,22 +42,17 @@ export function getDroppedItemCount(): number {
 function enqueue(task: PersistTask): void {
   if (queue.length >= QUEUE_MAX) {
     droppedCount += 1;
-    const dropped = queue.shift();
-    console.warn('[ItemPersistQueue] queue full, dropped oldest event', {
-      droppedCount,
-      droppedTurnId: dropped?.turnId,
-      droppedItemId: dropped?.item.id,
-    });
+    queue.shift();
   }
   queue.push(task);
 }
 
 /** 收到 SSE item 事件时调用：把当前 item 状态入队 */
 export function enqueueItemPersist(turnId: string, item: AssistantItem): void {
-  if (!turnId || !item?.id) return;
+  const workspaceId = requireWorkspaceId();
+  if (!turnId || !item?.id || discardedTurns.has(scopedKey(workspaceId, turnId))) return;
   // 去重：如果最新一条同 id 且 status 相同则跳过；否则替换
   const last = queue[queue.length - 1];
-  const workspaceId = requireWorkspaceId();
   if (last && last.turnId === turnId && last.item.id === item.id && last.workspaceId === workspaceId) {
     queue[queue.length - 1] = { ...last, item };
     return;
@@ -57,21 +61,21 @@ export function enqueueItemPersist(turnId: string, item: AssistantItem): void {
 }
 
 async function persistOne(task: PersistTask): Promise<void> {
-  const fields = extractItemFields(task.item);
-  await upsertAssistantTurnItem(task.item.id, task.turnId, task.item.createdAt, fields);
+  if (!discardedTurns.has(scopedKey(task.workspaceId, task.turnId))) await runWithWorkspace(task.workspaceId, () => upsertItem(task.turnId, task.item));
 }
 
 async function drainLoop(opts?: { throwOnError?: boolean }): Promise<void> {
   if (drainPromise) return drainPromise;
+  if (queue.length === 0) return;
   drainPromise = (async () => {
     try {
       while (queue.length > 0) {
         const task = queue.shift()!;
         try {
-          await runWithWorkspace(task.workspaceId, () => persistOne(task));
+          await persistOne(task);
         } catch (err) {
           task.attempts += 1;
-          const newerQueued = queue.some((queued) => queued.turnId === task.turnId && queued.item.id === task.item.id);
+          const newerQueued = queue.some((queued) => queued.turnId === task.turnId && queued.item.id === task.item.id && queued.workspaceId === task.workspaceId);
           if (newerQueued) continue;
           if (opts?.throwOnError || task.attempts < RETRY_LIMIT) {
             enqueue(task);

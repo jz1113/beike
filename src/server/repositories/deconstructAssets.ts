@@ -12,6 +12,7 @@ import {
 } from '@shared/domain/assets/assetDeconstruct/validate';
 import type { PerImageResult } from '@shared/domain/assets/assetDeconstruct/prompts';
 import { persistFullPromptRecords } from './deconstructFullPrompts';
+import { validateDeconstructTargetSubcategory } from './deconstructProductCategory';
 import { hasReusableOutfitText, isObservedDetail } from '@shared/domain/assets/assetDeconstruct/visualEvidence';
 
 export interface SavedRecords {
@@ -62,12 +63,14 @@ export async function persistDeconstructedAssets(params: {
   isSingleImage: boolean;
   category: string;
   productCategoryId?: string | null;
+  targetSubcategory?: string | null;
   sourceKey?: string;
   reviewId?: string;
   fullPromptOnly?: boolean;
   provenance?: string;
 }): Promise<SavedRecords> {
   const { parsedResult, perImageResults, imageUrls, albumName, isSingleImage, category, productCategoryId, sourceKey } = params;
+  await validateDeconstructTargetSubcategory(params.targetSubcategory, productCategoryId);
 
   const savedRecords: SavedRecords = {
     scenes: [],
@@ -98,6 +101,7 @@ export async function persistDeconstructedAssets(params: {
 
   const persisted = await persistFullPromptRecords({
     parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey,
+    targetSubcategory: params.targetSubcategory,
     sampleImagesJson, thumbForUrl, defaultCoverUrl, provenance: params.provenance,
   });
   savedRecords.fullPrompts = persisted.fullPrompts;

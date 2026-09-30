@@ -1,4 +1,7 @@
 import { runCodeSandbox } from '../codeSandbox';
+import { parseToolArguments } from '../toolArguments';
+import { formatToolError } from '../toolSafety';
+import { localUrlToDataUrl } from '@server/infrastructure/media/videoResources';
 export { runNonStreamingToolRound } from './nonStreamingRound';
 import { toolCallKey } from '../executionBudget';
 import type { AgentLoopOptions, ToolCallTask, ToolTaskResult } from './types';
@@ -13,8 +16,7 @@ import {
   type ToolExecContext,
 } from '../toolRegistry';
 import { mcpBridge } from '../mcpBridge';
-import type { McpServerConfig } from '@shared/domain/assistant/types';
-import '../../media/videoDeconstructService';
+import type { ApprovalDecision, McpServerConfig } from '@shared/domain/assistant/types';
 import { mapWithConcurrency } from '@shared/domain/core/asyncPool';
 import { BUILTIN_ASSISTANT_SKILLS, type AssistantSkill } from '@shared/domain/assistant/skills';
 
@@ -82,12 +84,7 @@ export async function executeToolCall(
   mcpServers: McpServerConfig[],
 ): Promise<string> {
   if (fnName.startsWith('mcp_')) {
-    let args: Record<string, unknown> = {};
-    try {
-      args = argsStr ? JSON.parse(argsStr) : {};
-    } catch {
-      args = {};
-    }
+    const args = parseToolArguments(fnName, argsStr);
     return mcpBridge.callTool(mcpServers, fnName, args, ctx.signal);
   }
   if (fnName === 'spawn_subagent') {
@@ -140,7 +137,8 @@ export async function runSingleTask(
     send: (evt: AssistantSSEEvent) => void;
   },
 ): Promise<ToolTaskResult> {
-  const { call, toolItemId, argsParsed } = task;
+  const { call, toolItemId } = task;
+  let argsParsed: Record<string, unknown>;
   const { opts, runtime, sessionApprovals, send } = ctx;
   const fnName = call.name;
   const displayName = toolDisplayName(fnName);
@@ -149,12 +147,10 @@ export async function runSingleTask(
     return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: '工具未授权或任务已停止' }), visualImages: [], declined: false };
   }
 
-  // Validate the actual wire arguments, including sandbox and MCP calls, before any side effect.
-  try {
-    const args = JSON.parse(call.arguments || '{}');
-    if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('invalid');
-  } catch {
-    return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: '工具参数必须为有效 JSON 对象' }), visualImages: [], declined: false };
+  // The budget, approval dialog and execution must all use the exact validated wire arguments.
+  try { argsParsed = parseToolArguments(fnName, call.arguments || '{}'); }
+  catch (error) {
+    return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: formatToolError(error, '工具参数无效') }), visualImages: [], declined: false };
   }
   const budgetError = opts.budget?.consumeTool(fnName, argsParsed);
   if (budgetError) return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: budgetError }), visualImages: [], declined: false };
@@ -197,7 +193,7 @@ export async function runSingleTask(
       });
       return { index: task.index, call, toolItemId, result: JSON.stringify({ success: true, sandbox: 'quickjs-wasm', ...result, productWidget }), visualImages, declined: false };
     } catch (error) {
-      return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }), visualImages: [], declined: false };
+      return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: formatToolError(error) }), visualImages: [], declined: false };
     } finally {
       controller.abort();
     }
@@ -209,21 +205,18 @@ export async function runSingleTask(
   }
   if (needsApproval(fnName, sessionApprovals) && opts.approvalWaiter) {
     const approvalId = runtime.requestApproval(fnName, displayName, argsParsed);
-    const decision = await opts.approvalWaiter.waitForApproval(
-      opts.turnId,
-      approvalId,
-      fnName,
-      displayName,
-      argsParsed,
-      send,
-      opts.signal,
-    );
+    let decision: ApprovalDecision;
+    try {
+      const raw = await opts.approvalWaiter.waitForApproval(opts.turnId, approvalId, fnName, displayName, argsParsed, send, opts.signal);
+      decision = ['accept', 'acceptForSession', 'decline', 'cancel'].includes(raw) ? raw : 'cancel';
+    } catch {
+      decision = 'cancel';
+    }
     runtime.resolveApproval(approvalId, decision);
-
     if (decision === 'decline' || decision === 'cancel') {
-      const declineResult = JSON.stringify({ success: false, error: '用户拒绝了此操作' });
-      runtime.completeToolCall(toolItemId, { status: 'error', summary: '用户已拒绝' });
-      return { index: task.index, call, toolItemId, result: declineResult, visualImages: [], declined: true };
+      const message = decision === 'cancel' ? '审批已取消或任务已停止' : '用户拒绝了此操作';
+      runtime.completeToolCall(toolItemId, { status: decision === 'cancel' ? 'cancelled' : 'error', summary: message });
+      return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: message }), visualImages: [], declined: true };
     }
     if (decision === 'acceptForSession' && getToolDefinition(fnName)?.approval === 'per_session') {
       sessionApprovals.add(fnName);
@@ -281,6 +274,8 @@ export async function runSingleTask(
         success: subResult.success,
         subTurnId: subResult.subTurnId,
         summary,
+        output: subResult.output,
+        outputTruncated: subResult.outputTruncated,
         items: subResult.items.length,
         ...(subResult.error ? { error: subResult.error } : {}),
       });
@@ -292,7 +287,7 @@ export async function runSingleTask(
       });
       return { index: task.index, call, toolItemId, result: subResultText, visualImages, declined: false };
     } catch (subErr: unknown) {
-      const errMsg = subErr instanceof Error ? subErr.message : String(subErr);
+      const errMsg = formatToolError(subErr, '子代理执行失败');
       runtime.completeItem(subItemId, 'error');
       const failResult = JSON.stringify({ success: false, error: errMsg });
       runtime.completeToolCall(toolItemId, {
@@ -315,7 +310,7 @@ export async function runSingleTask(
   try { result = await execution; }
   catch (error) {
     opts.readToolCache?.delete(cacheKey);
-    result = JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) });
+    result = JSON.stringify({ success: false, error: formatToolError(error) });
   }
   if (opts.signal?.aborted) return { index: task.index, call, toolItemId, result: JSON.stringify({ success: false, error: '任务已停止，未应用后续操作' }), visualImages: [], declined: false };
   if (/"success"\s*:\s*false/.test(result)) opts.readToolCache?.delete(cacheKey);
@@ -329,13 +324,15 @@ export async function runSingleTask(
     if (Array.isArray(parsed._visualImages) && parsed._visualImages.length > 0) {
       const raw = parsed._visualImages.slice(0, MAX_VISUAL_IMAGES);
       for (const img of raw) {
-        if (typeof img.url !== 'string' || !/^(?:https?:\/\/|\/storage\/|data:image\/(?:png|jpe?g|webp);base64,)/i.test(img.url)) continue;
+        if (!img || typeof img.url !== 'string' || !/^(?:https?:\/\/|\/storage\/|data:image\/(?:png|jpe?g|webp);base64,)/i.test(img.url)) continue;
         if (img.url.startsWith('data:')) {
           const b64 = img.url.split(',')[1] || '';
           const bytes = Math.ceil((b64.length * 3) / 4);
           if (bytes > MAX_VISUAL_IMAGE_BYTES) continue;
         }
-        visualImages.push({ url: img.url, label: typeof img.label === 'string' ? img.label : undefined });
+        const url = localUrlToDataUrl(img.url);
+        if (!url) continue;
+        visualImages.push({ url, label: typeof img.label === 'string' ? img.label : undefined });
       }
     }
   } catch {

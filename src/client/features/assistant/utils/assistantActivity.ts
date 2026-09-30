@@ -26,7 +26,7 @@ export function activityEntries(items: AssistantItem[], isSending: boolean, lega
       return [{ id: item.id, name: item.name, label: item.displayName || item.name, kind: 'tool',
         status: state === 'running' && !isSending ? 'interrupted' : state,
         target: activityTarget(item.args), summary: result?.summary, args: item.args, action: result?.action,
-        startedAt: item.createdAt, endedAt: result?.createdAt }];
+        startedAt: item.createdAt, endedAt: result?.createdAt, images: result?.visualImages }];
     }
     if (item.kind === 'subAgent') return [{ id:item.id, name:item.skillId, label:'子智能体', kind:'agent', target:item.prompt,
       status: item.status === 'completed' ? 'done' : item.status === 'failed' ? 'error' : isSending ? 'running' : 'interrupted',

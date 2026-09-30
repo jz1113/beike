@@ -33,8 +33,18 @@ export function inferProductCategoryAndAnatomy(
     };
   }
 
+  // 商品本体标题优先于规格里的“包装清单”等附带信息。
+  if (isPhoneProduct(title || undefined)) {
+    return {
+      primaryCategory: 'digital',
+      targetAnatomy: 'hand',
+      categoryTags: ['digital', 'hand', 'phone', 'all'],
+      subType: 'phone',
+    };
+  }
+
   // 2. 箱包皮具 (Bag)
-  if (/包|手袋|托特包|单肩包|斜挎包|双肩包|手提包|水桶包|链条包|胸包|腰包|钱包|卡包|bag|tote|backpack|crossbody/i.test(text)) {
+  if (/箱包|包袋|女包|男包|包包|小方包|皮包|手袋|托特包|单肩包|斜挎包|双肩包|手提包|水桶包|链条包|胸包|腰包|钱包|卡包|bag|tote|backpack|crossbody/i.test(text)) {
     return {
       primaryCategory: 'bag',
       targetAnatomy: 'hand',
@@ -86,16 +96,8 @@ export function inferProductCategoryAndAnatomy(
     };
   }
 
-  // 7. 3C数码：先识别在售手机本体，再识别壳/耳机等配件与日用数码
-  if (isPhoneProduct(title || undefined)) {
-    return {
-      primaryCategory: 'digital',
-      targetAnatomy: 'hand',
-      categoryTags: ['digital', 'hand', 'phone', 'all'],
-      subType: 'phone',
-    };
-  }
-  if (/手机壳|耳机|蓝牙耳机|头戴式|数码|平板|保温杯|咖啡杯|水杯|phonecase|headphones|mug/i.test(text)) {
+  // 7. 3C数码配件与日用数码
+  if (/手机壳|耳机|蓝牙耳机|头戴式|数码|平板|充电器|充电头|充电宝|移动电源|数据线|充电线|无线充|手机支架|智能手表|手环|蓝牙音箱|路由器|保温杯|咖啡杯|水杯|phone\s*case|headphones|earbuds|power\s*bank|charger|smartwatch|router|mug/i.test(text)) {
     return {
       primaryCategory: 'digital',
       targetAnatomy: 'hand',

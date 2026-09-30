@@ -1,5 +1,5 @@
 import { OFFICIAL_WORKSPACE_ID } from '@server/infrastructure/workspace/workspaceContext';
-import { saveStyleRecipe, deleteStyleRecipe, listStyleRecipes, createStyleRecipe, type StyleRecipeChanges } from '../../repositories/styleRecipe';
+import { saveStyleRecipe, deleteStyleRecipe, listStyleRecipes, listHiddenOfficialStyleRecipes, restoreOfficialStyleRecipe, createStyleRecipe, type StyleRecipeChanges } from '../../repositories/styleRecipe';
 import { jsonResponse } from '../../core/http';
 import { readJsonBody } from '../../core/validate';
 
@@ -11,7 +11,10 @@ export async function GET(req: Request) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10) || 50));
 
-    const { total, recipes } = await listStyleRecipes(category, page, pageSize);
+    const [{ total, recipes }, hiddenOfficialRecipes] = await Promise.all([
+      listStyleRecipes(category, page, pageSize),
+      listHiddenOfficialStyleRecipes(),
+    ]);
 
     return jsonResponse({
       success: true,
@@ -19,6 +22,7 @@ export async function GET(req: Request) {
       pageSize,
       total,
       recipes: recipes.map(({ workspaceId, ...recipe }) => ({ ...recipe, isOfficial: workspaceId === OFFICIAL_WORKSPACE_ID })),
+      hiddenOfficialRecipes,
     });
   } catch (error: unknown) {
     console.error('[StyleRecipe] GET 异常:', error);
@@ -36,6 +40,17 @@ export async function POST(req: Request) {
       const { upsertOfficialMasterRecipes } = await import('@server/infrastructure/database/officialCatalogSeed');
       await upsertOfficialMasterRecipes();
       return jsonResponse({ success: true, message: '官方预置品类拍摄大架构已全面更新至 V6.0 资产库联动版' });
+    }
+
+    if (action === 'restore') {
+      const body = await readJsonBody(req);
+      const id = typeof body.id === 'string' ? body.id.trim() : '';
+      if (!id) return jsonResponse({ success: false, code: 'invalid_id', error: '缺少官方架构 id' }, 400);
+
+      const status = await restoreOfficialStyleRecipe(id);
+      if (status === 'not_found') return jsonResponse({ success: false, code: status, error: '官方架构不存在' }, 404);
+      if (status === 'not_official') return jsonResponse({ success: false, code: status, error: '只能恢复官方架构' }, 400);
+      return jsonResponse({ success: true, id, status });
     }
 
     const body = await readJsonBody(req);

@@ -1,9 +1,10 @@
 /**
- * 贝壳云图 · 2×2 四宫格智能无损切片工具 (Grid Slicer)
- * 将单张 2×2 拼图大图快速、无损均分为 4 张独立分镜高清图片 (左上、右上、左下、右下)
+ * 贝壳云图 · 2×2 四宫格切片工具 (Grid Slicer)
+ * 去除分隔边，按目标宽高等比裁切与缩放，顺序为左上、右上、左下、右下。
  */
 
 import { dataUrlToBlob, fetchMediaBlob } from '@client/shared/media/downloadMedia';
+import { assertOutputDimensions } from '@shared/domain/media/outputDimensions';
 
 export interface SlicedShots {
   shot1Url: string; // 左上
@@ -43,7 +44,9 @@ async function loadSafeImageElement(imageUrl: string): Promise<{ img: HTMLImageE
 
   const blob = await fetchMediaBlob(imageUrl);
   const blobUrl = URL.createObjectURL(blob);
-  const img = await loadImageElement(blobUrl);
+  let img: HTMLImageElement;
+  try { img = await loadImageElement(blobUrl); }
+  catch (error) { URL.revokeObjectURL(blobUrl); throw error; }
   return {
     img,
     cleanup: () => {
@@ -126,17 +129,15 @@ export function detectGridDividerBounds(
       colIsWhite[x] = (whiteCount / totalSampled) >= 0.85;
     }
 
-    // 寻找包围 center 的连续白线区间
-    let vStart = -1;
-    let vEnd = -1;
-    for (let x = minCol; x <= maxCol; x++) {
-      if (colIsWhite[x]) {
-        if (vStart === -1) vStart = x;
-        vEnd = x;
-      }
+    // 只扩展穿过中点的连续白带；两侧分离的浅色背景不能合并成中缝。
+    let vStart = halfW;
+    let vEnd = halfW;
+    if (colIsWhite[halfW]) {
+      while (vStart > minCol && colIsWhite[vStart - 1]) vStart--;
+      while (vEnd < maxCol && colIsWhite[vEnd + 1]) vEnd++;
     }
 
-    if (vStart !== -1 && vEnd !== -1 && (vEnd - vStart + 1) >= 2) {
+    if (colIsWhite[halfW] && (vEnd - vStart + 1) >= 2) {
       // 找到了白线，向两侧安全扩展 1-2px 避免边缘抗锯齿残留
       splitLeft = Math.max(0, vStart - 1);
       splitRight = Math.min(width, vEnd + 2);
@@ -161,16 +162,14 @@ export function detectGridDividerBounds(
       rowIsWhite[y] = (whiteCount / totalSampled) >= 0.85;
     }
 
-    let hStart = -1;
-    let hEnd = -1;
-    for (let y = minRow; y <= maxRow; y++) {
-      if (rowIsWhite[y]) {
-        if (hStart === -1) hStart = y;
-        hEnd = y;
-      }
+    let hStart = halfH;
+    let hEnd = halfH;
+    if (rowIsWhite[halfH]) {
+      while (hStart > minRow && rowIsWhite[hStart - 1]) hStart--;
+      while (hEnd < maxRow && rowIsWhite[hEnd + 1]) hEnd++;
     }
 
-    if (hStart !== -1 && hEnd !== -1 && (hEnd - hStart + 1) >= 2) {
+    if (rowIsWhite[halfH] && (hEnd - hStart + 1) >= 2) {
       splitTop = Math.max(0, hStart - 1);
       splitBottom = Math.min(height, hEnd + 2);
     }
@@ -279,144 +278,144 @@ export async function sliceGridImage2x2Blobs(
   const autoTrim = options?.autoTrimBorders ?? true;
   const targetOutputW = options?.targetWidth ?? 1440;
   const targetOutputH = options?.targetHeight ?? 1920;
-  const targetRatio = targetOutputW / targetOutputH; // 3:4 = 0.75
+  assertOutputDimensions(targetOutputW, targetOutputH);
+  const targetRatio = targetOutputW / targetOutputH;
 
   const { img, cleanup } = await loadSafeImageElement(imageUrl);
+  try {
+    const { naturalWidth: fullW, naturalHeight: fullH } = img;
+    if (!fullW || !fullH || fullW < 100 || fullH < 100) {
+      throw new Error(`图片尺寸异常 (${fullW}x${fullH})，无法执行四宫格切片`);
+    }
 
-  const { naturalWidth: fullW, naturalHeight: fullH } = img;
-  if (!fullW || !fullH || fullW < 100 || fullH < 100) {
-    throw new Error(`图片尺寸异常 (${fullW}x${fullH})，无法执行四宫格切片`);
-  }
+    // 创建检测 Canvas
+    const inspectCanvas = document.createElement('canvas');
+    inspectCanvas.width = fullW;
+    inspectCanvas.height = fullH;
+    const inspectCtx = inspectCanvas.getContext('2d');
+    if (!inspectCtx) {
+      throw new Error('无法初始化 Canvas 2D 上下文进行图像检测');
+    }
+    inspectCtx.drawImage(img, 0, 0, fullW, fullH);
 
-  // 创建检测 Canvas
-  const inspectCanvas = document.createElement('canvas');
-  inspectCanvas.width = fullW;
-  inspectCanvas.height = fullH;
-  const inspectCtx = inspectCanvas.getContext('2d');
-  if (!inspectCtx) {
-    throw new Error('无法初始化 Canvas 2D 上下文进行图像检测');
-  }
-  inspectCtx.drawImage(img, 0, 0, fullW, fullH);
-
-  let bounds: GridDividerBounds;
-  if (autoTrim) {
-    bounds = detectGridDividerBounds(inspectCtx, fullW, fullH);
-  } else {
-    const halfW = Math.floor(fullW / 2);
-    const halfH = Math.floor(fullH / 2);
-    bounds = {
-      outerLeft: 0,
-      outerTop: 0,
-      outerRight: fullW,
-      outerBottom: fullH,
-      splitLeft: halfW,
-      splitRight: halfW,
-      splitTop: halfH,
-      splitBottom: halfH,
-    };
-  }
-
-  // 释放检测 Canvas 内存
-  inspectCanvas.width = 0;
-  inspectCanvas.height = 0;
-
-  // 根据智能白边检测结果构建 4 个象限的裁剪区域
-  const quadrants = [
-    // 0: 左上 (Top-Left)
-    {
-      sx: bounds.outerLeft,
-      sy: bounds.outerTop,
-      sw: bounds.splitLeft - bounds.outerLeft,
-      sh: bounds.splitTop - bounds.outerTop,
-    },
-    // 1: 右上 (Top-Right)
-    {
-      sx: bounds.splitRight,
-      sy: bounds.outerTop,
-      sw: bounds.outerRight - bounds.splitRight,
-      sh: bounds.splitTop - bounds.outerTop,
-    },
-    // 2: 左下 (Bottom-Left)
-    {
-      sx: bounds.outerLeft,
-      sy: bounds.splitBottom,
-      sw: bounds.splitLeft - bounds.outerLeft,
-      sh: bounds.outerBottom - bounds.splitBottom,
-    },
-    // 3: 右下 (Bottom-Right)
-    {
-      sx: bounds.splitRight,
-      sy: bounds.splitBottom,
-      sw: bounds.outerRight - bounds.splitRight,
-      sh: bounds.outerBottom - bounds.splitBottom,
-    },
-  ];
-
-  const slicedBlobs: Blob[] = [];
-
-  for (let i = 0; i < quadrants.length; i++) {
-    const q = quadrants[i];
-    const rawW = Math.max(10, q.sw);
-    const rawH = Math.max(10, q.sh);
-    const sourceRatio = rawW / rawH;
-
-    let srcCropX = q.sx;
-    let srcCropY = q.sy;
-    let srcCropW = rawW;
-    let srcCropH = rawH;
-
-    if (sourceRatio > targetRatio) {
-      // 象限较宽：按高度对齐，居中裁剪宽度，保证输出无形变 3:4 比例
-      srcCropW = rawH * targetRatio;
-      srcCropH = rawH;
-      srcCropX = q.sx + (rawW - srcCropW) / 2;
-      srcCropY = q.sy;
+    let bounds: GridDividerBounds;
+    if (autoTrim) {
+      bounds = detectGridDividerBounds(inspectCtx, fullW, fullH);
     } else {
-      // 象限较窄或等比：按宽度对齐，居中裁剪高度
-      srcCropW = rawW;
-      srcCropH = rawW / targetRatio;
-      srcCropX = q.sx;
-      srcCropY = q.sy + (rawH - srcCropH) / 2;
+      const halfW = Math.floor(fullW / 2);
+      const halfH = Math.floor(fullH / 2);
+      bounds = {
+        outerLeft: 0,
+        outerTop: 0,
+        outerRight: fullW,
+        outerBottom: fullH,
+        splitLeft: halfW,
+        splitRight: halfW,
+        splitTop: halfH,
+        splitBottom: halfH,
+      };
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = targetOutputW;
-    canvas.height = targetOutputH;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('无法初始化 Canvas 2D 上下文');
+    // 释放检测 Canvas 内存
+    inspectCanvas.width = 0;
+    inspectCanvas.height = 0;
+
+    // 根据智能白边检测结果构建 4 个象限的裁剪区域
+    const quadrants = [
+      // 0: 左上 (Top-Left)
+      {
+        sx: bounds.outerLeft,
+        sy: bounds.outerTop,
+        sw: bounds.splitLeft - bounds.outerLeft,
+        sh: bounds.splitTop - bounds.outerTop,
+      },
+      // 1: 右上 (Top-Right)
+      {
+        sx: bounds.splitRight,
+        sy: bounds.outerTop,
+        sw: bounds.outerRight - bounds.splitRight,
+        sh: bounds.splitTop - bounds.outerTop,
+      },
+      // 2: 左下 (Bottom-Left)
+      {
+        sx: bounds.outerLeft,
+        sy: bounds.splitBottom,
+        sw: bounds.splitLeft - bounds.outerLeft,
+        sh: bounds.outerBottom - bounds.splitBottom,
+      },
+      // 3: 右下 (Bottom-Right)
+      {
+        sx: bounds.splitRight,
+        sy: bounds.splitBottom,
+        sw: bounds.outerRight - bounds.splitRight,
+        sh: bounds.outerBottom - bounds.splitBottom,
+      },
+    ];
+
+    const slicedBlobs: Blob[] = [];
+
+    for (let i = 0; i < quadrants.length; i++) {
+      const q = quadrants[i];
+      const rawW = Math.max(10, q.sw);
+      const rawH = Math.max(10, q.sh);
+      const sourceRatio = rawW / rawH;
+
+      let srcCropX = q.sx;
+      let srcCropY = q.sy;
+      let srcCropW = rawW;
+      let srcCropH = rawH;
+
+      if (sourceRatio > targetRatio) {
+        // 象限较宽：按高度对齐，居中裁剪宽度，保持目标比例。
+        srcCropW = rawH * targetRatio;
+        srcCropH = rawH;
+        srcCropX = q.sx + (rawW - srcCropW) / 2;
+        srcCropY = q.sy;
+      } else {
+        // 象限较窄或等比：按宽度对齐，居中裁剪高度
+        srcCropW = rawW;
+        srcCropH = rawW / targetRatio;
+        srcCropX = q.sx;
+        srcCropY = q.sy + (rawH - srcCropH) / 2;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetOutputW;
+      canvas.height = targetOutputH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('无法初始化 Canvas 2D 上下文');
+      }
+
+      // 高质量图像缩放和平滑绘制
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      ctx.drawImage(
+        img,
+        srcCropX,
+        srcCropY,
+        srcCropW,
+        srcCropH,
+        0,
+        0,
+        targetOutputW,
+        targetOutputH
+      );
+
+      const blob = await new Promise<Blob | null>((res) => {
+        canvas.toBlob((b) => res(b), format, quality);
+      });
+
+      slicedBlobs.push(blob || dataUrlToBlob(canvas.toDataURL(format, quality)));
+
+      // 及时清理 canvas 引用，辅助垃圾回收
+      canvas.width = 0;
+      canvas.height = 0;
     }
 
-    // 高质量图像缩放和平滑绘制
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    ctx.drawImage(
-      img,
-      srcCropX,
-      srcCropY,
-      srcCropW,
-      srcCropH,
-      0,
-      0,
-      targetOutputW,
-      targetOutputH
-    );
-
-    const blob = await new Promise<Blob | null>((res) => {
-      canvas.toBlob((b) => res(b), format, quality);
-    });
-
-    slicedBlobs.push(blob || dataUrlToBlob(canvas.toDataURL(format, quality)));
-
-    // 及时清理 canvas 引用，辅助垃圾回收
-    canvas.width = 0;
-    canvas.height = 0;
-  }
-
-  cleanup?.();
-
-  return [slicedBlobs[0], slicedBlobs[1], slicedBlobs[2], slicedBlobs[3]];
+    return [slicedBlobs[0], slicedBlobs[1], slicedBlobs[2], slicedBlobs[3]];
+  } finally { cleanup?.(); }
 }
 
 /** 兼容旧调用：把切片 Blob 包成可预览的对象 URL。 */
@@ -427,4 +426,3 @@ export async function sliceGridImage2x2(
   const blobs = await sliceGridImage2x2Blobs(imageUrl, options);
   return blobs.map((blob) => URL.createObjectURL(blob)) as [string, string, string, string];
 }
-

@@ -1,5 +1,6 @@
 import { persistCanvasMedia } from '../model/canvasMediaImport';
 import { buildLightingDerivedNode, buildMultiAngleDerivedNode } from '../utils/canvasNodeHelpers';
+import { enqueueCanvasImageTool } from './canvasGenerationActions';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { type CanvasQuickNodeType } from '../components/CanvasNodeMenu';
 import { type LightingParams } from '../components/CanvasLightingModal';
@@ -54,6 +55,7 @@ export function useCanvasNodeActions(options: {
   const [lightingModalNode, setLightingModalNode] = useState<CanvasNode | null>(null);
   const [multiAngleModalNode, setMultiAngleModalNode] = useState<CanvasNode | null>(null);
   const [composerReference, setComposerReference] = useState<{ name: string; url: string; type: 'image' | 'video'; timestamp: number; attachOnly: boolean } | null>(null);
+  useEffect(() => { if (editingDrawingId) setComposerReference(null); }, [editingDrawingId]);
   const [isAssetSubmenuOpen, setIsAssetSubmenuOpen] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [assetModalTab, setAssetModalTab] = useState<'image' | 'video'>('image');
@@ -79,20 +81,21 @@ export function useCanvasNodeActions(options: {
   };
 
   const handleApplyLighting = (params: LightingParams, applyOptions?: { model?: string; quality?: string; aspectRatio?: string }) => {
-    if (!currentProject || !lightingModalNode) return;
-    addNode(currentProject.id, buildLightingDerivedNode(lightingModalNode, params, applyOptions));
+    if (!currentProject || !lightingModalNode) throw new Error('参考节点不可用，请重新打开打光工具');
+    enqueueCanvasImageTool(currentProject.id, buildLightingDerivedNode(lightingModalNode, params, applyOptions));
   };
 
   const handleApplyMultiAngle = (params: MultiAngleParams, applyOptions?: { model?: string; quality?: string; aspectRatio?: string }) => {
-    if (!currentProject || !multiAngleModalNode) return;
-    addNode(currentProject.id, buildMultiAngleDerivedNode(multiAngleModalNode, params, applyOptions));
+    if (!currentProject || !multiAngleModalNode) throw new Error('参考节点不可用，请重新打开多角度工具');
+    enqueueCanvasImageTool(currentProject.id, buildMultiAngleDerivedNode(multiAngleModalNode, params, applyOptions));
   };
 
   const handleAddNodeToComposer = (node: CanvasNode, e?: MouseEvent) => {
     e?.stopPropagation();
     const url = (node.type === 'video' || node.generationKind === 'video') ? node.videoUrl : node.imageUrl;
     if (!url) return;
-    const isVideo = node.type === 'video';
+    const isVideo = node.type === 'video' || node.generationKind === 'video';
+    setEditingDrawingId(null);
     setComposerReference({
       name: node.title || (isVideo ? '视频素材' : '图片素材'),
       url,
@@ -288,6 +291,7 @@ export function useCanvasNodeActions(options: {
     multiAngleModalNode,
     setMultiAngleModalNode,
     composerReference,
+    closeComposer: () => setComposerReference(null),
     isAssetSubmenuOpen,
     setIsAssetSubmenuOpen,
     showAssetModal,

@@ -7,6 +7,7 @@ interface PromptTask {
   taskId?: string;
   prompt?: string;
   title?: string;
+  referenceImageUrl?: string;
 }
 
 export { buildCanvasPromptNodes } from './canvasPromptNodes';

@@ -6,13 +6,14 @@ import {
   isGenerationDeleted,
   markGenerationDeleted,
   persistDrawingStateToStorage,
+  isDrawingHistoryReady,
 } from './persist/index';
-import { MAX_GENERATION_TASKS_IN_MEMORY } from './generationLimits';
+import { retainGenerationTasks } from './generationLimits';
+import { deferDrawingMutation } from './persist/generationHydration';
 import type { AppState, GenerateSlice } from '@client/store/types';
 
 function capGenerationTasks(tasks: GenerationTask[]): GenerationTask[] {
-  if (tasks.length <= MAX_GENERATION_TASKS_IN_MEMORY) return tasks;
-  return tasks.slice(0, MAX_GENERATION_TASKS_IN_MEMORY);
+  return retainGenerationTasks(tasks);
 }
 
 function mergeAndSortTasks(existing: GenerationTask[], incoming: GenerationTask[]): GenerationTask[] {
@@ -83,15 +84,21 @@ function mergeAndSortTasks(existing: GenerationTask[], incoming: GenerationTask[
 
 const initialDrawing = getStoredDrawingSessions();
 
-export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> = (set) => ({
+export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> = (set, get) => {
+  const setDrawing = (update: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => {
+    if (get().generationHistoryReady === false) deferDrawingMutation(() => set(update));
+    else set(update);
+  };
+  return ({
+  generationHistoryReady: isDrawingHistoryReady(),
   sessions: initialDrawing.sessions,
   currentSessionId: initialDrawing.currentId,
   previewTask: null,
   previewQueue: [],
   generationTasks: initialDrawing.tasks,
 
-  createSession: () => set((state) => {
-    const newSessionId = `session-${Date.now()}`;
+  createSession: () => setDrawing((state) => {
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const newSession: ChatSession = {
       id: newSessionId,
       title: '新创作对话',
@@ -105,18 +112,21 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
       currentSessionId: newSessionId,
       quickPrompt: '',
       quickRefImage: null,
-      quickRefImages: []
+      quickRefImages: [],
+      quickVideoFirstFrame: null,
+      quickVideoLastFrame: null,
+      quickVideoMultiFrames: [],
     };
   }),
 
-  switchSession: (id) => set(() => {
+  switchSession: (id) => setDrawing(() => {
     persistDrawingStateToStorage(undefined, undefined, id);
     return {
       currentSessionId: id
     };
   }),
 
-  deleteSession: (id) => set((state) => {
+  deleteSession: (id) => setDrawing((state) => {
     const deletedSession = state.sessions.find(s => s.id === id);
     const deletedTaskIds = new Set((deletedSession?.tasks || []).map(t => t.id));
     const filtered = state.sessions.filter(s => s.id !== id);
@@ -126,7 +136,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     let nextSessionId = state.currentSessionId;
 
     if (nextSessions.length === 0) {
-      const defaultId = `session-${Date.now()}`;
+      const defaultId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       nextSessions = [{
         id: defaultId,
         title: '新创作对话',
@@ -147,7 +157,18 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     };
   }),
 
-  renameSession: (id, newTitle) => set((state) => {
+  deleteAllSessions: () => setDrawing(() => {
+    const emptySessionId = 'session-default';
+    persistDrawingStateToStorage(undefined, [], emptySessionId, { force: true });
+    return {
+      sessions: [],
+      currentSessionId: emptySessionId,
+      previewTask: null,
+      previewQueue: [],
+    };
+  }),
+
+  renameSession: (id, newTitle) => setDrawing((state) => {
     const trimmed = newTitle.trim() || '未命名对话';
     const updated = state.sessions.map(s => s.id === id ? {
       ...s,
@@ -159,7 +180,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     return { sessions: updated, generationTasks: updatedGenTasks };
   }),
 
-  pinSession: (id) => set((state) => {
+  pinSession: (id) => setDrawing((state) => {
     const updated = state.sessions.map(s => s.id === id ? { ...s, isPinned: !s.isPinned } : s);
     // 置顶项排在最前面
     updated.sort((a, b) => {
@@ -171,7 +192,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     return { sessions: updated };
   }),
 
-  renameTask: (taskId, newTitle) => set((state) => {
+  renameTask: (taskId, newTitle) => setDrawing((state) => {
     const updatedGenTasks = state.generationTasks.map(t => t.id === taskId ? { ...t, title: newTitle } : t);
     const updatedSessions = state.sessions.map(s => ({
       ...s,
@@ -185,13 +206,13 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     };
   }),
 
-  setPreviewTask: (previewTask, queue) => set((state) => ({
+  setPreviewTask: (previewTask, queue) => setDrawing((state) => ({
     previewTask,
     previewQueue: queue !== undefined ? queue : (previewTask === null ? [] : state.previewQueue)
   })),
-  setPreviewQueue: (previewQueue) => set({ previewQueue }),
+  setPreviewQueue: (previewQueue) => setDrawing({ previewQueue }),
 
-  addGenerationTask: (task, isNewSession = false) => set((state) => {
+  addGenerationTask: (task, isNewSession = false) => setDrawing((state) => {
     let sessions = [...state.sessions];
     let targetSessionId = state.currentSessionId;
     let currentSessionTitle = task.title ? task.title.slice(0, 18) : 'AI 生图创作';
@@ -199,7 +220,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     const shouldCreateNew = isNewSession || targetSessionId === '__all__' || sessions.length === 0 || !sessions.some(s => s.id === targetSessionId);
 
     if (shouldCreateNew) {
-      targetSessionId = `session-${Date.now()}`;
+      targetSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     } else {
       const matched = sessions.find(s => s.id === targetSessionId);
       if (matched?.title) {
@@ -244,8 +265,8 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     };
   }),
 
-  addBatchGenerationTasks: (tasks, customTitle, isNewSession = true) => set((state) => {
-    const sharedBatchId = `batch-${Date.now()}`;
+  addBatchGenerationTasks: (tasks, customTitle, isNewSession = true) => setDrawing((state) => {
+    const sharedBatchId = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const sharedTime = Date.now();
     let sessions = [...state.sessions];
     let targetSessionId = state.currentSessionId;
@@ -254,7 +275,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     const shouldCreateNew = isNewSession || targetSessionId === '__all__' || sessions.length === 0 || !sessions.some(s => s.id === targetSessionId);
 
     if (shouldCreateNew) {
-      targetSessionId = `session-${Date.now()}`;
+      targetSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     } else {
       const matched = sessions.find(s => s.id === targetSessionId);
       if (matched?.title) {
@@ -302,11 +323,15 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     };
   }),
 
-  updateGenerationTask: (id, updates, opts) => set((state) => {
-    const current = state.generationTasks.find(g => g.id === id || g.taskId === id);
+  updateGenerationTask: (id, updates, opts) => setDrawing((state) => {
+    const matches = (task: GenerationTask) => task.id === id || task.taskId === id;
+    const current = state.generationTasks.find(matches) || state.sessions.flatMap(session => session.tasks).find(matches);
     // A late timeout/failure cannot downgrade a completed task. Retry creates a new task.
     if (current?.status === 'SUCCESS' && current.resultUrl && updates.status && updates.status !== 'SUCCESS') return state;
-    const updatedGenTasks = state.generationTasks.map(g => (g.id === id || g.taskId === id) ? { ...g, ...updates } : g);
+    let updatedGenTasks = state.generationTasks.map(g => matches(g) ? { ...g, ...updates } : g);
+    if (current && !state.generationTasks.some(matches) && updates.status === 'IN_PROGRESS') {
+      updatedGenTasks = capGenerationTasks([{ ...current, ...updates }, ...updatedGenTasks]);
+    }
     const updatedSessions = state.sessions.map(s => ({
       ...s,
       tasks: s.tasks.map(g => (g.id === id || g.taskId === id) ? { ...g, ...updates } : g)
@@ -314,8 +339,13 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
 
     const shouldPersist = opts?.persist !== false;
     const isTerminal = updates.status === 'SUCCESS' || updates.status === 'FAILURE';
+    const linked = Boolean(updates.taskId && updates.taskId !== current?.taskId) || Boolean(updates.dbId && updates.dbId !== current?.dbId);
+    const statusChanged = Boolean(updates.status && updates.status !== current?.status);
+    const recoveryChanged = updates.submissionRecoveryRequired !== undefined && updates.submissionRecoveryRequired !== current?.submissionRecoveryRequired;
+    if (shouldPersist && (isTerminal || linked || statusChanged || recoveryChanged)) {
+      persistDrawingStateToStorage(updatedGenTasks, updatedSessions, undefined, { immediate: linked || isTerminal || recoveryChanged });
+    }
     if (shouldPersist && isTerminal) {
-      persistDrawingStateToStorage(updatedGenTasks, updatedSessions);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('azhuo:generation-completed', { detail: { id, updates } }));
       }
@@ -331,7 +361,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   }),
 
   // 🌟 删除对话中的单项记录（仅从会话与当前对话流中移除，绝不删除数据库/资产库中的实体）
-  deleteGenerationTask: (id) => set((state) => {
+  deleteGenerationTask: (id) => setDrawing((state) => {
     const updatedGenTasks = state.generationTasks.filter(g => g.id !== id && g.taskId !== id);
     const updatedSessions = state.sessions.map(s => ({
       ...s,
@@ -348,7 +378,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   }),
 
   // 🌟 彻底物理删除生成记录 (同步清理本地会话、全局生成历史与 localStorage 缓存)
-  deleteGenerationPermanently: (ids: string[], urls?: string[]) => set((state) => {
+  deleteGenerationPermanently: (ids: string[], urls?: string[]) => setDrawing((state) => {
     const idSet = new Set((ids || []).filter(Boolean));
     const urlSet = new Set((urls || []).filter(Boolean));
 
@@ -383,7 +413,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     };
   }),
 
-  syncDatabaseTasks: (dbTasks) => set((state) => {
+  syncDatabaseTasks: (dbTasks) => setDrawing((state) => {
     if (!dbTasks || dbTasks.length === 0) return state;
 
     const allGens = mergeAndSortTasks(state.generationTasks, dbTasks);
@@ -421,4 +451,5 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
       sessions: updatedSessions
     };
   }),
-});
+  });
+};

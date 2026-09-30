@@ -1,5 +1,7 @@
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { groupTasksIntoBatches as groupTasksCore } from '@client/shared/utils/taskBatchGrouping';
+import { isDepthImageTask, isDepthVideoTask } from './generationTaskMedia';
+import { isGenerationVideoTask } from '@client/shared/media/generationTaskMedia';
 
 export type TimeFilter = 'all' | 'today' | '7days' | '30days' | '90days' | 'custom';
 export type ModeFilter = 'all' | 'image' | 'video' | 'depth-image' | 'depth-video';
@@ -28,18 +30,8 @@ export interface FlatBatchItem {
   bIdx: number;
 }
 
-const VIDEO_MODEL_RE =
-  /seedance|veo|kling|minimax|h3|hailuo|wan|vidu|luma|hunyuan/i;
-
 export function isGenerateVideoTask(task: GenerationTask): boolean {
-  return (
-    task.mediaType === 'depth-video' ||
-    task.mediaType === 'video' ||
-    Boolean(task.resultUrl?.includes('.mp4')) ||
-    (task.id || '').startsWith('depth_') ||
-    (task.taskId || '').startsWith('depth_') ||
-    Boolean(task.model && VIDEO_MODEL_RE.test(task.model))
-  );
+  return isGenerationVideoTask(task);
 }
 
 /**
@@ -101,12 +93,9 @@ export function filterGenerationTasks(
     }
 
     if (modeFilter !== 'all') {
-      const isDepthVid =
-        t.mediaType === 'depth-video' ||
-        (t.id || '').startsWith('depth_') ||
-        (t.taskId || '').startsWith('depth_') ||
-        Boolean(t.model && /depth-video|depth_video/i.test(t.model));
-      const isDepthImg = t.mediaType === 'depth-image';
+      const isDepthImg = isDepthImageTask(t);
+      const isDepthVid = !isDepthImg && (isDepthVideoTask(t) ||
+        Boolean(t.model && /depth-video|depth_video/i.test(t.model)));
       const isVid = !isDepthVid && isGenerateVideoTask(t);
       const isImg = !isDepthVid && !isDepthImg && !isVid;
 

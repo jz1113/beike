@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { AssistantSession } from '@client/store/appStoreTypes';
+import type { AssistantSession, MediaAttachment } from '@client/store/appStoreTypes';
 import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@client/features/assistant/api/sessions';
 import {
   assistantDeletedIds,
@@ -11,291 +11,266 @@ import {
   writeAssistantLocalCache,
 } from './persist/index';
 import type { AppState, AssistantSlice } from '@client/store/types';
+import { normalizeAssistantSessions } from './persist/assistantValidation';
 
-const defaultAssistantId = 'asst-session-default';
+function createEmptySession(): AssistantSession {
+  const now = Date.now();
+  return {
+    id: `asst-session-${globalThis.crypto?.randomUUID?.() || `${now}-${Math.random().toString(36).slice(2)}`}`,
+    title: '新对话',
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+}
 
-let lastStreamPersistAt = 0;
-let lastStreamPersistLen = 0;
+function getStoredHistoryLimit(): number {
+  try {
+    const limit = Number(localStorage.getItem('ai_assistant_history_limit'));
+    if (Number.isInteger(limit) && limit >= 1 && limit <= 500) return limit;
+  } catch {}
+  return 20;
+}
 
-export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice> = (set, get) => ({
-  // AI 助手初始状态（会话由 requestIdleCallback 延迟 hydrate）
-  isAssistantOpen: false,
-  assistantSessions: [
-    {
-      id: defaultAssistantId,
-      title: '新对话',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: [],
-    },
-  ],
-  currentAssistantSessionId: defaultAssistantId,
-  assistantModel: 'gemini-3.7-flash',
-  assistantHistoryLimit: 20,
-  assistantAttachments: [],
-  assistantInputDraft: '',
-  assistantSessionDrafts: {},
-
-  setIsAssistantOpen: (isAssistantOpen) => set({ isAssistantOpen }),
-  setAssistantInputDraft: (assistantInputDraft) => {
-    if (get().assistantInputDraft === assistantInputDraft) return;
-    set({ assistantInputDraft });
-  },
-  setAssistantModel: (assistantModel) => {
-    if (get().assistantModel === assistantModel) return;
-    if (typeof localStorage !== 'undefined') {
-      try { localStorage.setItem('beike_assistant_selected_model', assistantModel); localStorage.setItem('ai_assistant_model', assistantModel); } catch { /* Model selection still works without storage. */ }
-    }
-    set({ assistantModel });
-  },
-  setAssistantHistoryLimit: (assistantHistoryLimit) => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('ai_assistant_history_limit', String(assistantHistoryLimit));
-      } catch {}
-    }
-    set({ assistantHistoryLimit });
-  },
-
-  createAssistantSession: () => set((state) => {
-    const newId = `asst-session-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-    const newSession: AssistantSession = {
-      id: newId,
-      title: '新对话',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: []
-    };
-    const updatedSessions = [newSession, ...state.assistantSessions];
-    persistAssistantSessions(updatedSessions, newId);
+export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice> = (set, get) => {
+  const initial = getStoredAssistantState();
+  const drafts = new Map<string, { input: string; attachments: MediaAttachment[]; skillId: string | null }>();
+  const rememberDraft = (state: AppState) => drafts.set(state.currentAssistantSessionId, {
+    input: state.assistantInputDraft,
+    attachments: state.assistantAttachments,
+    skillId: state.activeAssistantSkillId,
+  });
+  const restoreDraft = (id: string) => {
+    const draft = drafts.get(id);
+    const skillId = draft?.skillId;
     return {
-      assistantSessions: updatedSessions,
-      currentAssistantSessionId: newId,
-      assistantInputDraft: '',
-      assistantSessionDrafts: { ...state.assistantSessionDrafts, [state.currentAssistantSessionId]: state.assistantInputDraft },
-      activeAssistantSkillId: null,
-      assistantAttachments: []
+      assistantInputDraft: draft?.input || get().assistantSessionDrafts[id] || '',
+      assistantAttachments: draft?.attachments || [],
+      activeAssistantSkillId: skillId && get().getAllAssistantSkills().some((skill) => skill.id === skillId) ? skillId : null,
     };
-  }),
+  };
+  let lastStreamPersistAt = 0;
+  let lastStreamPersistLen = 0;
+  let lastStreamMessageId = '';
+  let hydrationPromise: Promise<void> | null = null;
 
-  switchAssistantSession: (id) => {
-    const state = get();
-    if (id === state.currentAssistantSessionId || !state.assistantSessions.some(session => session.id === id)) return;
-    persistAssistantSessions(state.assistantSessions, id);
-    set({ currentAssistantSessionId: id, assistantAttachments: [],
-      assistantInputDraft: state.assistantSessionDrafts[id] || '',
-      assistantSessionDrafts: { ...state.assistantSessionDrafts, [state.currentAssistantSessionId]: state.assistantInputDraft },
-      ...(id !== state.currentAssistantSessionId ? { activeAssistantSkillId: null } : {}),
-    });
-  },
+  return {
+    isAssistantOpen: false,
+    assistantSessions: initial.sessions,
+    currentAssistantSessionId: initial.currentId,
+    assistantModel: 'gemini-3.7-flash',
+    assistantHistoryLimit: getStoredHistoryLimit(),
+    assistantAttachments: [],
+    assistantInputDraft: '',
+    assistantSessionDrafts: {},
 
-  deleteAssistantSession: async (id) => {
-    clearAssistantPersistTimer();
-
-    markAssistantSessionDeleted(id);
-
-    let serverOk = true;
-    let serverError: string | undefined;
-    if (typeof window !== 'undefined') {
-      const remote = await deleteAssistantSessionRemote(id);
-      serverOk = remote.success;
-      serverError = remote.error;
-    }
-
-    const state = get();
-    const filtered = state.assistantSessions.filter(s => s.id !== id && !assistantDeletedIds.has(s.id));
-    const nextSession = filtered[0] || {
-      id: `asst-session-${Date.now()}`,
-      title: '新对话',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: []
-    };
-    const finalSessions = filtered.length > 0 ? filtered : [nextSession];
-    // 删除后强制写本地，避免「空新对话不覆盖」把旧会话留在 localStorage
-    persistAssistantSessions(finalSessions, nextSession.id, { immediate: true, forceLocal: true });
-    set({
-      assistantSessions: finalSessions,
-      currentAssistantSessionId: nextSession.id,
-      activeAssistantSkillId: null,
-    });
-
-    return { success: serverOk, error: serverError };
-  },
-
-  renameAssistantSession: (id, title) => set((state) => {
-    const updated = state.assistantSessions.map(s =>
-      s.id === id ? { ...s, title: title.trim() || '未命名对话', updatedAt: Date.now() } : s
-    );
-    persistAssistantSessions(updated, state.currentAssistantSessionId);
-    return { assistantSessions: updated };
-  }),
-
-  updateAssistantSession: (sessionUpdate) => set((state) => {
-    const updated = state.assistantSessions.map(s =>
-      s.id === sessionUpdate.id ? { ...s, ...sessionUpdate, updatedAt: Date.now() } : s
-    );
-    persistAssistantSessions(updated, state.currentAssistantSessionId);
-    return { assistantSessions: updated };
-  }),
-
-  addAssistantMessage: (sessionId, message) => set((state) => {
-    const updated = state.assistantSessions.map(s => {
-      if (s.id === sessionId) {
-        const msgs = [...s.messages, message].slice(-100);
-        let title = s.title;
-        if (title === '新对话' && message.role === 'user' && message.content) {
-          title = message.content.slice(0, 16);
-        }
-        return {
-          ...s,
-          title,
-          updatedAt: Date.now(),
-          messages: msgs
-        };
+    setIsAssistantOpen: (isAssistantOpen) => set({ isAssistantOpen }),
+    setAssistantInputDraft: (assistantInputDraft) => {
+      if (get().assistantInputDraft === assistantInputDraft) return;
+      set({ assistantInputDraft });
+    },
+    setAssistantModel: (assistantModel) => {
+      if (get().assistantModel === assistantModel) return;
+      if (typeof localStorage !== 'undefined') {
+        try { localStorage.setItem('beike_assistant_selected_model', assistantModel); localStorage.setItem('ai_assistant_model', assistantModel); } catch { /* Model selection still works without storage. */ }
       }
-      return s;
-    });
-    persistAssistantSessions(updated, state.currentAssistantSessionId);
-    return { assistantSessions: updated };
-  }),
-
-  updateAssistantMessage: (sessionId, messageId, updates) => set((state) => {
-    const updated = state.assistantSessions.map(s => {
-      if (s.id === sessionId) {
-        const msgs = s.messages.map(m =>
-          m.id === messageId ? { ...m, ...updates } : m
-        );
-        return { ...s, updatedAt: Date.now(), messages: msgs };
+      set({ assistantModel });
+    },
+    setAssistantHistoryLimit: (assistantHistoryLimit) => {
+      if (!Number.isFinite(assistantHistoryLimit)) return;
+      assistantHistoryLimit = Math.max(1, Math.min(500, Math.trunc(assistantHistoryLimit)));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('ai_assistant_history_limit', String(assistantHistoryLimit));
+        } catch {}
       }
-      return s;
-    });
+      set({ assistantHistoryLimit });
+    },
 
-    // 流式节流落盘：每 2s 或内容增长约 800 字
-    const msg = updated
-      .find(s => s.id === sessionId)
-      ?.messages.find(m => m.id === messageId);
-    const contentLen = msg?.content?.length || 0;
-    const now = Date.now();
-    const dueByTime = now - lastStreamPersistAt >= 2000;
-    const dueByLen = contentLen - lastStreamPersistLen >= 800;
-    if (dueByTime || dueByLen) {
-      lastStreamPersistAt = now;
-      lastStreamPersistLen = contentLen;
-      persistAssistantSessions(updated, state.currentAssistantSessionId);
-    }
+    createAssistantSession: () => set((state) => {
+      rememberDraft(state);
+      const newSession = createEmptySession();
+      const newId = newSession.id;
+      const updatedSessions = [newSession, ...state.assistantSessions];
+      persistAssistantSessions(updatedSessions, newId);
+      return {
+        assistantSessions: updatedSessions,
+        currentAssistantSessionId: newId,
+        ...restoreDraft(newId),
+        assistantSessionDrafts: { ...state.assistantSessionDrafts, [state.currentAssistantSessionId]: state.assistantInputDraft },
+      };
+    }),
 
-    return { assistantSessions: updated };
-  }),
+    switchAssistantSession: (id) => {
+      const state = get();
+      if (id === state.currentAssistantSessionId || !state.assistantSessions.some((s) => s.id === id)) return;
+      rememberDraft(state);
+      persistAssistantSessions(state.assistantSessions, id);
+      set({ currentAssistantSessionId: id, ...restoreDraft(id),
+        assistantSessionDrafts: { ...state.assistantSessionDrafts, [state.currentAssistantSessionId]: state.assistantInputDraft } });
+    },
 
-  persistAssistantNow: () => {
-    const state = get();
-    lastStreamPersistAt = Date.now();
-    persistAssistantSessions(state.assistantSessions, state.currentAssistantSessionId, { immediate: true });
-  },
+    deleteAssistantSession: async (id) => {
+      const state = get();
+      if (!state.assistantSessions.some((s) => s.id === id)) return { success: true };
+      clearAssistantPersistTimer();
+      markAssistantSessionDeleted(id);
+      drafts.delete(id);
+      const assistantSessionDrafts = { ...state.assistantSessionDrafts };
+      delete assistantSessionDrafts[id];
+      const filtered = state.assistantSessions.filter(s => s.id !== id && !assistantDeletedIds.has(s.id));
+      const nextSession = filtered.find((s) => s.id === state.currentAssistantSessionId) || filtered[0] || createEmptySession();
+      const finalSessions = filtered.length > 0 ? filtered : [nextSession];
+      // 删除后强制写本地，避免「空新对话不覆盖」把旧会话留在 localStorage
+      persistAssistantSessions(finalSessions, nextSession.id, { immediate: true, forceLocal: true });
+      set({
+        assistantSessionDrafts,
+        assistantSessions: finalSessions,
+        currentAssistantSessionId: nextSession.id,
+        ...(state.currentAssistantSessionId === id ? restoreDraft(nextSession.id) : {}),
+      });
+      return typeof window !== 'undefined' ? deleteAssistantSessionRemote(id) : { success: true };
+    },
 
-  hydrateAssistantSessions: async () => {
-    if (typeof window === 'undefined') return;
-    loadAssistantTombstones();
-    let remoteSessions: AssistantSession[] | null = null;
-    try {
-      const sessions = await fetchAssistantSessionsRemote();
-      if (sessions && sessions.length > 0) {
-        remoteSessions = sessions
-          .filter((s) => s?.id && !assistantDeletedIds.has(s.id))
-          .map((s) => ({
-            id: s.id,
-            title: s.title || '新对话',
-            createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
-            updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : Date.now(),
-            messages: Array.isArray(s.messages) ? s.messages : [],
-          }));
-      }
-    } catch {}
-
-    const local = getStoredAssistantState();
-    const localSessions = local.sessions.filter(s => !assistantDeletedIds.has(s.id));
-    const localHasMsgs = localSessions.some(s => (s.messages || []).length > 0);
-    const remoteHasMsgs = remoteSessions?.some(s => (s.messages || []).length > 0);
-
-    let nextSessions = localSessions.length > 0 ? localSessions : local.sessions.filter(s => !assistantDeletedIds.has(s.id));
-    let nextId = local.currentId;
-    if (assistantDeletedIds.has(nextId) || !nextSessions.some(s => s.id === nextId)) {
-      nextId = nextSessions[0]?.id || local.currentId;
-    }
-
-    if (remoteSessions && remoteHasMsgs) {
-      const byId = new Map<string, AssistantSession>();
-      for (const s of localSessions) {
-        if (!assistantDeletedIds.has(s.id)) byId.set(s.id, s);
-      }
-      for (const r of remoteSessions) {
-        if (assistantDeletedIds.has(r.id)) continue;
-        const localS = byId.get(r.id);
-        if (!localS) {
-          byId.set(r.id, r);
-          continue;
-        }
-        const localTs = Number(localS.updatedAt) || 0;
-        const remoteTs = Number(r.updatedAt) || 0;
-        const localMsgN = (localS.messages || []).length;
-        const remoteMsgN = (r.messages || []).length;
-        if (remoteTs > localTs || (remoteTs === localTs && remoteMsgN > localMsgN)) {
-          byId.set(r.id, r);
-        }
-      }
-      nextSessions = Array.from(byId.values()).sort(
-        (a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0)
+    renameAssistantSession: (id, title) => set((state) => {
+      const updated = state.assistantSessions.map(s =>
+        s.id === id ? { ...s, title: title.trim() || '未命名对话', updatedAt: Date.now() } : s
       );
-      const savedId = localStorage.getItem('ai_assistant_current_session_id');
-      nextId = (savedId && nextSessions.some(s => s.id === savedId) && !assistantDeletedIds.has(savedId))
-        ? savedId
-        : (nextSessions[0]?.id || local.currentId);
-      persistAssistantSessions(nextSessions, nextId, { immediate: true, forceLocal: true });
-    } else if (localHasMsgs) {
-      nextSessions = localSessions;
-      nextId = nextSessions.some(s => s.id === local.currentId)
-        ? local.currentId
-        : (nextSessions[0]?.id || local.currentId);
-      persistAssistantSessions(nextSessions, nextId, { immediate: true, forceLocal: true });
-    }
+      persistAssistantSessions(updated, state.currentAssistantSessionId);
+      return { assistantSessions: updated };
+    }),
 
-    if (nextSessions.length === 0) {
-      const emptyId = `asst-session-${Date.now()}`;
-      nextSessions = [{
-        id: emptyId,
-        title: '新对话',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        messages: [],
-      }];
-      nextId = emptyId;
-      persistAssistantSessions(nextSessions, nextId, { immediate: true, forceLocal: true });
-    }
+    updateAssistantSession: (sessionUpdate) => set((state) => {
+      const updated = state.assistantSessions.map(s =>
+        s.id === sessionUpdate.id ? { ...s, ...sessionUpdate, updatedAt: Date.now() } : s
+      );
+      persistAssistantSessions(updated, state.currentAssistantSessionId);
+      return { assistantSessions: updated };
+    }),
 
-    set({
-      assistantSessions: nextSessions,
-      currentAssistantSessionId: nextId,
-    });
-    writeAssistantLocalCache(nextSessions, nextId, { force: true });
-  },
+    addAssistantMessage: (sessionId, message) => set((state) => {
+      const updated = state.assistantSessions.map(s => {
+        if (s.id === sessionId) {
+          const msgs = [...s.messages.filter((m) => m.id !== message.id), message];
+          let title = s.title;
+          if (title === '新对话' && message.role === 'user' && message.content) {
+            title = message.content.slice(0, 16);
+          }
+          return {
+            ...s,
+            title,
+            updatedAt: Date.now(),
+            messages: msgs
+          };
+        }
+        return s;
+      });
+      persistAssistantSessions(updated, state.currentAssistantSessionId);
+      return { assistantSessions: updated };
+    }),
 
-  setAssistantAttachments: (attachments) => set({ assistantAttachments: attachments }),
+    updateAssistantMessage: (sessionId, messageId, updates) => set((state) => {
+      const updated = state.assistantSessions.map(s => {
+        if (s.id === sessionId) {
+          const msgs = s.messages.map(m =>
+            m.id === messageId ? { ...m, ...updates } : m
+          );
+          return { ...s, updatedAt: Date.now(), messages: msgs };
+        }
+        return s;
+      });
 
-  addAssistantAttachment: (att) => set((state) => {
-    if (att.url && state.assistantAttachments.some(a => a.url === att.url)) {
-      return state;
-    }
-    if (att.type === 'document' && att.name && att.extractedText
-      && state.assistantAttachments.some(a => a.type === 'document' && a.name === att.name && a.extractedText === att.extractedText)) {
-      return state;
-    }
-    return { assistantAttachments: [...state.assistantAttachments, att] };
-  }),
+      // 流式节流落盘：每 2s 或内容增长约 800 字
+      const msg = updated
+        .find(s => s.id === sessionId)
+        ?.messages.find(m => m.id === messageId);
+      const contentLen = msg?.content?.length || 0;
+      const now = Date.now();
+      const dueByTime = now - lastStreamPersistAt >= 2000;
+      const streamMessageId = `${sessionId}:${messageId}`;
+      const dueByLen = contentLen - lastStreamPersistLen >= 800;
+      if (dueByTime || dueByLen || streamMessageId !== lastStreamMessageId) {
+        lastStreamPersistAt = now;
+        lastStreamPersistLen = contentLen;
+        lastStreamMessageId = streamMessageId;
+        persistAssistantSessions(updated, state.currentAssistantSessionId);
+      }
 
-  removeAssistantAttachment: (index) => set((state) => ({
-    assistantAttachments: state.assistantAttachments.filter((_, i) => i !== index)
-  })),
+      return { assistantSessions: updated };
+    }),
 
-  clearAssistantAttachments: () => set({ assistantAttachments: [] }),
-});
+    persistAssistantNow: () => {
+      const state = get();
+      lastStreamPersistAt = Date.now();
+      persistAssistantSessions(state.assistantSessions, state.currentAssistantSessionId, { immediate: true });
+    },
+
+    hydrateAssistantSessions: async () => {
+      if (typeof window === 'undefined') return;
+      if (hydrationPromise) return hydrationPromise;
+      hydrationPromise = (async () => {
+        loadAssistantTombstones();
+        const baseline = new Map(get().assistantSessions.map((s) => [s.id, s]));
+        let remoteSessions: AssistantSession[] = [];
+        try {
+          remoteSessions = normalizeAssistantSessions(await fetchAssistantSessionsRemote());
+        } catch {}
+
+        // Read live state after the request: sending, renaming, switching and deleting
+        // are allowed while remote history loads and must win over that older snapshot.
+        const state = get();
+        const byId = new Map(state.assistantSessions.filter((s) => !assistantDeletedIds.has(s.id)).map((s) => [s.id, s]));
+        for (const remote of remoteSessions) {
+          if (assistantDeletedIds.has(remote.id)) continue;
+          const local = byId.get(remote.id);
+          const changedDuringLoad = local && baseline.get(local.id) !== local;
+          if (!local || (!changedDuringLoad && (remote.updatedAt > local.updatedAt
+            || (remote.updatedAt === local.updatedAt && remote.messages.length > local.messages.length)))) {
+            byId.set(remote.id, { ...remote, allowedTools: remote.allowedTools ?? local?.allowedTools });
+          }
+        }
+        const placeholder = byId.get('asst-session-default');
+        if (byId.size > 1 && placeholder?.title === '新对话' && !placeholder.messages.length
+          && (state.currentAssistantSessionId !== placeholder.id
+            || (!state.assistantInputDraft && !state.assistantAttachments.length && !state.activeAssistantSkillId))) {
+          byId.delete(placeholder.id);
+        }
+        const nextSessions = Array.from(byId.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+        if (!nextSessions.length) nextSessions.push(createEmptySession());
+        const nextId = nextSessions.some((s) => s.id === state.currentAssistantSessionId)
+          ? state.currentAssistantSessionId : nextSessions[0].id;
+        set({
+          assistantSessions: nextSessions,
+          currentAssistantSessionId: nextId,
+          ...(nextId !== state.currentAssistantSessionId ? restoreDraft(nextId) : {}),
+        });
+        // Recovery reads server state; echoing it back would rewrite every timestamp.
+        writeAssistantLocalCache(nextSessions, nextId);
+      })();
+      try {
+        await hydrationPromise;
+      } finally {
+        hydrationPromise = null;
+      }
+    },
+
+    setAssistantAttachments: (attachments) => set({ assistantAttachments: attachments }),
+
+    addAssistantAttachment: (att) => set((state) => {
+      if (att.url && state.assistantAttachments.some(a => a.url === att.url)) {
+        return state;
+      }
+      if (att.type === 'document' && att.name && att.extractedText
+        && state.assistantAttachments.some(a => a.type === 'document' && a.name === att.name && a.extractedText === att.extractedText)) {
+        return state;
+      }
+      return { assistantAttachments: [...state.assistantAttachments, att] };
+    }),
+
+    removeAssistantAttachment: (index) => set((state) => ({
+      assistantAttachments: state.assistantAttachments.filter((_, i) => i !== index)
+    })),
+
+    clearAssistantAttachments: () => set({ assistantAttachments: [] }),
+  };
+};

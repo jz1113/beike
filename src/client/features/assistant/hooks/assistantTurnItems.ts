@@ -25,6 +25,20 @@ export function initialState(): TurnStreamState {
   };
 }
 
+/** The client cannot receive further item events once its stream is cancelled or disconnected. */
+export function finishInterruptedItems(items: AssistantItem[], cancelled: boolean): AssistantItem[] {
+  const next = items.map((item): AssistantItem => {
+    if (item.kind === 'toolCall' && item.status === 'running') return { ...item, status: 'error' };
+    if (item.kind === 'subAgent' && ['running', 'spawning'].includes(item.status)) return { ...item, status: 'failed' };
+    if (item.kind === 'approvalRequest' && item.status === 'pending') return { ...item, status: 'expired', decision: 'cancel' };
+    return item;
+  });
+  if (cancelled && next.length && !next.some((item) => item.id === 'client_stop_note')) {
+    next.push({ id: 'client_stop_note', kind: 'agentMessage', createdAt: Date.now(), content: '⏹ *用户已停止生成*' });
+  }
+  return next;
+}
+
 /** Apply an item-lifecycle event to the in-memory item list and return the resulting AssistantItem[] */
 export function applyItemEvent(
   items: AssistantItem[],
@@ -48,7 +62,9 @@ export function applyItemEvent(
       if (idx < 0) return items;
       const existing = next[idx];
       if (existing.kind === 'toolCall') {
-        next[idx] = { ...existing, status: (status === 'done' ? 'done' : status === 'cancelled' ? 'running' : 'error') as ToolCallItem['status'] };
+        next[idx] = { ...existing, status: (status === 'done' ? 'done' : status === 'cancelled' ? 'error' : 'error') as ToolCallItem['status'] };
+      } else if (existing.kind === 'subAgent') {
+        next[idx] = { ...existing, ...evt.meta, status: status === 'done' ? 'completed' : 'failed' } as SubAgentItem;
       }
       return next;
     }
@@ -119,7 +135,7 @@ export function applyItemEvent(
       return next;
     }
     case 'item/toolCall/completed': {
-      const { itemId, name, displayName, status, summary, action } = evt;
+      const { itemId, name, displayName, status, summary, action, visualImages } = evt;
       const idx = findById(itemId);
       if (idx < 0) return items;
       // Find or create a toolResult pair item
@@ -133,6 +149,7 @@ export function applyItemEvent(
         status: status === 'done' ? 'done' : 'error',
         summary: summary || '',
         ...(action ? { action } : {}),
+        ...(visualImages ? { visualImages } : {}),
       };
       // Replace toolCall item with final status
       next[idx] = {
@@ -225,7 +242,7 @@ export function makeEmptyItem(
         kind: 'subAgent',
         skillId: String(meta?.skillId || ''),
         prompt: String(meta?.prompt || ''),
-        status: 'spawning',
+        status: meta?.status === 'running' ? 'running' : 'spawning',
       } as SubAgentItem;
     default:
       return { ...base, kind: 'userMessage', content: '' } as UserMessageItem;
@@ -243,22 +260,26 @@ export function deriveLegacyState(items: AssistantItem[]): Pick<TurnStreamState,
   const toolActivity: ToolActivityEntry[] = [];
   const pendingApprovals: PendingApproval[] = [];
 
-  // 多 agentMessage：保留最后一段（与 ChatGPT 流式惯例一致）
+  const pairedResults = new Map(items.filter((item): item is ToolResultItem => item.kind === 'toolResult').map((item) => [item.id, item]));
+  // Preserve every nonempty reply segment; an empty planning item must not erase earlier text.
   for (const item of items) {
     if (item.kind === 'agentMessage') {
-      content = (item as AgentMessageItem).content || '';
+      if (item.content) content += `${content ? '\n\n' : ''}${item.content}`;
     } else if (item.kind === 'agentReasoning') {
-      thinking = (item as AgentReasoningItem).content || '';
+      if (item.content) thinking += `${thinking ? '\n\n' : ''}${item.content}`;
     } else if (item.kind === 'toolCall') {
       const tc = item as ToolCallItem;
+      const result = pairedResults.get(`${tc.id}__result`);
       toolActivity.push({
         name: tc.name,
         displayName: tc.displayName || tc.name,
-        status: (tc.status === 'done' ? 'done' : tc.status === 'error' ? 'error' : 'running'),
-        detail: tc.args ? tc.args.slice(0, 120) : undefined,
+        status: result?.status || tc.status,
+        detail: result?.summary || (tc.args ? tc.args.slice(0, 120) : undefined),
+        action: result?.action, visualImages: result?.visualImages,
       });
     } else if (item.kind === 'toolResult') {
       const tr = item as ToolResultItem;
+      if (items.some((call) => call.kind === 'toolCall' && `${call.id}__result` === tr.id)) continue;
       const idx = toolActivity.findIndex((t) => t.name === tr.name && t.status === 'running');
       const entry: ToolActivityEntry = {
         name: tr.name,
@@ -266,6 +287,7 @@ export function deriveLegacyState(items: AssistantItem[]): Pick<TurnStreamState,
         status: tr.status === 'done' ? 'done' : 'error',
         detail: tr.summary,
         action: tr.action,
+        visualImages: tr.visualImages,
       };
       if (idx >= 0) toolActivity[idx] = entry;
       else toolActivity.push(entry);

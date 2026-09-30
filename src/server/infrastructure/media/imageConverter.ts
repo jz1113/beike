@@ -1,6 +1,9 @@
 import sharp from 'sharp';
+import { readLocalImage } from './readLocalImage';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
-import { matchesDomainSuffix } from '@server/infrastructure/network/safeUrl';
+import { matchesDomainSuffix, MAX_PROXY_BYTES } from '@server/infrastructure/network/safeUrl';
+import { fetchSafeImageBuffer } from './safeImageFetch';
+import { withAbortSignal } from '../network/abortable';
 
 // 优化 libvips C++ 底层缓存与并发配置，防止批量图集反推时多核多进程解压导致内存飙升
 try {
@@ -24,6 +27,27 @@ export function clearSharpCache(): void {
 export interface ImageConvertOptions {
   maxDimension?: number; // 默认 1280px
   quality?: number;      // 默认 80
+  signal?: AbortSignal;
+}
+
+/** Bound decoded pixels as well as file bytes; a tiny compressed PNG can otherwise consume gigabytes. */
+async function encodeStandardJpeg(rawBuffer: Buffer, options: ImageConvertOptions): Promise<Buffer> {
+  options.signal?.throwIfAborted();
+  if (rawBuffer.length > MAX_PROXY_BYTES) throw new Error('图片数据过大');
+  const imageBuffer = await sharp(rawBuffer, { limitInputPixels: 64 * 1024 * 1024 })
+    .rotate()
+    .flatten({ background: '#ffffff' })
+    .resize({
+      width: options.maxDimension || 1280,
+      height: options.maxDimension || 1280,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .timeout({ seconds: 30 })
+    .jpeg({ quality: options.quality || 80, mozjpeg: true, progressive: true })
+    .toBuffer();
+  options.signal?.throwIfAborted();
+  return imageBuffer;
 }
 
 /**
@@ -36,21 +60,8 @@ export interface ImageConvertOptions {
  * 2. 采用高效 JPEG 压缩 (quality: 80)，单张图片体积从 3MB~8MB 骤降至 60KB~120KB (体积缩减 97%+)；
  * 3. 大模型解析耗时从数分钟缩短至 1~3 秒！
  */
-async function fetchRemoteImageBuffer(rawUrl: string): Promise<Buffer | null> {
-  // 🌟 内部对象存储直读（支持私有阿里云 OSS / S3 / R2 / COS）：避免未经鉴权公网访问被 OSS 403 拦截
-  try {
-    const { extractStorageKeyFromUrl, getObjectBufferFromStorage } = await import('../storage/storage');
-    const storageKey = extractStorageKeyFromUrl(rawUrl);
-    if (storageKey) {
-      const storageRes = await getObjectBufferFromStorage(storageKey);
-      if (storageRes?.buffer && storageRes.buffer.length > 0) {
-        return storageRes.buffer;
-      }
-    }
-  } catch {
-    /* 授权直读失败则回退至标准网络抓取 */
-  }
-
+async function fetchRemoteJpegBuffer(rawUrl: string, options: ImageConvertOptions): Promise<Buffer | null> {
+  const { signal } = options;
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -90,7 +101,7 @@ async function fetchRemoteImageBuffer(rawUrl: string): Promise<Buffer | null> {
   // 构造候选 URL 镜像列表（小红书多 CDN 节点自动故障转移）
   const candidateUrls: string[] = [rawUrl];
   const cleanUrl = normalizeImageUrlToStandardJpg(rawUrl);
-  if (cleanUrl !== rawUrl) candidateUrls.unshift(cleanUrl);
+  if (cleanUrl && cleanUrl !== rawUrl) candidateUrls.unshift(cleanUrl);
 
   if (isXhs) {
     const xhsMirrors = [
@@ -107,27 +118,16 @@ async function fetchRemoteImageBuffer(rawUrl: string): Promise<Buffer | null> {
     }
   }
 
-  const MAX_BYTES = 25 * 1024 * 1024; // 25MB 保护上限
-
   for (const candidate of candidateUrls) {
+    signal?.throwIfAborted();
     try {
-      const res = await fetch(candidate, {
-        headers,
-        signal: AbortSignal.timeout(10000),
-        redirect: 'follow',
-      });
-      if (res.ok) {
-        const contentLength = parseInt(res.headers.get('content-length') || '0', 10);
-        if (contentLength > MAX_BYTES) {
-          continue;
-        }
-
-        const arrayBuf = await res.arrayBuffer();
-        if (arrayBuf.byteLength > 100 && arrayBuf.byteLength <= MAX_BYTES) {
-          return Buffer.from(arrayBuf);
-        }
-      }
+      const timeout = AbortSignal.timeout(10000);
+      const buffer = await fetchSafeImageBuffer(candidate, headers, signal ? AbortSignal.any([signal, timeout]) : timeout);
+      // Some transformed links/CDN mirrors return HTTP 200 HTML or damaged images.
+      // Only a successfully decoded image should prevent trying the original link.
+      if (buffer) return await encodeStandardJpeg(buffer, options);
     } catch {
+      signal?.throwIfAborted();
       continue;
     }
   }
@@ -135,7 +135,12 @@ async function fetchRemoteImageBuffer(rawUrl: string): Promise<Buffer | null> {
   return null;
 }
 
-export async function convertToStandardJpegDataUrl(
+export async function convertToStandardJpegDataUrl(rawInput?: string | null, options: ImageConvertOptions = {}): Promise<string | undefined> {
+  options.signal?.throwIfAborted();
+  return withAbortSignal(convertImage(rawInput, options), options.signal);
+}
+
+async function convertImage(
   rawInput?: string | null,
   options: ImageConvertOptions = {}
 ): Promise<string | undefined> {
@@ -143,8 +148,7 @@ export async function convertToStandardJpegDataUrl(
   const input = rawInput.trim();
   if (!input) return undefined;
 
-  const maxDimension = options.maxDimension || 1280;
-  const quality = options.quality || 80;
+  options.signal?.throwIfAborted();
 
   try {
     let imageBuffer: Buffer | null = null;
@@ -154,18 +158,9 @@ export async function convertToStandardJpegDataUrl(
       const match = input.match(/^data:image\/([a-zA-Z0-9+\-.]+);base64,(.+)$/);
       if (match) {
         const base64Data = match[2];
+        if (base64Data.length > Math.ceil(MAX_PROXY_BYTES / 3) * 4) return undefined;
         const rawBuffer = Buffer.from(base64Data, 'base64');
-        imageBuffer = await sharp(rawBuffer)
-          .rotate()
-          .flatten({ background: '#ffffff' })
-          .resize({
-            width: maxDimension,
-            height: maxDimension,
-            fit: 'inside',
-            withoutEnlargement: true
-          })
-          .jpeg({ quality, mozjpeg: true, progressive: true })
-          .toBuffer();
+        imageBuffer = await encodeStandardJpeg(rawBuffer, options);
       }
     } 
     // 2. 如果是本地相对路径
@@ -174,19 +169,8 @@ export async function convertToStandardJpegDataUrl(
       const localFilePath = resolvePublicPath(input);
       
       if (localFilePath) {
-        const fs = await import('fs');
-        const rawBuf = await fs.promises.readFile(localFilePath);
-        imageBuffer = await sharp(rawBuf)
-          .rotate()
-          .flatten({ background: '#ffffff' })
-          .resize({
-            width: maxDimension,
-            height: maxDimension,
-            fit: 'inside',
-            withoutEnlargement: true
-          })
-          .jpeg({ quality, mozjpeg: true, progressive: true })
-          .toBuffer();
+        const rawBuf = await readLocalImage(localFilePath, options.signal);
+        imageBuffer = await encodeStandardJpeg(rawBuf, options);
       }
     }
     // 3. 如果是远程 HTTP/HTTPS URL
@@ -196,55 +180,38 @@ export async function convertToStandardJpegDataUrl(
         const { extractStorageKeyFromUrl, getObjectBufferFromStorage } = await import('../storage/storage');
         const storageKey = extractStorageKeyFromUrl(input);
         if (storageKey) {
-          const storageRes = await getObjectBufferFromStorage(storageKey);
+          const storageRes = await getObjectBufferFromStorage(storageKey, undefined, { signal: options.signal, maxBytes: MAX_PROXY_BYTES });
+          options.signal?.throwIfAborted();
           if (storageRes?.buffer && storageRes.buffer.length > 0) {
-            imageBuffer = await sharp(storageRes.buffer)
-              .rotate()
-              .flatten({ background: '#ffffff' })
-              .resize({
-                width: maxDimension,
-                height: maxDimension,
-                fit: 'inside',
-                withoutEnlargement: true
-              })
-              .jpeg({ quality, mozjpeg: true, progressive: true })
-              .toBuffer();
+            if (storageRes.buffer.length > MAX_PROXY_BYTES) return undefined;
+            imageBuffer = await encodeStandardJpeg(storageRes.buffer, options);
           }
         }
       } catch (storageErr) {
+        options.signal?.throwIfAborted();
         console.warn('[imageConverter] 内部对象存储直读失败，尝试公网拉取:', storageErr);
       }
 
       if (!imageBuffer) {
         const { assertSafeRemoteUrl } = await import('../network/safeUrl');
         try {
-          await assertSafeRemoteUrl(input, { requireAllowlist: true });
+          await withAbortSignal(assertSafeRemoteUrl(input, { requireAllowlist: true }), options.signal);
         } catch {
+          options.signal?.throwIfAborted();
           return undefined;
         }
 
-        const rawBuf = await fetchRemoteImageBuffer(input);
-        if (rawBuf && rawBuf.length > 0) {
-          imageBuffer = await sharp(rawBuf)
-            .rotate()
-            .flatten({ background: '#ffffff' })
-            .resize({
-              width: maxDimension,
-              height: maxDimension,
-              fit: 'inside',
-              withoutEnlargement: true
-            })
-            .jpeg({ quality, mozjpeg: true, progressive: true })
-            .toBuffer();
-        }
+        imageBuffer = await fetchRemoteJpegBuffer(input, options);
       }
     }
 
+    options.signal?.throwIfAborted();
     if (imageBuffer && imageBuffer.length > 0) {
       return `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
     }
-  } catch (err: any) {
-    console.warn(`[ImageConverter] 图片转码压缩失败 (${input.slice(0, 80)}):`, err.message);
+  } catch (err: unknown) {
+    options.signal?.throwIfAborted();
+    console.warn(`[ImageConverter] 图片转码压缩失败 (${input.slice(0, 80)}):`, err instanceof Error ? err.message : '未知错误');
   }
 
   return undefined;
@@ -323,5 +290,9 @@ export async function createCompactSourceImagesJson(
     list.map((url) => createCompactThumbnailDataUrl(url, maxDim))
   );
 
-  return JSON.stringify(compressedList.filter(Boolean));
+  // sourceImageIndices refers to the original album positions, so a missing
+  // thumbnail must not shift the images that follow it.
+  return JSON.stringify(compressedList.map((url, index) =>
+    url || (typeof list[index] === 'string' ? list[index].trim() : '')
+  ));
 }

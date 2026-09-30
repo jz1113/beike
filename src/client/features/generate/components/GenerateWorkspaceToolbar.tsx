@@ -8,6 +8,7 @@ export interface GenerateWorkspaceToolbarProps {
   onCreateSession?: () => void;
   onSwitchSession?: (id: string) => void;
   onDeleteSession?: (id: string, title?: string) => void;
+  onDeleteAllSessions?: () => void;
   onRenameSession?: (id: string, newTitle: string) => void;
 }
 
@@ -18,6 +19,7 @@ export function GenerateWorkspaceToolbar({
   onCreateSession,
   onSwitchSession,
   onDeleteSession,
+  onDeleteAllSessions,
   onRenameSession,
 }: GenerateWorkspaceToolbarProps) {
   return (
@@ -26,7 +28,7 @@ export function GenerateWorkspaceToolbar({
     >
       {/* 🌟 左侧：通栏靠左对齐的高质感会话环境胶囊（作为当前工作区/会话的顶级切换器） */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-        {sessions && currentSessionId && onSwitchSession && onCreateSession && onRenameSession && onDeleteSession ? (
+        {sessions && currentSessionId && onSwitchSession && onCreateSession && onRenameSession && onDeleteSession && onDeleteAllSessions ? (
           <GenerateSessionDropdown
             sessions={sessions}
             currentSessionId={currentSessionId}
@@ -34,6 +36,7 @@ export function GenerateWorkspaceToolbar({
             onCreateSession={onCreateSession}
             onSwitchSession={onSwitchSession}
             onDeleteSession={(id, title) => onDeleteSession(id, title)}
+            onDeleteAllSessions={onDeleteAllSessions}
             onRenameSession={onRenameSession}
           />
         ) : (

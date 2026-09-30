@@ -13,6 +13,7 @@ import {
 } from './model/generateWorkspaceLayout';
 import { pageRoot } from '@client/shared/ui/layoutClasses';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
+import { useGenerateFeedHistory } from './hooks/useGenerateFeedHistory';
 
 interface Props {
   onOpenSettings?: () => void;
@@ -28,6 +29,7 @@ export default function GenerateWorkspace({
     createSession,
     switchSession,
     deleteSession,
+    deleteAllSessions,
     renameSession,
     previewTask,
   } = useAppStore(
@@ -37,13 +39,15 @@ export default function GenerateWorkspace({
       createSession: s.createSession,
       switchSession: s.switchSession,
       deleteSession: s.deleteSession,
+      deleteAllSessions: s.deleteAllSessions,
       renameSession: s.renameSession,
       previewTask: s.previewTask,
     })),
   );
 
-  // 🌟 确认删除对话弹窗状态 (居中弹窗)
-  const [sessionToDelete, setSessionToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { type: 'single'; id: string; title: string } | { type: 'all' } | null
+  >(null);
 
   // 吐司提示状态
   const { setSafeTimeout } = useSafeTimeout();
@@ -53,36 +57,47 @@ export default function GenerateWorkspace({
     setSafeTimeout(() => setToastMsg(null), 2500);
   }, [setSafeTimeout]);
 
+  useEffect(() => {
+    const handleStorageError = (event: Event) => {
+      const message = (event as CustomEvent<unknown>).detail;
+      if (typeof message === 'string') showToast(message);
+    };
+    window.addEventListener('beike:generation-storage-error', handleStorageError);
+    return () => window.removeEventListener('beike:generation-storage-error', handleStorageError);
+  }, [showToast]);
+
   const handleRequestDeleteSession = useCallback(
     (id: string, title?: string) => {
       const target = sessions.find((s) => s.id === id);
       const resolvedTitle = title || target?.title || '未命名对话';
-      setSessionToDelete({ id, title: resolvedTitle });
+      setDeleteTarget({ type: 'single', id, title: resolvedTitle });
     },
     [sessions],
   );
 
   const handleConfirmDeleteSession = useCallback(() => {
-    if (!sessionToDelete) return;
-    const { id, title } = sessionToDelete;
-    deleteSession(id);
-    showToast(`已删除对话「${title}」`);
-    setSessionToDelete(null);
-  }, [sessionToDelete, deleteSession, showToast]);
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'all') {
+      deleteAllSessions();
+      showToast('已删除全部创作对话');
+    } else {
+      deleteSession(deleteTarget.id);
+      showToast(`已删除对话「${deleteTarget.title}」`);
+    }
+    setDeleteTarget(null);
+  }, [deleteTarget, deleteSession, deleteAllSessions, showToast]);
 
-  // 快捷键支持：弹窗打开时 Esc 关闭、Enter 确认删除
+  // Buttons own Enter activation, so confirming cannot override a focused Cancel button.
   useEffect(() => {
-    if (!sessionToDelete) return;
+    if (!deleteTarget) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setSessionToDelete(null);
-      } else if (e.key === 'Enter') {
-        handleConfirmDeleteSession();
+        setDeleteTarget(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [sessionToDelete, handleConfirmDeleteSession]);
+  }, [deleteTarget, handleConfirmDeleteSession]);
 
   const { dropZoneProps: pageMediaDropProps, toastMsg: dropToastMsg } = useQuickRefMediaDrop();
   const combinedToast = toastMsg || dropToastMsg;
@@ -142,31 +157,11 @@ export default function GenerateWorkspace({
     [dateGroupedBatches],
   );
 
-  const [visibleBatchLimit, setVisibleBatchLimit] = useState(50);
-  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setVisibleBatchLimit(50);
-  }, [currentSessionId]);
-
-  useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setVisibleBatchLimit((prev) => prev + 25);
-        }
-      },
-      { rootMargin: '400px' },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [flatBatches.length]);
-
-  // 🌟 取最新的 visibleBatchLimit 条批次，保证最新任务永远在底部可见
-  const visibleFlatBatches = flatBatches.slice(Math.max(0, flatBatches.length - visibleBatchLimit));
-  const hasMoreBatches = visibleBatchLimit < flatBatches.length;
+  const { visibleFlatBatches, hasMoreBatches, loadMoreSentinelRef } = useGenerateFeedHistory(
+    flatBatches,
+    currentSessionId,
+    scrollContainerRef,
+  );
 
   return (
     <div className={`${pageRoot} bg-transparent select-none relative`}>
@@ -186,6 +181,7 @@ export default function GenerateWorkspace({
         onCreateSession={createSession}
         onSwitchSession={switchSession}
         onDeleteSession={handleRequestDeleteSession}
+        onDeleteAllSessions={() => setDeleteTarget({ type: 'all' })}
         onRenameSession={renameSession}
       />
         <GenerateTaskFeed
@@ -195,7 +191,6 @@ export default function GenerateWorkspace({
           visibleFlatBatches={visibleFlatBatches}
           hasMoreBatches={hasMoreBatches}
           loadMoreSentinelRef={loadMoreSentinelRef}
-          activeSessionTitle={activeSession?.title}
           onShowToast={showToast}
         />
 
@@ -213,10 +208,10 @@ export default function GenerateWorkspace({
         </div>
 
       {/* 🌟 4. 居中弹出确认删除对话框（即梦同款设计） */}
-      {sessionToDelete && (
+      {deleteTarget && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in select-none"
-          onClick={() => setSessionToDelete(null)}
+          onClick={() => setDeleteTarget(null)}
         >
           <div
             className="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 max-w-[440px] w-full relative animate-scale-up"
@@ -225,7 +220,7 @@ export default function GenerateWorkspace({
             {/* 右上角关闭 X */}
             <button
               type="button"
-              onClick={() => setSessionToDelete(null)}
+              onClick={() => setDeleteTarget(null)}
               className="absolute top-6 right-6 p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               title="取消 (Esc)"
             >
@@ -234,19 +229,21 @@ export default function GenerateWorkspace({
 
             {/* 标题 */}
             <h3 className="text-[16px] font-bold text-slate-900 pr-7 truncate">
-              确认删除「{sessionToDelete.title}」
+              {deleteTarget.type === 'all' ? `确认删除全部 ${sessions.length} 个对话` : `确认删除「${deleteTarget.title}」`}
             </h3>
 
             {/* 说明文案 */}
             <p className="mt-3 text-[13px] text-slate-500 leading-relaxed font-normal">
-              此操作无法撤回，删除对话后，仍可在「资产」中找回已生成的内容，确认删除么？
+              {deleteTarget.type === 'all'
+                ? '将清空「最近」中的全部创作对话。此操作无法撤回，已生成的内容仍保留在「资产」中。'
+                : '此操作无法撤回，删除对话后，仍可在「资产」中找回已生成的内容，确认删除么？'}
             </p>
 
             {/* 底部按钮栏 */}
             <div className="mt-7 flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setSessionToDelete(null)}
+                onClick={() => setDeleteTarget(null)}
                 className="px-5 py-2 rounded-xl bg-[#F2F3F5] hover:bg-[#E5E6EB] text-slate-800 text-[13px] font-medium transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
                 取消
@@ -257,7 +254,7 @@ export default function GenerateWorkspace({
                 onClick={handleConfirmDeleteSession}
                 className="px-5 py-2 rounded-xl bg-black hover:bg-slate-800 text-white text-[13px] font-medium transition-all active:scale-95 cursor-pointer shadow-sm"
               >
-                删除
+                {deleteTarget.type === 'all' ? '全部删除' : '删除'}
               </button>
             </div>
           </div>

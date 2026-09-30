@@ -21,6 +21,8 @@ import type {
 } from '@shared/domain/assistant/types';
 import type { AssistantSSEEvent } from '@shared/domain/assistant/events';
 import type { ToolDefinition } from './toolRegistry';
+import { materializeRuntimeItems } from './runtimeItems';
+import { legacyToolCallEvent, legacyToolResultEvent } from './runtimeEvents';
 
 const idCounter = (prefix: string) =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -122,7 +124,7 @@ export class AgentRuntime {
   listItems(): AssistantItem[] {
     return Array.from(this.items.values())
       .sort((a, b) => a.startedAt - b.startedAt)
-      .map((it) => this.materializeItem(it));
+      .flatMap((it) => materializeRuntimeItems(it));
   }
 
   getPendingApprovals(): RuntimeApprovalRequest[] {
@@ -148,6 +150,7 @@ export class AgentRuntime {
   // ───────────────────────── 推进 item ─────────────────────────
 
   startItem(kind: ItemKind, payload: Record<string, unknown> = {}, meta?: Record<string, unknown>): string {
+    this.signal?.throwIfAborted();
     const id = idCounter(kind === 'agentMessage' ? 'msg' : kind === 'agentReasoning' ? 'reason' : kind);
     const state: InternalItemState = {
       id,
@@ -159,7 +162,7 @@ export class AgentRuntime {
     };
     this.items.set(id, state);
 
-    this.send({ type: 'item/started', turnId: this.turnId, itemId: id, kind, meta });
+    this.send({ type: 'item/started', turnId: this.turnId, itemId: id, kind, meta: kind === 'subAgent' ? { ...payload, ...meta } : meta });
     this.emitOnItem(id);
 
     // 同时发送特定类型专用事件（向后兼容旧的 kind/delta 命名空间）
@@ -177,13 +180,13 @@ export class AgentRuntime {
           itemId: id,
           name: String(payload.name || ''),
           displayName: String(payload.displayName || payload.name || ''),
-          args: String(payload.args || '{}'),
+          args: String(payload.args ?? '{}'),
         });
         this.toolCalls.set(id, {
           callId: String(payload.callId || id),
           name: String(payload.name || ''),
           displayName: String(payload.displayName || payload.name || ''),
-          args: String(payload.args || '{}'),
+          args: String(payload.args ?? '{}'),
           status: 'running',
           startedAt: state.startedAt,
         });
@@ -224,7 +227,7 @@ export class AgentRuntime {
   /** 完成一个 item —— 终态写入 payload + 广播 completed 事件 */
   completeItem(itemId: string, status: 'done' | 'error' | 'cancelled' = 'done'): void {
     const item = this.items.get(itemId);
-    if (!item) return;
+    if (!item || item.status !== 'running') return;
     item.status = status;
     item.completedAt = Date.now();
     this.emitOnItem(itemId);
@@ -235,7 +238,7 @@ export class AgentRuntime {
       itemId,
       kind: item.kind,
       status,
-      meta: item.meta,
+      meta: item.kind === 'subAgent' ? { ...item.payload, ...item.meta } : item.meta,
     });
 
     if (item.kind === 'agentMessage') {
@@ -341,6 +344,7 @@ export class AgentRuntime {
             ? 'cancelled'
             : 'error';
       item.completedAt = Date.now();
+      item.payload.decision = decision;
       this.emitOnItem(itemId);
     }
     this.send({
@@ -352,21 +356,14 @@ export class AgentRuntime {
   }
 
   rejectAllApprovals(): void {
-    for (const id of this.pendingApprovals.keys()) {
-      this.pendingApprovals.delete(id);
-      this.send({
-        type: 'item/approval/resolved',
-        turnId: this.turnId,
-        approvalId: id,
-        decision: 'cancel',
-      });
-    }
+    for (const id of [...this.pendingApprovals.keys()]) this.resolveApproval(id, 'cancel');
   }
 
   // ───────────────────────── 终态 ─────────────────────────
 
   /** 收尾：发 turn/completed + done（legacy 兼容） */
   complete(emitEvents = true): void {
+    if (this.status === 'completed' || this.status === 'failed' || this.status === 'interrupted') return;
     if (this.status === 'awaiting_approval') {
       this.rejectAllApprovals();
     }
@@ -381,12 +378,15 @@ export class AgentRuntime {
     if (this.status === 'completed' || this.status === 'failed' || this.status === 'interrupted') return;
     this.status = 'interrupted';
     this.rejectAllApprovals();
+    for (const item of this.items.values()) if (item.status === 'running') this.completeItem(item.id, 'cancelled');
     this.send({ type: 'turn/interrupted', turnId: this.turnId });
   }
 
   fail(error: string, emitEvent = true): void {
+    if (this.status === 'completed' || this.status === 'failed' || this.status === 'interrupted') return;
     this.status = 'failed';
     this.rejectAllApprovals();
+    for (const item of this.items.values()) if (item.status === 'running') this.completeItem(item.id, 'error');
     if (emitEvent) this.send({ type: 'error', error });
   }
 
@@ -416,7 +416,7 @@ export class AgentRuntime {
     const state = this.items.get(itemId);
     if (!state) return;
     try {
-      this.onItemEvent(this.materializeItem(state));
+      for (const item of materializeRuntimeItems(state)) this.onItemEvent(item);
     } catch {
       /* swallow consumer errors to keep stream flowing */
     }
@@ -450,7 +450,7 @@ export class AgentRuntime {
     },
   ): void {
     const item = this.items.get(itemId);
-    if (!item) return;
+    if (!item || item.status !== 'running') return;
     item.payload.summary = opts.summary;
     if (opts.action) item.payload.action = opts.action;
     if (opts.visualImages) item.payload.visualImages = opts.visualImages;
@@ -476,13 +476,7 @@ export class AgentRuntime {
   private emitLegacyToolCall(itemId: string, status: 'running' | 'done' | 'error'): void {
     const item = this.items.get(itemId);
     if (!item) return;
-    this.send({
-      type: 'tool_call',
-      name: String(item.payload.name || ''),
-      displayName: String(item.payload.displayName || item.payload.name || ''),
-      status,
-      detail: String(item.payload.args || '').slice(0, 120),
-    });
+    this.send(legacyToolCallEvent(item.payload, status));
   }
 
   private emitLegacyToolResult(
@@ -494,77 +488,10 @@ export class AgentRuntime {
   ): void {
     const item = this.items.get(itemId);
     if (!item) return;
-    const finalStatus = status === 'done' ? 'done' : status === 'cancelled' ? 'error' : 'error';
-    this.send({
-      type: 'tool_result',
-      name: String(item.payload.name || ''),
-      displayName: String(item.payload.displayName || item.payload.name || ''),
-      status: finalStatus,
-      detail: summary,
-      ...(action ? { action } : {}),
-      ...(visualImages && visualImages.length > 0 ? { visualImages } : {}),
-    });
+    this.send(legacyToolResultEvent(item.payload, status, summary, action, visualImages));
   }
 
-  private materializeItem(it: InternalItemState): AssistantItem {
-    const base = {
-      id: it.id,
-      kind: it.kind,
-      createdAt: it.startedAt,
-    } as const;
 
-    switch (it.kind) {
-      case 'agentMessage':
-        return { ...base, kind: 'agentMessage', content: String(it.payload.content || '') };
-      case 'agentReasoning':
-        return { ...base, kind: 'agentReasoning', content: String(it.payload.content || '') };
-      case 'toolCall':
-        return {
-          ...base,
-          kind: 'toolCall',
-          name: String(it.payload.name || ''),
-          displayName: String(it.payload.displayName || it.payload.name || ''),
-          args: String(it.payload.args || '{}'),
-          callId: String(it.payload.callId || it.id),
-          status:
-            it.status === 'done'
-              ? 'done'
-              : it.status === 'error'
-                ? 'error'
-                : 'running',
-        };
-      case 'toolResult':
-        return {
-          ...base,
-          kind: 'toolResult',
-          name: String(it.payload.name || ''),
-          displayName: String(it.payload.displayName || it.payload.name || ''),
-          status: it.status === 'done' ? 'done' : 'error',
-          summary: String(it.payload.summary || ''),
-          ...(it.payload.action ? { action: it.payload.action as Record<string, unknown> } : {}),
-        };
-      case 'approvalRequest':
-        return {
-          ...base,
-          kind: 'approvalRequest',
-          approvalId: String(it.payload.approvalId || ''),
-          toolName: String(it.payload.toolName || ''),
-          displayName: String(it.payload.displayName || it.payload.toolName || ''),
-          args: (it.payload.args as Record<string, unknown>) || {},
-          status:
-            it.status === 'done'
-              ? 'accepted'
-              : it.status === 'cancelled'
-                ? 'expired'
-                : it.status === 'error'
-                  ? 'declined'
-                  : 'pending',
-        };
-      case 'userMessage':
-      default:
-        return { ...base, kind: 'userMessage', content: String(it.payload.content || '') };
-    }
-  }
 }
 
 /** 便利工厂 */

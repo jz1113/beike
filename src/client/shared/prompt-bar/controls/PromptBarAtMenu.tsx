@@ -2,9 +2,11 @@ import type { RefObject } from 'react';
 import { Plus, Check } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
+import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 
 export interface PromptBarAtMenuProps {
   atMenuRef?: RefObject<HTMLDivElement | null>;
+  anchorRef: RefObject<HTMLDivElement | null>;
   isUp: boolean;
   atMenuQuery: string;
   allSubjects: SubjectItem[];
@@ -94,6 +96,7 @@ function AtMenuEmptyIllustration() {
 
 export function PromptBarAtMenu({
   atMenuRef,
+  anchorRef,
   isUp,
   atMenuQuery,
   allSubjects,
@@ -101,6 +104,7 @@ export function PromptBarAtMenu({
   onCreateSubjectClick,
   onSelectSubject,
 }: PromptBarAtMenuProps) {
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(true, isUp, anchorRef, 272);
   const hasSubjects = allSubjects.length > 0;
 
   const filteredSubjects = allSubjects.filter((sub, idx) => {
@@ -119,10 +123,13 @@ export function PromptBarAtMenu({
 
   return (
     <div
-      ref={atMenuRef}
+      ref={node => { panelRef.current = node; if (atMenuRef) atMenuRef.current = node; }}
+      style={panelStyle}
+      role="dialog"
+      aria-label="选择参考素材或主体"
       className={`absolute left-0 ${
-        isUp ? 'bottom-full mb-2.5 origin-bottom' : 'top-full mt-2 origin-top'
-      } w-[272px] rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-4 z-50 animate-fade-in text-left select-none`}
+        opensUp ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'
+      } w-[min(272px,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-4 z-50 animate-fade-in text-left select-none`}
     >
       {/* 顶部小标 */}
       <div className="flex items-center justify-between text-xs font-normal text-slate-400 select-none">
@@ -170,6 +177,7 @@ export function PromptBarAtMenu({
                   <button
                     key={sub.id}
                     type="button"
+                    onMouseDown={event => event.preventDefault()}
                     onClick={() => onSelectSubject(sub)}
                     className={`w-full px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                       isCurrent ? 'bg-slate-100 font-bold text-slate-900' : 'hover:bg-slate-50 text-slate-700'

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { SquarePen, PanelLeft, Trash2, Pencil } from 'lucide-react';
+import { SquarePen, Trash2, Pencil } from 'lucide-react';
 import type { ChatSession } from '@client/store';
 import { GenerateSessionThumbnail } from './GenerateSessionThumbnail';
 
@@ -10,6 +10,7 @@ export interface GenerateSessionDropdownProps {
   onCreateSession: () => void;
   onSwitchSession: (id: string) => void;
   onDeleteSession: (id: string, title?: string) => void;
+  onDeleteAllSessions: () => void;
   onRenameSession: (id: string, newTitle: string) => void;
 }
 
@@ -20,6 +21,7 @@ export function GenerateSessionDropdown({
   onCreateSession,
   onSwitchSession,
   onDeleteSession,
+  onDeleteAllSessions,
   onRenameSession,
 }: GenerateSessionDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -92,11 +94,11 @@ export function GenerateSessionDropdown({
     onDeleteSession(sess.id, sess.title);
   };
 
-  const displayTitle = activeSessionTitle || '新创作对话';
+  const displayTitle = sessions.length > 0 ? activeSessionTitle || '新创作对话' : '开始新对话';
 
   return (
     <div className="relative shrink-0" ref={dropdownRef}>
-      {/* 🌟 1. 顶部触发胶囊按钮（完全对齐图 2 原版设计：标题 + | 细分割线 + 分栏图标） */}
+      {/* 当前对话标题同时作为对话列表入口 */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -110,8 +112,6 @@ export function GenerateSessionDropdown({
         <span className="max-w-[140px] sm:max-w-[200px] md:max-w-[260px] truncate leading-none">
           {displayTitle}
         </span>
-        <span className="text-slate-300 font-light mx-0.5 select-none leading-none">|</span>
-        <PanelLeft className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-colors shrink-0" />
       </button>
 
       {/* 🌟 2. 悬浮下拉面板（完全对齐图 2 原版卡片式设计） */}
@@ -127,13 +127,24 @@ export function GenerateSessionDropdown({
             <span>新对话</span>
           </button>
 
-          {/* 分组标识（对齐图 2：仅展示灰色的「最近」，彻底去除多余对话数量统计） */}
-          <div className="px-2 pt-1 pb-0.5 text-xs font-medium text-slate-400">
-            最近
+          <div className="px-2 pt-1 pb-0.5 flex items-center justify-between text-xs font-medium text-slate-400">
+            <span>最近</span>
+            {sessions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setIsOpen(false); onDeleteAllSessions(); }}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                title="删除全部创作对话"
+              >
+                <Trash2 className="w-3 h-3" />
+                全部删除
+              </button>
+            )}
           </div>
 
           {/* 最近对话列表 */}
           <div className="max-h-[380px] overflow-y-auto space-y-1.5 pr-0.5 scrollbar-thin">
+            {sessions.length === 0 && <p className="px-2 py-5 text-center text-xs text-slate-400">暂无对话</p>}
             {sessions.map((sess) => {
               const isSelected = sess.id === currentSessionId;
               const isEditing = editingSessionId === sess.id;

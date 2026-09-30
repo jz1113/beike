@@ -4,6 +4,8 @@ import { drainDepthVideoQueue } from '../services/depth/depthVideoPipeline';
 import { flushItemQueue } from '../services/library/itemPersistQueue';
 import { purgeExpiredSubmissionReceipts } from '../services/tasks/submissionGuard';
 import { purgeExpiredMediaReviews } from '../services/library/mediaReviewQueue';
+import { recoverDeconstructJobsOnBoot } from '../repositories/deconstructJobs';
+import { drainDeconstructJobs } from '../services/deconstruct/jobs';
 
 const SHUTDOWN_DRAIN_MS = 5_000;
 
@@ -24,6 +26,8 @@ async function withTimeout(promise: Promise<unknown>, ms: number, label: string)
 }
 
 export async function recoverOnBoot(): Promise<void> {
+  const interrupted = await recoverDeconstructJobsOnBoot();
+  if (interrupted) console.log(`→ [后台反推] ${interrupted} 个遗留任务已暂停，未自动重放模型请求`);
   await checkpointDatabase().catch((err) => {
     console.error('[API] boot checkpointDatabase 失败:', err);
   });
@@ -79,6 +83,7 @@ export function installShutdown(server: { close: () => void }, walInterval: Retu
       clearInterval(walInterval);
       await Promise.all([
         drainDepthVideoQueue(SHUTDOWN_DRAIN_MS),
+        drainDeconstructJobs(SHUTDOWN_DRAIN_MS),
         withTimeout(flushItemQueue(), SHUTDOWN_DRAIN_MS, 'shutdown flushItemQueue'),
       ]);
       await checkpointDatabase().catch((err) => {

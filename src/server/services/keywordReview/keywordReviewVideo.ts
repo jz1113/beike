@@ -3,7 +3,10 @@ import { KEYWORD_VIDEO_CATEGORIES } from '@shared/contracts/generate';
 export const VIDEO_CATEGORY_SET = new Set<string>(KEYWORD_VIDEO_CATEGORIES);
 
 /** Video rules are independent of the existing image-and-text review contract. */
-export function buildVideoReviewPrompt(lookup = false): string {
+export function buildVideoReviewPrompt(lookup = false, compact = false): string {
+  const outputFormat = compact
+    ? `results 中每行使用定长数组，依次为 [id,category,producible,lowValue,categoryReason,rejectReason${lookup ? ',needsLookup' : ''}]。制作时 rejectReason 仍填空字符串，不得省略位置。严格返回 JSON：{"results":[["1","3C","制作","否","手机选购，归数码设备",""${lookup ? ',false' : ''}]]}`
+    : `严格返回 JSON：{"results":[{"id":"序号","category":"唯一允许垂类","producible":"制作或不制作","lowValue":"是或否","categoryReason":"垂类短依据","rejectReason":"不制作依据或空字符串"${lookup ? ',"needsLookup":false' : ''}}]}`;
   return `你是中文科普视频关键词的逐行审核员。理解每一行的真实语义，再判断唯一垂类、视频可制作性和低价值。不得只用关键词字面命中、旧「分类」列或同批多数结果代替逐行判断。
 
 最终垂类只能从以下 ${KEYWORD_VIDEO_CATEGORIES.length} 个原样选择一个：
@@ -32,5 +35,5 @@ ${KEYWORD_VIDEO_CATEGORIES.join('、')}
 
 categoryReason 用 10-18 字说明主体与归类依据。rejectReason 仅「不制作」填写，使用「低价值、医疗诊疗、金融决策、违法危险、算命迷信、敏感热点、简单问答、工业硬广、限制过细」之一作前缀，加冒号和该行具体命中点；「制作」必须为空字符串。${lookup ? '认不出专有作品、机构、品牌或外文实体时 needsLookup=true，其余 false。' : ''}
 
-id 是本批序号，必须原样返回。严格返回 JSON：{"results":[{"id":"序号","category":"唯一允许垂类","producible":"制作或不制作","lowValue":"是或否","categoryReason":"垂类短依据","rejectReason":"不制作依据或空字符串"${lookup ? ',"needsLookup":false' : ''}}]}。每个输入 id 恰好一次，不得遗漏。`;
+id 是本批序号，必须原样返回。${outputFormat}。每个输入 id 恰好一次，不得遗漏。`;
 }

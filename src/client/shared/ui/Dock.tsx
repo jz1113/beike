@@ -4,6 +4,7 @@ import {
   motion,
   MotionValue,
   useMotionValue,
+  useReducedMotion,
   useSpring,
   useTransform,
   type SpringOptions,
@@ -12,11 +13,13 @@ import {
 import React, { Children, cloneElement, useEffect, useMemo, useRef, useState } from 'react';
 
 export type DockItemData = {
+  id?: string;
   icon: React.ReactNode;
   label: React.ReactNode;
   onClick: () => void;
   className?: string;
   disabled?: boolean;
+  active?: boolean;
 };
 
 export type DockProps = {
@@ -45,6 +48,8 @@ type DockItemProps = {
   magnification: number;
   label?: React.ReactNode;
   disabled?: boolean;
+  active?: boolean;
+  reducedMotion: boolean;
 };
 
 function DockItem({
@@ -58,9 +63,12 @@ function DockItem({
   baseItemSize,
   label,
   disabled = false,
+  active = false,
+  reducedMotion,
 }: DockItemProps) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLButtonElement>(null);
   const isHovered = useMotionValue(0);
+  const isKeyboardFocused = useMotionValue(0);
 
   const mouseDistance = useTransform(mouseX, val => {
     const rect = ref.current?.getBoundingClientRect() ?? {
@@ -70,34 +78,32 @@ function DockItem({
     return val - rect.x - baseItemSize / 2;
   });
 
-  const targetSize = useTransform(mouseDistance, [-distance, 0, distance], [baseItemSize, magnification, baseItemSize]);
+  const pointerSize = useTransform(mouseDistance, [-distance, 0, distance], [baseItemSize, magnification, baseItemSize]);
+  const targetSize = useTransform<number, number>([pointerSize, isKeyboardFocused], ([pointerValue, focused]) => focused ? magnification : pointerValue);
   const size = useSpring(targetSize, spring);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (disabled) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onClick?.();
-    }
-  };
-
   return (
-    <motion.div
+    <motion.button
       ref={ref}
+      type="button"
       style={{
-        width: size,
-        height: size
+        width: reducedMotion ? baseItemSize : size,
+        height: reducedMotion ? baseItemSize : size
       }}
       onHoverStart={() => isHovered.set(1)}
       onHoverEnd={() => isHovered.set(0)}
-      onFocus={() => isHovered.set(1)}
-      onBlur={() => isHovered.set(0)}
-      onClick={() => { if (!disabled) onClick?.(); }}
-      onKeyDown={handleKeyDown}
-      className={`relative inline-flex items-center justify-center rounded-xl border border-[#3a3540] bg-[#201d25] text-slate-100 shadow-sm transition-colors ${disabled ? 'cursor-not-allowed text-slate-400 opacity-70' : 'cursor-pointer hover:border-[#554e5c] hover:bg-[#29252f]'} ${className}`}
-      tabIndex={disabled ? -1 : 0}
-      role="button"
-      aria-disabled={disabled}
+      onFocus={event => {
+        isHovered.set(1);
+        isKeyboardFocused.set(event.currentTarget.matches(':focus-visible') ? 1 : 0);
+      }}
+      onBlur={() => {
+        isHovered.set(0);
+        isKeyboardFocused.set(0);
+      }}
+      onClick={onClick}
+      className={`relative inline-flex shrink-0 items-center justify-center rounded-xl border border-[#3a3540] bg-[#201d25] text-slate-100 shadow-sm transition-colors focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${disabled ? 'cursor-not-allowed text-slate-400 opacity-70' : 'cursor-pointer hover:border-[#554e5c] hover:bg-[#29252f]'} ${className}`}
+      disabled={disabled}
+      aria-current={active ? 'page' : undefined}
       aria-label={typeof label === 'string' ? label : undefined}
     >
       {Children.map(children, child =>
@@ -105,7 +111,7 @@ function DockItem({
           ? cloneElement(child as React.ReactElement<{ isHovered?: MotionValue<number> }>, { isHovered })
           : child
       )}
-    </motion.div>
+    </motion.button>
   );
 }
 
@@ -114,6 +120,7 @@ type DockLabelProps = {
   children: React.ReactNode;
   isHovered?: MotionValue<number>;
   placement?: 'top' | 'bottom';
+  reducedMotion: boolean;
 };
 
 function DockLabel({
@@ -121,6 +128,7 @@ function DockLabel({
   className = '',
   isHovered,
   placement = 'top',
+  reducedMotion,
 }: DockLabelProps) {
   const [isVisible, setIsVisible] = useState(false);
   const isBottom = placement === 'bottom';
@@ -136,11 +144,11 @@ function DockLabel({
   return (
     <AnimatePresence>
       {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, y: isBottom ? -4 : 0 }}
+        <motion.span
+          initial={reducedMotion ? false : { opacity: 0, y: isBottom ? -4 : 0 }}
           animate={{ opacity: 1, y: isBottom ? 2 : -10 }}
           exit={{ opacity: 0, y: isBottom ? -4 : 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: reducedMotion ? 0 : 0.2 }}
           className={`${className} absolute ${isBottom
             ? 'top-[calc(100%+8px)] text-[11px] font-medium leading-none text-slate-500'
             : '-top-6 rounded-md border border-[#3a3540] bg-[#201d25] px-2 py-0.5 text-xs text-white shadow-lg'} left-1/2 w-fit whitespace-pre`}
@@ -148,7 +156,7 @@ function DockLabel({
           style={{ x: '-50%' }}
         >
           {children}
-        </motion.div>
+        </motion.span>
       )}
     </AnimatePresence>
   );
@@ -161,7 +169,7 @@ type DockIconProps = {
 };
 
 function DockIcon({ children, className = '' }: DockIconProps) {
-  return <div className={`flex items-center justify-center ${className}`}>{children}</div>;
+  return <span className={`flex items-center justify-center ${className}`}>{children}</span>;
 }
 
 export default function Dock({
@@ -180,17 +188,18 @@ export default function Dock({
 }: DockProps) {
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
+  const reducedMotion = useReducedMotion() === true;
 
   const maxHeight = useMemo(() => expandsOnHover ? Math.max(dockHeight, magnification + magnification / 2 + 4) : panelHeight, [dockHeight, expandsOnHover, magnification, panelHeight]);
   const heightRow = useTransform(isHovered, [0, 1], [panelHeight, maxHeight]);
   const height = useSpring(heightRow, spring);
 
   return (
-    <motion.div style={{ height, scrollbarWidth: 'none' }} className="flex max-w-full items-center">
+    <motion.div style={{ height: reducedMotion ? panelHeight : height, scrollbarWidth: 'none' }} className="flex max-w-full items-center">
       <motion.div
-        onMouseMove={({ pageX }) => {
+        onMouseMove={({ clientX }) => {
           isHovered.set(1);
-          mouseX.set(pageX);
+          mouseX.set(clientX);
         }}
         onMouseLeave={() => {
           isHovered.set(0);
@@ -203,7 +212,7 @@ export default function Dock({
       >
         {items.map((item, index) => (
           <DockItem
-            key={index}
+            key={item.id ?? index}
             onClick={item.onClick}
             className={item.className}
             mouseX={mouseX}
@@ -213,9 +222,11 @@ export default function Dock({
             baseItemSize={baseItemSize}
             label={item.label}
             disabled={item.disabled}
+            active={item.active}
+            reducedMotion={reducedMotion}
           >
             <DockIcon>{item.icon}</DockIcon>
-            {showLabels && <DockLabel placement={labelPlacement}>{item.label}</DockLabel>}
+            {showLabels && <DockLabel placement={labelPlacement} reducedMotion={reducedMotion}>{item.label}</DockLabel>}
           </DockItem>
         ))}
       </motion.div>

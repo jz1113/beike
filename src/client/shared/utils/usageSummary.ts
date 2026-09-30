@@ -48,7 +48,7 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
   const daysLimit = range === '30d' ? 30 : range === '90d' ? 90 : 365;
   const cutoffTime = now - daysLimit * 24 * 60 * 60 * 1000;
 
-  const filteredLogs = allLogs.filter(l => l.timestamp >= cutoffTime);
+  const filteredLogs = allLogs.filter(l => Number.isFinite(l.timestamp) && l.timestamp >= cutoffTime && l.timestamp <= now);
 
   if (filteredLogs.length === 0) {
     return {
@@ -100,10 +100,10 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
 
     // 🌟 纠正生图计数：仅限 image/video 类型的调用才计入生图数，vision/chat 视觉分析不计入
     const isMedia = log.type === 'image' || log.type === 'video';
-    const effectiveMediaCount = isMedia ? (log.mediaCount || 1) : 0;
+    const effectiveMediaCount = isMedia ? (log.mediaCount ?? (log.success !== false ? 1 : 0)) : 0;
 
     const costUsd = log.costUsd || 0;
-    const costRmb = Number((costUsd * ratio).toFixed(4));
+    const costRmb = Number.isFinite(log.costRmb) ? log.costRmb : Number((costUsd * ratio).toFixed(6));
 
     totalCostUsd += costUsd;
     totalCostRmb += costRmb;
@@ -226,8 +226,8 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
   }
 
   return {
-    totalCostUsd: Number(totalCostUsd.toFixed(2)),
-    totalCostRmb: Number(totalCostRmb.toFixed(2)),
+    totalCostUsd: Number(totalCostUsd.toFixed(6)),
+    totalCostRmb: Number(totalCostRmb.toFixed(6)),
     totalRequests: filteredLogs.length,
     totalTokens,
     cacheHitRate: Number(cacheHitRate.toFixed(1)),
@@ -246,8 +246,8 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
       acc[k] = {
         requests: dayRequestsMap[k] || 0,
         tokens: dayTokensMap[k] || 0,
-        costUsd: Number((dayCostUsdMap[k] || 0).toFixed(2)),
-        costRmb: Number((dayCostRmbMap[k] || 0).toFixed(2)),
+        costUsd: Number((dayCostUsdMap[k] || 0).toFixed(6)),
+        costRmb: Number((dayCostRmbMap[k] || 0).toFixed(6)),
       };
       return acc;
     }, {} as Record<string, { requests: number; tokens: number; costUsd: number; costRmb: number }>)

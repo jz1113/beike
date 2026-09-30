@@ -1,3 +1,4 @@
+import { useAssistantDialog } from './useAssistantDialog';
 import AssistantRuntimeInfo from './AssistantRuntimeInfo';
 import AssistantSessionMenu from './AssistantSessionMenu';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -23,6 +24,7 @@ export default function AssistantDrawerHeader(props: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showRuntime, setShowRuntime] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const settingsDialog = useAssistantDialog(menuOpen, () => setMenuOpen(false));
   const historyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLButtonElement>(null);
   const historyId = useId();
@@ -57,7 +59,7 @@ export default function AssistantDrawerHeader(props: Props) {
     <div className="agent-header-actions">
       <div className="relative" ref={menuRef}>
         <button className="agent-icon-button" aria-label="更多助手设置" aria-expanded={menuOpen} onClick={() => { props.onCloseHistory(); setMenuOpen(!menuOpen); }}><SlidersHorizontal size={16} strokeWidth={1.6} /></button>
-        {menuOpen && <div className="agent-popover agent-header-menu" aria-label="助手设置">
+        {menuOpen && <div ref={settingsDialog} role="dialog" aria-modal="false" tabIndex={-1} className="agent-popover agent-header-menu" aria-label="助手设置">
           {props.onOpenMemory && <button onClick={() => { setMenuOpen(false); props.onOpenMemory?.(); }}>会话记忆<span>查看与管理</span></button>}
           {props.onOpenSettings && <button onClick={() => { setMenuOpen(false); props.onOpenSettings?.(); }}>助手设置<span>模型与服务</span></button>}
           <button onClick={() => setShowRuntime(!showRuntime)} aria-expanded={showRuntime}>执行规则<span>{showRuntime ? '收起' : '预算与沙箱'}</span></button>

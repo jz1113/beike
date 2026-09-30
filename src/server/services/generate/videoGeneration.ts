@@ -1,6 +1,7 @@
 import { readVideoTaskId } from './videoResponse';
 import { videoInputError } from '@shared/domain/media/videoCapabilities';
-import { gatewayFetch } from '../../gateways/http';
+import { submitVideoToGateway } from '../../gateways/videoSubmission';
+import type { VideoGenerationBody } from '@shared/contracts/videoGeneration';
 import { generationTaskRepository } from '@server/repositories/generationTasks';
 import { convertToStandardJpegDataUrl } from '@server/infrastructure/media/imageConverter';
 import { buildVideoRequest } from '@shared/domain/models/modelAdapters';
@@ -9,7 +10,6 @@ import { createImageConvertCache, logLatencyAudit } from '@shared/domain/core/la
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { cleanPromptText } from '@shared/domain/media/drawing';
 import { videoTaskEndpointCache, videoTaskQueryTemplateCache } from './videoGenerationTypes';
-import { canTryAnotherSubmissionEndpoint } from './submissionPolicy';
 
 /**
  * POST /api/generate/video
@@ -17,7 +17,7 @@ import { canTryAnotherSubmissionEndpoint } from './submissionPolicy';
  */
 const videoResult = <T>(body: T, status = 200) => ({ body, status });
 
-export async function submitVideoOnce(body: Record<string, any>, credentials: { baseUrl: string; apiKey: string }, t0 = Date.now()) {
+export async function submitVideoOnce(body: VideoGenerationBody, credentials: { baseUrl: string; apiKey: string }, t0 = Date.now()) {
   let convertMs = 0;
   let gatewayMs = 0;
   let dbMs = 0;
@@ -131,102 +131,23 @@ export async function submitVideoOnce(body: Record<string, any>, credentials: { 
 
     console.log(`[AI视频-提交] family=${adapted.family} 模型=${normalizedModel}, 时长=${safeDuration}s, 比例=${effectiveRatio}, 分辨率=${safeResolution}, 尺寸=${computedSize}, 参考图数=${effectiveImages.length}`);
 
-    const submitUrls = adapted.endpoints(baseUrl).submit;
-
-    let genRes: Response | null = null;
-    let genData: any = null;
-    let lastErrorMsg = '';
-    let usedSubmitUrl = '';
-
-    const tGw0 = Date.now();
-    for (const submitUrl of submitUrls) {
-      endpointAttempts += 1;
-      console.log(`[AI视频-提交] 正在尝试派发任务至: ${submitUrl}`);
-      try {
-        const attemptTimeout = endpointAttempts === 1 ? 60000 : 20000;
-        const requestHeaders: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          ...(adapted.headers || {}),
-        };
-        if (submitUrl.includes('/video-generation/') || submitUrl.includes('/qwen/')) {
-          requestHeaders['X-DashScope-Async'] = 'enable';
-        }
-
-        const res = await gatewayFetch(submitUrl, {
-          method: 'POST',
-          headers: requestHeaders,
-          body: payloadJson,
-          signal: AbortSignal.timeout(attemptTimeout),
-        });
-
-        const data = await res.json().catch(() => null);
-        const tId = readVideoTaskId(data, adapted.family);
-
-        if (res.ok && tId) {
-          genRes = res;
-          genData = data;
-          usedSubmitUrl = submitUrl;
-          break;
-        } else {
-          // 深度提取上游错误信息（支持 new-api / one-api / volcengine / qwen 各类格式）
-          const errDetail =
-            data?.output?.message ||
-            data?.error?.message ||
-            data?.error?.details ||
-            (typeof data?.error === 'string' ? data.error : '') ||
-            data?.message ||
-            data?.fail_reason ||
-            `HTTP ${res.status}`;
-          lastErrorMsg = errDetail;
-          console.warn(`[AI视频-提交] 端点 ${submitUrl} 未被接受 (HTTP ${res.status}):`, JSON.stringify(data || errDetail));
-          if (res.ok || res.status >= 500) {
-            return videoResult({
-              success: false,
-              error: '视频提交结果不确定，请核对上游任务记录后再决定是否重试',
-              submissionUnknown: true,
-            }, 503);
-          }
-          // Only an explicit missing endpoint or unsupported media type permits
-          // another submission URL. Other responses may follow a billable task.
-          if (!canTryAnotherSubmissionEndpoint(res.status)) break;
-        }
-      } catch (err: any) {
-        lastErrorMsg = err.message || String(err);
-        console.warn(`[AI视频-提交] 连接 ${submitUrl} 异常: ${err.message}`);
-        return videoResult({
-          success: false,
-          error: formatUserError(err, '视频任务提交结果不确定，请核对上游任务记录后再决定是否重试'),
-          submissionUnknown: true,
-        }, 503);
-      }
+    const submission = await submitVideoToGateway({
+      endpoints: adapted.endpoints(baseUrl).submit, apiKey, payloadJson, headers: adapted.headers,
+      readTaskId: value => readVideoTaskId(value, adapted.family),
+    });
+    gatewayMs = submission.gatewayMs;
+    endpointAttempts = submission.endpointAttempts;
+    const usedSubmitUrl = submission.usedSubmitUrl;
+    if (submission.outcome !== 'accepted') {
+      const unknown = submission.outcome === 'unknown';
+      logLatencyAudit({ hypothesisId: 'H3', location: 'generate-video/route.ts:POST-fail', message: 'video submit outcome',
+        data: { model: normalizedModel, family: adapted.family, outcome: submission.outcome, gatewayMs, endpointAttempts, upstreamStatus: submission.upstreamStatus } });
+      return videoResult({ success: false, submissionOutcome: submission.outcome, submissionUnknown: unknown, retryable: false,
+        ...(submission.outcome === 'unknown' && submission.taskId ? { taskId: submission.taskId } : {}),
+        error: unknown ? '视频提交结果不确定，请核对上游任务记录' : formatUserError(submission.error, '视频提交被拒绝'),
+      }, unknown ? 503 : 400);
     }
-    gatewayMs = Date.now() - tGw0;
-
-    if (!genRes || !genData) {
-      logLatencyAudit({
-        hypothesisId: 'H3',
-        location: 'generate-video/route.ts:POST-fail',
-        message: 'video submit failed all endpoints',
-        data: {
-          model: normalizedModel,
-          family: adapted.family,
-          parseMs,
-          convertMs,
-          gatewayMs,
-          endpointAttempts,
-          payloadBytes,
-          imageCount: effectiveImages.length,
-          convertCacheHits,
-          lastErrorMsg,
-          totalMs: Date.now() - t0,
-        },
-      });
-      throw new Error(`视频接口错误: ${lastErrorMsg || '网络连接超时或网关拒绝该模型'}`);
-    }
-
-    const taskId = readVideoTaskId(genData, adapted.family);
-    if (!taskId) return videoResult({ success: false, submissionUnknown: true, error: '视频提交结果不确定，请核对上游任务记录后再决定是否重试' }, 503);
+    const taskId = submission.taskId;
     const queryTemplate = adapted.endpoints(baseUrl).query[0];
     if (queryTemplate) videoTaskQueryTemplateCache.set(`${baseUrl}:${taskId}`, queryTemplate);
 
@@ -254,12 +175,12 @@ export async function submitVideoOnce(body: Record<string, any>, credentials: { 
         quality: safeResolution || '720p',
       });
       recordId = taskRecord.id;
-    } catch (dbErr: any) {
-      console.error(`[AI视频-入库] 数据库记录失败: ${dbErr.message}`);
+    } catch (dbErr: unknown) {
+      console.error('[AI视频-入库] 数据库记录失败', dbErr);
       return videoResult({
         success: false,
-        error: `任务持久化失败: ${dbErr.message}`,
-        taskId,
+        error: '任务已提交，但本地记录保存失败，请核对原任务',
+        taskId, submissionOutcome: 'accepted', submissionUnknown: true, retryable: false,
       }, 500);
     }
     dbMs = Date.now() - tDb0;
@@ -306,17 +227,17 @@ export async function submitVideoOnce(body: Record<string, any>, credentials: { 
 
     return videoResult(responsePayload);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[AI视频] 任务提交发生异常:', error);
     logLatencyAudit({
       hypothesisId: 'H3',
       location: 'generate-video/route.ts:POST-catch',
       message: 'video submit exception',
-      data: { error: String(error?.message || error), convertMs, gatewayMs, endpointAttempts, totalMs: Date.now() - t0 },
+      data: { error: error instanceof Error ? error.message : String(error), convertMs, gatewayMs, endpointAttempts, totalMs: Date.now() - t0 },
     });
     return videoResult({
       success: false,
-      error: formatUserError(error, '视频生成任务提交失败')
+      error: formatUserError(error, '视频生成任务提交失败'), retryable: false
     }, 500);
   }
 }

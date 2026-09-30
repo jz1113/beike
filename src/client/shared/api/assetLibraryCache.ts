@@ -1,5 +1,7 @@
 import { apiFetch } from '@client/shared/api/apiClient';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
+import { categoryIds, type AssetProductCategory } from '@shared/domain/assets/assetOrganization';
+import { builtinSubcategoryFolderId, isPromptGroupSubcategory, PROMPT_GROUP_SUBCATEGORY_LABELS } from '@shared/domain/assets/promptGroupSubcategory';
 import type { PromptAssetType as AssetSubTab } from '@shared/domain/prompts/promptAsset/states';
 
 export interface GlobalAssetStore {
@@ -8,6 +10,7 @@ export interface GlobalAssetStore {
   scenes: AssetLibrarySlim[];
   actions: AssetLibrarySlim[];
   fullPrompts: AssetLibrarySlim[];
+  productCategories: AssetProductCategory[];
   lastUpdated: number;
   isLoaded: boolean;
 }
@@ -18,6 +21,7 @@ const store: GlobalAssetStore = {
   scenes: [],
   actions: [],
   fullPrompts: [],
+  productCategories: [],
   lastUpdated: 0,
   isLoaded: false,
 };
@@ -62,8 +66,24 @@ export async function getGlobalAssetLibrary(force = false): Promise<GlobalAssetS
         for (const key of Object.keys(lists) as (keyof typeof lists)[]) lists[key].push(...(data[key] || []));
         if (!data.hasMore) break;
       }
+      // Load empty and archived folders too, so production sees the same tree as the library.
+      const organizationResponse = await apiFetch('/api/catalog/assets/library?view=organization');
+      const organization = await organizationResponse.json();
+      if (!organizationResponse.ok || !organization.success || !Array.isArray(organization.categories)) {
+        throw new Error(organization.error || '资产文件夹加载失败');
+      }
+      const productCategories: AssetProductCategory[] = organization.categories;
+      const names = new Map(productCategories.filter(category => !category.isArchived).map(category => [category.id, category.name]));
+      lists.fullPrompts = lists.fullPrompts.map(group => ({
+        ...group,
+        productCategoryRules: productCategories,
+        productCategoryNames: categoryIds(group.productCategoryIds).map(id => names.get(id)).filter((name): name is string => !!name),
+        productSubcategoryName: isPromptGroupSubcategory(group.productSubcategory)
+          ? names.get(builtinSubcategoryFolderId(group.productSubcategory)) || PROMPT_GROUP_SUBCATEGORY_LABELS[group.productSubcategory]
+          : names.get(String(group.productSubcategory || '')) || null,
+      }));
       if (requestGeneration === cacheGeneration) {
-        Object.assign(store, lists, { isLoaded: true, lastUpdated: Date.now() });
+        Object.assign(store, lists, { productCategories, isLoaded: true, lastUpdated: Date.now() });
       }
     } catch (err) {
       console.warn('[assetLibraryCache] 获取全量资产失败:', err);

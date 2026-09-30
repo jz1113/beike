@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 import {
   X,
   ChevronLeft,
@@ -26,7 +27,8 @@ export function BatchPreviewLightbox({
 }: BatchPreviewLightboxProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const isOpen = Boolean(previewImageUrl || previewGallery);
+  const visible = useViewVisibility();
+  const isOpen = visible && Boolean(previewImageUrl || previewGallery);
   useEffect(() => {
     if (!isOpen) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -35,12 +37,12 @@ export function BatchPreviewLightbox({
     dialogRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      if (previousFocus?.isConnected && !previousFocus.closest('[inert]')) previousFocus.focus();
     };
   }, [isOpen]);
   // 键盘事件快捷切换或关闭大图预览
   useEffect(() => {
-    if (!previewImageUrl && !previewGallery) return;
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['Escape', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
       if (e.key === 'Tab') {
@@ -65,9 +67,9 @@ export function BatchPreviewLightbox({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewImageUrl, previewGallery, setGalleryIndex, closeGalleryPreview]);
+  }, [isOpen, previewGallery, setGalleryIndex, closeGalleryPreview]);
 
-  if (!previewImageUrl && !previewGallery) return null;
+  if (!isOpen) return null;
 
   const currentImageUrl = previewGallery
     ? previewGallery.images[previewGallery.currentIndex]

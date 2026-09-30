@@ -33,14 +33,14 @@ export default function WorkflowModelRow({ model, prices, isDefault, onToggleEna
       <td className="px-4 py-3 min-w-56 max-w-80">
         <div className="flex items-start gap-2.5">
           {reorderEnabled && <div className="settings-row-order">
-            <button type="button" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} aria-label={`拖动排序 ${model.name || model.id}`} title="拖动排序；也可使用上下按钮" className="cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></button>
+            <button type="button" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} aria-label={`拖动排序 ${model.name || model.id}`} title="拖动排序；也可使用上下按钮" className="cursor-grab active:cursor-grabbing rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500"><GripVertical className="h-4 w-4" /></button>
             <div className="flex"><button type="button" disabled={!onMoveUp} onClick={onMoveUp} aria-label={`上移 ${model.name || model.id}`} title="上移"><ArrowUp className="h-3 w-3" /></button><button type="button" disabled={!onMoveDown} onClick={onMoveDown} aria-label={`下移 ${model.name || model.id}`} title="下移"><ArrowDown className="h-3 w-3" /></button></div>
           </div>}
           <div className="mt-0.5 w-8 h-8 shrink-0 rounded-lg flex items-center justify-center bg-transparent">{getModelIcon(model.id, 'w-4 h-4')}</div>
           <div className="min-w-0">
             <div className="font-semibold text-sm text-slate-900 break-words">{model.name || model.id}</div>
-            <div className="text-[11px] text-slate-500 font-mono break-all mt-0.5" title={routeId}>{model.id}</div>
-            {isDefault && <span className="text-[10px] text-indigo-600">默认选择{model.enabled === false ? ' · 已停用，请重新选择' : ''}</span>}
+            <div className="text-[11px] text-slate-500 font-mono truncate mt-0.5" title={routeId}>{model.id}</div>
+            {isDefault && <span className="text-[10px] text-indigo-600">默认选择{model.enabled === false ? ' · 已停用' : ''}</span>}
             {!supported && <span className="block text-[10px] text-amber-700">未纳入业务支持目录</span>}
           </div>
         </div>

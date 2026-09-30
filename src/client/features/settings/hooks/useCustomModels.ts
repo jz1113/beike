@@ -1,26 +1,25 @@
 import { deepSeekRouteId } from '@shared/domain/models/deepseek';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, type SetStateAction } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import {
   DEFAULT_PRESET_MODELS,
   type WorkflowModel,
 } from '../components/settingsShared';
-import type { GatewayModelItem } from '../components/GatewayModelModal';
+import { mergeGatewayModels, type GatewayModelItem } from '../model/gatewayModelCatalog';
 import {
   gatewayModelToWorkflowModel,
-  inferWorkflowCapabilitiesFromId,
   workflowModelRouteId,
-  openAIModelRouteId,
   repairWorkflowModelsInStorage,
+  repairWorkflowModelsForSettings,
 } from '@shared/domain/models/workflowModels';
 import { loadCustomModels, persistCustomModels } from '../model/customModelsStorage';
 import { type ComflyPriceMap } from '../model/multimodalPriceSort';
 import { channelName, reorderVisibleModels, restoreChannelPresets, type ModelChannel } from '../model/modelManagement';
-import { createGatewayCatalogActions } from './gatewayCatalogActions';
+import { createGatewayCatalogActions, cancelGatewayCatalogRequests, type GatewayRequestState } from './gatewayCatalogActions';
 
-async function fetchComflyPrices(): Promise<ComflyPriceMap> {
-  const response = await apiFetch('/api/system/models/pricing');
+async function fetchComflyPrices(signal?: AbortSignal): Promise<ComflyPriceMap> {
+  const response = await apiFetch('/api/system/models/pricing', { signal });
   const data = await response.json();
   if (!response.ok || !data?.success || !data.prices || typeof data.prices !== 'object') {
     throw new Error(data?.error || '无法获取 Comfly 默认分组报价');
@@ -41,9 +40,15 @@ export function useCustomModels({
   apiKey,
   showToast,
 }: UseCustomModelsOptions) {
-  const [customModels, setCustomModels] = useState<WorkflowModel[]>([]);
+  const [customModels, setModelsState] = useState<WorkflowModel[]>([]);
   const modelsRef = useRef(customModels);
-  modelsRef.current = customModels;
+
+  const [areModelsLoaded, setAreModelsLoaded] = useState(false);
+  const requestRef = useRef<GatewayRequestState>({ version: 0, controller: null });
+  const cacheRef = useRef<Partial<Record<'comfly' | 'lianchi' | 'openai', string>>>({});
+  const priceRequestRef = useRef<AbortController | null>(null);
+  const [gatewayModelError, setGatewayModelError] = useState('');
+  const [lianchiModelError, setLianchiModelError] = useState('');
   const [comflyPrices, setComflyPrices] = useState<ComflyPriceMap | null>(null);
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
 
@@ -92,38 +97,53 @@ export function useCustomModels({
         : model);
       const migrateDeepSeek = !loaded.invalid && !!localStorage.getItem('deepseek_api_key') && !localStorage.getItem('deepseek_shared_models_v1');
       if (migrateDeepSeek && !renamed.some(model => workflowModelRouteId(model) === deepSeekRouteId('deepseek-flash'))) renamed.push(gatewayModelToWorkflowModel({ id: 'deepseek-flash', name: 'DeepSeek Flash', shortName: 'DeepSeek Flash' }, 'deepseek') as WorkflowModel);
-      setCustomModels(renamed);
-      if (!loaded.invalid && persistCustomModels(renamed)) {
+      const normalized = repairWorkflowModelsForSettings(renamed);
+      modelsRef.current = normalized;
+      setModelsState(normalized);
+      setAreModelsLoaded(true);
+      if (!loaded.invalid && persistCustomModels(normalized)) {
         if (migrateDeepSeek) { localStorage.setItem('deepseek_shared_models_v1', 'true'); notifyModelsUpdated(); }
         if (needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
         if (needsGpt6Migration) localStorage.setItem('gpt6_multimodal_models_added_v1', 'true');
         if (needsGrok47Migration) localStorage.setItem('grok47_multimodal_model_added_v1', 'true');
       }
       // Prices are presentation metadata, never an automatic routing-order migration.
-      void fetchComflyPrices().then(setComflyPrices).catch(() => {});
+      const controller = new AbortController();
+      priceRequestRef.current?.abort();
+      priceRequestRef.current = controller;
+      void fetchComflyPrices(controller.signal).then(prices => { if (!controller.signal.aborted) setComflyPrices(prices); }).catch(() => {});
       if (loaded.invalid) {
         showToast(loaded.recoveredFromBackup ? '自定义模型配置已损坏，已从备份恢复' : '自定义模型配置已损坏，已保留当前列表并备份原数据');
       }
     }
+    return () => { cancelGatewayCatalogRequests(requestRef); priceRequestRef.current?.abort(); };
   }, [isOpen, showToast]);
 
   const handleRefreshPrices = async () => {
+    const controller = new AbortController();
+    priceRequestRef.current?.abort();
+    priceRequestRef.current = controller;
     setIsFetchingPrices(true);
     try {
-      setComflyPrices(await fetchComflyPrices());
+      const prices = await fetchComflyPrices(controller.signal);
+      if (controller.signal.aborted) return;
+      setComflyPrices(prices);
       showToast('已刷新 Comfly 报价；未修改默认模型或调用顺序');
     } catch (error) {
+      if (controller.signal.aborted) return;
       showToast(`获取报价失败：${error instanceof Error ? error.message : '网络连接异常'}`);
-    } finally { setIsFetchingPrices(false); }
+    } finally { if (priceRequestRef.current === controller) setIsFetchingPrices(false); }
   };
 
   const commitModels = (updated: WorkflowModel[]): boolean => {
-    if (!persistCustomModels(updated)) {
+    const normalized = repairWorkflowModelsForSettings(updated);
+    if (JSON.stringify(normalized) === JSON.stringify(modelsRef.current)) return true;
+    if (!persistCustomModels(normalized)) {
       showToast('模型配置保存失败，未应用变更；请检查浏览器存储空间后重试');
       return false;
     }
-    modelsRef.current = updated;
-    setCustomModels(updated);
+    modelsRef.current = normalized;
+    setModelsState(normalized);
     notifyModelsUpdated();
     return true;
   };
@@ -140,18 +160,19 @@ export function useCustomModels({
 
   const handleDeleteModel = async (modelId: string) => {
     const model = modelsRef.current.find(item => workflowModelRouteId(item) === modelId);
-    if (!model || !await confirmAction(`从${channelName(model.channel ?? 'comfly')}移出「${model.name || model.id}」？不会删除渠道凭证。若它是默认模型，请到默认模型页重新选择。`)) return;
+    if (!model || !await confirmAction(`从${channelName(model.channel ?? 'comfly')}移出「${model.name || model.id}」？不会删除渠道凭证。若它是默认模型，将自动选择下一条已启用的受支持线路。`)) return;
     if (commitModels(modelsRef.current.filter(model => workflowModelRouteId(model) !== modelId))) showToast(`已移出模型 ${modelId}`);
   };
 
   const handleResetDefaultModels = async (channel: ModelChannel) => {
-    if (!await confirmAction(`恢复${channelName(channel)}的内置模型？仅重置本渠道内置条目，保留自定义模型、其他渠道、密钥及默认选择。`)) return;
+    if (!await confirmAction(`恢复${channelName(channel)}的内置模型？仅重置本渠道内置条目，保留自定义模型、其他渠道及密钥；不可用默认值将自动修复。`)) return;
     if (commitModels(restoreChannelPresets(modelsRef.current, DEFAULT_PRESET_MODELS, channel))) showToast(`已恢复${channelName(channel)}内置模型，其他渠道保持不变`);
   };
 
   const handleAddCustomModel = (modelObj: WorkflowModel): boolean => {
-    if (modelsRef.current.some(model => workflowModelRouteId(model) === workflowModelRouteId(modelObj))) return false;
-    if (!commitModels([modelObj, ...modelsRef.current])) return false;
+    const model = repairWorkflowModelsForSettings([modelObj])[0];
+    if (!model || modelsRef.current.some(item => workflowModelRouteId(item).toLowerCase() === workflowModelRouteId(model).toLowerCase())) return false;
+    if (!commitModels([model, ...modelsRef.current])) return false;
     showToast(`成功添加模型【${modelObj.name}】`);
     return true;
   };
@@ -164,6 +185,7 @@ export function useCustomModels({
   } = createGatewayCatalogActions({
     apiKey,
     baseUrl,
+    requestRef, cacheRef, setGatewayModelError, setLianchiModelError,
     showToast,
     allGatewayModels,
     lianchiModels,
@@ -181,34 +203,47 @@ export function useCustomModels({
     setIsFetchingOpenAI,
   });
 
-  const handleToggleGatewayModel = (model: GatewayModelItem) => {
-    if (model.supported === false) return;
-    const routeId = gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id;
-    const previous = modelsRef.current;
-    const exists = previous.some(model => workflowModelRouteId(model) === routeId);
-    const updated = exists ? previous.filter(model => workflowModelRouteId(model) !== routeId)
-      : [...previous, gatewayModelToWorkflowModel(model, gatewaySource) as WorkflowModel];
-    if (commitModels(updated) && gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
+  const handleToggleGatewayModel = (model: GatewayModelItem): boolean => {
+    if (model.supported === false) return false;
+    const entry = repairWorkflowModelsForSettings([gatewayModelToWorkflowModel(model, gatewaySource)])[0];
+    if (!entry) return false;
+    const routeId = workflowModelRouteId(entry);
+    const exists = modelsRef.current.some(item => workflowModelRouteId(item) === routeId);
+    const merged = mergeGatewayModels(modelsRef.current, [model], gatewaySource);
+    if (!exists && !merged.addedCount) return false;
+    if (!commitModels(exists ? modelsRef.current.filter(item => workflowModelRouteId(item) !== routeId) : merged.models)) return false;
+    if (gatewaySource === 'openai') { try { localStorage.setItem('openai_channel_split_v1', 'true'); } catch {} }
+    showToast(exists ? `已移出模型 ${model.id}` : `已接入模型 ${model.id}`);
+    return true;
   };
 
-  const handleAddAllUsefulGatewayModels = (models: GatewayModelItem[]) => {
-    const existingMap = new Map(modelsRef.current.map(model => [workflowModelRouteId(model), model]));
-    let addedCount = 0;
-    models.forEach(model => {
-      if (model.supported === false) return;
-      const caps = inferWorkflowCapabilitiesFromId(model.id);
-      if (!caps.isImage && !caps.isVideo && !caps.isMultimodal) return;
-      const entry = gatewayModelToWorkflowModel(model, gatewaySource) as WorkflowModel;
-      const routeId = workflowModelRouteId(entry);
-      if (!existingMap.has(routeId)) { existingMap.set(routeId, entry); addedCount++; }
-    });
-    if (!commitModels(Array.from(existingMap.values()))) return 0;
-    if (gatewaySource === 'openai') localStorage.setItem('openai_channel_split_v1', 'true');
-    return addedCount;
+  const handleAddAllUsefulGatewayModels = (models: GatewayModelItem[]): number => {
+    const merged = mergeGatewayModels(modelsRef.current, models, gatewaySource);
+    if (!merged.addedCount) { showToast('没有新的受支持模型需要接入'); return 0; }
+    if (!commitModels(merged.models)) return 0;
+    if (gatewaySource === 'openai') { try { localStorage.setItem('openai_channel_split_v1', 'true'); } catch {} }
+    showToast(`成功接入 ${merged.addedCount} 款模型`);
+    return merged.addedCount;
   };
+
+  const closeGatewayDiscovery = useCallback(() => {
+    cancelGatewayCatalogRequests(requestRef);
+    setIsGatewayModalOpen(false);
+    setIsFetchingGateway(false); setIsFetchingLianchi(false); setIsFetchingOpenAI(false);
+  }, []);
+  const setGatewayModalOpen = (open: boolean) => { if (open) setIsGatewayModalOpen(true); else closeGatewayDiscovery(); };
+  const setCustomModels = (action: SetStateAction<WorkflowModel[]>) => {
+    commitModels(typeof action === 'function' ? action(modelsRef.current) : action);
+  };
+  useEffect(() => {
+    if (!isOpen) { closeGatewayDiscovery(); setIsFetchingPrices(false); }
+  }, [isOpen, closeGatewayDiscovery]);
 
   return {
     customModels,
+    areModelsLoaded,
+    closeGatewayDiscovery,
+    gatewayModelError, lianchiModelError,
     setCustomModels,
     comflyPrices,
     isFetchingPrices,
@@ -219,7 +254,7 @@ export function useCustomModels({
     handleResetDefaultModels,
     handleAddCustomModel,
     isGatewayModalOpen,
-    setIsGatewayModalOpen,
+    setIsGatewayModalOpen: setGatewayModalOpen,
     isFetchingGateway,
     allGatewayModels,
     lianchiModels,

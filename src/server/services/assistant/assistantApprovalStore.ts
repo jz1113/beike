@@ -1,5 +1,4 @@
 import type { ApprovalDecision } from '@shared/domain/assistant/types';
-import type { AssistantSSEEvent } from '@shared/domain/assistant/events';
 import type { ApprovalWaiter } from '@server/infrastructure/assistant/agentLoop';
 import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
 import { getToolDefinition } from '@shared/domain/assistant/tools/defs';
@@ -12,6 +11,7 @@ export function getSessionApprovals(threadId: string): Set<string> {
   for (const [key, grant] of grants) if (grant.expiresAt < Date.now()) grants.delete(key);
   return new Set(grants.get(scopedKey(threadId))?.tools || []);
 }
+export function clearSessionApprovals(threadId: string): void { grants.delete(scopedKey(threadId)); }
 export function approvalWaiterForThread(threadId: string): ApprovalWaiter {
   const key = scopedKey(threadId);
   return { async waitForApproval(...args) {
@@ -26,6 +26,7 @@ export function approvalWaiterForThread(threadId: string): ApprovalWaiter {
 export function resolveApproval(approvalId: string, decision: ApprovalDecision): boolean {
   const entry = pending.get(scopedKey(approvalId));
   if (!entry) return false;
+  if (!['accept', 'acceptForSession', 'decline', 'cancel'].includes(decision)) return false;
   entry.settle(decision);
   return true;
 }
@@ -34,19 +35,25 @@ export function rejectTurnApprovals(turnId: string) {
   for (const entry of pending.values()) if (entry.turnId === turnId && entry.workspaceId === workspaceId) entry.settle('cancel');
 }
 export const apiApprovalWaiter: ApprovalWaiter = {
-  waitForApproval(turnId, approvalId, toolName, displayName, args, send, signal) {
+  waitForApproval(...args) {
+    const [turnId, approvalId, , , , , signal] = args;
     return new Promise<ApprovalDecision>((resolve) => {
       if (signal?.aborted) { resolve('cancel'); return; }
       const workspaceId = requireWorkspaceId();
       const key = scopedKey(`${turnId}_${approvalId}`);
+      pending.get(key)?.settle('cancel');
+      let settled = false;
       const settle = (decision: ApprovalDecision) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer); pending.delete(key); signal?.removeEventListener('abort', onAbort); resolve(decision);
       };
       const onAbort = () => settle('cancel');
       const timer = setTimeout(() => settle('decline'), APPROVAL_TIMEOUT_MS);
       pending.set(key, { turnId, workspaceId, settle });
       signal?.addEventListener('abort', onAbort, { once: true });
-      send({ type: 'item/approval/request', turnId, approvalId, toolName, displayName, args } as AssistantSSEEvent);
+      // AgentRuntime emits the request once. Registration itself must not duplicate it.
+      if (signal?.aborted) settle('cancel');
     });
   },
 };

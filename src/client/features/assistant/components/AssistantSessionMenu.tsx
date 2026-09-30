@@ -1,3 +1,5 @@
+import { getAssistantMessageText } from './assistantMessagePresentation';
+import { useAssistantDialog } from './useAssistantDialog';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Pencil, Search, Trash2, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -16,7 +18,8 @@ export default function AssistantSessionMenu({ id, onClose }: { id: string; onCl
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
-  const rootRef = useRef<HTMLDivElement>(null);
+  const rootRef = useAssistantDialog(true, () => { if (editingId || confirmId) { setEditingId(null); if (!busy) setConfirmId(null); } else onClose(); });
+  const deleteGuard = useRef(false);
   const editRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     rootRef.current?.querySelector<HTMLButtonElement>('[aria-current="true"]')?.focus({ preventScroll: true });
@@ -32,17 +35,18 @@ export default function AssistantSessionMenu({ id, onClose }: { id: string; onCl
     rename(editingId, title.trim()); restoreRowFocus(editingId); setEditingId(null);
   };
   const deleteSession = async (sessionId: string) => {
-    if (busy) return;
+    if (deleteGuard.current) return;
+    deleteGuard.current = true;
     setBusy(true); setFeedback('');
     try {
       const result = await remove(sessionId);
       setConfirmId(null);
       setFeedback(result.success ? '对话已删除' : `已从本地移除，服务端同步失败${result.error ? `：${result.error}` : ''}`);
     } catch (error) { setFeedback(formatUserError(error, '删除失败')); }
-    finally { setBusy(false); }
+    finally { deleteGuard.current = false; setBusy(false); }
   };
-  const filtered = sessions.filter(s => `${s.title} ${s.messages.map(m => m.content).join(' ')}`.toLowerCase().includes(query.toLowerCase()));
-  return <div ref={rootRef} id={id} role="dialog" aria-label="历史对话" className="agent-popover agent-session-menu" onKeyDown={event => {
+  const filtered = sessions.filter(s => `${s.title} ${s.messages.map(getAssistantMessageText).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()));
+  return <div ref={rootRef} id={id} role="dialog" aria-modal="false" tabIndex={-1} aria-label="历史对话" className="agent-popover agent-session-menu" onKeyDown={event => {
     if (event.key === 'Escape' && (editingId || confirmId)) {
       event.preventDefault(); event.stopPropagation();
       const rowId = editingId || confirmId;

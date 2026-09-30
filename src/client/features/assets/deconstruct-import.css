@@ -1,0 +1,19 @@
+.deconstruct-import-overlay { animation: deconstruct-overlay-in 160ms ease-out; }
+.deconstruct-import-dialog { animation: deconstruct-dialog-in 240ms cubic-bezier(.23, 1, .32, 1); }
+.deconstruct-import-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.deconstruct-source-tab, .deconstruct-action-button, .deconstruct-icon-button { -webkit-tap-highlight-color: transparent; }
+.deconstruct-action-button:focus-visible, .deconstruct-icon-button:focus-visible, .deconstruct-source-tab:focus-visible {
+  outline: 2px solid #818cf8; outline-offset: 3px;
+}
+.deconstruct-action-button:active:not(:disabled) { transform: scale(.98); }
+@keyframes deconstruct-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes deconstruct-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) {
+  .deconstruct-import-dialog { max-height: 94dvh; border-radius: 20px; }
+  .deconstruct-import-footer { max-height: 45dvh; overflow-y: auto; overscroll-behavior: contain; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deconstruct-import-overlay, .deconstruct-import-dialog, .deconstruct-import-dialog .animate-spin { animation: none; }
+  .deconstruct-import-dialog *, .deconstruct-import-dialog *::before, .deconstruct-import-dialog *::after { transition-duration: 0s !important; }
+  .deconstruct-action-button:active:not(:disabled) { transform: none; }
+}

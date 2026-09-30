@@ -1,5 +1,6 @@
 import { db } from './access';
 import type { Prisma } from '@prisma/client';
+import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
 
 const productSummary = { id: true, title: true, picUrl: true, platform: true } as const;
 
@@ -31,27 +32,18 @@ export const assetTaskRepository = {
     ]);
     return { total, tasks };
   },
-  async deleteFailed() {
-    const result = await db.imageTask.deleteMany({ where: { status: 'FAILURE' } });
-    compactDatabase();
-    return result.count;
-  },
-  async findAllResultUrls() {
-    const tasks = await db.imageTask.findMany({ select: { resultUrl: true } });
-    return tasks.map((task) => task.resultUrl).filter((url): url is string => Boolean(url));
-  },
-  async deleteAll() {
-    const result = await db.imageTask.deleteMany({});
-    compactDatabase();
-    return result.count;
-  },
-  async findResultUrls(ids: string[], urls: string[]) {
-    const tasks = await db.imageTask.findMany({ where: selectedWhere(ids, urls), select: { resultUrl: true } });
-    return tasks.map((task) => task.resultUrl).filter((url): url is string => Boolean(url));
-  },
-  async deleteSelected(ids: string[], urls: string[]) {
-    const result = await db.imageTask.deleteMany({ where: selectedWhere(ids, urls) });
-    if (result.count > 5) compactDatabase();
-    return result.count;
+  async removeRecords(selection: { all?: boolean; failed?: boolean; ids?: string[]; urls?: string[] }) {
+    const workspaceId = requireWorkspaceId();
+    const filter: Prisma.ImageTaskWhereInput = selection.all ? {} : selection.failed ? { status: 'FAILURE' } : selectedWhere(selection.ids || [], selection.urls || []);
+    const removed = await db.$transaction(async tx => {
+      const records = await tx.imageTask.findMany({ where: { AND: [filter, { workspaceId }] }, select: { id: true, resultUrl: true } });
+      if (!records.length) return { records, count: 0, referenced: [] as string[] };
+      const { count } = await tx.imageTask.deleteMany({ where: { workspaceId, id: { in: records.map(record => record.id) } } });
+      const urls = records.map(record => record.resultUrl).filter((url): url is string => Boolean(url));
+      const remaining = urls.length ? await tx.imageTask.findMany({ where: { workspaceId, resultUrl: { in: urls } }, select: { resultUrl: true } }) : [];
+      return { records, count, referenced: remaining.map(record => record.resultUrl).filter((url): url is string => Boolean(url)) };
+    });
+    if (removed.count > 5) compactDatabase();
+    return removed;
   },
 };

@@ -1,41 +1,13 @@
 import type { GenerationTask } from '@client/store';
-import { DEPTH_VIDEO_MODEL_ID } from '@shared/domain/media/depthVideo';
+import { isDepthImageTask, isDepthVideoTask, isGenerationVideoTask } from '@client/shared/media/generationTaskMedia';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
 
 export const SLOW_POLL_HINT = '生成较慢，后台继续等待…';
 
-export function isDepthVideoTask(t: GenerationTask): boolean {
-  return (
-    t.mediaType === 'depth-video' ||
-    t.model === DEPTH_VIDEO_MODEL_ID ||
-    (t.id || '').startsWith('depth_') ||
-    (t.taskId || '').startsWith('depth_')
-  );
-}
-
-export function isDepthImageTask(t: GenerationTask): boolean {
-  return t.mediaType === 'depth-image';
-}
+export { isDepthImageTask, isDepthVideoTask };
 
 export function isVideoTask(t: GenerationTask): boolean {
-  if (isDepthVideoTask(t)) return true;
-  const m = t.model?.toLowerCase() || '';
-  return (
-    t.mediaType === 'video' ||
-    Boolean(t.resultUrl?.includes('.mp4')) ||
-    m.includes('seedance') ||
-    m.includes('veo') ||
-    m.includes('kling') ||
-    m.includes('sora') ||
-    m.includes('gen3') ||
-    m.includes('minimax') ||
-    m.includes('h3') ||
-    m.includes('hailuo') ||
-    m.includes('wan') ||
-    m.includes('vidu') ||
-    m.includes('luma') ||
-    m.includes('hunyuan')
-  );
+  return isGenerationVideoTask(t);
 }
 
 export function getMaxPollCount(t: GenerationTask): number {

@@ -9,17 +9,18 @@ import { BatchConfigProvider, type BatchConfigContextValue } from './BatchConfig
 import BatchStage3Prompts from './BatchStage3Prompts';
 import BatchStage4Queue from './BatchStage4Queue';
 import { BatchPreviewLightbox } from '@client/shared/modals/lightbox/BatchPreviewLightbox';
-import { WorkshopSettingsModal } from './WorkshopSettingsModal';
+import { BatchWorkshopSettings } from './BatchWorkshopSettings';
 import { BatchWorkspaceBatchControls } from './BatchWorkspaceBatchControls';
 import { BatchArchitectureConfirmDialog } from './BatchArchitectureConfirmDialog';
 import { useAppStore } from '@client/store';
 import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
 import { isAutoPromptGroupSelection } from '@shared/domain/workshop/workshopPipeline';
-import { exportBatchZip, exportBatchExcel, exportSingleProductZip, downloadSingleTaskImage } from '../model/delivery/batchRunnerExport';
+import { BatchWorkshopHistoryPreview } from './BatchWorkshopHistoryPreview';
+import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
 export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
-export default function BatchWorkshopView() {
+export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?: (type: PromptAssetType) => void }) {
   const runner = useBatchWorkshopRunner();
   const freshEntry = useAppStore(s => s.pendingFreshWorkshopEntry);
   const isWorkshopConfigOpen = useAppStore(s => s.isWorkshopConfigOpen);
@@ -52,8 +53,6 @@ export default function BatchWorkshopView() {
     availableImageModels,
     selectedImageGenModel,
     setSelectedImageGenModel,
-    personaMode,
-    setPersonaMode,
     pipelineStatus,
     useAssetLibrary,
     setUseAssetLibrary,
@@ -71,8 +70,6 @@ export default function BatchWorkshopView() {
     availableActions,
     generationStrategy,
     setGenerationStrategy,
-    autoGenerateCopywriting,
-    setAutoGenerateCopywriting,
     imageGenConcurrency,
     setImageGenConcurrency,
     selectedQuality,
@@ -138,12 +135,6 @@ export default function BatchWorkshopView() {
     renameBatch,
     readBatch,
   } = runner;
-  const historyExportDeps = {
-    setIsExportingZip: setIsHistoryExporting,
-    setExportingSingleItemId: setHistoryExportItemId,
-    setToastMsg: (msg: string | null) => { if (msg) showToast(msg); },
-    showToast,
-  };
   useEffect(() => {
     // A cached history preview must not hide the newly selected active batch.
     setHistoryGenerationBatch(null);
@@ -207,8 +198,12 @@ export default function BatchWorkshopView() {
   }), [setIsWorkshopConfigOpen, setIsArchitectureConfirmOpen, currentStage, successfulItems, setItems, recipes, selectedArchId, setSelectedArchId, availableVisionModels, selectedVisionModel, setSelectedVisionModel, availableImageModels, selectedImageGenModel, setSelectedImageGenModel, useAssetLibrary, setUseAssetLibrary, lockedPersonaId, setLockedPersonaId, lockedSceneId, setLockedSceneId, lockedOutfitId, setLockedOutfitId, lockedActionId, setLockedActionId, availablePersonas, availableScenes, availableOutfits, availableActions, generationStrategy, setGenerationStrategy, imageGenConcurrency, setImageGenConcurrency, selectedQuality, setSelectedQuality, selectedAspect, setSelectedAspect, selectedShotCount, setSelectedShotCount, analyzeConcurrency, setAnalyzeConcurrency, isAnalyzingAll, analyzeProgress, startBatchVisionAnalyze, activeImgFilter, setActiveImgFilter, toggleProductImageSelection, batchSetProductImages, handleRemoveItem, openGalleryPreview, startAutoPilotPipeline, isAutoPilotRunning, setCurrentStage]);
 
   const confirmArchitectureAndAnalyze = (architectureId: string) => {
-    if (!recipes.some((recipe) => recipe.id === architectureId)) {
+    if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
       showToast('请先选择有效的类目拍摄架构，再开始提示词分析');
+      return;
+    }
+    if (recipes.length === 0) {
+      showToast('暂无可用拍摄架构，请先到拍摄架构页同步或新建');
       return;
     }
 
@@ -238,6 +233,7 @@ export default function BatchWorkshopView() {
         activeBatch={activeBatch}
         historyBatches={historyBatches}
         itemsCount={items.length}
+        batchInputText={batchInputText}
         currentStage={currentStage}
         ready={workspaceReady}
         createNewBatch={createNewBatch}
@@ -261,44 +257,17 @@ export default function BatchWorkshopView() {
         }>
           {!historyGenerationBatch && items.length > 0 && <WorkshopProductionOverview items={items} currentStage={currentStage} onStageChange={setCurrentStage}
             busy={isCollecting || isAnalyzingAll || isGeneratingBatch || isAutoPilotRunning || items.some((item) => item.isAnalyzing)}
-            analysisIssue={runner.analysisIssue} strategy={generationStrategy} shotCount={selectedShotCount} aspect={selectedAspect} concurrency={imageGenConcurrency} onSettings={() => setIsWorkshopConfigOpen(true)} />}
+            analysisIssue={runner.analysisIssue} strategy={generationStrategy} shotCount={selectedShotCount} aspect={selectedAspect} gridOutputSize={runner.gridOutputSize} concurrency={imageGenConcurrency} onSettings={() => setIsWorkshopConfigOpen(true)} />}
           {historyGenerationBatch ? (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-900">历史批次生成查看 · {historyGenerationBatch.name}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">历史批次内容只读；此前已采用的完整四镜仍可提炼为新母本。</p>
-                </div>
-                <button type="button" onClick={() => setHistoryGenerationBatch(null)} className="shrink-0 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50">返回当前批次</button>
-              </div>
-              <BatchStage4Queue
-                successfulItems={historyGenerationBatch.snapshot.items.filter(item => item.status === 'success' && item.selected) as BatchProductItem[]}
-                selectedVisionModel={availableVisionModels.some((model) => model.id === historyGenerationBatch.snapshot.settings.selectedVisionModel)
-                  ? historyGenerationBatch.snapshot.settings.selectedVisionModel : selectedVisionModel}
-                availableImageModels={availableImageModels}
-                selectedImageGenModel={historyGenerationBatch.snapshot.settings.selectedImageGenModel}
-                setSelectedImageGenModel={() => {}}
-                selectedQuality={historyGenerationBatch.snapshot.settings.selectedQuality}
-                setSelectedQuality={() => {}}
-                selectedAspect={historyGenerationBatch.snapshot.settings.selectedAspect}
-                setSelectedAspect={() => {}}
-                isGeneratingBatch={false}
-                totalTaskCount={0}
-                completedTaskCount={0}
-                successTaskCount={0}
-                failTaskCount={0}
-              generateCopywritingForProduct={async () => {}}
-                isExportingZip={isHistoryExporting}
-                exportingSingleItemId={historyExportItemId}
-                handleExportZip={() => exportBatchZip(historyGenerationBatch.snapshot.items as BatchProductItem[], historyExportDeps)}
-                handleExportExcel={() => exportBatchExcel(historyGenerationBatch.snapshot.items as BatchProductItem[], historyExportDeps)}
-                handleExportSingleProductZip={(item) => exportSingleProductZip(item, historyExportDeps)}
-                handleDownloadSingleTaskImage={(url, filename) => downloadSingleTaskImage(url, filename, showToast)}
-                setPreviewImageUrl={setPreviewImageUrl}
-                onPreviewGallery={openGalleryPreview}
-                readOnly
-              />
-            </>
+            <BatchWorkshopHistoryPreview
+              batch={historyGenerationBatch}
+              runner={runner}
+              isHistoryExporting={isHistoryExporting}
+              historyExportItemId={historyExportItemId}
+              setIsHistoryExporting={setIsHistoryExporting}
+              setHistoryExportItemId={setHistoryExportItemId}
+              onClose={() => setHistoryGenerationBatch(null)}
+            />
           ) : currentStage === 1 && (
             <BatchStage1Collect
               batchInputText={batchInputText}
@@ -404,56 +373,12 @@ export default function BatchWorkshopView() {
         handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
       />
       {/* 🌟 种草工坊全局生产预设中心模态框 */}
-      <WorkshopSettingsModal
-        workspaceStatus={runner.workspaceStatus} workspaceError={runner.workspaceError}
-        busy={isCollecting || isAnalyzingAll || isGeneratingBatch || runner.isAutoPilotRunning || items.some(item => item.isAnalyzing || item.isCopywritingGenerating)}
-        assetLoadState={runner.assetLoadState} assetLoadError={runner.assetLoadError} onReloadAssets={runner.reloadAssets}
-        onOpenAssets={() => { setIsWorkshopConfigOpen(false); setActiveWorkshopTab('prompt_assets'); }}
+      <BatchWorkshopSettings
+        runner={runner}
         isOpen={isWorkshopConfigOpen}
         onClose={() => setIsWorkshopConfigOpen(false)}
-        selectedArchId={selectedArchId}
-        setSelectedArchId={setSelectedArchId}
-        recipes={recipes}
-        selectedShotCount={selectedShotCount}
-        setSelectedShotCount={setSelectedShotCount}
-        selectedAspect={selectedAspect}
-        setSelectedAspect={setSelectedAspect}
-        selectedQuality={selectedQuality}
-        setSelectedQuality={setSelectedQuality}
-        selectedVisionModel={selectedVisionModel}
-        setSelectedVisionModel={setSelectedVisionModel}
-        availableVisionModels={availableVisionModels}
-        selectedImageGenModel={selectedImageGenModel}
-        setSelectedImageGenModel={setSelectedImageGenModel}
-        availableImageModels={availableImageModels}
-        generationStrategy={generationStrategy}
-        setGenerationStrategy={setGenerationStrategy}
-        autoGenerateCopywriting={autoGenerateCopywriting}
-        setAutoGenerateCopywriting={setAutoGenerateCopywriting}
-        imageGenConcurrency={imageGenConcurrency}
-        setImageGenConcurrency={setImageGenConcurrency}
-        analyzeConcurrency={analyzeConcurrency}
-        setAnalyzeConcurrency={setAnalyzeConcurrency}
-        useAssetLibrary={useAssetLibrary}
-        setUseAssetLibrary={setUseAssetLibrary}
-        lockedPersonaId={lockedPersonaId}
-        setLockedPersonaId={setLockedPersonaId}
-        availablePersonas={availablePersonas}
-        lockedSceneId={lockedSceneId}
-        setLockedSceneId={setLockedSceneId}
-        availableScenes={availableScenes}
-        lockedOutfitId={lockedOutfitId}
-        setLockedOutfitId={setLockedOutfitId}
-        availableOutfits={availableOutfits}
-        lockedActionId={lockedActionId}
-        setLockedActionId={setLockedActionId}
-        availableActions={availableActions}
-        lockedFullPromptId={runner.lockedFullPromptId}
-        setLockedFullPromptId={runner.setLockedFullPromptId}
-        availableFullPrompts={runner.availableFullPrompts}
-        products={successfulItems.map(item => ({ title: item.title, props: item.props }))}
-        personaMode={personaMode}
-        setPersonaMode={setPersonaMode}
+        onOpenAssetTab={onOpenAssetTab}
+        onFallbackAssets={() => setActiveWorkshopTab('prompt_assets')}
       />
       <BatchArchitectureConfirmDialog
         key={isArchitectureConfirmOpen ? 'architecture-confirm-open' : 'architecture-confirm-closed'}

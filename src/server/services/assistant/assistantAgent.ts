@@ -10,16 +10,14 @@ import { resolveGatewayCreds } from '@shared/domain/models/gatewayCreds';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { runAgentLoop, streamFinalReply } from '@server/infrastructure/assistant/agentLoop';
 import { resolveSkillAllowedTools } from '@shared/domain/assistant/skills';
-import type { AssistantSSEEvent } from '@shared/domain/assistant/events';
 import { AgentRuntime } from '@server/infrastructure/assistant/agentRuntime';
 import type { ClientContext, McpServerConfig } from '@shared/domain/assistant/types';
-import type { TurnStartBody } from '@shared/contracts/assistant';
 import { socialCollectionIntent, collectSocialImages } from './assistantSocialCollection';
 import { buildAssistantMessages } from './assistantMessageBuilder';
 import { resolveRequestOrigin } from './assistantChat';
 import { approvalWaiterForThread, getSessionApprovals } from './assistantApprovalStore';
-import { upsertTurn, updateTurnStatus, syncRuntimeToDb, syncSnapshot } from '@server/repositories/assistantTurnPersist';
-import { TurnTimer } from './agentTelemetry';
+import { updateTurnModel, updateTurnStatus, syncRuntimeToDb, syncSnapshot } from '@server/repositories/assistantTurnPersist';
+import { TurnTimer, createTurnTelemetrySender } from './agentTelemetry';
 import { enqueueItemPersist, flushItemQueue } from '../library/itemPersistQueue';
 import {
   buildMultimodalUpstreamFallbackChain,
@@ -27,6 +25,9 @@ import {
   isApprovedModel,
 } from '@shared/domain/models/modelCatalog';
 import { getDefaultBaseUrl, getDefaultApiKey } from '../models/gatewayCredentials';
+import { safeErrorMessage } from '../../core/validate';
+import { newTurnId, runWithTurnLifecycle, type RunAssistantTurnOptions } from './assistantTurnStream';
+import { AssistantThreadDeletedError, isAssistantThreadDeleted, withAssistantThreadWrite } from '@server/repositories/assistantThreadLifecycle';
 
 function resolveModelCandidates(modelId: string, clientFallbacks: string[] = [], customOrder?: unknown): string[] {
   if (isApprovedModel(modelId, 'multimodal')) {
@@ -36,15 +37,9 @@ function resolveModelCandidates(modelId: string, clientFallbacks: string[] = [],
   return Array.from(new Set([modelId, ...clientFallbacks].map((value) => value.trim()).filter(Boolean)));
 }
 
-const activeTurnControllers = new Map<string, AbortController>();
-export function interruptActiveAssistantTurn(turnId: string): boolean {
-  const controller = activeTurnControllers.get(`${requireWorkspaceId()}:${turnId}`);
-  controller?.abort();
-  return Boolean(controller);
-}
-
-function newTurnId() {
-  return `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+export type { RunAssistantTurnOptions } from './assistantTurnStream';
+export function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<void> {
+  return runWithTurnLifecycle(opts, executeAssistantTurn);
 }
 
 function workspaceStatusMessage(clientContext: ClientContext | undefined): string {
@@ -76,39 +71,7 @@ function shouldTrackAssistantTask(
   return compact.length > 12;
 }
 
-/** 给 started 事件构造一个最小化的 item，用于流式持久化入队 */
-function defaultPayloadForKind(kind: string, evt: Record<string, any>): Record<string, unknown> {
-  switch (kind) {
-    case 'agentMessage':
-      return { content: '' };
-    case 'agentReasoning':
-      return { content: '' };
-    case 'toolCall':
-      return {
-        name: String(evt.name || ''),
-        displayName: String(evt.displayName || evt.name || ''),
-        args: String(evt.args || '{}'),
-        callId: String(evt.itemId || ''),
-      };
-    case 'subAgent':
-      return {
-        skillId: String(evt.meta?.skillId || ''),
-        prompt: String(evt.meta?.prompt || ''),
-        status: 'spawning',
-      };
-    default:
-      return {};
-  }
-}
-
-export interface RunAssistantTurnOptions {
-  req: Request;
-  body: TurnStartBody;
-  signal?: AbortSignal;
-  send: (evt: AssistantSSEEvent) => void;
-}
-
-export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<void> {
+async function executeAssistantTurn(opts: RunAssistantTurnOptions): Promise<void> {
   const { req, body } = opts;
   const signal = AbortSignal.any([AbortSignal.timeout(EXECUTION_LIMITS.deadlineMs), ...(opts.signal ? [opts.signal] : [])]);
   const budget = new AgentExecutionBudget();
@@ -141,51 +104,22 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   // ── Telemetry wrapper ──
   const turnTimer = new TurnTimer(turnId, threadId, model);
   turnTimer.streamingConnected();
-  const send = (evt: AssistantSSEEvent) => {
-    if (evt && typeof evt === 'object') {
-      const type = (evt as { type?: string }).type;
-      switch (type) {
-        case 'item/started': {
-          const e = evt as Extract<AssistantSSEEvent, { type: 'item/started' }>;
-          turnTimer.itemStarted(String(e.kind || ''));
-          // 流式 item 持久化：把 started 状态入队
-          enqueueItemPersist(turnId, {
-            id: e.itemId,
-            kind: e.kind as any,
-            createdAt: Date.now(),
-            ...defaultPayloadForKind(e.kind, e),
-          } as any);
-          break;
-        }
-        case 'item/completed': {
-          const e = evt as Extract<AssistantSSEEvent, { type: 'item/completed' }>;
-          turnTimer.itemCompleted(String(e.kind || ''), e.itemId, e.status);
-          break;
-        }
-        case 'item/approval/request': {
-          const e = evt as Extract<AssistantSSEEvent, { type: 'item/approval/request' }>;
-          turnTimer.approvalRequested(e.toolName, e.approvalId);
-          break;
-        }
-        case 'item/approval/resolved': {
-          const e = evt as Extract<AssistantSSEEvent, { type: 'item/approval/resolved' }>;
-          turnTimer.approvalResolved('', e.approvalId, e.decision);
-          break;
-        }
-        case 'turn/interrupted':
-          turnTimer.complete({ status: 'interrupted', reason: 'client-disconnect' });
-          break;
-        default:
-          break;
-      }
-    }
-    baseSend(evt);
-  };
+  const send = createTurnTelemetrySender(baseSend, turnTimer);
 
-  await upsertTurn(turnId, threadId, model).catch(() => undefined);
+  // Claim ownership before memory, collection, or any external model work.
+  await updateTurnModel(turnId, threadId, model);
+  const withThreadMemory = <T>(run: () => Promise<T>): Promise<T> => withAssistantThreadWrite(threadId, async () => {
+    signal.throwIfAborted();
+    if (await isAssistantThreadDeleted(threadId)) throw new AssistantThreadDeletedError();
+    const result = await run();
+    signal.throwIfAborted();
+    return result;
+  });
 
   // Persist text before collection or history truncation. Collection never invokes the summarizer.
-  await assistantMemory.remember(threadId, messages).catch(() => {
+  await withThreadMemory(() => assistantMemory.remember(threadId, messages)).catch((error) => {
+    signal.throwIfAborted();
+    if (error instanceof AssistantThreadDeletedError) throw error;
     send({ type: 'status', phase: 'memory', message: '会话记忆暂时无法保存，本轮仍可继续' });
   });
 
@@ -200,9 +134,9 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   let collection: Awaited<ReturnType<typeof collectSocialImages>> | undefined;
   let reusedCollection = false;
   let collectionRuntime: AgentRuntime | undefined;
-  if (collectionIntent.urls.length && enableAgentTools && (!skillTools || skillTools.includes('parse_product_or_social_url'))) {
+  if (collectionIntent.urls.length && enableAgentTools && (!allowedTools || allowedTools.includes('parse_product_or_social_url'))) {
     // 必须位于密钥校验、上下文压缩和 agent loop 之前，纯采集无需模型配置。
-    await upsertTurn(turnId, threadId, 'direct-collection').catch(() => undefined);
+    await updateTurnModel(turnId, threadId, 'direct-collection');
     collectionRuntime = new AgentRuntime({ turnId, threadId, send, signal,
       onItemEvent: (item) => enqueueItemPersist(turnId, item) });
     const heartbeat = setInterval(() => send({ type: 'ping' }), 15000);
@@ -266,6 +200,7 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
       collectionRuntime.fail('视觉筛选未配置模型密钥');
       await syncRuntimeToDb(collectionRuntime, turnId).catch(() => undefined);
     }
+    await updateTurnStatus(turnId, 'failed').catch(() => undefined);
     turnTimer.complete({ status: 'failed', reason: 'no-api-key' });
     return;
   }
@@ -275,21 +210,30 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   let memorySummary = '';
   const memoryHeartbeat = setInterval(() => send({ type: 'ping' }), 15000);
   try {
-    const memory = await assistantMemory.remember(threadId, messages, async (previous, text) => {
+    const memory = await withThreadMemory(() => assistantMemory.remember(threadId, messages, async (previous, text) => {
       send({ type: 'status', phase: 'memory', message: '正在将较早对话整理为长期记忆…' });
       budget.consumeModel();
       return summarizeMemory({ previous, text, model, baseUrl, apiKey, signal, onUsage: usage => budget.recordUsage(usage) });
-    });
+    }));
     memorySummary = memory.enabled ? memory.summary : '';
   } catch {
     signal?.throwIfAborted();
-    const memory = await assistantMemory.get(threadId).catch(() => null);
+    const memory = await withThreadMemory(() => assistantMemory.get(threadId)).catch((error) => {
+      signal.throwIfAborted();
+      if (error instanceof AssistantThreadDeletedError) throw error;
+      return null;
+    });
     memorySummary = memory?.enabled ? memory.summary : '';
     send({ type: 'status', phase: 'memory', message: '本次摘要未完成，保留已有记忆，继续处理当前请求' });
   } finally { clearInterval(memoryHeartbeat); }
 
-  const contextMessages = await assistantMemory.contextMessages(threadId, messages as Array<{ role: string; content: string }>, memorySummary).catch(() => messages);
-  const { formattedMessages } = await buildAssistantMessages({
+  const contextMessages = await withThreadMemory(() => assistantMemory.contextMessages(threadId, messages as Array<{ role: string; content: string }>, memorySummary)).catch((error) => {
+    signal.throwIfAborted();
+    if (error instanceof AssistantThreadDeletedError) throw error;
+    return messages;
+  });
+  const { formattedMessages, documents } = await buildAssistantMessages({
+    signal,
     preserveReasoning: reasoningCapability(model).preserveReasoning,
     canReadDocuments: enableAgentTools !== false && (!allowedTools || allowedTools.includes('read_attached_document') || allowedTools.includes('execute_code')),
     messages: contextMessages as Parameters<typeof buildAssistantMessages>[0]['messages'],
@@ -365,13 +309,6 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
   const requestedModelId = model.trim();
 
   const origin = resolveRequestOrigin(req);
-  const lastUserForDocs = (messages as Array<{ role: string; attachments?: Array<{ type: string; extractedText?: string; name?: string }> }>)
-    .filter((m) => m.role === 'user')
-    .pop();
-  const documents = (lastUserForDocs?.attachments || [])
-    .filter((a) => a.type === 'document' && a.extractedText)
-    .map((a) => ({ name: a.name, extractedText: a.extractedText }));
-
   const toolCtx = {
     origin,
     documents,
@@ -385,14 +322,11 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     send({ type: 'ping' });
   }, 15000);
 
-  // Persist: Create turn record at start
-  await upsertTurn(turnId, threadId, model).catch((err) => {
-    console.error('[TurnPersist] Failed to create turn record:', err);
-  });
-
+  const turnRuntime = collectionRuntime ?? new AgentRuntime({ turnId, threadId, send, signal,
+    onItemEvent: (item) => enqueueItemPersist(turnId, item) });
   try {
     const loopResult = await runAgentLoop({
-      runtime: collectionRuntime,
+      runtime: turnRuntime,
       messages: formattedMessages,
       modelsToTry,
       reasoningEffort,
@@ -415,28 +349,9 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     let actualModel = loopResult.modelUsed;
 
     if (!loopResult.textStreamed && !signal?.aborted) {
-      let streamMessages = loopResult.finalMessages;
-      if (loopResult.toolsWereUsed) {
-        const lastVisionUserIdx = [...formattedMessages]
-          .map((m, i) => ({ m, i }))
-          .reverse()
-          .find(
-            (x) =>
-              (x.m as { role?: string }).role === 'user' &&
-              Array.isArray((x.m as { content?: unknown }).content),
-          )?.i;
-        const lastWorkUserIdx = [...streamMessages]
-          .map((m, i) => ({ m, i }))
-          .reverse()
-          .find((x) => (x.m as { role?: string }).role === 'user')?.i;
-        if (lastVisionUserIdx != null && lastWorkUserIdx != null) {
-          streamMessages = [...streamMessages];
-          streamMessages[lastWorkUserIdx] = formattedMessages[lastVisionUserIdx];
-        }
-      }
-
+      // Keep original user messages and every tool-generated visual frame in the loop context.
       actualModel = await streamFinalReply({
-        messages: streamMessages,
+        messages: loopResult.finalMessages,
         modelsToTry,
         reasoningEffort,
         budget,
@@ -491,11 +406,12 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     await flushItemQueue().catch(() => undefined);
   } catch (error: unknown) {
     task.status = signal?.aborted ? 'cancelled' : 'failed';
-    task.stage = signal?.aborted ? interruptionMessage() : formatUserError(error, '本轮未完成');
-    if (trackTask) {
-      send({ type: 'task', task: { ...task } });
-      await syncSnapshot(turnId, { task });
-    }
+    task.stage = signal?.aborted ? interruptionMessage() : safeErrorMessage(new Error(formatUserError(error, '本轮未完成')), '本轮未完成');
+    if (trackTask) send({ type: 'task', task: { ...task } });
+    if (signal?.aborted) turnRuntime.interrupt();
+    else turnRuntime.fail(task.stage);
+    await syncRuntimeToDb(turnRuntime, turnId).catch(() => undefined);
+    await syncSnapshot(turnId, { ...turnRuntime.snapshot(), ...(trackTask ? { task } : {}) }).catch(() => undefined);
     if (signal?.aborted) {
       await updateTurnStatus(turnId, 'interrupted').catch(() => undefined);
       if (signal.reason?.name === 'TimeoutError') send({ type: 'error', error: interruptionMessage() });
@@ -509,53 +425,10 @@ export async function runAssistantTurn(opts: RunAssistantTurnOptions): Promise<v
     });
     const msg = error instanceof Error ? error.message : '请求大模型服务异常';
     turnTimer.complete({ status: 'failed', reason: msg });
-    send({ type: 'error', error: formatUserError(error, msg) });
+    send({ type: 'done' });
   } finally {
     clearInterval(pingInterval);
     turnTimer.streamingDisconnected();
   }
 }
 
-export function createAssistantSSEStream(
-  req: Request,
-  body: TurnStartBody,
-  signal?: AbortSignal,
-): Response {
-  const encoder = new TextEncoder();
-  const turnId = body.turnId || newTurnId();
-  const abortController = new AbortController();
-  const runSignal = AbortSignal.any([req.signal, abortController.signal, ...(signal ? [signal] : [])]);
-  let closed = false;
-  const controllerKey = `${requireWorkspaceId()}:${turnId}`;
-  activeTurnControllers.get(controllerKey)?.abort();
-  activeTurnControllers.set(controllerKey, abortController);
-  const sseHeaders = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  };
-
-  return new Response(
-    new ReadableStream({
-      async start(controller) {
-        const send = (payload: AssistantSSEEvent) => {
-          if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-        };
-
-        try {
-          await runAssistantTurn({ req, body: { ...body, turnId }, signal: runSignal, send });
-        } finally {
-          if (activeTurnControllers.get(controllerKey) === abortController) activeTurnControllers.delete(controllerKey);
-          if (!closed) { closed = true; controller.close(); }
-        }
-      },
-      cancel() {
-        closed = true;
-        abortController.abort();
-        if (activeTurnControllers.get(controllerKey) === abortController) activeTurnControllers.delete(controllerKey);
-      },
-    }),
-    { headers: sseHeaders },
-  );
-}

@@ -1,26 +1,26 @@
 import { extractTaskReferenceImages } from '../shared/modals/lightbox/taskReferenceImages';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import '@client/shared/api/permanentDeleteGeneration';
-import { downloadMediaOrOpen, openExternalUrl } from '@client/shared/media/downloadMedia';
+import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
+import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import { useToast } from '@client/shared/hooks/useToast';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 import { TOAST_DURATION_MS } from '@client/shared/constants/timing';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-} from 'lucide-react';
-import { formatPromptParagraphs, buildMultiAnglePrompt, buildSmartEditPrompt } from '@shared/domain/media/drawing';
-import type { GenerationTask } from '@client/store/appStoreTypes';
+import { formatPromptParagraphs } from '@shared/domain/media/drawing';
 import { LightboxInfoPanel } from '../shared/modals/lightbox/LightboxInfoPanel';
 import { LightboxToolPanel } from '../shared/modals/lightbox/LightboxToolPanel';
 import { MultiAngleModal } from './lightbox/LightboxMultiAngleModal';
 import { SmartEditModal } from '../shared/modals/lightbox/SmartEditModal';
 import { OutpaintModal } from './lightbox/OutpaintModal';
-import { calculateTargetDimensions } from '../shared/modals/lightbox/lightboxDimensions';
+import { useLightboxEditActions } from './lightbox/useLightboxEditActions';
+import { LightboxMediaPanel } from './lightbox/LightboxMediaPanel';
+import { resolveTaskPreviewQueue } from '@client/shared/modals/lightbox/taskPreviewQueue';
+import { useGenerateTaskActions } from '@client/features/generate/hooks/useGenerateTaskActions';
+import { isGenerationVideoTask } from '@client/shared/media/generationTaskMedia';
+import { replacePromptReferenceMentions } from '@shared/domain/prompts/prompt-engine/mentions';
 
 export function ImageLightboxModal() {
   const {
@@ -28,13 +28,13 @@ export function ImageLightboxModal() {
     previewQueue,
     setPreviewTask,
     generationTasks,
+    sessions,
     currentView,
     setCurrentView,
     setQuickPrompt,
     setQuickRefImage,
     setQuickGenMode,
     quickRefImage,
-    addGenerationTask,
     quickModel,
     quickQuality,
     quickAspectId,
@@ -47,13 +47,13 @@ export function ImageLightboxModal() {
       previewQueue: s.previewQueue,
       setPreviewTask: s.setPreviewTask,
       generationTasks: s.generationTasks,
+      sessions: s.sessions,
       currentView: s.currentView,
       setCurrentView: s.setCurrentView,
       setQuickPrompt: s.setQuickPrompt,
       setQuickRefImage: s.setQuickRefImage,
       setQuickGenMode: s.setQuickGenMode,
       quickRefImage: s.quickRefImage,
-      addGenerationTask: s.addGenerationTask,
       quickModel: s.quickModel,
       quickQuality: s.quickQuality,
       quickAspectId: s.quickAspectId,
@@ -63,19 +63,26 @@ export function ImageLightboxModal() {
     })),
   );
 
+  const hasPreviewTask = Boolean(previewTask);
+  useEffect(() => hasPreviewTask ? videoPlaybackManager.suspend() : undefined, [hasPreviewTask]);
+
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
 
-  // 生产对话生成界面特有的子弹窗状态
-  const [isMultiAngleOpen, setIsMultiAngleOpen] = useState(false);
-  const [isSmartEditOpen, setIsSmartEditOpen] = useState(false);
-  const [isOutpaintOpen, setIsOutpaintOpen] = useState(false);
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const { show: showToast } = useToast();
   const { setSafeTimeout } = useSafeTimeout();
+  const { handleReuseTask, handleRegenerateTask } = useGenerateTaskActions(showToast);
+
+  const isVideo = Boolean(previewTask && isGenerationVideoTask(previewTask));
+  const {
+    isMultiAngleOpen, setIsMultiAngleOpen,
+    isSmartEditOpen, setIsSmartEditOpen,
+    isOutpaintOpen, setIsOutpaintOpen,
+    handleToolAction, handleSubmitNovelView, handleSubmitSmartEdit, handleSubmitOutpaint,
+  } = useLightboxEditActions(previewTask, isVideo, showToast);
 
   const isGenerateView = currentView === 'generate';
 
@@ -88,15 +95,6 @@ export function ImageLightboxModal() {
     setIsPromptExpanded(false);
     setIsImageLoading(true);
   }, [previewTask?.id, previewTask?.resultUrl]);
-
-  const isVideo = Boolean(
-    previewTask?.mediaType === 'video' ||
-      previewTask?.mediaType === 'depth-video' ||
-      previewTask?.model === 'video-depth-anything' ||
-      (previewTask?.id || '').startsWith('depth_video_') ||
-      (previewTask?.resultUrl &&
-        (previewTask.resultUrl.includes('.mp4') || previewTask.resultUrl.includes('video'))),
-  );
 
   // 计算视频播放源（优先走带 Range/防盗链代理的 proxyMediaUrl，避免跨域阻断与防盗链拦截）
   const initialVideoSrc = useMemo(() => {
@@ -156,31 +154,14 @@ export function ImageLightboxModal() {
     }
   }, []);
 
-  
 
-  const successTasks = useMemo(() => {
-    if (!previewTask) return [];
 
-    if (previewQueue && previewQueue.length > 0) {
-      const validQueue = previewQueue.filter(
-        (t) => t && t.resultUrl && (t.status === 'SUCCESS' || !t.status),
-      );
-      if (validQueue.length > 0) {
-        return validQueue;
-      }
-    }
-
-    if (previewTask.batchId) {
-      const batchList = generationTasks.filter(
-        (t) => t.batchId === previewTask.batchId && t.status === 'SUCCESS' && t.resultUrl,
-      );
-      if (batchList.length > 0) {
-        return batchList;
-      }
-    }
-
-    return [previewTask];
-  }, [previewTask, previewQueue, generationTasks]);
+  const livePreviewQueue = useMemo(() => resolveTaskPreviewQueue(
+    previewTask, previewQueue, generationTasks, sessions,
+  ), [previewTask, previewQueue, generationTasks, sessions]);
+  const successTasks = useMemo(() => livePreviewQueue.filter(
+    (task) => task.resultUrl && (task.status === 'SUCCESS' || !task.status),
+  ), [livePreviewQueue]);
 
   // 聚合当前任务所属同批次/同队列/同会话所有兄弟任务中使用的参考素材池（彻底杜绝翻页后子任务缺少字段导致素材丢失）
   const batchReferenceImages = useMemo(() => {
@@ -242,14 +223,14 @@ export function ImageLightboxModal() {
   const handlePrev = () => {
     if (total > 1 && currentIndex >= 0) {
       const prevIdx = (currentIndex - 1 + total) % total;
-      setPreviewTask(successTasks[prevIdx], successTasks);
+      setPreviewTask(successTasks[prevIdx], livePreviewQueue);
     }
   };
 
   const handleNext = () => {
     if (total > 1 && currentIndex >= 0) {
       const nextIdx = (currentIndex + 1) % total;
-      setPreviewTask(successTasks[nextIdx], successTasks);
+      setPreviewTask(successTasks[nextIdx], livePreviewQueue);
     }
   };
 
@@ -267,12 +248,12 @@ export function ImageLightboxModal() {
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         if (total > 1 && currentIndex >= 0) {
           const prevIdx = (currentIndex - 1 + total) % total;
-          setPreviewTask(successTasks[prevIdx], successTasks);
+          setPreviewTask(successTasks[prevIdx], livePreviewQueue);
         }
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         if (total > 1 && currentIndex >= 0) {
           const nextIdx = (currentIndex + 1) % total;
-          setPreviewTask(successTasks[nextIdx], successTasks);
+          setPreviewTask(successTasks[nextIdx], livePreviewQueue);
         }
       } else if (e.key === ' ' && isVideo && videoRef.current) {
         e.preventDefault();
@@ -285,7 +266,7 @@ export function ImageLightboxModal() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewTask, currentIndex, successTasks, total, setPreviewTask, isVideo]);
+  }, [previewTask, currentIndex, successTasks, livePreviewQueue, total, setPreviewTask, isVideo]);
 
 
 
@@ -306,16 +287,19 @@ export function ImageLightboxModal() {
       }, TOAST_DURATION_MS);
     } catch (err) {
       console.error('下载素材异常:', err);
+      showToast(err instanceof Error ? err.message : '下载失败，请打开原文件手动保存或重试');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  
+
 
   const handleUsePromptOnly = useCallback(() => {
     if (!previewTask?.prompt) return;
-    setQuickPrompt(previewTask.prompt);
+    useAppStore.setState({ quickVideoRefMode: 'omni', quickVideoFirstFrame: null,
+      quickVideoLastFrame: null, quickVideoMultiFrames: [] });
+    setQuickPrompt(replacePromptReferenceMentions(previewTask.prompt));
     setQuickGenMode(isVideo ? 'video' : 'image');
     setQuickRefImage(null);
     setCurrentView('generate');
@@ -325,9 +309,10 @@ export function ImageLightboxModal() {
 
   const handleUseAsReference = useCallback(() => {
     if (!previewTask?.resultUrl) return;
-    if (previewTask.prompt) {
-      setQuickPrompt(previewTask.prompt);
-    }
+    useAppStore.setState({ quickVideoRefMode: 'omni', quickVideoFirstFrame: null,
+      quickVideoLastFrame: null, quickVideoMultiFrames: [] });
+    setQuickPrompt(replacePromptReferenceMentions(previewTask.prompt || useAppStore.getState().quickPrompt,
+      isVideo ? '@视频1' : '@图片1'));
     setQuickGenMode(isVideo ? 'video' : 'image');
     setQuickRefImage(previewTask.resultUrl);
     setCurrentView('generate');
@@ -338,215 +323,19 @@ export function ImageLightboxModal() {
 
   const handleReEdit = useCallback(() => {
     if (!previewTask) return;
-    if (previewTask.prompt) {
-      setQuickPrompt(previewTask.prompt);
-    }
-    if (previewTask.resultUrl) {
-      setQuickRefImage(previewTask.resultUrl);
-    }
+    handleReuseTask(previewTask);
     setCurrentView('generate');
     setPreviewTask(null);
     showToast('✏️ 已填入输入框进行编辑');
-  }, [previewTask, setQuickPrompt, setQuickRefImage, setCurrentView, setPreviewTask, showToast]);
+  }, [previewTask, handleReuseTask, setCurrentView, setPreviewTask, showToast]);
 
-  const handleRegenerate = useCallback(() => {
+  const handleRegenerate = useCallback(async () => {
     if (!previewTask) return;
-    if (previewTask.prompt) {
-      setQuickPrompt(previewTask.prompt);
-    }
+    if (!await handleRegenerateTask(previewTask)) return;
     setCurrentView('generate');
     setPreviewTask(null);
-    showToast('🚀 已准备再次生成');
-  }, [previewTask, setQuickPrompt, setCurrentView, setPreviewTask, showToast]);
-
-  const handleToolAction = useCallback((actionKey: string, label: string) => {
-    if (actionKey === 'multi_angle') {
-      setIsMultiAngleOpen(true);
-    } else if (actionKey === 'smart_edit') {
-      setIsSmartEditOpen(true);
-    } else if (actionKey === 'outpaint') {
-      setIsOutpaintOpen(true);
-    } else {
-      showToast(`✨ ${label} 功能已准备就绪`);
-    }
-  }, [showToast]);
-
-  const handleSubmitNovelView = useCallback(
-    ({
-      azimuth,
-      elevation,
-      angleName,
-      model,
-      quality,
-      aspectRatio,
-    }: {
-      azimuth: number;
-      elevation: number;
-      angleName: string;
-      model?: string;
-      quality?: string;
-      aspectRatio?: string;
-    }) => {
-      setIsMultiAngleOpen(false);
-      setPreviewTask(null);
-      setCurrentView('generate');
-
-      if (!previewTask || !previewTask.resultUrl) {
-        showToast(`🎥 已提交多角度生成任务（${angleName}视角）`);
-        return;
-      }
-
-      const multiAnglePrompt = buildMultiAnglePrompt({
-        originalPrompt: previewTask.prompt || '',
-        azimuth,
-        elevation,
-        angleName,
-      });
-
-      const chosenModel = model || previewTask.model || 'gpt-image-2';
-      const chosenQuality = quality || previewTask.quality || 'medium';
-      const targetSize = calculateTargetDimensions(
-        aspectRatio,
-        chosenQuality,
-        previewTask.size || '2448x3264',
-      );
-
-      const newTaskId = `fast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const newTask: GenerationTask = {
-        id: newTaskId,
-        title: `多角度视角转换(${angleName})`,
-        prompt: multiAnglePrompt,
-        model: chosenModel,
-        size: targetSize,
-        quality: chosenQuality,
-        referenceImageUrl: previewTask.resultUrl,
-        referenceImages: [previewTask.resultUrl],
-        images: [previewTask.resultUrl],
-        useReferenceImage: true,
-        taskType: 'multi_angle',
-        angleName,
-        sourceImageUrl: previewTask.resultUrl,
-        status: 'IN_PROGRESS',
-        progress: '15%',
-        createdAt: Date.now(),
-      };
-
-      addGenerationTask(newTask, false);
-      showToast(`🎥 已提交多角度视角转换任务（${angleName}）`);
-    },
-    [previewTask, addGenerationTask, setPreviewTask, setCurrentView, showToast],
-  );
-
-  const handleSubmitSmartEdit = useCallback(
-    ({
-      markers,
-      prompt,
-      model,
-      quality,
-      aspectRatio,
-    }: {
-      markers: any[];
-      prompt: string;
-      model: string;
-      quality: string;
-      aspectRatio?: string;
-    }) => {
-      setIsSmartEditOpen(false);
-      setPreviewTask(null);
-      setCurrentView('generate');
-
-      if (previewTask && previewTask.resultUrl) {
-        // 🌟 1. 组装具备空间方位定位与一致性约束的高质量智能改图提示词
-        const smartEditPrompt = buildSmartEditPrompt({
-          originalPrompt: previewTask.prompt || '',
-          userPrompt: prompt,
-          markers,
-        });
-
-        // 🌟 2. 比例与尺寸精准匹配
-        const chosenModel = model || previewTask.model || 'gpt-image-2';
-        const chosenQuality = quality || previewTask.quality || 'medium';
-        const targetSize = calculateTargetDimensions(
-          aspectRatio,
-          chosenQuality,
-          previewTask.size || '2448x3264',
-        );
-
-        const newTaskId = `fast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        const newTask: GenerationTask = {
-          id: newTaskId,
-          title: `智能改图: ${prompt.slice(0, 15)}`,
-          prompt: smartEditPrompt,
-          model: chosenModel,
-          size: targetSize,
-          quality: chosenQuality,
-          referenceImageUrl: previewTask.resultUrl,
-          referenceImages: [previewTask.resultUrl],
-          images: [previewTask.resultUrl],
-          useReferenceImage: true,
-          taskType: 'smart_edit',
-          sourceImageUrl: previewTask.resultUrl,
-          status: 'IN_PROGRESS',
-          progress: '15%',
-          createdAt: Date.now(),
-        };
-        addGenerationTask(newTask, false);
-      }
-
-      showToast(`✨ 已提交局部修改任务：${prompt.slice(0, 15)}...`);
-    },
-    [previewTask, addGenerationTask, setPreviewTask, setCurrentView, showToast],
-  );
-
-  const handleSubmitOutpaint = useCallback(
-    ({
-      ratio,
-      prompt,
-      model,
-      quality,
-    }: {
-      ratio: string;
-      scale: number;
-      prompt: string;
-      model?: string;
-      quality?: string;
-    }) => {
-      setIsOutpaintOpen(false);
-      setPreviewTask(null);
-      setCurrentView('generate');
-
-      if (previewTask && previewTask.resultUrl) {
-        const chosenModel = model || previewTask.model || 'gpt-image-2';
-        const chosenQuality = quality || previewTask.quality || 'medium';
-        const targetSize = calculateTargetDimensions(
-          ratio === 'original' ? 'smart' : ratio,
-          chosenQuality,
-          previewTask.size || '2448x3264',
-        );
-
-        const newTaskId = `fast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        const newTask: GenerationTask = {
-          id: newTaskId,
-          title: `扩图(${ratio})`,
-          prompt: prompt || previewTask.prompt || '保持画风和内容自然延伸扩展画幅',
-          model: chosenModel,
-          size: targetSize,
-          quality: chosenQuality,
-          referenceImageUrl: previewTask.resultUrl,
-          referenceImages: [previewTask.resultUrl],
-          images: [previewTask.resultUrl],
-          useReferenceImage: true,
-          status: 'IN_PROGRESS',
-          progress: '15%',
-          createdAt: Date.now(),
-        };
-        addGenerationTask(newTask, false);
-      }
-
-      showToast(`📐 已提交扩图任务（比例：${ratio}）`);
-    },
-    [previewTask, addGenerationTask, setPreviewTask, setCurrentView, showToast],
-  );
+    showToast('🚀 已创建再次生成任务');
+  }, [previewTask, handleRegenerateTask, setCurrentView, setPreviewTask, showToast]);
 
   if (!previewTask || !previewTask.resultUrl) return null;
 
@@ -566,166 +355,27 @@ export function ImageLightboxModal() {
       <div
         className="w-full max-w-7xl max-h-[88vh] flex flex-col md:flex-row items-center justify-center gap-4 sm:gap-6 relative pointer-events-none"
       >
-        {/* 🌟 1. 左侧主体展示区：左翻页按键 + 大图/视频容器 (含左上角AI生成、底部<1/4>) + 右翻页按键 (外置宽松排布) */}
-        <div className="relative flex items-center justify-center flex-1 max-w-full md:max-w-[calc(100%-420px)] h-[50vh] md:h-[80vh] gap-3 sm:gap-5 lg:gap-7 min-w-0 pointer-events-none">
-          {/* 左侧外侧翻页按键 (稍微在往外一点，脱离图片) */}
-          {total > 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePrev();
-              }}
-              className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-xl hover:scale-110 active:scale-95 z-20 group pointer-events-auto"
-              title="上一张 (←)"
-            >
-              <ChevronLeft className="w-6 h-6 stroke-[2.2] group-hover:-translate-x-0.5 transition-transform" />
-            </button>
-          )}
-
-          {/* 中间媒体展示区 */}
-          <div className="relative flex flex-col items-center justify-center h-full max-w-full min-w-0 flex-1 pointer-events-none">
-            <div
-              className="w-full flex-1 flex items-center justify-center overflow-hidden cursor-pointer min-h-0 relative group/view pointer-events-auto"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isVideo && previewTask.resultUrl) {
-                  void openExternalUrl(previewTask.resultUrl);
-                }
-              }}
-              title={isVideo ? undefined : "点击在新窗口查看原图"}
-            >
-              {isVideo ? (
-                <div className="relative max-h-full max-w-full inline-flex items-center justify-center rounded-2xl overflow-hidden shadow-2xl">
-                  {/* 🌟 紧密贴合视频左上角「AI生成」标识 (对齐图 1 原版，随视频居中紧密贴合) */}
-                  {!videoLoadFailed && (
-                    <div className="absolute top-3 left-3 z-30 px-2 py-0.5 rounded bg-black/45 backdrop-blur-xs text-[10px] text-white/90 font-medium select-none pointer-events-none tracking-tight shadow-2xs">
-                      AI生成
-                    </div>
-                  )}
-
-                  {isVideoLoading && !videoLoadFailed && (
-                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                      <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-                    </div>
-                  )}
-
-                  {videoLoadFailed ? (
-                    <div
-                      className="p-6 rounded-2xl bg-black/80 border border-white/10 text-center flex flex-col items-center gap-3 z-10 select-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <p className="text-sm text-slate-300">视频播放源加载受限</p>
-                      <button
-                        type="button"
-                        onClick={() => void openExternalUrl(previewTask.resultUrl!)}
-                        className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors cursor-pointer"
-                      >
-                        在新窗口打开原视频
-                      </button>
-                    </div>
-                  ) : (
-                    <video
-                      key={currentVideoSrc}
-                      ref={videoRef}
-                      src={currentVideoSrc}
-                      controls
-                      autoPlay
-                      loop
-                      playsInline
-                      preload="auto"
-                      onCanPlay={handleVideoCanPlay}
-                      onLoadedMetadata={handleVideoDuration}
-                      onDurationChange={handleVideoDuration}
-                      onLoadedData={() => setIsVideoLoading(false)}
-                      onError={handleVideoError}
-                      className={`max-h-[48vh] md:max-h-[82vh] max-w-full object-contain transition-all duration-300 pointer-events-auto bg-black ${
-                        isVideoLoading ? 'opacity-0 scale-98' : 'opacity-100 scale-100'
-                      }`}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="relative max-h-full max-w-full inline-flex items-center justify-center rounded-2xl overflow-hidden shadow-2xl">
-                  {/* 🌟 紧密贴合大图左上角「AI生成」标识 (对齐图 1 原版，随图片居中紧密贴合) */}
-                  <div className="absolute top-3 left-3 z-30 px-2 py-0.5 rounded bg-black/45 backdrop-blur-xs text-[10px] text-white/90 font-medium select-none pointer-events-none tracking-tight shadow-2xs">
-                    AI生成
-                  </div>
-
-                  {isImageLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                      <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-                    </div>
-                  )}
-                  <img
-                    key={previewTask.resultUrl}
-                    src={proxyMediaUrl(previewTask.resultUrl, { width: 1920 })}
-                    alt={previewTask.prompt}
-                    onLoad={(e) => {
-                      setIsImageLoading(false);
-                      const target = e.currentTarget;
-                      // 🌟 防御性检测：若代理接口返回了 400x400 兜底 SVG 占位图，自动无缝切换为直连原图
-                      if (
-                        !target.dataset.hasRetried &&
-                        target.naturalWidth === 400 &&
-                        target.naturalHeight === 400 &&
-                        previewTask.resultUrl
-                      ) {
-                        target.dataset.hasRetried = 'true';
-                        target.src = previewTask.resultUrl;
-                      }
-                    }}
-                    onError={(e) => {
-                      setIsImageLoading(false);
-                      const target = e.currentTarget;
-                      if (!target.dataset.hasRetried && previewTask.resultUrl) {
-                        target.dataset.hasRetried = 'true';
-                        target.src = previewTask.resultUrl;
-                      } else if (!target.dataset.hasThumbFallback && previewTask.resultUrl) {
-                        // 🌟 第二重容灾：若直连原图也遇到网络限制，使用已在列表页成功呈现的 640px 缓存缩略图
-                        target.dataset.hasThumbFallback = 'true';
-                        target.src = proxyMediaUrl(previewTask.resultUrl, { thumb: true, width: 640 });
-                      }
-                    }}
-                    className={`max-h-[48vh] md:max-h-[82vh] max-w-full object-contain transition-all duration-300 select-none ${
-                      isImageLoading ? 'opacity-0 scale-98' : 'opacity-100 scale-100'
-                    }`}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* 大图正下方居中页码胶囊 (仅显示数量，移除切换按键) */}
-            {total > 1 && currentIndex >= 0 && (
-              <div className="mt-3 shrink-0 flex items-center justify-center select-none pointer-events-none">
-                <div className="flex items-center justify-center px-3 py-1 rounded-full bg-black/65 backdrop-blur-md text-white text-xs font-mono font-medium shadow-lg border border-white/15">
-                  <span className="tabular-nums">
-                    {currentIndex + 1} / {total}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 右侧外侧翻页按键 (位于大图与右侧面板之间) */}
-          {total > 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNext();
-              }}
-              className="shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-xl hover:scale-110 active:scale-95 z-20 group pointer-events-auto"
-              title="下一张 (→)"
-            >
-              <ChevronRight className="w-6 h-6 stroke-[2.2] group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          )}
-        </div>
+        <LightboxMediaPanel
+          previewTask={previewTask}
+          isVideo={isVideo}
+          total={total}
+          currentIndex={currentIndex}
+          handlePrev={handlePrev}
+          handleNext={handleNext}
+          videoRef={videoRef}
+          currentVideoSrc={currentVideoSrc}
+          videoLoadFailed={videoLoadFailed}
+          isVideoLoading={isVideoLoading}
+          isImageLoading={isImageLoading}
+          handleVideoCanPlay={handleVideoCanPlay}
+          handleVideoDuration={handleVideoDuration}
+          handleVideoError={handleVideoError}
+          setIsVideoLoading={setIsVideoLoading}
+          setIsImageLoading={setIsImageLoading}
+        />
 
         {/* 🌟 2. 右侧区域：主信息卡片 (完全对齐图 1) + 对话生图界面专有工具箱面板 (完全对齐图 2) */}
-        <div 
+        <div
           className="w-full md:w-[360px] lg:w-[380px] xl:w-[400px] max-h-[50vh] md:max-h-[88vh] flex flex-col gap-3 shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200/90 pr-1 select-none pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
@@ -764,7 +414,7 @@ export function ImageLightboxModal() {
       </div>
 
       {/* 🌟 3. 对话生图特有的扩展功能子弹窗 (多角度、智能改图、扩图) */}
-      {isGenerateView && (
+      {isGenerateView && !isVideo && (
         <>
           <MultiAngleModal
             isOpen={isMultiAngleOpen}

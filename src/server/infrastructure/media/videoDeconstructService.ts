@@ -1,5 +1,6 @@
-import { resolveStorageRoot, resolveStoredMediaPath } from '../storage/storagePaths';
-import { assertSafeVideoPath } from './videoPathSecurity';
+import { resolveStorageRoot, toWorkspaceStorageKey } from '../storage/storagePaths';
+import { resolveLocalVideoPath } from './videoResources';
+export { resolveLocalVideoPath, localUrlToDataUrl } from './videoResources';
 import fs from 'node:fs';
 import path from 'node:path';
 import 'node:os';
@@ -34,98 +35,6 @@ export interface SegmentFramesResult {
 }
 
 /**
- * 将本地 /storage/... 路径或文件绝对路径转为多模态模型可读取的 data:image/...;base64 字符串
- */
-export function localUrlToDataUrl(localUrl: string): string {
-  if (!localUrl) return '';
-  if (localUrl.startsWith('data:image/')) return localUrl;
-  try {
-    let absPath = localUrl;
-    if (localUrl.startsWith('/storage/')) {
-      absPath = resolveStoredMediaPath(localUrl.replace(/^\/storage\/?/, '')) || '';
-    }
-    if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
-      const ext = path.extname(absPath).toLowerCase().replace('..', '') || 'jpeg';
-      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-      const b64 = fs.readFileSync(absPath).toString('base64');
-      return `data:${mime};base64,${b64}`;
-    }
-  } catch {
-    /* ignore */
-  }
-  return localUrl;
-}
-
-/**
- * 确保输入路径为本地可读取的文件路径
- * 若为 URL 或 /storage 相对路径，解析为实际本地文件
- */
-export async function resolveLocalVideoPath(urlOrPath: string, signal?: AbortSignal): Promise<{ localPath: string; isTemp: boolean }> {
-  signal?.throwIfAborted();
-  const raw = assertSafeVideoPath(urlOrPath);
-
-  // 1. 本地绝对路径
-  if (path.isAbsolute(raw) && fs.existsSync(raw)) {
-    return { localPath: raw, isTemp: false };
-  }
-
-  // 2. /storage/... 本地映射路径
-  if (raw.startsWith('/storage/')) {
-    const rel = raw.replace(/^\/storage\/?/, '');
-    const abs = resolveStoredMediaPath(rel);
-    if (abs) {
-      return { localPath: abs, isTemp: false };
-    }
-  }
-
-  // 3. 用户常用 Downloads 目录文件名容错
-  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
-    const userDownloads = path.join(process.env.HOME || '/Users/huayuzulin', 'Downloads');
-    const directDownloads = path.join(userDownloads, raw);
-    if (fs.existsSync(directDownloads)) {
-      return { localPath: directDownloads, isTemp: false };
-    }
-
-    // 模糊匹配文件名（处理全角半角符号差异）
-    try {
-      const files = fs.readdirSync(userDownloads);
-      const cleanTarget = raw.replace(/[|｜\s_-]/g, '').toLowerCase();
-      const matched = files.find((f) => f.replace(/[|｜\s_-]/g, '').toLowerCase().includes(cleanTarget));
-      if (matched) {
-        return { localPath: path.join(userDownloads, matched), isTemp: false };
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  // 4. 远程 HTTP(S) 链接：下载到临时缓存目录
-  if (raw.startsWith('http://') || raw.startsWith('https://')) {
-    const storageRoot = resolveStorageRoot();
-    const tempDir = path.join(storageRoot, 'cache', 'video_downloads');
-    fs.mkdirSync(tempDir, { recursive: true });
-
-    const hash = crypto.createHash('md5').update(raw).digest('hex');
-    const localFile = path.join(tempDir, `vid_${hash}.mp4`);
-
-    if (fs.existsSync(localFile) && fs.statSync(localFile).size > 1024) {
-      return { localPath: localFile, isTemp: false };
-    }
-
-    const resp = await fetch(raw, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000) });
-    if (!resp.ok) {
-      throw new Error(`下载远程视频失败: ${resp.status} ${resp.statusText}`);
-    }
-    const buffer = Buffer.from(await resp.arrayBuffer());
-    signal?.throwIfAborted();
-    fs.writeFileSync(localFile, buffer);
-    return { localPath: localFile, isTemp: false };
-  }
-
-  throw new Error(`无法找到或读取视频文件: ${urlOrPath}`);
-}
-
-/**
  * 运行 Python 辅助脚本，执行 OpenCV / PIL 多媒体操作
  *
  * 安全：将内联脚本写入临时 `.py` 文件再以 `python3 <file> ...args` 方式调用，
@@ -133,30 +42,36 @@ export async function resolveLocalVideoPath(urlOrPath: string, signal?: AbortSig
  * 临时文件存放在系统 tmp 目录（权限 0o600），运行结束后立即清理。
  */
 async function runPythonScript(script: string, args: string[] = [], signal?: AbortSignal): Promise<any> {
-  signal?.throwIfAborted();
   const os = await import('node:os');
-  signal?.throwIfAborted();
   const scriptPath = path.join(
     os.tmpdir(),
     `azhuo_py_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.py`,
   );
   fs.writeFileSync(scriptPath, script, { mode: 0o600 });
   return new Promise((resolve, reject) => {
-    const py = spawn('python3', [scriptPath, ...args], { signal, timeout: 120_000, killSignal: 'SIGKILL' });
+    const py = spawn('python3', [scriptPath, ...args]);
+    const runSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(90000)]) : AbortSignal.timeout(90000);
+    const onAbort = () => { py.kill('SIGKILL'); };
+    runSignal.addEventListener('abort', onAbort, { once: true });
+    if (runSignal.aborted) onAbort();
     let stdout = '';
     let stderr = '';
 
     py.stdout.on('data', (data) => {
       stdout += data.toString();
+      if (stdout.length > 2_000_000) py.kill('SIGKILL');
     });
 
     py.stderr.on('data', (data) => {
       stderr += data.toString();
+      if (stderr.length > 100_000) py.kill('SIGKILL');
     });
 
     py.on('close', (code) => {
+      runSignal.removeEventListener('abort', onAbort);
       // 清理临时脚本（无论成功失败）
       fs.unlink(scriptPath, () => {});
+      if (runSignal.aborted) return reject(runSignal.reason);
       if (code !== 0) {
         return reject(new Error(`Python 脚本执行失败(code ${code}): ${stderr || stdout}`));
       }
@@ -169,6 +84,7 @@ async function runPythonScript(script: string, args: string[] = [], signal?: Abo
     });
 
     py.on('error', (err) => {
+      runSignal.removeEventListener('abort', onAbort);
       fs.unlink(scriptPath, () => {});
       reject(err);
     });
@@ -183,7 +99,7 @@ export async function inspectVideoMetadata(urlOrPath: string, signal?: AbortSign
   const sizeBytes = fs.existsSync(localPath) ? fs.statSync(localPath).size : undefined;
 
   const script = `
-import cv2, json, os, sys
+import cv2, json, os, sys, math
 
 path = sys.argv[1]
 cap = cv2.VideoCapture(path)
@@ -198,7 +114,8 @@ frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 dur = frames / fps if fps > 0 else 0
 cap.release()
 
-ar = "9:16" if h > w * 1.3 else ("16:9" if w > h * 1.3 else ("3:4" if h > w else "1:1"))
+divisor = math.gcd(w, h) or 1
+ar = f"{w // divisor}:{h // divisor}"
 res = {
     "width": w,
     "height": h,
@@ -211,6 +128,7 @@ print(json.dumps(res, ensure_ascii=False))
 `;
 
   const meta = await runPythonScript(script, [localPath], signal);
+  if (![meta.width, meta.height, meta.fps, meta.duration].every(value => Number.isFinite(value) && value > 0)) throw new Error('无法可靠读取视频规格，请确认文件可播放');
   return {
     ...meta,
     filename: path.basename(localPath),
@@ -226,14 +144,15 @@ export async function extractVideoStoryboards(
   options: { sampleCount?: number; columns?: number; signal?: AbortSignal } = {},
 ): Promise<StoryboardResult> {
   const { localPath } = await resolveLocalVideoPath(urlOrPath, options.signal);
-  const sampleCount = Math.max(4, Math.min(24, options.sampleCount || 12));
-  const columns = Math.max(2, Math.min(6, options.columns || 4));
+  const sampleCount = Math.floor(Math.max(4, Math.min(24, options.sampleCount || 12)));
+  const columns = Math.floor(Math.max(2, Math.min(6, options.columns || 4)));
 
   const storageRoot = resolveStorageRoot();
   const now = new Date();
   const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
   const batchId = `sb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const outDir = path.join(storageRoot, 'generated', 'images', yyyymm, batchId);
+  const outputKey = toWorkspaceStorageKey(`generated/images/${yyyymm}/${batchId}`);
+  const outDir = path.join(storageRoot, outputKey);
   fs.mkdirSync(outDir, { recursive: true });
 
   const script = `
@@ -301,7 +220,8 @@ sheet_fname = "storyboard_grid.jpg"
 sheet_fpath = os.path.join(out_dir, sheet_fname)
 contact_sheet.save(sheet_fpath, quality=86)
 
-ar = "9:16" if h > w * 1.3 else ("16:9" if w > h * 1.3 else "1:1")
+divisor = math.gcd(w, h) or 1
+ar = f"{w // divisor}:{h // divisor}"
 print(json.dumps({
     "contactSheetFile": sheet_fname,
     "frameFiles": extracted_files,
@@ -313,8 +233,9 @@ print(json.dumps({
 `;
 
   const pyRes = await runPythonScript(script, [localPath, outDir, String(sampleCount), String(columns)], options.signal);
+  if (!Array.isArray(pyRes.frameFiles) || !pyRes.frameFiles.length || !pyRes.contactSheetFile) throw new Error('未能提取可用的视频画面');
 
-  const basePath = `/storage/generated/images/${yyyymm}/${batchId}`;
+  const basePath = `/storage/${outputKey}`;
   return {
     contactSheetUrl: `${basePath}/${pyRes.contactSheetFile}`,
     frameUrls: pyRes.frameFiles.map((f: string) => `${basePath}/${f}`),
@@ -335,13 +256,14 @@ export async function extractVideoSegmentFrames(
   const { localPath } = await resolveLocalVideoPath(urlOrPath, options.signal);
   const startSec = Math.max(0, options.startSec || 0);
   const endSec = Math.max(startSec + 0.1, options.endSec || 3);
-  const count = Math.max(1, Math.min(10, options.frameCount || 4));
+  const count = Math.floor(Math.max(1, Math.min(10, options.frameCount || 4)));
 
   const storageRoot = resolveStorageRoot();
   const now = new Date();
   const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
   const batchId = `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const outDir = path.join(storageRoot, 'generated', 'images', yyyymm, batchId);
+  const outputKey = toWorkspaceStorageKey(`generated/images/${yyyymm}/${batchId}`);
+  const outDir = path.join(storageRoot, outputKey);
   fs.mkdirSync(outDir, { recursive: true });
 
   const script = `
@@ -399,8 +321,9 @@ print(json.dumps({
     String(endSec),
     String(count),
   ], options.signal);
+  if (!Array.isArray(pyRes.frameFiles) || !pyRes.frameFiles.length) throw new Error('指定区间没有可读取的视频画面');
 
-  const basePath = `/storage/generated/images/${yyyymm}/${batchId}`;
+  const basePath = `/storage/${outputKey}`;
   return {
     frameUrls: pyRes.frameFiles.map((f: string) => `${basePath}/${f}`),
     count: pyRes.count,

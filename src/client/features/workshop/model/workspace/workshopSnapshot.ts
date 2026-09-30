@@ -12,6 +12,7 @@ export interface WorkshopLiveState {
   selectedArchId: string;
   selectedQuality: 'high' | 'medium' | 'low';
   selectedAspect: '3:4' | '1:1' | '9:16' | '16:9';
+  gridOutputSize?: string;
   selectedShotCount: number;
   useAssetLibrary: boolean;
   lockedPersonaId: string;
@@ -19,6 +20,7 @@ export interface WorkshopLiveState {
   lockedOutfitId: string;
   lockedActionId: string;
   lockedFullPromptId?: string;
+  promptGroupFolderId?: string;
   generationStrategy: GenerationStrategy;
   autoGenerateCopywriting: boolean;
   personaMode?: 'asset_driven' | 'none';
@@ -50,6 +52,7 @@ export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
       personaMode: state.personaMode || 'asset_driven',
       selectedQuality: state.selectedQuality,
       selectedAspect: state.selectedAspect,
+      gridOutputSize: state.gridOutputSize,
       selectedShotCount: state.selectedShotCount,
       useAssetLibrary: state.useAssetLibrary,
       lockedPersonaId: state.lockedPersonaId || 'auto',
@@ -57,6 +60,7 @@ export function toWorkshopSnapshot(state: WorkshopLiveState): WorkshopSnapshot {
       lockedOutfitId: state.lockedOutfitId || 'auto',
       lockedActionId: state.lockedActionId || 'auto',
       lockedFullPromptId: state.lockedFullPromptId || 'auto',
+      promptGroupFolderId: state.promptGroupFolderId || 'auto',
       generationStrategy: state.generationStrategy,
       autoGenerateCopywriting: state.autoGenerateCopywriting,
     },

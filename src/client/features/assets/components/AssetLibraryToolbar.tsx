@@ -1,12 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Search,
-  Star,
   FolderOpen,
-  CheckSquare,
-  Square,
-  X,
 } from 'lucide-react';
 import type { ActionCategoryId, SubCategoryDef } from '@shared/domain/products/productCategory';
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
@@ -23,16 +18,9 @@ export type AssetLibraryToolbarProps = {
   statusFilters?: ReactNode;
   audienceFilters?: ReactNode;
   activeSubTab: AssetSubTab;
+  hideSecondaryRow?: boolean;
   setActiveSubTab: (tab: AssetSubTab) => void;
   setSelectedTag: (tag: string | null) => void;
-  searchKeyword: string;
-  setSearchKeyword: (v: string) => void;
-  onlyFavorite: boolean;
-  setOnlyFavorite: (v: boolean) => void;
-  items: unknown[];
-  isBatchMode: boolean;
-  setIsBatchMode: (v: boolean) => void;
-  setSelectedIds: (ids: string[] | ((prev: string[]) => string[])) => void;
   onOpenDeconstruct: () => void;
   folderInputRef: RefObject<HTMLInputElement | null>;
   onFolderInputChange: (files: FileList) => void;
@@ -72,16 +60,9 @@ export default function AssetLibraryToolbar({
   statusFilters,
   audienceFilters,
   activeSubTab,
+  hideSecondaryRow,
   setActiveSubTab,
   setSelectedTag,
-  searchKeyword,
-  setSearchKeyword,
-  onlyFavorite,
-  setOnlyFavorite,
-  items,
-  isBatchMode,
-  setIsBatchMode,
-  setSelectedIds,
   onOpenDeconstruct,
   folderInputRef,
   onFolderInputChange,
@@ -144,7 +125,7 @@ export default function AssetLibraryToolbar({
   );
 
   // 分类切换属于内容区的导航。让它靠左放在资产列表上方，避免与居中的工坊模块导航
-  // 和右侧操作抢占同一条顶栏；只有搜索和管理操作在宽屏时继续挂到顶栏右边。
+  // 和右侧管理操作抢占同一条顶栏。
   const tabNavigation = (
     <div className="flex items-center gap-2.5 flex-wrap shrink-0">
       <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl" aria-label="资产类型">
@@ -160,92 +141,40 @@ export default function AssetLibraryToolbar({
 
   const actionControls = (
     <div className="flex items-center gap-2.5 shrink-0">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 border border-slate-200/60 rounded-xl transition-colors w-48 sm:w-60 h-9">
-            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="搜索资产标题、特征、提示词..."
-              className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
-            />
-            {searchKeyword && (
-              <button
-                type="button"
-                onClick={() => setSearchKeyword('')}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+      <button
+        type="button"
+        onClick={onOpenDeconstruct}
+        className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer h-9"
+      >
+        <FolderOpen className="w-3.5 h-3.5" />
+        <span>导入图集并提取</span>
+      </button>
+      <input
+        ref={folderInputRef}
+        type="file"
+        // @ts-expect-error webkitdirectory is standard for folder picker
+        webkitdirectory="true"
+        directory="true"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            onFolderInputChange(e.target.files);
+          }
+          e.target.value = '';
+        }}
+      />
 
-          <button
-            type="button"
-            onClick={() => setOnlyFavorite(!onlyFavorite)}
-            className={`p-2 rounded-xl transition-colors cursor-pointer h-9 flex items-center gap-1.5 justify-center ${
-              onlyFavorite
-                ? 'bg-amber-50 text-amber-800 border border-amber-200/60'
-                : 'bg-slate-100 text-slate-500 hover:text-slate-700'
-            }`}
-            aria-pressed={onlyFavorite}
-            title={onlyFavorite ? '显示全部' : '仅看收藏'}
-          >
-            <Star className={`w-4 h-4 ${onlyFavorite ? 'fill-amber-500 text-amber-500' : ''}`} /><span className="text-xs">仅看收藏</span>
-          </button>
-
-          {(items.length > 0 || isBatchMode) && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsBatchMode(!isBatchMode);
-                if (isBatchMode) setSelectedIds([]);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer h-9 ${
-                isBatchMode
-                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                  : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
-              }`}
-            >
-              {isBatchMode ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-              <span>批量管理</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onOpenDeconstruct}
-            className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer h-9"
-          >
-            <FolderOpen className="w-3.5 h-3.5" />
-            <span>导入图集并提取</span>
-          </button>
-          <input
-            ref={folderInputRef}
-            type="file"
-            // @ts-expect-error webkitdirectory is standard for folder picker
-            webkitdirectory="true"
-            directory="true"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files.length > 0) {
-                onFolderInputChange(e.target.files);
-              }
-              e.target.value = '';
-            }}
-          />
-
-          <AssetLibraryMoreMenu
-            showMoreMenu={showMoreMenu}
-            setShowMoreMenu={setShowMoreMenu}
-            importJsonRef={importJsonRef}
-            onImportJsonBackup={onImportJsonBackup}
-            onExportJsonBackup={onExportJsonBackup}
-            onDeduplicate={onDeduplicate}
-            onOpenPromptSpec={onOpenPromptSpec}
-            onClearAssets={onClearAssets}
-          />
+      <AssetLibraryMoreMenu
+        showMoreMenu={showMoreMenu}
+        setShowMoreMenu={setShowMoreMenu}
+        importJsonRef={importJsonRef}
+        onImportJsonBackup={onImportJsonBackup}
+        onExportJsonBackup={onExportJsonBackup}
+        onDeduplicate={onDeduplicate}
+        onOpenPromptSpec={onOpenPromptSpec}
+        onClearAssets={onClearAssets}
+      />
     </div>
   );
 
@@ -255,7 +184,7 @@ export default function AssetLibraryToolbar({
       {!portalTarget && (
         <div
           data-asset-main-toolbar
-          className="flex items-center justify-end gap-3 flex-wrap px-5 sm:px-7 xl:px-8 py-2.5 bg-transparent"
+          className="flex items-center justify-end gap-3 flex-wrap px-5 sm:px-7 xl:px-8 py-1.5 bg-transparent"
         >
           {actionControls}
         </div>
@@ -269,6 +198,7 @@ export default function AssetLibraryToolbar({
       {/* 🌟 紧凑型专业复合过滤控制栏 (Filter Bar) */}
       <AssetLibraryFilterBar
         navigation={<>{tabNavigation}{audienceFilters}</>}
+        hideSecondaryRow={hideSecondaryRow}
         statusFilters={statusFilters}
         activeSubTab={activeSubTab}
         dynamicTagList={dynamicTagList}

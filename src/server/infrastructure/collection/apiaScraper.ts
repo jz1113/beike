@@ -1,15 +1,9 @@
 import { assertSafeRemoteUrl } from '../network/safeUrl';
+import { socialRemoteUrl } from './socialMediaUrls';
 
-export type ApiaMediaResult = {
-  title: string;
-  description: string;
-  author: string;
-  cover: string;
-  images: string[];
-  video: string | null;
-  /** 全量视频/实况流；video 保留首条以兼容旧调用方。 */
-  videos: string[];
-};
+import { extractMediaFromApiaData, type ApiaMediaResult } from './apiaMedia';
+export { extractMediaFromApiaData } from './apiaMedia';
+export type { ApiaMediaResult } from './apiaMedia';
 
 export type ApiaCredentials = {
   clientId: string;
@@ -21,10 +15,9 @@ export type ApiaParseResult =
   | { success: false; error: string; upstreamCode?: string | number };
 
 const APIA_BASE = 'https://apia.vip/api/dsp';
-// 小红书笔记在上游需要回源时，12 秒不足以覆盖正常的响应时间；保留单次
-// 请求超时（避免批量任务永久挂起），但不要过早中断一个仍在正常解析的请求。
 const APIA_TIMEOUT_MS = 30_000;
-const RETRY_DELAY_MS = 1_500;
+const MAX_APIA_REQUESTS = 6;
+const TERMINAL_APIA_CODES = new Set(['104', '107', '108', '109', '110', '115', '155', '401', '403', '429']);
 
 const MOBILE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
@@ -36,11 +29,21 @@ const APIA_ERROR_MAP: Record<string, string> = {
   '104': '该解析接口已暂停使用',
   '110': '解析次数不足，请稍后再试',
   '113': '解析失败，该作品可能为私密或需要登录',
-  '114': 'APIA 暂时无法解析该笔记，请稍后重试或换用 App 分享短链',
+  '107': 'APIA 数据结构异常，请检查服务接口配置',
+  '108': 'APIA 会员接口不存在，请检查服务接口配置',
+  '109': 'APIA 会员接口已关闭，请检查账号权限',
+  '114': '作品不存在或当前链接不受支持，请检查作品是否公开或换用 App 分享短链',
+  '115': 'APIA 会员等级不足，请检查账号权限',
   '155': '接口密钥配置错误',
 };
 
-const SHORT_LINK_RE = /(?:v\.douyin\.com|xhslink\.com|v\.kuaishou\.com|b23\.tv|t\.cn)/i;
+function isShortLink(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return ['v.douyin.com', 'xhslink.com', 'v.kuaishou.com', 'b23.tv', 't.cn']
+      .some(root => host === root || host.endsWith(`.${root}`));
+  } catch { return false; }
+}
 
 export function mapApiaErrorCode(code: string | number | undefined, fallback?: string): string {
   if (code == null) return fallback || '作品链接解析异常';
@@ -88,41 +91,45 @@ export function pickUserAgentForUrl(url: string): string {
   if (/xsec_source=pc_user/i.test(url) || /www\.xiaohongshu\.com/i.test(url)) {
     return DESKTOP_UA;
   }
-  if (SHORT_LINK_RE.test(url)) {
+  if (isShortLink(url)) {
     return MOBILE_UA;
   }
   return DESKTOP_UA;
 }
 
 /** 自动尝试解析短链重定向 */
-export async function resolveShortUrlRedirect(shortUrl: string): Promise<string> {
-  if (!SHORT_LINK_RE.test(shortUrl)) {
+export async function resolveShortUrlRedirect(shortUrl: string, signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
+  if (!isShortLink(shortUrl)) {
     return shortUrl;
   }
   try {
     await assertSafeRemoteUrl(shortUrl, { requireAllowlist: true });
+    signal?.throwIfAborted();
     const res = await fetch(shortUrl, {
       method: 'GET',
       redirect: 'manual',
       headers: { 'User-Agent': MOBILE_UA },
-      signal: AbortSignal.timeout(4000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(4000)]) : AbortSignal.timeout(4000),
     });
     const loc = res.headers.get('location');
-    if (loc && loc.startsWith('http')) {
-      await assertSafeRemoteUrl(loc, { requireAllowlist: true });
-      console.log(`[ApiaScraper] 短链自动展开: ${shortUrl} -> ${loc}`);
-      return loc;
+    if (res.status >= 300 && res.status < 400 && loc) {
+      const expanded = new URL(loc, shortUrl).href;
+      await assertSafeRemoteUrl(expanded, { requireAllowlist: true });
+      signal?.throwIfAborted();
+      return expanded;
     }
   } catch (e) {
+    if (signal?.aborted) throw signal.reason;
     console.warn('[ApiaScraper] 短链展开被安全策略拦截或失败:', (e as Error)?.message);
   }
   return shortUrl;
 }
 
 /** 生成 APIA 候选 URL 列表（按优先级） */
-export async function buildApiaCandidateUrls(rawText: string): Promise<string[]> {
+export async function buildApiaCandidateUrls(rawText: string, signal?: AbortSignal): Promise<string[]> {
   const { originalUrl, cleanUrl, discoveryUrl } = normalizeSocialMediaUrl(rawText);
-  const expandedUrl = await resolveShortUrlRedirect(originalUrl);
+  const expandedUrl = await resolveShortUrlRedirect(originalUrl, signal);
 
   const candidates: string[] = [];
   const add = (u?: string) => {
@@ -147,143 +154,6 @@ export async function buildApiaCandidateUrls(rawText: string): Promise<string[]>
 }
 
 /** 深度提取 APIA 响应中的图片、封面与视频 */
-export function extractMediaFromApiaData(data: unknown): ApiaMediaResult {
-  if (!data || typeof data !== 'object') {
-    return { title: '', description: '', author: '', cover: '', images: [], video: null, videos: [] };
-  }
-
-  const payload = data as Record<string, unknown>;
-  const root =
-    payload.data && typeof payload.data === 'object'
-      ? (payload.data as Record<string, unknown>)
-      : payload;
-
-  const rawTitle = String(root.title || payload.title || '');
-  const rawDesc = String(root.desc || root.text || payload.desc || payload.text || '');
-  const msgText = String(root.msg || payload.msg || root.message || payload.message || '');
-
-  const fullTextCheck = `${rawTitle} ${rawDesc} ${msgText}`;
-  if (/请求次数频繁|请勿使用盗版|操作过于频繁|请稍后再试|验证码|安全验证|风控拦截/i.test(fullTextCheck)) {
-    throw new Error('小红书解析接口触发上游频控/风控拦截（提示：请求次数频繁，请稍后再试或降低并发）');
-  }
-
-  const authorRaw =
-    (root.author as { nickname?: string } | string | undefined) ??
-    root.user_name ??
-    root.nickname ??
-    payload.author ??
-    '';
-  const author =
-    typeof authorRaw === 'object' && authorRaw !== null
-      ? String((authorRaw as { nickname?: string }).nickname || '')
-      : String(authorRaw || '');
-
-  let cleanTitle = rawTitle;
-  let cleanDesc = rawDesc;
-
-  if (rawTitle.includes('||')) {
-    const parts = rawTitle.split('||').map((p) => p.trim()).filter(Boolean);
-    cleanTitle = parts[0] || '社媒精选爆款素材';
-    cleanDesc = parts.slice(1).join('\n\n') || cleanDesc;
-  } else if (!cleanTitle && cleanDesc) {
-    const lines = cleanDesc.split(/[\n\r]+/);
-    cleanTitle = lines[0]?.slice(0, 50) || '社媒精选爆款素材';
-    if (lines.length > 1) cleanDesc = lines.slice(1).join('\n');
-  }
-
-  cleanTitle = cleanTitle.replace(/^[📌📱🔴🔥✨\s]+/u, '').trim() || '社媒精选爆款素材';
-
-  let cover = String(
-    root.cover ||
-      root.download_image ||
-      root.image ||
-      root.cover_url ||
-      root.video_cover ||
-      payload.cover ||
-      payload.download_image ||
-      '',
-  );
-  if (typeof root.cover === 'object' && root.cover !== null) {
-    const c = root.cover as { url?: string; url_list?: string[] };
-    cover = c.url || c.url_list?.[0] || cover;
-  }
-
-  const isVideoUrl = (url: string) => /\.(mp4|mov|m4v|webm|avi|flv|m3u8)(?:[?#/]|$)/i.test(url);
-  const staticUrls = (value: unknown, depth = 0): string[] => {
-    if (depth > 8 || value == null) return [];
-    if (typeof value === 'string') {
-      const url = value.trim().replace(/^\/\//, 'https://');
-      return /^https?:\/\//i.test(url) && !isVideoUrl(url) ? [url] : [];
-    }
-    if (Array.isArray(value)) return value.flatMap((entry) => staticUrls(entry, depth + 1));
-    if (typeof value !== 'object') return [];
-    const item = value as Record<string, unknown>;
-    // Live 的 image/images 是静态图；url 可能是视频，不得优先于静态字段。
-    for (const field of ['images', 'image', 'download_image', 'pic', 'origin_url', 'url_list', 'download_url', 'url']) {
-      if (item[field] != null) {
-        const urls = staticUrls(item[field], depth + 1);
-        if (urls.length) return urls;
-      }
-    }
-    return [];
-  };
-  const rawList: unknown[] = [];
-  const sources = root === payload ? [root] : [root, payload];
-  for (const source of sources) {
-    if (Array.isArray(source)) rawList.push(...source);
-    for (const field of ['images', 'pics', 'img_list', 'live_photos', 'livePhotos', 'live', 'image']) {
-      if (source[field]) rawList.push(source[field]);
-    }
-    if (source.photo) rawList.push(typeof source.photo === 'string' ? source.photo.split(/[\n\r,;\s]+/) : source.photo);
-  }
-  // 使用精确 URL 去重，不能去掉查询参数：部分接口用同一路径的不同参数标识不同图片。
-  const cleanImages = [...new Set(rawList.flatMap((entry) => staticUrls(entry)))];
-  cover = staticUrls(root.cover || root.download_image || root.cover_url || root.video_cover || payload.cover || payload.download_image)[0] || cleanImages[0] || '';
-
-  const VIDEO_CDN_RE = /kwaicdn|kwai|yximgs|snssdk|bytecdn|xhscdn|douyinvod/i;
-  const looksLikeVideoUrl = (u: string) =>
-    u.includes('.mp4') || u.includes('video') || VIDEO_CDN_RE.test(u);
-
-  const videoUrls = (value: unknown, depth = 0): string[] => {
-    if (depth > 8 || value == null) return [];
-    if (typeof value === 'string') {
-      const url = value.trim().replace(/^\/\//, 'https://');
-      return /^https?:\/\//i.test(url) && (isVideoUrl(url) || looksLikeVideoUrl(url)) ? [url] : [];
-    }
-    if (Array.isArray(value)) return value.flatMap((entry) => videoUrls(entry, depth + 1));
-    if (typeof value !== 'object') return [];
-    const item = value as Record<string, unknown>;
-    return ['videos', 'video', 'down', 'download_video', 'download_url', 'play_url', 'url']
-      .flatMap((field) => videoUrls(item[field], depth + 1));
-  };
-
-  // 实况作品同时包含静态封面与多段动态流，不能因存在图片而丢掉视频。
-  const rawVideos = sources.flatMap((source) => [
-    source.videos, source.video, source.down, source.download_video,
-    source.live, source.live_photos, source.livePhotos,
-  ].flatMap(videoUrls));
-  const fallbackVideos = videoUrls([root.url, payload.url]);
-  const cleanVideos = [...new Set([...rawVideos, ...fallbackVideos])];
-
-  if (cleanImages.length === 0 && cover) {
-    const cleanCover = cover.startsWith('//') ? 'https:' + cover : cover;
-    if (cleanCover) cleanImages.push(cleanCover);
-  }
-
-  const coverOut =
-    cover && cover.startsWith('//') ? 'https:' + cover : cover || cleanImages[0] || '';
-
-  return {
-    title: cleanTitle,
-    description: cleanDesc,
-    author,
-    cover: coverOut,
-    images: cleanImages,
-    video: cleanVideos[0] || null,
-    videos: cleanVideos,
-  };
-}
-
 type ApiaFetchAttempt = {
   method: 'GET' | 'POST';
   bodyType?: 'json' | 'form';
@@ -304,10 +174,13 @@ async function fetchApiaOnce(
   shareText: string,
   attempt: ApiaFetchAttempt,
   userAgent: string,
-): Promise<{ data: Record<string, unknown> | null; httpOk: boolean; timedOut?: boolean }> {
-  const endpoint = `${APIA_BASE}/${secretKey}/${clientId}/`;
+  signal?: AbortSignal,
+): Promise<{ data: Record<string, unknown> | null; httpStatus?: number; error?: string }> {
+  signal?.throwIfAborted();
+  const endpoint = `${APIA_BASE}/${encodeURIComponent(secretKey)}/${encodeURIComponent(clientId)}/`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), APIA_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 
   try {
     let res: Response;
@@ -317,7 +190,7 @@ async function fetchApiaOnce(
       res = await fetch(apiUrl, {
         method: 'GET',
         headers: { 'User-Agent': userAgent },
-        signal: controller.signal,
+        signal: requestSignal,
       });
     } else {
       const body: Record<string, string> = { url: targetUrl };
@@ -335,7 +208,7 @@ async function fetchApiaOnce(
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams(body).toString(),
-          signal: controller.signal,
+          signal: requestSignal,
         });
       } else {
         res = await fetch(endpoint, {
@@ -345,18 +218,21 @@ async function fetchApiaOnce(
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(body),
-          signal: controller.signal,
+          signal: requestSignal,
         });
       }
     }
 
-    if (!res.ok) return { data: null, httpOk: false };
-    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
-    return { data, httpOk: true };
+    if (!res.ok) return { data: null, httpStatus: res.status, error: `APIA 网关返回 HTTP ${res.status}` };
+    const raw = await res.json().catch(() => null);
+    const data = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    return { data, httpStatus: res.status };
   } catch (err) {
+    if (signal?.aborted) throw signal.reason;
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[ApiaScraper] 请求异常 (${attempt.method}):`, msg);
-    return { data: null, httpOk: false, timedOut: controller.signal.aborted };
+    const timeout = controller.signal.aborted;
+    return { data: null, httpStatus: timeout ? 504 : undefined, error: timeout ? '请求 APIA 解析服务超时（30秒）' : '连接 APIA 解析网关失败' };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -366,8 +242,8 @@ function isApiaSuccess(data: Record<string, unknown> | null): boolean {
   if (!data) return false;
   const code = data.code;
   if (code === 200 || code === '200') return true;
-  if (data.data && typeof data.data === 'object') return true;
-  return false;
+  // 部分版本省略 code，但显式的失败码必须先于 data 判断。
+  return code == null && Boolean(data.data && typeof data.data === 'object');
 }
 
 function getApiaErrorCode(data: Record<string, unknown> | null): string | number | undefined {
@@ -380,7 +256,8 @@ async function tryCredentialOrder(
   targetUrl: string,
   shareText: string,
   userAgent: string,
-  retryOnTransient: boolean,
+  budget: { remaining: number },
+  signal?: AbortSignal,
 ): Promise<{ media: ApiaMediaResult | null; lastCode?: string | number; lastMsg: string }> {
   let lastCode: string | number | undefined;
   let lastMsg = '';
@@ -391,22 +268,22 @@ async function tryCredentialOrder(
     const clientId = useSwapped ? credentials.secretKey : credentials.clientId;
 
     for (const attempt of FETCH_ATTEMPTS) {
-      const run = async (): Promise<ApiaMediaResult | 'auth_error' | 'timeout' | null> => {
-        const { data, httpOk, timedOut } = await fetchApiaOnce(
+      signal?.throwIfAborted();
+      if (budget.remaining <= 0) return { media: null, lastCode, lastMsg };
+      const run = async (): Promise<ApiaMediaResult | 'auth_error' | null> => {
+        budget.remaining--;
+        lastCode = undefined; lastMsg = '';
+        const { data, httpStatus, error } = await fetchApiaOnce(
           secretKey,
           clientId,
           targetUrl,
           shareText,
           attempt,
           userAgent,
+          signal,
         );
-        if (!httpOk || !data) {
-          if (timedOut) {
-            lastMsg = `APIA 社媒解析服务超时（${Math.round(APIA_TIMEOUT_MS / 1000)} 秒），请稍后重试或在设置中配置奇云解析作为备用`;
-            return 'timeout';
-          }
-          return null;
-        }
+        signal?.throwIfAborted();
+        if (!data) { lastCode = httpStatus; lastMsg = error || 'APIA 接口返回无效响应'; return null; }
 
         const code = getApiaErrorCode(data);
         console.log('[ApiaScraper] 接口响应:', code, data.msg || data.title);
@@ -430,7 +307,12 @@ async function tryCredentialOrder(
         return null;
       };
 
-      let result = await run();
+      const result = await run();
+
+      // 暂停服务与额度耗尽无法通过换请求方法或重试恢复。
+      if (TERMINAL_APIA_CODES.has(String(lastCode)) && String(lastCode) !== '155') {
+        return { media: null, lastCode, lastMsg };
+      }
 
       if (result === 'auth_error') {
         if (!useSwapped && round === 0) {
@@ -440,63 +322,51 @@ async function tryCredentialOrder(
         return { media: null, lastCode, lastMsg };
       }
 
-      if (result === 'timeout') {
-        return { media: null, lastCode, lastMsg };
-      }
-
-      if (
-        result === null &&
-        retryOnTransient &&
-        (lastCode === 114 || lastCode === '114' || lastCode === 110 || lastCode === '110')
-      ) {
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-        result = await run();
-      }
-
-      if (result === 'timeout') {
-        return { media: null, lastCode, lastMsg };
-      }
-
-      if (result && result !== 'auth_error') {
+      if (result) {
         return { media: result, lastCode, lastMsg };
       }
+      // 业务错误不能通过改 HTTP 方法恢复；114 官方定义为作品不存在/不支持。
+      // HTTP 405 才允许尝试 POST，网络/其他网关错误直接交给备用渠道。
+      if (lastCode !== undefined && !['200', '405'].includes(String(lastCode))) return { media: null, lastCode, lastMsg };
+      if (lastCode === undefined && lastMsg) return { media: null, lastCode, lastMsg };
     }
 
-    if (lastCode === 155 || lastCode === '155') {
-      if (!useSwapped) {
-        useSwapped = true;
-        continue;
-      }
-      break;
-    }
-
+    if (String(lastCode) === '155' && useSwapped && round === 0) continue;
     if (!useSwapped) break;
   }
 
   return { media: null, lastCode, lastMsg };
 }
 
-/** 使用 APIA 解析社媒链接（多 URL 候选 + GET/POST + 重试） */
+/** 使用 APIA 解析社媒链接；候选 URL 与 GET/POST 兼容尝试共用请求上限。 */
 export async function parseSocialLinkViaApia(
   rawText: string,
   credentials: ApiaCredentials,
+  signal?: AbortSignal,
 ): Promise<ApiaParseResult> {
-  const candidateUrls = await buildApiaCandidateUrls(rawText);
+  signal?.throwIfAborted();
+  const trimmed = { clientId: credentials.clientId?.trim(), secretKey: credentials.secretKey?.trim() };
+  if (!trimmed.clientId || !trimmed.secretKey) return { success: false, error: '未配置 APIA 接口 ID 与密钥' };
+  if (!socialRemoteUrl(extractUrlFromShareText(rawText))) return { success: false, error: '未能从输入中提取有效链接' };
+  const candidateUrls = await buildApiaCandidateUrls(rawText, signal);
   if (candidateUrls.length === 0) {
     return { success: false, error: '未能从输入中提取有效链接' };
   }
 
   let lastCode: string | number | undefined;
   let lastMsg = '';
+  const budget = { remaining: MAX_APIA_REQUESTS };
 
   for (const targetUrl of candidateUrls) {
+    signal?.throwIfAborted();
     const userAgent = pickUserAgentForUrl(targetUrl);
     const { media, lastCode: code, lastMsg: msg } = await tryCredentialOrder(
-      credentials,
+      trimmed,
       targetUrl,
       rawText,
       userAgent,
-      true,
+      budget,
+      signal,
     );
 
     if (media) {
@@ -505,7 +375,8 @@ export async function parseSocialLinkViaApia(
 
     lastCode = code;
     lastMsg = msg;
-    if (code === 155 || code === '155') break;
+    if (TERMINAL_APIA_CODES.has(String(code)) || budget.remaining <= 0 ||
+      (Number(code) >= 400 && String(code) !== '405') || (code === undefined && msg)) break;
   }
 
   return {
@@ -542,7 +413,7 @@ export async function testApiaConnection(
   }
 
   const code = result.upstreamCode;
-  const authOk = code !== 155 && code !== '155';
+  const authOk = ['103', '104', '110', '113', '114'].includes(String(code));
 
   return {
     success: authOk,

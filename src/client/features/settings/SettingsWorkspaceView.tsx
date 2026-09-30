@@ -2,15 +2,12 @@ import './settingsWorkspace.css';
 import { SETTINGS_NAV_GROUPS, type SettingsNavSection } from './model/settingsNavigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@client/shared/hooks/useToast';
-import {
-  House,
-  Search,
-  X,
-} from 'lucide-react';
+import { SettingsSidebar } from './components/SettingsSidebar';
+import { useSettingsLeaveGuard } from './hooks/useSettingsLeaveGuard';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import { getUsageSummary, type UsageSummary } from '@client/shared/utils/usageTracker';
-import { getStoredMultimodalModelId, openAIModelRouteId, workflowModelRouteId } from '@shared/domain/models/workflowModels';
+import { getStoredMultimodalModelId, workflowModelRouteId } from '@shared/domain/models/workflowModels';
 import GatewayModelModal from './components/GatewayModelModal';
 import ApiServicesTab from './tabs/ApiServicesTab';
 import DefaultsTab from './tabs/DefaultsTab';
@@ -46,7 +43,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     }))
   );
 
-  const handleBackToApp = useCallback(() => {
+  const leaveSettings = useCallback(() => {
     if (onBack) {
       onBack();
     } else {
@@ -54,27 +51,11 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     }
   }, [onBack, backFromSettings]);
 
-  // 全局 Escape 键快捷返回
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        const target = e.target as HTMLElement | null;
-        const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
-        if (!isInput) {
-          handleBackToApp();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleBackToApp]);
-
   // Toast 提示
   const { message: toastMsg, show: showToast } = useToast();
 
   // 1. 左侧大类导航
   const [navSection, setNavSection] = useState<SettingsNavSection>('api_services');
-  const [navSearchQuery, setNavSearchQuery] = useState('');
 
   // 2. 中间选中的 API 接口
   const [selectedServiceId, setSelectedServiceId] = useState<string>('comfly_gateway');
@@ -108,8 +89,32 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   // 6. 手动添加模型模态窗
   const [isAddingModelModalOpen, setIsAddingModelModalOpen] = useState(false);
   const [addingChannel, setAddingChannel] = useState<ModelChannel>('comfly');
+  const busy = config.isSavingConfig || config.isMigratingStorage;
+  const handleBackToApp = useSettingsLeaveGuard(config.hasUnsavedChanges, leaveSettings, busy, showToast);
+  const changeSection = (section: SettingsNavSection) => {
+    if (busy) { showToast('配置保存或存储迁移正在进行，请等待当前操作完成'); return; }
+    setNavSection(section);
+  };
+  const changeService = (setter: (id: string) => void, id: string) => {
+    if (busy) { showToast('请等待当前配置保存或存储迁移完成'); return; }
+    setter(id);
+  };
+  const { isGatewayModalOpen, closeGatewayDiscovery } = models;
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (isAddingModelModalOpen) { event.preventDefault(); setIsAddingModelModalOpen(false); return; }
+      if (isGatewayModalOpen) { event.preventDefault(); closeGatewayDiscovery(); return; }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+      event.preventDefault(); handleBackToApp();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleBackToApp, isAddingModelModalOpen, isGatewayModalOpen, closeGatewayDiscovery]);
   const openAddModel = (channel: ModelChannel) => { setAddingChannel(channel); setIsAddingModelModalOpen(true); };
   const configureChannel = (channel: ModelChannel) => {
+    if (busy) { showToast('请等待当前配置保存或存储迁移完成'); return; }
     setSelectedServiceId(MODEL_CHANNELS.find(item => item.id === channel)!.serviceId);
     setServiceSearch('');
     setNavSection('api_services');
@@ -146,22 +151,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
 
   const navGroups = SETTINGS_NAV_GROUPS;
 
-  // 搜索过滤匹配项
-  const filteredGroups = useMemo(() => {
-    const q = navSearchQuery.trim().toLowerCase();
-    if (!q) return navGroups;
-    return navGroups
-      .map((g) => ({
-        ...g,
-        items: g.items.filter(
-          (item) =>
-            item.label.toLowerCase().includes(q) ||
-            item.keywords.some((kw) => kw.toLowerCase().includes(q))
-        ),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, [navGroups, navSearchQuery]);
-
   const activeTitle = useMemo(() => {
     for (const g of navGroups) {
       const match = g.items.find((i) => i.id === navSection);
@@ -170,13 +159,13 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     return '系统设置';
   }, [navGroups, navSection]);
 
-  const gatewayBalanceFormatted = gatewayUser.userInfo?.quotaFormatted;
+  const gatewayBalanceFormatted = gatewayUser.userInfo?.balanceAvailable === false ? undefined : gatewayUser.userInfo?.quotaFormatted;
 
   return (
     <div className="settings-workspace w-full h-full flex flex-col text-slate-900 font-sans overflow-hidden relative">
       {/* Toast 提示条 */}
       {toastMsg && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fade-in">
+        <div role="status" aria-live="polite" className="max-w-[calc(100%-2rem)] break-words absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fade-in">
           <span>{toastMsg}</span>
         </div>
       )}
@@ -184,106 +173,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
       {/* 🌟 1. 独立双栏主舞台（左侧专有导航栏 + 右侧宽屏卡片内容区） */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         {/* ===================== COLUMN 1: 左侧专有侧边栏 ===================== */}
-        <aside
-          data-settings-sidebar
-          className="settings-sidebar hidden md:flex w-52 xl:w-56 shrink-0 h-full bg-slate-50 border-r border-slate-200/60 flex flex-col justify-between overflow-hidden relative z-20"
-        >
-          <div className="flex flex-col pt-3 sm:pt-4 px-3 sm:px-4">
-            <button
-              type="button"
-              onClick={handleBackToApp}
-              aria-label="返回首页"
-              className="h-10 w-10 rounded-xl bg-white hover:bg-slate-100/90 active:bg-slate-200/80 border border-slate-200/80 shadow-2xs flex items-center justify-center text-slate-600 hover:text-slate-950 transition-all cursor-pointer"
-              title="返回首页"
-            >
-              <House className="h-4 w-4" />
-            </button>
-
-            {/* 搜索框（对标图 2 搜索设置...） */}
-            <div className="relative mt-3 mb-1.5">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={navSearchQuery}
-                onChange={(e) => setNavSearchQuery(e.target.value)}
-                aria-label="搜索设置"
-                placeholder="搜索设置"
-                className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white/90 hover:bg-white focus:bg-white border border-slate-200/80 focus:border-indigo-500 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all"
-              />
-              {navSearchQuery && (
-                <button
-                  type="button"
-                  aria-label="清空设置搜索"
-                  onClick={() => setNavSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 分组导航列表（对标图 2） */}
-          <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 space-y-4">
-            {filteredGroups.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">未找到相关设置项</div>
-            ) : (
-              filteredGroups.map((group) => (
-                <div key={group.groupTitle} className="space-y-1">
-                  <div className="px-2.5 text-[11px] font-bold text-slate-600 tracking-wider">
-                    {group.groupTitle}
-                  </div>
-                  <div className="space-y-0.5">
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = navSection === item.id;
-                      const isUsage = item.id === 'usage';
-
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          aria-current={isActive ? 'page' : undefined}
-                          onClick={() => setNavSection(item.id)}
-                          className={`w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer group ${
-                            isActive
-                              ? 'bg-slate-200/80 text-slate-950 font-bold shadow-2xs'
-                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/40'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Icon
-                              className={`w-4 h-4 shrink-0 transition-colors ${
-                                isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-700'
-                              }`}
-                            />
-                            <span className="text-left leading-5 whitespace-nowrap">{item.label}</span>
-                          </div>
-
-                          {isUsage && gatewayBalanceFormatted !== undefined && (
-                            <span
-                              className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold shrink-0 ${
-                                isActive
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              }`}
-                            >
-                              {gatewayBalanceFormatted > 999
-                                ? (gatewayBalanceFormatted / 1000).toFixed(1) + 'k'
-                                : gatewayBalanceFormatted.toFixed(1)}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="px-6 py-5 text-xs text-slate-400">贝壳 · 设置中心</div>
-        </aside>
+        <SettingsSidebar onBack={handleBackToApp} navSection={navSection} setNavSection={changeSection} gatewayBalanceFormatted={gatewayBalanceFormatted} />
 
         {/* ===================== COLUMN 2: 右侧宽屏主内容区 ===================== */}
         <main className="flex-1 min-w-0 h-full flex flex-col bg-white overflow-hidden relative z-10">
@@ -304,15 +194,19 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           {/* 主内容展示区 */}
           <div className="md:hidden px-4 py-3 border-b border-slate-100 flex items-center gap-3">
             <button type="button" onClick={handleBackToApp} className="text-xs text-slate-600 shrink-0">返回应用</button>
-            <select aria-label="设置分类" value={navSection} onChange={event => setNavSection(event.target.value as SettingsNavSection)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">{navGroups.flatMap(group => group.items).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+            <select aria-label="设置分类" value={navSection} onChange={event => changeSection(event.target.value as SettingsNavSection)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">{navGroups.flatMap(group => group.items).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
           </div>
+          {!config.configLoaded && <div role={config.configLoadError ? 'alert' : 'status'} className="px-5 py-3 text-xs text-slate-600 border-b border-slate-100">
+            {config.configLoadError || '正在加载服务配置…'}
+            {config.configLoadError && <button type="button" onClick={() => void config.reloadConfig()} className="ml-3 text-indigo-600">重新加载</button>}
+          </div>}
           {navSection === 'api_services' || navSection === 'other_services' ? (
             <div className="flex-1 min-h-0 flex overflow-hidden @container/settings-modal bg-white">
               <ApiServicesTab config={config} models={models} group={navSection === 'api_services' ? 'models' : 'other'}
                 selectedServiceId={navSection === 'api_services' ? selectedServiceId : otherServiceId}
-                setSelectedServiceId={navSection === 'api_services' ? setSelectedServiceId : setOtherServiceId}
+                setSelectedServiceId={id => changeService(navSection === 'api_services' ? setSelectedServiceId : setOtherServiceId, id)}
                 serviceSearch={serviceSearch} setServiceSearch={setServiceSearch}
-                onAddModel={openAddModel} onManageModels={() => setNavSection('models')}
+                onAddModel={openAddModel} onManageModels={() => changeSection('models')}
                 defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} showToast={showToast} />
             </div>
           ) : (
@@ -326,6 +220,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                 defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} />}
               {navSection === 'defaults' && <DefaultsTab
                     customModels={models.customModels}
+                    areModelsLoaded={models.areModelsLoaded}
                     activeVisionModel={activeVisionModel}
                     setActiveVisionModel={setActiveVisionModel}
                     setActiveAssistantModel={setActiveAssistantModel}
@@ -379,17 +274,14 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels}
           gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? (models.openAIModelSource === 'codex' ? 'Codex' : 'OpenAI') : 'Comfly'}
           channel={models.gatewaySource}
+          error={models.gatewaySource === 'lianchi' ? models.lianchiModelError : models.gatewaySource === 'openai' ? models.openAIModelError : models.gatewayModelError}
+          onRefresh={() => discoverModels(models.gatewaySource)}
           activeModelIds={new Set(models.customModels.map(workflowModelRouteId))}
           isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.gatewaySource === 'openai' ? models.isFetchingOpenAI : models.isFetchingGateway}
-          onToggleAddModel={(model) => {
-            const routeId = models.gatewaySource === 'openai' ? openAIModelRouteId(model.id) : model.id;
-            const exists = models.customModels.some((m) => workflowModelRouteId(m) === routeId);
-            models.handleToggleGatewayModel(model);
-            showToast(exists ? `已移出模型 ${model.id}` : `✨ 已接入模型 ${model.id}`);
-          }}
+          onToggleAddModel={models.handleToggleGatewayModel}
+          onAddModels={models.handleAddAllUsefulGatewayModels}
           onAddAllUsefulModels={() => {
-            const count = models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels);
-            showToast(`🎉 成功接入 ${count} 款核心模型！`);
+            models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels);
             models.setIsGatewayModalOpen(false);
           }}
         />
@@ -398,6 +290,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
       {/* 🌟 3. 手动添加自定义模型模态窗 */}
       {isAddingModelModalOpen && <AddModelModal
         initialChannel={addingChannel}
+        existingRouteIds={new Set(models.customModels.map(workflowModelRouteId))}
         onClose={() => setIsAddingModelModalOpen(false)}
         onAdd={models.handleAddCustomModel}
       />}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { UsageSummary } from '@client/shared/utils/usageTracker';
 import { buildUsageHeatmap } from '../model/usageHeatmap';
+import { formatUsageCost } from '../model/usageFormatting';
 
 type HeatmapRange = 'year' | 'half_year' | 'quarter';
 
@@ -23,26 +24,30 @@ export function UsageHeatmapPanel({ usageSummary }: { usageSummary: UsageSummary
     currentYear,
   );
 
+  const visibleDays = heatmapData.flatMap(week => week.days).filter(day => !day.isFuture);
+  const activeDays = visibleDays.filter(day => day.count > 0).length;
+  const totalRequests = visibleDays.reduce((total, day) => total + day.count, 0);
+
   return (
-    <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+    <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3 [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-indigo-600">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-900 text-sm">每日活动热力图</span>
-          <div className="flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200/70 text-[10.5px]">
-            <button type="button" onClick={() => setHeatmapRange('year')} className={`px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer ${heatmapRange === 'year' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}>
+          <div role="group" aria-label="热力图时间范围" className="flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200/70 text-[10.5px]">
+            <button type="button" aria-pressed={heatmapRange === 'year'} onClick={() => { setHeatmapRange('year'); setHoveredDay(null); }} className={`px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer ${heatmapRange === 'year' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}>
               {currentYear} 年度
             </button>
-            <button type="button" onClick={() => setHeatmapRange('half_year')} className={`px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer ${heatmapRange === 'half_year' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}>
+            <button type="button" aria-pressed={heatmapRange === 'half_year'} onClick={() => { setHeatmapRange('half_year'); setHoveredDay(null); }} className={`px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer ${heatmapRange === 'half_year' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}>
               近半年
             </button>
-            <button type="button" onClick={() => setHeatmapRange('quarter')} className={`px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer ${heatmapRange === 'quarter' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}>
+            <button type="button" aria-pressed={heatmapRange === 'quarter'} onClick={() => { setHeatmapRange('quarter'); setHoveredDay(null); }} className={`px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer ${heatmapRange === 'quarter' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}>
               近 3 个月
             </button>
           </div>
         </div>
         <div className="text-xs text-slate-500 font-mono flex items-center gap-3">
-          <span>累计 <strong className="text-slate-900">{usageSummary.activeDays}</strong> 个活跃日</span>
-          <span>总调用 <strong className="text-slate-900">{usageSummary.totalRequests}</strong> 次</span>
+          <span>当前范围 <strong className="text-slate-900">{activeDays}</strong> 个活跃日</span>
+          <span>总调用 <strong className="text-slate-900">{totalRequests}</strong> 次</span>
         </div>
       </div>
       <div className="w-full overflow-x-auto pb-1 no-scrollbar select-none">
@@ -78,11 +83,27 @@ export function UsageHeatmapPanel({ usageSummary }: { usageSummary: UsageSummary
                     else if (day.count > 0) bg = 'bg-[#9BE9A8]';
                     const isHovered = hoveredDay?.dateKey === day.dateKey;
                     return (
-                      <div
+                      <button
+                        type="button"
+                        data-heatmap-day
+                        disabled={day.isFuture}
+                        tabIndex={day.isToday ? 0 : -1}
+                        aria-label={`${day.dateKey} ${day.dayName}，${day.count} 次调用，${formatUsageCost(day.costUsd)} 算力`}
+                        title={`${day.dateKey} · ${day.count} 次调用`}
+                        onFocus={() => setHoveredDay(day)}
+                        onBlur={() => setHoveredDay(null)}
+                        onKeyDown={(event) => {
+                          const offset = ({ ArrowDown: 1, ArrowUp: -1, ArrowLeft: -7, ArrowRight: 7 } as Record<string, number>)[event.key];
+                          if (offset === undefined) return;
+                          event.preventDefault();
+                          const cells = [...(event.currentTarget.parentElement?.parentElement?.querySelectorAll<HTMLButtonElement>('button[data-heatmap-day]') || [])];
+                          const next = cells[cells.indexOf(event.currentTarget) + offset];
+                          if (next && !next.disabled) next.focus();
+                        }}
                         key={rowIdx}
                         onMouseEnter={() => { if (!day.isFuture) setHoveredDay(day); }}
                         onMouseLeave={() => setHoveredDay(null)}
-                        className={`aspect-square w-full rounded-[2.5px] ${bg} ${day.isToday ? 'ring-1.5 ring-indigo-600/90 ring-offset-1' : ''} ${
+                        className={`p-0 aspect-square w-full rounded-[2.5px] ${bg} ${day.isToday ? 'ring-1.5 ring-indigo-600/90 ring-offset-1' : ''} ${
                           day.isFuture ? 'cursor-not-allowed' : 'cursor-pointer hover:ring-2 hover:ring-slate-900/60 transition-all duration-75 hover:scale-125 hover:z-20'
                         } ${isHovered ? 'ring-2 ring-slate-900 shadow-xs scale-125 z-20' : ''}`}
                       />
@@ -94,9 +115,9 @@ export function UsageHeatmapPanel({ usageSummary }: { usageSummary: UsageSummary
           </div>
         </div>
         <div className="flex items-center justify-between pt-3 mt-1 border-t border-slate-100 text-[11px] text-slate-500 font-mono flex-wrap gap-2">
-          <div className="flex items-center gap-2 min-h-[22px]">
+          <div aria-live="polite" className="flex flex-wrap items-center gap-2 min-h-[22px]">
             {hoveredDay ? (
-              <div className="flex items-center gap-2 text-slate-900 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/80 animate-fade-in">
+              <div className="flex flex-wrap items-center gap-2 text-slate-900 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/80 animate-fade-in">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="font-bold">{hoveredDay.dateKey} ({hoveredDay.dayName}{hoveredDay.isToday ? ' · 今天' : ''})</span>
                 <span className="text-slate-400">·</span>
@@ -110,12 +131,12 @@ export function UsageHeatmapPanel({ usageSummary }: { usageSummary: UsageSummary
                 {hoveredDay.costUsd > 0 && (
                   <>
                     <span className="text-slate-400">·</span>
-                    <span className="font-bold text-indigo-700">{hoveredDay.costUsd.toFixed(2)} 算力 (¥{hoveredDay.costRmb.toFixed(2)})</span>
+                    <span className="font-bold text-indigo-700">{formatUsageCost(hoveredDay.costUsd)} 算力 (¥{formatUsageCost(hoveredDay.costRmb)})</span>
                   </>
                 )}
               </div>
             ) : (
-              <span className="text-slate-400 text-[10.5px]">悬停查看当日调用与消耗</span>
+              <span className="text-slate-400 text-[10.5px]">移入方格或聚焦今日方格后使用方向键，查看每日调用与预估消耗。</span>
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0 ml-auto text-[10.5px] text-slate-400">

@@ -4,9 +4,10 @@ import { CanvasRecentProjects } from './CanvasRecentProjects';
 
 interface CanvasHomeFeedProps {
   onEnterCanvas?: (projectId: string) => void;
+  onSubmitSuccess: React.ComponentProps<typeof PromptActionBar>['onSubmitSuccess'];
 }
 
-export const CanvasHomeFeed: React.FC<CanvasHomeFeedProps> = ({ onEnterCanvas }) => {
+export const CanvasHomeFeed: React.FC<CanvasHomeFeedProps> = ({ onEnterCanvas, onSubmitSuccess }) => {
   return (
     <div className="flex-1 w-full min-w-0 overflow-y-auto px-4 sm:px-6 lg:px-8 2xl:px-12 pt-6 pb-20 select-none bg-transparent">
       {/* 🌟 1. 顶部大标题 */}
@@ -18,7 +19,7 @@ export const CanvasHomeFeed: React.FC<CanvasHomeFeedProps> = ({ onEnterCanvas })
 
       {/* 🌟 2. 主输入框区域 */}
       <div className="w-full max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto pb-10 relative z-20">
-        <PromptActionBar />
+        <PromptActionBar onSubmitSuccess={onSubmitSuccess} />
       </div>
 
       {/* 🌟 3. 最近项目模块 */}

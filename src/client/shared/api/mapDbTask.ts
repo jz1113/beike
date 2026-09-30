@@ -1,76 +1,49 @@
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID } from '@shared/domain/media/depthVideo';
 import { toUiGenerationStatus } from '@shared/domain/core/taskStatus';
+import { getAssetTime, resolveAssetMediaType } from '@client/shared/utils/assetTaskData';
 
-function resolveUiStatus(rawStatus: unknown, resultUrl: string | undefined): GenerationTask['status'] {
-  if (typeof rawStatus === 'string' && rawStatus.trim()) {
-    return toUiGenerationStatus(rawStatus);
-  }
-  return resultUrl ? 'SUCCESS' : 'IDLE';
-}
+/** Asset archives also accept audio/documents without widening generation submission contracts. */
+export type AssetHistoryTask = Omit<GenerationTask, 'mediaType' | 'status' | 'progress' | 'title' | 'size' | 'quality'> & {
+  mediaType?: GenerationTask['mediaType'] | 'audio' | 'doc';
+  status: GenerationTask['status'] | 'PENDING';
+  progress?: string;
+  title?: string;
+  size?: string;
+  quality?: string;
+};
 
-export function mapDbTaskToGenerationTask(t: Record<string, unknown>): GenerationTask {
-  const mediaType = t.mediaType as string | undefined;
-  const resultUrl = typeof t.resultUrl === 'string' && t.resultUrl ? t.resultUrl : undefined;
-  const model = (t.model as string) || '';
-
-  const depthMediaType =
-    mediaType === 'depth-image' || model === DEPTH_IMAGE_MODEL_ID
-      ? 'depth-image'
-      : mediaType === 'depth-video' || model === DEPTH_VIDEO_MODEL_ID
-        ? 'depth-video'
-        : null;
-
-  const status = resolveUiStatus(t.status, resultUrl);
-  const createdAtRaw = t.createdAt;
-  const createdAt =
-    typeof createdAtRaw === 'number'
-      ? createdAtRaw
-      : new Date(createdAtRaw as string | Date).getTime();
-  const prompt = (t.prompt as string) || '';
-
-  if (depthMediaType) {
-    return {
-      id: t.id as string,
-      taskId: depthMediaType === 'depth-video'
-        ? ((t.taskId as string) || (t.id as string))
-        : ((t.taskId as string) || undefined),
-      dbId: t.id as string,
-      title: prompt.slice(0, 25) || (depthMediaType === 'depth-video' ? '深度动作捕捉' : '深度图片'),
-      prompt,
-      model,
-      mediaType: depthMediaType,
-      size: (t.size as string) || '-',
-      quality: (t.quality as string) || '',
-      status,
-      resultUrl,
-      failReason: (t.failReason as string) || undefined,
-      progress: status === 'SUCCESS' ? '100%' : status === 'FAILURE' ? '0%' : '65%',
-      createdAt,
-      useReferenceImage: false,
-    };
-  }
-
-  const video =
-    mediaType === 'video' ||
-    Boolean(resultUrl?.includes('.mp4')) ||
-    /seedance|veo|kling|sora|minimax|h3|wan|vidu|omni_flash/i.test(model);
+export function mapDbTaskToGenerationTask(t: Record<string, unknown>): AssetHistoryTask {
+  const model = String(t.model || '');
+  const resultUrl = typeof t.resultUrl === 'string' ? t.resultUrl : undefined;
+  const mediaType = resolveAssetMediaType(
+    model === DEPTH_IMAGE_MODEL_ID ? 'depth-image' : model === DEPTH_VIDEO_MODEL_ID ? 'depth-video' : t.mediaType,
+    model,
+    resultUrl,
+  ) as AssetHistoryTask['mediaType'];
+  const status = t.status === 'PENDING' ? 'PENDING' : typeof t.status === 'string' && t.status.trim() ? toUiGenerationStatus(t.status) : resultUrl ? 'SUCCESS' : 'IDLE';
+  const prompt = String(t.prompt || '');
+  const referenceImages = Array.isArray(t.referenceImages) ? t.referenceImages.filter((url): url is string => typeof url === 'string') : undefined;
+  const referenceImageUrl = typeof t.referenceImageUrl === 'string' ? t.referenceImageUrl : undefined;
 
   return {
-    id: t.id as string,
-    taskId: (t.taskId as string) || undefined,
-    dbId: t.id as string,
-    title: prompt.slice(0, 25) || (video ? 'AI 视频创作' : 'AI 生图'),
+    ...t,
+    id: String(t.id || t.taskId || ''),
+    taskId: typeof t.taskId === 'string' ? t.taskId : mediaType === 'depth-video' ? String(t.id || '') : undefined,
+    dbId: String(t.id || ''),
+    title: typeof t.title === 'string' && t.title.trim() ? t.title : undefined,
     prompt,
     model,
-    mediaType: video ? 'video' : 'image',
-    size: (t.size as string) || (video ? '16:9' : '3:4'),
-    quality: (t.quality as string) || (video ? '720P' : 'high'),
+    mediaType,
+    size: typeof t.size === 'string' && t.size.trim() ? t.size : undefined,
+    quality: typeof t.quality === 'string' && t.quality.trim() ? t.quality : undefined,
     status,
     resultUrl,
-    failReason: (t.failReason as string) || undefined,
-    progress: status === 'SUCCESS' ? '100%' : status === 'FAILURE' ? '0%' : '65%',
-    createdAt,
-    useReferenceImage: false,
+    failReason: typeof t.failReason === 'string' ? t.failReason : undefined,
+    progress: typeof t.progress === 'string' ? t.progress : status === 'SUCCESS' ? '100%' : status === 'FAILURE' ? '0%' : undefined,
+    createdAt: getAssetTime(t.createdAt),
+    referenceImages,
+    referenceImageUrl,
+    useReferenceImage: Boolean(t.useReferenceImage || referenceImages?.length || referenceImageUrl || t.sourceImageUrl),
   };
 }

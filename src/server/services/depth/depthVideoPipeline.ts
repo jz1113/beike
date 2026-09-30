@@ -267,11 +267,17 @@ export async function createDepthVideoTask(
     quality: DepthQuality;
   },
 ): Promise<{ taskId: string; recordId: string }> {
-  const storageConfig = extractStorageConfigFromRequest(req);
   const prompt = '深度动作捕捉';
   const taskId = `depth_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-
-  const record = await generationTaskRepository.createDepthTask(taskId, prompt, DEPTH_VIDEO_MODEL_ID, body.quality);
+  let storageConfig: StorageConfig | undefined;
+  let record: { id: string };
+  try {
+    storageConfig = extractStorageConfigFromRequest(req);
+    record = await generationTaskRepository.createDepthTask(taskId, prompt, DEPTH_VIDEO_MODEL_ID, body.quality);
+  } catch (error) {
+    // No worker has been queued yet; only this boundary can prove a safe rejection.
+    throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), { submissionRejected: true });
+  }
 
   // 严格入队串行处理，并发限制为 1，杜绝多路 Python + FFmpeg 撑爆系统内存
   enqueueDepthVideoJob({

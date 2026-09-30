@@ -1,8 +1,10 @@
 import type { StateCreator } from 'zustand';
 import type { AppState, ViewSlice } from '@client/store/types';
+import { normalizeWorkshopTab } from './workshopTab';
+import { normalizeAppView } from './appView';
 
 export const createViewSlice: StateCreator<AppState, [], [], ViewSlice> = (set, get) => ({
-  currentView: 'home',
+  currentView: typeof window === 'undefined' ? 'home' : normalizeAppView(new URLSearchParams(window.location.search).get('view')) ?? 'home',
   previousView: null,
   activeModuleId: 'workshop',
   activeWorkshopTab: 'studio',
@@ -26,6 +28,6 @@ export const createViewSlice: StateCreator<AppState, [], [], ViewSlice> = (set, 
     set({ currentView: target === 'settings' ? 'home' : target });
   },
   setActiveModuleId: (activeModuleId) => set({ activeModuleId }),
-  setActiveWorkshopTab: (activeWorkshopTab) => set({ activeWorkshopTab }),
+  setActiveWorkshopTab: (activeWorkshopTab) => set({ activeWorkshopTab: normalizeWorkshopTab(activeWorkshopTab) }),
   setIsWorkshopConfigOpen: (isWorkshopConfigOpen) => set({ isWorkshopConfigOpen }),
 });

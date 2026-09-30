@@ -16,6 +16,10 @@ import {
 import {
   type AssetSubTab,
 } from '../utils/assetPromptConstants';
+import { compareAssetGalleryOrder } from '../utils/assetGalleryLabels';
+import { recognizedPromptGroupSubcategory, type PromptGroupSubcategoryFilter } from '../utils/promptGroupSubcategory';
+import { promptGroupCategoryIds, promptGroupCategoryKey } from '../utils/promptGroupCategory';
+import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 
 function readCategoryLists() {
   return new Map((Object.keys(DEFAULT_SUBCATEGORIES_MAP) as ActionCategoryId[])
@@ -26,13 +30,12 @@ export type ActionShotScale = 'all' | 'macro_closeup' | 'half_body' | 'full_body
 
 export function useAssetLibraryFilters<T extends FilterableAsset>(
   activeSubTab: AssetSubTab,
-  items: T[]
+  items: T[],
+  categories: AssetProductCategory[] = [],
+  albums: PromptAlbum[] = [],
 ) {
   const [audienceFilter, setAudienceFilter] = useState<AppearanceAudience | 'all'>('all');
   useEffect(() => { setAudienceFilter('all'); }, [activeSubTab]);
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [debouncedKeyword, setDebouncedKeyword] = useState('');
-  const [onlyFavorite, setOnlyFavorite] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [actionCategory, setActionCategory] = useState<ActionCategoryId | 'all'>('all');
   const [actionSubCategory, setActionSubCategory] = useState<string>('all');
@@ -40,6 +43,8 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
   const [actionAnchor, setActionAnchor] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'default' | 'usage' | 'favorite'>('default');
   const [lifecycleFilter, setLifecycleFilter] = useState<'all' | 'pending_review' | 'needs_fix' | 'published'>('all');
+  const [promptGroupCategoryFilter, setPromptGroupCategoryFilterState] = useState<string>('all');
+  const [promptGroupSubcategoryFilter, setPromptGroupSubcategoryFilter] = useState<PromptGroupSubcategoryFilter>('all');
   const [categoryLists, setCategoryLists] = useState(readCategoryLists);
 
   useEffect(() => {
@@ -55,19 +60,20 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedKeyword(searchKeyword.trim());
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [searchKeyword]);
-
-  useEffect(() => {
     setSelectedTag(null);
     setActionCategory('all');
     setActionSubCategory('all');
     setActionShotScale('all');
     setActionAnchor(null);
+    setLifecycleFilter('all');
+    setPromptGroupCategoryFilterState('all');
+    setPromptGroupSubcategoryFilter('all');
   }, [activeSubTab]);
+
+  const setPromptGroupCategoryFilter = (value: string) => {
+    setPromptGroupCategoryFilterState(value);
+    setPromptGroupSubcategoryFilter('all');
+  };
 
   // 空库不保留上次浏览时的动作筛选，否则会出现「0 条资产」却挂着珠宝/景别等条件的假象。
   useEffect(() => {
@@ -192,9 +198,9 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
   const isAnyFilterActive = useMemo(
     () =>
       Boolean(
-        ((activeSubTab === 'persona' || activeSubTab === 'outfit') && audienceFilter !== 'all') || onlyFavorite ||
+        ((activeSubTab === 'persona' || activeSubTab === 'outfit') && audienceFilter !== 'all') ||
           lifecycleFilter !== 'all' ||
-          searchKeyword.trim() ||
+          (activeSubTab === 'full_prompt' && promptGroupCategoryFilter !== 'all') ||
           selectedTag ||
           (activeSubTab === 'action' &&
             (actionCategory !== 'all' ||
@@ -202,7 +208,7 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
               actionShotScale !== 'all' ||
               actionAnchor !== null))
       ),
-    [audienceFilter, onlyFavorite, lifecycleFilter, searchKeyword, selectedTag, activeSubTab, actionCategory, actionSubCategory, actionShotScale, actionAnchor]
+    [audienceFilter, lifecycleFilter, promptGroupCategoryFilter, promptGroupSubcategoryFilter, selectedTag, activeSubTab, actionCategory, actionSubCategory, actionShotScale, actionAnchor]
   );
 
   const displayedItems = useMemo<T[]>(() => {
@@ -210,11 +216,18 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
     if (!baseList || baseList.length === 0) return items;
 
     let filtered = baseList.filter((item) => {
-      if (onlyFavorite && !item.isFavorite) return false;
       if ((activeSubTab === 'persona' || activeSubTab === 'outfit') && audienceFilter !== 'all' && appearanceAudience({ ...item }, activeSubTab === 'outfit') !== audienceFilter) return false;
       if (lifecycleFilter !== 'all') {
         const status = String(item.registry?.status || item.lifecycleStatus || '');
         if (status !== lifecycleFilter) return false;
+      }
+      if (activeSubTab === 'full_prompt' && promptGroupCategoryFilter !== 'all') {
+        const key = promptGroupCategoryKey(item, categories, albums);
+        if (promptGroupCategoryFilter !== key && !promptGroupCategoryIds(item, categories, albums).includes(promptGroupCategoryFilter)) return false;
+      }
+      if (activeSubTab === 'full_prompt' && promptGroupCategoryFilter !== 'all' && promptGroupSubcategoryFilter !== 'all') {
+        const kind = recognizedPromptGroupSubcategory(item.productSubcategory, categories, promptGroupCategoryFilter);
+        if (promptGroupSubcategoryFilter === 'unclassified' ? kind !== null : kind !== promptGroupSubcategoryFilter) return false;
       }
 
       // 动作 Tab 下的品类过滤
@@ -248,12 +261,6 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
         }
       }
 
-      if (debouncedKeyword.trim()) {
-        const kw = debouncedKeyword.trim().toLowerCase();
-        const text = `${item.title || ''} ${item.name || ''} ${item.tags || ''} ${item.description || ''} ${item.reversePrompt || ''} ${item.reversePromptZh || ''} ${item.action || ''} ${item.suitableAnatomy || ''}`.toLowerCase();
-        if (!text.includes(kw)) return false;
-      }
-
       if (selectedTag) {
         if (activeSubTab === 'action') {
           const text = `${item.title || ''} ${item.action || ''} ${item.camera || ''} ${item.shotType || ''} ${item.posture || ''} ${item.tags || ''} ${item.reversePrompt || ''} ${item.reversePromptZh || ''}`.toLowerCase();
@@ -273,31 +280,29 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
       filtered = [...filtered].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
     } else if (sortBy === 'favorite') {
       filtered = [...filtered].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
+    } else if (activeSubTab === 'scene' || activeSubTab === 'persona' || activeSubTab === 'outfit') {
+      filtered = [...filtered].sort(compareAssetGalleryOrder);
     }
 
     return filtered;
-  }, [audienceFilter, activeSubTab, lifecycleFilter, actionCategory, actionSubCategory,
-    currentSubCategories, actionShotScale, actionAnchor, debouncedKeyword, onlyFavorite,
+  }, [audienceFilter, activeSubTab, lifecycleFilter, promptGroupCategoryFilter, promptGroupSubcategoryFilter, categories, albums, actionCategory, actionSubCategory,
+    currentSubCategories, actionShotScale, actionAnchor,
     selectedTag, sortBy, items]);
 
   const handleResetAllFilters = () => {
     setAudienceFilter('all');
-    setSearchKeyword('');
-    setOnlyFavorite(false);
     setSelectedTag(null);
     setActionCategory('all');
     setActionSubCategory('all');
     setActionShotScale('all');
     setActionAnchor(null);
     setLifecycleFilter('all');
+    setPromptGroupCategoryFilterState('all');
+    setPromptGroupSubcategoryFilter('all');
   };
 
   return {
     audienceFilter, setAudienceFilter,
-    searchKeyword,
-    setSearchKeyword,
-    onlyFavorite,
-    setOnlyFavorite,
     selectedTag,
     setSelectedTag,
     actionCategory,
@@ -317,6 +322,10 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
     setSortBy,
     lifecycleFilter,
     setLifecycleFilter,
+    promptGroupCategoryFilter,
+    setPromptGroupCategoryFilter,
+    promptGroupSubcategoryFilter,
+    setPromptGroupSubcategoryFilter,
     dynamicTagList,
     isAnyFilterActive,
     displayedItems,

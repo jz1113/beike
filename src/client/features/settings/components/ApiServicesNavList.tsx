@@ -11,7 +11,7 @@ export function ApiServicesNavList({ services, serviceSearch, setServiceSearch, 
   selectedServiceId: string; setSelectedServiceId: (id: string) => void; statuses: Record<string, ServiceStatus>;
 }) {
   const categories = [{ id: 'core', name: '模型渠道' }, { id: 'ecommerce', name: '电商采集' }, { id: 'social', name: '内容解析' }, { id: 'storage', name: '文件存储' }];
-  return <aside className="settings-service-nav hidden lg:flex w-44 xl:w-48 border-r border-slate-200/80 bg-white/20 p-3 flex-col shrink-0 min-h-0" aria-label="渠道与服务列表">
+  return <aside className="settings-service-nav hidden @[840px]/settings-modal:flex w-48 border-r border-slate-200/80 bg-white/20 p-3 flex-col shrink-0 min-h-0" aria-label="渠道与服务列表">
     <label className="relative mb-3"><Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" /><input aria-label="搜索渠道与服务" value={serviceSearch} onChange={event => setServiceSearch(event.target.value)} placeholder="搜索渠道" className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl bg-white outline-none focus:border-indigo-500" /></label>
     <div className="flex-1 overflow-y-auto space-y-4">
       {categories.map(category => {

@@ -63,6 +63,8 @@ sudo systemctl status beike --no-pager
 
 运行中的数据库需要备份时，以 `beike` 用户在仓库根目录执行 `pnpm db:backup`，脚本会读取生产环境的 `DATABASE_URL` 并生成一致性快照到数据库旁的 `database-backups/`。恢复前先用 `pnpm db:restore:verify <快照路径>` 校验完整性和外键；替换运行库前须停服务并保留原文件及 WAL/SHM。
 
+图集后台反推由运行中的 API 进程执行，任务状态持久化到数据库；关闭或刷新浏览器不影响执行。升级服务时先停止新派发并等待已提交请求收尾，重启后未确认任务只标记中断，不自动重放付费请求。用户重新进入页面即可查询状态和核对结果。工作区存储中的 `deconstruct-inputs` 与 `deconstruct-results` 分别保存本地图集和大体积解析结果，须与数据库一起备份；模型密钥只保留在执行中的内存，任务恢复不会保存或重用该密钥。
+
 ## 3. 本机仓库里已经准备好的文件
 
 - `src/shared/domain/prompts/masterRecipes.ts`：官方 8 段式（珠宝 + 手机通讯）

@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { OFFICIAL_MASTER_RECIPES } from '@shared/domain/prompts/masterRecipes';
 import { unscopedPrisma as prisma } from './prisma';
 import { OFFICIAL_WORKSPACE_ID } from '../workspace/workspaceContext';
+import { nextFullPromptDisplayNumber } from './fullPromptDisplayNumbers';
+import { inferPromptGroupSubcategory } from '@shared/domain/workshop/workshopPipeline/groupCategoryFit';
+import { parseGroupShotSkeleton } from '@shared/domain/workshop/workshopPipeline/storyboardSlots';
+import { isPromptGroupSubcategory } from '@shared/domain/assets/promptGroupSubcategory';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -69,6 +73,7 @@ function isOfficialCatalogSeedSuppressed(): boolean {
 const BOOL_KEYS = new Set(['isFavorite', 'hasHuman', 'isUniversal']);
 const INT_KEYS = new Set([
   'sourceImageIndex',
+  'groupIndex',
   'usageCount',
   'shotOrder',
   'productFrameRatio',
@@ -212,13 +217,23 @@ export async function seedOfficialPromptAssets(): Promise<{ inserted: number }> 
     'fullPrompt',
     data.fullPrompts || [],
     async () => (await prisma.fullPromptAsset.findMany({ select: { id: true } })).map((r) => r.id),
-    (row) => prisma.fullPromptAsset.create({
-      data: pickRow(row, [
-        'id', 'title', 'albumName', 'reversePromptZh', 'reversePromptEn', 'dimensions', 'imageType',
-        'sourceImageIndex', 'coverUrl', 'sourceImages', 'hasHuman', 'shotFraming', 'productFrameRatio',
-        'sceneSummary', 'outfitSummary', 'actionSummary', 'personaSummary', 'tags', 'category',
-        'provenance', 'usageCount', 'isFavorite', 'albumId', 'productCategoryIds', 'isUniversal',
-      ]) as never,
+    (row) => prisma.$transaction(async tx => {
+      const fields = pickRow(row, [
+          'id', 'title', 'albumName', 'reversePromptZh', 'reversePromptEn', 'dimensions', 'imageType',
+          'sourceImageIndex', 'sourceImageIndices', 'groupIndex', 'contentSummary', 'architectureSummary',
+          'replaceableSlots', 'shotPromptsJson', 'coverUrl', 'sourceImages', 'hasHuman', 'shotFraming', 'productFrameRatio',
+          'sceneSummary', 'outfitSummary', 'actionSummary', 'personaSummary', 'tags', 'category',
+          'productSubcategory',
+          'provenance', 'usageCount', 'isFavorite', 'albumId', 'productCategoryIds', 'isUniversal',
+      ]);
+      if (fields.productSubcategory !== undefined && fields.productSubcategory !== null
+        && !isPromptGroupSubcategory(fields.productSubcategory)) throw new Error('官方母组商品二级类目无效');
+      if (fields.productSubcategory === undefined && parseGroupShotSkeleton(fields.shotPromptsJson).length === 4) {
+        fields.productSubcategory = inferPromptGroupSubcategory(fields);
+      }
+      return tx.fullPromptAsset.create({
+        data: { ...fields, displayNumber: await nextFullPromptDisplayNumber(tx) } as never,
+      });
     }),
   );
   inserted += await insertMissing(

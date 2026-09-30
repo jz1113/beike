@@ -86,7 +86,9 @@ export default function BatchStage1Collect({
   // 快速示例
   const sampleDataA = `https://item.jd.com/100279945637.html\nhttps://item.jd.com/100323048782.html\n10160092696077`;
 
-  const currentRecipe = recipes.find(r => r.id === selectedArchId) || recipes[0];
+  const currentRecipeName = selectedArchId === 'auto'
+    ? '自动按商品类目匹配'
+    : recipes.find(recipe => recipe.id === selectedArchId)?.name;
 
   return (
     <div className={`w-full transition-all duration-300 flex flex-col ${
@@ -194,7 +196,7 @@ export default function BatchStage1Collect({
             itemsCount={items.length}
             handleParseInput={handleParseInput}
             handleSmartBatchCollect={handleSmartBatchCollect}
-            recipeName={currentRecipe?.name}
+            recipeName={currentRecipeName}
             selectedAspect={selectedAspect}
             selectedQuality={selectedQuality}
             selectedShotCount={selectedShotCount}

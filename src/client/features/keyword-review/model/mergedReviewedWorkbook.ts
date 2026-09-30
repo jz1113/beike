@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { KeywordReviewRecord, OutputColumn, ParsedKeywordWorkbook } from './keywordReviewWorkbookTypes';
+import { writeWorkbookProgress } from './keywordReviewWorkbookState';
+import { buildReviewedWorkbook } from './keywordReviewWorkbookExport';
 
 function cloneCell(cell: XLSX.CellObject | undefined): XLSX.CellObject | undefined {
   if (!cell) return undefined;
@@ -24,11 +26,14 @@ function columnWidth(column: OutputColumn): number {
 }
 
 export function buildMergedReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: KeywordReviewRecord[]): XLSX.WorkBook {
+  if (parsed.preserveSourceLayout || parsed.hasFormulas) return buildReviewedWorkbook(parsed, records);
   const columns = parsed.displayColumns;
   const includeSourceSheet = parsed.sheets.length > 1;
   const offset = includeSourceSheet ? 1 : 0;
   const sheet: XLSX.WorkSheet = {};
   const first = parsed.sheets[0];
+  const name = includeSourceSheet ? '审核结果' : first.name;
+  const outputRecords: KeywordReviewRecord[] = [];
   const firstSource = parsed.workbook.Sheets[first.name];
   const headerStyle = firstSource?.[XLSX.utils.encode_cell({ r: first.headerRow, c: first.range.s.c })];
   const sheetByName = new Map(parsed.sheets.map((meta) => [meta.name, meta]));
@@ -67,6 +72,7 @@ export function buildMergedReviewedWorkbook(parsed: ParsedKeywordWorkbook, recor
         writeCell(sheet, outputRow, targetCol, value, styleSource);
       }
     }
+    outputRecords.push({ ...record, id: `${name}:${outputRow + 1}`, sheetName: name, rowNumber: outputRow + 1 });
     outputRow += 1;
   }
 
@@ -82,6 +88,10 @@ export function buildMergedReviewedWorkbook(parsed: ParsedKeywordWorkbook, recor
     }),
   ];
 
-  const name = includeSourceSheet ? '审核结果' : first.name;
-  return { SheetNames: [name], Sheets: { [name]: sheet }, Props: parsed.workbook.Props };
+  const workbook: XLSX.WorkBook = {
+    SheetNames: [name], Sheets: { [name]: sheet }, Props: parsed.workbook.Props,
+    Workbook: { WBProps: parsed.workbook.Workbook?.WBProps },
+  };
+  writeWorkbookProgress(workbook, outputRecords, parsed.mode);
+  return workbook;
 }

@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { useAppStore } from '@client/store';
 
+function navigateWithSettingsGuard(navigate: () => void) {
+  const event = new CustomEvent('app:before-navigate', { cancelable: true, detail: { navigate } });
+  if (window.dispatchEvent(event)) navigate();
+}
+
 interface ShortcutHandlers {
   onOpenSettings?: () => void;
   onNewSession?: () => void;
@@ -24,25 +29,27 @@ export function useDesktopShortcuts({ onOpenSettings, onNewSession }: ShortcutHa
       // 1. 视图秒切：Cmd/Ctrl + 1 ~ 4
       if (e.key === '1') {
         e.preventDefault();
-        setCurrentView('home');
+        navigateWithSettingsGuard(() => setCurrentView('home'));
         return;
       }
       if (e.key === '2') {
         e.preventDefault();
-        setCurrentView('generate');
+        navigateWithSettingsGuard(() => setCurrentView('generate'));
         return;
       }
       if (e.key === '3') {
         e.preventDefault();
-        const store = useAppStore.getState();
-        store.setWorkshopMode('storyboard_generate');
-        store.setActiveWorkshopTab('studio');
-        setCurrentView('workshop');
+        navigateWithSettingsGuard(() => {
+          const store = useAppStore.getState();
+          store.setWorkshopMode('storyboard_generate');
+          store.setActiveWorkshopTab('studio');
+          setCurrentView('workshop');
+        });
         return;
       }
       if (e.key === '4') {
         e.preventDefault();
-        setCurrentView('assets');
+        navigateWithSettingsGuard(() => setCurrentView('assets'));
         return;
       }
 
@@ -52,6 +59,8 @@ export function useDesktopShortcuts({ onOpenSettings, onNewSession }: ShortcutHa
         onOpenSettings?.();
         return;
       }
+
+      if (useAppStore.getState().currentView === 'settings') return;
 
       // 3. 新建对话：Cmd/Ctrl + N
       if (e.key === 'n' || e.key === 'N') {

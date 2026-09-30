@@ -5,6 +5,7 @@ import { renderRatioMiniIcon } from '@client/shared/ui/modelDisplayHelpers';
 import { PromptBarVideoParamsPanel } from './PromptBarVideoControls';
 import PromptBarImageControls from './PromptBarImageControls';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
+import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 
 interface PromptBarAspectPickerProps {
   isUp: boolean;
@@ -55,6 +56,8 @@ export default function PromptBarAspectPicker({
   currentH,
   quickModel,
 }: PromptBarAspectPickerProps) {
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, aspectMenuRef);
+
   return (
     <div className="relative" ref={aspectMenuRef}>
       <button
@@ -110,11 +113,13 @@ export default function PromptBarAspectPicker({
 
       {isOpen && (
         <div
+          ref={panelRef}
+          style={panelStyle}
           className={`absolute left-0 ${
-            isUp
-              ? 'bottom-full mb-2 sm:mb-3 origin-bottom'
+            opensUp
+              ? 'bottom-full mb-2 origin-bottom'
               : 'top-full mt-2 origin-top'
-          } w-[min(480px,calc(100vw-2rem))] max-h-[min(28rem,calc(100dvh-180px))] overflow-y-auto rounded-2xl sm:rounded-[28px] xl:rounded-[32px] bg-white border border-slate-200/90 shadow-2xl p-3.5 sm:p-5 xl:p-6 z-50 animate-fade-in space-y-3 sm:space-y-4 xl:space-y-5 text-left`}
+          } w-[min(480px,calc(100vw-2rem))] max-h-[28rem] overflow-y-auto overscroll-contain rounded-2xl sm:rounded-[28px] xl:rounded-[32px] bg-white border border-slate-200/90 shadow-2xl p-3.5 sm:p-5 xl:p-6 z-50 animate-fade-in space-y-3 sm:space-y-4 xl:space-y-5 text-left`}
         >
           {quickGenMode === 'video' ? (
             <PromptBarVideoParamsPanel

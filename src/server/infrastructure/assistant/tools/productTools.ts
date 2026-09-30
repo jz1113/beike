@@ -1,5 +1,6 @@
 import { prisma } from '../../database/prisma';
-import { getInternalApiHeaders } from '../../auth/apiAuth';
+import { getInternalApiHeaders, getInternalApiOrigin } from '../../auth/apiAuth';
+import { formatToolError } from '../toolSafety';
 import type { AssistantDocAttachment } from '@shared/domain/assistant/tools/defs';
 
 export function detectPlatform(input: string): 'jd' | 'taobao' | '1688' | 'pinduoduo' | 'social' | 'auto' {
@@ -13,7 +14,8 @@ export function detectPlatform(input: string): 'jd' | 'taobao' | '1688' | 'pindu
   return 'auto';
 }
 
-export async function toolParseUrl(urlRaw: string, origin: string, signal?: AbortSignal): Promise<string> {
+export async function toolParseUrl(urlRaw: string, _origin: string, signal?: AbortSignal): Promise<string> {
+  void _origin;
   const url = String(urlRaw || '').trim();
   if (!url) return JSON.stringify({ success: false, error: '缺少 url' });
 
@@ -22,9 +24,10 @@ export async function toolParseUrl(urlRaw: string, origin: string, signal?: Abor
     if (platform === 'social' || /xiaohongshu|douyin|kuaishou|weibo|bilibili/i.test(url)) {
       const scraperId = process.env.EXTERNAL_SCRAPER_ID || '';
       const scraperSecret = process.env.EXTERNAL_SCRAPER_SECRET || '';
-      const res = await fetch(`${origin}/api/catalog/styles/parse-link`, {
+      const res = await fetch(`${getInternalApiOrigin()}/api/catalog/styles/parse-link`, {
         method: 'POST',
         headers: getInternalApiHeaders(),
+      redirect: 'error',
         body: JSON.stringify({
           url,
           text: url,
@@ -43,7 +46,7 @@ export async function toolParseUrl(urlRaw: string, origin: string, signal?: Abor
             : '';
         return JSON.stringify({
           success: false,
-          error: `${data.error || '社媒解析失败'}${hint}`,
+          error: `${formatToolError(data.error || '社媒解析失败')}${hint}`,
           upstreamCode: data.upstreamCode,
         });
       }
@@ -63,9 +66,10 @@ export async function toolParseUrl(urlRaw: string, origin: string, signal?: Abor
       });
     }
 
-    const res = await fetch(`${origin}/api/catalog/collect`, {
+    const res = await fetch(`${getInternalApiOrigin()}/api/catalog/collect`, {
       method: 'POST',
       headers: getInternalApiHeaders(),
+      redirect: 'error',
       body: JSON.stringify({
         url,
         platform: platform === 'auto' ? undefined : platform,
@@ -75,7 +79,7 @@ export async function toolParseUrl(urlRaw: string, origin: string, signal?: Abor
     });
     const data = await res.json();
     if (!data.success || !data.product) {
-      return JSON.stringify({ success: false, error: data.error || '商品采集失败' });
+      return JSON.stringify({ success: false, error: formatToolError(data.error || '商品采集失败') });
     }
     const p = data.product;
     const main = p.mainImages || data.images?.main || [];
@@ -97,7 +101,7 @@ export async function toolParseUrl(urlRaw: string, origin: string, signal?: Abor
       props: p.props || {},
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '解析请求失败';
+    const msg = formatToolError(e, '解析请求失败');
     return JSON.stringify({ success: false, error: msg });
   }
 }
@@ -107,12 +111,13 @@ export function toolReadDocument(
   documents: AssistantDocAttachment[],
 ): string {
   if (!documents.length) {
-    return JSON.stringify({ success: false, error: '本轮没有可读取的文档附件' });
+    return JSON.stringify({ success: false, error: '当前会话近期没有可读取的文档附件' });
   }
 
   const nameQ = (args.document_name || '').toLowerCase();
   const doc =
-    (nameQ ? documents.find((d) => (d.name || '').toLowerCase().includes(nameQ)) : null) || documents[0];
+    nameQ ? documents.find((d) => (d.name || '').toLowerCase().includes(nameQ)) : documents[0];
+  if (!doc) return JSON.stringify({ success: false, error: '未找到指定文档，请核对文件名', availableDocuments: documents.map(document => document.name || '未命名') });
 
   const full = doc.extractedText || '';
   if (!full) {
@@ -194,16 +199,17 @@ export async function toolListProducts(args: { limit?: number; keyword?: string 
       })),
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '读取商品库失败';
+    const msg = formatToolError(e, '读取商品库失败');
     return JSON.stringify({ success: false, error: msg });
   }
 }
 
 export async function toolQueryAssetLibrary(
   args: { asset_type?: string; keyword?: string; limit?: number },
-  origin: string,
+  _origin: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  void _origin;
   const assetType = args.asset_type || 'all';
   const keyword = (args.keyword || '').trim();
   const limit = Math.min(30, Math.max(1, Number(args.limit) || 10));
@@ -216,13 +222,14 @@ export async function toolQueryAssetLibrary(
     });
     if (keyword) params.set('keyword', keyword);
 
-    const res = await fetch(`${origin}/api/catalog/assets/library?${params}`, {
+    const res = await fetch(`${getInternalApiOrigin()}/api/catalog/assets/library?${params}`, {
       headers: getInternalApiHeaders(),
+      redirect: 'error',
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
     });
     const data = await res.json();
     if (!data.success) {
-      return JSON.stringify({ success: false, error: data.error || '资产库查询失败' });
+      return JSON.stringify({ success: false, error: formatToolError(data.error || '资产库查询失败') });
     }
     let assets: Record<string, unknown>[] = [];
     if (assetType === 'all') {
@@ -269,7 +276,7 @@ export async function toolQueryAssetLibrary(
       })),
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '资产库查询失败';
+    const msg = formatToolError(e, '资产库查询失败');
     return JSON.stringify({ success: false, error: msg });
   }
 }
@@ -288,24 +295,26 @@ export function parseReversePromptSections(text: string): Record<string, string>
 
 export async function toolGetPromptAssetDetail(
   args: { asset_type?: string; asset_id?: string },
-  origin: string,
+  _origin: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  void _origin;
   const assetType = args.asset_type || 'full_prompt';
   const assetId = String(args.asset_id || '').trim();
   if (!assetId) return JSON.stringify({ success: false, error: '缺少 asset_id' });
 
   try {
     const res = await fetch(
-      `${origin}/api/catalog/assets/library?type=${encodeURIComponent(assetType)}&id=${encodeURIComponent(assetId)}`,
+      `${getInternalApiOrigin()}/api/catalog/assets/library?type=${encodeURIComponent(assetType)}&id=${encodeURIComponent(assetId)}`,
       {
         headers: getInternalApiHeaders(),
+      redirect: 'error',
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
       },
     );
     const data = await res.json();
     if (!data.success || !data.item) {
-      return JSON.stringify({ success: false, error: data.error || '资产不存在' });
+      return JSON.stringify({ success: false, error: formatToolError(data.error || '资产不存在') });
     }
     const item = data.item as Record<string, unknown>;
     const reversePromptZh = String(item.reversePromptZh || item.reversePrompt || '').trim();
@@ -327,7 +336,7 @@ export async function toolGetPromptAssetDetail(
       sections: reversePromptZh ? parseReversePromptSections(reversePromptZh) : undefined,
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '读取资产详情失败';
+    const msg = formatToolError(e, '读取资产详情失败');
     return JSON.stringify({ success: false, error: msg });
   }
 }

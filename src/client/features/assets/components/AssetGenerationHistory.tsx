@@ -1,19 +1,18 @@
-import { useMemo } from 'react';
-import { Trash2, Check, RotateCw, Loader2, AlertCircle, ImageIcon, Film, Layers, Music } from 'lucide-react';
-import { formatDisplayModel, formatDisplayModelCompact, normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
-import { isImageTaskActive, isImageTaskFailed } from '@shared/domain/core/taskStatus';
-import { proxyMediaUrl } from '@client/shared/api/apiClient';
-import '@client/shared/media/downloadMedia';
+import { AlertCircle, Check, Film, ImageIcon, Layers, Loader2, Music, Trash2 } from 'lucide-react';
+import { formatDisplayModelCompact } from '@shared/domain/media/drawing';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
-import { autoFillGrid, cardContainer } from '@client/shared/ui/layoutClasses';
+import { autoFillGrid } from '@client/shared/ui/layoutClasses';
 import Folder from '@client/shared/media/Folder';
-import LazyVideoCover from '@client/shared/media/LazyVideoCover';
+import AssetMediaPreview from './AssetMediaPreview';
+import AssetTaskCard from './AssetTaskCard';
+import { getAssetMediaKind, isAssetTaskRunning } from '../utils/assetMedia';
 import type { AssetTaskBatch } from '../utils/assetBatch';
 
+type Task = AssetTaskBatch['tasks'][number];
 interface Props {
   isPreparing?: boolean;
   mediaCategory: 'image' | 'video' | 'audio' | 'canvas';
-  mergedTasks: any[];
+  mergedTasks: Task[];
   visibleToday: AssetTaskBatch[];
   visibleYesterday: AssetTaskBatch[];
   visibleEarlier: AssetTaskBatch[];
@@ -22,530 +21,116 @@ interface Props {
   totalBatches: number;
   loadMoreSentinelRef: React.RefObject<HTMLDivElement | null>;
   isBatchMode: boolean;
+  isBusy?: boolean;
+  isSearchingHistory?: boolean;
+  tasksHasMore?: boolean;
+  onLoadMore?: () => void;
   selectedTaskIds: string[];
   setSelectedTaskIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setIsBatchMode: (v: boolean) => void;
-  copiedId: string | null;
-  setCopiedId: (id: string | null) => void;
-  setCurrentView: (view: any) => void;
-  setPreviewTask: (...args: any[]) => void;
-  setQuickPrompt: (prompt: string) => void;
-  showToast: (msg: string) => void;
+  setCurrentView: (view: 'canvas' | 'home') => void;
+  setPreviewTask: (task: Task, queue?: Task[]) => void;
   onDeleteBatch: (batch: AssetTaskBatch, e: React.MouseEvent) => void;
-  onDeleteTask: (taskOrId: any, e?: React.MouseEvent) => void;
-  onRegenerate: (task: any, e: React.MouseEvent) => void;
+  onDeleteTask: (task: Task, e?: React.MouseEvent) => void;
+  onRegenerate: (task: Task, e: React.MouseEvent) => void;
   onOpenFolderBatch?: (batch: AssetTaskBatch) => void;
-  section?: 'toolbar' | 'gallery' | 'both';
+  isLoadingTasks?: boolean;
+  isLoadingMoreTasks?: boolean;
+  loadError?: string | null;
+  isFiltered?: boolean;
+  onRetryLoad?: () => void;
+  showToast?: (message: string) => void;
 }
 
 export default function AssetGenerationHistory(props: Props) {
-  const {
-    isPreparing = false,
-    mediaCategory,
-    mergedTasks,
-    visibleToday,
-    visibleYesterday,
-    visibleEarlier,
-    hasMore,
-    renderedBatches,
-    totalBatches,
-    loadMoreSentinelRef,
-    isBatchMode,
-    selectedTaskIds,
-    setSelectedTaskIds,
-    setCurrentView,
-    setPreviewTask,
-    onDeleteBatch,
-    onDeleteTask,
-    onRegenerate,
-    onOpenFolderBatch,
-  } = props;
-
-
-  const premiumGeneratingTaskId = useMemo(() => {
-    const running = mergedTasks.find(
-      (t) => isImageTaskActive(t.status) && !t.resultUrl,
-    );
-    return running?.id ?? null;
-  }, [mergedTasks]);
-
-  // 资产中心刚切入时先交出一帧可交互的骨架，下一帧再执行任务归并与缩略图挂载。
-  if (isPreparing) {
-    return (
-      <div aria-busy="true" aria-label="正在载入资产" className="space-y-5 animate-fade-in">
-        <div className="h-6 w-20 rounded-lg bg-slate-200/70" />
-        <div className={`${autoFillGrid} pt-1`}>
-          {[0, 1, 2, 3, 4, 5].map((item) => (
-            <div key={item} className="aspect-square rounded-2xl bg-slate-100/85 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const { isPreparing, mediaCategory, mergedTasks, visibleToday, visibleYesterday, visibleEarlier, hasMore, renderedBatches, totalBatches, loadMoreSentinelRef, isBatchMode, isBusy, isSearchingHistory, tasksHasMore, onLoadMore, selectedTaskIds, setSelectedTaskIds, setCurrentView, setPreviewTask, onDeleteBatch, onDeleteTask, onRegenerate, onOpenFolderBatch, isLoadingTasks, isLoadingMoreTasks, loadError, isFiltered, onRetryLoad, showToast } = props;
 
   function renderBatchCard(batch: AssetTaskBatch) {
     const isCanvas = batch.batchId.startsWith('canvas-') || mediaCategory === 'canvas';
-    // 🌟 1. 单项任务直接平铺展示完整卡片（杜绝单任务/单视频被强行套上 1P 文件夹外壳，确保归类清晰直观）
-    // 特别说明：如果是画布分类（用户明确要求：打包文件夹增加画布，存放的文件夹全放置画布的内容），则即使只有 1 张图也保持为 Folder 文件夹！
     if (batch.tasks.length <= 1 && !isCanvas) {
-      return batch.tasks[0] ? renderTaskCard(batch.tasks[0]) : null;
+      return batch.tasks[0] ? <AssetTaskCard key={batch.batchId} task={batch.tasks[0]} {...{ mergedTasks, isBatchMode, isBusy, selectedTaskIds, setSelectedTaskIds, setPreviewTask, onDeleteTask, onRegenerate, showToast }} /> : null;
     }
+    const validTasks = batch.tasks.filter(t => t.resultUrl && t.status !== 'FAILURE');
+    const runningTasks = batch.tasks.filter(isAssetTaskRunning);
+    const failedTasks = batch.tasks.filter(t => t.status === 'FAILURE');
+    const emptyTasks = batch.tasks.filter(t => t.status === 'EMPTY');
+    const primaryTask = runningTasks[0] || validTasks[0] || batch.tasks[0];
+    const title = (batch.title || batch.prompt || '未命名套组').trim();
+    const allSelected = batch.tasks.length > 0 && batch.tasks.every(t => selectedTaskIds.includes(t.id));
+    const someSelected = batch.tasks.some(t => selectedTaskIds.includes(t.id));
+    const kinds = new Set(batch.tasks.map(getAssetMediaKind));
+    const kind = kinds.size === 1 ? getAssetMediaKind(primaryTask || {}) : 'mixed';
+    const unit = isCanvas || kind === 'mixed' ? '项内容' : kind === 'video' ? '段视频' : kind === 'audio' ? '首音频' : kind === 'document' ? '篇文档' : '张图片';
+    const model = formatDisplayModelCompact(batch.model, kind === 'video');
+    const status = runningTasks.length ? `${validTasks.length}/${batch.tasks.length} 项完成 · ${runningTasks.length} 项生成中`
+      : failedTasks.length ? `${validTasks.length} ${unit} · ${failedTasks.length} 项失败`
+      : emptyTasks.length ? `${validTasks.length} ${unit} · ${emptyTasks.length} 项待添加媒体` : `${validTasks.length} ${unit}`;
 
-    const validTasks = batch.tasks.filter(t => t.resultUrl && (t.status === 'SUCCESS' || !t.status));
-    const runningTasks = batch.tasks.filter(t => isImageTaskActive(t.status) && !t.resultUrl);
-    const failedTasks = batch.tasks.filter(t => isImageTaskFailed(t.status) && !t.resultUrl);
-
-    const primaryTask = validTasks[0] || batch.tasks[0];
-    const isAllSelected = batch.tasks.every(t => selectedTaskIds.includes(t.id));
-    const isSomeSelected = batch.tasks.some(t => selectedTaskIds.includes(t.id));
-    const isVid = batch.tasks.some(
-      (t) =>
-        t.mediaType === 'video' ||
-        t.mediaType === 'depth-video' ||
-        t.resultUrl?.includes('.mp4') ||
-        t.model?.includes('video') ||
-        t.model?.includes('seedance') ||
-        t.model === 'video-depth-anything'
-    );
-    const isAud = batch.tasks.some((t) => t.mediaType === 'audio' || t.resultUrl?.includes('.mp3') || t.resultUrl?.includes('.wav'));
-    const isDoc = batch.tasks.some((t) => t.mediaType === 'doc' || t.mediaType === 'document' || t.resultUrl?.includes('.pdf'));
-
-    const mediaUnit = isCanvas ? '张画布内容' : isVid ? '段视频' : isAud ? '首音频' : isDoc ? '篇文档' : '张图片';
-    const runningUnit = isCanvas ? '张' : isVid ? '段' : isAud ? '首' : isDoc ? '篇' : '张';
-    const badgeSuffix = isCanvas ? 'P' : isVid ? 'V' : isAud ? 'A' : isDoc ? 'D' : 'P';
-
-    const modelCompact = formatDisplayModelCompact(batch.model, isVid);
-
-    // 1. 若当前批次没有任何有效成功的媒体
-    if (validTasks.length === 0) {
-      // 1.1 若正在批量生成中（对齐生成对话界面，去除深色沉重背景框，只保留纯粹呼吸动效卡片）
-      if (runningTasks.length > 0) {
-        return (
-          <div
-            key={batch.batchId}
-            className={`${cardContainer} group relative rounded-xl sm:rounded-2xl overflow-hidden aspect-square select-none shadow-2xs hover:shadow-md transition-all duration-200 border border-sky-200/70 bg-sky-50/20`}
-          >
-            <div className="absolute inset-0">
-              <AIGeneratingCard
-                task={primaryTask}
-                progressNumber={
-                  primaryTask?.progress && primaryTask.progress.includes('%')
-                    ? parseInt(primaryTask.progress, 10)
-                    : undefined
-                }
-                showProgressBadge={true}
-                isVideo={isVid}
-                variant={primaryTask?.id === premiumGeneratingTaskId ? 'premium' : 'lite'}
-              />
-            </div>
-            {/* 多图/多视频任务角标（极简半透明毛玻璃胶囊） */}
-            {runningTasks.length > 1 && (
-              <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none animate-in fade-in duration-200">
-                <span className="px-2 py-0.5 rounded-lg bg-white/80 backdrop-blur-md border border-white/80 text-sky-800 text-[10px] font-bold font-mono shadow-2xs">
-                  {runningTasks.length}{runningUnit}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      // 1.2 若全部失败或中断 (杜绝纯白空白框！)
-      return (
-        <div
-          key={batch.batchId}
-          className={`${cardContainer} group relative rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 shadow-2xs aspect-square select-none flex flex-col justify-between p-3`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
-              <span>生成未完成 ({batch.tasks.length})</span>
-            </span>
-            <button
-              type="button"
-              onClick={(e) => onDeleteBatch(batch, e)}
-              className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-              title="清理此异常记录"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <div className="flex flex-col items-center justify-center gap-1 text-center my-auto px-2">
-            <span className="text-xs font-bold text-slate-600">任务中断或失败</span>
-            <span className="text-[10px] text-slate-400 line-clamp-2">{batch.title || batch.prompt || '暂无可用图像'}</span>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => onDeleteBatch(batch, e)}
-            className="w-full py-1 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 text-[10px] font-bold transition-colors cursor-pointer text-center"
-          >
-            清理记录
-          </button>
-        </div>
-      );
-    }
-
-    // 2. 🌟 拥有有效生成图片的套组：以极具质感且高性能的 Folder 文件夹形式展示
-    const totalCount = batch.tasks.length;
-    const validCount = validTasks.length;
-    const coverTask = validTasks[0] || batch.tasks[0];
-    const coverUrl = coverTask?.resultUrl ? proxyMediaUrl(normalizeImageUrlToStandardJpg(coverTask.resultUrl), { thumb: true, width: 320 }) : undefined;
-    const previewItems = validTasks.slice(0, 3).map((t) => proxyMediaUrl(normalizeImageUrlToStandardJpg(t.resultUrl), { thumb: true, width: 320 }));
-    const folderDisplayName = (batch.title || batch.prompt || '未命名对话').trim();
-
-    const handleOpenBatch = () => {
+    const openBatch = () => {
+      if (isBusy) return;
       if (isBatchMode) {
-        if (isAllSelected) {
-          const batchTaskIds = new Set(batch.tasks.map(t => t.id));
-          setSelectedTaskIds(prev => prev.filter(id => !batchTaskIds.has(id)));
-        } else {
-          const newIds = batch.tasks.map(t => t.id);
-          setSelectedTaskIds(prev => Array.from(new Set([...prev, ...newIds])));
-        }
-      } else {
-        if (onOpenFolderBatch) onOpenFolderBatch(batch);
-        else setPreviewTask(primaryTask, validTasks);
-      }
+        const ids = new Set(batch.tasks.map(t => t.id));
+        setSelectedTaskIds(prev => allSelected ? prev.filter(id => !ids.has(id)) : Array.from(new Set([...prev, ...ids])));
+      } else if (onOpenFolderBatch) onOpenFolderBatch(batch);
+      else if (validTasks.length) setPreviewTask(validTasks[0], validTasks);
     };
 
     return (
       <div
         key={batch.batchId}
-        onMouseEnter={() => {
-          // 文件夹界面只展示前三张预览图；预热同样只取这三张。
-          // 过去会在鼠标恰好停留在首卡时预取整个批次，数十张图片会阻塞资产页切换。
-          validTasks.slice(0, 3).forEach((t) => {
-            if (t.resultUrl) {
-              const img = new Image();
-              img.src = proxyMediaUrl(normalizeImageUrlToStandardJpg(t.resultUrl), { thumb: true, width: 320 });
-            }
-          });
-        }}
-        onClick={handleOpenBatch}
-        className={`group relative cursor-pointer aspect-square flex flex-col items-center justify-between p-2 select-none will-change-transform ${
-          isAllSelected ? 'ring-2 ring-indigo-600 rounded-2xl bg-indigo-50/20' : ''
-        }`}
+        className={`group relative flex aspect-square min-w-0 cursor-pointer flex-col items-center justify-between rounded-2xl p-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-500 ${allSelected ? 'bg-indigo-50/30 ring-2 ring-indigo-600' : ''}`}
       >
-        {/* 多选框（仅在批量模式下显示） */}
-        {isBatchMode && (
-          <div className="absolute top-2 left-2 z-30 flex items-center gap-1.5">
-            <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all shadow-xs ${
-              isAllSelected ? 'bg-indigo-600 text-white' : isSomeSelected ? 'bg-indigo-100 text-indigo-700 border border-indigo-400' : 'bg-white/90 border border-slate-300'
-            }`}>
-              {isAllSelected ? <Check className="w-3 h-3 stroke-[3]" /> : isSomeSelected ? <div className="w-2 h-2 bg-indigo-600 rounded-xs" /> : null}
+        <button type="button" onClick={openBatch} disabled={isBusy} aria-label={`${isBatchMode ? '选择' : '打开文件夹'}：${title}，${batch.tasks.filter(t => !t.isCanvasPlaceholder).length} 项内容`} aria-pressed={isBatchMode ? allSelected : undefined} className="absolute inset-0 z-20 cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-wait" />
+        {isBatchMode && <div aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 z-30 flex h-5 w-5 items-center justify-center rounded-md shadow-xs ${allSelected ? 'bg-indigo-600 text-white' : someSelected ? 'border border-indigo-400 bg-indigo-100 text-indigo-700' : 'border border-slate-300 bg-white/90'}`}>{allSelected ? <Check className="h-3 w-3" /> : someSelected ? <span className="h-2 w-2 rounded-xs bg-indigo-600" /> : null}</div>}
+        {!isBatchMode && <button type="button" disabled={isBusy} onClick={e => { e.stopPropagation(); onDeleteBatch(batch, e); }} title="删除文件夹" aria-label={`删除文件夹：${title}`} className="absolute right-1 top-1 z-30 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/90 text-slate-500 opacity-0 shadow-xs transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>}
+        <div className="flex w-full min-h-0 flex-1 items-center justify-center">
+          {validTasks.length > 0 ? (
+            <Folder
+              color={isCanvas ? '#0EA5E9' : kind === 'video' ? '#2563EB' : '#4F46E5'}
+              size={1.05}
+              count={validTasks.length}
+              badgeSuffix={isCanvas || kind === 'mixed' ? '项' : kind === 'video' ? 'V' : kind === 'audio' ? 'A' : kind === 'document' ? 'D' : 'P'}
+              items={validTasks.slice(0, 3).map(t => <AssetMediaPreview key={t.id} src={t.resultUrl} mediaType={t.mediaType} model={t.model} width={320} title={title} videoAutoPlay={false} posterUrl={t.coverUrl} />)}
+              interactive={false}
+            />
+          ) : runningTasks.length > 0 ? (
+            <div className="relative h-full min-h-20 w-full overflow-hidden rounded-xl">
+              <AIGeneratingCard task={primaryTask} showProgressBadge={Boolean(primaryTask?.progress)} badgePosition={isBatchMode ? 'right' : 'left'} />
+              <span role="status" className="absolute inset-x-1 bottom-3 text-center text-[11px] text-sky-800">{runningTasks.length} 项正在生成</span>
             </div>
-          </div>
-        )}
-
-        {/* 🌟 核心 Folder 文件夹组件展示（上半部分） */}
-        <div className="w-full flex-1 min-h-0 flex items-center justify-center pt-0.5 pb-0 -mt-1">
-          <Folder
-            color={isCanvas ? '#0EA5E9' : isVid ? '#2563EB' : '#4F46E5'}
-            size={1.05}
-            count={validCount}
-            badgeSuffix={badgeSuffix}
-            items={previewItems}
-            coverImage={coverUrl}
-            expandOnClick={false}
-            onClick={handleOpenBatch}
-          />
+          ) : (
+            <div className="flex h-full min-h-20 w-full flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center">
+              {isCanvas && (emptyTasks.length || batch.tasks.some(t => t.isCanvasPlaceholder)) ? <Layers className="h-6 w-6 text-sky-500" /> : <AlertCircle className="h-6 w-6 text-rose-500" />}<span className="text-xs font-semibold text-slate-600">{isCanvas && batch.tasks.some(t => t.isCanvasPlaceholder) ? '空画布项目' : emptyTasks.length ? '尚未添加媒体' : failedTasks.length ? '生成失败' : '暂无可用结果'}</span>
+            </div>
+          )}
         </div>
-
-        {/* 🌟 底部对话名称与微标签（向下移位、拉开呼吸空间、提高清晰度、动态适配媒体类型单位） */}
-        <div className="w-full flex flex-col items-center justify-center px-2 pt-2.5 pb-1 text-center pointer-events-none shrink-0">
-          <span
-            className="w-full text-[12.5px] sm:text-[13px] font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 transition-colors truncate tracking-tight text-center leading-tight"
-            title={folderDisplayName}
-          >
-            {folderDisplayName}
-          </span>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate mt-1 leading-none">
-            {runningTasks.length > 0
-              ? `${validCount}/${totalCount} ${runningUnit} (生成中)`
-              : failedTasks.length > 0
-                ? `${validCount} ${mediaUnit} (${failedTasks.length}张失败)`
-                : `${validCount} ${mediaUnit}`} · {modelCompact}
-          </span>
+        <div className="pointer-events-none w-full shrink-0 px-1 pb-1 pt-3 text-center">
+          <p className="truncate text-[13px] font-semibold leading-tight text-slate-800 group-hover:text-indigo-600" title={title}>{title}</p>
+          <p className="mt-1 truncate text-[11px] leading-tight text-slate-500" title={`${status} · ${model}`}>{status} · {model}</p>
         </div>
       </div>
     );
   }
 
-  // 渲染单张生图卡片
-  function renderTaskCard(task: any) {
-    const isSelected = selectedTaskIds.includes(task.id);
-    const isSuccess = Boolean(task.resultUrl);
-    const isRunning = isImageTaskActive(task.status) && !task.resultUrl;
-    const isFailed = isImageTaskFailed(task.status) && !task.resultUrl;
-    void isFailed;
-
-    const isVidTask = task.mediaType === 'video' || task.mediaType === 'depth-video' || task.resultUrl?.includes('.mp4');
-    const taskModelFull = formatDisplayModel(task.model, isVidTask);
-    const taskModelCompact = formatDisplayModelCompact(task.model, isVidTask);
-
-    return (
-      <div
-        key={task.id}
-        onClick={() => {
-          if (isBatchMode) {
-            if (isSelected) {
-              setSelectedTaskIds(prev => prev.filter(id => id !== task.id));
-            } else {
-              setSelectedTaskIds(prev => [...prev, task.id]);
-            }
-          } else if (isSuccess) {
-            const isVid = task.mediaType === 'video' || task.mediaType === 'depth-video' || (task.resultUrl && (task.resultUrl.includes('.mp4') || task.resultUrl.includes('video')));
-            const raw = task.rawTask || {};
-            const refImgs = task.referenceImages || raw.referenceImages || task.images || raw.images;
-            const refImgUrl = task.referenceImageUrl || raw.referenceImageUrl || task.sourceImageUrl || raw.sourceImageUrl;
-            const previewPayload = {
-              ...task,
-              id: task.id,
-              dbId: task.dbId,
-              taskId: task.taskId,
-              batchId: task.batchId || raw.batchId,
-              sessionId: task.sessionId || raw.sessionId,
-              title: task.title || (task.prompt ? (task.prompt.slice(0, 24) + '...') : (isVid ? '历史生成视频' : '历史生成图片')),
-              prompt: task.prompt,
-              status: 'SUCCESS',
-              resultUrl: task.resultUrl,
-              model: task.model || (isVid ? 'doubao-seedance-2.5' : 'gpt-image-2'),
-              mediaType: isVid ? 'video' : 'image',
-              size: task.size || task.aspectRatio || '3:4',
-              aspectRatio: task.aspectRatio || task.size || '3:4',
-              quality: task.quality || (isVid ? '720P' : 'medium'),
-              videoResolution: task.videoResolution || (isVid ? (task.quality || '720P') : undefined),
-              videoDuration: task.videoDuration,
-              referenceImages: refImgs,
-              referenceImageUrl: refImgUrl,
-              images: task.images || refImgs,
-              sourceImageUrl: task.sourceImageUrl || refImgUrl,
-              useReferenceImage: Boolean((refImgs && refImgs.length > 0) || refImgUrl || task.useReferenceImage),
-              rawTask: task.rawTask || task,
-              progress: '100%',
-              createdAt: task.createdAt ? new Date(task.createdAt).getTime() : Date.now(),
-            };
-
-            // 🌟 寻找同批次兄弟任务构建队列，使得单张卡片点入也能左右翻页并共享参考素材
-            const siblingTasks = mergedTasks.filter((t: any) => {
-              if (!t.resultUrl) return false;
-              if (task.batchId && t.batchId === task.batchId) return true;
-              if (task.sessionId && t.sessionId === task.sessionId) return true;
-              return false;
-            });
-            const queue = siblingTasks.length > 1 ? siblingTasks : [previewPayload];
-            setPreviewTask(previewPayload, queue);
-          }
-        }}
-        className={`${cardContainer} group relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border transition-all duration-200 cursor-pointer aspect-square flex flex-col justify-between shadow-2xs hover:shadow-lg hover:-translate-y-0.5 select-none [content-visibility:auto] [contain-intrinsic-size:200px] will-change-transform ${
-          isSelected 
-            ? 'ring-2 ring-indigo-600 border-indigo-500' 
-            : 'border-slate-200/80 hover:border-slate-300'
-        }`}
-      >
-        {/* Top-left: Selection Checkbox */}
-        <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-          {isBatchMode && (
-            <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all shadow-xs ${
-              isSelected ? 'bg-indigo-600 text-white' : 'bg-white/90 border border-slate-300'
-            }`}>
-              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-            </div>
-          )}
-        </div>
-
-        {/* Top-right Model Tag — 窄卡片隐藏 */}
-        {!isRunning && !isBatchMode && (
-          <div className="absolute top-2 right-2 z-20 pointer-events-none hidden @min-[160px]/card:block max-w-[calc(100%-0.5rem)]">
-            <span
-              className="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-xs text-white text-[9px] font-mono font-medium shadow-xs truncate block max-w-full"
-              title={taskModelFull}
-            >
-              {taskModelCompact}
-            </span>
-          </div>
-        )}
-
-
-        {/* Card Main Media */}
-        <div className="w-full h-full relative overflow-hidden bg-slate-100 flex items-center justify-center">
-          {isSuccess ? (
-            (task.mediaType === 'video' || task.mediaType === 'depth-video' || task.resultUrl?.includes('.mp4')) ? (
-              <LazyVideoCover src={proxyMediaUrl(task.resultUrl)} />
-            ) : (
-              <img 
-                src={proxyMediaUrl(normalizeImageUrlToStandardJpg(task.resultUrl), { thumb: true, width: 480 })} 
-                alt="" 
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (!target.dataset.hasRetried && task.resultUrl) {
-                    target.dataset.hasRetried = 'true';
-                    target.src = proxyMediaUrl(task.resultUrl);
-                  } else {
-                    target.src = '/inspirations/insp_1.jpg';
-                  }
-                }}
-                className="w-full h-full object-cover" 
-              />
-            )
-          ) : isRunning ? (
-            <AIGeneratingCard
-              task={task}
-              progressNumber={
-                task?.progress && task.progress.includes('%')
-                  ? parseInt(task.progress, 10)
-                  : undefined
-              }
-              showProgressBadge={true}
-              isVideo={task.mediaType === 'video' || task.mediaType === 'depth-video' || task.resultUrl?.includes('.mp4')}
-              variant={task.id === premiumGeneratingTaskId ? 'premium' : 'lite'}
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-1.5 p-4 text-center text-red-500 overflow-x-hidden">
-              <AlertCircle className="w-6 h-6 shrink-0" />
-              <span className="text-[10px] font-bold">{
-                task.mediaType === 'depth-video'
-                  ? '深度视频生成失败'
-                  : task.mediaType === 'depth-image'
-                    ? '深度图片生成失败'
-                    : task.mediaType === 'video'
-                      ? '视频生成失败'
-                      : '生图失败'
-              }</span>
-              <span
-                className="text-[9px] text-slate-400 w-full min-w-0 line-clamp-3 break-words [overflow-wrap:anywhere] leading-relaxed"
-                title={task.failReason || '网络异常'}
-              >
-                {task.failReason || '网络异常'}
-              </span>
-            </div>
-          )}
-        </div>
-
-          {/* Hover Overlay Toolbar (When Running / Failed) */}
-          {!isSuccess && !isBatchMode && (
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between z-10">
-              <div className="flex items-center justify-end">
-                <button
-                  onClick={(e) => onDeleteTask(task, e)}
-                  className="w-7 h-7 rounded-lg bg-red-600/90 hover:bg-red-600 text-white flex items-center justify-center transition-colors shadow-xs cursor-pointer"
-                  title="删除/清除此记录"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1 pt-1">
-                {task.prompt && (
-                  <button
-                    onClick={(e) => onRegenerate(task, e)}
-                    className="flex-1 py-1 rounded-lg bg-white/90 hover:bg-white text-slate-900 text-[10px] font-bold shadow-xs flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <RotateCw className="w-3 h-3" />
-                    <span>重试生成</span>
-                  </button>
-                )}
-                <button
-                  onClick={(e) => onDeleteTask(task, e)}
-                  className="px-2 py-1 rounded-lg bg-red-500/90 hover:bg-red-600 text-white text-[10px] font-bold shadow-xs flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                  title="删除记录"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>删除</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
+  const emptyIcon = mediaCategory === 'canvas' ? <Layers className="h-8 w-8" /> : mediaCategory === 'video' ? <Film className="h-8 w-8" /> : mediaCategory === 'audio' ? <Music className="h-8 w-8" /> : <ImageIcon className="h-8 w-8" />;
+  const emptyTitle = isFiltered ? '没有匹配的资产' : mediaCategory === 'canvas' ? '暂无画布资产' : mediaCategory === 'video' ? '暂无视频资产' : mediaCategory === 'audio' ? '暂无音频资产' : '暂无生成历史资产';
+  const isSearching = Boolean(isPreparing || isLoadingTasks || isSearchingHistory || (isFiltered && isLoadingMoreTasks));
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {tasksHasMore && isFiltered && !loadError && <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"><span>{isSearching || isLoadingMoreTasks ? '正在查找更早的资产…' : '当前结果来自已加载记录，还有更早的历史可查找'}</span><button type="button" onClick={onLoadMore} disabled={isBusy || isSearching || isLoadingMoreTasks} className="rounded-lg bg-white px-3 py-1.5 font-semibold text-indigo-600 disabled:opacity-50">继续查找</button></div>}
+      {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><span>{loadError}</span><button type="button" onClick={onRetryLoad} disabled={isBusy || isLoadingTasks || isLoadingMoreTasks} className="cursor-pointer rounded-lg bg-white px-3 py-1.5 font-semibold hover:bg-amber-100">重新加载</button></div>}
       {mergedTasks.length === 0 ? (
-        <div className="py-24 text-center text-slate-400 flex flex-col items-center gap-3">
-          <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400">
-            {mediaCategory === 'canvas' ? (
-              <Layers className="w-8 h-8 text-sky-500" />
-            ) : mediaCategory === 'video' ? (
-              <Film className="w-8 h-8" />
-            ) : mediaCategory === 'audio' ? (
-              <Music className="w-8 h-8" />
-            ) : (
-              <ImageIcon className="w-8 h-8" />
-            )}
-          </div>
-          <div className="space-y-1">
-            <span className="font-bold text-slate-700 text-sm">
-              {mediaCategory === 'canvas' ? '暂无画布资产' : mediaCategory === 'video' ? '暂无生成视频资产' : mediaCategory === 'audio' ? '暂无音频资产' : '暂无生成历史资产'}
-            </span>
-            <p className="text-xs text-slate-500">
-              {mediaCategory === 'canvas'
-                ? '在无限画布中创作并生成的图片工程将自动在此归档'
-                : mediaCategory === 'video'
-                ? '在工作区生成的商用视频将自动在此沉淀归档'
-                : mediaCategory === 'audio'
-                ? '在工作区提取或生成的音频素材将自动在此归档'
-                : '在工作区生成的商用美图与视觉资产将自动在此沉淀归档'}
-            </p>
-          </div>
-          <button
-            onClick={() => setCurrentView(mediaCategory === 'canvas' ? 'canvas' : 'home')}
-            className="mt-2 px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-black transition-all shadow-sm cursor-pointer"
-          >
-            {mediaCategory === 'canvas' ? '前往无限画布创作 ➔' : '去灵感大厅生成 ➔'}
-          </button>
+        <div className="flex flex-col items-center gap-3 py-20 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-400">{isSearching ? <Loader2 className="h-8 w-8 animate-spin text-indigo-500" /> : emptyIcon}</div>
+          <div className="space-y-1"><p role="status" className="text-sm font-semibold text-slate-700">{isSearching ? '正在加载资产' : loadError ? '历史资产加载失败' : emptyTitle}</p><p className="text-xs text-slate-500">{isSearching ? '正在获取历史记录，请稍候' : loadError ? '请稍后重新加载历史记录' : isFiltered ? tasksHasMore ? '已加载的历史中暂无匹配，可继续查找更早的资产' : '试试其他关键词或调整时间范围' : '创作完成的媒体会自动在此归档'}</p></div>
+          {!isSearching && tasksHasMore && !isFiltered && !loadError && <button type="button" onClick={onLoadMore} disabled={isBusy} className="rounded-xl bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-600">继续加载更早的资产</button>}
+          {!isSearching && !isFiltered && !loadError && !tasksHasMore && <button type="button" onClick={() => setCurrentView(mediaCategory === 'canvas' ? 'canvas' : 'home')} className="mt-2 cursor-pointer rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white hover:bg-black">{mediaCategory === 'canvas' ? '前往无限画布创作' : '前往灵感大厅创作'}</button>}
         </div>
-      ) : (
-        <>
-          {/* 1. 今天 分组 */}
-          {visibleToday.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight pb-0.5">
-                今天
-              </h2>
-              <div className={`${autoFillGrid} pt-1`}>
-                {visibleToday.map(batch => renderBatchCard(batch))}
-              </div>
-            </div>
-          )}
-
-          {/* 2. 昨天 分组 */}
-          {visibleYesterday.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight pb-0.5">
-                昨天
-              </h2>
-              <div className={`${autoFillGrid} pt-1`}>
-                {visibleYesterday.map(batch => renderBatchCard(batch))}
-              </div>
-            </div>
-          )}
-
-          {/* 3. 更早 分组 */}
-          {visibleEarlier.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight pb-0.5">
-                更早
-              </h2>
-              <div className={`${autoFillGrid} pt-1`}>
-                {visibleEarlier.map(batch => renderBatchCard(batch))}
-              </div>
-            </div>
-          )}
-
-          {/* 🌟 底部平滑无限加载哨兵 (秒级自适应加载下一页，杜绝 DOM 爆炸卡顿) */}
-          {hasMore && (
-            <div ref={loadMoreSentinelRef} className="py-8 flex items-center justify-center text-xs text-slate-400 gap-2 select-none">
-              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-              <span>正在加载更多历史资产 (已渲染 {renderedBatches} / 共 {totalBatches} 批)...</span>
-            </div>
-          )}
-        </>
-      )}
+      ) : ([['今天', visibleToday], ['昨天', visibleYesterday], ['更早', visibleEarlier]] as const).map(([label, batches]) => batches.length > 0 && (
+        <section key={label} className="space-y-4" aria-label={`${label}的资产`}><h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900 sm:text-xl">{label}</h2><div className={`${autoFillGrid} pt-1`}>{batches.map(renderBatchCard)}</div></section>
+      ))}
+      {tasksHasMore && !isFiltered && renderedBatches === totalBatches && !loadError && <div className="flex justify-center"><button type="button" onClick={onLoadMore} disabled={isBusy || isLoadingMoreTasks} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-indigo-600 disabled:opacity-50">{isLoadingMoreTasks ? '正在加载…' : '加载更早的历史资产'}</button></div>}
+      {hasMore && !loadError && !(isFiltered && tasksHasMore && renderedBatches === totalBatches) && <div ref={loadMoreSentinelRef} className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500">{isLoadingMoreTasks && <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />}<span role="status">{isLoadingMoreTasks ? '正在加载更多历史资产' : `加载更多资产 · 已展示 ${renderedBatches} / ${totalBatches} 个套组`}</span></div>}
     </div>
   );
 }

@@ -85,7 +85,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentLoopRes
   const modelResult = (result: string) => opts.executableToolNames!.includes('read_tool_result') ? opts.resultStore!.forModel(result) : result;
 
   if (enableAgentTools && tools.length > 0) {
-    injectToolAndWorkspaceContext(workingMessages, allowedTools, toolCtx);
+    injectToolAndWorkspaceContext(workingMessages, opts.executableToolNames, toolCtx);
   }
 
   let streamingSupported = true;
@@ -162,7 +162,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentLoopRes
 
       if (streamResp?.body && streamingSupported) {
         const { agentMsgId, reasoningId, contentAccum, reasoningAccum, toolCallAccum, toolItemIds } =
-          await readAgentStream(streamResp, runtime, actualModel, opts.budget);
+          await readAgentStream(streamResp, runtime, actualModel, opts.budget, signal);
         // 关闭 reasoning 与 agentMessage items
         runtime.completeItem(reasoningId, reasoningAccum ? 'done' : 'cancelled');
         runtime.completeItem(agentMsgId, contentAccum ? 'done' : 'cancelled');

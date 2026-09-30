@@ -21,6 +21,8 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
   return (
     <div
       key={node.id}
+      data-canvas-node-id={node.id}
+      data-canvas-group-id={node.groupId}
       tabIndex={-1}
       className={`canvas-node-card [&:has(>[data-layer-editor])_.canvas-node-toolbar]:invisible absolute ${node.type === 'drawing' ? 'pointer-events-none outline-none' : 'pointer-events-auto'} flex flex-col group transition-[outline,box-shadow,opacity] duration-150 select-none ${
         node.type === 'drawing'
@@ -43,17 +45,23 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
           e.currentTarget.focus({ preventScroll: true });
         }
         if (node.type === 'drawing') drawingPress.current = { x: e.clientX, y: e.clientY };
-        if (node.layerLocked) { e.stopPropagation(); setSelectedNodeId(node.id); }
-        else handleNodeDragStart(node, e);
+        handleNodeDragStart(node, e);
       }}
       onClick={(e) => {
         e.stopPropagation();
         if (props.handleNodeClick) props.handleNodeClick(node, e); else setSelectedNodeId(node.id);
         if (node.type === 'drawing') {
           const press = drawingPress.current;
-          setEditingDrawingId(!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5 ? node.id : null);
+          setEditingDrawingId(!node.layerLocked && !node.groupId && !e.shiftKey && (!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) ? node.id : null);
           drawingPress.current = null;
+        } else {
+          setEditingDrawingId(null);
         }
+      }}
+      onDoubleClick={event => {
+        if (node.type !== 'drawing' || node.layerLocked || (event.target as HTMLElement).closest('button,input,textarea,video,audio')) return;
+        event.stopPropagation();
+        setEditingDrawingId(node.id);
       }}
     >
       {isSelected && !node.layerLocked && (['image','video','prompt','note','frame'].includes(node.type)) && !isGenerating && !node.missingMedia && (

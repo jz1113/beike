@@ -1,5 +1,39 @@
 import { db } from './access';
+import type { Prisma } from '@prisma/client';
 import { withOrganization } from './assetLibraryImport';
+import { nextFullPromptDisplayNumber } from '@server/infrastructure/database/fullPromptDisplayNumbers';
+import { deleteMotherReplacements } from './motherGroupReplacement';
+import { inferPromptGroupSubcategory } from '@shared/domain/workshop/workshopPipeline/groupCategoryFit';
+import {
+  PROMPT_GROUP_SUBCATEGORIES,
+  builtinSubcategoryFolderId,
+  isPromptGroupSubcategory,
+  isPromptGroupSubcategoryFolderId,
+} from '@shared/domain/assets/promptGroupSubcategory';
+import { AssetCategoryError, setPromptAlbumMajorCategory, validateMajorCategory } from './assetOrganization';
+import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
+
+async function validateMotherGroupSubcategory(
+  tx: Prisma.TransactionClient, value: unknown, categoryId: string | null,
+): Promise<string | null> {
+  if (value == null) return null;
+  if (isPromptGroupSubcategory(value)) {
+    if (categoryId !== 'digital_3c') throw new AssetCategoryError('数码细分只能用于手机数码');
+    const archived = await tx.assetProductCategory.findUnique({ where: { id: builtinSubcategoryFolderId(value) } });
+    if (archived?.isArchived) throw new AssetCategoryError('商品细分文件夹已删除');
+    return value;
+  }
+  if (!isPromptGroupSubcategoryFolderId(value)) throw new AssetCategoryError('商品二级类目无效');
+  const folder = await tx.assetProductCategory.findUnique({ where: { id: value } });
+  if (!folder || folder.parentId !== categoryId || folder.isArchived || folder.workspaceId !== requireWorkspaceId()) {
+    throw new AssetCategoryError('细分文件夹不属于当前商品大类');
+  }
+  if (categoryId === 'digital_3c') {
+    const builtin = PROMPT_GROUP_SUBCATEGORIES.find(kind => builtinSubcategoryFolderId(kind) === value);
+    if (builtin) return builtin;
+  }
+  return value;
+}
 
 export async function validateActionSceneReference(assetType: unknown, data: Record<string, unknown>): Promise<string | null> {
   if (assetType !== 'action' || data.sceneId === undefined || data.sceneId === null || data.sceneId === '') return null;
@@ -78,9 +112,32 @@ export async function createLibraryAsset(assetType: string, data: Record<string,
       },
     });
   } else if (assetType === 'full_prompt') {
-    const org = await withOrganization('full_prompt', data);
-    created = await db.fullPromptAsset.create({
-      data: {
+    created = await db.$transaction(async tx => {
+      const org = await withOrganization('full_prompt', data, tx);
+      const albumId = org.albumId as string;
+      const album = await tx.promptAlbum.findUniqueOrThrow({ where: { id: albumId } });
+      const explicitCategory = data.productCategoryIds !== undefined;
+      const inferredSubcategory = data.productSubcategory === undefined
+        ? inferPromptGroupSubcategory({ title: data.title, shotPromptsJson: data.shotPromptsJson })
+        : data.productSubcategory;
+      let categoryId = explicitCategory
+        ? await validateMajorCategory(tx, data.productCategoryIds)
+        : album.productCategoryId;
+      if (!explicitCategory && !categoryId && isPromptGroupSubcategory(inferredSubcategory)) {
+        categoryId = await validateMajorCategory(tx, '["digital_3c"]');
+      }
+      const archivedInferred = data.productSubcategory === undefined && isPromptGroupSubcategory(inferredSubcategory)
+        ? (await tx.assetProductCategory.findUnique({ where: { id: builtinSubcategoryFolderId(inferredSubcategory) } }))?.isArchived
+        : false;
+      const productSubcategory = await validateMotherGroupSubcategory(
+        tx, archivedInferred ? null : (categoryId === 'digital_3c' || data.productSubcategory !== undefined ? inferredSubcategory : null), categoryId,
+      );
+      if (album.productCategoryId !== categoryId) {
+        await setPromptAlbumMajorCategory(tx, albumId, categoryId);
+      }
+      const displayNumber = await nextFullPromptDisplayNumber(tx);
+      return tx.fullPromptAsset.create({ data: {
+        displayNumber,
         title: data.title || '新完整反推提示词',
         albumName: String(org.albumName || data.albumName || ''),
         reversePromptZh: data.reversePromptZh || '',
@@ -104,11 +161,12 @@ export async function createLibraryAsset(assetType: string, data: Record<string,
         personaSummary: data.personaSummary || '',
         tags: Array.isArray(data.tags) ? data.tags.join(', ') : data.tags || '',
         category: data.category || 'general',
+        productSubcategory,
         provenance: data.provenance || 'manual',
-        albumId: org.albumId as string,
-        productCategoryIds: String(org.productCategoryIds || '[]'),
+        albumId,
+        productCategoryIds: JSON.stringify(categoryId ? [categoryId] : []),
         isUniversal: false,
-      },
+      } });
     });
   } else {
     return null;
@@ -140,9 +198,38 @@ export async function updateLibraryAsset(assetType: string, id: string, data: Re
       data,
     });
   } else if (assetType === 'full_prompt') {
-    updated = await db.fullPromptAsset.update({
-      where: { id },
-      data,
+    const safeData = { ...data };
+    delete safeData.displayNumber;
+    updated = await db.$transaction(async tx => {
+      const current = await tx.fullPromptAsset.findUnique({ where: { id } });
+      if (!current) throw new AssetCategoryError('图组不存在');
+      if (current.workspaceId !== requireWorkspaceId()) throw new AssetCategoryError('官方图组不可修改');
+      if ('albumId' in safeData && safeData.albumId !== current.albumId) {
+        throw new AssetCategoryError('请通过图集管理调整图组归属');
+      }
+      if ('productCategoryIds' in safeData) {
+        const categoryId = await validateMajorCategory(tx, safeData.productCategoryIds);
+        if ('productSubcategory' in safeData) safeData.productSubcategory = await validateMotherGroupSubcategory(tx, safeData.productSubcategory, categoryId);
+        if (current.albumId) await setPromptAlbumMajorCategory(tx, current.albumId, categoryId);
+        safeData.productCategoryIds = JSON.stringify(categoryId ? [categoryId] : []);
+        if (categoryId !== JSON.parse(current.productCategoryIds || '[]')[0] && !('productSubcategory' in safeData)) safeData.productSubcategory = null;
+      } else if (safeData.productSubcategory != null) {
+        const currentCategories = JSON.parse(current.productCategoryIds || '[]') as unknown;
+        const categoryIds = Array.isArray(currentCategories) ? currentCategories : [];
+        let categoryId = typeof categoryIds[0] === 'string' ? categoryIds[0] : null;
+        if (!categoryId) {
+          if (isPromptGroupSubcategory(safeData.productSubcategory)) categoryId = 'digital_3c';
+          else if (isPromptGroupSubcategoryFolderId(safeData.productSubcategory)) {
+            categoryId = (await tx.assetProductCategory.findUnique({ where: { id: safeData.productSubcategory } }))?.parentId || null;
+          }
+          if (!categoryId) throw new AssetCategoryError('请先选择商品大类');
+          categoryId = await validateMajorCategory(tx, JSON.stringify([categoryId]));
+          if (current.albumId) await setPromptAlbumMajorCategory(tx, current.albumId, categoryId);
+          safeData.productCategoryIds = JSON.stringify([categoryId]);
+        }
+        safeData.productSubcategory = await validateMotherGroupSubcategory(tx, safeData.productSubcategory, categoryId);
+      }
+      return tx.fullPromptAsset.update({ where: { id }, data: safeData });
     });
   } else {
     return null;
@@ -199,7 +286,15 @@ export async function prepareAssetDeletion(assetType: string, idsToDelete: strin
     }
     deleteRecords = () => db.personaAsset.deleteMany({ where: { id: { in: idsToDelete } } });
   } else if (assetType === 'full_prompt') {
-    deleteRecords = () => db.fullPromptAsset.deleteMany({ where: { id: { in: idsToDelete } } });
+    const workspaceId = requireWorkspaceId();
+    deleteRecords = () => db.$transaction(async tx => {
+      const where = { id: { in: idsToDelete }, workspaceId };
+      if (await tx.fullPromptAsset.count({ where }) !== new Set(idsToDelete).size) {
+        throw new Error('所选母组不存在或不可删除');
+      }
+      await deleteMotherReplacements(tx, idsToDelete);
+      return tx.fullPromptAsset.deleteMany({ where });
+    });
   } else {
     return null;
   }

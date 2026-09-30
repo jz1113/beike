@@ -73,6 +73,7 @@ export function apiHeaders(extra?: HeadersInit): Headers {
 
 /** 统一带鉴权的浏览器 fetch。 */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  init?.signal?.throwIfAborted();
   syncAppTokenCookie();
   syncWorkspaceCookie();
 
@@ -101,10 +102,11 @@ export function readClientStorageConfig(): ClientStorageConfig {
     try { return localStorage.getItem(key) || ''; } catch { return ''; }
   };
   const provider = read('storage_provider');
+  const providers: readonly string[] = ['r2', 'oss', 'cos', 's3', 'minio', 'supabase'];
   return {
     enabled: true,
     persistResults: read('storage_enabled') === 'true',
-    provider: provider === 'cos' ? 'cos' : 'oss',
+    provider: providers.includes(provider) ? provider as ClientStorageConfig['provider'] : 'oss',
     accountId: read('storage_account_id'),
     endpoint: read('storage_endpoint'),
     accessKeyId: read('storage_access_key_id'),

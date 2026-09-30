@@ -60,6 +60,7 @@ export function mergeUnifiedShardMetadata(
   shards: Array<{ parsedResult: Record<string, unknown>; offset: number }>,
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = {};
+  const productCategories = new Set<string>();
   for (const { parsedResult, offset } of shards) {
     const shifted = offsetShardMetadata(parsedResult, offset);
     for (const key of ['content_groups', 'scenes', 'outfits', 'actions']) {
@@ -67,10 +68,16 @@ export function mergeUnifiedShardMetadata(
         ...(Array.isArray(shifted[key]) ? shifted[key] as unknown[] : [])];
     }
     if (!merged.theme_category && shifted.theme_category) merged.theme_category = shifted.theme_category;
+    const productCategory = typeof shifted.product_major_category === 'string'
+      ? shifted.product_major_category.trim().toLowerCase() : '';
+    if (productCategory && productCategory !== 'unknown') {
+      productCategories.add(productCategory === 'digital' || productCategory === 'phone' ? 'digital_3c' : productCategory);
+    }
     if (!merged.persona && shifted.persona) merged.persona = shifted.persona;
     const summary = typeof shifted.content_summary === 'string' ? shifted.content_summary.trim() : '';
     if (summary) merged.content_summary = [merged.content_summary, summary].filter(Boolean).join('；');
   }
+  merged.product_major_category = productCategories.size === 1 ? [...productCategories][0] : 'unknown';
   return merged;
 }
 

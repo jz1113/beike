@@ -1,12 +1,21 @@
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { apiFetch, proxyMediaUrl, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
+import { formatWorkshopCopywriting, type WorkshopExportRow } from '@shared/domain/workshop/workshopExport';
 import type { BatchProductItem } from '../batchTypes';
-import { isDeliverableWorkshopResult } from '../generation/workshopReadiness';
+import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExportFields';
 
-export type MatrixExportRow = Record<string, string>;
+export type MatrixExportRow = WorkshopExportRow;
+
+function existingImageUrl(url: string): string {
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) return '';
+  if (url.startsWith('//')) return new URL(url, window.location.origin).href;
+  if (url.startsWith('/')) return new URL(proxyMediaUrl(url), window.location.origin).href;
+  return /^(https?:)?\/\//i.test(url) ? url : '';
+}
 
 export async function ensurePermanentImageUrl(url: string, filename: string): Promise<string> {
   if (!url) return url;
+  if (url.startsWith('//')) url = new URL(url, window.location.origin).href;
   // 已保存的工作区文件无需再次上传；直接导出可在当前站点访问的绝对地址。
   if (url.startsWith('/storage/')) return new URL(proxyMediaUrl(url), window.location.origin).href;
   const looksAlreadyPermanent = /^(https?:)?\/\//i.test(url)
@@ -52,43 +61,29 @@ export async function ensurePermanentImageUrl(url: string, filename: string): Pr
 export async function buildMatrixExportRows(
   items: BatchProductItem[],
   onProgress?: (current: number, total: number) => void,
-  opts?: { offline?: boolean; linkForShot?: (item: BatchProductItem, shotNo: number) => string | undefined }
+  opts?: { includeShot?: (item: BatchProductItem, shotNo: number) => boolean; allowUpload?: boolean },
 ): Promise<MatrixExportRow[]> {
   const rows: MatrixExportRow[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const content = item.copywriting?.content?.trim() || '';
-    const tags = (item.copywriting?.tags || []).map(t => (t.startsWith('#') ? t : `#${t}`)).join(' ');
-    let taskCopywriting = content;
-    if (tags && !content.includes('#')) taskCopywriting = content ? `${content}\n\n${tags}` : tags;
-
-    const shots = (item.tasks || []).filter(isDeliverableWorkshopResult).slice().sort((a, b) => a.shot_no - b.shot_no);
-    // Keep the original shot number when resolving a file. A failed download must
-    // leave a blank cell, never silently fall back to a remote image in an offline ZIP.
-    const rawUrls = shots.map((task) => opts?.linkForShot
-      ? opts.linkForShot(item, task.shot_no) || ''
-      : task.resultUrl!);
-    const finalUrls = opts?.offline
-      ? rawUrls
-      : await Promise.all(rawUrls.map((url, idx) => url ? ensurePermanentImageUrl(url, `slice_${item.itemId || item.id}_${idx + 1}`) : Promise.resolve('')));
-
     const row: MatrixExportRow = {
-      '任务标题': item.copywriting?.title?.trim() || item.title?.trim() || item.itemId || '未命名任务',
-      '任务文案': taskCopywriting,
       '商品名称': item.title?.trim() || '',
-      '商品ID': item.itemId?.trim() || item.id || '',
-      '图链接1': '',
-      '图链接2': '',
-      '图链接3': '',
-      '图链接4': '',
-      '图链接5': '',
-      '图链接6': '',
-      '图链接7': '',
-      '图链接8': '',
+      '商品类目': item.category?.trim() || '',
+      '商品id': exportProductId(item),
+      '生成图片链接1': '',
+      '生成图片链接2': '',
+      '生成图片链接3': '',
+      '生成图片链接4': '',
+      '标题': exportGeneratedTitle(item),
+      '文案': formatWorkshopCopywriting(item.copywriting?.content),
+      '对应生成的提示词资产分组组名': exportPromptGroupName(item),
     };
-    finalUrls.forEach((url, idx) => {
-      row[`图链接${idx + 1}`] = url || '';
-    });
+    const shots = exportFourShots(item).filter(task => !opts?.includeShot || opts.includeShot(item, task.shot_no));
+    await Promise.all(shots.map(async task => {
+      row[`生成图片链接${task.shot_no}` as keyof MatrixExportRow] = opts?.allowUpload === false
+        ? existingImageUrl(task.resultUrl!)
+        : await ensurePermanentImageUrl(task.resultUrl!, `slice_${exportProductId(item)}_${task.shot_no}`);
+    }));
     rows.push(row);
     onProgress?.(i + 1, items.length);
   }

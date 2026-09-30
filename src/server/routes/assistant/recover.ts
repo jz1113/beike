@@ -1,6 +1,6 @@
 import { getTurnSnapshot } from './turns';
 
-/** Recovery is read-only: preserve completed/failed/running state and normalized items. */
+/** Read-only recovery preserves live workers and terminal history, and normalizes orphaned work after restart. */
 export async function recoverTurn(req: Request): Promise<Response> {
   const url = new URL(req.url);
   url.pathname = url.pathname.replace(/\/recover$/, '/snapshot');

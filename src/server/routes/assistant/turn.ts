@@ -1,17 +1,18 @@
 import { jsonResponse } from '../../core/http';
-import { readJsonBody } from '../../core/validate';
 import { parseJsonBody } from '../../core/validate';
 import { turnStartBodySchema, turnApproveBodySchema, turnInterruptBodySchema } from '@shared/contracts/assistant';
-import { createAssistantSSEStream, interruptActiveAssistantTurn } from '../../services/assistant/assistantAgent';
+import { startAssistantTurn, interruptActiveAssistantTurn } from '../../services/assistant/assistantStart';
+import { readResponseBodyLimited } from '../../core/readBodyLimited';
 import { resolveApproval, rejectTurnApprovals } from '../../services/assistant/assistantApprovalStore';
 
 export async function startTurn(req: Request) {
   let body: unknown;
   try {
-    body = await readJsonBody(req);
-  } catch (parseErr: unknown) {
-    const msg = parseErr instanceof Error ? parseErr.message : '内容格式异常';
-    return jsonResponse({ success: false, error: `请求载荷解析失败: ${msg}` }, 400);
+    const read = await readResponseBodyLimited(new Response(req.body, { headers: req.headers }), 32_000_000, req.signal);
+    if (!read.ok) return jsonResponse({ success: false, error: read.reason === 'too_large' ? '请求附件过大，请减少附件后重试' : '请求内容为空' }, read.reason === 'too_large' ? 413 : 400);
+    body = JSON.parse(read.buffer.toString('utf8'));
+  } catch {
+    return jsonResponse({ success: false, error: '请求内容格式异常，请检查消息和附件后重试' }, 400);
   }
 
   const parsed = parseJsonBody(body, turnStartBodySchema);
@@ -19,13 +20,15 @@ export async function startTurn(req: Request) {
     return jsonResponse({ success: false, error: parsed.error }, 400);
   }
 
-  return createAssistantSSEStream(req, parsed.data);
+  return startAssistantTurn(req, parsed.data);
 }
 
 export async function approveTurn(req: Request) {
   let body: unknown;
   try {
-    body = await readJsonBody(req);
+    const read = await readResponseBodyLimited(new Response(req.body, { headers: req.headers }), 4096, req.signal);
+    if (!read.ok) return jsonResponse({ success: false, error: '审批内容过大或为空' }, read.reason === 'too_large' ? 413 : 400);
+    body = JSON.parse(read.buffer.toString('utf8'));
   } catch {
     return jsonResponse({ success: false, error: '无效 JSON' }, 400);
   }
@@ -47,7 +50,9 @@ export async function approveTurn(req: Request) {
 export async function interruptTurn(req: Request) {
   let body: unknown;
   try {
-    body = await readJsonBody(req);
+    const read = await readResponseBodyLimited(new Response(req.body, { headers: req.headers }), 4096, req.signal);
+    if (!read.ok) return jsonResponse({ success: false, error: '中断请求内容过大或为空' }, read.reason === 'too_large' ? 413 : 400);
+    body = JSON.parse(read.buffer.toString('utf8'));
   } catch {
     return jsonResponse({ success: false, error: '无效 JSON' }, 400);
   }

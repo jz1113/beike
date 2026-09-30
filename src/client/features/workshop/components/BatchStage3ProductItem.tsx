@@ -12,7 +12,9 @@ import BatchStatusBadge from './BatchStatusBadge';
 import { BatchStage3ShotCard } from './BatchStage3ShotCard';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { getSharedAssetLabels, getShotAssetLabels } from '../model/assetPresentation';
+import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';
 import { stableAssetCode } from '@shared/domain/assets/assetSampling';
+import { getCachedAssetsSync } from '@client/shared/api/assetLibraryCache';
 
 export interface BatchStage3ProductItemProps {
   isGridMode?: boolean;
@@ -52,6 +54,11 @@ const MemoizedProductItem = React.memo(function ProductItem({
   const coverImg = item.selectedProductImages[0] || item.coverImage || '';
   const hasPrompts = item.prompts && item.prompts.length > 0;
   const sharedAssets = getSharedAssetLabels(item.prompts || [], item.applied_persona);
+  const sourceGroupNumber = item.appliedFullPromptDisplayNumber
+    ?? getCachedAssetsSync('full_prompt').find(group => group.id === item.appliedFullPromptId)?.displayNumber;
+  const sourceGroupName = sourceGroupNumber
+    ? fullPromptGroupLabel(sourceGroupNumber)
+    : item.appliedFullPromptId ? `#${stableAssetCode('R', item.appliedFullPromptId)}` : '未编号图组';
 
   return (
     <div style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }} className="p-4 sm:p-5 space-y-4 bg-transparent border border-slate-200/60 rounded-2xl">
@@ -112,13 +119,11 @@ const MemoizedProductItem = React.memo(function ProductItem({
                 <>
                   <span>·</span>
                   <span className="inline-flex max-w-full flex-wrap items-center gap-1.5" title={`母本原名称：${item.appliedFullPromptTitle || '未命名'}；资产 ID：${item.appliedFullPromptId}`}>
-                    <span>{item.appliedFullPromptSelectionMode === 'auto' ? '轮询使用' : '锁定使用'}</span>
-                    <strong className="font-mono text-indigo-700">#{stableAssetCode('R', item.appliedFullPromptId).toUpperCase()}</strong>
-                    <span className="max-w-[240px] truncate" title={item.appliedFullPromptAlbumName || item.appliedFullPromptTitle || ''}>{item.appliedFullPromptAlbumName || item.appliedFullPromptTitle || '未命名图集'}</span>
-                    {item.appliedFullPromptGroupIndex && <span className="text-slate-400">图集内组 {item.appliedFullPromptGroupIndex}</span>}
+                    <span>{item.appliedFullPromptSelectionMode === 'auto' ? '轮询使用' : '固定使用'}</span>
+                    <strong className="text-indigo-700">{sourceGroupName}</strong>
                   </span>
                   {item.appliedFullPromptAppearance && <span className={`rounded px-1.5 py-0.5 font-medium ${item.appliedFullPromptAppearance === 'human' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {item.appliedFullPromptAppearance === 'human' ? '有人物母版' : item.appliedFullPromptAppearance === 'product' ? '无人物母版' : '出镜待判定'}
+                    {item.appliedFullPromptAppearance === 'human' ? '含人物镜头' : item.appliedFullPromptAppearance === 'product' ? '全组无人物' : '出镜待判定'}
                   </span>}
                   {item.appliedFullPromptSelectionMode === 'auto' && typeof item.appliedFullPromptEligibleCount === 'number' && typeof item.appliedFullPromptInventoryCount === 'number' && (
                     <span className="text-slate-500">本商品可轮询 {item.appliedFullPromptEligibleCount} / 库存 {item.appliedFullPromptInventoryCount} 母版</span>

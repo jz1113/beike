@@ -1,7 +1,8 @@
 import { jsonResponse } from '../../core/http';
-import { safeErrorMessage } from '../../core/validate';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
+import { readResponseBodyLimited } from '../../core/readBodyLimited';
+import { safeErrorMessage } from '../../core/validate';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -10,6 +11,8 @@ const MAX_ZIP_ENTRIES = 200;
 const MAX_DECOMPRESSED_BYTES = 50 * 1024 * 1024;
 const MAX_PDF_PAGES = 200;
 const MAX_SHEETS = 50;
+const MAX_SHEET_CELLS = 200_000;
+const MAX_WORKBOOK_CELLS = 1_000_000;
 const PARSE_TIMEOUT_MS = 30_000;
 
 const ALLOWED_EXT = new Set([
@@ -33,12 +36,12 @@ function truncateText(text: string): { text: string; truncated: boolean } {
 }
 
 async function withParseTimeout<T>(work: Promise<T>): Promise<T> {
-  return Promise.race([
-    work,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error('文档解析超时，请缩小文件后重试')), PARSE_TIMEOUT_MS);
-    }),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([work, new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('文档解析超时，请缩小文件后重试')), PARSE_TIMEOUT_MS);
+    })]);
+  } finally { if (timer) clearTimeout(timer); }
 }
 
 async function inspectZipBuffer(buffer: Buffer): Promise<JSZip> {
@@ -59,6 +62,25 @@ async function inspectZipBuffer(buffer: Buffer): Promise<JSZip> {
         throw new Error('解压后体积过大');
       }
     }
+  }
+  // ZIP metadata is controlled by the file. Count real output in bounded chunks
+  // before handing the archive to parsers which otherwise inflate it in memory.
+  let decodedBytes = 0;
+  for (const path of entries) {
+    const entry = zip.files[path];
+    if (!entry || entry.dir) continue;
+    await new Promise<void>((resolve, reject) => {
+      const stream = (entry as JSZip.JSZipObject & {
+        internalStream(type: 'uint8array'): JSZip.JSZipStreamHelper<Uint8Array>;
+      }).internalStream('uint8array');
+      stream.on('data', (chunk) => {
+        decodedBytes += chunk.byteLength;
+        if (decodedBytes > MAX_DECOMPRESSED_BYTES) {
+          stream.pause();
+          reject(new Error('解压后体积过大'));
+        }
+      }).on('error', reject).on('end', resolve).resume();
+    });
   }
   return zip;
 }
@@ -103,28 +125,44 @@ async function extractPptxText(buffer: Buffer): Promise<string> {
 async function extractPdfText(buffer: Buffer): Promise<string> {
   const { extractText, getDocumentProxy } = await import('unpdf');
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
-  const pageCount = (pdf as { numPages?: number }).numPages ?? 0;
-  if (pageCount > MAX_PDF_PAGES) {
-    throw new Error(`PDF 页数过多（>${MAX_PDF_PAGES}）`);
+  try {
+    const pageCount = (pdf as { numPages?: number }).numPages ?? 0;
+    if (pageCount > MAX_PDF_PAGES) {
+      throw new Error(`PDF 页数过多（>${MAX_PDF_PAGES}）`);
+    }
+    const extracted = await extractText(pdf, { mergePages: true });
+    const rawText: unknown = (extracted as { text?: unknown })?.text ?? extracted;
+    return typeof rawText === 'string' ? rawText : Array.isArray(rawText) ? rawText.join('\n') : String(rawText || '');
+  } finally {
+    await pdf.loadingTask.destroy();
   }
-  const extracted = await extractText(pdf, { mergePages: true });
-  const rawText: unknown = (extracted as { text?: unknown })?.text ?? extracted;
-  return typeof rawText === 'string' ? rawText : Array.isArray(rawText) ? rawText.join('\n') : String(rawText || '');
 }
 
 async function extractDocxText(buffer: Buffer): Promise<string> {
+  await inspectZipBuffer(buffer);
   const result = await mammoth.extractRawText({ buffer });
   return result.value || '';
 }
 
 async function extractSpreadsheetText(buffer: Buffer, ext: string): Promise<string> {
   try {
+    if (ext === 'xlsx') await inspectZipBuffer(buffer);
     const XLSX = await import('xlsx');
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    if (workbook.SheetNames.length > MAX_SHEETS) throw new Error(`工作表过多（>${MAX_SHEETS}），请拆分文件后上传`);
     const parts: string[] = [];
-    for (const sheetName of workbook.SheetNames.slice(0, MAX_SHEETS)) {
+    let totalCells = 0;
+    for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) continue;
+      if (sheet['!ref']) {
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        const cells = (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1);
+        totalCells += cells;
+        if (!Number.isSafeInteger(cells) || cells < 1 || cells > MAX_SHEET_CELLS || totalCells > MAX_WORKBOOK_CELLS) {
+          throw new Error('工作表范围过大，请删除多余空白行列或拆分文件后上传');
+        }
+      }
       const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
       const trimmed = (csv || '').trim();
       if (trimmed) {
@@ -146,7 +184,9 @@ async function extractSpreadsheetText(buffer: Buffer, ext: string): Promise<stri
  */
 export async function POST(req: Request) {
   try {
-    const form = await req.formData();
+    const read = await readResponseBodyLimited(new Response(req.body, { headers: req.headers }), MAX_BYTES + 1024 * 1024, req.signal);
+    if (!read.ok) return jsonResponse({ success: false, error: '文件过大或内容为空，请控制在 15MB 以内' }, read.reason === 'too_large' ? 413 : 400);
+    const form = await new Response(new Uint8Array(read.buffer), { headers: req.headers }).formData();
     const file = form.get('file');
     if (!file || !(file instanceof File)) {
       return jsonResponse({ success: false, error: '缺少文件 file' }, 400);
@@ -173,6 +213,7 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    req.signal.throwIfAborted();
     let raw = '';
 
     const parse = async () => {
@@ -188,10 +229,11 @@ export async function POST(req: Request) {
 
     try {
       raw = await withParseTimeout(parse());
+      req.signal.throwIfAborted();
     } catch (err: unknown) {
-      const msg = safeErrorMessage(err, '文档解析失败');
+      const msg = err instanceof Error ? err.message : '文档解析失败';
       const status = /过大|过多|超时/.test(msg) ? 413 : 422;
-      return jsonResponse({ success: false, error: msg }, status);
+      return jsonResponse({ success: false, error: safeErrorMessage(new Error(formatUserError(err)), '文档解析失败，请检查格式后重试') }, status);
     }
 
     const { text, truncated } = truncateText(raw);
@@ -211,7 +253,7 @@ export async function POST(req: Request) {
     console.error('[extract-document]', error);
     return jsonResponse({
       success: false,
-      error: formatUserError(error, '文档解析失败'),
+      error: safeErrorMessage(new Error(formatUserError(error, '文档解析失败')), '文档解析失败，请检查格式后重试'),
     }, 500);
   }
 }

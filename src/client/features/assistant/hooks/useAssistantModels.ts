@@ -52,8 +52,12 @@ export function useAssistantModels({
     };
 
     loadCustomAssistantModels();
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || ['custom_models', 'beike_assistant_selected_model', 'ai_assistant_model', 'ai_multimodal_model', 'ai_vision_model'].includes(event.key)) loadCustomAssistantModels();
+    };
     window.addEventListener('models_updated', loadCustomAssistantModels);
-    return () => window.removeEventListener('models_updated', loadCustomAssistantModels);
+    window.addEventListener('storage', onStorage);
+    return () => { window.removeEventListener('models_updated', loadCustomAssistantModels); window.removeEventListener('storage', onStorage); };
   }, [setAssistantModel]);
 
   // 全局点击空白处关闭模型下拉菜单

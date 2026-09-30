@@ -55,7 +55,7 @@ export const generationTaskRepository = {
     const data = { productId: product ? input.productId : null, prompt: input.prompt, model: input.model, mediaType: 'video', size: input.size, quality: input.quality, status: 'IN_PROGRESS' };
     return db.imageTask.upsert({
       where: { workspaceId_taskId: { workspaceId: requireWorkspaceId(), taskId: input.taskId } },
-      update: data,
+      update: {},
       create: { ...data, taskId: input.taskId },
     });
   },

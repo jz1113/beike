@@ -10,6 +10,22 @@ if (!g.__beike_ref_files__) {
 const files: Map<string, File> = g.__beike_ref_files__;
 const kinds: Map<string, RefMediaKind> = g.__beike_ref_kinds__;
 const names: Map<string, string> = g.__beike_ref_names__;
+const identities: Map<string, string> = g.__beike_ref_identities__ ||= new Map<string, string>();
+
+/** Identity follows the URL through reordering and duplicate filenames. */
+export function getRefMediaIdentity(url: string): string {
+  let id = identities.get(url);
+  if (!id) {
+    id = `media-${globalThis.crypto.randomUUID()}`;
+    identities.set(url, id);
+  }
+  return id;
+}
+
+export function resolveRefMediaIdentity(id: string): string | undefined {
+  for (const [url, identity] of identities) if (identity === id) return url;
+  return undefined;
+}
 
 export function registerRefMedia(url: string, file: File, origName?: string): void {
   files.set(url, file);
@@ -56,6 +72,7 @@ export function clearRefMediaRegistry(): void {
   files.clear();
   kinds.clear();
   names.clear();
+  identities.clear();
 }
 
 export function snapshotRefMediaFiles(): Map<string, File> {

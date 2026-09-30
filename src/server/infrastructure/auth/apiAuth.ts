@@ -87,3 +87,18 @@ export function getInternalApiHeaders(extra?: HeadersInit): Headers {
   }
   return headers;
 }
+
+/** Internal authenticated requests never derive their destination from a client Host header. */
+export function getInternalApiOrigin(): string {
+  const configured = process.env.INTERNAL_API_ORIGIN?.trim();
+  if (configured) {
+    const url = new URL(configured);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('内部 API 地址配置无效');
+    return url.origin;
+  }
+  const configuredHost = process.env.HOSTNAME?.trim() || '127.0.0.1';
+  const host = ['0.0.0.0', '::'].includes(configuredHost) ? '127.0.0.1' : configuredHost;
+  const port = Number(process.env.PORT || 3000);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('内部 API 端口配置无效');
+  return `http://${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}:${port}`;
+}

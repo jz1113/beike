@@ -1,25 +1,83 @@
 import * as XLSX from 'xlsx';
 import type { OutputColumn } from './keywordReviewWorkbookTypes';
 
-function cellText(sheet: XLSX.WorkSheet, row: number, col: number): string {
+export function cellText(sheet: XLSX.WorkSheet, row: number, col: number): string {
   const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
   if (!cell || cell.v === undefined || cell.v === null) return '';
-  return String(cell.w ?? cell.v).replace(/\s+/g, ' ').trim();
+  return String(cell.w ?? cell.v);
 }
 
 export function emptyDataColumns(sheet: XLSX.WorkSheet, headerRow: number, range: XLSX.Range): Set<number> {
-  const empty = new Set<number>();
-  for (let col = range.s.c; col <= range.e.c; col += 1) {
-    let hasValue = false;
-    for (let row = headerRow + 1; row <= range.e.r; row += 1) {
-      if (cellText(sheet, row, col)) {
-        hasValue = true;
-        break;
-      }
-    }
-    if (!hasValue) empty.add(col);
+  const populated = new Set<number>();
+  for (const [address, cell] of Object.entries(sheet)) {
+    if (address.startsWith('!') || !String(cell?.w ?? cell?.v ?? '').trim()) continue;
+    const { r, c } = XLSX.utils.decode_cell(address);
+    if (r > headerRow && r <= range.e.r && c >= range.s.c && c <= range.e.c) populated.add(c);
   }
-  return empty;
+  return new Set(Array.from({ length: range.e.c - range.s.c + 1 }, (_, col) => col + range.s.c).filter((col) => !populated.has(col)));
+}
+
+function meaningfulCell(cell: XLSX.CellObject | undefined): boolean {
+  return Boolean(cell && (String(cell.w ?? cell.v ?? '').trim() || cell.f || cell.F || cell.l || cell.c));
+}
+
+export function sheetHasData(sheet: XLSX.WorkSheet): boolean {
+  return Object.entries(sheet).some(([address, cell]) => !address.startsWith('!') && meaningfulCell(cell));
+}
+
+/** Excel can retain a million-row used range after its data is deleted. Work from stored values instead. */
+export function effectiveSheetRange(sheet: XLSX.WorkSheet): XLSX.Range | null {
+  let range: XLSX.Range | null = null;
+  for (const [address, cell] of Object.entries(sheet)) {
+    if (address.startsWith('!') || !meaningfulCell(cell)) continue;
+    const { r, c } = XLSX.utils.decode_cell(address);
+    if (!range) range = { s: { r, c }, e: { r, c } };
+    else {
+      range.s.r = Math.min(range.s.r, r);
+      range.s.c = Math.min(range.s.c, c);
+      range.e.r = Math.max(range.e.r, r);
+      range.e.c = Math.max(range.e.c, c);
+    }
+  }
+  return range;
+}
+
+export function trimWorkbookRanges(workbook: XLSX.WorkBook): void {
+  for (const name of workbook.SheetNames) {
+    const sheet = workbook.Sheets[name];
+    if (!sheet) continue;
+    const range = effectiveSheetRange(sheet);
+    workbook.Sheets[name] = { ...sheet, '!ref': range ? XLSX.utils.encode_range(range) : 'A1' };
+  }
+}
+
+export function dataRows(sheet: XLSX.WorkSheet, col: number, afterRow: number): number[] {
+  return Object.entries(sheet).flatMap(([address, cell]) => {
+    if (address.startsWith('!') || !String(cell?.w ?? cell?.v ?? '').trim()) return [];
+    const position = XLSX.utils.decode_cell(address);
+    return position.c === col && position.r > afterRow ? [position.r] : [];
+  }).sort((a, b) => a - b);
+}
+
+export function hasInternalLinks(sheet: XLSX.WorkSheet): boolean {
+  return Object.entries(sheet).some(([address, cell]) => !address.startsWith('!') && cell?.l?.Target?.startsWith('#'));
+}
+
+export function formulaColumns(sheet: XLSX.WorkSheet): Set<number> {
+  const columns = new Set<number>();
+  for (const [address, cell] of Object.entries(sheet)) {
+    if (!address.startsWith('!') && (cell?.f || cell?.F)) columns.add(XLSX.utils.decode_cell(address).c);
+  }
+  return columns;
+}
+
+export function preserveColumnOrder(source: OutputColumn[], review: OutputColumn[], firstCol: number): OutputColumn[] {
+  const leading = Array.from({ length: firstCol }, (_, col): OutputColumn => ({
+    key: `source:unlabeled:${col}`, label: `列${col + 1}`, kind: 'source', sourceCol: col,
+  }));
+  const existing = [...leading, ...source, ...review.filter((column) => column.sourceCol !== undefined)]
+    .sort((a, b) => (a.sourceCol ?? 0) - (b.sourceCol ?? 0));
+  return [...existing, ...review.filter((column) => column.sourceCol === undefined)];
 }
 
 function cloneStyle(source: XLSX.CellObject | undefined): XLSX.CellObject['s'] | undefined {
@@ -56,7 +114,7 @@ function remapMerges(merges: XLSX.Range[] | undefined, colMap: Map<number, numbe
 }
 
 export function remapSheet(sheet: XLSX.WorkSheet, outputColumns: OutputColumn[], range: XLSX.Range): XLSX.WorkSheet {
-  const next: XLSX.WorkSheet = {};
+  const next: XLSX.WorkSheet = Object.fromEntries(Object.entries(sheet).filter(([key]) => key.startsWith('!')));
   const oldCols = sheet['!cols'] || [];
   const newCols: XLSX.ColInfo[] = [];
   const colMap = new Map<number, number>();
@@ -67,10 +125,14 @@ export function remapSheet(sheet: XLSX.WorkSheet, outputColumns: OutputColumn[],
     newCols[newCol] = inherited ? { ...inherited } : { wch: defaultWidth(column) };
     if (column.sourceCol === undefined) continue;
     colMap.set(column.sourceCol, newCol);
-    for (let row = range.s.r; row <= range.e.r; row += 1) {
-      const from = cloneCell(sheet[XLSX.utils.encode_cell({ r: row, c: column.sourceCol })]);
-      if (from) next[XLSX.utils.encode_cell({ r: row, c: newCol })] = from;
-    }
+  }
+  for (const [address, cell] of Object.entries(sheet)) {
+    if (address.startsWith('!')) continue;
+    const position = XLSX.utils.decode_cell(address);
+    const targetCol = colMap.get(position.c);
+    if (targetCol === undefined || position.r < range.s.r || position.r > range.e.r) continue;
+    const from = cloneCell(cell);
+    if (from) next[XLSX.utils.encode_cell({ r: position.r, c: targetCol })] = from;
   }
 
   next['!ref'] = XLSX.utils.encode_range({

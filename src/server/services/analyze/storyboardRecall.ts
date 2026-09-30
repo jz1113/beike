@@ -10,7 +10,10 @@ import {
   stableAssetCode,
 } from '@shared/domain/assets/assetSampling';
 import { inferProductCategoryAndAnatomy } from '@shared/domain/products/productCategory';
-import { eligiblePromptGroups, isAutoPromptGroupSelection, isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, type PromptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
+import { categoryIds } from '@shared/domain/assets/assetOrganization';
+import { filterPromptGroupsByFolder, hasActivePromptGroupFolders, promptGroupSourceFolders } from '@shared/domain/assets/promptGroupFolders';
+import { builtinSubcategoryFolderId, isPromptGroupSubcategory, PROMPT_GROUP_SUBCATEGORY_LABELS } from '@shared/domain/assets/promptGroupSubcategory';
+import { eligiblePromptGroups, isAutoPromptGroupSelection, isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, promptGroupCategoryFit, promptGroupExplicitMajorCategoryConflict, promptGroupExplicitSubcategoryConflict, promptGroupMatchesMajorCategory, type PromptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
 
@@ -147,7 +150,9 @@ export async function loadStoryboardLibrary(input: {
 
 export async function loadLockedGroupSkeleton(input: {
   fullPromptId?: unknown;
+  groupFolderId?: unknown;
   groupAppearance?: PromptGroupAppearanceFilter;
+  architectureMajor?: 'digital' | 'jewelry';
   batchId?: string;
   productId?: string;
   analysisRunId?: string;
@@ -158,28 +163,64 @@ export async function loadLockedGroupSkeleton(input: {
   const id = String(input.fullPromptId || '').trim();
   const manuallyLocked = !isAutoPromptGroupSelection(id);
   const appearance = input.groupAppearance || promptGroupAppearanceFilter(id);
+  const categories = await storyboardAssetsRepository.listProductCategories();
+  const folderId = String(input.groupFolderId || 'auto').trim();
+  const folder = folderId === 'auto' ? undefined : promptGroupSourceFolders(categories).find(item => item.id === folderId);
+  if (folderId !== 'auto' && !folder) throw new Error('母本文件夹已删除或不可用，请在生产设置中重新选择');
+  if (folder && input.architectureMajor && !promptGroupMatchesMajorCategory({
+    productCategoryIds: JSON.stringify([folder.majorId]), productCategoryNames: [folder.majorName],
+  }, input.architectureMajor)) throw new Error('母本文件夹与当前拍摄架构的商品大类不符，请调整文件夹或拍摄架构');
+  const categoryNames = new Map(categories.filter(category => !category.isArchived).map(category => [category.id, category.name]));
+  const withCategoryNames = <T extends { productCategoryIds: string; productSubcategory?: string | null }>(group: T) => ({
+    ...group,
+    productCategoryRules: categories,
+    productCategoryNames: categoryIds(group.productCategoryIds).map(categoryId => categoryNames.get(categoryId)).filter((name): name is string => !!name),
+    productSubcategoryName: isPromptGroupSubcategory(group.productSubcategory)
+      ? categoryNames.get(builtinSubcategoryFolderId(group.productSubcategory)) || PROMPT_GROUP_SUBCATEGORY_LABELS[group.productSubcategory]
+      : categoryNames.get(group.productSubcategory || '') || null,
+  });
   const availableGroups = manuallyLocked ? []
-    : (await storyboardAssetsRepository.listCompleteGroups({ AND: [PROVENANCE, await publishedWhere('full_prompt'), { sourceImageIndices: { not: null }, shotPromptsJson: { not: null } }] }))
-      .filter(group => isWorkshopAssetEligible(group, 'full_prompt'));
+    : filterPromptGroupsByFolder((await storyboardAssetsRepository.listCompleteGroups({ AND: [PROVENANCE, await publishedWhere('full_prompt'), { sourceImageIndices: { not: null }, shotPromptsJson: { not: null } }] }))
+      .filter(group => isWorkshopAssetEligible(group, 'full_prompt')).map(withCategoryNames)
+      .filter(group => !input.architectureMajor || promptGroupMatchesMajorCategory(group, input.architectureMajor)), categories, folderId);
   const eligibleCount = manuallyLocked ? 1
     : eligiblePromptGroups(availableGroups, input.productTitle || '', input.productProps, appearance).length;
-  const row = manuallyLocked
+  const lockedRow = manuallyLocked
     ? await storyboardAssetsRepository.findGroup({ AND: [{ id }, PROVENANCE, await publishedWhere('full_prompt')] })
+    : null;
+  const row = manuallyLocked
+    ? (lockedRow ? withCategoryNames(lockedRow) : null)
     : await reservePromptGroup(
         availableGroups,
         input.productTitle || '', input.productProps, input.batchId, appearance, input.productId, input.analysisRunId,
       );
   if (!row) throw new Error(manuallyLocked
     ? '选定的图组母本不存在、未发布或已停用，请重新选择'
-    : `资产库暂无适配该商品类目的${appearance === 'human' ? '有人物' : appearance === 'product' ? '无人物' : ''}完整四图母本，请调整出镜要求或导入并解构对应图组`);
+    : `资产库暂无适配该商品类目的${appearance === 'human' ? '含人物镜头' : appearance === 'product' ? '全组无人物' : ''}完整四图母本，请调整出镜要求或导入并解构对应图组`);
   if (!isWorkshopAssetEligible(row, 'full_prompt') || !isCompletePromptGroup(row)) {
     throw new Error('选定的图组母本不是完整的四图组，请重新选择');
+  }
+  if (!hasActivePromptGroupFolders(row, categories) || !filterPromptGroupsByFolder([row], categories, folderId).length) {
+    throw new Error('选定的图组母本不在当前有效文件夹内，请更换母本或调整文件夹');
+  }
+  if (input.architectureMajor && !promptGroupMatchesMajorCategory(row, input.architectureMajor)) {
+    throw new Error('选定的图组母本不属于当前拍摄架构的商品大类，请更换母本或核对其分类');
+  }
+  if (manuallyLocked) {
+    const majorConflict = promptGroupExplicitMajorCategoryConflict(row, input.productTitle || '', input.productProps);
+    if (majorConflict) throw new Error(`${majorConflict}，请更换母组或核对其商品大类归属`);
+    const conflict = promptGroupExplicitSubcategoryConflict(row, input.productTitle || '', input.productProps);
+    if (conflict) throw new Error(`${conflict}，请更换母组或核对其商品细分分类`);
+    if (promptGroupCategoryFit(row, input.productTitle || '', input.productProps) <= 0) {
+      throw new Error('选定的图组母本与当前商品品类或细分不匹配，请更换母组或核对分类');
+    }
   }
   const shots = parseGroupShotSkeleton(row.shotPromptsJson);
   const groupAppearance = promptGroupAppearance(row);
   return {
     id: row.id,
     title: row.title,
+    displayNumber: row.displayNumber,
     groupIndex: row.groupIndex,
     albumName: row.albumName,
     selectionMode: manuallyLocked ? 'manual' as const : 'auto' as const,

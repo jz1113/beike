@@ -8,6 +8,7 @@ export interface ImageTaskKeyInput {
   model: string;
   aspectRatio: string;
   quality: string;
+  outputSize?: string;
   attempt?: number;
 }
 
@@ -38,6 +39,7 @@ export function buildImageTaskKey(input: ImageTaskKeyInput): string {
     input.model,
     input.aspectRatio,
     input.quality,
+    ...(input.outputSize ? [`output=${input.outputSize}`] : []),
   ].join(':');
   return input.attempt && input.attempt > 0 ? `${base}:a${input.attempt}` : base;
 }

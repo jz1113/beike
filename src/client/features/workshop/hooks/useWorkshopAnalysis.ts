@@ -32,7 +32,7 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
   };
 
   const startBatchVisionAnalyze = async (architectureId = selectedArchId): Promise<number> => {
-    if (!recipes.some((recipe) => recipe.id === architectureId)) {
+    if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
       showToast('请先确认类目拍摄架构，再开始提示词分析');
       return 0;
     }
@@ -47,7 +47,7 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
     const blocked = activeItems.map(item => ({ item, reason: workshopAnalysisBlockReason(analysisDeps, item) })).filter(row => row.reason);
     if (blocked.length) {
       setItems(prev => prev.map(item => { const issue = blocked.find(row => row.item.id === item.id); return issue ? { ...item, analysisError: issue.reason! } : item; }));
-      showToast(`${blocked.length} 款商品未通过分析检查：${blocked[0].reason}`);
+      showToast(`${blocked.length} 款商品未通过分析检查（首款 SKU ${blocked[0].item.itemId}）：${blocked[0].reason}`);
       return 0;
     }
     if (analysisInFlight.current) return 0;

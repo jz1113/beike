@@ -1,10 +1,13 @@
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import type { SubjectItem } from './promptBarConstants';
+import { formatSubjectMention, PROMPT_MENTION_REGEX } from '@shared/domain/prompts/prompt-engine/mentions';
+import { getRefMediaIdentity } from '@client/shared/media/refMediaRegistry';
 
 export function createMentionNode(subject: SubjectItem): HTMLElement {
   const pill = document.createElement('span');
   pill.contentEditable = 'false';
   pill.setAttribute('data-mention-id', subject.id);
+  pill.setAttribute('data-mention-media-id', getRefMediaIdentity(subject.url));
   pill.setAttribute('data-mention-name', subject.name);
   pill.className =
     'inline-mention-pill inline-flex items-center gap-1 mx-1 px-1.5 py-0 h-[20px] rounded-md bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold border border-slate-300/80 shadow-2xs select-none align-middle relative -top-[1.5px] cursor-default';
@@ -37,7 +40,7 @@ export function extractTextFromDOM(container: HTMLElement): string {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       if (el.hasAttribute('data-mention-name')) {
-        text += `@${el.getAttribute('data-mention-name')}`;
+        text += formatSubjectMention(el.getAttribute('data-mention-media-id') || '', el.getAttribute('data-mention-name') || '');
       } else if (el.tagName === 'BR') {
         text += '\n';
       } else if (el.tagName === 'DIV' || el.tagName === 'P') {
@@ -59,7 +62,7 @@ export function renderTextToDOM(
 ) {
   container.replaceChildren();
   if (!str) return;
-  const regex = /(@(?:insp_\d+|图片\d+|视频\d+|主体\d*|模特\d*|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)|\{\{\s*(?:Mixed|Image|图)?\s*\d+\s*\}\})/gi;
+  const regex = new RegExp(PROMPT_MENTION_REGEX.source, 'gi');
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(str)) !== null) {

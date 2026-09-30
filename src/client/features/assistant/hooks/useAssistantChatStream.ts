@@ -2,9 +2,8 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { persistAssistantImages } from '../utils/persistAssistantImages';
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { apiFetch, proxyMediaUrl } from '@client/shared/api/apiClient';
-import { extractVideoFramesFromSrc, isVideoMediaUrl } from '@client/shared/media/mediaHelper';
-import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
+import { apiFetch } from '@client/shared/api/apiClient';
+import { recordAssistantChatUsage } from '../utils/assistantUsage';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { buildBrandKitSystemPrompt } from '@shared/domain/products/brandKitModels';
 import { composeSkillRuntime } from '@shared/domain/assistant/skills';
@@ -12,6 +11,10 @@ import { useAppStore, AssistantMessage, MediaAttachment } from '@client/store';
 import { useAssistantTurn } from '@client/features/assistant/hooks/useAssistantTurn';
 import type { PendingApproval } from '@client/features/assistant/utils/assistantTurnTypes';
 import { createStreamPatchBatcher } from './streamPatchBatcher';
+import { readAssistantTurnReceipt, saveAssistantTurnReceipt } from '../utils/assistantTurnRecovery';
+import { deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
+import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
+import { buildAssistantRequestMessages, validateAssistantSubmission } from '../utils/assistantSubmission';
 
 interface UseAssistantChatStreamOptions {
   currentSession: any;
@@ -20,6 +23,7 @@ interface UseAssistantChatStreamOptions {
   assistantModel: string;
   reasoningEffort?: ReasoningEffort;
   assistantHistoryLimit: number;
+  sessionAllowedTools?: string[];
   selectedLang: string;
   assistantAttachments: MediaAttachment[];
   clearAssistantAttachments: () => void;
@@ -46,6 +50,7 @@ export function useAssistantChatStream({
   assistantModel,
   reasoningEffort = 'medium',
   assistantHistoryLimit,
+  sessionAllowedTools,
   selectedLang,
   assistantAttachments,
   clearAssistantAttachments,
@@ -67,7 +72,8 @@ export function useAssistantChatStream({
   const [livePendingApprovals, setLivePendingApprovals] = useState<PendingApproval[]>([]);
   const [streamingAssistantMsgId, setStreamingAssistantMsgId] = useState<string | null>(null);
   const sendingGuard = useRef(false);
-  const sessionApprovalsRef = useRef<string[]>([]);
+  const retryVerificationGuard = useRef(false);
+  const sessionApprovalsRef = useRef(new Map<string, string[]>());
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -80,14 +86,17 @@ export function useAssistantChatStream({
   const { runTurn, handleApprovalDecision, getItems, turnIdRef } = useAssistantTurn();
   const runTurnHook = useMemo(() => ({ getItems }), [getItems]);
 
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
+
   const isSending = Boolean(sendingSessionId);
   const isSendingCurrent = sendingSessionId === currentSession?.id;
 
   // 发送消息 (SSE 流式逐字输出)
   const handleSendMessage = async (
     textToSend?: string,
-    options?: { retryAssistantId?: string }
+    options?: { retryAssistantId?: string; onSubmitted?: () => void }
   ) => {
+    if (sendingSessionId || sendingGuard.current || retryVerificationGuard.current) return;
     const retryAssistantId = options?.retryAssistantId;
     let retryUserMsg: AssistantMessage | undefined;
 
@@ -96,20 +105,29 @@ export function useAssistantChatStream({
       const msgs = sess?.messages || [];
       const failIdx = msgs.findIndex((m) => m.id === retryAssistantId);
       if (failIdx < 0) return;
-      const previousTurnId = msgs[failIdx].turnId;
+      const previousTurnId = msgs[failIdx].turnId || readAssistantTurnReceipt(currentSession.id, retryAssistantId);
+      if (!previousTurnId) {
+        showToast('缺少原任务标识，无法核实执行结果，已阻止重复提交');
+        return;
+      }
       if (previousTurnId) {
+        retryVerificationGuard.current = true;
         try {
           const response = await apiFetch(`/api/assistant/turns/${encodeURIComponent(previousTurnId)}/snapshot`);
           const data = await response.json();
           const snapshot = data.snapshot;
-          if (!response.ok || !snapshot) throw new Error('无法核实');
+          if (snapshot && (snapshot.threadId !== currentSession.id || snapshot.id !== previousTurnId)) throw new Error('任务不匹配');
+          if (!response.ok || !data.success || !snapshot || !Array.isArray(snapshot.items)) throw new Error('无法核实');
+          snapshot.items = normalizeAssistantItems(snapshot.items);
           if (snapshot.status === 'completed') {
             updateAssistantMessage(currentSession.id, retryAssistantId, {
               items: snapshot.items,
-              task: snapshot.task,
-              content: snapshot.items.filter((item: any) => item.kind === 'agentMessage').map((item: any) => item.content || '').join('\n\n'),
+              task: normalizeAssistantTask(snapshot.task),
+              ...deriveLegacyState(snapshot.items),
+              modelUsed: snapshot.modelUsed, turnId: previousTurnId,
               error: false, interruptionReason: undefined, streamingStatus: undefined,
             });
+            useAppStore.getState().persistAssistantNow();
             showToast('已找回执行结果，没有重新调用模型');
             return;
           }
@@ -120,6 +138,8 @@ export function useAssistantChatStream({
         } catch {
           showToast('暂时无法核实原任务结果，已阻止重复提交，请恢复连接后再试');
           return;
+        } finally {
+          retryVerificationGuard.current = false;
         }
       }
       retryUserMsg = [...msgs.slice(0, failIdx)].reverse().find((m) => m.role === 'user');
@@ -136,6 +156,10 @@ export function useAssistantChatStream({
     if (retryUserMsg && !text && !retryUserMsg.attachments?.length) return;
     // 同一会话禁止并发发送；其他会话可查看历史，全局仍只允许一路流
     if (sendingSessionId || sendingGuard.current) return;
+    if (!useAppStore.getState().assistantSessions.some((session) => session.id === currentSession.id)) {
+      showToast('当前会话已不存在，请新建对话后再发送');
+      return;
+    }
 
     const selectedSkill = getActiveAssistantSkill();
     const selectedRuntime = composeSkillRuntime(selectedSkill);
@@ -153,14 +177,25 @@ export function useAssistantChatStream({
       : [...assistantAttachments, ...workspaceAttachments.filter((candidate) =>
           !assistantAttachments.some((attachment) => attachment.url === candidate.url),
         )];
+    const brandKitPrompt = buildBrandKitSystemPrompt(activeBrandKit);
+    const combinedSystemPrompt = [brandKitPrompt, skillRuntime?.systemPrompt].filter(Boolean).join('\n\n');
+    const invalidSubmission = validateAssistantSubmission(text, attachmentsToSend, combinedSystemPrompt);
+    if (invalidSubmission) { showToast(invalidSubmission); return; }
     sendingGuard.current = true;
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
     setSendingSessionId(sessionId);
     try {
-      attachmentsToSend = await persistAssistantImages(attachmentsToSend);
+      attachmentsToSend = await persistAssistantImages(attachmentsToSend, abortCtrl.signal);
+      abortCtrl.signal.throwIfAborted();
+      if (useAppStore.getState().currentAssistantSessionId !== sessionId || !useAppStore.getState().assistantSessions.some((session) => session.id === sessionId)) {
+        throw new Error('会话已切换，原草稿已保留，请返回原会话发送');
+      }
     } catch (error) {
       sendingGuard.current = false;
       setSendingSessionId(null);
-      showToast(error instanceof Error ? error.message : '图片保存失败，请重试');
+      abortControllerRef.current = null;
+      if (!abortCtrl.signal.aborted) showToast(error instanceof Error ? error.message : '素材保存失败，请重试');
       return;
     }
     if (!text && attachmentsToSend.some((a) => a.type === 'document')) {
@@ -171,6 +206,22 @@ export function useAssistantChatStream({
 
     let userMsg: AssistantMessage;
     let assistantMsgId: string;
+    const submittedMessageId = retryUserMsg?.id || `msg-${Date.now()}-user`;
+    const existingMessages = useAppStore.getState().assistantSessions.find((session) => session.id === sessionId)?.messages || [];
+    const retryIndex = retryUserMsg ? existingMessages.findIndex((message) => message.id === retryUserMsg.id) : -1;
+    let allMsgs: ReturnType<typeof buildAssistantRequestMessages>;
+    try {
+      allMsgs = buildAssistantRequestMessages([
+        ...(retryIndex >= 0 ? existingMessages.slice(0, retryIndex) : existingMessages),
+        { id: submittedMessageId, role: 'user', content: text, attachments: attachmentsToSend, timestamp: Date.now() },
+      ]);
+    } catch (error) {
+      sendingGuard.current = false;
+      setSendingSessionId(null);
+      abortControllerRef.current = null;
+      showToast(error instanceof Error ? error.message : '消息无法提交；草稿已保留');
+      return;
+    }
 
     if (retryAssistantId && retryUserMsg) {
       userMsg = { ...retryUserMsg, content: text || retryUserMsg.content, attachments: attachmentsToSend };
@@ -186,13 +237,14 @@ export function useAssistantChatStream({
         streamingStatus: undefined,
         modelUsed: undefined,
         toolActivity: undefined,
+        turnId: undefined,
         productWidget: undefined,
         timestamp: Date.now(),
       });
     } else {
       // 构建并追加用户消息
       userMsg = {
-        id: `msg-${Date.now()}-user`,
+        id: submittedMessageId,
         role: 'user',
         usedSkill,
         runMode,
@@ -203,7 +255,11 @@ export function useAssistantChatStream({
       };
 
       addAssistantMessage(sessionId, userMsg);
-      clearAssistantAttachments();
+      const submittedAttachments = new Set(assistantAttachments);
+      const remaining = useAppStore.getState().assistantAttachments.filter((attachment) => !submittedAttachments.has(attachment));
+      if (remaining.length) useAppStore.getState().setAssistantAttachments(remaining);
+      else clearAssistantAttachments();
+      options?.onSubmitted?.();
       // 只清除本次实际发送的选择，不覆盖上传期间新选的技能。
       if (usedSkill && useAppStore.getState().getActiveAssistantSkill()?.id === usedSkill.skillId) {
         useAppStore.getState().setActiveAssistantSkillId(null);
@@ -223,120 +279,15 @@ export function useAssistantChatStream({
 
     setSendingSessionId(sessionId);
     setStreamingAssistantMsgId(assistantMsgId);
+    turnIdRef.current = null;
 
-    // 创建 AbortController 以支持取消
-    const abortCtrl = new AbortController();
-    abortControllerRef.current = abortCtrl;
     const streamUpdates = createStreamPatchBatcher<AssistantMessage>(patch => updateAssistantMessage(sessionId, assistantMsgId, patch));
+    let preparedTurnId: string | undefined;
 
     try {
-      /** 视频抽帧；文档带 extractedText；图片原样 */
-      const expandAttachmentsForApi = async (
-        atts: MediaAttachment[] | undefined,
-        isLatestUser: boolean
-      ): Promise<Array<{ type: string; url?: string; name?: string; mentionName?: string; extractedText?: string }>> => {
-        if (!atts || atts.length === 0) return [];
-        if (!isLatestUser) {
-          return atts
-            .map((a) => ({
-              type: a.type,
-              url: a.type === 'document' ? undefined : a.thumbnailUrl || a.url,
-              name: a.name, mentionName: a.mentionName,
-            }))
-            .filter((a) => a.type === 'document' || Boolean(a.url));
-        }
-
-        const out: Array<{ type: string; url?: string; name?: string; mentionName?: string; extractedText?: string }> = [];
-        for (const a of atts) {
-          if (a.type === 'document') {
-            if (a.extractedText) {
-              out.push({
-                type: 'document',
-                name: a.name || '文档',
-                extractedText: a.extractedText,
-              });
-            }
-            continue;
-          }
-
-          if (a.type !== 'video') {
-            if (a.url) out.push({ type: 'image', url: a.url, name: a.name, mentionName: a.mentionName });
-            continue;
-          }
-
-          const proxySrc =
-            a.url.startsWith('data:') || a.url.startsWith('blob:') || a.url.startsWith('/')
-              ? a.url
-              : proxyMediaUrl(a.url);
-
-          let frames: string[] = [];
-          try {
-            frames = await extractVideoFramesFromSrc(proxySrc, 6);
-          } catch {
-            frames = [];
-          }
-
-          if (frames.length > 0) {
-            frames.forEach((f, i) => {
-              out.push({ type: 'image', url: f, name: `视频帧${i + 1}` });
-            });
-          } else if (a.thumbnailUrl) {
-            out.push({ type: 'image', url: a.thumbnailUrl, name: a.name || '视频封面' });
-          } else if (a.url && !isVideoMediaUrl(a.url)) {
-            out.push({ type: 'image', url: a.url, name: a.name || '视频封面' });
-          }
-        }
-        return out.filter((x) => (x.type === 'document' ? Boolean(x.extractedText) : Boolean(x.url)));
-      };
-
-      const latestUserId = userMsg.id;
-      const sessMsgs =
-        useAppStore.getState().assistantSessions.find((s) => s.id === sessionId)?.messages ||
-        currentSession?.messages ||
-        [];
-      const thread = retryAssistantId
-        ? (() => {
-            const uIdx = sessMsgs.findIndex((m: any) => m.id === userMsg.id);
-            return uIdx >= 0
-              ? sessMsgs.slice(0, uIdx + 1)
-              : [...sessMsgs.filter((m: any) => m.id !== retryAssistantId), userMsg];
-          })()
-        : [...sessMsgs.filter((m: AssistantMessage) => m.id !== assistantMsgId && m.id !== userMsg.id), userMsg];
-
-      const allMsgs = await Promise.all(
-        thread.map(async (m: any) => {
-          const isLatestUser = m.id === latestUserId && m.role === 'user';
-          const expanded = await expandAttachmentsForApi(m.attachments, isLatestUser);
-          let content = m.content || '';
-          if (isLatestUser && m.attachments?.some((a: any) => a.type === 'video')) {
-            const frameHint = expanded.some((a) => (a.name || '').startsWith('视频帧'))
-              ? '\n【系统：本轮含原视频，已均匀抽取多帧画面供视觉分析，请结合镜头节奏与产品动态作答】'
-              : '\n【系统：本轮含原视频，抽帧失败，请结合封面/用户描述尽量分析】';
-            content = `${content}${frameHint}`;
-          }
-          if (isLatestUser && m.attachments?.some((a: any) => a.type === 'document')) {
-            content = `${content}\n【系统：本轮含文档附件，正文已抽取为文本注入，请仔细阅读文档内容后作答】`;
-          }
-          return {
-            id: m.id,
-            timestamp: m.timestamp,
-            error: m.error,
-            role: m.role,
-            content,
-            thinking: m.role === 'assistant' ? m.thinking || m.items?.filter((item: { kind: string }) => item.kind === 'agentReasoning').map((item: { content?: string }) => item.content || '').join('\n\n') : undefined,
-            productWidget: m.role === 'assistant' ? m.productWidget : undefined,
-            attachments: expanded.length > 0 ? expanded : undefined,
-          };
-        })
-      );
-
-      const brandKitPrompt = buildBrandKitSystemPrompt(activeBrandKit);
-      const combinedSystemPrompt = [brandKitPrompt, skillRuntime?.systemPrompt]
-        .filter(Boolean)
-        .join('\n\n');
-
       setLivePendingApprovals([]);
 
+      abortCtrl.signal.throwIfAborted();
       const finalState = await runTurn({
         sessionId,
         assistantMsgId,
@@ -349,7 +300,9 @@ export function useAssistantChatStream({
         referenceScope: userMsg.referenceScope || 'auto',
         systemPrompt: combinedSystemPrompt,
         skillId: skillRuntime?.skillId,
-        allowedTools: skillRuntime?.allowedTools,
+        allowedTools: sessionAllowedTools === undefined
+          ? skillRuntime?.allowedTools
+          : skillRuntime?.allowedTools === undefined ? sessionAllowedTools : sessionAllowedTools.filter((name) => skillRuntime.allowedTools!.includes(name)),
         language: selectedLang,
         clientContext: {
           currentView,
@@ -364,12 +317,18 @@ export function useAssistantChatStream({
               : undefined,
           workspaceSnapshot: getWorkspaceSnapshot?.(),
         },
-        sessionApprovals: sessionApprovalsRef.current,
+        sessionApprovals: sessionApprovalsRef.current.get(sessionId) || [],
         signal: abortCtrl.signal,
         showToast,
+        onTurnPrepared: (turnId) => {
+          preparedTurnId = turnId;
+          updateAssistantMessage(sessionId, assistantMsgId, { turnId });
+          saveAssistantTurnReceipt(sessionId, assistantMsgId, turnId);
+          useAppStore.getState().persistAssistantNow();
+        },
         onUpdate: (patch: any) => {
           if (patch.pendingApprovals) setLivePendingApprovals(patch.pendingApprovals);
-          if (patch.sessionApprovals) sessionApprovalsRef.current = patch.sessionApprovals;
+          if (patch.sessionApprovals) sessionApprovalsRef.current.set(sessionId, patch.sessionApprovals);
           const msgPatch: Partial<AssistantMessage> = { error: false, turnId: turnIdRef.current || undefined };
           if (patch.task !== undefined) msgPatch.task = patch.task;
           if (patch.content !== undefined) msgPatch.content = patch.content;
@@ -377,7 +336,7 @@ export function useAssistantChatStream({
           if (patch.toolActivity !== undefined) msgPatch.toolActivity = patch.toolActivity;
           if (patch.productWidget !== undefined) msgPatch.productWidget = patch.productWidget;
           if (patch.modelUsed !== undefined) msgPatch.modelUsed = patch.modelUsed;
-          if (patch.streamingStatus !== undefined) msgPatch.streamingStatus = patch.streamingStatus;
+          if ('streamingStatus' in patch) msgPatch.streamingStatus = patch.streamingStatus;
           const items = runTurnHook.getItems();
           if (items) {
             msgPatch.items = [...items];
@@ -402,42 +361,24 @@ export function useAssistantChatStream({
       });
       setLivePendingApprovals([]);
 
-      const promptChars = allMsgs.reduce((acc, m) => acc + (m.content?.length || 0), 0);
-      const replyChars = accumulated.length;
-      const estPromptTokens = Math.max(50, Math.round(promptChars / 2.5));
-      const estCompletionTokens = Math.max(30, Math.round(replyChars / 2.5));
-      const usedModelId = modelUsed;
-      const provider = resolveModelVendor(usedModelId);
-
-      if (usedModelId !== 'direct-collection') recordModelUsage({
-        modelId: usedModelId,
-        modelName: usedModelId,
-        provider,
-        type: 'chat',
-        promptTokens: estPromptTokens,
-        completionTokens: estCompletionTokens,
-        totalTokens: estPromptTokens + estCompletionTokens,
-        success: true,
-      });
+      recordAssistantChatUsage(allMsgs, accumulated, modelUsed);
 
       useAppStore.getState().persistAssistantNow();
     } catch (err: any) {
       streamUpdates.flush();
-      if (err.name === 'AbortError') {
+      if (abortCtrl.signal.aborted || err.name === 'AbortError') {
+        const message = useAppStore.getState().assistantSessions.find((session) => session.id === sessionId)?.messages.find((item) => item.id === assistantMsgId);
+        const items = finishInterruptedItems(message?.items || [], true);
         updateAssistantMessage(sessionId, assistantMsgId, {
-          content:
-            (useAppStore
-              .getState()
-              .assistantSessions.find((s) => s.id === sessionId)
-              ?.messages.find((m) => m.id === assistantMsgId)?.content || '') +
-            '\n\n⏹ *用户已停止生成*',
+          ...(items.length ? { items, ...deriveLegacyState(items) } : { content: (message?.content || '') + '\n\n⏹ *用户已停止生成*' }),
+          turnId: preparedTurnId, streamingStatus: undefined, error: false, interruptionReason: undefined,
         });
       } else {
         const partial = useAppStore.getState().assistantSessions.find((s) => s.id === sessionId)
           ?.messages.find((m) => m.id === assistantMsgId)?.content || '';
         updateAssistantMessage(sessionId, assistantMsgId, {
           content: partial,
-          turnId: turnIdRef.current || undefined,
+          turnId: preparedTurnId,
           interruptionReason: formatUserError(err, '连接中断，执行结果尚未确认。点击重试将先查询原任务，避免重复扣费。'),
           streamingStatus: undefined,
           error: true,
@@ -456,6 +397,11 @@ export function useAssistantChatStream({
 
   const handleStopGeneration = () => {
     if (abortControllerRef.current) {
+      if (streamingAssistantMsgId && turnIdRef.current) {
+        void apiFetch('/api/assistant/turn/interrupt', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ turnId: turnIdRef.current }),
+        }).catch(() => undefined);
+      }
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }

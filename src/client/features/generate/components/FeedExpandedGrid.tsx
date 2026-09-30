@@ -2,6 +2,8 @@ import { type GenerationTask } from '@client/store';
 import { getAspectRatioClass, getBatchGridClass } from '../model/generateCanvasLayout';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
+import LazyVideoCover from '@client/shared/media/LazyVideoCover';
+import { isGenerateVideoTask } from '../model/generateWorkspaceLayout';
 import { getFeedImageUrl } from './FeedSingleCard';
 import { AlertCircle, RotateCw, Maximize2, Trash2, X } from 'lucide-react';
 import FeedCardActionBar from './FeedCardActionBar';
@@ -15,7 +17,7 @@ interface FeedExpandedGridProps {
   setOpenMenuTaskId: (id: string | null) => void;
   onPreview: (task: GenerationTask, allTasks: GenerationTask[]) => void;
   onReuse: (task: GenerationTask) => void;
-  onRegenerate: (task: GenerationTask) => void;
+  onRegenerate: (tasks: GenerationTask[]) => void;
   onCopyPrompt?: (task: GenerationTask) => void;
   onDownload?: (url: string, title?: string) => void;
   onDeleteBatch: (tasks: GenerationTask[]) => void;
@@ -41,15 +43,15 @@ export default function FeedExpandedGrid({
 }: FeedExpandedGridProps) {
   const isMenuOpen = openMenuTaskId === `batch-${batch.batchId}`;
 
-  // 统计未完成/失败的任务与成功任务
-  const uncompletedTasks = batch.tasks.filter(
-    (t) => t.status === 'FAILURE' || (!t.resultUrl && t.status !== 'SUCCESS')
+  // 仅清理确定失败的任务，进行中的任务继续生成。
+  const failedTasks = batch.tasks.filter(
+    (t) => t.status === 'FAILURE'
   );
   const successTasks = batch.tasks.filter(
     (t) => t.status === 'SUCCESS' && Boolean(t.resultUrl)
   );
   const showClearFailedBtn =
-    uncompletedTasks.length > 0 &&
+    failedTasks.length > 0 &&
     successTasks.length > 0 &&
     typeof onDeleteFailedTasks === 'function';
 
@@ -89,7 +91,7 @@ export default function FeedExpandedGrid({
                       ? 'bg-black/30 hover:bg-red-600 text-white/90 opacity-80 group-hover/card:opacity-100'
                       : 'bg-black/35 hover:bg-red-600 text-white/90 opacity-0 group-hover/card:opacity-100'
                   }`}
-                  title={isFailure ? '清除此失败卡片' : isGenerating ? '取消并清除此生成任务' : '从当前对话移除此图'}
+                  title={isFailure ? '清除此失败卡片' : isGenerating ? '移除任务并取消尚未发送的请求；已发送的生成仍会继续' : '从当前对话移除此图'}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -149,7 +151,11 @@ export default function FeedExpandedGrid({
               ) : (
                 /* 生成成功 (高清图片展示) */
                 <div className="relative w-full h-full">
-                  <img
+                  {isGenerateVideoTask(task) ? (
+                    <div className="w-full h-full cursor-pointer" onClick={() => onPreview(task, batch.tasks)} title="点击播放视频">
+                      <LazyVideoCover src={proxyMediaUrl(task.resultUrl!, { asVideo: true })} />
+                    </div>
+                  ) : <img
                     src={getFeedImageUrl(task.resultUrl, { thumb: true, width: 640 })}
                     alt=""
                     referrerPolicy="no-referrer"
@@ -163,7 +169,7 @@ export default function FeedExpandedGrid({
                     className="w-full h-full object-cover cursor-pointer hover:scale-102 transition-transform duration-300 select-none"
                     onClick={() => onPreview(task, batch.tasks)}
                     title="点击放大查看"
-                  />
+                  />}
 
                   {/* 左上角轻量「AI生成」标识 (图同款) */}
                   <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded bg-black/35 backdrop-blur-xs text-[10px] text-white/90 font-medium select-none pointer-events-none tracking-tight">
@@ -190,7 +196,7 @@ export default function FeedExpandedGrid({
       {/* 2. 底部整组通用操作条 (参考图2规格: 高度40px、正方形更多按钮、冷灰质感底色) */}
       <FeedCardActionBar
         onReuse={() => onReuse(primaryTask)}
-        onRegenerate={() => onRegenerate(primaryTask)}
+        onRegenerate={() => onRegenerate(batch.tasks)}
         isMenuOpen={isMenuOpen}
         onToggleMenu={(e) => {
           e.stopPropagation();
@@ -203,8 +209,8 @@ export default function FeedExpandedGrid({
         deleteText="删除该批次结果"
         reEditTitle="重新编辑提示词与参数"
         regenerateTitle="在当前对话中再次生成这组图"
-        failedCount={showClearFailedBtn ? uncompletedTasks.length : 0}
-        onClearFailed={showClearFailedBtn ? () => onDeleteFailedTasks?.(uncompletedTasks) : undefined}
+        failedCount={showClearFailedBtn ? failedTasks.length : 0}
+        onClearFailed={showClearFailedBtn ? () => onDeleteFailedTasks?.(failedTasks) : undefined}
       />
     </div>
   );

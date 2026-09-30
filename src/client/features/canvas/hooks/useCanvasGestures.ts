@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type RefObject, type MouseEvent as ReactMouseEvent, type WheelEvent } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { nodeBounds } from '../model/canvasGraph';
+import { canvasGroupSelection, expandCanvasGroups } from '../model/canvasGroups';
 import type { CanvasNode, CanvasProject } from '../model/types';
 
 type Point = {x:number; y:number};
@@ -29,7 +30,17 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
   const fitted=useRef<string|null>(null);
   const isHandMode=handTool || spaceHeld;
   const selectedNodeId=selectedNodeIds.at(-1) || null;
-  const setSelectedNodeId=(id:string|null) => setSelectedNodeIds(id ? [id] : []);
+  const projectNodes=()=>useCanvasStore.getState().projects.find(project=>project.id===currentProject?.id)?.nodes || currentProject?.nodes || [];
+  const groupSelection=(id:string)=>{
+    const ids=canvasGroupSelection(projectNodes(),id);
+    return [...ids.filter(memberId=>memberId!==id),...(ids.includes(id)?[id]:[])];
+  };
+  const setSelectedNodeId=(id:string|null) => setSelectedNodeIds(id ? groupSelection(id) : []);
+  const toggleGroupSelection=(id:string)=>{
+    const group=groupSelection(id), members=new Set(group);
+    setSelectedNodeIds(ids=>group.length && group.every(memberId=>ids.includes(memberId))
+      ? ids.filter(memberId=>!members.has(memberId)) : [...new Set([...ids,...group])]);
+  };
   const world=(x:number,y:number) => {
     const rect=viewportRef.current?.getBoundingClientRect();
     return {x:(x-(rect?.left || 0)-live.current.pan.x)/live.current.zoom,y:(y-(rect?.top || 0)-live.current.pan.y)/live.current.zoom};
@@ -59,7 +70,7 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
     if(currentProject.nodes.length) handleResetView();
   },[currentProject,handleResetView]);
   useEffect(()=>{
-    const existing = new Set(currentProject?.nodes.map(node=>node.id));
+    const existing = new Set(currentProject?.nodes.filter(node=>!node.layerHidden).map(node=>node.id));
     setSelectedNodeIds(ids=>ids.every(id=>existing.has(id))?ids:ids.filter(id=>existing.has(id)));
   },[currentProject?.nodes]);
   useEffect(()=>{
@@ -103,28 +114,33 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
       const end=world(e.clientX,e.clientY);
       const box={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),width:Math.abs(end.x-start.x),height:Math.abs(end.y-start.y)};
       setSelectionBox(box);
-      setSelectedNodeIds([...new Set([...keep,...(currentProject?.nodes || []).filter(n=>!n.layerHidden && n.type!=='frame' && intersects(box,nodeBounds(n))).map(n=>n.id)])]);
+      const nodes=projectNodes();
+      setSelectedNodeIds(expandCanvasGroups(nodes,[...keep,...nodes.filter(n=>!n.layerHidden && n.type!=='frame' && intersects(box,nodeBounds(n))).map(n=>n.id)]));
     },()=>setSelectionBox(null));
   };
   const handleNodeDragStart=(node:CanvasNode,event:ReactMouseEvent)=>{
     if(isHandMode || event.button===1 || event.button===2){event.stopPropagation();startPan(event);return;}
     if(event.button!==0)return;
     if((event.target as HTMLElement).closest('button,input,textarea,video,audio,[contenteditable="true"]'))return;
+    if(node.layerHidden)return;
     event.preventDefault();event.stopPropagation();
-    if(event.shiftKey){setSelectedNodeIds(ids=>ids.includes(node.id)?ids.filter(id=>id!==node.id):[...ids,node.id]);suppressClick.current=true;return;}
-    let ids=selectedNodeIds.includes(node.id)?selectedNodeIds:[node.id];
+    if(event.shiftKey){toggleGroupSelection(node.id);suppressClick.current=true;return;}
+    const nodes=projectNodes();
+    let ids=selectedNodeIds.includes(node.id)?expandCanvasGroups(nodes,selectedNodeIds):groupSelection(node.id);
     if(node.type==='frame'){
       const area=nodeBounds(node);
-      ids=[...new Set([...ids,...(currentProject?.nodes || []).filter(n=>{const b=nodeBounds(n);return n.id!==node.id && !n.layerHidden && b.x>=area.x && b.y>=area.y && b.x+b.width<=area.x+area.width && b.y+b.height<=area.y+area.height;}).map(n=>n.id)])];
+      ids=expandCanvasGroups(nodes,[...ids,...nodes.filter(n=>{const b=nodeBounds(n);return n.id!==node.id && !n.layerHidden && b.x>=area.x && b.y>=area.y && b.x+b.width<=area.x+area.width && b.y+b.height<=area.y+area.height;}).map(n=>n.id)]);
     }
     setSelectedNodeIds(ids);
-    const moving=(currentProject?.nodes || []).filter(n=>ids.includes(n.id) && !n.layerLocked);
+    if(node.layerLocked)return;
+    const selected=new Set(ids);
+    const moving=nodes.filter(n=>selected.has(n.id) && !n.layerLocked && !n.layerHidden);
     const start={x:event.clientX,y:event.clientY}, dragZoom=zoom;let latest:Record<string,Point>={};let moved=false;
     track(e=>{
       const dx=(e.clientX-start.x)/dragZoom,dy=(e.clientY-start.y)/dragZoom;
       if(!moved && Math.hypot(dx,dy)*zoom<3)return;
       moved=true;setDraggingNodeId(node.id);
-      latest=Object.fromEntries(moving.map(n=>[n.id,{x:Math.round(n.x+dx),y:Math.round(n.y+dy)}]));setDragPositions(latest);
+      latest=Object.fromEntries(moving.map(n=>[n.id,{x:n.x+Math.round(dx),y:n.y+Math.round(dy)}]));setDragPositions(latest);
     },()=>{
       if(moved && currentProject)useCanvasStore.getState().patchNodes(currentProject.id,latest);
       suppressClick.current=moved;setDraggingNodeId(null);setDragPositions({});
@@ -132,10 +148,7 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
   };
   const handleNodeClick=(node:CanvasNode,event:ReactMouseEvent)=>{
     if(suppressClick.current){suppressClick.current=false;return;}
-    if(!event.shiftKey) {
-      setSelectedNodeId(node.id);
-
-    }
+    if(event.shiftKey)toggleGroupSelection(node.id);else setSelectedNodeId(node.id);
   };
   const handleWheel=(event:WheelEvent)=>{
     if(cleanup.current)return;

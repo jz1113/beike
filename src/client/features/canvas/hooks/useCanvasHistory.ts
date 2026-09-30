@@ -5,7 +5,7 @@ import type { CanvasNode } from '../model/types';
 type Change = { id: string; before?: CanvasNode; after?: CanvasNode; keys?: (keyof CanvasNode)[] };
 type Edit = { changes: Change[]; at: number };
 // Execution results are not editor commands. Undoing a move must never rewind a completed task.
-const editable: (keyof CanvasNode)[] = ['x', 'y', 'width', 'height', 'title', 'content', 'drawing', 'referenceNodeIds', 'layerHidden', 'layerLocked', 'layerOpacity', 'layerOrder', 'layerGroupId'];
+const editable: (keyof CanvasNode)[] = ['x', 'y', 'width', 'height', 'title', 'content', 'drawing', 'referenceNodeIds', 'layerHidden', 'layerLocked', 'layerOpacity', 'layerOrder', 'layerGroupId', 'groupId'];
 export function useCanvasHistory(projectId: string) {
   const past = useRef<Edit[]>([]);
   const future = useRef<Edit[]>([]);

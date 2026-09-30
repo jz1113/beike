@@ -10,6 +10,7 @@ import {
 } from '@shared/domain/media/video';
 import { densityComposerPill } from '@client/shared/ui/layoutClasses';
 import '@client/shared/ui/modelDisplayHelpers';
+import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 
 interface VideoModelLike {
   id: string;
@@ -207,10 +208,14 @@ export function PromptBarVideoRefModePill({
   | 'setQuickVideoRefMode'
 >) {
   const modes = videoModes(useAppStore(state => state.quickVideoModel));
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(showVideoRefModeDropdown, isUp, videoRefModeDropdownRef, 280);
   return (
     <div className="relative" ref={videoRefModeDropdownRef}>
       <button
         type="button"
+        aria-label="视频参考模式"
+        aria-haspopup="dialog"
+        aria-expanded={showVideoRefModeDropdown}
         onClick={() => setShowVideoRefModeDropdown(!showVideoRefModeDropdown)}
         className={`${densityComposerPill} rounded-2xl font-semibold flex items-center gap-1 xl:gap-2.5 border-0 transition-all cursor-pointer ${
           showVideoRefModeDropdown
@@ -225,7 +230,7 @@ export function PromptBarVideoRefModePill({
 
       {/* 参考模式下拉弹窗 */}
       {showVideoRefModeDropdown && (
-        <div className={`absolute left-0 ${isUp ? 'bottom-full mb-2 sm:mb-3 origin-bottom' : 'top-full mt-2 origin-top'} w-[min(280px,calc(100vw-2rem))] sm:w-72 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 shadow-2xl p-2 sm:p-2.5 z-50 animate-fade-in space-y-0.5 sm:space-y-1 text-left`}>
+        <div ref={panelRef} style={panelStyle} role="dialog" aria-label="选择视频参考模式" className={`absolute left-0 ${opensUp ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'} w-[min(280px,calc(100vw-2rem))] rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 shadow-2xl p-2 sm:p-2.5 z-50 animate-fade-in space-y-0.5 sm:space-y-1 text-left overflow-y-auto overscroll-contain`}>
           <div className="px-2.5 py-1 text-[10px] sm:text-[11px] font-bold text-slate-400 border-b border-slate-100 pb-1.5 sm:pb-2 mb-1">
             选择视频参考模式
           </div>

@@ -21,7 +21,7 @@ export const ImageTaskSchema = z.object({
   quality: z.string().nullable().optional(),
   createdAt: z.union([z.string(), z.number(), z.date()]).optional(),
   updatedAt: z.union([z.string(), z.number(), z.date()]).optional(),
-});
+}).passthrough();
 
 export const AssetTasksListResponseSchema = z.object({
   success: z.boolean().optional(),
@@ -132,29 +132,38 @@ export type DepthImageResponse = z.infer<typeof DepthImageResponseSchema>;
 
 export const HeadlineAspectRatioSchema = z.enum(['3:4', '1:1']);
 
+const HeadlineModelSchema = z.string().trim().max(160).optional();
+const HeadlineInputTitleSchema = z.string().trim().max(2000, '标题最多 2000 字').optional();
+const HeadlineProductNameSchema = z.string().max(128).transform((name) => name.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().max(64, '商品名称/型号最多 64 字')).optional();
+// 25 MiB originals fit within this base64 limit; remote and local URLs are also accepted.
+const HeadlineImageSchema = z.string().trim().min(1).max(36 * 1024 * 1024, '商品图片数据过大');
+const HeadlineCredentials = {
+  customBaseUrl: z.string().trim().max(2048).optional(),
+  customApiKey: z.string().trim().max(4096).optional(),
+};
+
 export const HeadlineDesignRequestSchema = z.object({
-  model: z.string().optional(),
-  originalTitle: z.string().optional(),
-  coverTitle: z.string().optional(),
-  productTitle: z.string().optional(),
-  productName: z.string().optional(),
-  imageUrls: z.array(z.string()).optional(),
+  model: HeadlineModelSchema,
+  originalTitle: HeadlineInputTitleSchema,
+  coverTitle: HeadlineInputTitleSchema,
+  productTitle: HeadlineInputTitleSchema,
+  productName: HeadlineProductNameSchema,
+  imageUrls: z.array(HeadlineImageSchema).min(1, '封面设计需要商品图片').max(2, '最多使用两张商品图片'),
   aspectRatio: HeadlineAspectRatioSchema.optional(),
   reservedArtDirection: z.object({
-    id: z.string().optional(),
-    description: z.string().optional(),
+    id: z.string().trim().max(160).optional(),
+    description: z.string().trim().max(2000).optional(),
   }).optional(),
-  customBaseUrl: z.string().optional(),
-  customApiKey: z.string().optional(),
+  ...HeadlineCredentials,
 });
 
 export const HeadlineTitleRequestSchema = z.object({
-  model: z.string().optional(),
-  originalTitle: z.string().optional(),
-  productName: z.string().optional(),
-  imageUrls: z.array(z.string()).optional(),
-  customBaseUrl: z.string().optional(),
-  customApiKey: z.string().optional(),
+  model: HeadlineModelSchema,
+  originalTitle: HeadlineInputTitleSchema,
+  productName: HeadlineProductNameSchema,
+  imageUrls: z.array(HeadlineImageSchema).min(1, '标题改写需要商品图片').max(1, '标题改写只使用一张商品图片'),
+  ...HeadlineCredentials,
 });
 
 export type HeadlineDesignRequest = z.infer<typeof HeadlineDesignRequestSchema>;
@@ -172,7 +181,10 @@ export const KeywordReviewRequestSchema = z.object({
   model: z.string().max(160).optional(),
   provider: z.enum(['deepseek', 'gateway']).optional(),
   reviewMode: z.enum(['image', 'video']).optional(),
-  rows: z.array(KeywordReviewRowSchema).min(1).max(60),
+  rows: z.array(KeywordReviewRowSchema).min(1).max(60).refine(
+    (rows) => new Set(rows.map((row) => row.id)).size === rows.length,
+    '关键词行 id 不能重复',
+  ),
   customBaseUrl: z.string().optional(),
   customApiKey: z.string().optional(),
   lookup: z.boolean().optional(),
@@ -197,6 +209,13 @@ export const KeywordReviewRulesUpdateSchema = z.object({
 
 export type KeywordReviewRuleEntry = z.infer<typeof KeywordReviewRuleEntrySchema>;
 export type KeywordReviewMode = 'image' | 'video';
+
+export const KEYWORD_REVIEW_CATEGORIES = [
+  '政史军', '3C数码', '本地生活', '动漫', '动物', '法律', '购物消费', '互联网IT', '家居',
+  '交通出行', '教育', '金融财经', '科学技术', '旅游', '美食', '美术', '民俗文化', '其他', '汽车',
+  '情感', '求职招聘', '软件工具', '社会', '时尚', '体育', '小说', '星座', '医疗健康', '音乐', '影视',
+  '游戏', '娱乐', '政策政务', '植物',
+] as const;
 
 export const KEYWORD_VIDEO_CATEGORIES = [
   '财经', '健康', '法律', '教育', '宗教', '历史', '3C', '美食', '汽车', '时尚', '旅游',

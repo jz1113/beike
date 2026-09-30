@@ -1,6 +1,6 @@
 import { videoInputError } from '@shared/domain/media/videoCapabilities';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
-import { normalizeVideoReferenceMentions } from '@client/shared/media/videoReferences';
+import { mediaReferenceSlots, normalizeVideoReferenceMentions } from '@client/shared/media/videoReferences';
 import type { GenerationTask } from '@client/store';
 import {
   cleanPromptText,
@@ -11,6 +11,8 @@ import {
   mentionTokenToName,
   isStandardImageMention,
   isGenericSubjectMention,
+  PROMPT_MENTION_REGEX,
+  parseSubjectMention,
 } from '@shared/domain/media/drawing';
 import {
   DEPTH_IMAGE_LIMITS,
@@ -27,6 +29,7 @@ import { isVideoFile } from '@client/shared/api/mediaUpload';
 import { resolveRefMediaFile, resolveRefMediaName } from '@client/shared/media/refMediaRegistry';
 import { resolveSubjectByMention } from './promptMentions';
 import { formatSubjectName, type SubjectItem } from './promptBarConstants';
+import { normalizeSubjectReferences } from './promptSubjectReferences';
 
 export interface PromptBarSubmitInput {
   quickGenMode: QuickGenMode;
@@ -84,8 +87,7 @@ function collectEffectiveImages(input: PromptBarSubmitInput): string[] {
   }
 
   const referencedImages: string[] = [];
-  const mentionRegex =
-    /(@(?:insp_\d+|图片\d+|视频\d+|主体\d*|模特\d*|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)|\{\{\s*(?:Mixed|Image|图)?\s*\d+\s*\}\})/gi;
+  const mentionRegex = new RegExp(PROMPT_MENTION_REGEX.source, 'gi');
   const allMatches = Array.from(quickPrompt.matchAll(mentionRegex));
 
   allMatches.forEach((m) => {
@@ -109,7 +111,7 @@ function collectEffectiveImages(input: PromptBarSubmitInput): string[] {
     return Array.from(new Set([...quickRefImages, ...referencedImages]));
   }
 
-  return Array.from(new Set([...referencedImages, ...quickRefImages]));
+  return Array.from(new Set([...quickRefImages, ...referencedImages]));
 }
 
 function buildOrderedMentionNames(
@@ -127,15 +129,18 @@ function validatePromptMentions(
   allSubjects: SubjectItem[],
   quickRefImages: string[],
   orderedMentionNames: string[],
+  effectiveImages: string[],
 ): string | null {
   if (!prompt.trim()) return null;
 
-  const unresolvedByName = findUnresolvedMentions(prompt, orderedMentionNames);
+  const slots = effectiveImages.map((url, index) => ({ url, name: `图片${index + 1}` }));
+  const normalizedPrompt = normalizeReferenceMentions(normalizeSubjectReferences(prompt, slots), orderedMentionNames);
+  const unresolvedByName = findUnresolvedMentions(normalizedPrompt, orderedMentionNames);
   if (unresolvedByName.length > 0) {
     return `提示词中的 @${unresolvedByName[0]} 未匹配到参考图，请重新上传并 @ 选择，或改为 @图片1`;
   }
 
-  for (const token of extractPromptMentions(prompt)) {
+  for (const token of extractPromptMentions(normalizedPrompt)) {
     const name = mentionTokenToName(token);
     if (!name || isStandardImageMention(name) || isGenericSubjectMention(name)) continue;
     const seqMatch = name.match(/^(?:主体|模特|参考图|商品图|主图|图片|图|insp_|insp)(\d+)$/i);
@@ -220,6 +225,12 @@ function validationError(input: PromptBarSubmitInput, effectiveImages: string[])
       duration: input.quickVideoDuration, resolution: input.quickVideoResolution, aspectRatio: input.quickVideoAspectId,
     });
     if (mediaError) return mediaError;
+    const normalized = normalizeVideoReferenceMentions(quickPrompt, effectiveImages, input.allSubjects);
+    const slots = new Set(mediaReferenceSlots(effectiveImages).map(slot => slot.name));
+    for (const token of extractPromptMentions(normalized)) {
+      const name = mentionTokenToName(token);
+      if (parseSubjectMention(token) || !slots.has(name)) return `提示词中的 @${name} 未匹配到参考素材，请重新选择或移除引用`;
+    }
   }
 
   if (quickGenMode === 'image' && quickPrompt.trim()) {
@@ -229,6 +240,7 @@ function validationError(input: PromptBarSubmitInput, effectiveImages: string[])
       input.allSubjects,
       input.quickRefImages,
       orderedMentionNames,
+      effectiveImages,
     );
     if (mentionError) return mentionError;
   }
@@ -298,14 +310,10 @@ export function buildPromptBarGenerationTasks(
 
   let finalPrompt = quickPrompt.trim();
   if (effectiveImages.length > 0) {
-    finalPrompt = finalPrompt
-      .replace(/\{\{\s*(?:Mixed|Image|图)?\s*1\s*\}\}/gi, '@图片1')
-      .replace(/\{\{\s*(?:Mixed|Image|图)?\s*2\s*\}\}/gi, '@图片2')
-      .replace(/\{\{\s*(?:Mixed|Image|图)?\s*3\s*\}\}/gi, '@图片3');
     const orderedMentionNames = buildOrderedMentionNames(effectiveImages, input.allSubjects);
     finalPrompt = quickGenMode === 'video'
       ? normalizeVideoReferenceMentions(finalPrompt, effectiveImages, input.allSubjects)
-      : normalizeReferenceMentions(finalPrompt, orderedMentionNames);
+      : normalizeReferenceMentions(normalizeSubjectReferences(finalPrompt, effectiveImages.map((url, index) => ({ url, name: `图片${index + 1}` }))), orderedMentionNames);
   }
 
   const cleanedPrompt = stripWorkshopPromptGuards(cleanPromptText(finalPrompt));
@@ -321,7 +329,7 @@ export function buildPromptBarGenerationTasks(
       id: taskId,
       batchId,
       shotNo: i + 1,
-      title: quickPrompt.slice(0, 25) || (quickGenMode === 'video' ? '智能视频创作' : '快速商用生图'),
+      title: cleanedPrompt.slice(0, 25) || (quickGenMode === 'video' ? '智能视频创作' : '快速商用生图'),
       prompt: cleanedPrompt,
       mediaType: quickGenMode,
       model: quickGenMode === 'video' ? quickVideoModel : quickModel,

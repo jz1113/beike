@@ -3,7 +3,7 @@ import { readJsonBody } from '../../core/validate';
 import { assetTaskRepository } from '@server/repositories/assetTasks';
 import { isAdminAuthorized, unauthorizedJson } from '@server/infrastructure/auth/apiAuth';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { deleteObjectsFromStorage } from '@server/infrastructure/storage/storage';
+import { removeAssetTasks } from '@server/services/library/removeAssetTasks';
 
 const PROMPT_SUMMARY_LEN = 120;
 
@@ -103,74 +103,34 @@ export async function GET(req: Request) {
   }
 }
 
-/**
- * DELETE /api/assets/tasks
- */
+/** DELETE /api/assets/tasks: remove records, retain media until references are reviewed. */
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const body = await readJsonBody(req, null);
-
-    const id = searchParams.get('id');
-    const idsParam = searchParams.get('ids');
-    const urlParam = searchParams.get('url');
-    const urlsParam = searchParams.get('urls');
+    const protectUrls = Array.isArray(body?.protectUrls) ? body.protectUrls.filter((url: unknown): url is string => typeof url === 'string' && Boolean(url.trim())) : [];
     const clearFailed = searchParams.get('clearFailed') === 'true' || body?.clearFailed === true;
     const clearAll = searchParams.get('clearAll') === 'true' || body?.clearAll === true;
-
-    if (clearFailed) {
-      const count = await assetTaskRepository.deleteFailed();
-      return jsonResponse({ success: true, count });
-    }
-
     if (clearAll) {
-      if (!isAdminAuthorized(req)) {
-        return unauthorizedJson('clearAll requires admin token');
-      }
-      const allUrls = await assetTaskRepository.findAllResultUrls();
-      if (allUrls.length > 0) {
-        deleteObjectsFromStorage(allUrls).catch((err) => {
-          console.warn('[清空任务-OSS清理异常]', err);
-        });
-      }
-      const count = await assetTaskRepository.deleteAll();
-      return jsonResponse({ success: true, count });
+      if (!isAdminAuthorized(req)) return unauthorizedJson('clearAll requires admin token');
+      return jsonResponse(await removeAssetTasks({ all: true }, protectUrls));
     }
-
-    let targetIds: string[] = [];
-    let targetUrls: string[] = [];
-
-    if (id) targetIds.push(id);
-    if (idsParam) targetIds.push(...idsParam.split(',').map((s) => s.trim()).filter(Boolean));
-    if (body?.id) targetIds.push(String(body.id));
-    if (body?.ids && Array.isArray(body.ids)) targetIds.push(...body.ids.map(String));
-
-    if (urlParam) targetUrls.push(urlParam);
-    if (urlsParam) targetUrls.push(...urlsParam.split(',').map((s) => s.trim()).filter(Boolean));
-    if (body?.url) targetUrls.push(String(body.url));
-    if (body?.urls && Array.isArray(body.urls)) targetUrls.push(...body.urls.map(String));
-
-    targetIds = Array.from(new Set(targetIds.map((s) => s.trim()).filter(Boolean)));
-    targetUrls = Array.from(new Set(targetUrls.map((s) => s.trim()).filter(Boolean)));
-
-    if (targetIds.length === 0 && targetUrls.length === 0) {
-      return jsonResponse({ success: false, error: '缺少待删除的任务 ID 或 URL' }, 400);
-    }
-
-    const mediaUrlsToDelete = [
-      ...(await assetTaskRepository.findResultUrls(targetIds, targetUrls)),
-      ...targetUrls,
-    ];
-
-    if (mediaUrlsToDelete.length > 0) {
-      deleteObjectsFromStorage(mediaUrlsToDelete).catch((err) => {
-        console.warn('[删除任务-OSS清理异常]', err);
-      });
-    }
-
-    const count = await assetTaskRepository.deleteSelected(targetIds, targetUrls);
-
-    return jsonResponse({ success: true, count });
+    if (clearFailed) return jsonResponse(await removeAssetTasks({ failed: true }, protectUrls));
+    const targetIds: string[] = [];
+    const targetUrls: string[] = [];
+    const collect = (target: string[], value: unknown) => { if (typeof value === 'string' && value.trim()) target.push(value.trim()); };
+    collect(targetIds, searchParams.get('id'));
+    searchParams.get('ids')?.split(',').forEach((id) => collect(targetIds, id));
+    collect(targetIds, body?.id);
+    if (Array.isArray(body?.ids)) body.ids.forEach((id: unknown) => collect(targetIds, id));
+    collect(targetUrls, searchParams.get('url'));
+    searchParams.get('urls')?.split(',').forEach((url) => collect(targetUrls, url));
+    collect(targetUrls, body?.url);
+    if (Array.isArray(body?.urls)) body.urls.forEach((url: unknown) => collect(targetUrls, url));
+    const ids = Array.from(new Set(targetIds));
+    const urls = Array.from(new Set(targetUrls));
+    if (ids.length === 0 && urls.length === 0) return jsonResponse({ success: false, error: '缺少待删除的任务 ID 或 URL' }, 400);
+    return jsonResponse(await removeAssetTasks({ ids, urls }, protectUrls));
   } catch (error: unknown) {
     console.error('删除生图任务失败:', error);
     return jsonResponse({ success: false, error: formatUserError(error) }, 500);

@@ -1,4 +1,4 @@
-import { verifyWorkshopImageSize } from './workshopImageSize';
+import { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { runGridImageTask } from './batchGridGeneration';
 import type { BatchProductItem } from '../batchTypes';
@@ -8,6 +8,7 @@ export interface GridRecoverySettings {
   selectedAspect: TaskExecutionConfig['selectedAspect'];
   selectedQuality: TaskExecutionConfig['selectedQuality'];
   selectedImageGenModel: string;
+  gridOutputSize?: string;
 }
 
 const recoveryInFlight = new Set<string>();
@@ -32,6 +33,7 @@ export async function recheckWorkshopTask(itemId: string, taskId: string, items:
         selectedQuality: settings?.selectedQuality || 'high',
         selectedImageGenModel: settings?.selectedImageGenModel || 'gpt-image-2',
         selectedShotCount: 4,
+        gridOutputSize: settings?.gridOutputSize,
         isAborted: () => false, idempotencyKey: task.gridTaskKey,
       }, setItems, (ok, n) => { if (ok) recovered += n; }, true);
       showToast(recovered ? `已恢复 ${recovered} 张分镜，未重新提交生图` : '原结果尚未恢复，请查看分镜中的具体原因；未重新提交生图');
@@ -44,12 +46,15 @@ export async function recheckWorkshopTask(itemId: string, taskId: string, items:
     const data = await response.json();
     if (!response.ok || data.status === 'QUERY_FAILED') throw new Error(data.error || '原任务暂时无法查询，请稍后再核对');
     const succeeded = data.status === 'SUCCESS' && typeof data.resultUrl === 'string' && data.resultUrl;
-    if (succeeded && task.outputSize) await verifyWorkshopImageSize(data.resultUrl, task.outputSize);
+    const output = succeeded ? await finishWorkshopSingleOutput(
+      { url: data.resultUrl, temporary: Boolean(data.temporaryUrl) }, task.generationSize, task.outputSize,
+      `${item.id}-${task.shot_no}.jpg`,
+    ) : undefined;
     const failed = data.status === 'FAILURE';
     setItems(previous => previous.map(product => product.id === itemId ? { ...product, tasks: product.tasks.map(entry => {
       if (entry.id !== taskId || entry.upstreamTaskId !== task.upstreamTaskId || entry.idempotencyKey !== task.idempotencyKey || entry.status !== 'FAILURE') return entry;
       return { ...entry, upstreamTaskId: data.taskId || entry.upstreamTaskId,
-        ...(succeeded ? { status: 'SUCCESS' as const, resultUrl: data.resultUrl, temporaryUrl: Boolean(data.temporaryUrl), error: undefined, recoveryRequired: false }
+        ...(succeeded ? { status: 'SUCCESS' as const, resultUrl: output!.url, temporaryUrl: output!.temporary, error: undefined, recoveryRequired: false }
           : failed ? { recoveryRequired: false, error: data.failReason || '原任务已明确失败，可重新生成' }
             : { recoveryRequired: true, error: '原任务仍在处理中，请稍后再次核对，不要重复生成' }),
       };

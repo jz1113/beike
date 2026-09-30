@@ -13,16 +13,12 @@ import {
   registerRefMedia,
   resolveRefMediaFile,
   resolveRefMediaKind,
-  unregisterRefMedia,
 } from '@client/shared/media/refMediaRegistry';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
 import { buildPromptBarSubjects } from '@client/shared/prompt-bar/promptBarSubmit';
 import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
-
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import { removePromptReferences, serializeSubjectMention } from '../promptSubjectReferences';
 
 interface UsePromptBarMediaOptions {
   quickGenMode: QuickGenMode;
@@ -75,6 +71,7 @@ export function usePromptBarMedia({
   const createSubjectInputRef = useRef<HTMLInputElement>(null);
   const refImagesContainerRef = useRef<HTMLDivElement>(null);
   const atMenuRef = useRef<HTMLDivElement>(null);
+  const atMenuButtonRef = useRef<HTMLDivElement>(null);
   const hoverRefImagesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 清理悬停定时器
@@ -89,7 +86,7 @@ export function usePromptBarMedia({
     if (!showAtMenu) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (atMenuRef.current && !atMenuRef.current.contains(e.target as Node)) {
+      if (!atMenuRef.current?.contains(e.target as Node) && !atMenuButtonRef.current?.contains(e.target as Node)) {
         setShowAtMenu(false);
         setAtMenuTrigger(null);
       }
@@ -136,10 +133,10 @@ export function usePromptBarMedia({
     if (!extraSubjects || extraSubjects.length === 0) return base;
     const map = new Map<string, SubjectItem>();
     // 画板主体优先保留
-    extraSubjects.forEach((s) => map.set(s.name, s));
+    extraSubjects.forEach((s) => map.set(s.url, s));
     base.forEach((s) => {
-      if (!map.has(s.name)) {
-        map.set(s.name, s);
+      if (!map.has(s.url)) {
+        map.set(s.url, s);
       }
     });
     return Array.from(map.values());
@@ -282,7 +279,7 @@ export function usePromptBarMedia({
     if (richInputRef.current) {
       richInputRef.current.insertMention(subject);
     } else {
-      const insertTag = `@${subject.name} `;
+      const insertTag = `${serializeSubjectMention(subject)} `;
       const curr = quickPrompt;
       if (cursorPosition !== null && cursorPosition >= 0 && cursorPosition <= curr.length) {
         const prefix = curr.slice(0, cursorPosition);
@@ -365,48 +362,23 @@ export function usePromptBarMedia({
   const handleRemoveRefImage = useCallback(
     (index: number) => {
       const url = quickRefImages[index];
-      const targetSub = allSubjects.find((s) => s.url === url) || allSubjects[index];
-      const targetName = targetSub?.name;
-
-      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+      if (!url) return;
+      const nextPrompt = removePromptReferences(quickPrompt, quickRefImages, new Set([url]), allSubjects);
+      // Files and URLs are shared with historical and queued tasks; registry cleanup owns their lifetime.
       removeQuickRefImage(index);
-      if (url) {
-        unregisterRefMedia(url);
-        bumpRefMediaVersion();
-        setRefImageNames((prev) => {
-          const next = { ...prev };
-          delete next[url];
-          return next;
-        });
-      }
-
-      // 同步从输入框中移除对应的 @mention 胶囊
-      if (targetName) {
-        const reg = new RegExp(`@${escapeRegExp(targetName)}(\\s+|$)`, 'g');
-        setQuickPrompt(quickPrompt.replace(reg, '').replace(/\s{2,}/g, ' ').trimStart());
-      }
+      setQuickPrompt(nextPrompt);
+      setActiveSubjects(prev => prev.filter(subject => subject.url !== url));
+      setRefImageNames(prev => { const next = { ...prev }; delete next[url]; return next; });
 
       if (quickRefImages.length <= 1) {
         setIsExpandedRefImages(false);
       }
     },
-    [allSubjects, bumpRefMediaVersion, quickPrompt, quickRefImages, removeQuickRefImage, setQuickPrompt],
+    [allSubjects, quickPrompt, quickRefImages, removeQuickRefImage, setQuickPrompt],
   );
 
   const handleClearAllRefImages = useCallback(() => {
-    quickRefImages.forEach((url) => {
-      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
-      unregisterRefMedia(url);
-    });
-
-    // 清空全部素材时，同步清理输入框中的所有主体胶囊，保留纯文本描述
-    let next = quickPrompt;
-    allSubjects.forEach((sub) => {
-      if (!sub?.name) return;
-      const reg = new RegExp(`@${escapeRegExp(sub.name)}(\\s+|$)`, 'g');
-      next = next.replace(reg, '');
-    });
-    setQuickPrompt(next.replace(/\s{2,}/g, ' ').trim());
+    setQuickPrompt(removePromptReferences(quickPrompt, quickRefImages, new Set(quickRefImages), allSubjects));
 
     setQuickRefImages([]);
     setRefImageNames({});
@@ -437,6 +409,7 @@ export function usePromptBarMedia({
     createSubjectInputRef,
     refImagesContainerRef,
     atMenuRef,
+    atMenuButtonRef,
     handleMouseEnterRefImages,
     handleMouseLeaveRefImages,
     handleFileUpload,

@@ -8,6 +8,7 @@ export function prepareTaskRetry(task: BatchTaskItem): BatchTaskItem {
   return {
     ...task, status: 'PENDING', error: undefined, recoveryRequired: false,
     attempt, idempotencyKey: `${base}:a${attempt}`, upstreamTaskId: undefined,
+    generationSize: undefined,
     gridTaskKey: undefined, gridSourceUrl: undefined, gridSize: undefined, outputSize: savedWorkshopOutputSize(task),
     resultUrl: undefined, temporaryUrl: false, outputReview: 'unreviewed',
     resultStatus: 'current',
@@ -20,7 +21,7 @@ export function acknowledgeUncertainTasks(items: BatchProductItem[]): BatchProdu
     if (!item.selected || !item.tasks.some(task => task.recoveryRequired)) return item;
     return { ...item, masterGridUrl: undefined, tasks: item.tasks.map(task => task.recoveryRequired
       ? { ...task, recoveryRequired: false, gridTaskKey: undefined, gridSourceUrl: undefined,
-        gridSize: undefined, outputSize: savedWorkshopOutputSize(task), upstreamTaskId: undefined, error: '已确认放弃原结果，可手动重新生成' }
+        gridSize: undefined, outputSize: savedWorkshopOutputSize(task), generationSize: undefined, upstreamTaskId: undefined, error: '已确认放弃原结果，可手动重新生成' }
       : task) };
   });
 }

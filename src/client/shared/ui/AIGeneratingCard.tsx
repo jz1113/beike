@@ -1,4 +1,5 @@
 import React, { createContext, useMemo, useRef } from 'react';
+import { getGenerationProgress } from '@client/shared/utils/generationProgress';
 
 interface AIGeneratingCardProps {
   task?: {
@@ -13,9 +14,12 @@ interface AIGeneratingCardProps {
     prompt?: string;
     referenceImageUrl?: string;
     referenceImages?: string[];
+    submissionRecoveryRequired?: boolean;
+    failReason?: string;
   };
   progressNumber?: number;
   showProgressBadge?: boolean;
+  badgePosition?: 'left' | 'right';
   isVideo?: boolean;
   className?: string;
   embedded?: boolean;
@@ -62,10 +66,14 @@ function SoftSkyGeneratingCard({
   className = '',
   formattedProgress,
   showProgressBadge = false,
+  badgePosition = 'left',
+  statusHint,
 }: {
   className?: string;
   formattedProgress: string;
   showProgressBadge?: boolean;
+  badgePosition?: 'left' | 'right';
+  statusHint?: string;
 }) {
   return (
     <div
@@ -87,12 +95,17 @@ function SoftSkyGeneratingCard({
         <div className="h-full w-1/3 bg-gradient-to-r from-sky-400 to-indigo-400 rounded-full animate-[shimmerMove_2s_ease-in-out_infinite]" />
       </div>
 
-      {/* 🌟 4. 左上角进度胶囊 (即梦原版红框同款 39%) */}
+      {/* 4. 根据真实进度展示百分比 */}
       {showProgressBadge && (
-        <div className="absolute top-2.5 left-2.5 z-20 px-2 py-0.5 rounded-lg bg-white/80 backdrop-blur-md border border-white/80 shadow-2xs select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+        <div className={`absolute top-2.5 ${badgePosition === 'right' ? 'right-2.5' : 'left-2.5'} z-20 px-2 py-0.5 rounded-lg bg-white/80 backdrop-blur-md border border-white/80 shadow-2xs select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150`}>
           <span className="text-slate-800 font-semibold text-[11px] leading-tight font-sans tracking-tight">
             {formattedProgress}
           </span>
+        </div>
+      )}
+      {statusHint && (
+        <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg bg-white/85 px-2 py-1.5 text-[11px] leading-relaxed text-slate-600" role="status">
+          {statusHint}
         </div>
       )}
     </div>
@@ -106,28 +119,18 @@ function AIGeneratingCard({
   task,
   progressNumber,
   showProgressBadge = false,
+  badgePosition = 'left',
   className = '',
 }: AIGeneratingCardProps) {
-  // 提取格式化百分比（支持 39%、39、progressNumber 等，默认展示 39%）
-  const formattedProgress = useMemo(() => {
-    if (typeof progressNumber === 'number' && !Number.isNaN(progressNumber)) {
-      return `${Math.min(99, Math.max(1, Math.round(progressNumber)))}%`;
-    }
-    const raw = task?.progress;
-    if (raw) {
-      const match = String(raw).match(/(\d+)/);
-      if (match) {
-        return `${Math.min(99, Math.max(1, parseInt(match[1], 10)))}%`;
-      }
-    }
-    return '39%'; // 对齐即梦原版截图默认进度展示
-  }, [task?.progress, progressNumber]);
+  const progress = getGenerationProgress(progressNumber ?? task?.progress);
 
   return (
     <SoftSkyGeneratingCard
       className={className}
-      formattedProgress={formattedProgress}
-      showProgressBadge={showProgressBadge}
+      formattedProgress={progress === undefined ? '' : `${progress}%`}
+      showProgressBadge={showProgressBadge && progress !== undefined}
+      badgePosition={badgePosition}
+      statusHint={task?.submissionRecoveryRequired ? '正在核对原任务，请勿重复提交' : task?.failReason}
     />
   );
 }

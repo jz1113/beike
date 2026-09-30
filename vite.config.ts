@@ -13,10 +13,12 @@ const workspaceRoot = dirname(fileURLToPath(import.meta.url));
 const portFilePaths = [
   resolve(workspaceRoot, '.local-api-port'),
 ];
-let apiPort = 3000;
+const launchPort = Number(process.env.BEIKE_DEV_API_PORT);
+const hasLaunchPort = Number.isInteger(launchPort) && launchPort > 0 && launchPort <= 65535;
+let apiPort = hasLaunchPort ? launchPort : 3000;
 try {
   for (const portFilePath of portFilePaths) {
-    if (!existsSync(portFilePath)) continue;
+    if (hasLaunchPort || !existsSync(portFilePath)) continue;
     const n = Number.parseInt(readFileSync(portFilePath, 'utf8').trim(), 10);
     if (Number.isFinite(n) && n > 0) {
       apiPort = n;
@@ -40,6 +42,11 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // Backend hot restarts must not refresh the browser and interrupt local drafts.
+    // Shared rules and client code remain watched; generated/data files do not.
+    watch: {
+      ignored: ['**/src/server/**', '**/database/**', '**/docs/**', '**/.local/**', '**/tools/build/**'],
+    },
     headers: {
       // 防御性响应头：仅开发服务器配置，生产由部署网关负责
       'X-Content-Type-Options': 'nosniff',

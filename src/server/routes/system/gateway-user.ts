@@ -2,6 +2,7 @@ import { gatewayFetch } from '../../gateways/http';
 import { readJsonBody, safeErrorMessage } from '../../core/validate';
 import { jsonResponse } from '../../core/http';
 import { getDefaultBaseUrl } from '../../services/models/gatewayCredentials';
+import { gatewayBillingAmounts, gatewayBillingDates } from '../../services/models/gatewayBilling';
 
 export interface GatewayUserResponse {
   success: boolean;
@@ -17,6 +18,8 @@ export interface GatewayUserResponse {
     usedQuotaFormatted: number;  // 已消耗算力
     usedQuotaRmb: number;        // 已消耗人民币
     remainingPercent: number;    // 剩余额度百分比 (0 - 100)
+    balanceAvailable?: boolean;
+    usageAvailable?: boolean;
     requestCount: number;
     group: string;
   };
@@ -108,7 +111,7 @@ export async function POST(req: Request): Promise<Response> {
         const totalQuota = quota + usedQuota;
         const remainingPercent = totalQuota > 0
           ? Math.min(100, Math.max(0, Math.round((quota / totalQuota) * 100)))
-          : 100;
+          : 0;
 
         return jsonResponse({
           success: true,
@@ -143,8 +146,8 @@ export async function POST(req: Request): Promise<Response> {
           const subJson = await subRes.json().catch(() => ({}));
           if (subJson && subJson.object === 'billing_subscription') {
             // 获取消耗用量
-            const today = new Date().toISOString().split('T')[0];
-            const usageRes = await gatewayFetch(`${targetUrl}/dashboard/billing/usage?start_date=2026-01-01&end_date=${today}`, {
+            const { startDate, endDate } = gatewayBillingDates(new Date(), typeof body.timeZone === 'string' ? body.timeZone : 'Asia/Shanghai');
+            const usageRes = await gatewayFetch(`${targetUrl}/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${systemToken}`,
@@ -152,14 +155,7 @@ export async function POST(req: Request): Promise<Response> {
               },
             }).catch(() => null);
             const usageJson = usageRes?.ok ? await usageRes.json().catch(() => ({})) : {};
-            const totalUsageCents = Number(usageJson?.total_usage ?? 0); // 1 美分
-            const hardLimitUsd = Number(subJson.hard_limit_usd ?? 100);
-            
-            // 转换为算力，保留 2 位小数
-            const usedQuotaFormatted = Number((totalUsageCents / 100).toFixed(2));
-            const quotaFormatted = Number(Math.max(0, hardLimitUsd - usedQuotaFormatted).toFixed(2));
-            const quotaRmb = Number((quotaFormatted * 1.2).toFixed(2));
-            const usedQuotaRmb = Number((usedQuotaFormatted * 1.2).toFixed(2));
+            const amounts = gatewayBillingAmounts(subJson.hard_limit_usd, usageJson.total_usage);
 
             return jsonResponse({
               success: true,
@@ -168,13 +164,9 @@ export async function POST(req: Request): Promise<Response> {
                 username: `用户 #${userId}`,
                 displayName: `用户 #${userId}`,
                 email: '',
-                quota: quotaFormatted * 500000,
-                usedQuota: usedQuotaFormatted * 500000,
-                quotaFormatted,
-                quotaRmb,
-                usedQuotaFormatted,
-                usedQuotaRmb,
-                remainingPercent: 100,
+                quota: amounts.quotaFormatted * 500000,
+                usedQuota: amounts.usedQuotaFormatted * 500000,
+                ...amounts,
                 requestCount: 0,
                 group: 'DEFAULT',
               },

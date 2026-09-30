@@ -17,6 +17,8 @@ export {
   persistDrawingStateToStorage,
   getStoredDrawingSessions,
   sanitizeTaskForStorage,
+  restoreDrawingArchive,
+  isDrawingHistoryReady,
 } from './generation';
 
 export {

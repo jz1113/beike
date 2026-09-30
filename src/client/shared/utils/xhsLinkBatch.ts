@@ -19,6 +19,7 @@ export interface ParseLinkMedia {
   cover?: string;
   video?: string | null;
   videos?: string[];
+  livePhotos?: string[];
   images?: string[];
 }
 
@@ -87,54 +88,57 @@ export function toXhsQueueItem(
   };
 }
 
-/** 单条链接 parse-link（含 429 退避，最多 2 次尝试） */
+export interface ParseLinkRequestOptions {
+  qiyunAppId?: string;
+  qiyunAppKey?: string;
+  shouldStop?: () => boolean;
+  signal?: AbortSignal;
+  onSubmitted?: () => void;
+}
+
+/** 单条解析：限流后再确认派发，网络异常不自动重新提交付费请求。 */
 export async function fetchParseLinkWithRateLimit(
   url: string,
   scraperId: string | undefined,
   scraperSecret: string | undefined,
   rateLimiter: RateLimiter,
-  extra?: { qiyunAppId?: string; qiyunAppKey?: string }
+  extra?: ParseLinkRequestOptions,
+  signal?: AbortSignal,
 ): Promise<{ success: true; media: ParseLinkMedia; apiUsed?: string } | { success: false; error: string }> {
-  const qiyunAppId =
-    extra?.qiyunAppId ||
-    (typeof window !== 'undefined' ? (localStorage.getItem('qiyun_app_id') || '').trim() || undefined : undefined);
-  const qiyunAppKey =
-    extra?.qiyunAppKey ||
-    (typeof window !== 'undefined' ? (localStorage.getItem('qiyun_app_key') || '').trim() || undefined : undefined);
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    await rateLimiter.acquire();
-    try {
-      const res = await apiFetch('/api/catalog/styles/parse-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url,
-          scraperId,
-          scraperSecret,
-          qiyunAppId,
-          qiyunAppKey,
-        }),
-      });
-
-      if (res.status === 429) {
-        rateLimiter.triggerBackoff(1200);
-        continue;
-      }
-
-      const data = await res.json().catch(() => ({}));
-      if (data.success && data.data) {
-        return { success: true, media: data.data as ParseLinkMedia, apiUsed: data.apiUsed };
-      }
-      return { success: false, error: data.error || '解析接口无有效数据' };
-    } catch (e: unknown) {
-      if (attempt === 1) {
-        const msg = e instanceof Error ? e.message : '网络连接异常';
-        return { success: false, error: msg };
-      }
+  const requestSignal = signal || extra?.signal;
+  const readStoredCredential = (key: string) => {
+    try { return typeof window !== 'undefined' ? localStorage.getItem(key)?.trim() || undefined : undefined; }
+    catch { return undefined; }
+  };
+  const qiyunAppId = extra?.qiyunAppId || readStoredCredential('qiyun_app_id');
+  const qiyunAppKey = extra?.qiyunAppKey || readStoredCredential('qiyun_app_key');
+  const checkDispatch = () => {
+    requestSignal?.throwIfAborted();
+    if (extra?.shouldStop?.()) throw new DOMException('已停止派发采集请求', 'AbortError');
+  };
+  checkDispatch();
+  await rateLimiter.acquire(requestSignal);
+  checkDispatch();
+  try {
+    extra?.onSubmitted?.();
+    const res = await apiFetch('/api/catalog/styles/parse-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: requestSignal,
+      body: JSON.stringify({ url, scraperId, scraperSecret, qiyunAppId, qiyunAppKey }),
+    });
+    requestSignal?.throwIfAborted();
+    const data = await res.json().catch(() => ({}));
+    requestSignal?.throwIfAborted();
+    if (res.status === 429) rateLimiter.triggerBackoff(1200);
+    if (res.ok && data.success && data.data) {
+      return { success: true, media: data.data as ParseLinkMedia, apiUsed: data.apiUsed };
     }
+    return { success: false, error: data.error || `解析接口无有效数据（HTTP ${res.status}）` };
+  } catch (error) {
+    requestSignal?.throwIfAborted();
+    return { success: false, error: error instanceof Error ? error.message : '网络连接异常，请检查结果后再手动重试' };
   }
-  return { success: false, error: '解析请求失败' };
 }
 
 /** 批量解析小红书链接为反推队列项 */
@@ -190,20 +194,22 @@ export async function batchParseXhsLinks(
   return { queueItems, skipped };
 }
 
-/** 社媒单条 parse-link（带限流，供采集弹窗等复用） */
+/** 社媒单条 parse-link；兼容已有 options 与显式 AbortSignal 调用。 */
 export async function parseSocialLinkWithRateLimit(
   url: string,
   scraperId: string | undefined,
   scraperSecret: string | undefined,
-  rateLimiter?: RateLimiter
+  rateLimiter?: RateLimiter,
+  optionsOrSignal?: ParseLinkRequestOptions | AbortSignal,
+  extra?: ParseLinkRequestOptions,
 ): Promise<{ success: true; data: ParseLinkMedia } | { success: false; error: string }> {
+  const isSignal = optionsOrSignal && 'aborted' in optionsOrSignal;
+  const options = isSignal ? { ...extra, signal: optionsOrSignal as AbortSignal } : { ...extra, ...optionsOrSignal };
   const limiter = rateLimiter ?? new RateLimiter(8.5);
-  const result = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, limiter);
+  const result = await fetchParseLinkWithRateLimit(url, scraperId, scraperSecret, limiter, options);
   if (!result.success) return result;
   const media = result.media;
   const images = Array.isArray(media.images) ? media.images.filter(Boolean) : [];
-  if (media.cover && !images.includes(media.cover)) {
-    images.unshift(media.cover);
-  }
+  if (media.cover && !images.includes(media.cover)) images.unshift(media.cover);
   return { success: true, data: { ...media, images } };
 }

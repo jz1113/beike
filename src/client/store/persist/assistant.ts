@@ -5,6 +5,7 @@ import type {
 } from '@client/store/appStoreTypes';
 import { putAssistantSessionsRemote } from '@client/features/assistant/api/sessions';
 import { isProjectAutosaveEnabled } from '@client/shared/utils/localStoragePrefs';
+import { normalizeAssistantSessions } from './assistantValidation';
 
 function sanitizeAssistantAttachment(a: MediaAttachment): MediaAttachment {
   const persistableUrl = (u?: string) => {
@@ -35,9 +36,9 @@ function sanitizeAssistantAttachment(a: MediaAttachment): MediaAttachment {
 }
 
 export function sanitizeAssistantSessions(sessions: AssistantSession[]): AssistantSession[] {
-  return (sessions || []).filter((s, index) => index < 30 || s.updatedAt > Date.now() - 7 * 86400000).map((s) => ({
+  return (sessions || []).map((s) => ({
     ...s,
-    messages: (s.messages || []).filter((m, index, all) => index >= all.length - 80 || m.timestamp > Date.now() - 7 * 86400000).map((m) => ({
+    messages: (s.messages || []).map((m) => ({
       ...m,
       attachments: m.attachments
         ?.map(sanitizeAssistantAttachment)
@@ -57,19 +58,27 @@ const ASSISTANT_TOMBSTONE_KEY = 'ai_assistant_deleted_ids';
 
 export function loadAssistantTombstones() {
   if (typeof window === 'undefined') return;
-  try {
-    const raw = sessionStorage.getItem(ASSISTANT_TOMBSTONE_KEY);
-    if (!raw) return;
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) arr.forEach((id: string) => id && assistantDeletedIds.add(id));
-  } catch {}
+  for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const storage = globalThis[storageName];
+      const raw = storage.getItem(ASSISTANT_TOMBSTONE_KEY);
+      if (!raw) continue;
+      const arr: unknown = JSON.parse(raw);
+      if (Array.isArray(arr)) arr.forEach((id: unknown) => {
+        if (typeof id === 'string' && id) assistantDeletedIds.add(id);
+      });
+    } catch {}
+  }
 }
 
 function persistAssistantTombstones() {
   if (typeof window === 'undefined') return;
-  try {
-    sessionStorage.setItem(ASSISTANT_TOMBSTONE_KEY, JSON.stringify(Array.from(assistantDeletedIds).slice(-80)));
-  } catch {}
+  const raw = JSON.stringify(Array.from(assistantDeletedIds).slice(-200));
+  for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      globalThis[storageName].setItem(ASSISTANT_TOMBSTONE_KEY, raw);
+    } catch {}
+  }
 }
 
 export function markAssistantSessionDeleted(id: string) {
@@ -84,14 +93,45 @@ export function clearAssistantPersistTimer() {
   }
 }
 
+/** Explicit deletion still removes old cached history when automatic local saving is off. */
+function removeDeletedAssistantSessionsFromLocalCache(currentId?: string) {
+  try {
+    const raw = localStorage.getItem('ai_assistant_sessions');
+    if (!raw) return;
+    const cached: unknown = JSON.parse(raw);
+    if (!Array.isArray(cached)) return;
+    const remaining = cached.filter((session) => !session || typeof session.id !== 'string' || !assistantDeletedIds.has(session.id));
+    if (remaining.length === cached.length) return;
+    localStorage.setItem('ai_assistant_sessions', JSON.stringify(remaining));
+    const savedId = currentId && remaining.some((session) => session?.id === currentId)
+      ? currentId : remaining.find((session) => typeof session?.id === 'string')?.id;
+    if (savedId) localStorage.setItem('ai_assistant_current_session_id', savedId);
+    else localStorage.removeItem('ai_assistant_current_session_id');
+  } catch {}
+}
+
 export function writeAssistantLocalCache(
   sessions: AssistantSession[],
   currentId?: string,
   opts?: { force?: boolean }
 ) {
   if (typeof window === 'undefined') return;
-  if (!isProjectAutosaveEnabled() && !opts?.force) return;
-  const lightweight = sanitizeAssistantSessions(sessions);
+  try {
+    if (!isProjectAutosaveEnabled()) {
+      if (opts?.force) removeDeletedAssistantSessionsFromLocalCache(currentId);
+      return;
+    }
+  } catch {
+    // Storage may be blocked by the browser; server persistence can still proceed.
+    return;
+  }
+  const visible = sessions.filter((s) => !assistantDeletedIds.has(s.id));
+  const selected = visible.find((s) => s.id === currentId);
+  const lightweight = sanitizeAssistantSessions(visible);
+  // An old selected thread must remain recoverable even beyond the cache's usual window.
+  if (selected && !lightweight.some((s) => s.id === selected.id)) {
+    lightweight.push(...sanitizeAssistantSessions([selected]));
+  }
   const onlyEmpty =
     lightweight.length === 1 &&
     lightweight[0].title === '新对话' &&
@@ -107,22 +147,33 @@ export function writeAssistantLocalCache(
       }
     } catch {}
   }
-  try {
-    localStorage.setItem('ai_assistant_sessions', JSON.stringify(lightweight));
-    if (currentId) localStorage.setItem('ai_assistant_current_session_id', currentId);
-  } catch (e: unknown) {
-    const err = e as { name?: string; code?: number };
-    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
-      try {
-        const tiny = lightweight.slice(0, 5).map((s) => ({
-          ...s,
-          messages: (s.messages || []).slice(-20).map((m) => ({
-            ...m,
-            attachments: m.attachments,
-          })),
-        }));
-        localStorage.setItem('ai_assistant_sessions', JSON.stringify(tiny));
-      } catch {}
+  const prioritized = [...lightweight].sort((a, b) =>
+    Number(b.id === currentId) - Number(a.id === currentId) || b.updatedAt - a.updatedAt);
+  const compact = (count: number, messageCount: number) => prioritized.slice(0, count).map((s) => ({
+    ...s,
+    messages: s.messages.slice(-messageCount).map((m) => ({
+      ...m,
+      content: m.content.slice(-40000),
+      thinking: undefined,
+      // Preserve readable replies if a single oversized tool result exhausts the quota.
+      items: m.items?.filter((item) => item.kind === 'agentMessage')
+        .map((item) => ({ ...item, content: item.content.slice(-40000) })),
+      toolActivity: undefined,
+      productWidget: undefined,
+      attachments: m.attachments?.map((a) => a.type === 'document'
+        ? { ...a, extractedText: a.extractedText?.slice(0, 8000) } : a),
+    })),
+  }));
+  for (const getCandidate of [() => lightweight, () => compact(5, 20), () => compact(1, 6)]) {
+    try {
+      const candidate = getCandidate();
+      localStorage.setItem('ai_assistant_sessions', JSON.stringify(candidate));
+      const savedId = candidate.some((s) => s.id === currentId) ? currentId : candidate[0]?.id;
+      if (savedId) localStorage.setItem('ai_assistant_current_session_id', savedId);
+      return;
+    } catch (e: unknown) {
+      const err = e as { name?: string; code?: number };
+      if (err?.name !== 'QuotaExceededError' && err?.code !== 22 && err?.code !== 1014) return;
     }
   }
 }
@@ -163,19 +214,22 @@ export function persistAssistantSessions(
 
 export const getStoredAssistantState = () => {
   if (typeof window !== 'undefined') {
+    loadAssistantTombstones();
     try {
       const saved = localStorage.getItem('ai_assistant_sessions');
       const savedId = localStorage.getItem('ai_assistant_current_session_id');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const currentId = savedId && parsed.some((s: { id: string }) => s.id === savedId) ? savedId : parsed[0].id;
-          return { sessions: parsed as AssistantSession[], currentId };
+        const parsed = normalizeAssistantSessions(JSON.parse(saved)).filter((s) => !assistantDeletedIds.has(s.id));
+        if (parsed.length > 0) {
+          const currentId = savedId && parsed.some((s) => s.id === savedId) ? savedId : parsed[0].id;
+          return { sessions: parsed, currentId };
         }
       }
     } catch {}
   }
-  const defaultId = 'asst-session-default';
+  // A deleted ID is permanently tombstoned on the server, including legacy defaults.
+  // A fresh local installation must not reuse that same fixed identifier.
+  const defaultId = `asst-session-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
   return {
     sessions: [
       {

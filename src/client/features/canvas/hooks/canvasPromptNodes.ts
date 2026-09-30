@@ -5,6 +5,7 @@ interface PromptTask {
   taskId?: string;
   prompt?: string;
   title?: string;
+  referenceImageUrl?: string;
 }
 
 export function buildCanvasPromptNodes(options: {
@@ -19,13 +20,11 @@ export function buildCanvasPromptNodes(options: {
   const { pan, zoom, viewport, promptText, refImage, mode, tasks } = options;
   const viewCenterX = (-pan.x + (viewport?.clientWidth || 900) / 2) / zoom;
   const viewCenterY = (-pan.y + (viewport?.clientHeight || 600) / 2) / zoom;
-  const isVideo = mode === 'video';
+  const isVideo = mode === 'video' || mode === 'depth-video';
   const cardW = isVideo ? 340 : 360;
   const cardH = isVideo ? 520 : 360;
   const gap = 36;
-  const taskList = tasks && tasks.length > 0
-    ? tasks
-    : [{ id: `node-gen-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, taskId: `task-${Date.now()}`, prompt: promptText }];
+  const taskList = (tasks || []).filter(task => task.id || task.taskId);
   const count = taskList.length;
   const cols = count === 4 ? 2 : count === 3 ? 3 : count === 2 ? 2 : 1;
   const rows = Math.ceil(count / cols);
@@ -50,10 +49,10 @@ export function buildCanvasPromptNodes(options: {
       taskId,
       type: isVideo ? 'video' : 'image',
       title: initialTitle,
-      content: promptText,
+      content: task.prompt || promptText,
       status: 'generating' as const,
       progress: 15,
-      referenceImageUrl: refImage,
+      referenceImageUrl: task.referenceImageUrl || refImage,
       x: posX,
       y: posY,
       width: cardW,

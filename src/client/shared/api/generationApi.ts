@@ -1,7 +1,7 @@
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders, getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
 import { AssetTasksListResponseSchema } from '@shared/contracts/generate';
-import type { GenerationTask } from '@client/store/appStoreTypes';
+import type { AssetHistoryTask } from '@client/shared/api/mapDbTask';
 import { mapDbTaskToGenerationTask } from '@client/shared/api/mapDbTask';
 import { compressImageToDataUrl } from '@client/shared/media/image-utils';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
@@ -14,15 +14,16 @@ import {
 import { generationRecoveryError } from './generationRecovery';
 import { isGenerationCancelled, sleepWhilePolling, throwIfGenerationAborted } from '@client/shared/api/generationAbort';
 
-export async function fetchAssetTasks(page = 1, pageSize = 40): Promise<{
-  tasks: GenerationTask[];
+export async function fetchAssetTasks(page = 1, pageSize = 40, signal?: AbortSignal): Promise<{
+  tasks: AssetHistoryTask[];
   total: number;
 }> {
-  const res = await apiFetch(`/api/assets/tasks?page=${page}&pageSize=${pageSize}&detail=true`);
+  const res = await apiFetch(`/api/assets/tasks?page=${page}&pageSize=${pageSize}&detail=true`, { signal });
   if (!res.ok) {
     throw new Error(`资产任务列表请求失败 (${res.status})`);
   }
   const json = await res.json();
+  if (json.success === false) throw new Error(json.error || '资产任务列表加载失败');
   const parsed = AssetTasksListResponseSchema.safeParse(json);
   const rawTasks = parsed.success
     ? (parsed.data.tasks || parsed.data.items || [])
@@ -32,7 +33,7 @@ export async function fetchAssetTasks(page = 1, pageSize = 40): Promise<{
 
   return {
     tasks,
-    total: parsed.success ? (parsed.data.total ?? tasks.length) : tasks.length,
+    total: parsed.success ? (parsed.data.total ?? tasks.length) : (typeof json.total === 'number' ? json.total : tasks.length),
   };
 }
 
@@ -122,7 +123,7 @@ export interface SubmitImageGenTaskDeps {
   isAborted: () => boolean;
   isPaused?: () => boolean;
   idempotencyKey?: string;
-  onTaskSubmitted?: (taskId: string) => void;
+  onTaskSubmitted?: (taskId: string) => void | Promise<void>;
 }
 
 const LOCAL_API_RETRY_DELAYS_MS = [800, 1600, 2600] as const;
@@ -185,7 +186,10 @@ export async function submitImageGenTaskResult(
     throw generationRecoveryError('生图响应解析失败，提交结果待核对');
   }
   // Even a persistence-error response can carry a valid upstream task id.
-  if (data.taskId) deps.onTaskSubmitted?.(String(data.taskId));
+  if (data.taskId) {
+    try { await deps.onTaskSubmitted?.(String(data.taskId)); }
+    catch (error) { throw generationRecoveryError(`已获得上游任务 ${data.taskId}，但本地保存未确认：${error instanceof Error ? error.message : '保存失败'}，请核对原任务`); }
+  }
   if (!res.ok || !data.success) {
     const errorFactory = data.submissionUnknown || data.taskId || res.status >= 500 || res.status === 408
       ? generationRecoveryError : nonRetryableError;

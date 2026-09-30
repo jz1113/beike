@@ -8,34 +8,17 @@ import { VIDEO_GEN_MODELS } from '@shared/domain/media/video';
 import {
   DEFAULT_MULTIMODAL_MODEL_ID,
   isApprovedModel,
+  getApprovedModel,
 } from '@shared/domain/models/modelCatalog';
 import { deepSeekModel, deepSeekRouteId, isDeepSeekRoute, deepSeekModelId } from './deepseek';
 import { domainStorage } from '../core/runtime';
-import { inferWorkflowCapabilitiesFromId } from './workflowCapabilities';
+import { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
+import { parseWorkflowModelList, isValidWorkflowModelList } from './workflowModelStorage';
 export { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
 export type { InferredWorkflowCapabilities } from './workflowCapabilities';
 
-export type WorkflowCapability = {
-  id: string;
-  /** Upstream model ID stays bare; routeId distinguishes equal IDs on separate gateways. */
-  routeId?: string;
-  enabled?: boolean;
-  channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi';
-  name?: string;
-  shortName?: string;
-  provider?: string;
-  badge?: string;
-  desc?: string;
-  description?: string;
-  isMultimodal?: boolean;
-  isImage?: boolean;
-  isVideo?: boolean;
-  isVision?: boolean;
-  isAssistant?: boolean;
-  isDistill?: boolean;
-  isThinking?: boolean;
-  isCustom?: boolean;
-};
+import type { WorkflowCapability } from './workflowModelTypes';
+export type { WorkflowCapability } from './workflowModelTypes';
 
 export const OPENAI_MODEL_ROUTE_PREFIX = 'openai-responses:';
 
@@ -65,33 +48,19 @@ export function workflowModelRouteId(model: Pick<WorkflowCapability, 'id' | 'rou
 export function normalizeWorkflowModel(m: WorkflowCapability): WorkflowCapability {
   if (m.channel === 'deepseek' || isDeepSeekRoute(m.id)) {
     const official = deepSeekModel(m.id);
-    return { ...m, isImage: false, isVideo: false, isMultimodal: !!official?.vision, isVision: !!official?.vision, isAssistant: !!official, isThinking: true };
+    const isVision = Boolean(official?.vision && (m.isVision ?? m.isMultimodal ?? true));
+    return { ...m, isImage: false, isVideo: false, isMultimodal: isVision, isVision,
+      isAssistant: Boolean(official && (m.isAssistant ?? true)), isThinking: m.isThinking ?? true };
   }
   const inferred = inferWorkflowCapabilitiesFromId(m.id);
-  const isImage = !!(m.isImage || inferred.isImage);
-  const isVideo = !!(m.isVideo || inferred.isVideo);
-
-  if (isImage || isVideo) {
-    return {
-      ...m,
-      isImage,
-      isVideo,
-      isMultimodal: false,
-      isVision: false,
-      isAssistant: false,
-    };
-  }
-
-  const isMultimodal = !!(m.isMultimodal || m.isVision || m.isAssistant || inferred.isMultimodal);
-  return {
-    ...m,
-    isImage: false,
-    isVideo: false,
-    isMultimodal,
-    isVision: isMultimodal,
-    isAssistant: m.isAssistant ?? isMultimodal,
-    isThinking: m.isThinking ?? inferred.isThinking,
-  };
+  const isImage = Boolean(m.isImage ?? inferred.isImage);
+  const isVideo = Boolean(m.isVideo ?? inferred.isVideo);
+  const generationOnly = isKnownImageOnlyModel(m.id) || isKnownVideoOnlyModel(m.id);
+  const isMultimodal = !generationOnly && !isImage && !isVideo
+    && Boolean(m.isMultimodal ?? m.isVision ?? (m.channel === 'openai' ? inferred.isMultimodal : m.isAssistant ?? inferred.isMultimodal));
+  return { ...m, isImage, isVideo, isMultimodal, isVision: isMultimodal,
+    isAssistant: isMultimodal && (m.isAssistant ?? true),
+    isThinking: !generationOnly && !isImage && !isVideo && Boolean(m.isThinking ?? inferred.isThinking) };
 }
 
 /** 生图 model id 别名 → canonical id（localStorage 与上游提交共用） */
@@ -114,7 +83,48 @@ function collapseRepeatedResolutionSuffix(id: string): string {
 /** 修复 custom_models 条目中的畸形 / 别名 model id */
 export function repairWorkflowModelId(id: string): string {
   const collapsed = collapseRepeatedResolutionSuffix(id);
-  return IMAGE_MODEL_ID_ALIASES[collapsed.toLowerCase()] || collapsed;
+  const aliased = IMAGE_MODEL_ID_ALIASES[collapsed.toLowerCase()] || collapsed;
+  return aliased.includes('/') || aliased.includes(':') ? aliased : getApprovedModel(aliased)?.id || aliased;
+}
+
+/** Normalize and deduplicate routes, preserving the first saved enabled state and stored order. */
+export function repairWorkflowModelList(value: unknown): WorkflowCapability[] {
+  const seen = new Set<string>();
+  const repaired: WorkflowCapability[] = [];
+
+  for (const item of parseWorkflowModelList(value)) {
+    const canonicalId = repairWorkflowModelId(upstreamModelId(item.id));
+    if (item.channel === 'deepseek' || isDeepSeekRoute(item.id) || isDeepSeekRoute(item.routeId || '')) {
+      const routeId = deepSeekRouteId(deepSeekModelId(canonicalId));
+      if (!deepSeekModel(canonicalId) || seen.has(routeId)) continue;
+      seen.add(routeId);
+      repaired.push(normalizeWorkflowModel({ ...item, id: deepSeekModelId(canonicalId), routeId, channel: 'deepseek' }));
+      continue;
+    }
+    if (!isApprovedModel(canonicalId)) continue;
+    const routeId = item.channel === 'openai' || isOpenAIModelRouteId(item.id) || isOpenAIModelRouteId(item.routeId || '')
+      ? openAIModelRouteId(canonicalId) : canonicalId;
+    if (seen.has(routeId.toLowerCase())) continue;
+    seen.add(routeId.toLowerCase());
+
+    const builtin = IMAGE_GEN_MODELS.find((m) => m.id === canonicalId);
+    repaired.push(
+      normalizeWorkflowModel({
+        ...item,
+        id: canonicalId,
+        routeId: routeId === canonicalId ? undefined : routeId,
+        channel: routeId === canonicalId ? (item.channel || (canonicalId === 'openai/gpt-image-2' ? 'lianchi' : 'comfly')) : 'openai',
+        isAssistant: routeId === canonicalId ? item.isAssistant : false,
+        name: item.name && item.name !== item.id ? item.name : builtin?.name || item.name || canonicalId,
+        shortName: item.shortName && item.shortName !== item.id ? item.shortName : builtin?.shortName || item.shortName || canonicalId,
+        badge: item.badge || builtin?.badge,
+        desc: item.desc || item.description || builtin?.description,
+        description: item.description || item.desc || builtin?.description,
+      })
+    );
+  }
+
+  return repaired;
 }
 
 /** 启动时修复 localStorage 中误标的能力标签（无需用户重新添加模型） */
@@ -123,6 +133,10 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
   if (raw.length === 0) return raw;
 
   const storage = domainStorage();
+  try {
+    const saved = storage?.getItem('custom_models');
+    if (saved && !isValidWorkflowModelList(JSON.parse(saved))) return repairWorkflowModelList(raw);
+  } catch { return repairWorkflowModelList(raw); }
   const migrateLegacyOpenAI = storage?.getItem('openai_responses_enabled') === 'true'
     && storage.getItem('openai_channel_split_v1') !== 'true';
   const legacySelectedIds = new Set(
@@ -138,40 +152,7 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
     : [];
   const source = [...raw, ...legacyOpenAIModels];
 
-  const seen = new Set<string>();
-  const repaired: WorkflowCapability[] = [];
-
-  for (const item of source) {
-    const canonicalId = repairWorkflowModelId(item.id);
-    if (item.channel === 'deepseek') {
-      const routeId = deepSeekRouteId(deepSeekModelId(canonicalId));
-      if (!deepSeekModel(canonicalId) || seen.has(routeId)) continue;
-      seen.add(routeId);
-      repaired.push(normalizeWorkflowModel({ ...item, id: deepSeekModelId(canonicalId), routeId }));
-      continue;
-    }
-    if (!isApprovedModel(canonicalId)) continue;
-    const routeId = item.channel === 'openai' || isOpenAIModelRouteId(item.routeId || '')
-      ? openAIModelRouteId(canonicalId) : canonicalId;
-    if (seen.has(routeId.toLowerCase())) continue;
-    seen.add(routeId.toLowerCase());
-
-    const builtin = IMAGE_GEN_MODELS.find((m) => m.id === canonicalId);
-    repaired.push(
-      normalizeWorkflowModel({
-        ...item,
-        id: canonicalId,
-        routeId: routeId === canonicalId ? undefined : routeId,
-        channel: routeId === canonicalId ? (item.channel || (canonicalId === 'openai/gpt-image-2' ? 'lianchi' : 'comfly')) : 'openai',
-        isAssistant: routeId === canonicalId ? item.isAssistant : false,
-        name: item.id !== canonicalId ? (builtin?.name || item.name || canonicalId) : (item.name || builtin?.name || canonicalId),
-        shortName: item.id !== canonicalId ? (builtin?.shortName || item.shortName || canonicalId) : (item.shortName || builtin?.shortName || canonicalId),
-        badge: item.badge || builtin?.badge,
-        desc: item.desc || item.description || builtin?.description,
-        description: item.description || item.desc || builtin?.description,
-      })
-    );
-  }
+  const repaired = repairWorkflowModelList(source);
 
   const changed = JSON.stringify(raw) !== JSON.stringify(repaired);
   let persisted = true;
@@ -199,8 +180,8 @@ export function repairWorkflowModelsInStorage(): WorkflowCapability[] {
 }
 
 /** 设置页 WorkflowModel 列表（保证 name/shortName/isImage 等必填字段） */
-export function repairWorkflowModelsForSettings() {
-  return repairWorkflowModelsInStorage().map((m) => {
+export function repairWorkflowModelsForSettings(value?: unknown) {
+  return (value === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(value)).map((m) => {
     const caps = inferWorkflowCapabilitiesFromId(m.id);
     return {
       id: m.id,
@@ -227,7 +208,7 @@ export function repairWorkflowModelsForSettings() {
 export function hasWorkflowModelConfiguration(): boolean {
   try {
     const raw = domainStorage()?.getItem('custom_models');
-    return Boolean(raw && Array.isArray(JSON.parse(raw)));
+    return raw !== null && raw !== undefined;
   } catch { return false; }
 }
 
@@ -236,7 +217,7 @@ export function readWorkflowModelsFromStorage(): WorkflowCapability[] {
     const raw = domainStorage()?.getItem('custom_models');
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return parseWorkflowModelList(parsed);
   } catch {
     return [];
   }
@@ -290,9 +271,14 @@ export function setStoredMultimodalModelId(id: string): boolean {
   const storage = domainStorage();
   if (!storage) return false;
   try {
-    storage.setItem('ai_multimodal_model', id);
-    storage.setItem('ai_vision_model', id);
-    if (!isOpenAIModelRouteId(id)) storage.setItem('ai_assistant_model', id);
+    const keys = ['ai_multimodal_model', 'ai_vision_model', ...(id && !isOpenAIModelRouteId(id) ? ['ai_assistant_model'] : [])];
+    const previous = keys.map(key => [key, storage.getItem(key)] as const);
+    try {
+      for (const key of keys) { if (id) storage.setItem(key, id); else storage.removeItem(key); }
+    } catch (error) {
+      for (const [key, value] of previous) { try { if (value === null) storage.removeItem(key); else storage.setItem(key, value); } catch {} }
+      throw error;
+    }
     return true;
   } catch {
     return false;
@@ -311,7 +297,8 @@ export function resolveStoredMultimodalModelId(
     setStoredMultimodalModelId(list[0].id);
     return list[0].id;
   }
-  return stored;
+  setStoredMultimodalModelId('');
+  return '';
 }
 
 /** 网关模型条目 → 工作区 WorkflowModel */
@@ -326,18 +313,19 @@ export function gatewayModelToWorkflowModel(model: {
   isThinking?: boolean;
   category?: string;
 }, channel: WorkflowCapability['channel'] = 'comfly'): WorkflowCapability {
+  const caps = getApprovedModel(model.id) ? inferWorkflowCapabilitiesFromId(model.id) : undefined;
   return normalizeWorkflowModel({
     id: model.id,
     routeId: channel === 'deepseek' ? deepSeekRouteId(model.id) : channel === 'openai' ? openAIModelRouteId(model.id) : undefined,
     channel,
     name: model.name || model.id,
     shortName: model.shortName || model.id.split(/[-_]/)[0] || model.name || model.id,
-    isVision: model.isVision,
-    isImage: model.isImage,
-    isVideo: model.isVideo || model.category === 'video',
-    isMultimodal: model.isMultimodal,
+    isVision: caps?.isVision ?? model.isVision,
+    isImage: caps?.isImage ?? model.isImage,
+    isVideo: caps?.isVideo ?? model.isVideo ?? (model.category === 'video' ? true : undefined),
+    isMultimodal: caps?.isMultimodal ?? model.isMultimodal,
     isAssistant: channel === 'openai' ? false : undefined,
-    isThinking: model.isThinking,
+    isThinking: caps?.isThinking ?? model.isThinking,
     isCustom: false,
   });
 }
@@ -345,14 +333,9 @@ export function gatewayModelToWorkflowModel(model: {
 /** 设置中勾选「生图」的模型 → Hub / 生图工作室列表 */
 export function getEnabledImageModelsFromSettings(
   models?: WorkflowCapability[]
-): Array<Record<string, unknown>> {
+) {
   const seen = new Set<string>();
-  const list = (models ?? repairWorkflowModelsInStorage()).map((m) =>
-    normalizeWorkflowModel({
-      ...m,
-      id: repairWorkflowModelId(m.id),
-    })
-  );
+  const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
     .filter((m) => m.enabled !== false && m.isImage && isApprovedModel(m.id, 'image'))
     .filter((m) => {
@@ -362,7 +345,7 @@ export function getEnabledImageModelsFromSettings(
       return true;
     })
     .map((m) => {
-      const builtin = IMAGE_GEN_MODELS.find((x) => x.id === m.id);
+      const builtin = IMAGE_GEN_MODELS.find((x) => x.id === getApprovedModel(m.id)?.id);
       return {
         id: m.id,
         name: builtin?.shortName || builtin?.name || m.name || m.id,
@@ -382,12 +365,12 @@ export function getEnabledImageModelsFromSettings(
 /** 设置中勾选「视频」的模型 → Hub 视频列表 */
 export function getEnabledVideoModelsFromSettings(
   models?: WorkflowCapability[]
-): Array<Record<string, unknown>> {
-  const list = (models ?? repairWorkflowModelsInStorage()).map(normalizeWorkflowModel);
+) {
+  const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
     .filter((m) => m.enabled !== false && m.isVideo && isApprovedModel(m.id, 'video'))
     .map((m) => {
-      const builtin = VIDEO_GEN_MODELS.find((x) => x.id === m.id);
+      const builtin = VIDEO_GEN_MODELS.find((x) => x.id === getApprovedModel(m.id)?.id);
       return {
         id: m.id,
         name: builtin?.shortName || builtin?.name || m.name || m.id,
@@ -408,10 +391,10 @@ export function getEnabledMultimodalModelsFromSettings(
   models?: WorkflowCapability[],
   purpose: 'vision' | 'assistant' = 'vision',
 ): WorkflowCapability[] {
-  const list = models ?? repairWorkflowModelsInStorage();
+  const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return sortModelsByMultimodalPriority(
     list.filter((m) => m.enabled !== false && (m.channel === 'deepseek'
-      ? !!deepSeekModel(m.id) && (purpose === 'assistant' || !!deepSeekModel(m.id)?.vision)
+      ? !!deepSeekModel(m.id) && (purpose === 'assistant' ? !!m.isAssistant : !!m.isVision)
       : isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal')))
       .map((m) => ({ ...m, id: workflowModelRouteId(m),
         name: `${m.name || m.id} · ${m.channel === 'deepseek' ? 'DeepSeek 官方' : m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道'}`,

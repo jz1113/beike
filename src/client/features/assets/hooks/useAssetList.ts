@@ -1,4 +1,5 @@
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
+import { uniqueSceneAssets } from '@shared/domain/assets/scenePresentation';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 import {
@@ -15,6 +16,11 @@ export interface UseAssetListOptions {
   setCopiedId: (id: string | null) => void;
 }
 
+function visibleAssets(tab: UseAssetListOptions['activeSubTab'], assets: AssetLibrarySlim[]): AssetLibrarySlim[] {
+  const available = assets.filter((item) => !isNonHumanPlaceholderAsset(item, tab));
+  return tab === 'scene' ? uniqueSceneAssets(available) : available;
+}
+
 /**
  * 资产列表加载、缓存同步与批量多选管理 Hook
  */
@@ -28,8 +34,8 @@ export function useAssetList({
   const loadIdRef = useRef(0);
   const { setSafeTimeout } = useSafeTimeout();
   const [isLoading, setIsLoading] = useState(true);
-  const [items, setItems] = useState<AssetLibrarySlim[]>(() => getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab)));
-  const [totalCount, setTotalCount] = useState(() => getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab)).length);
+  const [items, setItems] = useState<AssetLibrarySlim[]>(() => visibleAssets(activeSubTab, getCachedAssetsSync(activeSubTab)));
+  const [totalCount, setTotalCount] = useState(() => visibleAssets(activeSubTab, getCachedAssetsSync(activeSubTab)).length);
 
   const [loadError, setLoadError] = useState('');
 
@@ -48,7 +54,7 @@ export function useAssetList({
       try {
         await getCategoryAssetLibrary(activeSubTab, forceReload);
         if (activeTabRef.current !== activeSubTab || loadIdRef.current !== loadId) return;
-        const list = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
+        const list = visibleAssets(activeSubTab, getCachedAssetsSync(activeSubTab));
         setItems(list);
         setTotalCount(list.length);
       } catch (err) {
@@ -69,7 +75,7 @@ export function useAssetList({
 
   // Cached rows can render immediately, but failure must not masquerade as an empty library.
   useEffect(() => {
-    const list = getCachedAssetsSync(activeSubTab).filter((item) => !isNonHumanPlaceholderAsset(item, activeSubTab));
+    const list = visibleAssets(activeSubTab, getCachedAssetsSync(activeSubTab));
     setItems(list); setTotalCount(list.length);
     void fetchAssets(false);
     const unsubscribe = subscribeAssetInvalidation(() => { void fetchAssets(false); });

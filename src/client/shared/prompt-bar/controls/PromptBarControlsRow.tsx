@@ -212,7 +212,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow({
         )}
 
         {quickGenMode === 'video' && (
-          <div className="compact:hidden">
+          <div className="min-w-0">
             <PromptBarVideoRefModePill
               isUp={isUp}
               showVideoRefModeDropdown={videoRefModeMenu.isOpen}
@@ -241,9 +241,12 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow({
 
         {/* 快捷操作: @ 主体快捷键 */}
         {!isDepthMode && (
-          <div className="relative" ref={media.atMenuRef}>
+          <div className="relative" ref={media.atMenuButtonRef}>
             <button
               type="button"
+              aria-label="选择参考素材或主体"
+              aria-haspopup="dialog"
+              aria-expanded={media.showAtMenu && media.atMenuTrigger === 'button'}
               onClick={() => {
                 if (media.showAtMenu && media.atMenuTrigger === 'button') {
                   media.setShowAtMenu(false);
@@ -267,6 +270,8 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow({
             {/* 🌟 点击底栏 @ 按钮触发时：在底栏 @ 按钮正上方展开 */}
             {media.showAtMenu && media.atMenuTrigger === 'button' && (
               <PromptBarAtMenu
+                atMenuRef={media.atMenuRef}
+                anchorRef={media.atMenuButtonRef}
                 isUp={isUp}
                 atMenuQuery={media.atMenuQuery}
                 allSubjects={media.allSubjects}

@@ -1,6 +1,9 @@
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
-import { enforceLookConsistency, isGenericLook, getAspectRatioFromSize } from '@shared/domain/media/drawing';
-import { resolveWorkshopImageSize, verifyWorkshopImageSize } from './workshopImageSize';
+import { enforceLookConsistency, isGenericLook } from '@shared/domain/media/drawing';
+import { closestWorkshopOutputAspect } from './workshopOutputSize';
+import { resolveWorkshopImageSize } from './workshopImageSize';
+import { assertOutputDimensions, parseOutputDimensions } from '@shared/domain/media/outputDimensions';
+import { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { isActionAllowedForProduct } from '@shared/domain/products/phoneProductPolicy';
 import { submitImageGenTaskResult } from '@client/shared/api/generationApi';
 import type { BatchProductItem } from '../batchTypes';
@@ -17,8 +20,11 @@ export interface TaskExecutionConfig {
   isPaused?: () => boolean;
   idempotencyKey?: string;
   outputSize?: string;
+  gridOutputSize?: string;
   onOutputSizeResolved?: (size: string) => void;
-  onTaskSubmitted?: (taskId: string) => void;
+  onGenerationSizeResolved?: (size: string) => void;
+  onTaskSubmitted?: (taskId: string) => void | Promise<void>;
+  beforeSubmit?: () => Promise<void>;
   /** Confirmed original-workshop face anchor; sent only for human shots. */
   anchorFaceUrl?: string;
 }
@@ -68,15 +74,22 @@ export async function executeSingleImageTask(
     ? await compressProductImageIfNeeded(anchorFaceUrl)
     : undefined;
   const qualityTier = (config.selectedQuality || 'high') as 'high' | 'medium' | 'low';
-  const aspect = config.outputSize ? getAspectRatioFromSize(config.outputSize) : config.selectedAspect;
+  if (config.outputSize) {
+    const dimensions = parseOutputDimensions(config.outputSize);
+    if (!dimensions) throw new Error('分镜交付尺寸无效，未提交生图任务');
+    assertOutputDimensions(dimensions.width, dimensions.height);
+  }
+  const aspect = config.outputSize ? closestWorkshopOutputAspect(config.outputSize) : config.selectedAspect;
   const pixelSize = resolveWorkshopImageSize(
     aspect,
     config.selectedImageGenModel,
     qualityTier,
-    config.outputSize
   );
 
-  config.onOutputSizeResolved?.(pixelSize);
+  const outputSize = config.outputSize || pixelSize;
+  config.onOutputSizeResolved?.(outputSize);
+  config.onGenerationSizeResolved?.(pixelSize);
+  await config.beforeSubmit?.();
   const generated = await submitImageGenTaskResult(
     {
       prompt: promptText,
@@ -106,6 +119,5 @@ export async function executeSingleImageTask(
       onTaskSubmitted: config.onTaskSubmitted,
     }
   );
-  await verifyWorkshopImageSize(generated.url, pixelSize);
-  return generated;
+  return finishWorkshopSingleOutput(generated, pixelSize, outputSize, `${item.id}-${shot.shot_no}.jpg`);
 }

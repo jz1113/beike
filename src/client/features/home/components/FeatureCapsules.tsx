@@ -90,8 +90,8 @@ export default function FeatureCapsules({
                     <div className={item.contentWidth}>
                       <h3 className={`${item.titleSizeClass || 'text-[18px] sm:text-[19px] 2xl:text-[21px]'} leading-tight drop-shadow-sm ${item.titleClass}`}>{item.title}</h3>
                       <p className={`mt-0.5 font-serif text-[18px] font-semibold italic leading-tight tracking-[-0.035em] sm:text-[19px] 2xl:text-[21px] ${item.displayClass}`}>{item.displayName}</p>
-                      <p className={`mt-1.5 line-clamp-1 text-[11px] leading-relaxed sm:text-[12px] ${item.subtitleClass}`}>{item.subtitle}</p>
                     </div>
+                    <p className={`mt-1.5 text-[11px] leading-relaxed sm:text-[12px] ${item.subtitleClass}`}>{item.subtitle}</p>
                   </div>
                 </>
               }

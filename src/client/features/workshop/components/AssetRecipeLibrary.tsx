@@ -9,6 +9,7 @@ import {
   Sliders,
   X,
   Plus,
+  RotateCcw,
 } from 'lucide-react';
 import '@shared/domain/media/drawing';
 import { apiFetch } from '@client/shared/api/apiClient';
@@ -34,6 +35,9 @@ interface Props {
   onSaveEditedRecipe: () => void;
   onCreateCategory: () => void;
   onRefreshRecipes?: () => void;
+  hiddenOfficialRecipes?: Array<{ id: string; name: string }>;
+  onRestoreOfficialRecipe?: (id: string) => void;
+  isRestoringOfficial?: boolean;
   section?: 'list' | 'modal' | 'both';
 }
 
@@ -56,6 +60,9 @@ export default function AssetRecipeLibrary({
   onSaveEditedRecipe,
   onCreateCategory,
   onRefreshRecipes,
+  hiddenOfficialRecipes = [],
+  onRestoreOfficialRecipe,
+  isRestoringOfficial = false,
   section = 'both',
 }: Props) {
   const { setSafeTimeout } = useSafeTimeout();
@@ -85,6 +92,27 @@ export default function AssetRecipeLibrary({
                   <p className="mt-1.5 text-xs leading-5 text-slate-500">收藏品类的光影与构图规则，为每次创作提供 8 段式分镜骨架。</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {hiddenOfficialRecipes.length > 0 && onRestoreOfficialRecipe && (
+                    <details className="relative">
+                      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 [&::-webkit-details-marker]:hidden">
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        恢复已隐藏官方架构（{hiddenOfficialRecipes.length}）
+                      </summary>
+                      <div className="absolute right-0 top-full z-30 mt-1 min-w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                        {hiddenOfficialRecipes.map(recipe => (
+                          <button
+                            key={recipe.id}
+                            type="button"
+                            disabled={isRestoringOfficial}
+                            onClick={() => onRestoreOfficialRecipe(recipe.id)}
+                            className="w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            {recipe.name}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                   <button
                     onClick={handleSeedDefaults}
                     disabled={isSeeding}

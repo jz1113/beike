@@ -28,9 +28,11 @@ export interface FolderProps {
   count?: number;
   badgeSuffix?: string;
   className?: string;
-  onClick?: () => void;
+  ariaLabel?: string;
+  onClick?: (event: React.MouseEvent) => void;
   onItemClick?: (index: number) => void;
   expandOnClick?: boolean;
+  interactive?: boolean;
 }
 
 export const Folder: React.FC<FolderProps> = ({
@@ -41,9 +43,11 @@ export const Folder: React.FC<FolderProps> = ({
   count,
   badgeSuffix = 'P',
   className = '',
+  ariaLabel,
   onClick,
   onItemClick,
   expandOnClick = false,
+  interactive = true,
 }) => {
   const maxItems = 3;
   const papers = items.slice(0, maxItems);
@@ -65,7 +69,7 @@ export const Folder: React.FC<FolderProps> = ({
     }
     if (onClick) {
       e.stopPropagation();
-      onClick();
+      onClick(e);
     }
   };
 
@@ -85,17 +89,17 @@ export const Folder: React.FC<FolderProps> = ({
       <div
         className={folderClassName}
         style={folderStyle}
-        onClick={handleClick}
+        onClick={interactive ? handleClick : undefined}
         onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (interactive && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault();
-            handleClick(e as any);
+            e.currentTarget.click();
           }
         }}
-        tabIndex={0}
-        role="button"
-        aria-expanded={open}
-        aria-label={open ? 'Close folder' : 'Open folder'}
+        tabIndex={interactive ? 0 : undefined}
+        role={interactive ? 'button' : undefined}
+        aria-expanded={interactive && expandOnClick ? open : undefined}
+        aria-label={interactive ? ariaLabel || (open ? '收起文件夹' : '打开文件夹') : undefined}
       >
         <div className="folder__back">
           {papers.map((item, i) => (
@@ -138,4 +142,3 @@ export const Folder: React.FC<FolderProps> = ({
 
 export const MemoizedFolder = React.memo(Folder);
 export default MemoizedFolder;
-

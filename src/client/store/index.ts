@@ -6,13 +6,14 @@ import { createWorkshopSlice } from './workshopSlice';
 import { createAssistantSlice } from './assistantSlice';
 import { createBrandKitSlice } from './brandKitSlice';
 import { createAssistantSkillSlice } from './assistantSkillSlice';
+import { finishDrawingHydration } from './persist/generationHydration';
 import {
   loadGenerationTombstones,
   migrateLegacyWorkshopDraftKeys,
-  getStoredAssistantState,
   STUDIO_DRAFT_KEY,
   getStoredWorkshopModeDraft,
   persistWorkshopModeDraftToStorage,
+  restoreDrawingArchive,
 } from './persist/index';
 import {
   applyWorkshopModeSession,
@@ -62,6 +63,13 @@ export const useAppStore = create<AppState>()((...a) => ({
 }));
 
 if (typeof window !== 'undefined') {
+  void restoreDrawingArchive().then(restored => {
+    useAppStore.setState({
+      ...(restored ? { sessions: restored.sessions, currentSessionId: restored.currentId, generationTasks: restored.tasks } : {}),
+      generationHistoryReady: true,
+    });
+    finishDrawingHydration();
+  });
   useAppStore.subscribe((state, prev) => {
     const mode = state.workshopMode;
     const sessionFields = extractWorkshopModeSession(state);
@@ -81,13 +89,7 @@ if (typeof window !== 'undefined') {
     }
   });
 
-  const hydrateAssistant = () => {
-    const { sessions, currentId } = getStoredAssistantState();
-    useAppStore.setState({
-      assistantSessions: sessions,
-      currentAssistantSessionId: currentId,
-    });
-  };
+  const hydrateAssistant = () => { void useAppStore.getState().hydrateAssistantSessions(); };
   if ('requestIdleCallback' in window) {
     requestIdleCallback(hydrateAssistant, { timeout: 2000 });
   } else {

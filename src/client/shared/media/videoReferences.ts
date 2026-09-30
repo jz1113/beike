@@ -1,4 +1,6 @@
 import { isVideoMediaUrl } from './mediaHelper';
+import { isGenericSubjectMention, mentionTokenToName, parseSubjectMention, PROMPT_MENTION_REGEX } from '@shared/domain/prompts/prompt-engine/mentions';
+import { resolveRefMediaIdentity } from './refMediaRegistry';
 
 /** Number each modality independently, in upload order, matching the request content. */
 export function mediaReferenceSlots(urls: string[]) {
@@ -9,9 +11,15 @@ export function mediaReferenceSlots(urls: string[]) {
 
 export function normalizeVideoReferenceMentions(prompt: string, urls: string[], subjects: { name: string; url: string }[]) {
   const slots = mediaReferenceSlots(urls);
-  return prompt.replace(/@(?:图片\d+|视频\d+|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)|\{\{\s*(?:Mixed|Image|图)?\s*\d+\s*\}\}/gi, token => {
-    const name = token.replace(/^@/, '').replace(/[{}]/g, '').trim();
+  return prompt.replace(new RegExp(PROMPT_MENTION_REGEX.source, 'gi'), token => {
+    const selected = parseSubjectMention(token);
+    if (selected) {
+      const slot = slots.find(item => item.url === resolveRefMediaIdentity(selected.id));
+      return slot ? `@${slot.name}` : token;
+    }
+    const name = mentionTokenToName(token);
     if (/^(图片|视频)\d+$/.test(name)) return `@${name}`;
+    if (isGenericSubjectMention(name)) return slots[0] ? `@${slots[0].name}` : token;
     const subject = subjects.find(item => item.name === name || item.name.replace(/\.[^/.]+$/, '') === name);
     const match = name.match(/^(?:insp_?|mixed\s*)(\d+)$/i);
     const imageMatch = name.match(/^(?:主体|模特|参考图|商品图|主图|图|image\s*)(\d+)$/i);

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 /** 解析 .env 为键值表（保留未知键） */
 export function parseEnvFile(content: string): Map<string, string> {
@@ -75,5 +76,17 @@ export function upsertEnvFile(envPath: string, updates: Record<string, string>):
     ...Array.from(map.entries()).map(([k, v]) => `${k}=${v}`),
     '',
   ];
-  fs.writeFileSync(envPath, lines.join('\n'), 'utf8');
+  const temporaryPath = path.join(dir, `.env-${randomUUID()}.tmp`);
+  let descriptor: number | undefined;
+  try {
+    descriptor = fs.openSync(temporaryPath, 'wx', 0o600);
+    fs.writeFileSync(descriptor, lines.join('\n'), 'utf8');
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+    fs.renameSync(temporaryPath, envPath);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+    if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+  }
 }

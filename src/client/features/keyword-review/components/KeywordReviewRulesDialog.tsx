@@ -1,14 +1,8 @@
 import { BookOpen, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode } from '@shared/contracts/generate';
+import { KEYWORD_REVIEW_CATEGORIES, KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode } from '@shared/contracts/generate';
+import { useKeywordReviewDialog } from '../hooks/useKeywordReviewDialog';
 import { KeywordReviewRuleEditor } from './KeywordReviewRuleEditor';
-
-export const KEYWORD_REVIEW_CATEGORIES = [
-  '政史军', '3C数码', '本地生活', '动漫', '动物', '法律', '购物消费', '互联网IT', '家居',
-  '交通出行', '教育', '金融财经', '科学技术', '旅游', '美食', '美术', '民俗文化', '其他', '汽车',
-  '情感', '求职招聘', '软件工具', '社会', '时尚', '体育', '小说', '星座', '医疗健康', '音乐', '影视',
-  '游戏', '娱乐', '政策政务', '植物',
-] as const;
 
 const VERTICAL_BOUNDARIES = [
   '宠物疾病、用药、诊疗、疫苗、兽医干预 → 医疗健康；普通物种、行为、训练、喂养、宠物用品 → 动物。',
@@ -78,27 +72,28 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
+  const dialogRef = useKeywordReviewDialog(open, onClose);
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="keyword-review-rules-title" className="flex max-h-[90vh] w-full max-w-[820px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)]" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="keyword-review-rules-title" aria-describedby="keyword-review-rules-description" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[820px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] outline-none" onMouseDown={(event) => event.stopPropagation()}>
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100">
               <BookOpen className="h-4 w-4 text-amber-600" />
             </span>
             <div>
-              <h2 id="keyword-review-rules-title" className="text-sm font-black tracking-tight">{mode === 'video' ? '视频关键词审核规则' : '图文关键词审核规则'}</h2>
-              <p className="mt-0.5 text-xs text-slate-600">{mode === 'video' ? '保留视频原表全部列，新增最终垂类、制作判断与低价值标记' : '保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面'}</p>
+              <h2 id="keyword-review-rules-title" tabIndex={-1} data-dialog-initial-focus className="text-sm font-black tracking-tight outline-none">{mode === 'video' ? '视频关键词审核规则' : '图文关键词审核规则'}</h2>
+              <p id="keyword-review-rules-description" className="mt-0.5 text-xs text-slate-600">{mode === 'video' ? '保留视频原表全部列，新增最终垂类、制作判断与低价值标记' : '保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面'}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4 text-sm sm:px-6">
+        <div tabIndex={0} role="region" aria-label="审核规则正文" className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400 sm:px-6">
           {mode === 'video' ? <>
             <Section title="视频关键词表头">
               <p>识别「序号、query、相关拓展q、分类、需上传数量、已上传数量、下发时间」。原列原值保留；旧「分类」只作参考，不作为最终垂类。审核结果增加「最终垂类、垂类依据、是否可制作、不制作依据、低价值关键词」。</p>

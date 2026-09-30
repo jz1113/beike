@@ -21,13 +21,14 @@ type BatchRow = {
 };
 
 type StateRow = { activeBatchId: string | null; legacyMigratedAt: string | null };
+type BatchConnection = Pick<PrismaClient, '$queryRaw' | '$executeRaw'>;
 export class WorkshopBatchConflict extends Error {}
 export class WorkshopBatchNotFound extends Error {}
 
 const DEFAULT_SETTINGS: WorkshopSnapshot['settings'] = {
   selectedVisionModel: 'gemini-3.7-flash',
   selectedImageGenModel: 'gpt-image-2',
-  selectedArchId: 'recipe_jewelry_master',
+  selectedArchId: 'auto',
   hasHumanPersona: true,
   selectedQuality: 'high',
   selectedAspect: '3:4',
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: WorkshopSnapshot['settings'] = {
   lockedOutfitId: 'auto',
   lockedActionId: 'auto',
   lockedFullPromptId: 'auto',
+  promptGroupFolderId: 'auto',
   generationStrategy: 'grid_first',
   autoGenerateCopywriting: true,
   personaMode: 'asset_driven',
@@ -53,6 +55,10 @@ function emptySnapshot(): WorkshopSnapshot {
     settings: DEFAULT_SETTINGS,
     pipeline: emptyPipelineState('draft'),
   };
+}
+
+function hasBatchContent(snapshot: WorkshopSnapshot) {
+  return snapshot.items.length > 0 || snapshot.batchInputText.trim().length > 0;
 }
 
 function makeId() {
@@ -84,13 +90,13 @@ function summarize(batch: WorkshopBatch) {
 }
 
 export function createWorkshopBatchRepository(db: PrismaClient) {
-  const insert = async (id: string, name: string, status: WorkshopBatchStatus, snapshot: WorkshopSnapshot, legacyRecovered = false) => {
+  const insert = async (connection: BatchConnection, id: string, name: string, status: WorkshopBatchStatus, snapshot: WorkshopSnapshot, legacyRecovered = false) => {
     const now = new Date().toISOString();
-    await db.$executeRaw`
+    await connection.$executeRaw`
       INSERT INTO "WorkshopBatch" ("id", "workspaceId", "name", "status", "revision", "snapshotJson", "createdAt", "updatedAt", "legacyRecovered")
       VALUES (${id}, ${requireWorkspaceId()}, ${name}, ${status}, 1, ${JSON.stringify(workshopSnapshotSchema.parse(snapshot))}, ${now}, ${now}, ${legacyRecovered ? 1 : 0})
     `;
-    return parseRow((await db.$queryRaw<BatchRow[]>`SELECT * FROM "WorkshopBatch" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${id}`)[0]);
+    return parseRow((await connection.$queryRaw<BatchRow[]>`SELECT * FROM "WorkshopBatch" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${id}`)[0]);
   };
 
   const initialize = async () => db.$transaction(async tx => {
@@ -110,7 +116,7 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
       const legacyRows = await tx.$queryRaw<Array<{ snapshotJson: string }>>`SELECT "snapshotJson" FROM "WorkshopWorkspace" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = 'original'`;
       if (legacyRows[0]) {
         const legacySnapshot = workshopSnapshotSchema.safeParse(JSON.parse(legacyRows[0].snapshotJson));
-        if (legacySnapshot.success && legacySnapshot.data.items.length > 0) {
+        if (legacySnapshot.success && hasBatchContent(legacySnapshot.data)) {
           const legacyId = makeId();
           await tx.$executeRaw`
             INSERT INTO "WorkshopBatch" ("id", "workspaceId", "name", "status", "revision", "snapshotJson", "createdAt", "updatedAt", "legacyRecovered")
@@ -131,21 +137,37 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     return parseRow((await tx.$queryRaw<BatchRow[]>`SELECT * FROM "WorkshopBatch" WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${activeId}`)[0]);
   });
 
-  const retireActive = async (active: WorkshopBatch) => {
-    if (active.status === 'archived') return;
-    if (active.status === 'draft' && active.snapshot.items.length === 0) return;
+  const retireActive = async (connection: BatchConnection, active: WorkshopBatch, forceArchive = false) => {
+    if (!forceArchive && active.status === 'draft' && !hasBatchContent(active.snapshot)) {
+      const rows = await connection.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "WorkshopBatch"
+        WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${active.id} AND "revision" = ${active.revision} AND "status" <> 'archived'
+          AND "id" = (SELECT "activeBatchId" FROM "WorkshopBatchState" WHERE "workspaceId" = ${requireWorkspaceId()})`;
+      if (rows.length !== 1) throw new WorkshopBatchConflict('当前批次已在其他窗口更新或切换，请重新加载后再新建');
+      return;
+    }
     const now = new Date().toISOString();
     const snapshot: WorkshopSnapshot = {
       ...active.snapshot,
       currentStage: statusToViewStage('archived'),
       pipeline: { ...active.snapshot.pipeline, status: 'archived' },
     };
-    await db.$executeRaw`
+    const changed = await connection.$executeRaw`
       UPDATE "WorkshopBatch"
-      SET "status" = 'archived', "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
-      WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${active.id} AND "status" <> 'archived'
+      SET "revision" = "revision" + 1, "status" = 'archived', "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
+      WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${active.id} AND "revision" = ${active.revision} AND "status" <> 'archived'
+        AND "id" = (SELECT "activeBatchId" FROM "WorkshopBatchState" WHERE "workspaceId" = ${requireWorkspaceId()})
     `;
+    if (changed !== 1) throw new WorkshopBatchConflict('当前批次已在其他窗口更新或切换，请重新加载后再归档');
   };
+
+  const replaceActive = (active: WorkshopBatch, name: string, snapshot: WorkshopSnapshot, forceArchive = false) => db.$transaction(async tx => {
+    await retireActive(tx, active, forceArchive);
+    const batch = await insert(tx, makeId(), name, 'draft', snapshot);
+    const changed = await tx.$executeRaw`UPDATE "WorkshopBatchState" SET "activeBatchId" = ${batch.id}
+      WHERE "workspaceId" = ${requireWorkspaceId()} AND "activeBatchId" = ${active.id}`;
+    if (changed !== 1) throw new WorkshopBatchConflict('当前批次已在其他窗口切换，请重新加载后继续');
+    return batch;
+  });
 
   return {
     async getActive() { return initialize(); },
@@ -164,24 +186,20 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
     },
     async create(name?: string) {
       const active = await initialize();
-      if (active.status === 'draft' && active.snapshot.items.length === 0 && !name) return active;
-      await retireActive(active);
-      const batch = await insert(makeId(), name || '未命名新批次', 'draft', emptySnapshot());
-      await db.$executeRaw`UPDATE "WorkshopBatchState" SET "activeBatchId" = ${batch.id} WHERE "workspaceId" = ${requireWorkspaceId()}`;
-      return batch;
+      if (active.status === 'draft' && !hasBatchContent(active.snapshot) && !name) return active;
+      return replaceActive(active, name || '未命名新批次', emptySnapshot());
     },
     async duplicate(id: string) {
-      const source = await this.get(id);
-      await retireActive(await initialize());
+      const requestedSource = await this.get(id);
+      const active = await initialize();
+      const source = requestedSource.id === active.id ? active : requestedSource;
       const snapshot: WorkshopSnapshot = {
         ...source.snapshot,
         currentStage: stageForSnapshotContent(source.snapshot),
         batchInputText: '',
         pipeline: emptyPipelineState('draft'),
       };
-      const batch = await insert(makeId(), `${source.name}（副本）`, 'draft', snapshot);
-      await db.$executeRaw`UPDATE "WorkshopBatchState" SET "activeBatchId" = ${batch.id} WHERE "workspaceId" = ${requireWorkspaceId()}`;
-      return batch;
+      return replaceActive(active, `${source.name}（副本）`, snapshot);
     },
     async archiveActive(options: { force?: boolean } = {}) {
       const active = await initialize();
@@ -189,29 +207,20 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
       if (!completable && !options.force) {
         throw new WorkshopBatchConflict('请先完成本批次，或确认放弃后再归档');
       }
-      const now = new Date().toISOString();
-      const snapshot: WorkshopSnapshot = {
-        ...active.snapshot,
-        currentStage: statusToViewStage('archived'),
-        pipeline: {
-          ...active.snapshot.pipeline,
-          status: 'archived',
-        },
-      };
-      await db.$executeRaw`
-        UPDATE "WorkshopBatch"
-        SET "status" = 'archived', "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
-        WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${active.id}
-      `;
-      return initialize();
+      return replaceActive(active, '未命名新批次', emptySnapshot(), true);
     },
     async clearHistory() {
       const active = await initialize();
       const workspaceId = requireWorkspaceId();
       return db.$transaction(async (tx) => {
+        const states = await tx.$queryRaw<StateRow[]>`SELECT "activeBatchId", "legacyMigratedAt" FROM "WorkshopBatchState" WHERE "workspaceId" = ${workspaceId}`;
+        if (states[0]?.activeBatchId !== active.id) throw new WorkshopBatchConflict('当前批次已在其他窗口切换，请刷新后再清空历史');
         await tx.$executeRaw`DELETE FROM "WorkshopOutputReview" WHERE "workspaceId" = ${workspaceId} AND "batchId" <> ${active.id}`;
         await tx.$executeRaw`DELETE FROM "WorkshopPipelineRun" WHERE "workspaceId" = ${workspaceId} AND "batchId" <> ${active.id}`;
-        await tx.$executeRaw`DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ${workspaceId} AND "batchId" <> ${active.id}`;
+        // Recipe tombstones and library rotation events share this table, but
+        // only events attached to the removed history batches belong here.
+        await tx.$executeRaw`DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ${workspaceId}
+          AND "batchId" IN (SELECT "id" FROM "WorkshopBatch" WHERE "workspaceId" = ${workspaceId} AND "id" <> ${active.id})`;
         const deleted = await tx.$executeRaw`DELETE FROM "WorkshopBatch" WHERE "workspaceId" = ${workspaceId} AND "id" <> ${active.id}`;
         return { deleted };
       });
@@ -247,7 +256,8 @@ export function createWorkshopBatchRepository(db: PrismaClient) {
       const changed = await db.$executeRaw`
         UPDATE "WorkshopBatch"
         SET "revision" = "revision" + 1, "status" = ${status}, "snapshotJson" = ${JSON.stringify(snapshot)}, "updatedAt" = ${now}
-        WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${id} AND "revision" = ${revision}
+        WHERE "workspaceId" = ${requireWorkspaceId()} AND "id" = ${id} AND "revision" = ${revision} AND "status" <> 'archived'
+          AND "id" = (SELECT "activeBatchId" FROM "WorkshopBatchState" WHERE "workspaceId" = ${requireWorkspaceId()})
       `;
       if (changed !== 1) throw new WorkshopBatchConflict('当前批次已在其他窗口更新，请重新加载后继续');
       return { revision: revision + 1, updatedAt: now };

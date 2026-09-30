@@ -9,6 +9,7 @@ import { mutableGenerationStatuses, withPersistedGenerationStatus } from '../../
 import { recordPollTelemetry } from '../../../services/assistant/agentTelemetry';
 import { decideDirectImagePoll, decideProbeMissPoll } from '../../../services/generate/pollStatus';
 import { createTaskEndpointCache, fetchProbeJson, rememberMatchedEndpoint } from '../../../services/generate/probeUpstream';
+import { readSubmissionReceipt } from '../../../services/tasks/submissionGuard';
 
 export const taskEndpointCache = createTaskEndpointCache();
 
@@ -29,9 +30,18 @@ export async function executeImagePoll(req: Request): Promise<Response> {
   const lookup = new URL(req.url);
   if (!lookup.searchParams.get('taskId') && lookup.searchParams.get('taskKey')) {
     const key = lookup.searchParams.get('taskKey')!;
-    if (key.length > 1024) return jsonResponse({ status: 'QUERY_FAILED', error: '任务标识无效' }, 400);
-    const taskId = await generationTaskRepository.findTaskIdByKey(key);
-    if (!taskId) return jsonResponse({ status: 'QUERY_FAILED', error: '尚未找到原任务记录，请稍后核对；不会自动重新提交' }, 200);
+    if (!key.trim() || key.length > 256) return jsonResponse({ success: false, error: '任务标识无效' }, 400);
+    let taskId: string | null;
+    try {
+      taskId = await generationTaskRepository.findTaskIdByKey(key);
+      if (!taskId) {
+        const receipt = await readSubmissionReceipt('image', resolveImageCredentials(req, { model: lookup.searchParams.get('model') || undefined }), key);
+        if (receipt) return receipt;
+        return jsonResponse({ status: 'QUERY_FAILED', retryable: true, error: '尚未找到原任务记录，请稍后核对；不会自动重新提交' }, 200);
+      }
+    } catch {
+      return jsonResponse({ success: false, retryable: true, error: '原任务提交记录暂时无法核对，请稍后查询' }, 503);
+    }
     lookup.searchParams.set('taskId', taskId);
     const response = await executeImagePoll(new Request(lookup, { headers: req.headers }));
     const data = await response.json();

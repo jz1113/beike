@@ -1,27 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { apiFetch } from '../../../shared/api/apiClient';
-import { credentialGet, credentialSet, credentialDelete } from '../../../shared/api/credentialClient';
-import { getGatewayClientOverrides } from '../../../shared/api/gatewayClient';
+import { apiFetch } from '@client/shared/api/apiClient';
+import { credentialGet, credentialSetBatch } from '@client/shared/api/credentialClient';
+import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
+import { formatUsageCost, formatUsageDate } from '../model/usageFormatting';
+import { gatewayAccountKey, isGatewayUserInfo, readGatewayCache } from './gatewayUserCache';
 
-export interface GatewayUserInfo {
-  id: number | string;
-  username: string;
-  displayName: string;
-  email?: string;
-  quota: number;
-  usedQuota: number;
-  quotaFormatted: number;      // 折算剩余算力
-  quotaRmb: number;            // 折合人民币 (1 算力 = ¥1.20)
-  usedQuotaFormatted: number;  // 已消耗算力
-  usedQuotaRmb: number;        // 已消耗人民币
-  remainingPercent: number;    // 剩余额度百分比 (0 - 100)
-  requestCount: number;
-  group: string;
-}
+import type { GatewayUserInfo } from '../model/gatewayUserTypes';
+export type { GatewayUserInfo } from '../model/gatewayUserTypes';
 
 const CACHE_KEY = 'gateway_user_cache_v1';
 const USER_ID_KEY = 'gateway_user_id';
 const CREDENTIAL_TOKEN_KEY = 'gateway_system_token';
+const CACHE_TTL = 3 * 60 * 1000;
+function readLocal(key: string): string { try { return localStorage.getItem(key)?.trim() || ''; } catch { return ''; } }
 
 interface UseGatewayUserOptions {
   isOpen?: boolean;
@@ -29,244 +20,134 @@ interface UseGatewayUserOptions {
 }
 
 export function useGatewayUser({ isOpen = true, showToast }: UseGatewayUserOptions = {}) {
-  const [userId, setUserId] = useState<string>(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(USER_ID_KEY)?.trim() || '' : ''
-  );
-  const [systemToken, setSystemToken] = useState<string>(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(CREDENTIAL_TOKEN_KEY)?.trim() || '' : ''
-  );
+  const [userId, setUserId] = useState(() => readLocal(USER_ID_KEY));
+  const [systemToken, setSystemToken] = useState('');
   const [userInfo, setUserInfo] = useState<GatewayUserInfo | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState<boolean>(false);
+  const [isReady, setIsReady] = useState(false);
+  const requestVersion = useRef(0);
+  const credentialsVersion = useRef(0);
+  const requestController = useRef<AbortController | null>(null);
+  const credentialsBusy = useRef(false);
+  const baseUrl = getGatewayClientOverrides().customBaseUrl || 'https://ai.comfly.org';
 
-  // 避免并发重复拉取
-  const isFetchingRef = useRef(false);
-
-  // 1. 初始化读取凭据和本地缓存（本地 localStorage + 安全持久化存储双重读取兜底）
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    let isMounted = true;
-    (async () => {
-      try {
-        const savedId = localStorage.getItem(USER_ID_KEY)?.trim() || '';
-        const savedTokenLocal = localStorage.getItem(CREDENTIAL_TOKEN_KEY)?.trim() || '';
-        const savedTokenCred = (await credentialGet(CREDENTIAL_TOKEN_KEY))?.trim() || '';
-        const finalToken = savedTokenCred || savedTokenLocal;
-
-        if (!isMounted) return;
-        if (savedId) setUserId(savedId);
-        if (finalToken) {
-          setSystemToken(finalToken);
-          try {
-            localStorage.setItem(CREDENTIAL_TOKEN_KEY, finalToken);
-          } catch {
-            /* ignore */
-          }
-        }
-
-        // 尝试载入本地持久化缓存（秒开回显）
-        const cachedRaw = localStorage.getItem(CACHE_KEY);
-        if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            if (parsed && parsed.user) {
-              setUserInfo(parsed.user);
-              if (parsed.updatedAt) {
-                const date = new Date(parsed.updatedAt);
-                setLastUpdated(
-                  `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-                );
-              }
-            }
-          } catch {
-            /* ignore invalid cache */
-          }
-        }
-      } finally {
-        if (isMounted) setIsReady(true);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
+  const invalidateRequest = useCallback(() => {
+    requestVersion.current += 1;
+    requestController.current?.abort();
+    requestController.current = null;
+    setIsLoading(false);
   }, []);
 
-  // 2. 刷新用户信息核心逻辑
-  const refreshUserInfo = useCallback(
-    async (silent: boolean = false, overrideId?: string, overrideToken?: string) => {
-      const activeId = (overrideId !== undefined ? overrideId : userId).trim();
-      const activeToken = (overrideToken !== undefined ? overrideToken : systemToken).trim();
-
-      if (!activeId || !activeToken) {
-        if (!silent) {
-          showToast?.('⚠️ 请先配置用户 ID 与个人中心系统访问令牌');
-        }
-        return false;
-      }
-
-      if (isFetchingRef.current) return false;
-      isFetchingRef.current = true;
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const { customBaseUrl } = getGatewayClientOverrides();
-        const baseUrl = customBaseUrl || 'https://ai.comfly.org';
-
-        const res = await apiFetch('/api/system/gateway-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            baseUrl,
-            userId: activeId,
-            systemToken: activeToken,
-          }),
-        });
-
-        const data = await res.json().catch(() => ({}));
-
-        if (res.ok && data.success && data.user) {
-          const freshUser: GatewayUserInfo = data.user;
-          setUserInfo(freshUser);
-          const now = Date.now();
-          const date = new Date(now);
-          const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-          setLastUpdated(timeStr);
-          setError(null);
-
-          // 存入本地缓存
-          try {
-            localStorage.setItem(
-              CACHE_KEY,
-              JSON.stringify({ user: freshUser, updatedAt: now })
-            );
-          } catch {
-            /* ignore */
-          }
-
-          if (!silent) {
-            showToast?.(`✅ 余额同步成功！剩余算力: ${freshUser.quotaFormatted.toFixed(2)} (约 ¥${freshUser.quotaRmb.toFixed(2)})`);
-          }
-          return true;
-        } else {
-          const errMsg = data.error || `拉取失败 (${res.status})`;
-          setError(errMsg);
-          if (!silent) {
-            showToast?.(`🔴 ${errMsg}`);
-          }
-          return false;
-        }
-      } catch (err: any) {
-        const errMsg = err?.message || '网络连接异常，无法获取余额';
-        setError(errMsg);
-        if (!silent) {
-          showToast?.(`🔴 ${errMsg}`);
-        }
-        return false;
-      } finally {
-        setIsLoading(false);
-        isFetchingRef.current = false;
-      }
-    },
-    [userId, systemToken, showToast]
-  );
-
-  // 3. 自动同步逻辑（当凭据齐备且面板展开时，超过 3 分钟自动拉取一次最新数据）
   useEffect(() => {
-    if (!isOpen || !isReady) return;
-    if (!userId.trim() || !systemToken.trim()) return;
+    let active = true;
+    const version = credentialsVersion.current;
+    void credentialGet(CREDENTIAL_TOKEN_KEY).then((token) => {
+      if (active && version === credentialsVersion.current) setSystemToken(token.trim());
+    }).catch(() => {
+      if (active) setError('账户查询凭据读取失败，请重新配置。');
+    }).finally(() => { if (active) setIsReady(true); });
+    return () => { active = false; requestVersion.current += 1; requestController.current?.abort(); };
+  }, []);
 
-    let shouldFetch = true;
-    try {
-      const cachedRaw = localStorage.getItem(CACHE_KEY);
-      if (cachedRaw) {
-        const parsed = JSON.parse(cachedRaw);
-        // 如果上次更新在 3 分钟内，则无需立刻重复拉取
-        if (parsed?.updatedAt && Date.now() - parsed.updatedAt < 3 * 60 * 1000) {
-          shouldFetch = false;
-        }
-      }
-    } catch {
-      shouldFetch = true;
+  const refreshUserInfo = useCallback(async (silent = false, overrideId?: string, overrideToken?: string) => {
+    const activeId = (overrideId ?? userId).trim();
+    const activeToken = (overrideToken ?? systemToken).trim();
+    if (!activeId || !activeToken) {
+      if (!silent) showToast?.('请先配置用户 ID 与个人中心系统访问令牌。');
+      return false;
     }
-
-    if (shouldFetch) {
-      void refreshUserInfo(true);
-    }
-  }, [isOpen, isReady, userId, systemToken, refreshUserInfo]);
-
-  // 4. 保存凭据
-  const saveCredentials = useCallback(
-    async (newId: string, newToken: string) => {
-      const cleanId = newId.trim();
-      const cleanToken = newToken.trim();
-
-      setUserId(cleanId);
-      setSystemToken(cleanToken);
-
-      try {
-        if (cleanId) {
-          localStorage.setItem(USER_ID_KEY, cleanId);
-        } else {
-          localStorage.removeItem(USER_ID_KEY);
-        }
-
-        if (cleanToken) {
-          localStorage.setItem(CREDENTIAL_TOKEN_KEY, cleanToken);
-          await credentialSet(CREDENTIAL_TOKEN_KEY, cleanToken);
-        } else {
-          localStorage.removeItem(CREDENTIAL_TOKEN_KEY);
-          await credentialDelete(CREDENTIAL_TOKEN_KEY);
-        }
-        showToast?.('✅ 网关查询凭据已永久保存在本地，正在同步余额...');
-      } catch (e) {
-        console.error('保存网关凭据失败:', e);
-      }
-
-      if (cleanId && cleanToken) {
-        void refreshUserInfo(false, cleanId, cleanToken);
-      }
-      return true;
-    },
-    [refreshUserInfo, showToast]
-  );
-
-  // 5. 清除凭据
-  const clearCredentials = useCallback(async () => {
-    setUserId('');
-    setSystemToken('');
-    setUserInfo(null);
-    setLastUpdated(null);
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
+    const version = ++requestVersion.current;
+    const accountKey = gatewayAccountKey(activeId, baseUrl);
+    setIsLoading(true);
     setError(null);
     try {
-      localStorage.removeItem(USER_ID_KEY);
-      localStorage.removeItem(CREDENTIAL_TOKEN_KEY);
-      localStorage.removeItem(CACHE_KEY);
-      await credentialDelete(CREDENTIAL_TOKEN_KEY);
-      showToast?.('ℹ️ 已清除网关账户凭据与本地缓存');
-    } catch {
-      /* ignore */
+      const response = await apiFetch('/api/system/gateway-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl, userId: activeId, systemToken: activeToken, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }), signal: controller.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (version !== requestVersion.current || controller.signal.aborted) return false;
+      if (!response.ok || !data.success || !isGatewayUserInfo(data.user)) {
+        throw new Error(typeof data.error === 'string' ? data.error : `余额数据不可用（HTTP ${response.status}）`);
+      }
+      const user: GatewayUserInfo = data.user;
+      const updatedAt = Date.now();
+      setUserInfo(user);
+      setLastUpdated(formatUsageDate(updatedAt));
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ accountKey, user, updatedAt })); } catch { /* Cache is optional. */ }
+      if (!silent) showToast?.(user.balanceAvailable === false ? '账户已同步，网关未提供可用余额信息。' : `余额已同步：${formatUsageCost(user.quotaFormatted)} 算力（约 ¥${formatUsageCost(user.quotaRmb)}）。`);
+      return true;
+    } catch (reason: unknown) {
+      if (version !== requestVersion.current || controller.signal.aborted) return false;
+      const message = reason instanceof Error ? reason.message : '网络连接异常，无法获取余额。';
+      setError(message);
+      if (!silent) showToast?.(message);
+      return false;
+    } finally {
+      if (version === requestVersion.current) { requestController.current = null; setIsLoading(false); }
     }
-  }, [showToast]);
+  }, [userId, systemToken, baseUrl, showToast]);
 
-  const isConfigured = Boolean(userId.trim() && systemToken.trim());
-  const isLowBalance = Boolean(userInfo && userInfo.quotaFormatted < 5);
+  useEffect(() => {
+    invalidateRequest();
+    setUserInfo(null);
+    setLastUpdated(null);
+    if (!isOpen || !isReady || !userId.trim() || !systemToken.trim()) return;
+    const cached = readGatewayCache(readLocal(CACHE_KEY), gatewayAccountKey(userId, baseUrl));
+    if (cached) { setUserInfo(cached.user); setLastUpdated(formatUsageDate(cached.updatedAt)); }
+    if (!cached || Date.now() - cached.updatedAt >= CACHE_TTL) void refreshUserInfo(true);
+  }, [isOpen, isReady, userId, systemToken, baseUrl, refreshUserInfo, invalidateRequest]);
+
+  const saveCredentials = useCallback(async (newId: string, newToken: string) => {
+    const cleanId = newId.trim();
+    const cleanToken = newToken.trim();
+    if (!cleanId || !cleanToken || credentialsBusy.current) return false;
+    credentialsBusy.current = true;
+    try {
+      await credentialSetBatch([[CREDENTIAL_TOKEN_KEY, cleanToken]], { [USER_ID_KEY]: cleanId, [CACHE_KEY]: null });
+      credentialsVersion.current += 1;
+      invalidateRequest();
+      setUserId(cleanId);
+      setSystemToken(cleanToken);
+      setUserInfo(null);
+      setLastUpdated(null);
+      setError(null);
+      showToast?.('账户查询凭据已保存，正在同步余额。');
+      // The credentials effect refreshes changed accounts. Also refresh an unchanged account explicitly.
+      if (cleanId === userId && cleanToken === systemToken) void refreshUserInfo(false, cleanId, cleanToken);
+      return true;
+    } catch {
+      setError('账户查询凭据保存失败，请重试。');
+      showToast?.('账户查询凭据保存失败，请重试。');
+      return false;
+    } finally { credentialsBusy.current = false; }
+  }, [userId, systemToken, invalidateRequest, refreshUserInfo, showToast]);
+
+  const clearCredentials = useCallback(async () => {
+    if (credentialsBusy.current) return false;
+    credentialsBusy.current = true;
+    try {
+      await credentialSetBatch([[CREDENTIAL_TOKEN_KEY, '']], { [USER_ID_KEY]: null, [CACHE_KEY]: null });
+      credentialsVersion.current += 1;
+      invalidateRequest();
+      setUserId(''); setSystemToken(''); setUserInfo(null); setLastUpdated(null); setError(null);
+      showToast?.('已清除网关账户凭据与余额缓存。');
+      return true;
+    } catch {
+      const message = '账户查询凭据清除失败，请重试。';
+      setError(message); showToast?.(message); return false;
+    } finally { credentialsBusy.current = false; }
+  }, [invalidateRequest, showToast]);
 
   return {
-    userId,
-    systemToken,
-    userInfo,
-    isLoading,
-    isConfigured,
-    isLowBalance,
-    lastUpdated,
-    error,
-    refreshUserInfo,
-    saveCredentials,
-    clearCredentials,
+    userId, systemToken, userInfo, isLoading, lastUpdated, error,
+    isConfigured: Boolean(userId.trim() && systemToken.trim()),
+    isLowBalance: Boolean(userInfo && userInfo.balanceAvailable !== false && userInfo.quotaFormatted < 5),
+    refreshUserInfo, saveCredentials, clearCredentials,
   };
 }

@@ -24,6 +24,7 @@ export interface FullPromptSourceMotherRow {
   id: string;
   title: string | null;
   groupIndex: number | null;
+  displayNumber: number | null;
   albumName: string | null;
   available: number;
 }
@@ -47,13 +48,6 @@ const assetTables = {
 export function listAssetsForRegistryBackfill(assetType: PromptAssetType) {
   return db.$queryRawUnsafe<Array<{ id: string; provenance: string | null }>>(
     `SELECT "id", "provenance" FROM "${assetTables[assetType]}" WHERE "workspaceId" IN (?, ?)`,
-    requireWorkspaceId(), OFFICIAL_WORKSPACE_ID,
-  ).catch(() => []);
-}
-
-export function listCoverageAssets(assetType: 'scene' | 'outfit' | 'action' | 'persona') {
-  return db.$queryRawUnsafe<Array<{ id: string; tags: string | null; shotType: string | null; productCategoryIds: string | null }>>(
-    `SELECT "id", "tags", ${assetType === 'action' ? '"shotType"' : 'NULL as "shotType"'}, "productCategoryIds" FROM "${assetTables[assetType]}" WHERE "workspaceId" IN (?, ?)`,
     requireWorkspaceId(), OFFICIAL_WORKSPACE_ID,
   ).catch(() => []);
 }
@@ -94,7 +88,7 @@ export async function listFullPromptSourceMothers(registryIds: string[]): Promis
   const placeholders = registryIds.map(() => '?').join(', ');
   return db.$queryRawUnsafe<FullPromptSourceMotherRow[]>(
     `SELECT registry."id" AS "registryId", registry."sourceAssetId" AS "id",
-      parent."title" AS "title", parent."groupIndex" AS "groupIndex",
+      parent."title" AS "title", parent."groupIndex" AS "groupIndex", parent."displayNumber" AS "displayNumber",
       parent."albumName" AS "albumName",
       CASE WHEN parent."id" IS NULL THEN 0 ELSE 1 END AS "available"
      FROM "PromptAssetRegistry" AS registry
@@ -262,16 +256,6 @@ export async function insertOutputReview(input: {
     input.note || null,
     nowIso(),
   );
-}
-
-export async function listCategoryLinks(assetIds: string[]) {
-  if (assetIds.length === 0) return [];
-  const placeholders = assetIds.map(() => '?').join(', ');
-  return db.$queryRawUnsafe<Array<{ assetId: string; categoryId: string; scope: string }>>(
-    `SELECT "assetId", "categoryId", "scope" FROM "PromptAssetCategoryLink" WHERE "workspaceId" = ? AND "assetId" IN (${placeholders})`,
-    requireWorkspaceId(),
-    ...assetIds,
-  ).catch(() => []);
 }
 
 export async function replaceCategoryLinks(assetId: string, categoryIds: string[], scope = 'suitable') {

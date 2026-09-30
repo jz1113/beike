@@ -40,7 +40,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
 }) => {
   const isDark = theme === 'dark';
 
-  const availableImageModels = useLightboxImageModels();
+  const availableImageModels = useLightboxImageModels(selectedModelId, onSelectModel);
 
   // 下拉菜单显示控制
   const [showModelDropdown, setShowModelDropdown] = useState<boolean>(false);
@@ -71,7 +71,8 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
     return (
       availableImageModels.find((m) => m.id === selectedModelId) || {
         id: selectedModelId,
-        name: selectedModelId || '生图模型',
+        name: selectedModelId || '请先启用生图模型',
+    shortName: selectedModelId || '请先启用生图模型',
         provider: 'OpenAI',
       }
     );
@@ -96,7 +97,8 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                 ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs'
                 : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
           }`}
-          title="点击切换生图模型"
+          disabled={!availableImageModels.length}
+          title={availableImageModels.length ? "点击切换生图模型" : "请在设置中启用生图模型"}
         >
           <div className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
             {getModelIcon(selectedModelId, 'w-3.5 h-3.5')}

@@ -7,6 +7,10 @@ const assetOrder = [
 ];
 
 export const storyboardAssetsRepository = {
+  listProductCategories: () => db.assetProductCategory.findMany({
+    select: { id: true, name: true, parentId: true, position: true, isArchived: true, keywords: true, anatomy: true, aliases: true },
+    orderBy: [{ position: 'asc' }, { id: 'asc' }],
+  }),
   findPersona: (where: any) => db.personaAsset.findFirst({ where }),
   listPersonas: (where: any) => db.personaAsset.findMany({ where, orderBy: assetOrder, take: 12 }),
   findScene: (where: any) => db.sceneAsset.findFirst({ where }),

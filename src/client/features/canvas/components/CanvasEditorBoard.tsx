@@ -1,4 +1,5 @@
 import { CanvasMinimap } from './CanvasMinimap';
+import { CanvasSelectionToolbar } from './CanvasSelectionToolbar';
 import { Image as ImageIcon, MousePointer2, Type, Upload, Video as VideoIcon } from 'lucide-react';
 import { CanvasNodeMenu, type CanvasQuickNodeType } from './CanvasNodeMenu';
 import { DotGrid } from '@client/shared/media/DotGrid';
@@ -13,10 +14,12 @@ import type { MutableRefObject, RefObject, MouseEvent, WheelEvent } from 'react'
 export interface CanvasEditorBoardProps {
   centerAt: (x:number,y:number) => void;
   selectedNodeIds: string[];
+  setSelectedNodeIds: (ids: string[]) => void;
   dragPositions: Record<string, {x:number; y:number}>;
   selectionBox: {x:number; y:number; width:number; height:number} | null;
   handleNodeClick: (node: CanvasNode, event: MouseEvent) => void;
   composerOpen: boolean;
+  onRegenerate: (node: CanvasNode) => void;
   canvasViewportRef: RefObject<HTMLDivElement | null>;
   canvasFileDrop: ReturnType<typeof useCanvasFileDrop>;
   handleMouseDownCanvas: (e: MouseEvent) => void;
@@ -164,20 +167,19 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
               setPreviewMedia={setPreviewMedia}
               updateNode={updateNode}
               deleteNode={deleteNode}
-              onRegenerate={(target) => {
-                if (target.content) handleCanvasPromptSubmit(target.content, target.referenceImageUrl, target.type);
-              }}
+              onRegenerate={p.onRegenerate}
             />
           ))}
 
         </div>
+        {!p.selectionBox && !isHandMode && <CanvasSelectionToolbar projectId={currentProject.id} nodes={nodes} selectedIds={p.selectedNodeIds} onSelect={p.setSelectedNodeIds} pan={pan} zoom={zoom} positions={p.dragPositions} viewportRef={canvasViewportRef} />}
       </div>
 
       {!editingDrawingId && <CanvasMinimap nodes={nodes} pan={pan} zoom={zoom} viewportRef={canvasViewportRef} onCenter={p.centerAt} />}
       <CanvasLayersPanel project={currentProject} selectedId={selectedNodeId} onSelect={setSelectedNodeId} />
 
       {/* 节点开始创作后再展示底部输入舱，空画布由中央起点负责引导。 */}
-      {p.composerOpen && (
+      {p.composerOpen && !editingDrawingId && (
         <div className="canvas-fixed-ui absolute bottom-20 left-1/2 -translate-x-1/2 w-full max-w-3xl xl:max-w-4xl z-30 px-4 pointer-events-none flex justify-center">
           <CanvasPromptDock
             data-testid="canvas-prompt-dock"

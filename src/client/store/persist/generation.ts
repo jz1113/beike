@@ -1,6 +1,9 @@
 import type { ChatSession, GenerationTask } from '@client/store/appStoreTypes';
 import { isProjectAutosaveEnabled } from '@client/shared/utils/localStoragePrefs';
-import { MAX_GENERATION_TASKS_IN_MEMORY, STARTUP_TASK_SUMMARY_COUNT } from '../generationLimits';
+import { isImageTaskActive } from '@shared/domain/core/taskStatus';
+import { retainGenerationTasks, STARTUP_TASK_SUMMARY_COUNT } from '../generationLimits';
+import { hasDrawingArchive, mapTaskMedia, readDrawingArchive, restoreArchivedMedia, saveDrawingArchive, type DrawingSnapshot } from './generationArchive';
+import { mergeDrawingSnapshots } from './generationSnapshotMerge';
 
 export const generationDeletedKeys = new Set<string>();
 const GENERATION_TOMBSTONE_KEY = 'drawing_deleted_keys';
@@ -40,164 +43,168 @@ export function markGenerationDeleted(ids: string[], urls?: string[]) {
   persistGenerationTombstones();
 }
 
-function sanitizeTaskForStartup(task: GenerationTask): GenerationTask {
-  const stripUrl = (url?: string) => {
-    if (!url) return url;
-    if (url.startsWith('data:')) return undefined;
-    if (url.length > 800) return undefined;
-    return url;
-  };
-  return {
-    ...task,
-    resultUrl: stripUrl(task.resultUrl),
-    productImageUrl: stripUrl(task.productImageUrl),
-    referenceImageUrl: stripUrl(task.referenceImageUrl),
-    referenceImages: task.referenceImages?.map(stripUrl).filter(Boolean) as string[] | undefined,
-    images: task.images?.map(stripUrl).filter(Boolean) as string[] | undefined,
-  };
-}
+const SNAPSHOT_KEY = 'drawing_history_v2';
+const LEGACY_KEYS = ['drawing_all_generations', 'drawing_sessions', 'drawing_current_session_id'];
+let latestSnapshot: DrawingSnapshot | undefined;
+let flushedLocalSnapshot: DrawingSnapshot | undefined;
+let saveDrawingTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function sanitizeTaskForStorage(task: GenerationTask): GenerationTask {
-  const sanitizeUrl = (url?: string) => {
-    if (!url) return url;
-    if (url.startsWith('data:image/') && url.length > 500) {
-      return url.slice(0, 80) + '...[stripped]';
-    }
-    return url;
-  };
-
-  return {
-    ...task,
-    productImageUrl: sanitizeUrl(task.productImageUrl),
-    referenceImageUrl: sanitizeUrl(task.referenceImageUrl),
-    referenceImages: task.referenceImages?.map(sanitizeUrl).filter(Boolean) as string[] | undefined,
-    images: task.images?.map(sanitizeUrl).filter(Boolean) as string[] | undefined
-  };
+  const inputMedia = [task.referenceImageUrl, task.sourceImageUrl, task.productImageUrl, ...(task.referenceImages || []), ...(task.images || [])];
+  const referenceMediaMissing = task.referenceMediaMissing || inputMedia.some(url => url && (/^(data:|blob:)/i.test(url) || url.includes('...[stripped]')));
+  return { ...mapTaskMedia(task, url => /^(data:|blob:)/i.test(url) || url.includes('...[stripped]') ? undefined : url), referenceMediaMissing };
 }
 
-let saveDrawingTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingGens: GenerationTask[] | undefined;
-let pendingSessions: ChatSession[] | undefined;
-let pendingCurrentId: string | undefined;
+function sanitizeTaskForStartup(task: GenerationTask, stripMedia = true, failMissingMedia = true): GenerationTask {
+  const clean = stripMedia ? sanitizeTaskForStorage(task) : task;
+  // A missing local input cannot be resubmitted with the original operation ID.
+  if (failMissingMedia && isImageTaskActive(clean.status) && !clean.submissionRecoveryRequired && !clean.taskId && clean.useReferenceImage
+    && (clean.referenceMediaMissing || (!clean.referenceImageUrl && !clean.referenceImages?.length && !clean.images?.length && !clean.productImageUrl && !clean.sourceImageUrl))) {
+    return { ...clean, status: 'FAILURE', failReason: '参考素材未恢复，请重新上传后再次生成' };
+  }
+  return clean;
+}
+
+function readStoredSnapshot(): DrawingSnapshot {
+  let sessions: ChatSession[] = [];
+  let currentId = 'session-default';
+  let tasks: GenerationTask[] = [];
+  let hasStoredSessions = false;
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(SNAPSHOT_KEY);
+      if (saved) {
+        const snapshot = JSON.parse(saved) as DrawingSnapshot;
+        if (Array.isArray(snapshot.sessions) && Array.isArray(snapshot.tasks)) return snapshot;
+      }
+      const rawSessions = localStorage.getItem('drawing_sessions');
+      const rawTasks = localStorage.getItem('drawing_all_generations');
+      const savedId = localStorage.getItem('drawing_current_session_id');
+      if (rawSessions) {
+        const parsed = JSON.parse(rawSessions);
+        if (Array.isArray(parsed)) { sessions = parsed; hasStoredSessions = true; }
+      }
+      if (rawTasks) {
+        const parsed = JSON.parse(rawTasks);
+        if (Array.isArray(parsed)) tasks = parsed;
+      }
+      if (savedId && sessions.some(session => session.id === savedId)) currentId = savedId;
+      else if (sessions.length) currentId = sessions[0].id;
+    } catch { /* preserve the last valid in-memory state */ }
+  }
+  if (!sessions.length && !hasStoredSessions) {
+    sessions = [{ id: currentId, title: '未命名对话', createdAt: Date.now(), tasks: [] }];
+  }
+  return { sessions, currentId, tasks, updatedAt: 0 };
+}
+
+function storageError(message = '对话历史保存失败，请检查本地存储空间；当前内容仍保留在页面中') {
+  window.dispatchEvent(new CustomEvent('beike:generation-storage-error', {
+    detail: message,
+  }));
+}
+
+export function flushDrawingStateToStorage() {
+  if (!latestSnapshot) return;
+  if (saveDrawingTimer) clearTimeout(saveDrawingTimer);
+  saveDrawingTimer = null;
+  const snapshot = latestSnapshot;
+  const base = flushedLocalSnapshot || snapshot;
+  const lightweight = mergeDrawingSnapshots(lightSnapshot(base), lightSnapshot(snapshot), readStoredSnapshot());
+  let cached = false;
+  try {
+    // One write commits sessions, current selection and task IDs together.
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(lightweight));
+    cached = true;
+    flushedLocalSnapshot = snapshot;
+    LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
+  } catch { /* Keep the previous valid snapshot instead of trimming history. */ }
+  if (hasDrawingArchive()) void saveDrawingArchive(snapshot, base).then(() => {
+    if (!flushedLocalSnapshot || flushedLocalSnapshot.updatedAt < snapshot.updatedAt) flushedLocalSnapshot = snapshot;
+  }).catch(() => storageError(cached
+    ? '参考素材归档失败，请暂时保留当前页面，刷新后可能需要重新上传素材' : undefined));
+  else if (!cached) storageError();
+}
+
+function lightSnapshot(snapshot: DrawingSnapshot): DrawingSnapshot {
+  return {
+    ...snapshot,
+    tasks: snapshot.tasks.map(sanitizeTaskForStorage),
+    sessions: snapshot.sessions.map(session => ({ ...session, tasks: session.tasks.map(sanitizeTaskForStorage) })),
+  };
+}
 
 export function persistDrawingStateToStorage(
   allGens?: GenerationTask[],
   sessions?: ChatSession[],
   currentId?: string,
+  options?: { force?: boolean; immediate?: boolean },
 ) {
   if (typeof window === 'undefined') return;
-  if (!isProjectAutosaveEnabled()) return;
-  if (allGens !== undefined) pendingGens = allGens;
-  if (sessions !== undefined) pendingSessions = sessions;
-  if (currentId !== undefined) pendingCurrentId = currentId;
+  if (!isProjectAutosaveEnabled() && !options?.force) return;
+  const previous = latestSnapshot || readStoredSnapshot();
+  latestSnapshot = {
+    tasks: allGens ?? previous.tasks,
+    sessions: sessions ?? previous.sessions,
+    currentId: currentId ?? previous.currentId,
+    updatedAt: Math.max(Date.now(), previous.updatedAt + 1),
+  };
   if (saveDrawingTimer) clearTimeout(saveDrawingTimer);
-  saveDrawingTimer = setTimeout(() => {
-    const gens = pendingGens;
-    const nextSessions = pendingSessions;
-    const id = pendingCurrentId;
-    pendingGens = undefined;
-    pendingSessions = undefined;
-    pendingCurrentId = undefined;
-    try {
-      if (gens !== undefined) {
-        const lightweightGens = gens.slice(0, 100).map(sanitizeTaskForStorage);
-        localStorage.setItem('drawing_all_generations', JSON.stringify(lightweightGens));
-      }
-      if (nextSessions !== undefined) {
-        const lightweightSessions = nextSessions.slice(0, 25).map(s => ({
-          ...s,
-          tasks: (s.tasks || []).slice(0, 30).map(sanitizeTaskForStorage)
-        }));
-        localStorage.setItem('drawing_sessions', JSON.stringify(lightweightSessions));
-      }
-      if (id !== undefined) {
-        localStorage.setItem('drawing_current_session_id', id);
-      }
-    } catch (e: unknown) {
-      const err = e as { name?: string; code?: number };
-      if (err?.name === 'QuotaExceededError' || err?.code === 22) {
-        try {
-          localStorage.removeItem('drawing_all_generations');
-          if (nextSessions) {
-            localStorage.setItem('drawing_sessions', JSON.stringify(nextSessions.slice(0, 5).map(s => ({
-              ...s,
-              tasks: (s.tasks || []).slice(0, 10).map(sanitizeTaskForStorage)
-            }))));
-          }
-        } catch {}
-      }
-    }
-  }, 150);
+  if (options?.force || options?.immediate) flushDrawingStateToStorage();
+  else saveDrawingTimer = setTimeout(flushDrawingStateToStorage, 150);
 }
 
-export const getStoredDrawingSessions = () => {
-  loadGenerationTombstones();
-
-  let sessions: ChatSession[] = [];
-  let currentId = 'session-default';
-  let allGenerations: GenerationTask[] = [];
-
-  if (typeof window !== 'undefined') {
-    try {
-      const savedSessions = localStorage.getItem('drawing_sessions');
-      const savedId = localStorage.getItem('drawing_current_session_id');
-      const savedAll = localStorage.getItem('drawing_all_generations');
-      if (savedSessions) {
-        const parsed = JSON.parse(savedSessions);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          sessions = parsed.map((s: ChatSession) => ({
-            ...s,
-            tasks: (s.tasks || []).slice(0, 30).map(sanitizeTaskForStartup),
-          }));
-          currentId = (savedId && savedId !== '__all__' && parsed.some((s: { id: string }) => s.id === savedId)) ? savedId : parsed[0].id;
-        }
-      }
-      if (savedAll) {
-        const parsedAll = JSON.parse(savedAll);
-        if (Array.isArray(parsedAll)) {
-          allGenerations = parsedAll.map(sanitizeTaskForStartup);
-        }
-      }
-    } catch {}
-  }
-
-  if (sessions.length === 0) {
-    const defaultId = 'session-default';
-    sessions = [
-      {
-        id: defaultId,
-        title: '未命名对话',
-        createdAt: Date.now(),
-        tasks: []
-      }
-    ];
-    currentId = defaultId;
-  }
-
+function drawingState(snapshot: DrawingSnapshot, sanitize: boolean, failMissingMedia = true) {
+  const prepare = (task: GenerationTask) => sanitizeTaskForStartup(task, sanitize, failMissingMedia);
+  const valid = (task: GenerationTask) => !isGenerationDeleted(task.id, task.taskId, task.resultUrl, task.dbId);
+  const sessions = snapshot.sessions.map(session => ({
+    ...session, tasks: (session.tasks || []).filter(valid).map(prepare),
+  }));
   const map = new Map<string, GenerationTask>();
-  allGenerations.forEach(t => {
-    const key = t.id || t.taskId;
-    if (key) map.set(key, t);
+  [...snapshot.tasks, ...sessions.flatMap(session => session.tasks)].filter(valid).forEach(task => {
+    const key = task.id || task.taskId;
+    if (key && !map.has(key)) map.set(key, prepare(task));
   });
-  sessions.forEach(s => {
-    (s.tasks || []).forEach(t => {
-      const key = t.id || t.taskId;
-      if (key && !map.has(key)) map.set(key, t);
-    });
-  });
+  const tasks = [...map.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const currentId = sessions.some(session => session.id === snapshot.currentId)
+    ? snapshot.currentId : sessions[0]?.id || 'session-default';
+  return { sessions, currentId, tasks: retainGenerationTasks(tasks, STARTUP_TASK_SUMMARY_COUNT) };
+}
 
-  const mergedGenerations = Array.from(map.values())
-    .filter((t) => !isGenerationDeleted(t.id, t.taskId, t.resultUrl, t.dbId))
-    .sort((a, b) => {
-      const tA = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt || 0).getTime();
-      const tB = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt || 0).getTime();
-      return tB - tA;
-    })
-    .slice(0, Math.min(STARTUP_TASK_SUMMARY_COUNT, MAX_GENERATION_TASKS_IN_MEMORY));
+export function getStoredDrawingSessions() {
+  loadGenerationTombstones();
+  latestSnapshot = readStoredSnapshot();
+  flushedLocalSnapshot = latestSnapshot;
+  if (!hasDrawingArchive()) return adoptDrawingView(latestSnapshot, true);
+  return drawingState(latestSnapshot, true, !hasDrawingArchive());
+}
 
-  return {
-    sessions,
-    currentId,
-    tasks: mergedGenerations
+/** Hydration failures are a local view, not edits that should terminate another tab's task. */
+function adoptDrawingView(snapshot: DrawingSnapshot, sanitize: boolean) {
+  const prepare = (task: GenerationTask) => sanitizeTaskForStartup(task, sanitize);
+  latestSnapshot = {
+    ...snapshot,
+    tasks: snapshot.tasks.map(prepare),
+    sessions: snapshot.sessions.map(session => ({ ...session, tasks: session.tasks.map(prepare) })),
   };
-};
+  flushedLocalSnapshot = latestSnapshot;
+  return drawingState(latestSnapshot, false);
+}
+
+export async function restoreDrawingArchive() {
+  const original = latestSnapshot;
+  if (!original) return null;
+  try {
+    const archive = await readDrawingArchive(0);
+    // Do not replace a new session or task created while the archive was loading.
+    if (latestSnapshot !== original) return null;
+    latestSnapshot = archive && archive.updatedAt >= original.updatedAt
+      ? archive : archive ? restoreArchivedMedia(original, archive) : original;
+    return adoptDrawingView(latestSnapshot, false);
+  } catch { return adoptDrawingView(original, true); }
+}
+
+export const isDrawingHistoryReady = () => !hasDrawingArchive();
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => { if (saveDrawingTimer) flushDrawingStateToStorage(); });
+}

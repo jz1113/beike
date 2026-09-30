@@ -8,6 +8,7 @@ import {
   listAssetsForRegistryBackfill,
 } from '../../repositories/promptAsset';
 import { stableAssetCode } from '@shared/domain/assets/assetSampling';
+import { listMotherReplacementIds } from '@server/repositories/motherGroupReplacement';
 import {
   initialRegistryStatus,
   type PromptAssetType,
@@ -54,8 +55,10 @@ export async function attachRegistryMeta<T extends { id: string; provenance?: st
 }
 
 /** Resolve a promoted group's parent through its registry id, without confusing source image numbers with parent assets. */
-export async function attachFullPromptSource<T extends { id: string; provenance?: string | null }>(items: T[]) {
+export async function attachFullPromptSource<T extends { id: string; provenance?: string | null; groupIndex?: number | null }>(items: T[]) {
   const withRegistry = await attachRegistryMeta('full_prompt', items);
+  const replacedIds = await listMotherReplacementIds(withRegistry
+    .filter(item => item.provenance !== 'workshop_generated' && item.groupIndex != null).map(item => item.id));
   const sourceRefs = [...new Set(withRegistry
     .filter((item) => item.registry?.provenance === 'workshop_generated')
     .map((item) => item.registry?.sourceRef)
@@ -68,11 +71,14 @@ export async function attachFullPromptSource<T extends { id: string; provenance?
       : null;
     return {
       ...item,
+      imageReplaced: replacedIds.has(item.id),
+      imageReplaceable: item.groupIndex != null && item.provenance !== 'workshop_generated' && !replacedIds.has(item.id),
       sourceMother: item.registry?.provenance === 'workshop_generated' && source
         ? {
           id: source.id,
           code: stableAssetCode('R', source.id),
           title: source.title,
+          displayNumber: source.displayNumber,
           groupIndex: source.groupIndex,
           albumName: source.albumName,
           available: Boolean(source.available),

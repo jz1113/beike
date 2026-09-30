@@ -29,6 +29,7 @@ generate.get('/video', mountJson((req) => videoGen.GET(req)));
 generate.post('/depth-video', mountJson((req) => depthVideo.POST(req)));
 generate.get('/depth-video', mountJson((req) => depthVideo.GET(req)));
 generate.post('/depth-image', mountJson((req) => depthImage.POST(req)));
+generate.get('/depth-image', mountJson((req) => depthImage.GET(req)));
 generate.post('/analyze', mountJson((req) => analyze.POST(req)));
 generate.post('/copywriting', mountJson((req) => copywriting.POST(req)));
 generate.post('/headline-title', mountJson((req) => headlineTitle.POST(req)));

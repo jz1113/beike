@@ -17,8 +17,13 @@ for (const result of results) {
     if (message.ruleId !== 'max-lines') continue;
     remaining++;
     const file = path.relative(root, result.filePath).replace(/\\/g, '/');
-    const match = /(\d+) lines/.exec(message.message);
-    const lines = match ? Number(match[1]) : 401;
+    const match = /too many lines\s*\((\d+)\)/i.exec(message.message)
+      ?? /(\d+)\s+lines/i.exec(message.message);
+    if (!match) {
+      added.push(`${file}:${message.line} Unrecognized max-lines diagnostic: ${message.message}`);
+      continue;
+    }
+    const lines = Number(match[1]);
     const allowedLines = allowed.get(file);
     if (!allowedLines || lines > allowedLines) {
       added.push(`${file}:${message.line} ${message.message}`);

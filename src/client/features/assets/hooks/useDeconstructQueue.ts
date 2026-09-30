@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { processDeconstructQueueItem } from '@client/features/assets/api/deconstructClient';
+import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
+import { readDeconstructJob, submitDeconstructJob, stopDeconstructJob, DeconstructJobRequestError } from '../api/deconstructJobsClient';
+import { useDeconstructJobsState } from './useDeconstructJobs';
+import { applyDeconstructJobToQueue } from '../model/deconstructJobQueue';
+import { getDeconstructJobsState, isDeconstructJobActive, upsertDeconstructJob, updateDeconstructJobsState } from '../model/deconstructJobsState';
 import {
   getEnabledMultimodalModelsFromSettings,
   resolveStoredMultimodalModelId,
@@ -12,18 +16,21 @@ import {
 } from '../utils/assetDeconstructCsvExport';
 import { buildQueueItemsFromFiles } from '../utils/assetFolderImport';
 import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
-import { getSubCategoriesForCategory, type ActionCategoryId } from '@shared/domain/products/productCategory';
+import { selectableDeconstructSubcategory } from '../model/deconstructImportTarget';
 import {
   clearDeconstructQueueDraft,
   persistDeconstructQueue,
   persistQueueConcurrency,
   readDeconstructQueueDraft,
   readQueueConcurrency,
+  persistDeconstructJobReceipt, readDeconstructJobReceiptState,
 } from '../utils/deconstructQueueStorage';
 import {
   categoryForQueueItem,
   resolveActionCategory,
   selectedQueueImages,
+  selectableMajorCategoryId,
+  subCategoriesForItem,
   type ProductCategoryOption,
 } from './deconstructQueueOps';
 
@@ -41,6 +48,7 @@ export type UseDeconstructQueueOptions = {
   showToast: (msg: string) => void;
   onRefreshAssets: () => void;
   defaultProductCategoryId?: string | null;
+  defaultProductSubcategory?: string | null;
   productCategories?: ProductCategoryOption[];
 };
 
@@ -48,6 +56,7 @@ export function useDeconstructQueue({
   showToast,
   onRefreshAssets,
   defaultProductCategoryId = null,
+  defaultProductSubcategory = null,
   productCategories,
 }: UseDeconstructQueueOptions) {
   const [showDeconstructModal, setShowDeconstructModal] = useState(false);
@@ -55,29 +64,54 @@ export function useDeconstructQueue({
   const [selectedVisionModel, setSelectedVisionModel] = useState<string>(() =>
     defaultDeconstructModelId(loadMultimodalModels())
   );
-  const [targetCategory, setTargetCategory] = useState<ActionCategoryId>(() =>
+  const [targetCategory, setTargetCategoryState] = useState<string>(() =>
     resolveActionCategory(defaultProductCategoryId, productCategories)
   );
+  const activeTargetCategory = selectableMajorCategoryId(targetCategory, productCategories);
+  const [targetSubcategory, setTargetSubcategory] = useState(() => selectableDeconstructSubcategory(
+    defaultProductSubcategory, activeTargetCategory, productCategories,
+  ));
+  const activeTargetSubcategory = selectableDeconstructSubcategory(targetSubcategory, activeTargetCategory, productCategories);
+  const targetSelectionInvalid = Boolean(targetCategory && !activeTargetCategory)
+    || Boolean(targetSubcategory && !activeTargetSubcategory);
+  const setTargetCategory = useCallback((value: string) => {
+    setTargetCategoryState(value);
+    setTargetSubcategory('');
+  }, []);
   const [architectureMode] = useState<'auto'>('auto');
   const [queue, setQueue] = useState<ImageSetQueueItem[]>([]);
-  const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
+  const [backgroundJobId, setBackgroundJobId] = useState<string | null>(null);
+  const [isSubmittingJob, setIsSubmittingJob] = useState(false);
+  const jobsState = useDeconstructJobsState();
+  const backgroundJob = jobsState.jobs.find(job => job.jobId === backgroundJobId);
+  const currentQueueIndex = queue.findIndex(item => item.status === 'processing');
   const [userHint, setUserHint] = useState('');
-  const [isDeconstructing, setIsDeconstructing] = useState(false);
+  const isDeconstructing = isSubmittingJob || Boolean(backgroundJob && isDeconstructJobActive(backgroundJob));
   const [queueConcurrency, setQueueConcurrency] = useState<number>(() => readQueueConcurrency());
-  const [processingQueueCount, setProcessingQueueCount] = useState(0);
-  const [progressById, setProgressById] = useState<Record<string, { stage: string; message: string; startedAt: number; updatedAt: number }>>({});
-  const [deconstructStartedAt, setDeconstructStartedAt] = useState<number | null>(null);
+  const processingQueueCount = backgroundJob?.items.filter(item => item.status === 'running').length || 0;
+  const progressById = Object.fromEntries(backgroundJob?.items.filter(item => item.progress).map(item => [item.id, item.progress!]) || []);
+  const deconstructStartedAt = backgroundJob ? Date.parse(backgroundJob.createdAt) : null;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [deconstructRecordRows, setDeconstructRecordRows] = useState<DeconstructedRecordRow[]>([]);
+  const deconstructRecordRows: DeconstructedRecordRow[] = queue.map(transformQueueItemToRecordRow);
   const [lastExportedCsvFilename, setLastExportedCsvFilename] = useState<string | null>(null);
 
   useEffect(() => {
-    setTargetCategory(resolveActionCategory(defaultProductCategoryId, productCategories));
-  }, [defaultProductCategoryId, productCategories]);
+    if (showDeconstructModal || isDeconstructing || queue.some((item) => item.status !== 'done')) return;
+    const majorId = selectableMajorCategoryId(resolveActionCategory(defaultProductCategoryId, productCategories), productCategories);
+    setTargetCategoryState(majorId);
+    setTargetSubcategory(selectableDeconstructSubcategory(defaultProductSubcategory, majorId, productCategories));
+  }, [showDeconstructModal, isDeconstructing, queue, defaultProductCategoryId, defaultProductSubcategory, productCategories]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const isDeconstructingRef = useRef(false);
-  const queueConcurrencyRef = useRef(queueConcurrency);
+  const lastSyncedJobRef = useRef('');
+  const refreshedJobRef = useRef('');
+  const submissionUncertainRef = useRef(false);
+  const loadingDetailRef = useRef(false);
+  const attemptedDetailRef = useRef('');
+  const viewingJobRef = useRef('');
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
 
   useEffect(() => {
     if (!isDeconstructing || deconstructStartedAt === null) return;
@@ -88,8 +122,49 @@ export function useDeconstructQueue({
   }, [isDeconstructing, deconstructStartedAt]);
 
   useEffect(() => {
-    const draft = readDeconstructQueueDraft();
-    if (!draft) return;
+    let draft = readDeconstructQueueDraft();
+    const receipt = readDeconstructJobReceiptState();
+    if (receipt && draft?.backgroundJobId !== receipt.jobId && receipt.savedAt > (draft?.draftSavedAt || 0)) draft = null;
+    if (!draft) {
+      const jobId = receipt?.jobId;
+      if (!jobId) return;
+      setBackgroundJobId(jobId);
+      submissionUncertainRef.current = true;
+      const workspace = getWorkspaceSecret();
+      void readDeconstructJob(jobId).then(job => {
+        if (getWorkspaceSecret() !== workspace) return;
+        submissionUncertainRef.current = false;
+        upsertDeconstructJob(job);
+        setQueue(applyDeconstructJobToQueue(job, []));
+        setTargetCategoryState(job.items[0]?.targetCategory || '');
+        setTargetSubcategory(job.items[0]?.targetSubcategory || '');
+      }).catch(() => { /* Keep the receipt; no automatic billable replay. */ });
+      return;
+    }
+    if (draft.backgroundJobId) {
+      submissionUncertainRef.current = true;
+      setQueue(draft.queue);
+      setBackgroundJobId(draft.backgroundJobId);
+      setUserHint(draft.userHint);
+      setSelectedVisionModel(draft.selectedVisionModel);
+      setTargetCategoryState(draft.targetCategory || '');
+      setTargetSubcategory(draft.targetSubcategory || '');
+      // A lost submission response is reconciled read-only; never replay on mount.
+      const workspace = getWorkspaceSecret();
+      void readDeconstructJob(draft.backgroundJobId).then(job => {
+        if (getWorkspaceSecret() !== workspace) return;
+        submissionUncertainRef.current = false;
+        upsertDeconstructJob(job);
+      }).catch(error => {
+        if (getWorkspaceSecret() !== workspace) return;
+        if (error instanceof DeconstructJobRequestError && error.status === 404) {
+          submissionUncertainRef.current = true;
+          setQueue(draft.queue.map(item => item.status === 'processing' ? { ...item, status: 'pending' as const } : item));
+          showToastRef.current('上次提交尚未确认，可重新打开导入窗口核对并使用同一任务编号提交');
+        }
+      });
+      return;
+    }
     const hasPending = draft.queue.some(
       (item) => item.status === 'pending' || item.status === 'processing' || item.status === 'error'
     );
@@ -98,13 +173,14 @@ export function useDeconstructQueue({
       return;
     }
     const restore = window.confirm(
-      '检测到上次反推队列未完成（可能因页面刷新中断）。是否恢复队列并继续？'
+      '检测到未完成的图集草稿。是否恢复查看？恢复不会自动反推。'
     );
     if (restore) {
-      setQueue(draft.queue.map((it) => (it.status === 'processing' ? { ...it, status: 'pending' as const } : it)));
-      setCurrentQueueIndex(draft.currentQueueIndex);
+      setQueue(draft.queue.map((it) => (it.status === 'processing' ? { ...it, status: 'error' as const, error: '旧任务结果未确认，请先核对资产库再重试' } : it)));
       setUserHint(draft.userHint);
       setSelectedVisionModel(draft.selectedVisionModel);
+      setTargetCategoryState(draft.targetCategory || '');
+      setTargetSubcategory(typeof draft.targetSubcategory === 'string' ? draft.targetSubcategory : '');
       setShowDeconstructModal(true);
     } else {
       clearDeconstructQueueDraft();
@@ -122,28 +198,63 @@ export function useDeconstructQueue({
   }, [showDeconstructModal]);
 
   useEffect(() => {
-    if (!isDeconstructing) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [isDeconstructing]);
+    if (!queue.length || (!backgroundJobId && !showDeconstructModal)) return;
+    persistDeconstructQueue({ queue, currentQueueIndex, userHint, selectedVisionModel, targetCategory, targetSubcategory, backgroundJobId: backgroundJobId || undefined });
+  }, [showDeconstructModal, queue, currentQueueIndex, userHint, selectedVisionModel, targetCategory, targetSubcategory, backgroundJobId]);
+
+  useEffect(() => {
+    if (!backgroundJob || lastSyncedJobRef.current === `${backgroundJob.jobId}:${backgroundJob.updatedAt}`) return;
+    const version = `${backgroundJob.jobId}:${backgroundJob.updatedAt}`;
+    if (backgroundJob.items.some(item => item.result?.ok && item.result.data === null) && attemptedDetailRef.current !== version) {
+      if (!loadingDetailRef.current) {
+        loadingDetailRef.current = true;
+        const workspace = getWorkspaceSecret();
+        void readDeconstructJob(backgroundJob.jobId).then(job => {
+          if (getWorkspaceSecret() === workspace) {
+            attemptedDetailRef.current = version;
+            upsertDeconstructJob(job);
+          }
+        }).catch(() => {
+          if (getWorkspaceSecret() === workspace) showToast('结果详情暂未同步，后台结果已保留，可稍后重新查看');
+        }).finally(() => { loadingDetailRef.current = false; });
+      }
+      return;
+    }
+    lastSyncedJobRef.current = `${backgroundJob.jobId}:${backgroundJob.updatedAt}`;
+    setQueue(previous => applyDeconstructJobToQueue(backgroundJob, previous));
+    if (!isDeconstructJobActive(backgroundJob) && refreshedJobRef.current !== backgroundJob.jobId) {
+      refreshedJobRef.current = backgroundJob.jobId;
+      isDeconstructingRef.current = false;
+      onRefreshAssets();
+    }
+  }, [backgroundJob, onRefreshAssets, showToast]);
+
+  useEffect(() => {
+    if (!jobsState.viewJobId) return;
+    const jobId = jobsState.viewJobId;
+    if (viewingJobRef.current === jobId) return;
+    viewingJobRef.current = jobId;
+    const workspace = getWorkspaceSecret();
+    void readDeconstructJob(jobId).then(job => {
+      if (getWorkspaceSecret() !== workspace || getDeconstructJobsState().viewJobId !== jobId) return;
+      upsertDeconstructJob(job);
+      setBackgroundJobId(job.jobId);
+      setQueue(applyDeconstructJobToQueue(job, []));
+      setShowDeconstructModal(true);
+      updateDeconstructJobsState({ viewJobId: null });
+    }).catch(() => {
+      if (getWorkspaceSecret() !== workspace) return;
+      showToast('结果暂时无法读取，请稍后再查看。后台任务会继续。');
+      if (getDeconstructJobsState().viewJobId === jobId) updateDeconstructJobsState({ viewJobId: null });
+    }).finally(() => { viewingJobRef.current = ''; });
+  }, [jobsState.viewJobId, showToast]);
 
   const handleCloseDeconstructModal = useCallback(() => {
-    if (isDeconstructing) {
-      const ok = window.confirm('反推正在进行中，关闭将中断当前任务。确定关闭吗？');
-      if (!ok) return;
-      isDeconstructingRef.current = false;
-      setIsDeconstructing(false);
-    }
     setShowDeconstructModal(false);
-  }, [isDeconstructing]);
+  }, []);
 
   const handleQueueConcurrencyChange = useCallback((value: number) => {
     const next = Math.min(8, Math.max(1, value));
-    queueConcurrencyRef.current = next;
     setQueueConcurrency(next);
     persistQueueConcurrency(next);
   }, []);
@@ -172,154 +283,88 @@ export function useDeconstructQueue({
   );
 
   const runQueueDeconstruction = useCallback(async (options?: { reviewBeforeSave?: boolean }) => {
-    if (isDeconstructingRef.current) return;
-
-    const pendingIndices = queue
-      .map((item, idx) => (item.status === 'pending' || item.status === 'error' ? idx : -1))
-      .filter((i) => i !== -1)
-      .filter((i) => selectedQueueImages(queue[i]).length > 0);
-
-    if (pendingIndices.length === 0) {
-      showToast('⚠️ 没有待处理的图集队列');
+    if (isDeconstructingRef.current || isDeconstructing) return;
+    if (targetSelectionInvalid) {
+      showToast('所选归档文件夹已删除或不再属于当前大类，请重新选择');
       return;
     }
-
+    const pending = queue.filter(item => (item.status === 'pending' || item.status === 'error') && selectedQueueImages(item).length > 0);
+    if (!pending.length) { showToast('没有待处理的图集'); return; }
+    const modelIds = multimodalModels.map(model => model.id).filter(Boolean);
+    if (!modelIds.length) { showToast('请先在设置中启用多模态模型'); return; }
     isDeconstructingRef.current = true;
-    setIsDeconstructing(true);
-    setDeconstructStartedAt(Date.now());
-    setElapsedSeconds(0);
-    setProgressById({});
-
-    const modelIds = multimodalModels.map((m) => m.id).filter(Boolean);
-    if (modelIds.length === 0) {
-      showToast('请先在设置 → 服务接口配置中启用多模态模型');
+    setIsSubmittingJob(true);
+    const workspace = getWorkspaceSecret();
+    // Keep one stable identity until the acceptance is known. The retry button
+    // may submit the same identity again; the server deduplicates before work.
+    const jobId = submissionUncertainRef.current && backgroundJobId ? backgroundJobId : crypto.randomUUID();
+    if (!persistDeconstructJobReceipt(jobId)) {
+      showToast('浏览器无法保存任务编号，请释放浏览器存储空间后再提交，避免刷新后重复反推。');
       isDeconstructingRef.current = false;
-      setIsDeconstructing(false);
+      setIsSubmittingJob(false);
       return;
     }
-
-    const maxWorkers = Math.min(8, pendingIndices.length);
-    let doneCount = 0;
-    let partialCount = 0;
-    let errorCount = 0;
-    let workingQueue = [...queue];
-    const workQueue = [...pendingIndices];
-    let activeWorkers = 0;
-
-    const syncQueueState = (idx: number) => {
-      setQueue([...workingQueue]);
-      setCurrentQueueIndex(idx);
-      persistDeconstructQueue({
-        queue: workingQueue,
-        currentQueueIndex: idx,
-        userHint,
-        selectedVisionModel,
-      });
-    };
-
-    const processQueueItem = async (idx: number) => {
-      const targetItem = workingQueue[idx];
-      if (!targetItem) return;
-
-      activeWorkers++;
-      setProcessingQueueCount(activeWorkers);
-
-      workingQueue = workingQueue.map((it, i) =>
-        i === idx ? { ...it, status: 'processing' as const, error: undefined } : it
-      );
-      syncQueueState(idx);
-
-      const images = selectedQueueImages(targetItem);
-      const itemCategory = categoryForQueueItem(targetItem, targetCategory, productCategories);
-      const customSubCategories = getSubCategoriesForCategory(itemCategory);
-      const result = await processDeconstructQueueItem({
-        item: { ...targetItem, images },
-        userHint,
-        selectedVisionModel,
-        modelIds,
-        targetCategory: itemCategory,
-        customSubCategories,
-        reviewBeforeSave: options?.reviewBeforeSave,
-        onProgress: (progress) => setProgressById((prev) => ({ ...prev, [targetItem.id]: progress })),
-      });
-
-      if (result.ok) {
-        if (result.partial) partialCount++;
-        else doneCount++;
-        workingQueue = workingQueue.map((it, i) =>
-          i === idx
-            ? {
-                ...it,
-                status: 'done' as const,
-                result: result.data as Record<string, unknown>,
-                deconstructStats: result.stats as ImageSetQueueItem['deconstructStats'],
-                reviewId: result.reviewId,
-              }
-            : it
-        );
-      } else {
-        errorCount++;
-        workingQueue = workingQueue.map((it, i) =>
-          i === idx ? { ...it, status: 'error' as const, error: result.error } : it
-        );
-      }
-
-      activeWorkers = Math.max(0, activeWorkers - 1);
-      setProcessingQueueCount(activeWorkers);
-      syncQueueState(idx);
-    };
-
+    setBackgroundJobId(jobId);
+    persistDeconstructQueue({ queue, currentQueueIndex: -1, userHint, selectedVisionModel, targetCategory, targetSubcategory, backgroundJobId: jobId });
     try {
-      const workers = Array.from({ length: maxWorkers }, async (_, workerIndex) => {
-        while (workQueue.length > 0) {
-          if (workerIndex >= queueConcurrencyRef.current) {
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            continue;
-          }
-          const idx = workQueue.shift();
-          if (idx === undefined) break;
-          await processQueueItem(idx);
-        }
-      });
-
-      await Promise.all(workers);
-      onRefreshAssets();
-
-      const allRows = workingQueue.map((item) => transformQueueItemToRecordRow(item));
-      setDeconstructRecordRows(allRows);
-
-      let savedCsvFilename: string | null = null;
-      if (allRows.some((r) => r.status === 'success' || r.status === 'partial')) {
+      if (submissionUncertainRef.current) {
         try {
-          savedCsvFilename = await exportDeconstructRecordsToCsv(allRows);
-          setLastExportedCsvFilename(savedCsvFilename);
-        } catch (csvErr) {
-          console.error('自动导出反推 CSV 报表失败:', csvErr);
+          const existing = await readDeconstructJob(jobId);
+          if (getWorkspaceSecret() !== workspace) return;
+          upsertDeconstructJob(existing);
+          submissionUncertainRef.current = false;
+          setShowDeconstructModal(false);
+          return;
+        } catch (error) {
+          if (getWorkspaceSecret() !== workspace) return;
+          if (!(error instanceof DeconstructJobRequestError && error.status === 404)) throw error;
         }
       }
-
-      const totalProcessed = doneCount + partialCount + errorCount;
-      const csvTip = savedCsvFilename ? `，并已自动导出解析报表：${savedCsvFilename}` : '';
-      if (errorCount === 0 && partialCount === 0) {
-        showToast(`🎉 图集队列反推全部完成并已入库${csvTip}！`);
-      } else if (errorCount === 0 && partialCount > 0) {
-        showToast(`⚠️ 已完成 ${totalProcessed} 套，其中 ${partialCount} 套部分图片反推失败${csvTip}`);
-      } else if (errorCount > 0 && doneCount + partialCount > 0) {
-        showToast(
-          `⚠️ 处理 ${totalProcessed} 套：成功 ${doneCount + partialCount} 套，失败 ${errorCount} 套${csvTip}`
-        );
-      } else {
-        const firstError = workingQueue.find((item) => item.status === 'error')?.error;
-        showToast(`❌ 全部 ${errorCount} 套反推失败${firstError ? `：${firstError}` : ''}。请检查后重试`);
+      if (getWorkspaceSecret() !== workspace) return;
+      const job = await submitDeconstructJob({ jobId,
+        items: pending.map(item => {
+          const major = categoryForQueueItem(item, activeTargetCategory, productCategories);
+          return { id: item.id, name: item.name, images: selectedQueueImages(item), targetCategory: major,
+            targetSubcategory: selectableDeconstructSubcategory(activeTargetSubcategory, major, productCategories),
+            customSubCategories: major ? subCategoriesForItem(major, productCategories) : [] };
+        }), userHint, selectedVisionModel, modelIds, concurrency: queueConcurrency, reviewBeforeSave: options?.reviewBeforeSave });
+      if (getWorkspaceSecret() !== workspace) return;
+      upsertDeconstructJob(job);
+      submissionUncertainRef.current = false;
+      setShowDeconstructModal(false);
+      window.dispatchEvent(new Event('deconstruct-jobs-refresh'));
+      showToast('已交给后台反推，可以继续使用其他页面');
+    } catch (error) {
+      if (getWorkspaceSecret() !== workspace) return;
+      // Even a gateway error can arrive after acceptance. Only a read-only check
+      // can establish the result; no new identity or automatic POST retry here.
+      try {
+        const existing = await readDeconstructJob(jobId);
+        if (getWorkspaceSecret() !== workspace) return;
+        upsertDeconstructJob(existing);
+        submissionUncertainRef.current = false;
+        setShowDeconstructModal(false);
+      } catch {
+        if (getWorkspaceSecret() !== workspace) return;
+        submissionUncertainRef.current = true;
+        showToast(`提交未确认：${error instanceof Error ? error.message : '连接失败'}。再次提交会核对同一任务，避免重复反推。`);
       }
     } finally {
+      setIsSubmittingJob(false);
       isDeconstructingRef.current = false;
-      setIsDeconstructing(false);
-      setProcessingQueueCount(0);
-      setCurrentQueueIndex(-1);
-      clearDeconstructQueueDraft();
     }
-  }, [queue, multimodalModels, userHint, selectedVisionModel, targetCategory, productCategories, showToast, onRefreshAssets]);
+  }, [queue, isDeconstructing, multimodalModels, userHint, selectedVisionModel, targetCategory, targetSubcategory, backgroundJobId,
+    activeTargetCategory, activeTargetSubcategory, targetSelectionInvalid, productCategories, queueConcurrency, showToast]);
+
+  const handleStopBackgroundJob = useCallback(async () => {
+    if (!backgroundJobId) return;
+    const workspace = getWorkspaceSecret();
+    try {
+      const job = await stopDeconstructJob(backgroundJobId);
+      if (getWorkspaceSecret() === workspace) upsertDeconstructJob(job);
+    }
+    catch (error) { if (getWorkspaceSecret() === workspace) showToast(error instanceof Error ? error.message : '停止请求未确认，请核对进度'); }
+  }, [backgroundJobId, showToast]);
 
   const exportQueueCsv = useCallback(async () => {
     const allRows = queue.map((it) => transformQueueItemToRecordRow(it));
@@ -334,29 +379,30 @@ export function useDeconstructQueue({
     multimodalModels,
     selectedVisionModel,
     setSelectedVisionModel,
-    targetCategory,
+    targetCategory: activeTargetCategory,
     setTargetCategory,
+    targetSubcategory: activeTargetSubcategory,
+    setTargetSubcategory,
+    targetSelectionInvalid,
+    productCategories,
     architectureMode,
     queue,
     setQueue,
     currentQueueIndex,
-    setCurrentQueueIndex,
     userHint,
     setUserHint,
     isDeconstructing,
-    setIsDeconstructing,
+    backgroundJobId,
+    isSubmittingJob,
+    handleStopBackgroundJob,
     isDeconstructingRef,
     queueConcurrency,
     handleQueueConcurrencyChange,
     processingQueueCount,
-    setProcessingQueueCount,
     progressById,
-    setProgressById,
     deconstructStartedAt,
-    setDeconstructStartedAt,
     elapsedSeconds,
     deconstructRecordRows,
-    setDeconstructRecordRows,
     lastExportedCsvFilename,
     setLastExportedCsvFilename,
     fileInputRef,

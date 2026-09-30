@@ -3,7 +3,7 @@ import { prepareTaskRetry } from '../model/generation/taskRetry';
 import { requiresGenerationRecovery } from '@client/shared/api/generationRecovery';
 import { checkWorkshopReadiness } from '../model/generation/workshopReadiness';
 import { runGridImageTask } from '../model/generation/batchGridGeneration';
-import { waitWhilePaused } from '@client/shared/api/generationAbort';
+import { runSelectedShots } from '../model/generation/batchSingleGeneration';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import type { BatchProductItem, BatchTaskItem, GenerationStrategy } from '../model/batchTypes';
 import { runGenerationJobs } from '../model/generation/batchImageGeneration';
@@ -33,6 +33,7 @@ export interface BatchCoordinatorDeps {
   setFailTaskCount: (val: number) => void;
   autoGenerateCopywriting: boolean;
   generateAllCopywriting: () => Promise<void>;
+  createCheckpoint: () => () => Promise<void>;
 }
 
 let generationLock = false;
@@ -58,52 +59,6 @@ function patchItemTasks(
   setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, tasks: updater(item.tasks || []) } : item)));
 }
 
-async function runSelectedShots(
-  item: BatchProductItem,
-  shots: ShotPrompt[],
-  config: TaskExecutionConfig,
-  setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>,
-  bumpProgress: (ok: boolean, n?: number) => void
-) {
-  for (const shot of shots) {
-    if (config.isAborted()) break;
-    if (config.isPaused) await waitWhilePaused(config.isPaused, config.isAborted);
-    if (config.isAborted()) break;
-    const liveTask = (item.tasks || []).find((task) => task.shot_no === shot.shot_no);
-    if (liveTask?.status === 'SUCCESS' && liveTask.resultUrl) {
-      bumpProgress(true, 1);
-      continue;
-    }
-    patchItemTasks(setItems, item.id, (tasks) =>
-      tasks.map((task) => (task.shot_no === shot.shot_no ? { ...task, status: 'IN_PROGRESS', error: undefined } : task))
-    );
-    try {
-      const generated = await executeSingleImageTask(item, shot, config.anchorFaceUrl, {
-        ...config,
-        outputSize: savedWorkshopOutputSize(liveTask),
-        idempotencyKey: liveTask?.idempotencyKey || config.idempotencyKey,
-        onOutputSizeResolved: (outputSize) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, outputSize } : task)),
-        onTaskSubmitted: (upstreamTaskId) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, upstreamTaskId } : task)),
-      });
-      patchItemTasks(setItems, item.id, (tasks) =>
-        tasks.map((task) =>
-          task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey
-            ? { ...task, status: 'SUCCESS', resultUrl: generated.url, temporaryUrl: generated.temporary, error: undefined, recoveryRequired: false }
-            : task
-        )
-      );
-      bumpProgress(true, 1);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '生图失败';
-      patchItemTasks(setItems, item.id, (tasks) =>
-        tasks.map((task) =>
-          task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, status: 'FAILURE', error: message, recoveryRequired: requiresGenerationRecovery(err) } : task
-        )
-      );
-      bumpProgress(false, 1);
-    }
-  }
-}
 
 export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps): Promise<void> {
   if (generationLock) return;
@@ -161,6 +116,7 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
           aspectRatio: config.selectedAspect,
           quality: config.selectedQuality,
           generationStrategy: deps.generationStrategy,
+          gridOutputSize: config.gridOutputSize,
         }),
       };
     });
@@ -194,7 +150,8 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
 
     const isAborted = () => runControlRef.current.status === 'cancelled';
     const isPaused = () => runControlRef.current.status === 'paused';
-    const taskConfig = { ...config, isAborted, isPaused };
+    const taskConfig = { ...config, isAborted, isPaused, beforeSubmit: deps.createCheckpoint() };
+    await taskConfig.beforeSubmit();
 
     const jobs = buildBatchGenerationJobs(
       mergedItems.filter((item) => item.selected && item.status === 'success'), deps.generationStrategy,
@@ -214,6 +171,7 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
       showToast('已停止批量生图。已经提交到上游的任务仍可能完成并计费');
       return;
     }
+    await taskConfig.beforeSubmit();
 
     if (autoGenerateCopywriting) {
       void generateAllCopywriting();
@@ -291,6 +249,8 @@ export async function retryFailedImageTasksCoordinator(
     const nextItems = itemsRef.current.map((item) => preparedById.get(item.id) || item);
     itemsRef.current = nextItems;
     setItems(nextItems);
+    const beforeSubmit = deps.createCheckpoint();
+    await beforeSubmit();
 
     const isAborted = () => runControlRef.current.status === 'cancelled';
     const isPaused = () => runControlRef.current.status === 'paused';
@@ -306,7 +266,7 @@ export async function retryFailedImageTasksCoordinator(
         const live = preparedById.get(item.id) || item;
         const execute = deps.generationStrategy === 'grid_first' ? runGridImageTask : runSelectedShots;
         await execute(live, shots, {
-          ...config, isAborted, isPaused,
+          ...config, isAborted, isPaused, beforeSubmit,
           idempotencyKey: live.tasks.find((task) => shots.some((shot) => shot.shot_no === task.shot_no))?.idempotencyKey,
         }, setItems, bumpProgress);
       },
@@ -315,6 +275,7 @@ export async function retryFailedImageTasksCoordinator(
       showToast('已停止重试，已经提交的任务仍可能完成并计费');
       return;
     }
+    await beforeSubmit();
 
     if (failCount === 0) showToast(`失败分镜重试完成：全部成功 ${successCount} 张`);
     else if (successCount === 0) showToast(`失败分镜重试仍全部失败（${failCount} 张）`);
@@ -333,7 +294,8 @@ export async function retrySingleShotTaskCoordinator(
   items: BatchProductItem[],
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>,
   config: TaskExecutionConfig,
-  showToast: (msg: string) => void
+  showToast: (msg: string) => void,
+  createCheckpoint: () => () => Promise<void>,
 ): Promise<void> {
   if (generationLock) {
     showToast('已有生图任务进行中，请等当前生成结束后再重试单镜');
@@ -367,21 +329,31 @@ export async function retrySingleShotTaskCoordinator(
     tasks.map((entry, idx) => (idx === shotIndex ? { ...prepared, status: 'IN_PROGRESS' } : entry))
   );
 
+  let generationCompleted = false;
   try {
+    const beforeSubmit = createCheckpoint();
+    await beforeSubmit();
     const generated = await executeSingleImageTask(targetItem, shot, config.anchorFaceUrl, { ...config, idempotencyKey, outputSize: savedWorkshopOutputSize(task),
+      beforeSubmit,
       onOutputSizeResolved: (outputSize) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, outputSize } : entry)),
-      onTaskSubmitted: (upstreamTaskId) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, upstreamTaskId } : entry)),
+      onGenerationSizeResolved: (generationSize) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, generationSize } : entry)),
+      onTaskSubmitted: async (upstreamTaskId) => {
+        patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, upstreamTaskId } : entry));
+        await beforeSubmit();
+      },
     });
+    generationCompleted = true;
     patchItemTasks(setItems, itemId, (tasks) =>
       tasks.map((entry) =>
         entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, status: 'SUCCESS', resultUrl: generated.url, temporaryUrl: generated.temporary, error: undefined, recoveryRequired: false, attempt, idempotencyKey } : entry
       )
     );
+    await beforeSubmit();
     showToast(`分镜 ${shot.shot_no} 重新生成成功！`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '重试失败';
     patchItemTasks(setItems, itemId, (tasks) =>
-      tasks.map((entry) => (entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, status: 'FAILURE', error: message, recoveryRequired: requiresGenerationRecovery(err) } : entry))
+      tasks.map((entry) => (entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, status: 'FAILURE', error: message, recoveryRequired: generationCompleted || requiresGenerationRecovery(err) } : entry))
     );
     showToast(`分镜 ${shot.shot_no} 重试失败: ${message}`);
   } finally {

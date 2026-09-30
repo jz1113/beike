@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiFetch } from '@client/shared/api/apiClient';
+import { useAssistantDialog } from './useAssistantDialog';
 
 interface MemoryView { enabled: boolean; summary: string; updatedAt: number; coveredCount: number; pendingCount: number }
 export default function AssistantMemoryPanel({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+  const dialogRef = useAssistantDialog(true, onClose);
   const [memory, setMemory] = useState<MemoryView | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,7 +32,7 @@ export default function AssistantMemoryPanel({ sessionId, onClose }: { sessionId
     finally { setBusy(false); }
   };
   return <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onClick={onClose}>
-    <section role="dialog" aria-modal="true" aria-label="会话记忆" className="flex max-h-[80%] w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+    <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="会话记忆" className="flex max-h-[80%] w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
       <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">会话记忆</h2><button aria-label="关闭会话记忆" onClick={onClose} className="rounded p-1 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
       <p className="mb-3 text-xs leading-5 text-slate-500">仅用于当前会话，重启后保留。超过 30 条待处理消息时，将较早消息增量摘要，保留最近 20 条；较长历史会提前触发。采集时只保存文本，后续对话再整理。摘要会额外调用当前模型。</p>
       {error && <p role="alert" className="mb-3 text-sm text-orange-700">{error}</p>}

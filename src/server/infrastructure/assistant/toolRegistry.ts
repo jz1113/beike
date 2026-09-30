@@ -8,6 +8,10 @@
  * - ./tools/clientTools: 客户端工作台状态感知与各视图能力查询
  */
 
+import { prisma } from '@server/infrastructure/database/prisma';
+import { parseToolArguments } from './toolArguments';
+import { formatToolError } from './toolSafety';
+import { listWorkshopArchitectures, toolSetWorkshopArch } from './tools/workshopTools';
 import type { ToolExecContext } from '@shared/domain/assistant/tools/defs';
 import {
   toolParseUrl,
@@ -48,12 +52,9 @@ export async function executeAssistantTool(
   ctx: ToolExecContext,
 ): Promise<string> {
   ctx.signal?.throwIfAborted();
-  let args: Record<string, unknown> = {};
-  try {
-    args = argsJson ? JSON.parse(argsJson) : {};
-  } catch {
-    args = {};
-  }
+  let args: Record<string, unknown>;
+  try { args = parseToolArguments(name, argsJson); }
+  catch (error) { return JSON.stringify({ success: false, error: formatToolError(error, '工具参数无效') }); }
 
   switch (name) {
     case 'parse_product_or_social_url':
@@ -86,40 +87,52 @@ export async function executeAssistantTool(
       );
     case 'get_workshop_state':
       return toolGetWorkshopState(ctx);
-    case 'get_view_capabilities':
-      return toolGetViewCapabilities(args as { view?: string }, ctx);
+    case 'get_view_capabilities': {
+      const result = JSON.parse(toolGetViewCapabilities(args as { view?: string }, ctx));
+      if (result.view === 'workshop') {
+        try { result.availableArchitectures = await listWorkshopArchitectures(); }
+        catch (error) { result.availableArchitectures = []; result.architectureError = formatToolError(error, '架构列表暂时不可用'); }
+      }
+      return JSON.stringify(result);
+    }
     case 'workspace_navigate':
       return JSON.stringify({
         success: true,
         action: 'navigate',
         target_view: args.target_view,
         reason: args.reason || '',
-        message: `已为您将工作台调度至「${args.target_view === 'workshop' ? '种草工坊' : args.target_view === 'generate' ? '极速生图' : args.target_view === 'assets' ? '资产中心' : '灵感首页'}」`,
+        message: `已请求将工作台切换至「${args.target_view === 'workshop' ? '种草工坊' : args.target_view === 'generate' ? '极速生图' : args.target_view === 'assets' ? '资产中心' : '灵感首页'}」`,
       });
-    case 'workspace_load_workshop_product':
-      return JSON.stringify({
-        success: true,
-        action: 'load_workshop_product',
-        itemId: args.itemId,
-        title: args.title || '',
-        message: `已将商品【${args.title || args.itemId}】装载至种草工坊工作区`,
-      });
+    case 'workspace_load_workshop_product': {
+      const itemId = String(args.itemId || '').trim();
+      if (!itemId) return JSON.stringify({ success: false, error: '缺少商品编号，请先查询商品库或采集商品' });
+      try {
+        const product = await prisma.product.findFirst({ where: { itemId }, orderBy: { createdAt: 'desc' } });
+        if (!product) return JSON.stringify({ success: false, error: '该商品尚未保存，请先采集链接或从商品库选择商品' });
+        let stored: unknown;
+        try { stored = JSON.parse(product.detailUrls || '{}'); } catch { stored = {}; }
+        const data = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored as Record<string, unknown> : {};
+        const urls = (value: unknown): string[] => Array.isArray(value) ? value.filter((url): url is string => typeof url === 'string' && /^(https?:\/\/|\/storage\/|data:image\/)/i.test(url)).slice(0, 100) : [];
+        const main = urls(data.main || data.mainImages);
+        const details = urls(data.details || data.detailImages);
+        const skus = urls(data.skus || data.skuImages);
+        if (!main.length && product.picUrl) main.push(...urls([product.picUrl]));
+        if (!main.length && !details.length && !skus.length) return JSON.stringify({ success: false, error: '该商品没有可用图片，请先重新采集或补充图片' });
+        return JSON.stringify({ success: true, action: 'load_workshop_product', itemId: product.itemId,
+          title: product.title || '商品', product: { itemId: product.itemId, title: product.title || '商品', platform: product.platform, price: '', picUrl: product.picUrl || main[0] || details[0] || skus[0] },
+          images: { main, details, skus }, message: '商品资料已核实，已请求将图片和资料载入种草工坊' });
+      } catch (error) { return JSON.stringify({ success: false, error: formatToolError(error, '商品资料读取失败，请稍后重试') }); }
+    }
     case 'trigger_generate':
       return JSON.stringify({
         success: true,
         action: 'trigger_generate',
         prompt: args.prompt,
-        model: args.model || null,
-        message: '已准备将提示词发送至极速生图工作区',
+        requiresUserGenerate: true,
+        message: '已请求将提示词和参考图载入首页生图输入，等待用户确认生成',
       });
     case 'set_workshop_arch':
-      return JSON.stringify({
-        success: true,
-        action: 'set_workshop_arch',
-        arch_id: args.arch_id,
-        reason: args.reason || '',
-        message: `已切换拍摄架构为 ${args.arch_id}`,
-      });
+      return toolSetWorkshopArch(args);
     case 'spawn_subagent':
       return JSON.stringify({
         success: false,

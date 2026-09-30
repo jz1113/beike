@@ -12,12 +12,14 @@ import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { checkDepthModelReady } from '../../services/depth/depthEnvCheck';
 import { createDepthVideoTask, getDepthVideoRuntimeState } from '../../services/depth/depthVideoPipeline';
 import { checkFfmpegAvailable } from '../../services/media/videoFrames';
+import { depthInputDigest, guardDepthSubmission, readDepthSubmissionReceipt } from '../../services/tasks/depthSubmissionGuard';
 
 async function ensureDepthEnvReady() {
   const ffmpegOk = await checkFfmpegAvailable();
   if (!ffmpegOk) {
     return jsonResponse({
       success: false,
+      submissionRejected: true,
       error: '深度动作捕捉服务未就绪：请重启 API 服务（npm run dev:api）或执行 npm run setup:depth-env',
     }, 503);
   }
@@ -26,6 +28,7 @@ async function ensureDepthEnvReady() {
   if (!depthModelReady) {
     return jsonResponse({
       success: false,
+      submissionRejected: true,
       error: `深度模型未就绪，请在终端执行：${DEPTH_MODEL_SETUP_COMMAND}`,
     }, 503);
   }
@@ -77,19 +80,11 @@ export async function POST(req: Request) {
       const style = resolveDepthVideoStyle({ style: form.get('style') });
       const quality = resolveDepthQuality(form.get('quality'));
       const videoBuffer = Buffer.from(await file.arrayBuffer());
-      const { taskId, recordId } = await createDepthVideoTask(req, {
-        videoBuffer,
-        style,
-        quality,
-      });
-
-      return jsonResponse({
-        success: true,
-        taskId,
-        recordId,
-        status: 'IN_PROGRESS',
-        style,
-        quality,
+      return guardDepthSubmission(req, 'depth-video', form.get('clientTaskId'), {
+        fileDigest: depthInputDigest(videoBuffer), style, quality,
+      }, async () => {
+        const { taskId, recordId } = await createDepthVideoTask(req, { videoBuffer, style, quality });
+        return jsonResponse({ success: true, taskId, recordId, status: 'IN_PROGRESS', style, quality });
       });
     }
 
@@ -104,26 +99,20 @@ export async function POST(req: Request) {
 
     const style = resolveDepthVideoStyle(parsed.data);
     const quality = resolveDepthQuality(parsed.data.quality);
-    const { taskId, recordId } = await createDepthVideoTask(req, {
-      videoDataUrl: parsed.data.videoDataUrl,
-      videoUrl: parsed.data.videoUrl,
-      style,
-      quality,
-    });
-
-    return jsonResponse({
-      success: true,
-      taskId,
-      recordId,
-      status: 'IN_PROGRESS',
-      style,
-      quality,
+    return guardDepthSubmission(req, 'depth-video', rawBody.clientTaskId, {
+      inputDigest: depthInputDigest(Buffer.from(parsed.data.videoDataUrl || parsed.data.videoUrl || '')), style, quality,
+    }, async () => {
+      const { taskId, recordId } = await createDepthVideoTask(req, {
+        videoDataUrl: parsed.data.videoDataUrl, videoUrl: parsed.data.videoUrl, style, quality,
+      });
+      return jsonResponse({ success: true, taskId, recordId, status: 'IN_PROGRESS', style, quality });
     });
   } catch (error: unknown) {
     console.error('[深度动作捕捉] 提交失败:', error);
     return jsonResponse({
       success: false,
       error: formatUserError(error, '深度动作捕捉任务提交失败'),
+      submissionRejected: true,
     }, 500);
   }
 }
@@ -134,6 +123,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    if (!searchParams.get('taskId') && searchParams.has('taskKey')) return readDepthSubmissionReceipt(req, 'depth-video');
     const taskId = searchParams.get('taskId');
     if (!taskId) {
       return jsonResponse({ success: false, error: '缺少 taskId 参数' }, 400);

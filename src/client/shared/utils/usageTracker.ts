@@ -55,7 +55,7 @@ export function estimateModelCost(
 
   // 2. 图片生成计费
   if (type === 'image') {
-    const count = params.mediaCount || 1;
+    const count = params.mediaCount ?? 1;
     if (rule?.fixedPerUnit) return count * rule.fixedPerUnit;
     if (m.includes('gpt-image-2-4k') || m.includes('image2-4k')) return count * 0.08;
     if (m.includes('gpt-image-2-2k')) return count * 0.06;
@@ -74,7 +74,7 @@ export function estimateModelCost(
 
   // 3. 视频生成计费
   if (type === 'video') {
-    const count = params.mediaCount || 1;
+    const count = params.mediaCount ?? 1;
     const dur = params.duration || 5;
     if (rule?.perSecPrice) return count * dur * rule.perSecPrice;
     if (rule?.fixedPerUnit) return count * rule.fixedPerUnit;
@@ -200,7 +200,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
 
       const newLog: UsageLogItem = {
         id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        timestamp: item.timestamp || Date.now(),
+        timestamp: item.timestamp ?? Date.now(),
         modelId: item.modelId,
         modelName: item.modelName || item.modelId,
         provider: vendor,
@@ -208,7 +208,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
         promptTokens: item.promptTokens || 0,
         completionTokens: item.completionTokens || 0,
         totalTokens: item.totalTokens || ((item.promptTokens || 0) + (item.completionTokens || 0)) || 0,
-        mediaCount: item.mediaCount || (item.type === 'image' || item.type === 'video' ? 1 : 0),
+        mediaCount: item.mediaCount ?? ((item.type === 'image' || item.type === 'video') && item.success !== false ? 1 : 0),
         costUsd,
         costRmb,
         success: item.success,

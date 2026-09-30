@@ -1,4 +1,5 @@
-import { getInternalApiHeaders } from '../../auth/apiAuth';
+import { getInternalApiHeaders, getInternalApiOrigin } from '../../auth/apiAuth';
+import { formatToolError } from '../toolSafety';
 import {
   inspectVideoMetadata,
   extractVideoStoryboards,
@@ -6,20 +7,22 @@ import {
 } from '../../media/videoDeconstructService';
 import { parseReversePromptSections } from './productTools';
 
-export async function toolDeconstructImage(args: { image_url?: string }, origin: string, signal?: AbortSignal): Promise<string> {
+export async function toolDeconstructImage(args: { image_url?: string }, _origin: string, signal?: AbortSignal): Promise<string> {
+  void _origin;
   const imageUrl = String(args.image_url || '').trim();
   if (!imageUrl) return JSON.stringify({ success: false, error: '缺少 image_url' });
 
   try {
-    const res = await fetch(`${origin}/api/catalog/assets/deconstruct`, {
+    const res = await fetch(`${getInternalApiOrigin()}/api/catalog/assets/deconstruct`, {
       method: 'POST',
       headers: getInternalApiHeaders(),
+      redirect: 'error',
       body: JSON.stringify({ imageUrl, mode: 'single' }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000),
     });
     const data = await res.json();
     if (!data.success) {
-      return JSON.stringify({ success: false, error: data.error || '反推失败' });
+      return JSON.stringify({ success: false, error: formatToolError(data.error || '反推失败') });
     }
     return JSON.stringify({
       success: true,
@@ -28,7 +31,7 @@ export async function toolDeconstructImage(args: { image_url?: string }, origin:
       sections: parseReversePromptSections(String(data.reversePrompt || data.prompt || '')),
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '反推请求失败';
+    const msg = formatToolError(e, '反推请求失败');
     return JSON.stringify({ success: false, error: msg });
   }
 }
@@ -50,7 +53,7 @@ export async function toolInspectVideoMedia(videoUrl: string, signal?: AbortSign
       filename: meta.filename,
     });
   } catch (err: unknown) {
-    return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) });
+    return JSON.stringify({ success: false, error: formatToolError(err) });
   }
 }
 
@@ -72,7 +75,7 @@ export async function toolExtractVideoStoryboard(videoUrl: string, sampleCount: 
       ],
     });
   } catch (err: unknown) {
-    return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) });
+    return JSON.stringify({ success: false, error: formatToolError(err) });
   }
 }
 
@@ -104,6 +107,6 @@ export async function toolExtractVideoDetailedFrames(
       })),
     });
   } catch (err: unknown) {
-    return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) });
+    return JSON.stringify({ success: false, error: formatToolError(err) });
   }
 }

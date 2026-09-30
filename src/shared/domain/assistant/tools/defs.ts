@@ -73,7 +73,7 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
     function: {
       name: 'read_attached_document',
       description:
-        '读取本轮用户已上传文档的文本片段。可按关键词搜索，或按字符偏移截取。当需要引用文档细节、核对规格或长文未完整展示时调用。',
+        '读取当前会话近期已上传文档的文本片段，优先最新文档。可按关键词搜索，或按字符偏移截取。当需要引用文档细节、核对规格或长文未完整展示时调用。',
       parameters: {
         type: 'object',
         properties: {
@@ -190,7 +190,7 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
     type: 'function',
     function: {
       name: 'workspace_load_workshop_product',
-      description: '将指定商品一键装载进入「种草工坊五步流程」开始全流程买家秀图文制作。',
+      description: '核实当前工作区已保存商品资料及图片后，请求将商品载入种草工坊；不能用未采集的编号建立空壳商品。',
       parameters: {
         type: 'object',
         properties: {
@@ -205,12 +205,11 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
     type: 'function',
     function: {
       name: 'trigger_generate',
-      description: '将优化后的提示词发送到极速生图工作区并准备生图。当用户明确要求开始生图时调用。',
+      description: '将提示词和参考图载入首页生图草稿，使用已有模型设置；由用户确认后才生成。用户明确要求准备生图时调用，返回请求不表示已经生成。',
       parameters: {
         type: 'object',
         properties: {
           prompt: { type: 'string', description: '生图提示词正文' },
-          model: { type: 'string', description: '可选生图模型 ID' },
         },
         required: ['prompt'],
       },
@@ -224,7 +223,7 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
       parameters: {
         type: 'object',
         properties: {
-          arch_id: { type: 'string', description: '拍摄架构 ID' },
+          arch_id: { type: 'string', description: '从 get_view_capabilities(workshop) 返回的 availableArchitectures 中选择有效 ID' },
           reason: { type: 'string', description: '切换原因' },
         },
         required: ['arch_id'],
@@ -236,13 +235,13 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
     function: {
       name: 'get_view_capabilities',
       description:
-        '查询当前所在工作台视图可执行的子动作清单（可加载的商品、可切换的架构、可触发的生图模式等）。当 agent 即将执行跨视图操作前、或需要根据工作台当前能力调整下一步动作时调用。',
+        '查询当前工作台能力及限制；workshop 返回可选架构 availableArchitectures。生图工具只准备首页草稿。当 agent 即将执行跨视图操作前、或需要根据工作台当前能力调整下一步动作时调用。',
       parameters: {
         type: 'object',
         properties: {
           view: {
             type: 'string',
-            enum: ['home', 'workshop', 'generate', 'assets', 'collect', 'settings'],
+            enum: ['home', 'workshop', 'generate', 'assets', 'collect', 'settings', 'canvas', 'replicate'],
             description: '要查询的视图；留空则使用当前视图',
           },
         },
@@ -323,7 +322,7 @@ export const TOOL_META: Record<string, { scope: ToolScope; approval: ToolApprova
   list_user_products: { scope: 'server', approval: 'none' },
   query_asset_library: { scope: 'server', approval: 'none' },
   get_prompt_asset_detail: { scope: 'server', approval: 'none' },
-  deconstruct_image: { scope: 'server', approval: 'none' },
+  deconstruct_image: { scope: 'server', approval: 'per_turn' },
   inspect_video_media: { scope: 'server', approval: 'none' },
   extract_video_storyboard: { scope: 'server', approval: 'none' },
   extract_video_detailed_frames: { scope: 'server', approval: 'none' },
@@ -359,75 +358,4 @@ export function getToolDefinition(name: string): ToolDefinition | undefined {
   return TOOL_DEFINITIONS.find((d) => d.name === name);
 }
 
-export function toolDisplayName(name: string): string {
-  switch (name) {
-    case 'update_plan':
-      return '更新执行计划';
-    case 'read_tool_result':
-      return '读取工具结果';
-    case 'execute_code':
-      return '运行代码';
-    case 'parse_product_or_social_url':
-      return '解析商品/社媒链接';
-    case 'read_attached_document':
-      return '阅读附件文档';
-    case 'list_user_products':
-      return '查询商品库';
-    case 'query_asset_library':
-      return '搜索资产库';
-    case 'get_prompt_asset_detail':
-      return '读取提示词资产详情';
-    case 'deconstruct_image':
-      return '反推图片提示词';
-    case 'get_workshop_state':
-      return '读取工作台状态';
-    case 'workspace_navigate':
-      return '调度工作台视图';
-    case 'workspace_load_workshop_product':
-      return '载入种草工坊';
-    case 'trigger_generate':
-      return '触发生图';
-    case 'set_workshop_arch':
-      return '切换拍摄架构';
-    case 'inspect_video_media':
-      return '探查视频物理规格';
-    case 'extract_video_storyboard':
-      return '提取全片故事板九宫格';
-    case 'extract_video_detailed_frames':
-      return '提取关键镜头特写画面';
-    default:
-      return name;
-  }
-}
-
-export function summarizeToolResult(raw: string): string {
-  try {
-    const j = JSON.parse(raw);
-    if (j.success === false) return j.error || '失败';
-    if (j.plan) return j.plan.map((step: { title: string; status: string }) => `${step.status === 'completed' ? '✓' : step.status === 'blocked' ? '受阻' : step.status === 'in_progress' ? '进行中' : '待办'} ${step.title}`).join('；');
-    if (j.sandbox === 'quickjs-wasm') return j.output?.join('\n').slice(0, 1200) || '代码执行完成';
-    if (j.kind === 'social') return `社媒「${j.title || ''}」图${j.imageCount || 0}张`;
-    if (j.kind === 'ecommerce') return `商品「${j.title || ''}」`;
-    if (j.products) return `商品库 ${j.count || j.products.length} 条`;
-    if (j.assets) return `资产库 ${j.count || j.assets.length} 条`;
-    if (j.excerpt) return `文档片段 ${String(j.excerpt).length} 字`;
-    if (j.action === 'navigate') return `导航至 ${j.target_view}`;
-    if (j.action === 'load_workshop_product') return `载入商品 ${j.itemId}`;
-    if (j.action === 'trigger_generate') return '准备生图';
-    if (j.action === 'set_workshop_arch') return `切换架构 ${j.arch_id}`;
-    if (j.workshopState) return '已读取工作台状态';
-    return '完成';
-  } catch {
-    return raw.slice(0, 80);
-  }
-}
-
-export function parseToolAction(raw: string): Record<string, unknown> | undefined {
-  try {
-    const j = JSON.parse(raw);
-    if (j?.action) return j as Record<string, unknown>;
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
+export { toolDisplayName, summarizeToolResult, parseToolAction } from './resultPresentation';

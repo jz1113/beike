@@ -3,10 +3,13 @@ export interface AssetLibrarySlim extends Record<string, unknown> {
   registry?: { status?: string; [key: string]: unknown } | null;
   lifecycleStatus?: string;
   id: string;
+  /** Stable, library-wide number for a full prompt group (independent of sorting/filtering). */
+  displayNumber?: number | null;
   title?: string | null;
   name?: string | null;
   tags?: string | null;
   category?: string | null;
+  productSubcategory?: string | null;
   isFavorite?: boolean;
   usageCount?: number;
   createdAt?: string | Date;

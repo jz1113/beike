@@ -2,56 +2,53 @@ import { isWorkshopAssetEligible } from '@shared/domain/workshop/workshopPipelin
 import { apiFetch } from '@client/shared/api/apiClient';
 import { useAppStore } from '@client/store';
 import { getGlobalAssetLibrary } from '@client/shared/api/assetLibraryCache';
-import { SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
+import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
+import { hasActivePromptGroupFolders } from '@shared/domain/assets/promptGroupFolders';
 
 export { loadSystemConfiguredModels };
 
 /**
- * 拉取自定义配方列表并与系统配方合并
+ * 以服务端的可见配方列表为准。服务端会过滤用户隐藏的官方架构；
+ * 客户端不能再拼入内置配方，否则删除或编辑后的官方架构会重新出现。
  */
 export async function fetchRecipes(
   setRecipes: (r: any[]) => void,
   setSelectedArchId: (id: string) => void
 ): Promise<void> {
   try {
-    const res = await apiFetch('/api/catalog/styles');
-    const data = await res.json();
-    if (data.success && Array.isArray(data.recipes) && data.recipes.length > 0) {
-      const customFormatted = data.recipes.map((r: any) => ({
-        id: r.id,
-        name: r.id === 'recipe_jewelry_master' ? r.name : (r.name.startsWith('🌟 ') ? r.name : `🌟 ${r.name}`),
-        category: r.category || '我的专属配方',
-        tag: r.tag || '已保存配方',
-        promptSnippet: r.promptSnippet || r.prompt_snippet || '',
-      }));
-      const dbIds = new Set(customFormatted.map((r: { id: string }) => r.id));
-      const merged = [
-        ...SYSTEM_MASTER_RECIPES.filter((r) => !dbIds.has(r.id)),
-        ...customFormatted,
-      ];
-      setRecipes(merged);
-      const prev = useAppStore.getState().selectedArchId;
-      if (!merged.some((r) => r.id === prev)) {
-        const jewelryArch = merged.find(
-          (r) =>
-            r.id === 'recipe_jewelry_master' ||
-            r.id === 'arch_jewelry_master' ||
-            /珠宝首饰/.test(String(r.name))
-        );
-        setSelectedArchId(jewelryArch?.id || merged[0]?.id || 'recipe_jewelry_master');
-      }
-    } else {
-      setRecipes(SYSTEM_MASTER_RECIPES);
-      if (!SYSTEM_MASTER_RECIPES.some((r) => r.id === useAppStore.getState().selectedArchId)) {
-        setSelectedArchId(SYSTEM_MASTER_RECIPES[0].id);
-      }
+    const recipes: any[] = [];
+    const pageSize = 100;
+    let pages = 1;
+    for (let page = 1; page <= pages; page++) {
+      const res = await apiFetch(`/api/catalog/styles?page=${page}&pageSize=${pageSize}`);
+      if (!res.ok) throw new Error('拍摄架构加载失败');
+      const data = await res.json();
+      if (!data.success || !Array.isArray(data.recipes)) throw new Error('拍摄架构响应无效');
+      if (page === 1 && Number.isInteger(data.total) && data.total > 0) pages = Math.ceil(data.total / pageSize);
+      recipes.push(...data.recipes);
+      if (data.recipes.length === 0) break;
+    }
+
+    const visibleRecipes = [...new Map(recipes.map(recipe => [recipe.id, recipe])).values()].map((recipe: any) => ({
+      id: recipe.id,
+      name: recipe.name,
+      category: recipe.category || 'general',
+      tag: recipe.tag || '已保存配方',
+      promptSnippet: recipe.promptSnippet || recipe.prompt_snippet || '',
+    }));
+    setRecipes(visibleRecipes);
+
+    const selectedId = useAppStore.getState().selectedArchId;
+    if (selectedId !== 'auto' && !visibleRecipes.some((recipe: { id: string }) => recipe.id === selectedId)) {
+      setSelectedArchId(visibleRecipes.length ? 'auto' : '');
+    } else if (selectedId === 'auto' && visibleRecipes.length === 0) {
+      setSelectedArchId('');
     }
   } catch {
-    setRecipes(SYSTEM_MASTER_RECIPES);
-    if (!SYSTEM_MASTER_RECIPES.some((r) => r.id === useAppStore.getState().selectedArchId)) {
-      setSelectedArchId(SYSTEM_MASTER_RECIPES[0].id);
-    }
+    // A failed request must not resurrect an official recipe that the user hid.
+    // Keep the saved preference so a later successful reload can restore it.
+    setRecipes([]);
   }
 }
 
@@ -64,6 +61,7 @@ export async function fetchAssetLibraryOptions(force = false): Promise<{
   outfits: any[];
   actions: any[];
   fullPrompts: any[];
+  productCategories: AssetProductCategory[];
 }> {
   const store = await getGlobalAssetLibrary(force);
   return {
@@ -71,6 +69,7 @@ export async function fetchAssetLibraryOptions(force = false): Promise<{
     scenes: store.scenes.filter(row => isWorkshopAssetEligible(row, 'scene')),
     outfits: store.outfits.filter(row => isWorkshopAssetEligible(row, 'outfit')),
     actions: store.actions.filter(row => isWorkshopAssetEligible(row, 'action')),
-    fullPrompts: store.fullPrompts.filter(row => isWorkshopAssetEligible(row, 'full_prompt')),
+    fullPrompts: store.fullPrompts.filter(row => isWorkshopAssetEligible(row, 'full_prompt') && hasActivePromptGroupFolders(row, store.productCategories)),
+    productCategories: store.productCategories,
   };
 }

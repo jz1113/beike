@@ -63,8 +63,7 @@ export function CanvasStageNodeMedia({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              updateNode(projectId, node.id, { status: 'generating', progress: 20 });
-              if (node.content) onRegenerate(node);
+              onRegenerate(node);
             }}
             className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[11px] font-bold hover:bg-slate-800 transition-all cursor-pointer shadow-xs active:scale-95"
           >

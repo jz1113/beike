@@ -2,6 +2,8 @@ import { createContext, useContext, useState, type InputHTMLAttributes, type Rea
 import { Activity, Eye, EyeOff, ExternalLink, Loader2 } from 'lucide-react';
 import { ExternalLinkAnchor } from '@client/shared/ui/ExternalLinkAnchor';
 
+export const SettingsSaveContext = createContext(false);
+
 export const SettingsConnectionContext = createContext<ReactNode>(null);
 
 export function SettingsServiceHeader({ icon, title, description, links, action, actions }: {
@@ -25,10 +27,11 @@ export function SettingsSecretField({ label, id, visible, onVisibleChange, ...in
   return <div className="settings-form-field"><label htmlFor={id}>{label}</label><div className="relative"><input {...input} id={id} type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} className="settings-field w-full pr-11" /><button type="button" aria-label={`${shown ? '隐藏' : '显示'}${label}`} aria-pressed={shown} onClick={() => (onVisibleChange ?? setLocalVisible)(!shown)} className="settings-secret-reveal">{shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>;
 }
 
-export function SettingsActions({ onTest, onSave, testing, testDisabled, testLabel = '测试连接' }: { onTest: () => void; onSave: () => void; testing: boolean; testDisabled?: boolean; testLabel?: string }) {
-  return <div className="settings-form-actions"><button type="button" onClick={onTest} disabled={testing || testDisabled} className="settings-button-secondary">{testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}{testing ? '测试中…' : testLabel}</button><button type="button" onClick={onSave} className="settings-button-primary">保存配置</button></div>;
+export function SettingsActions({ onTest, onSave, testing, testDisabled, disabled, testLabel = '测试连接' }: { onTest: () => void; onSave: () => void; testing: boolean; testDisabled?: boolean; disabled?: boolean; testLabel?: string }) {
+  const saving = useContext(SettingsSaveContext);
+  return <div className="settings-form-actions"><button type="button" onClick={onTest} disabled={testing || testDisabled || saving || disabled} className="settings-button-secondary">{testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}{testing ? '测试中…' : testLabel}</button><button type="submit" onClick={onSave} disabled={saving || disabled} aria-busy={saving} className="settings-button-primary">{saving ? '正在保存…' : '保存配置'}</button></div>;
 }
 
-export function SettingsToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <button type="button" role="switch" aria-label={label} aria-checked={checked} onClick={() => onChange(!checked)} className="settings-toggle"><span>{checked ? '已启用' : '未启用'}</span><span className={`settings-toggle-track ${checked ? 'is-on' : ''}`} aria-hidden="true"><span /></span></button>;
+export function SettingsToggle({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
+  return <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)} className="settings-toggle"><span>{checked ? '已启用' : '未启用'}</span><span className={`settings-toggle-track ${checked ? 'is-on' : ''}`} aria-hidden="true"><span /></span></button>;
 }

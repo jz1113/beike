@@ -7,6 +7,7 @@ import {
   SEED_PURGE_FILTER,
 } from './assetSeedConstants';
 import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
+import { deleteMotherReplacements } from './motherGroupReplacement';
 
 // 清理官方预置种子资产（按标题白名单精确匹配，避免误删用户手动录入）
 export async function purgeSeedAssetsData() {
@@ -75,7 +76,10 @@ export async function clearAllAssetsData(targetType: string) {
     deletedCount += res.count;
   }
   if (targetType === 'full_prompt' || targetType === 'all') {
-    const res = await db.fullPromptAsset.deleteMany({});
+    const res = await db.$transaction(async tx => {
+      await deleteMotherReplacements(tx);
+      return tx.fullPromptAsset.deleteMany({});
+    });
     deletedCount += res.count;
   }
   return {
@@ -95,6 +99,7 @@ export async function clearAllAssetsData(targetType: string) {
 export async function clearLocalDatabaseData() {
   const workspaceId = requireWorkspaceId();
   const deletedCount = await db.$transaction(async (tx) => {
+    const replacements = await deleteMotherReplacements(tx);
     const results = await Promise.all([
       tx.assistantTurnItem.deleteMany(),
       tx.assistantTurn.deleteMany(),
@@ -132,7 +137,7 @@ export async function clearLocalDatabaseData() {
       categoriesDeleted += result.count;
     }
 
-    return results.reduce((sum, result) => sum + result.count, 0) + categoriesDeleted;
+    return replacements + results.reduce((sum, result) => sum + result.count, 0) + categoriesDeleted;
   });
 
   return {

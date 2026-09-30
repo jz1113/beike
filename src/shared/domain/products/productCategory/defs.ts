@@ -16,6 +16,7 @@ export interface SubCategoryDef {
   shortLabel: string;
   anchorId?: string;
   anatomy?: string;
+  anatomyOptions?: string[];
   keywords: string[];
   isCustom?: boolean;
 }

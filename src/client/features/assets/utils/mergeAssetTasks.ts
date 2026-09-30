@@ -1,215 +1,146 @@
 import { isGenerationDeleted } from '@client/store/persist/generation';
 import { getAspectRatioFromSize } from '@shared/domain/media/drawing';
+import { getAssetTime, matchesAssetTime, resolveAssetMediaType, type AssetMediaCategory, type AssetTimeFilter } from '@client/shared/utils/assetTaskData';
 import type { useAppStore } from '@client/store';
+
 type AppState = ReturnType<typeof useAppStore.getState>;
 interface MergeAssetTaskInput {
   dbTasks: any[];
   generationTasks: AppState['generationTasks'];
   sessions: AppState['sessions'];
   canvasTasks: any[];
-  mediaCategory: 'image' | 'video' | 'audio' | 'canvas';
+  mediaCategory: AssetMediaCategory;
   searchKeyword: string;
-  timeFilter: 'all' | 'today' | 'yesterday' | '7days' | '30days';
+  timeFilter: AssetTimeFilter;
+  now?: Date;
+  serverHistoryComplete?: boolean;
 }
-export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTasks, mediaCategory, searchKeyword, timeFilter }: MergeAssetTaskInput) {
-    // 0. 建立全量内存任务检索表 (包括当前会话 tasks、全局 generationTasks)
-    const memoryTaskMap = new Map<string, any>();
-    (generationTasks || []).forEach(t => {
-      if (t.id) memoryTaskMap.set(t.id, t);
-      if (t.taskId) memoryTaskMap.set(t.taskId, t);
-    });
 
-    const sessionMap = new Map<string, { sessionId: string; sessionTitle: string }>();
-    (sessions || []).forEach((sess) => {
-      sess.tasks?.forEach((st) => {
-        const info = { sessionId: sess.id, sessionTitle: sess.title };
-        if (st.id) {
-          sessionMap.set(st.id, info);
-          if (!memoryTaskMap.has(st.id)) memoryTaskMap.set(st.id, st);
-        }
-        if (st.taskId) {
-          sessionMap.set(st.taskId, info);
-          if (!memoryTaskMap.has(st.taskId)) memoryTaskMap.set(st.taskId, st);
-        }
-      });
-    });
-
-    // 1. 建立数据库任务快速索引表 (taskId, id, resultUrl)
-    const dbByTaskId = new Map<string, any>();
-    const dbById = new Map<string, any>();
-    const dbByResultUrl = new Map<string, any>();
-    dbTasks.forEach(t => {
-      if (t.taskId) dbByTaskId.set(t.taskId, t);
-      if (t.id) dbById.set(t.id, t);
-      if (t.resultUrl) dbByResultUrl.set(t.resultUrl, t);
-    });
-
-    // 2. 规范化内存任务（包括进行中的任务 + 刚完成但尚未落库的新任务）
-    const memoryMapped: any[] = [];
-    Array.from(memoryTaskMap.values()).forEach(t => {
-      if (isGenerationDeleted(t.id, t.taskId, t.resultUrl, t.dbId)) return;
-      const matchedDb = (t.taskId ? dbByTaskId.get(t.taskId) : null) || 
-        dbById.get(t.id) || 
-        (t.resultUrl ? dbByResultUrl.get(t.resultUrl) : null);
-      
-      const isDbSuccess = matchedDb && matchedDb.status === 'SUCCESS' && matchedDb.resultUrl;
-      const finalStatus = (t.resultUrl || isDbSuccess || t.status === 'SUCCESS') ? 'SUCCESS' : (t.status || 'IN_PROGRESS');
-      const finalResultUrl = t.resultUrl || (isDbSuccess ? matchedDb.resultUrl : undefined);
-
-      // 如果数据库里已经有了成功的此任务，则由 dbMapped 接管，避免重复处理
-      if (matchedDb && isDbSuccess && !t.taskId?.startsWith('local_')) {
-        return;
+export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTasks, mediaCategory, searchKeyword, timeFilter, now, serverHistoryComplete = false }: MergeAssetTaskInput) {
+  // Drafts in the global engine take precedence over archived session copies.
+  const memoryTasks = new Map<string, any>();
+  const sessionMap = new Map<string, { sessionId: string; sessionTitle: string }>();
+  const sessionByTaskId = new Map<string, { sessionId: string; sessionTitle: string } | null>();
+  const activeDbTasks = dbTasks.filter((task) => !isGenerationDeleted(task.id, task.taskId, task.resultUrl, task.dbId));
+  const archivedIds = new Set(activeDbTasks.map((task) => task.id));
+  for (const task of generationTasks || []) {
+    const key = task.id || task.dbId || task.taskId;
+    if (key) memoryTasks.set(key, task);
+  }
+  for (const session of sessions || []) {
+    for (const task of session.tasks || []) {
+      const key = task.id || task.dbId || task.taskId;
+      if (key && !memoryTasks.has(key)) memoryTasks.set(key, task);
+      const info = { sessionId: session.id, sessionTitle: session.title };
+      for (const alias of [task.id, task.dbId]) {
+        if (alias) sessionMap.set(alias, { sessionId: session.id, sessionTitle: session.title });
       }
-
-      const rawMediaType = String((t as any).mediaType || '');
-      const rawModel = String((t as any).model || matchedDb?.model || '').toLowerCase();
-      const isTaskVideo =
-        rawMediaType === 'video' ||
-        rawMediaType === 'depth-video' ||
-        rawModel.includes('video') ||
-        rawModel.includes('seedance') ||
-        rawModel === 'video-depth-anything' ||
-        (matchedDb ? (matchedDb.mediaType === 'video' || matchedDb.mediaType === 'depth-video') : false) ||
-        (finalResultUrl?.includes('.mp4'));
-      const isTaskAudio = rawMediaType === 'audio' || (matchedDb ? matchedDb.mediaType === 'audio' : false) || (finalResultUrl?.includes('.mp3') || finalResultUrl?.includes('.wav'));
-      const isTaskDoc = rawMediaType === 'doc' || rawMediaType === 'document' || (matchedDb ? matchedDb.mediaType === 'doc' : false);
-      const resolvedMediaType = isTaskVideo ? 'video' : isTaskAudio ? 'audio' : isTaskDoc ? 'doc' : 'image';
-
-      const tAny = t as any;
-      const sessInfo = (t.taskId ? sessionMap.get(t.taskId) : null) || (t.id ? sessionMap.get(t.id) : null);
-      const resolvedSessionId = t.sessionId || sessInfo?.sessionId;
-      const resolvedSessionTitle = t.sessionTitle || sessInfo?.sessionTitle;
-
-      memoryMapped.push({
-        id: matchedDb?.id || t.id,
-        taskId: t.taskId || matchedDb?.taskId,
-        sessionId: resolvedSessionId,
-        sessionTitle: resolvedSessionTitle,
-        batchId: tAny.batchId,
-        prompt: t.prompt,
-        resultUrl: finalResultUrl,
-        status: finalStatus,
-        createdAt: t.createdAt ? (typeof t.createdAt === 'number' ? new Date(t.createdAt).toISOString() : t.createdAt) : new Date().toISOString(),
-        model: t.model,
-        aspectRatio: tAny.aspectRatio || (tAny.size ? getAspectRatioFromSize(tAny.size) : '1:1'),
-        mediaType: resolvedMediaType,
-        referenceImages: t.referenceImages || tAny.images || tAny.rawTask?.referenceImages || tAny.rawTask?.images,
-        referenceImageUrl: t.referenceImageUrl || tAny.sourceImageUrl || tAny.rawTask?.referenceImageUrl,
-        images: t.images || t.referenceImages || tAny.rawTask?.images,
-        sourceImageUrl: t.sourceImageUrl || t.referenceImageUrl || tAny.rawTask?.sourceImageUrl,
-        useReferenceImage: Boolean(t.referenceImages?.length || t.referenceImageUrl || t.images?.length || t.sourceImageUrl),
-        rawTask: t,
-        mode: tAny.mode || (tAny.isWorkshop ? 'workshop' : undefined)
-      });
-    });
-
-    // 3. 规范化数据库任务（严格剔除已持久化删除的记录，并施加内存实时热补丁）
-    const dbMapped = dbTasks
-      .filter((t) => !isGenerationDeleted(t.id, t.taskId, t.resultUrl, (t as any).dbId))
-      .map((t) => {
-        // 🌟 实时热补丁：若内存中该任务状态更新（如已变成 SUCCESS），立即覆盖，绝不等待数据库慢轮询！
-        const memTask = (t.taskId ? memoryTaskMap.get(t.taskId) : null) || (t.id ? memoryTaskMap.get(t.id) : null);
-        const memIsSuccess = memTask && (memTask.status === 'SUCCESS' || Boolean(memTask.resultUrl));
-        const effectiveStatus = memIsSuccess ? 'SUCCESS' : (t.status || 'SUCCESS');
-        const effectiveResultUrl = memTask?.resultUrl || t.resultUrl;
-
-        const dbRawMediaType = String((t as any).mediaType || memTask?.mediaType || '');
-        const dbModel = String((t as any).model || memTask?.model || '').toLowerCase();
-        const isVideo =
-          dbRawMediaType === 'video' ||
-          dbRawMediaType === 'depth-video' ||
-          dbModel.includes('video') ||
-          dbModel.includes('seedance') ||
-          dbModel === 'video-depth-anything' ||
-          (effectiveResultUrl && effectiveResultUrl.includes('.mp4'));
-        const isAudio = dbRawMediaType === 'audio' || (effectiveResultUrl && (effectiveResultUrl.includes('.mp3') || effectiveResultUrl.includes('.wav')));
-        const isDoc = dbRawMediaType === 'doc' || dbRawMediaType === 'document' || (effectiveResultUrl && (effectiveResultUrl.includes('.pdf') || effectiveResultUrl.includes('.docx')));
-        const resolvedMediaType = isVideo ? 'video' : isAudio ? 'audio' : isDoc ? 'doc' : 'image';
-
-        const tAny = t as any;
-        const sessInfo = (t.taskId ? sessionMap.get(t.taskId) : null) || (t.id ? sessionMap.get(t.id) : null);
-        const resolvedSessionId = tAny.sessionId || memTask?.sessionId || sessInfo?.sessionId;
-        const resolvedSessionTitle = tAny.sessionTitle || memTask?.sessionTitle || sessInfo?.sessionTitle;
-
-        const refImgs = t.referenceImages || memTask?.referenceImages || tAny.images || memTask?.images || tAny.rawTask?.referenceImages || tAny.rawTask?.images;
-        const refImgUrl = t.referenceImageUrl || memTask?.referenceImageUrl || tAny.sourceImageUrl || memTask?.sourceImageUrl || tAny.rawTask?.referenceImageUrl;
-
-        return {
-          id: t.id,
-          taskId: t.taskId || memTask?.taskId,
-          sessionId: resolvedSessionId,
-          sessionTitle: resolvedSessionTitle,
-          batchId: tAny.batchId || memTask?.batchId,
-          prompt: t.prompt || memTask?.prompt,
-          resultUrl: effectiveResultUrl,
-          status: effectiveStatus,
-          createdAt: t.createdAt,
-          model: t.model || memTask?.model,
-          aspectRatio: t.aspectRatio || memTask?.aspectRatio || (t.size ? getAspectRatioFromSize(t.size) : '1:1'),
-          mediaType: resolvedMediaType,
-          referenceImages: refImgs,
-          referenceImageUrl: refImgUrl,
-          images: refImgs || t.images,
-          sourceImageUrl: refImgUrl || t.sourceImageUrl,
-          useReferenceImage: Boolean((refImgs && refImgs.length > 0) || refImgUrl),
-          rawTask: memTask || t,
-          mode: t.mode || memTask?.mode || (t.isWorkshop ? 'workshop' : undefined)
-        };
-      });
-
-    // 4. 按 ID 合并去重（正在生成的任务与内存最新任务优先）
-    const map = new Map<string, any>();
-    memoryMapped.forEach(t => map.set(t.id, t));
-    dbMapped.forEach(t => {
-      if (!map.has(t.id)) {
-        map.set(t.id, t);
-      } else {
-        const existing = map.get(t.id);
-        if (existing.status !== 'SUCCESS' && t.status === 'SUCCESS') {
-          map.set(t.id, t);
-        }
+      if (task.taskId) {
+        if (!sessionByTaskId.has(task.taskId)) sessionByTaskId.set(task.taskId, info);
+        else if (sessionByTaskId.get(task.taskId)?.sessionId !== session.id) sessionByTaskId.set(task.taskId, null);
       }
-    });
-
-    let list = Array.from(map.values());
-
-    // 5. 严格过滤媒体类型 (图片/视频/音频/画布)
-    if (mediaCategory === 'canvas') {
-      list = canvasTasks;
-    } else if (mediaCategory === 'image') {
-      list = list.filter(t => t.mediaType === 'image' || t.mediaType === 'depth-image' || (!t.mediaType && !t.resultUrl?.includes('.mp4')));
-    } else if (mediaCategory === 'video') {
-      list = list.filter(t => t.mediaType === 'video' || t.mediaType === 'depth-video' || t.resultUrl?.includes('.mp4'));
-    } else if (mediaCategory === 'audio') {
-      list = list.filter(t => t.mediaType === 'audio' || t.resultUrl?.includes('.mp3') || t.resultUrl?.includes('.wav'));
     }
+  }
+  const memoryById = new Map<string, any>();
+  const memoryByResult = new Map<string, any[]>();
+  const memoryByTaskId = new Map<string, any[]>();
+  const dbByTaskId = new Map<string, any[]>();
+  const matchedMemory = new Set<any>();
+  function indexMany(index: Map<string, any[]>, key: string | undefined, task: any) {
+    if (!key) return;
+    const tasks = index.get(key);
+    if (tasks) tasks.push(task);
+    else index.set(key, [task]);
+  }
+  for (const task of memoryTasks.values()) {
+    if (task.id) memoryById.set(task.id, task);
+    if (task.dbId) memoryById.set(task.dbId, task);
+    indexMany(memoryByResult, task.resultUrl, task);
+    indexMany(memoryByTaskId, task.taskId, task);
+  }
+  for (const task of activeDbTasks) indexMany(dbByTaskId, task.taskId, task);
 
-    // 6. 搜索关键词
-    if (searchKeyword.trim()) {
-      const kw = searchKeyword.trim().toLowerCase();
-      list = list.filter(t => t.prompt?.toLowerCase().includes(kw) || t.title?.toLowerCase().includes(kw));
-    }
+  function matchMemory(db: any) {
+    const exact = memoryById.get(db.id) || memoryById.get(db.dbId);
+    if (exact) return exact;
+    const sameResult = db.resultUrl ? memoryByResult.get(db.resultUrl) : undefined;
+    if (sameResult?.length === 1) return sameResult[0];
+    const candidates = db.taskId ? memoryByTaskId.get(db.taskId) : undefined;
+    // One upstream request can produce several archive rows: never patch them all with one draft.
+    return candidates?.length === 1 && dbByTaskId.get(db.taskId)?.length === 1 ? candidates[0] : undefined;
+  }
 
-    // 7. 时间范围过滤 (只保留画圈的时间筛选)
-    if (timeFilter !== 'all') {
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      const yesterdayStart = todayStart - 86400000;
+  function normalizeTask(db: any, memory?: any, archived = false) {
+    // Defined database fields overlay draft metadata; drafts retain metadata absent from the archive.
+    const combined = { ...memory, ...Object.fromEntries(Object.entries(db).filter(([, value]) => value != null)) };
+    // The server owns terminal states. Local completion only bridges a pending archive update.
+    const source = db.status === 'SUCCESS' || db.status === 'FAILURE' ? db : memory || db;
+    const resultUrl = source.status === 'FAILURE' ? undefined : source.resultUrl;
+    const status = resultUrl ? 'SUCCESS' : source.status || 'IN_PROGRESS';
+    const session = sessionMap.get(db.id) || sessionMap.get(db.dbId) || sessionMap.get(memory?.id)
+      || sessionMap.get(memory?.dbId) || sessionByTaskId.get(db.taskId);
+    const referenceImages = db.referenceImages || memory?.referenceImages || db.images || memory?.images || combined.rawTask?.referenceImages;
+    const referenceImageUrl = db.referenceImageUrl || memory?.referenceImageUrl || db.sourceImageUrl || memory?.sourceImageUrl;
 
-      list = list.filter(t => {
-        const time = new Date(t.createdAt).getTime();
-        if (timeFilter === 'today') return time >= todayStart;
-        if (timeFilter === 'yesterday') return time >= yesterdayStart && time < todayStart;
-        if (timeFilter === '7days') return time >= now.getTime() - 7 * 86400000;
-        if (timeFilter === '30days') return time >= now.getTime() - 30 * 86400000;
-        return true;
-      });
-    }
+    return {
+      ...combined,
+      id: db.id || memory?.id || db.taskId,
+      dbId: archived ? db.id : db.dbId || memory?.dbId,
+      taskId: db.taskId || memory?.taskId,
+      title: db.title || memory?.title,
+      prompt: db.prompt || memory?.prompt || '',
+      batchId: db.batchId || memory?.batchId,
+      sessionId: db.sessionId || memory?.sessionId || session?.sessionId,
+      sessionTitle: db.sessionTitle || memory?.sessionTitle || session?.sessionTitle,
+      status,
+      resultUrl,
+      progress: status === 'SUCCESS' ? '100%' : status === 'FAILURE' ? '0%' : source.progress,
+      failReason: status === 'FAILURE' ? source.failReason || db.failReason || memory?.failReason : undefined,
+      size: db.size || memory?.size,
+      quality: db.quality || memory?.quality,
+      createdAt: getAssetTime(db.createdAt ?? memory?.createdAt),
+      model: db.model || memory?.model,
+      mediaType: resolveAssetMediaType(db.mediaType || memory?.mediaType, db.model || memory?.model, resultUrl),
+      aspectRatio: db.aspectRatio || (db.size ? getAspectRatioFromSize(db.size) : memory?.aspectRatio || (memory?.size ? getAspectRatioFromSize(memory.size) : '1:1')),
+      referenceImages,
+      referenceImageUrl,
+      images: referenceImages || combined.images,
+      sourceImageUrl: referenceImageUrl || combined.sourceImageUrl,
+      useReferenceImage: Boolean(referenceImages?.length || referenceImageUrl || combined.useReferenceImage),
+      rawTask: { ...combined, status, resultUrl },
+    };
+  }
 
-    // 8. 排序 (默认最新优先在最前)
-    list.sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+  const tasksById = new Map<string, any>();
+  for (const db of activeDbTasks) {
+    const memory = matchMemory(db);
+    if (memory) matchedMemory.add(memory);
+    const task = normalizeTask(db, memory, true);
+    if (task.id) tasksById.set(task.id, task);
+  }
+  for (const memory of memoryTasks.values()) {
+    if (isGenerationDeleted(memory.id, memory.taskId, memory.resultUrl, memory.dbId)) continue;
+    if (serverHistoryComplete && memory.dbId && !archivedIds.has(memory.dbId)
+      && (memory.status === 'SUCCESS' || memory.status === 'FAILURE')) continue;
+    if (matchedMemory.has(memory) || (memory.taskId && dbByTaskId.has(memory.taskId))) continue;
+    const task = normalizeTask(memory);
+    if (task.id) tasksById.set(task.id, task);
+  }
 
-    return list;
+  let list = mediaCategory === 'canvas' ? [...canvasTasks] : Array.from(tasksById.values());
+  if (mediaCategory !== 'canvas') {
+    list = list.filter((task) => mediaCategory === 'image'
+      ? task.mediaType === 'image' || task.mediaType === 'depth-image'
+      : mediaCategory === 'video'
+        ? task.mediaType === 'video' || task.mediaType === 'depth-video'
+        : task.mediaType === 'audio');
+  }
+  const keyword = searchKeyword.trim().toLowerCase();
+  if (keyword) {
+    list = list.filter((task) => [task.prompt, task.title, task.sessionTitle, task.batchTitle, task.canvasProjectTitle, task.model]
+      .some((value) => typeof value === 'string' && value.toLowerCase().includes(keyword)));
+  }
+  list = list.filter((task) => matchesAssetTime(task.createdAt, timeFilter, now));
+  list.sort((a, b) => getAssetTime(b.createdAt) - getAssetTime(a.createdAt));
+  return list;
 }

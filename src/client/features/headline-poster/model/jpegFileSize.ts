@@ -7,16 +7,16 @@ export const MAX_COVER_FILE_BYTES = 5 * 1024 * 1024 - 1;
  * case, preserving every rendered pixel instead of adding visual noise.
  */
 export async function enforceCoverJpegFileSize(blob: Blob): Promise<Blob> {
+  const signature = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  if (signature.length < 2 || signature[0] !== 0xff || signature[1] !== 0xd8) {
+    throw new Error('导出文件不是有效 JPEG，无法校验封面体积');
+  }
   if (blob.size >= MIN_COVER_FILE_BYTES && blob.size <= MAX_COVER_FILE_BYTES) return blob;
   if (blob.size > MAX_COVER_FILE_BYTES) {
     throw new Error('封面无法压缩到严格小于 5MB，请降低图片质量后重试');
   }
 
   const source = new Uint8Array(await blob.arrayBuffer());
-  if (source.length < 2 || source[0] !== 0xff || source[1] !== 0xd8) {
-    throw new Error('导出文件不是有效 JPEG，无法校验封面体积');
-  }
-
   let remaining = MIN_COVER_FILE_BYTES - blob.size;
   const segments: ArrayBuffer[] = [];
   while (remaining > 0) {

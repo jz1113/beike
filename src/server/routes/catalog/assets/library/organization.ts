@@ -7,8 +7,8 @@ export async function readOrganization() {
 
 export async function mutateOrganization(body: Record<string, any>) {
   try {
-    await applyAssetOrganizationMutation(body);
-    return readOrganization();
+    const result = await applyAssetOrganizationMutation(body);
+    return jsonResponse({ success: true, ...(await listAssetOrganization()), ...(result || {}) });
   } catch (error) {
     return jsonResponse({ success: false, error: error instanceof Error ? error.message : '分类操作失败' }, 400);
   }

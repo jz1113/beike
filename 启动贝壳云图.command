@@ -39,22 +39,7 @@ if [[ ! -f node_modules/tsx/package.json || ! -f node_modules/vite/package.json 
   corepack pnpm install --frozen-lockfile || fail "依赖安装失败。请查看上方错误信息。"
 fi
 
-APP_URL="http://127.0.0.1:5173"
-API_PORT=3000
-if [[ -f .local-api-port ]]; then
-  read -r SAVED_PORT < .local-api-port
-  [[ "$SAVED_PORT" =~ ^[0-9]+$ ]] && API_PORT="$SAVED_PORT"
-fi
-
-# Repeated double-clicks should open the existing app, not restart its API.
-if command -v curl >/dev/null 2>&1 \
-  && curl -fsS --max-time 2 "$APP_URL/" 2>/dev/null | grep -q '<title>贝壳云图</title>' \
-  && curl -fsS --max-time 2 "http://127.0.0.1:$API_PORT/api/health" 2>/dev/null | grep -q '"success":true'; then
-  echo "✓ 贝壳云图已在运行：$APP_URL"
-  [[ "${BEIKE_NO_OPEN:-}" == "1" ]] || open "$APP_URL"
-  exit 0
-fi
-
+# The Node launcher validates workspace ownership before reusing existing services.
 echo "→ 正在启动前端和 API；准备好后会自动打开浏览器。"
 node tools/scripts/web/dev-web.mjs
 STATUS=$?

@@ -1,16 +1,18 @@
 import { db } from './access';
+import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
 
 export const productRepository = {
-  findCollected: (platform: string, itemId: string) => db.product.findFirst({
-    where: { platform, itemId },
-    orderBy: { createdAt: 'desc' },
+  findCollected: (platform: string, itemId: string) => db.product.findUnique({
+    where: { workspaceId_platform_itemId: { workspaceId: requireWorkspaceId(), platform, itemId } },
   }),
   async saveCollected(platform: string, itemId: string, data: { title: string; picUrl: string; detailUrls: string }) {
-    const existing = await db.product.findFirst({ where: { platform, itemId } });
-    return existing
-      ? db.product.update({ where: { id: existing.id }, data })
-      : db.product.create({ data: { platform, itemId, ...data } });
+    const workspaceId = requireWorkspaceId();
+    return db.product.upsert({
+      where: { workspaceId_platform_itemId: { workspaceId, platform, itemId } },
+      update: data,
+      create: { workspaceId, platform, itemId, ...data },
+    });
   },
   async list(page: number, pageSize: number) {
     const [total, products] = await Promise.all([

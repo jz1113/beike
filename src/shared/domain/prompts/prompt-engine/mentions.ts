@@ -3,9 +3,37 @@
  */
 
 export const PROMPT_MENTION_REGEX =
-  /(@(?:insp_\d+|图片\d+|主体\d*|模特\d*|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)|\{\{\s*(?:Mixed|Image|图)?\s*\d+\s*\}\})/gi;
+  /(@\["(?:\\.|[^"\\])*","(?:\\.|[^"\\])*"\]|@"(?:\\.|[^"\\])*"|@(?:insp_\d+|图片\d+|视频\d+|主体\d*|模特\d*|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)|\{\{\s*(?:Mixed|Image|图)?\s*\d+\s*\}\})/gi;
+
+export function parseSubjectMention(token: string): { id: string; name: string } | null {
+  if (!token.startsWith('@[')) return null;
+  try {
+    const value: unknown = JSON.parse(token.slice(1));
+    if (Array.isArray(value) && value.length === 2 && value.every(item => typeof item === 'string')) {
+      return { id: value[0], name: value[1] };
+    }
+  } catch { /* An incomplete token remains editable text. */ }
+  return null;
+}
+
+export function formatSubjectMention(id: string, name: string): string {
+  return `@${JSON.stringify([id, name])}`;
+}
+
+/** Quotes preserve filenames containing spaces or punctuation as one mention. */
+export function formatPromptMention(name: string): string {
+  return /^[a-zA-Z0-9_\u4e00-\u9fa5.-]+$/.test(name) ? `@${name}` : `@${JSON.stringify(name)}`;
+}
 
 export function mentionTokenToName(token: string): string {
+  const subject = parseSubjectMention(token);
+  if (subject) return subject.name;
+  if (token.startsWith('@"')) {
+    try {
+      const name: unknown = JSON.parse(token.slice(1));
+      if (typeof name === 'string') return name;
+    } catch { /* Incomplete quoted mentions remain plain text. */ }
+  }
   return token.replace(/^@/, '').replace(/[{}]/g, '').trim();
 }
 
@@ -18,6 +46,12 @@ export function extractPromptMentions(prompt: string): string[] {
     matches.push(match[0]);
   }
   return matches;
+}
+
+/** A shortcut that replaces the reference pool must also replace its old tokens. */
+export function replacePromptReferenceMentions(prompt: string, replacement = ''): string {
+  return prompt.replace(new RegExp(PROMPT_MENTION_REGEX.source, 'gi'), () => replacement)
+    .replace(/[ \t]{2,}/g, ' ').trim();
 }
 
 export function isStandardImageMention(name: string): boolean {
@@ -42,6 +76,10 @@ function escapeRegExp(value: string): string {
 
 function replaceMentionName(text: string, name: string, slot: string): string {
   if (!name || isStandardImageMention(name)) return text;
+  const serialized = formatPromptMention(name);
+  if (serialized.startsWith('@"')) {
+    text = text.replace(new RegExp(escapeRegExp(serialized), 'gi'), slot);
+  }
   const escaped = escapeRegExp(name);
   const pattern = new RegExp(`@${escaped}(?![a-zA-Z0-9_\\u4e00-\\u9fa5.-])`, 'gi');
   let next = text.replace(pattern, slot);
@@ -70,7 +108,13 @@ export function normalizeReferenceMentions(
     const slot = `@图片${idx + 1}`;
     text = replaceMentionName(text, name, slot);
   });
-  return text;
+  return text.replace(new RegExp(PROMPT_MENTION_REGEX.source, 'gi'), token => {
+    if (parseSubjectMention(token)) return token;
+    const name = mentionTokenToName(token);
+    if (isGenericSubjectMention(name)) return '@图片1';
+    const sequence = name.match(/^(?:主体|模特|参考图|商品图|主图|图|insp_?|image|img|mixed\s*)(\d+)$/i);
+    return sequence ? `@图片${Number(sequence[1])}` : token;
+  });
 }
 
 /** 提取 prompt 中非标准槽位的自定义 @ 名（按首次出现顺序去重） */
@@ -143,8 +187,21 @@ export function findUnresolvedMentions(
   for (const token of extractPromptMentions(prompt)) {
     const name = mentionTokenToName(token);
     if (!name) continue;
-    if (isStandardImageMention(name)) continue;
-    if (isGenericSubjectMention(name)) continue;
+    if (parseSubjectMention(token)) {
+      unresolved.push(name);
+      continue;
+    }
+    if (isStandardImageMention(name)) {
+      const index = Number(name.match(/\d+$/)?.[0]);
+      if (index >= 1 && index <= orderedMentionNames.length) continue;
+      unresolved.push(name);
+      continue;
+    }
+    if (isGenericSubjectMention(name)) {
+      if (orderedMentionNames.length > 0) continue;
+      unresolved.push(name);
+      continue;
+    }
     if (isResolvableSeqMention(name, orderedMentionNames.length)) continue;
     const key = name.toLowerCase();
     const keyNoExt = name.replace(/\.[^/.]+$/, '').toLowerCase();

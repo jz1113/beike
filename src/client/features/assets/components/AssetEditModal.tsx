@@ -6,11 +6,15 @@ import {
   parsePersonaLayers,
   formatPersonaPrompt,
 } from '../utils/assetPromptConstants';
+import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
+import { PromptGroupCategoryEditor } from './PromptGroupCategoryEditor';
 
 export interface AssetEditModalProps {
   editingItem: any;
   setEditingItem: React.Dispatch<React.SetStateAction<any>>;
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';
+  productCategories: AssetProductCategory[];
+  albums: PromptAlbum[];
   isUpdating: boolean;
   onSave: () => void;
   onClose: () => void;
@@ -20,12 +24,13 @@ export function AssetEditModal({
   editingItem,
   setEditingItem,
   activeSubTab,
+  productCategories,
+  albums,
   isUpdating,
   onSave,
   onClose,
 }: AssetEditModalProps) {
   if (!editingItem) return null;
-
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-in fade-in duration-150">
       <section role="dialog" aria-modal="true" aria-label="编辑提示词资产" className="relative flex max-h-[90vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)]">
@@ -82,6 +87,19 @@ export function AssetEditModal({
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                 />
               </div>
+              <PromptGroupCategoryEditor
+                item={editingItem}
+                categories={productCategories}
+                albums={albums}
+                onCategoryChange={(next) => setEditingItem((prev: any) => ({
+                  ...prev,
+                  _productCategoryDirty: true,
+                  productCategoryIds: JSON.stringify(next === 'unclassified' ? [] : [next]),
+                  isUniversal: false,
+                  productSubcategory: null,
+                }))}
+                onSubcategoryChange={(next) => setEditingItem((prev: any) => ({ ...prev, productSubcategory: next }))}
+              />
               <div>
                 <label className="block text-slate-700 font-bold mb-1">完整中文生图提示词：</label>
                 <textarea

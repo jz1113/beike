@@ -1,8 +1,26 @@
 import { assistantMemory } from '../../services/assistant/assistantMemory';
-import { readJsonBody } from '../../core/validate';
 import { jsonResponse } from '../../core/http';
 import { assistantSessionRepository } from '@server/repositories/assistantSessions';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
+import { readResponseBodyLimited } from '../../core/readBodyLimited';
+import { safeErrorMessage, parseJsonBody } from '../../core/validate';
+import { assistantMessageSchema } from '@shared/contracts/assistant';
+import { z } from 'zod';
+import { interruptAssistantThreadTurns, stopAssistantThreadTurns } from '../../services/assistant/assistantTurnStream';
+import { clearSessionApprovals } from '../../services/assistant/assistantApprovalStore';
+import { discardQueuedTurnItems } from '../../services/library/itemPersistQueue';
+
+const sessionBodySchema = z.object({
+  sessions: z.array(z.object({
+    id: z.string().trim().min(1).max(255),
+    title: z.string().max(500).optional(),
+    createdAt: z.number().finite().min(0).max(8_640_000_000_000_000).optional(),
+    updatedAt: z.number().finite().min(0).max(8_640_000_000_000_000).optional(),
+    messages: z.array(assistantMessageSchema).max(2000).optional(),
+    allowedTools: z.array(z.string().min(1).max(128)).max(50).optional(),
+  })).min(1).max(50),
+  currentId: z.string().max(255).nullish(),
+});
 
 function sanitizeAttachment(a: any) {
   if (!a || typeof a !== 'object') return null;
@@ -13,7 +31,7 @@ function sanitizeAttachment(a: any) {
     return u;
   };
   if (type === 'document') {
-    const text = typeof a.extractedText === 'string' ? a.extractedText.slice(0, 80000) : undefined;
+    const text = typeof a.extractedText === 'string' ? a.extractedText.slice(0, 100000) : undefined;
     if (!text && !a.name) return null;
     return {
       type: 'document',
@@ -40,7 +58,7 @@ function sanitizeAttachment(a: any) {
 
 function sanitizeMessages(messages: any[]): any[] {
   if (!Array.isArray(messages)) return [];
-  return messages.filter((m, index) => index >= messages.length - 100 || Number(m.timestamp) > Date.now() - 7 * 86400000).map((m) => ({
+  return messages.map((m) => ({
     ...m,
     attachments: Array.isArray(m.attachments)
       ? m.attachments.map(sanitizeAttachment).filter((a: any) => a && (a.url || (a.type === 'document' && a.extractedText) || a.type === 'video'))
@@ -55,7 +73,7 @@ function sanitizeSession(s: any) {
     createdAt: typeof s.createdAt === 'number' ? s.createdAt : new Date(s.createdAt || Date.now()).getTime(),
     updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : new Date(s.updatedAt || Date.now()).getTime(),
     messages: sanitizeMessages(s.messages || []),
-    allowedTools: Array.isArray(s.allowedTools) ? s.allowedTools : [],
+    allowedTools: Array.isArray(s.allowedTools) ? [...new Set<string>(s.allowedTools)] : undefined,
   };
 }
 
@@ -68,16 +86,19 @@ export async function GET() {
 
     const sessions = threads.map((t) => {
       let messages: any[] = [];
-      let allowedTools: string[] = [];
+      let allowedTools: string[] | undefined;
       try {
         messages = JSON.parse(t.messagesJson || '[]');
       } catch {
         messages = [];
       }
       try {
-        allowedTools = JSON.parse(t.allowedToolsJson || '[]');
+        const stored = JSON.parse(t.allowedToolsJson || '[]');
+        // Legacy [] meant no configured policy; v1 distinguishes an explicit deny-all list.
+        if (Array.isArray(stored)) allowedTools = stored.length ? stored.filter((name): name is string => typeof name === 'string') : undefined;
+        else if (stored?.version === 1 && Array.isArray(stored.tools)) allowedTools = stored.tools.filter((name: unknown): name is string => typeof name === 'string');
       } catch {
-        allowedTools = [];
+        allowedTools = undefined;
       }
       return {
         id: t.id,
@@ -90,8 +111,8 @@ export async function GET() {
     });
 
     return jsonResponse({ success: true, sessions });
-  } catch (error: unknown) {
-    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+  } catch (error: any) {
+    return jsonResponse({ success: false, error: safeErrorMessage(new Error(formatUserError(error)), '会话操作失败，请稍后重试') }, 500);
   }
 }
 
@@ -102,9 +123,16 @@ export async function GET() {
  */
 export async function PUT(req: Request) {
   try {
-    const body = await readJsonBody(req);
-    const rawSessions = Array.isArray(body?.sessions) ? body.sessions : [];
-    const sessions = rawSessions.slice(0, 40).map(sanitizeSession).filter((s: any) => s.id);
+    let rawBody: unknown;
+    try {
+      const read = await readResponseBodyLimited(new Response(req.body, { headers: req.headers }), 64_000_000);
+      if (!read.ok) return jsonResponse({ success: false, error: '会话内容过大或为空' }, read.reason === 'too_large' ? 413 : 400);
+      rawBody = JSON.parse(read.buffer.toString('utf8'));
+    } catch { return jsonResponse({ success: false, error: '无效 JSON' }, 400); }
+    const parsed = parseJsonBody(rawBody, sessionBodySchema);
+    if (!parsed.success) return jsonResponse({ success: false, error: parsed.error }, 400);
+    const body = parsed.data;
+    const sessions = body.sessions.map(sanitizeSession);
 
     if (sessions.length === 0) {
       return jsonResponse({ success: false, error: 'sessions 不能为空' }, 400);
@@ -138,15 +166,16 @@ export async function PUT(req: Request) {
       }
     }
 
-    await assistantSessionRepository.save(sessions);
+    const savedCount = await assistantSessionRepository.save(sessions);
 
     return jsonResponse({
       success: true,
-      count: sessions.length,
+      count: savedCount,
+      skippedCount: sessions.length - savedCount,
       currentId: body?.currentId || null,
     });
-  } catch (error: unknown) {
-    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+  } catch (error: any) {
+    return jsonResponse({ success: false, error: safeErrorMessage(new Error(formatUserError(error)), '会话操作失败，请稍后重试') }, 500);
   }
 }
 
@@ -155,14 +184,24 @@ export async function PUT(req: Request) {
  */
 export async function DELETE(req: Request) {
   try {
-    const id = new URL(req.url).searchParams.get('id');
-    if (!id) {
+    const id = new URL(req.url).searchParams.get('id')?.trim();
+    if (!id || id.length > 255) {
       return jsonResponse({ success: false, error: '缺少 id' }, 400);
     }
-    await assistantSessionRepository.delete(id).catch(() => null);
+    // Commit the durable barrier before waiting for worker cleanup. Old clients and late
+    // item writes cannot recreate this thread, even if cleanup must be retried.
+    // Abort first so a running, abortable memory summarizer can release its write lock.
+    const interruptedTurnIds = interruptAssistantThreadTurns(id);
+    clearSessionApprovals(id);
+    await assistantSessionRepository.markDeleted(id);
+    const activeTurnIds = await stopAssistantThreadTurns(id);
+    const turns = await assistantSessionRepository.turnIds(id);
+    const turnIds = [...new Set([...interruptedTurnIds, ...activeTurnIds, ...turns.map(turn => turn.id)])];
+    discardQueuedTurnItems(turnIds);
+    await assistantSessionRepository.deleteTurnData(id, turnIds);
     await assistantMemory.remove(id);
     return jsonResponse({ success: true });
-  } catch (error: unknown) {
-    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+  } catch (error: any) {
+    return jsonResponse({ success: false, error: safeErrorMessage(new Error(formatUserError(error)), '会话操作失败，请稍后重试') }, 500);
   }
 }

@@ -36,18 +36,38 @@ export async function parseWanbangResponse(res: Response): Promise<Record<string
 }
 
 // 辅助函数：带智能错误识别和快速失败机制的 fetch（默认最多重试 1 次，超时 7s，快速跳过不存在的商品）
-// 万邦要求 key/secret 位于 query；调用方禁止记录最终请求 URL。
+// 兼容官方 query 凭证调用；禁止在日志中输出完整 URL。
+export class WanbangHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`万邦网关请求失败（HTTP ${status}）`);
+    this.name = 'WanbangHttpError';
+  }
+}
+
+function retryDelay(signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
+    const cancel = () => { clearTimeout(timer); reject(signal?.reason); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', cancel); resolve(); }, 1000);
+    signal?.addEventListener('abort', cancel, { once: true });
+  });
+}
+
 export async function fetchWithRetry(
   url: string,
   apiKey: string,
   apiSecret: string,
   retries = 1,
   timeoutMs = 7000,
+  signal?: AbortSignal,
 ): Promise<any> {
   for (let i = 0; i <= retries; i++) {
+    signal?.throwIfAborted();
+    const controller = new AbortController();
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener('abort', cancel, { once: true });
+    const timeoutId = setTimeout(() => controller.abort(new DOMException('万邦采集请求超时', 'TimeoutError')), timeoutMs);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       const res = await gatewayFetch(withWanbangCredentials(url, apiKey, apiSecret), {
         signal: controller.signal,
         headers: {
@@ -55,9 +75,8 @@ export async function fetchWithRetry(
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         },
       });
-      clearTimeout(timeoutId);
       if (!res.ok) {
-        throw new Error(`万邦网关请求失败（HTTP ${res.status}）`);
+        throw new WanbangHttpError(res.status);
       }
       const json = await parseWanbangResponse(res);
 
@@ -70,33 +89,34 @@ export async function fetchWithRetry(
         errMsg.includes('invalid') ||
         errMsg.includes('empty') ||
         errMsg.includes('apikey') ||
-        json?.error_code === '4000'
+        ['2000', '4003', '4004', '4005', '4006', '4007', '4008', '4009', '4010', '4012', '4013', '4014', '4015', '4016'].includes(String(json?.error_code))
       );
       if (isPermanentError) {
         return json; // 秒级直接返回，绝不挂起
       }
 
-      // 2. 临时性网络/网关限流错误（4001 限流、5000 繁忙、2000 超时）-> 允许重试 1 次
-      const isTemporaryWbError = json && (
-        json.error_code === '4001' || // 访问频率受限 / API Call limit
-        json.error_code === '5000' || // 服务商网关繁忙
-        json.error_code === '2000'    // 上游数据拉取超时
-      );
+      // 官方文档：2000 是收费的无结果响应；仅不收费的网络/服务端/超时错误重试一次。
+      const isTemporaryWbError = json && ['4000', '4001', '4002', '4017', '5000'].includes(String(json.error_code));
       if (isTemporaryWbError && i < retries) {
         throw new Error(`万邦网关临时限流/繁忙(${json.reason || json.error_code})`);
       }
 
       return json;
     } catch (err: any) {
+      if (signal?.aborted) throw signal.reason;
+      if (err instanceof WanbangHttpError && err.status < 500 && err.status !== 408) throw err;
       if (i === retries) throw err;
-      console.warn(`[Collect] 第 ${i + 1} 次请求万邦接口抖动(${err.message})，将在 1000ms 后进行最后一次快速重试...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.warn(`[Collect] 第 ${i + 1} 次请求万邦接口失败，将进行最后一次快速重试`);
+    } finally {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', cancel);
     }
+    await retryDelay(signal);
   }
 }
 
 // 通用图片提取器：递归穿透所有万邦可能返回的复杂数组/对象/HTML结构，并彻底去水印大图化
-export function extractUrls(source: any): string[] {
+export function extractUrls(source: any, allowHtml = true): string[] {
   const urls: string[] = [];
   if (!source) return urls;
 
@@ -106,6 +126,7 @@ export function extractUrls(source: any): string[] {
 
     // 如果包含 HTML 标签 (例如 desc 或 desc_img 为 HTML 片段)
     if (clean.includes('<img') || clean.includes('&lt;img')) {
+      if (!allowHtml) return urls;
       const imgRegex = /<img[^>]+(?:src|data-original|data-src|data-lazyload|data-ks-lazyload)=["']([^"']+)["']/gi;
       let match;
       while ((match = imgRegex.exec(clean)) !== null) {
@@ -128,7 +149,7 @@ export function extractUrls(source: any): string[] {
 
   if (Array.isArray(source)) {
     for (const item of source) {
-      const subUrls = extractUrls(item);
+      const subUrls = extractUrls(item, allowHtml);
       for (const u of subUrls) {
         if (u && !urls.includes(u)) urls.push(u);
       }
@@ -139,34 +160,34 @@ export function extractUrls(source: any): string[] {
   if (typeof source === 'object') {
     // 优先提取直接 url 属性
     if (source.url) {
-      const sub = extractUrls(source.url);
+      const sub = extractUrls(source.url, allowHtml);
       for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
     }
     if (source.pic_url) {
-      const sub = extractUrls(source.pic_url);
+      const sub = extractUrls(source.pic_url, allowHtml);
       for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
     }
     // 提取 item_img、prop_img、sku_img 嵌套
     if (source.item_img) {
-      const sub = extractUrls(source.item_img);
+      const sub = extractUrls(source.item_img, allowHtml);
       for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
     }
     if (source.prop_img) {
-      const sub = extractUrls(source.prop_img);
+      const sub = extractUrls(source.prop_img, allowHtml);
       for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
     }
     if (source.sku) {
-      const sub = extractUrls(source.sku);
+      const sub = extractUrls(source.sku, allowHtml);
       for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
     }
 
     for (const [key, val] of Object.entries(source)) {
       if (!['url', 'pic_url', 'item_img', 'prop_img', 'sku', 'sku_url', 'detail_url'].includes(key)) {
         if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('//') || val.includes('<img'))) {
-          const sub = extractUrls(val);
+          const sub = extractUrls(val, allowHtml);
           for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
         } else if (typeof val === 'object' && val !== null) {
-          const sub = extractUrls(val);
+          const sub = extractUrls(val, allowHtml);
           for (const u of sub) { if (u && !urls.includes(u)) urls.push(u); }
         }
       }

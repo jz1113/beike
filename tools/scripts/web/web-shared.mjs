@@ -3,14 +3,15 @@
  * 本机 Web 运行环境共享逻辑：数据目录、访问令牌、health 检查、API/Vite 启停。
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recordWebProcess, stopWebProcess } from './web-processes.mjs';
 
 export const APP_IDENTIFIER = 'com.azhuo.workbench';
 export const VITE_PORT = 5173;
@@ -55,38 +56,33 @@ export function resolveAppDataDir() {
   return join(home, '.local', 'share', APP_IDENTIFIER);
 }
 
-export function ensureAppDatabase(workspaceRoot, appDataDir) {
+export function ensureAppDatabase(_workspaceRoot, appDataDir) {
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(join(appDataDir, 'storage'), { recursive: true });
-  const targetDb = join(appDataDir, 'azhuo.db');
-  const devDb = join(workspaceRoot, 'database', 'dev.db');
-  if (!existsSync(targetDb) && existsSync(devDb)) {
-    copyFileSync(devDb, targetDb);
-    console.log(`→ 已复制初始数据库：${targetDb}`);
-  }
-  // The API's versioned migration runner backs up and upgrades before listening.
+  // New databases are initialized by the API's versioned migration runner.
+  // Never copy a live SQLite main file without its WAL or overwrite user data.
 }
 
-export function resolveAccessToken(root, appDataDir) {
+export function resolveAccessToken(root, appDataDir, { isolated = false } = {}) {
   const tokenFile = join(appDataDir, 'access.token');
   const legacyTokenPath = join(root, '.local-api-token');
   let token = '';
 
-  for (const file of [tokenFile, legacyTokenPath]) {
+  for (const file of isolated ? [tokenFile] : [tokenFile, legacyTokenPath]) {
     if (token || !existsSync(file)) continue;
     try {
       token = readFileSync(file, 'utf8').trim();
-    } catch {
-      /* ignore */
-    }
+    } catch { throw new Error('本地访问令牌读取失败，请检查数据目录权限'); }
   }
   if (!token) token = randomBytes(32).toString('hex');
 
+  mkdirSync(appDataDir, { recursive: true });
+  const temporary = `${tokenFile}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
   try {
-    writeFileSync(tokenFile, `${token}\n`, { mode: 0o600 });
-  } catch {
-    /* ignore */
-  }
+    writeFileSync(temporary, `${token}\n`, { mode: 0o600, flag: 'wx' });
+    renameSync(temporary, tokenFile);
+    chmodSync(tokenFile, 0o600);
+  } finally { rmSync(temporary, { force: true }); }
 
   return token;
 }
@@ -100,18 +96,20 @@ export function getLogPaths(appDataDir) {
 
 const PORT_FILE = '.local-api-port';
 
-export function readApiPort(root) {
+export function readApiPort(root, { isolated = false } = {}) {
   try {
-    const n = Number.parseInt(readFileSync(join(root, PORT_FILE), 'utf8').trim(), 10);
-    if (Number.isFinite(n) && n > 0) return n;
+    const file = isolated ? join(root, '.local', 'isolated-api-port') : join(root, PORT_FILE);
+    const n = Number.parseInt(readFileSync(file, 'utf8').trim(), 10);
+    if (Number.isInteger(n) && n >= PORT_MIN && n <= PORT_MAX) return n;
   } catch {
     /* use default */
   }
-  return PORT_MIN;
+  return isolated ? PORT_MIN + 1 : PORT_MIN;
 }
 
-export function writeApiPort(root, port) {
-  writeFileSync(join(root, PORT_FILE), String(port), 'utf8');
+export function writeApiPort(root, port, { isolated = false } = {}) {
+  if (isolated) mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(isolated ? join(root, '.local', 'isolated-api-port') : join(root, PORT_FILE), String(port), 'utf8');
 }
 
 export function healthOk(port) {
@@ -163,20 +161,13 @@ export async function waitFor(fn, label, timeoutMs = 60000, child = null) {
   return false;
 }
 
-/** 仅停止本项目的 Hono API，避免 lsof -ti :port 误杀其他进程 */
-export async function stopApiServer() {
-  if (process.platform === 'win32') {
-    try {
-      spawnSync('cmd.exe', ['/c', 'taskkill /F /FI "WINDOWTITLE eq beike-api"'], { stdio: 'ignore' });
-    } catch {
-      /* ignore */
-    }
-    return;
-  }
-  spawnSync('pkill', ['-f', 'tsx.*src/server/index.ts'], { stdio: 'ignore' });
-  spawnSync('pkill', ['-f', 'src/server/index.ts'], { stdio: 'ignore' });
-  spawnSync('pkill', ['-f', 'infer_video_depth.py'], { stdio: 'ignore' });
-  await new Promise((r) => setTimeout(r, 500));
+/** Stop only this workspace's recorded development watcher, never a production API. */
+export function stopApiServer(workspaceRoot, { isolated = false } = {}) {
+  return stopWebProcess(workspaceRoot, 'api', isolated);
+}
+
+export function webProcessOptions({ apiPort, appDataDir, accessToken }) {
+  return { apiPort, appDataDir: resolve(appDataDir), tokenFingerprint: createHash('sha256').update(accessToken).digest('hex') };
 }
 
 export function buildApiEnv({ apiPort, appDataDir, accessToken, extra = {} }) {
@@ -188,32 +179,38 @@ export function buildApiEnv({ apiPort, appDataDir, accessToken, extra = {} }) {
     AZHUO_DATA_DIR: appDataDir,
     DATABASE_URL: `file:${join(appDataDir, 'azhuo.db')}`,
     LOCAL_ACCESS_TOKEN: accessToken,
+    BEIKE_WEB_LAUNCH: '1',
     ...extra,
   };
 }
 
-export function startApiServer({ workspaceRoot, apiPort, appDataDir, accessToken, watch = true, extraEnv }) {
+export function startApiServer({ workspaceRoot, apiPort, appDataDir, accessToken, watch = true, extraEnv, isolated = false }) {
   const tsxCli = resolveCli(workspaceRoot, 'tsx', 'tsx');
   const args = ['--max-old-space-size=2048', '--expose-gc', tsxCli];
   if (watch) args.push('watch');
-  args.push('--tsconfig', 'tsconfig.json', 'src/server/index.ts');
-  return spawn(process.execPath, args, {
+  args.push('--tsconfig', join(workspaceRoot, 'tsconfig.json'), join(workspaceRoot, 'src/server/index.ts'));
+  const child = spawn(process.execPath, args, {
     cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: buildApiEnv({ apiPort, appDataDir, accessToken, extra: extraEnv }),
   });
+  if (watch) recordWebProcess(workspaceRoot, 'api', child, webProcessOptions({ apiPort, appDataDir, accessToken }), isolated);
+  return child;
 }
 
-export function startViteServer({ workspaceRoot, accessToken, vitePort = VITE_PORT }) {
+export function startViteServer({ workspaceRoot, accessToken, apiPort, appDataDir, vitePort = VITE_PORT, isolated = false }) {
   const viteCli = resolveCli(workspaceRoot, 'vite', 'vite');
-  return spawn(process.execPath, [viteCli, '--strictPort', '--host', '127.0.0.1', '--port', String(vitePort)], {
+  const child = spawn(process.execPath, [viteCli, '--config', join(workspaceRoot, 'vite.config.ts'), '--strictPort', '--host', '127.0.0.1', '--port', String(vitePort)], {
     cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: {
       ...process.env,
       VITE_APP_ACCESS_TOKEN: accessToken,
+      BEIKE_DEV_API_PORT: String(apiPort),
     },
   });
+  recordWebProcess(workspaceRoot, 'vite', child, { ...webProcessOptions({ apiPort, appDataDir, accessToken }), vitePort }, isolated);
+  return child;
 }
 
 export function openBrowser(url) {

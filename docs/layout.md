@@ -20,7 +20,9 @@
 
 根目录仅保留入口和项目配置。依赖 `node_modules`、构建结果 `tools/build/ui` 由工具生成。
 
-macOS 根目录入口 `启动贝壳云图.command` 调用 `tools/scripts/web/dev-web.mjs`，由同一流程启动本地 API 与 Vite；已有服务健康时直接打开页面。它是浏览器版的入口，不依赖已停用的桌面端。
+macOS 根目录入口 `启动贝壳云图.command` 调用 `tools/scripts/web/dev-web.mjs`，由同一流程启动本地 API 与 Vite；只复用启动器记录且 PID、启动时间、工作目录和配置匹配的本项目开发服务。未记录的端口占用需先关闭对应启动终端，启动器不会按端口或模糊进程名停止服务。它是浏览器版的入口，不依赖已停用的桌面端。
+
+日常入口保留历史用户数据目录与访问令牌，不迁移或复制已有库。代码验证可运行 `BEIKE_ISOLATED_DEV=1 pnpm dev:web`：默认使用用户数据目录下的 `development/`、独立令牌、API 空闲端口和 UI `5174`；不读取根 `.env`、旧根令牌或日常 API 端口缓存。可显式指定 `AZHUO_DATA_DIR`，应选择独立目录。隔离与日常模式的 PID 记录分别保存在本项目 `.local/`；新库仅由同一版本化运行时迁移链初始化，不复制 `database/dev.db`。
 
 `database` 保持浅层结构：`schema.prisma` 是 Prisma 模型入口，`migrations/` 留存历史 SQL；当前运行的版本化迁移由 `src/server/infrastructure/database/migrations.ts` 执行。`dev.db` 与同名的 `-wal`、`-shm` 是同一开发数据库的文件组，不能拆开整理。`database-backups/` 是当前备份和迁移快照的统一目录；旧的 `backups/` 已完整归档到其中的 `legacy-20260920/`，备份文件没有删除。生产数据库及其备份位于配置的数据目录，不要求搬入仓库。
 
@@ -165,4 +167,12 @@ shared/
 
 前端公共代码不反向导入 features；功能之间不直接相互导入；跨功能组合由 app 负责。repositories 不反向依赖 services；routes 和 services 不直接持有 Prisma；数据库连接和底层迁移在 infrastructure/database。工坊契约只解析快照格式；`src/shared/workshopSnapshot.ts` 组合契约与纯业务状态规则，升级旧快照。`pnpm db:migrate` 与 `pnpm db:deploy` 共用运行时的 `_BeikeMigration` 迁移链，历史 Prisma SQL 不参与新库初始化。
 
-单项目不会自动消除巨型文件或历史耦合。文件长度、未使用绑定基线继续保持，后续按实际业务变更逐步收紧。
+源码文件按职责拆分，单文件上限为 400 行有效代码（不计空行与注释）。文件长度基线已清空，不再保留超长文件豁免；未使用绑定和依赖边界基线只能收紧。
+
+## 任务提交与恢复
+
+工坊以已确认保存的批次快照作为提交依据：生成计划、每次提交的标识和参数先保存；收到上游任务 ID 后再次保存，才进入轮询。保存期间输入、配置或批次变化会阻止新提交，保存失败保留现有恢复标识。资产列表由同一 React Query 缓存承载。
+
+助手先在当前工作区原子领取 turnId，再执行模型和工具。重复请求只查询或回放原任务；同一标识对应不同输入或凭据返回冲突。请求指纹只存摘要，私有领取信息不进入公共快照；结果条目保存后才写终态。浏览器在发送前保留最小恢复回执，断线或中断后继续核对同一任务。
+
+视频由请求契约校验参数，service 编排模型规则和记录，gateway 判定上游提交结果，repository 写入数据。上游结果分为已接收、明确拒绝与待核实；仅 404、405、415 允许尝试另一提交端点，超时、5xx 和缺少任务 ID 的响应不会自动再次提交。

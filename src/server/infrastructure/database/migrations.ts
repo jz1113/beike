@@ -10,7 +10,14 @@ import { chmod, mkdir, open, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { baselineSql } from './baseline';
 import { libraryIndexSql } from './libraryIndexes';
+import { applyFullPromptDisplayNumbers, fullPromptDisplayNumbersMigrationSource } from './fullPromptDisplayNumbers';
+import { applyFullPromptImageReplacement, fullPromptImageReplacementSql } from './fullPromptImageReplacement';
+import { applyFullPromptProductSubcategory, fullPromptProductSubcategorySql } from './fullPromptProductSubcategory';
+import { applyFullPromptProductSubcategoryBackfill, fullPromptProductSubcategoryBackfillSource } from './fullPromptProductSubcategoryBackfill';
+import { applyFullPromptMajorCategoryBackfill, fullPromptMajorCategoryBackfillSource } from './fullPromptMajorCategoryBackfill';
+import { applyFullPromptMajorCategoryEvidence, fullPromptMajorCategoryEvidenceSource } from './fullPromptMajorCategoryEvidence';
 import { applyWorkspaceIsolation, workspaceIsolationSql } from './workspaceIsolation';
+import { deconstructJobsSql } from './deconstructJobs';
 
 type Database = Prisma.TransactionClient;
 interface Column { name: string }
@@ -251,6 +258,47 @@ export const desktopMigrations: readonly DatabaseMigration[] = [{
   apply: async db => {
     for (const statement of keywordLookupCacheSql.split(';').map(s => s.trim()).filter(Boolean)) {
       await db.$executeRawUnsafe(statement);
+    }
+  },
+}, {
+  version: '20260929_01_full_prompt_display_numbers',
+  checksum: createHash('sha256').update(fullPromptDisplayNumbersMigrationSource).digest('hex'),
+  apply: applyFullPromptDisplayNumbers,
+}, {
+  version: '20260929_02_full_prompt_image_replacements',
+  checksum: createHash('sha256').update(fullPromptImageReplacementSql).digest('hex'),
+  apply: applyFullPromptImageReplacement,
+}, {
+  version: '20260929_03_full_prompt_product_subcategory',
+  checksum: createHash('sha256').update(fullPromptProductSubcategorySql).digest('hex'),
+  apply: applyFullPromptProductSubcategory,
+}, {
+  version: '20260929_04_full_prompt_product_subcategory_backfill',
+  checksum: createHash('sha256').update(fullPromptProductSubcategoryBackfillSource).digest('hex'),
+  apply: applyFullPromptProductSubcategoryBackfill,
+}, {
+  version: '20260929_05_full_prompt_major_category_backfill',
+  checksum: createHash('sha256').update(fullPromptMajorCategoryBackfillSource).digest('hex'),
+  apply: applyFullPromptMajorCategoryBackfill,
+}, {
+  version: '20260929_06_full_prompt_major_category_evidence',
+  checksum: createHash('sha256').update(fullPromptMajorCategoryEvidenceSource).digest('hex'),
+  apply: applyFullPromptMajorCategoryEvidence,
+}, {
+  version: '20260930_01_prompt_folder_archiving',
+  checksum: createHash('sha256').update('AssetProductCategory.isArchived:v1').digest('hex'),
+  apply: async db => {
+    const columns = await db.$queryRawUnsafe<Column[]>('PRAGMA table_info("AssetProductCategory")');
+    if (!columns.some(column => column.name === 'isArchived')) {
+      await db.$executeRawUnsafe('ALTER TABLE "AssetProductCategory" ADD COLUMN "isArchived" BOOLEAN NOT NULL DEFAULT false');
+    }
+  },
+}, {
+  version: '20260930_02_deconstruct_background_jobs',
+  checksum: createHash('sha256').update(deconstructJobsSql).digest('hex'),
+  apply: async db => {
+    for (const sql of deconstructJobsSql.split(';').map(statement => statement.trim()).filter(Boolean)) {
+      await db.$executeRawUnsafe(sql);
     }
   },
 }];

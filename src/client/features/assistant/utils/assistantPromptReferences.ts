@@ -1,12 +1,18 @@
 import type { AssistantMessage, MediaAttachment } from '@client/store/appStoreTypes';
+import { normalizeAssistantTaskReferences } from '@shared/domain/assistant/normalizeAssistantItems';
 
 /** Numbering is local to the most recent user attachment batch before this reply. */
 export function getReplyReferenceMedia(messages: AssistantMessage[], replyId: string): MediaAttachment[] {
   const replyIndex = messages.findIndex((message) => message.id === replyId);
   const taskRefs = messages[replyIndex]?.task?.references;
-  if (taskRefs?.length) {
-    return Array.from({ length: Math.max(...taskRefs.map(ref => ref.number)) }, (_, index) => {
-      const reference = taskRefs.find(ref => ref.number === index + 1);
+  if (Array.isArray(taskRefs) && taskRefs.length) {
+    // Live events may arrive before persisted-state normalization. Never allocate
+    // an array using an unchecked reference number from the event or cache.
+    const safeReferences = normalizeAssistantTaskReferences(taskRefs);
+    if (!safeReferences.length) return [];
+    const byNumber = new Map(safeReferences.map(reference => [reference.number, reference]));
+    return Array.from({ length: Math.max(...byNumber.keys()) }, (_, index) => {
+      const reference = byNumber.get(index + 1);
       return { type: 'image' as const, url: reference?.url || '', name: reference?.label };
     });
   }

@@ -11,12 +11,12 @@ export const BUILTIN_ASSISTANT_SKILLS: AssistantSkill[] = [
     author: '官方',
     colorTheme: 'cyan',
     icon: 'sparkles',
-    description: '按官方多模态反推规范，从参考图或资产库拆解九段式生图提示词与原子资产',
+    description: '按应用内多模态反推规范，从参考图或资产库拆解九段式生图提示词与原子资产',
     prompt: `你是「提示词反推专家」技能。严格遵循下方「参考：反推规范」中的《多模态视觉大反推提示词工程规范》执行分析与输出。
 
 ## 工具决策
 
-1. 用户上传参考图 → 调用 deconstruct_image，将九段式 reversePrompt 用 Markdown 代码块完整展示。
+1. 用户上传参考图 → 直接基于实际可见图片分析并交付提示词；只有用户明确要求额外反推引擎或保存资产时，按工具审批调用 deconstruct_image。上传图片本身不授权额外请求或资产写入。
 2. 用户询问资产库某条提示词 → 先 query_asset_library 定位 id，再 get_prompt_asset_detail 拉取全文，用代码块展示 reversePromptZh，并简要解读九维分析与四维原子摘要。
 3. 用户要求优化已有提示词 → 在保留九段结构的前提下强化具体视觉描述，去除空泛形容词。
 
@@ -28,12 +28,12 @@ export const BUILTIN_ASSISTANT_SKILLS: AssistantSkill[] = [
     markdownDoc: `# 提示词反推专家
 
 ## 目的
-按官方多模态视觉大反推提示词工程规范，从输入参考图或系统资产库中，精准反推拆解出符合 Midjourney / Flux / SD 工业级生图标准的九段式结构化提示词与四维原子资产。
+按应用内多模态视觉大反推提示词工程规范，从输入参考图或系统资产库中，精准反推拆解出符合 Midjourney / Flux / SD 工业级生图标准的九段式结构化提示词与四维原子资产。
 
 ## 核心工作流
 1. **图像特征深度解析**：主体特征、艺术风格、灯光阴影、色彩调色、材质细节、镜头视角、画面构图、氛围渲染、质量控制；
 2. **工具集成**：
-   - 上传参考图：自动调用 \`deconstruct_image\` 进行多模态反推；
+   - 上传参考图：先直接分析可见画面；额外反推引擎或保存资产需用户明确要求并完成审批；
    - 资产库检索：通过 \`query_asset_library\` 与 \`get_prompt_asset_detail\` 精准定位提示词资产；
 3. **成果交付**：完整九段式提示词放入代码块，配合九维视觉拆解报告。`,
     tools: ['deconstruct_image', 'query_asset_library', 'get_prompt_asset_detail'],

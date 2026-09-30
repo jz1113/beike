@@ -1,4 +1,5 @@
 import { extractUrlFromShareText } from './apiaScraper';
+import { socialImageUrl, socialRemoteUrl, socialVideoUrl } from './socialMediaUrls';
 
 export type QiyunMediaResult = {
   title: string;
@@ -22,7 +23,7 @@ export type QiyunCredentials = {
 
 export type QiyunParseResult =
   | { success: true; media: QiyunMediaResult; apiUsed: string }
-  | { success: false; error: string; upstreamCode?: string | number };
+  | { success: false; error: string; upstreamCode?: string | number; httpStatus?: number };
 
 const DEFAULT_QIYUN_ENDPOINT = 'https://qyapi.ipaybuy.cn/api/video';
 const QIYUN_TIMEOUT_MS = 25_000;
@@ -50,7 +51,9 @@ export function mapQiyunErrorCode(code: string | number | undefined, fallback?: 
 export async function parseSocialLinkViaQiyun(
   rawText: string,
   credentials: QiyunCredentials,
+  signal?: AbortSignal,
 ): Promise<QiyunParseResult> {
+  signal?.throwIfAborted();
   const appId = credentials.appId?.trim();
   const appKey = credentials.appKey?.trim();
 
@@ -59,7 +62,7 @@ export async function parseSocialLinkViaQiyun(
   }
 
   const targetUrl = extractUrlFromShareText(rawText);
-  if (!targetUrl || !targetUrl.startsWith('http')) {
+  if (!socialRemoteUrl(targetUrl)) {
     return { success: false, error: '未能从输入中提取有效社媒链接' };
   }
 
@@ -77,7 +80,7 @@ export async function parseSocialLinkViaQiyun(
         appKey,
         url: targetUrl,
       }),
-      signal: AbortSignal.timeout(QIYUN_TIMEOUT_MS),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(QIYUN_TIMEOUT_MS)]) : AbortSignal.timeout(QIYUN_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -85,20 +88,20 @@ export async function parseSocialLinkViaQiyun(
         success: false,
         error: `奇云网关返回 HTTP ${res.status}: ${res.statusText}`,
         upstreamCode: res.status,
+        httpStatus: res.status,
       };
     }
 
     const data = await res.json();
+    signal?.throwIfAborted();
     if (!data) {
       return { success: false, error: '奇云接口返回空响应' };
     }
 
-    if (data.code === 200 && data.data) {
+    if (String(data.code) === '200' && data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
       const item = data.data;
 
       // 静态图片与实况视频分别收集。实况笔记可同时拥有图片和动态流。
-      const isVideoLike = (u: string) => /\.(mp4|mov|m4v|webm|avi|flv)(\?|#|$)/i.test(u);
-
       const rawImages: string[] = [];
       const rawVideos: string[] = [];
 
@@ -116,8 +119,9 @@ export async function parseSocialLinkViaQiyun(
           }
 
           // 严格剔除可能混入的视频/实况流地址
-          if (imgUrl && !isVideoLike(imgUrl)) {
-            rawImages.push(imgUrl);
+          const image = socialImageUrl(imgUrl);
+          if (image && !rawImages.includes(image)) {
+            rawImages.push(image);
           }
         }
       }
@@ -137,24 +141,25 @@ export async function parseSocialLinkViaQiyun(
             .map((url) => url.trim());
         }
         return [];
-      }).filter((url) => isVideoLike(url) || /video|live/i.test(url));
+      }).map(socialVideoUrl).filter((url): url is string => Boolean(url));
       const videos = [...new Set(videoCandidates)];
 
       // 仅在非视频作品且 rawImages 为空但有静态封面图时才备选
-      if (videos.length === 0 && rawImages.length === 0 && item.cover_url && !isVideoLike(item.cover_url)) {
-        rawImages.push(item.cover_url.trim());
+      const cover = socialImageUrl(item.cover_url);
+      if (videos.length === 0 && rawImages.length === 0 && cover) {
+        rawImages.push(cover);
       }
 
       const media: QiyunMediaResult = {
-        title: (item.title || '').trim(),
-        description: (item.content || item.title || '').trim(),
-        author: (item.author?.name || '').trim(),
-        authorAvatar: (item.author?.avatar || '').trim(),
-        cover: (rawImages[0] || item.cover_url || '').trim(),
+        title: typeof item.title === 'string' ? item.title.trim() : '',
+        description: typeof (item.content || item.title) === 'string' ? (item.content || item.title).trim() : '',
+        author: typeof item.author?.name === 'string' ? item.author.name.trim() : '',
+        authorAvatar: socialImageUrl(item.author?.avatar),
+        cover: cover || rawImages[0] || '',
         images: rawImages,
         video: videos[0] || null,
         videos,
-        music: item.music_url ? item.music_url.trim() : undefined,
+        music: socialRemoteUrl(item.music_url) || undefined,
       };
 
       return {
@@ -171,6 +176,7 @@ export async function parseSocialLinkViaQiyun(
       upstreamCode: data.code,
     };
   } catch (err: unknown) {
+    if (signal?.aborted) throw signal.reason;
     const isTimeout = err instanceof Error && err.name === 'TimeoutError';
     return {
       success: false,
@@ -199,7 +205,7 @@ export async function testQiyunConnection(
   }
 
   // 1001/204 说明密钥有效但测试链接已过期或未公开
-  if (res.upstreamCode === 204 || res.upstreamCode === 500) {
+  if (!res.httpStatus && ['204', '500'].includes(String(res.upstreamCode))) {
     return {
       success: true,
       message: `奇云 AppId/AppKey 凭证校验通过（测试样本返回状态码: ${res.upstreamCode}）`,

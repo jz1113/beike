@@ -1,10 +1,13 @@
+import { canRetryAssistantMessage } from './assistantMessagePresentation';
+import { getAssistantProductIdeaPrompt } from '../utils/assistantSuggestions';
+import AssistantApprovalNotice from './AssistantApprovalNotice';
 import AssistantWelcome from './AssistantWelcome';
 import AssistantLiveStatus from './AssistantLiveStatus';
 import { duplicateCollectionCards } from '../utils/collectionCardVisibility';
 import { AssistantSkillIcon } from './AssistantSkillIcon';
 import { useAssistantAutoScroll } from '../hooks/useAssistantAutoScroll';
 import { AssistantReplyFooter } from './AssistantReplyFooter';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { Eye, FileText, Play, RotateCcw } from 'lucide-react';
 import { AssistantMessage, MediaAttachment, useAppStore } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -14,7 +17,7 @@ import FormattedMarkdown from '@client/features/assistant/components/FormattedMa
 import { getReplyReferenceMedia } from '../utils/assistantPromptReferences';
 import ProductCardWidget from '@client/features/assistant/components/ProductCardWidget';
 import TurnTimeline from '@client/features/assistant/components/TurnTimeline';
-import AssistantTurnList from '@client/features/assistant/components/AssistantTurnList';
+import CodexAssistantBubble from './CodexAssistantBubble';
 import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/utils/assistantTurnTypes';
 
 export interface AssistantMessageListProps {
@@ -75,6 +78,12 @@ export default function AssistantMessageList({
 }: AssistantMessageListProps) {
   const { scrollRef, onScroll } = useAssistantAutoScroll(isOpen, sessionId, messages);
   const [messageWindow, setMessageWindow] = useState(80);
+  const historyAnchor = useRef<{ sessionId: string; height: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const anchor = historyAnchor.current; historyAnchor.current = null;
+    const list = scrollRef.current;
+    if (anchor?.sessionId === sessionId && list) list.scrollTop = anchor.top + list.scrollHeight - anchor.height;
+  }, [messageWindow, sessionId, scrollRef]);
   const displayMessages = useMemo(() => {
     if (messages.length <= messageWindow) return messages;
     return messages.slice(-messageWindow);
@@ -87,14 +96,14 @@ export default function AssistantMessageList({
       {/* 🌟 消息流与空状态主区域 */}
       <div ref={scrollRef} onScroll={onScroll} data-empty={messages.length === 0} className="agent-messages flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 min-h-0 scrollbar-thin">
         {messages.length === 0 ? (
-          <AssistantWelcome key={sessionId} onUpload={onUpload} onPrompt={prompt => { setInputContent(prompt); textareaRef.current?.focus(); }} />
+          <AssistantWelcome key={sessionId} onUpload={onUpload} onPrompt={prompt => { const draft = useAppStore.getState().assistantInputDraft; setInputContent(draft.trim() ? `${draft.trimEnd()}\n\n${prompt}` : prompt); textareaRef.current?.focus(); }} />
         ) : (
             /* 消息列表 */
             <>
             {hiddenMessageCount > 0 && (
               <button
                 type="button"
-                onClick={() => setMessageWindow((n) => n + 40)}
+                onClick={() => { const list = scrollRef.current; if (list) historyAnchor.current = { sessionId, height: list.scrollHeight, top: list.scrollTop }; setMessageWindow(n => n + 40); }}
                 className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 cursor-pointer"
               >
                 显示更早的 {hiddenMessageCount} 条消息
@@ -285,7 +294,7 @@ export default function AssistantMessageList({
                           url: imgUrl,
                           name: `商品实物图_${Date.now()}.jpg`
                         });
-                        showToast('📌 已将该图片设为当前生图垫图 (图1)！');
+                        showToast('已将图片加入待发送附件，发送前可预览或移除');
                       }}
                       onLoadToStudio={(prod, imgs) => {
                         setProductData(prod, imgs, '🤖 AI 助手智能抓取导入');
@@ -299,7 +308,7 @@ export default function AssistantMessageList({
                       }}
                       onAnalyzeImages={canAnalyzeCollection ? () => { setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。'); textareaRef.current?.focus(); } : undefined}
           onGenerateShotsForProduct={(title) => {
-                        handleSendMessage(`请针对【${title}】的真实外观、材质与核心卖点，构思 6 条极具商业转化力的高清实拍生图提示词，用 Markdown 标题 + 代码块给出，方便直接复制`);
+                        handleSendMessage(getAssistantProductIdeaPrompt(title));
                       }}
                       onPreviewImage={(imgUrl) => {
                         setChatPreview({ url: imgUrl, type: 'image' });
@@ -316,11 +325,11 @@ export default function AssistantMessageList({
                       copied={copiedMsgId === msg.id}
                       onCopy={() => handleCopyText(msg.content, msg.id)}
                     >
-                      {(msg.error || (msg.content || '').startsWith('⚠️ 请求失败') || msg.content?.includes('用户已停止')) && (
+                      {canRetryAssistantMessage(msg) && (
                         <button type="button" disabled={Boolean(sendingSessionId)}
                           onClick={() => handleSendMessage(undefined, { retryAssistantId: msg.id })}
                           className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 disabled:opacity-50">
-                          <RotateCcw className="h-3 w-3" />{(msg.error || msg.content?.includes('用户已停止')) ? '继续重试' : '重新执行'}
+                          <RotateCcw className="h-3 w-3" />继续重试
                         </button>
                       )}
                     </AssistantReplyFooter>
@@ -339,124 +348,10 @@ export default function AssistantMessageList({
 
         <div ref={messagesEndRef} />
       </div>
+      <AssistantApprovalNotice count={isSendingCurrent ? livePendingApprovals.length : 0} onView={() => {
+        const card = scrollRef.current?.querySelector<HTMLElement>('[data-pending-approval]');
+        card?.scrollIntoView({ block: 'center' }); card?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+      }} />
     </>
-  );
-}
-
-/**
- * CodexAssistantBubble — assistant 消息的 item-based 渲染壳。
- *
- * 旧 AssistantMessageList 仍负责头像、商品挂件、操作栏与气泡的"用户视角"层；
- * AssistantTurnList 负责把 items[] 渲染为多段 agentMessage / 工具时间线 / 思考 / 审批。
- */
-function CodexAssistantBubble({
-  onAnalyzeImages,
-  msg,
-  referenceMedia,
-  isSendingCurrent,
-  livePendingApprovals,
-  onApprovalDecision,
-  handleSendMessage,
-  sendingSessionId,
-  handleCopyText,
-  copiedMsgId,
-  addAssistantAttachment,
-  setProductData,
-  setStep,
-  setCurrentView,
-  setIsAssistantOpen,
-  setChatPreview,
-  showToast,
-}: {
-  onAnalyzeImages?: () => void;
-  msg: AssistantMessage;
-  referenceMedia: MediaAttachment[];
-  isSendingCurrent: boolean;
-  livePendingApprovals: PendingApproval[];
-  onApprovalDecision?: (approvalId: string, decision: ApprovalDecision) => void;
-  handleSendMessage: (overrideContent?: string, options?: { retryAssistantId?: string }) => void;
-  sendingSessionId: string | null;
-  handleCopyText: (content: string, id: string) => void;
-  copiedMsgId: string | null;
-  addAssistantAttachment: (att: MediaAttachment) => void;
-  setProductData: (...args: any[]) => void;
-  setStep: (step: number) => void;
-  setCurrentView: (view: any) => void;
-  setIsAssistantOpen: (v: boolean) => void;
-  setChatPreview: (v: { url: string; type: 'image' | 'video'; poster?: string } | null) => void;
-  resolveAssistantMediaSrc: (rawUrl?: string | null, asVideo?: boolean) => string;
-  showToast: (msg: string) => void;
-}) {
-  // 把当前会话中的 approvalRequest 通过 legacy pendingApprovals 注入（覆盖）
-  const approvalOverrides = msg.items?.filter(
-    (it) => it.kind === 'approvalRequest' && it.status === 'pending',
-  );
-  const livePending = livePendingApprovals.length > 0
-    ? livePendingApprovals
-    : (approvalOverrides || []).map((ap: any) => ({
-        turnId: msg.turnId || '',
-        approvalId: ap.approvalId,
-        toolName: ap.toolName,
-        displayName: ap.displayName,
-        args: ap.args || {},
-      }));
-
-  return (
-    <div className="agent-message flex items-start gap-3 flex-row animate-fade-in group">
-      <div className="w-full min-w-0 space-y-2 flex flex-col items-start">
-        {msg.error && msg.interruptionReason && <p role="alert" className="text-sm text-amber-700">{msg.interruptionReason}</p>}
-        <AssistantTurnList
-          items={msg.items || []}
-          task={msg.task}
-          startedAt={msg.timestamp}
-          livePendingApprovals={livePending}
-          referenceMedia={referenceMedia}
-          streamingStatus={msg.streamingStatus}
-          isSending={isSendingCurrent}
-          productWidget={msg.productWidget}
-          onApprovalDecision={(id, d) => onApprovalDecision?.(id, d)}
-          onSetAsReference={(imgUrl) => {
-            addAssistantAttachment({
-              type: 'image',
-              url: imgUrl,
-              name: `商品实物图_${Date.now()}.jpg`,
-            });
-            showToast('📌 已将该图片设为当前生图垫图 (图1)！');
-          }}
-          onLoadToStudio={(prod, imgs) => {
-            setProductData(prod, imgs, '🤖 AI 助手智能抓取导入');
-            const store = useAppStore.getState();
-            store.setWorkshopMode('storyboard_generate');
-            store.setActiveWorkshopTab('studio');
-            setStep(2);
-            setCurrentView('workshop');
-            setIsAssistantOpen(false);
-            showToast('🚀 已载入生图工坊！');
-          }}
-          onAnalyzeImages={onAnalyzeImages}
-          onGenerateShotsForProduct={(title) =>
-            handleSendMessage(`请针对【${title}】的真实外观、材质与核心卖点，构思 6 条极具商业转化力的高清实拍生图提示词，用 Markdown 标题 + 代码块给出，方便直接复制`)
-          }
-          onPreviewImage={(imgUrl) => setChatPreview({ url: imgUrl, type: 'image' })}
-        />
-        {/* 底部操作栏：模型标签 + 复制 + 重新执行 */}
-        {!isSendingCurrent && (msg.content || msg.error) && <AssistantReplyFooter
-                      canCopy={Boolean(msg.content?.trim())}
-                      model={msg.modelUsed}
-                      timestamp={msg.timestamp}
-                      copied={copiedMsgId === msg.id}
-                      onCopy={() => handleCopyText(msg.content, msg.id)}
-                    >
-                      {(msg.error || (msg.content || '').startsWith('⚠️ 请求失败') || msg.content?.includes('用户已停止')) && (
-                        <button type="button" disabled={Boolean(sendingSessionId)}
-                          onClick={() => handleSendMessage(undefined, { retryAssistantId: msg.id })}
-                          className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 disabled:opacity-50">
-                          <RotateCcw className="h-3 w-3" />{(msg.error || msg.content?.includes('用户已停止')) ? '继续重试' : '重新执行'}
-                        </button>
-                      )}
-                    </AssistantReplyFooter>}
-
-      </div>
-    </div>
   );
 }

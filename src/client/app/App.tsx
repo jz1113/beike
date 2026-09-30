@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, clearWorkshopStudioDraft } from '@client/store';
 import { GenerationEngineHost } from '@client/features/generate/components/GenerationEngineHost';
@@ -14,16 +14,16 @@ import AppSidebar from '@client/app/AppSidebar';
 import AIAssistantButton from '@client/features/assistant/components/AIAssistantButton';
 import AppErrorBoundary from '@client/shared/ui/AppErrorBoundary';
 import GlobalContextMenu from '@client/app/GlobalContextMenu';
+import { DeconstructJobsHost } from '@client/app/DeconstructJobsHost';
 import { GeneratingEffectsProvider } from '@client/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@client/app/ViewKeepAlive';
+import { useMountedAfterFirstOpen } from '@client/app/hooks/useMountedAfterFirstOpen';
 import { usePerformanceMode } from '@client/shared/utils/performancePreference';
 
 import { useDesktopShortcuts } from '@client/shared/hooks/useDesktopShortcuts';
-import { parseViewFromSearchParams, syncViewToUrl } from '@client/app/routes';
+import { parseViewFromSearchParams, parseWorkshopTabFromSearchParams, syncViewToUrl } from '@client/app/routes';
 import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 import '@client/features/canvas/store/registerCanvasWorkspace';
-
-import HomePage from '@client/features/home/HomePage';
 
 // 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
 function lazyWithRetry<T extends React.ComponentType<any>>(
@@ -63,6 +63,7 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
   });
 }
 
+const HomePage = lazyWithRetry(() => import('@client/features/home/HomePage'));
 const SettingsWorkspaceView = lazyWithRetry(() => import('@client/features/settings/SettingsWorkspaceView'));
 const UniversalCollectorModal = lazyWithRetry(() => import('@client/features/collect/components/UniversalCollectorModal'));
 const AIAssistantDrawer = lazyWithRetry(() => import('@client/features/assistant/components/AIAssistantDrawer'));
@@ -92,6 +93,9 @@ const GlobalDynamicBackground = lazyWithRetry(() => import('@client/shared/media
 export default function App() {
   const [isCollectorOpen, setIsCollectorOpen] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
+  const initialSearch = useRef(typeof window === 'undefined' ? '' : window.location.search);
+  const mountAssistant = useMountedAfterFirstOpen(useAppStore((s) => s.isAssistantOpen));
+  const mountPreview = useMountedAfterFirstOpen(useAppStore((s) => Boolean(s.previewTask)));
 
   const {
     currentView,
@@ -139,14 +143,13 @@ export default function App() {
   // URL 同步 currentView / currentStep
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const view = parseViewFromSearchParams(window.location.search);
-    const params = new URLSearchParams(window.location.search);
+    const view = parseViewFromSearchParams(initialSearch.current);
+    const params = new URLSearchParams(initialSearch.current);
     const step = params.get('step');
     const project = params.get('project');
     setCurrentView(view);
     if (view === 'workshop') {
-      const tab = params.get('tab');
-      useAppStore.getState().setActiveWorkshopTab(tab === 'prompt_assets' || tab === 'recipes' || tab === 'categories' ? tab : 'studio');
+      useAppStore.getState().setActiveWorkshopTab(parseWorkshopTabFromSearchParams(initialSearch.current));
     }
     if (view === 'canvas' && project) {
       useCanvasStore.getState().selectProject(project);
@@ -210,7 +213,7 @@ export default function App() {
     <GenerationEngineHost />
     <div className="h-screen w-screen bg-[#FAFAFC] text-slate-900 flex flex-col overflow-hidden selection:bg-blue-100 selection:text-blue-900" data-density={density}>
       {/* 设置全屏独立视图 */}
-      {isSettingsFullscreen ? (
+      {isSettingsFullscreen && (
         <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative z-20">
           <Suspense fallback={
             <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm bg-[#F9FAFB]">
@@ -227,9 +230,9 @@ export default function App() {
             </AppErrorBoundary>
           </Suspense>
         </div>
-      ) : (
-        /* 🌟 2. 主体区域 (左侧 Sidebar + 右侧主工作区，通体贯穿无边框点阵背景) */
-        <div className="flex-1 min-w-0 flex overflow-hidden relative">
+      )}
+        {/* 主工作区保持挂载，进入设置时保留未导出的任务和进度。 */}
+        <div className={isSettingsFullscreen ? 'hidden' : 'flex-1 min-w-0 flex overflow-hidden relative'} aria-hidden={isSettingsFullscreen} inert={isSettingsFullscreen}>
           {/* 🌟 全局轻奢自适应动态背景（首页右上角流体粒子 + 工作区交互式点阵微澜 + 智能降级兜底） */}
           <Suspense fallback={null}>
             {(!isDedicatedFullscreen || isWorkshopFullscreen) && <GlobalDynamicBackground />}
@@ -328,7 +331,7 @@ export default function App() {
                     />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
-                {currentView === 'headline_poster' ? (
+                <ViewKeepAlivePanel view="headline_poster" currentView={currentView}>
                   <AppErrorBoundary
                     title="大字报生成异常"
                     resetLabel="返回首页"
@@ -336,25 +339,25 @@ export default function App() {
                   >
                     <HeadlinePosterStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
-                ) : null}
+                </ViewKeepAlivePanel>
               </Suspense>
             </main>
           </div>
         </div>
-      )}
 
       {/* 全局大图放大查看与下载模态框 */}
       <Suspense fallback={null}>
-        <ImageLightboxModal />
+        {mountPreview && <ImageLightboxModal />}
       </Suspense>
 
       {/* 🌟 全局桌面级上下文右键菜单（接管图片/视频快捷操作，彻底消除检查元素与冗余项） */}
       <GlobalContextMenu />
+      <DeconstructJobsHost />
 
       {/* 🌟 右下角常驻多模态 AI 问答助手与抽屉面板（设置视图时静默以保持沉浸） */}
       {!isSettingsFullscreen && <AIAssistantButton />}
       <Suspense fallback={null}>
-        <AppErrorBoundary
+        {mountAssistant && <AppErrorBoundary
           title="AI 助手组件异常"
           resetLabel="关闭助手"
           onReset={() => {
@@ -362,7 +365,7 @@ export default function App() {
           }}
         >
           <AIAssistantDrawer onOpenSettings={navigateToSettings} />
-        </AppErrorBoundary>
+        </AppErrorBoundary>}
       </Suspense>
 
       {/* 🌟 全渠道智能采集与资产汇总中心 */}

@@ -50,6 +50,8 @@ dev.db*
 storage/
 !src/server/routes/assets/storage/
 !src/server/routes/assets/storage/**
+!src/server/infrastructure/storage/
+!src/server/infrastructure/storage/**
 **/.azhuo_storage/
 **/app_data/
 

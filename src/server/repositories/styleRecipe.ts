@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { db } from './access';
 import { OFFICIAL_WORKSPACE_ID, requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
@@ -19,6 +19,27 @@ function hideOfficial(tx: Prisma.TransactionClient, id: string) {
 /** Workspace tombstones survive refresh and official catalogue sync. */
 export async function hiddenStyleRecipeIds() {
   return (await db.promptAssetUsageEvent.findMany({ where: { eventType: hiddenEvent }, select: { assetId: true } })).map(row => row.assetId);
+}
+
+export async function listHiddenOfficialStyleRecipes() {
+  const hiddenIds = await hiddenStyleRecipeIds();
+  if (hiddenIds.length === 0) return [];
+  return db.styleRecipe.findMany({
+    where: { id: { in: hiddenIds }, workspaceId: OFFICIAL_WORKSPACE_ID },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
+export async function restoreOfficialStyleRecipe(id: string): Promise<'restored' | 'already_visible' | 'not_found' | 'not_official'> {
+  const recipe = await db.styleRecipe.findUnique({ where: { id }, select: { workspaceId: true } });
+  if (!recipe) return 'not_found';
+  if (recipe.workspaceId !== OFFICIAL_WORKSPACE_ID) return 'not_official';
+
+  const result = await db.promptAssetUsageEvent.deleteMany({
+    where: { id: localId('recipe_hidden', id), assetId: id, eventType: hiddenEvent },
+  });
+  return result.count > 0 ? 'restored' : 'already_visible';
 }
 
 export async function listStyleRecipes(category: string | null, page: number, pageSize: number) {
@@ -68,7 +89,9 @@ export async function saveStyleRecipe(id: string, changes: StyleRecipeChanges) {
     sourceUrl: existing.sourceUrl, isFavorite: existing.isFavorite,
   };
   return db.$transaction(async tx => {
-    const overrideId = localId('recipe_override', id);
+    // Restoring an official recipe does not delete an earlier private copy.
+    // A later edit must create another copy without colliding with its ID.
+    const overrideId = `${localId('recipe_override', id)}_${randomUUID()}`;
     if (await tx.promptAssetUsageEvent.findUnique({ where: { id: localId('recipe_hidden', id) } })) {
       // A stale editor must not recreate a deleted entry or overwrite a newer override.
       return null;

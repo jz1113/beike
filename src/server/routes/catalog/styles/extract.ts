@@ -20,7 +20,17 @@ import { getDefaultBaseUrl, getDefaultApiKey } from '../../../services/models/ga
 
 export async function POST(req: Request) {
   try {
-    const body = await readJsonBody(req);
+    req.signal.throwIfAborted();
+    let body: Record<string, any>;
+    try { body = await readJsonBody(req); }
+    catch {
+      if (req.signal.aborted) return jsonResponse({ success: false, error: '风格提炼已取消' }, 499);
+      return jsonResponse({ success: false, error: '请求体必须为有效的 JSON' }, 400);
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return jsonResponse({ success: false, error: '请求体必须为 JSON 对象' }, 400);
+    }
+    req.signal.throwIfAborted();
     const { 
       imageUrls = [], 
       userHint = '', 
@@ -67,6 +77,7 @@ export async function POST(req: Request) {
       console.log(`[StyleExtract] 启动全量分片并发分析: 共 ${shards.length} 个分片（总图数 ${imageUrls.length}）`);
 
       const runShard = async (shardImgs: string[], shardIdx: number) => {
+        req.signal.throwIfAborted();
         const shardPrompt = `你是一位顶级商业视觉美学总监与摄影置景架构师。请仔细观察本批次包含的 ${shardImgs.length} 张参考图片，深度解构该图集所属品类的视觉风格与拍摄置景特征：
 1. 【品类与画面主体定位】：识别图集中展示的商品品类（如：数码3C、服饰穿搭、美妆个护、家居日用、美食饮品、鞋包配饰等）及主体呈现方式；
 2. 【空间置景与材质美感】：空间环境调性（如极简微水泥/温暖原木阳光角/轻奢大理石/现代奶油风/清透飘窗/户外自然等）、台面或背景材质质感；
@@ -76,6 +87,7 @@ export async function POST(req: Request) {
 请输出 200 字以内的精炼、专业且具体的品类视觉特征分析要点。`;
 
         const safeShardImgs = await Promise.all(shardImgs.map(u => convertToStandardJpegDataUrl(u, { maxDimension: 800, quality: 75 })));
+        req.signal.throwIfAborted();
         const contentArray: any[] = [{ type: 'text', text: shardPrompt }];
         safeShardImgs.forEach(url => {
           if (url && typeof url === 'string') {
@@ -84,6 +96,7 @@ export async function POST(req: Request) {
         });
 
         for (const targetModel of modelsToTry) {
+          req.signal.throwIfAborted();
           try {
             const shardTimeoutMs = Math.max(
               resolveVisionTimeoutMs(targetModel, true),
@@ -100,7 +113,7 @@ export async function POST(req: Request) {
                 messages: [{ role: 'user', content: contentArray }],
                 temperature: 0.4
               }),
-              signal: AbortSignal.timeout(shardTimeoutMs)
+              signal: AbortSignal.any([req.signal, AbortSignal.timeout(shardTimeoutMs)])
             });
             if (!resp.ok) {
               const error = new Error(`分片模型调用失败（HTTP ${resp.status}）`) as Error & { status?: number };
@@ -109,12 +122,14 @@ export async function POST(req: Request) {
               continue;
             }
             const data = await resp.json();
+            req.signal.throwIfAborted();
             const text = data.choices?.[0]?.message?.content || '';
             if (text) {
               console.log(`[StyleExtract] 分片 ${shardIdx + 1}/${shards.length} 分析成功 (${targetModel})`);
               return `【分片 ${shardIdx + 1}/${shards.length}（包含 ${shardImgs.length} 张图）视觉特征分析】：\n${text}`;
             }
           } catch (e: any) {
+            if (req.signal.aborted) throw req.signal.reason;
             if (!isRetryableUpstreamError(e)) throw e;
             console.warn(`[StyleExtract] 分片 ${shardIdx + 1} 模型 ${targetModel} 异常:`, e.message);
           }
@@ -184,10 +199,12 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
           imageUrls[imageUrls.length - 1]
         ].filter(Boolean);
 
+    req.signal.throwIfAborted();
     const safeSampleImages = await Promise.all(
       rawSampleImages.map(u => convertToStandardJpegDataUrl(u, { maxDimension: 960, quality: 80 }))
     );
 
+    req.signal.throwIfAborted();
     const masterContentArray: any[] = [
       { type: 'text', text: masterSystemPrompt }
     ];
@@ -206,6 +223,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
     let lastError: any = null;
 
     for (const targetModel of modelsToTry) {
+      req.signal.throwIfAborted();
       try {
         const masterTimeoutMs = resolveVisionTimeoutMs(targetModel, true);
         const response = await gatewayFetch(`${normalizeGatewayBaseUrl(targetBaseUrl)}/v1/chat/completions`, {
@@ -221,7 +239,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
             max_tokens: 8192,
             response_format: { type: 'json_object' },
           }),
-          signal: AbortSignal.timeout(Math.max(masterTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS))
+          signal: AbortSignal.any([req.signal, AbortSignal.timeout(Math.max(masterTimeoutMs, VISION_EXTRACT_MASTER_TIMEOUT_MS))])
         });
 
         if (!response.ok) {
@@ -232,12 +250,14 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
         }
 
         const data = await response.json();
+        req.signal.throwIfAborted();
         rawText = data.choices?.[0]?.message?.content || '';
         if (rawText) {
           console.log(`[StyleExtract] 成功通过模型 [${targetModel}] 完成元架构提炼`);
           break;
         }
       } catch (err: any) {
+        if (req.signal.aborted) throw req.signal.reason;
         if (!isRetryableUpstreamError(err)) throw err;
         lastError = err;
         console.warn(`[StyleExtract] 模型 ${targetModel} 响应异常，尝试备选模型:`, err.message);
@@ -280,6 +300,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
       finalPromptSnippet = `${roleText}\n\n【核心视觉置景架构规则】：\n${spatialText}\n${lightingText}\n${propsText}\n${screenText}\n${opticsText}\n\n【分镜策划指令】：\n请以【参考图1所示商品】为主体（严禁文字描写商品几何外观），严格按照上述空间、光线、道具与壁纸风格，为目标商品规划 4 组机位不同、质感高级的真实买家秀分镜！`;
     }
 
+    req.signal.throwIfAborted();
     return jsonResponse({
       success: true,
       recipe: {
@@ -294,6 +315,7 @@ ${shardSummaries.length > 0 ? `\n【全量图片（共 ${imageUrls.length} 张�
       }
     });
   } catch (error: unknown) {
+    if (req.signal.aborted) return jsonResponse({ success: false, error: '风格提炼已取消' }, 499);
     console.error('[StyleExtract] 异常:', error);
     return jsonResponse({ error: formatUserError(error, '风格架构提炼失败，请重试') }, 500);
   }

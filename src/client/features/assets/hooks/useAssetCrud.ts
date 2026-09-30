@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { apiFetch as rawApiFetch } from '@client/shared/api/apiClient';
 import { pickAssetEditFields } from '@shared/domain/assets/assetEdit';
+import { appearanceAudience } from '@shared/domain/assets/appearanceAudience';
 import { isCompletePromptGroup, workshopAssetBlockReason } from '@shared/domain/workshop/workshopPipeline';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
@@ -156,6 +157,7 @@ export function useAssetCrud({
         method: 'DELETE',
       });
       const result = await response.json();
+      if (!response.ok || !result?.success) throw new Error(result?.error || '删除失败');
       invalidateGlobalAssetCache();
       setItems((prev) => prev.filter((it) => !selectedIds.includes(it.id)));
       showToast(`🗑️ 成功批量删除 ${result.count ?? 0} 项资产`);
@@ -221,14 +223,15 @@ export function useAssetCrud({
     reader.onload = async (evt) => {
       try {
         const text = evt.target?.result as string;
-        const bulkItems = parseBackupDataToBulkItems(text);
+        const { items: bulkItems, productCategories, albums, promptAssetRegistries, fullPromptImageReplacements } = parseBackupDataToBulkItems(text);
 
         showToast('⏳ 正在恢复并合并资产库...');
 
         const res = await apiFetch('/api/catalog/assets/library', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'bulk-import', items: bulkItems }),
+          body: JSON.stringify({ action: 'bulk-import', items: bulkItems, productCategories, albums,
+            promptAssetRegistries, fullPromptImageReplacements }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
@@ -236,7 +239,13 @@ export function useAssetCrud({
         }
 
         const importedCount = data.count ?? bulkItems.length;
+        const warnings: string[] = Array.isArray(data.warnings)
+          ? data.warnings.filter((warning: unknown): warning is string => typeof warning === 'string' && !!warning.trim())
+          : [];
         showToast(`🎉 成功导入 ${importedCount} 条原子资产！`);
+        if (warnings.length) {
+          window.alert(`导入已完成，但有 ${warnings.length} 项需要核对：\n${warnings.map((warning) => `• ${warning}`).join('\n')}`);
+        }
         void fetchAssets(true);
       } catch (err: any) {
         alert('导入失败: ' + (err.message || err));
@@ -250,6 +259,11 @@ export function useAssetCrud({
   const handleApplyToWorkshop = (item: any) => {
     const blocked = workshopAssetBlockReason(item, activeSubTab);
     if (blocked) { showToast(blocked); return; }
+    if ((activeSubTab === 'persona' || activeSubTab === 'outfit')
+      && appearanceAudience(item, activeSubTab === 'outfit') === 'unknown') {
+      showToast('请先确认该资产的适用人群，再载入工坊进行人物或穿搭替换');
+      return;
+    }
     let promptSnippet = '';
     if (activeSubTab === 'full_prompt') {
       if (!isCompletePromptGroup(item)) {
@@ -260,7 +274,15 @@ export function useAssetCrud({
         item.architectureSummary ? `【固定图组架构】${item.architectureSummary}` : '',
         item.contentSummary ? `【内容总结】${item.contentSummary}` : '',
       ].filter(Boolean).join('\n');
-      setPendingBatchLockedAssets({ fullPromptId: item.id });
+      // Loading a new mother means its own people, clothing and scene are the default.
+      // Do not silently carry substitutions from the previously selected group.
+      setPendingBatchLockedAssets({
+        fullPromptId: item.id,
+        personaId: 'auto',
+        outfitId: 'auto',
+        sceneId: 'auto',
+        actionId: 'auto',
+      });
       setPendingBatchStage(2);
     } else if (activeSubTab === 'scene') {
       const desc = item.description || '';
@@ -306,20 +328,30 @@ export function useAssetCrud({
     if (!editingItem) return;
     setIsUpdating(true);
     try {
+      const data = pickAssetEditFields(resolveAssetApiType(activeSubTab), editingItem);
+      if (activeSubTab === 'full_prompt' && !editingItem._productCategoryDirty) {
+        delete data.productCategoryIds;
+        delete data.isUniversal;
+      }
       const response = await apiFetch('/api/catalog/assets/library', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assetType: resolveAssetApiType(activeSubTab),
           id: editingItem.id,
-          data: pickAssetEditFields(resolveAssetApiType(activeSubTab), editingItem),
+          data,
         }),
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || '资产保存失败');
       const savedItem = { ...editingItem, ...result.item };
       invalidateGlobalAssetCache();
-      setItems((prev) => prev.map((it) => (it.id === editingItem.id ? savedItem : it)));
+      if (activeSubTab === 'full_prompt') {
+        // 商品大类由服务端按图集级联更新，重新读取整组以同步卡片与筛选数量。
+        await fetchAssets();
+      } else {
+        setItems((prev) => prev.map((it) => (it.id === editingItem.id ? savedItem : it)));
+      }
       if (detailItem?.id === editingItem.id) setDetailItem(savedItem);
       setEditingItem(null);
       showToast('✅ 资产已更新保存');

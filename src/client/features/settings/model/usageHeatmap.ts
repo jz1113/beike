@@ -13,7 +13,8 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
       const jan1DayOfWeek = jan1.getDay() === 0 ? 6 : jan1.getDay() - 1; // 0=周一, 6=周日
       calendarStart = new Date(jan1);
       calendarStart.setDate(jan1.getDate() - jan1DayOfWeek);
-      totalWeeks = 53;
+      const yearDays = (Date.UTC(currentYear + 1, 0, 1) - Date.UTC(currentYear, 0, 1)) / 86400000;
+      totalWeeks = Math.ceil((jan1DayOfWeek + yearDays) / 7);
     } else {
       totalWeeks = heatmapRange === 'quarter' ? 13 : 26;
       // 以本周周日为截止基准倒推对应周数
@@ -72,9 +73,10 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
         }
 
         const isToday = dateKey === todayKey;
-        const isFuture = cursor > today;
+        const outsideYear = heatmapRange === 'year' && year !== currentYear;
+        const isFuture = cursor > today || outsideYear;
 
-        const count = usageSummary.heatmapActiveMap?.[dateKey] || 0;
+        const count = isFuture ? 0 : usageSummary.heatmapActiveMap?.[dateKey] || 0;
         const details = usageSummary.heatmapDetailsMap?.[dateKey];
         const tokens = details?.tokens || 0;
         const costUsd = details?.costUsd || 0;

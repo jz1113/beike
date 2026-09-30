@@ -13,6 +13,7 @@ import {
 import { peekDepthSubmit } from '@client/shared/api/depthGeneration';
 import { classifyGenerationPollResult, isTransientPollError, accumulateTransientPollFailure } from '@client/shared/api/generationErrors';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
+import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generationRecovery';
 
 const pollingTaskIds = new Set<string>();
 
@@ -41,6 +42,7 @@ export async function pollTasksOnce(
       const depthVideo = isDepthVideoTask(t);
       const video = isVideoTask(t);
       const maxCount = getMaxPollCount(t);
+      const recovering = Boolean(t.submissionRecoveryRequired && !t.taskId);
       let count = pollCounts[t.id] || 0;
 
       if (!options?.skipCountIncrement) {
@@ -48,7 +50,7 @@ export async function pollTasksOnce(
         pollCounts[t.id] = count;
       }
 
-      if (!options?.skipTimeout && count > maxCount) {
+      if (!recovering && !options?.skipTimeout && count > maxCount) {
         slowPollIds.add(t.id);
         update(
           t.id,
@@ -62,7 +64,9 @@ export async function pollTasksOnce(
         return;
       }
 
-      if (options?.skipTimeout) {
+      if (recovering) {
+        update(t.id, { failReason: SUBMISSION_RECOVERY_HINT }, noPersist);
+      } else if (options?.skipTimeout) {
         update(t.id, { progress: '97%', failReason: SLOW_POLL_HINT }, noPersist);
       } else {
         const dynamicProgress = Math.min(97, Math.floor(15 + (count / maxCount) * 82));
@@ -72,10 +76,12 @@ export async function pollTasksOnce(
       try {
         const pollEndpoint = depthVideo
           ? '/api/generate/depth-video'
+          : isDepthImageTask(t)
+            ? '/api/generate/depth-image'
           : video
             ? '/api/generate/video'
             : '/api/generate/image';
-        const queryParams = new URLSearchParams({ taskId: t.taskId! });
+        const queryParams = new URLSearchParams(recovering ? { taskKey: t.id, model: t.model } : { taskId: t.taskId! });
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
@@ -86,7 +92,15 @@ export async function pollTasksOnce(
         });
 
         const data = await res.json().catch(() => null);
-        const outcome = classifyGenerationPollResult(data, { httpOk: res.ok });
+        const recoveredTaskId = recovering && typeof data?.taskId === 'string' && data.taskId ? data.taskId : undefined;
+        let outcome = classifyGenerationPollResult(data, { httpOk: res.ok, httpStatus: res.status });
+        // Authentication/query errors cannot prove that an unknown POST was rejected.
+        if (recovering && outcome === 'failure' && !recoveredTaskId && data?.submissionRejected !== true) outcome = 'pending';
+        const recoveredLink = recovering ? {
+          ...(recoveredTaskId ? { taskId: recoveredTaskId, submissionRecoveryRequired: false } : {}),
+          ...(typeof data?.recordId === 'string' ? { dbId: data.recordId } : {}),
+          ...(typeof data?.model === 'string' ? { model: data.model } : {}),
+        } : {};
 
         if (outcome === 'success') {
           slowPollIds.delete(t.id);
@@ -97,6 +111,8 @@ export async function pollTasksOnce(
             resultUrl: data.resultUrl,
             progress: '100%',
             failReason: undefined,
+            submissionRecoveryRequired: false,
+            ...recoveredLink,
           });
         } else if (outcome === 'failure') {
           slowPollIds.delete(t.id);
@@ -106,14 +122,25 @@ export async function pollTasksOnce(
             status: 'FAILURE',
             progress: '0%',
             failReason: data?.failReason || data?.error || (depthVideo ? '深度动作捕捉生成失败' : '模型渲染失败'),
+            submissionRecoveryRequired: false,
+            ...recoveredLink,
           });
         } else {
           delete pollFailureCounts[t.id];
-          if (depthVideo && data?.progress) {
+          if (recoveredTaskId) {
+            delete pollCounts[t.id];
+            update(t.id, { ...recoveredLink, failReason: undefined });
+          } else if (recovering || !res.ok || data?.retryable === true || data?.status === 'QUERY_FAILED') {
+            update(t.id, { failReason: recovering ? SUBMISSION_RECOVERY_HINT : GENERATION_QUERY_RETRY_HINT }, noPersist);
+          } else if (depthVideo && data?.progress) {
             update(t.id, { progress: String(data.progress) }, noPersist);
           }
         }
       } catch (e) {
+        if (recovering) {
+          update(t.id, { failReason: SUBMISSION_RECOVERY_HINT }, noPersist);
+          return;
+        }
         if (!isTransientPollError(e)) {
           slowPollIds.delete(t.id);
           delete pollCounts[t.id];
@@ -128,14 +155,9 @@ export async function pollTasksOnce(
         const failuresFatal = accumulateTransientPollFailure(pollFailureCounts, t.id);
         console.warn(`[generationEngine] 轮询任务 ${t.id} 失败 (${options?.location || 'poll'}):`, e);
         if (failuresFatal) {
-          slowPollIds.delete(t.id);
-          delete pollCounts[t.id];
-          delete pollFailureCounts[t.id];
           update(t.id, {
-            status: 'FAILURE',
-            progress: '0%',
-            failReason: '多次轮询失败，请稍后重试',
-          });
+            failReason: GENERATION_QUERY_RETRY_HINT,
+          }, noPersist);
         }
       }
       } finally { pollingTaskIds.delete(t.id); }
@@ -146,22 +168,20 @@ export async function pollTasksOnce(
 export function getOngoingGenerationTasks(): GenerationTask[] {
   return useAppStore
     .getState()
-    .generationTasks.filter((t) => isImageTaskActive(t.status) && t.taskId && !t.resultUrl);
+    .generationTasks.filter((t) => isImageTaskActive(t.status) && (t.taskId || t.submissionRecoveryRequired) && !t.resultUrl);
 }
 
 export function isLocalUnsubmittedTask(t: GenerationTask): boolean {
-  // 深度生成任务：若在当前会话内存中持有有效待提交载荷，无论历史是否存在 dbId 都允许提交
+  if (t.submissionRecoveryRequired || !isImageTaskActive(t.status) || t.taskId || t.resultUrl) return false;
+  // A refreshed local depth task restores its exact File asynchronously in the submitter.
   if (isDepthImageTask(t) || isDepthVideoTask(t)) {
-    if (peekDepthSubmit(t.id)) {
-      return isImageTaskActive(t.status) && !t.taskId && !t.resultUrl;
-    }
-    return false;
+    return !t.dbId || t.id.startsWith('hub-gen-') || Boolean(peekDepthSubmit(t.id));
   }
 
   // 排除来自数据库历史同步的常规图文任务，绝不自动重新提交
   if (t.dbId && !t.id.startsWith('hub-gen-')) return false;
 
-  return isImageTaskActive(t.status) && !t.taskId && !t.resultUrl;
+  return true;
 }
 
 export function getUnsubmittedGenerationTasks(): GenerationTask[] {
@@ -200,7 +220,7 @@ export async function probeFailedTasks(
 
         if (!res) return;
         const data = await res.json().catch(() => null);
-        if (classifyGenerationPollResult(data, { httpOk: res.ok }) === 'success') {
+        if (classifyGenerationPollResult(data, { httpOk: res.ok, httpStatus: res.status }) === 'success') {
           recoveredOnce.add(t.id);
           slowPollIds.delete(t.id);
           update(t.id, {

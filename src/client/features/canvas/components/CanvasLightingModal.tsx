@@ -5,11 +5,12 @@ import {
   Sun,
   ArrowUp,
   HelpCircle,
-  Check,
+  Loader2,
 } from 'lucide-react';
 import type { CanvasNode } from '../store/useCanvasStore';
 import { LightboxGenConfigToolbar } from '@client/shared/modals/lightbox/LightboxGenConfigToolbar';
 import { useCanvasToolConfig } from '@client/shared/hooks/useCanvasToolConfig';
+import { useCanvasToolSubmission } from '@client/shared/hooks/useCanvasToolSubmission';
 
 import { DEFAULT_LIGHTING_PARAMS, LIGHT_DIRECTION_COORDS_BY_VIEW, PRESET_LIGHT_COLORS, type LightingParams, type MainLightDirection } from '../model/lighting';
 import { CanvasLightingPreview } from './CanvasLightingPreview';
@@ -19,10 +20,10 @@ interface CanvasLightingModalProps {
   isOpen: boolean;
   onClose: () => void;
   node: CanvasNode | null;
-  onSubmit?: (
+  onSubmit: (
     params: LightingParams,
     options?: { model?: string; quality?: string; aspectRatio?: string }
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
@@ -35,8 +36,7 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
 
   const [params, setParams] = useState<LightingParams>(DEFAULT_LIGHTING_PARAMS);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const { isSubmitting, submitError, submit } = useCanvasToolSubmission(isOpen, onClose);
 
 
   // 当弹窗打开时重置状态并同步全局模型与画质设置
@@ -44,11 +44,8 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
     if (isOpen) {
       setParams(DEFAULT_LIGHTING_PARAMS);
       setShowColorPicker(false);
-      setIsSubmitting(false);
-      setSubmitSuccess(false);
-
     }
-  }, [isOpen, selectedModelId, selectedQuality, selectedAspectId]);
+  }, [isOpen]);
 
   // 选择主光源方向预设 (结合当前视角)
   const handleSelectDirection = (dir: MainLightDirection) => {
@@ -66,27 +63,17 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
 
   // 提交生成
   const handleSubmit = () => {
-    setIsSubmitting(true);
     const finalParams: LightingParams = {
       ...params,
       model: selectedModelId,
       quality: selectedQuality,
       aspectRatio: selectedAspectId,
     };
-    if (onSubmit) {
-      onSubmit(finalParams, {
-        model: selectedModelId,
-        quality: selectedQuality,
-        aspectRatio: selectedAspectId,
-      });
-    }
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitSuccess(true);
-      setTimeout(() => {
-        onClose();
-      }, 700);
-    }, 600);
+    void submit(() => onSubmit(finalParams, {
+      model: selectedModelId,
+      quality: selectedQuality,
+      aspectRatio: selectedAspectId,
+    }));
   };
 
   if (!isOpen || !node) return null;
@@ -298,6 +285,7 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
           </div>
         </div>
 
+        {submitError && <p role="alert" className="px-5 pb-3 text-xs text-rose-600">{submitError}</p>}
         {/* 底部控制栏 (Footer) */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-100 bg-zinc-50/80">
           {/* 重置参数 */}
@@ -325,16 +313,12 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting || submitSuccess}
-              className={`w-9 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-                submitSuccess
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-zinc-900 hover:bg-black text-white shadow-sm'
-              }`}
+              disabled={isSubmitting}
+              className="w-9 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 bg-zinc-900 hover:bg-black text-white shadow-sm disabled:opacity-50"
               title="应用打光效果并生成"
             >
-              {submitSuccess ? (
-                <Check className="w-4 h-4 text-white" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
               ) : (
                 <ArrowUp className="w-4 h-4 text-white stroke-[2.5]" />
               )}

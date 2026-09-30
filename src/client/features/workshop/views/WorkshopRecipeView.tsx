@@ -19,6 +19,8 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
   const setPendingBatchStage = useAppStore((s) => s.setPendingBatchStage);
 
   const [recipes, setRecipes] = useState<any[]>(() => getCachedRecipes() || []);
+  const [hiddenOfficialRecipes, setHiddenOfficialRecipes] = useState<Array<{ id: string; name: string }>>([]);
+  const [isRestoringOfficial, setIsRestoringOfficial] = useState(false);
   const [, setIsLoading] = useState(() => !getCachedRecipes());
   const [isExtractModalOpen, setIsExtractModalOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
@@ -51,6 +53,7 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
         if (data?.success) {
           setCachedRecipes(data.recipes || []);
           setRecipes(data.recipes || []);
+          setHiddenOfficialRecipes(Array.isArray(data.hiddenOfficialRecipes) ? data.hiddenOfficialRecipes : []);
         }
       }
     } catch (err) {
@@ -75,15 +78,38 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
 
   const handleDeleteRecipe = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!(await confirmAction('确定删除该自定义拍摄架构吗？'))) return;
+    const isOfficial = recipes.find(recipe => recipe.id === id)?.isOfficial;
+    if (!(await confirmAction(isOfficial
+      ? '隐藏这条官方拍摄架构吗？之后可在“恢复已隐藏官方架构”中重新显示。'
+      : '确定删除该自定义拍摄架构吗？'))) return;
     try {
       const res = await apiFetch(`/api/catalog/styles?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (!res.ok) { showToast('删除失败，请稍后重试'); return; }
       setRecipes((prev) => prev.filter((r) => r.id !== id));
       if (useAppStore.getState().selectedArchId === id) setSelectedArchId('');
-      showToast('🗑️ 已删除该架构配方');
+      showToast(isOfficial ? '已隐藏官方架构，可随时恢复' : '🗑️ 已删除该架构配方');
+      void fetchRecipes(true);
     } catch (err) {
       showToast(`❌ 删除失败: ${formatUserError(err, '请稍后重试')}`);
+    }
+  };
+
+  const handleRestoreOfficialRecipe = async (id: string) => {
+    if (isRestoringOfficial) return;
+    setIsRestoringOfficial(true);
+    try {
+      const res = await apiFetch('/api/catalog/styles?action=restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error('恢复失败，请稍后重试');
+      await fetchRecipes(true);
+      showToast('官方拍摄架构已恢复');
+    } catch (err) {
+      showToast(`恢复架构失败：${formatUserError(err, '请稍后重试')}`);
+    } finally {
+      setIsRestoringOfficial(false);
     }
   };
 
@@ -192,6 +218,9 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
           onSaveEditedRecipe={handleSaveEditedRecipe}
           onCreateCategory={handleCreateCategory}
           onRefreshRecipes={fetchRecipes}
+          hiddenOfficialRecipes={hiddenOfficialRecipes}
+          onRestoreOfficialRecipe={handleRestoreOfficialRecipe}
+          isRestoringOfficial={isRestoringOfficial}
           section="list"
         />
       </div>

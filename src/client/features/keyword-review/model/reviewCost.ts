@@ -7,12 +7,18 @@ export type ReviewTokenUsage = {
 const EMPTY: ReviewTokenUsage = { cacheHit: 0, cacheMiss: 0, completion: 0 };
 
 export function readTokenUsage(usage: unknown): ReviewTokenUsage {
-  const value = (usage || {}) as Record<string, unknown>;
-  const promptDetails = (value.prompt_tokens_details || value.input_tokens_details || {}) as Record<string, unknown>;
-  const cacheHit = Number(value.prompt_cache_hit_tokens || promptDetails.cached_tokens || 0);
-  const prompt = Number(value.prompt_tokens || value.input_tokens || 0);
-  const cacheMiss = Number(value.prompt_cache_miss_tokens || Math.max(0, prompt - cacheHit));
-  const completion = Number(value.completion_tokens || value.output_tokens || 0);
+  const value = (usage && typeof usage === 'object' ? usage : {}) as Record<string, unknown>;
+  const details = value.prompt_tokens_details ?? value.input_tokens_details;
+  const promptDetails = (details && typeof details === 'object' ? details : {}) as Record<string, unknown>;
+  const count = (raw: unknown) => {
+    if (typeof raw !== 'number' && typeof raw !== 'string') return 0;
+    const number = Number(raw);
+    return Number.isFinite(number) && number >= 0 ? number : 0;
+  };
+  const cacheHit = count(value.prompt_cache_hit_tokens ?? promptDetails.cached_tokens);
+  const prompt = count(value.prompt_tokens ?? value.input_tokens);
+  const cacheMiss = count(value.prompt_cache_miss_tokens ?? Math.max(0, prompt - cacheHit));
+  const completion = count(value.completion_tokens ?? value.output_tokens);
   return { cacheHit, cacheMiss, completion };
 }
 
@@ -36,6 +42,8 @@ export function isDeepSeekPeakHour(date = new Date()): boolean {
 }
 
 export function estimateReviewYuan(usage: ReviewTokenUsage, date = new Date()): { yuan: number; peak: boolean } {
+  // DeepSeek Flash CNY pricing verified 2026-09-30:
+  // https://api-docs.deepseek.com/zh-cn/quick_start/pricing/
   const peak = isDeepSeekPeakHour(date);
   const hit = peak ? 0.04 : 0.02;
   const miss = peak ? 2 : 1;

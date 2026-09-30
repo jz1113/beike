@@ -55,6 +55,13 @@ export interface ParsedKeywordWorkbook {
   records: KeywordReviewRecord[];
   sheets: KeywordReviewSheet[];
   displayColumns: OutputColumn[];
+  hasFormulas?: boolean;
+  sourceReviewMode?: KeywordReviewMode;
+  reviewModeMismatch?: boolean;
+  preserveSourceLayout?: boolean;
+  hasInternalLinks?: boolean;
+  hasDefinedNames?: boolean;
+  hasAuxiliarySheets?: boolean;
 }
 
 export interface ReviewColumns {
@@ -63,7 +70,7 @@ export interface ReviewColumns {
   producibleCol: number;
   rejectReasonCol: number;
   categoryReasonReadCol?: number;
-  producibleReadCol: number;
+  producibleReadCol?: number;
   rejectReasonReadCol?: number;
   lowValueCol?: number;
   lowValueReadCol?: number;

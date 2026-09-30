@@ -17,6 +17,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onRecipeCreated?: (recipe: any) => void;
+  initialImages?: string[];
+  initialTitle?: string;
 }
 
 /**
@@ -26,7 +28,7 @@ interface Props {
  * - 图源录入多渠道交互抽离为 StyleExtractSourcePanel
  * - 配方调优编辑器由 RecipeEditorPanel 承载
  */
-export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: Props) {
+export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated, initialImages, initialTitle }: Props) {
   const {
     sourceType,
     setSourceType,
@@ -75,6 +77,8 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
     isOpen,
     onClose,
     onRecipeCreated,
+    initialImages,
+    initialTitle,
   });
 
   if (!isOpen) return null;
@@ -82,19 +86,19 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-3 sm:p-6 animate-fade-in select-none">
       <div
-        className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+        <div className="px-4 sm:px-6 py-4.5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/70">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
               <Sparkles className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
                 提示词架构推理实验室
-                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                <span className="hidden sm:inline-flex text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80">
                   Prompt Architecture Inference
                 </span>
               </h3>
@@ -107,7 +111,7 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all flex items-center justify-center cursor-pointer"
+            className="w-8 h-8 shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all flex items-center justify-center cursor-pointer"
             title="关闭窗口"
           >
             <X className="w-4 h-4" />
@@ -115,7 +119,7 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated }: 
         </div>
 
         {/* Modal Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
           {/* Step 1: 参考图源采集 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

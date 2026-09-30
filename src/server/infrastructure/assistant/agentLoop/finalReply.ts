@@ -7,6 +7,7 @@ import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayUrl';
 import { isRetryableModelRequestError, modelRequestError } from './requestError';
 import type { AssistantSSEEvent } from '@shared/domain/assistant/events';
 import { AgentRuntime } from '../agentRuntime';
+import { readModelStream, assertModelTextLimit } from './modelStream';
 
 /** Stream final assistant reply when agent loop produced tool context but no text yet */
 export async function streamFinalReply(opts: {
@@ -30,6 +31,8 @@ export async function streamFinalReply(opts: {
 
   for (const tryModel of modelsToTry) {
     let emittedContent = false;
+    let agentMsgId: string | undefined;
+    let reasoningId: string | undefined;
     signal?.throwIfAborted();
     try {
       opts.budget?.consumeModel(true);
@@ -56,66 +59,46 @@ export async function streamFinalReply(opts: {
       }
       if (!resp.body) throw new Error('上游返回成功状态但没有响应体，请检查网关的流式响应支持');
 
-      const agentMsgId = runtime.startItem('agentMessage');
-      const reasoningId = runtime.startItem('agentReasoning');
+      agentMsgId = runtime.startItem('agentMessage');
+      reasoningId = runtime.startItem('agentReasoning');
 
-      const decoder = new TextDecoder();
-      const reader = resp.body.getReader();
-      let buffer = '';
       let contentAccum = '';
       let reasoningAccum = '';
       const modelUsed = tryModel;
-
       let finishReason: string | null = null;
       let reportedUsage: unknown;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done && !buffer) break;
-
-        buffer += done ? decoder.decode() + '\n' : decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
-          const payload = trimmed.slice(5).trimStart();
-          if (payload === '[DONE]') continue;
-
-          try {
-            const chunk = JSON.parse(payload);
-            finishReason = chunk.choices?.[0]?.finish_reason || finishReason;
-            const delta = chunk.choices?.[0]?.delta;
-            if (delta?.reasoning_content) {
-              reasoningAccum += delta.reasoning_content;
-              runtime.appendItemText(reasoningId, delta.reasoning_content);
-            }
-            if (delta?.content) {
-              emittedContent = true;
-              contentAccum += delta.content;
-              runtime.appendItemText(agentMsgId, delta.content);
-            }
-            if (chunk.usage) {
-              reportedUsage = chunk.usage;
-              if (!opts.budget) send({ type: 'usage', usage: chunk.usage });
-            }
-          } catch {
-            /* ignore */
-          }
+      await readModelStream(resp.body, signal, (chunk) => {
+        finishReason = chunk.choices?.[0]?.finish_reason || finishReason;
+        const delta = chunk.choices?.[0]?.delta;
+        if (delta?.reasoning_content) {
+          assertModelTextLimit(reasoningAccum, delta.reasoning_content);
+          reasoningAccum += delta.reasoning_content;
+          runtime.appendItemText(reasoningId!, delta.reasoning_content);
         }
-      }
+        if (delta?.content) {
+          assertModelTextLimit(contentAccum, delta.content);
+          contentAccum += delta.content;
+          emittedContent ||= Boolean(delta.content.trim());
+          runtime.appendItemText(agentMsgId!, delta.content);
+        }
+        if (chunk.usage) {
+          reportedUsage = chunk.usage;
+          if (!opts.budget) send({ type: 'usage', usage: chunk.usage });
+        }
+      });
 
       opts.budget?.recordUsage(reportedUsage);
       console.info('[AssistantStream] ended', { turnId, model: modelUsed, finishReason, contentChars: contentAccum.length });
       if (!finishReason) throw new Error('模型连接提前关闭，回复尚未完成，请重试。');
       if (finishReason === 'length') throw new Error('模型达到输出长度限制，请发送“接着上一段继续”。');
       if (finishReason !== 'stop') throw new Error(`模型未正常完成回复（${finishReason}），已保留现有内容。`);
-      if (!contentAccum.trim()) throw new Error('模型返回空回复，本轮尚未完成。');
-      runtime.completeItem(reasoningId, reasoningAccum ? 'done' : 'cancelled');
-      runtime.completeItem(agentMsgId, contentAccum ? 'done' : 'cancelled');
+      if (!contentAccum.trim()) { lastError = new Error('模型返回空回复，本轮尚未完成。'); runtime.completeItem(reasoningId!, 'error'); runtime.completeItem(agentMsgId!, 'error'); continue; }
+      runtime.completeItem(reasoningId!, reasoningAccum ? 'done' : 'cancelled');
+      runtime.completeItem(agentMsgId!, contentAccum ? 'done' : 'cancelled');
       return modelUsed;
     } catch (error) {
+      if (agentMsgId) runtime.completeItem(agentMsgId, signal?.aborted ? 'cancelled' : 'error');
+      if (reasoningId) runtime.completeItem(reasoningId, signal?.aborted ? 'cancelled' : 'error');
       signal?.throwIfAborted();
       if (emittedContent || !isRetryableModelRequestError(error)) throw error;
       lastError = error;

@@ -1,10 +1,12 @@
 import { validateAssetEdit } from '@shared/domain/assets/assetEdit';
+import { isValidPromptGroupSubcategoryValue } from '@shared/domain/assets/promptGroupSubcategory';
 import { readJsonBody } from '../../../../core/validate';
 import { jsonResponse } from '../../../../core/http';
 import { queueMediaReview } from '../../../../services/library/mediaReviewQueue';
 import { mutateOrganization } from './organization';
 import { validateActionSceneReference, createLibraryAsset, updateLibraryAsset, prepareAssetDeletion } from '@server/repositories/assetLibraryCrud';
 import { bulkImportAssets } from '@server/repositories/assetLibraryBulkImport';
+import { AssetCategoryError } from '@server/repositories/assetOrganization';
 
 // 创建单项或批量导入原子资产
 export async function executeLibraryPost(req: Request) {
@@ -12,6 +14,11 @@ export async function executeLibraryPost(req: Request) {
 
   if (typeof body.action === 'string' && [
     'save-product-category',
+    'save-prompt-subcategory',
+    'save-prompt-folder-rules',
+    'import-prompt-folder-rules',
+    'archive-prompt-folders',
+    'move-prompt-groups',
     'reorder-product-categories',
     'classify-albums',
     'classify-assets',
@@ -21,8 +28,8 @@ export async function executeLibraryPost(req: Request) {
 
   if (body.action === 'bulk-import' && Array.isArray(body.items)) {
     const items = body.items as Array<{ assetType: string; data: Record<string, unknown>; sourceId?: string }>;
-    const created = await bulkImportAssets(body, items);
-    return jsonResponse({ success: true, count: created.length, items: created });
+    const { created, warnings } = await bulkImportAssets(body, items);
+    return jsonResponse({ success: true, count: created.length, items: created, warnings });
   }
 
   const { assetType, data } = body;
@@ -33,8 +40,17 @@ export async function executeLibraryPost(req: Request) {
 
   const sceneError = await validateActionSceneReference(assetType, data);
   if (sceneError) return jsonResponse({ success: false, error: sceneError }, 400);
+  if (assetType === 'full_prompt' && data.productSubcategory !== undefined
+    && data.productSubcategory !== null && !isValidPromptGroupSubcategoryValue(data.productSubcategory)) {
+    return jsonResponse({ success: false, error: '商品二级类目无效' }, 400);
+  }
 
-  const created = await createLibraryAsset(assetType, data);
+  let created;
+  try { created = await createLibraryAsset(assetType, data); }
+  catch (error) {
+    if (error instanceof AssetCategoryError) return jsonResponse({ success: false, error: error.message }, error.status);
+    throw error;
+  }
   if (!created) return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);
 
   if (created?.id && ['scene', 'outfit', 'action', 'persona', 'full_prompt'].includes(assetType)) {
@@ -59,7 +75,12 @@ export async function executeLibraryPut(req: Request) {
   const sceneError = await validateActionSceneReference(assetType, data);
   if (sceneError) return jsonResponse({ success: false, error: sceneError }, 400);
 
-  const updated = await updateLibraryAsset(assetType, id, data);
+  let updated;
+  try { updated = await updateLibraryAsset(assetType, id, data); }
+  catch (error) {
+    if (error instanceof AssetCategoryError) return jsonResponse({ success: false, error: error.message }, error.status);
+    throw error;
+  }
   if (!updated) return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);
 
   return jsonResponse({ success: true, item: updated });

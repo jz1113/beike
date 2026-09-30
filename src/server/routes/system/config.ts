@@ -156,14 +156,10 @@ export async function POST(req: Request) {
     // 2. 测试万邦电商采集接口
     if (type === 'wanbang') {
       const key = (
-        req.headers.get('x-wanbang-key') ||
-        body.wanbangKey ||
-        ''
+        typeof body.wanbangKey === 'string' ? body.wanbangKey : req.headers.get('x-wanbang-key') || ''
       ).trim();
       const secret = (
-        req.headers.get('x-wanbang-secret') ||
-        body.wanbangSecret ||
-        ''
+        typeof body.wanbangSecret === 'string' ? body.wanbangSecret : req.headers.get('x-wanbang-secret') || ''
       ).trim();
       if (!key || !secret) {
         return jsonResponse({ error: '请先在输入框中填入万邦 API Key 与 API Secret 后再测试' }, 400);

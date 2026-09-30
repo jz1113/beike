@@ -1,4 +1,5 @@
 import { audienceOptions } from './appearanceAudience';
+import { isValidPromptGroupSubcategoryValue } from './promptGroupSubcategory';
 /** Explicit scalar update contract. Presentation fields and nested Prisma writes are excluded. */
 const fields: Record<string, Record<string, [string, boolean]>> = {
   "scene": {
@@ -288,6 +289,7 @@ const fields: Record<string, Record<string, [string, boolean]>> = {
       "string",
       false
     ],
+    "productSubcategory": ["string", true],
     "provenance": [
       "string",
       false
@@ -321,6 +323,9 @@ export function validateAssetEdit(type: string, input: unknown): string | null {
   if (!fields[type]) return '不支持的资产类型';
   if (!input || typeof input !== 'object' || Array.isArray(input)) return '资产数据必须为对象';
   if (!Object.keys(input).length) return '没有可更新字段';
+  if (type === 'full_prompt' && 'productSubcategory' in input
+    && input.productSubcategory !== null
+    && !isValidPromptGroupSubcategoryValue(input.productSubcategory)) return '商品二级类目无效';
   if ((type === 'persona' || type === 'outfit') && 'dimensions' in input && input.dimensions != null) {
     try {
       const dimensions = JSON.parse(String(input.dimensions));

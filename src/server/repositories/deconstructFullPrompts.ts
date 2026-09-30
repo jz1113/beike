@@ -1,11 +1,15 @@
 import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
 import { db } from './access';
-import { ensurePromptAlbum } from '@server/repositories/assetOrganization';
+import { AssetCategoryError, ensurePromptAlbum, setPromptAlbumMajorCategory } from '@server/repositories/assetOrganization';
 import type { ContentPromptGroup, PerImageResult } from '@shared/domain/assets/assetDeconstruct/prompts';
 import { resolveAssetShotSubject } from '@shared/domain/workshop/workshopShotSubject';
+import { inferPromptGroupSubcategory } from '@shared/domain/workshop/workshopPipeline/groupCategoryFit';
+import { recognizedPromptGroupSubcategory } from '@shared/domain/assets/promptGroupSubcategory';
+import { nextFullPromptDisplayNumber } from '@server/infrastructure/database/fullPromptDisplayNumbers';
+import { deleteMotherReplacements, findMotherReplacement } from './motherGroupReplacement';
+import { validateDeconstructTargetSubcategory } from './deconstructProductCategory';
 
 const MAX_IMAGES_PER_CONTENT_GROUP = 4;
-const IMPORT_CATEGORY_IDS = new Set(['jewelry', 'digital', 'digital_3c', 'apparel', 'bag', 'shoes', 'beauty', 'eyewear', 'hat_accessory']);
 type RawGroup = Partial<ContentPromptGroup> & Record<string, unknown>;
 
 function asImageIndices(value: unknown, max: number): number[] {
@@ -18,26 +22,37 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function summarizePersona(images: PerImageResult[]): string {
+export async function validateDeconstructMajorCategory(value: unknown): Promise<string | null> {
+  const id = text(value);
+  if (!id) return null;
+  const category = await db.assetProductCategory.findFirst({
+    where: { id, parentId: null, workspaceId: requireWorkspaceId(), isArchived: false },
+    select: { id: true },
+  });
+  if (!category) throw new AssetCategoryError('所选商品大类未在资产库配置，请先添加一级品类或选择待分类');
+  return category.id;
+}
+
+export function summarizePersona(images: PerImageResult[]): string {
   const person = images.find((image) => image.persona)?.persona;
   return person ? [person.hair, person.face, person.skin, person.vibe].filter(Boolean).join('；') : '';
 }
 
-function summarizeOutfit(images: PerImageResult[]): string {
+export function summarizeOutfit(images: PerImageResult[]): string {
   const outfit = images.find((image) => image.outfit)?.outfit;
   return outfit
     ? [outfit.top, outfit.bottom, outfit.shoes, outfit.accessories, outfit.color_palette].filter(Boolean).join('；')
     : '';
 }
 
-function summarizeScene(images: PerImageResult[], declared?: RawGroup): string {
+export function summarizeScene(images: PerImageResult[], declared?: RawGroup): string {
   const groupScene = text(declared?.scene_summary ?? declared?.sceneSummary);
   if (groupScene) return groupScene;
   const scene = images.find((image) => image.scene)?.scene;
   return scene ? [scene.description, scene.lighting].filter(Boolean).join('；') : '';
 }
 
-function buildArchitecture(images: PerImageResult[], declared?: RawGroup): string {
+export function buildArchitecture(images: PerImageResult[], declared?: RawGroup): string {
   const declaredArchitecture = text(declared?.architecture_summary ?? declared?.architectureSummary);
   if (declaredArchitecture) return declaredArchitecture;
   return images.map((image, index) => {
@@ -77,7 +92,7 @@ function normalizeContentGroups(perImageResults: PerImageResult[], rawGroups: un
   return groups.sort((a, b) => a.indices[0] - b.indices[0]);
 }
 
-function buildGroupPrompt(params: {
+export function buildGroupPrompt(params: {
   contentSummary: string;
   sceneSummary: string;
   architectureSummary: string;
@@ -93,7 +108,7 @@ function buildGroupPrompt(params: {
   ].filter(Boolean).join('\n\n');
 }
 
-function buildGroupShots(images: PerImageResult[], sceneSummary: string) {
+export function buildGroupShots(images: PerImageResult[], sceneSummary: string) {
   return images.map((image, index) => ({
     shot_no: index + 1,
     title: image.title || `图组分镜 ${index + 1}`,
@@ -118,6 +133,7 @@ export async function persistFullPromptRecords(params: {
   albumName: string;
   category: string;
   productCategoryId?: string | null;
+  targetSubcategory?: string | null;
   sourceKey?: string;
   sampleImagesJson: string;
   thumbForUrl: (url: string) => Promise<string>;
@@ -125,12 +141,8 @@ export async function persistFullPromptRecords(params: {
   provenance?: string;
 }) {
   const { parsedResult, perImageResults, imageUrls, albumName, category, productCategoryId, sourceKey, sampleImagesJson, thumbForUrl, defaultCoverUrl } = params;
-  const requestedId = text(productCategoryId);
-  const databaseCategory = requestedId ? await db.assetProductCategory.findFirst({
-    where: { id: requestedId, workspaceId: requireWorkspaceId() },
-    select: { id: true },
-  }) : null;
-  const requestedCategory = databaseCategory || IMPORT_CATEGORY_IDS.has(requestedId) ? requestedId : '';
+  const requestedCategory = await validateDeconstructMajorCategory(productCategoryId);
+  const selectedSubcategory = await validateDeconstructTargetSubcategory(params.targetSubcategory, requestedCategory);
   let albumId: string | null = null;
   if (sourceKey) {
     const rows = await db.$queryRaw<{ albumId: string | null }[]>`SELECT "albumId" FROM "PromptImportSource" WHERE "workspaceId" = ${requireWorkspaceId()} AND "sourceKey" = ${sourceKey}`;
@@ -138,13 +150,22 @@ export async function persistFullPromptRecords(params: {
   }
   const album = albumId
     ? await db.promptAlbum.findUnique({ where: { id: albumId } })
-    : await ensurePromptAlbum(db, { albumName, sourceImages: JSON.stringify(imageUrls), productCategoryIds: databaseCategory ? JSON.stringify([requestedId]) : '[]' });
+    : await ensurePromptAlbum(db, { albumName, sourceImages: JSON.stringify(imageUrls), productCategoryIds: JSON.stringify(requestedCategory ? [requestedCategory] : []) });
   if (!album) throw new Error('图集不存在');
-  if (album.name !== albumName) await db.promptAlbum.update({ where: { id: album.id }, data: { name: albumName } });
+  if (album.name !== albumName || (requestedCategory && album.productCategoryId !== requestedCategory)) {
+    await db.$transaction(async tx => {
+      if (album.name !== albumName) await tx.promptAlbum.update({ where: { id: album.id }, data: { name: albumName } });
+      if (requestedCategory && album.productCategoryId !== requestedCategory) {
+        await setPromptAlbumMajorCategory(tx, album.id, requestedCategory);
+      }
+    });
+  }
 
-  // The deconstruction category is a semantic product tag even when that
-  // category has no organization row yet (for example digital_3c).
-  const productCategoryIds = JSON.stringify(requestedCategory ? [requestedCategory] : (album.productCategoryId ? [album.productCategoryId] : []));
+  const effectiveCategory = requestedCategory || album.productCategoryId;
+  // Archived rows are needed here to stop implicit built-in folders reappearing.
+  const subcategoryFolders = effectiveCategory
+    ? await db.assetProductCategory.findMany({ where: { parentId: effectiveCategory, workspaceId: requireWorkspaceId() } }) : [];
+  const productCategoryIds = JSON.stringify(effectiveCategory ? [effectiveCategory] : []);
   const contentSummary = text(parsedResult.content_summary ?? parsedResult.contentSummary) || `${albumName}：按连续图组复用的种草内容架构。`;
   const normalizedGroups = normalizeContentGroups(perImageResults, parsedResult.content_groups ?? parsedResult.contentGroups);
   const saved: any[] = [];
@@ -165,24 +186,42 @@ export async function persistFullPromptRecords(params: {
     const firstImageIndex = group.indices[0];
     const coverUrl = await thumbForUrl(imageUrls[firstImageIndex - 1] || defaultCoverUrl);
     const existing = await db.fullPromptAsset.findFirst({ where: { albumId: album.id, groupIndex } });
+    // A repeated crawl/re-analysis must not put the original images back after
+    // this mother has already made its one-time transition to generated images.
+    if (existing && await findMotherReplacement(existing.id)) {
+      saved.push(selectedSubcategory ? await db.fullPromptAsset.update({
+        where: { id: existing.id }, data: { productCategoryIds, productSubcategory: selectedSubcategory.storedValue },
+      }) : existing);
+      continue;
+    }
+    const title = text(group.declared?.title) || `${albumName} · 图组 ${groupIndex}`;
+    const shotPromptsJson = JSON.stringify(buildGroupShots(images, sceneSummary));
     const shared = {
-      title: text(group.declared?.title) || `${albumName} · 图组 ${groupIndex}`,
+      title,
       albumName, albumId: album.id,
       reversePromptZh: buildGroupPrompt({ contentSummary, sceneSummary, architectureSummary, images }),
       sourceImageIndex: firstImageIndex,
       sourceImageIndices: JSON.stringify(group.indices),
       groupIndex, contentSummary, architectureSummary, replaceableSlots,
-      shotPromptsJson: JSON.stringify(buildGroupShots(images, sceneSummary)),
+      shotPromptsJson,
       coverUrl: coverUrl || existing?.coverUrl || defaultCoverUrl,
       sourceImages: sampleImagesJson,
       hasHuman, sceneSummary, outfitSummary: summarizeOutfit(images),
       actionSummary: images.map((image) => image.action?.action).filter(Boolean).join('；'),
       personaSummary: hasHuman ? summarizePersona(images) : '本组无人物，不调用人物与穿搭槽位',
-      category, productCategoryIds, provenance: params.provenance || 'deconstructed',
+      category, productCategoryIds,
+      productSubcategory: selectedSubcategory?.storedValue ?? (effectiveCategory ? recognizedPromptGroupSubcategory(
+        existing ? existing.productSubcategory
+          : effectiveCategory === 'digital_3c' ? inferPromptGroupSubcategory({ title, shotPromptsJson }) : null,
+        subcategoryFolders, effectiveCategory,
+      ) : null),
+      provenance: params.provenance || 'deconstructed',
     };
     saved.push(existing
       ? await db.fullPromptAsset.update({ where: { id: existing.id }, data: shared })
-      : await db.fullPromptAsset.create({ data: shared }));
+      : await db.$transaction(async tx => tx.fullPromptAsset.create({
+          data: { ...shared, displayNumber: await nextFullPromptDisplayNumber(tx) },
+        })));
   }
   // 旧版遗留的残组在重跑时清除；不触碰同一图集的其他完整组。
   const previous = await db.fullPromptAsset.findMany({
@@ -193,6 +232,9 @@ export async function persistFullPromptRecords(params: {
     try { return JSON.parse(item.sourceImageIndices || '[]').length !== MAX_IMAGES_PER_CONTENT_GROUP; }
     catch { return true; }
   }).map((item) => item.id);
-  if (invalidIds.length) await db.fullPromptAsset.deleteMany({ where: { id: { in: invalidIds } } });
+  if (invalidIds.length) await db.$transaction(async tx => {
+    await deleteMotherReplacements(tx, invalidIds);
+    await tx.fullPromptAsset.deleteMany({ where: { id: { in: invalidIds } } });
+  });
   return { album, fullPrompts: saved };
 }

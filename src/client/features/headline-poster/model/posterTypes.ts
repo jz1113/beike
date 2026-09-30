@@ -36,6 +36,13 @@ export interface PosterItem {
   resultUrl?: string;
   /** IndexedDB cache key used to recover completed local JPGs after a restart. */
   persistedResultKey?: string;
+  /** Import validation failures must be corrected before a paid request is sent. */
+  importError?: string;
+  /** Reconcile the original image request before submitting another paid task. */
+  imageTaskId?: string;
+  imageSubmissionKey?: string;
+  generatedSceneUrl?: string;
+  generationRecoveryRequired?: boolean;
   status: PosterStatus;
   error?: string;
   /** Records a successful automatic title/design model fallback for the current run. */
@@ -94,6 +101,7 @@ export function buildPosterTitleModelFallbackChain(selectedModel: string, config
 }
 
 export function makeId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return `poster_${globalThis.crypto.randomUUID()}`;
   return `poster_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -111,19 +119,43 @@ export function normalizeCoverTitle(value: string): string {
 }
 
 export function normalizeProductName(value: string): string {
-  return value.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 64);
+  return value.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function isPosterImageUrl(value: string): boolean {
+  if (!/^https?:\/\/\S+$/i.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname)
+      && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+export function posterInputError(item: Pick<PosterItem, 'sourceImageUrl' | 'originalTitle' | 'importError'> & Partial<Pick<PosterItem, 'productName'>>): string | undefined {
+  if (item.importError) return item.importError;
+  if (!item.sourceImageUrl.trim()) return '缺少图片链接，请补充后重新导入';
+  if (!isPosterImageUrl(item.sourceImageUrl.trim())) return '图片链接必须为完整有效的 http:// 或 https:// 地址';
+  if (!item.originalTitle.trim()) return '缺少原标题，请补充后重新导入';
+  if (item.originalTitle.trim().length > 2000) return '原标题最多 2000 字，请缩短后重新导入';
+  if (item.productName && normalizeProductName(item.productName).length > 64) return '商品名称/型号最多 64 字，请修正后重新导入；未自动截断名称';
+  return undefined;
 }
 
 export function safeBaseName(title: string, fallback: string): string {
-  return (title || fallback)
+  const name = (title || fallback)
     .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\p{Cc}/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 80) || fallback;
+    .slice(0, 80)
+    .replace(/[. ]+$/g, '') || fallback;
+  return /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) ? `_${name}` : name;
 }
 
 export function normalizeConcurrency(value: unknown, fallback = POSTER_CONCURRENCY_OPTIONS[0]): number {
-  const numeric = Number(value);
+  const numeric = typeof value === 'number' || (typeof value === 'string' && value.trim()) ? Number(value) : NaN;
   if (!Number.isFinite(numeric)) return fallback;
   return POSTER_CONCURRENCY_OPTIONS.reduce((nearest, candidate) => (
     Math.abs(candidate - numeric) < Math.abs(nearest - numeric) ? candidate : nearest

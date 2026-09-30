@@ -9,6 +9,7 @@ export interface MergeTaskContext {
   aspectRatio: string;
   quality: string;
   generationStrategy?: 'grid_first' | 'single_shot';
+  gridOutputSize?: string;
 }
 
 export function mergeGenerationTasks(
@@ -32,6 +33,7 @@ export function mergeGenerationTasks(
       model: context.model,
       aspectRatio: context.aspectRatio,
       quality: context.quality,
+      outputSize: context.generationStrategy === 'grid_first' ? context.gridOutputSize : undefined,
       attempt: undefined,
     });
     const previous = [...existing.values()].find((task) => {
@@ -50,6 +52,7 @@ export function mergeGenerationTasks(
       model: context.model,
       aspectRatio: context.aspectRatio,
       quality: context.quality,
+      outputSize: context.generationStrategy === 'grid_first' ? context.gridOutputSize : undefined,
       attempt,
     });
     const action = resolveTaskMergeAction(previous ? { key, status: previous.status } : undefined);
@@ -67,7 +70,8 @@ export function mergeGenerationTasks(
       resultStatus: 'current' as const,
       revision: (shot as { revision?: number }).revision || 0,
       outputReview: 'unreviewed' as const,
-      outputSize: previous?.resultStatus === 'superseded' ? undefined : savedWorkshopOutputSize(previous),
+      outputSize: context.generationStrategy === 'grid_first' && context.gridOutputSize
+        ? context.gridOutputSize : previous?.resultStatus === 'superseded' ? undefined : savedWorkshopOutputSize(previous),
     };
   });
 }

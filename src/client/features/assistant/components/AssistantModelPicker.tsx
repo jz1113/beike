@@ -1,3 +1,4 @@
+import { useAssistantDialog } from './useAssistantDialog';
 import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
@@ -31,6 +32,7 @@ export default function AssistantModelPicker({ models, model, current, onModelCh
   const visible = groups.flatMap(group => group.models);
   const activeIndex = visible.findIndex(m => m.id === active);
   const close = () => { onOpenChange(false); (tab === 'model' ? triggerRef : effortRef).current?.focus(); };
+  const focusSurface = useAssistantDialog(open, close, { initialFocusSelector: tab === 'model' ? '[role="listbox"]' : 'input' });
   const select = (value: string) => { onModelChange(value); close(); };
   const toggle = (next: 'model' | 'effort') => { setTab(next); onOpenChange(!open || tab !== next); };
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function AssistantModelPicker({ models, model, current, onModelCh
         <span>{supported ? EFFORT_LABELS[resolved] : capability.unavailableLabel}</span><ChevronDown size={11} />
       </button>
     </div>
-    {open && tab === 'model' && <section className="agent-popover agent-model-panel" aria-label="模型选择">
+    {open && tab === 'model' && <section ref={focusSurface} tabIndex={-1} className="agent-popover agent-model-panel" aria-label="模型选择">
       <div ref={listRef} className="agent-model-list" role="listbox" tabIndex={0} id={`${id}-models`} aria-label="按厂商选择模型" aria-activedescendant={activeIndex >= 0 ? `${id}-option-${active}` : undefined} onKeyDown={e => {
         if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
           e.preventDefault();
@@ -72,7 +74,7 @@ export default function AssistantModelPicker({ models, model, current, onModelCh
         {!visible.length && <p className="agent-empty-result">暂无已启用的模型，请在设置中添加。</p>}
       </div>
     </section>}
-    {open && tab === 'effort' && <section ref={listRef} role="dialog" aria-label="思考强度" className="agent-popover agent-effort-panel">
+    {open && tab === 'effort' && <section ref={focusSurface} tabIndex={-1} role="dialog" aria-label="思考强度" className="agent-popover agent-effort-panel">
       <div className="agent-effort-heading">
         <div className="agent-effort-summary">
           <span className="agent-effort-caption">思考强度</span>

@@ -36,7 +36,7 @@ export function useCanvasGenerationSync(currentProject: CanvasProject | null | u
       if (!currProj) return;
 
       const targetNode = currProj.nodes.find(
-        (n) => targetId && (n.id === targetId || n.taskId === targetId)
+        (n) => targetId && (n.taskId ? n.taskId === targetId : n.id === targetId)
       );
 
       if (targetNode) {
@@ -72,8 +72,7 @@ export function useCanvasGenerationSync(currentProject: CanvasProject | null | u
     currProj.nodes.forEach((node) => {
       const matchedTask = generationTasks.find(
         (t) =>
-          (t.id && (t.id === node.id || t.id === node.taskId)) ||
-          (t.taskId && (t.taskId === node.taskId || t.taskId === node.id))
+          t.id === (node.taskId || node.id) || t.taskId === (node.taskId || node.id)
       );
 
       if (!matchedTask) return;

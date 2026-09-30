@@ -1,11 +1,10 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import {
-  X,
   FolderOpen,
   RefreshCw,
   Upload,
   FolderUp,
-  FileSpreadsheet,
   Layers,
   Sparkles,
 } from 'lucide-react';
@@ -14,8 +13,9 @@ import { QueueImageSet } from './QueueImageSet';
 import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from '@client/shared/utils/xhsLinkBatch';
 import type { DeconstructQueueApi } from '../hooks/useDeconstructQueue';
 import type { useXhsBatchImport } from '../hooks/useXhsBatchImport';
-import type { WorkflowCapability } from '@shared/domain/models/workflowModels';
-import { getSubCategoriesForCategory, type ActionCategoryId } from '@shared/domain/products/productCategory';
+import { DeconstructImportFooter } from './DeconstructImportFooter';
+import { DeconstructImportHeader } from './DeconstructImportHeader';
+import '../deconstruct-import.css';
 
 type XhsImportApi = ReturnType<typeof useXhsBatchImport>;
 
@@ -28,27 +28,18 @@ export type DeconstructModalProps = {
 export default function DeconstructModal({ queueApi, xhsImport }: DeconstructModalProps) {
   const {
     showDeconstructModal,
-    multimodalModels,
-    selectedVisionModel,
-    setSelectedVisionModel,
-    targetCategory,
-    setTargetCategory,
+    productCategories,
     queue,
     setQueue,
-    currentQueueIndex,
     isDeconstructing,
-    queueConcurrency,
-    handleQueueConcurrencyChange,
     processingQueueCount,
     progressById,
     elapsedSeconds,
-    lastExportedCsvFilename,
     fileInputRef,
     folderInputRef,
     handleCloseDeconstructModal,
     processFilesOrFolders,
-    runQueueDeconstruction,
-    exportQueueCsv,
+    isSubmittingJob = false,
   } = queueApi;
 
   const {
@@ -61,13 +52,12 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
     isParsingXhsLinks,
     xhsParseProgress,
     collectionIssues,
-    handleBatchParseXhsLinks,
   } = xhsImport;
 
   const candidateUrls = React.useMemo(() => parseXhsUrlsFromText(xhsLinksInput), [xhsLinksInput]);
   const hasLinks = Boolean(xhsLinksInput.trim());
   const linkCount = candidateUrls.length;
-  const isBusy = isParsingXhsLinks || isDeconstructing;
+  const isBusy = isParsingXhsLinks || isDeconstructing || isSubmittingJob;
   // 首次采集和追加采集时显示编辑器；采集完成后把空间完全让给图集选择。
   const shouldShowXhsLinkInput = showXhsLinkInput || queue.length === 0 || isParsingXhsLinks;
   const completedCount = queue.filter((item) => item.status === 'done' || item.status === 'error').length;
@@ -105,8 +95,9 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
   }, [isBusy, setQueue]);
 
   const removeQueueItem = React.useCallback((itemId: string) => {
+    if (isBusy) return;
     setQueue((prev) => prev.filter((item) => item.id !== itemId));
-  }, [setQueue]);
+  }, [isBusy, setQueue]);
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const pasteText = e.clipboardData.getData('text');
@@ -141,65 +132,21 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
 
   if (!showDeconstructModal) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-[94vw] max-w-[1600px] max-h-[90vh] flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.18)] overflow-hidden text-left">
+  return createPortal(
+    <div className="deconstruct-import-overlay fixed inset-0 z-[140] flex items-center justify-center p-3 bg-slate-950/35 backdrop-blur-xs sm:p-5">
+      <div role="dialog" aria-modal="true" aria-labelledby="deconstruct-import-title" className="deconstruct-import-dialog relative flex max-h-[min(90dvh,900px)] w-full max-w-[1200px] flex-col overflow-hidden rounded-3xl border border-white/80 bg-white text-left shadow-[0_24px_80px_-20px_rgba(15,23,42,0.26)]">
         
-        {/* 顶部标题与模式切换栏 */}
-        <div className="px-6 pt-5 pb-3.5 border-b border-slate-100 bg-white">
-          <div className="flex items-center justify-between pb-3.5">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">批量图集 · 智能逆向解构</h3>
-              <p className="text-[11px] text-slate-400 font-normal">
-                批量解析图集素材，自动提炼场景、穿搭、人物与机位动作
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleCloseDeconstructModal}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              title="关闭"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* 两个模式的切换置于最上方 (Segmented Tabs) */}
-          <div className="flex items-center p-1 bg-slate-100/90 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setDeconstructSourceMode('xhs')}
-              className={`flex-1 flex items-center justify-center py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                deconstructSourceMode === 'xhs'
-                  ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-950/5'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <span>小红书链接批量采集</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeconstructSourceMode('local')}
-              className={`flex-1 flex items-center justify-center py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                deconstructSourceMode === 'local'
-                  ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-950/5'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <span>本地文件夹 / 图片导入</span>
-            </button>
-          </div>
-        </div>
+        <DeconstructImportHeader mode={deconstructSourceMode} onModeChange={setDeconstructSourceMode} onClose={handleCloseDeconstructModal} disabled={isBusy} />
 
         {/* 主内容区域 */}
-        <div className="flex-1 overflow-y-auto p-7 space-y-4 text-xs text-slate-700">
+        <div className="deconstruct-import-content min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-white px-5 py-5 text-xs text-slate-700 sm:px-6">
           {deconstructSourceMode === 'xhs' && shouldShowXhsLinkInput ? (
             /* 小红书链接输入区 */
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <label className="text-slate-800 font-semibold text-xs">
-                    <span>笔记链接（支持多行批量输入）</span>
+            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/65 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor="deconstruct-note-links" className="text-slate-800 font-semibold text-xs">
+                    <span>添加笔记链接</span>
                   </label>
                   {hasLinks && (
                     <button
@@ -223,17 +170,16 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                       清空
                     </button>
                   )}
-                  <span className="text-[11px] text-slate-400 font-normal">
-                    单行一条 · 过滤视频 · ≥3图入选 · 最多10图/套
-                  </span>
                 </div>
               </div>
+              <p className="text-[11px] leading-5 text-slate-500">支持批量粘贴分享文案，自动识别链接。跳过视频，至少 3 张图入选，每套最多 10 张。</p>
 
-              <div className="relative flex overflow-hidden rounded-[24px] border-2 border-dashed border-slate-300 bg-white/70 transition hover:border-blue-300 hover:bg-white focus-within:border-blue-400 focus-within:bg-white">
+              <div className="relative flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100/80">
                 {/* 左侧行号栏 */}
                 <div
                   ref={gutterRef}
-                  className="py-3 pl-2.5 pr-2 bg-slate-100/70 border-r border-slate-200/60 select-none text-right font-mono text-[11px] text-slate-400 min-w-[36px] max-h-[160px] overflow-hidden leading-relaxed pointer-events-none"
+                  aria-hidden="true"
+                  className="py-3 pl-2.5 pr-2 bg-slate-50/80 border-r border-slate-100 select-none text-right font-mono text-[11px] text-slate-400 min-w-[36px] max-h-[160px] overflow-hidden leading-relaxed pointer-events-none"
                 >
                   {Array.from({ length: Math.max(5, xhsLinksInput.split('\n').length) }).map((_, i) => (
                     <div key={i}>{i + 1}</div>
@@ -242,6 +188,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
 
                 {/* 右侧文本域 */}
                 <textarea
+                  id="deconstruct-note-links"
                   ref={textareaRef}
                   value={xhsLinksInput}
                   onChange={(e) => setXhsLinksInput(e.target.value)}
@@ -249,22 +196,22 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   onScroll={handleScroll}
                   disabled={isBusy}
                   wrap="off"
-                  placeholder={`在此粘贴小红书笔记链接或分享文案（每行一条，支持批量粘贴）：\nhttps://www.xiaohongshu.com/explore/6a844a9a0000000005032b86\nhttp://xhslink.com/a/xxxxxx`}
+                  placeholder={`粘贴笔记链接或分享文案，每行一条\nhttps://www.xiaohongshu.com/explore/…\nhttps://xhslink.com/a/…`}
                   rows={6}
-                  className="flex-1 p-3 bg-transparent border-0 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-mono whitespace-pre overflow-x-auto resize-none leading-relaxed min-h-[140px]"
+                  className="min-w-0 flex-1 p-3 pb-9 bg-transparent border-0 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-mono whitespace-pre overflow-x-auto resize-none leading-relaxed min-h-[140px]"
                 />
 
                 {hasLinks && (
                   <div className="absolute bottom-2.5 right-3 text-[11px] text-slate-500 font-medium pointer-events-none bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-2xs backdrop-blur-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                    <span>已识别 {linkCount} 条链接（一行一条）</span>
+                    <span>已识别 {linkCount} 条链接</span>
                   </div>
                 )}
               </div>
 
               {/* 实时采编进度状态条 (仅在采编中时展示) */}
               {xhsParseProgress && (
-                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-50/70 border border-indigo-100 text-indigo-700 text-xs animate-pulse">
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-50/70 border border-indigo-100 text-indigo-700 text-xs" role="status">
                   <span className="flex items-center gap-1.5 font-medium">
                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
                     <span>
@@ -289,8 +236,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
             </div>
           ) : deconstructSourceMode === 'local' ? (
             /* 本地文件 / 文件夹导入区 */
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="text-slate-800 font-semibold flex items-center gap-1.5 text-xs">
                   <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
                   <span>参考图集文件或文件夹</span>
@@ -305,13 +252,14 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={async (e) => {
                     e.preventDefault();
+                    if (isBusy) return;
                     if (e.dataTransfer) {
                       const files = await getFilesFromDataTransfer(e.dataTransfer);
                       if (files.length > 0) processFilesOrFolders(files);
                     }
                   }}
-                  className="flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 transition-all text-center cursor-pointer group"
-                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 px-4 py-8 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 cursor-pointer group"
+                  onClick={() => { if (!isBusy) fileInputRef.current?.click(); }}
                 >
                   <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-all mb-2 shadow-2xs">
                     <FolderOpen className="w-5 h-5" />
@@ -324,6 +272,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isBusy}
                       className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     >
                       <Upload className="w-3.5 h-3.5 text-slate-500" />
@@ -332,6 +281,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                     <button
                       type="button"
                       onClick={() => folderInputRef.current?.click()}
+                      disabled={isBusy}
                       className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border border-indigo-200/80 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                     >
                       <FolderUp className="w-3.5 h-3.5 text-indigo-600" />
@@ -344,10 +294,11 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   <span className="text-xs text-slate-600 font-medium">
                     已载入 {queue.length} 套本地参考图集
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isBusy}
                       className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-medium flex items-center gap-1 cursor-pointer shadow-2xs"
                     >
                       <Upload className="w-3 h-3 text-slate-500" />
@@ -356,6 +307,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                     <button
                       type="button"
                       onClick={() => folderInputRef.current?.click()}
+                      disabled={isBusy}
                       className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border border-indigo-200/80 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <FolderUp className="w-3 h-3 text-indigo-600" />
@@ -368,6 +320,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
               <input
                 ref={fileInputRef}
                 type="file"
+                disabled={isBusy}
                 multiple
                 accept="image/*"
                 className="hidden"
@@ -381,6 +334,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
               <input
                 ref={folderInputRef}
                 type="file"
+                disabled={isBusy}
                 // @ts-expect-error webkitdirectory is standard for folder inputs
                 webkitdirectory=""
                 className="hidden"
@@ -413,8 +367,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   </p>
                 </div>
               )}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-slate-800">
                   <Layers className="w-4 h-4 text-indigo-500" />
                   <span className="text-sm font-semibold">图集选择</span>
                   <span className="text-[11px] text-slate-400">共 {queue.length} 套 · 点击图片保留或排除</span>
@@ -427,7 +381,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                         openXhsLinkInput();
                         window.setTimeout(() => textareaRef.current?.focus(), 0);
                       }}
-                      disabled={isDeconstructing}
+                      disabled={isBusy}
                       className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors cursor-pointer"
                     >
                       继续采集
@@ -436,7 +390,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   <button
                     type="button"
                     onClick={() => setQueue([])}
-                    disabled={isDeconstructing}
+                    disabled={isBusy}
                     className="text-[11px] text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
                   >
                     清空队列
@@ -444,13 +398,14 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                 </div>
               </div>
 
-              <div className={`space-y-6 overflow-y-auto pr-1 ${shouldShowXhsLinkInput ? 'max-h-72' : 'max-h-[620px]'}`}>
+              <div className="space-y-6">
                 {queue.map((item, idx) => (
                   <QueueImageSet
                     key={item.id}
                     item={item}
                     index={idx}
-                    isDeconstructing={isDeconstructing}
+                    isDeconstructing={isBusy}
+                    categories={productCategories}
                     progressMessage={progressById[item.id]?.message}
                     onToggleImage={toggleQueueImage}
                     onRemove={removeQueueItem}
@@ -461,141 +416,9 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
           )}
         </div>
 
-        {/* 底部操作行：模型选择 + 并发设置 + 解析操作按钮（弹性防挤压排版） */}
-        <div className="flex flex-wrap items-center justify-between px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 gap-3">
-          {/* 左侧：模型选择 + 并发控制胶囊组 */}
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
-            {/* 目标品类与二级类目 */}
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-2xs shrink-0">
-              <span className="text-[11px] font-medium text-slate-500 shrink-0">品类</span>
-              <select
-                value={targetCategory}
-                onChange={(e) => setTargetCategory(e.target.value as ActionCategoryId)}
-                disabled={isDeconstructing}
-                className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
-              >
-                <option value="jewelry">珠宝首饰</option>
-                <option value="digital_3c">手机数码</option>
-                <option value="apparel">服饰穿搭</option>
-              </select>
-              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/60 px-1.5 py-0.5 rounded font-bold shrink-0 whitespace-nowrap">
-                {getSubCategoriesForCategory(targetCategory).length}个二级
-              </span>
-            </div>
-
-            {/* 模型选择 */}
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-2xs shrink-0">
-              <span className="text-[11px] font-medium text-slate-500 shrink-0">模型</span>
-              <select
-                value={selectedVisionModel}
-                onChange={(e) => setSelectedVisionModel(e.target.value)}
-                disabled={isDeconstructing || multimodalModels.length === 0}
-                className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer max-w-[130px] sm:max-w-[150px] truncate"
-              >
-                {multimodalModels.length === 0 ? (
-                  <option value="">未配置模型</option>
-                ) : (
-                  multimodalModels.map((m: WorkflowCapability) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name || m.id}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            {/* 并发设置 */}
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-2xs shrink-0">
-              <span className="text-[11px] font-medium text-slate-500 shrink-0">并发</span>
-              <select
-                value={queueConcurrency}
-                onChange={(e) => handleQueueConcurrencyChange(Number(e.target.value) || 4)}
-                className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
-                title="运行中调整会影响尚未开始的图集；已发出的请求会继续完成"
-              >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={4}>4</option>
-                <option value={8}>8</option>
-              </select>
-            </div>
-
-            {queue.length > 0 && (
-              <span className="text-[11px] text-slate-600 font-bold shrink-0 whitespace-nowrap bg-slate-200/80 px-2 py-1 rounded-md">
-                共 {queue.length} 套
-              </span>
-            )}
-          </div>
-
-          {/* 右侧：操作按钮组 */}
-          <div className="flex items-center gap-2 shrink-0 ml-auto">
-            {/* 导出表格按钮（若有完成项） */}
-            {queue.some((it) => it.status === 'done') && (
-              <button
-                type="button"
-                onClick={exportQueueCsv}
-                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded-lg text-xs font-medium flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                title={lastExportedCsvFilename ? `已导出：${lastExportedCsvFilename}` : '导出明细表格'}
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>导出表格</span>
-              </button>
-            )}
-
-            {/* 主操作按钮 */}
-            {deconstructSourceMode === 'xhs' && hasLinks ? (
-              /* 小红书模式且有输入时：采编并直接反推入库 */
-              <button
-                type="button"
-                onClick={handleBatchParseXhsLinks}
-                disabled={isBusy || multimodalModels.length === 0}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-xs shadow-2xs hover:shadow transition-all disabled:opacity-40 disabled:hover:bg-indigo-600 cursor-pointer"
-              >
-                {isDeconstructing ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>
-                      {processingQueueCount > 0
-                        ? `并发解构中 (${processingQueueCount})...`
-                        : '正在处理中...'}
-                    </span>
-                  </>
-                ) : isParsingXhsLinks ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>正在采编链接...</span>
-                  </>
-                ) : (
-                  <span>提取图片供选择</span>
-                )}
-              </button>
-            ) : (
-              /* 本地模式或队列已有图集：执行队列智能解构 */
-              <button
-                type="button"
-                onClick={() => { void runQueueDeconstruction(); }}
-                disabled={isDeconstructing || queue.length === 0 || multimodalModels.length === 0}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-xs shadow-2xs hover:shadow transition-all disabled:opacity-40 disabled:hover:bg-indigo-600 cursor-pointer"
-              >
-                {isDeconstructing ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>
-                      {processingQueueCount > 1
-                        ? `正在并行反推 ${processingQueueCount} 套...`
-                        : `正在反推第 ${currentQueueIndex + 1}/${queue.length} 套...`}
-                    </span>
-                  </>
-                ) : (
-                  <span>
-                    {queue.length > 0 ? `开始智能解构 (${queue.length}套)` : '开始智能解构'}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
+        <DeconstructImportFooter queueApi={queueApi} xhsImport={xhsImport} />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

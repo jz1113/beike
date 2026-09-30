@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '@client/store';
 import { useDocumentHidden } from '@client/shared/hooks/useDocumentHidden';
-import { useAssetTasksQuery } from '@client/shared/hooks/useAssetTasksQuery';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import {
@@ -14,6 +13,7 @@ import {
   getUnsubmittedGenerationTasks,
 } from '../engine/generationTaskPolling';
 import { submitSingleGenerationTask } from '../engine/generationTaskSubmitter';
+import { GenerationSubmissionQueue } from '../engine/generationSubmissionQueue';
 import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@client/shared/api/generationAbort';
 
 export {
@@ -27,26 +27,16 @@ export {
  * 全局生图/视频任务引擎：与视图解耦，挂在 page 级即可在切页后继续提交与轮询。
  * 工坊批量生图由 useBatchWorkshopRunner 自行轮询 per-item tasks，不在此处理。
  */
-// 模块级提交单飞锁：跨组件生命周期与重渲染严格持久化，同一个任务 ID 绝不发起并发/重复提交
-const globalSubmittingTaskIds = new Set<string>();
-const engineAbortControllers = new Map<string, AbortController>();
-let generationEngineRunEpoch = 0;
+// 跨批次与组件生命周期共享同一个提交 worker，新增任务只能排到当前请求之后。
+const generationSubmissionQueue = new GenerationSubmissionQueue();
 
 export function abortActiveGenerationEngine() {
-  generationEngineRunEpoch += 1;
-  for (const controller of engineAbortControllers.values()) {
-    try {
-      controller.abort();
-    } catch {
-      /* ignore */
-    }
-  }
-  engineAbortControllers.clear();
-  globalSubmittingTaskIds.clear();
+  generationSubmissionQueue.cancel();
 }
 
 export function useGenerationEngine() {
   const generationTasks = useAppStore((s) => s.generationTasks);
+  const generationHistoryReady = useAppStore((s) => s.generationHistoryReady);
   const updateGenerationTask = useAppStore((s) => s.updateGenerationTask);
   const currentView = useAppStore((s) => s.currentView);
   const documentHidden = useDocumentHidden();
@@ -56,16 +46,19 @@ export function useGenerationEngine() {
   const pollFailureCountsRef = useRef<Record<string, number>>({});
   // 达到上限后转入慢速轮询的任务 ID
   const homeSlowPollIdsRef = useRef<Set<string>>(new Set());
-  // 提交锁：防止并发触发重复网络请求 (与 globalSubmittingTaskIds 协同)
-  const submittingTaskIdsRef = useRef<Set<string>>(globalSubmittingTaskIds);
-  // 活跃 AbortController：组件彻底卸载时安全释放
-  const activeAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
   // 记录上一轮任务状态，用于检测重试
   const prevGenerationTaskStateRef = useRef<Map<string, { status?: string; failReason?: string }>>(new Map());
   // 避免对同一个超时失败任务反复探测
   const recoveredOnceRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => () => abortActiveGenerationEngine(), []);
+  useEffect(() => {
+    // Store subscriptions run synchronously, including when a task is deleted during media preparation.
+    const unsubscribe = useAppStore.subscribe((state, previous) => {
+      if (state.generationTasks === previous.generationTasks) return;
+      generationSubmissionQueue.retain(new Set(state.generationTasks.map(task => task.id)));
+    });
+    return () => { unsubscribe(); abortActiveGenerationEngine(); };
+  }, []);
 
   // 后台标签页/非生成相关页面：拉长轮询间隔，减少无谓的网络与 CPU 消耗
   const isInHubView = currentView === 'generate' || currentView === 'home';
@@ -75,37 +68,34 @@ export function useGenerationEngine() {
   const probeIntervalFast = isThrottled ? 12000 : 5000;
   const probeIntervalSlow = isThrottled ? 60000 : 30000;
 
-  // 挂载资产中心轻量任务轮询
-  useAssetTasksQuery();
-
   const unsubmittedTasksKey = useMemo(
     () =>
-      generationTasks
-        .filter((t) => isImageTaskActive(t.status) && !t.taskId && !t.resultUrl)
+      generationHistoryReady ? generationTasks
+        .filter((t) => isImageTaskActive(t.status) && !t.taskId && !t.resultUrl && !t.submissionRecoveryRequired)
         .map((t) => t.id)
-        .join(','),
-    [generationTasks],
+        .join(',') : '',
+    [generationTasks, generationHistoryReady],
   );
 
   const ongoingTasksKey = useMemo(
     () =>
-      generationTasks
+      generationHistoryReady ? generationTasks
         .filter(
           (t) =>
             isImageTaskActive(t.status) &&
-            t.taskId &&
+            (t.taskId || t.submissionRecoveryRequired) &&
             !t.resultUrl &&
             !homeSlowPollIdsRef.current.has(t.id) &&
             t.failReason !== SLOW_POLL_HINT,
         )
         .map((t) => t.id)
-        .join(','),
-    [generationTasks],
+        .join(',') : '',
+    [generationTasks, generationHistoryReady],
   );
 
   const homeSlowPollTasksKey = useMemo(
     () =>
-      generationTasks
+      generationHistoryReady ? generationTasks
         .filter(
           (t) =>
             isImageTaskActive(t.status) &&
@@ -114,13 +104,13 @@ export function useGenerationEngine() {
             (homeSlowPollIdsRef.current.has(t.id) || t.failReason === SLOW_POLL_HINT),
         )
         .map((t) => t.id)
-        .join(','),
-    [generationTasks],
+        .join(',') : '',
+    [generationTasks, generationHistoryReady],
   );
 
   const homeTimeoutFailureKey = useMemo(
     () =>
-      generationTasks
+      generationHistoryReady ? generationTasks
         .filter(
           (t) =>
             t.status === 'FAILURE' &&
@@ -129,13 +119,13 @@ export function useGenerationEngine() {
             (t.failReason || '').includes('渲染超时'),
         )
         .map((t) => t.id)
-        .join(','),
-    [generationTasks],
+        .join(',') : '',
+    [generationTasks, generationHistoryReady],
   );
 
   const homeOtherFailureKey = useMemo(
     () =>
-      generationTasks
+      generationHistoryReady ? generationTasks
         .filter(
           (t) =>
             t.status === 'FAILURE' &&
@@ -144,8 +134,8 @@ export function useGenerationEngine() {
             !(t.failReason || '').includes('渲染超时'),
         )
         .map((t) => t.id)
-        .join(','),
-    [generationTasks],
+        .join(',') : '',
+    [generationTasks, generationHistoryReady],
   );
 
   // 重试时重置 poll 计数（FAILURE → IN_PROGRESS 且 failReason 已清空）
@@ -162,76 +152,40 @@ export function useGenerationEngine() {
     });
   }, [generationTasks]);
 
-  // 提交未发送的任务（并发调度队列，带 AbortController 安全保障）
+  // 每批只将任务 ID 加入全局队列，真正派发时重新检查当前任务，避免提交已删除的快照。
   useEffect(() => {
     if (!unsubmittedTasksKey) return;
-
-    const unsubmittedTasks = getUnsubmittedGenerationTasks();
-    if (unsubmittedTasks.length === 0) return;
-
-    const processQueue = async () => {
-      const runEpoch = generationEngineRunEpoch;
-      const tasksToSubmit = unsubmittedTasks.filter(
-        (t) => !submittingTaskIdsRef.current.has(t.id),
-      );
-      if (tasksToSubmit.length === 0) return;
-
-      // 上游按分组共享并发配额。一次性提交整批图会挤占同组的分析请求，
-      // 导致后者 429；而且在提交结果不确定时，重放可能产生额外计费。
-      // 因此这里保守地一次只派发一张。每个任务仍使用自己的幂等键，
-      // 已提交的任务不会因后续任务失败而重新提交。
-      tasksToSubmit.forEach((t) => {
-        submittingTaskIdsRef.current.add(t.id);
-        globalSubmittingTaskIds.add(t.id);
-      });
-
-      for (let index = 0; index < tasksToSubmit.length; index += 1) {
-        if (runEpoch !== generationEngineRunEpoch) {
-          // abortActiveGenerationEngine may be invoked while this serial queue is
-          // waiting. Release tasks that never reached the network; do not start
-          // the next billable request after a user cancellation.
-          for (const pending of tasksToSubmit.slice(index)) {
-            submittingTaskIdsRef.current.delete(pending.id);
-            globalSubmittingTaskIds.delete(pending.id);
-          }
-          break;
-        }
-        const t = tasksToSubmit[index];
-        const ctrl = new AbortController();
-        activeAbortControllersRef.current.set(t.id, ctrl);
-        engineAbortControllers.set(t.id, ctrl);
+    generationSubmissionQueue.enqueue(getUnsubmittedGenerationTasks().map(({ id }) => ({
+      id,
+      run: async (signal) => {
+        if (!useAppStore.getState().generationHistoryReady) return;
+        const task = getUnsubmittedGenerationTasks().find((t) => t.id === id);
+        if (!task || signal.aborted) return;
         try {
           await submitSingleGenerationTask(
-            t,
+            task,
             updateGenerationTask,
             pollCountsRef.current,
             homeSlowPollIdsRef.current,
-            ctrl.signal,
+            signal,
           );
         } catch (err: unknown) {
-          if (isGenerationCancelled(err, ctrl.signal)) {
-            updateGenerationTask(t.id, {
+          if (isGenerationCancelled(err, signal)) {
+            updateGenerationTask(id, {
               status: 'FAILURE',
               failReason: GENERATION_CANCELLED_MESSAGE,
             });
           } else {
             const message = err instanceof Error ? err.message : String(err);
-            console.warn(`[generationEngine] 任务 ${t.id} 失败:`, message);
-            updateGenerationTask(t.id, {
+            console.warn(`[generationEngine] 任务 ${id} 失败:`, message);
+            updateGenerationTask(id, {
               status: 'FAILURE',
               failReason: formatUserError(err, '网络连接异常或模型接口错误'),
             });
           }
-        } finally {
-          submittingTaskIdsRef.current.delete(t.id);
-          globalSubmittingTaskIds.delete(t.id);
-          activeAbortControllersRef.current.delete(t.id);
-          engineAbortControllers.delete(t.id);
         }
-      }
-    };
-
-    void processQueue();
+      },
+    })));
   }, [unsubmittedTasksKey, updateGenerationTask]);
 
   // 轮询进行中 Hub 任务

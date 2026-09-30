@@ -12,7 +12,22 @@ function canonical(value: unknown): string {
   if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
   return JSON.stringify(value) ?? 'null';
 }
-interface Receipt { fingerprint: string; kind?: string; status?: number; body?: string; createdAt: number }
+interface Receipt { fingerprint: string; kind?: string; status?: number; body?: string; createdAt: number; attemptId?: string }
+
+async function withKeywordReceiptMeta(response: Response, kind: string, attemptId: string | undefined, replayed: boolean): Promise<Response> {
+  if (kind !== 'keyword-review') return response.clone();
+  const headers = new Headers(response.headers);
+  headers.set('x-submission-replayed', String(replayed));
+  if (attemptId) headers.set('x-submission-attempt-id', attemptId);
+  let text = await response.clone().text();
+  try {
+    const body: unknown = JSON.parse(text);
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      text = JSON.stringify({ ...body, replayed, ...(attemptId ? { submissionAttemptId: attemptId } : {}) });
+    }
+  } catch { /* Keep an older non-JSON receipt intact; its headers still identify the replay. */ }
+  return new Response(text, { status: response.status, headers });
+}
 
 export function isExpiredReceipt(createdAt: number | undefined, now = Date.now()): boolean {
   return !createdAt || now - createdAt >= SUBMISSION_RECEIPT_TTL_MS;
@@ -25,6 +40,29 @@ function receiptsRoot(): string {
 
 function receiptsDir(): string {
   return path.join(receiptsRoot(), requireWorkspaceId());
+}
+
+/** Read an operation's receipt without dispatching or waiting for another submission. */
+export async function readSubmissionReceipt(kind: 'image' | 'video' | 'depth-image' | 'depth-video', credentials: { baseUrl: string; apiKey: string }, operation: string): Promise<Response | null> {
+  if (!operation.trim() || operation.length > 256) return null;
+  const scope = digest(`${kind}\0${credentials.baseUrl}\0${credentials.apiKey}`);
+  const key = digest(`${requireWorkspaceId()}\0${scope}\0${operation}`);
+  let saved: Receipt;
+  try {
+    saved = JSON.parse(await fs.readFile(path.join(receiptsDir(), `${key}.json`), 'utf8')) as Receipt;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+  if ((saved.kind && saved.kind !== kind) || !saved.status || saved.body === undefined) return null;
+  let body = saved.body;
+  try {
+    const data = JSON.parse(body);
+    if (saved.status >= 400 && saved.status < 500 && data?.success === false && !data.submissionUnknown) {
+      body = JSON.stringify({ ...data, submissionRejected: true });
+    }
+  } catch { /* An unreadable receipt remains unresolved; never dispatch another POST here. */ }
+  return new Response(body, { status: saved.status, headers: { 'content-type': 'application/json' } });
 }
 
 async function receiptDirs(): Promise<string[]> {
@@ -74,9 +112,14 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
   if (operation !== undefined && (typeof operation !== 'string' || operation.length > 256)) {
     return Response.json({ success: false, error: '任务标识不合法' }, { status: 400 });
   }
+  const attemptId = kind === 'keyword-review' ? req.headers.get('x-submission-attempt-id')?.trim() || undefined : undefined;
+  if (attemptId && attemptId.length > 128) return Response.json({ success: false, error: '请求尝试标识不合法' }, { status: 400 });
   const input = { ...body };
   delete input.clientTaskId;
   delete input.customApiKey;
+  const legacyFingerprint = digest(canonical(input));
+  // Equivalent /v1 and trailing-slash spellings target the same model endpoint.
+  if (kind === 'keyword-review') input.customBaseUrl = credentials.baseUrl;
   const scope = digest(`${kind}\0${credentials.baseUrl}\0${credentials.apiKey}`);
   const fingerprint = digest(canonical(input));
   // Without a client operation id each explicit request is a new generation.
@@ -85,13 +128,13 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
   if (existing) {
     const response = await existing;
     if (response.headers.get('x-request-fingerprint') !== fingerprint) return conflict();
-    return response.clone();
+    return withKeywordReceiptMeta(response, kind, response.headers.get('x-submission-attempt-id') || undefined, true);
   }
   const run = async (): Promise<Response> => {
     const dir = receiptsDir();
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
     const file = path.join(dir, `${key}.json`);
-    const receipt: Receipt = { fingerprint, kind, createdAt: Date.now() };
+    const receipt: Receipt = { fingerprint, kind, createdAt: Date.now(), ...(attemptId ? { attemptId } : {}) };
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         await fs.writeFile(file, JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
@@ -103,8 +146,11 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
           await fs.unlink(file).catch(() => {});
           continue;
         }
-        if (saved.fingerprint !== fingerprint) return conflict();
-        if (saved.status && saved.body !== undefined) return new Response(saved.body, { status: saved.status, headers: { 'content-type': 'application/json', 'x-request-fingerprint': fingerprint } });
+        // Exact older requests remain replayable after URL canonicalization.
+        if (saved.fingerprint !== fingerprint && saved.fingerprint !== legacyFingerprint) return conflict();
+        if (saved.status && saved.body !== undefined) return withKeywordReceiptMeta(new Response(saved.body, {
+          status: saved.status, headers: { 'content-type': 'application/json', 'x-request-fingerprint': fingerprint },
+        }), kind, saved.attemptId, true);
         return Response.json({ success: false, error: '该任务正在提交或提交结果待核对，请查询原任务，不要重复提交', submissionUnknown: true }, { status: 409 });
       }
     }
@@ -115,7 +161,7 @@ export async function guardSubmission(req: Request, kind: string, credentials: {
     await fs.rename(temp, file);
     const headers = new Headers(response.headers);
     headers.set('x-request-fingerprint', fingerprint);
-    return new Response(text, { status: response.status, headers });
+    return withKeywordReceiptMeta(new Response(text, { status: response.status, headers }), kind, attemptId, false);
   };
   const promise = run();
   inFlight.set(key, promise);

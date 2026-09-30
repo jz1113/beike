@@ -1,110 +1,46 @@
 /**
  * Assistant Turn 持久化服务
- *
+ * 
  * 将 AgentRuntime 的 item 状态同步写入 DB，支持：
  * - Turn 生命周期管理（running -> completed/interrupted/failed）
  * - Item 增量写入（每个 item 事件完成时同步）
- * - Snapshot 立即同步
+ * - Snapshot 批量更新（debounced）
  */
 
-import { db } from './access';
+import { db as prisma } from './access';
 import type { AgentRuntime } from '@server/infrastructure/assistant/agentRuntime';
 import type { AssistantItem } from '@shared/domain/assistant/types';
-import { fromAssistantTurnStatus } from '@shared/domain/core/taskStatus';
+import type { Prisma } from '@prisma/client';
+import { AssistantThreadDeletedError, isAssistantThreadDeleted, withAssistantThreadWrite } from './assistantThreadLifecycle';
 
-/** 提取 AssistantItem 的可存储字段 */
-export function extractItemFields(item: AssistantItem): {
-  kind: string;
-  status: string;
-  content: string;
-  reasoning: string;
-  toolName: string | null;
-  displayName: string | null;
-  argsJson: string;
-  summary: string | null;
-  actionJson: string | null;
-  visualImagesJson: string | null;
-  metaJson: string;
-} {
-  const base = {
-    kind: item.kind,
-    status: 'done',
-    content: '',
-    reasoning: '',
-    toolName: null as string | null,
-    displayName: null as string | null,
-    argsJson: '{}',
-    summary: null as string | null,
-    actionJson: null as string | null,
-    visualImagesJson: null as string | null,
-    metaJson: '{}',
-  };
+import { extractItemFields } from './assistantItemFields';
+import { createAssistantExecutionRepository } from './assistantExecution';
+import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
 
-  switch (item.kind) {
-    case 'agentMessage':
-      return { ...base, kind: 'agentMessage', content: (item as { content: string }).content || '' };
-    case 'agentReasoning':
-      return { ...base, kind: 'agentReasoning', reasoning: (item as { content: string }).content || '' };
-    case 'toolCall': {
-      const tc = item as { name: string; displayName?: string; args?: string; callId?: string };
-      return {
-        ...base,
-        kind: 'toolCall',
-        toolName: tc.name,
-        displayName: tc.displayName || tc.name,
-        argsJson: tc.args || '{}',
-        status: (item as { status: string }).status === 'done' ? 'done' : (item as { status: string }).status === 'error' ? 'error' : 'running',
-      };
-    }
-    case 'toolResult': {
-      const tr = item as { name: string; displayName?: string; summary?: string; action?: Record<string, unknown> };
-      return {
-        ...base,
-        kind: 'toolResult',
-        toolName: tr.name,
-        displayName: tr.displayName || tr.name,
-        summary: tr.summary || '',
-        actionJson: tr.action ? JSON.stringify(tr.action) : null,
-        status: (item as { status: string }).status === 'done' ? 'done' : 'error',
-      };
-    }
-    case 'approvalRequest': {
-      const ar = item as { toolName: string; displayName?: string; args?: Record<string, unknown>; status?: string };
-      const approvalStatus =
-        ar.status === 'accepted' ? 'done'
-        : ar.status === 'declined' ? 'error'
-        : ar.status === 'expired' ? 'cancelled'
-        : 'running';
-      return {
-        ...base,
-        kind: 'approvalRequest',
-        toolName: ar.toolName,
-        displayName: ar.displayName || ar.toolName,
-        argsJson: JSON.stringify(ar.args || {}),
-        status: approvalStatus,
-      };
-    }
-    default:
-      return { ...base, kind: 'userMessage', content: (item as { content: string }).content || '' };
-  }
+/** Only the immutable execution claim may create turns; runners verify its ownership. */
+export async function updateTurnModel(turnId: string, threadId: string, model?: string): Promise<void> {
+  await withAssistantThreadWrite(threadId, () => prisma.$transaction(async (tx) => {
+    if (await isAssistantThreadDeleted(threadId, tx)) throw new AssistantThreadDeletedError();
+    const existing = await tx.assistantTurn.findUnique({ where: { id: turnId } });
+    if (!existing || existing.threadId !== threadId) throw new Error('任务与当前对话不匹配');
+    if (!['running', 'awaiting_approval'].includes(existing.status)) throw new Error('此任务已结束，请使用新的任务编号');
+    await tx.assistantTurn.update({ where: { id: turnId }, data: { model: model || undefined } });
+  }));
 }
 
-/** 创建或更新 Turn 记录 */
-export async function upsertTurn(turnId: string, threadId: string, model?: string): Promise<void> {
-  await db.assistantTurn.upsert({
-    where: { id: turnId },
-    create: {
-      id: turnId,
-      threadId,
-      model: model || null,
-      status: 'running',
-      startedAt: new Date(),
-      snapshotJson: '{}',
-    },
-    update: {
-      model: model || undefined,
-    },
-  });
+/** Late events after deletion are discarded; every read/write uses the same transaction. */
+async function withPersistableTurn(
+  turnId: string,
+  run: (tx: Prisma.TransactionClient, turn: { threadId: string; status: string }) => Promise<void>,
+  expectedThreadId?: string,
+): Promise<void> {
+  const current = await prisma.assistantTurn.findUnique({ where: { id: turnId }, select: { threadId: true } });
+  if (!current || (expectedThreadId && current.threadId !== expectedThreadId)) return;
+  await withAssistantThreadWrite(current.threadId, () => prisma.$transaction(async (tx) => {
+    const turn = await tx.assistantTurn.findUnique({ where: { id: turnId }, select: { threadId: true, status: true } });
+    if (!turn || turn.threadId !== current.threadId || await isAssistantThreadDeleted(turn.threadId, tx)) return;
+    await run(tx, turn);
+  }));
 }
 
 /** 更新 Turn 状态 */
@@ -112,11 +48,11 @@ export async function updateTurnStatus(
   turnId: string,
   status: 'completed' | 'interrupted' | 'failed' | 'awaiting_approval',
   usage?: { inputTokens: number; outputTokens: number },
+  expectedThreadId?: string,
 ): Promise<void> {
-  const canonical = fromAssistantTurnStatus(status);
   const update: Record<string, unknown> = {
     status,
-    completedAt: canonical === 'running' ? null : new Date(),
+    completedAt: status === 'awaiting_approval' ? null : new Date(),
   };
 
   if (usage) {
@@ -124,17 +60,22 @@ export async function updateTurnStatus(
     update.usageOutputTokens = usage.outputTokens;
   }
 
-  await db.assistantTurn.update({
-    where: { id: turnId },
-    data: update,
-  });
+  await withPersistableTurn(turnId, async (tx, turn) => {
+    if (['completed', 'interrupted', 'failed'].includes(turn.status) && turn.status !== status) return;
+    await tx.assistantTurn.update({ where: { id: turnId }, data: update });
+  }, expectedThreadId);
 }
 
 /** 同步单个 Item 到 DB */
 export async function upsertItem(turnId: string, item: AssistantItem): Promise<void> {
-  const fields = extractItemFields(item);
+  await withPersistableTurn(turnId, (tx) => upsertItemInTransaction(tx, turnId, item));
+}
 
-  await db.assistantTurnItem.upsert({
+async function upsertItemInTransaction(tx: Prisma.TransactionClient, turnId: string, item: AssistantItem): Promise<void> {
+  const fields = extractItemFields(item);
+  const existing = await tx.assistantTurnItem.findUnique({ where: { id: item.id }, select: { turnId: true } });
+  if (existing && existing.turnId !== turnId) throw new Error('消息与当前任务不匹配');
+  await tx.assistantTurnItem.upsert({
     where: { id: item.id },
     create: {
       id: item.id,
@@ -164,60 +105,15 @@ export async function upsertItem(turnId: string, item: AssistantItem): Promise<v
       argsJson: fields.argsJson,
       displayName: fields.displayName,
       toolName: fields.toolName,
+      metaJson: fields.metaJson,
     },
   });
 }
 
-/** 批量同步 Items 到 DB */
-export async function upsertItems(turnId: string, items: AssistantItem[]): Promise<void> {
-  if (items.length === 0) return;
-
-  await db.$transaction(
-    items.map((item) => {
-      const fields = extractItemFields(item);
-      return db.assistantTurnItem.upsert({
-        where: { id: item.id },
-        create: {
-          id: item.id,
-          turnId,
-          kind: fields.kind,
-          status: fields.status,
-          startedAt: new Date(item.createdAt),
-          completedAt: fields.status === 'done' || fields.status === 'error' || fields.status === 'cancelled' ? new Date() : null,
-          content: fields.content,
-          reasoning: fields.reasoning,
-          toolName: fields.toolName,
-          displayName: fields.displayName,
-          argsJson: fields.argsJson,
-          summary: fields.summary,
-          actionJson: fields.actionJson,
-          visualImagesJson: fields.visualImagesJson,
-          metaJson: fields.metaJson,
-        },
-        update: {
-          status: fields.status,
-          completedAt: fields.status === 'done' || fields.status === 'error' || fields.status === 'cancelled' ? new Date() : null,
-          content: fields.content,
-          reasoning: fields.reasoning,
-          summary: fields.summary,
-          actionJson: fields.actionJson,
-          visualImagesJson: fields.visualImagesJson,
-          argsJson: fields.argsJson,
-          displayName: fields.displayName,
-          toolName: fields.toolName,
-        },
-      });
-    }),
-  );
-}
-
-/** 立即同步 snapshot */
+/** Synchronize snapshots under the same deletion barrier as item and status writes. */
 export async function syncSnapshot(turnId: string, snapshot: unknown): Promise<void> {
-  await db.assistantTurn.update({
-    where: { id: turnId },
-    data: {
-      snapshotJson: JSON.stringify(snapshot),
-    },
+  await withPersistableTurn(turnId, async (tx) => {
+    await createAssistantExecutionRepository(tx, requireWorkspaceId).saveSnapshot(turnId, snapshot);
   });
 }
 
@@ -226,20 +122,9 @@ export async function syncRuntimeToDb(runtime: AgentRuntime, turnId: string): Pr
   const snapshot = runtime.snapshot();
 
   // Update turn status and snapshot
-  await db.assistantTurn.update({
-    where: { id: turnId },
-    data: {
-      status: snapshot.status,
-      completedAt: snapshot.status === 'completed' || snapshot.status === 'failed' || snapshot.status === 'interrupted' ? new Date() : null,
-      usageInputTokens: snapshot.usage?.inputTokens,
-      usageOutputTokens: snapshot.usage?.outputTokens,
-      model: snapshot.modelUsed || null,
-      snapshotJson: JSON.stringify(snapshot),
-    },
-  });
-
-  // Sync items
-  if (snapshot.items.length > 0) {
-    await upsertItems(turnId, snapshot.items);
-  }
+  await withPersistableTurn(turnId, async (tx, turn) => {
+    if (['completed', 'interrupted', 'failed'].includes(turn.status) && turn.status !== snapshot.status) return;
+    for (const item of snapshot.items) await upsertItemInTransaction(tx, turnId, item);
+    await createAssistantExecutionRepository(tx, requireWorkspaceId).saveRuntime(turnId, snapshot);
+  }, snapshot.threadId);
 }

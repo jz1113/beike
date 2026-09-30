@@ -42,6 +42,8 @@ export interface BatchTaskItem {
   gridSize?: string;
   /** Frozen expected delivery dimensions for this attempt (not a measurement of the product). */
   outputSize?: string;
+  /** Upstream canvas size, which can differ from the final cropped delivery size. */
+  generationSize?: string;
   attempt?: number;
   outputReview?: 'unreviewed' | 'accepted' | 'retry_requested' | 'rejected';
 }
@@ -99,6 +101,7 @@ export interface BatchProductItem {
   applied_persona?: string;
   appliedFullPromptId?: string;
   appliedFullPromptTitle?: string;
+  appliedFullPromptDisplayNumber?: number | null;
   appliedFullPromptGroupIndex?: number | null;
   appliedFullPromptAlbumName?: string | null;
   appliedFullPromptSelectionMode?: 'manual' | 'auto';
@@ -113,4 +116,11 @@ export interface BatchProductItem {
   copywriting?: BatchCopywriting;
   isCopywritingGenerating?: boolean;
   copywritingError?: string;
+}
+
+/** Use the collected category consistently in preview, preflight and analysis. */
+export function productPropsWithCategory(item: Pick<BatchProductItem, 'props' | 'category'>): Record<string, string> {
+  const props = item.props || {};
+  const category = item.category?.trim();
+  return category && !props['商品类目'] ? { ...props, 商品类目: category } : props;
 }

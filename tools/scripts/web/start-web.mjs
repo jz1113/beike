@@ -24,15 +24,6 @@ if (!existsSync(join(webDistDir, 'index.html'))) {
   process.exit(1);
 }
 
-if (process.env.NODE_ENV === 'production' && !process.env.LOCAL_ACCESS_TOKEN) {
-  const token = resolveAccessToken(workspaceRoot, appDataDir);
-  if (!token) {
-    console.error('生产环境必须设置 LOCAL_ACCESS_TOKEN');
-    process.exit(1);
-  }
-  process.env.LOCAL_ACCESS_TOKEN = token;
-}
-
 ensureAppDatabase(workspaceRoot, appDataDir);
 const accessToken = process.env.LOCAL_ACCESS_TOKEN || resolveAccessToken(workspaceRoot, appDataDir);
 

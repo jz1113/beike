@@ -9,6 +9,7 @@ import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { extractStorageConfigFromRequest } from '@server/infrastructure/storage/storage';
 import { checkDepthModelReady } from '../../services/depth/depthEnvCheck';
 import { runDepthImageJob } from '../../services/depth/depthImagePipeline';
+import { depthInputDigest, guardDepthSubmission, readDepthSubmissionReceipt } from '../../services/tasks/depthSubmissionGuard';
 
 /**
  * POST /api/generate/depth-image
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
     if (!depthModelReady) {
       return jsonResponse({
         success: false,
+        submissionRejected: true,
         error: `深度模型未就绪，请在终端执行：${DEPTH_MODEL_SETUP_COMMAND}`,
       }, 503);
     }
@@ -47,22 +49,25 @@ export async function POST(req: Request) {
     const quality = resolveDepthQuality(form.get('quality'));
     const storageConfig = extractStorageConfigFromRequest(req);
     const imageBuffer = Buffer.from(await file.arrayBuffer());
-    const { resultUrl, meta } = await runDepthImageJob({ imageBuffer, style, quality, storageConfig });
-
-    return jsonResponse({
-      success: true,
-      resultUrl,
-      style,
-      quality,
-      modelId: meta?.modelId,
-      inferenceSizePx: meta?.inferenceSizePx,
-      device: meta?.device,
+    return guardDepthSubmission(req, 'depth-image', form.get('clientTaskId'), {
+      fileDigest: depthInputDigest(imageBuffer), style, quality,
+    }, async () => {
+      const { resultUrl, meta } = await runDepthImageJob({ imageBuffer, style, quality, storageConfig });
+      return jsonResponse({
+        success: true, resultUrl, style, quality,
+        modelId: meta?.modelId, inferenceSizePx: meta?.inferenceSizePx, device: meta?.device,
+      });
     });
   } catch (error: unknown) {
     console.error('[深度图片] 生成失败:', error);
     return jsonResponse({
       success: false,
+      submissionRejected: true,
       error: formatUserError(error, '深度图片生成失败'),
     }, 500);
   }
+}
+
+export async function GET(req: Request) {
+  return readDepthSubmissionReceipt(req, 'depth-image');
 }

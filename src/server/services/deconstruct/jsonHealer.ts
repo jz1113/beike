@@ -146,6 +146,8 @@ export function repairAndParseDeconstructJson(text: string): any {
 
   const themeMatch = raw.match(/"theme_category"\s*:\s*"([^"]+)"/);
   if (themeMatch) result.theme_category = themeMatch[1];
+  const productCategoryMatch = raw.match(/"product_major_category"\s*:\s*"([^"]+)"/);
+  if (productCategoryMatch) result.product_major_category = productCategoryMatch[1];
 
   const personaMatch = raw.match(/"persona"\s*:\s*(\{[\s\S]*?\n\s*\})/);
   if (personaMatch) {

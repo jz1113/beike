@@ -6,6 +6,7 @@ export * from './viewStage';
 export * from './invalidation';
 export * from './idempotency';
 export * from './storyboardSlots';
+export * from './groupCategoryFit';
 export * from './groupAssetSelection';
 export * from './boundGroupPrompt';
 

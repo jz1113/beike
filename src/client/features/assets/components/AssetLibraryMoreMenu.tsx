@@ -1,5 +1,4 @@
-import { useState, type RefObject, type ChangeEvent } from 'react';
-import { AssetCoverageModal } from './AssetCoverageModal';
+import { type RefObject, type ChangeEvent } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 
 export interface AssetLibraryMoreMenuProps {
@@ -23,7 +22,6 @@ export function AssetLibraryMoreMenu({
   onOpenPromptSpec,
   onClearAssets,
 }: AssetLibraryMoreMenuProps) {
-  const [coverageOpen, setCoverageOpen] = useState(false);
   return (
     <div className="relative">
       <button
@@ -69,7 +67,6 @@ export function AssetLibraryMoreMenu({
           <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             资产维护与规范
           </div>
-          <button type="button" onClick={() => { setShowMoreMenu(false); setCoverageOpen(true); }} className="w-full px-3.5 py-2 text-left font-medium hover:bg-slate-50">覆盖度看板</button>
           <button
             type="button"
             onClick={() => {
@@ -119,7 +116,6 @@ export function AssetLibraryMoreMenu({
         </div>
       )}
 
-      <AssetCoverageModal open={coverageOpen} onClose={() => setCoverageOpen(false)} />
       <input
         ref={importJsonRef}
         type="file"

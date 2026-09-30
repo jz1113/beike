@@ -1,8 +1,14 @@
 /** Product titles only: never classify a product from “Shot on iPhone” camera prose. */
 export function isPhoneProduct(title = ''): boolean {
-  const soldTitle = title.replace(/(?:赠送|赠|配赠|附赠)[^，,；;]{0,24}(?:手机壳|保护壳|钢化膜|充电器|数据线)/g, '').trim();
+  const soldTitle = title.replace(/(?:赠送|赠|配赠|附赠)[^，,；;]{0,24}(?:手机壳|保护壳|钢化膜|手机支架|手机座|手机夹|充电器|数据线)/g, '').trim();
   if (/手机壳|保护壳|保护套|手机挂绳|手机挂饰|手机膜|钢化膜|屏幕膜|镜头膜|贴膜|手机支架|手机座|手机夹|手机充电器|充电头|充电宝|移动电源|数据线|充电线|手机散热器|手机稳定器|耳机|手表|平板|笔记本|电脑|matepad|xiaomi\s*pad|\b(?:phone\s*case|screen\s*protector|charger|power\s*bank|earbuds?|buds|watch|tablet|ipad|pad|tab|laptop)\b/i.test(soldTitle)) return false;
-  return /手机|智能机|iphone|redmi|iqoo|红米|小米\s*\d|小米note|galaxy|pixel\s*\d|smartphone|(?:vivo|oppo|荣耀|honor|realme|一加|华为|huawei|三星|samsung|nova|oneplus)\s*[a-z0-9][a-z0-9\s+.-]{0,16}\d/i.test(soldTitle);
+  if (/手机|智能机|iphone|redmi|iqoo|红米|小米\s*\d|小米note|galaxy|pixel\s*\d|smartphone|(?:vivo|oppo|荣耀|honor|realme|一加|华为|huawei|三星|samsung|nova|oneplus)\s*[a-z0-9][a-z0-9\s+.-]{0,16}\d/i.test(soldTitle)) return true;
+  // Some marketplace titles put promotions between the brand and model and omit “手机”.
+  // Require several independent phone hardware clues before treating them as a handset.
+  return /华为|huawei|荣耀|honor|vivo|oppo|realme|一加|oneplus|三星|samsung|小米|xiaomi/i.test(soldTitle)
+    && /曲面屏|护眼屏|直屏|折叠屏|屏幕/i.test(soldTitle)
+    && /鸿蒙系统|harmonyos|麒麟\s*\d{3,5}|骁龙\s*\d{3,5}|天玑\s*\d{3,5}/i.test(soldTitle)
+    && /\d{4,5}\s*mah|全网通|双卡双待|北斗卫星|5g/i.test(soldTitle);
 }
 
 /** Keep factual reverse-analysis separate from rules for reusing a reference. */

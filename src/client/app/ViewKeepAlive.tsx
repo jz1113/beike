@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppView } from '@client/store/appView';
+import { ViewVisibilityContext } from '@client/shared/hooks/useViewVisibility';
 
-const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'keyword_review', 'assets', 'canvas', 'workshop'];
+const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'keyword_review', 'headline_poster', 'assets', 'canvas', 'workshop'];
 
 interface ViewKeepAlivePanelProps {
   view: AppView;
@@ -21,18 +22,21 @@ export function ViewKeepAlivePanel({ view, currentView, children }: ViewKeepAliv
   }, [active]);
 
   if (!KEEP_ALIVE_VIEWS.includes(view)) {
-    return active ? <>{children}</> : null;
+    return active ? <ViewVisibilityContext.Provider value={active}>{children}</ViewVisibilityContext.Provider> : null;
   }
 
   if (!active && !hasRendered) return null;
 
   return (
-    <div
-      className={active ? 'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden' : 'hidden'}
-      aria-hidden={!active}
-      data-view-panel={view}
-    >
-      {active ? children : frozenChildren.current}
-    </div>
+    <ViewVisibilityContext.Provider value={active}>
+      <div
+        className={active ? 'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden' : 'hidden'}
+        aria-hidden={!active}
+        inert={!active}
+        data-view-panel={view}
+      >
+        {active ? children : frozenChildren.current}
+      </div>
+    </ViewVisibilityContext.Provider>
   );
 }

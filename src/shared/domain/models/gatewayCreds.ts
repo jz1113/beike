@@ -3,18 +3,25 @@ import { domainEnv } from '../core/runtime';
 import { normalizeGatewayBaseUrl } from './gatewayUrl';
 
 function isPrivateHostname(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.$/, '');
   if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return true;
-  if (host === '::1' || host === '0.0.0.0') return true;
-  const ipv4 = host.startsWith('::ffff:') ? host.slice(7) : host;
-  const parts = ipv4.split('..').map(Number);
+  if (host === '::' || host === '::1' || host === '0.0.0.0') return true;
+  if (/^(?:f[cd][0-9a-f]{2}|fe[89ab][0-9a-f]):/i.test(host)) return true;
+  let ipv4 = host.startsWith('::ffff:') ? host.slice(7) : host;
+  // URL canonicalizes IPv4-mapped IPv6 addresses to two hexadecimal groups.
+  if (host.startsWith('::ffff:') && /^[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(ipv4)) {
+    const [high, low] = ipv4.split(':').map((part) => parseInt(part, 16));
+    ipv4 = [high >> 8, high & 255, low >> 8, low & 255].join('.');
+  }
+  const parts = ipv4.split('.').map(Number);
   if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
     const [a, b] = parts;
-    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 10 || a === 127 || a === 0 || a >= 224) return true;
     if (a === 192 && b === 168) return true;
     if (a === 169 && b === 254) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a === 198 && (b === 18 || b === 19)) return true;
   }
   return false;
 }
@@ -35,7 +42,7 @@ export function isPublicHttpGatewayIpUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
     if (url.protocol !== 'http:' || url.username || url.password || url.search || url.hash) return false;
-    const parts = url.hostname.split('..').map(Number);
+    const parts = url.hostname.split('.').map(Number);
     if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
     const [a, b, c] = parts;
     if (a === 0 || a === 10 || a === 127 || a >= 224) return false;

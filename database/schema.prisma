@@ -339,6 +339,7 @@ model FullPromptAsset {
   sourceImageIndex   Int?     // 图集第几张 (1-based)
   sourceImageIndices String?  // 图组包含的来源图序号 JSON，如 [1,2,3,4]
   groupIndex         Int?     // 同一图集内的图组序号 (1-based)
+  displayNumber      Int?     @unique // 全库永久展示序号；旧单图记录为空
   contentSummary     String?  // 整条外站内容的简明总结
   architectureSummary String? // 固定不替换的图组架构：镜头节奏、动作、出镜规则
   replaceableSlots   String?  // 图组级可替换槽位 JSON（人物/穿搭/场景）
@@ -354,6 +355,7 @@ model FullPromptAsset {
   personaSummary     String?  // 人设摘要
   tags               String   @default("") // 提取标签
   category           String   @default("general")
+  productSubcategory String?  // 商品细分：数码内置键或 prompt_subcategory: 文件夹 ID；空值待人工确认
   provenance         String   @default("deconstructed")
   usageCount         Int      @default(0)
   isFavorite         Boolean  @default(false)
@@ -365,6 +367,7 @@ model FullPromptAsset {
 
   @@index([workspaceId])
   @@index([category])
+  @@index([productSubcategory])
   @@index([isFavorite])
   @@index([createdAt])
   @@index([albumName])
@@ -373,12 +376,30 @@ model FullPromptAsset {
   @@index([isFavorite(sort: Desc), usageCount(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "FullPromptAsset_library_order_idx")
 }
 
+model FullPromptDisplaySequence {
+  id         String @id
+  lastNumber Int    @default(0)
+}
+
+// One approved generated-image replacement per four-shot mother group.
+model FullPromptImageReplacement {
+  motherAssetId       String   @id
+  workspaceId         String   @default("legacy")
+  reviewId            String   @unique
+  sourceSnapshotJson  String
+  generatedImagesJson String
+  createdAt           DateTime @default(now())
+
+  @@index([workspaceId])
+}
+
 model AssetProductCategory {
   id       String  @id @default(cuid())
   workspaceId String   @default("legacy")
   name     String
   parentId String?
   position Int     @default(0)
+  isArchived Boolean @default(false) // 图组母本文件夹已移除；保留记录以免内置文件夹重现
   aliases  String  @default("[]")
   keywords String  @default("[]")
   anatomy  String  @default("[]")
@@ -550,4 +571,43 @@ model WorkshopPipelineRun {
 
   @@index([workspaceId])
   @@index([batchId, status])
+}
+
+model DeconstructJob {
+  id               String   @id @default(cuid())
+  workspaceId      String   @default("legacy")
+  jobId            String
+  inputHash        String
+  status           String   @default("queued")
+  configJson       String
+  concurrency      Int
+  reviewBeforeSave Boolean
+  stopRequested    Boolean  @default(false)
+  error            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  finishedAt       DateTime?
+
+  @@unique([workspaceId, jobId])
+  @@index([workspaceId, createdAt])
+}
+
+model DeconstructJobItem {
+  id           String   @id @default(cuid())
+  workspaceId  String   @default("legacy")
+  jobId        String
+  itemId       String
+  position     Int
+  inputJson    String
+  status       String   @default("queued")
+  progressJson String?
+  resultJson   String?
+  error        String?
+  startedAt    DateTime?
+  dispatchedAt DateTime?
+  finishedAt   DateTime?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([workspaceId, jobId, itemId])
+  @@index([workspaceId, jobId, position])
 }

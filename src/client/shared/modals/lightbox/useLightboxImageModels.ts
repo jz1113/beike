@@ -1,33 +1,19 @@
 import { useEffect, useState } from 'react';
-import { getEnabledImageModelsFromSettings, hasWorkflowModelConfiguration, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
+import { getEnabledImageModelsFromSettings } from '@shared/domain/models/workflowModels';
 
-export function useLightboxImageModels() {
-  // 获取启用的生图模型列表
-  const [availableImageModels, setAvailableImageModels] = useState<any[]>(() => {
-    try {
-      const list = getEnabledImageModelsFromSettings();
-      if (list.length > 0 || hasWorkflowModelConfiguration()) return list;
-    } catch {}
-    return [
-      { id: 'gpt-image-2', name: 'GPT Image 2', provider: 'OpenAI', isPrimary: true },
-      { id: 'midjourney-v6', name: 'Midjourney v6', provider: 'Midjourney' },
-      { id: 'flux-1-dev', name: 'FLUX.1 Dev', provider: 'BFL' },
-    ];
-  });
-
+export function useLightboxImageModels(selectedModelId?: string, onSelectModel?: (id: string) => void) {
+  const [availableImageModels, setAvailableImageModels] = useState(() => getEnabledImageModelsFromSettings());
   useEffect(() => {
-    const loadModels = () => {
-      try {
-        const all = readWorkflowModelsFromStorage();
-        const customImage = getEnabledImageModelsFromSettings(all);
-        if (customImage.length > 0 || hasWorkflowModelConfiguration()) {
-          setAvailableImageModels(customImage);
-        }
-      } catch {}
-    };
+    const loadModels = () => setAvailableImageModels(getEnabledImageModelsFromSettings());
+    loadModels();
     window.addEventListener('models_updated', loadModels);
     return () => window.removeEventListener('models_updated', loadModels);
   }, []);
-
+  useEffect(() => {
+    if (!onSelectModel || selectedModelId === undefined || availableImageModels.some(model => model.id === selectedModelId)) return;
+    const saved = localStorage.getItem('ai_image_gen_model');
+    const fallback = availableImageModels.find(model => model.id === saved)?.id || availableImageModels[0]?.id || '';
+    if (fallback !== selectedModelId) onSelectModel(fallback);
+  }, [availableImageModels, selectedModelId, onSelectModel]);
   return availableImageModels;
 }

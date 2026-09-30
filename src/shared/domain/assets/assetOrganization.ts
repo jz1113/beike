@@ -1,4 +1,8 @@
-export interface AssetProductCategory { id: string; name: string; parentId: string | null; position: number }
+export interface AssetProductCategory {
+  id: string; name: string; parentId: string | null; position: number; isArchived?: boolean;
+  keywords?: string; anatomy?: string; aliases?: string;
+  isReadOnly?: boolean;
+}
 export interface PromptAlbum { id: string; name: string; productCategoryId: string | null; sourceKey?: string }
 export interface OrganizedAsset {
   id: string; albumId?: string | null; productCategoryIds?: string; isUniversal?: boolean;

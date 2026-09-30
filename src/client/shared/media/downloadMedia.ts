@@ -1,6 +1,7 @@
+import { getMediaDownloadFilename, isMediaDownloadContent } from '@shared/domain/media/mediaDownload';
 import { apiFetch, proxyMediaUrl } from '@client/shared/api/apiClient';
 import { saveToDownloadDir } from '@client/shared/media/saveDownload';
-import { fetchWithDerivedCache, getDerived, putDerived } from '@client/shared/media/idbMediaCache';
+import { getDerived, putDerived } from '@client/shared/media/idbMediaCache';
 
 /** 在新标签页打开外链 */
 export async function openExternalUrl(url: string): Promise<void> {
@@ -23,18 +24,6 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime });
 }
 
-/** 智能根据 MIME 类型校准文件名后缀 */
-function fixFilenameExtension(filename: string, mimeType: string): string {
-  if (filename.includes('.')) return filename;
-  if (mimeType.includes('png')) return `${filename}.png`;
-  if (mimeType.includes('jpeg') || mimeType.includes('jpg')) return `${filename}.jpg`;
-  if (mimeType.includes('webp')) return `${filename}.webp`;
-  if (mimeType.includes('mp4')) return `${filename}.mp4`;
-  if (mimeType.includes('zip')) return `${filename}.zip`;
-  if (mimeType.includes('json')) return `${filename}.json`;
-  return `${filename}.png`;
-}
-
 function isLocalPersistedMedia(url: string): boolean {
   return url.startsWith('/storage/') || url.startsWith('/api/assets/storage/');
 }
@@ -46,6 +35,16 @@ async function blobIsReadable(blob: Blob): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function isDownloadableMedia(blob: Blob, url: string): Promise<boolean> {
+  return blob.size > 0 && isMediaDownloadContent(blob.type, url, await blob.slice(0, 512).text());
+}
+
+async function readDownloadableResponse(res: Response, url: string): Promise<Blob | null> {
+  if (!res.ok || res.headers.get('x-proxy-fallback') === 'true') return null;
+  const blob = await res.blob();
+  return !isTruncatedResponse(res, blob) && await isDownloadableMedia(blob, url) ? blob : null;
 }
 
 function isTruncatedResponse(res: Response, blob: Blob): boolean {
@@ -115,7 +114,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
 
   const cachedMem = memoryBlobCache.get(url);
   if (cachedMem && Date.now() - cachedMem.at < MEMORY_CACHE_TTL_MS) {
-    if (await blobIsReadable(cachedMem.blob)) return cachedMem.blob;
+    if (await isDownloadableMedia(cachedMem.blob, url) && await blobIsReadable(cachedMem.blob)) return cachedMem.blob;
     memoryBlobCache.delete(url);
   }
 
@@ -125,7 +124,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
   if (!skipIdb) {
     try {
       const idbBlob = await getDerived(url);
-      if (idbBlob && idbBlob.size > 200 && await blobIsReadable(idbBlob)) {
+      if (idbBlob && await isDownloadableMedia(idbBlob, url) && await blobIsReadable(idbBlob)) {
         memoryBlobCache.set(url, { blob: idbBlob, at: Date.now() });
         evictMemoryBlobCache();
         return idbBlob;
@@ -145,12 +144,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
       try {
         const proxyUrl = proxyMediaUrl(url);
         const res = await apiFetch(proxyUrl);
-        if (res.ok) {
-          const blob = await res.blob();
-          if (blob.size > 200 && blob.type !== 'image/svg+xml' && !isTruncatedResponse(res, blob)) {
-            resultBlob = blob;
-          }
-        }
+        resultBlob = await readDownloadableResponse(res, url);
       } catch (proxyErr) {
         console.warn('[fetchMediaBlob] 代理拉取流失败，退回直连尝试:', proxyErr);
       }
@@ -159,25 +153,16 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
       if (!resultBlob) {
         try {
           const directRes = await fetch(url, { mode: 'cors' });
-          if (directRes.ok) {
-            const directBlob = await directRes.blob();
-            if (directBlob.size > 200 && !isTruncatedResponse(directRes, directBlob)) {
-              resultBlob = directBlob;
-            }
-          }
+          resultBlob = await readDownloadableResponse(directRes, url);
         } catch (directErr) {
-          console.warn('[fetchMediaBlob] 直连拉取失败，尝试从本地衍生缓存读取:', directErr);
+          console.warn('[fetchMediaBlob] 直连拉取失败:', directErr);
         }
       }
 
-      // 5.3 尝试兜底管道
       if (!resultBlob) {
-        try {
-          resultBlob = await fetchWithDerivedCache(url);
-        } catch (cacheErr) {
-          console.error('[fetchMediaBlob] 所有拉取通道均失败:', cacheErr);
-          throw new Error('无法获取图片媒体数据流');
-        }
+        // Cached media was checked above. Never retry via an unvalidated fetch:
+        // that could silently save the partial response or error page rejected here.
+        throw new Error('无法获取完整媒体文件，请重试或打开原文件');
       }
 
       // 存入内存高速缓存与 IndexedDB
@@ -195,12 +180,13 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
   return fetchPromise;
 }
 
+/** 使用浏览器发起文件下载 */
 export async function downloadMedia(
   url: string,
   filename: string,
 ): Promise<'browser'> {
   const blob = await fetchMediaBlob(url);
-  const correctedName = fixFilenameExtension(filename, blob.type);
+  const correctedName = getMediaDownloadFilename(filename, blob.type, url);
   return saveToDownloadDir(correctedName, blob);
 }
 
@@ -213,7 +199,7 @@ export async function downloadMediaOrOpen(
     return await downloadMedia(url, filename);
   } catch (err) {
     console.warn('[downloadMediaOrOpen] Local save failed, opening in browser:', err);
-    await openExternalUrl(url);
-    return 'browser';
+    try { await openExternalUrl(url); } catch { /* The original download still failed. */ }
+    throw new Error('下载失败，已尝试打开原文件，请手动保存或重试', { cause: err });
   }
 }

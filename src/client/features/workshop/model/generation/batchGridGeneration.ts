@@ -7,6 +7,8 @@ import { sliceGridImage2x2Blobs } from '@client/shared/media/imageGridSlicer';
 import type { BatchProductItem } from '../batchTypes';
 import type { TaskExecutionConfig } from './batchTaskExecution';
 import { resolveGridRecoverySource } from './gridRecoverySource';
+import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
+import { savedWorkshopOutputSize } from './workshopOutputSize';
 
 export async function runGridImageTask(
   item: BatchProductItem,
@@ -34,8 +36,10 @@ export async function runGridImageTask(
   try {
     if (shots.length !== 4 || !item.gridPrompt?.trim()) throw new Error('四宫格需要完整的 4 镜和整组提示词，请重新分析');
     const size = previous?.gridSize || resolveWorkshopImageSize(config.selectedAspect, config.selectedImageGenModel, config.selectedQuality);
-    const [width, height] = size.split('x').map(Number);
-    const outputSize = `${Math.max(1, Math.floor(width / 2))}x${Math.max(1, Math.floor(height / 2))}`;
+    const savedOutput = savedWorkshopOutputSize(item.tasks.find(task => pending.has(task.shot_no)));
+    const outputSize = savedOutput || config.gridOutputSize || savedWorkshopOutputSize({ gridSize: size })!;
+    const output = parseOutputDimensions(outputSize);
+    if (!output) throw new Error('切图尺寸无效，请设置 1–4096 的整数像素宽高');
     let verifySource = Boolean(previous?.outputSize);
     if (!sourceUrl && (previous?.gridTaskKey || recoveryOnly)) {
       const upstream = previous?.upstreamTaskId;
@@ -64,6 +68,7 @@ export async function runGridImageTask(
         ? await compressProductImageIfNeeded(config.anchorFaceUrl)
         : undefined;
       patch({ gridTaskKey: taskKey, gridSize: size, outputSize, upstreamTaskId: undefined });
+      await config.beforeSubmit?.();
       verifySource = true;
       const generated = await submitImageGenTaskResult({
       prompt: item.gridPrompt.trim(), model: config.selectedImageGenModel, size,
@@ -76,15 +81,20 @@ export async function runGridImageTask(
       productRole: item.productRole,
       anchorFaceImageUrl: safeAnchorFaceUrl,
       has_human: shots.some((shot) => shot.has_human !== false),
-    }, { isAborted: config.isAborted, isPaused: config.isPaused, idempotencyKey: taskKey, onTaskSubmitted: upstreamTaskId => patch({ upstreamTaskId }) });
+    }, { isAborted: config.isAborted, isPaused: config.isPaused, idempotencyKey: taskKey, onTaskSubmitted: async upstreamTaskId => {
+      patch({ upstreamTaskId });
+      await config.beforeSubmit?.();
+    } });
       sourceUrl = generated.url;
     }
-    patch({ gridSourceUrl: sourceUrl, gridTaskKey: taskKey, gridSize: size });
-    setItems((items) => items.map((entry) => entry.id === item.id ? { ...entry, masterGridUrl: sourceUrl } : entry));
+    patch({ gridSourceUrl: sourceUrl, gridTaskKey: taskKey, gridSize: size, outputSize });
+    setItems((items) => items.map((entry) => entry.id === item.id
+      && entry.tasks.some(task => matchesAttempt(task) && task.resultStatus !== 'superseded')
+      ? { ...entry, masterGridUrl: sourceUrl } : entry));
     stage = '下载或拆分';
     if (verifySource) await verifyWorkshopImageSize(sourceUrl!, size);
     slices = await sliceGridImage2x2Blobs(sourceUrl!, {
-      targetWidth: Math.max(1, Math.floor(width / 2)), targetHeight: Math.max(1, Math.floor(height / 2)),
+      targetWidth: output.width, targetHeight: output.height,
     });
     for (let index = 0; index < shots.length; index++) {
       const shot = shots[index];

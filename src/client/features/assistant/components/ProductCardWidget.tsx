@@ -1,3 +1,4 @@
+import { dedupeUrls } from '../utils/assistantProductImages';
 import { useState, useEffect } from 'react';
 import SocialCollectionGallery from './SocialCollectionGallery';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -25,27 +26,6 @@ interface Props {
   onPreviewImage?: (imageUrl: string) => void;
 }
 
-function dedupeUrls(urls: (string | undefined | null)[]): string[] {
-  const seen = new Set<string>();
-  const res: string[] = [];
-  for (const item of urls) {
-    if (!item || typeof item !== 'string') continue;
-    const u = item.trim();
-    if (!u.startsWith('http') && !u.startsWith('//')) continue;
-    let canonical = u;
-    try {
-      const p = new URL(u.startsWith('//') ? 'https:' + u : u);
-      canonical = `${p.hostname}${p.pathname}`.toLowerCase();
-    } catch {
-      canonical = u.split('?')[0].toLowerCase();
-    }
-    if (!seen.has(canonical)) {
-      seen.add(canonical);
-      res.push(u.startsWith('//') ? 'https:' + u : u);
-    }
-  }
-  return res;
-}
 
 export default function ProductCardWidget({
   product,
@@ -86,12 +66,12 @@ export default function ProductCardWidget({
 
   const propsList = Object.entries(product.props || {});
 
-  const handleCopySku = (e: React.MouseEvent) => {
+  const [copySkuError, setCopySkuError] = useState('');
+  const handleCopySku = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (product.itemId) {
-      navigator.clipboard.writeText(product.itemId);
-      setCopiedSku(true);
-      setTimeout(() => setCopiedSku(false), 2000);
+      try { await navigator.clipboard.writeText(product.itemId); setCopySkuError(''); setCopiedSku(true); setTimeout(() => setCopiedSku(false), 2000); }
+      catch { setCopySkuError('复制失败，请手动复制商品编号'); }
     }
   };
 
@@ -157,6 +137,7 @@ export default function ProductCardWidget({
           </button>
         </div>
 
+        {copySkuError && <p role="alert" className="text-xs text-rose-600">{copySkuError}</p>}
         {/* 创作者 / 价格与分类状态 */}
         <div className="flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-2">
@@ -312,7 +293,7 @@ export default function ProductCardWidget({
           </div>
 
           <span className="text-[10px] text-slate-400 hidden sm:inline">
-            💡 点击图片设为生图垫图
+            💡 预览图片，或添加为本轮参考
           </span>
         </div>
 
@@ -330,13 +311,12 @@ export default function ProductCardWidget({
               return (
                 <div 
                   key={imgUrl}
-                  onClick={() => onPreviewImage && onPreviewImage(imgUrl)}
                   className={`group/material relative aspect-square rounded-xl overflow-hidden bg-white border transition-all cursor-pointer shadow-2xs hover:border-blue-500 hover:scale-105 ${
                     isPinned ? 'ring-2 ring-blue-500 border-blue-500' : 'border-slate-200'
                   }`}
                   title={product.imageSources?.find((image) => image.url === imgUrl)?.label || `素材 ${imageNumber} · 点击查看大图`}
                 >
-                  <img 
+                  <button type="button" aria-label={`预览素材 ${imageNumber}`} className="absolute inset-0 w-full h-full" onClick={() => onPreviewImage?.(imgUrl)}><img 
                     src={proxyMediaUrl(imgUrl, { thumb: true, width: 240 })} 
                     alt={`素材 ${currentPage * 24 + idx + 1}`} 
                     referrerPolicy="no-referrer"
@@ -350,25 +330,25 @@ export default function ProductCardWidget({
                     className="w-full h-full object-cover"
                     loading="lazy"
                     decoding="async"
-                  />
+                  /></button>
 
                   <span className="absolute top-1 left-1 rounded bg-black/60 px-1 text-[10px] text-white pointer-events-none">{imageNumber}</span>
                   {/* 悬浮操作层 */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/material:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                  <div className="absolute inset-0 bg-black/40 pointer-events-none opacity-0 group-hover/material:opacity-100 group-focus-within/material:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
                     <button
                       onClick={(e) => handlePin(imgUrl, e)}
-                      className="px-1.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold flex items-center gap-0.5 shadow-md transition-transform active:scale-95 cursor-pointer"
-                      title="设为生图垫图 (图1)"
+                      className="pointer-events-auto px-1.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold flex items-center gap-0.5 shadow-md transition-transform active:scale-95 cursor-pointer"
+                      title="加入助手参考附件" aria-label={`加入参考附件 素材 ${imageNumber}`} type="button"
                     >
                       <Pin className="w-2.5 h-2.5" />
-                      <span>垫图</span>
+                      <span>添加参考</span>
                     </button>
                   </div>
 
                   {/* 已固定垫图标签 */}
                   {isPinned && (
                     <div className="absolute top-1 right-1 z-10 px-1 py-0.2 rounded-md bg-blue-600 text-white text-[8px] font-bold flex items-center gap-0.5 shadow-xs">
-                      <Pin className="w-2 h-2" /> 垫图1
+                      <Pin className="w-2 h-2" /> 已添加
                     </div>
                   )}
                 </div>

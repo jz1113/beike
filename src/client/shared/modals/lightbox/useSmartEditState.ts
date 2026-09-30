@@ -56,11 +56,11 @@ export function useSmartEditState(props: SmartEditModalProps) {
   const setQuickQuality = onChangeQuickQuality || (() => {});
   const setQuickAspectId = onChangeQuickAspectId || (() => {});
 
-  const availableImageModels = useLightboxImageModels();
 
   const [selectedModelId, setSelectedModelId] = useState<string>(() => {
     return storeQuickModel || 'gpt-image-2';
   });
+  const availableImageModels = useLightboxImageModels(selectedModelId, setSelectedModelId);
 
   const [selectedQuality, setSelectedQuality] = useState<'1K' | '2K' | '4K'>(() => {
     return storeQuickQuality === 'low' ? '1K' : storeQuickQuality === 'high' ? '4K' : '2K';
@@ -119,7 +119,8 @@ export function useSmartEditState(props: SmartEditModalProps) {
 
   const activeModelObj = useMemo(() => availableImageModels.find((m) => m.id === selectedModelId) || {
     id: selectedModelId,
-    name: selectedModelId || '生图模型',
+    name: selectedModelId || '请先启用生图模型',
+    shortName: selectedModelId || '请先启用生图模型',
     provider: 'OpenAI',
   }, [availableImageModels, selectedModelId]);
 
@@ -290,17 +291,17 @@ export function useSmartEditState(props: SmartEditModalProps) {
   const handleZoomIn = () => setZoomLevel((z) => Math.min(200, z + 25));
   const handleZoomOut = () => setZoomLevel((z) => Math.max(50, z - 25));
 
-  const canSubmit = Boolean(prompt.trim());
+  const canSubmit = Boolean(prompt.trim()) && availableImageModels.some(model => model.id === selectedModelId);
 
   const handleSubmit = useCallback(() => {
-    if (!prompt.trim()) return;
+    if (!canSubmit) return;
     const normalizedQuality =
       selectedQuality === '1K' ? 'low' : selectedQuality === '4K' ? 'high' : 'medium';
 
     onSubmitSmartEdit({
       markers,
       prompt: prompt.trim(),
-      model: selectedModelId || activeModelObj.id || 'gpt-image-2',
+      model: selectedModelId,
       quality: normalizedQuality,
       aspectRatio: selectedAspectId,
     });
@@ -308,7 +309,7 @@ export function useSmartEditState(props: SmartEditModalProps) {
   }, [
     markers,
     prompt,
-    activeModelObj,
+    canSubmit,
     selectedModelId,
     selectedQuality,
     selectedAspectId,

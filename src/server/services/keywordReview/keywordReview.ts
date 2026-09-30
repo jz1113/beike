@@ -1,14 +1,11 @@
 import type { KeywordReviewMode, KeywordReviewResult, KeywordReviewRow } from '@shared/contracts/generate';
+import { KEYWORD_REVIEW_CATEGORIES } from '@shared/contracts/generate';
 import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayUrl';
 import { gatewayFetch } from '../../gateways/http';
-import {
-  KEYWORD_REVIEW_LOOKUP_LIMIT,
-  lookupUncertainCategories,
-  type ReviewedKeywordRow,
-} from './keywordReviewLookup';
+import type { ReviewedKeywordRow } from './keywordReviewLookup';
 import { normalizeCategoryReason, normalizeRejectReason } from './keywordReviewReasons';
 import { formatKeywordReviewRuleAdditions, ruleEntriesForMode } from './keywordReviewRules';
-import { deepSeekResponseError } from './keywordReviewUpstreamError';
+import { DeepSeekApiError, KeywordReviewOutputError, deepSeekResponseError } from './keywordReviewUpstreamError';
 import { buildVideoReviewPrompt, VIDEO_CATEGORY_SET } from './keywordReviewVideo';
 import type { KeywordReviewRuleEntry } from '@shared/contracts/generate';
 
@@ -16,12 +13,7 @@ export const KEYWORD_REVIEW_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 export const KEYWORD_REVIEW_DEEPSEEK_MODEL = 'deepseek-flash';
 const KEYWORD_REVIEW_MAX_TOKENS = 12288;
 
-export const KEYWORD_REVIEW_CATEGORIES = [
-  '政史军', '3C数码', '本地生活', '动漫', '动物', '法律', '购物消费', '互联网IT', '家居',
-  '交通出行', '教育', '金融财经', '科学技术', '旅游', '美食', '美术', '民俗文化', '其他', '汽车',
-  '情感', '求职招聘', '软件工具', '社会', '时尚', '体育', '小说', '星座', '医疗健康', '音乐', '影视',
-  '游戏', '娱乐', '政策政务', '植物',
-] as const;
+export { KEYWORD_REVIEW_CATEGORIES } from '@shared/contracts/generate';
 
 const CATEGORY_SET = new Set<string>(KEYWORD_REVIEW_CATEGORIES);
 
@@ -57,11 +49,14 @@ export function remapModelIds(value: unknown, rows: KeywordReviewRow[]): unknown
   };
 }
 
-function buildSystemPrompt(lookup: boolean): string {
+function buildSystemPrompt(lookup: boolean, compact: boolean): string {
   const lookupRule = lookup
     ? '认不出作品、品牌、游戏、外文词、机构或陌生实体时，needsLookup 为 true；其余为 false。不要因为想更稳就把常识词标成 true。'
     : '';
   const lookupField = lookup ? ',"needsLookup":false' : '';
+  const outputFormat = compact
+    ? `results 中每行使用定长数组，依次为 [id,category,producible,categoryReason,rejectReason${lookup ? ',needsLookup' : ''}]。制作时 rejectReason 仍填空字符串，不得省略位置。严格返回 JSON：{"results":[["1","3C数码","制作","手机选购，归数码设备",""${lookup ? ',false' : ''}]]}`
+    : `严格返回 JSON：{"results":[{"id":"序号","category":"唯一允许垂类","producible":"制作或不制作","categoryReason":"垂类短依据","rejectReason":"不制作短依据或空字符串"${lookupField}}]}`;
   return `你是中文内容关键词的资深语义审核员。必须逐行理解真实意图，不得使用关键词命中、正则或“未命中即其他”。
 
 输出只允许这 34 个垂类：
@@ -107,12 +102,32 @@ ${lookupRule}
 - rejectReason 仅当 producible 为「不制作」时填写；「制作」必须是空字符串。句式：{否决类型}：{这一行命中的点}，12-24字。否决类型只能是：简单问答、低价值、金融决策、医疗诊疗、敏感热点、违法危险、算命迷信、工业硬广、非笔记需求、限制过细。只写第一条命中的。
 例子：游戏手机推荐 → categoryReason=被选的是手机，不是游戏内容，rejectReason=""；美国总统是谁 → rejectReason=简单问答：只确认一个身份；怎么判断他对我有好感 → rejectReason=低价值：个人恋爱好感判断；电影抓娃娃在线观看 → rejectReason=非笔记需求：索取电影正片播放。
 
-id 是本批序号，必须原样返回。严格返回 JSON：{"results":[{"id":"序号","category":"唯一允许垂类","producible":"制作或不制作","categoryReason":"垂类短依据","rejectReason":"不制作短依据或空字符串"${lookupField}}]}。每个输入 id 恰好返回一次，不得遗漏。`;
+id 是本批序号，必须原样返回。${outputFormat}。每个输入 id 恰好返回一次，不得遗漏。`;
 }
 
 function parseModelJson(raw: string): unknown {
   const clean = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   return JSON.parse(clean);
+}
+
+export function expandCompactResults(value: unknown, mode: KeywordReviewMode, lookup: boolean): unknown {
+  const items = (value as { results?: unknown[] } | null)?.results;
+  if (!Array.isArray(items)) return value;
+  const fields = mode === 'video'
+    ? ['id', 'category', 'producible', 'lowValue', 'categoryReason', 'rejectReason']
+    : ['id', 'category', 'producible', 'categoryReason', 'rejectReason'];
+  return {
+    ...(value as object),
+    results: items.map((item) => {
+      if (!Array.isArray(item)) return item;
+      const valid = item.length >= fields.length - 1
+        && item.length <= fields.length + Number(lookup)
+        && (typeof item[0] === 'string' || (typeof item[0] === 'number' && Number.isInteger(item[0])));
+      if (!valid) return { id: item[0] };
+      const result = Object.fromEntries(fields.map((field, index) => [field, item[index]]));
+      return lookup ? { ...result, needsLookup: item[fields.length] === true } : result;
+    }),
+  };
 }
 
 export type KeywordReviewValidation = { results: ReviewedKeywordRow[]; failedIds: string[] };
@@ -200,8 +215,11 @@ export async function reviewKeywordRows(options: {
   rulesVersion?: number;
   reviewMode?: KeywordReviewMode;
 }): Promise<{ results: KeywordReviewResult[]; failedIds: string[]; usage?: Record<string, number>; lookupUsage?: Record<string, number>; lookedUp: number }> {
+  if (options.lookup === true || (options.lookupBudget ?? 0) > 0) {
+    throw new Error('联网补查已暂停：当前接口不会执行网页搜索');
+  }
   const mode = options.reviewMode || 'image';
-  const lookup = options.lookup === true && (options.lookupBudget === undefined || options.lookupBudget > 0);
+  const compact = options.provider !== 'gateway';
   const additions = formatKeywordReviewRuleAdditions(ruleEntriesForMode(options.ruleEntries || [], mode));
   const response = await gatewayFetch(`${normalizeGatewayBaseUrl(options.baseUrl)}/v1/chat/completions`, {
     method: 'POST',
@@ -213,14 +231,18 @@ export async function reviewKeywordRows(options: {
       ...(options.provider !== 'gateway' ? { thinking: { type: 'disabled' } } : {}),
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `${mode === 'video' ? buildVideoReviewPrompt(lookup) : buildSystemPrompt(lookup)}${additions}` },
+        { role: 'system', content: `${mode === 'video' ? buildVideoReviewPrompt(false, compact) : buildSystemPrompt(false, compact)}${additions}` },
         { role: 'user', content: `请审核以下行：\n${JSON.stringify(buildModelRows(options.rows))}` },
       ],
     }),
     signal: AbortSignal.timeout(10 * 60_000 + 30_000),
   });
   if (!response.ok) throw await deepSeekResponseError(response, options.provider === 'gateway' ? '模型网关' : 'DeepSeek');
-  const data = await response.json();
+  let data;
+  try { data = await response.json(); }
+  catch {
+    throw new DeepSeekApiError(502, '模型服务响应传输异常，提交结果待核对', options.provider === 'gateway' ? '模型网关' : 'DeepSeek');
+  }
   // Record provider usage before validating the answer: malformed output can
   // still be billed, and successful-only accounting hides that expense.
   const reasoningTokens = Number(data.usage?.completion_tokens_details?.reasoning_tokens || 0);
@@ -232,39 +254,21 @@ export async function reviewKeywordRows(options: {
     rowCount: options.rows.length,
     usage: data.usage || null,
   }));
-  const finishReason = String(data.choices?.[0]?.finish_reason || '');
-  if (finishReason === 'length') {
-    throw new SyntaxError(`关键词审核模型 ${options.model} 输出被截断，本批结果未写入`);
-  }
-  const raw = data.choices?.[0]?.message?.content;
-  if (typeof raw !== 'string' || !raw.trim()) throw new Error(`关键词审核模型 ${options.model} 没有返回内容`);
-  let parsed: unknown;
   try {
-    parsed = parseModelJson(raw);
-  } catch {
-    throw new SyntaxError(`关键词审核模型 ${options.model} 返回了不完整 JSON，本批结果未写入`);
-  }
-  const firstPass = validateResults(remapModelIds(parsed, options.rows), options.rows, mode);
-  const failedIds = firstPass.failedIds;
-  if (!lookup || firstPass.results.length === 0) {
-    return { results: stripLookupFlag(firstPass.results), failedIds, usage: data.usage, lookedUp: 0 };
-  }
-  try {
-    const looked = await lookupUncertainCategories({
-      baseUrl: options.baseUrl,
-      apiKey: options.apiKey,
-      model: options.model,
-      rows: options.rows,
-      results: firstPass.results,
-      allowed: mode === 'video' ? VIDEO_CATEGORY_SET : CATEGORY_SET,
-      categories: mode === 'video' ? [...VIDEO_CATEGORY_SET] : KEYWORD_REVIEW_CATEGORIES,
-      rulesVersion: mode === 'video' ? -(options.rulesVersion ?? 0) - 1 : options.rulesVersion,
-      ruleAdditions: additions,
-      maxLookups: Math.min(KEYWORD_REVIEW_LOOKUP_LIMIT, options.lookupBudget ?? KEYWORD_REVIEW_LOOKUP_LIMIT),
-    });
-    return { results: looked.results, failedIds, usage: data.usage, lookupUsage: looked.usage, lookedUp: looked.lookedUp };
-  } catch {
-    return { results: stripLookupFlag(firstPass.results), failedIds, usage: data.usage, lookedUp: 0 };
+    const finishReason = String(data.choices?.[0]?.finish_reason || '');
+    if (finishReason === 'length') {
+      throw new SyntaxError(`关键词审核模型 ${options.model} 输出被截断，本批结果未写入`);
+    }
+    const raw = data.choices?.[0]?.message?.content;
+    if (typeof raw !== 'string' || !raw.trim()) throw new SyntaxError(`关键词审核模型 ${options.model} 没有返回内容`);
+    let parsed: unknown;
+    try { parsed = parseModelJson(raw); }
+    catch { throw new SyntaxError(`关键词审核模型 ${options.model} 返回了不完整 JSON，本批结果未写入`); }
+    const firstPass = validateResults(remapModelIds(expandCompactResults(parsed, mode, false), options.rows), options.rows, mode);
+    return { results: stripLookupFlag(firstPass.results), failedIds: firstPass.failedIds, usage: data.usage, lookedUp: 0 };
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new KeywordReviewOutputError(error.message, data.usage);
+    throw error;
   }
 }
 

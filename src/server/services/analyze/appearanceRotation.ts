@@ -1,5 +1,5 @@
 import { matchesAppearanceSelection, type AppearanceSelection } from '@shared/domain/assets/appearanceSelection';
-import { appearanceRotationRepository } from '../../repositories/appearanceRotation';
+import { appearanceRotationRepository, type InheritedAppearanceShot } from '../../repositories/appearanceRotation';
 import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
 import { isWorkshopAssetEligible } from '@shared/domain/workshop/workshopPipeline';
 import { publishedWhere } from '../promptAsset/recall';
@@ -12,6 +12,7 @@ export async function rotateAppearance(input: {
   rotatePersona: boolean; rotateOutfit: boolean;
   personaSelection?: AppearanceSelection; outfitSelection?: AppearanceSelection;
   persona: Appearance; outfit: Appearance; batchId?: string;
+  inheritedShots?: InheritedAppearanceShot[];
 }) {
   const key = requireWorkspaceId();
   const pending = (pendingByWorkspace.get(key) || Promise.resolve()).catch(() => undefined).then(async () => {

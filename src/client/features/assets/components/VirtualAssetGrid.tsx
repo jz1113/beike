@@ -6,20 +6,23 @@ interface Props<T extends { id: string }> {
   scrollRef: RefObject<HTMLDivElement | null>;
   resetKey: string;
   openItemId: string | null;
-  renderItem: (item: T) => ReactNode;
+  renderItem: (item: T, index: number) => ReactNode;
 }
 
 const CachedCard = memo(function CachedCard<T extends { id: string }>({
   item,
+  index,
   renderItem,
 }: {
   item: T;
-  renderItem: (item: T) => ReactNode;
+  index: number;
+  renderItem: (item: T, index: number) => ReactNode;
 }) {
-  return <>{renderItem(item)}</>;
-}, (prev, next) => prev.item === next.item && prev.renderItem === next.renderItem) as <T extends { id: string }>(props: {
+  return <>{renderItem(item, index)}</>;
+}, (prev, next) => prev.item === next.item && prev.index === next.index && prev.renderItem === next.renderItem) as <T extends { id: string }>(props: {
   item: T;
-  renderItem: (item: T) => ReactNode;
+  index: number;
+  renderItem: (item: T, index: number) => ReactNode;
 }) => ReactElement;
 
 /** Keep the full collection available for filtering while mounting only visible rows. */
@@ -79,8 +82,8 @@ export function VirtualAssetGrid<T extends { id: string }>({
               zIndex: rowItems.some((item) => item.id === openItemId) ? 1 : undefined,
             }}
           >
-            {rowItems.map((item) => (
-              <CachedCard key={item.id} item={item} renderItem={renderItem} />
+            {rowItems.map((item, columnIndex) => (
+              <CachedCard key={item.id} item={item} index={row.index * columns + columnIndex} renderItem={renderItem} />
             ))}
           </div>
         );

@@ -4,6 +4,7 @@ import type { SubjectItem } from './promptBarConstants';
 import { resolveSubjectByMention } from './promptMentions';
 import { createMentionNode, extractTextFromDOM, renderTextToDOM } from './promptMentionDom';
 import type { RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
+import { PROMPT_MENTION_REGEX } from '@shared/domain/prompts/prompt-engine/mentions';
 
 export type { SubjectItem, RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
 export { resolveSubjectByMention } from './promptMentions';
@@ -282,7 +283,7 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
     range.deleteContents();
 
     // 解析粘贴文本并逐个插入文本或胶囊
-    const regex = /(@(?:insp_\d+|图片\d+|视频\d+|主体\d*|模特\d*|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)|\{\{\s*(?:Mixed|Image|图)?\s*\d+\s*\}\})/gi;
+    const regex = new RegExp(PROMPT_MENTION_REGEX.source, 'gi');
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     let lastInsertedNode: Node | null = null;

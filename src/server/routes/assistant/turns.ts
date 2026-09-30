@@ -1,7 +1,10 @@
 import { jsonResponse } from '../../core/http';
 import { assistantTurnRepository } from '@server/repositories/assistantTurns';
+import { safeErrorMessage } from '../../core/validate';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import type { AssistantTurn } from '@shared/domain/assistant/types';
+import { readAssistantSnapshot } from '@server/repositories/assistantSnapshots';
+import { isAssistantThreadDeleted } from '@server/repositories/assistantThreadLifecycle';
+import { getEffectiveAssistantTurnStatus } from '../../services/assistant/assistantTurnStream';
 
 /**
  * 从 pathname 中提取 `:threadId` 或 `:turnId`（路径最后第二个段）。
@@ -27,12 +30,13 @@ export async function listThreadTurns(req: Request): Promise<Response> {
     if (!threadId) {
       return jsonResponse({ success: false, error: '缺少 threadId' }, 400);
     }
+    if (await isAssistantThreadDeleted(threadId)) return jsonResponse({ success: false, error: '对话已删除' }, 404);
 
     const turns = await assistantTurnRepository.listForThread(threadId, statusFilter);
 
     const summaries = turns.map((t) => ({
       id: t.id,
-      status: t.status,
+      status: getEffectiveAssistantTurnStatus(t.id, t.status),
       model: t.model,
       startedAt: t.startedAt.getTime(),
       completedAt: t.completedAt?.getTime() ?? null,
@@ -42,9 +46,10 @@ export async function listThreadTurns(req: Request): Promise<Response> {
       },
     }));
 
-    return jsonResponse({ success: true, turns: summaries });
+    return jsonResponse({ success: true, turns: summaries.filter(turn => !statusFilter
+      || !['running', 'completed', 'interrupted', 'failed', 'awaiting_approval'].includes(statusFilter) || turn.status === statusFilter) });
   } catch (error: unknown) {
-    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+    return jsonResponse({ success: false, error: safeErrorMessage(new Error(formatUserError(error)), '对话记录读取失败，请稍后重试') }, 500);
   }
 }
 
@@ -62,73 +67,11 @@ export async function getTurnSnapshot(req: Request): Promise<Response> {
       return jsonResponse({ success: false, error: '缺少 turnId' }, 400);
     }
 
-    const stored = await assistantTurnRepository.findSnapshot(turnId);
-    if (!stored) return jsonResponse({ success: false, error: 'Turn 不存在' }, 404);
-    const { turn, items } = stored;
-
-    let task: AssistantTurn['task'];
-    try { task = JSON.parse(turn.snapshotJson || '{}').task; } catch { /* Legacy snapshot */ }
-    // Rebuild AssistantTurn from DB
-    const snapshot: AssistantTurn = {
-      task,
-      id: turn.id,
-      threadId: turn.threadId,
-      status: turn.status as AssistantTurn['status'],
-      modelUsed: turn.model ?? undefined,
-      usage: {
-        inputTokens: turn.usageInputTokens ?? 0,
-        outputTokens: turn.usageOutputTokens ?? 0,
-      },
-      items: items.map((item) => {
-        const base = {
-          id: item.id,
-          kind: item.kind as AssistantTurn['items'][number]['kind'],
-          createdAt: item.startedAt.getTime(),
-        };
-
-        switch (item.kind) {
-          case 'agentMessage':
-            return { ...base, kind: 'agentMessage' as const, content: item.content };
-          case 'agentReasoning':
-            return { ...base, kind: 'agentReasoning' as const, content: item.reasoning };
-          case 'toolCall':
-            return {
-              ...base,
-              kind: 'toolCall' as const,
-              name: item.toolName ?? '',
-              displayName: item.displayName ?? item.toolName ?? '',
-              args: item.argsJson || '{}',
-              callId: item.id,
-              status: item.status === 'done' ? ('done' as const) : item.status === 'error' ? ('error' as const) : ('running' as const),
-            };
-          case 'toolResult':
-            return {
-              ...base,
-              kind: 'toolResult' as const,
-              name: item.toolName ?? '',
-              displayName: item.displayName ?? item.toolName ?? '',
-              status: item.status === 'done' ? ('done' as const) : ('error' as const),
-              summary: item.summary ?? '',
-              action: item.actionJson ? JSON.parse(item.actionJson) : undefined,
-            };
-          case 'approvalRequest':
-            return {
-              ...base,
-              kind: 'approvalRequest' as const,
-              approvalId: item.id,
-              toolName: item.toolName ?? '',
-              displayName: item.displayName ?? item.toolName ?? '',
-              args: item.argsJson ? JSON.parse(item.argsJson) : {},
-              status: item.status === 'done' ? ('accepted' as const) : item.status === 'cancelled' ? ('expired' as const) : item.status === 'error' ? ('declined' as const) : ('pending' as const),
-            };
-          default:
-            return { ...base, kind: 'userMessage' as const, content: item.content };
-        }
-      }),
-    };
+    const snapshot = await readAssistantSnapshot(turnId, getEffectiveAssistantTurnStatus);
+    if (!snapshot) return jsonResponse({ success: false, error: 'Turn 不存在或对话已删除' }, 404);
 
     return jsonResponse({ success: true, snapshot });
   } catch (error: unknown) {
-    return jsonResponse({ success: false, error: formatUserError(error) }, 500);
+    return jsonResponse({ success: false, error: safeErrorMessage(new Error(formatUserError(error)), '对话记录读取失败，请稍后重试') }, 500);
   }
 }

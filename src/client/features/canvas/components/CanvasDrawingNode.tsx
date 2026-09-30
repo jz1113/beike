@@ -25,7 +25,11 @@ import { CanvasModelPicker } from './CanvasModelPicker';
 
 const loadModels = (video = false) => (video ? getEnabledVideoModelsFromSettings : getEnabledImageModelsFromSettings)(readWorkflowModelsFromStorage())
   .filter(item => typeof item.id === 'string' && item.id)
-  .map(item => ({ ...item, supportedAspectRatios:item.supportedAspectRatios, supportedResolutions:item.supportedResolutions, supportedDurations:item.supportedDurations, id: String(item.id), name: typeof item.name === 'string' ? item.name : String(item.id) }));
+  .map(item => ({ ...item,
+    supportedAspectRatios: 'supportedAspectRatios' in item ? item.supportedAspectRatios : undefined,
+    supportedResolutions: 'supportedResolutions' in item ? item.supportedResolutions : undefined,
+    supportedDurations: 'supportedDurations' in item ? item.supportedDurations : undefined,
+    id: String(item.id), name: typeof item.name === 'string' ? item.name : String(item.id) }));
 
 export function CanvasDrawingNode({ node, projectId, nodes, selected = false, highlighted = false, onPreview }: { node: CanvasNode; projectId: string; nodes: CanvasNode[]; selected?: boolean; highlighted?: boolean; onPreview?: (url: string) => void }) {
   const editorAnchor = useRef<HTMLDivElement>(null);

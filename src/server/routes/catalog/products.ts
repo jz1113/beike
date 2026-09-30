@@ -3,7 +3,8 @@ import { readJsonBody } from '../../core/validate';
 import { productRepository } from '@server/repositories/products';
 import { normalizeImageUrlToStandardJpg, isProductImageUrl } from '@shared/domain/media/drawing';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { deleteObjectsFromStorage } from '@server/infrastructure/storage/storage';
+import { cleanupStorageObjects } from '@server/infrastructure/storage/storageCleanup';
+import { resolveStorageConfig } from '@server/infrastructure/storage/storage';
 
 // 获取已采集保存的商品记录列表（分页）
 export async function GET(req: Request) {
@@ -124,7 +125,7 @@ export async function DELETE(req: Request) {
         }
       }
       if (mediaUrls.length > 0) {
-        deleteObjectsFromStorage(mediaUrls).catch((err) => {
+        cleanupStorageObjects(mediaUrls, resolveStorageConfig()).catch((err) => {
           console.warn('[删除商品-OSS清理异常]', err);
         });
       }
@@ -137,4 +138,3 @@ export async function DELETE(req: Request) {
     return jsonResponse({ error: formatUserError(error) }, 500);
   }
 }
-

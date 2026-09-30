@@ -1,4 +1,5 @@
 import { normalizeAppView, type AppView } from '@client/store/appView';
+import { normalizeWorkshopTab } from '@client/store/workshopTab';
 
 /** 声明式视图 ↔ URL 映射（轻量路由层，无需引入 TanStack Router） */
 export const VIEW_URL_ALIASES: Record<string, AppView> = {
@@ -24,6 +25,10 @@ export function parseViewFromSearchParams(search: string): AppView {
   return normalizeAppView(normalized) ?? 'home';
 }
 
+export function parseWorkshopTabFromSearchParams(search: string) {
+  return normalizeWorkshopTab(new URLSearchParams(search).get('tab'));
+}
+
 export function buildViewSearchParams(view: AppView, extra?: Record<string, string>): string {
   const params = new URLSearchParams();
   // 首页就是站点根路径，不再拼 ?view=home
@@ -32,7 +37,7 @@ export function buildViewSearchParams(view: AppView, extra?: Record<string, stri
   }
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
-      if (v) params.set(k, v);
+      if (v) params.set(k, view === 'workshop' && k === 'tab' ? normalizeWorkshopTab(v) : v);
     }
   }
   return params.toString();

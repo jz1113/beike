@@ -28,7 +28,9 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
   readyCount,
   totalCount,
 }) => {
-  const currentArchName = recipes.find(r => r.id === selectedArchId)?.name || '未确认拍摄架构';
+  const currentArchName = selectedArchId === 'auto'
+    ? '自动按商品类目匹配'
+    : recipes.find(r => r.id === selectedArchId)?.name || '未确认拍摄架构';
   const currentVisionName = availableVisionModels.find(m => m.id === selectedVisionModel)?.shortName ||
     availableVisionModels.find(m => m.id === selectedVisionModel)?.name ||
     selectedVisionModel;

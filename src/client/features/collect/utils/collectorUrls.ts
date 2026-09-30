@@ -1,11 +1,12 @@
-import { isProductImageUrl, normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
+import { isProductImageUrl, normalizeImageSource, normalizeImageUrlToStandardJpg, normalizeRemoteMediaUrl } from '@shared/domain/media/drawing';
 
 /**
  * 修复小红书图片域名
  */
 export function fixXhsUrl(u: string): string {
   if (!u) return '';
-  if (/ci\.xiaohongshu\.com/i.test(u)) {
+  const remote = normalizeRemoteMediaUrl(u);
+  if (remote && new URL(remote).hostname === 'ci.xiaohongshu.com' && !new URL(remote).search) {
     return u.replace(/https?:\/\/ci\.xiaohongshu\.com/i, 'https://sns-img-hw.xhscdn.com');
   }
   return u;
@@ -15,10 +16,9 @@ export function fixXhsUrl(u: string): string {
  * 过滤合法图片链接（区分社媒与电商）
  */
 export function keepCollectedUrl(u: string, isSocial: boolean): boolean {
-  if (!u) return false;
+  if (!u || typeof u !== 'string') return false;
   if (isSocial) {
-    const n = fixXhsUrl(normalizeImageUrlToStandardJpg(u) || u);
-    return /^https?:\/\//i.test(n) || n.startsWith('//');
+    return Boolean(normalizeImageSource(u));
   }
   return isProductImageUrl(normalizeImageUrlToStandardJpg(u) || u);
 }
@@ -27,29 +27,35 @@ export function keepCollectedUrl(u: string, isSocial: boolean): boolean {
  * 统一数据清洗过滤函数，彻底剔除统计追踪图、UI服务图标、角标等垃圾碎片
  */
 export function sanitizeCollectedItem(it: any): any {
-  if (!it) return it;
+  if (!it || typeof it !== 'object') return it;
   const isSocial =
-    it.platform === 'social' ||
-    Boolean(it.video) ||
-    /xiaohongshu|douyin|kuaishou|weibo|bilibili/i.test(String(it.url || ''));
+    it.type === 'social' || it.platform === 'social' ||
+    ['xiaohongshu.com', 'xhslink.com', 'douyin.com', 'kuaishou.com', 'weibo.com', 'bilibili.com'].some(domain => {
+      const source = normalizeRemoteMediaUrl(it.sourceUrl || it.url);
+      const host = source ? new URL(source).hostname : '';
+      return host === domain || host.endsWith(`.${domain}`);
+    });
 
   const keepUrl = (u: string) => keepCollectedUrl(u, isSocial);
+  // Signed social CDN URLs must retain their path, format and query parameters.
+  const cleanUrl = (u: unknown) => typeof u === 'string'
+    ? isSocial
+      ? fixXhsUrl(normalizeImageSource(u))
+      : normalizeImageUrlToStandardJpg(u)
+    : '';
   const mapImgs = (arr: any) =>
-    (Array.isArray(arr) ? arr : [])
-      .map((u: string) => fixXhsUrl(normalizeImageUrlToStandardJpg(u) || u))
-      .filter(keepUrl);
+    [...new Set<string>((Array.isArray(arr) ? arr : []).map(cleanUrl).filter(keepUrl))];
 
   const cleanMain = mapImgs(it.mainImages?.length ? it.mainImages : it.images);
   const cleanSkus = mapImgs(it.skuImages);
   const cleanDesc = mapImgs(it.descImages?.length ? it.descImages : it.detailImages);
-  const all = Array.from(new Set([...cleanMain, ...cleanSkus, ...cleanDesc])).filter(Boolean);
-  const rawCover = fixXhsUrl(normalizeImageUrlToStandardJpg(it.coverImage) || cleanMain[0] || all[0] || '');
-  const cover = keepUrl(rawCover) ? fixXhsUrl(normalizeImageUrlToStandardJpg(rawCover) || rawCover) : all[0] || '';
-  const videos = Array.from(new Set([
-    ...(Array.isArray(it.videos) ? it.videos : []),
-    it.video,
-    it.videoUrl,
-  ].filter((url): url is string => typeof url === 'string' && Boolean(url.trim()))));
+  const all = [...new Set([...cleanMain, ...cleanSkus, ...cleanDesc, ...mapImgs(it.images)])];
+  const rawCover = cleanUrl(it.coverImage || it.picUrl) || cleanMain[0] || all[0] || '';
+  const cover = keepUrl(rawCover) ? rawCover : all[0] || '';
+  if (all.length === 0 && cover) all.push(cover);
+  const videos = [...new Set([...(Array.isArray(it.videos) ? it.videos : []), it.video, it.videoUrl]
+    .map(normalizeRemoteMediaUrl).filter(Boolean))];
+  const video = videos[0] || null;
 
   return {
     ...it,
@@ -58,7 +64,9 @@ export function sanitizeCollectedItem(it: any): any {
     mainImages: cleanMain.length > 0 ? cleanMain : all.length > 0 ? [all[0]] : [],
     skuImages: cleanSkus,
     descImages: cleanDesc,
-    video: videos[0] || null,
+    video,
+    videoUrl: video,
     videos,
+    livePhotos: [...new Set((Array.isArray(it.livePhotos) ? it.livePhotos : []).map(normalizeRemoteMediaUrl).filter(Boolean))],
   };
 }

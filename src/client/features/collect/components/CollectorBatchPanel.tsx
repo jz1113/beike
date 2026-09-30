@@ -8,6 +8,7 @@ import {
   extractUrlsFromRawText,
 } from '@client/features/collect/utils/collectorTypes';
 import BatchTaskCard from './BatchTaskCard';
+import { COLLECTOR_BATCH_LIMIT } from '../utils/collectorTaskIdentity';
 
 export interface CollectorBatchPanelProps {
   batchInputMode: 'text' | 'file';
@@ -17,6 +18,8 @@ export interface CollectorBatchPanelProps {
   handleAddTasksFromText: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onBatchFileSelect: (file: File) => void;
+  isBatchImporting?: boolean;
+  cancelBatchImport?: () => void;
   handleDownloadCsvTemplate: (e: React.MouseEvent) => void;
   batchTasks: BatchTaskItem[];
   setBatchTasks: React.Dispatch<React.SetStateAction<BatchTaskItem[]>>;
@@ -44,6 +47,8 @@ export default function CollectorBatchPanel({
   handleAddTasksFromText,
   fileInputRef,
   onBatchFileSelect,
+  isBatchImporting = false,
+  cancelBatchImport,
   handleDownloadCsvTemplate,
   batchTasks,
   setBatchTasks,
@@ -73,7 +78,7 @@ export default function CollectorBatchPanel({
   }, [batchTextarea]);
 
   const acceptBatchFile = (file: File) =>
-    /\.(xlsx|xls|csv|txt)$/i.test(file.name) ||
+    /\.(xlsx|xls|csv|tsv|txt)$/i.test(file.name) ||
     file.type.includes('spreadsheet') ||
     file.type === 'text/plain' ||
     file.type.includes('csv');
@@ -117,7 +122,9 @@ export default function CollectorBatchPanel({
                     </button>
                   </div>
 
-
+                  <span className="text-xs text-slate-400">
+                    支持 .csv / .tsv / .xlsx / .xls / .txt，自动去重，每批最多 {COLLECTOR_BATCH_LIMIT} 条
+                  </span>
                 </div>
 
                 {/* 模式 A：多链接文本框粘贴 */}
@@ -189,7 +196,7 @@ export default function CollectorBatchPanel({
                         <UploadCloud className="h-7 w-7" />
                       </div>
                       <div className="mt-5 text-lg font-black text-slate-900">点击或拖拽上传批量采集表</div>
-                      <p className="mt-2 max-w-lg text-sm text-slate-400">支持 .xlsx、.xls、.csv 与 .txt，自动识别商品链接、社媒 URL 和纯数字 ID</p>
+                      <p className="mt-2 max-w-lg text-sm text-slate-400">支持 10 MB 以内 .xlsx、.xls、.csv、.tsv、.txt；数字 ID 可填写「所属平台」列，未填默认京东</p>
                     </div>
                     <div className="flex items-center justify-center">
                       <button type="button" onClick={handleDownloadCsvTemplate} className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 transition hover:text-blue-800" title="下载标准 CSV 表格模板"><Download className="h-3.5 w-3.5" />下载标准表格模板 (.csv)</button>
@@ -197,6 +204,13 @@ export default function CollectorBatchPanel({
                   </div>
                 )}
               </div>
+
+              {isBatchImporting && (
+                <div className="flex items-center justify-between rounded-xl bg-blue-50 p-3 text-xs text-blue-700" role="status">
+                  <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />正在读取导入文件...</span>
+                  <button type="button" onClick={cancelBatchImport} className="font-bold underline">取消导入</button>
+                </div>
+              )}
 
               {/* 任务队列状态看板 */}
               {batchTasks.length > 0 && (
@@ -226,9 +240,9 @@ export default function CollectorBatchPanel({
                         <select
                           value={batchConcurrency}
                           onChange={(e) => setBatchConcurrency?.(Number(e.target.value))}
-                          disabled={isBatchRunning}
+                          disabled={isBatchRunning || batchRunningCount > 0}
                           className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer text-xs"
-                          title="万邦接口并发线程数（推荐 4~8，万邦接口 QPS 限制一般为 3~5，建议保持 ≤8 以免触发频率限制）"
+                          title="本轮最多同时执行的任务数；遇到频率限制时可降低并发后重试"
                         >
                           <option value={2}>2 线程 (稳定)</option>
                           <option value={4}>4 线程 (平稳)</option>
@@ -251,14 +265,14 @@ export default function CollectorBatchPanel({
                         <button
                           type="button"
                           onClick={handleStartBatchTasks}
-                          disabled={batchPendingCount === 0 && batchFailedCount === 0}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${batchPendingCount === 0 && batchFailedCount === 0
+                          disabled={batchRunningCount > 0 || (batchPendingCount === 0 && batchFailedCount === 0)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${batchRunningCount > 0 || (batchPendingCount === 0 && batchFailedCount === 0)
                               ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                               : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25'
                             }`}
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
-                          <span>{batchFailedCount > 0 && batchPendingCount === 0 ? '重试失败项' : '全部开始采集'}</span>
+                          <span>{batchRunningCount > 0 ? '单项重试中' : batchFailedCount > 0 && batchPendingCount === 0 ? '重试失败项' : '开始本轮采集'}</span>
                         </button>
                       )}
 
@@ -271,7 +285,7 @@ export default function CollectorBatchPanel({
                             ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
                             : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
                           }`}
-                        title="将所有成功采集的商品按文件夹结构打包为一个总 ZIP 文件。打包由服务端 16 路并发高速处理，与上方「采集并发」设置无关"
+                        title="将已成功采集的素材按商品分别打包，并按素材容量分卷下载。"
                       >
                         {batchExporting ? (
                           <>
@@ -290,6 +304,7 @@ export default function CollectorBatchPanel({
                         type="button"
                         onClick={async () => {
                           if (await confirmAction('确定要清空当前批量任务列表吗？')) {
+                            if (isBatchRunning || batchRunningCount > 0) handlePauseBatchTasks();
                             setBatchTasks([]);
                           }
                         }}
@@ -325,10 +340,9 @@ export default function CollectorBatchPanel({
                         task={task}
                         index={idx}
                         onRetry={async (t) => {
-                          setBatchTasks(prev => prev.map(item => item.id === t.id ? { ...item, status: 'running' } : item));
-                          const updated = await executeSingleTask(t);
-                          setBatchTasks(prev => prev.map(item => item.id === t.id ? updated : item));
+                          await executeSingleTask(t);
                         }}
+                        retryDisabled={isBatchRunning}
                         onRemove={(taskId) => setBatchTasks(prev => prev.filter(t => t.id !== taskId))}
                         onPreview={(url) => setPreviewImageUrl(url)}
                         onDownloadZip={handleDownloadSingleZip}

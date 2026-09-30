@@ -1,4 +1,5 @@
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { useAssistantDialog } from './useAssistantDialog';
 
 export interface ChatPreviewState {
   url: string;
@@ -17,6 +18,7 @@ export default function AssistantMediaLightbox({
   onClose,
   resolveAssistantMediaSrc,
 }: AssistantMediaLightboxProps) {
+  const dialogRef = useAssistantDialog(Boolean(preview), onClose);
   if (!preview) return null;
 
   return (
@@ -25,6 +27,11 @@ export default function AssistantMediaLightbox({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={preview.type === 'video' ? '视频预览' : '图片预览'}
+        tabIndex={-1}
         className="relative max-w-4xl max-h-[90vh] w-full bg-transparent flex flex-col items-center justify-center cursor-default"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -46,12 +53,13 @@ export default function AssistantMediaLightbox({
           />
         ) : (
           <img
+            key={preview.url}
             src={resolveAssistantMediaSrc(preview.url, false)}
             alt="图片大图预览"
             referrerPolicy="no-referrer"
             onError={(e) => {
               const target = e.currentTarget;
-              if (!target.dataset.hasRetried && preview.url) {
+              if (!target.dataset.hasRetried && preview.url && !/^(data:|blob:)/.test(preview.url)) {
                 target.dataset.hasRetried = 'true';
                 target.src = proxyMediaUrl(preview.url);
               }
@@ -60,6 +68,7 @@ export default function AssistantMediaLightbox({
           />
         )}
         <button
+          type="button"
           onClick={onClose}
           className="mt-3 px-5 py-2 rounded-full bg-slate-900/90 text-white text-xs font-bold border border-white/10 hover:bg-slate-800 transition-colors shadow-lg cursor-pointer"
         >

@@ -29,8 +29,10 @@ export function classifyGenerationPollResult(
     failReason?: unknown;
     error?: unknown;
     success?: unknown;
+    retryable?: unknown;
+    submissionUnknown?: unknown;
   } | null,
-  options?: { httpOk?: boolean },
+  options?: { httpOk?: boolean; httpStatus?: number },
 ): GenerationPollOutcome {
   if (!data) return 'pending';
   const rawStatus = typeof data.status === 'string' ? data.status.trim() : '';
@@ -38,6 +40,9 @@ export function classifyGenerationPollResult(
   const resultUrl = typeof data.resultUrl === 'string' && data.resultUrl.trim() ? data.resultUrl : '';
   if ((canonical === 'succeeded' || Boolean(resultUrl)) && resultUrl) return 'success';
   if (canonical === 'failed' || canonical === 'cancelled' || canonical === 'expired') return 'failure';
+  // A failed status query does not terminate the original generation.
+  if (data.retryable === true || data.submissionUnknown === true || rawStatus.toUpperCase() === 'QUERY_FAILED'
+    || (options?.httpStatus !== undefined && options.httpStatus >= 500)) return 'pending';
   if (options?.httpOk === false && (data.error || data.success === false)) return 'failure';
   if (data.failReason && !resultUrl && canonical !== 'running' && (canonical !== 'queued' || !rawStatus)) {
     return 'failure';

@@ -36,6 +36,7 @@ export default function HomePage({
   const { dropZoneProps: pageMediaDropProps, toastMsg } = useQuickRefMediaDrop();
 
   const handleUsePrompt = (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => {
+    setHomeMode('generate');
     const isVideo = !!(refMedia && isVideoMediaUrl(refMedia));
     setQuickPrompt(prompt);
 

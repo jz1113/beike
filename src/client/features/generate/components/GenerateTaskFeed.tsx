@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { RefObject } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, type GenerationTask } from '@client/store';
 import {
   getAspectRatioFromSize,
@@ -7,66 +8,13 @@ import {
   formatDepthQualityLabel,
   formatImageQualityLabel,
   isDepthMediaType,
-  stripWorkshopPromptGuards,
-  cleanPromptText,
 } from '@shared/domain/media/drawing';
-import { getGatewayClientHeaders, getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
-import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { isGenerateVideoTask, type FlatBatchItem } from '../model/generateWorkspaceLayout';
-import {
-  cloneDepthSubmit,
-  peekDepthSubmit,
-  resolveDepthSubmit,
-} from '@client/shared/api/depthGeneration';
-import { resolveRefMediaFile, registerRefMedia } from '@client/shared/media/refMediaRegistry';
-import {
-  DEPTH_IMAGE_MODEL_ID,
-  DEPTH_VIDEO_MODEL_ID,
-  type DepthQuality,
-  type DepthVideoStyle,
-} from '@shared/domain/media/depthVideo';
+import { useGenerateTaskActions } from '../hooks/useGenerateTaskActions';
 import { dockSafeArea } from '@client/shared/ui/layoutClasses';
 import FeedBatchHeader from './FeedBatchHeader';
 import FeedSingleCard from './FeedSingleCard';
 import FeedExpandedGrid from './FeedExpandedGrid';
-
-function isDepthVideoTask(task: GenerationTask): boolean {
-  return (
-    task.mediaType === 'depth-video' ||
-    task.model === DEPTH_VIDEO_MODEL_ID ||
-    (task.id || '').startsWith('depth_') ||
-    (task.taskId || '').startsWith('depth_')
-  );
-}
-
-function isDepthImageTask(task: GenerationTask): boolean {
-  return task.mediaType === 'depth-image' || task.model === DEPTH_IMAGE_MODEL_ID;
-}
-
-async function restoreDepthSubmitForRetry(task: GenerationTask): Promise<boolean> {
-  const refUrl = task.referenceImages?.[0] || task.referenceImageUrl;
-  const payload = await resolveDepthSubmit(task.id, refUrl, {
-    style: (task.depthStyle as DepthVideoStyle) || 'mocap',
-    quality: (task.quality as DepthQuality) || 'standard',
-    mode: isDepthVideoTask(task) ? 'depth-video' : 'depth-image',
-  });
-  if (payload?.file) {
-    if (
-      !task.referenceImageUrl ||
-      (task.referenceImageUrl.startsWith('blob:') &&
-        !resolveRefMediaFile(task.referenceImageUrl))
-    ) {
-      const freshUrl = URL.createObjectURL(payload.file);
-      registerRefMedia(freshUrl, payload.file);
-      useAppStore.getState().updateGenerationTask(task.id, {
-        referenceImageUrl: freshUrl,
-        referenceImages: [freshUrl],
-      });
-    }
-    return true;
-  }
-  return false;
-}
 
 export interface GenerateTaskFeedProps {
   scrollContainerRef: RefObject<HTMLDivElement | null>;
@@ -75,7 +23,6 @@ export interface GenerateTaskFeedProps {
   visibleFlatBatches: FlatBatchItem[];
   hasMoreBatches: boolean;
   loadMoreSentinelRef: RefObject<HTMLDivElement | null>;
-  activeSessionTitle?: string;
   onShowToast: (msg: string) => void;
 }
 
@@ -86,18 +33,17 @@ export function GenerateTaskFeed({
   visibleFlatBatches,
   hasMoreBatches,
   loadMoreSentinelRef,
-  activeSessionTitle,
   onShowToast,
 }: GenerateTaskFeedProps) {
   const {
     setPreviewTask,
-    setQuickPrompt,
-    setQuickModel,
-    setQuickQuality,
-    addGenerationTask,
-    updateGenerationTask,
     deleteGenerationTask,
-  } = useAppStore();
+    generationHistoryReady,
+  } = useAppStore(useShallow(state => ({
+    setPreviewTask: state.setPreviewTask,
+    deleteGenerationTask: state.deleteGenerationTask,
+    generationHistoryReady: state.generationHistoryReady,
+  })));
 
   const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
 
@@ -110,40 +56,6 @@ export function GenerateTaskFeed({
     return null;
   }, [visibleFlatBatches]);
 
-  const prevBatchCountRef = useRef(visibleFlatBatches.length);
-  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
-
-  // 🌟 会话切换或页面加载时，自动定位到底部最新生成内容
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const timer = setTimeout(() => {
-      container.scrollTop = container.scrollHeight;
-    }, 60);
-    return () => clearTimeout(timer);
-  }, [activeSessionTitle, scrollContainerRef]);
-
-  // 🌟 当有新任务生成或正在生成中时，自动平滑滚动到底部
-  const lastBatch = visibleFlatBatches[visibleFlatBatches.length - 1]?.batch;
-  const lastTask = lastBatch?.tasks[0];
-  const lastTaskId = lastTask?.id;
-  const isLastGenerating = Boolean(lastTask && (lastTask.status === 'IN_PROGRESS' || !lastTask.resultUrl));
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    if (visibleFlatBatches.length > prevBatchCountRef.current || isLastGenerating) {
-      requestAnimationFrame(() => {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: 'smooth',
-        });
-      });
-    }
-    prevBatchCountRef.current = visibleFlatBatches.length;
-  }, [visibleFlatBatches.length, lastTaskId, isLastGenerating, scrollContainerRef]);
-
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       const target = e.target as Element;
@@ -155,156 +67,13 @@ export function GenerateTaskFeed({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const handleReuseTask = useCallback(
-    (task: GenerationTask) => {
-      if (isDepthVideoTask(task) || isDepthImageTask(task)) {
-        useAppStore
-          .getState()
-          .setQuickGenMode(isDepthVideoTask(task) ? 'depth-video' : 'depth-image');
-        if (task.depthStyle) {
-          useAppStore.getState().setQuickDepthStyle(task.depthStyle as any);
-        }
-        if (task.quality) {
-          useAppStore.getState().setQuickDepthQuality(task.quality as any);
-        }
-        onShowToast('已切换至深度动作捕捉模式，请上传视频后生成');
-        return;
-      }
-      setQuickPrompt(task.prompt);
-      if (task.model) setQuickModel(task.model);
-      if (task.quality)
-        setQuickQuality((task.quality as 'high' | 'medium' | 'low') || 'high');
-      if (task.resultUrl) {
-        useAppStore.getState().setQuickRefImage(task.resultUrl);
-      }
-    },
-    [onShowToast, setQuickModel, setQuickPrompt, setQuickQuality]
-  );
-
-  const handleRetryTask = useCallback(
-    async (task: GenerationTask) => {
-      if (isDepthImageTask(task) || isDepthVideoTask(task)) {
-        const inMem = peekDepthSubmit(task.id);
-        if (inMem) {
-          updateGenerationTask(task.id, {
-            status: 'IN_PROGRESS',
-            progress: '15%',
-            resultUrl: undefined,
-            failReason: undefined,
-            taskId: undefined,
-            dbId: undefined,
-          });
-          return;
-        }
-
-        const restored = await restoreDepthSubmitForRetry(task);
-        if (restored) {
-          updateGenerationTask(task.id, {
-            status: 'IN_PROGRESS',
-            progress: '15%',
-            resultUrl: undefined,
-            failReason: undefined,
-            taskId: undefined,
-            dbId: undefined,
-          });
-          return;
-        }
-
-        onShowToast('无法读取本地缓存，请点击卡片上的「重新选择文件并生成」继续');
-        return;
-      }
-
-      if (task.taskId) {
-        updateGenerationTask(task.id, {
-          status: 'IN_PROGRESS',
-          progress: '50%',
-          failReason: undefined,
-        });
-        try {
-          const pollEndpoint = isGenerateVideoTask(task)
-            ? '/api/generate/video'
-            : '/api/generate/image';
-          const queryParams = new URLSearchParams({ taskId: task.taskId });
-          const localUrl = getGatewayClientOverrides().customBaseUrl || '';
-          const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
-            headers: {
-              ...getGatewayClientHeaders(),
-              ...storageConfigHeaders(),
-              ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
-            },
-          }).catch(() => null);
-          if (res && res.ok) {
-            const data = await res.json().catch(() => null);
-            if (
-              (data?.status === 'SUCCESS' || Boolean(data?.resultUrl)) &&
-              data?.resultUrl
-            ) {
-              updateGenerationTask(task.id, {
-                status: 'SUCCESS',
-                resultUrl: data.resultUrl,
-                progress: '100%',
-                failReason: undefined,
-              });
-              return;
-            }
-          }
-        } catch {
-          /* retry via engine */
-        }
-      }
-
-      updateGenerationTask(task.id, {
-        status: 'IN_PROGRESS',
-        progress: '15%',
-        resultUrl: undefined,
-        failReason: undefined,
-        taskId: undefined,
-        dbId: undefined,
-      });
-    },
-    [onShowToast, updateGenerationTask]
-  );
-
-  const handleRegenerateTask = useCallback(
-    async (task: GenerationTask) => {
-      const newTaskId = `hub-gen-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      if (isDepthImageTask(task) || isDepthVideoTask(task)) {
-        const inMem = peekDepthSubmit(task.id);
-        if (inMem) {
-          cloneDepthSubmit(task.id, newTaskId);
-        } else {
-          const refUrl = task.referenceImages?.[0] || task.referenceImageUrl;
-          const restored = await resolveDepthSubmit(newTaskId, refUrl, {
-            style: (task.depthStyle as DepthVideoStyle) || 'mocap',
-            quality: (task.quality as DepthQuality) || 'standard',
-            mode: isDepthVideoTask(task) ? 'depth-video' : 'depth-image',
-          });
-          if (!restored) {
-            onShowToast(
-              '该任务历史文件未在当前会话缓存，请点击卡片上的「重新选择文件并生成」'
-            );
-            return;
-          }
-        }
-      }
-
-      const newTask: GenerationTask = {
-        ...task,
-        batchId: undefined,
-        id: newTaskId,
-        dbId: undefined,
-        taskId: undefined,
-        prompt: stripWorkshopPromptGuards(cleanPromptText(task.prompt || '')),
-        status: 'IN_PROGRESS',
-        progress: '15%',
-        resultUrl: undefined,
-        failReason: undefined,
-        createdAt: Date.now(),
-      };
-      addGenerationTask(newTask, false);
-    },
-    [addGenerationTask, onShowToast]
-  );
+  const {
+    handleReuseTask,
+    handleRetryTask,
+    handleRegenerateTask,
+    handleRegenerateBatch,
+    handleRetryWithFile,
+  } = useGenerateTaskActions(onShowToast);
 
   return (
     <div
@@ -313,6 +82,12 @@ export function GenerateTaskFeed({
       {...pageMediaDropProps}
       className={`flex-1 overflow-y-auto px-4 sm:px-6 py-4 ${dockSafeArea} relative`}
     >
+      {taskBatches.length === 0 && (
+        <div className="min-h-[45vh] flex flex-col items-center justify-center gap-2 text-center px-4" role="status" aria-live="polite">
+          <p className="text-base font-medium text-slate-600">{generationHistoryReady ? '从一个想法开始创作' : '正在恢复对话历史…'}</p>
+          {generationHistoryReady && <p className="text-sm text-slate-500">输入描述，或上传参考素材后开始生成。</p>}
+        </div>
+      )}
       {taskBatches.length > 0 && (
         <div className="w-full space-y-8 animate-fade-in">
           {/* 🌟 向上滑动加载更早的历史记录 */}
@@ -410,9 +185,11 @@ export function GenerateTaskFeed({
                               useReferenceImage: false,
                             });
                           }}
-                          onShowDetails={() =>
-                            setPreviewTask(primaryTask, batch.tasks)
-                          }
+                          onShowDetails={() => {
+                            const task = batch.tasks.find((item) => item.status === 'SUCCESS' && item.resultUrl);
+                            if (task) setPreviewTask(task, batch.tasks);
+                            else onShowToast('本批次尚无可预览结果，可在卡片查看生成状态');
+                          }}
                         />
 
                         {/* 2. 媒体内容展示区域 */}
@@ -430,6 +207,7 @@ export function GenerateTaskFeed({
                               onReuse={handleReuseTask}
                               onRegenerate={handleRegenerateTask}
                               onRetry={handleRetryTask}
+                              onRetryWithFile={handleRetryWithFile}
                               onDelete={(task) => {
                                 deleteGenerationTask(task.id);
                                 if (task.taskId && task.taskId !== task.id) {
@@ -438,7 +216,6 @@ export function GenerateTaskFeed({
                                 setOpenMenuTaskId(null);
                                 onShowToast('已从对话记录中移除此卡片');
                               }}
-                              onShowToast={onShowToast}
                             />
                           </div>
                         ) : (
@@ -452,7 +229,7 @@ export function GenerateTaskFeed({
                             setOpenMenuTaskId={setOpenMenuTaskId}
                             onPreview={setPreviewTask}
                             onReuse={handleReuseTask}
-                            onRegenerate={handleRegenerateTask}
+                            onRegenerate={handleRegenerateBatch}
                             onDeleteBatch={(tasks) => {
                               tasks.forEach((t) => {
                                 deleteGenerationTask(t.id);
@@ -467,17 +244,20 @@ export function GenerateTaskFeed({
                               if (task.taskId && task.taskId !== task.id) {
                                 deleteGenerationTask(task.taskId);
                               }
-                              onShowToast('已清除该卡片');
+                              onShowToast(task.status === 'IN_PROGRESS'
+                                ? '已移除卡片并取消尚未发送的请求，已发送的生成仍可能继续'
+                                : '已清除该卡片');
                             }}
                             onDeleteFailedTasks={(tasksToClear) => {
-                              tasksToClear.forEach((t) => {
+                              const failedTasks = tasksToClear.filter((task) => task.status === 'FAILURE');
+                              failedTasks.forEach((t) => {
                                 deleteGenerationTask(t.id);
                                 if (t.taskId && t.taskId !== t.id) {
                                   deleteGenerationTask(t.taskId);
                                 }
                               });
                               setOpenMenuTaskId(null);
-                              onShowToast(`已清除 ${tasksToClear.length} 个未成功卡片`);
+                              onShowToast(`已清除 ${failedTasks.length} 个失败卡片`);
                             }}
                             onRetryTask={handleRetryTask}
                           />
@@ -490,7 +270,7 @@ export function GenerateTaskFeed({
             );
           })}
           {/* 🌟 底部定位锚点与安全间距 */}
-          <div ref={bottomAnchorRef} className="col-span-full h-6 w-full pointer-events-none" aria-hidden />
+          <div className="col-span-full h-6 w-full pointer-events-none" aria-hidden />
         </div>
       )}
     </div>

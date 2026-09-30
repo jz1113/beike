@@ -1,16 +1,10 @@
-import { type GenerationTask, useAppStore } from '@client/store';
+import type { GenerationTask } from '@client/store';
 import { getAspectRatioClass } from '../model/generateCanvasLayout';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import LazyVideoCover from '@client/shared/media/LazyVideoCover';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
-import { registerRefMedia } from '@client/shared/media/refMediaRegistry';
-import { registerDepthSubmit, peekDepthSubmit } from '@client/shared/api/depthGeneration';
-import {
-  DEPTH_IMAGE_MODEL_ID,
-  DEPTH_VIDEO_MODEL_ID,
-  type DepthQuality,
-  type DepthVideoStyle,
-} from '@shared/domain/media/depthVideo';
+import { peekDepthSubmit } from '@client/shared/api/depthGeneration';
+import { isDepthImageTask, isDepthVideoTask } from '../model/generationTaskMedia';
 import {
   AlertCircle,
   Upload,
@@ -19,19 +13,6 @@ import {
   X,
 } from 'lucide-react';
 import FeedCardActionBar from './FeedCardActionBar';
-
-function isDepthVideoTask(task: GenerationTask): boolean {
-  return (
-    task.mediaType === 'depth-video' ||
-    task.model === DEPTH_VIDEO_MODEL_ID ||
-    (task.id || '').startsWith('depth_') ||
-    (task.taskId || '').startsWith('depth_')
-  );
-}
-
-function isDepthImageTask(task: GenerationTask): boolean {
-  return task.mediaType === 'depth-image' || task.model === DEPTH_IMAGE_MODEL_ID;
-}
 
 export function getFeedImageUrl(
   url?: string | null,
@@ -61,10 +42,10 @@ interface FeedSingleCardProps {
   onReuse: (task: GenerationTask) => void;
   onRegenerate: (task: GenerationTask) => void;
   onRetry: (task: GenerationTask) => void;
+  onRetryWithFile: (task: GenerationTask, file: File) => void;
   onCopyPrompt?: (task: GenerationTask) => void;
   onDownload?: (url: string, title?: string) => void;
   onDelete: (task: GenerationTask) => void;
-  onShowToast: (msg: string) => void;
 }
 
 export default function FeedSingleCard({
@@ -78,11 +59,9 @@ export default function FeedSingleCard({
   onReuse,
   onRegenerate,
   onRetry,
+  onRetryWithFile,
   onDelete,
-  onShowToast,
 }: FeedSingleCardProps) {
-  const { updateGenerationTask } = useAppStore();
-
   return (
     <div className="w-full space-y-3">
       <div
@@ -117,32 +96,8 @@ export default function FeedSingleCard({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const newBlobUrl = URL.createObjectURL(file);
-                      registerRefMedia(newBlobUrl, file);
-                      const mode = isDepthVideoTask(primaryTask)
-                        ? 'depth-video'
-                        : 'depth-image';
-                      const style =
-                        (primaryTask.depthStyle as DepthVideoStyle) || 'mocap';
-                      const quality =
-                        (primaryTask.quality as DepthQuality) || 'standard';
-                      registerDepthSubmit(primaryTask.id, {
-                        file,
-                        style,
-                        quality,
-                        mode,
-                      });
-                      onShowToast('已重新绑定文件，开始生成…');
-                      updateGenerationTask(primaryTask.id, {
-                        status: 'IN_PROGRESS',
-                        progress: '15%',
-                        referenceImageUrl: newBlobUrl,
-                        referenceImages: [newBlobUrl],
-                        resultUrl: undefined,
-                        failReason: undefined,
-                        taskId: undefined,
-                        dbId: undefined,
-                      });
+                      onRetryWithFile(primaryTask, file);
+                      e.target.value = '';
                     }}
                   />
                 </label>

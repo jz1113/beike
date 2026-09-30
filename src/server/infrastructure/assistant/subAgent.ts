@@ -1,3 +1,6 @@
+import { CLEAN_CHAT_SYSTEM_PROMPT } from '@shared/domain/prompts/skills/ecommerce-visual-director';
+import { formatToolError } from './toolSafety';
+import { streamFinalReply } from './agentLoop/finalReply';
 import { PLANNING_TOOLS } from '@shared/domain/assistant/taskPolicy';
 import type { AgentExecutionBudget } from './executionBudget';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
@@ -39,6 +42,8 @@ export interface SubAgentResult {
   subTurnId: string;
   success: boolean;
   summary: string;
+  output?: string;
+  outputTruncated?: boolean;
   items: AssistantItem[];
   error?: string;
 }
@@ -56,8 +61,8 @@ export interface SubAgentDeps {
   onItemEvent?: (item: AssistantItem) => void;
 }
 
-const SUBAGENT_SYSTEM_HINT = (skillId: string) =>
-  `【子代理 · ${skillId}】你是一个专注于单次任务的子代理。独立上下文、独立工具子集，结果汇总回父代理。只进行资料读取、计算与分析；需要修改工作区或调用外部写入时交给父代理。不要主动与用户对话。`;
+const SUBAGENT_SYSTEM_HINT =
+  `【子代理】你是一个专注于单次任务的子代理。独立上下文、独立工具子集，结果汇总回父代理。只进行资料读取、计算与分析；需要修改工作区或调用外部写入时交给父代理。不要主动与用户对话。`;
 
 /** 数量限制检查（与 agentLoop.ts 中的调用约定一致） */
 export function checkSubAgentQuota(existing: AssistantItem[]): { ok: boolean; limit: number } {
@@ -74,10 +79,10 @@ function isSpawnSubagentToolCall_(call: { name?: string }): boolean {
 
 export { isSpawnSubagentToolCall_ as isSpawnSubagentToolCall };
 
-function buildSubAgentSystemPrompt(spec: SubAgentSpec): string {
+function buildSubAgentSystemPrompt(): string {
   return [
-    SUBAGENT_SYSTEM_HINT(spec.skillId),
-    `【任务】${spec.prompt}`,
+    SUBAGENT_SYSTEM_HINT,
+    CLEAN_CHAT_SYSTEM_PROMPT,
     `【回答格式】先用一段精炼总结，再调用必要的工具；最终通过 final_reply 段返回聚合结果。`,
   ].join('\n\n');
 }
@@ -114,7 +119,7 @@ export async function runSubAgent(opts: {
   const subTurnId = `sub_${parentTurnId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
   const subMessages = [
-    { role: 'system', content: [buildSubAgentSystemPrompt(spec), opts.skillRegistry?.find(skill => skill.id === spec.skillId)?.prompt].filter(Boolean).join('\n\n') },
+    { role: 'system', content: [buildSubAgentSystemPrompt(), opts.skillRegistry?.find(skill => skill.id === spec.skillId)?.prompt].filter(Boolean).join('\n\n') },
     { role: 'user', content: spec.prompt },
   ];
 
@@ -123,8 +128,10 @@ export async function runSubAgent(opts: {
     // 子代理结果通过 return value 传回
   };
 
+  const runtime = new AgentRuntime({ turnId: subTurnId, threadId, send, signal, onItemEvent });
   try {
     const loopResult = await opts.runLoop({
+      runtime,
       messages: subMessages,
       modelsToTry: opts.modelsToTry,
       reasoningEffort: opts.reasoningEffort,
@@ -146,26 +153,35 @@ export async function runSubAgent(opts: {
       onItemEvent,
     });
 
+    signal?.throwIfAborted();
+    if (!loopResult.textStreamed) {
+      await streamFinalReply({ messages: loopResult.finalMessages, budget: opts.budget, modelsToTry: opts.modelsToTry,
+        reasoningEffort: opts.reasoningEffort, baseUrl, apiKey, send, signal, turnId: subTurnId, threadId, runtime });
+    }
     const items = loopResult.runtime.listItems();
     const agentItems = items.filter((it) => it.kind === 'agentMessage') as Array<{ content: string }>;
     const lastMsg = agentItems[agentItems.length - 1];
-    const summary = loopResult.textStreamed ? lastMsg?.content?.slice(0, 4000) || '' : '子任务达到执行上限，尚未产出最终结果';
-
+    signal?.throwIfAborted();
+    const fullOutput = lastMsg?.content?.trim() || '';
+    if (!fullOutput) throw new Error('子任务达到执行上限，尚未产出最终结果');
+    loopResult.runtime.complete(false);
     return {
-      success: loopResult.textStreamed,
-      skillId: spec.skillId,
-      subTurnId,
-      summary,
-      items: items.slice(0, MAX_SUBAGENT_ITEMS),
+      success: true, skillId: spec.skillId, subTurnId,
+      summary: fullOutput.slice(0, 300) + (fullOutput.length > 300 ? '…（正文见 output）' : ''),
+      output: fullOutput.slice(0, 32_000), outputTruncated: fullOutput.length > 32_000,
+      items: items.slice(-MAX_SUBAGENT_ITEMS),
     };
   } catch (err: unknown) {
+    const error = formatToolError(err, '子代理执行失败');
+    if (signal?.aborted) runtime.interrupt(); else runtime.fail(error, false);
+    const items = runtime.listItems();
+    const partial = items.filter(item => item.kind === 'agentMessage').at(-1);
+    const output = partial && 'content' in partial ? partial.content : '';
     return {
-      success: false,
-      skillId: spec.skillId,
-      subTurnId,
-      summary: '子代理执行失败',
-      items: [],
-      error: err instanceof Error ? err.message : String(err),
+      success: false, skillId: spec.skillId, subTurnId,
+      summary: signal?.aborted ? '子代理已停止，已有输出已保留' : '子代理执行失败，已有输出已保留',
+      output: output.slice(0, 32_000), outputTruncated: output.length > 32_000,
+      items: items.slice(-MAX_SUBAGENT_ITEMS), error,
     };
   }
 }

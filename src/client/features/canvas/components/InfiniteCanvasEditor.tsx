@@ -4,6 +4,7 @@ import { CanvasEditorChrome } from './CanvasEditorChrome';
 import { CanvasEditorBoard } from './CanvasEditorBoard';
 import { CanvasEditorOverlays } from './CanvasEditorOverlays';
 import { useCanvasPromptSubmit } from '../hooks/useCanvasPromptSubmit';
+import { retryCanvasGeneration } from '../hooks/canvasGenerationActions';
 import { useCanvasTitleEditing } from '../hooks/useCanvasTitleEditing';
 import { useCanvasNodeActions } from '../hooks/useCanvasNodeActions';
 import { useCanvasFileDrop } from '../hooks/useCanvasFileDrop';
@@ -61,13 +62,20 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
 
   useCanvasGenerationSync(currentProject, generationTasks, updateNode);
   const canvasFileDrop = useCanvasFileDrop(projectId, pan, zoom);
-  const handleCanvasPromptSubmit = useCanvasPromptSubmit(currentProject?.id, pan, zoom, canvasViewportRef);
+  const submitCanvasPrompt = useCanvasPromptSubmit(currentProject?.id, pan, zoom, canvasViewportRef);
 
   const actions = useCanvasNodeActions({
     currentProject, pan, zoom, canvasViewportRef, selectedNodeId, setSelectedNodeId,
     draggingNodeId, isEditingTitle, addNode, updateNode, deleteNode, generationTasks,
   });
   const { setIsAssetSubmenuOpen, setEditingDrawingId } = actions;
+  useEffect(() => {
+    if (selectedNodeIds.length > 1) setEditingDrawingId(null);
+  }, [selectedNodeIds.length, setEditingDrawingId]);
+  const handleCanvasPromptSubmit: typeof submitCanvasPrompt = (...args) => {
+    submitCanvasPrompt(...args);
+    actions.closeComposer();
+  };
 
   const handleBackToHome = () => {
     selectProject(null);
@@ -134,8 +142,11 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
         handleOpenAssetModal={actions.handleOpenAssetModal}
       />
       <CanvasEditorBoard
-        selectedNodeIds={selectedNodeIds} dragPositions={dragPositions} selectionBox={selectionBox}
-        centerAt={centerAt} handleNodeClick={handleNodeClick} composerOpen={false}
+        selectedNodeIds={selectedNodeIds} setSelectedNodeIds={setSelectedNodeIds} dragPositions={dragPositions} selectionBox={selectionBox}
+        centerAt={centerAt} handleNodeClick={handleNodeClick} composerOpen={Boolean(actions.composerReference)}
+        onRegenerate={node => { void retryCanvasGeneration(projectId, node).catch(error => {
+          window.alert(error instanceof Error ? error.message : '无法重新生成，请重试');
+        }); }}
         canvasViewportRef={canvasViewportRef}
         canvasFileDrop={canvasFileDrop}
         handleMouseDownCanvas={handleMouseDownCanvas}

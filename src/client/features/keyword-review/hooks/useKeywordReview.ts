@@ -1,414 +1,266 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeywordReviewMode } from '@shared/contracts/generate';
-import { apiFetch } from '@client/shared/api/apiClient';
-import { credentialGet } from '@client/shared/api/credentialClient';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
-import {
-  exportReviewedWorkbook,
-  parseKeywordWorkbook,
-  parseKeywordWorkbookData,
-  type KeywordReviewRecord,
-  type ParsedKeywordWorkbook,
-} from '../model/keywordReviewWorkbook';
+import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
+import { exportReviewedWorkbook, parseKeywordWorkbook, parseKeywordWorkbookData } from '../model/keywordReviewWorkbook';
 import { advanceKnownFailureVersions, applyBatchResults, isKnownModelOutputFailure, updateReviewRecords } from '../model/reviewProgress';
-import { reviewBatchWithRecovery } from '../model/reviewBatchRecovery';
-import { DEEPSEEK_BASE_URL, type ReviewRequestError } from '../model/reviewRequest';
-import { ReviewPacer } from '../model/reviewPacer';
-import { createReviewBatchSubmit } from '../model/reviewBatchSubmit';
-import { DEFAULT_KEYWORD_REVIEW_MODEL, KEYWORD_REVIEW_MODEL_STORAGE_KEY, loadKeywordReviewModels } from '@client/shared/models/keywordReviewModels';
-import { DEFAULT_KEYWORD_REVIEW_SETTINGS, loadKeywordReviewSettings, normalizeKeywordReviewSettings, persistKeywordReviewSettings, type KeywordReviewSettings } from '../model/keywordReviewSettings';
-import { addTokenUsage, estimateReviewYuan, formatReviewYuan, isDeepSeekPeakHour, readTokenUsage, type ReviewTokenUsage } from '../model/reviewCost';
+import { DEEPSEEK_BASE_URL } from '../model/reviewRequest';
+import { runKeywordReviewBatches } from '../model/reviewRun';
+import { prepareReviewRun } from '../model/reviewRunPreparation';
+import { DEFAULT_KEYWORD_REVIEW_SETTINGS, normalizeKeywordReviewSettings, type KeywordReviewSettings } from '../model/keywordReviewSettings';
+import { addTokenUsage, estimateReviewYuan, formatReviewYuan, isDeepSeekPeakHour, readTokenUsage } from '../model/reviewCost';
 import { useKeywordReviewPreview, PREVIEW_LIMIT, type KeywordReviewFilter } from './useKeywordReviewPreview';
+import { useKeywordReviewConfig } from './useKeywordReviewConfig';
 import { useKeywordReviewBalance } from './useKeywordReviewBalance';
+import { useKeywordReviewSession } from './useKeywordReviewSession';
+import type { ReviewSubmission } from '../model/reviewSubmission';
 
 export const KEYWORD_REVIEW_BATCH_SIZE = DEFAULT_KEYWORD_REVIEW_SETTINGS.batchSize;
 export const KEYWORD_REVIEW_CONCURRENCY = DEFAULT_KEYWORD_REVIEW_SETTINGS.maxConcurrency;
 export type { KeywordReviewFilter } from './useKeywordReviewPreview';
-const LOOKUP_BATCH_LIMIT = 2;
-const LOOKUP_RUN_LIMIT = 100;
-const EMPTY_USAGE: ReviewTokenUsage = { cacheHit: 0, cacheMiss: 0, completion: 0 };
 
 export function useKeywordReview() {
-  const [settings, setSettings] = useState<KeywordReviewSettings>(loadKeywordReviewSettings);
-  const [modelOptions, setModelOptions] = useState(loadKeywordReviewModels);
-  const [modelValue, setModelValue] = useState(() => {
-    try { return localStorage.getItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY) || DEFAULT_KEYWORD_REVIEW_MODEL; }
-    catch { return DEFAULT_KEYWORD_REVIEW_MODEL; }
-  });
-  const selectedModel = modelOptions.find((option) => option.value === modelValue) || modelOptions[0];
-  const [parsed, setParsed] = useState<ParsedKeywordWorkbook | null>(null);
+  const session = useKeywordReviewSession();
+  const { parsed, records, context, setRecords, setContext } = session;
+  const visible = useViewVisibility();
   const [reviewMode, setReviewMode] = useState<KeywordReviewMode>('image');
-  const [records, setRecords] = useState<KeywordReviewRecord[]>([]);
-  const [lastTrialIds, setLastTrialIds] = useState<string[]>([]);
   const [filter, setFilter] = useState<KeywordReviewFilter>('all');
   const [isImporting, setIsImporting] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [notice, setNotice] = useState('');
   const [runMode, setRunMode] = useState<'idle' | 'trial' | 'all'>('idle');
-  const [lookupEnabled, setLookupEnabled] = useState(false);
-  const [tokenUsage, setTokenUsage] = useState<ReviewTokenUsage>(EMPTY_USAGE);
-  const { balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance, markDispatch } =
-    useKeywordReviewBalance(selectedModel.provider === 'deepseek');
   const abortRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
   const runStartingRef = useRef(false);
+  const exportingRef = useRef(false);
+  const importingRef = useRef(false);
+  const mountedRef = useRef(true);
   const batchRetryVersionsRef = useRef(new Map<number, number>());
   const inputVersionRef = useRef(0);
-  const reviewAttemptedRef = useRef(false);
-  const rulesVersionRef = useRef<number | null>(null);
   const recordIndicesRef = useRef<Map<string, number>>(new Map());
-  const lookupRemainingRef = useRef(LOOKUP_RUN_LIMIT);
-
+  const busy = () => isRunning || runStartingRef.current || exportingRef.current || importingRef.current || session.pendingWrites.current > 0;
+  const { settings, modelOptions, selectedModel, selectModel: selectConfiguredModel, saveSettings: saveConfiguredSettings } = useKeywordReviewConfig(busy, setNotice);
+  const { balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance, markDispatch } =
+    useKeywordReviewBalance(selectedModel.provider === 'deepseek' && (visible || isRunning));
   useEffect(() => {
-    const reload = () => setModelOptions(loadKeywordReviewModels());
-    window.addEventListener('models_updated', reload);
-    return () => window.removeEventListener('models_updated', reload);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; stopRequestedRef.current = true; inputVersionRef.current += 1; };
   }, []);
-
-  const selectModel = (value: string) => {
-    if (isRunning || runStartingRef.current || !modelOptions.some((option) => option.value === value)) return;
-    setModelValue(value);
-    try { localStorage.setItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY, value); } catch { /* storage unavailable */ }
-    if (value !== DEFAULT_KEYWORD_REVIEW_MODEL) setLookupEnabled(false);
+  const preview = useKeywordReviewPreview(records, parsed, filter);
+  const { counts, filteredRecords } = preview;
+  useEffect(() => {
+    if (!isRunning && !isPreparing && !context.hasUnexportedResults && !session.saving) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isRunning, isPreparing, context.hasUnexportedResults, session.saving]);
+  const canSwitchMode = session.canStart() && !busy()
+    && (!parsed || (!context.reviewAttempted && counts.done === 0 && counts.failed === 0 && counts.pending === counts.total));
+  const finishPreparing = () => { runStartingRef.current = false; setIsPreparing(false); };
+  const refreshIndices = () => {
+    recordIndicesRef.current = new Map(session.taskRef.current.records.map((record, index) => [record.id, index]));
+    batchRetryVersionsRef.current = new Map(session.taskRef.current.context.retryVersions);
   };
-
+  const commit = async (ids: string[] = []) => {
+    setContext({ retryVersions: [...batchRetryVersionsRef.current] });
+    const values = ids.map((id) => session.taskRef.current.records[recordIndicesRef.current.get(id) ?? -1]).filter(Boolean);
+    await session.persist(values);
+  };
+  const removeSubmission = (submission: ReviewSubmission) => setContext((current) => ({ ...current,
+    submissions: current.submissions.filter((item) => item.attemptId !== submission.attemptId),
+  }));
+  const persistConfiguration = (patch: Partial<typeof context>) => {
+    if (!session.taskRef.current.parsed) return;
+    setContext(patch);
+    void commit().catch((error) => setNotice(error instanceof Error ? error.message : '当前设置未能保存至本机任务'));
+  };
+  const selectModel = (value: string) => {
+    const option = modelOptions.find((item) => item.value === value);
+    if (!option || busy()) return;
+    selectConfiguredModel(value);
+    persistConfiguration({ modelValue: value });
+  };
   const saveSettings = (next: KeywordReviewSettings) => {
-    if (isRunning || runStartingRef.current) {
-      setNotice('审核任务正在启动或运行，当前设置暂不可修改。');
-      return false;
-    }
-    const normalized = normalizeKeywordReviewSettings(next);
-    const persisted = persistKeywordReviewSettings(normalized);
-    setSettings(normalized);
-    setNotice(persisted ? '关键词分类设置已保存。' : '设置已应用到当前页面，但浏览器无法保存本地配置。');
+    if (!saveConfiguredSettings(next)) return false;
+    persistConfiguration({ settings: normalizeKeywordReviewSettings(next) });
     return true;
   };
 
-  const { counts, sheetSummary, filteredRecords, previewRecords } = useKeywordReviewPreview(records, parsed, filter, lastTrialIds);
-  const canSwitchMode = !isRunning && !isPreparing && !isImporting
-    && (!parsed || (!reviewAttemptedRef.current && counts.done === 0 && counts.failed === 0 && counts.pending === counts.total));
-
-  const finishPreparing = () => {
-    runStartingRef.current = false;
-    setIsPreparing(false);
-  };
-
   const importFile = async (file: File) => {
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      setNotice('仅支持 .xlsx、.xls 或 .csv 文件');
-      return;
-    }
-    setIsImporting(true);
-    const inputVersion = ++inputVersionRef.current;
+    if (busy() || !session.canStart()) return;
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setNotice('仅支持 .xlsx、.xls 或 .csv 文件'); return; }
+    importingRef.current = true; setIsImporting(true);
+    const version = ++inputVersionRef.current;
     setNotice('');
-    setLastTrialIds([]);
-    setFilter('all');
     try {
       const next = await parseKeywordWorkbook(file, reviewMode);
-      if (inputVersion !== inputVersionRef.current) return;
-      setReviewMode(next.mode);
-      reviewAttemptedRef.current = false;
-      rulesVersionRef.current = null;
-      batchRetryVersionsRef.current.clear();
-      recordIndicesRef.current = new Map(next.records.map((record, index) => [record.id, index]));
-      setParsed(next);
-      setRecords(next.records);
+      if (!mountedRef.current || version !== inputVersionRef.current) return;
+      await session.replace(next, { settings, modelValue: selectedModel.value, usageProvider: selectedModel.provider });
+      refreshIndices(); setReviewMode(next.mode); setFilter('all');
       const summary = next.sheets.map((sheet) => `${sheet.name} ${sheet.recordCount} 条`).join('、');
-      setNotice(`已按${next.mode === 'video' ? '视频' : '图文'}规则识别 ${next.records.length} 条关键词：${summary}`);
-    } catch (error) {
-      if (inputVersion !== inputVersionRef.current) return;
-      recordIndicesRef.current = new Map();
-      setParsed(null);
-      setRecords([]);
-      setNotice(error instanceof Error ? error.message : '表格解析失败');
-    } finally {
-      if (inputVersion === inputVersionRef.current) setIsImporting(false);
-    }
+      setNotice(`${next.reviewModeMismatch ? '此表含另一审核类型的结果，旧裁决已清除，需重新审核。' : ''}已按${next.mode === 'video' ? '视频' : '图文'}规则识别 ${next.records.length} 条关键词：${summary}`);
+    } catch (error) { setNotice(error instanceof Error ? error.message : '表格解析失败'); }
+    finally { importingRef.current = false; if (mountedRef.current) setIsImporting(false); }
   };
 
   const runReview = async (mode: 'trial' | 'all' = 'trial') => {
-    if (isRunning || isImporting || runStartingRef.current || records.length === 0) return;
+    if (busy() || !session.canStart() || records.length === 0) return;
     const candidates = records.filter((record) => record.status === 'idle' || (mode === 'all' && isKnownModelOutputFailure(record)));
-    if (candidates.length === 0) {
-      setNotice(counts.failed > 0 ? '没有待审核记录；失败批次需单独选择重新审核，可能再次产生费用' : '所有记录都已完成审核');
-      return;
-    }
-    runStartingRef.current = true;
-    setIsPreparing(true);
-    const inputVersion = inputVersionRef.current;
+    if (!candidates.length) { setNotice(counts.failed ? '没有待审核记录；已确认失败的记录可单独选择重审' : '所有记录都已完成审核'); return; }
+    runStartingRef.current = true; setIsPreparing(true);
+    const version = inputVersionRef.current;
     const runModel = selectedModel;
-    const baseUrl = runModel.provider === 'deepseek'
-      ? DEEPSEEK_BASE_URL
-      : getGatewayClientOverrides().customBaseUrl || 'https://ai.comfly.org';
+    const baseUrl = runModel.provider === 'deepseek' ? DEEPSEEK_BASE_URL : getGatewayClientOverrides().customBaseUrl || 'https://ai.comfly.org';
     let apiKey: string;
-    try { apiKey = (await credentialGet(runModel.provider === 'deepseek' ? 'deepseek_api_key' : 'ai_api_key')).trim(); }
-    catch {
-      finishPreparing();
-      setNotice('读取所选模型的 API Key 失败，未发起审核请求');
-      return;
-    }
-    if (inputVersion !== inputVersionRef.current) { finishPreparing(); return; }
-    if (!apiKey) {
-      finishPreparing();
-      setNotice(runModel.provider === 'deepseek'
-        ? '未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写'
-        : '未配置模型网关 API Key，请到设置里的大模型网关填写');
-      return;
-    }
     let rulesVersion: number;
     try {
-      if (rulesVersionRef.current === null) {
-        const rulesResponse = await apiFetch('/api/generate/keyword-review/rules');
-        if (!rulesResponse.ok) throw new Error('读取审核规则失败');
-        const rules = await rulesResponse.json() as { current?: { version?: number } };
-        if (!Number.isInteger(rules.current?.version)) throw new Error('审核规则版本异常');
-        rulesVersionRef.current = rules.current!.version!;
-      }
-      rulesVersion = rulesVersionRef.current;
-      if (inputVersion !== inputVersionRef.current) { finishPreparing(); return; }
+      ({ apiKey, rulesVersion } = await prepareReviewRun(runModel.provider, session.taskRef.current.context.rulesVersion));
+      if (!mountedRef.current || version !== inputVersionRef.current) { finishPreparing(); return; }
+      advanceKnownFailureVersions(candidates, recordIndicesRef.current, batchRetryVersionsRef.current);
+      setContext({ rulesVersion, usageProvider: runModel.provider, modelValue: runModel.value, settings,
+        tokenUsage: { cacheHit: 0, cacheMiss: 0, completion: 0 }, estimatedYuan: 0 });
+      await commit();
     } catch (error) {
-      finishPreparing();
-      setNotice(error instanceof Error ? error.message : '读取审核规则失败');
-      return;
+      finishPreparing(); setNotice(error instanceof Error ? error.message : '审核准备失败，未发起审核请求'); return;
     }
-    const runSettings = settings;
-    const queue = mode === 'trial' ? candidates.slice(0, runSettings.trialSize) : candidates;
-    lookupRemainingRef.current = LOOKUP_RUN_LIMIT;
-    setTokenUsage(EMPTY_USAGE);
-    advanceKnownFailureVersions(queue, recordIndicesRef.current, batchRetryVersionsRef.current);
+    const queue = mode === 'trial' ? candidates.slice(0, settings.trialSize) : candidates;
     const controller = new AbortController();
-    stopRequestedRef.current = false;
-    abortRef.current = controller;
-    setIsRunning(true);
-    setRunMode(mode);
-    let completedNow = 0;
-    let failedNow = 0;
-    let lookedUpNow = 0;
-    let rateLimitRetries = 0;
-    let consecutiveBudgetExhausted = 0;
-    let consecutiveInfrastructureFailures = 0;
-    let uncertainNow = 0;
-    const pacer = new ReviewPacer(runSettings.maxConcurrency);
-    const runState: { fatalError: Error | null } = { fatalError: null };
+    stopRequestedRef.current = false; abortRef.current = controller;
+    setIsRunning(true); setRunMode(mode); setIsStopping(false);
+    const shouldStop = () => !mountedRef.current || controller.signal.aborted || stopRequestedRef.current || Boolean(session.errorRef.current);
+    const update = (ids: string[], change: Parameters<typeof updateReviewRecords>[3]) =>
+      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids, change));
     try {
-      let nextIndex = 0;
-      const runWorker = async () => {
-        while (!controller.signal.aborted && !stopRequestedRef.current && nextIndex < queue.length) {
-          const index = nextIndex;
-          nextIndex += runSettings.batchSize;
-          const batch = queue.slice(index, index + runSettings.batchSize);
-          const ids = batch.map((record) => record.id);
-          const settledIds = new Set<string>();
-          const markFailed = (failedIds: string[], message: string, submissionUncertain = false) => {
-            const freshIds = failedIds.filter((id) => !settledIds.has(id));
-            freshIds.forEach((id) => settledIds.add(id));
-            setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, freshIds,
-              (record) => ({ ...record, status: 'error', error: message, submissionUncertain })));
-            failedNow += freshIds.length;
-            if (submissionUncertain) uncertainNow += freshIds.length;
-          };
-          setLastTrialIds(ids);
-          const remaining = queue.length - completedNow - failedNow;
-          setNotice(mode === 'trial'
-            ? `按规则 v${rulesVersion} 正在试跑 ${batch.length} 条${lookupEnabled ? '，不确定词将联网补查' : ''}…`
-            : `按规则 v${rulesVersion} 并行审核中，本轮还剩 ${remaining} 条${lookupEnabled ? '，不确定词将联网补查' : ''}`);
-          setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids,
-            (record) => ({ ...record, status: 'running', error: undefined })));
-          const lookupBudget = runModel.provider === 'deepseek' && lookupEnabled
-            ? Math.min(LOOKUP_BATCH_LIMIT, lookupRemainingRef.current)
-            : 0;
-          const submit = createReviewBatchSubmit({
-            model: runModel.model, provider: runModel.provider, baseUrl,
-            reviewMode, apiKey, lookup: lookupBudget > 0, lookupBudget, rulesVersion,
-            signal: controller.signal, shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
-            indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, pacer,
-            onDispatch: () => {
-              reviewAttemptedRef.current = true;
-              if (runModel.provider === 'deepseek') markDispatch();
-            },
-            onSuccess: (chunk, results, lookedUp, usage, lookupUsage) => {
-              setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
-              chunk.forEach((record) => settledIds.add(record.id));
-              completedNow += chunk.length; lookedUpNow += lookedUp;
-              lookupRemainingRef.current = Math.max(0, lookupRemainingRef.current - lookedUp);
-              setTokenUsage((current) => addTokenUsage(current, readTokenUsage(usage), readTokenUsage(lookupUsage)));
-              if (runModel.provider === 'deepseek') refreshBalance();
-              consecutiveInfrastructureFailures = 0;
-            },
-            onRateLimit: (concurrency) => {
-              rateLimitRetries += 1;
-              setNotice(`${runModel.label} 限流，已降至 ${concurrency} 个并行请求并等待重试…`);
-            },
-            onFailure: () => { if (runModel.provider === 'deepseek') refreshBalance(true); },
-          });
-          try {
-            const recovery = await reviewBatchWithRecovery({
-              rows: batch,
-              submit,
-              isModelOutputError: (error) => (error as Error & { modelOutputInvalid?: boolean }).modelOutputInvalid === true,
-              shouldStop: () => controller.signal.aborted || stopRequestedRef.current,
-              onRetry: (chunk) => setNotice(`模型格式异常，正在自动重试 ${chunk.length} 条…`),
-              onSingleRowFailure: (record, error) => markFailed([record.id], error instanceof Error ? error.message : '模型结果异常'),
-              onUnresolvedRows: (rows) => markFailed(rows.map((record) => record.id), '模型格式异常，本批自动重试已达费用保护上限'),
-            });
-            consecutiveBudgetExhausted = recovery.exhausted ? consecutiveBudgetExhausted + 1 : 0;
-            if (consecutiveBudgetExhausted >= 2) {
-              runState.fatalError = new Error('连续两批模型格式异常达到自动重试费用保护上限');
-              stopRequestedRef.current = true;
-            }
-          } catch (error) {
-            if (controller.signal.aborted) break;
-            const failure = error instanceof Error ? error as ReviewRequestError : new Error('审核失败') as ReviewRequestError;
-            markFailed(ids, failure.message, failure.outcomeUncertain === true);
-            if (failure.fatalConfig) {
-              runState.fatalError = failure;
-              stopRequestedRef.current = true;
-              break;
-            }
-            consecutiveInfrastructureFailures = failure.infrastructureFailure
-              ? consecutiveInfrastructureFailures + 1 : 0;
-            if (consecutiveInfrastructureFailures >= 6) {
-              runState.fatalError = new Error('审核服务连续 6 批不可用，已暂停提交以控制费用；完成的结果均已保留');
-              stopRequestedRef.current = true;
-              break;
-            }
-          }
-        }
-      };
-      const workerCount = Math.min(mode === 'trial' ? 1 : runSettings.maxConcurrency, Math.ceil(queue.length / runSettings.batchSize));
-      await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
-      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, queue.map((record) => record.id),
-        (record) => record.status === 'running' ? { ...record, status: 'idle' } : record));
-      if (runState.fatalError) {
-        setNotice(`${runState.fatalError.message}。本次完成 ${completedNow} 条、失败 ${failedNow} 条${uncertainNow ? `（其中 ${uncertainNow} 条提交待核对）` : ''}；可导出当前进度。`);
-        return;
-      }
+      setNotice(await runKeywordReviewBatches({
+        queue, candidates: candidates.length, mode, settings, model: runModel, baseUrl, apiKey, rulesVersion, reviewMode,
+        signal: controller.signal, shouldStop, requestStop: () => { stopRequestedRef.current = true; },
+        indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, notice: setNotice,
+        refreshBalance: (force) => { if (runModel.provider === 'deepseek') refreshBalance(force); },
+        onWaiting: () => {},
+        onDispatch: async (submission) => {
+          if (session.errorRef.current) throw new Error(session.errorRef.current);
+          setContext((current) => ({ ...current, reviewAttempted: true, submissions: [...current.submissions, submission] }));
+          update(submission.rows.map((row) => row.id), (record) => ({ ...record, status: 'running', error: undefined, submissionUncertain: false }));
+          await commit(submission.rows.map((row) => row.id));
+          if (runModel.provider === 'deepseek') markDispatch();
+        },
+        onCancelled: async (submission) => {
+          removeSubmission(submission);
+          const ids = submission.rows.map((row) => row.id);
+          update(ids, (record) => ({ ...record, status: 'idle', submissionUncertain: false }));
+          await commit(ids);
+        },
+        onUsage: (usage, date) => {
+          const used = readTokenUsage(usage);
+          setContext((current) => ({ ...current, tokenUsage: addTokenUsage(current.tokenUsage, used),
+            estimatedYuan: current.estimatedYuan + estimateReviewYuan(used, date).yuan }));
+        },
+        onSuccess: async (_chunk, results, _lookedUp, _usage, _lookupUsage, submission) => {
+          setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
+          const ids = submission.rows.map((row) => row.id);
+          update(ids, (record) => record.status === 'done' ? record : { ...record, status: 'error', error: '模型结果无法修复', submissionUncertain: false });
+          removeSubmission(submission); setContext({ hasUnexportedResults: true });
+          await commit(ids);
+        },
+        onRequestFailure: async (error, submission) => {
+          const ids = submission.rows.map((row) => row.id);
+          update(ids, (record) => record.status === 'done' ? record : { ...record, status: 'error', error: error.message, submissionUncertain: error.outcomeUncertain === true });
+          if (!error.outcomeUncertain || ids.every((id) => session.taskRef.current.records[recordIndicesRef.current.get(id)!]?.status === 'done')) removeSubmission(submission);
+          setContext({ hasUnexportedResults: true });
+          await commit(ids);
+        },
+        markFailed: async (ids, message, uncertain) => {
+          update(ids, (record) => record.status === 'done' ? record : { ...record, status: 'error', error: message, submissionUncertain: uncertain === true });
+          if (ids.length) setContext({ hasUnexportedResults: true });
+          if (!session.errorRef.current) try { await commit(ids); } catch { stopRequestedRef.current = true; }
+        },
+      }));
+    } catch (error) { setNotice(error instanceof Error ? error.message : '审核失败，已保留当前进度'); }
+    finally {
+      const dispatched = new Set(session.taskRef.current.context.submissions.flatMap((item) => item.rows.map((row) => row.id)));
+      const ids = queue.map((record) => record.id).filter((id) => session.taskRef.current.records[recordIndicesRef.current.get(id)!]?.status === 'running');
+      update(ids, (record) => record.status !== 'running' ? record : dispatched.has(record.id)
+        ? { ...record, status: 'error', submissionUncertain: true, error: '提交结果尚未确认，已隔离以避免重复费用' }
+        : { ...record, status: 'idle' });
+      if (!session.errorRef.current) try { await commit(ids); } catch { /* Keep all available results for export. */ }
+      abortRef.current = null; finishPreparing(); setIsRunning(false); setIsStopping(false); setRunMode('idle');
       if (runModel.provider === 'deepseek') refreshBalance(true);
-      const lookupNote = lookedUpNow > 0 ? `，联网补查 ${lookedUpNow} 条` : '';
-      if (controller.signal.aborted || stopRequestedRef.current) {
-        setNotice(`已停止，本次完成 ${completedNow} 条${lookupNote}，可继续未完成记录`);
-      } else if (mode === 'trial') {
-        const leftover = candidates.length - completedNow - failedNow;
-        const failedNote = failedNow > 0 ? `，失败 ${failedNow} 条（可稍后重试）` : '';
-        setNotice(leftover > 0
-          ? `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}，还剩 ${leftover} 条未审核`
-          : `本批试跑完成 ${completedNow} 条${failedNote}${lookupNote}`);
-      } else {
-        setNotice(`批量审核已处理到最后一个词：完成 ${completedNow} 条${failedNow > 0 ? `，失败 ${failedNow} 条` : ''}${uncertainNow ? `（其中 ${uncertainNow} 条提交待核对，暂不重新收费）` : ''}${lookupNote}${rateLimitRetries > 0 ? `，限流后重试 ${rateLimitRetries} 次` : ''}`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '审核失败';
-      setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, queue.map((record) => record.id),
-        (record) => record.status === 'running'
-          ? { ...record, status: controller.signal.aborted ? 'idle' : 'error', error: message }
-          : record));
-      if (controller.signal.aborted) setNotice(`已停止，本次完成 ${completedNow} 条，可继续未完成记录`);
-      else setNotice(`${message}。已保留完成的结果，修复后可继续。`);
-    } finally {
-      abortRef.current = null;
-      finishPreparing();
-      setIsRunning(false);
-      setRunMode('idle');
     }
   };
 
   const stopReview = () => {
     if (!abortRef.current) return;
-    stopRequestedRef.current = true;
+    stopRequestedRef.current = true; setIsStopping(true);
     setNotice('将在当前批次返回后停止，不取消已提交的模型请求');
   };
-
-  const retryFailed = () => {
-    if (isRunning) return;
+  const retryFailed = async () => {
+    if (busy() || !session.canStart()) return;
     const failed = records.filter((record) => record.status === 'error' && !record.submissionUncertain);
-    if (failed.length === 0) {
-      setNotice('失败记录的提交结果待核对，已阻止重新收费；请先导出当前进度并核对所用模型的用量');
-      return;
-    }
+    if (!failed.length) { setNotice('待核对记录已隔离，请先导出进度并核对模型用量'); return; }
     for (const record of failed) {
       const index = recordIndicesRef.current.get(record.id);
       if (index !== undefined) batchRetryVersionsRef.current.set(index, (batchRetryVersionsRef.current.get(index) ?? 0) + 1);
     }
-    setRecords((current) => current.map((record) => record.status === 'error' && !record.submissionUncertain
-      ? { ...record, status: 'idle', error: undefined } : record));
-    setNotice(`已将 ${failed.length} 条已确认失败的记录放回待审核队列；重新审核可能产生新费用。提交结果待核对的记录仍被隔离。`);
+    setRecords((current) => current.map((record) => record.status === 'error' && !record.submissionUncertain ? { ...record, status: 'idle', error: undefined } : record));
+    try { await commit(failed.map((record) => record.id)); setNotice(`已将 ${failed.length} 条已确认失败记录放回待审；重新审核可能产生新费用。`); }
+    catch (error) { setNotice(error instanceof Error ? error.message : '本机保存失败，未发起审核'); }
   };
-
   const exportWorkbook = async () => {
-    if (!parsed || counts.done === 0 || isRunning) return;
-    setIsExporting(true);
+    if (!parsed || (!counts.done && !counts.failed) || busy()) return false;
+    exportingRef.current = true; setIsExporting(true);
     try {
-      const partial = counts.done !== counts.total;
-      const fileName = await exportReviewedWorkbook(parsed, records, partial);
-      setNotice(`已导出 ${fileName}${partial ? '；重新导入该文件可继续审核未完成记录' : ''}`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '导出失败');
-    } finally {
-      setIsExporting(false);
-    }
+      const fileName = await exportReviewedWorkbook(parsed, records, counts.done !== counts.total);
+      setContext({ hasUnexportedResults: false });
+      try { await commit(); } catch { /* The downloaded workbook remains available. */ }
+      setNotice(`已导出 ${fileName}；本机任务仍保留，可继续审核或换表。`); return true;
+    } catch (error) { setNotice(error instanceof Error ? error.message : '导出失败'); return false; }
+    finally { exportingRef.current = false; setIsExporting(false); }
   };
-
-  const reset = () => {
-    inputVersionRef.current += 1;
-    abortRef.current?.abort();
-    reviewAttemptedRef.current = false;
-    setParsed(null);
-    rulesVersionRef.current = null;
-    batchRetryVersionsRef.current.clear();
-    recordIndicesRef.current = new Map();
-    setRecords([]);
-    setLastTrialIds([]);
-    setFilter('all');
-    setNotice('');
-    setRunMode('idle');
-  };
-
-  const selectReviewMode = (next: KeywordReviewMode) => {
-    if (next === reviewMode || !canSwitchMode || runStartingRef.current) return;
-    if (!parsed) {
-      setReviewMode(next);
-      setNotice('');
-      return;
-    }
+  const reset = async () => {
+    if (busy() || session.loading || session.recovery) return false;
+    importingRef.current = true; setIsImporting(true);
     try {
-      const updated = parseKeywordWorkbookData(parsed.workbook, parsed.fileName, next);
-      inputVersionRef.current += 1;
-      rulesVersionRef.current = null;
-      batchRetryVersionsRef.current.clear();
-      recordIndicesRef.current = new Map(updated.records.map((record, index) => [record.id, index]));
-      setParsed(updated);
-      setRecords(updated.records);
-      setReviewMode(next);
-      setLastTrialIds([]);
-      setFilter('all');
+      await session.discard(); inputVersionRef.current += 1; refreshIndices(); setFilter('all'); setNotice(''); return true;
+    } catch (error) { setNotice(error instanceof Error ? error.message : '清除本机任务失败'); return false; }
+    finally { importingRef.current = false; setIsImporting(false); }
+  };
+  const selectReviewMode = async (next: KeywordReviewMode) => {
+    if (next === reviewMode || !canSwitchMode || busy()) return;
+    if (!parsed) { setReviewMode(next); setNotice(''); return; }
+    importingRef.current = true; setIsImporting(true);
+    try {
+      await session.replace(parseKeywordWorkbookData(parsed.workbook, parsed.fileName, next),
+        { settings, modelValue: selectedModel.value, usageProvider: selectedModel.provider });
+      inputVersionRef.current += 1; refreshIndices(); setReviewMode(next); setFilter('all');
       setNotice(`已切换为${next === 'video' ? '视频' : '图文'}规则，当前表格已重新识别。`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '切换审核类型失败');
-    }
+    } catch (error) { setNotice(error instanceof Error ? error.message : '切换审核类型失败'); }
+    finally { importingRef.current = false; setIsImporting(false); }
+  };
+  const restoreSession = async () => {
+    const saved = await session.restore();
+    if (!saved) return;
+    refreshIndices(); inputVersionRef.current += 1; setReviewMode(saved.parsed.mode); setFilter('all');
+    if (modelOptions.some((item) => item.value === saved.context.modelValue)) selectConfiguredModel(saved.context.modelValue);
+    saveConfiguredSettings(saved.context.settings);
+    setNotice('已恢复上次表格和审核进度；审核不会自动开始，待核对记录继续隔离。');
   };
 
   return {
-    model: selectedModel.label,
-    modelOptions, modelValue: selectedModel.value,
-    modelProvider: selectedModel.provider, selectModel,
-    parsed, reviewMode, canSwitchMode, selectReviewMode,
-    records, filter, setFilter, filteredCount: filteredRecords.length,
-    previewRecords, previewLimit: PREVIEW_LIMIT,
-    sheetSummary, counts, settings, saveSettings,
+    model: selectedModel.label, modelOptions, modelValue: selectedModel.value, modelProvider: selectedModel.provider, selectModel,
+    parsed, reviewMode, canSwitchMode, selectReviewMode, ...preview, records, filter, setFilter,
+    filteredCount: filteredRecords.length, previewLimit: PREVIEW_LIMIT, settings, saveSettings,
     trialSize: settings.trialSize, batchSize: settings.batchSize, concurrency: settings.maxConcurrency,
-    isImporting, isPreparing, isRunning, runMode, isExporting,
-    notice, lookupEnabled,
-    setLookupEnabled: (enabled: boolean) => {
-      setLookupEnabled(enabled);
-      if (enabled) setNotice('联网补查按搜索网页计费，高峰时段成本显著上升');
-    },
-    tokenUsage, estimatedCost: estimateReviewYuan(tokenUsage),
-    estimatedCostLabel: formatReviewYuan(estimateReviewYuan(tokenUsage).yuan),
-    peakHour: isDeepSeekPeakHour(),
+    isImporting, isPreparing, isRunning, runMode, isExporting, isStopping, hasUnexportedResults: context.hasUnexportedResults, notice,
+    tokenUsage: context.tokenUsage, usageProvider: context.usageProvider, estimatedCost: { yuan: context.estimatedYuan },
+    estimatedCostLabel: formatReviewYuan(context.estimatedYuan), peakHour: selectedModel.provider === 'deepseek' && isDeepSeekPeakHour(),
     balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance,
-    importFile, runReview, stopReview, retryFailed,
-    exportWorkbook, reset,
+    sessionRecovery: session.recovery, sessionLoading: session.loading, sessionSaving: session.saving,
+    sessionSavedAt: session.savedAt, sessionError: session.error, sessionReady: session.canStart(),
+    sessionCanClear: session.canClear,
+    restoreSession, discardSession: session.discard, retrySessionSave: () => busy() ? Promise.resolve() : session.retrySave(),
+    importFile, runReview, stopReview, retryFailed, exportWorkbook, reset,
   };
 }

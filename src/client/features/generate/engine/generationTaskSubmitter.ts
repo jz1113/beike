@@ -1,4 +1,4 @@
-import type { GenerationTask } from '@client/store';
+import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@shared/domain/media/drawing';
@@ -8,7 +8,9 @@ import { prepareVideoReferences } from './prepareVideoReferences';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { logLatencyAudit } from '@shared/domain/core/latencyAudit';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@client/shared/api/generationAbort';
+import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled, throwIfGenerationAborted } from '@client/shared/api/generationAbort';
+import { requiresGenerationRecovery, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generationRecovery';
+import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import {
   clearDepthSubmit,
   peekDepthSubmit,
@@ -31,13 +33,37 @@ export async function submitSingleGenerationTask(
   slowPollIds: Set<string>,
   signal?: AbortSignal,
 ) {
+  if (t.submissionRecoveryRequired) return;
   if (signal?.aborted) {
     updateGenerationTask(t.id, {
       status: 'FAILURE',
       failReason: GENERATION_CANCELLED_MESSAGE,
+      submissionRecoveryRequired: false,
     });
     return;
   }
+
+  const currentTask = () => {
+    const state = useAppStore.getState();
+    return state.generationTasks.find(task => task.id === t.id) ||
+      state.sessions?.flatMap(session => session.tasks).find(task => task.id === t.id);
+  };
+  const requireRecovery = () => {
+    const current = currentTask();
+    // A concurrent receipt query may have already linked or resolved this operation.
+    if (current?.taskId || current?.resultUrl ||
+      (current?.status === 'FAILURE' && current.submissionRecoveryRequired === false)) return;
+    updateGenerationTask(t.id, {
+      status: 'IN_PROGRESS', progress: '15%', submissionRecoveryRequired: true,
+      failReason: SUBMISSION_RECOVERY_HINT,
+    });
+  };
+  const claimSubmission = () => {
+    const current = currentTask();
+    if (!current || !isImageTaskActive(current.status) || current.taskId || current.resultUrl || current.submissionRecoveryRequired) return false;
+    requireRecovery();
+    return true;
+  };
 
   if (isDepthImageTask(t) || isDepthVideoTask(t)) {
     let payload = peekDepthSubmit(t.id);
@@ -47,7 +73,7 @@ export async function submitSingleGenerationTask(
         style: (t.depthStyle as any) || 'mocap',
         quality: (t.quality as any) || 'standard',
         mode: isDepthVideoTask(t) ? 'depth-video' : 'depth-image',
-      });
+      }, signal);
     }
 
     if (!payload) {
@@ -58,24 +84,32 @@ export async function submitSingleGenerationTask(
       return;
     }
 
-    updateGenerationTask(t.id, { progress: '20%', failReason: undefined });
+    throwIfGenerationAborted(() => Boolean(signal?.aborted));
+    if (!claimSubmission()) return;
 
-    if (isDepthImageTask(t)) {
-      const { resultUrl } = await submitDepthImage(payload.file, payload.style, payload.quality);
-      clearDepthSubmit(t.id);
+    try {
+      if (isDepthImageTask(t)) {
+        const { resultUrl } = await submitDepthImage(payload.file, payload.style, payload.quality, signal, t.id);
+        clearDepthSubmit(t.id);
+        updateGenerationTask(t.id, {
+          status: 'SUCCESS', progress: '100%', resultUrl, submissionRecoveryRequired: false,
+        });
+      } else {
+        const { taskId, recordId } = await submitDepthVideo(payload.file, payload.style, payload.quality, signal, t.id);
+        delete pollCounts[t.id];
+        slowPollIds.delete(t.id);
+        updateGenerationTask(t.id, {
+          status: 'IN_PROGRESS', progress: '25%', taskId, dbId: recordId, submissionRecoveryRequired: false,
+        });
+      }
+    } catch (error) {
+      if (requiresGenerationRecovery(error)) {
+        requireRecovery();
+        return;
+      }
       updateGenerationTask(t.id, {
-        status: 'SUCCESS',
-        progress: '100%',
-        resultUrl,
-      });
-    } else {
-      const { taskId } = await submitDepthVideo(payload.file, payload.style, payload.quality);
-      delete pollCounts[t.id];
-      slowPollIds.delete(t.id);
-      updateGenerationTask(t.id, {
-        status: 'IN_PROGRESS',
-        progress: '25%',
-        taskId,
+        status: 'FAILURE', submissionRecoveryRequired: false,
+        failReason: formatUserError(error, '深度任务提交失败'),
       });
     }
     return;
@@ -93,6 +127,7 @@ export async function submitSingleGenerationTask(
         ? 1
         : 0;
 
+  let submissionDispatched = false;
   let res: Response;
   try {
     if (video) {
@@ -111,6 +146,9 @@ export async function submitSingleGenerationTask(
 
       const finalVideoRefs = await prepareVideoReferences(videoRefs, signal);
 
+      throwIfGenerationAborted(() => Boolean(signal?.aborted));
+      if (!claimSubmission()) return;
+      submissionDispatched = true;
       res = await apiFetch('/api/generate/video', {
         method: 'POST',
         headers: {
@@ -174,6 +212,9 @@ export async function submitSingleGenerationTask(
       imgBody.clientTaskId = t.id;
       imgBody.storageConfig = readClientStorageConfig();
       const imgBodyStr = await prepareImageSubmission(imgBody, signal);
+      throwIfGenerationAborted(() => Boolean(signal?.aborted));
+      if (!claimSubmission()) return;
+      submissionDispatched = true;
       res = await apiFetch('/api/generate/image', {
         method: 'POST',
         headers: {
@@ -187,10 +228,16 @@ export async function submitSingleGenerationTask(
       });
     }
   } catch (networkErr: any) {
+    // Once dispatch started, a lost or cancelled response may hide an accepted task.
+    if (submissionDispatched) {
+      requireRecovery();
+      return;
+    }
     if (isGenerationCancelled(networkErr, signal)) {
       updateGenerationTask(t.id, {
         status: 'FAILURE',
         failReason: GENERATION_CANCELLED_MESSAGE,
+        submissionRecoveryRequired: false,
       });
       return;
     }
@@ -216,15 +263,16 @@ export async function submitSingleGenerationTask(
   }
 
   if (signal?.aborted) {
-    updateGenerationTask(t.id, {
-      status: 'FAILURE',
-      failReason: GENERATION_CANCELLED_MESSAGE,
-    });
+    requireRecovery();
     return;
   }
 
   const clientSubmitMs = Date.now() - clientT0;
   const data = await res.json().catch(() => null);
+  if (signal?.aborted) {
+    requireRecovery();
+    return;
+  }
   logLatencyAudit({
     hypothesisId: 'H4',
     location: 'useGenerationEngine.ts:submit-done',
@@ -242,8 +290,16 @@ export async function submitSingleGenerationTask(
     },
   });
 
+  if (!data?.taskId && !data?.resultUrl && (data?.submissionUnknown || res.status >= 500 || res.ok)) {
+    requireRecovery();
+    return;
+  }
   if ((!res.ok || !data?.success) && !data?.taskId) {
-    throw new Error(data?.error || `生成任务提交失败 (HTTP ${res.status})`);
+    updateGenerationTask(t.id, {
+      status: 'FAILURE', submissionRecoveryRequired: false,
+      failReason: formatUserError(data?.error || `生成任务提交失败 (HTTP ${res.status})`),
+    });
+    return;
   }
 
   (pollCounts as any)[`_start_${t.id}`] = Date.now();
@@ -266,6 +322,7 @@ export async function submitSingleGenerationTask(
       progress: '100%',
       resultUrl: data.resultUrl,
       taskId: data.taskId,
+      submissionRecoveryRequired: false,
       ...(data.model ? { model: data.model } : {}),
       ...(data.recordId ? { dbId: data.recordId } : {}),
     });
@@ -276,6 +333,7 @@ export async function submitSingleGenerationTask(
       status: 'IN_PROGRESS',
       progress: '25%',
       taskId: data.taskId,
+      submissionRecoveryRequired: false,
       ...(data.model ? { model: data.model } : {}),
       ...(data.recordId ? { dbId: data.recordId } : {}),
     });

@@ -1,32 +1,22 @@
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
+import { WORKSHOP_EXPORT_HEADERS, type WorkshopExportRow } from '@shared/domain/workshop/workshopExport';
 
 export const TXT_FILE_OPTS: JSZip.JSZipFileOptions = { compression: 'DEFLATE' };
 export const MEDIA_FILE_OPTS: JSZip.JSZipFileOptions = { compression: 'STORE' };
 
-/** 严格过滤操作系统文件系统禁止命名的特殊符号 (\ / : * ? " < > | 以及换行符等) */
-export function sanitizeFileSystemName(name: string, fallback = 'EXPORT'): string {
-  if (!name) return fallback;
-  let sanitized = (name || '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\\/:*?"<>|\r\n\t\x00-\x1f]/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^[. ]+|[. ]+$/g, '');
-  if (!sanitized) sanitized = fallback;
-  return sanitized.slice(0, 70);
+export function truncateFileSystemName(name: string, maxLength: number): string {
+  let result = '';
+  for (const char of name) {
+    const code = char.charCodeAt(0);
+    const safeChar = char.length === 1 && code >= 0xd800 && code <= 0xdfff ? '_' : char;
+    if (result.length + safeChar.length > maxLength) break;
+    result += safeChar;
+  }
+  return result;
 }
 
-/** 按照【商品id-标题】生成合法的目录名与压缩包名 */
-export function buildProductFolderName(skuId?: string, title?: string): string {
-  const cleanId = sanitizeFileSystemName(skuId || 'PROD', 'PROD');
-  const cleanTitle = sanitizeFileSystemName(title || '', '');
-  if (cleanTitle) {
-    if (cleanTitle.startsWith(cleanId)) return cleanTitle;
-    return `${cleanId}-${cleanTitle}`;
-  }
-  return cleanId;
-}
+export { sanitizeFileSystemName, buildProductFolderName } from './exportZipNames';
 
 export function mediaExtension(url: string, mediaType: 'image' | 'video'): string {
   const dataMime = url.match(/^data:([a-z0-9.+-]+)\/([a-z0-9.+-]+);/i);
@@ -62,4 +52,16 @@ export function addExportManifest(zipFolder: JSZip, rows: ExportManifestRow[]) {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, '采集清单');
   zipFolder.file('采集清单.xlsx', XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }), MEDIA_FILE_OPTS);
+}
+
+export function addWorkshopExportManifest(zipFolder: JSZip, rows: WorkshopExportRow[]) {
+  const sheet = XLSX.utils.json_to_sheet(rows, { header: [...WORKSHOP_EXPORT_HEADERS] });
+  sheet['!cols'] = [
+    { wch: 35 }, { wch: 22 }, { wch: 24 },
+    { wch: 64 }, { wch: 64 }, { wch: 64 }, { wch: 64 },
+    { wch: 42 }, { wch: 80 }, { wch: 28 },
+  ];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, '生成成果清单');
+  zipFolder.file('生成成果清单.xlsx', XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }), MEDIA_FILE_OPTS);
 }

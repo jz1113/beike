@@ -23,6 +23,7 @@ interface WorkshopGenerationOptions {
   autoGenerateCopywriting: boolean;
   generateAllCopywriting: () => Promise<void>;
   successfulItems: BatchProductItem[];
+  createCheckpoint: () => () => Promise<void>;
 }
 
 export function useWorkshopGeneration(options: WorkshopGenerationOptions) {
@@ -50,6 +51,7 @@ export function useWorkshopGeneration(options: WorkshopGenerationOptions) {
     setFailTaskCount,
     autoGenerateCopywriting: options.autoGenerateCopywriting,
     generateAllCopywriting: options.generateAllCopywriting,
+    createCheckpoint: options.createCheckpoint,
   };
 
   const startBatchGeneration = () => startBatchGenerationCoordinator(coordinator);
@@ -66,7 +68,7 @@ export function useWorkshopGeneration(options: WorkshopGenerationOptions) {
     }
     options.runControlRef.current = createRunControl();
     await retrySingleShotTaskCoordinator(
-      itemId, shotIndex, options.itemsRef.current, options.setItems, options.config, options.showToast,
+      itemId, shotIndex, options.itemsRef.current, options.setItems, options.config, options.showToast, options.createCheckpoint,
     );
   };
 

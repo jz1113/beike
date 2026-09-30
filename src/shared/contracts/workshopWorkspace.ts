@@ -5,6 +5,10 @@ export const workspaceIdSchema = z.literal('original');
 const strings = z.array(z.string()).max(2000);
 const resultRevisionStatus = z.enum(['current', 'superseded']);
 const lockedId = z.string().transform((value) => (value === '' ? 'auto' : value));
+const outputSize = z.string().regex(/^\d+x\d+$/).refine(value => {
+  const [width, height] = value.split('x').map(Number);
+  return width >= 1 && height >= 1 && width <= 4096 && height <= 4096;
+}, '切图宽高须为 1–4096 的整数像素');
 
 const task = z.object({
   id: z.string(),
@@ -23,6 +27,8 @@ const task = z.object({
   gridTaskKey: z.string().optional(),
   gridSourceUrl: z.string().optional(),
   gridSize: z.string().optional(),
+  outputSize: outputSize.optional(),
+  generationSize: z.string().optional(),
   attempt: z.number().int().min(0).optional(),
   outputReview: z.enum(['unreviewed', 'accepted', 'retry_requested', 'rejected']).default('unreviewed'),
 });
@@ -57,6 +63,7 @@ const settingsSchema = z.object({
   personaMode: z.enum(['asset_driven', 'none']).default('asset_driven'),
   selectedQuality: z.enum(['high', 'medium', 'low']),
   selectedAspect: z.enum(['3:4', '1:1', '9:16', '16:9']),
+  gridOutputSize: outputSize.optional(),
   selectedShotCount: z.number().int().min(1).max(100),
   useAssetLibrary: z.boolean(),
   lockedPersonaId: lockedId,
@@ -64,6 +71,7 @@ const settingsSchema = z.object({
   lockedOutfitId: lockedId,
   lockedActionId: lockedId,
   lockedFullPromptId: z.string().optional().transform((value) => (!value || value === '' ? 'auto' : value)),
+  promptGroupFolderId: z.string().default('auto'),
   generationStrategy: z.enum(['grid_first', 'single_shot']),
   autoGenerateCopywriting: z.boolean().default(true),
 });

@@ -23,7 +23,7 @@ export function resolveTaskPolicy(text: string, mode: AssistantRunMode = 'auto',
   };
 }
 
-export const PLANNING_TOOLS = ['update_plan', 'read_tool_result', 'execute_code', 'parse_product_or_social_url', 'read_attached_document', 'list_user_products', 'query_asset_library', 'get_prompt_asset_detail', 'get_workshop_state', 'get_view_capabilities'];
+export const PLANNING_TOOLS = ['update_plan', 'read_tool_result', 'execute_code', 'parse_product_or_social_url', 'read_attached_document', 'list_user_products', 'query_asset_library', 'get_prompt_asset_detail', 'get_workshop_state', 'get_view_capabilities', 'inspect_video_media', 'extract_video_storyboard', 'extract_video_detailed_frames'];
 export function toolsForTask(mode: 'plan' | 'act', allowed?: string[]) {
   return mode === 'act' ? allowed : PLANNING_TOOLS.filter(name => !allowed || allowed.includes(name));
 }

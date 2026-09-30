@@ -1,3 +1,5 @@
+import { REVERSE_ENGINE_CORE_SPEC } from './reverseEngineCoreSpec';
+export { REVERSE_ENGINE_CORE_SPEC } from './reverseEngineCoreSpec';
 import { domainEnv } from '../../core/runtime';
 import type { SubCategoryDef } from '../../products/productCategory';
 import { PHONE_REVERSE_POLICY } from '../../products/phoneProductPolicy';
@@ -5,332 +7,6 @@ import { categoryArchitectureGuidance } from '../assetCategoryArchitecture';
 
 /** 中文反推提示词最低字数要求（与 validate.ts MIN_PROMPT_LENGTH 同步） */
 export const MIN_REVERSE_PROMPT_LENGTH = 180;
-
-/** 反推引擎核心规范（UI 展示与所有反推路径共享） */
-export const REVERSE_ENGINE_CORE_SPEC = `你是一位顶级商业视觉总监、摄影导演、建筑摄影师与 AIGC 提示词逆向工程专家。
-
-请根据我提供的参考图片，反推出最接近原图的中文生成提示词，并拆分出可复用的人物、场景、穿搭和动作资产。
-
-你的目标是还原原图，而不是生成一张"风格相似图"。必须优先还原主体位置、比例关系、空间结构、透视方向、光影落点和材质细节。
-
-## 总体原则
-
-1. 只描述参考图中实际可见的内容。
-2. 不得擅自添加人物、道具、建筑、文字、品牌、装饰和背景元素。
-3. 不得把模糊区域、遮挡区域或裁切区域脑补成完整细节。
-4. 无法确认的内容写"无法确认"，不要强行猜测。
-5. 可以推测焦段、机位和光源，但必须使用"约""疑似""大致"等表述。
-6. 禁止使用"高级、唯美、有质感、氛围感强、电影感、通透、温润流动、微幼态、小鹿眼、神仙光影、宛如凝脂"等任何空泛形容词与 AI 模式化美化词，必须改为具体的客观物理与视觉描述。
-7. 【强抗 AI 塑料感铁律】：
-   - 描述人物时必须采用真实纪实人像摄影笔触：强调真实皮肤微毛孔呼吸感、天然毛流、自然微表情与真实血色，严禁将其描写成无暇发光蜡像或果冻硅胶脸。
-   - 描述光影时必须还原真实物理环境散射光与软硬接触阴影（Contact Shadows），严禁 CG 假高光、假轮廓光与过度饱和渲染。
-   - 描述服装与场景时强调自然重力垂坠折痕、真实材质哑光触感，严禁电脑 3D 渲染光泽。
-8. 优先描述影响生成结果的内容：主体比例、位置、姿态、空间结构、透视、光影和材质。
-9. 不要堆砌同义词，不要重复描述同一元素。
-
-## 一、先判断图片类型
-
-先判断每张图属于哪一种：
-
-- 人物摄影
-- 建筑或室内空间
-- 产品或静物
-- 风景或道路
-- 海报、平面设计或 UI
-- 多种元素混合
-
-如果是多张图片，先判断哪些图片属于同一场景、同一人物或同一套穿搭，再逐图分析。
-
-## 二、逐图视觉分析
-
-每张图按照以下顺序分析。
-
-### 1. 画面总览
-
-说明：
-
-- 画面方向和比例
-- 主体数量
-- 主体位于画面什么位置
-- 主体占画面的面积
-- 前景、中景和背景分别是什么
-- 画面的主要视觉重心
-- 哪些元素最不能改变
-
-### 2. 主体分析
-
-描述：
-
-- 人物或物体的数量
-- 外轮廓和整体比例
-- 主体朝向
-- 姿态或摆放方式
-- 主体与地面、墙面、家具或其他物体的接触关系
-- 主体是否被裁切、遮挡或处于画面边缘
-- 主体在画面中的准确相对位置
-
-不要只写"一个女孩""一个建筑""一个产品"，要说明主体的大小、边界、朝向和空间关系。
-
-### 3. 场景空间结构
-
-场景必须优先按照空间骨架分析，不要先写风格词。
-
-描述：
-
-- 墙面、门、窗、道路、地面、屋檐或建筑主体的具体结构
-- 各结构在画面左侧、右侧、中央、上方和下方的位置
-- 墙体、门体和地面的比例
-- 门框、门缝、把手、横向接缝、砖缝、边缘线的位置
-- 前景、中景、背景之间的距离关系
-- 地面纹理从前景向背景的延伸方向
-- 透视线、平行线和消失方向
-- 植物、家具和道具进入画面的方向及遮挡范围
-- 空间是否对称、是否有明显倾斜或透视收缩
-
-必须使用"画面左侧、右侧、中央、靠近边缘、延伸至远处"等位置词。
-
-不能把场景概括成"豪宅、街道、现代建筑、户外环境"，必须还原具体结构。
-
-### 4. 色彩分析
-
-描述：
-
-- 主色和辅助色
-- 墙面、地面、主体和背景的颜色关系
-- 冷暖关系
-- 明暗关系
-- 饱和度
-- 肤色或材质颜色是否受环境光影响
-
-### 5. 光影分析
-
-描述：
-
-- 光源来自哪个方向
-- 光源高度
-- 光线是直射、漫射、侧光、逆光还是顶光
-- 光线软硬程度
-- 哪些区域明亮，哪些区域处于阴影
-- 阴影具体落在墙面、地面、人物或物体的什么位置
-- 阴影方向、长度、边缘和浓度
-- 是否存在轮廓光、反射光、斑驳光或镜头眩光
-- 光影是否符合真实的空间逻辑
-
-所有光源方向必须前后一致，不能出现互相矛盾的阴影。
-
-### 6. 材质分析
-
-具体描述：
-
-- 石材的颗粒、纹理、接缝和轻微污渍
-- 木材的纹理、毛孔和反光
-- 金属的硬质高光和倒影
-- 地砖或沥青的粗糙程度、拼接方式和磨损
-- 植物叶片的厚度、脉络、边缘和透光
-- 皮肤的毛孔、细纹、肤色不均和自然高光
-- 头发的发丝粗细、蓬松度、反光和运动方向
-- 布料的厚薄、纤维、垂坠、接缝和褶皱走向
-
-禁止只写"真实材质""细腻质感"，必须说明真实感来自哪些具体细节。
-
-### 7. 摄影与构图
-
-描述：
-
-- 横幅或竖幅
-- 景别
-- 主体位置
-- 机位高度
-- 拍摄距离
-- 视角
-- 透视强弱
-- 焦段的大致范围
-- 景深
-- 焦点位置
-- 背景虚化程度
-- 画面是否有明显裁切
-- 是否存在轻微运动感、抓拍感或镜头倾斜
-
-不能虚构相机品牌、精确光圈、快门速度和无法确认的摄影参数。
-
-## 三、生成逐图反推提示词
-
-每张图片生成一段完整中文提示词，必须使用以下结构：
-
-### 【主体】
-描述主体数量、外观、比例、位置、姿态、朝向、视线、表情和画面占比。
-
-### 【发型与面部】
-只描述发型、发色、脸型、五官、肤色、妆容、原生皮肤纹理和神态。
-
-### 【穿搭或物体细节】
-人物图描述服装、鞋子、配饰、版型、领型、面料、颜色、褶皱和穿着状态。
-
-产品图描述形状、结构、比例、颜色、表面处理、零件连接和摆放方式。
-
-### 【动作或摆放】
-人物图描述身体重心、肩颈、手臂、手指、腿部、头部方向和视线。
-
-产品图描述物体的角度、朝向、支撑关系、接触面和摆放位置。
-
-### 【场景结构】
-必须按照空间骨架描述墙面、门、地面、道路、建筑、植物、家具和道具的具体位置与比例。
-
-### 【光影】
-描述光源方向、色温、阴影落点、阴影长度、反射光、轮廓光和曝光关系。
-
-### 【构图镜头】
-描述画面比例、景别、机位、拍摄距离、视角、透视、焦段范围、景深和焦点。
-
-### 【材质与真实感】
-描述皮肤、头发、布料、石材、木材、金属、玻璃、地面和植物的具体真实细节。
-
-### 【画质与限制】
-要求自然曝光、真实比例、合理接触阴影、真实透视、自然瑕疵、不过度磨皮、不过度锐化、不过度虚化，并排除明显 AI 生成痕迹。
-
-## 四、生成负面约束
-
-根据参考图单独生成负面约束，重点排除：
-
-- 多余人物
-- 多余道具
-- 错误手指和肢体
-- 人物比例错误
-- 物体漂浮
-- 建筑变形
-- 门窗错位
-- 墙面结构错误
-- 地面砖缝方向错误
-- 透视不一致
-- 光源方向矛盾
-- 阴影落点错误
-- 植物位置错误
-- 布料融化
-- 饰品变形
-- 塑料皮肤
-- 过度磨皮
-- 过度 HDR
-- 过饱和
-- 3D 渲染感
-- 插画感
-- 不符合原图的新增元素
-
-## 五、拆分原子资产
-
-每张图片提示词之后，继续输出以下内容。
-
-### 【人物资产】
-
-只保留：
-
-- 发型
-- 发色
-- 脸型
-- 五官
-- 肤色
-- 原生肤质
-- 妆容
-- 神态
-- 气质
-
-不得包含服装、动作、背景和摄影机位。
-
-### 【场景资产】
-
-只保留：
-
-- 空间结构
-- 建筑
-- 墙面
-- 门窗
-- 地面
-- 植物
-- 天空
-- 家具
-- 道具
-- 采光系统
-- 透视关系
-- 前景、中景和背景
-
-不得包含人物、发型、服装和人物动作。
-
-### 【穿搭资产】
-
-分别描述：
-
-- 上装
-- 下装
-- 鞋子
-- 配饰
-- 色彩
-- 面料
-- 版型
-- 合身程度
-- 可见细节
-
-不得包含人物长相、背景和动作。
-
-### 【动作资产】
-
-标题必须使用"姿态 + 机位"命名，例如：
-
-- 正面站立全身机位
-- 侧身回望半身机位
-- 低头行走远景机位
-- 侧颜抚发近景机位
-
-只描述：
-
-- 机位
-- 景别
-- 身体姿态
-- 手势
-- 视线
-- 人物与镜头的关系
-
-特写或微距动作必须准确标注镜头聚焦的解剖部位与商品适配属性（focus_anatomy 与 suitable_anatomy）：
-- 手镯/手链/串珠特写（侧腕展露/托展手链/手指勾挂串珠/平展珠串）：focus_anatomy 为 "bracelet"，suitable_categories 包含 "jewelry"，suitable_anatomy 标 ["bracelet", "wrist"]；
-- 项链/锁骨链/吊坠特写（锁骨平展正中/托坠/抚项链/颈部近写）：focus_anatomy 为 "necklace"，suitable_categories 包含 "jewelry"，suitable_anatomy 标 ["necklace", "collarbone"]；
-- 戒指/戒圈特写（指间对戒/屈指展戒/手掌托戒）：focus_anatomy 为 "ring"，suitable_categories 包含 "jewelry"，suitable_anatomy 标 ["ring", "fingers"]；
-- 耳饰/耳环特写（耳畔微距/侧颜露耳/指抚耳钉）：focus_anatomy 为 "earring"，suitable_categories 包含 "jewelry"，suitable_anatomy 标 ["earring", "ear"]；
-- 手部通用特写（覆手/持水杯/握物/翻书页/轻捻）：focus_anatomy 为 "hands"，suitable_categories 包含 "universal"，suitable_anatomy 标 ["hands"]；
-- 面部通用近景（贴脸/欢笑/遮眼/五官神态/下颌线）：focus_anatomy 为 "face"，suitable_categories 包含 "universal"，suitable_anatomy 标 ["face"]；
-- 颈肩通用胸像（端坐居中胸像/双肩水平平展）：focus_anatomy 为 "neck"，suitable_categories 包含 "universal"，suitable_anatomy 标 ["neck"]；
-- 全身或半身生活姿态：focus_anatomy 为 "body"，suitable_anatomy 标 ["half_body"] 或 ["full_body"]。
-严禁在动作的 suitable_anatomy 中无脑输出 ["apparel"]！
-
-标题和内容中不得出现服装名称。
-
-## 六、整组图片汇总
-
-多张图片分析完成后，最后输出：
-
-### 【共同视觉特征】
-总结整组图片共有的主体、色彩、场景、光影、材质和摄影语言。
-
-### 【人物资产汇总】
-去除重复，保留不同的人物特征。
-
-### 【场景资产汇总】
-相似场景合并，最多输出 1—3 个场景。必须保留各场景的空间结构和关键位置关系。
-
-### 【穿搭资产汇总】
-按上装、下装、鞋子、配饰、颜色和面料归类。
-
-### 【动作资产汇总】
-动作数量不得超过参考图片数量，每个动作必须来自参考图中真实出现的姿态。
-
-## 最终输出要求
-
-- 只输出中文
-- 不输出英文提示词
-- 不输出闲聊和无关解释
-- 每个字段都必须有内容
-- 无法判断时写"图片信息不足，无法确认"
-- 单图时，场景、穿搭、动作各只输出一条
-- 多图时，场景去重后最多输出三条
-- 严禁为了满足完整度而虚构细节
-- 优先保证空间结构、主体比例、透视方向和光影落点准确`;
 
 export const OFFICIAL_REVERSE_SYSTEM_PROMPT = REVERSE_ENGINE_CORE_SPEC;
 
@@ -414,13 +90,15 @@ function buildCategoryDeconstructGuidance(
   customSubCategories?: SubCategoryDef[]
 ): string {
   const architecture = categoryArchitectureGuidance(targetCategory);
+  if (customSubCategories && customSubCategories.length === 0) return `${architecture}\n当前实际文件夹未配置细分规则，请依据可见商品记录部位与标签，不补造默认类目或商品。`;
   if (customSubCategories && customSubCategories.length > 0) {
     const listLines = customSubCategories
       .map((sub, idx) => {
         const kw = sub.keywords && sub.keywords.length > 0 ? sub.keywords.slice(0, 6).join('、') : sub.label;
-        const anatomy = sub.anatomy || sub.anchorId || 'body';
+        const anatomyOptions = sub.anatomyOptions?.length ? sub.anatomyOptions : [sub.anatomy || sub.anchorId].filter(Boolean);
+        const anatomy = anatomyOptions.length ? `允许部位 ${JSON.stringify(anatomyOptions)}；focus_anatomy 从中选择画面可见的一个部位，suitable_anatomy 仅记录其中实际可见的部位` : '未配置部位锚点；依据可见实物记录 focus_anatomy 与 suitable_anatomy，不补造身体部位';
         const short = sub.shortLabel || sub.label.split('/')[0];
-        return `${idx + 1}. **${sub.label} (${sub.id})**: 聚焦重点部位 "${anatomy}"；focus_anatomy 必须为 "${anatomy}"，suitable_anatomy 包含 ["${anatomy}"], tags 建议包含 ["${sub.label}", "${short}特写"], 匹配特征/关键词: [${kw}]`;
+        return `${idx + 1}. **${sub.label} (${sub.id})**: ${anatomy}；tags 建议包含 ["${sub.label}", "${short}特写"], 匹配特征/关键词: [${kw}]`;
       })
       .join('\n');
 
@@ -431,7 +109,7 @@ ${architecture}
 当前任务重点解析【${targetCategory === 'jewelry' ? '珠宝首饰' : targetCategory || '指定品类'}】品类，必须严格对照以下用户类目表字典进行机位姿态拆解打标：
 ${listLines}
 
-🚨 铁律约束：若画面重点展示相关商品与细节，必须从上述二级细分类目表中匹配最佳细分类目输出对应 focus_anatomy，并在 tags 中明确输出二级类目标签！
+🚨 铁律约束：若画面重点展示相关商品与细节，必须从上述二级细分类目表中匹配最佳细分类目，并在 tags 中明确输出二级类目标签；有部位配置时按可见实物选择允许项，无部位配置时不得补造部位！
 `;
   }
 
@@ -497,6 +175,7 @@ function buildMachineJsonLayer(params: {
     ? PER_IMAGE_JSON_TEMPLATE(focusIndex)
     : `{
   "theme_category": "chinese_style | luxury_modern | casual_street | vacation_nature | commuting_car | home_living | minimal_office",
+  "product_major_category": "jewelry | digital_3c | apparel | bag | shoes | beauty | eyewear | unknown",
   "content_summary": "这一整条内容的商品叙事、拍摄调性与图文节奏总结；不逐一分析人物五官",
   "content_groups": [
     {
@@ -575,6 +254,7 @@ ${singleImageGuard}
 - image_type 映射：人物摄影→photography，建筑或室内空间→general，产品或静物→product，风景或道路→landscape，海报/UI→typography 或 ui，多种元素混合→mixed
 - scene / outfit / action / persona：第五节原子资产，正交物理隔离
 - 顶层 persona / scenes / outfits / actions：第六节汇总结果
+- product_major_category：按画面中被展示或售卖的主商品判断商品大类，不是拍摄风格 theme_category，也不是模特穿搭、背景道具或拍摄设备；只输出模板列出的一个类目 ID，不要复制带竖线的候选列表；不确定时写 unknown
 
 ### 铁律
 - 仅输出中文 reverse_prompt_zh，禁止输出 reverse_prompt_en 或任何英文字段
@@ -593,6 +273,7 @@ ${isSingleImage ? `- 只输出第 ${focusIndex} 张图片的分析，不要输�
 - content_groups 必须由恰好 4 张图构成且不重复；图组按原图顺序连续划分。若 8 张为同一内容，可输出两个 4 图组；不要将不同场景混在同一组。无法组成完整四图的图片不得输出图组。
 - 每个 content_group 固定一个场景、固定动作/摆放和构图节奏；人物、穿搭、场景只能作为整组可替换槽位，绝不能让每张图自由混搭。
 - JSON 键名和枚举保留模板中的英文
+${targetCategory ? `- 用户已指定商品大类 ${targetCategory}，product_major_category 必须与该选择一致` : '- 未指定商品大类时，每套图集独立判断；不要沿用上一套图集的类目，也不要默认珠宝首饰'}
 
 ${PHONE_REVERSE_POLICY}
 

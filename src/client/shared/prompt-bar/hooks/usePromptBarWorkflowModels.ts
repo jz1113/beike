@@ -10,8 +10,8 @@ export function usePromptBarWorkflowModels(
   setQuickModel: (id: string) => void,
   setQuickVideoModel: (id: string) => void,
 ) {
-  const [availableImageModels, setAvailableImageModels] = useState<any[]>([]);
-  const [availableVideoModels, setAvailableVideoModels] = useState<any[]>([]);
+  const [availableImageModels, setAvailableImageModels] = useState<ReturnType<typeof getEnabledImageModelsFromSettings>>([]);
+  const [availableVideoModels, setAvailableVideoModels] = useState<ReturnType<typeof getEnabledVideoModelsFromSettings>>([]);
 
   useEffect(() => {
     const loadCustomModels = () => {

@@ -64,7 +64,7 @@ export default function FeedCardActionBar({
           type="button"
           onClick={onClearFailed}
           className="h-10 px-3 rounded-[13px] bg-red-50 hover:bg-red-100/90 text-red-600 text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 shrink-0 border border-red-200/60 shadow-2xs"
-          title={`一键清除本批次中的 ${failedCount} 个失败/未成功卡片（保留生成成功的图片）`}
+          title={`清除本批次中的 ${failedCount} 个失败卡片`}
         >
           <Trash2 className="w-3.5 h-3.5 text-red-500 shrink-0" />
           <span>清除失败 ({failedCount})</span>
@@ -102,7 +102,7 @@ export default function FeedCardActionBar({
                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs text-red-600 hover:bg-red-50 font-medium transition-colors cursor-pointer group/clearFail text-left"
               >
                 <Trash2 className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                <span>清除未成功卡片 ({failedCount})</span>
+                <span>清除失败卡片 ({failedCount})</span>
               </button>
             )}
             <button

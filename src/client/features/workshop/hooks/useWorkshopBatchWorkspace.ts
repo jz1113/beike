@@ -6,12 +6,14 @@ import { workshopBatchSummarySchema } from '@shared/contracts/workshopBatches';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { recoverWorkspace, hasWorkspaceContent } from '../model/workspace/workspaceRecovery';
 import { serializeWorkspaceSnapshot, WorkspaceSaveSession } from '../model/workspace/workspaceSave';
+import { createWorkspaceCheckpoint } from '../model/workspace/workspaceCheckpoint';
+import { downloadWorkspaceDraft } from '../model/workspace/workspaceDraft';
 
 function parseBatchResponse(data: unknown): WorkshopBatch {
   return workshopBatchSchema.parse((data as { batch?: unknown }).batch);
 }
 
-export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (snapshot: WorkshopSnapshot) => void) {
+export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (snapshot: WorkshopSnapshot) => void, readSnapshot: () => WorkshopSnapshot) {
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState('正在加载当前批次…');
   const [error, setError] = useState('');
@@ -23,6 +25,9 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
   const [isSwitching, setIsSwitching] = useState(false);
   const saved = useRef('');
   const latest = useRef(snapshot);
+  const readSnapshotRef = useRef(readSnapshot);
+  readSnapshotRef.current = readSnapshot;
+  const getSnapshot = useCallback(() => readSnapshotRef.current(), []);
   const restoreRef = useRef(restore);
   const alive = useRef(true);
   const activeBatchRef = useRef<WorkshopBatch | null>(null);
@@ -55,6 +60,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
 
   const loadActive = useCallback(async () => {
     const sequence = ++loadSequence.current;
+    const inputAtStart = JSON.stringify({ items: getSnapshot().items, batchInputText: getSnapshot().batchInputText });
     setReady(false);
     setStatus('正在加载当前批次…');
     try {
@@ -62,6 +68,10 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '当前批次读取失败');
       if (!alive.current || sequence !== loadSequence.current) return;
+      const current = getSnapshot();
+      if (JSON.stringify({ items: current.items, batchInputText: current.batchInputText }) !== inputAtStart) {
+        throw new Error('读取期间本地内容已变化，已保留修改；请下载本地草稿后重新加载');
+      }
       adoptBatch(parseBatchResponse(data), '当前批次已就绪');
       if (alive.current) setReady(true);
       await refreshHistory();
@@ -70,7 +80,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       setError(cause instanceof Error ? cause.message : '当前批次读取失败');
       setStatus('批次加载失败，未覆盖本地内容');
     }
-  }, [adoptBatch, refreshHistory]);
+  }, [adoptBatch, refreshHistory, getSnapshot]);
 
   useEffect(() => {
     alive.current = true;
@@ -78,11 +88,12 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     return () => { alive.current = false; };
   }, [loadActive]);
 
-  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean; duringSwitch?: boolean; force?: boolean }) => {
+  const persistSnapshot = useCallback(async (options?: { keepalive?: boolean; duringSwitch?: boolean; force?: boolean; expectedJson?: string }) => {
     if (!ready || (switching.current && !options?.duringSwitch)) return false;
     const session = saveSession.current;
     if (!session || (session.blocked && !options?.force)) return false;
-    const json = serializeWorkspaceSnapshot(latest.current);
+    const json = serializeWorkspaceSnapshot(getSnapshot());
+    if (options?.expectedJson && options.expectedJson !== json) return false;
     if (json === saved.current && !session.hasPendingSave) return true;
     if (!options?.force && Date.now() < session.retryAt) return false;
     if (alive.current) setStatus('正在保存当前批次…');
@@ -97,7 +108,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
         setStatus('当前批次已保存');
         setError('');
       }
-      return true;
+      return serializeWorkspaceSnapshot(getSnapshot()) === json;
     } catch (cause) {
       if (saveSession.current !== session) return false;
       // A recovered older write may be confirmed even if saving newer edits fails.
@@ -108,9 +119,9 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       }
       return false;
     }
-  }, [ready]);
+  }, [ready, getSnapshot]);
 
-  const flush = useCallback((options?: { keepalive?: boolean; duringSwitch?: boolean; force?: boolean }) => {
+  const flush = useCallback((options?: { keepalive?: boolean; duringSwitch?: boolean; force?: boolean; expectedJson?: string }) => {
     const run = flushChain.current.then(() => persistSnapshot(options), () => persistSnapshot(options));
     flushChain.current = run.then(() => undefined, () => undefined);
     return run;
@@ -121,7 +132,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     const timer = window.setInterval(() => { void flush(); }, 1200);
     const onVisibility = () => { if (document.visibilityState === 'hidden') void flush(); };
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (serializeWorkspaceSnapshot(latest.current) === saved.current && !saveSession.current?.hasPendingSave) return;
+      if (serializeWorkspaceSnapshot(getSnapshot()) === saved.current && !saveSession.current?.hasPendingSave) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -139,7 +150,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       window.removeEventListener('beforeunload', onBeforeUnload);
       void flush({ keepalive: true });
     };
-  }, [flush, ready]);
+  }, [flush, ready, getSnapshot]);
 
   const requestBatch = useCallback(async (url: string, init: RequestInit, successMessage: string) => {
     if (switching.current) throw new Error('正在切换批次，请稍候');
@@ -234,15 +245,16 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     ready: ready && !isSwitching,
     startFreshEntry,
     flush,
-    retrySave: () => flush({ force: true }),
-    downloadDraft: () => {
-      const url = URL.createObjectURL(new Blob([serializeWorkspaceSnapshot(latest.current)], { type: 'application/json' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `workshop-draft-${activeBatchRef.current?.id || 'unsaved'}.json`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    createCheckpoint: () => {
+      const session = saveSession.current;
+      if (!ready || switching.current || !session || session.blocked) throw new Error('当前批次尚未就绪或存在保存冲突，请先恢复保存');
+      return createWorkspaceCheckpoint({
+        batchId: session.batchId, currentBatchId: () => saveSession.current?.batchId,
+        read: getSnapshot, save: expectedJson => flush({ expectedJson }),
+      });
     },
+    retrySave: () => flush({ force: true }),
+    downloadDraft: () => downloadWorkspaceDraft(getSnapshot(), activeBatchRef.current?.id),
     status: ready && !error && !isSwitching && status !== '正在保存当前批次…' && serialized !== saved.current ? '等待保存当前批次…' : status,
     error,
     activeBatch,
@@ -256,7 +268,10 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     renameBatch,
     readBatch,
     reload: async () => {
-      if (serializeWorkspaceSnapshot(latest.current) !== saved.current && !window.confirm('重新加载将用服务器版本替换当前内容，未保存的修改可能丢失。确定继续吗？')) return;
+      if (serializeWorkspaceSnapshot(getSnapshot()) !== saved.current) {
+        if (!window.confirm('将先下载本地草稿保留未保存修改，再用服务器版本替换当前内容。确定重新加载吗？')) return;
+        downloadWorkspaceDraft(getSnapshot(), activeBatchRef.current?.id);
+      }
       await loadActive();
     },
   };

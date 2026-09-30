@@ -255,7 +255,8 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                       ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs'
                       : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
                   }`}
-                  title="点击切换生图模型"
+                  disabled={!availableImageModels.length}
+                  title={availableImageModels.length ? "点击切换生图模型" : "请在设置中启用生图模型"}
                 >
                   <div className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
                     {getModelIcon(selectedModelId, 'w-3.5 h-3.5')}
@@ -378,7 +379,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                     ? 'bg-slate-900 hover:bg-black text-white hover:scale-105 active:scale-95 shadow-md shadow-slate-900/20'
                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`}
-                title={canSubmit ? '提交智能改图任务' : '请先输入局部改图描述'}
+                title={canSubmit ? '提交智能改图任务' : availableImageModels.length ? '请先输入局部改图描述' : '请在设置中启用生图模型'}
               >
                 <span>生成</span>
                 <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />

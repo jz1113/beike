@@ -26,9 +26,10 @@ function parseYamlFrontmatter(raw: string): { meta: Record<string, string>; body
 function parseStringArray(raw: unknown): string[] | undefined {
   if (Array.isArray(raw)) {
     const items = raw.map((v) => String(v).trim()).filter(Boolean);
-    return items.length > 0 ? items : undefined;
+    return items;
   }
   if (typeof raw === 'string') {
+    if (raw.trim() === '[]') return [];
     const items = raw
       .split(/[,，\n]/)
       .map((v) => v.trim())

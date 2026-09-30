@@ -13,7 +13,11 @@ import type {
   AssistantItem,
   ApprovalRequestItem,
 } from '@shared/domain/assistant/types';
-import { initialState, applyItemEvent, deriveLegacyState } from './assistantTurnItems';
+import { initialState, applyItemEvent, deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
+import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
+import { readAssistantEvents } from '../utils/readAssistantEvents';
+import { submitPreparedAssistantTurn } from '../utils/assistantTurnRecovery';
+import { fetchAssistantTurnSnapshot } from '../api/runs';
 export { deriveLegacyState } from './assistantTurnItems';
 
 export interface RunTurnParams {
@@ -34,6 +38,7 @@ export interface RunTurnParams {
   sessionApprovals: string[];
   signal: AbortSignal;
   onUpdate: (patch: Partial<TurnStreamState>) => void;
+  onTurnPrepared: (turnId: string) => void | Promise<void>;
   showToast: (msg: string) => void;
 }
 
@@ -53,9 +58,10 @@ export function useAssistantTurn() {
   const handleApprovalDecision = useCallback(
     async (approvalId: string, decision: ApprovalDecision, onUpdate: RunTurnParams['onUpdate']) => {
       const turnId = turnIdRef.current;
-      if (!turnId) return;
-
+      const approval = stateRef.current.pendingApprovals.find((item) => item.approvalId === approvalId);
+      if (!turnId || !approval) throw new Error('审批请求已过期，请刷新当前任务');
       await approveAssistantTool(turnId, approvalId, decision);
+      if (turnIdRef.current !== turnId || !stateRef.current.pendingApprovals.some((item) => item.approvalId === approvalId)) return;
 
       const nextItems = applyItemEvent(itemsRef.current, {
         type: 'item/approval/resolved',
@@ -71,9 +77,8 @@ export function useAssistantTurn() {
           sessionApprovals:
             decision === 'acceptForSession'
               ? [
-                  ...stateRef.current.sessionApprovals,
-                  stateRef.current.pendingApprovals.find((a) => a.approvalId === approvalId)?.toolName || '',
-                ].filter(Boolean)
+                  ...stateRef.current.sessionApprovals, approval.toolName,
+                ].filter((name, index, list) => list.indexOf(name) === index)
               : stateRef.current.sessionApprovals,
         },
         onUpdate,
@@ -87,18 +92,14 @@ export function useAssistantTurn() {
    * 使用 lastTurnIdRef 而非当前 turnIdRef，确保查的是"上一轮"而非正在生成的"新 turn"。
    */
   const fetchTurnSnapshot = useCallback(
-    async (turnId: string, showToast: (msg: string) => void) => {
+    async (turnId: string, showToast: (msg: string) => void, sessionId?: string) => {
       const targetTurnId = turnId || lastTurnIdRef.current;
       if (!targetTurnId) return null;
       try {
-        const snapshotRes = await apiFetch(
-          `/api/assistant/turns/${encodeURIComponent(targetTurnId)}/snapshot`,
-        );
-        if (!snapshotRes.ok) return null;
-        const data = await snapshotRes.json();
-        if (!data.success || !data.snapshot) return null;
+        const snapshot = await fetchAssistantTurnSnapshot(targetTurnId, sessionId);
+        if (!snapshot) return null;
         showToast('已恢复上轮对话进度');
-        return data.snapshot as { items: AssistantItem[]; modelUsed?: string };
+        return snapshot;
       } catch {
         return null;
       }
@@ -126,7 +127,6 @@ export function useAssistantTurn() {
 
     stateRef.current = { ...initialState(), sessionApprovals: [...sessionApprovals] };
     itemsRef.current = [];
-    let lastEventId = '';
 
     // Every request is a distinct turn. Reusing turnId overwrote persisted history and
     // made retries ambiguous; threadId is the stable assistant session identity.
@@ -134,14 +134,14 @@ export function useAssistantTurn() {
     const nextTurnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     turnIdRef.current = nextTurnId;
     turnIdForApprovalRef.current = nextTurnId;
+    patch({}, onUpdate);
 
     const { customBaseUrl: localUrl } = getGatewayClientOverrides();
 
-    const res = await apiFetch('/api/assistant/turn/start', {
+    const res = await submitPreparedAssistantTurn(nextTurnId, params.onTurnPrepared, () => apiFetch('/api/assistant/turn/start', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(lastEventId ? { 'Last-Event-ID': lastEventId } : {}),
       },
       body: JSON.stringify({
         threadId: sessionId,
@@ -163,7 +163,7 @@ export function useAssistantTurn() {
         sessionApprovals: stateRef.current.sessionApprovals,
       }),
       signal,
-    });
+    }), signal);
 
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
@@ -175,41 +175,19 @@ export function useAssistantTurn() {
       return stateRef.current;
     }
 
+    if (!res.ok) throw new Error(`AI 助手请求失败（HTTP ${res.status}）`);
+    if (!contentType.includes('text/event-stream')) throw new Error('AI 助手返回了无效的流式响应');
     if (!res.body) throw new Error('未获取到流式响应体');
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let eventIdCounter = 0;
     let receivedTerminal = false;
-
+    const executedActions = new Set<string>();
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-        let evt: any;
-        try {
-          evt = JSON.parse(trimmed.slice(6));
-        } catch (parseErr: unknown) {
-          // 记录 JSON 解析错误，但继续处理下一行（网络抖动可能导致部分数据截断）
-          console.warn('[SSE] Failed to parse event, skipping:', trimmed.slice(0, 100), parseErr);
-          continue;
-        }
-
-        lastEventId = `${++eventIdCounter}`;
+      for await (const evt of readAssistantEvents(res.body, signal)) {
         if (evt.type === 'done' || evt.type === 'turn/completed') receivedTerminal = true;
         if (evt.type === 'turn/interrupted') throw new Error('对话已中断，已生成内容已保留，请重试。');
 
         if (evt.type === 'turn/started' && evt.turnId) {
+          if (evt.threadId && evt.threadId !== sessionId) throw new Error('对话响应与当前会话不匹配');
           // Server normally echoes nextTurnId; still accept its canonical ID.
           turnIdRef.current = evt.turnId;
           turnIdForApprovalRef.current = evt.turnId;
@@ -217,20 +195,15 @@ export function useAssistantTurn() {
 
         // turn/snapshot: 直接替换 item[]，重建 UI
         if (evt.type === 'turn/snapshot' && evt.snapshot) {
-          const snapItems: AssistantItem[] = evt.snapshot.items || [];
+          if ((evt.snapshot.threadId && evt.snapshot.threadId !== sessionId) || (evt.snapshot.id && evt.snapshot.id !== turnIdRef.current)) throw new Error('对话快照与当前任务不匹配');
+          const snapItems = normalizeAssistantItems(evt.snapshot.items);
           itemsRef.current = snapItems;
           // 同步 pendingApprovals 的 turnId
-          for (const item of snapItems) {
-            if (item.kind === 'approvalRequest' && (item as ApprovalRequestItem).status === 'pending') {
-              const ap = item as ApprovalRequestItem;
-              ap.args = { ...ap.args };
-            }
-          }
           const legacy = deriveLegacyState(snapItems);
           patch(
             {
               ...legacy,
-              ...(evt.snapshot.task ? { task: evt.snapshot.task } : {}),
+              ...(normalizeAssistantTask(evt.snapshot.task) ? { task: normalizeAssistantTask(evt.snapshot.task) } : {}),
               modelUsed: evt.snapshot.modelUsed || stateRef.current.modelUsed,
               pendingApprovals: legacy.pendingApprovals.map((a) => ({
                 ...a,
@@ -256,7 +229,10 @@ export function useAssistantTurn() {
           }
         }
 
-        if (evt.type === 'task' && evt.task) patch({ task: evt.task }, onUpdate);
+        if (evt.type === 'task') {
+          const task = normalizeAssistantTask(evt.task);
+          if (task) patch({ task }, onUpdate);
+        }
         if ((evt.type === 'turn/completed' || evt.type === 'done') && stateRef.current.task?.status === 'running') {
           patch({ task: { ...stateRef.current.task, status: 'completed', stage: '本轮已完成' } }, onUpdate);
         }
@@ -294,14 +270,15 @@ export function useAssistantTurn() {
             onUpdate,
           );
 
-          if (evt.type === 'item/toolCall/completed' && evt.action && evt.status !== 'error') {
-            executeClientToolAction(evt.action, showToast);
+          if (evt.type === 'item/toolCall/completed' && evt.action && evt.status === 'done' && !executedActions.has(evt.itemId)) {
+            executedActions.add(evt.itemId);
+            executeClientToolAction(evt.action, showToast, sessionId);
           }
           continue;
         }
 
         // ── Legacy events (backward compat) ──
-        if (evt.type === 'delta' && evt.content) {
+        if (evt.type === 'delta' && evt.content && !itemsRef.current.some((item) => item.kind === 'agentMessage')) {
           patch(
             {
               content: stateRef.current.content + evt.content,
@@ -311,11 +288,11 @@ export function useAssistantTurn() {
           );
         }
 
-        if (evt.type === 'thinking' && evt.content) {
+        if (evt.type === 'thinking' && evt.content && !itemsRef.current.some((item) => item.kind === 'agentReasoning')) {
           patch({ thinking: stateRef.current.thinking + evt.content }, onUpdate);
         }
 
-        if (evt.type === 'tool_call' || evt.type === 'tool_result') {
+        if ((evt.type === 'tool_call' || evt.type === 'tool_result') && !itemsRef.current.some((item) => item.kind === 'toolCall')) {
           const prev = [...stateRef.current.toolActivity];
           const idx = prev.findIndex((t) => t.name === evt.name && t.status === 'running');
           const visualImages = (evt as any).visualImages;
@@ -334,7 +311,7 @@ export function useAssistantTurn() {
               visualImages: visualImages || prev[idx].visualImages,
             };
             if (evt.action && evt.status !== 'error') {
-              executeClientToolAction(evt.action, showToast);
+              executeClientToolAction(evt.action, showToast, sessionId);
             }
           } else if (evt.type === 'tool_call') {
             prev.push(entry);
@@ -361,11 +338,14 @@ export function useAssistantTurn() {
         if (evt.type === 'error') {
           throw new Error(evt.error || '流式传输异常');
         }
+        if (receivedTerminal) break;
       }
-    }
     } catch (streamErr: unknown) {
       // 🐛 不要吞：把 SSE 流错误暴露给上层，触发 toast + 重连
-      if (stateRef.current.task) patch({ task: { ...stateRef.current.task, status: signal.aborted ? 'cancelled' : 'failed', stage: signal.aborted ? '用户已停止' : '本轮未完成' } }, onUpdate);
+      itemsRef.current = finishInterruptedItems(itemsRef.current, signal.aborted);
+      patch({ ...(itemsRef.current.length ? deriveLegacyState(itemsRef.current) : { pendingApprovals: [] }), streamingStatus: undefined,
+        ...(stateRef.current.task ? { task: { ...stateRef.current.task, status: signal.aborted ? 'cancelled' : 'failed', stage: signal.aborted ? '用户已停止' : '本轮未完成' } } : {}),
+      }, onUpdate);
       console.error('[SSE stream error]', streamErr);
       throw streamErr instanceof Error
         ? streamErr
@@ -373,7 +353,10 @@ export function useAssistantTurn() {
     }
 
     if (!receivedTerminal) {
-      if (stateRef.current.task) patch({ task: { ...stateRef.current.task, status: 'failed', stage: '连接中断，执行结果待核实' } }, onUpdate);
+      itemsRef.current = finishInterruptedItems(itemsRef.current, false);
+      patch({ ...(itemsRef.current.length ? deriveLegacyState(itemsRef.current) : { pendingApprovals: [] }), streamingStatus: undefined,
+        ...(stateRef.current.task ? { task: { ...stateRef.current.task, status: 'failed', stage: '连接中断，执行结果待核实' } } : {}),
+      }, onUpdate);
       throw new Error('对话连接意外断开（服务重启或网络中断），已生成内容已保留，请重试。');
     }
     return stateRef.current;

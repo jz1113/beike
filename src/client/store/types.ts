@@ -30,7 +30,7 @@ export type {
   AssistantSession,
 } from '@client/store/appStoreTypes';
 
-export type WorkshopTab = 'studio' | 'prompt_assets' | 'recipes' | 'categories';
+export type WorkshopTab = 'studio' | 'prompt_assets' | 'recipes';
 
 export interface ViewSlice {
   currentView: AppView;
@@ -42,7 +42,7 @@ export interface ViewSlice {
   navigateToSettings: () => void;
   backFromSettings: () => void;
   setActiveModuleId: (id: string) => void;
-  setActiveWorkshopTab: (tab: WorkshopTab) => void;
+  setActiveWorkshopTab: (tab: WorkshopTab | 'categories') => void;
   setIsWorkshopConfigOpen: (open: boolean) => void;
 }
 
@@ -93,6 +93,7 @@ export interface HomeSlice {
 }
 
 export interface GenerateSlice {
+  generationHistoryReady: boolean;
   sessions: ChatSession[];
   currentSessionId: string;
   previewTask: GenerationTask | null;
@@ -101,6 +102,7 @@ export interface GenerateSlice {
   createSession: () => void;
   switchSession: (id: string) => void;
   deleteSession: (id: string) => void;
+  deleteAllSessions: () => void;
   renameSession: (id: string, newTitle: string) => void;
   pinSession: (id: string) => void;
   renameTask: (taskId: string, newTitle: string) => void;

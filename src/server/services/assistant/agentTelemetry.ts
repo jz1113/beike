@@ -8,6 +8,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import type { AssistantSSEEvent } from '@shared/domain/assistant/events';
 
 export type AgentTelemetryPhase =
   | 'turn/started'
@@ -354,4 +355,42 @@ export class TurnTimer {
       tags: { itemCount: this.itemCount, toolCount: this.toolCount },
     });
   }
+}
+
+/** Observe item and approval events without altering the stream payload. */
+export function createTurnTelemetrySender(baseSend: (evt: AssistantSSEEvent) => void, turnTimer: TurnTimer) {
+  return (evt: AssistantSSEEvent) => {
+    if (evt && typeof evt === 'object') {
+      const type = (evt as { type?: string }).type;
+      switch (type) {
+        case 'item/started': {
+          const e = evt as Extract<AssistantSSEEvent, { type: 'item/started' }>;
+          turnTimer.itemStarted(String(e.kind || ''));
+          break;
+        }
+        case 'item/completed': {
+          const e = evt as Extract<AssistantSSEEvent, { type: 'item/completed' }>;
+          turnTimer.itemCompleted(String(e.kind || ''), e.itemId, e.status);
+          break;
+        }
+        case 'item/approval/request': {
+          const e = evt as Extract<AssistantSSEEvent, { type: 'item/approval/request' }>;
+          turnTimer.approvalRequested(e.toolName, e.approvalId);
+          break;
+        }
+        case 'item/approval/resolved': {
+          const e = evt as Extract<AssistantSSEEvent, { type: 'item/approval/resolved' }>;
+          turnTimer.approvalResolved('', e.approvalId, e.decision);
+          break;
+        }
+        case 'turn/interrupted':
+          turnTimer.complete({ status: 'interrupted', reason: 'client-disconnect' });
+          break;
+        default:
+          break;
+      }
+    }
+    baseSend(evt);
+  };
+
 }

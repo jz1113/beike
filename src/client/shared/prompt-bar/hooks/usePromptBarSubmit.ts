@@ -6,8 +6,10 @@ import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '@client/share
 import { registerDepthSubmit } from '@client/shared/api/depthGeneration';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
+import { claimPromptBarShortcut } from '../promptBarShortcut';
 
 interface UsePromptBarSubmitOptions {
+  composerRef: React.RefObject<HTMLElement | null>;
   quickGenMode: QuickGenMode;
   isDepthMode: boolean;
   quickPrompt: string;
@@ -41,6 +43,7 @@ interface UsePromptBarSubmitOptions {
 }
 
 export function usePromptBarSubmit({
+  composerRef,
   quickGenMode,
   isDepthMode,
   quickPrompt,
@@ -174,7 +177,7 @@ export function usePromptBarSubmit({
         result.shouldCreateNewSession
       );
     onSubmitSuccess?.({
-      prompt: quickPrompt,
+      prompt: result.cleanedPrompt,
       refImages: quickRefImages,
       mode: quickGenMode,
       tasks: result.tasks,
@@ -195,12 +198,12 @@ export function usePromptBarSubmit({
   });
 
   useEffect(() => {
-    const handleTrigger = () => {
-      handleSendPromptRef.current();
+    const handleTrigger = (event: Event) => {
+      if (claimPromptBarShortcut(event, composerRef.current)) handleSendPromptRef.current();
     };
     window.addEventListener('app:trigger-generate', handleTrigger);
     return () => window.removeEventListener('app:trigger-generate', handleTrigger);
-  }, []);
+  }, [composerRef]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLElement>) => {

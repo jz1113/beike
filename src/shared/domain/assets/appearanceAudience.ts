@@ -60,6 +60,27 @@ export function audiencesCompatible(persona: Asset, outfit: Asset): boolean {
   return personObserved === 'unknown' || personObserved === gender;
 }
 
+/**
+ * A group mother is a free-form description, not a classified library asset.
+ * When one side is inherited, reject only a conflict we can actually observe.
+ * Two selected library assets must still use the strict audiencesCompatible rule.
+ */
+export function audiencesCompatibleWithInherited(persona: Asset, outfit: Asset): boolean {
+  const person = appearanceAudience(persona);
+  const clothes = appearanceAudience(outfit, true);
+  if (person !== 'unknown' && clothes !== 'unknown') return audiencesCompatible(persona, outfit);
+
+  const personText = appearanceText(persona);
+  const outfitText = appearanceText(outfit);
+  const personAge = person !== 'unknown' ? person.split('_')[0] : ageGroup(personText);
+  const outfitAge = clothes !== 'unknown' ? clothes.split('_')[0] : ageGroup(outfitText);
+  if (personAge && outfitAge && personAge !== outfitAge) return false;
+
+  const personGender = person !== 'unknown' ? person.split('_')[1] : appearanceGender(personText);
+  const outfitGender = clothes !== 'unknown' ? clothes.split('_')[1] : appearanceGender(outfitText, true);
+  return personGender !== 'male' || outfitGender !== 'female';
+}
+
 export function mergeAudienceDimensions(existing: unknown, incoming: unknown): string {
   const old = audienceDimensions(existing);
   const next = { ...old, ...audienceDimensions(incoming) };

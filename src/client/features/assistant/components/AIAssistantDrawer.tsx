@@ -1,3 +1,8 @@
+import { buildAssistantWorkspaceSnapshot } from '../utils/assistantWorkspaceContext';
+import { useAssistantDialog } from './useAssistantDialog';
+import { useAssistantNarrowViewport } from './useAssistantViewport';
+import { useAssistantOutputLanguage } from './useAssistantOutputLanguage';
+import { getAssistantSuggestions } from '../utils/assistantSuggestions';
 import { useAssistantReasoning } from '../hooks/useAssistantReasoning';
 import '../assistantWorkspace.css';
 import { normalizeReasoningEffort } from '@shared/domain/assistant/reasoning';
@@ -19,7 +24,6 @@ import { useAssistantMediaUpload } from '@client/features/assistant/hooks/useAss
 import { useAssistantChatStream } from '@client/features/assistant/hooks/useAssistantChatStream';
 import {
   getCanvasWorkspaceAttachments,
-  getCanvasWorkspaceSnapshot,
   useCanvasWorkspaceSelection,
 } from '@client/shared/workspace/canvasWorkspace';
 import { Sparkles, UploadCloud } from 'lucide-react';
@@ -106,6 +110,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
         title: '全新对话',
         messages: [],
         createdAt: Date.now(),
+        allowedTools: undefined as string[] | undefined,
       }
     );
   }, [assistantSessions, currentAssistantSessionId]);
@@ -124,7 +129,10 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const isNarrowViewport = useAssistantNarrowViewport();
+  const drawerRef = useAssistantDialog(isAssistantOpen && hasClientMounted, () => {
+    if (isExpanded) setIsExpanded(false); else setIsAssistantOpen(false);
+  }, { trapFocus: isExpanded || isNarrowViewport, initialFocusSelector: 'textarea[aria-label="消息内容"]' });
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { message: toastMsg, show: showToast } = useToast(2600);
 
@@ -156,39 +164,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     }
   }, [assistantInputDraft]);
 
-  // 打开时聚焦输入框；关闭前先移走焦点，再让容器不可交互。
-  useEffect(() => {
-    if (isAssistantOpen) {
-      const timer = setTimeout(() => {
-        if (!drawerRef.current?.contains(document.activeElement)) textareaRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && drawerRef.current?.contains(active)) {
-      active.blur();
-      requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid="ai-assistant-button"]')?.focus());
-    }
-  }, [isAssistantOpen]);
-
-  // 语言偏好设置
-  const [selectedLang, setSelectedLang] = useState<'中文' | 'English' | '双语'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('beike_assistant_output_lang');
-      if (saved === 'English' || saved === '双语') return saved;
-    }
-    return '中文';
-  });
-
-  useEffect(() => {
-    const handleLangChange = (e: any) => {
-      if (e.detail?.lang) {
-        setSelectedLang(e.detail.lang);
-      }
-    };
-    window.addEventListener('assistant_lang_changed', handleLangChange);
-    return () => window.removeEventListener('assistant_lang_changed', handleLangChange);
-  }, []);
+  const [selectedLang] = useAssistantOutputLanguage();
 
   // 1. 模型列表与当前模型管理 Hook
   const {
@@ -212,6 +188,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     isUploading,
   } = useAssistantMediaUpload({
     isAssistantOpen,
+    sessionId: currentSession.id,
     addAssistantAttachment,
     showToast,
   });
@@ -220,25 +197,8 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
   const activeBrandKit = getActiveBrandKit();
   // 只在发送时读取精简画布摘要：让助手知道当前项目状态，同时避免把图片 URL、
   // 完整提示词或画布坐标塞入上下文。
-  const getWorkspaceSnapshot = useCallback((): Record<string, unknown> => {
-    if (currentView === 'canvas') {
-      return getCanvasWorkspaceSnapshot();
-    }
-
-    if (currentView === 'workshop') {
-      return {
-        workspaceType: 'workshop',
-        title: product?.title || '种草工坊',
-        summary: product?.title
-          ? `当前已加载商品「${product.title}」，处于工坊第 ${currentStep || 1} 步。`
-          : '当前尚未加载商品。',
-      };
-    }
-
-    return {
-      workspaceType: currentView === 'generate' ? 'generate' : currentView === 'assets' ? 'assets' : currentView === 'home' ? 'home' : 'other',
-    };
-  }, [currentStep, currentView, product?.title]);
+  const getWorkspaceSnapshot = useCallback(() => buildAssistantWorkspaceSnapshot(currentView, currentStep, product?.title),
+    [currentStep, currentView, product?.title]);
 
   // 仅将“当前选中”的可视节点作为本轮参考附件带入模型；画布里其他素材仍以摘要传递。
   // 这样既能让视觉模型真正看见用户正在讨论的图，也不会把整张画布重复上传。
@@ -273,6 +233,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     currentSession,
     assistantModel,
     assistantHistoryLimit,
+    sessionAllowedTools: currentSession.allowedTools,
     reasoningEffort: normalizeReasoningEffort(assistantModel, reasoningEffort),
     selectedLang,
     assistantAttachments,
@@ -292,39 +253,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     showToast,
   });
 
-  // 根据当前所在工作区智能动态感知推荐灵感气泡
-  const activeSuggestionChips = useMemo(() => {
-    if (currentView === 'workshop') {
-      return [
-        '🛒 针对当前京东商品分析材质光影并写 4 条爆款生图提示词',
-        '💡 如何提升买家秀生活化纪实质感避免AI假图感？',
-        '🎬 拆解小红书爆款图集的人像构图与色彩配方',
-        '📐 推荐适合这件商品的摄影焦段与自然漫反射打光',
-      ];
-    }
-    if (currentView === 'generate') {
-      return [
-        '✨ 扩写一段超写实产品棚拍提示词（含相机焦段与反光板打光）',
-        '🛍️ 生成适合美妆个护品类的多角度摆拍方案',
-        '👗 帮我设计一组韩系简约风穿搭女装场景图',
-        '🖼️ 给出 3 组不同视觉风格的同款场景对比方案',
-      ];
-    }
-    if (currentView === 'canvas') {
-      return [
-        '🎨 针对当前画板给出多镜头视觉分镜与构图建议',
-        '💡 如何将画板中的参考素材组合为统一色调风格？',
-        '✨ 结合画板当前主体生成一组电商种草提示词',
-        '📐 推荐适合当前画板分镜的打光参数与景深控制',
-      ];
-    }
-    return [
-      '✨ 针对当前任务推荐一套高转化率视觉方案',
-      '💬 帮我润色当前工作区的提示词增加光影细节',
-      '🔍 分析当前画面的构图与色调配方',
-      '💡 给我 3 个小红书高点击率场景创意灵感',
-    ];
-  }, [currentView]);
+  const activeSuggestionChips = useMemo(() => getAssistantSuggestions(currentView, { productTitle: product?.title, attachmentTypes: assistantAttachments.map(attachment => attachment.type) }), [currentView, product?.title, assistantAttachments]);
 
   const resolveAssistantMediaSrc = useCallback((rawUrl?: string | null, asVideo = false) => {
     if (!rawUrl) return '';
@@ -334,50 +263,47 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     return proxyMediaUrl(rawUrl, asVideo ? { asVideo: true } : undefined);
   }, []);
 
+  const submitDraft = () => {
+    if (isSending || isUploading || (!inputContent.trim() && assistantAttachments.length === 0)) return;
+    const submittedDraft = inputContent;
+    const submittedSessionId = currentSession.id;
+    void handleSendMessage(submittedDraft, { onSubmitted: () => {
+      const state = useAppStore.getState();
+      if (state.currentAssistantSessionId === submittedSessionId && state.assistantInputDraft === submittedDraft) handleInputChange('');
+    } });
+  };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
-      if (isSending || isUploading || (!inputContent.trim() && assistantAttachments.length === 0)) { e.preventDefault(); return; }
       e.preventDefault();
-      handleSendMessage(inputContent);
-      handleInputChange('');
+      if (!e.repeat) submitDraft();
     }
   };
+  useEffect(() => {
+    if (isAssistantOpen) return;
+    setIsHistoryMenuOpen(false); setIsMemoryOpen(false); setIsBrandKitModalOpen(false); setChatPreview(null); setShowModelMenu(false);
+  }, [isAssistantOpen, setShowModelMenu]);
 
-  const handleCopyText = (content: string, id: string) => {
-    navigator.clipboard.writeText(content);
+  const handleCopyText = async (content: string, id: string) => {
+    try { await navigator.clipboard.writeText(content);
     setCopiedMsgId(id);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => {
       toastTimerRef.current = null;
       setCopiedMsgId(null);
     }, COPY_FEEDBACK_DURATION_MS);
+    } catch { showToast('复制失败，请选中文字手动复制'); }
   };
 
   if (!hasClientMounted) return null;
 
   return (
     <div
-      ref={drawerRef}
       className={`agent-shell fixed inset-0 z-50 flex justify-end select-none pointer-events-none ${
         isAssistantOpen ? '' : 'invisible opacity-0'
       }`}
       inert={isAssistantOpen ? undefined : true}
-      onKeyDown={event => {
-        if (!drawerRef.current?.contains(event.target as Node)) return;
-        if (isExpanded && event.key === 'Tab') {
-          const focusable = Array.from(drawerRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not([type="hidden"]), textarea, select, a[href], summary, [tabindex="0"]')).filter(node => node.offsetParent !== null);
-          const first = focusable[0];
-          const last = focusable.at(-1);
-          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-        }
-        if (event.key === 'Escape' && !isHistoryMenuOpen && !isMemoryOpen && !isBrandKitModalOpen && !chatPreview) {
-          event.stopPropagation();
-          if (isExpanded) setIsExpanded(false);
-          else setIsAssistantOpen(false);
-        }
-      }}
+
     >
       {isExpanded && <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[3px] pointer-events-auto" onClick={() => setIsExpanded(false)} aria-hidden="true" />}
 
@@ -386,7 +312,10 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
         {...(isAssistantOpen ? dropZoneProps : {})}
         className="agent-panel"
         data-expanded={isExpanded}
-        role="complementary"
+        ref={drawerRef}
+        role="dialog"
+        tabIndex={-1}
+        aria-modal={isExpanded || isNarrowViewport}
         aria-label="贝壳 Agent 助手"
       >
         {isDragging && <div className="agent-drop-overlay"><UploadCloud size={28} /><strong>松开以添加附件</strong><span>图片、视频或文档</span></div>}
@@ -413,10 +342,10 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           onCloseAssistant={() => setIsAssistantOpen(false)}
         />
 
-        {isMemoryOpen && <AssistantMemoryPanel key={currentSession.id} sessionId={currentSession.id} onClose={() => setIsMemoryOpen(false)} />}
+        {isAssistantOpen && isMemoryOpen && <AssistantMemoryPanel key={currentSession.id} sessionId={currentSession.id} onClose={() => setIsMemoryOpen(false)} />}
 
         {/* 🌟 2. 消息流列表 */}
-        <AssistantMessageList
+        {isAssistantOpen && <AssistantMessageList
           isOpen={isAssistantOpen}
           onUpload={() => fileInputRef.current?.click()}
           sessionId={currentSession.id}
@@ -431,7 +360,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           onApprovalDecision={(approvalId, decision) => {
             void handleApprovalDecision(approvalId, decision, (patch) => {
               if (patch.pendingApprovals) setLivePendingApprovals(patch.pendingApprovals);
-            });
+            }).catch((error: unknown) => showToast(error instanceof Error ? error.message : '审批提交失败，请重试'));
           }}
           copiedMsgId={copiedMsgId}
           messagesEndRef={messagesEndRef}
@@ -448,10 +377,10 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           setStep={setStep}
           setCurrentView={setCurrentView}
           setIsAssistantOpen={setIsAssistantOpen}
-        />
+        />}
 
         {/* 🌟 3. 输入交互区 */}
-        <AssistantInputArea
+        {isAssistantOpen && <AssistantInputArea
           key={currentSession.id}
           assistantAttachments={assistantAttachments}
           removeAssistantAttachment={removeAssistantAttachment}
@@ -461,10 +390,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           textareaRef={textareaRef}
           handleKeyDown={handleKeyDown}
           handlePaste={handlePaste}
-          handleSendMessage={() => {
-            handleSendMessage(inputContent);
-            handleInputChange('');
-          }}
+          handleSendMessage={submitDraft}
           handleStopGeneration={handleStopGeneration}
           isSending={isSending || isUploading}
           isUploading={isUploading}
@@ -485,7 +411,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           onOpenBrandKitModal={() => setIsBrandKitModalOpen(true)}
           addAssistantAttachment={addAssistantAttachment}
           workspaceContext={canvasAssistantContext}
-        />
+        />}
 
 
 
@@ -507,7 +433,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
 
       {/* Toast 提示 */}
       {toastMsg && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-70 px-4 py-2 rounded-2xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold shadow-xl animate-fade-in flex items-center gap-2 border border-white/10 pointer-events-none">
+        <div role="status" className="fixed top-8 left-1/2 -translate-x-1/2 z-70 px-4 py-2 rounded-2xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold shadow-xl animate-fade-in flex items-center gap-2 border border-white/10 pointer-events-none">
           <Sparkles className="w-4 h-4 text-red-400" />
           <span>{toastMsg}</span>
         </div>

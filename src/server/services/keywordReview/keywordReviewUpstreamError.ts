@@ -15,6 +15,14 @@ export class DeepSeekApiError extends Error {
   }
 }
 
+/** A received model answer can be unusable while its tokens were still billed. */
+export class KeywordReviewOutputError extends SyntaxError {
+  constructor(message: string, readonly usage?: Record<string, number>) {
+    super(message);
+    this.name = 'KeywordReviewOutputError';
+  }
+}
+
 function upstreamMessage(body: unknown): string {
   if (!body || typeof body !== 'object') return '';
   const error = (body as { error?: unknown }).error;

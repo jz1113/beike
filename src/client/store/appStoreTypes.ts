@@ -8,6 +8,10 @@ import type { GenerationTask as ContractGenerationTask, GenerationMediaType } fr
 export type { GenerationMediaType };
 export type GenerationTask = ContractGenerationTask & {
   depthStyle?: DepthVideoStyle;
+  /** Local cache fallback omitted input media; require restoration before a new attempt. */
+  referenceMediaMissing?: boolean;
+  /** The original submission may have been accepted; only query it until reconciled. */
+  submissionRecoveryRequired?: boolean;
 };
 
 export interface ChatSession {

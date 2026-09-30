@@ -28,6 +28,7 @@ export interface ProcessDeconstructItemInput {
   selectedVisionModel: string;
   modelIds: string[];
   targetCategory?: string;
+  targetSubcategory?: string;
   customSubCategories?: SubCategoryDef[];
   reviewBeforeSave?: boolean;
   onProgress?: (progress: { stage: string; message: string; startedAt: number; updatedAt: number }) => void;
@@ -41,7 +42,7 @@ export type ProcessDeconstructItemResult =
 export async function processDeconstructQueueItem(
   input: ProcessDeconstructItemInput
 ): Promise<ProcessDeconstructItemResult> {
-  const { item, userHint, selectedVisionModel, modelIds, targetCategory, customSubCategories, reviewBeforeSave, onProgress } = input;
+  const { item, userHint, selectedVisionModel, modelIds, targetCategory, targetSubcategory, customSubCategories, reviewBeforeSave, onProgress } = input;
 
   let polling = false;
   const pollProgress = async () => {
@@ -67,6 +68,7 @@ export async function processDeconstructQueueItem(
       userHint: userHint ? `${userHint}（套组名称：${item.name}）` : `套组名称：${item.name}`,
       albumName: item.name,
       targetCategory,
+      targetSubcategory,
       customSubCategories,
       model: requestModelId(selectedVisionModel),
       ...getMultimodalClientOverrides(selectedVisionModel),

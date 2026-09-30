@@ -1,9 +1,9 @@
+import { getInternalApiOrigin } from '@server/infrastructure/auth/apiAuth';
 import type { AssistantDocAttachment } from '@shared/domain/assistant/tools/defs';
 
 export function resolveRequestOrigin(req: Request): string {
-  const proto = req.headers.get('x-forwarded-proto') || 'http';
-  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '127.0.0.1:3000';
-  return `${proto}://${host}`;
+  void req;
+  return getInternalApiOrigin();
 }
 
 /** 工具规划轮次：去掉 image_url，避免部分网关 tools+vision 不兼容 */
@@ -75,3 +75,20 @@ export interface ChatMessage {
 
 
 
+
+export function getAssistantDocuments(messages: ChatMessage[]): AssistantDocAttachment[] {
+  const seen = new Set<string>();
+  const documents: AssistantDocAttachment[] = [];
+  for (const message of [...messages].reverse()) {
+    if (message.role !== 'user') continue;
+    for (const attachment of message.attachments || []) {
+      if (attachment.type !== 'document' || !attachment.extractedText) continue;
+      const key = JSON.stringify([attachment.name || '', attachment.extractedText]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      documents.push({ name: attachment.name, extractedText: attachment.extractedText });
+      if (documents.length === 20) return documents;
+    }
+  }
+  return documents;
+}

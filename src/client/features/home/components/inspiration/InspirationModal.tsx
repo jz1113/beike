@@ -1,20 +1,19 @@
 import {InspirationReferences} from './InspirationReferences';
+import { InspirationPromptPanel } from './InspirationPromptPanel';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { handleImgError } from '@client/shared/media/imageError';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
-import { 
+import {
   RotateCcw,
-  Image as ImageIcon, 
+  Image as ImageIcon,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Download,
   Check,
 } from 'lucide-react';
-import { formatPromptParagraphs, formatDisplayModel } from '@shared/domain/media/drawing';
+import { formatDisplayModel } from '@shared/domain/media/drawing';
 import type { StoryboardPresetConfig } from '@shared/domain/prompts/prompt-engine/storyboardPreset';
 
 export interface InspirationUseOptions {
@@ -70,19 +69,12 @@ interface Props {
 }
 
 export default function InspirationModal({ item, allItems, isOpen, onClose, onUsePromptOnly, onUseAsReference, onNavigate }: Props) {
-  const [isPromptExpanded, setIsPromptExpanded] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [videoLoadFailed, setVideoLoadFailed] = useState(false);
   const downloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const promptText = item?.prompt || '';
-  const promptParagraphs = useMemo(() => formatPromptParagraphs(promptText), [promptText]);
-  const isLongPrompt = promptText.length > 120 || promptParagraphs.length > 2;
-
   useEffect(() => {
-    // 默认保持展开状态
-    setIsPromptExpanded(true);
     setVideoLoadFailed(false);
   }, [item?.id]);
 
@@ -197,7 +189,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
   if (!isOpen || !item || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div 
+    <div
       className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 lg:p-10 select-none font-sans animate-fade-in cursor-zoom-out"
       onClick={onClose}
     >
@@ -224,13 +216,13 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
           <div className="relative flex items-center justify-center flex-1 max-w-full h-full min-w-0 overflow-hidden pointer-events-none">
             {isVideo ? (
               <div className="relative max-h-[86vh] max-w-full">
-                <video 
+                <video
                   key={item.video || item.image}
                   src={videoLoadFailed ? undefined : (item.video || item.image)}
                   poster={item.poster}
                   controls={!videoLoadFailed}
                   autoPlay
-                  loop 
+                  loop
                   playsInline
                   preload="metadata"
                   onError={() => setVideoLoadFailed(true)}
@@ -244,9 +236,9 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
                 )}
               </div>
             ) : (
-              <img 
+              <img
                 key={item.image}
-                src={item.image} 
+                src={item.image}
                 alt={item.title}
                 referrerPolicy="no-referrer"
                 onError={(e) => handleImgError(e, item.image)}
@@ -273,11 +265,11 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
         </div>
 
         {/* 🌟 2. 右侧：精致大方的信息与操作面板 */}
-        <div 
+        <div
           className={`w-full ${wideVideo ? 'md:w-[300px] lg:w-[320px] xl:w-[340px]' : 'md:w-[350px] lg:w-[380px] xl:w-[400px]'} max-h-[86vh] bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 flex flex-col justify-between flex-shrink-0 overflow-y-auto relative pointer-events-auto`}
           onClick={(e) => e.stopPropagation()}
         >
-          
+
           <div className="space-y-4">
             {/* 顶部 Header: 左侧贝壳云图官方作者信息，右侧仅保留下载按钮（点击空白处退出全屏，无需关闭叉） */}
             <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
@@ -318,56 +310,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
               <span>{item.date || '2026-08-19 | 内容由 AI 生成'}</span>
             </div>
 
-            {/* 提示词正文 (分段排版，移除复制按钮，不显示字数，支持展开/折叠) */}
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-xs font-normal text-slate-400 shrink-0">
-                    {isVideo ? '视频提示词' : '图片提示词'}
-                  </span>
-                </div>
-                {isLongPrompt && (
-                  <button
-                    type="button"
-                    onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                    className="inline-flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-indigo-50"
-                    title={isPromptExpanded ? '收起长文本' : '展开查看完整提示词'}
-                  >
-                    <span>{isPromptExpanded ? '收起' : '展开全文'}</span>
-                    {isPromptExpanded ? (
-                      <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
-                    )}
-                  </button>
-                )}
-              </div>
-
-              <div className="relative">
-                <div
-                  className={`text-[13px] sm:text-[13.5px] text-slate-800 leading-relaxed font-normal select-text transition-all duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 pr-1 space-y-2.5 ${
-                    isPromptExpanded
-                      ? 'max-h-[50vh] pb-2'
-                      : 'max-h-40'
-                  }`}
-                >
-                  {promptParagraphs.map((para, pIdx) => (
-                    <p key={pIdx} className="break-words leading-relaxed">
-                      {para}
-                    </p>
-                  ))}
-                </div>
-
-                {/* 收起状态且为长文本时，底部半透明渐变平滑遮罩（点击亦可展开全文） */}
-                {!isPromptExpanded && isLongPrompt && (
-                  <div
-                    onClick={() => setIsPromptExpanded(true)}
-                    className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-auto cursor-pointer"
-                    title="点击展开全文"
-                  />
-                )}
-              </div>
-            </div>
+            <InspirationPromptPanel itemId={item.id} prompt={item.prompt} isVideo={isVideo} />
 
             <div className="pt-3 border-t border-slate-100 flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-[12px] sm:text-[12.5px] text-slate-500 select-none">
               {!!item.referenceImages?.length && <>

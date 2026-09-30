@@ -12,7 +12,7 @@ export interface LightboxToolPanelProps {
   onToolAction?: (actionKey: string, label: string) => void;
 }
 
-export const LightboxToolPanel = React.memo(function LightboxToolPanel({ isCurrentRefImage = false, onUseAsReference, onReEdit, onRegenerate, onToolAction }: LightboxToolPanelProps) {
+export const LightboxToolPanel = React.memo(function LightboxToolPanel({ isVideo, isCurrentRefImage = false, onUseAsReference, onReEdit, onRegenerate, onToolAction }: LightboxToolPanelProps) {
   const handleAction = (key: string, label: string) => {
     if (onToolAction) {
       onToolAction(key, label);
@@ -35,12 +35,12 @@ export const LightboxToolPanel = React.memo(function LightboxToolPanel({ isCurre
           title={isCurrentRefImage ? '当前画面已在底栏参考素材中' : '将当前画面作为提示词输入框的参考素材'}
         >
           <ImageIcon className={`w-4 h-4 shrink-0 stroke-[1.8] ${isCurrentRefImage ? 'text-black' : 'text-slate-700 group-hover:text-black'}`} />
-          <span>用作参考图</span>
+          <span>{isVideo ? '用作参考素材' : '用作参考图'}</span>
         </button>
       </div>
 
       {/* 🌟 卡片 2: AI 图像编辑工具箱矩阵 (多角度、智能改图、扩图) */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-100/90 shadow-xs">
+      {!isVideo && <div className="bg-white rounded-2xl p-3 border border-slate-100/90 shadow-xs">
         <div className="grid grid-cols-3 gap-1.5">
           {/* 多角度 (带 new 标签) */}
           <button
@@ -75,7 +75,7 @@ export const LightboxToolPanel = React.memo(function LightboxToolPanel({ isCurre
             <span className="truncate">扩图</span>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* 🌟 卡片 3: 底部快捷操作 (重新编辑、再次生成) */}
       <div className="bg-white rounded-2xl p-3 border border-slate-100/90 shadow-xs">

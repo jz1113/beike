@@ -3,16 +3,18 @@ import { createPortal } from 'react-dom';
 import { X, Settings2, Check } from 'lucide-react';
 import type { WorkshopSettingsModalProps } from './workshopSettingsTypes';
 import { WorkshopContentSettings, WorkshopOutputSettings, WorkshopExecutionSettings } from './WorkshopSettingsSections';
+import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 
 export type { WorkshopSettingsModalProps } from './workshopSettingsTypes';
 
 export function WorkshopSettingsModal(props: WorkshopSettingsModalProps) {
   const { isOpen, onClose, busy = false, workspaceError, workspaceStatus } = props;
+  const visible = useViewVisibility();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !visible) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -36,10 +38,10 @@ export function WorkshopSettingsModal(props: WorkshopSettingsModalProps) {
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (previousFocus?.isConnected && !previousFocus.closest('[inert]')) previousFocus.focus();
     };
-  }, [isOpen]);
-  if (!isOpen) return null;
+  }, [isOpen, visible]);
+  if (!isOpen || !visible) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-3 backdrop-blur-[3px] sm:p-6">

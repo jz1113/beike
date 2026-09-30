@@ -219,7 +219,7 @@ export const OFFICIAL_MASTER_RECIPES = [
   {
     id: 'recipe_phone_comms_master',
     name: '手机通讯',
-    category: 'cat_1789444727548',
+    category: 'digital_3c',
     tag: '专属架构',
     desc: '手机通讯全品类 · 8段式装配骨架与物理红线守卫（V6.0 资产库联动版）',
     promptSnippet: PHONE_COMMS_MASTER_SNIPPET,

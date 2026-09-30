@@ -13,19 +13,24 @@ interface VideoPlayerRegistration {
   visibleRatio: number;
   lastVisibleAt: number;
   isPlaying: boolean;
+  hovered: boolean;
 }
 
-class VideoPlaybackManager {
+export class VideoPlaybackManager {
   private players = new Map<string, VideoPlayerRegistration>();
   private maxConcurrent = 3; // 最多同时硬解播放 3 个视频，保证 60fps 丝滑与硬解通道安全
   private observer: IntersectionObserver | null = null;
+  private suspensions = new Set<symbol>();
 
   constructor() {
     if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
       this.observer = new IntersectionObserver(this.handleIntersection, {
         threshold: [0, 0.25, 0.5, 0.75, 1.0],
-        rootMargin: '100px 0px 100px 0px',
+        rootMargin: '0px',
       });
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => this.rebalance());
     }
   }
 
@@ -66,11 +71,15 @@ class VideoPlaybackManager {
       visibleRatio: 0,
       lastVisibleAt: 0,
       isPlaying: false,
+      hovered: false,
     };
     this.players.set(id, player);
 
     if (this.observer) {
       this.observer.observe(element);
+    } else {
+      player.visibleRatio = 1;
+      this.rebalance();
     }
 
     return () => {
@@ -85,12 +94,34 @@ class VideoPlaybackManager {
     };
   }
 
+  /** Hover changes priority while preserving the global decoder limit. */
+  public setHovered(id: string, hovered: boolean): void {
+    const player = this.players.get(id);
+    if (!player) return;
+    player.hovered = hovered;
+    if (hovered) player.lastVisibleAt = Date.now();
+    this.rebalance();
+  }
+
+  /** Dialogs suspend background previews; nested dialogs release independently. */
+  public suspend(): () => void {
+    const token = Symbol('video-preview-suspension');
+    this.suspensions.add(token);
+    this.rebalance();
+    return () => {
+      this.suspensions.delete(token);
+      this.rebalance();
+    };
+  }
+
   /** 动态调配播放权：给最居中/可见比例最高的 top-N 个视频发放播放权 */
   private rebalance() {
-    const candidates = Array.from(this.players.values()).filter((p) => p.visibleRatio > 0.15);
+    const paused = this.suspensions.size > 0 || (typeof document !== 'undefined' && document.hidden);
+    const candidates = paused ? [] : Array.from(this.players.values()).filter((p) => p.visibleRatio > 0.15);
 
     // 按可见面积排序，优先播放视口最核心的视频
     candidates.sort((a, b) => {
+      if (a.hovered !== b.hovered) return a.hovered ? -1 : 1;
       if (Math.abs(b.visibleRatio - a.visibleRatio) > 0.1) {
         return b.visibleRatio - a.visibleRatio;
       }
@@ -115,10 +146,18 @@ class VideoPlaybackManager {
   /** 安全播放辅助函数（吞并 AbortError） */
   public static async safePlay(video: HTMLVideoElement): Promise<boolean> {
     try {
+      if (typeof document !== 'undefined' && document.hidden) {
+        VideoPlaybackManager.safePause(video);
+        return false;
+      }
       video.muted = true;
       const p = video.play();
       if (p !== undefined) {
         await p;
+      }
+      if (typeof document !== 'undefined' && document.hidden) {
+        VideoPlaybackManager.safePause(video);
+        return false;
       }
       return true;
     } catch {
@@ -137,7 +176,16 @@ class VideoPlaybackManager {
 
   /** 安全播放辅助函数（支持实例调用） */
   public async safePlay(video: HTMLVideoElement): Promise<boolean> {
-    return VideoPlaybackManager.safePlay(video);
+    if (this.suspensions.size > 0) {
+      VideoPlaybackManager.safePause(video);
+      return false;
+    }
+    const played = await VideoPlaybackManager.safePlay(video);
+    if (this.suspensions.size > 0) {
+      VideoPlaybackManager.safePause(video);
+      return false;
+    }
+    return played;
   }
 
   /** 安全暂停辅助函数（支持实例调用） */

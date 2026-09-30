@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { History, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { WorkshopBatchSummary } from '@shared/contracts/workshopBatches';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
 import { BatchHistoryPanel } from './BatchHistoryPanel';
+import { useWorkshopDockActions } from './WorkshopDockActionsContext';
 
 interface Props {
   activeBatch: WorkshopBatch | null;
   historyBatches: WorkshopBatchSummary[];
   itemsCount: number;
+  batchInputText: string;
   currentStage: number;
   ready: boolean;
   createNewBatch: () => Promise<void>;
@@ -23,18 +23,12 @@ interface Props {
 }
 
 export function BatchWorkspaceBatchControls({
-  activeBatch, historyBatches, itemsCount, currentStage, ready,
+  activeBatch, historyBatches, itemsCount, batchInputText, currentStage, ready,
   createNewBatch, refreshHistory, duplicateBatch, clearHistory, deleteHistoryBatch, renameBatch, readBatch, onOpenGenerationView, showToast,
 }: Props) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [newBatchTarget, setNewBatchTarget] = useState<HTMLElement | null>(null);
-  const [historyTarget, setHistoryTarget] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setNewBatchTarget(document.getElementById('workshop-batch-new-anchor'));
-    setHistoryTarget(document.getElementById('workshop-batch-history-anchor'));
-  }, []);
+  const { setActions } = useWorkshopDockActions();
 
   const run = async (action: () => Promise<void>) => {
     setIsRunning(true);
@@ -52,41 +46,32 @@ export function BatchWorkspaceBatchControls({
     setIsHistoryOpen(true);
   };
 
+  const requestNew = () => {
+    if (itemsCount === 0 && currentStage === 1 && !batchInputText.trim()) {
+      showToast('当前已经是空白新批次，可以直接输入 SKU');
+      return;
+    }
+    if (!window.confirm('新建批次会保留当前内容到历史，并切换到空白批次。确定继续吗？')) return;
+    void run(createNewBatch);
+  };
+  // The dock lives above this view; stable callbacks read the current batch state.
+  const handlersRef = useRef({ requestNew, openHistory });
+  handlersRef.current = { requestNew, openHistory };
+  useEffect(() => {
+    setActions({
+      onCreate: () => handlersRef.current.requestNew(),
+      onHistory: () => handlersRef.current.openHistory(),
+      disabled: true,
+    });
+    return () => setActions(null);
+  }, [setActions]);
+  useEffect(() => {
+    setActions(current => current && current.disabled !== (!ready || isRunning)
+      ? { ...current, disabled: !ready || isRunning } : current);
+  }, [ready, isRunning, setActions]);
+
   return (
     <>
-      {newBatchTarget && createPortal(
-        <button
-          type="button"
-          disabled={!ready || isRunning}
-          onClick={() => {
-            if (itemsCount === 0 && currentStage === 1) {
-              showToast('当前已经是空白新批次，可以直接输入 SKU');
-              return;
-            }
-            if (!window.confirm('新建批次会保留当前内容到历史，并切换到空白批次。确定继续吗？')) return;
-            void run(createNewBatch);
-          }}
-          aria-label="新建批次"
-          title="新建批次"
-          className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-950 shadow-sm transition-[transform,colors,box-shadow] duration-200 ease-out hover:scale-110 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      , newBatchTarget)}
-
-      {historyTarget && createPortal(
-        <button
-          type="button"
-          disabled={!ready || isRunning}
-          onClick={openHistory}
-          aria-label="批次历史"
-          title="批次历史"
-          className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-950 shadow-sm transition-[transform,colors,box-shadow] duration-200 ease-out hover:scale-110 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-        >
-          <History className="h-4 w-4" />
-        </button>
-      , historyTarget)}
-
       {isHistoryOpen && (
         <BatchHistoryPanel
           activeBatch={activeBatch}

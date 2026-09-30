@@ -15,7 +15,7 @@ export default function ApprovalCard({ approval, onDecision, disabled }: Props) 
     .join(' · ');
 
   return (
-    <div className="agent-approval-card">
+    <div data-pending-approval={!disabled ? approval.approvalId : undefined} className="agent-approval-card">
       <div className="flex items-center gap-1.5 font-semibold mb-1.5">
         <Shield className="w-3.5 h-3.5 text-zinc-500" />
         <span>确认操作 · {approval.displayName}</span>
@@ -26,6 +26,7 @@ export default function ApprovalCard({ approval, onDecision, disabled }: Props) 
         </div>
       )}
       <details className="mb-3"><summary className="cursor-pointer text-zinc-500">查看完整操作参数</summary><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-white/60 p-2">{JSON.stringify(approval.args, null, 2)}</pre></details>
+      <p className="mb-2 text-zinc-500">{canRemember ? '允许仅批准本次操作；本会话允许会在30分钟内批准此工具在当前对话中的后续操作。' : '允许仅批准本次操作，后续操作仍按工具规则确认。'}</p>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"

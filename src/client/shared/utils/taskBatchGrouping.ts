@@ -26,9 +26,15 @@ export function extractBaseTheme(prompt?: string, title?: string): string {
 }
 
 export function areTasksInSameBatch(taskA: any, timeA: number, taskB: any, timeB: number): boolean {
+  const sessionA = taskA.sessionId || taskA.rawTask?.sessionId;
+  const sessionB = taskB.sessionId || taskB.rawTask?.sessionId;
+  if (sessionA && sessionB && sessionA !== sessionB) return false;
   if (taskA.batchId && taskB.batchId && taskA.batchId === taskB.batchId) {
     return true;
   }
+  // Conversation identities stay authoritative; timing and similar prompts cannot merge them.
+  if (sessionA || sessionB) return Boolean(sessionA && sessionA === sessionB);
+  if (taskA.batchId || taskB.batchId) return false;
 
   const timeDiff = Math.abs(timeA - timeB);
   if (timeDiff > 90000) {
@@ -148,6 +154,8 @@ export function groupTasksIntoBatches<T = any>(
     // 🌟 2. 次优先级：按明确的 batchId 归并
     if (!targetBatch && row.batchId) {
       targetBatch = batchIdMap.get(String(row.batchId));
+      const targetSessionId = (targetBatch?.tasks[0] as any)?.sessionId || (targetBatch?.tasks[0] as any)?.rawTask?.sessionId;
+      if (rawSessionId && targetSessionId && rawSessionId !== targetSessionId) targetBatch = undefined;
     }
 
     // 🌟 3. 第三优先级：90 秒时间窗口与主题相似度启发式聚类 (适用于未绑定会话的历史散客任务)
@@ -165,6 +173,8 @@ export function groupTasksIntoBatches<T = any>(
 
     if (targetBatch) {
       targetBatch.tasks.push(task);
+      if (row.batchId) batchIdMap.set(String(row.batchId), targetBatch);
+      if (rawSessionId) sessionIdMap.set(String(rawSessionId), targetBatch);
       // 如果该批次先前没有设置 title，或者当前任务携带了更完整的 sessionTitle，补充更新
       if (rawSessionTitle && (!targetBatch.title || targetBatch.title === 'AI 生图创作' || targetBatch.title === 'AI 批量分镜生图')) {
         targetBatch.title = rawSessionTitle;
@@ -175,7 +185,7 @@ export function groupTasksIntoBatches<T = any>(
     const isTaskVideo = detectVideo(task);
     const uniqueFallbackId = rawSessionId 
       ? `session_${rawSessionId}` 
-      : String(row.batchId || `batch-${row.id || row.taskId || time}-${idx}`);
+      : String(row.batchId || (row.id || row.taskId ? `batch-${row.id || row.taskId}` : `batch-${time}-${idx}`));
 
     const taskQuality =
       options?.resolveQuality?.(task, isTaskVideo) ??
@@ -186,7 +196,7 @@ export function groupTasksIntoBatches<T = any>(
         : String(row.quality || 'medium'));
 
     // 标题优先采用对话名称 (sessionTitle)，其次为任务 title
-    const batchTitle = rawSessionTitle || row.title;
+    const batchTitle = rawSessionTitle || row.batchTitle || row.title;
 
     const newBatch: TaskBatch<T> = {
       batchId: uniqueFallbackId,

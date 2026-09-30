@@ -1,5 +1,6 @@
 import { parseGroupShotSkeleton } from './storyboardSlots';
 import { promptGroupCategoryFit } from './groupCategoryFit';
+import type { AssetProductCategory } from '../../assets/assetOrganization';
 
 export interface PromptGroupCandidate {
   id: string;
@@ -8,6 +9,10 @@ export interface PromptGroupCandidate {
   contentSummary?: string | null;
   category?: string | null;
   productCategoryIds?: string | null;
+  productCategoryNames?: string[] | null;
+  productSubcategory?: string | null;
+  productSubcategoryName?: string | null;
+  productCategoryRules?: AssetProductCategory[];
   isUniversal?: boolean;
   sourceImageIndices?: string | null;
   shotPromptsJson?: string | null;

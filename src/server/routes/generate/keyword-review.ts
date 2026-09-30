@@ -13,7 +13,7 @@ import {
   reviewKeywordRows,
 } from '../../services/keywordReview/keywordReview';
 import { getKeywordReviewRules, listKeywordReviewRules, publishKeywordReviewRules } from '../../services/keywordReview/keywordReviewRules';
-import { DeepSeekApiError } from '../../services/keywordReview/keywordReviewUpstreamError';
+import { DeepSeekApiError, KeywordReviewOutputError } from '../../services/keywordReview/keywordReviewUpstreamError';
 import { getDefaultApiKey, getDefaultBaseUrl } from '../../services/models/gatewayCredentials';
 import { guardSubmission } from '../../services/tasks/submissionGuard';
 
@@ -58,7 +58,10 @@ function keywordReviewFailure(error: unknown): Response {
   const message = formatUserError(error, '关键词审核失败');
   if (error instanceof DeepSeekApiError) return jsonResponse({ success: false, error: message, code: error.provider === 'DeepSeek' ? 'deepseek_api_error' : 'upstream_api_error' }, error.status);
   if (/审核规则版本 v\d+ 不存在/.test(message)) return jsonResponse({ success: false, error: message }, 409);
-  if (error instanceof SyntaxError) return jsonResponse({ success: false, error: message, code: 'model_output_invalid' }, 502);
+  if (error instanceof SyntaxError) return jsonResponse({
+    success: false, error: message, code: 'model_output_invalid',
+    ...(error instanceof KeywordReviewOutputError && error.usage ? { usage: error.usage } : {}),
+  }, 502);
   return jsonResponse({ success: false, error: message }, 500);
 }
 
@@ -72,6 +75,9 @@ export async function POST(req: Request): Promise<Response> {
     }
     const parsedBody = parseJsonBody(rawBody, KeywordReviewRequestSchema);
     if (!parsedBody.success) return jsonResponse({ success: false, error: parsedBody.error }, 400);
+    if (parsedBody.data.lookup === true || (parsedBody.data.lookupBudget ?? 0) > 0) {
+      return jsonResponse({ success: false, error: '联网补查已暂停：当前接口不会执行网页搜索。请关闭补查后重试。' }, 400);
+    }
     const provider = parsedBody.data.provider || 'deepseek';
     const model = String(parsedBody.data.model || KEYWORD_REVIEW_DEEPSEEK_MODEL).trim() || KEYWORD_REVIEW_DEEPSEEK_MODEL;
     if (provider === 'deepseek' && model !== KEYWORD_REVIEW_DEEPSEEK_MODEL) {
@@ -79,9 +85,6 @@ export async function POST(req: Request): Promise<Response> {
     }
     if (provider === 'gateway' && !isApprovedModel(model, 'multimodal')) {
       return jsonResponse({ success: false, error: '请选择设置中已支持的多模态模型' }, 400);
-    }
-    if (provider === 'gateway' && parsedBody.data.lookup) {
-      return jsonResponse({ success: false, error: '联网补查仅支持 DeepSeek 官方模型' }, 400);
     }
     const credentials = provider === 'deepseek'
       ? readDeepSeekKey(parsedBody.data)

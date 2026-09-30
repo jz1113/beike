@@ -34,6 +34,12 @@ function hashUrl(url: string): string {
   return `d_${(h >>> 0).toString(16)}`;
 }
 
+function cacheKey(url: string): string {
+  // A 32-bit hash can alias unrelated covers or media URLs. IndexedDB accepts
+  // full string keys; the legacy hash is used only for guarded compatibility.
+  return `media:${url}`;
+}
+
 function getDb() {
   if (!dbPromise) {
     dbPromise = openDB<AzhuoMediaCacheDB>(DB_NAME, DB_VERSION, {
@@ -43,6 +49,9 @@ function getDb() {
           store.createIndex('by-lastAccessAt', 'lastAccessAt');
         }
       },
+    }).catch((reason: unknown) => {
+      dbPromise = null;
+      throw reason;
     });
   }
   return dbPromise;
@@ -98,7 +107,7 @@ export async function putDerived(url: string, blob: Blob, mime?: string): Promis
       lastAccessAt: now,
       sourceUrl: url,
     };
-    await db.put('derived', record, hashUrl(url));
+    await db.put('derived', record, cacheKey(url));
     await enforceLimits();
   } catch {
     /* quota or private mode */
@@ -109,12 +118,24 @@ export async function getDerived(url: string): Promise<Blob | null> {
   if (typeof window === 'undefined' || !url) return null;
   try {
     const db = await getDb();
-    const key = hashUrl(url);
-    const rec = await db.get('derived', key);
-    if (!rec) return null;
+    const key = cacheKey(url);
+    let rec = await db.get('derived', key);
+    const legacyKey = hashUrl(url);
+    const isLegacy = !rec;
+    if (!rec) rec = await db.get('derived', legacyKey);
+    if (!rec || rec.sourceUrl !== url) return null;
     try {
       rec.lastAccessAt = Date.now();
       await db.put('derived', rec, key);
+      if (isLegacy) {
+        // Remove the old entry only after the full key is durable, and compare
+        // its source inside the write transaction so a collision is never
+        // allowed to remove another media record.
+        const tx = db.transaction('derived', 'readwrite');
+        const legacy = await tx.store.get(legacyKey);
+        if (legacy?.sourceUrl === url) await tx.store.delete(legacyKey);
+        await tx.done;
+      }
     } catch {
       /* ignore timestamp update failure on desearialized Blobs in Safari/WebKit */
     }
@@ -128,51 +149,40 @@ export async function deleteDerived(url: string): Promise<void> {
   if (typeof window === 'undefined' || !url) return;
   try {
     const db = await getDb();
-    await db.delete('derived', hashUrl(url));
+    const tx = db.transaction('derived', 'readwrite');
+    await tx.store.delete(cacheKey(url));
+    const legacyKey = hashUrl(url);
+    const legacy = await tx.store.get(legacyKey);
+    if (legacy?.sourceUrl === url) await tx.store.delete(legacyKey);
+    await tx.done;
   } catch {
     /* storage may be unavailable or already cleared */
   }
 }
 
-export async function getDerivedCacheStats(): Promise<{ count: number; bytes: number }> {
-  if (typeof window === 'undefined') return { count: 0, bytes: 0 };
+export async function getDerivedCacheStats(throwOnError = false): Promise<{ count: number; bytes: number; available?: boolean }> {
+  if (typeof window === 'undefined') return { count: 0, bytes: 0, available: false };
   try {
     const db = await getDb();
     const all = await db.getAll('derived');
     return {
       count: all.length,
       bytes: all.reduce((sum, r) => sum + (r?.size || 0), 0),
+      available: true,
     };
-  } catch {
-    return { count: 0, bytes: 0 };
+  } catch (error) {
+    if (throwOnError) throw error;
+    return { count: 0, bytes: 0, available: false };
   }
 }
 
 export async function clearDerivedCache(): Promise<{ count: number; bytes: number }> {
   if (typeof window === 'undefined') return { count: 0, bytes: 0 };
-  const before = await getDerivedCacheStats();
+  const before = await getDerivedCacheStats(true);
   if (before.count === 0 && before.bytes === 0) return before;
 
-  try {
-    if (dbPromise) {
-      const db = await dbPromise;
-      db.close();
-      dbPromise = null;
-    }
-    await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.deleteDatabase(DB_NAME);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-      req.onblocked = () => resolve();
-    });
-  } catch {
-    try {
-      const db = await getDb();
-      await db.clear('derived');
-    } catch {
-      /* ignore */
-    }
-  }
+  const db = await getDb();
+  await db.clear('derived');
   return before;
 }
 

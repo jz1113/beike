@@ -7,8 +7,9 @@ import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@shared/domain/products/jewelryArch';
+import { recipeKind, resolveRecipeForProduct } from '@shared/domain/products/productRecipeSelection';
 import { isAutoPromptGroupSelection, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
-import type { BatchProductItem } from '../batchTypes';
+import { productPropsWithCategory, type BatchProductItem } from '../batchTypes';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
 export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';
 
@@ -63,10 +64,9 @@ export async function analyzeBatchProduct(
       deps.setItems?.(prev => prev.map(row => row.id === item.id ? { ...row, analysisError: blockReason } : row));
       throw new Error(blockReason);
     }
-    const archObj = deps.recipes.find(r => r.id === deps.selectedArchId);
-    if (!archObj) {
-      throw new Error('未确认有效的类目拍摄架构，无法开始提示词分析');
-    }
+    const architecture = resolveRecipeForProduct(deps.recipes, deps.selectedArchId, item);
+    if (!architecture.recipe) throw new Error(architecture.error);
+    const archObj = architecture.recipe;
     const mode = 'storyboard_generate';
 
     const chosenProductImgs = item.selectedProductImages.filter(url => url.trim());
@@ -82,23 +82,21 @@ export async function analyzeBatchProduct(
 
     const groupAppearance = promptGroupAppearanceFilter(deps.lockedFullPromptId);
     const fullPromptId = !isAutoPromptGroupSelection(deps.lockedFullPromptId) ? deps.lockedFullPromptId : undefined;
-    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || fullPromptId || groupAppearance) ? {
+    const groupFolderId = deps.promptGroupFolderId && deps.promptGroupFolderId !== 'auto' ? deps.promptGroupFolderId : undefined;
+    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || fullPromptId || groupAppearance || groupFolderId) ? {
       personaId: deps.lockedPersonaId !== 'auto' ? deps.lockedPersonaId : undefined,
       sceneId: deps.lockedSceneId !== 'auto' ? deps.lockedSceneId : undefined,
       outfitId: deps.lockedOutfitId !== 'auto' ? deps.lockedOutfitId : undefined,
       fullPromptId,
       groupAppearance,
+      groupFolderId,
     } : undefined;
 
     const computedProductIdx = typeof itemIndex === 'number'
       ? itemIndex
       : (deps.items ? deps.items.findIndex(p => p.id === item.id) : 0);
 
-    const isJewelryArch =
-      deps.selectedArchId === 'recipe_jewelry_master' ||
-      deps.selectedArchId === 'arch_jewelry_master' ||
-      archObj.id === 'recipe_jewelry_master' ||
-      /珠宝|jewelry/i.test(String(archObj.category || ''));
+    const isJewelryArch = recipeKind(archObj) === 'jewelry';
     const jewelryProduct = isJewelryProductTitle(item.title, item.props);
     const templateStyle = isJewelryArch && jewelryProduct
       ? buildJewelryTemplateStyle(archObj.name, archObj.promptSnippet || '', item.title, item.props)
@@ -110,12 +108,13 @@ export async function analyzeBatchProduct(
     const analysisRunId = globalThis.crypto.randomUUID();
     const configSignature = JSON.stringify({
       revision: deps.getConfigRevision?.(),
-      arch: deps.selectedArchId,
+      arch: archObj.id,
       shots: targetShotCount,
       persona: deps.lockedPersonaId,
       scene: deps.lockedSceneId,
       outfit: deps.lockedOutfitId,
       fullPrompt: deps.lockedFullPromptId || 'auto',
+      groupFolder: deps.promptGroupFolderId || 'auto',
       images: item.selectedProductImages || [],
     });
     deps.setItems?.(prev => prev.map(p => (
@@ -130,7 +129,7 @@ export async function analyzeBatchProduct(
         body: JSON.stringify({
           mode,
           productTitle: item.title || '优质电商商品',
-          productProps: item.props || {},
+          productProps: productPropsWithCategory(item),
           productIndex: Math.max(0, computedProductIdx),
           imageUrls: imagePayload,
           modelPersona: effectivePersona,
@@ -184,12 +183,13 @@ export async function analyzeBatchProduct(
     if (analyzeEpochs.get(item.id) !== analyzeRun.epoch) return false;
     const latestSignature = JSON.stringify({
       revision: deps.getConfigRevision?.(),
-      arch: deps.selectedArchId,
+      arch: archObj.id,
       shots: deps.selectedShotCount || 4,
       persona: deps.lockedPersonaId,
       scene: deps.lockedSceneId,
       outfit: deps.lockedOutfitId,
       fullPrompt: deps.lockedFullPromptId || 'auto',
+      groupFolder: deps.promptGroupFolderId || 'auto',
       images: (deps.getItems?.().find(p => p.id === item.id)?.selectedProductImages) || item.selectedProductImages || [],
     });
     if (latestSignature !== configSignature) {
@@ -279,6 +279,7 @@ export async function analyzeBatchProduct(
         applied_persona: data?.applied_persona || data?.appliedPersona,
         appliedFullPromptId: data?.assetTrace?.fullPromptId,
         appliedFullPromptTitle: data?.assetTrace?.fullPromptTitle,
+        appliedFullPromptDisplayNumber: data?.assetTrace?.fullPromptDisplayNumber,
         appliedFullPromptGroupIndex: data?.assetTrace?.fullPromptGroupIndex,
         appliedFullPromptAlbumName: data?.assetTrace?.fullPromptAlbumName,
         appliedFullPromptSelectionMode: data?.assetTrace?.fullPromptSelectionMode,

@@ -9,11 +9,13 @@ import {
 import type { ActionCategoryId, SubCategoryDef } from '@shared/domain/products/productCategory';
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
 import type { AssetSubTab } from '../utils/assetPromptConstants';
-import DynamicTagDropdown from './DynamicTagDropdown';
+import { AssetLibrarySortControls } from './AssetLibrarySortControls';
+import { AssetTagFilter } from './AssetTagFilter';
 
 export interface AssetLibraryFilterBarProps {
   /** 与筛选维度同级的资产类型导航，由父级提供以保持筛选栏的单行布局。 */
   navigation?: ReactNode;
+  hideSecondaryRow?: boolean;
   statusFilters?: ReactNode;
   activeSubTab: AssetSubTab;
   dynamicTagList: Array<{ tag: string; count: number }>;
@@ -42,6 +44,7 @@ export interface AssetLibraryFilterBarProps {
 
 export function AssetLibraryFilterBar({
   navigation,
+  hideSecondaryRow,
   statusFilters,
   activeSubTab,
   dynamicTagList,
@@ -105,8 +108,8 @@ export function AssetLibraryFilterBar({
 
   return (
     <>
-    <div className="border-b border-slate-200/70 bg-transparent px-5 sm:px-7 py-3">{navigation}</div>
-    <div className="flex items-center justify-between px-5 sm:px-7 py-3 bg-transparent border-b border-slate-200/60 gap-3 flex-wrap text-xs select-none">
+    <div className="border-b border-slate-200/70 bg-transparent px-5 sm:px-7 py-2.5">{navigation}</div>
+    {!hideSecondaryRow && <div className="flex items-center justify-between px-5 sm:px-7 py-3 bg-transparent border-b border-slate-200/60 gap-3 flex-wrap text-xs select-none">
       <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
         {statusFilters}
 
@@ -381,28 +384,10 @@ export function AssetLibraryFilterBar({
           </div>
         )}
 
-        {/* 5. 非动作 Tab 动态标签下拉选择器 */}
-        {activeSubTab !== 'action' && dynamicTagList.length > 0 && (
-          <DynamicTagDropdown
-            selectedTag={selectedTag}
-            tagList={dynamicTagList}
-            activeColorClass={
-              activeSubTab === 'full_prompt'
-                ? 'bg-indigo-50 border-indigo-300 text-indigo-900'
-                : activeSubTab === 'persona'
-                ? 'bg-amber-50 border-amber-300 text-amber-900'
-                : activeSubTab === 'outfit'
-                ? 'bg-sky-50 border-sky-300 text-sky-900'
-                : activeSubTab === 'scene'
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                : 'bg-purple-50 border-purple-300 text-purple-900'
-            }
-            onSelectTag={setSelectedTag}
-          />
-        )}
+        <AssetTagFilter activeSubTab={activeSubTab} dynamicTagList={dynamicTagList} selectedTag={selectedTag} setSelectedTag={setSelectedTag} />
 
         {/* 下拉按钮本身已表达当前选择，不再重复生成一排同义筛选标签。 */}
-        {isAnyFilterActive && (
+        {activeSubTab !== 'full_prompt' && isAnyFilterActive && (
           <button
             type="button"
             onClick={() => {
@@ -418,31 +403,8 @@ export function AssetLibraryFilterBar({
         )}
       </div>
 
-      {/* 右侧：资产统计与视图排序切换 */}
-      <div className="flex items-center gap-3 shrink-0">
-        <span className="text-xs text-slate-500 font-medium select-none">
-          {isAnyFilterActive ? '筛选结果：' : ''}
-          <strong className="text-indigo-600 font-bold">{displayedItemsCount}</strong> 条资产
-        </span>
-
-        <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-xl text-xs">
-          {(['default', 'usage'] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSortBy(key)}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                sortBy === key
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {key === 'default' ? '默认排序' : '使用最多'}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
+      <AssetLibrarySortControls isAnyFilterActive={activeSubTab !== 'full_prompt' && isAnyFilterActive} displayedItemsCount={displayedItemsCount} unit={activeSubTab === 'full_prompt' ? '组母本' : undefined} sortBy={sortBy} setSortBy={setSortBy} />
+    </div>}
     </>
   );
 }

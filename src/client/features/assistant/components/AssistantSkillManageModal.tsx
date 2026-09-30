@@ -1,3 +1,4 @@
+import { useAssistantDialog } from './useAssistantDialog';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -34,6 +35,7 @@ export default function AssistantSkillManageModal({
   onDelete,
   showToast,
 }: Props) {
+  const dialogRef = useAssistantDialog(isOpen, onClose);
   const [keyword, setKeyword] = useState('');
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
 
@@ -81,7 +83,7 @@ export default function AssistantSkillManageModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-fade-in select-none">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="技能管理" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-fade-in select-none">
       <div className="flex max-h-[90vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)]">
         {/* ================= 视图 2：技能详情视图 ================= */}
         {selectedSkill ? (

@@ -10,6 +10,7 @@ export { resolveStorageRoot } from '@server/infrastructure/storage/storagePaths'
 function guessContentType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.mp4') return 'video/mp4';
+  if (ext === '.mov') return 'video/quicktime';
   if (ext === '.webm') return 'video/webm';
   if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
   if (ext === '.png') return 'image/png';
@@ -80,7 +81,7 @@ export async function GET(req: Request): Promise<Response> {
   try {
     const stat = await file.stat();
     if (!stat.isFile()) return new Response('Not Found', { status: 404 });
-    const expiryMatch = /(?:^|\/)assistant-attachments\/(\d{13})-[a-f0-9-]+\.jpg$/.exec(rel);
+    const expiryMatch = /(?:^|\/)assistant-attachments\/(\d{13})-[a-f0-9-]+\.(?:jpg|mp4|mov|webm)$/.exec(rel);
     if (expiryMatch && Number(expiryMatch[1]) <= Date.now()) {
       await unlink(absPath).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;

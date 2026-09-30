@@ -30,6 +30,7 @@ export function AssistantImageBatch({ content, referenceMedia }: { content: stri
       setSessionId(useAppStore.getState().currentSessionId);
       if (source && conversation) store.updateAssistantMessage(conversation.id, source.id, { imageBatchSessionId: useAppStore.getState().currentSessionId });
       store.setCurrentView('generate');
+      store.setIsAssistantOpen(false);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : '批量载入失败');
@@ -40,7 +41,7 @@ export function AssistantImageBatch({ content, referenceMedia }: { content: stri
     <div className="flex items-center justify-between gap-3">
       <span>{source ? `第 ${batches.indexOf(source) + 1} 版 · ` : '本条回复包含 '}{entries.length} 张生图提示词{superseded ? ' · 已有新版' : ''}</span>
       <button type="button" disabled={superseded && !resultSession} className="rounded-lg bg-zinc-900 px-3 py-2 text-white disabled:opacity-40" onClick={() => {
-        if (resultSession) { const s = useAppStore.getState(); s.switchSession(resultSession); s.setCurrentView('generate'); }
+        if (resultSession) { const s = useAppStore.getState(); s.switchSession(resultSession); s.setCurrentView('generate'); s.setIsAssistantOpen(false); }
         else setOpen(!open);
       }}>{resultSession ? '查看本组结果' : superseded ? '请使用最新版本' : '批量生成'}</button>
     </div>

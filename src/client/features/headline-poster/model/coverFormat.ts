@@ -20,11 +20,12 @@ export const COVER_FORMATS: Record<CoverFormatId, CoverFormat> = {
   },
 };
 
-const PORTRAIT_ALIASES = new Set(['文字竖', '竖', '竖版', '竖图', '34', '3:4', '720x960', '720960']);
-const SQUARE_ALIASES = new Set(['文字横', '横', '横版', '横图', '方', '方图', '正方形', '11', '1:1', '720x720', '720720', '1440x1440', '14401440']);
+const PORTRAIT_ALIASES = new Set(['文字竖', '竖', '竖版', '竖图', 'portrait', '34', '3:4', '3/4', '720x960', '720960']);
+const SQUARE_ALIASES = new Set(['文字横', '横', '横版', '横图', '方', '方图', '正方形', 'square', '11', '1:1', '1/1', '720x720', '720720', '1440x1440', '14401440']);
 
 function normalize(value: unknown): string {
   return String(value ?? '')
+    .normalize('NFKC')
     .trim()
     .toLowerCase()
     .replace(/[\s×*]/g, '')

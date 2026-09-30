@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@client/store';
 import { subscribeAssetInvalidation } from '@client/shared/api/assetLibraryCache';
 import { fetchAssetLibraryOptions } from '../api/workshopResources';
+import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 
 export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?: () => void) {
   const [useAssetLibrary, setUseAssetLibrary] = useState(true);
@@ -10,11 +11,13 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
   const [lockedOutfitId, setLockedOutfitId] = useState('auto');
   const [lockedActionId, setLockedActionId] = useState('auto');
   const [lockedFullPromptId, setLockedFullPromptId] = useState('auto');
+  const [promptGroupFolderId, setPromptGroupFolderId] = useState('auto');
   const [availablePersonas, setAvailablePersonas] = useState<any[]>([]);
   const [availableScenes, setAvailableScenes] = useState<any[]>([]);
   const [availableOutfits, setAvailableOutfits] = useState<any[]>([]);
   const [availableActions, setAvailableActions] = useState<any[]>([]);
   const [availableFullPrompts, setAvailableFullPrompts] = useState<any[]>([]);
+  const [availableProductCategories, setAvailableProductCategories] = useState<AssetProductCategory[]>([]);
 
   const [assetLoadState, setAssetLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [assetLoadError, setAssetLoadError] = useState('');
@@ -24,10 +27,11 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
     setAssetLoadState('loading');
     setAssetLoadError('');
     try {
-      const { personas, scenes, outfits, actions, fullPrompts } = await fetchAssetLibraryOptions(force);
+      const { personas, scenes, outfits, actions, fullPrompts, productCategories } = await fetchAssetLibraryOptions(force);
       if (id !== requestId.current) return;
       setAvailablePersonas(personas); setAvailableScenes(scenes); setAvailableOutfits(outfits);
       setAvailableActions(actions); setAvailableFullPrompts(fullPrompts);
+      setAvailableProductCategories(productCategories);
       setAssetLoadState('ready');
     } catch (error) {
       if (id !== requestId.current) return;
@@ -54,7 +58,7 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
     if (pending.outfitId) setLockedOutfitId(pending.outfitId);
     if (pending.personaId) setLockedPersonaId(pending.personaId);
     if (pending.actionId) setLockedActionId(pending.actionId);
-    if (pending.fullPromptId) setLockedFullPromptId(pending.fullPromptId);
+    if (pending.fullPromptId) { setLockedFullPromptId(pending.fullPromptId); setPromptGroupFolderId('auto'); }
     onBindingApplied?.();
     setPending(null);
     void load(true);
@@ -68,6 +72,8 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
     lockedOutfitId, setLockedOutfitId,
     lockedActionId, setLockedActionId,
     lockedFullPromptId, setLockedFullPromptId,
+    promptGroupFolderId, setPromptGroupFolderId,
     availablePersonas, availableScenes, availableOutfits, availableActions, availableFullPrompts,
+    availableProductCategories,
   };
 }

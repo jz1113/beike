@@ -1,0 +1,81 @@
+/* React Bits SwipeToast adaptation; license and source are retained in DeconstructJobNotifications.tsx. */
+.deconstruct-job-dock {
+  --job-ease: cubic-bezier(.23, 1, .32, 1);
+  position: fixed; right: 24px; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  z-index: 80; width: min(370px, calc(100vw - 32px)); color: #334155;
+  font-family: inherit; font-size: 12px; line-height: 1.5;
+  animation: deconstruct-job-rise 360ms var(--job-ease);
+}
+.deconstruct-job-dock-surface {
+  overflow: hidden; border: 1px solid #e2e8f0; border-radius: 20px; background: rgba(255, 255, 255, .97);
+  box-shadow: 0 2px 5px rgba(15, 23, 42, .035), 0 16px 48px -12px rgba(15, 23, 42, .2);
+  backdrop-filter: blur(16px);
+}
+.deconstruct-job-toggle { display: flex; width: 100%; align-items: center; gap: 11px; padding: 15px; text-align: left; cursor: pointer; }
+.deconstruct-job-toggle:hover { background: #f8fafc; }
+.deconstruct-job-dock-mark { display: grid; flex: none; width: 34px; height: 34px; place-items: center; color: #5b3ff9; background: #f0edff; border-radius: 12px; }
+.deconstruct-job-dock-mark[data-attention=true] { color: #b45309; background: #fff7ed; }
+.deconstruct-job-dock-mark svg { width: 17px; height: 17px; }
+.deconstruct-job-dock-title { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.deconstruct-job-dock-title strong { color: #0f172a; font-size: 12px; font-weight: 600; }
+.deconstruct-job-dock-title > span { color: #64748b; font-size: 11px; }
+.deconstruct-job-update-badge { display: inline-block; margin-left: 6px; padding: 1px 4px; border-radius: 4px; color: #059669; background: #ecfdf5; font-size: 9px; font-weight: 500; }
+.deconstruct-job-update-badge[data-attention=true] { color: #b45309; background: #fffbeb; }
+.deconstruct-job-toggle-chevron { flex: none; width: 15px; height: 15px; color: #94a3b8; transition: transform 240ms var(--job-ease); }
+[data-expanded=true] .deconstruct-job-toggle-chevron { transform: rotate(180deg); }
+.deconstruct-job-live-status { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.deconstruct-job-list { max-height: min(520px, 65dvh); padding: 0 10px 10px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; animation: deconstruct-job-expand 220ms var(--job-ease); }
+.deconstruct-job-card { overflow: hidden; margin-top: 6px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
+.deconstruct-job-card-head { display: flex; align-items: center; gap: 9px; padding: 12px 11px 10px; }
+.deconstruct-job-card-head[data-dismissible=true] { touch-action: pan-x; user-select: none; cursor: grab; }
+.deconstruct-job-card-head[data-dismissible=true]:active { cursor: grabbing; }
+.deconstruct-job-mark { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border-radius: 50%; color: #6d5ce8; background: #f5f3ff; }
+.deconstruct-job-mark svg { width: 13px; height: 13px; }
+[data-status=completed] .deconstruct-job-mark { color: #059669; background: #ecfdf5; }
+[data-status=failed] .deconstruct-job-mark, [data-status=interrupted] .deconstruct-job-mark { color: #d97706; background: #fffbeb; }
+[data-status=stopped] .deconstruct-job-mark { color: #64748b; background: #f1f5f9; }
+.deconstruct-job-card[data-attention=true] .deconstruct-job-mark { color: #d97706; background: #fffbeb; }
+.deconstruct-job-card-title { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.deconstruct-job-card-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: #1e293b; }
+.deconstruct-job-card-title > span { font-size: 10px; color: #64748b; }
+.deconstruct-job-icon-button { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; color: #94a3b8; cursor: pointer; }
+.deconstruct-job-icon-button svg { width: 14px; height: 14px; }
+.deconstruct-job-icon-button:hover { background: #f1f5f9; color: #475569; }
+.deconstruct-job-progress { height: 2px; overflow: hidden; margin: 0 12px; background: #f1f5f9; border-radius: 3px; }
+.deconstruct-job-progress > span { display: block; height: 100%; background: linear-gradient(90deg, #c4b5fd, #7c5cfc); transform-origin: left center; transition: width 400ms var(--job-ease); }
+[data-status=completed] .deconstruct-job-progress > span { background: linear-gradient(90deg, #6ee7b7, #10b981); }
+.deconstruct-job-description { margin: 9px 12px 0; color: #64748b; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.deconstruct-job-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; }
+.deconstruct-job-actions button { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 7px; font-size: 11px; cursor: pointer; transition: background-color 160ms ease, transform 160ms var(--job-ease); }
+.deconstruct-job-actions svg { width: 12px; height: 12px; }
+.deconstruct-job-view { color: #5b3ff9; font-weight: 500; }
+.deconstruct-job-view:hover { background: #f0edff; }
+.deconstruct-job-stop { color: #64748b; }
+.deconstruct-job-stop:hover:not(:disabled) { background: #f1f5f9; color: #334155; }
+.deconstruct-job-stop:disabled { cursor: default; opacity: .55; }
+.deconstruct-job-actions button:active:not(:disabled), .deconstruct-job-icon-button:active { transform: scale(.97); }
+.deconstruct-job-dock button:focus-visible, .deconstruct-job-details summary:focus-visible { outline: 2px solid #a5b4fc; outline-offset: -2px; }
+.deconstruct-job-details { border-top: 1px solid #f1f5f9; background: #fafbfc; }
+.deconstruct-job-details summary { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; color: #64748b; font-size: 10px; cursor: pointer; list-style: none; }
+.deconstruct-job-details summary::-webkit-details-marker { display: none; }
+.deconstruct-job-details summary svg { width: 12px; height: 12px; transition: transform 160ms var(--job-ease); }
+.deconstruct-job-details[open] summary svg { transform: rotate(180deg); }
+.deconstruct-job-details ul { margin: 0; padding: 0 12px 10px; list-style: none; }
+.deconstruct-job-details li { padding: 8px 0; border-top: 1px solid #e2e8f0; }
+.deconstruct-job-details li > div { display: flex; justify-content: space-between; gap: 8px; }
+.deconstruct-job-details li strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; font-size: 11px; font-weight: 500; }
+.deconstruct-job-details li span { flex: none; color: #94a3b8; font-size: 10px; }
+.deconstruct-job-details li p { margin: 3px 0 0; font-size: 10px; color: #94a3b8; overflow-wrap: anywhere; white-space: pre-wrap; }
+.deconstruct-job-details li[data-status=error] p, .deconstruct-job-details li[data-status=interrupted] p { color: #b45309; }
+.deconstruct-job-connection-error { display: flex; gap: 7px; margin: 0 1px 9px; padding: 10px; border-radius: 10px; background: #fffbeb; color: #92400e; font-size: 11px; overflow-wrap: anywhere; }
+.deconstruct-job-connection-error svg { width: 14px; height: 14px; flex: none; margin-top: 1px; }
+.deconstruct-job-spinner { animation: deconstruct-job-spin 1.4s linear infinite; }
+@keyframes deconstruct-job-spin { to { transform: rotate(360deg); } }
+@keyframes deconstruct-job-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+@keyframes deconstruct-job-expand { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) { .deconstruct-job-dock { right: 16px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); } .deconstruct-job-list { max-height: min(450px, calc(100dvh - 200px)); } }
+@media (prefers-reduced-motion: reduce) {
+  .deconstruct-job-dock, .deconstruct-job-list, .deconstruct-job-spinner { animation: none; }
+  .deconstruct-job-dock *, .deconstruct-job-dock *::before, .deconstruct-job-dock *::after { transition: none !important; }
+  .deconstruct-job-actions button:active:not(:disabled), .deconstruct-job-icon-button:active { transform: none; }
+}

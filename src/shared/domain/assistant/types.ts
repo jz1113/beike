@@ -61,6 +61,7 @@ export interface ToolCallItem extends AssistantItemBase {
 }
 
 export interface ToolResultItem extends AssistantItemBase {
+  visualImages?: Array<{ url: string; label?: string }>;
   kind: 'toolResult';
   name: string;
   displayName: string;

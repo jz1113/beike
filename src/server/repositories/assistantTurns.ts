@@ -5,7 +5,7 @@ const VISIBLE_STATUSES = new Set(['running', 'completed', 'interrupted', 'failed
 export const assistantTurnRepository = {
   listForThread(threadId: string, status: string | null) {
     return db.assistantTurn.findMany({
-      where: { threadId, ...(status && VISIBLE_STATUSES.has(status) ? { status } : {}) },
+      where: { threadId, ...(status && VISIBLE_STATUSES.has(status) ? { status: status === 'interrupted' ? { in: ['interrupted', 'running', 'awaiting_approval'] } : status } : {}) },
       orderBy: { startedAt: 'desc' },
       take: 50,
     });

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ScanSearch, Sparkles, FileSpreadsheet } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
@@ -6,12 +6,12 @@ import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
 import { ToolSuiteMark } from '@client/shared/icons';
 import {
   type BatchTaskItem,
-  displayMediaSrc,
-  displayVideoSrc,
-  handleImgError,
-  isLikelyVideoUrl,
   buildCollectorAIAssistantPayload,
+  collectedVideos,
 } from '@client/features/collect/utils/collectorTypes';
+import CollectorMediaPreview from './CollectorMediaPreview';
+import { useCollectorDownloads } from '../hooks/useCollectorDownloads';
+import { buildCollectorWorkshopPayload } from '../utils/collectorWorkshopImport';
 import CollectorSinglePanel from '@client/features/collect/components/CollectorSinglePanel';
 import CollectorBatchPanel from '@client/features/collect/components/CollectorBatchPanel';
 import CollectorResultPanel from '@client/features/collect/components/CollectorResultPanel';
@@ -63,22 +63,34 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
   // 大图全屏查看 Lightbox 状态
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
-  // 下载状态
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
-  const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
-
   // 风格提炼弹窗联动
   const [isStyleExtractOpen, setIsStyleExtractOpen] = useState(false);
+
+  const [styleExtractSource, setStyleExtractSource] = useState<{ images: string[]; title?: string }>({ images: [] });
 
   // Toast 提示
   const { toastMsg, showToast } = useCollectorToast();
 
+  const { isDownloadingZip, isDownloadingVideo, runZipDownload, runVideoDownload } = useCollectorDownloads(isOpen, showToast);
+  const ignoreLoading = () => {};
+  const handleDownloadSingleZip = (item: any) => runZipDownload(signal => downloadSingleZip(item, showToast, ignoreLoading, signal));
+  const handleDownloadSingleVideo = (item: any) => runVideoDownload(signal => downloadSingleVideo(item, showToast, ignoreLoading, signal));
+
   // 模态框容器 ref，用于焦点陷阱
   const modalCardRef = useRef<HTMLDivElement | null>(null);
+  const styleDialogRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(modalCardRef, isOpen, onClose);
+  useFocusTrap(styleDialogRef, isOpen && isStyleExtractOpen, () => setIsStyleExtractOpen(false));
+  useEffect(() => {
+    if (!isOpen) {
+      setInspectingItem(null);
+      setPreviewImageUrl(null);
+      setIsStyleExtractOpen(false);
+    }
+  }, [isOpen]);
 
   // 单条极速采集 Hook
-  const single = useSingleCollect({ showToast });
+  const single = useSingleCollect({ isOpen, showToast });
 
   // 批量任务队列 Hook
   const batch = useBatchTaskQueue({
@@ -88,28 +100,9 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
 
   // 一键带入商用生图工坊
   const handleImportToWorkshop = (item: any) => {
-    const allImages = Array.isArray(item.images) ? item.images : [];
-    const mainImages =
-      Array.isArray(item.mainImages) && item.mainImages.length > 0
-        ? item.mainImages
-        : allImages.slice(0, 5);
-    const skuImages = Array.isArray(item.skuImages) ? item.skuImages : [];
-    const descImages =
-      Array.isArray(item.descImages) ? item.descImages : allImages.slice(5);
-
-    setProductData(
-      {
-        title: item.title || '精选采集商品',
-        price: item.price || '99.00',
-        category: item.category || '数码美妆/服饰鞋包',
-        skuId: item.skuId || 'COLLECTOR_SKU',
-      },
-      {
-        main: mainImages,
-        skus: skuImages,
-        details: descImages,
-      },
-    );
+    const payload = buildCollectorWorkshopPayload(item);
+    if (!payload) { showToast('请先采集可用图片，再带入商业视觉工坊'); return; }
+    setProductData(payload.product, payload.images);
 
     setStep(1);
     if (onEnterWorkshop) {
@@ -164,10 +157,6 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="collector-modal-title"
-      aria-describedby="collector-modal-desc"
       className="fixed inset-0 z-50 animate-fade-in select-none bg-[#fbfcfe] text-slate-900"
     >
       <input
@@ -180,6 +169,12 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
 
       <div
         ref={modalCardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collector-modal-title"
+        aria-describedby="collector-modal-desc"
+        aria-hidden={Boolean(inspectingItem || previewImageUrl || isStyleExtractOpen)}
+        tabIndex={-1}
         className="relative flex h-full w-full flex-col overflow-hidden bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.38)_1px,transparent_1.4px)] bg-[size:24px_24px] text-left"
       >
         {/* 轻量顶部操作条：与大字报页面保持一致 */}
@@ -231,10 +226,12 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
               isDownloadingVideo={isDownloadingVideo}
               isDownloadingZip={isDownloadingZip}
               setPreviewImageUrl={setPreviewImageUrl}
-              setInspectingItem={setInspectingItem}
-              setIsStyleExtractOpen={setIsStyleExtractOpen}
-              handleDownloadSingleVideo={(item) => downloadSingleVideo(item, showToast, setIsDownloadingVideo)}
-              handleDownloadSingleZip={(item) => downloadSingleZip(item, showToast, setIsDownloadingZip)}
+              onExtractStyle={(images, title) => {
+                setStyleExtractSource({ images, title });
+                setIsStyleExtractOpen(true);
+              }}
+              handleDownloadSingleVideo={handleDownloadSingleVideo}
+              handleDownloadSingleZip={handleDownloadSingleZip}
               handleImportToWorkshop={handleImportToWorkshop}
               handleImportToAIAssistant={handleImportToAIAssistant}
             />
@@ -249,6 +246,8 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
               handleAddTasksFromText={batch.handleAddTasksFromText}
               fileInputRef={batch.fileInputRef}
               onBatchFileSelect={batch.processBatchUploadFile}
+              isBatchImporting={batch.isBatchImporting}
+              cancelBatchImport={batch.cancelBatchImport}
               handleDownloadCsvTemplate={(e) => {
                 e.stopPropagation();
                 downloadCsvTemplate(showToast);
@@ -265,8 +264,8 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
               setBatchConcurrency={batch.setBatchConcurrency}
               handlePauseBatchTasks={batch.handlePauseBatchTasks}
               handleStartBatchTasks={batch.handleStartBatchTasks}
-              handleBatchDownloadAllSuccessTasks={() => downloadBatchSuccessTasks(batch.batchTasks, showToast, batch.setBatchExporting)}
-              handleDownloadSingleZip={(item) => downloadSingleZip(item, showToast, setIsDownloadingZip)}
+              handleBatchDownloadAllSuccessTasks={() => runZipDownload(signal => downloadBatchSuccessTasks(batch.batchTasks, showToast, batch.setBatchExporting, signal))}
+              handleDownloadSingleZip={handleDownloadSingleZip}
               executeSingleTask={batch.executeSingleTask}
               setPreviewImageUrl={setPreviewImageUrl}
             />
@@ -280,46 +279,32 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
       {inspectingItem && (
         <CollectorResultPanel
           inspectingItem={inspectingItem}
+          hasPreview={Boolean(previewImageUrl)}
+          isDownloadingZip={isDownloadingZip}
           inspectingSelectedImages={inspectingSelectedImages}
           setInspectingItem={setInspectingItem}
           setPreviewImageUrl={setPreviewImageUrl}
           handleImportToAIAssistant={handleImportToAIAssistant}
-          handleDownloadSingleZip={(item) => downloadSingleZip(item, showToast, setIsDownloadingZip)}
+          handleDownloadSingleZip={handleDownloadSingleZip}
         />
       )}
 
-      {/* 大图灯箱预览 */}
       {previewImageUrl && (
-        <div
-          onClick={() => setPreviewImageUrl(null)}
-          className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in cursor-zoom-out"
-        >
-          {isLikelyVideoUrl(previewImageUrl) || previewImageUrl === single.singleCollectedResult?.video || previewImageUrl === inspectingItem?.video ? (
-            <video
-              src={displayVideoSrc(previewImageUrl)}
-              controls
-              autoPlay
-              playsInline
-              className="max-w-[90vw] max-h-[90vh] rounded-2xl shadow-2xl border border-white/20 bg-black"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={displayMediaSrc(previewImageUrl) || previewImageUrl}
-              alt="高清大图预览"
-              referrerPolicy="no-referrer"
-              onError={(e) => handleImgError(e, previewImageUrl)}
-              className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl border border-white/20"
-            />
-          )}
-        </div>
+        <CollectorMediaPreview
+          url={previewImageUrl}
+          videoUrls={[...collectedVideos(single.singleCollectedResult), ...collectedVideos(inspectingItem), ...batch.batchTasks.flatMap(collectedVideos)]}
+          onClose={() => setPreviewImageUrl(null)}
+        />
       )}
 
-      {/* 风格提炼弹窗联动 */}
-      <StyleExtractModal
-        isOpen={isStyleExtractOpen}
-        onClose={() => setIsStyleExtractOpen(false)}
-      />
+      <div ref={styleDialogRef} tabIndex={-1} role={isStyleExtractOpen ? 'dialog' : undefined} aria-modal={isStyleExtractOpen || undefined} aria-label="风格提炼">
+        <StyleExtractModal
+          isOpen={isStyleExtractOpen}
+          initialImages={styleExtractSource.images}
+          initialTitle={styleExtractSource.title}
+          onClose={() => setIsStyleExtractOpen(false)}
+        />
+      </div>
 
       {/* 全局 Toast */}
       {toastMsg && (

@@ -1,4 +1,5 @@
 import { appearanceAudience } from '@shared/domain/assets/appearanceAudience';
+import { createHash } from 'node:crypto';
 import { jsonResponse } from '../../../../core/http';
 import { assetLibraryQueries } from '../../../../repositories/assetLibraryQueries';
 import { resolveShotsForScene, type ActionLike } from '@shared/domain/assets/sceneBundle';
@@ -12,6 +13,10 @@ const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | und
   if (!text) return undefined;
   return text.slice(0, maxLen);
 };
+
+const sceneSourceKey = (sourceImages: string | null): string | undefined => sourceImages
+  ? createHash('sha256').update(sourceImages).digest('hex').slice(0, 16)
+  : undefined;
 
 const slimAsset = <T extends Record<string, unknown>>(row: T, extra: string[] = []) => {
   const base: Record<string, unknown> = {
@@ -114,11 +119,12 @@ export async function executeLibraryGet(req: Request) {
         const mapped = {
           ...s,
           code: stableAssetCode('S', String(s.id)),
+          sceneSourceKey: sceneSourceKey(s.sourceImages),
           shots,
           shotCount: shots.length,
         };
         return slim
-          ? slimAsset(mapped as Record<string, unknown>, ['shotCount', 'spatialType', 'lighting'])
+          ? slimAsset(mapped as Record<string, unknown>, ['shotCount', 'spatialType', 'lighting', 'description', 'sceneSourceKey'])
           : mapped;
       }),
       outfits: outfits.map((o) => {
@@ -139,6 +145,7 @@ export async function executeLibraryGet(req: Request) {
         const slimmed = slimAsset(mapped as Record<string, unknown>, [
           'albumName',
           'productCategoryIds',
+          'productSubcategory',
           'isUniversal',
           'sceneSummary',
           'outfitSummary',
@@ -147,6 +154,7 @@ export async function executeLibraryGet(req: Request) {
           'sourceImageIndex',
           'sourceImageIndices',
           'groupIndex',
+          'displayNumber',
           'contentSummary',
           'architectureSummary',
           'replaceableSlots',
@@ -154,6 +162,8 @@ export async function executeLibraryGet(req: Request) {
           'hasHuman',
           'provenance',
           'sourceMother',
+          'imageReplaced',
+          'imageReplaceable',
         ]);
         const preview = buildPromptPreview(f.reversePromptZh);
         if (preview) slimmed.promptPreview = preview;
@@ -170,13 +180,14 @@ export async function executeLibraryGet(req: Request) {
     const mappedItems = items.map((item) => {
       const code = stableAssetCode('S', String(item.id));
       if (assetType !== 'scene_bundle') {
-        return { ...item, code };
+        return { ...item, code, sceneSourceKey: sceneSourceKey(item.sourceImages) };
       }
       const linkedActions = (item as typeof item & { actions?: ActionLike[] }).actions || [];
       const shots = resolveShotsForScene(item, linkedActions);
       return {
         ...item,
         code,
+        sceneSourceKey: sceneSourceKey(item.sourceImages),
         shots,
         shotCount: shots.length,
       };

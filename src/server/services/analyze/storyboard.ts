@@ -1,10 +1,10 @@
 import { isAppearanceRotation, parseAppearanceSelection } from '@shared/domain/assets/appearanceSelection';
+import { recipeKind } from '@shared/domain/products/productRecipeSelection';
 import {
   assembleStoryboardSlots,
   buildProductOnlyVisionPrompt,
   extractProductSentences,
   fillProductSentences,
-  expandGroupShotSkeleton,
 } from '@shared/domain/workshop/workshopPipeline';
 import { evaluateStoryboardQuality } from '@shared/domain/prompts/promptAsset';
 import {
@@ -15,9 +15,10 @@ import {
 } from './analyzeVisionCall';
 import { assembleStoryboardShots } from './promptAssembler';
 import { rotateAppearance } from './appearanceRotation';
-import { audiencesCompatible } from '@shared/domain/assets/appearanceAudience';
+import { appearanceAudience, audiencesCompatible, audiencesCompatibleWithInherited } from '@shared/domain/assets/appearanceAudience';
 import { resolveBoundGroupAppearance } from '@shared/domain/workshop/workshopPipeline/boundGroupPrompt';
 import { loadLockedGroupSkeleton, loadStoryboardLibrary } from './storyboardRecall';
+import { planExpandedGroup } from './groupExpansion';
 
 export interface ExecuteStoryboardParams {
   productTitle?: string;
@@ -59,9 +60,12 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   if (!productTitle && imageUrls.length === 0) {
     throw new Error('缺少商品标题或商品图片素材');
   }
+  const architectureKind = recipeKind({ id: '', promptSnippet: resolvedTemplateStyle });
+  const architectureMajor = architectureKind === 'phone' ? 'digital' : architectureKind === 'jewelry' ? 'jewelry' : undefined;
 
   const lockedGroup = await loadLockedGroupSkeleton({
     fullPromptId: lockedAssets?.fullPromptId,
+    groupFolderId: lockedAssets?.groupFolderId,
     groupAppearance: modelPersona === 'none' ? 'product'
       : lockedAssets?.groupAppearance === 'human' || lockedAssets?.groupAppearance === 'product'
         ? lockedAssets.groupAppearance : undefined,
@@ -71,6 +75,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     productTitle,
     productProps,
     productIndex,
+    architectureMajor,
   });
   if (modelPersona === 'none' && lockedGroup.groupAppearance !== 'product') {
     throw new Error('当前批次设置为无人物，但所选母版包含人物或出镜类型未确认，请选择无人物母版');
@@ -107,6 +112,12 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   // 沿用图组的场景、人物与穿搭；仅用户明确锁定的槽位才覆盖。
   assetLibraryData ||= { personas: [], scenes: [], outfits: [], actions: [] };
   assetLibraryData.actions = [];
+  if (effectiveLockedAssets.personaId && appearanceAudience(assetLibraryData.personas[0] || {}) === 'unknown') {
+    throw new Error('锁定的人物资产仍为待分类，请先在资产库确认适用人群，或重新选择已分类资产。');
+  }
+  if (effectiveLockedAssets.outfitId && appearanceAudience(assetLibraryData.outfits[0] || {}, true) === 'unknown') {
+    throw new Error('锁定的穿搭资产仍为待分类，请先在资产库确认适用人群，或重新选择已分类资产。');
+  }
   if (!effectiveLockedAssets.sceneId && lockedGroup.sceneSummary) {
     assetLibraryData.scenes = [{ title: '图组原场景', description: lockedGroup.sceneSummary }];
   }
@@ -116,12 +127,35 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
   if (!effectiveLockedAssets.outfitId && lockedGroup.outfitSummary && lockedGroup.hasHuman) {
     assetLibraryData.outfits = [{ title: '图组原穿搭', top: lockedGroup.outfitSummary, bottom: '' }];
   }
+  const personaMode = modelPersona === 'none' || lockedGroup?.hasHuman === false ? 'none' : 'asset_driven';
+  const expandedShots = shotCount > 4
+    ? await planExpandedGroup({
+        originals: lockedGroup.shots,
+        productTitle: productTitle || '',
+        productIndex,
+        model, fallbackModels, baseUrl: targetBaseUrl, apiKey: targetApiKey, apiFormat,
+      })
+    : [];
+  const groupShots = [...lockedGroup.shots.slice(0, 4), ...expandedShots].slice(0, shotCount)
+    .map((shot) => effectiveLockedAssets.sceneId ? { ...shot, scene: '', lighting_type: '' } : shot);
   if (rotatePersona || rotateOutfit) {
+    // Check the same inherited per-shot descriptions used by the final prompt
+    // before reserving a rotating pair; otherwise a later mirror may fail.
+    const inheritedSlots = assembleStoryboardSlots({
+      shotCount, assets: assetLibraryData, replaceScene: Boolean(effectiveLockedAssets.sceneId),
+      lockedGroupShots: groupShots, personaMode,
+    });
+    const inheritedShots = inheritedSlots.shots.flatMap((slot, index) => {
+      const source = groupShots[index];
+      if (!source || source.has_human === false || source.shot_type === 'hand_held_only' || source.shot_type === 'pure_product') return [];
+      return [resolveBoundGroupAppearance({ ...slot, hasHuman: true })];
+    });
     const selected = await rotateAppearance({
       rotatePersona, rotateOutfit, batchId,
       personaSelection: rotatePersona ? parseAppearanceSelection(lockedAssets.personaId) : undefined,
       outfitSelection: rotateOutfit ? parseAppearanceSelection(lockedAssets.outfitId, true) : undefined,
       persona: assetLibraryData.personas[0] || {}, outfit: assetLibraryData.outfits[0] || {},
+      inheritedShots,
     });
     assetLibraryData.personas = [selected.persona];
     assetLibraryData.outfits = [selected.outfit];
@@ -129,21 +163,31 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
     if (rotateOutfit) effectiveLockedAssets.outfitId = selected.outfit.id;
     assetPickTrace = { ...assetPickTrace, personaId: selected.persona.id, outfitId: selected.outfit.id };
   }
-  const personaMode = modelPersona === 'none' || lockedGroup?.hasHuman === false ? 'none' : 'asset_driven';
   const assembledSlots = assembleStoryboardSlots({
     shotCount,
     assets: assetLibraryData,
     replaceScene: Boolean(effectiveLockedAssets.sceneId),
-    lockedGroupShots: expandGroupShotSkeleton(lockedGroup.shots, shotCount)
-      .map((shot) => effectiveLockedAssets.sceneId ? { ...shot, scene: '', lighting_type: '' } : shot),
+    lockedGroupShots: groupShots,
     personaMode,
   });
   if (acceptsPeople && (effectiveLockedAssets.personaId || effectiveLockedAssets.outfitId)) {
     for (const slot of assembledSlots.shots) {
       if (!slot.hasHuman || slot.shotType === 'hand_held_only' || slot.shotType === 'pure_product') continue;
       const appearance = resolveBoundGroupAppearance(slot);
-      if (!audiencesCompatible({ ...assetLibraryData.personas[0], description: appearance.persona }, { ...assetLibraryData.outfits[0], reversePrompt: appearance.outfit })) {
-        throw new Error('人物与穿搭的性别、年龄段不匹配或尚未分类，请选择兼容组合，或将人物和穿搭同时设为自动轮换。男性人物不会配用女装。');
+      const persona = effectiveLockedAssets.personaId
+        ? { ...assetLibraryData.personas[0], description: appearance.persona }
+        : { description: appearance.persona };
+      const outfit = effectiveLockedAssets.outfitId
+        ? { ...assetLibraryData.outfits[0], reversePrompt: appearance.outfit }
+        : { reversePrompt: appearance.outfit };
+      const bothReplaced = Boolean(effectiveLockedAssets.personaId && effectiveLockedAssets.outfitId);
+      const compatible = bothReplaced
+        ? audiencesCompatible(persona, outfit)
+        : audiencesCompatibleWithInherited(persona, outfit);
+      if (!compatible) {
+        throw new Error(bothReplaced
+          ? '所选人物与穿搭的性别、年龄段不匹配或尚未分类，请在资产库选择兼容的已发布组合。'
+          : '所选人物或穿搭与母本镜头的性别、年龄段明显冲突，请调整替换项，或同时替换人物与穿搭。');
       }
     }
   }
@@ -212,6 +256,7 @@ export async function executeStoryboard(params: ExecuteStoryboardParams) {
       ...assembled.assetTrace,
       fullPromptId: lockedGroup.id,
       fullPromptTitle: lockedGroup.title,
+      fullPromptDisplayNumber: lockedGroup.displayNumber,
       fullPromptGroupIndex: lockedGroup.groupIndex,
       fullPromptAlbumName: lockedGroup.albumName,
       fullPromptSelectionMode: lockedGroup.selectionMode,

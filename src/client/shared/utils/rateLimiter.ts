@@ -10,6 +10,7 @@ export class RateLimiter {
   private queue: Array<() => void> = [];
   private isProcessing = false;
   private backoffUntil = 0;
+  private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(targetQps = 8.5) {
     this.targetQps = Math.max(0.1, targetQps);
@@ -28,9 +29,26 @@ export class RateLimiter {
   /**
    * 获取通行令牌（异步等待直到符合 QPS 限制）
    */
-  public async acquire(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.queue.push(resolve);
+  public async acquire(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    return new Promise<void>((resolve, reject) => {
+      const release = () => {
+        signal?.removeEventListener('abort', cancel);
+        resolve();
+      };
+      const cancel = () => {
+        const index = this.queue.indexOf(release);
+        if (index >= 0) this.queue.splice(index, 1);
+        if (this.queue.length === 0 && this.timer !== null) {
+          clearTimeout(this.timer);
+          this.timer = null;
+          this.isProcessing = false;
+        }
+        signal?.removeEventListener('abort', cancel);
+        reject(signal?.reason || new DOMException('请求已取消', 'AbortError'));
+      };
+      signal?.addEventListener('abort', cancel, { once: true });
+      this.queue.push(release);
       this.processQueue();
     });
   }
@@ -38,8 +56,9 @@ export class RateLimiter {
   /**
    * 使用限流器包装并执行异步任务
    */
-  public async schedule<T>(task: () => Promise<T>): Promise<T> {
-    await this.acquire();
+  public async schedule<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    await this.acquire(signal);
+    signal?.throwIfAborted();
     return task();
   }
 
@@ -48,6 +67,7 @@ export class RateLimiter {
     this.isProcessing = true;
 
     const executeNext = () => {
+      this.timer = null;
       if (this.queue.length === 0) {
         this.isProcessing = false;
         return;
@@ -59,7 +79,7 @@ export class RateLimiter {
       const waitTime = Math.max(waitBackoff, waitInterval);
 
       if (waitTime > 0) {
-        setTimeout(executeNext, waitTime);
+        this.timer = setTimeout(executeNext, waitTime);
         return;
       }
 
@@ -70,7 +90,7 @@ export class RateLimiter {
       }
 
       if (this.queue.length > 0) {
-        setTimeout(executeNext, this.minIntervalMs);
+        this.timer = setTimeout(executeNext, this.minIntervalMs);
       } else {
         this.isProcessing = false;
       }

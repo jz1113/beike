@@ -31,6 +31,7 @@ export async function GET(req: Request) {
         return Response.redirect(new URL(trimmedUrl.split('?')[0], new URL(req.url).origin));
       }
       return new Response(getFallbackSvgImage('非法本地路径'), {
+        status: 404,
         headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' },
       });
     }
@@ -56,6 +57,7 @@ export async function GET(req: Request) {
 
     if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
       return new Response(getFallbackSvgImage('不支持的地址'), {
+        status: 400,
         headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' },
       });
     }
@@ -64,6 +66,7 @@ export async function GET(req: Request) {
       await assertSafeRemoteUrl(imageUrl, { requireAllowlist: true });
     } catch {
       return new Response(getFallbackSvgImage('地址被安全策略拦截'), {
+        status: 403,
         headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' },
       });
     }
@@ -177,6 +180,7 @@ export async function GET(req: Request) {
     });
   } catch {
     return new Response(getFallbackSvgImage('商品素材保护中'), {
+      status: 502,
       headers: {
         'Content-Type': 'image/svg+xml',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
