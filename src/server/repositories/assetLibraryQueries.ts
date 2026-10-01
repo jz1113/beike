@@ -20,7 +20,12 @@ async function groupPage(where: Prisma.FullPromptAssetWhereInput, page: number, 
   identities.sort((a, b) => (numbers.get(a.id) ?? Infinity) - (numbers.get(b.id) ?? Infinity)
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const pageIds = identities.slice((page - 1) * pageSize, page * pageSize).map(row => row.id);
-  const rows = pageIds.length ? await db.fullPromptAsset.findMany({ where: { AND: [scopedWhere, { id: { in: pageIds } }] } }) : [];
+  // The aggregate endpoint requests 1000 groups; leave room for filters under SQLite's bind limit.
+  const chunks: string[][] = [];
+  for (let offset = 0; offset < pageIds.length; offset += 400) chunks.push(pageIds.slice(offset, offset + 400));
+  const rows = (await Promise.all(chunks.map(ids => db.fullPromptAsset.findMany({
+    where: { AND: [scopedWhere, { id: { in: ids } }] },
+  })))).flat();
   const byId = new Map(rows.map(row => [row.id, row]));
   const items = pageIds.flatMap(id => {
     const row = byId.get(id);
