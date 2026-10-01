@@ -7,6 +7,19 @@ import { mutateOrganization } from './organization';
 import { validateActionSceneReference, createLibraryAsset, updateLibraryAsset, prepareAssetDeletion } from '@server/repositories/assetLibraryCrud';
 import { bulkImportAssets } from '@server/repositories/assetLibraryBulkImport';
 import { AssetCategoryError } from '@server/repositories/assetOrganization';
+import { attachFullPromptLibraryNumbers } from '@server/repositories/fullPromptNumbers';
+
+function isFullPromptResponseItem(item: unknown): item is { id: string; displayNumber: unknown } {
+  return !!item && typeof item === 'object' && 'id' in item
+    && typeof item.id === 'string' && 'displayNumber' in item;
+}
+
+async function publicImportedItems(items: unknown[]): Promise<unknown[]> {
+  const groups = items.filter(isFullPromptResponseItem);
+  if (!groups.length) return items;
+  const numbered = new Map((await attachFullPromptLibraryNumbers(groups)).map(item => [item.id, item]));
+  return items.map(item => isFullPromptResponseItem(item) ? numbered.get(item.id) || item : item);
+}
 
 // 创建单项或批量导入原子资产
 export async function executeLibraryPost(req: Request) {
@@ -29,7 +42,7 @@ export async function executeLibraryPost(req: Request) {
   if (body.action === 'bulk-import' && Array.isArray(body.items)) {
     const items = body.items as Array<{ assetType: string; data: Record<string, unknown>; sourceId?: string }>;
     const { created, warnings } = await bulkImportAssets(body, items);
-    return jsonResponse({ success: true, count: created.length, items: created, warnings });
+    return jsonResponse({ success: true, count: created.length, items: await publicImportedItems(created), warnings });
   }
 
   const { assetType, data } = body;
@@ -57,7 +70,8 @@ export async function executeLibraryPost(req: Request) {
     const { ensureRegistryForAsset } = await import('../../../../services/promptAsset/registry');
     await ensureRegistryForAsset(assetType, created.id, created.provenance).catch(() => null);
   }
-  return jsonResponse({ success: true, item: created });
+  const publicItem = assetType === 'full_prompt' ? (await attachFullPromptLibraryNumbers([created]))[0] : created;
+  return jsonResponse({ success: true, item: publicItem });
 }
 
 // 修改原子资产（编辑、修改收藏状态、增加调用计数）
@@ -83,7 +97,8 @@ export async function executeLibraryPut(req: Request) {
   }
   if (!updated) return jsonResponse({ error: `不支持的资产类型: ${assetType}` }, 400);
 
-  return jsonResponse({ success: true, item: updated });
+  const publicItem = assetType === 'full_prompt' ? (await attachFullPromptLibraryNumbers([updated]))[0] : updated;
+  return jsonResponse({ success: true, item: publicItem });
 }
 
 // 删除指定 ID 资产及关联媒体

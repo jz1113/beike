@@ -1,7 +1,8 @@
 import type { Prisma } from '@prisma/client';
 import { isFixedLocalWorkspace, LEGACY_WORKSPACE_ID, LOCAL_WORKSPACE_ID } from '../workspace/workspaceContext';
+import { adoptLegacyFullPromptNumbers } from './workspaceFullPromptNumbers';
 
-type Database = Prisma.TransactionClient | { $executeRawUnsafe: (sql: string, ...args: unknown[]) => Promise<unknown>; $queryRawUnsafe: <T>(sql: string, ...args: unknown[]) => Promise<T> };
+type Database = Pick<Prisma.TransactionClient, '$executeRawUnsafe' | '$queryRawUnsafe'>;
 
 export const WORKSPACE_TABLES = [
   'Product',
@@ -143,4 +144,5 @@ export async function adoptLegacyWorkspaceRows(db: Database): Promise<void> {
       LEGACY_WORKSPACE_ID,
     );
   }
+  if (await tableExists(db, 'FullPromptLibraryNumber')) await adoptLegacyFullPromptNumbers(db);
 }

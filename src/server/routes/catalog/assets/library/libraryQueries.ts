@@ -7,6 +7,7 @@ import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 import { readOrganization } from './organization';
 import { buildLibraryListWhere } from '../../../../services/library/listWhere';
 import { attachFullPromptSource, attachRegistryMeta } from '../../../../services/promptAsset/registry';
+import { fullPromptGroupVisibilityWhere } from '@server/infrastructure/database/fullPromptGroupVisibility';
 
 const buildPromptPreview = (reversePromptZh: unknown, maxLen = 80): string | undefined => {
   const text = typeof reversePromptZh === 'string' ? reversePromptZh.trim() : '';
@@ -229,7 +230,7 @@ export async function executeLibraryGet(req: Request) {
     const where: any = {
       AND: [
         baseWhere,
-        { OR: [{ groupIndex: { not: null } }, { provenance: { not: 'legacy_single' } }] },
+        fullPromptGroupVisibilityWhere(),
       ],
     };
 

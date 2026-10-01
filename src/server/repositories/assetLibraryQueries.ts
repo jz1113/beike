@@ -1,13 +1,33 @@
 import { db } from './access';
 import { requireWorkspaceId } from '@server/infrastructure/workspace/workspaceContext';
+import { fullPromptGroupVisibilityWhere } from '@server/infrastructure/database/fullPromptGroupVisibility';
+import { readFullPromptLibraryNumbers } from './fullPromptNumbers';
+import type { Prisma } from '@prisma/client';
+import { isFullPromptGroupVisible } from '@shared/domain/assets/fullPromptGroupVisibility';
 
 const order = [
   { isFavorite: 'desc' as const },
   { usageCount: 'desc' as const },
   { createdAt: 'desc' as const },
 ];
-const groupOrder = [...order, { id: 'desc' as const }];
 const actions = { actions: { orderBy: [{ shotOrder: 'asc' as const }, { createdAt: 'asc' as const }], take: 4 } };
+
+async function groupPage(where: Prisma.FullPromptAssetWhereInput, page: number, pageSize: number) {
+  const scopedWhere = { AND: [where, fullPromptGroupVisibilityWhere()] };
+  const numbers = await readFullPromptLibraryNumbers();
+  // Sort lightweight identities before pagination, then fetch only this page's prompt/image payload.
+  const identities = await db.fullPromptAsset.findMany({ where: scopedWhere, select: { id: true } });
+  identities.sort((a, b) => (numbers.get(a.id) ?? Infinity) - (numbers.get(b.id) ?? Infinity)
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const pageIds = identities.slice((page - 1) * pageSize, page * pageSize).map(row => row.id);
+  const rows = pageIds.length ? await db.fullPromptAsset.findMany({ where: { AND: [scopedWhere, { id: { in: pageIds } }] } }) : [];
+  const byId = new Map(rows.map(row => [row.id, row]));
+  const items = pageIds.flatMap(id => {
+    const row = byId.get(id);
+    return row ? [{ ...row, displayNumber: numbers.get(id) ?? null }] : [];
+  });
+  return { total: identities.length, items };
+}
 
 export const assetLibraryQueries = {
   sceneDetail: (id: string) => db.sceneAsset.findUnique({ where: { id }, include: { actions: { orderBy: [{ shotOrder: 'asc' }, { createdAt: 'asc' }] } } }),
@@ -15,7 +35,9 @@ export const assetLibraryQueries = {
   actionDetail: (id: string) => db.actionAsset.findUnique({ where: { id } }),
   personaDetail: (id: string) => db.personaAsset.findUnique({ where: { id } }),
   groupDetail: (id: string) => db.fullPromptAsset.findUnique({ where: { id } }),
-  exportAll: () => db.$transaction(async tx => {
+  exportAll: async () => {
+    const numbers = await readFullPromptLibraryNumbers();
+    return db.$transaction(async tx => {
     const [scenes, outfits, actions, personas, fullPrompts, productCategories, albums, fullPromptImageReplacements] = await Promise.all([
       tx.sceneAsset.findMany({ orderBy: { id: 'asc' } }),
       tx.outfitAsset.findMany({ orderBy: { id: 'asc' } }),
@@ -52,16 +74,19 @@ export const assetLibraryQueries = {
     });
     const promptAssetRegistries = registries.filter(row => exportedIds.get(row.assetType)?.has(row.sourceAssetId));
     const exportedMotherIds = exportedIds.get('full_prompt');
-    return { scenes, outfits, actions, personas, fullPrompts, productCategories, albums,
+    return { scenes, outfits, actions, personas,
+      fullPrompts: fullPrompts.map(row => ({ ...row,
+        displayNumber: isFullPromptGroupVisible(row) ? numbers.get(row.id) ?? null : null })), productCategories, albums,
       promptAssetRegistries,
       fullPromptImageReplacements: fullPromptImageReplacements.filter(row => exportedMotherIds?.has(row.motherAssetId)) };
-  }, { timeout: 60_000 }),
+    }, { timeout: 60_000 });
+  },
   listAll: (page: number) => Promise.all([
     db.sceneAsset.findMany({ orderBy: order, take: 1000, skip: (page - 1) * 1000, include: actions }),
     db.outfitAsset.findMany({ orderBy: order, take: 1000, skip: (page - 1) * 1000 }),
     db.actionAsset.findMany({ orderBy: order, take: 1000, skip: (page - 1) * 1000 }),
     db.personaAsset.findMany({ orderBy: order, take: 1000, skip: (page - 1) * 1000 }),
-    db.fullPromptAsset.findMany({ where: { OR: [{ groupIndex: { not: null } }, { provenance: { not: 'legacy_single' } }] }, orderBy: groupOrder, take: 1000, skip: (page - 1) * 1000 }),
+    groupPage({}, page, 1000).then(result => result.items),
   ]),
   scenes: async (where: any, page: number, pageSize: number) => {
     const [total, items] = await Promise.all([
@@ -91,11 +116,5 @@ export const assetLibraryQueries = {
     ]);
     return { total, items };
   },
-  groups: async (where: any, page: number, pageSize: number) => {
-    const [total, items] = await Promise.all([
-      db.fullPromptAsset.count({ where }),
-      db.fullPromptAsset.findMany({ where, orderBy: groupOrder, skip: (page - 1) * pageSize, take: pageSize }),
-    ]);
-    return { total, items };
-  },
+  groups: groupPage,
 };

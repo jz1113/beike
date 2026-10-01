@@ -116,7 +116,7 @@ export function AssetPromptLibraryGrid({
             {!subcategoryFoldersVisible && <div className="flex flex-wrap items-center gap-2">
               {showLifecycleFilters && <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} items={items} />}
               <AssetTagFilter activeSubTab={activeSubTab} dynamicTagList={dynamicTagList} selectedTag={selectedTag} setSelectedTag={setSelectedTag} />
-              <AssetLibrarySortControls showCount={false} isAnyFilterActive={false} displayedItemsCount={displayedItems.length} sortBy={sortBy} setSortBy={setSortBy} />
+              <AssetLibrarySortControls showCount={false} isAnyFilterActive={false} displayedItemsCount={displayedItems.length} sortBy={sortBy} setSortBy={setSortBy} defaultSortTitle="按组号从小到大" />
             </div>}
           </div>
         )}

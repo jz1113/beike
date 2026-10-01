@@ -16,6 +16,7 @@ import { builtinSubcategoryFolderId, isPromptGroupSubcategory, PROMPT_GROUP_SUBC
 import { eligiblePromptGroups, isAutoPromptGroupSelection, isCompletePromptGroup, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, promptGroupCategoryFit, promptGroupExplicitMajorCategoryConflict, promptGroupExplicitSubcategoryConflict, promptGroupMatchesMajorCategory, type PromptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
 import { publishedWhere, sortByQuality } from '../promptAsset/recall';
 import { recordAssetUsageEvents } from '../promptAsset/usage';
+import { readFullPromptLibraryNumbers } from '@server/repositories/fullPromptNumbers';
 
 import { reservePromptGroup } from './groupRotation';
 
@@ -220,7 +221,7 @@ export async function loadLockedGroupSkeleton(input: {
   return {
     id: row.id,
     title: row.title,
-    displayNumber: row.displayNumber,
+    displayNumber: (await readFullPromptLibraryNumbers()).get(row.id) ?? null,
     groupIndex: row.groupIndex,
     albumName: row.albumName,
     selectionMode: manuallyLocked ? 'manual' as const : 'auto' as const,

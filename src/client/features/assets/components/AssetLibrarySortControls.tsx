@@ -3,6 +3,7 @@ export function AssetLibrarySortControls({
   displayedItemsCount,
   unit = '条资产',
   showCount = true,
+  defaultSortTitle,
   sortBy,
   setSortBy,
 }: {
@@ -10,6 +11,7 @@ export function AssetLibrarySortControls({
   displayedItemsCount: number;
   unit?: string;
   showCount?: boolean;
+  defaultSortTitle?: string;
   sortBy: 'default' | 'usage' | 'favorite';
   setSortBy: (value: 'default' | 'usage' | 'favorite') => void;
 }) {
@@ -24,6 +26,8 @@ export function AssetLibrarySortControls({
           <button
             key={key}
             type="button"
+            title={key === 'default' ? defaultSortTitle : undefined}
+            aria-label={key === 'default' && defaultSortTitle ? `默认排序：${defaultSortTitle}` : undefined}
             onClick={() => setSortBy(key)}
             className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${sortBy === key ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
           >

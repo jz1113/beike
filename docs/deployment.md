@@ -83,8 +83,10 @@ sudo systemctl status beike --no-pager
 
 ```bash
 rsync -a --delete --progress \
-  --exclude node_modules --exclude .git --exclude .env --exclude .env.production \
-  --exclude .local --exclude tools/build --exclude src/client/public/inspirations \
+  --exclude node_modules --exclude .git --exclude '.env*' --exclude '.local*' \
+  --exclude /tools/build/ --exclude /src/client/public/inspirations/ --exclude /storage/ \
+  --exclude database/database-backups --exclude database/backups \
+  --exclude '*.db*' --exclude '*.sqlite*' \
   -e 'ssh -i .local/beike-deploy-key -o IdentitiesOnly=yes' \
   ./ root@103.108.66.184:/opt/beike/
 ```
@@ -93,12 +95,15 @@ rsync -a --delete --progress \
 
 ```bash
 chown -R beike:beike /opt/beike
-sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install --frozen-lockfile && pnpm run build:ui'
+chmod 755 /opt/beike
+sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install --frozen-lockfile && pnpm run db:generate && pnpm run build:ui'
 systemctl restart beike
 systemctl status beike --no-pager
 ```
 
 浏览器强制刷新 `http://103.108.66.184/`。灵感图目录 `/opt/beike/src/client/public/inspirations` 不必每次重传。
+
+上线前先提交并推送 GitHub，用该提交导出的源码同步，避免本机忽略文件混入发布。先备份代码、前端产物与一致性数据库快照；代码根目录必须允许 Nginx 遍历（755），否则静态资源会返回 403。启动时按版本迁移工作区图组库编号，旧全库号保留用于历史追溯；当前工作区的私有图组与共享官方图组统一按库号升序展示，不会因其它工作区的旧记录出现编号跳涨。
 
 ## 深度图片与视频环境
 

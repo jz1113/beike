@@ -8,6 +8,7 @@ import { nextFullPromptDisplayNumber } from './fullPromptDisplayNumbers';
 import { inferPromptGroupSubcategory } from '@shared/domain/workshop/workshopPipeline/groupCategoryFit';
 import { parseGroupShotSkeleton } from '@shared/domain/workshop/workshopPipeline/storyboardSlots';
 import { isPromptGroupSubcategory } from '@shared/domain/assets/promptGroupSubcategory';
+import { isFullPromptGroupVisible, isLegacyFullPromptSingle } from '@shared/domain/assets/fullPromptGroupVisibility';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -231,8 +232,10 @@ export async function seedOfficialPromptAssets(): Promise<{ inserted: number }> 
       if (fields.productSubcategory === undefined && parseGroupShotSkeleton(fields.shotPromptsJson).length === 4) {
         fields.productSubcategory = inferPromptGroupSubcategory(fields);
       }
+      if (isLegacyFullPromptSingle(fields)) fields.provenance = 'legacy_single';
+      const displayNumber = isFullPromptGroupVisible(fields) ? await nextFullPromptDisplayNumber(tx) : null;
       return tx.fullPromptAsset.create({
-        data: { ...fields, displayNumber: await nextFullPromptDisplayNumber(tx) } as never,
+        data: { ...fields, displayNumber } as never,
       });
     }),
   );

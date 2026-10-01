@@ -18,6 +18,7 @@ import { applyFullPromptMajorCategoryBackfill, fullPromptMajorCategoryBackfillSo
 import { applyFullPromptMajorCategoryEvidence, fullPromptMajorCategoryEvidenceSource } from './fullPromptMajorCategoryEvidence';
 import { applyWorkspaceIsolation, workspaceIsolationSql } from './workspaceIsolation';
 import { deconstructJobsSql } from './deconstructJobs';
+import { applyWorkspaceFullPromptNumbers, workspaceFullPromptNumbersMigrationSource } from './workspaceFullPromptNumbers';
 
 type Database = Prisma.TransactionClient;
 interface Column { name: string }
@@ -301,6 +302,10 @@ export const desktopMigrations: readonly DatabaseMigration[] = [{
       await db.$executeRawUnsafe(sql);
     }
   },
+}, {
+  version: '20261001_01_workspace_full_prompt_numbers',
+  checksum: createHash('sha256').update(workspaceFullPromptNumbersMigrationSource).digest('hex'),
+  apply: applyWorkspaceFullPromptNumbers,
 }];
 
 async function readApplied(db: Database): Promise<Applied[]> {

@@ -339,7 +339,7 @@ model FullPromptAsset {
   sourceImageIndex   Int?     // 图集第几张 (1-based)
   sourceImageIndices String?  // 图组包含的来源图序号 JSON，如 [1,2,3,4]
   groupIndex         Int?     // 同一图集内的图组序号 (1-based)
-  displayNumber      Int?     @unique // 全库永久展示序号；旧单图记录为空
+  displayNumber      Int?     @unique // 历史全库编号；界面使用 FullPromptLibraryNumber 中的工作区编号
   contentSummary     String?  // 整条外站内容的简明总结
   architectureSummary String? // 固定不替换的图组架构：镜头节奏、动作、出镜规则
   replaceableSlots   String?  // 图组级可替换槽位 JSON（人物/穿搭/场景）
@@ -379,6 +379,17 @@ model FullPromptAsset {
 model FullPromptDisplaySequence {
   id         String @id
   lastNumber Int    @default(0)
+}
+
+// Viewer-library identity includes shared official groups; retain assignments after asset deletion.
+model FullPromptLibraryNumber {
+  workspaceId         String
+  assetId             String
+  displayNumber       Int
+  legacyDisplayNumber Int?
+
+  @@id([workspaceId, assetId])
+  @@unique([workspaceId, displayNumber])
 }
 
 // One approved generated-image replacement per four-shot mother group.

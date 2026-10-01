@@ -17,6 +17,7 @@ import {
   type AssetSubTab,
 } from '../utils/assetPromptConstants';
 import { compareAssetGalleryOrder } from '../utils/assetGalleryLabels';
+import { compareFullPromptGroupOrder } from '@shared/domain/assets/fullPromptGroupLabel';
 import { recognizedPromptGroupSubcategory, type PromptGroupSubcategoryFilter } from '../utils/promptGroupSubcategory';
 import { promptGroupCategoryIds, promptGroupCategoryKey } from '../utils/promptGroupCategory';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
@@ -277,9 +278,13 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
     });
 
     if (sortBy === 'usage') {
-      filtered = [...filtered].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+      filtered = [...filtered].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0)
+        || (activeSubTab === 'full_prompt' ? compareFullPromptGroupOrder(a, b) : 0));
     } else if (sortBy === 'favorite') {
-      filtered = [...filtered].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
+      filtered = [...filtered].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0)
+        || (activeSubTab === 'full_prompt' ? compareFullPromptGroupOrder(a, b) : 0));
+    } else if (activeSubTab === 'full_prompt') {
+      filtered = [...filtered].sort(compareFullPromptGroupOrder);
     } else if (activeSubTab === 'scene' || activeSubTab === 'persona' || activeSubTab === 'outfit') {
       filtered = [...filtered].sort(compareAssetGalleryOrder);
     }

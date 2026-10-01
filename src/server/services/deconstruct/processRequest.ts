@@ -34,6 +34,7 @@ import {
   validateDeconstructTargetSubcategory,
 } from '@server/repositories/deconstructProductCategory';
 import { AssetCategoryError } from '@server/repositories/assetOrganization';
+import { attachFullPromptLibraryNumbers } from '@server/repositories/fullPromptNumbers';
 
 export interface DeconstructExecutionHooks {
   onProgress?: (progress: DeconstructProgress) => void;
@@ -341,6 +342,7 @@ export async function processDeconstructRequest(req: Request, body: Record<strin
 
     updateDeconstructProgress(progressId, 'completed', '反推完成');
     completed = true;
+    if (savedRecords.fullPrompts.length) savedRecords.fullPrompts = await attachFullPromptLibraryNumbers(savedRecords.fullPrompts);
     return jsonResponse({
       success: true,
       partial: partial || skippedCount > 0 || safeImgs.length < targetImgs.length,

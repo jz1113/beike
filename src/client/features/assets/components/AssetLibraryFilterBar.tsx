@@ -403,7 +403,7 @@ export function AssetLibraryFilterBar({
         )}
       </div>
 
-      <AssetLibrarySortControls isAnyFilterActive={activeSubTab !== 'full_prompt' && isAnyFilterActive} displayedItemsCount={displayedItemsCount} unit={activeSubTab === 'full_prompt' ? '组母本' : undefined} sortBy={sortBy} setSortBy={setSortBy} />
+      <AssetLibrarySortControls isAnyFilterActive={activeSubTab !== 'full_prompt' && isAnyFilterActive} displayedItemsCount={displayedItemsCount} unit={activeSubTab === 'full_prompt' ? '组母本' : undefined} sortBy={sortBy} setSortBy={setSortBy} defaultSortTitle={activeSubTab === 'full_prompt' ? '按组号从小到大' : undefined} />
     </div>}
     </>
   );
