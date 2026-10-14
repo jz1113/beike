@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	reviewsvc "beike.local/cloud/src/backend/internal/service/keywordreview"
+	reviewsvc "beike.local/cloud/src/backend/internal/keywordreview/review"
 )
 
 func parseKeywordReview(raw []byte) (map[string]any, []reviewsvc.Row, string) {

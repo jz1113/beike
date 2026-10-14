@@ -13,9 +13,9 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	reviewsvc "beike.local/cloud/src/backend/internal/keywordreview/review"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/network"
-	reviewsvc "beike.local/cloud/src/backend/internal/service/keywordreview"
 	"beike.local/cloud/src/backend/internal/system"
 )
 

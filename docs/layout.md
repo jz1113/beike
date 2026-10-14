@@ -69,8 +69,7 @@ backend/
   internal/generate/         图片、视频、深度、分析、文案、大字报、画布文字、导出
   internal/workshop/         工坊批次与输出审核
   internal/assistant/        会话、回合、文档抽取与沙箱
-  internal/keywordreview/    关键词审核与提交保护
-  internal/service/keywordreview  审核提示词、结果校验与补救
+  internal/keywordreview/    关键词审核与提交保护；review 子包做提示词、结果校验与补救
   internal/modelgw/          上游模型提交
   internal/platform/collect  采集上游请求与响应
   internal/platform/database 数据访问；migrate 做版本化迁移、checksum、备份与官方种子
