@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 本机 Web 开发模式：同时启动 Hono API 与 Vite UI，浏览器访问 http://127.0.0.1:5173。
+ * 本机 Web 开发模式：Go 监听浏览器使用的 API 端口。
  */
 import {
   VITE_PORT,
@@ -14,7 +14,7 @@ import {
   resolveAccessToken,
   resolveAppDataDir,
   resolveCli,
-  startApiServer,
+  startGateway,
   startViteServer,
   stopApiServer,
   viteOk,
@@ -31,10 +31,12 @@ let apiPort = readApiPort(workspaceRoot, { isolated });
 const vitePort = isolated ? VITE_PORT + 1 : VITE_PORT;
 const appDataDir = resolve(process.env.AZHUO_DATA_DIR || (isolated ? join(resolveAppDataDir(), 'development') : resolveAppDataDir()));
 let apiChild = null;
+let gatewayChild = null;
 let viteChild = null;
 
 const shutdown = (code = 0) => {
   killChild(viteChild);
+  killChild(gatewayChild);
   killChild(apiChild);
   process.exit(code);
 };
@@ -50,17 +52,13 @@ try {
   ensureAppDatabase(workspaceRoot, appDataDir);
   const accessToken = resolveAccessToken(workspaceRoot, appDataDir, { isolated });
   const processOptions = () => webProcessOptions({ apiPort, appDataDir, accessToken });
-
-  if (ownsWebProcess(workspaceRoot, 'api', {}, isolated)
-      && !ownsWebProcess(workspaceRoot, 'api', processOptions(), isolated)) {
+  if (ownsWebProcess(workspaceRoot, 'api', {}, isolated)) {
     await stopApiServer(workspaceRoot, { isolated });
   }
-  let reuseApi = ownsWebProcess(workspaceRoot, 'api', processOptions(), isolated);
-  if (!reuseApi && !(await portFree(apiPort))) {
+  if (!(await portFree(apiPort))) {
     if (!isolated) throw new Error(`API 端口 ${apiPort} 已被未记录的进程占用，请先关闭对应启动终端；不会自动停止其它服务`);
     for (apiPort = 3001; apiPort <= 3099 && !(await portFree(apiPort)); apiPort += 1) { /* find isolated port */ }
     if (apiPort > 3099) throw new Error('找不到隔离开发 API 的空闲端口');
-    reuseApi = false;
   }
   const viteOptions = { ...processOptions(), vitePort };
   if (ownsWebProcess(workspaceRoot, 'vite', {}, isolated)
@@ -72,8 +70,9 @@ try {
     throw new Error(`UI 端口 ${vitePort} 已被未记录的进程占用，请先关闭对应启动终端`);
   }
   writeApiPort(workspaceRoot, apiPort, { isolated });
-  if (!reuseApi) apiChild = startApiServer({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
-  if (!(await waitFor(() => healthOk(apiPort), `API http://127.0.0.1:${apiPort}`, 60000, apiChild))) shutdown(1);
+  const reuseGateway = ownsWebProcess(workspaceRoot, 'gateway', processOptions(), isolated);
+  if (!reuseGateway) gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
+  if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gatewayChild))) shutdown(1);
   if (!reuseVite) viteChild = startViteServer({ workspaceRoot, apiPort, appDataDir, accessToken, vitePort, isolated });
   if (!(await waitFor(() => viteOk(vitePort), `Vite http://127.0.0.1:${vitePort}`, 60000, viteChild))) shutdown(1);
 

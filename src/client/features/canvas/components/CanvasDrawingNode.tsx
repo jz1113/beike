@@ -22,6 +22,7 @@ import type { CanvasNode } from '../model/types';
 import { canReference, isTextSource, referenceReady, linkedPrompt } from '../model/canvasGraph';
 import { CanvasPromptInput, type CanvasPromptInputRef } from './CanvasPromptInput';
 import { CanvasModelPicker } from './CanvasModelPicker';
+import { HomeSyncToggle } from '@client/shared/homePublish/HomeSyncToggle';
 
 const loadModels = (video = false) => (video ? getEnabledVideoModelsFromSettings : getEnabledImageModelsFromSettings)(readWorkflowModelsFromStorage())
   .filter(item => typeof item.id === 'string' && item.id)
@@ -165,6 +166,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
         {isVideo ? <CanvasVideoControls config={{...config, references: refs, refMode: videoMode, duration}} model={selectedModel} onChange={change} /> : <CanvasImageControls config={config} onChange={change} />}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
+        <HomeSyncToggle />
         <button type="button" aria-label={isVideo ? '开始生成视频' : '开始绘图'} disabled={busy || uploading || Boolean(videoValidation) || (!linkedPrompt(node, nodes) && !(isVideo && refs.length)) || !models.some(item => item.id === selectedModel)} onClick={generate} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white transition hover:bg-slate-700 disabled:bg-slate-100 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
         </div>
       </div>

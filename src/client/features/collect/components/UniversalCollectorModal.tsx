@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScanSearch, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { ScanSearch, Sparkles, FileSpreadsheet, FileVideo } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
@@ -14,6 +14,7 @@ import { useCollectorDownloads } from '../hooks/useCollectorDownloads';
 import { buildCollectorWorkshopPayload } from '../utils/collectorWorkshopImport';
 import CollectorSinglePanel from '@client/features/collect/components/CollectorSinglePanel';
 import CollectorBatchPanel from '@client/features/collect/components/CollectorBatchPanel';
+import CollectorVideoDownloadPanel from '@client/features/collect/components/CollectorVideoDownloadPanel';
 import CollectorResultPanel from '@client/features/collect/components/CollectorResultPanel';
 import { useCollectorToast } from '@client/features/collect/hooks/useCollectorToast';
 import { useFocusTrap } from '@client/features/collect/hooks/useFocusTrap';
@@ -54,7 +55,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
   );
 
   // 当前主 Tab
-  const [activeTab, setActiveTab] = useState<'single' | 'batch'>('single');
+  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'video'>('single');
 
   // 详情查看模态状态
   const [inspectingItem, setInspectingItem] = useState<any | null>(null);
@@ -198,10 +199,11 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
           <section className="mx-auto w-full max-w-[1120px]">
             <div className="mx-auto max-w-[980px] text-center">
               <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px]">全渠道智能采集</h1>
-              <p id="collector-modal-desc" className="mt-3 text-sm text-slate-500">{activeTab === 'batch' ? '粘贴多条链接或导入表格，批量收集商品图片与社媒素材。' : '一个链接，收集商品图片与社媒素材。'}</p>
+              <p id="collector-modal-desc" className="mt-3 text-sm text-slate-500">{activeTab === 'batch' ? '粘贴多条链接或导入表格，批量收集商品图片与社媒素材。' : activeTab === 'video' ? '导入含标题和视频链接的表格，按标题批量下载到本地文件夹。' : '一个链接，收集商品图片与社媒素材。'}</p>
               <div role="tablist" aria-label="采集模式选择" className="mt-6 inline-flex max-w-full overflow-x-auto rounded-full bg-slate-100 p-1 shadow-inner text-sm font-medium">
                 <button type="button" role="tab" aria-selected={activeTab === 'single'} onClick={() => setActiveTab('single')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'single' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><Sparkles className="h-3.5 w-3.5" />单条采集</button>
                 <button type="button" role="tab" aria-selected={activeTab === 'batch'} onClick={() => setActiveTab('batch')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'batch' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileSpreadsheet className="h-3.5 w-3.5" />批量采集{batch.batchTasks.length > 0 ? ` (${batch.batchTasks.length})` : ''}</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'video'} onClick={() => setActiveTab('video')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'video' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileVideo className="h-3.5 w-3.5" />oss视频下载</button>
               </div>
             </div>
 
@@ -270,6 +272,8 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
               setPreviewImageUrl={setPreviewImageUrl}
             />
           )}
+
+          {activeTab === 'video' && <CollectorVideoDownloadPanel showToast={showToast} />}
 
             </div>
           </section>

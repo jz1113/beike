@@ -132,7 +132,7 @@ export default function AppSidebar({
               ? 'bg-slate-950 text-white shadow-sm'
               : 'text-slate-400 hover:bg-white/85 hover:text-slate-950'
           }`}
-          title="系统设置 / 模型与接口配置"
+          title="设置"
         >
           <div className="relative flex h-6 w-6 items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-45 pointer-events-none">
             <Settings className="h-5 w-5 stroke-current stroke-[1.8] transition-colors" />

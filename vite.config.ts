@@ -45,7 +45,7 @@ export default defineConfig({
     // Backend hot restarts must not refresh the browser and interrupt local drafts.
     // Shared rules and client code remain watched; generated/data files do not.
     watch: {
-      ignored: ['**/src/server/**', '**/database/**', '**/docs/**', '**/.local/**', '**/tools/build/**'],
+      ignored: ['**/database/**', '**/docs/**', '**/.local/**', '**/tools/build/**'],
     },
     headers: {
       // 防御性响应头：仅开发服务器配置，生产由部署网关负责

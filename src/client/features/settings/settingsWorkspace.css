@@ -125,3 +125,28 @@
 .settings-row-order button { padding: 4px; border-radius: 4px; }
 .settings-row-order button:hover { color: #4f46e5; background: #eef2ff; }
 .settings-row-order button:disabled { opacity: .25; }
+
+.settings-shell { background: #f4f2ee; }
+.settings-shell .settings-sidebar { background: transparent; }
+.settings-shell .settings-page-scroll { background: #fff; }
+.settings-shell .settings-sidebar button { color: #57534e; }
+.settings-shell .settings-sidebar button[aria-current="page"] { background: #fff; color: #1c1917; box-shadow: 0 1px 2px rgba(28, 25, 23, 0.06); }
+.settings-preview header h2 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; color: #1c1917; }
+.settings-preview header p { margin-top: 8px; font-size: 13px; line-height: 1.6; color: #78716c; }
+.settings-preview-notice { margin-top: 8px; font-size: 12px; color: #a16207; }
+.settings-preview-list { margin-top: 8px; }
+.settings-preview-row { display: flex; align-items: center; justify-content: space-between; gap: 16px 28px; padding: 16px 0; border-bottom: 1px solid #f1f5f9; }
+.settings-preview-row .settings-field { width: min(100%, 280px); }
+.settings-switch { width: 42px; height: 24px; flex-shrink: 0; border-radius: 999px; background: #e7e5e4; padding: 2px; }
+.settings-switch.is-on { background: #3b82f6; }
+.settings-switch > span { display: block; width: 20px; height: 20px; border-radius: 999px; background: white; box-shadow: 0 1px 2px rgba(0,0,0,.16); transition: transform .15s; }
+.settings-switch.is-on > span { transform: translateX(18px); }
+.settings-segment { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: #f5f5f4; }
+.settings-segment button { border-radius: 999px; padding: 6px 12px; font-size: 12px; color: #78716c; }
+.settings-segment button[aria-pressed="true"] { background: white; color: #1c1917; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.settings-slider { display: flex; min-width: 180px; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 12px; color: #78716c; }
+.settings-slider input { width: 180px; }
+@media (max-width: 720px) {
+  .settings-preview-row { align-items: flex-start; flex-direction: column; }
+  .settings-slider, .settings-slider input, .settings-preview-row .settings-field { width: 100%; }
+}

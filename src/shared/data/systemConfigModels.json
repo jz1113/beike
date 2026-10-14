@@ -1,0 +1,470 @@
+{
+  "visionModels": [
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT 6 Astra",
+      "shortName": "GPT 6 Astra",
+      "provider": "OpenAI",
+      "badge": "多模态",
+      "description": "OpenAI GPT 6 Astra 多模态模型"
+    },
+    {
+      "id": "gpt-6-luna",
+      "name": "GPT 6 Luna",
+      "shortName": "GPT 6 Luna",
+      "provider": "OpenAI",
+      "badge": "多模态",
+      "description": "GPT 6 Luna 多模态模型"
+    },
+    {
+      "id": "grok-4.7",
+      "name": "Grok 4.7",
+      "shortName": "Grok 4.7",
+      "provider": "xAI",
+      "badge": "多模态",
+      "description": "xAI Grok 4.7 多模态"
+    },
+    {
+      "id": "gpt-6-sol",
+      "name": "GPT 6 Sol",
+      "shortName": "GPT 6 Sol",
+      "provider": "OpenAI",
+      "badge": "多模态",
+      "description": "GPT 6 Sol 多模态模型"
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "name": "GPT 5.6 Luna",
+      "shortName": "GPT 5.6 Luna",
+      "provider": "OpenAI",
+      "badge": "多模态",
+      "description": "OpenAI 新一代多模态视觉推理"
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "name": "GPT 5.6 Sol",
+      "shortName": "GPT 5.6 Sol",
+      "provider": "OpenAI",
+      "badge": "多模态",
+      "description": "OpenAI GPT 5.6 Sol"
+    },
+    {
+      "id": "gpt-5.6",
+      "name": "GPT 5.6",
+      "shortName": "GPT 5.6",
+      "provider": "OpenAI",
+      "description": "OpenAI GPT 5.6 Sol 的官方别名"
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "name": "GPT 5.6 Terra",
+      "shortName": "GPT 5.6 Terra",
+      "provider": "OpenAI",
+      "badge": "多模态",
+      "description": "OpenAI GPT 5.6 Terra"
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "name": "GPT 5.4 Mini",
+      "shortName": "GPT 5.4 Mini",
+      "provider": "OpenAI",
+      "badge": "轻量",
+      "description": "OpenAI GPT 5.4 Mini"
+    },
+    {
+      "id": "claude-opus-5",
+      "name": "Claude Opus 5",
+      "shortName": "Claude Opus 5",
+      "provider": "Anthropic",
+      "badge": "旗舰推理",
+      "description": "Anthropic 顶尖深度推理大模型"
+    },
+    {
+      "id": "claude-fable-5",
+      "name": "Claude Fable 5",
+      "shortName": "Claude Fable 5",
+      "provider": "Anthropic",
+      "badge": "架构专家",
+      "description": "Anthropic 高密度结构化推理"
+    },
+    {
+      "id": "claude-opus-4-7",
+      "name": "Claude Opus 4.7",
+      "shortName": "Claude Opus 4.7",
+      "provider": "Anthropic",
+      "badge": "Opus 4.7",
+      "description": "Anthropic Claude Opus 4.7"
+    },
+    {
+      "id": "claude-haiku-4-5-20251001-thinking",
+      "name": "Claude Haiku 4.5 Thinking",
+      "shortName": "Claude Haiku 4.5",
+      "provider": "Anthropic",
+      "badge": "极速思考",
+      "description": "Anthropic Haiku 4.5 思考模式"
+    },
+    {
+      "id": "claude-sonnet-5",
+      "name": "Claude Sonnet 5",
+      "shortName": "Claude Sonnet 5",
+      "provider": "Anthropic",
+      "badge": "Sonnet 5",
+      "description": "Anthropic Claude Sonnet 5"
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "name": "Gemini 3.8 Flash",
+      "shortName": "Gemini 3.8 Flash",
+      "provider": "Google",
+      "badge": "极速",
+      "description": "Google Gemini 3.8 Flash"
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "name": "Gemini 3.7 Flash",
+      "shortName": "Gemini 3.7 Flash",
+      "provider": "Google",
+      "badge": "助手首选",
+      "description": "Google Gemini 3.7 Flash"
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro Preview",
+      "shortName": "Gemini 3.1 Pro",
+      "provider": "Google",
+      "badge": "视觉旗舰",
+      "description": "Google Gemini 3.1 Pro 预览"
+    },
+    {
+      "id": "deepseek-v4.1-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "shortName": "DeepSeek V4.1 Flash",
+      "provider": "DeepSeek",
+      "badge": "V4.1",
+      "description": "DeepSeek V4.1 Flash"
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash",
+      "shortName": "DeepSeek V4 Flash",
+      "provider": "DeepSeek",
+      "badge": "V4",
+      "description": "DeepSeek V4 Flash"
+    },
+    {
+      "id": "qwen3.8-max",
+      "name": "Qwen 3.8 Max",
+      "shortName": "Qwen 3.8 Max",
+      "provider": "Alibaba",
+      "badge": "通义旗舰",
+      "description": "通义千问 3.8 Max"
+    },
+    {
+      "id": "grok-4.6",
+      "name": "Grok 4.6",
+      "shortName": "Grok 4.6",
+      "provider": "xAI",
+      "badge": "反AI纪实",
+      "description": "xAI Grok 4.6 多模态"
+    },
+    {
+      "id": "kimi-k3",
+      "name": "Kimi K3",
+      "shortName": "Kimi K3",
+      "provider": "Moonshot",
+      "badge": "Kimi",
+      "description": "月之暗面 Kimi K3"
+    }
+  ],
+  "imageModels": [
+    {
+      "id": "gpt-image-2.5-flare",
+      "name": "GPT Image 2.5 Flare",
+      "shortName": "GPT Image 2.5 Flare",
+      "provider": "OpenAI",
+      "isPrimary": true,
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "2.5 旗舰",
+      "description": "OpenAI 新一代生图，支持 low/medium/high 与参考图编辑"
+    },
+    {
+      "id": "openai/gpt-image-2",
+      "name": "联池image2",
+      "shortName": "联池image2",
+      "provider": "OpenAI",
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "description": "联池 OpenAI 兼容图像接口，支持文生图与多参考图编辑"
+    },
+    {
+      "id": "gpt-image-2.5-sunburst",
+      "name": "GPT Image 2.5 Sunburst",
+      "shortName": "GPT Image 2.5 Sunburst",
+      "provider": "OpenAI",
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "2.5",
+      "description": "OpenAI 2.5 生图通道，尺寸约束与 Flare 相同"
+    },
+    {
+      "id": "gpt-image-2",
+      "name": "GPT Image 2",
+      "shortName": "GPT Image 2",
+      "provider": "OpenAI",
+      "isPrimary": true,
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1536",
+      "supportEdits": true,
+      "badge": "4K标准",
+      "description": "OpenAI 官方文档标准通道，支持 low/medium/high 画质与参考图编辑"
+    },
+    {
+      "id": "nano-banana-pro",
+      "name": "Nano Banana Pro",
+      "shortName": "Nano Banana Pro",
+      "provider": "Google",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "Pro",
+      "description": "Google Gemini 系高质量多参考图生图"
+    },
+    {
+      "id": "nano-banana",
+      "name": "Nano Banana",
+      "shortName": "Nano Banana",
+      "provider": "Google",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "极速",
+      "description": "Google Gemini 系极速多参考图生图"
+    },
+    {
+      "id": "doubao-seedream-4-0-250828",
+      "name": "Seedream 4.0",
+      "shortName": "Seedream 4.0",
+      "provider": "Bytedance",
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "4.0",
+      "description": "火山引擎即梦 4.0 生图"
+    },
+    {
+      "id": "doubao-seedream-4-5-251128",
+      "name": "Seedream 4.5",
+      "shortName": "Seedream 4.5",
+      "provider": "Bytedance",
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "4.5",
+      "description": "火山引擎即梦 4.5 生图"
+    },
+    {
+      "id": "doubao-seedream-5-0-260128",
+      "name": "Seedream 5.0",
+      "shortName": "Seedream 5.0",
+      "provider": "Bytedance",
+      "isPrimary": true,
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "电商旗舰",
+      "description": "火山引擎官方电商生成旗舰模型"
+    },
+    {
+      "id": "seedream-v5-pro",
+      "name": "Seedream V5 Pro",
+      "shortName": "Seedream V5 Pro",
+      "provider": "Bytedance",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "V5 Pro",
+      "description": "即梦 V5 Pro，已验证 1K～2K 尺寸"
+    },
+    {
+      "id": "qwen-image-max",
+      "name": "Qwen Image Max",
+      "shortName": "Qwen Image Max",
+      "provider": "Alibaba",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "Max",
+      "description": "通义千问图像生成 Max（网关真实 id；原清单 qwen-image-3 无对应条目）"
+    },
+    {
+      "id": "z-image-turbo",
+      "name": "Z-Image Turbo",
+      "shortName": "Z-Image Turbo",
+      "provider": "Alibaba",
+      "supportedQualities": [
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": false,
+      "badge": "极速",
+      "description": "阿里极速生图通道"
+    },
+    {
+      "id": "qwen-image",
+      "name": "Qwen Image",
+      "shortName": "Qwen Image",
+      "provider": "Alibaba",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": false,
+      "badge": "文生图",
+      "description": "通义千问文生图"
+    },
+    {
+      "id": "qwen-image-edit",
+      "name": "Qwen Image Edit",
+      "shortName": "Qwen Edit",
+      "provider": "Alibaba",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "图编辑",
+      "description": "通义千问图像编辑，仅支持一张参考图"
+    },
+    {
+      "id": "midjourney",
+      "name": "Midjourney",
+      "shortName": "Midjourney",
+      "provider": "Midjourney",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "Imagine",
+      "description": "网关模型 id 为 midjourney，适配器提交 mj_fast_imagine"
+    },
+    {
+      "id": "flux",
+      "name": "Flux",
+      "shortName": "Flux",
+      "provider": "Black Forest Labs",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "基础",
+      "description": "Black Forest Labs Flux 文生图"
+    },
+    {
+      "id": "flux-pro-max",
+      "name": "Flux Pro Max",
+      "shortName": "Flux Pro Max",
+      "provider": "Black Forest Labs",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "Pro Max",
+      "description": "Black Forest Labs Flux Pro Max"
+    },
+    {
+      "id": "grok-4.1-image",
+      "name": "Grok 4.1 Image",
+      "shortName": "Grok 4.1 Image",
+      "provider": "xAI",
+      "supportedQualities": [
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1536",
+      "supportEdits": true,
+      "badge": "写实",
+      "description": "xAI Grok 4.1 文生图（aspect_ratio 驱动）"
+    },
+    {
+      "id": "grok-4.2-image",
+      "name": "Grok 4.2 Image",
+      "shortName": "Grok 4.2 Image",
+      "provider": "xAI",
+      "isPrimary": true,
+      "supportedQualities": [
+        "medium",
+        "low"
+      ],
+      "defaultSize": "1024x1536",
+      "supportEdits": true,
+      "badge": "最新",
+      "description": "xAI Grok 4.2 文生图（aspect_ratio 驱动）"
+    },
+    {
+      "id": "grok-imagine-image-quality",
+      "name": "Grok Imagine Image Quality",
+      "shortName": "Grok Imagine Quality",
+      "provider": "xAI",
+      "supportedQualities": [
+        "high",
+        "medium"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "高质",
+      "description": "xAI Grok Imagine 高质量生图 / 图像编辑"
+    }
+  ]
+}

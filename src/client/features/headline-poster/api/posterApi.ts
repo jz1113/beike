@@ -1,4 +1,5 @@
-import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
+import { storageConfigHeaders } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import { retryWhenLocalApiUnavailable } from '@client/shared/api/localApiRetry';
 import { pollSingleTask, submitImageGenTask } from '@client/shared/api/generationApi';
 import { generationRecoveryError } from '@client/shared/api/generationRecovery';
@@ -28,8 +29,7 @@ function waitForPosterOperation<T>(operation: Promise<T>, signal?: AbortSignal):
 
 export async function rewriteCoverTitle(item: PosterItem, titleModel: string, signal?: AbortSignal): Promise<string> {
   try {
-    const response = await retryWhenLocalApiUnavailable(() => apiFetch('/api/generate/headline-title', {
-      method: 'POST',
+    const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-title', {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: titleModel,
@@ -56,8 +56,7 @@ export async function directCoverDesign(
   signal?: AbortSignal,
 ): Promise<HeadlineDesignResponse> {
   try {
-    const response = await retryWhenLocalApiUnavailable(() => apiFetch('/api/generate/headline-design', {
-      method: 'POST',
+    const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-design', {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: titleModel,
@@ -104,7 +103,7 @@ export async function generateFinalCover(
   let taskId = recovery.taskId;
   if (!generatedSceneUrl && !taskId && recovery.required) {
     if (!recovery.submissionKey) throw generationRecoveryError('旧任务缺少查询标识，请在资产中心核对原任务；不会重新提交生图');
-    const response = await apiFetch(`/api/generate/image?taskKey=${encodeURIComponent(recovery.submissionKey)}`, { headers: storageConfigHeaders(), signal: recovery.signal });
+    const response = await apiRequest('GET', '/api/generate/image', { search: `taskKey=${encodeURIComponent(recovery.submissionKey)}`, headers: storageConfigHeaders(), signal: recovery.signal });
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.taskId) throw generationRecoveryError(data?.error || '尚未查到原任务，请稍后核对；不会重新提交生图');
     taskId = String(data.taskId);

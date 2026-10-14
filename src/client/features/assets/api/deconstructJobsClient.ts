@@ -1,11 +1,11 @@
-import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readEffectiveFallbackOrder } from '@client/shared/api/fallbackOrder';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import type { DeconstructJobSnapshot } from '@shared/contracts/deconstructJobs';
 
-const endpoint = '/api/catalog/assets/deconstruct/jobs';
+const endpoint = '/api/catalog/assets/deconstruct/jobs' as const;
 
 export class DeconstructJobRequestError extends Error {
   constructor(message: string, public readonly status?: number) { super(message); }
@@ -33,13 +33,13 @@ function snapshot(value: unknown): DeconstructJobSnapshot {
 }
 
 export async function listDeconstructJobs(): Promise<DeconstructJobSnapshot[]> {
-  const body = await readResponse(await apiFetch(endpoint));
+  const body = await readResponse(await apiRequest('GET', endpoint));
   if (!Array.isArray(body.jobs)) throw new DeconstructJobRequestError('任务列表未确认，稍后重试查询');
   return body.jobs.map(snapshot);
 }
 
 export async function readDeconstructJob(jobId: string): Promise<DeconstructJobSnapshot> {
-  const body = await readResponse(await apiFetch(`${endpoint}?jobId=${encodeURIComponent(jobId)}`));
+  const body = await readResponse(await apiRequest('GET', endpoint, { search: `jobId=${encodeURIComponent(jobId)}` }));
   return snapshot(body.job);
 }
 
@@ -57,8 +57,8 @@ export async function submitDeconstructJob(input: {
   const isolatedRoute = isOpenAIModelRouteId(selectedVisionModel) || isDeepSeekRoute(selectedVisionModel);
   // Submission is never replayed automatically. An unknown response is recovered
   // with this same persisted jobId, so one user action cannot bill twice.
-  const body = await readResponse(await apiFetch(endpoint, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const body = await readResponse(await apiRequest('POST', endpoint, {
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...rest, reviewBeforeSave: Boolean(rest.reviewBeforeSave), model: requestModelId(selectedVisionModel), overrides,
       fallbackOrder: isolatedRoute ? [] : (readEffectiveFallbackOrder() || modelIds).filter(id => !isOpenAIModelRouteId(id) && !isDeepSeekRoute(id)).map(requestModelId) }),
   }));
@@ -66,8 +66,8 @@ export async function submitDeconstructJob(input: {
 }
 
 export async function stopDeconstructJob(jobId: string): Promise<DeconstructJobSnapshot> {
-  const body = await readResponse(await apiFetch(endpoint, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop', jobId }),
+  const body = await readResponse(await apiRequest('POST', endpoint, {
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop', jobId }),
   }));
   return snapshot(body.job);
 }

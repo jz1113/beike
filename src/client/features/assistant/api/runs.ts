@@ -1,4 +1,4 @@
-import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import type { AssistantTurn } from '@shared/domain/assistant/types';
 import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
 
@@ -13,7 +13,7 @@ export interface ActiveRun {
 }
 
 export async function fetchAssistantRuns(): Promise<ActiveRun[]> {
-  const res = await apiFetch('/api/assistant/runs');
+  const res = await apiRequest('GET', '/api/assistant/runs');
   if (!res.ok) throw new Error(`读取助手任务失败 (HTTP ${res.status})`);
   const data = await res.json();
   if (data.success === false) throw new Error(data.error || '读取助手任务失败');
@@ -32,11 +32,11 @@ async function readSnapshotResponse(res: Response, turnId: string, threadId?: st
 }
 
 export async function fetchAssistantTurnSnapshot(turnId: string, threadId?: string): Promise<AssistantTurn | null> {
-  const res = await apiFetch(`/api/assistant/turns/${encodeURIComponent(turnId)}/snapshot`);
+  const res = await apiRequest('GET', '/api/assistant/turns/{turnId}/snapshot', { pathParams: { turnId } });
   return readSnapshotResponse(res, turnId, threadId);
 }
 
 export async function recoverAssistantTurn(turnId: string, threadId?: string): Promise<AssistantTurn | null> {
-  const res = await apiFetch(`/api/assistant/turns/${encodeURIComponent(turnId)}/recover`, { method: 'POST' });
+  const res = await apiRequest('POST', '/api/assistant/turns/{turnId}/recover', { pathParams: { turnId } });
   return readSnapshotResponse(res, turnId, threadId);
 }

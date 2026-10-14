@@ -86,9 +86,9 @@ export default function UsageTab({
                 <div className="settings-usage-toolbar">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-semibold text-slate-900">使用概览</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">创作档案</h2>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1.5">本机调用记录与预估费用</p>
+                    <p className="text-xs text-slate-500 mt-1.5">本机创作足迹、调用记录与预估消耗</p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">

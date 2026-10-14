@@ -1,0 +1,75 @@
+package generate
+
+import (
+	"strings"
+	"sync"
+
+	"beike.local/cloud/src/backend/internal/system"
+)
+
+var videoQueries sync.Map
+
+func rememberVideoQuery(base, taskID, template string) {
+	videoQueries.Store(strings.TrimRight(base, "/")+":"+taskID, template)
+}
+
+func videoQueryTemplate(base, taskID string) string {
+	value, ok := videoQueries.Load(strings.TrimRight(base, "/") + ":" + taskID)
+	if !ok {
+		return ""
+	}
+	text, _ := value.(string)
+	return text
+}
+
+func videoEndpointSet(family, model string, images []string) ([]string, []string, map[string]string) {
+	root := "{base}"
+	var submit, query []string
+	headers := map[string]string{}
+	switch family {
+	case "seedance":
+		submit = []string{root + "/seedance/v3/contents/generations/tasks", root + "/v2/videos/generations"}
+		query = []string{root + "/seedance/v3/contents/generations/tasks/{taskId}", root + "/v2/videos/generations/{taskId}"}
+	case "wan":
+		submit = []string{root + "/qwen/api/v1/services/aigc/video-generation/video-synthesis", root + "/api/v1/services/aigc/video-generation/video-synthesis"}
+		query = []string{root + "/qwen/api/v1/tasks/{taskId}", root + "/api/v1/tasks/{taskId}"}
+		headers["X-DashScope-Async"] = "enable"
+	case "kling":
+		mode := "text2video"
+		if strings.Contains(strings.ToLower(model), "omni") {
+			mode = "omni-video"
+		} else if len(images) > 0 {
+			mode = "image2video"
+		}
+		submit = []string{root + "/kling/v1/videos/" + mode}
+		query = []string{root + "/kling/v1/videos/" + mode + "/{taskId}"}
+	case "vidu":
+		path := "text2video"
+		if len(images) > 0 {
+			path = "img2video"
+		}
+		submit = []string{root + "/vidu/v2/" + path, root + "/vidu/ent/v2/" + path}
+		query = []string{root + "/vidu/v2/tasks/{taskId}/creations", root + "/vidu/ent/v2/tasks/{taskId}/creations"}
+	case "grok-video":
+		submit = []string{root + "/xai/v1/videos/generations"}
+		query = []string{root + "/xai/v1/videos/{taskId}"}
+	case "sora":
+		submit = []string{root + "/v2/videos/generations", root + "/v1/videos", root + "/v1/video/generations", root + "/xai/v1/videos/generations"}
+		query = []string{root + "/v2/videos/generations/{taskId}", root + "/v1/videos/{taskId}", root + "/v1/video/generations/{taskId}"}
+	default:
+		submit = []string{root + "/v2/videos/generations", root + "/v1/videos", root + "/v1/video/generations"}
+		query = []string{root + "/v2/videos/generations/{taskId}", root + "/v1/videos/{taskId}", root + "/v1/video/generations/{taskId}"}
+	}
+	return submit, query, headers
+}
+
+func expandVideoURLs(base string, templates []string, taskID string) []string {
+	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	out := make([]string, 0, len(templates))
+	for _, template := range templates {
+		endpoint := strings.ReplaceAll(template, "{base}", root)
+		endpoint = strings.ReplaceAll(endpoint, "{taskId}", taskID)
+		out = append(out, endpoint)
+	}
+	return out
+}

@@ -61,7 +61,11 @@ function matches(root, kind, record, options) {
   for (const [key, value] of Object.entries(options)) if (record[key] !== value) return false;
   const info = processInfo(record.pid);
   if (!info || info.started !== record.started || (info.cwd !== null && info.cwd !== record.root)) return false;
-  const marker = kind === 'api' ? resolve(root, 'src/server/index.ts') : resolve(root, 'vite.config.ts');
+  const marker = kind === 'api'
+    ? resolve(root, 'src/server/index.ts')
+    : kind === 'gateway'
+      ? resolve(root, 'tools/build/beike-api')
+      : resolve(root, 'vite.config.ts');
   return info.command.includes(marker) && (kind !== 'api' || /\swatch\s/.test(info.command));
 }
 

@@ -9,6 +9,7 @@ export default defineConfig([
     '.local/**',
     'tools/build/**',
     'node_modules/**',
+    'src/client/shared/api/openapi-types.ts',
   ]),
   {
     files: ['src/client/**/*.{ts,tsx}'],

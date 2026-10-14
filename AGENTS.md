@@ -2,10 +2,10 @@
 
 ## 单项目结构
 
-这是一个单 package 的全栈应用，不使用 monorepo、workspace 协议或子目录 package.json。依赖只声明在根 package.json，根 pnpm-lock.yaml 锁定版本。Node.js 22、pnpm 10.13.1。
+这是一个单 package 的全栈应用，不使用 monorepo、workspace 协议或子目录 package.json。Node 依赖只声明在根 package.json，根 pnpm-lock.yaml 锁定版本；Go 依赖在 go.mod / go.sum。Node.js 22、pnpm 10.13.1、Go 1.26。
 
 - `src/client`：浏览器界面，按 `app / features / shared / store / assets / styles / types` 分工。
-- `src/server`：后端，按 `routes / services / repositories / gateways / core / bootstrap / infrastructure` 分工。
+- `src/backend`：对外 API、数据库迁移和官方种子。入口在 `cmd/api`，接口按领域放在 `internal`，迁移在 `internal/platform/database/migrate`。`pnpm dev`、`pnpm start` 与 `pnpm db:migrate` 都走这里。需要 Go 1.26。
 - `src/shared/contracts`：前后端接口与 Zod 契约，不承载业务编排。
 - `src/shared/domain`：浏览器安全的业务规则、模型适配、类型与种子。
 - `database`：schema、迁移和本地开发库；数据库和备份不提交。
@@ -14,16 +14,15 @@
 ## 依赖与分类
 
 - 别名使用 `@client/*`、`@server/*`、`@shared/*`，不再使用 `@beike/*` 包名。
-- client 与 shared 禁止依赖 server、Node 原生模块、Prisma、sharp、AWS SDK。
-- server 不引用 client；shared 不引用 client/server；domain 与 contracts 保持各自独立。
-- server/infrastructure 不反向引用 routes、services、repositories 等应用层。
-- routes 处理 HTTP，services 处理业务，数据访问经过 repositories；Prisma 连接属于 infrastructure。
+- client 与 shared 禁止依赖 backend、Node 原生模块、Prisma、sharp、AWS SDK。
+- `src/backend` 不引用 client。shared 不引用 client 或 backend；domain 与 contracts 保持各自独立。
+- 对外 HTTP、迁移和官方种子都在 `src/backend`。新接口写到 Go。
 - client/shared 不反向引用 features。单个 feature 按实际需要设 `components / hooks / api / model`，不要机械创建空目录。
 - 工坊 model 不引用 UI/hooks；跨功能复用优先下沉最小共享能力，禁止扩充边界豁免。
 
 ## 验证与数据保护
 
-- 当前项目按维护要求不保留测试源码、QA 脚本和临时 Agent 计划；验证临时文件放项目外。`pnpm check` 执行静态检查和构建，不包含测试步骤。
+- 正式测试保留在仓库内：与源码同目录的 `*.test.ts`、根目录 `tests/api` 的接口行为测试。不保留 QA fixture、截图、一次性报告和临时 Agent 计划；这类临时文件放项目外。`pnpm check` 包含静态检查、单元测试和构建。
 - 变更目录时同步启动、构建、部署、检查、文档和路径型配置。
 - 未使用、文件长度、依赖边界基线只允许收紧；目录移动只更新路径。
 - 不删除用户未提交修改或以“未被引用”为由批量删文件。

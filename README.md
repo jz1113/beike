@@ -8,12 +8,13 @@
 
 ```text
 贝壳/
-├── src/                 源码（前端、后端、共用代码）
+├── src/                 源码（前端、Go API、共用代码、迁移脚本）
 │   ├── client/          前端：页面、交互、样式
 │   │   └── public/      前端公开图片与品牌素材
-│   ├── server/          后端：接口、业务、数据访问
+│   ├── backend/         对外 API：Go 入口、领域接口、数据库迁移与官方种子
 │   └── shared/          前后端共用的接口定义与业务规则
 ├── database/            数据库结构、迁移与本地开发库
+├── go.mod / go.sum      Go 模块与依赖锁
 ├── node_modules/        安装生成的依赖，不手工维护
 ├── docs/                架构、产品、厂商接口与部署说明
 ├── tools/               工程工具
@@ -29,7 +30,7 @@
 └── pnpm-lock.yaml       唯一依赖锁文件
 ```
 
-日常修改界面看 `src/client`，修改接口看 `src/server`，修改数据结构看 `database`，使用方法看 `docs`。依赖由 `pnpm install` 管理；工程工具独立收纳，避免混入产品源码。根目录几个配置文件是工具入口，不必为了减少文件数再包一层。
+日常修改界面看 `src/client`，修改接口、数据库迁移和官方种子看 `src/backend`，历史 SQL 看 `database/migrations`，使用方法看 `docs`。`pnpm dev` 与 `pnpm start` 编译并启动 Go API。依赖由 `pnpm install` 管理；工程工具独立收纳，避免混入产品源码。根目录几个配置文件是工具入口，不必为了减少文件数再包一层。
 
 详细归属和功能导航见 [目录与分层](docs/layout.md)，依赖限制见同页的模块职责与依赖边界。
 
@@ -37,7 +38,7 @@
 
 ## 安装与启动
 
-环境：Node.js 22、pnpm 10.13.1。技术栈：React 19、Vite、Tailwind CSS、Hono、Prisma 5、SQLite。
+环境：Node.js 22、pnpm 10.13.1、Go 1.26。技术栈：React 19、Vite、Tailwind CSS、Go、SQLite。
 
 ```bash
 nvm use
@@ -47,28 +48,27 @@ pnpm install --frozen-lockfile
 pnpm dev                     # 同时启动前端和 API
 ```
 
-浏览器打开 http://127.0.0.1:5173。单独启动使用 `pnpm dev:api`、`pnpm dev:ui`；原有 `dev:web` / `start:web` 命令仍可用。
+浏览器打开 http://127.0.0.1:5173。`pnpm dev` 同时启动 Vite 与 Go API。单独启动前端用 `pnpm dev:ui`；`dev:web` / `start:web` 与 `dev` / `start` 相同。
 
 macOS 也可在 Finder 中双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)：它选用 `.nvmrc` 的 Node.js 22，首次缺依赖时按锁文件安装，然后启动 API 与前端并打开浏览器。重复双击会打开已运行的页面；在启动器的终端窗口按 Ctrl+C 停止服务。现有 `.env` 和本机数据不会被启动器覆盖。
 
-在 `.env` 填写模型网关和采集配置；不要提交密钥。前端通过开发代理访问 API，生产由同一 Node 服务托管页面与 API。
+在 `.env` 填写模型网关和采集配置；不要提交密钥。前端通过开发代理访问 API。生产由 Go 进程托管页面与 API：`pnpm start` 先编译 `src/backend/cmd/api`，启动时再用现有 Node 脚本执行数据库迁移和官方种子。
 
 ## 构建与检查
 
 ```bash
-pnpm build                   # 类型检查、生成 Prisma 客户端、构建前端
+pnpm build                   # 类型检查并构建前端
 pnpm start                   # 启动生产服务，读取 tools/build/ui/
 pnpm check                   # 静态质量检查与生产构建，与 CI 一致
 pnpm run check:structure     # 单项目结构与依赖声明
 pnpm run lint:boundaries     # 浏览器/服务端、公共/功能模块边界
 ```
 
-当前目录按维护要求不保留测试源码、测试执行器和浏览器 QA 脚本，`pnpm check` 不包含自动化测试。它检查目录、依赖声明、模型文档、TypeScript、ESLint、未使用绑定、文件长度、依赖边界和密钥，并构建前端。既有质量基线只允许收紧。临时验证脚本、截图、报告和 Agent 计划应放在项目外的临时目录，验证后清理。
+`pnpm check` 检查目录、依赖声明、模型文档、TypeScript、ESLint、未使用绑定、文件长度、依赖边界、密钥和 Go，运行单元测试，并构建前端。正式测试留在仓库内。QA fixture、截图、报告和 Agent 计划应放在项目外的临时目录，验证后清理。
 
 ## 数据与部署
 
-- `pnpm db:generate` 生成客户端，不修改数据。
-- `pnpm db:migrate` / `pnpm db:deploy` 都运行项目的版本化 SQLite 迁移；不使用 Prisma 的另一套迁移历史。
+- `pnpm db:migrate` / `pnpm db:deploy` 都运行 Go 版版本化 SQLite 迁移和官方种子。`database/migrations/` 里的历史 SQL 不参与新库初始化。
 - `pnpm db:backup` 对实际运行库做一致性快照；`pnpm db:restore:verify <文件>` 检查快照完整性及外键。
 - 本地启动器继续使用系统原有应用数据目录；`database/dev.db` 仅作为开发/首次启动后备数据。
 - [部署说明](docs/deployment.md)与 Nginx 模板使用 `tools/build/ui/`。

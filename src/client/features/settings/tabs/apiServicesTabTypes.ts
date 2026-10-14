@@ -5,7 +5,7 @@ import type { ModelChannel } from '../model/modelManagement';
 export interface ApiServicesTabProps {
   config: ReturnType<typeof useSettingsConfig>;
   models: ReturnType<typeof useCustomModels>;
-  group: 'models' | 'other';
+  group: 'models' | 'other' | 'all' | 'storage';
   selectedServiceId: string;
   setSelectedServiceId: (id: string) => void;
   serviceSearch: string;

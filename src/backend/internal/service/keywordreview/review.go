@@ -1,0 +1,345 @@
+package keywordreview
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"regexp"
+	"strings"
+)
+
+const (
+	maxTokens    = 12288
+	reasonMax    = 18
+	rejectMax    = 24
+	expansionMax = 120
+)
+
+type RuleEntry struct {
+	Section string
+	Text    string
+	Mode    string
+}
+
+type Row struct {
+	ID              string
+	Query           string
+	Expansion       *string
+	EntityExpansion *string
+	ContentType     *string
+}
+
+type Result struct {
+	Results []map[string]any
+	Failed  []string
+	Usage   json.RawMessage
+	Model   string
+}
+
+type UpstreamError struct {
+	Status   int
+	Provider string
+	Body     map[string]any
+	Message  string
+}
+
+func (e *UpstreamError) Error() string { return "upstream" }
+
+type OutputError struct {
+	Message string
+	Usage   json.RawMessage
+}
+
+func (e *OutputError) Error() string { return e.Message }
+
+type Input struct {
+	BaseURL  string
+	APIKey   string
+	Model    string
+	Provider string
+	Mode     string
+	Rows     []Row
+	Rules    []RuleEntry
+}
+
+func Review(ctx context.Context, client *http.Client, input Input) (Result, error) {
+	mode := input.Mode
+	if mode == "" {
+		mode = "image"
+	}
+	compact := input.Provider != "gateway"
+	requestBody := chatRequest{
+		Model: input.Model, Temperature: 0.1, MaxTokens: maxTokens,
+		ResponseFormat: map[string]string{"type": "json_object"},
+		Messages: []chatMessage{
+			{Role: "system", Content: systemPrompt(mode, compact, input.Rules)},
+			{Role: "user", Content: "请审核以下行：\n" + marshalText(modelRows(input.Rows))},
+		},
+	}
+	if input.Provider != "gateway" {
+		requestBody.Thinking = &chatThinking{Type: "disabled"}
+	}
+	body, err := marshalTextBytes(requestBody)
+	if err != nil {
+		return Result{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(input.BaseURL, "/")+"/v1/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return Result{}, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+input.APIKey)
+	response, err := client.Do(request)
+	if err != nil {
+		return Result{}, err
+	}
+	defer response.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	provider := "DeepSeek"
+	if input.Provider == "gateway" {
+		provider = "模型网关"
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		parsed := map[string]any{}
+		_ = json.Unmarshal(raw, &parsed)
+		return Result{}, &UpstreamError{Status: response.StatusCode, Provider: provider, Body: parsed}
+	}
+	var data map[string]any
+	if json.Unmarshal(raw, &data) != nil {
+		return Result{}, &UpstreamError{Status: 502, Provider: provider, Message: "模型服务响应传输异常，提交结果待核对"}
+	}
+	usage, _ := json.Marshal(data["usage"])
+	if data["usage"] == nil {
+		usage = nil
+	}
+	parsed, err := readModelPayload(data, input.Model)
+	if err != nil {
+		return Result{}, &OutputError{Message: err.Error(), Usage: usage}
+	}
+	checked, err := validateResults(remapIDs(expandCompact(parsed, mode), input.Rows), input.Rows, mode)
+	if err != nil {
+		return Result{}, &OutputError{Message: err.Error(), Usage: usage}
+	}
+	return Result{Results: stripLookup(checked.results), Failed: checked.failed, Usage: usage, Model: input.Model}, nil
+}
+
+type chatRequest struct {
+	Model          string            `json:"model"`
+	Temperature    float64           `json:"temperature"`
+	MaxTokens      int               `json:"max_tokens"`
+	Thinking       *chatThinking     `json:"thinking,omitempty"`
+	ResponseFormat map[string]string `json:"response_format"`
+	Messages       []chatMessage     `json:"messages"`
+}
+
+type chatThinking struct {
+	Type string `json:"type"`
+}
+
+type chatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type promptRow struct {
+	ID              string  `json:"id"`
+	Query           string  `json:"query"`
+	Expansion       *string `json:"expansion,omitempty"`
+	EntityExpansion *string `json:"entityExpansion,omitempty"`
+	ContentType     *string `json:"contentType,omitempty"`
+}
+
+func modelRows(rows []Row) []promptRow {
+	items := make([]promptRow, len(rows))
+	for index, row := range rows {
+		item := promptRow{ID: itoa(index + 1), Query: row.Query}
+		if row.Expansion != nil {
+			value := clipRaw(*row.Expansion, expansionMax)
+			item.Expansion = &value
+		}
+		if row.EntityExpansion != nil {
+			value := clipRaw(*row.EntityExpansion, expansionMax)
+			item.EntityExpansion = &value
+		}
+		if row.ContentType != nil {
+			value := clipRaw(*row.ContentType, 40)
+			item.ContentType = &value
+		}
+		items[index] = item
+	}
+	return items
+}
+
+func expandCompact(value any, mode string) any {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	items, ok := object["results"].([]any)
+	if !ok {
+		return value
+	}
+	fields := []string{"id", "category", "producible", "categoryReason", "rejectReason"}
+	if mode == "video" {
+		fields = []string{"id", "category", "producible", "lowValue", "categoryReason", "rejectReason"}
+	}
+	expanded := make([]any, len(items))
+	for index, item := range items {
+		row, ok := item.([]any)
+		if !ok {
+			expanded[index] = item
+			continue
+		}
+		id, idOK := compactID(row)
+		if !idOK || len(row) < len(fields)-1 || len(row) > len(fields) {
+			expanded[index] = map[string]any{"id": id}
+			continue
+		}
+		mapped := map[string]any{}
+		for fieldIndex, field := range fields {
+			if fieldIndex < len(row) {
+				mapped[field] = row[fieldIndex]
+			}
+		}
+		expanded[index] = mapped
+	}
+	object["results"] = expanded
+	return object
+}
+
+func compactID(row []any) (any, bool) {
+	if len(row) == 0 {
+		return nil, false
+	}
+	switch typed := row[0].(type) {
+	case string:
+		return typed, true
+	case float64:
+		if typed == math.Trunc(typed) {
+			return itoa(int(typed)), true
+		}
+	}
+	return row[0], false
+}
+
+func remapIDs(value any, rows []Row) any {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	items, ok := object["results"].([]any)
+	if !ok {
+		return value
+	}
+	byShort := map[string]string{}
+	for index, row := range rows {
+		byShort[itoa(index+1)] = row.ID
+	}
+	remapped := make([]any, len(items))
+	for index, item := range items {
+		candidate, ok := item.(map[string]any)
+		if !ok {
+			remapped[index] = item
+			continue
+		}
+		if mapped, ok := byShort[fmt.Sprint(candidate["id"])]; ok {
+			candidate["id"] = mapped
+		}
+		remapped[index] = candidate
+	}
+	object["results"] = remapped
+	return object
+}
+
+func stripLookup(results []map[string]any) []map[string]any {
+	stripped := make([]map[string]any, len(results))
+	for index, item := range results {
+		next := map[string]any{
+			"id": item["id"], "category": item["category"], "producible": item["producible"],
+			"categoryReason": item["categoryReason"], "rejectReason": item["rejectReason"],
+		}
+		if item["lowValue"] != nil && item["lowValue"] != "" {
+			next["lowValue"] = item["lowValue"]
+		}
+		stripped[index] = next
+	}
+	return stripped
+}
+
+func readModelPayload(data map[string]any, model string) (any, error) {
+	choices, _ := data["choices"].([]any)
+	if len(choices) == 0 {
+		return nil, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
+	}
+	choice, _ := choices[0].(map[string]any)
+	if fmt.Sprint(choice["finish_reason"]) == "length" {
+		return nil, fmt.Errorf("关键词审核模型 %s 输出被截断，本批结果未写入", model)
+	}
+	message, _ := choice["message"].(map[string]any)
+	raw, _ := message["content"].(string)
+	if strings.TrimSpace(raw) == "" {
+		return nil, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
+	}
+	parsed, err := parseModelJSON(raw)
+	if err != nil {
+		return nil, fmt.Errorf("关键词审核模型 %s 返回了不完整 JSON，本批结果未写入", model)
+	}
+	return parsed, nil
+}
+
+var fencePattern = regexp.MustCompile("(?i)^```(?:json)?\\s*")
+var fenceTailPattern = regexp.MustCompile("\\s*```$")
+
+func parseModelJSON(raw string) (any, error) {
+	clean := fenceTailPattern.ReplaceAllString(fencePattern.ReplaceAllString(strings.TrimSpace(raw), ""), "")
+	var parsed any
+	if err := json.Unmarshal([]byte(clean), &parsed); err != nil {
+		return nil, err
+	}
+	return parsed, nil
+}
+
+func textValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
+func clipRaw(value string, max int) string {
+	if value == "" {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max])
+}
+
+func clipText(value string, max int) string {
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= max {
+		return strings.TrimSpace(value)
+	}
+	return string(runes[:max])
+}
+
+func marshalText(value any) string {
+	body, _ := marshalTextBytes(value)
+	return string(body)
+}
+
+func marshalTextBytes(value any) ([]byte, error) {
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}

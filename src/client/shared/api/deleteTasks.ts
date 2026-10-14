@@ -27,7 +27,7 @@ const CHUNK_SIZE = 50;
 
 function gatewayErrorMessage(status: number): string {
   if (status === 502 || status === 503 || status === 504) {
-    return '无法连接 API 服务，请确认已启动 API（npm run dev:api）或重启桌面端';
+    return '无法连接 API 服务，请确认已用 pnpm dev 启动，或重启当前服务';
   }
   return `删除失败 (${status})`;
 }

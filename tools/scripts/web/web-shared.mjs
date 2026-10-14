@@ -184,17 +184,42 @@ export function buildApiEnv({ apiPort, appDataDir, accessToken, extra = {} }) {
   };
 }
 
-export function startApiServer({ workspaceRoot, apiPort, appDataDir, accessToken, watch = true, extraEnv, isolated = false }) {
-  const tsxCli = resolveCli(workspaceRoot, 'tsx', 'tsx');
-  const args = ['--max-old-space-size=2048', '--expose-gc', tsxCli];
-  if (watch) args.push('watch');
-  args.push('--tsconfig', join(workspaceRoot, 'tsconfig.json'), join(workspaceRoot, 'src/server/index.ts'));
-  const child = spawn(process.execPath, args, {
+export function gatewayBinary(workspaceRoot) {
+  return join(workspaceRoot, 'tools/build/beike-api');
+}
+
+export function resolveGo() {
+  const candidates = [process.env.GO_BIN, 'go', join(homedir(), '.local/go/bin/go')].filter(Boolean);
+  for (const candidate of candidates) {
+    if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;
+  }
+  throw new Error('未找到 Go 1.23 或更高版本。可安装到 ~/.local/go，或设置 GO_BIN');
+}
+
+export function buildGateway(workspaceRoot) {
+  const out = gatewayBinary(workspaceRoot);
+  mkdirSync(dirname(out), { recursive: true });
+  const result = spawnSync(resolveGo(), ['build', '-o', out, './src/backend/cmd/api'], {
+    cwd: workspaceRoot,
+    stdio: 'inherit',
+    env: { ...process.env, GOTOOLCHAIN: 'local' },
+  });
+  if (result.status !== 0) throw new Error('Go API 构建失败');
+  return out;
+}
+
+export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, extraEnv, isolated = false, record = true }) {
+  const child = spawn(buildGateway(workspaceRoot), [], {
     cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
-    env: buildApiEnv({ apiPort, appDataDir, accessToken, extra: extraEnv }),
+    env: buildApiEnv({
+      apiPort,
+      appDataDir,
+      accessToken,
+      extra: extraEnv,
+    }),
   });
-  if (watch) recordWebProcess(workspaceRoot, 'api', child, webProcessOptions({ apiPort, appDataDir, accessToken }), isolated);
+  if (record) recordWebProcess(workspaceRoot, 'gateway', child, webProcessOptions({ apiPort, appDataDir, accessToken }), isolated);
   return child;
 }
 

@@ -21,6 +21,7 @@ export interface DefaultsTabProps {
   setQuickVideoModel: (v: string) => void;
   notifyModelsUpdated: () => void;
   showToast: (msg: string) => void;
+  focus?: 'vision' | 'image' | 'video';
 }
 
 export default function DefaultsTab(props: DefaultsTabProps) {
@@ -47,12 +48,13 @@ export default function DefaultsTab(props: DefaultsTabProps) {
     setActiveVideoGenModel(defaults.video); setQuickVideoModel(defaults.video);
   };
   const cards = [
-    { id: 'vision' as const, title: '默认视觉分析 / 分镜模型', desc: '用于图片理解与分镜分析。', icon: Bot, value: props.activeVisionModel, models: pools.vision },
+    { id: 'vision' as const, title: '默认视觉分析 / 分镜模型', desc: '用于图片理解、对话与分镜分析。', icon: Bot, value: props.activeVisionModel, models: pools.vision },
     { id: 'image' as const, title: '默认商业生图模型', desc: '用于新建生图任务，已有选择不受影响。', icon: Palette, value: props.activeImageGenModel, models: pools.image },
     { id: 'video' as const, title: '默认视频生成模型', desc: '用于新建视频任务，已有任务不受影响。', icon: Video, value: props.activeVideoGenModel, models: pools.video },
-  ];
+  ].filter(card => !props.focus || card.id === props.focus);
+  const heading = props.focus === 'image' ? '绘画' : props.focus === 'video' ? '视频' : props.focus === 'vision' ? '对话' : '新任务默认模型';
   return <div className="settings-defaults-page space-y-6 w-full">
-    <header><h2 className="text-base font-bold text-slate-900">新任务默认模型</h2><p className="text-xs text-slate-500 mt-2">选择新任务默认使用的模型，修改后自动保存。停用或移出默认线路时，将选择下一条已启用的受支持线路。</p></header>
+    <header><h2 className="text-base font-bold text-slate-900">{heading}</h2><p className="text-xs text-slate-500 mt-2">选择新任务默认使用的模型，修改后自动保存。密钥仍在 API 接入的渠道里保存，这里不另建一套 Key。</p></header>
     <div className="settings-default-grid">
       {cards.map(card => {
         const valid = card.models.some(model => model.id === card.value);

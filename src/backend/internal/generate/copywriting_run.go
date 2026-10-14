@@ -1,0 +1,125 @@
+package generate
+
+import (
+	"net/http"
+	"strings"
+	"time"
+
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/system"
+)
+
+func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
+	model, _ := payload["model"].(string)
+	if strings.TrimSpace(model) == "" {
+		model = "gpt-5.6-luna"
+	}
+	base, key := copyCredentials(cfg, r, payload)
+	prompt := copyUserPrompt(payload)
+	messages := []any{
+		map[string]any{"role": "system", "content": copySystemPrompt},
+		map[string]any{"role": "user", "content": prompt},
+	}
+	text, data, status, err := chatCompletion(r.Context(), base, key, model, messages, 0.7, 18*time.Second)
+	parsed := decodeObject(text)
+	if err != nil || status >= 300 || parsed == nil {
+		if status == 404 {
+			writeCopyFallback(w, payload)
+			return
+		}
+		writeCopyFallback(w, payload)
+		return
+	}
+	title, _ := parsed["title"].(string)
+	content, _ := parsed["content"].(string)
+	if title == "" || content == "" {
+		writeCopyFallback(w, payload)
+		return
+	}
+	fallback := localCopy(payload)
+	tags := []any{"#小红书买家秀", "#好物分享", "#实测推荐"}
+	if list, ok := parsed["tags"].([]any); ok && len(list) > 0 {
+		tags = list
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"success": true,
+		"data": map[string]any{
+			"title":   formatCleanTitle(title, sanitizeProductTitle(stringField(payload, "productTitle")), stringListField(payload, "existingTitles")),
+			"content": formatCleanContent(content, stringField(fallback, "content")),
+			"tags":    tags,
+		},
+		"model": model,
+		"usage": chatUsage(data),
+	})
+}
+
+const copySystemPrompt = "你是一位拥有丰富真实自用经验的小红书生活买家秀博主。标题 5 到 20 个字且不含表情符号，正文大于 100 字并用双换行分段。只返回 JSON：{\"title\":\"\",\"content\":\"\",\"tags\":[]}。"
+
+func copyUserPrompt(payload map[string]any) string {
+	return "商品名称：" + stringField(payload, "productTitle") + "。品类：" + stringField(payload, "productCategory") + "。角色：" + stringField(payload, "productRole") + "。补充：" + stringField(payload, "extraRequirements") + "。输出纯 JSON。"
+}
+
+func copyCredentials(cfg config.Config, r *http.Request, payload map[string]any) (string, string) {
+	model := strings.TrimSpace(stringField(payload, "model"))
+	base := strings.TrimSpace(stringField(payload, "customBaseUrl"))
+	if base == "" {
+		base = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
+	}
+	key := strings.TrimSpace(stringField(payload, "customApiKey"))
+	if key == "" {
+		key = strings.TrimSpace(r.Header.Get("x-custom-api-key"))
+	}
+	if strings.HasPrefix(model, "deepseek-official:") {
+		return "https://api.deepseek.com", key
+	}
+	if base == "" {
+		base = imageDefaultBase()
+	}
+	return system.NormalizeGatewayBaseURL(base), key
+}
+
+func formatCleanContent(raw, fallback string) string {
+	content := strings.TrimSpace(stripEmojis(raw))
+	if utf16Len(content) < 100 {
+		content = strings.TrimSpace(fallback)
+	}
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	for strings.Contains(content, "\n\n\n") {
+		content = strings.ReplaceAll(content, "\n\n\n", "\n\n")
+	}
+	return strings.TrimSpace(content)
+}
+
+func chatUsage(data map[string]any) map[string]any {
+	if data == nil {
+		data = map[string]any{}
+	}
+	usage, _ := data["usage"].(map[string]any)
+	prompt := numberField(usage, "prompt_tokens", "promptTokens")
+	completion := numberField(usage, "completion_tokens", "completionTokens")
+	total := numberField(usage, "total_tokens", "totalTokens")
+	if prompt == 0 {
+		prompt = 150
+	}
+	if completion == 0 {
+		completion = 350
+	}
+	if total == 0 {
+		total = 500
+	}
+	return map[string]any{"promptTokens": prompt, "completionTokens": completion, "totalTokens": total}
+}
+
+func numberField(data map[string]any, keys ...string) float64 {
+	if data == nil {
+		return 0
+	}
+	for _, key := range keys {
+		switch value := data[key].(type) {
+		case float64:
+			return value
+		}
+	}
+	return 0
+}

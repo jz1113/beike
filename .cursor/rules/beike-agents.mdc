@@ -5,10 +5,10 @@ alwaysApply: true
 
 以根目录 [AGENTS.md](../../AGENTS.md) 为准。
 
-- 单 package 项目；根目录执行 Node.js 22、pnpm 10.13.1 命令。
-- 源码分为 `src/client`、`src/server`、`src/shared`；禁止恢复 apps/packages/workspace 架构。
+- 单 package 项目；根目录执行 Node.js 22、pnpm 10.13.1 与 Go 1.26 命令。
+- 源码分为 `src/client`、`src/backend`、`src/shared`。对外 API、数据库迁移和官方种子都在 `src/backend`（Go 1.26）。禁止恢复 apps/packages/workspace 架构。
 - 功能组件、hooks、接口、业务规则按职责归类，具体位置见 `docs/layout.md`。
 - 工程工具在 `tools`，部署模板在 `tools/deploy`，部署说明在 `docs/deployment.md`，当前文档在 `docs`。
-- 不在产品目录保留临时 Agent 计划、测试 fixture、QA 截图或一次性报告。
+- 正式测试可保留；不在产品目录保留临时 Agent 计划、QA fixture、截图或一次性报告。
 - 数据库、环境配置、密钥、备份和用户素材不是垃圾文件。
-- 修改后运行 `pnpm check`；当前门禁包含静态检查和构建，不包含测试套件。
+- 修改后运行 `pnpm check`；门禁包含静态检查、单元测试和构建。

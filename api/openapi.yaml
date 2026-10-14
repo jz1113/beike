@@ -1,0 +1,624 @@
+openapi: 3.0.3
+info:
+  title: 贝壳云图 API
+  version: 0.0.2
+paths:
+  /api/assets/storage/migrate:
+    post:
+      operationId: post_api_assets_storage_migrate
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assets/storage/test:
+    post:
+      operationId: post_api_assets_storage_test
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assets/storage/upload:
+    post:
+      operationId: post_api_assets_storage_upload
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assets/tasks:
+    delete:
+      operationId: delete_api_assets_tasks
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_assets_tasks
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/chat:
+    post:
+      operationId: post_api_assistant_chat
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/extract-document:
+    post:
+      operationId: post_api_assistant_extract_document
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/media:
+    post:
+      operationId: post_api_assistant_media
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/runs:
+    get:
+      operationId: get_api_assistant_runs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/sessions:
+    delete:
+      operationId: delete_api_assistant_sessions
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_assistant_sessions
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_assistant_sessions
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/threads/{threadId}/memory':
+    get:
+      operationId: get_api_assistant_threads_threadId_memory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_assistant_threads_threadId_memory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/threads/{threadId}/runs':
+    get:
+      operationId: get_api_assistant_threads_threadId_runs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/threads/{threadId}/turns':
+    get:
+      operationId: get_api_assistant_threads_threadId_turns
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/turn/approve:
+    post:
+      operationId: post_api_assistant_turn_approve
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/turn/interrupt:
+    post:
+      operationId: post_api_assistant_turn_interrupt
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/turn/start:
+    post:
+      operationId: post_api_assistant_turn_start
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/turns/{turnId}/recover':
+    post:
+      operationId: post_api_assistant_turns_turnId_recover
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/turns/{turnId}/snapshot':
+    get:
+      operationId: get_api_assistant_turns_turnId_snapshot
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/create-version':
+    post:
+      operationId: post_api_catalog_assets_type_id_create_version
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/disable':
+    post:
+      operationId: post_api_catalog_assets_type_id_disable
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/performance':
+    get:
+      operationId: get_api_catalog_assets_type_id_performance
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/publish':
+    post:
+      operationId: post_api_catalog_assets_type_id_publish
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/submit-review':
+    post:
+      operationId: post_api_catalog_assets_type_id_submit_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/deconstruct:
+    post:
+      operationId: post_api_catalog_assets_deconstruct
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/deconstruct/jobs:
+    get:
+      operationId: get_api_catalog_assets_deconstruct_jobs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_deconstruct_jobs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/deconstruct/progress:
+    get:
+      operationId: get_api_catalog_assets_deconstruct_progress
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/library:
+    delete:
+      operationId: delete_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/mother-replacement:
+    get:
+      operationId: get_api_catalog_assets_mother_replacement
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/reviews:
+    get:
+      operationId: get_api_catalog_assets_reviews
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_reviews
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/seed:
+    post:
+      operationId: post_api_catalog_assets_seed
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/source-check:
+    get:
+      operationId: get_api_catalog_assets_source_check
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_source_check
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/categories:
+    get:
+      operationId: get_api_catalog_categories
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/categories/migration-apply:
+    post:
+      operationId: post_api_catalog_categories_migration_apply
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/categories/migration-preview:
+    post:
+      operationId: post_api_catalog_categories_migration_preview
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/collect:
+    post:
+      operationId: post_api_catalog_collect
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/products:
+    delete:
+      operationId: delete_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/prompts:
+    delete:
+      operationId: delete_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/styles:
+    delete:
+      operationId: delete_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/styles/extract:
+    post:
+      operationId: post_api_catalog_styles_extract
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/styles/parse-link:
+    post:
+      operationId: post_api_catalog_styles_parse_link
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches:
+    get:
+      operationId: get_api_catalog_workshop_batches
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_workshop_batches
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/workshop-batches/{id}':
+    delete:
+      operationId: delete_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/workshop-batches/{id}/duplicate':
+    post:
+      operationId: post_api_catalog_workshop_batches_id_duplicate
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/workshop-batches/{id}/events':
+    post:
+      operationId: post_api_catalog_workshop_batches_id_events
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches/active:
+    get:
+      operationId: get_api_catalog_workshop_batches_active
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches/active/archive:
+    post:
+      operationId: post_api_catalog_workshop_batches_active_archive
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches/history:
+    delete:
+      operationId: delete_api_catalog_workshop_batches_history
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-workspace:
+    get:
+      operationId: get_api_catalog_workshop_workspace
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_workshop_workspace
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/analyze:
+    post:
+      operationId: post_api_generate_analyze
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/canvas-text:
+    post:
+      operationId: post_api_generate_canvas_text
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/copywriting:
+    post:
+      operationId: post_api_generate_copywriting
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/depth-image:
+    get:
+      operationId: get_api_generate_depth_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_depth_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/depth-video:
+    get:
+      operationId: get_api_generate_depth_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_depth_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/export-zip:
+    post:
+      operationId: post_api_generate_export_zip
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-design:
+    post:
+      operationId: post_api_generate_headline_design
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-title:
+    post:
+      operationId: post_api_generate_headline_title
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/image:
+    get:
+      operationId: get_api_generate_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/keyword-review:
+    post:
+      operationId: post_api_generate_keyword_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/keyword-review/balance:
+    post:
+      operationId: post_api_generate_keyword_review_balance
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/keyword-review/rules:
+    get:
+      operationId: get_api_generate_keyword_review_rules
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_generate_keyword_review_rules
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/layer-decomposition:
+    post:
+      operationId: post_api_generate_layer_decomposition
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/upload-ref:
+    post:
+      operationId: post_api_generate_upload_ref
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video:
+    get:
+      operationId: get_api_generate_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/health:
+    get:
+      operationId: get_api_health
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/config:
+    get:
+      operationId: get_api_system_config
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_system_config
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/depth-env:
+    get:
+      operationId: get_api_system_depth_env
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/gateway-user:
+    post:
+      operationId: post_api_system_gateway_user
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/local-storage/clear-derived:
+    post:
+      operationId: post_api_system_local_storage_clear_derived
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/local-storage/stats:
+    get:
+      operationId: get_api_system_local_storage_stats
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/media-review:
+    get:
+      operationId: get_api_system_media_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/memory-cleanup:
+    post:
+      operationId: post_api_system_memory_cleanup
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/models/fetch:
+    post:
+      operationId: post_api_system_models_fetch
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/models/pricing:
+    get:
+      operationId: get_api_system_models_pricing
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/proxy-image:
+    get:
+      operationId: get_api_system_proxy_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/proxy-video:
+    get:
+      operationId: get_api_system_proxy_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/video-downloads:
+    post:
+      operationId: post_api_system_video_downloads
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/system/video-downloads/{jobId}':
+    get:
+      operationId: get_api_system_video_downloads_jobId
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/system/video-downloads/{jobId}/cancel':
+    post:
+      operationId: post_api_system_video_downloads_jobId_cancel
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/video-downloads/pick-directory:
+    post:
+      operationId: post_api_system_video_downloads_pick_directory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/workshop/tasks/{taskId}/review':
+    post:
+      operationId: post_api_workshop_tasks_taskId_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应

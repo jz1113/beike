@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 WorkingDirectory=__REPO_DIR__
 Environment=NODE_ENV=production
+Environment=GO_BIN=/usr/local/bin/go
 EnvironmentFile=__DATA_DIR__/.env
 ExecStart=/usr/bin/node __REPO_DIR__/tools/scripts/web/start-web.mjs
 Restart=on-failure

@@ -1,0 +1,28 @@
+
+CREATE TABLE "AssetProductCategory" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "parentId" TEXT, "position" INTEGER NOT NULL DEFAULT 0, FOREIGN KEY ("parentId") REFERENCES "AssetProductCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE INDEX "AssetProductCategory_parentId_position_idx" ON "AssetProductCategory"("parentId", "position");
+CREATE TABLE "PromptAlbum" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "sourceKey" TEXT NOT NULL, "productCategoryId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("productCategoryId") REFERENCES "AssetProductCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE UNIQUE INDEX "PromptAlbum_sourceKey_key" ON "PromptAlbum"("sourceKey");
+CREATE INDEX "PromptAlbum_productCategoryId_idx" ON "PromptAlbum"("productCategoryId");
+ALTER TABLE "SceneAsset" ADD COLUMN "albumId" TEXT;
+ALTER TABLE "SceneAsset" ADD COLUMN "productCategoryIds" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "SceneAsset" ADD COLUMN "isUniversal" BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX "SceneAsset_albumId_idx" ON "SceneAsset"("albumId");
+ALTER TABLE "OutfitAsset" ADD COLUMN "albumId" TEXT;
+ALTER TABLE "OutfitAsset" ADD COLUMN "productCategoryIds" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "OutfitAsset" ADD COLUMN "isUniversal" BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX "OutfitAsset_albumId_idx" ON "OutfitAsset"("albumId");
+ALTER TABLE "ActionAsset" ADD COLUMN "albumId" TEXT;
+ALTER TABLE "ActionAsset" ADD COLUMN "productCategoryIds" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "ActionAsset" ADD COLUMN "isUniversal" BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX "ActionAsset_albumId_idx" ON "ActionAsset"("albumId");
+ALTER TABLE "PersonaAsset" ADD COLUMN "albumId" TEXT;
+ALTER TABLE "PersonaAsset" ADD COLUMN "productCategoryIds" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "PersonaAsset" ADD COLUMN "isUniversal" BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX "PersonaAsset_albumId_idx" ON "PersonaAsset"("albumId");
+ALTER TABLE "FullPromptAsset" ADD COLUMN "albumId" TEXT;
+ALTER TABLE "FullPromptAsset" ADD COLUMN "productCategoryIds" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "FullPromptAsset" ADD COLUMN "isUniversal" BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX "FullPromptAsset_albumId_idx" ON "FullPromptAsset"("albumId");
+INSERT INTO "AssetProductCategory" ("id", "name", "position") VALUES ('jewelry', '珠宝首饰', 0);
+source-grouping-v1

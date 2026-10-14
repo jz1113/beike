@@ -26,6 +26,18 @@ if ! command -v pnpm >/dev/null 2>&1 || [[ "$(pnpm --version)" != 10.13.1 ]]; th
   npm install -g pnpm@10.13.1
 fi
 
+if [[ ! -x /usr/local/go/bin/go ]]; then
+  case "$(dpkg --print-architecture)" in
+    amd64) GO_ARCH=amd64 ;;
+    arm64) GO_ARCH=arm64 ;;
+    *) echo "不支持的架构：$(dpkg --print-architecture)"; exit 1 ;;
+  esac
+  curl -fsSL -o /tmp/go.tgz "https://go.dev/dl/go1.26.9.linux-${GO_ARCH}.tar.gz"
+  rm -rf /usr/local/go
+  tar -C /usr/local -xzf /tmp/go.tgz
+  ln -sfn /usr/local/go/bin/go /usr/local/bin/go
+fi
+
 id -u "$SITE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SITE_USER"
 
 mkdir -p "$DATA_DIR/storage" "$DATA_DIR/database-backups"

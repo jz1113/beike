@@ -1,10 +1,10 @@
 # 贝壳云图云服务器部署（新手逐步）
 
-> 单项目结构：从根目录安装和构建，产物为 `tools/build/ui/`。已有环境的 `WEB_DIST_DIR` 与 Nginx 静态根路径须改为 `/opt/beike/tools/build/ui`；无需迁移 `/var/lib/beike` 中的运行数据。
+> 单项目结构：从根目录安装和构建，产物为 `tools/build/ui/`。对外 API 与静态页由 Go 监听。启动时用现有脚本执行数据库迁移和官方种子，不再另起 Node API。已有环境的 `WEB_DIST_DIR` 与 Nginx 静态根路径须改为 `/opt/beike/tools/build/ui`；无需迁移 `/var/lib/beike` 中的运行数据。服务器需要 Go 1.26，安装脚本会放到 `/usr/local/go`。
 
 https://www.yeziidc.com/ 是椰子云商家官网，用来买机器、看实例、重置密码。它不是贝壳云图上线后的网址。上线后请用你这台机器的公网 IP，或你自己另外买的域名。
 
-提示词架构（珠宝 / 手机通讯 8 段式、以及已沉淀的提示词资产）已经写进仓库种子，启动时会自动装上，不要删除 `src/shared/domain/prompts/masterRecipes.ts` 与 `src/shared/domain/seeds/`。
+提示词架构（珠宝 / 手机通讯 8 段式、以及已沉淀的提示词资产）已经写进仓库种子，启动时会自动装上，不要删除 `src/shared/domain/prompts/masterRecipes.ts` 与 `src/shared/data/` 里的种子 JSON。
 
 ## 1. 在椰子云控制台拿到登录信息
 
@@ -68,7 +68,7 @@ sudo systemctl status beike --no-pager
 ## 3. 本机仓库里已经准备好的文件
 
 - `src/shared/domain/prompts/masterRecipes.ts`：官方 8 段式（珠宝 + 手机通讯）
-- `src/shared/domain/seeds/promptAssets.json`：已沉淀提示词资产
+- `src/shared/data/promptAssets.json`：已沉淀提示词资产
 - `tools/deploy/env.production.example`、`tools/deploy/beike.service`、`tools/deploy/nginx.conf.example`、`tools/deploy/nginx.https.conf.example`
 - 启动：`pnpm run start:web`（先 `pnpm run build:ui`）
 - 重新从本机数据库导出种子：`pnpm run seed:export`
@@ -96,7 +96,7 @@ rsync -a --delete --progress \
 ```bash
 chown -R beike:beike /opt/beike
 chmod 755 /opt/beike
-sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install --frozen-lockfile && pnpm run db:generate && pnpm run build:ui'
+sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install --frozen-lockfile && pnpm run build:ui'
 systemctl restart beike
 systemctl status beike --no-pager
 ```

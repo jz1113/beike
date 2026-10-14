@@ -1,12 +1,13 @@
 import {justifiedRows} from '../../utils/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { handleImgError } from '@client/shared/media/imageError';
-import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
-import { Search, X } from 'lucide-react';
 import type { InspirationItem, InspirationUseOptions } from './InspirationModal';
 import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../utils/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
+import { INSPIRATION_MEDIA_FILTERS, isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
+import { HOME_PUBLISHED_EVENT, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/homePublish/homePublish';
+import { CanvasShowcase } from './CanvasShowcase';
 import { getStoryboardPresetById, persistStoryboardPreset } from '@shared/domain/prompts/prompt-engine/storyboardPreset';
 import { useAppStore } from '@client/store';
 
@@ -19,9 +20,13 @@ interface Props {
   onUsePrompt: (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => void;
 }
 
+const FEED_GAP = 8;
+
 export default function InspirationFeed({ onUsePrompt }: Props) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [mediaFilter, setMediaFilter] = useState<InspirationMediaFilter>('image');
+  const [published, setPublished] = useState<PublishedHomeItem[]>(() => readPublishedHomeItems());
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
+  const [selectedCanvasItem, setSelectedCanvasItem] = useState<PublishedHomeItem | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [hasStartedBrowsing, setHasStartedBrowsing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -52,43 +57,22 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
     });
   },[]);
 
-  const mixedItems=useMemo(()=>{
-    // Fixed shuffle seed keeps pagination, search and modal navigation consistent.
-    const shuffled=[...INSPIRATION_ITEMS];
-    let seed=20260910;
-    for(let i=shuffled.length-1;i>0;i--){
-      seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
-      const j=Math.floor(((seed>>>0)/4294967296)*(i+1));
-      [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
-    }
-    const videos=shuffled.filter(item=>item.mediaType==='video' || !!item.video || isVideoMediaUrl(item.image));
-    const images=shuffled.filter(item=>!videos.includes(item));
-    if(!videos.length || !images.length)return shuffled;
-    const result:InspirationItem[]=[];
-    let imageIndex=0;
-    videos.forEach((video,index)=>{
-      const end=Math.round((index+1)*images.length/videos.length);
-      result.push(...images.slice(imageIndex,Math.min(imageIndex+2,end)),video,...images.slice(Math.min(imageIndex+2,end),end));
-      imageIndex=end;
-    });
-    return result;
-  },[]);
   const filteredItems = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return mixedItems;
-    return mixedItems.filter((item) => {
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.prompt.toLowerCase().includes(q) ||
-        (item.tag && item.tag.toLowerCase().includes(q))
-      );
-    });
-  }, [searchTerm,mixedItems]);
+    const mine = published.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
+    const seeded = INSPIRATION_ITEMS.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
+    return [...mine, ...seeded];
+  }, [published, mediaFilter]);
+
+  useEffect(() => {
+    const refresh = () => setPublished(readPublishedHomeItems());
+    window.addEventListener(HOME_PUBLISHED_EVENT, refresh);
+    return () => window.removeEventListener(HOME_PUBLISHED_EVENT, refresh);
+  }, []);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
     setHasStartedBrowsing(false);
-  }, [searchTerm]);
+  }, [mediaFilter, published]);
 
   // 原生 lazy-loading 会预取视口下方一大段图片。若哨兵初始就在视口内，
   // 自动分页会立刻把整条瀑布流渲染出来，抵消首屏限流效果。
@@ -108,10 +92,10 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   );
   const hasMore = visibleCount < filteredItems.length;
   const ratios=visibleItems.map(item=>{
-    const [w,h]=inspirationAspectRatio(item).split('/').map(Number);
+    const [w,h]=inspirationAspectRatio({ aspectRatio: 'aspectRatio' in item ? item.aspectRatio : undefined }).split('/').map(Number);
     return mediaRatios[item.id] || w/h;
   });
-  const rows=justifiedRows(ratios,feedWidth);
+  const rows=justifiedRows(ratios,feedWidth,FEED_GAP);
 
 
   useEffect(()=>{
@@ -144,6 +128,11 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
     return () => obs.disconnect();
   }, [hasMore, hasStartedBrowsing, handleLoadMore, visibleItems.length]);
 
+  const openItem = (item: InspirationItem | PublishedHomeItem) => {
+    if ('publishedKind' in item && item.publishedKind === 'canvas') setSelectedCanvasItem(item);
+    else setSelectedModalItem(item);
+  };
+
   const scrollHubToTop = () => {
     const hub = document.querySelector('[data-hub-scroll]') as HTMLElement | null;
     if (hub) hub.scrollTo({ top: 0, behavior: 'smooth' });
@@ -153,48 +142,51 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   return (
     <div className="w-full space-y-3.5 pt-2 select-none">
       {/* 搜索工具栏 (紧凑药丸尺寸，对标用户画框) */}
-      <div className="flex items-center select-none">
-        <div className="relative w-52 sm:w-60 md:w-64">
-          <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="搜索爆款灵感 / 提示词"
-            className="w-full pl-9 sm:pl-10 pr-8 sm:pr-9 py-1.5 sm:py-2 rounded-full bg-[#F4F5F8] border border-transparent text-xs sm:text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-slate-300 focus:bg-white transition-all shadow-2xs"
-          />
-          {searchTerm && (
+      <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1">
+        {INSPIRATION_MEDIA_FILTERS.map((item) => {
+          const selected = mediaFilter === item.id;
+          return (
             <button
+              key={item.id}
               type="button"
-              onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
-              title="清空搜索"
-              aria-label="清空搜索"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setMediaFilter(item.id)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selected ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              <X className="w-3.5 h-3.5" />
+              {item.label}
             </button>
-          )}
-        </div>
+          );
+        })}
       </div>
 
       {filteredItems.length === 0 ? (
         <div className="py-16 text-center text-sm text-slate-400">
-          无匹配结果，试试切换分类或更换关键词
+          这里还没有{mediaFilter === 'video' ? '视频' : '图片'}
         </div>
       ) : (
         <>
-          <div ref={gridRef} className="flex flex-col gap-1">
-            {rows.map(row=><div key={visibleItems[row[0]].id} className="flex gap-1 [content-visibility:auto] [contain-intrinsic-size:180px]" style={{height:(feedWidth-4*(row.length-1))/row.reduce((sum,index)=>sum+ratios[index],0)}}>
+          <div ref={gridRef} className="flex flex-col gap-2">
+            {rows.map(row=><div key={visibleItems[row[0]].id} className="flex gap-2 [content-visibility:auto] [contain-intrinsic-size:180px]" style={{height:(feedWidth-FEED_GAP*(row.length-1))/row.reduce((sum,index)=>sum+ratios[index],0)}}>
             {row.map(index => {
               const item=visibleItems[index];
-              const isVideo=item.mediaType==='video' || !!item.video || isVideoMediaUrl(item.image);
+              const isVideo=isInspirationVideo(item);
               const eager = index < INSPIRATION_EAGER_COUNT;
               return (
                   <div
                     key={item.id}
-                    onClick={() => setSelectedModalItem(item)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={item.title}
+                    onClick={() => openItem(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openItem(item);
+                      }
+                    }}
                     style={{flex:`${ratios[index]} 1 0%`}}
-                    className="min-w-0 h-full rounded-lg bg-slate-100 shadow-2xs hover:shadow-md transition-[box-shadow,border-color] duration-200 overflow-hidden group cursor-pointer relative border border-slate-100/80"
+                    className="min-w-0 h-full rounded-xl bg-slate-100 shadow-2xs hover:shadow-md transition-[box-shadow,border-color] duration-200 overflow-hidden group cursor-pointer relative border border-slate-100/80"
                   >
                     <div
                       className="relative w-full h-full overflow-hidden rounded-lg"
@@ -220,6 +212,9 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                           className="w-full h-full object-cover block transition-transform duration-300 group-hover:scale-[1.02] bg-slate-100"
                         />
                       )}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/55 to-transparent px-2.5 pb-2 pt-8 opacity-0 transition-opacity group-hover:opacity-100">
+                        <p className="truncate text-xs font-medium text-white">{item.title}</p>
+                      </div>
                       {isVideo && (
                         <span aria-label="视频" className="pointer-events-none absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-white/90 backdrop-blur-sm">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -237,9 +232,11 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
         </>
       )}
 
+      {selectedCanvasItem && <CanvasShowcase item={selectedCanvasItem} onClose={() => setSelectedCanvasItem(null)} />}
+
       {selectedModalItem && <Suspense fallback={null}><InspirationModal
         item={selectedModalItem}
-        allItems={filteredItems}
+        allItems={filteredItems.filter(item => !('publishedKind' in item) || item.publishedKind !== 'canvas')}
         isOpen={!!selectedModalItem}
         onClose={() => setSelectedModalItem(null)}
         onUsePromptOnly={(prompt) => {

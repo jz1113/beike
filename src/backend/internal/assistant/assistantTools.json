@@ -1,0 +1,481 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "update_plan",
+      "description": "为复杂、多步骤任务维护简短执行清单。首次规划及步骤状态变化时更新；简单问答无需调用。completed 必须附已验证结果，blocked 必须说明阻碍。计划不是执行成功的证明。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "in_progress",
+                    "completed",
+                    "blocked"
+                  ]
+                },
+                "evidence": {
+                  "type": "string",
+                  "maxLength": 600
+                }
+              },
+              "required": [
+                "title",
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "steps"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_tool_result",
+      "description": "分页读取本轮已存储的较大工具输出。使用工具返回的 storedResult，不会访问文件系统或其他会话。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "result_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "length": {
+            "type": "number",
+            "maximum": 8000
+          }
+        },
+        "required": [
+          "result_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "execute_code",
+      "description": "在本地隔离 JavaScript 沙箱执行数据整理、计算和批量工具编排，无需额外模型请求。支持 await tools.工具名({...})、Promise.all 和 text(value) 输出摘要。input.documents 为当前文档，input.workspace 为工作台快照。没有文件系统、process、require、fetch 或任意网络权限。工具调用仍受当前技能权限和审批约束。代码应 await 所有调用，纯对话直接回答，不调用此工具。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "JavaScript 代码。使用 text() 返回必要结果，不输出完整原始数据。"
+          },
+          "title": {
+            "type": "string",
+            "description": "简短中文操作说明，例如“汇总参考图编号”"
+          }
+        },
+        "required": [
+          "code",
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "parse_product_or_social_url",
+      "description": "解析电商商品链接/SKU 或小红书/抖音/快手等社媒作品链接，返回标题、封面、图片列表与视频地址（如有）。当用户消息中出现商品或社媒 URL、或明确要求采集/解析链接时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "完整的 http(s) 商品或社媒作品链接，或纯数字京东 SKU"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_attached_document",
+      "description": "读取当前会话近期已上传文档的文本片段，优先最新文档。可按关键词搜索，或按字符偏移截取。当需要引用文档细节、核对规格或长文未完整展示时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "document_name": {
+            "type": "string",
+            "description": "文档文件名（可部分匹配）。不传则使用第一份文档。"
+          },
+          "query": {
+            "type": "string",
+            "description": "可选关键词，返回匹配附近的上下文片段。"
+          },
+          "offset": {
+            "type": "number",
+            "description": "可选字符起始偏移，默认 0。"
+          },
+          "length": {
+            "type": "number",
+            "description": "截取长度，默认 4000，最大 8000。"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_user_products",
+      "description": "列出用户本地商品库中最近采集/保存的商品摘要（标题、平台、封面）。当用户询问「我有哪些商品」「商品库」「历史采集」时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "description": "返回条数，默认 10，最大 30。"
+          },
+          "keyword": {
+            "type": "string",
+            "description": "可选标题关键词过滤。"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "query_asset_library",
+      "description": "搜索提示词资产库（场景/穿搭/动作/人设/完整提示词），返回摘要列表（id、code、title）。查看某条资产的完整提示词正文须再调用 get_prompt_asset_detail。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "asset_type": {
+            "type": "string",
+            "enum": [
+              "scene",
+              "outfit",
+              "action",
+              "persona",
+              "full_prompt",
+              "all"
+            ],
+            "description": "资产类型"
+          },
+          "keyword": {
+            "type": "string",
+            "description": "搜索关键词"
+          },
+          "limit": {
+            "type": "number",
+            "description": "返回条数，默认 10，最大 30"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_prompt_asset_detail",
+      "description": "读取提示词资产库中单条资产的完整详情（含 reversePromptZh 九段式全文、九维分析、四维摘要）。当用户要查看某条资产的具体提示词内容、或已通过 query_asset_library 获得 id 后需要全文时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "asset_type": {
+            "type": "string",
+            "enum": [
+              "scene",
+              "outfit",
+              "action",
+              "persona",
+              "full_prompt"
+            ],
+            "description": "资产类型，默认 full_prompt"
+          },
+          "asset_id": {
+            "type": "string",
+            "description": "资产数据库 id（非 code）；可先 query_asset_library 搜索获得"
+          }
+        },
+        "required": [
+          "asset_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "deconstruct_image",
+      "description": "对图片 URL 进行视觉反推，提取可复用的生图提示词。当用户要求反推/拆解参考图时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "image_url": {
+            "type": "string",
+            "description": "要反推的图片 URL"
+          }
+        },
+        "required": [
+          "image_url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_workshop_state",
+      "description": "获取用户当前工作台状态（所在视图、工坊步骤、已载入商品、拍摄架构）。当需要感知用户当前工作环境时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "workspace_navigate",
+      "description": "工作台视图调度导航。当用户明确要求「去种草工坊」「去极速生图」「查看资产中心」「返回首页」或需要跨模块执行任务时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target_view": {
+            "type": "string",
+            "enum": [
+              "workshop",
+              "generate",
+              "assets",
+              "home"
+            ],
+            "description": "目标工作台视图"
+          },
+          "reason": {
+            "type": "string",
+            "description": "跳转或调度原因"
+          }
+        },
+        "required": [
+          "target_view"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "workspace_load_workshop_product",
+      "description": "核实当前工作区已保存商品资料及图片后，请求将商品载入种草工坊；不能用未采集的编号建立空壳商品。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "商品 itemId 或 SKU"
+          },
+          "title": {
+            "type": "string",
+            "description": "商品标题"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "trigger_generate",
+      "description": "将提示词和参考图载入首页生图草稿，使用已有模型设置；由用户确认后才生成。用户明确要求准备生图时调用，返回请求不表示已经生成。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "生图提示词正文"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_workshop_arch",
+      "description": "切换种草工坊的拍摄架构偏好。当用户要求更换拍摄方案/架构时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "arch_id": {
+            "type": "string",
+            "description": "从 get_view_capabilities(workshop) 返回的 availableArchitectures 中选择有效 ID"
+          },
+          "reason": {
+            "type": "string",
+            "description": "切换原因"
+          }
+        },
+        "required": [
+          "arch_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_view_capabilities",
+      "description": "查询当前工作台能力及限制；workshop 返回可选架构 availableArchitectures。生图工具只准备首页草稿。当 agent 即将执行跨视图操作前、或需要根据工作台当前能力调整下一步动作时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "type": "string",
+            "enum": [
+              "home",
+              "workshop",
+              "generate",
+              "assets",
+              "collect",
+              "settings",
+              "canvas",
+              "replicate"
+            ],
+            "description": "要查询的视图；留空则使用当前视图"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "inspect_video_media",
+      "description": "分析视频物理参数（精确时长、分辨率、帧率、长宽比、大小）。当用户要求拆解视频、短片基调、拍摄参数推测或实拍复刻时，必须在任何深入分析的第一步调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "video_url": {
+            "type": "string",
+            "description": "视频文件路径、名称或 URL"
+          }
+        },
+        "required": [
+          "video_url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "extract_video_storyboard",
+      "description": "对视频进行全片等距/关键帧抽样，并自动拼合成一张全景故事板联系表（Contact Sheet 九宫格大图）。调用后系统会将故事板大图动态提供给视觉模型，用于鸟瞰全片结构、固定机位与转场节奏变化。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "video_url": {
+            "type": "string",
+            "description": "视频路径、文件名或 URL"
+          },
+          "sample_count": {
+            "type": "number",
+            "description": "抽样帧数，默认 12，推荐 8-16"
+          }
+        },
+        "required": [
+          "video_url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "extract_video_detailed_frames",
+      "description": "针对视频特定时间段（如前3秒开头、特写镜头、换装转场瞬间）深度截取多张高清连续帧。调用后系统会将抽出的高清图片呈递给视觉模型，用于像素级细看人物服装纹理、妆容细节、道具、字幕文字或微表情。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "video_url": {
+            "type": "string",
+            "description": "视频路径、文件名或 URL"
+          },
+          "start_time": {
+            "type": "number",
+            "description": "起始秒数，例如 0"
+          },
+          "end_time": {
+            "type": "number",
+            "description": "结束秒数，例如 3"
+          },
+          "frame_count": {
+            "type": "number",
+            "description": "截取张数，默认 4"
+          }
+        },
+        "required": [
+          "video_url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "spawn_subagent",
+      "description": "启动一个子智能体执行复杂子任务。当主智能体需要并行处理多个独立子任务、或需要借助特定技能（如数据分析、文案写作、提示词优化等）完成子目标时调用此工具。子智能体将在独立上下文中执行，结果回传后合并入主智能体回复。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "description": "子智能体使用的技能 ID（如 \"prompt-engineer\", \"data-analyst\"）"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "给子智能体的具体任务指令"
+          }
+        },
+        "required": [
+          "skill_id",
+          "prompt"
+        ]
+      }
+    }
+  }
+]

@@ -23,6 +23,7 @@ import { usePerformanceMode } from '@client/shared/utils/performancePreference';
 import { useDesktopShortcuts } from '@client/shared/hooks/useDesktopShortcuts';
 import { parseViewFromSearchParams, parseWorkshopTabFromSearchParams, syncViewToUrl } from '@client/app/routes';
 import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
+import { HomePublishSync } from '@client/app/HomePublishSync';
 import '@client/features/canvas/store/registerCanvasWorkspace';
 
 // 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
@@ -175,11 +176,8 @@ export default function App() {
   // 🌟 画布独立全屏工作台：进入项目后隐藏全局 Sidebar，呈现完全独立的画板创作界面
   const activeCanvasProjectId = useCanvasStore((s) => s.activeProjectId);
   const isCanvasFullscreen = currentView === 'canvas' && !!activeCanvasProjectId;
-  // 🌟 Codex 风格独立全屏设置界面：进入后接管窗口，左侧由设置专属侧栏驱动，带「← 返回应用」
-  const isSettingsFullscreen = currentView === 'settings';
-  // 种草工坊与大字报工作台使用独立全屏布局。
   const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review';
-  const isDedicatedFullscreen = isCanvasFullscreen || isSettingsFullscreen || isWorkshopFullscreen;
+  const isDedicatedFullscreen = isCanvasFullscreen || isWorkshopFullscreen;
 
   useEffect(() => {
     if (typeof window === 'undefined' || !routeReady) return;
@@ -210,29 +208,22 @@ export default function App() {
 
   return (
     <GeneratingEffectsProvider>
+    <HomePublishSync />
     <GenerationEngineHost />
     <div className="h-screen w-screen bg-[#FAFAFC] text-slate-900 flex flex-col overflow-hidden selection:bg-blue-100 selection:text-blue-900" data-density={density}>
       {/* 设置全屏独立视图 */}
-      {isSettingsFullscreen && (
-        <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative z-20">
-          <Suspense fallback={
-            <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-400 text-sm bg-[#F9FAFB]">
-              <div className="w-6 h-6 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
-              <span>设置中心加载中…</span>
-            </div>
-          }>
-            <AppErrorBoundary
-              title="系统设置异常"
-              resetLabel="返回应用"
-              onReset={backFromSettings}
-            >
-              <SettingsWorkspaceView onBack={backFromSettings} />
-            </AppErrorBoundary>
-          </Suspense>
-        </div>
+      {currentView === 'settings' && (
+        <Suspense fallback={null}>
+          <AppErrorBoundary
+            title="系统设置异常"
+            resetLabel="返回应用"
+            onReset={backFromSettings}
+          >
+            <SettingsWorkspaceView onBack={backFromSettings} />
+          </AppErrorBoundary>
+        </Suspense>
       )}
-        {/* 主工作区保持挂载，进入设置时保留未导出的任务和进度。 */}
-        <div className={isSettingsFullscreen ? 'hidden' : 'flex-1 min-w-0 flex overflow-hidden relative'} aria-hidden={isSettingsFullscreen} inert={isSettingsFullscreen}>
+        <div className="flex-1 min-w-0 flex overflow-hidden relative">
           {/* 🌟 全局轻奢自适应动态背景（首页右上角流体粒子 + 工作区交互式点阵微澜 + 智能降级兜底） */}
           <Suspense fallback={null}>
             {(!isDedicatedFullscreen || isWorkshopFullscreen) && <GlobalDynamicBackground />}
@@ -355,7 +346,7 @@ export default function App() {
       <DeconstructJobsHost />
 
       {/* 🌟 右下角常驻多模态 AI 问答助手与抽屉面板（设置视图时静默以保持沉浸） */}
-      {!isSettingsFullscreen && <AIAssistantButton />}
+      {currentView !== 'settings' && <AIAssistantButton />}
       <Suspense fallback={null}>
         {mountAssistant && <AppErrorBoundary
           title="AI 助手组件异常"

@@ -348,6 +348,12 @@ const REMOVED_INSPIRATION_IDS = new Set([
   'item-20',
   'item-23',
   'item-24',
+  'imported-image-jay-collab-02',
+  'imported-image-jay-collab-03',
+  'imported-image-jay-collab-04',
+  'imported-image-jay-collab-06',
+  'imported-image-jay-collab-08',
+  'imported-image-jay-collab-10',
 ]);
 
 export const INSPIRATION_ITEMS: InspirationItem[] = ALL_INSPIRATION_ITEMS.filter(

@@ -1,5 +1,5 @@
 import { isWorkshopAssetEligible } from '@shared/domain/workshop/workshopPipeline';
-import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import { useAppStore } from '@client/store';
 import { getGlobalAssetLibrary } from '@client/shared/api/assetLibraryCache';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
@@ -21,7 +21,7 @@ export async function fetchRecipes(
     const pageSize = 100;
     let pages = 1;
     for (let page = 1; page <= pages; page++) {
-      const res = await apiFetch(`/api/catalog/styles?page=${page}&pageSize=${pageSize}`);
+      const res = await apiRequest('GET', '/api/catalog/styles', { search: `page=${page}&pageSize=${pageSize}` });
       if (!res.ok) throw new Error('拍摄架构加载失败');
       const data = await res.json();
       if (!data.success || !Array.isArray(data.recipes)) throw new Error('拍摄架构响应无效');

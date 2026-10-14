@@ -20,7 +20,7 @@ export function sanitizeBatchItem<T extends BatchProductItem>(item: T): T {
     tasks: (item.tasks || []).map((task) => {
       const resultUrl = sanitizePersistedUrl(task.resultUrl);
       if (task.status === 'SUCCESS' && !resultUrl) {
-        return { ...task, resultUrl: undefined, status: 'FAILURE' as const, error: task.error || '图片地址无法保留，请重新生成' };
+        return { ...task, resultUrl: undefined, status: 'FAILURE' as const, recoveryRequired: true, error: task.error || '图片地址无法保留，请先核对原任务，不要重新生图' };
       }
       return { ...task, resultUrl };
     }),

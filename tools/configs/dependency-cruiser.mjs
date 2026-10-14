@@ -32,6 +32,7 @@ export default {
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
+    exclude: { path: '\\.go$' },
     tsConfig: { fileName: 'tsconfig.json' },
     tsPreCompilationDeps: true,
   },

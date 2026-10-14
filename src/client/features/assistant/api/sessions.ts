@@ -1,4 +1,4 @@
-import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import type { AssistantSession } from '@client/store/appStoreTypes';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 
@@ -13,7 +13,7 @@ function enqueueMutation<T>(run: () => Promise<T>): Promise<T> {
 export async function deleteAssistantSessionRemote(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     return await enqueueMutation(async () => {
-      const res = await apiFetch(`/api/assistant/sessions?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await apiRequest('DELETE', '/api/assistant/sessions', { search: `id=${encodeURIComponent(id)}` });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) {
         return { success: false, error: data.error || `删除失败 (HTTP ${res.status})` };
@@ -35,8 +35,8 @@ export async function putAssistantSessionsRemote(sessions: AssistantSession[], c
     let batchBytes = 0;
     const flush = async () => {
       if (!batch.length) return;
-      const res = await apiFetch('/api/assistant/sessions', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      const res = await apiRequest('PUT', '/api/assistant/sessions', {
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessions: batch, currentId }),
       });
       const data = await res.json().catch(() => null);
@@ -66,7 +66,7 @@ export async function putAssistantSessionsRemote(sessions: AssistantSession[], c
 }
 
 export async function fetchAssistantSessionsRemote(): Promise<AssistantSession[] | null> {
-  const res = await apiFetch('/api/assistant/sessions');
+  const res = await apiRequest('GET', '/api/assistant/sessions');
   if (!res.ok) return null;
   const data = await res.json().catch(() => null);
   if (!data?.success || !Array.isArray(data.sessions)) return null;

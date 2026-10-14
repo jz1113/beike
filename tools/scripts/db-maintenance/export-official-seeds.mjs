@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const defaultDb = join(homedir(), 'Library/Application Support/com.azhuo.workbench/azhuo.db');
 const dbPath = process.env.AZHUO_DB_PATH || defaultDb;
-const seedDir = join(root, 'src/shared/domain/seeds');
+const seedDir = join(root, 'src/shared/data');
 const backupDir = join(root, '.local/deploy-backup');
 
 if (!existsSync(dbPath)) {

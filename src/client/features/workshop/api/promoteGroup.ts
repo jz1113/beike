@@ -1,4 +1,4 @@
-import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { requestModelId } from '@shared/domain/models/workflowModels';
 import type { BatchProductItem, BatchTaskItem } from '../model/batchTypes';
@@ -7,7 +7,7 @@ import type { MotherReplacementState, PromotedGroupCandidate } from '../model/ge
 export type { MotherReplacementState, PromotedGroupCandidate } from '../model/generation/promoteGroup';
 
 export async function loadMotherReplacement(motherId: string): Promise<MotherReplacementState> {
-  const response = await apiFetch(`/api/catalog/assets/mother-replacement?motherId=${encodeURIComponent(motherId)}`);
+  const response = await apiRequest('GET', '/api/catalog/assets/mother-replacement', { search: `motherId=${encodeURIComponent(motherId)}` });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) throw new Error(result.error || '母组换图状态读取失败');
   return {
@@ -24,8 +24,8 @@ export async function analyzePromotedGroup(input: {
   visionModel: string;
 }): Promise<PromotedGroupCandidate> {
   const { item, groupIndex, tasks, visionModel } = input;
-  const response = await apiFetch('/api/catalog/assets/deconstruct', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const response = await apiRequest('POST', '/api/catalog/assets/deconstruct', {
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       imageUrls: tasks.map((task) => task.resultUrl),
       albumName: `优选衍生图组 · ${item.title.slice(0, 40)} · ${groupIndex + 1}`,
@@ -53,14 +53,14 @@ export async function analyzePromotedGroup(input: {
 
 export async function approvePromotedGroup(candidate: PromotedGroupCandidate): Promise<void> {
   if (candidate.reviewStatus === 'rejected') {
-    const restored = await apiFetch('/api/catalog/assets/reviews', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const restored = await apiRequest('POST', '/api/catalog/assets/reviews', {
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: candidate.reviewId, action: 'restore' }),
     });
     if (!restored.ok) throw new Error((await restored.json().catch(() => ({}))).error || '恢复候选失败');
   }
-  const response = await apiFetch('/api/catalog/assets/reviews', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const response = await apiRequest('POST', '/api/catalog/assets/reviews', {
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: candidate.reviewId, action: 'approve' }),
   });
   const result = await response.json().catch(() => ({}));
@@ -69,14 +69,14 @@ export async function approvePromotedGroup(candidate: PromotedGroupCandidate): P
 
 export async function replacePromotedGroup(candidate: PromotedGroupCandidate): Promise<void> {
   if (candidate.reviewStatus === 'rejected') {
-    const restored = await apiFetch('/api/catalog/assets/reviews', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const restored = await apiRequest('POST', '/api/catalog/assets/reviews', {
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: candidate.reviewId, action: 'restore' }),
     });
     if (!restored.ok) throw new Error((await restored.json().catch(() => ({}))).error || '恢复候选失败');
   }
-  const response = await apiFetch('/api/catalog/assets/reviews', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const response = await apiRequest('POST', '/api/catalog/assets/reviews', {
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: candidate.reviewId, action: 'replace' }),
   });
   const result = await response.json().catch(() => ({}));

@@ -1,8 +1,10 @@
 import './settingsWorkspace.css';
-import { SETTINGS_NAV_GROUPS, type SettingsNavSection } from './model/settingsNavigation';
+import { settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
+import { CanvasPreview, LanguagePreview, ModalityPreview, PrivacyPreview, StoragePreviewNote } from './components/SettingsPreview';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@client/shared/hooks/useToast';
 import { SettingsSidebar } from './components/SettingsSidebar';
+import { X } from 'lucide-react';
 import { useSettingsLeaveGuard } from './hooks/useSettingsLeaveGuard';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
@@ -55,12 +57,13 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const { message: toastMsg, show: showToast } = useToast();
 
   // 1. 左侧大类导航
-  const [navSection, setNavSection] = useState<SettingsNavSection>('api_services');
+  const [navSection, setNavSection] = useState<SettingsNavSection>('api');
+  const [canvasPage, setCanvasPage] = useState<CanvasSettingsPage>('connections');
+  const [showModelBoard, setShowModelBoard] = useState(false);
 
   // 2. 中间选中的 API 接口
   const [selectedServiceId, setSelectedServiceId] = useState<string>('comfly_gateway');
   const [serviceSearch, setServiceSearch] = useState('');
-  const [otherServiceId, setOtherServiceId] = useState('wanbang_ecommerce');
 
   // 3. 用量统计面板状态
   const [usageRange, setUsageRange] = useState<'30d' | '90d' | '1y'>('30d');
@@ -93,6 +96,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const handleBackToApp = useSettingsLeaveGuard(config.hasUnsavedChanges, leaveSettings, busy, showToast);
   const changeSection = (section: SettingsNavSection) => {
     if (busy) { showToast('配置保存或存储迁移正在进行，请等待当前操作完成'); return; }
+    setShowModelBoard(false);
     setNavSection(section);
   };
   const changeService = (setter: (id: string) => void, id: string) => {
@@ -106,7 +110,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
       if (isAddingModelModalOpen) { event.preventDefault(); setIsAddingModelModalOpen(false); return; }
       if (isGatewayModalOpen) { event.preventDefault(); closeGatewayDiscovery(); return; }
       const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       event.preventDefault(); handleBackToApp();
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -117,7 +121,8 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     if (busy) { showToast('请等待当前配置保存或存储迁移完成'); return; }
     setSelectedServiceId(MODEL_CHANNELS.find(item => item.id === channel)!.serviceId);
     setServiceSearch('');
-    setNavSection('api_services');
+    setShowModelBoard(false);
+    setNavSection('api');
   };
   const discoverModels = (channel: ModelChannel) => {
     if (channel === 'deepseek') { configureChannel(channel); return; }
@@ -149,94 +154,86 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     }
   }, [quickVideoModel]);
 
-  const navGroups = SETTINGS_NAV_GROUPS;
-
-  const activeTitle = useMemo(() => {
-    for (const g of navGroups) {
-      const match = g.items.find((i) => i.id === navSection);
-      if (match) return match.label;
-    }
-    return '系统设置';
-  }, [navGroups, navSection]);
+  const activeTitle = useMemo(() => showModelBoard ? '模型管理' : settingsSectionLabel(navSection, canvasPage), [showModelBoard, navSection, canvasPage]);
 
   const gatewayBalanceFormatted = gatewayUser.userInfo?.balanceAvailable === false ? undefined : gatewayUser.userInfo?.quotaFormatted;
+  const storageOpen = navSection === 'storage' || (navSection === 'canvas' && canvasPage === 'media');
 
   return (
-    <div className="settings-workspace w-full h-full flex flex-col text-slate-900 font-sans overflow-hidden relative">
-      {/* Toast 提示条 */}
+    <div className="settings-workspace fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-8 text-slate-900 font-sans" role="presentation">
+      <button type="button" aria-label="关闭设置" className="absolute inset-0 bg-slate-900/35" onClick={handleBackToApp} />
       {toastMsg && (
         <div role="status" aria-live="polite" className="max-w-[calc(100%-2rem)] break-words absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fade-in">
           <span>{toastMsg}</span>
         </div>
       )}
-
-      {/* 🌟 1. 独立双栏主舞台（左侧专有导航栏 + 右侧宽屏卡片内容区） */}
-      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-        {/* ===================== COLUMN 1: 左侧专有侧边栏 ===================== */}
-        <SettingsSidebar onBack={handleBackToApp} navSection={navSection} setNavSection={changeSection} gatewayBalanceFormatted={gatewayBalanceFormatted} />
-
-        {/* ===================== COLUMN 2: 右侧宽屏主内容区 ===================== */}
+      <div role="dialog" aria-modal="true" aria-label="设置" className="settings-shell relative flex h-[min(880px,100%)] w-[min(1080px,100%)] overflow-hidden rounded-[28px] shadow-2xl">
+        <button type="button" onClick={handleBackToApp} aria-label="关闭" className="absolute right-4 top-4 z-30 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900">
+          <X className="h-4 w-4" />
+        </button>
+        <SettingsSidebar navSection={navSection} setNavSection={changeSection} canvasPage={canvasPage} setCanvasPage={setCanvasPage} gatewayBalanceFormatted={gatewayBalanceFormatted} />
         <main className="flex-1 min-w-0 h-full flex flex-col bg-white overflow-hidden relative z-10">
-          {/* 顶栏控制条：包含窗口拖拽与标题 */}
-          <div
-            className="h-16 px-6 md:px-8 border-b border-slate-100 bg-white/95 backdrop-blur-md flex items-center justify-between shrink-0 select-none cursor-default"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold text-slate-900 tracking-tight truncate">
-                {activeTitle}
-              </h1>
-            </div>
-
-            <div className="flex items-center gap-2.5">
-            </div>
+          <div className="h-16 px-6 md:px-8 border-b border-slate-100 bg-white flex items-center shrink-0">
+            <h1 className="pr-10 text-base sm:text-lg font-semibold text-slate-900 tracking-tight truncate">{activeTitle}</h1>
           </div>
-
-          {/* 主内容展示区 */}
-          <div className="md:hidden px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-            <button type="button" onClick={handleBackToApp} className="text-xs text-slate-600 shrink-0">返回应用</button>
-            <select aria-label="设置分类" value={navSection} onChange={event => changeSection(event.target.value as SettingsNavSection)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">{navGroups.flatMap(group => group.items).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+          <div className="md:hidden px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+            <select aria-label="设置分类" value={navSection} onChange={event => changeSection(event.target.value as SettingsNavSection)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">
+              {SETTINGS_NAV_ITEMS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            {navSection === 'canvas' && (
+              <select aria-label="画布功能" value={canvasPage} onChange={event => setCanvasPage(event.target.value as CanvasSettingsPage)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">
+                {['connections', 'board', 'nodes', 'actions', 'token', 'media', 'pet', 'jimeng', 'codex', 'upscale'].map(id => <option key={id} value={id}>{settingsSectionLabel('canvas', id as CanvasSettingsPage)}</option>)}
+              </select>
+            )}
           </div>
-          {!config.configLoaded && <div role={config.configLoadError ? 'alert' : 'status'} className="px-5 py-3 text-xs text-slate-600 border-b border-slate-100">
+          {!config.configLoaded && (navSection === 'api' || storageOpen) && <div role={config.configLoadError ? 'alert' : 'status'} className="px-5 py-3 text-xs text-slate-600 border-b border-slate-100">
             {config.configLoadError || '正在加载服务配置…'}
             {config.configLoadError && <button type="button" onClick={() => void config.reloadConfig()} className="ml-3 text-indigo-600">重新加载</button>}
           </div>}
-          {navSection === 'api_services' || navSection === 'other_services' ? (
-            <div className="flex-1 min-h-0 flex overflow-hidden @container/settings-modal bg-white">
-              <ApiServicesTab config={config} models={models} group={navSection === 'api_services' ? 'models' : 'other'}
-                selectedServiceId={navSection === 'api_services' ? selectedServiceId : otherServiceId}
-                setSelectedServiceId={id => changeService(navSection === 'api_services' ? setSelectedServiceId : setOtherServiceId, id)}
-                serviceSearch={serviceSearch} setServiceSearch={setServiceSearch}
-                onAddModel={openAddModel} onManageModels={() => changeSection('models')}
-                defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} showToast={showToast} />
+          {showModelBoard ? (
+            <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6">
+              <button type="button" onClick={() => setShowModelBoard(false)} className="mb-4 text-xs text-slate-500 hover:text-slate-900">返回 API 接入</button>
+              <ModelManagementPanel models={models} onAdd={openAddModel} onConfigure={configureChannel} onDiscover={discoverModels}
+                isDiscovering={models.isFetchingGateway || models.isFetchingOpenAI || models.isFetchingLianchi}
+                defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} />
+            </div>
+          ) : navSection === 'api' || storageOpen ? (
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden @container/settings-modal bg-white">
+              {storageOpen && <div className="px-4 pt-4 lg:px-5"><StoragePreviewNote /></div>}
+              <div className="flex-1 min-h-0 flex overflow-hidden">
+                <ApiServicesTab config={config} models={models} group={storageOpen ? 'storage' : 'all'}
+                  selectedServiceId={storageOpen ? 'cloud_storage' : selectedServiceId}
+                  setSelectedServiceId={id => changeService(setSelectedServiceId, id)}
+                  serviceSearch={serviceSearch} setServiceSearch={setServiceSearch}
+                  onAddModel={openAddModel} onManageModels={() => setShowModelBoard(true)}
+                  defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} showToast={showToast} />
+              </div>
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
-
-
-
-              {navSection === 'models' && <ModelManagementPanel models={models} onAdd={openAddModel} onConfigure={configureChannel} onDiscover={discoverModels}
-                isDiscovering={models.isFetchingGateway || models.isFetchingOpenAI || models.isFetchingLianchi}
-                defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} />}
-              {navSection === 'defaults' && <DefaultsTab
-                    customModels={models.customModels}
-                    areModelsLoaded={models.areModelsLoaded}
-                    activeVisionModel={activeVisionModel}
-                    setActiveVisionModel={setActiveVisionModel}
-                    setActiveAssistantModel={setActiveAssistantModel}
-                    setSelectedVisionModel={setSelectedVisionModel}
-                    activeImageGenModel={activeImageGenModel}
-                    setActiveImageGenModel={setActiveImageGenModel}
-                    setSelectedImageGenModel={setSelectedImageGenModel}
-                    activeVideoGenModel={activeVideoGenModel}
-                    setActiveVideoGenModel={setActiveVideoGenModel}
-                    setQuickVideoModel={setQuickVideoModel}
-                    notifyModelsUpdated={models.notifyModelsUpdated}
-                    showToast={showToast}
-                  />}
-
-              {navSection === 'usage' && (
-                <div className="min-w-0">
+                {navSection === 'privacy' && <PrivacyPreview />}
+                {navSection === 'canvas' && canvasPage !== 'media' && <CanvasPreview page={canvasPage} />}
+                {(navSection === 'chat' || navSection === 'image' || navSection === 'video') && <DefaultsTab
+                  customModels={models.customModels}
+                  areModelsLoaded={models.areModelsLoaded}
+                  activeVisionModel={activeVisionModel}
+                  setActiveVisionModel={setActiveVisionModel}
+                  setActiveAssistantModel={setActiveAssistantModel}
+                  setSelectedVisionModel={setSelectedVisionModel}
+                  activeImageGenModel={activeImageGenModel}
+                  setActiveImageGenModel={setActiveImageGenModel}
+                  setSelectedImageGenModel={setSelectedImageGenModel}
+                  activeVideoGenModel={activeVideoGenModel}
+                  setActiveVideoGenModel={setActiveVideoGenModel}
+                  setQuickVideoModel={setQuickVideoModel}
+                  notifyModelsUpdated={models.notifyModelsUpdated}
+                  showToast={showToast}
+                  focus={navSection === 'chat' ? 'vision' : navSection === 'image' ? 'image' : 'video'}
+                />}
+                {(navSection === 'three_d' || navSection === 'music' || navSection === 'voice') && <ModalityPreview kind={navSection} />}
+                {navSection === 'language' && <LanguagePreview />}
+                {navSection === 'profile' && (
                   <UsageTab
                     usageRange={usageRange}
                     setUsageRange={setUsageRange}
@@ -257,13 +254,11 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                     onSaveGatewayCredentials={gatewayUser.saveCredentials}
                     onClearGatewayCredentials={gatewayUser.clearCredentials}
                   />
-                </div>
-              )}
-
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
       </div>
 
       {/* 🌟 2. 网关模型库多厂商发现模态窗 */}

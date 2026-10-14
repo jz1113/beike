@@ -16,7 +16,11 @@ import { serviceStatuses } from '../model/serviceStatuses';
 import type { ApiServicesTabProps } from './apiServicesTabTypes';
 
 export default function ApiServicesTab({ config: c, models: m, group, selectedServiceId, setSelectedServiceId, serviceSearch, setServiceSearch, onAddModel, onManageModels, defaultRouteIds, showToast }: ApiServicesTabProps) {
-  const services = API_SERVICES.filter(service => (service.category === 'core') === (group === 'models'));
+  const services = group === 'storage'
+    ? API_SERVICES.filter(service => service.id === 'cloud_storage')
+    : group === 'all'
+      ? API_SERVICES
+      : API_SERVICES.filter(service => (service.category === 'core') === (group === 'models'));
   const query = serviceSearch.trim().toLowerCase();
   const filteredServices = services.filter(service => [service.name, service.subTitle, service.tag].some(text => text.toLowerCase().includes(query)));
   const statuses = serviceStatuses(c);
@@ -32,7 +36,7 @@ export default function ApiServicesTab({ config: c, models: m, group, selectedSe
     else void m.handleOpenGatewayDiscovery();
   };
   return <>
-    <ApiServicesNavList services={filteredServices} serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} selectedServiceId={activeId} setSelectedServiceId={setSelectedServiceId} statuses={statuses} />
+    {group !== 'storage' && <ApiServicesNavList services={filteredServices} serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} selectedServiceId={activeId} setSelectedServiceId={setSelectedServiceId} statuses={statuses} />}
     <div className="settings-page-scroll flex-1 min-w-0 overflow-y-auto">
       <div className="settings-page-content w-full p-4 lg:p-5 space-y-4">
         <label className="@[840px]/settings-modal:hidden block text-xs text-slate-600">{group === 'models' ? '选择模型渠道' : '选择服务'}<select aria-label="选择接口服务" value={activeId} onChange={event => setSelectedServiceId(event.target.value)} className="block w-full mt-2 p-2.5 rounded-xl border border-slate-200 bg-white">{services.map(service => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>

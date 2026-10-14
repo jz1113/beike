@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 生产 Web：托管已构建的 tools/build/ui，并由同一 Node 进程提供 /api 与 /storage。
+ * 生产 Web：Go 托管已构建的 tools/build/ui，并提供 /api 与 /storage。
  * Nginx 应反代到 127.0.0.1:PORT，不要把 PORT 直接暴露公网。
  */
 import { existsSync } from 'node:fs';
@@ -8,9 +8,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ensureAppDatabase,
+  healthOk,
+  killChild,
   resolveAccessToken,
   resolveAppDataDir,
-  startApiServer,
+  startGateway,
+  waitFor,
 } from './web-shared.mjs';
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -27,28 +30,27 @@ if (!existsSync(join(webDistDir, 'index.html'))) {
 ensureAppDatabase(workspaceRoot, appDataDir);
 const accessToken = process.env.LOCAL_ACCESS_TOKEN || resolveAccessToken(workspaceRoot, appDataDir);
 
-const child = startApiServer({
+const sharedEnv = {
+  NODE_ENV: process.env.NODE_ENV || 'production',
+  PUBLIC_WEB_ORIGIN: process.env.PUBLIC_WEB_ORIGIN || '',
+};
+const gateway = startGateway({
   workspaceRoot,
   apiPort,
   appDataDir,
   accessToken,
-  watch: false,
-  extraEnv: {
-    NODE_ENV: process.env.NODE_ENV || 'production',
-    WEB_DIST_DIR: webDistDir,
-    HOSTNAME: process.env.HOSTNAME || '127.0.0.1',
-    PUBLIC_WEB_ORIGIN: process.env.PUBLIC_WEB_ORIGIN || '',
-  },
+  extraEnv: { ...sharedEnv, WEB_DIST_DIR: webDistDir, HOSTNAME: process.env.HOSTNAME || '127.0.0.1' },
+  record: false,
 });
 
 const stop = (signal) => {
-  if (child?.pid) child.kill(signal);
+  killChild(gateway);
+  if (signal) process.exit(0);
 };
-
 process.on('SIGTERM', () => stop('SIGTERM'));
 process.on('SIGINT', () => stop('SIGINT'));
-child.on('exit', (code, signal) => {
+gateway.on('exit', (code, signal) => {
   process.exit(code ?? (signal ? 1 : 0));
 });
-
-console.log(`→ 生产 Web 启动中：127.0.0.1:${apiPort}  dist=${webDistDir}  data=${appDataDir}`);
+if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gateway))) process.exit(1);
+console.log(`→ 生产 Web 已由 Go 接管：127.0.0.1:${apiPort}  dist=${webDistDir}  data=${appDataDir}`);

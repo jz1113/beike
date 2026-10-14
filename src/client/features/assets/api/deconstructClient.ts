@@ -1,4 +1,4 @@
-import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
@@ -13,8 +13,7 @@ import { resolveQueueItemPartial } from '@client/features/assets/utils/assetDeco
 export async function fetchDeconstructWithRetry(
   body: Record<string, unknown>,
 ): Promise<Response> {
-  return apiFetch('/api/catalog/assets/deconstruct', {
-    method: 'POST',
+  return apiRequest('POST', '/api/catalog/assets/deconstruct', {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -49,7 +48,7 @@ export async function processDeconstructQueueItem(
     if (!onProgress || polling) return;
     polling = true;
     try {
-      const response = await apiFetch(`/api/catalog/assets/deconstruct/progress?clientTaskId=${encodeURIComponent(item.id)}`);
+      const response = await apiRequest('GET', '/api/catalog/assets/deconstruct/progress', { search: `clientTaskId=${encodeURIComponent(item.id)}` });
       if (response.ok) {
         const data = await response.json();
         if (data.progress) onProgress(data.progress);
