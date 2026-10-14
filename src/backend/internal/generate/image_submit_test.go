@@ -1,6 +1,10 @@
 package generate
 
 import (
+	"bytes"
+	"encoding/base64"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -172,4 +176,177 @@ func TestImageSubmitAndPollUseGateway(t *testing.T) {
 	if polled.Code != http.StatusOK || !strings.Contains(polled.Body.String(), `"status":"SUCCESS"`) || !strings.Contains(polled.Body.String(), "https://cdn.example.com/out.jpg") {
 		t.Fatalf("poll %d %s", polled.Code, polled.Body.String())
 	}
+}
+
+const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+
+func TestImageEditSubmitsMultipart(t *testing.T) {
+	expected, err := base64.StdEncoding.DecodeString(tinyPNG)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+			t.Errorf("content-type %s", r.Header.Get("Content-Type"))
+		}
+		raw, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Error(readErr)
+			return
+		}
+		form, formErr := multipart.NewReader(bytes.NewReader(raw), boundaryOf(r.Header.Get("Content-Type"))).ReadForm(8 << 20)
+		if formErr != nil {
+			t.Errorf("form %v", formErr)
+			return
+		}
+		if form.Value["model"][0] != "gpt-image-2" || form.Value["prompt"][0] != "改封面" {
+			t.Errorf("fields %#v", form.Value)
+		}
+		if _, ok := form.Value["image"]; ok {
+			t.Errorf("image must be a file, got %v", form.Value["image"])
+		}
+		files := form.File["image"]
+		if len(files) != 1 || files[0].Header.Get("Content-Type") != "image/png" {
+			t.Errorf("files %#v", files)
+			return
+		}
+		opened, openErr := files[0].Open()
+		if openErr != nil {
+			t.Error(openErr)
+			return
+		}
+		defer opened.Close()
+		got, _ := io.ReadAll(opened)
+		if !bytes.Equal(got, expected) {
+			t.Errorf("image bytes %d", len(got))
+		}
+		_, _ = w.Write([]byte(`{"task_id":"edit-1"}`))
+	}))
+	defer server.Close()
+	previous := modelHTTP
+	modelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { modelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	response := httptest.NewRecorder()
+	body := `{"prompt":"改封面","model":"gpt-image-2","size":"1024x1024","quality":"high","customApiKey":"secret","customBaseUrl":"` + server.URL + `","images":["data:image/png;base64,` + tinyPNG + `"]}`
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(body)))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"taskId":"edit-1"`) {
+		t.Fatalf("submit %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestImageGenerationStaysJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("content-type %s", r.Header.Get("Content-Type"))
+		}
+		raw, _ := io.ReadAll(r.Body)
+		if !bytes.Contains(raw, []byte(`"prompt":"一只猫"`)) || bytes.Contains(raw, []byte(`"image"`)) {
+			t.Errorf("body %s", raw)
+		}
+		_, _ = w.Write([]byte(`{"task_id":"json-1"}`))
+	}))
+	defer server.Close()
+	previous := modelHTTP
+	modelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { modelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"taskId":"json-1"`) {
+		t.Fatalf("submit %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestImageEditRejectsBadDataURL(t *testing.T) {
+	hits := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	previous := modelHTTP
+	modelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { modelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	response := httptest.NewRecorder()
+	body := `{"prompt":"改封面","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"` + server.URL + `","images":["data:image/png;base64,%%%"]}`
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(body)))
+	if hits != 0 || response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "第 1 张参考图无法读取") {
+		t.Fatalf("hits %d status %d body %s", hits, response.Code, response.Body.String())
+	}
+}
+
+func imageTaskDatabase(t *testing.T) string {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "images.db")
+	db, err := database.OpenWrite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE "ImageTask" (
+		"id" TEXT, "workspaceId" TEXT, "productId" TEXT, "prompt" TEXT, "taskId" TEXT, "status" TEXT,
+		"resultUrl" TEXT, "failReason" TEXT, "model" TEXT, "mediaType" TEXT, "size" TEXT, "quality" TEXT,
+		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	return dbPath
+}
+
+func TestGptImageSizeStaysInsidePixelBudget(t *testing.T) {
+	model, size, quality := normalizeGptImageRequest("gpt-image-2", "3072x3072", "high")
+	if model != "gpt-image-2" || size != "2880x2880" || quality != "high" {
+		t.Fatalf("budget %s %s %s", model, size, quality)
+	}
+	model, size, quality = normalizeGptImageRequest("gpt-image-2-4k", "3072x3072", "high")
+	if model != "gpt-image-2-4k" || size != "2880x2880" || quality != "" {
+		t.Fatalf("suffix %s %s %q", model, size, quality)
+	}
+	adapted := buildImagePayload("gpt-image-2", "一只猫", "3072x3072", "high", nil)
+	if adapted.payload["size"] != "2880x2880" || adapted.payload["quality"] != "high" {
+		t.Fatalf("payload %#v", adapted.payload)
+	}
+	if _, ok := buildImagePayload("gpt-image-2-4k", "一只猫", "3072x3072", "high", nil).payload["quality"]; ok {
+		t.Fatal("4k suffix must omit quality")
+	}
+}
+
+func TestLianchiEditUsesImageArrayField(t *testing.T) {
+	body, contentType, err := buildImageEditBody(t.Context(), map[string]any{
+		"model": "openai/gpt-image-2", "prompt": "改封面", "size": "1024x1024", "quality": "high",
+		"image": []string{"data:image/png;base64," + tinyPNG},
+	}, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := io.ReadAll(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, err := multipart.NewReader(bytes.NewReader(raw), boundaryOf(contentType)).ReadForm(8 << 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := form.File["image"]; ok {
+		t.Fatal("lianchi field must be image[]")
+	}
+	if len(form.File["image[]"]) != 1 || form.File["image[]"][0].Header.Get("Content-Type") != "image/png" {
+		t.Fatalf("files %#v", form.File)
+	}
+	urls := imageSubmitURLs("https://api.gapnet.ai/endpoint", true, "openai-dalle", "openai/gpt-image-2")
+	if len(urls) != 1 || urls[0] != "https://api.gapnet.ai/endpoint/v1/images/edits" {
+		t.Fatalf("urls %v", urls)
+	}
+	generations := imageSubmitURLs("https://api.gapnet.ai/endpoint", false, "openai-dalle", "openai/gpt-image-2")
+	if len(generations) != 1 || strings.Contains(generations[0], "async=true") || !strings.HasSuffix(generations[0], "/v1/images/generations") {
+		t.Fatalf("generations %v", generations)
+	}
+}
+
+func boundaryOf(contentType string) string {
+	_, value, _ := strings.Cut(contentType, "boundary=")
+	return strings.Trim(value, `"`)
 }

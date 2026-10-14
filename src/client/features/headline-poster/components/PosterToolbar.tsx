@@ -1,6 +1,5 @@
-import { Check, ClipboardList, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, Type, X } from 'lucide-react';
+import { Check, ClipboardList, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, X } from 'lucide-react';
 import Dock, { type DockItemData } from '@client/shared/ui/Dock';
-import { ToolSuiteMark } from '@client/shared/icons';
 
 interface Props {
   onBack: () => void;
@@ -50,8 +49,8 @@ export function PosterToolbar({
   return (
     <header className="relative flex min-h-[72px] flex-wrap items-center justify-between gap-3 pb-2">
       <button type="button" onClick={onBack} className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white" title="返回首页">
-        <ToolSuiteMark><Type className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
-        <span className="text-sm font-black tracking-tight">大字报生成</span>
+        <img src="/brand/cover-gen.jpg" alt="" draggable={false} className="h-8 w-8 shrink-0 object-contain" />
+        <span className="text-sm font-black tracking-tight">封面生成</span>
       </button>
       <div className="contents sm:ml-auto sm:flex sm:max-w-full sm:items-center sm:justify-end sm:gap-2">
         <button type="button" onClick={onOpenRules} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-950" aria-label="查看生成规则" title="查看当前大字报生成规则"><ClipboardList className="h-3.5 w-3.5" /><span className="hidden sm:inline">生成规则</span></button>

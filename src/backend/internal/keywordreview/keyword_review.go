@@ -1,6 +1,7 @@
 package keywordreview
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,7 +62,7 @@ func executeKeywordReview(cfg config.Config, r *http.Request, client *http.Clien
 		if ruleBody != nil {
 			return ruleStatus, ruleBody
 		}
-		reviewed, err := reviewsvc.Review(r.Context(), client, reviewsvc.Input{
+		reviewed, err := reviewsvc.Review(context.WithoutCancel(r.Context()), client, reviewsvc.Input{
 			BaseURL: baseURL, APIKey: apiKey, Model: model, Provider: provider, Mode: mode, Rows: rows, Rules: rules,
 		})
 		return keywordReviewResult(provider, reviewed, err)

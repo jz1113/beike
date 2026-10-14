@@ -1,11 +1,30 @@
 import type { UsageLogItem } from './usageLog';
 import { resolveModelVendor } from './modelVendor';
 
+export type UsageRange = 'today' | '30d' | '90d' | '1y' | 'all';
+
+export interface UsageHeatmapDayDetail {
+  requests: number;
+  tokens: number;
+  costUsd: number;
+  costRmb: number;
+  imageCount: number;
+  videoCount: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
 export interface UsageSummary {
   totalCostUsd: number;     // 总算力消耗 (点)
   totalCostRmb: number;     // 折算人民币金额 (¥)
   totalRequests: number;    // 总请求次数
   totalTokens: number;      // 总 Token 吞吐
+  imageCount: number;
+  videoCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
   cacheHitRate: number;     // 缓存命中率
   activeDays: number;       // 活跃天数
   peakDayLabel: string;     // 高峰日
@@ -37,16 +56,57 @@ export interface UsageSummary {
     items: { vendor: string; tokens: number; color: string }[];
   }[];
   heatmapActiveMap: Record<string, number>;
-  heatmapDetailsMap?: Record<string, { requests: number; tokens: number; costUsd: number; costRmb: number }>;
+  heatmapDetailsMap?: Record<string, UsageHeatmapDayDetail>;
+}
+
+function dateKeyOf(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function rangeCutoff(range: UsageRange, now: number) {
+  if (range === 'all') return Number.NEGATIVE_INFINITY;
+  if (range === 'today') {
+    const date = new Date(now);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  }
+  const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
+  return now - days * 24 * 60 * 60 * 1000;
+}
+
+function streakStats(logs: UsageLogItem[], now: number) {
+  const active = new Set(logs.filter(log => Number.isFinite(log.timestamp) && log.timestamp <= now).map(log => dateKeyOf(log.timestamp)));
+  const hasDay = (offset: number) => {
+    const date = new Date(now);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - offset);
+    return active.has(dateKeyOf(date.getTime()));
+  };
+  let currentStreakDays = 0;
+  const start = hasDay(0) ? 0 : hasDay(1) ? 1 : -1;
+  if (start >= 0) {
+    for (let offset = start; hasDay(offset); offset += 1) currentStreakDays += 1;
+  }
+  let longestStreakDays = 0;
+  let run = 0;
+  let previous: number | null = null;
+  for (const key of [...active].sort()) {
+    const [year, month, day] = key.split('-').map(Number);
+    const time = new Date(year, month - 1, day).getTime();
+    run = previous !== null && time - previous === 86_400_000 ? run + 1 : 1;
+    longestStreakDays = Math.max(longestStreakDays, run);
+    previous = time;
+  }
+  return { currentStreakDays, longestStreakDays };
 }
 
 /**
  * 计算指定时间范围内的真实统计指标
  */
-export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range: '30d' | '90d' | '1y'): UsageSummary {
+export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range: UsageRange): UsageSummary {
   const now = Date.now();
-  const daysLimit = range === '30d' ? 30 : range === '90d' ? 90 : 365;
-  const cutoffTime = now - daysLimit * 24 * 60 * 60 * 1000;
+  const cutoffTime = rangeCutoff(range, now);
+  const streaks = streakStats(allLogs, now);
 
   const filteredLogs = allLogs.filter(l => Number.isFinite(l.timestamp) && l.timestamp >= cutoffTime && l.timestamp <= now);
 
@@ -56,6 +116,11 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
       totalCostRmb: 0,
       totalRequests: 0,
       totalTokens: 0,
+      imageCount: 0,
+      videoCount: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      ...streaks,
       cacheHitRate: 0,
       activeDays: 0,
       peakDayLabel: '暂无数据',
@@ -67,18 +132,27 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
       dailyAvgRequests: 0,
       modelBreakdown: [],
       recentDaysActivity: generateEmptyRecentDays(7),
-      heatmapActiveMap: {}
+      heatmapActiveMap: {},
+      heatmapDetailsMap: {},
     };
   }
 
   let totalCostUsd = 0;
   let totalCostRmb = 0;
   let totalTokens = 0;
+  let imageCount = 0;
+  let videoCount = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
   let cachedCount = 0;
   const dayTokensMap: Record<string, number> = {};
   const dayRequestsMap: Record<string, number> = {};
   const dayCostUsdMap: Record<string, number> = {};
   const dayCostRmbMap: Record<string, number> = {};
+  const dayImageMap: Record<string, number> = {};
+  const dayVideoMap: Record<string, number> = {};
+  const dayPromptMap: Record<string, number> = {};
+  const dayCompletionMap: Record<string, number> = {};
   const modelMap: Record<string, {
     id: string;
     name: string;
@@ -111,12 +185,23 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
     if (log.cached) cachedCount++;
 
     // 按天归并 (YYYY-MM-DD)
-    const d = new Date(log.timestamp);
-    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dateKey = dateKeyOf(log.timestamp);
     dayTokensMap[dateKey] = (dayTokensMap[dateKey] || 0) + (log.totalTokens || 0);
     dayRequestsMap[dateKey] = (dayRequestsMap[dateKey] || 0) + 1;
     dayCostUsdMap[dateKey] = (dayCostUsdMap[dateKey] || 0) + costUsd;
     dayCostRmbMap[dateKey] = (dayCostRmbMap[dateKey] || 0) + costRmb;
+    dayPromptMap[dateKey] = (dayPromptMap[dateKey] || 0) + (log.promptTokens || 0);
+    dayCompletionMap[dateKey] = (dayCompletionMap[dateKey] || 0) + (log.completionTokens || 0);
+    if (log.type === 'image') {
+      imageCount += effectiveMediaCount;
+      dayImageMap[dateKey] = (dayImageMap[dateKey] || 0) + effectiveMediaCount;
+    }
+    if (log.type === 'video') {
+      videoCount += effectiveMediaCount;
+      dayVideoMap[dateKey] = (dayVideoMap[dateKey] || 0) + effectiveMediaCount;
+    }
+    promptTokens += log.promptTokens || 0;
+    completionTokens += log.completionTokens || 0;
 
     // 按模型归并
     const mKey = log.modelId || log.modelName || 'unknown';
@@ -230,6 +315,11 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
     totalCostRmb: Number(totalCostRmb.toFixed(6)),
     totalRequests: filteredLogs.length,
     totalTokens,
+    imageCount,
+    videoCount,
+    promptTokens,
+    completionTokens,
+    ...streaks,
     cacheHitRate: Number(cacheHitRate.toFixed(1)),
     activeDays,
     peakDayLabel,
@@ -248,9 +338,13 @@ export function buildUsageSummary(allLogs: UsageLogItem[], ratio: number, range:
         tokens: dayTokensMap[k] || 0,
         costUsd: Number((dayCostUsdMap[k] || 0).toFixed(6)),
         costRmb: Number((dayCostRmbMap[k] || 0).toFixed(6)),
+        imageCount: dayImageMap[k] || 0,
+        videoCount: dayVideoMap[k] || 0,
+        promptTokens: dayPromptMap[k] || 0,
+        completionTokens: dayCompletionMap[k] || 0,
       };
       return acc;
-    }, {} as Record<string, { requests: number; tokens: number; costUsd: number; costRmb: number }>)
+    }, {} as Record<string, UsageHeatmapDayDetail>)
   };
 }
 

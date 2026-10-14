@@ -2,6 +2,7 @@ package generate
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -36,8 +37,13 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		}
 	}
 	adapted := buildImagePayload(model, prompt, size, quality, refs)
-	status, data, err := dispatchImage(r, imageSubmitURLs(base, adapted.useEdits, adapted.family), apiKey, adapted.payload)
+	status, data, err := dispatchImage(r, imageSubmitURLs(base, adapted.useEdits, adapted.family, model), apiKey, adapted.payload, workspaceOf(r), cfg.Production())
 	if err != nil {
+		var prepare imageEditPrepareError
+		if errors.As(err, &prepare) {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": prepare.Error()})
+			return
+		}
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "提交响应未确认：" + err.Error() + "。请先在上游任务记录核实是否已创建任务，避免重复生成"})
 		return
 	}
@@ -79,6 +85,7 @@ type imageAdapted struct {
 }
 
 func buildImagePayload(model, prompt, size, quality string, refs []string) imageAdapted {
+	model, size, quality = normalizeGptImageRequest(model, size, quality)
 	family := imageFamily(model)
 	payload := map[string]any{"model": model, "prompt": prompt, "size": size, "n": 1}
 	if family != "grok-image" && quality != "" {
@@ -121,8 +128,15 @@ func imageFamily(model string) string {
 	}
 }
 
-func imageSubmitURLs(base string, edits bool, family string) []string {
+func imageSubmitURLs(base string, edits bool, family, model string) []string {
 	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	if model == "openai/gpt-image-2" {
+		path := "/v1/images/generations"
+		if edits {
+			path = "/v1/images/edits"
+		}
+		return []string{root + path}
+	}
 	if family == "qwen-edit" {
 		return []string{root + "/v1/images/edits"}
 	}
@@ -132,11 +146,22 @@ func imageSubmitURLs(base string, edits bool, family string) []string {
 	return []string{root + "/v1/images/generations?async=true", root + "/v1/images/generations"}
 }
 
-func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[string]any) (int, map[string]any, error) {
+func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[string]any, workspace string, production bool) (int, map[string]any, error) {
 	var lastStatus int
 	var lastData map[string]any
+	timeout := 45 * time.Second
+	if payloadText(payload["model"]) == "openai/gpt-image-2" {
+		timeout = 180 * time.Second
+	}
 	for _, endpoint := range urls {
-		status, raw, err := postModel(r.Context(), http.MethodPost, endpoint, apiKey, payload, 45*time.Second)
+		var status int
+		var raw []byte
+		var err error
+		if isImageEditEndpoint(endpoint) {
+			status, raw, err = postImageEdit(r.Context(), endpoint, apiKey, payload, workspace, production, timeout)
+		} else {
+			status, raw, err = postModel(r.Context(), http.MethodPost, endpoint, apiKey, payload, timeout)
+		}
 		if err != nil {
 			return 0, nil, err
 		}

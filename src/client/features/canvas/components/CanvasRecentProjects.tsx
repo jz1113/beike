@@ -9,12 +9,15 @@ interface CanvasRecentProjectsProps {
   onEnterCanvas?: (projectId: string) => void;
   className?: string;
   maxDisplay?: number;
+  /** 首页画布模式用独立方卡；画布视图保持网格里的新建入口。 */
+  lead?: 'grid' | 'square';
 }
 
 export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
   onEnterCanvas,
   className = '',
   maxDisplay = 7,
+  lead = 'grid',
 }) => {
   const hydrated = useCanvasHydrated();
   const { projects:allProjects, createProject, selectProject, updateProjectTitle, deleteProject } = useCanvasStore();
@@ -65,8 +68,38 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
   const displayedProjects = maxDisplay > 0 ? projects.slice(0, maxDisplay) : projects;
   const hasRecentProjects = projects.length > 0;
 
+  const createCard = lead === 'square' ? (
+    <button
+      type="button"
+      onClick={handleCreateNew}
+      className="flex h-[168px] w-[168px] flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200/90 bg-white text-slate-500 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-950 hover:shadow-md"
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+        <Plus className="h-5 w-5" strokeWidth={2.2} />
+      </span>
+      <span className="text-sm font-medium">新建项目</span>
+    </button>
+  ) : (
+    <div
+      onClick={handleCreateNew}
+      className="group/new flex flex-col gap-2 cursor-pointer transition-all duration-200"
+    >
+      <div className="w-full aspect-video rounded-2xl border border-slate-200/80 bg-slate-100/70 hover:bg-slate-200/70 hover:border-slate-300 flex items-center justify-center transition-all duration-200 shadow-2xs group-hover/new:shadow-md group-hover/new:-translate-y-0.5">
+        <div className="w-10 h-10 rounded-full bg-white/80 shadow-2xs flex items-center justify-center text-slate-400 group-hover/new:text-slate-900 group-hover/new:scale-110 transition-all duration-200">
+          <Plus className="w-6 h-6 stroke-[2.2]" />
+        </div>
+      </div>
+      <div className="px-1">
+        <span className="text-xs sm:text-[13px] font-semibold text-slate-800 group-hover/new:text-slate-950 transition-colors">
+          新建项目
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <section className={`w-full space-y-4 select-none ${className}`}>
+      {lead === 'square' && createCard}
       {/* 空画布不展示“最近项目 · 0 个画布”的无效标题行，直接给出新建入口。 */}
       {hasRecentProjects && (
         <div className="flex items-center justify-between pb-1 border-b border-slate-200/50">
@@ -98,24 +131,9 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
         </div>
       )}
 
-      {/* 大屏固定为四列，让少量项目也能以画布入口应有的尺度展示。 */}
+      {(lead === 'grid' || hasRecentProjects) && (
       <div className="grid grid-cols-1 min-[540px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-        {/* 🌟 新建项目卡片 */}
-        <div
-          onClick={handleCreateNew}
-          className="group/new flex flex-col gap-2 cursor-pointer transition-all duration-200"
-        >
-          <div className="w-full aspect-video rounded-2xl border border-slate-200/80 bg-slate-100/70 hover:bg-slate-200/70 hover:border-slate-300 flex items-center justify-center transition-all duration-200 shadow-2xs group-hover/new:shadow-md group-hover/new:-translate-y-0.5">
-            <div className="w-10 h-10 rounded-full bg-white/80 shadow-2xs flex items-center justify-center text-slate-400 group-hover/new:text-slate-900 group-hover/new:scale-110 transition-all duration-200">
-              <Plus className="w-6 h-6 stroke-[2.2]" />
-            </div>
-          </div>
-          <div className="px-1">
-            <span className="text-xs sm:text-[13px] font-semibold text-slate-800 group-hover/new:text-slate-950 transition-colors">
-              新建项目
-            </span>
-          </div>
-        </div>
+        {lead === 'grid' && createCard}
 
         {/* 🌟 历史画布卡片 */}
         {displayedProjects.map((proj) => {
@@ -215,6 +233,7 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
           );
         })}
       </div>
+      )}
     </section>
   );
 };

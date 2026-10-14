@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScanSearch, Sparkles, FileSpreadsheet, FileVideo } from 'lucide-react';
+import { Sparkles, FileSpreadsheet, FileVideo } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
-import { ToolSuiteMark } from '@client/shared/icons';
 import {
   type BatchTaskItem,
   buildCollectorAIAssistantPayload,
@@ -189,8 +188,8 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             aria-label="返回首页"
             title="返回首页"
           >
-            <ToolSuiteMark><ScanSearch className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
-            <span className="text-sm font-black tracking-tight">全渠道采集</span>
+            <img src="/brand/content-collect.jpg" alt="" draggable={false} className="h-8 w-8 shrink-0 object-contain" />
+            <span className="text-sm font-black tracking-tight">内容采集</span>
           </button>
         </header>
 
@@ -198,7 +197,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
         <div className="flex-1 overflow-y-auto px-4 pb-10 pt-8 sm:px-6 sm:pt-12 lg:px-8">
           <section className="mx-auto w-full max-w-[1120px]">
             <div className="mx-auto max-w-[980px] text-center">
-              <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px]">全渠道智能采集</h1>
+              <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px]">内容采集</h1>
               <p id="collector-modal-desc" className="mt-3 text-sm text-slate-500">{activeTab === 'batch' ? '粘贴多条链接或导入表格，批量收集商品图片与社媒素材。' : activeTab === 'video' ? '导入含标题和视频链接的表格，按标题批量下载到本地文件夹。' : '一个链接，收集商品图片与社媒素材。'}</p>
               <div role="tablist" aria-label="采集模式选择" className="mt-6 inline-flex max-w-full overflow-x-auto rounded-full bg-slate-100 p-1 shadow-inner text-sm font-medium">
                 <button type="button" role="tab" aria-selected={activeTab === 'single'} onClick={() => setActiveTab('single')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'single' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><Sparkles className="h-3.5 w-3.5" />单条采集</button>

@@ -15,7 +15,7 @@ export function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif|tiff?)$/i;
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif|tiff?|svg)$/i;
 const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|avi|mkv)$/i;
 
 export function isImageFile(file: File): boolean {
@@ -49,6 +49,8 @@ export function normalizeImageDataUrl(file: File, dataUrl: string): string {
     mime = 'image/png';
   } else if (/\.webp$/i.test(file.name)) {
     mime = 'image/webp';
+  } else if (/\.svg$/i.test(file.name)) {
+    mime = 'image/svg+xml';
   } else if (/\.gif$/i.test(file.name)) {
     mime = 'image/gif';
   }

@@ -16,7 +16,6 @@ import {
   resolveCli,
   startGateway,
   startViteServer,
-  stopApiServer,
   viteOk,
   waitFor,
   webProcessOptions,
@@ -30,14 +29,12 @@ const isolated = process.env.BEIKE_ISOLATED_DEV === '1';
 let apiPort = readApiPort(workspaceRoot, { isolated });
 const vitePort = isolated ? VITE_PORT + 1 : VITE_PORT;
 const appDataDir = resolve(process.env.AZHUO_DATA_DIR || (isolated ? join(resolveAppDataDir(), 'development') : resolveAppDataDir()));
-let apiChild = null;
 let gatewayChild = null;
 let viteChild = null;
 
 const shutdown = (code = 0) => {
   killChild(viteChild);
   killChild(gatewayChild);
-  killChild(apiChild);
   process.exit(code);
 };
 process.on('SIGINT', () => shutdown());
@@ -52,8 +49,8 @@ try {
   ensureAppDatabase(workspaceRoot, appDataDir);
   const accessToken = resolveAccessToken(workspaceRoot, appDataDir, { isolated });
   const processOptions = () => webProcessOptions({ apiPort, appDataDir, accessToken });
-  if (ownsWebProcess(workspaceRoot, 'api', {}, isolated)) {
-    await stopApiServer(workspaceRoot, { isolated });
+  if (ownsWebProcess(workspaceRoot, 'gateway', {}, isolated)) {
+    await stopWebProcess(workspaceRoot, 'gateway', isolated);
   }
   if (!(await portFree(apiPort))) {
     if (!isolated) throw new Error(`API 端口 ${apiPort} 已被未记录的进程占用，请先关闭对应启动终端；不会自动停止其它服务`);
@@ -70,8 +67,7 @@ try {
     throw new Error(`UI 端口 ${vitePort} 已被未记录的进程占用，请先关闭对应启动终端`);
   }
   writeApiPort(workspaceRoot, apiPort, { isolated });
-  const reuseGateway = ownsWebProcess(workspaceRoot, 'gateway', processOptions(), isolated);
-  if (!reuseGateway) gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
+  gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
   if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gatewayChild))) shutdown(1);
   if (!reuseVite) viteChild = startViteServer({ workspaceRoot, apiPort, appDataDir, accessToken, vitePort, isolated });
   if (!(await waitFor(() => viteOk(vitePort), `Vite http://127.0.0.1:${vitePort}`, 60000, viteChild))) shutdown(1);

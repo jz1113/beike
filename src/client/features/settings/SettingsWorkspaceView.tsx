@@ -1,6 +1,6 @@
 import './settingsWorkspace.css';
-import { settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
-import { CanvasPreview, LanguagePreview, ModalityPreview, PrivacyPreview, StoragePreviewNote } from './components/SettingsPreview';
+import { CANVAS_SETTINGS_PAGES, settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
+import { CanvasPreview, LanguagePreview, ModalityPreview, StoragePreviewNote } from './components/SettingsPreview';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@client/shared/hooks/useToast';
 import { SettingsSidebar } from './components/SettingsSidebar';
@@ -8,7 +8,7 @@ import { X } from 'lucide-react';
 import { useSettingsLeaveGuard } from './hooks/useSettingsLeaveGuard';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
-import { getUsageSummary, type UsageSummary } from '@client/shared/utils/usageTracker';
+import { getUsageSummary, type UsageRange, type UsageSummary } from '@client/shared/utils/usageTracker';
 import { getStoredMultimodalModelId, workflowModelRouteId } from '@shared/domain/models/workflowModels';
 import GatewayModelModal from './components/GatewayModelModal';
 import ApiServicesTab from './tabs/ApiServicesTab';
@@ -57,7 +57,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const { message: toastMsg, show: showToast } = useToast();
 
   // 1. 左侧大类导航
-  const [navSection, setNavSection] = useState<SettingsNavSection>('api');
+  const [navSection, setNavSection] = useState<SettingsNavSection>('profile');
   const [canvasPage, setCanvasPage] = useState<CanvasSettingsPage>('connections');
   const [showModelBoard, setShowModelBoard] = useState(false);
 
@@ -66,8 +66,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const [serviceSearch, setServiceSearch] = useState('');
 
   // 3. 用量统计面板状态
-  const [usageRange, setUsageRange] = useState<'30d' | '90d' | '1y'>('30d');
-  const [usageModelSearch, setUsageModelSearch] = useState<string>('');
+  const [usageRange, setUsageRange] = useState<UsageRange>('30d');
   const [usageRefreshKey, setUsageRefreshKey] = useState<number>(0);
 
   const usageSummary: UsageSummary = useMemo(() => {
@@ -160,18 +159,37 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const storageOpen = navSection === 'storage' || (navSection === 'canvas' && canvasPage === 'media');
 
   return (
-    <div className="settings-workspace fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-8 text-slate-900 font-sans" role="presentation">
-      <button type="button" aria-label="关闭设置" className="absolute inset-0 bg-slate-900/35" onClick={handleBackToApp} />
+    <div className="settings-workspace fixed inset-0 z-[80] flex items-center justify-center p-4 text-slate-900 font-sans sm:p-8" role="presentation">
+      <button type="button" aria-label="关闭设置" className="absolute inset-0 bg-slate-950/25" onClick={handleBackToApp} />
       {toastMsg && (
         <div role="status" aria-live="polite" className="max-w-[calc(100%-2rem)] break-words absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fade-in">
           <span>{toastMsg}</span>
         </div>
       )}
-      <div role="dialog" aria-modal="true" aria-label="设置" className="settings-shell relative flex h-[min(880px,100%)] w-[min(1080px,100%)] overflow-hidden rounded-[28px] shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label="设置" className="settings-shell relative flex h-[min(760px,calc(100%-64px))] w-[min(1120px,calc(100%-64px))] overflow-hidden rounded-[20px] shadow-2xl">
         <button type="button" onClick={handleBackToApp} aria-label="关闭" className="absolute right-4 top-4 z-30 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900">
           <X className="h-4 w-4" />
         </button>
-        <SettingsSidebar navSection={navSection} setNavSection={changeSection} canvasPage={canvasPage} setCanvasPage={setCanvasPage} gatewayBalanceFormatted={gatewayBalanceFormatted} />
+        <SettingsSidebar navSection={navSection} setNavSection={changeSection} gatewayBalanceFormatted={gatewayBalanceFormatted} />
+        {navSection === 'canvas' && (
+          <nav aria-label="画布功能" className="settings-canvas-rail hidden md:flex w-44 shrink-0 h-full flex-col overflow-y-auto border-r border-slate-200/80 bg-[#f7f8fa] px-3 py-5">
+            <div className="px-2 pb-3 text-[13px] font-medium text-slate-500">画布功能</div>
+            <div className="space-y-0.5">
+              {CANVAS_SETTINGS_PAGES.map(page => (
+                <button
+                  key={page.id}
+                  type="button"
+                  aria-current={canvasPage === page.id ? 'page' : undefined}
+                  onClick={() => setCanvasPage(page.id)}
+                  className={`flex w-full items-center justify-between rounded-full px-2.5 py-2 text-[13px] ${canvasPage === page.id ? 'bg-[#e8edf5] font-semibold text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                >
+                  <span>{page.label}</span>
+                  {page.count !== undefined && <span className="text-[11px] text-slate-400">{page.count}</span>}
+                </button>
+              ))}
+            </div>
+          </nav>
+        )}
         <main className="flex-1 min-w-0 h-full flex flex-col bg-white overflow-hidden relative z-10">
           <div className="h-16 px-6 md:px-8 border-b border-slate-100 bg-white flex items-center shrink-0">
             <h1 className="pr-10 text-base sm:text-lg font-semibold text-slate-900 tracking-tight truncate">{activeTitle}</h1>
@@ -212,7 +230,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
-                {navSection === 'privacy' && <PrivacyPreview />}
                 {navSection === 'canvas' && canvasPage !== 'media' && <CanvasPreview page={canvasPage} />}
                 {(navSection === 'chat' || navSection === 'image' || navSection === 'video') && <DefaultsTab
                   customModels={models.customModels}
@@ -237,8 +254,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                   <UsageTab
                     usageRange={usageRange}
                     setUsageRange={setUsageRange}
-                    usageModelSearch={usageModelSearch}
-                    setUsageModelSearch={setUsageModelSearch}
                     setUsageRefreshKey={setUsageRefreshKey}
                     usageSummary={usageSummary}
                     showToast={showToast}

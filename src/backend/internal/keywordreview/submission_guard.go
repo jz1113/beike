@@ -79,6 +79,16 @@ func guardKeywordSubmission(r *http.Request, workspace, baseURL, apiKey string, 
 		return decorateSubmission(replay, "", true)
 	}
 	status, payload := submit()
+	if discardUnbilledReject(status, payload) {
+		_ = os.Remove(file)
+		header := http.Header{}
+		header.Set("x-request-fingerprint", fingerprint)
+		if attemptID != "" {
+			header.Set("x-submission-attempt-id", attemptID)
+		}
+		flight.resp = guardedResult{status: status, body: payload, header: header}
+		return decorateSubmission(flight.resp, "", false)
+	}
 	completed := map[string]any{
 		"fingerprint": fingerprint, "kind": "keyword-review", "createdAt": receipt["createdAt"],
 		"status": status, "body": marshalReceiptText(payload),
@@ -98,6 +108,17 @@ func guardKeywordSubmission(r *http.Request, workspace, baseURL, apiKey string, 
 	}
 	flight.resp = guardedResult{status: status, body: payload, header: header}
 	return decorateSubmission(flight.resp, "", false)
+}
+
+func discardUnbilledReject(status int, payload map[string]any) bool {
+	if status != http.StatusTooManyRequests && status != http.StatusServiceUnavailable {
+		return false
+	}
+	if payload == nil {
+		return true
+	}
+	usage, ok := payload["usage"]
+	return !ok || usage == nil
 }
 
 func replayGuarded(resp guardedResult, fingerprint string) guardedResult {

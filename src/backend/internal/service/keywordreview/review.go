@@ -71,16 +71,15 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if mode == "" {
 		mode = "image"
 	}
-	compact := input.Provider != "gateway"
 	requestBody := chatRequest{
 		Model: input.Model, Temperature: 0.1, MaxTokens: maxTokens,
 		ResponseFormat: map[string]string{"type": "json_object"},
 		Messages: []chatMessage{
-			{Role: "system", Content: systemPrompt(mode, compact, input.Rules)},
+			{Role: "system", Content: systemPrompt(mode, true, input.Rules)},
 			{Role: "user", Content: "请审核以下行：\n" + marshalText(modelRows(input.Rows))},
 		},
 	}
-	if input.Provider != "gateway" {
+	if disableThinking(input) {
 		requestBody.Thinking = &chatThinking{Type: "disabled"}
 	}
 	body, err := marshalTextBytes(requestBody)
@@ -116,7 +115,7 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if data["usage"] == nil {
 		usage = nil
 	}
-	parsed, err := readModelPayload(data, input.Model)
+	parsed, partial, err := readModelPayload(data, input.Model)
 	if err != nil {
 		return Result{}, &OutputError{Message: err.Error(), Usage: usage}
 	}
@@ -124,7 +123,14 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if err != nil {
 		return Result{}, &OutputError{Message: err.Error(), Usage: usage}
 	}
+	if partial && len(checked.results) == 0 {
+		return Result{}, &OutputError{Message: fmt.Sprintf("关键词审核模型 %s 输出被截断，本批结果未写入", input.Model), Usage: usage}
+	}
 	return Result{Results: stripLookup(checked.results), Failed: checked.failed, Usage: usage, Model: input.Model}, nil
+}
+
+func disableThinking(input Input) bool {
+	return input.Provider != "gateway" || strings.HasPrefix(input.Model, "deepseek-")
 }
 
 type chatRequest struct {
@@ -157,18 +163,9 @@ func modelRows(rows []Row) []promptRow {
 	items := make([]promptRow, len(rows))
 	for index, row := range rows {
 		item := promptRow{ID: itoa(index + 1), Query: row.Query}
-		if row.Expansion != nil {
-			value := clipRaw(*row.Expansion, expansionMax)
-			item.Expansion = &value
-		}
-		if row.EntityExpansion != nil {
-			value := clipRaw(*row.EntityExpansion, expansionMax)
-			item.EntityExpansion = &value
-		}
-		if row.ContentType != nil {
-			value := clipRaw(*row.ContentType, 40)
-			item.ContentType = &value
-		}
+		item.Expansion = clippedOptional(row.Expansion, expansionMax)
+		item.EntityExpansion = clippedOptional(row.EntityExpansion, expansionMax)
+		item.ContentType = clippedOptional(row.ContentType, 40)
 		items[index] = item
 	}
 	return items
@@ -270,25 +267,32 @@ func stripLookup(results []map[string]any) []map[string]any {
 	return stripped
 }
 
-func readModelPayload(data map[string]any, model string) (any, error) {
+func readModelPayload(data map[string]any, model string) (any, bool, error) {
 	choices, _ := data["choices"].([]any)
 	if len(choices) == 0 {
-		return nil, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
+		return nil, false, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
 	}
 	choice, _ := choices[0].(map[string]any)
-	if fmt.Sprint(choice["finish_reason"]) == "length" {
-		return nil, fmt.Errorf("关键词审核模型 %s 输出被截断，本批结果未写入", model)
-	}
+	truncated := fmt.Sprint(choice["finish_reason"]) == "length"
 	message, _ := choice["message"].(map[string]any)
 	raw, _ := message["content"].(string)
 	if strings.TrimSpace(raw) == "" {
-		return nil, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
+		if truncated {
+			return nil, false, fmt.Errorf("关键词审核模型 %s 输出被截断，本批结果未写入", model)
+		}
+		return nil, false, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
 	}
 	parsed, err := parseModelJSON(raw)
-	if err != nil {
-		return nil, fmt.Errorf("关键词审核模型 %s 返回了不完整 JSON，本批结果未写入", model)
+	if err == nil {
+		return parsed, false, nil
 	}
-	return parsed, nil
+	if salvaged, ok := salvagePartialResults(raw); ok {
+		return salvaged, true, nil
+	}
+	if truncated {
+		return nil, false, fmt.Errorf("关键词审核模型 %s 输出被截断，本批结果未写入", model)
+	}
+	return nil, false, fmt.Errorf("关键词审核模型 %s 返回了不完整 JSON，本批结果未写入", model)
 }
 
 var fencePattern = regexp.MustCompile("(?i)^```(?:json)?\\s*")
@@ -308,6 +312,17 @@ func textValue(value any) string {
 		return ""
 	}
 	return fmt.Sprint(value)
+}
+
+func clippedOptional(value *string, max int) *string {
+	if value == nil {
+		return nil
+	}
+	clipped := clipRaw(strings.TrimSpace(*value), max)
+	if clipped == "" {
+		return nil
+	}
+	return &clipped
 }
 
 func clipRaw(value string, max int) string {

@@ -270,7 +270,6 @@ export function buildPromptBarGenerationTasks(
     quickVideoResolution,
     quickVideoDuration,
     quickVideoRefMode,
-    currentView,
     quickDepthStyle,
     quickDepthQuality,
     quickVideoGenerateAudio,
@@ -304,7 +303,7 @@ export function buildPromptBarGenerationTasks(
       tasks: [task],
       cleanedPrompt: task.prompt,
       sessionTitle: task.title,
-      shouldCreateNewSession: currentView !== 'generate',
+      shouldCreateNewSession: true,
     };
   }
 
@@ -355,7 +354,7 @@ export function buildPromptBarGenerationTasks(
     cleanedPrompt,
     sessionTitle:
       cleanedPrompt.slice(0, 18) || (quickGenMode === 'video' ? '智能视频创作' : '快速商用生图'),
-    shouldCreateNewSession: currentView !== 'generate',
+    shouldCreateNewSession: true,
   };
 }
 

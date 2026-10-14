@@ -1,6 +1,23 @@
 import type { UsageSummary } from '@client/shared/utils/usageTracker';
 
-export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiveMap' | 'heatmapDetailsMap'>, heatmapRange: 'year' | 'half_year' | 'quarter', currentYear: number, now = new Date()) {
+export type UsageHeatmapRange = 'year' | 'half_year' | 'quarter' | 'rolling';
+
+export interface UsageHeatmapCell {
+  dateKey: string;
+  dayName: string;
+  count: number;
+  tokens: number;
+  costUsd: number;
+  costRmb: number;
+  imageCount: number;
+  videoCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  isToday: boolean;
+  isFuture: boolean;
+}
+
+export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiveMap' | 'heatmapDetailsMap'>, heatmapRange: UsageHeatmapRange, currentYear: number, now = new Date()) {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -16,7 +33,7 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
       const yearDays = (Date.UTC(currentYear + 1, 0, 1) - Date.UTC(currentYear, 0, 1)) / 86400000;
       totalWeeks = Math.ceil((jan1DayOfWeek + yearDays) / 7);
     } else {
-      totalWeeks = heatmapRange === 'quarter' ? 13 : 26;
+      totalWeeks = heatmapRange === 'quarter' ? 13 : heatmapRange === 'half_year' ? 26 : 53;
       // 以本周周日为截止基准倒推对应周数
       const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
       const daysUntilSunday = 6 - dayOfWeek;
@@ -29,16 +46,7 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
     const weeks: {
       weekIdx: number;
       monthLabel?: string;
-      days: {
-        dateKey: string;
-        dayName: string;
-        count: number;
-        tokens: number;
-        costUsd: number;
-        costRmb: number;
-        isToday: boolean;
-        isFuture: boolean;
-      }[];
+      days: UsageHeatmapCell[];
     }[] = [];
 
     const cursor = new Date(calendarStart);
@@ -46,16 +54,7 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
     const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
     for (let w = 0; w < totalWeeks; w++) {
-      const days: {
-        dateKey: string;
-        dayName: string;
-        count: number;
-        tokens: number;
-        costUsd: number;
-        costRmb: number;
-        isToday: boolean;
-        isFuture: boolean;
-      }[] = [];
+      const days: UsageHeatmapCell[] = [];
 
       let containsDay1 = false;
       let day1Month = -1;
@@ -78,17 +77,17 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
 
         const count = isFuture ? 0 : usageSummary.heatmapActiveMap?.[dateKey] || 0;
         const details = usageSummary.heatmapDetailsMap?.[dateKey];
-        const tokens = details?.tokens || 0;
-        const costUsd = details?.costUsd || 0;
-        const costRmb = details?.costRmb || 0;
-
         days.push({
           dateKey,
           dayName: DAY_NAMES[d],
           count,
-          tokens,
-          costUsd,
-          costRmb,
+          tokens: details?.tokens || 0,
+          costUsd: details?.costUsd || 0,
+          costRmb: details?.costRmb || 0,
+          imageCount: details?.imageCount || 0,
+          videoCount: details?.videoCount || 0,
+          promptTokens: details?.promptTokens || 0,
+          completionTokens: details?.completionTokens || 0,
           isToday,
           isFuture,
         });
@@ -111,12 +110,12 @@ export function buildUsageHeatmap(usageSummary: Pick<UsageSummary, 'heatmapActiv
             lastLabelWeek = w;
           }
         }
-      } else {
-        // 近半年或近 3 个月：只在包含 1 号且间距充足的周显示月份，彻底避免第 0 周与紧挨着的次月 1 号打架
-        if (containsDay1 && (w - lastLabelWeek >= 4)) {
-          monthLabel = `${day1Month}月`;
-          lastLabelWeek = w;
-        }
+      } else if (w === 0) {
+        monthLabel = `${Number(days[0]?.dateKey.slice(5, 7))}月`;
+        lastLabelWeek = 0;
+      } else if (containsDay1 && w - lastLabelWeek >= 2) {
+        monthLabel = `${day1Month}月`;
+        lastLabelWeek = w;
       }
 
       weeks.push({ weekIdx: w, monthLabel, days });

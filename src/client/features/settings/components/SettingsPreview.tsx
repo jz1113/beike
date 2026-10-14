@@ -163,15 +163,6 @@ export function CanvasPreview({ page }: { page: Exclude<CanvasSettingsPage, 'med
   );
 }
 
-export function PrivacyPreview() {
-  return (
-    <section className="settings-preview">
-      <header><h2>隐私</h2><SettingsPreviewNotice /></header>
-      <PreviewRows controls={[{ kind: 'toggle', id: 'privacy', label: '隐私模式', desc: '截图或分享屏幕时，隐藏项目名称和封面。首页和项目库不显示封面。' }]} />
-    </section>
-  );
-}
-
 export function LanguagePreview() {
   return (
     <section className="settings-preview">

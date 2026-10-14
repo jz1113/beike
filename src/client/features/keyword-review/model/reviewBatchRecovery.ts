@@ -38,8 +38,50 @@ export async function reviewBatchWithRecovery<T extends { id: string }>(options:
         else await onUnresolvedRows?.(pending, error);
         return { attempts, exhausted };
       }
+      if (pending.length > 10) {
+        onRetry?.(pending, error);
+        return retrySplitBatch(pending, {
+          submit, isModelOutputError, onSingleRowFailure, onUnresolvedRows, shouldStop, attempts, previousError: error,
+        });
+      }
       onRetry?.(pending, error);
     }
   }
   return { attempts, exhausted };
+}
+
+async function retrySplitBatch<T extends { id: string }>(
+  pending: T[],
+  options: {
+    submit: (rows: T[]) => Promise<string[]>;
+    isModelOutputError: (error: unknown) => boolean;
+    onSingleRowFailure: (row: T, error: unknown) => void | Promise<void>;
+    onUnresolvedRows?: (rows: T[], error: unknown) => void | Promise<void>;
+    shouldStop: () => boolean;
+    attempts: number;
+    previousError: unknown;
+  },
+): Promise<{ attempts: number; exhausted: boolean }> {
+  const mid = Math.ceil(pending.length / 2);
+  let attempts = options.attempts;
+  let recovered = false;
+  let unresolved = false;
+  for (const half of [pending.slice(0, mid), pending.slice(mid)]) {
+    if (half.length === 0 || options.shouldStop()) return { attempts, exhausted: unresolved && !recovered };
+    attempts += 1;
+    try {
+      const failedIds = new Set(await options.submit(half));
+      const failed = half.filter((row) => failedIds.has(row.id));
+      if (failed.length < half.length) recovered = true;
+      for (const row of failed) await options.onSingleRowFailure(row, options.previousError);
+    } catch (error) {
+      if (!options.isModelOutputError(error)) throw error;
+      if (half.length === 1) await options.onSingleRowFailure(half[0], error);
+      else {
+        unresolved = true;
+        await options.onUnresolvedRows?.(half, error);
+      }
+    }
+  }
+  return { attempts, exhausted: unresolved && !recovered };
 }

@@ -11,7 +11,7 @@ import { createServer } from 'node:net';
 import { get } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { recordWebProcess, stopWebProcess } from './web-processes.mjs';
+import { recordWebProcess } from './web-processes.mjs';
 
 export const APP_IDENTIFIER = 'com.azhuo.workbench';
 export const VITE_PORT = 5173;
@@ -159,11 +159,6 @@ export async function waitFor(fn, label, timeoutMs = 60000, child = null) {
   }
   console.error(`✗ ${label} 启动超时`);
   return false;
-}
-
-/** Stop only this workspace's recorded development watcher, never a production API. */
-export function stopApiServer(workspaceRoot, { isolated = false } = {}) {
-  return stopWebProcess(workspaceRoot, 'api', isolated);
 }
 
 export function webProcessOptions({ apiPort, appDataDir, accessToken }) {

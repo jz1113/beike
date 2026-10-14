@@ -100,6 +100,7 @@ export default function App() {
 
   const {
     currentView,
+    previousView,
     setCurrentView,
     batchStage,
     activeWorkshopTab,
@@ -109,6 +110,7 @@ export default function App() {
   } = useAppStore(
     useShallow((s) => ({
       currentView: s.currentView,
+      previousView: s.previousView,
       setCurrentView: s.setCurrentView,
       batchStage: s.batchStage,
       activeWorkshopTab: s.activeWorkshopTab,
@@ -117,6 +119,7 @@ export default function App() {
       backFromSettings: s.backFromSettings,
     })),
   );
+  const pageView = currentView === 'settings' ? (previousView && previousView !== 'settings' ? previousView : 'home') : currentView;
   const density = useViewportDensity();
   const { ref: mainContentRef } = useCompactLayout();
   usePerformanceMode();
@@ -233,9 +236,24 @@ export default function App() {
             <AppSidebar
               currentView={currentView}
               onNavigateHub={() => setCurrentView('home')}
-              onNavigateGenerate={() => setCurrentView('generate')}
+              onNavigateCanvas={() => {
+                useCanvasStore.getState().selectProject(null);
+                setCurrentView('canvas');
+              }}
               onNavigateAssets={() => setCurrentView('assets')}
               onOpenSettings={navigateToSettings}
+              onOpenSession={(id) => {
+                useAppStore.getState().switchSession(id);
+                setCurrentView('generate');
+              }}
+              onCreateConversation={() => {
+                useAppStore.getState().createSession();
+                setCurrentView('generate');
+              }}
+              onOpenCanvasProject={(id) => {
+                useCanvasStore.getState().selectProject(id);
+                setCurrentView('canvas');
+              }}
             />
           )}
 
@@ -249,19 +267,19 @@ export default function App() {
                   <span>工作区加载中…</span>
                 </div>
               }>
-                <ViewKeepAlivePanel view="home" currentView={currentView}>
+                <ViewKeepAlivePanel view="home" currentView={pageView}>
                   <AppErrorBoundary title="首页异常" resetLabel="重新加载" onReset={() => window.location.reload()}>
                     <HomePage 
                       onEnterWorkshop={enterOriginalWorkshop}
                       onOpenHeadlinePoster={enterHeadlinePoster}
                       onOpenKeywordReview={() => setCurrentView('keyword_review')}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
-                      recentProjects={<CanvasRecentProjects onEnterCanvas={() => setCurrentView('canvas')} />}
+                      recentProjects={<CanvasRecentProjects lead="square" onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="generate" currentView={currentView}>
+                <ViewKeepAlivePanel view="generate" currentView={pageView}>
                   <AppErrorBoundary title="生成工作区异常" resetLabel="清空会话" onReset={() => {
                     abortActiveGenerationEngine();
                     useAppStore.setState({ generationTasks: [] });
@@ -272,7 +290,7 @@ export default function App() {
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="assets" currentView={currentView}>
+                <ViewKeepAlivePanel view="assets" currentView={pageView}>
                   <AppErrorBoundary
                     title="资产中心异常"
                     resetLabel="重新加载"
@@ -286,7 +304,7 @@ export default function App() {
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="canvas" currentView={currentView}>
+                <ViewKeepAlivePanel view="canvas" currentView={pageView}>
                   <AppErrorBoundary
                     title="画布异常"
                     resetLabel="重新加载"
@@ -300,15 +318,15 @@ export default function App() {
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="keyword_review" currentView={currentView}>
-                  <AppErrorBoundary title="关键词审核异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                <ViewKeepAlivePanel view="keyword_review" currentView={pageView}>
+                  <AppErrorBoundary title="词包审核异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <KeywordReviewStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="workshop" currentView={currentView}>
+                <ViewKeepAlivePanel view="workshop" currentView={pageView}>
                   <AppErrorBoundary
-                    title="种草工坊异常"
+                    title="电商工坊异常"
                     resetLabel="重置工坊"
                     onReset={() => {
                       clearWorkshopStudioDraft();
@@ -322,9 +340,9 @@ export default function App() {
                     />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
-                <ViewKeepAlivePanel view="headline_poster" currentView={currentView}>
+                <ViewKeepAlivePanel view="headline_poster" currentView={pageView}>
                   <AppErrorBoundary
-                    title="大字报生成异常"
+                    title="封面生成异常"
                     resetLabel="返回首页"
                     onReset={() => setCurrentView('home')}
                   >

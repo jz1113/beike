@@ -74,27 +74,18 @@ export default function HomePage({
       )}
       <div className="w-full px-4 pb-5 pt-7 sm:px-6 sm:pt-10 lg:px-8 2xl:px-10">
         <section className="mx-auto w-full max-w-6xl xl:max-w-[1440px] 2xl:max-w-[1640px]">
-          <div className="relative z-20 mx-auto max-w-[1120px] text-center">
-            <div className="mx-auto flex max-w-2xl flex-col items-center px-4">
-              <p className="font-brush mb-3 inline-flex items-baseline gap-2 text-slate-400">
-                <span className="text-[18px] tracking-[0.09em] text-slate-500 sm:text-[20px]">贝壳云图</span>
-                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#df6a48]" />
-                <span className="text-[13px] tracking-[0.18em] text-slate-400 sm:text-[14px]">CREATIVE STUDIO</span>
-              </p>
-              <h1 className="font-brush whitespace-nowrap text-[clamp(30px,3.7vw,60px)] leading-[1.04] tracking-[0.025em] text-[#0a0a0a]" aria-label="把灵感，变成画面">
-                把灵感，变成画面
-              </h1>
-              <p className="font-brush mt-2 text-[13px] tracking-[0.02em] text-slate-400 sm:text-[14px]">
-                从一张参考图或一句描述开始
-              </p>
-            </div>
-            <div role="tablist" aria-label="首页创作模式" className="mx-auto mt-6 inline-flex w-[min(100%,420px)] rounded-full bg-slate-100 p-1 shadow-inner">
+          <div className="relative z-20 mx-auto flex max-w-[1120px] flex-col items-center">
+            <h1 className="text-[28px] font-semibold tracking-tight text-slate-950 sm:text-[34px]">
+              今天要做点什么？
+            </h1>
+            <span aria-hidden="true" className="mt-3 h-[3px] w-10 rounded-full bg-[#df6a48]" />
+            <div role="tablist" aria-label="首页创作模式" className="mt-6 inline-flex rounded-full bg-white/80 p-1 shadow-sm ring-1 ring-slate-200/70">
               <button
                 type="button"
                 role="tab"
                 aria-selected={homeMode === 'generate'}
                 onClick={() => setHomeMode('generate')}
-                className={`flex-1 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${homeMode === 'generate' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${homeMode === 'generate' ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:text-slate-950'}`}
               >
                 生成
               </button>
@@ -103,7 +94,7 @@ export default function HomePage({
                 role="tab"
                 aria-selected={homeMode === 'canvas'}
                 onClick={() => setHomeMode('canvas')}
-                className={`flex-1 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${homeMode === 'canvas' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${homeMode === 'canvas' ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:text-slate-950'}`}
               >
                 画布
               </button>
@@ -125,8 +116,8 @@ export default function HomePage({
               </div>
             </div>
           ) : (
-            <div className="relative z-20 mx-auto mt-9 w-full max-w-[1640px]">
-              <div className="w-full">{recentProjects}</div>
+            <div className="relative z-20 mx-auto mt-8 w-full max-w-[1120px]">
+              {recentProjects}
             </div>
           )}
         </section>

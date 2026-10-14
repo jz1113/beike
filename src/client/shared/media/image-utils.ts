@@ -14,10 +14,15 @@ export async function compressImageToDataUrl(
   return new Promise((resolve) => {
     const processImg = (src: string) => {
       const img = new Image();
+      const svg = /^data:image\/svg\+xml/i.test(src);
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         let width = img.width;
         let height = img.height;
+        if (svg && (!width || !height)) {
+          width = width || 1024;
+          height = height || 1024;
+        }
 
         if (width > maxDimension || height > maxDimension) {
           if (width > height) {
@@ -65,6 +70,11 @@ export async function compressImageToDataUrl(
   });
 }
 
+function isSvgInput(input: File | string): boolean {
+  if (typeof input === 'string') return /^data:image\/svg\+xml/i.test(input.trim());
+  return input.type === 'image/svg+xml' || /\.svg$/i.test(input.name);
+}
+
 /** Strict submission encoder: meet a byte budget or report failure; never silently send the oversized original. */
 export async function compressImageForSubmission(
   input: File | string,
@@ -72,7 +82,7 @@ export async function compressImageForSubmission(
   signal?: AbortSignal,
 ): Promise<string> {
   signal?.throwIfAborted();
-  if (typeof input === 'string' && /^data:image\//i.test(input) && input.length <= maxDataUrlChars) return input;
+  if (!isSvgInput(input) && typeof input === 'string' && /^data:image\//i.test(input) && input.length <= maxDataUrlChars) return input;
   if (maxDataUrlChars < 2048) throw new Error('参考图数量过多，无法保留可用的图片清晰度');
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -96,8 +106,13 @@ export async function compressImageForSubmission(
     image.onload = () => {
       const canvas = document.createElement('canvas');
       try {
-        const width = image.naturalWidth || image.width;
-        const height = image.naturalHeight || image.height;
+        const svg = isSvgInput(input);
+        let width = image.naturalWidth || image.width;
+        let height = image.naturalHeight || image.height;
+        if (svg && (!width || !height)) {
+          width = width || 1024;
+          height = height || 1024;
+        }
         if (!width || !height) throw new Error('图片尺寸无效');
         for (const dimension of [1600, 1280, 1024, 800, 640, 480, 320, 256]) {
           signal?.throwIfAborted();

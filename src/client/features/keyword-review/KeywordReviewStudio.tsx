@@ -1,9 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  BookOpen, Download, FileSpreadsheet, Layers, ListChecks, Loader2, Play,
+  BookOpen, Download, FileSpreadsheet, Layers, Loader2, Play,
   RefreshCcw, Settings2, Square, UploadCloud,
 } from 'lucide-react';
-import { ToolSuiteMark } from '@client/shared/icons';
 import { KeywordReviewRulesDialog } from './components/KeywordReviewRulesDialog';
 import { KeywordReviewSettingsDialog } from './components/KeywordReviewSettingsDialog';
 import { useKeywordReview } from './hooks/useKeywordReview';
@@ -64,9 +63,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-slate-900">
       <header className="flex min-h-[72px] shrink-0 flex-wrap items-center justify-between py-3 gap-3 px-4 sm:px-6 lg:px-8">
-        <button type="button" onClick={onBack} aria-label="关键词分类及制作判断，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white">
-          <ToolSuiteMark><ListChecks className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
-          <span className="text-sm font-black tracking-tight">关键词分类及制作判断</span>
+        <button type="button" onClick={onBack} aria-label="词包审核，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white">
+          <img src="/brand/keyword-pack.jpg" alt="" draggable={false} className="h-8 w-auto max-w-16 shrink-0 object-contain" />
+          <span className="text-sm font-black tracking-tight">词包审核</span>
         </button>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <button type="button" onClick={() => setShowRules(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-bold text-slate-600 shadow-sm transition hover:border-amber-300 hover:bg-white hover:text-slate-950">
@@ -117,7 +116,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             <section className="mx-auto max-w-[980px] pt-8 sm:pt-14">
               <div className="mb-7 text-center">
                 <p className="text-xs font-black tracking-[0.22em] text-amber-600">SEMANTIC REVIEW</p>
-                <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-5xl">{review.reviewMode === 'video' ? '视频关键词分类及制作判断' : '图文关键词分类及制作判断'}</h1>
+                <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-5xl">{review.reviewMode === 'video' ? '视频词包审核' : '图文词包审核'}</h1>
                 <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">{review.reviewMode === 'video'
                   ? `保留视频词包原始内容，逐行判断最终垂类、是否可制作及低价值标记。先试跑 ${review.trialSize} 条，查看结果后再批量审核。`
                   : `逐行判断图文关键词的最终垂类和制作价值，并给出具体依据。先试跑 ${review.trialSize} 条，查看结果后再批量审核、导出结果。`}审核模型可在右上角切换。</p>

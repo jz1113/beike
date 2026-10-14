@@ -141,7 +141,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
 
   return (
     <div className="w-full space-y-3.5 pt-2 select-none">
-      {/* 搜索工具栏 (紧凑药丸尺寸，对标用户画框) */}
+      <h2 className="text-base font-semibold tracking-tight text-slate-900">精选作品</h2>
       <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1">
         {INSPIRATION_MEDIA_FILTERS.map((item) => {
           const selected = mediaFilter === item.id;

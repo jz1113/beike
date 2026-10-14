@@ -320,7 +320,7 @@ export function useAssetCrud({
     }
     showToast(activeSubTab === 'full_prompt'
       ? '已锁定图组母本；默认沿用原组人物、穿搭和场景，可在生产设置中单独替换'
-      : '已载入种草工坊并锁定应用该提示词资产');
+      : '已载入电商工坊并锁定应用该提示词资产');
   };
 
   // 保存编辑后的资产

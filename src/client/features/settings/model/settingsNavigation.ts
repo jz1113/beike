@@ -9,12 +9,10 @@ import {
   Music,
   Palette,
   Plug,
-  Shield,
   Video,
 } from 'lucide-react';
 
 export type SettingsNavSection =
-  | 'privacy'
   | 'canvas'
   | 'api'
   | 'chat'
@@ -42,7 +40,7 @@ export type CanvasSettingsPage =
 interface NavItem {
   id: SettingsNavSection;
   label: string;
-  icon: typeof Shield;
+  icon: typeof LayoutGrid;
   keywords: string[];
 }
 
@@ -60,7 +58,7 @@ export const CANVAS_SETTINGS_PAGES: { id: CanvasSettingsPage; label: string; cou
 ];
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { id: 'privacy', label: '隐私', icon: Shield, keywords: ['隐私', '截图', '分享'] },
+  { id: 'profile', label: '创作档案', icon: Activity, keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
   { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点', '图床', '桌宠'] },
   { id: 'api', label: 'API 接入', icon: Plug, keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦', '奇云'] },
   { id: 'chat', label: '对话', icon: MessageSquare, keywords: ['对话', '视觉', '默认', '助手'] },
@@ -71,7 +69,6 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'voice', label: '语音', icon: AudioLines, keywords: ['语音', '配音'] },
   { id: 'storage', label: '存储', icon: HardDrive, keywords: ['存储', 'oss', 'r2', 's3'] },
   { id: 'language', label: '语言', icon: Languages, keywords: ['语言', '中文'] },
-  { id: 'profile', label: '创作档案', icon: Activity, keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
 ];
 
 export function settingsSectionLabel(section: SettingsNavSection, canvasPage: CanvasSettingsPage) {

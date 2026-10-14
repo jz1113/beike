@@ -1,4 +1,4 @@
-import { buildUsageSummary, type UsageSummary } from './usageSummary';
+import { buildUsageSummary, type UsageRange, type UsageSummary } from './usageSummary';
 // src/lib/usageTracker.ts
 
 /**
@@ -229,8 +229,8 @@ export function clearUsageLogs(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export { type UsageSummary } from './usageSummary';
+export { type UsageSummary, type UsageRange } from './usageSummary';
 
-export function getUsageSummary(range: '30d' | '90d' | '1y' = '30d'): UsageSummary {
+export function getUsageSummary(range: UsageRange = '30d'): UsageSummary {
   return buildUsageSummary(getUsageLogs(), getQuotaToRmbRatio(), range);
 }

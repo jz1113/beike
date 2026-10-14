@@ -1,8 +1,6 @@
 import React from 'react';
-import { WandSparkles } from 'lucide-react';
 import type { WorkshopTab } from '@client/store/types';
 import { useAppStore } from '@client/store';
-import { ToolSuiteMark } from '@client/shared/icons';
 
 export interface WorkshopTopBarProps {
   assetToolbarRef?: React.Ref<HTMLDivElement>;
@@ -12,7 +10,7 @@ export interface WorkshopTopBarProps {
 
 export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarProps) {
   const setCurrentView = useAppStore((s) => s.setCurrentView);
-  const studioTitle = '原创种草工坊';
+  const studioTitle = '电商工坊';
   return (
     <header
       className="relative w-full min-h-14 pt-3 pb-2 px-4 sm:px-6 xl:pr-8 bg-transparent flex items-center justify-between gap-3 shrink-0 z-30 select-none cursor-default transition-all"
@@ -31,7 +29,7 @@ export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarPro
         className="group flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-black tracking-tight text-slate-900 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white select-none cursor-pointer active:scale-98"
         title={`${studioTitle} · 点击返回首页`}
       >
-        <ToolSuiteMark><WandSparkles className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /></ToolSuiteMark>
+        <img src="/brand/commerce-workshop.jpg" alt="" draggable={false} className="h-8 w-8 shrink-0 object-contain" />
         <span className="truncate leading-none">{studioTitle}</span>
       </button>
 
