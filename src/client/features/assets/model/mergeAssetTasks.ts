@@ -4,11 +4,41 @@ import { getAssetTime, matchesAssetTime, resolveAssetMediaType, type AssetMediaC
 import type { useAppStore } from '@client/store';
 
 type AppState = ReturnType<typeof useAppStore.getState>;
+
+interface MergedAssetTask {
+  id: string;
+  dbId?: string;
+  taskId?: string;
+  resultUrl?: string;
+  status?: string;
+  title?: string;
+  prompt?: string;
+  batchId?: string;
+  sessionId?: string;
+  sessionTitle?: string;
+  progress?: string;
+  failReason?: string;
+  size?: string;
+  quality?: string;
+  createdAt?: unknown;
+  model?: string;
+  mediaType?: string;
+  aspectRatio?: string;
+  referenceImages?: string[];
+  referenceImageUrl?: string;
+  images?: string[];
+  sourceImageUrl?: string;
+  useReferenceImage?: boolean;
+  rawTask?: { id?: string; status?: string; resultUrl?: string; referenceImages?: string[] };
+  batchTitle?: string;
+  canvasProjectTitle?: string;
+}
+
 interface MergeAssetTaskInput {
-  dbTasks: any[];
+  dbTasks: MergedAssetTask[];
   generationTasks: AppState['generationTasks'];
   sessions: AppState['sessions'];
-  canvasTasks: any[];
+  canvasTasks: MergedAssetTask[];
   mediaCategory: AssetMediaCategory;
   searchKeyword: string;
   timeFilter: AssetTimeFilter;
@@ -18,7 +48,7 @@ interface MergeAssetTaskInput {
 
 export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTasks, mediaCategory, searchKeyword, timeFilter, now, serverHistoryComplete = false }: MergeAssetTaskInput) {
   // Drafts in the global engine take precedence over archived session copies.
-  const memoryTasks = new Map<string, any>();
+  const memoryTasks = new Map<string, MergedAssetTask>();
   const sessionMap = new Map<string, { sessionId: string; sessionTitle: string }>();
   const sessionByTaskId = new Map<string, { sessionId: string; sessionTitle: string } | null>();
   const activeDbTasks = dbTasks.filter((task) => !isGenerationDeleted(task.id, task.taskId, task.resultUrl, task.dbId));
@@ -41,12 +71,12 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
       }
     }
   }
-  const memoryById = new Map<string, any>();
-  const memoryByResult = new Map<string, any[]>();
-  const memoryByTaskId = new Map<string, any[]>();
-  const dbByTaskId = new Map<string, any[]>();
-  const matchedMemory = new Set<any>();
-  function indexMany(index: Map<string, any[]>, key: string | undefined, task: any) {
+  const memoryById = new Map<string, MergedAssetTask>();
+  const memoryByResult = new Map<string, MergedAssetTask[]>();
+  const memoryByTaskId = new Map<string, MergedAssetTask[]>();
+  const dbByTaskId = new Map<string, MergedAssetTask[]>();
+  const matchedMemory = new Set<MergedAssetTask>();
+  function indexMany(index: Map<string, MergedAssetTask[]>, key: string | undefined, task: MergedAssetTask) {
     if (!key) return;
     const tasks = index.get(key);
     if (tasks) tasks.push(task);
@@ -60,31 +90,33 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
   }
   for (const task of activeDbTasks) indexMany(dbByTaskId, task.taskId, task);
 
-  function matchMemory(db: any) {
-    const exact = memoryById.get(db.id) || memoryById.get(db.dbId);
+  function matchMemory(db: MergedAssetTask) {
+    const exact = memoryById.get(db.id) || (db.dbId ? memoryById.get(db.dbId) : undefined);
     if (exact) return exact;
     const sameResult = db.resultUrl ? memoryByResult.get(db.resultUrl) : undefined;
     if (sameResult?.length === 1) return sameResult[0];
     const candidates = db.taskId ? memoryByTaskId.get(db.taskId) : undefined;
     // One upstream request can produce several archive rows: never patch them all with one draft.
-    return candidates?.length === 1 && dbByTaskId.get(db.taskId)?.length === 1 ? candidates[0] : undefined;
+    const taskId = db.taskId;
+    return taskId && candidates?.length === 1 && dbByTaskId.get(taskId)?.length === 1 ? candidates[0] : undefined;
   }
 
-  function normalizeTask(db: any, memory?: any, archived = false) {
+  function normalizeTask(db: MergedAssetTask, memory?: MergedAssetTask, archived = false) {
     // Defined database fields overlay draft metadata; drafts retain metadata absent from the archive.
     const combined = { ...memory, ...Object.fromEntries(Object.entries(db).filter(([, value]) => value != null)) };
     // The server owns terminal states. Local completion only bridges a pending archive update.
     const source = db.status === 'SUCCESS' || db.status === 'FAILURE' ? db : memory || db;
     const resultUrl = source.status === 'FAILURE' ? undefined : source.resultUrl;
     const status = resultUrl ? 'SUCCESS' : source.status || 'IN_PROGRESS';
-    const session = sessionMap.get(db.id) || sessionMap.get(db.dbId) || sessionMap.get(memory?.id)
-      || sessionMap.get(memory?.dbId) || sessionByTaskId.get(db.taskId);
+    const sessionFor = (id?: string) => id ? sessionMap.get(id) : undefined;
+    const session = sessionFor(db.id) || sessionFor(db.dbId) || sessionFor(memory?.id)
+      || sessionFor(memory?.dbId) || (db.taskId ? sessionByTaskId.get(db.taskId) : undefined);
     const referenceImages = db.referenceImages || memory?.referenceImages || db.images || memory?.images || combined.rawTask?.referenceImages;
     const referenceImageUrl = db.referenceImageUrl || memory?.referenceImageUrl || db.sourceImageUrl || memory?.sourceImageUrl;
 
     return {
       ...combined,
-      id: db.id || memory?.id || db.taskId,
+      id: db.id || memory?.id || db.taskId || '',
       dbId: archived ? db.id : db.dbId || memory?.dbId,
       taskId: db.taskId || memory?.taskId,
       title: db.title || memory?.title,
@@ -111,7 +143,7 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
     };
   }
 
-  const tasksById = new Map<string, any>();
+  const tasksById = new Map<string, MergedAssetTask>();
   for (const db of activeDbTasks) {
     const memory = matchMemory(db);
     if (memory) matchedMemory.add(memory);

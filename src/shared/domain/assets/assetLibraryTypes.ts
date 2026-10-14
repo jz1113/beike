@@ -27,6 +27,14 @@ export interface AssetLibrarySlim extends Record<string, unknown> {
   shotCount?: number;
   spatialType?: string | null;
   lighting?: string | null;
+  top?: string | null;
+  bottom?: string | null;
+  shoes?: string | null;
+  colorPalette?: string | null;
+  architectureSummary?: string | null;
+  contentSummary?: string | null;
+  reversePrompt?: string | null;
+  reversePromptZh?: string | null;
 }
 
 /** 资产库详情（含长文本与 sourceImages） */

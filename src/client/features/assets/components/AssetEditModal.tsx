@@ -6,12 +6,26 @@ import {
   parsePersonaLayers,
   formatPersonaPrompt,
 } from '../model/assetPromptConstants';
+import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import { PromptGroupCategoryEditor } from './PromptGroupCategoryEditor';
 
+function patchEditingItem(prev: AssetLibrarySlim | null, patch: Record<string, unknown>): AssetLibrarySlim | null {
+  if (!prev) return null;
+  return { ...prev, ...patch, id: prev.id };
+}
+
+function personaLayersOf(item: AssetLibrarySlim): PersonaLayers {
+  const stored = item._personaLayers;
+  if (stored && typeof stored === 'object' && 'hairStyle' in stored && 'faceFeatures' in stored) {
+    return stored as PersonaLayers;
+  }
+  return parsePersonaLayers(item.description || item.name);
+}
+
 export interface AssetEditModalProps {
-  editingItem: any;
-  setEditingItem: React.Dispatch<React.SetStateAction<any>>;
+  editingItem: AssetLibrarySlim | null;
+  setEditingItem: React.Dispatch<React.SetStateAction<AssetLibrarySlim | null>>;
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';
   productCategories: AssetProductCategory[];
   albums: PromptAlbum[];
@@ -57,15 +71,14 @@ export function AssetEditModal({
         </header>
 
         <div className="flex-1 overflow-y-auto space-y-3 px-5 py-4 text-xs sm:px-6">
-          {(activeSubTab === 'persona' || activeSubTab === 'outfit') && <AppearanceAudienceEditor item={editingItem} type={activeSubTab} onChange={dimensions => setEditingItem({ ...editingItem, dimensions })} />}
+          {(activeSubTab === 'persona' || activeSubTab === 'outfit') && <AppearanceAudienceEditor item={editingItem} type={activeSubTab} onChange={dimensions => setEditingItem(patchEditingItem(editingItem, { dimensions }))} />}
           <div>
             <label className="block text-slate-700 font-bold mb-1">标题 / 名称：</label>
             <input
               type="text"
               value={editingItem.title || editingItem.name || ''}
               onChange={(e) =>
-                setEditingItem((prev: any) => ({
-                  ...prev,
+                setEditingItem((prev) => patchEditingItem(prev, {
                   title: e.target.value,
                   name: e.target.value,
                 }))
@@ -82,7 +95,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.albumName || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, albumName: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { albumName: e.target.value }))
                   }
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                 />
@@ -91,14 +104,13 @@ export function AssetEditModal({
                 item={editingItem}
                 categories={productCategories}
                 albums={albums}
-                onCategoryChange={(next) => setEditingItem((prev: any) => ({
-                  ...prev,
+                onCategoryChange={(next) => setEditingItem((prev) => patchEditingItem(prev, {
                   _productCategoryDirty: true,
                   productCategoryIds: JSON.stringify(next === 'unclassified' ? [] : [next]),
                   isUniversal: false,
                   productSubcategory: null,
                 }))}
-                onSubcategoryChange={(next) => setEditingItem((prev: any) => ({ ...prev, productSubcategory: next }))}
+                onSubcategoryChange={(next) => setEditingItem((prev) => patchEditingItem(prev, { productSubcategory: next }))}
               />
               <div>
                 <label className="block text-slate-700 font-bold mb-1">完整中文生图提示词：</label>
@@ -106,8 +118,7 @@ export function AssetEditModal({
                   rows={4}
                   value={editingItem.reversePromptZh || editingItem.reversePrompt || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({
-                      ...prev,
+                    setEditingItem((prev) => patchEditingItem(prev, {
                       reversePromptZh: e.target.value,
                       reversePrompt: e.target.value,
                     }))
@@ -120,14 +131,11 @@ export function AssetEditModal({
 
           {activeSubTab === 'persona' &&
             (() => {
-              const layers: PersonaLayers =
-                editingItem._personaLayers ||
-                parsePersonaLayers(editingItem.description || editingItem.name);
+              const layers: PersonaLayers = personaLayersOf(editingItem);
               const updateLayer = (key: keyof PersonaLayers, val: string) => {
                 const updated: PersonaLayers = { ...layers, [key]: val };
                 const newDesc = formatPersonaPrompt(updated);
-                setEditingItem((prev: any) => ({
-                  ...prev,
+                setEditingItem((prev) => patchEditingItem(prev, {
                   _personaLayers: updated,
                   description: newDesc,
                 }));
@@ -202,7 +210,7 @@ export function AssetEditModal({
                   rows={3}
                   value={editingItem.description || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, description: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { description: e.target.value }))
                   }
                   className="soft-textarea w-full px-3 py-2 text-slate-800"
                 />
@@ -213,7 +221,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.lighting || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, lighting: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { lighting: e.target.value }))
                   }
                   className="soft-textarea w-full px-3 py-2 text-slate-800"
                 />
@@ -229,7 +237,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.top || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, top: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { top: e.target.value }))
                   }
                   className="soft-textarea w-full px-3 py-2 text-slate-800"
                 />
@@ -240,7 +248,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.bottom || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, bottom: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { bottom: e.target.value }))
                   }
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-amber-500"
                 />
@@ -251,7 +259,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.shoes || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, shoes: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { shoes: e.target.value }))
                   }
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-amber-500"
                 />
@@ -262,7 +270,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.colorPalette || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, colorPalette: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { colorPalette: e.target.value }))
                   }
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-amber-500"
                 />
@@ -309,8 +317,7 @@ export function AssetEditModal({
                                 ].includes(t)
                             );
                           existingTokens.unshift(preset.label);
-                          setEditingItem((prev: any) => ({
-                            ...prev,
+                          setEditingItem((prev) => patchEditingItem(prev, {
                             shotType: preset.shotType,
                             suitableAnatomy: preset.anatomy,
                             tags: existingTokens.join(', '),
@@ -335,7 +342,7 @@ export function AssetEditModal({
                   rows={3}
                   value={editingItem.action || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, action: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { action: e.target.value }))
                   }
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-amber-500"
                 />
@@ -346,7 +353,7 @@ export function AssetEditModal({
                   type="text"
                   value={editingItem.camera || ''}
                   onChange={(e) =>
-                    setEditingItem((prev: any) => ({ ...prev, camera: e.target.value }))
+                    setEditingItem((prev) => patchEditingItem(prev, { camera: e.target.value }))
                   }
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-amber-500"
                 />
@@ -360,7 +367,7 @@ export function AssetEditModal({
               type="text"
               value={editingItem.tags || ''}
               onChange={(e) =>
-                setEditingItem((prev: any) => ({ ...prev, tags: e.target.value }))
+                setEditingItem((prev) => patchEditingItem(prev, { tags: e.target.value }))
               }
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-amber-500"
             />

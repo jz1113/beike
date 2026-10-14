@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type RefObject } from 'react';
 import {
   densityComposerPill,
   densityComposerSendBtn,
@@ -15,20 +15,35 @@ import {
 import PromptBarAspectPicker from './PromptBarAspectPicker';
 import { PromptBarAtMenu } from './PromptBarAtMenu';
 import type { DepthVideoStyle, DepthQuality, QuickGenMode } from '@shared/domain/media/depthVideo';
+import type { VideoAspectRatioItem, VideoRefModeItem } from '@shared/domain/media/video';
+import type { DropdownMenuState } from '@client/shared/hooks/useDropdownMenu';
+import type { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
+import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
+import type { usePromptBarMedia } from '@client/shared/prompt-bar/hooks/usePromptBarMedia';
+
+type PromptBarModel = {
+  id: string;
+  name: string;
+  shortName?: string;
+  provider?: string;
+  badge?: string;
+  isPrimary?: boolean;
+  isVip?: boolean;
+};
 
 interface PromptBarControlsRowProps {
   isUp: boolean;
   anyDropdownOpen?: boolean;
   quickGenMode: QuickGenMode;
   isDepthMode: boolean;
-  modeMenu: any;
+  modeMenu: DropdownMenuState;
   modeButtonClass: string;
   handleModeSwitch: (mode: QuickGenMode) => void;
-  modelMenu: any;
-  activeVideoModelObj: any;
-  activeImageModelObj: any;
-  availableVideoModels: any[];
-  availableImageModels: any[];
+  modelMenu: DropdownMenuState;
+  activeVideoModelObj: PromptBarModel;
+  activeImageModelObj: PromptBarModel;
+  availableVideoModels: PromptBarModel[];
+  availableImageModels: PromptBarModel[];
   quickVideoModel: string;
   quickModel: string;
   quickVideoDuration: number;
@@ -37,37 +52,37 @@ interface PromptBarControlsRowProps {
   setQuickModel: (m: string) => void;
   quickDepthStyle: DepthVideoStyle;
   setQuickDepthStyle: (s: DepthVideoStyle) => void;
-  depthStyleMenu: any;
+  depthStyleMenu: DropdownMenuState;
   quickDepthQuality: DepthQuality;
   setQuickDepthQuality: (q: DepthQuality) => void;
-  depthQualityMenu: any;
-  videoRefModeMenu: any;
-  activeVideoRefModeObj: any;
+  depthQualityMenu: DropdownMenuState;
+  videoRefModeMenu: DropdownMenuState;
+  activeVideoRefModeObj: VideoRefModeItem;
   quickVideoRefMode: string;
-  setQuickVideoRefMode: (mode: any) => void;
-  aspectMenu: any;
-  activeVideoRatioObj: any;
+  setQuickVideoRefMode: (mode: string) => void;
+  aspectMenu: DropdownMenuState;
+  activeVideoRatioObj: VideoAspectRatioItem;
   quickVideoResolution: string;
   quickVideoCount: number;
-  activeImageRatioObj: any;
+  activeImageRatioObj: (typeof IMAGE_RATIO_ITEMS)[number];
   quickQuality: string;
   quickCount: number;
   quickVideoAspectId: string;
   setQuickVideoAspectId: (id: string) => void;
-  setQuickVideoResolution: (res: any) => void;
+  setQuickVideoResolution: (res: '480P' | '720P' | '1080P' | '4K') => void;
   setQuickVideoCount: (c: number) => void;
   quickAspectId: string;
   setQuickAspectId: (id: string) => void;
-  setQuickQuality: (q: any) => void;
+  setQuickQuality: (q: 'high' | 'medium' | 'low') => void;
   setQuickCount: (c: number) => void;
   currentW: number;
   currentH: number;
-  durationMenu: any;
-  videoDurationBounds: any;
+  durationMenu: DropdownMenuState;
+  videoDurationBounds: { min: number; max: number };
   quickPrompt: string;
   setQuickPrompt: (p: string) => void;
-  media: any;
-  richInputRef: any;
+  media: ReturnType<typeof usePromptBarMedia>;
+  richInputRef: RefObject<RichPromptInputRef | null>;
   handleSendPrompt: () => void;
   canSend: boolean;
   isSubmitting: boolean;

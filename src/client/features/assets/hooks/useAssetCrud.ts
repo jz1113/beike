@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import { apiFetch as rawApiFetch } from '@client/shared/api/apiClient';
 import { pickAssetEditFields } from '@shared/domain/assets/assetEdit';
 import { appearanceAudience } from '@shared/domain/assets/appearanceAudience';
@@ -17,16 +18,21 @@ import { resolveAssetApiType } from '../model/assetPromptConstants';
 import { buildBackupData, parseBackupDataToBulkItems } from '../model/assetBackup';
 import { parsePersonaLayers, formatPersonaPrompt } from '../model/assetPromptConstants';
 
+function errorText(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export interface UseAssetCrudOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';
-  items: any[];
-  setItems: React.Dispatch<React.SetStateAction<any[]>>;
+  items: AssetLibrarySlim[];
+  setItems: React.Dispatch<React.SetStateAction<AssetLibrarySlim[]>>;
   selectedIds: string[];
   setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
   setIsBatchMode: (v: boolean) => void;
   setIsLoading: (v: boolean) => void;
-  detailItem: any;
-  setDetailItem: React.Dispatch<React.SetStateAction<any>>;
+  detailItem: AssetLibrarySlim | null;
+  setDetailItem: React.Dispatch<React.SetStateAction<AssetLibrarySlim | null>>;
   showToast: (msg: string) => void;
   fetchAssets: (forceReload?: boolean) => Promise<void>;
   onEnterWorkshop?: () => void;
@@ -48,8 +54,8 @@ export function useAssetCrud({
   fetchAssets,
   onEnterWorkshop,
 }: UseAssetCrudOptions) {
-  const [editingItem, setEditingItem] = useState<any | null>(null);
-  const [tagEditItem, setTagEditItem] = useState<any | null>(null);
+  const [editingItem, setEditingItem] = useState<AssetLibrarySlim | null>(null);
+  const [tagEditItem, setTagEditItem] = useState<AssetLibrarySlim | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const {
@@ -96,13 +102,13 @@ export function useAssetCrud({
       } else {
         throw new Error('清空失败');
       }
-    } catch (err: any) {
-      alert('清空操作失败: ' + (err.message || err));
+    } catch (err) {
+      alert('清空操作失败: ' + errorText(err));
     }
   };
 
   // 切换收藏
-  const toggleFavorite = async (item: any, e?: React.MouseEvent) => {
+  const toggleFavorite = async (item: AssetLibrarySlim, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
       const updatedFav = !item.isFavorite;
@@ -119,7 +125,7 @@ export function useAssetCrud({
         prev.map((it) => (it.id === item.id ? { ...it, isFavorite: updatedFav } : it))
       );
       if (detailItem?.id === item.id) {
-        setDetailItem((prev: any) => (prev ? { ...prev, isFavorite: updatedFav } : null));
+        setDetailItem((prev) => (prev ? { ...prev, isFavorite: updatedFav } : null));
       }
       invalidateGlobalAssetCache();
       showToast(updatedFav ? '⭐ 已加入收藏' : '已取消收藏');
@@ -164,8 +170,8 @@ export function useAssetCrud({
       setSelectedIds(prev => prev.filter(id => !selectedIds.includes(id)));
       setIsBatchMode(false);
       await fetchAssets(true);
-    } catch (err: any) {
-      alert('批量删除失败: ' + (err.message || err));
+    } catch (err) {
+      alert('批量删除失败: ' + errorText(err));
     }
   };
 
@@ -210,8 +216,8 @@ export function useAssetCrud({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast('📦 资产库数据备份已下载（不含媒体文件）！');
-    } catch (err: any) {
-      alert('导出失败: ' + (err.message || err));
+    } catch (err) {
+      alert('导出失败: ' + errorText(err));
     }
   };
 
@@ -247,8 +253,8 @@ export function useAssetCrud({
           window.alert(`导入已完成，但有 ${warnings.length} 项需要核对：\n${warnings.map((warning) => `• ${warning}`).join('\n')}`);
         }
         void fetchAssets(true);
-      } catch (err: any) {
-        alert('导入失败: ' + (err.message || err));
+      } catch (err) {
+        alert('导入失败: ' + errorText(err));
       }
     };
     reader.readAsText(file);
@@ -256,7 +262,7 @@ export function useAssetCrud({
   };
 
   // 一键应用并载入种草工坊
-  const handleApplyToWorkshop = (item: any) => {
+  const handleApplyToWorkshop = (item: AssetLibrarySlim) => {
     const blocked = workshopAssetBlockReason(item, activeSubTab);
     if (blocked) { showToast(blocked); return; }
     if ((activeSubTab === 'persona' || activeSubTab === 'outfit')
@@ -286,13 +292,15 @@ export function useAssetCrud({
       setPendingBatchStage(2);
     } else if (activeSubTab === 'scene') {
       const desc = item.description || '';
-      const spacePart = desc.includes(item.title) ? desc : `${item.title ? `${item.title}，` : ''}${desc}`;
+      const title = item.title || '';
+      const spacePart = title && desc.includes(title) ? desc : `${title ? `${title}，` : ''}${desc}`;
       promptSnippet = `【场景空间】：${spacePart}；【采光光影】：${item.lighting || '自然采光与清晰接触阴影'}`;
       setPendingBatchLockedAssets({ sceneId: item.id });
       setPendingBatchStage(2);
     } else if (activeSubTab === 'action') {
       const act = item.action || '';
-      const actPart = act.includes(item.title) ? act : `${item.title ? `${item.title}，` : ''}${act}`;
+      const actionTitle = item.title || '';
+      const actPart = actionTitle && act.includes(actionTitle) ? act : `${actionTitle ? `${actionTitle}，` : ''}${act}`;
       promptSnippet = `【抓拍动作】：${actPart}；【机位】：${item.camera || 'iPhone 50mm 生活镜头'}`;
       setPendingBatchLockedAssets({ actionId: item.id });
       setPendingBatchStage(2);

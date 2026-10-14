@@ -21,11 +21,11 @@ interface PromptBarAspectPickerProps {
   quickCount: number;
   quickVideoAspectId: string;
   setQuickVideoAspectId: (id: string) => void;
-  setQuickVideoResolution: (res: any) => void;
+  setQuickVideoResolution: (res: '480P' | '720P' | '1080P' | '4K') => void;
   setQuickVideoCount: (count: number) => void;
   quickAspectId: string;
   setQuickAspectId: (id: string) => void;
-  setQuickQuality: (q: any) => void;
+  setQuickQuality: (q: 'high' | 'medium' | 'low') => void;
   setQuickCount: (c: number) => void;
   currentW: number;
   currentH: number;

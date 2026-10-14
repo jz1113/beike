@@ -31,6 +31,11 @@ interface Props {
   initialSubTab?: PromptAssetType;
 }
 
+function libraryItem(item: Record<string, unknown>): AssetLibrarySlim | null {
+  if (typeof item.id !== 'string') return null;
+  return { ...item, id: item.id } as AssetLibrarySlim;
+}
+
 export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, initialSubTab = 'full_prompt' }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<PromptAssetType>(initialSubTab);
   const [showCategoryFolders, setShowCategoryFolders] = useState(initialSubTab === 'full_prompt');
@@ -376,7 +381,9 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
         selectionAnchorRef={selectionAnchorRef} setAssetContextMenu={setAssetContextMenu}
         toggleSelectItem={toggleSelectItem} toggleFavorite={toggleFavorite} setZoomImageUrl={setZoomImageUrl}
         withAssetDetail={withAssetDetail} handleCopyPrompt={handleCopyPrompt} getAssetPreviewText={getAssetPreviewText}
-        setEditingItem={setEditingItem} setTagEditItem={setTagEditItem} deleteAsset={deleteAsset}
+        setEditingItem={(item) => { const next = libraryItem(item); if (next) setEditingItem(next); }}
+        setTagEditItem={(item) => { const next = libraryItem(item); if (next) setTagEditItem(next); }}
+        deleteAsset={deleteAsset}
       />
 
       {assetContextMenu && selectedIds.length > 0 && <PromptAssetContextMenu
