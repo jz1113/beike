@@ -1,6 +1,7 @@
 package assets
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"bytes"
 	"context"
 	"database/sql"
@@ -13,7 +14,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
@@ -74,7 +74,7 @@ func migrationPage(config map[string]any) (string, int) {
 }
 
 func migrateStoredTasks(ctx context.Context, db *sql.DB, workspace string, config storage.ObjectConfig, cursor string, limit int) map[string]any {
-	tasks, err := database.ListMigrationTasks(ctx, db, workspace, cursor, limit+1)
+	tasks, err := dbworkshop.ListMigrationTasks(ctx, db, workspace, cursor, limit+1)
 	if err != nil {
 		return map[string]any{"success": false, "error": "批量迁移执行失败"}
 	}
@@ -106,7 +106,7 @@ func migrateStoredTasks(ctx context.Context, db *sql.DB, workspace string, confi
 			}
 			continue
 		}
-		if err := database.UpdateTaskResultURL(ctx, db, workspace, task.ID, permanent); err != nil {
+		if err := dbworkshop.UpdateTaskResultURL(ctx, db, workspace, task.ID, permanent); err != nil {
 			failed++
 			continue
 		}

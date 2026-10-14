@@ -1,6 +1,7 @@
 package assets
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func assetTasksDeleteHandler(cfg config.Config) http.HandlerFunc {
@@ -28,7 +28,7 @@ func assetTasksDeleteHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "error": "clearAll requires admin token"})
 			return
 		}
-		selection := database.TaskRemovalSelection{All: clearAll, Failed: !clearAll && clearFailed}
+		selection := dbworkshop.TaskRemovalSelection{All: clearAll, Failed: !clearAll && clearFailed}
 		if !selection.All && !selection.Failed {
 			selection.IDs = uniqueTaskValues(r.URL.Query().Get("id"), r.URL.Query().Get("ids"), object["id"], object["ids"])
 			selection.URLs = uniqueTaskValues(r.URL.Query().Get("url"), r.URL.Query().Get("urls"), object["url"], object["urls"])
@@ -43,7 +43,7 @@ func assetTasksDeleteHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		result, err := database.RemoveImageTasks(r.Context(), db, httpx.WorkspaceFrom(r), selection, stringList(object["protectUrls"]), cfg.MediaReviewRoot(), cfg.Production())
+		result, err := dbworkshop.RemoveImageTasks(r.Context(), db, httpx.WorkspaceFrom(r), selection, stringList(object["protectUrls"]), cfg.MediaReviewRoot(), cfg.Production())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "操作失败，请稍后重试"})
 			return

@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -9,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryCreate(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) bool {
@@ -62,7 +62,7 @@ func serveLibraryCreate(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		return true
 	}
 	defer db.Close()
-	item, err := database.CreateLibraryAsset(r.Context(), db, httpx.WorkspaceFrom(r), assetType, data)
+	item, err := dblibrary.CreateLibraryAsset(r.Context(), db, httpx.WorkspaceFrom(r), assetType, data)
 	if err != nil {
 		writeLibraryCreateError(w, err)
 		return true
@@ -75,12 +75,12 @@ func serveLibraryCreate(cfg config.Config, w http.ResponseWriter, r *http.Reques
 }
 
 func writeLibraryCreateError(w http.ResponseWriter, err error) {
-	var client database.LibraryUpdateError
+	var client dblibrary.LibraryUpdateError
 	if errors.As(err, &client) {
 		writeLibraryPutClient(w, client.Message)
 		return
 	}
-	var failure database.LibraryFailure
+	var failure dblibrary.LibraryFailure
 	if errors.As(err, &failure) {
 		writeLibraryPutFailure(w, failure.Message)
 		return

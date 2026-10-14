@@ -1,13 +1,12 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"strings"
-
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
-func parseCategoryApply(raw []byte) ([]database.CategoryApplyItem, bool) {
+func parseCategoryApply(raw []byte) ([]dbcatalog.CategoryApplyItem, bool) {
 	if strings.TrimSpace(string(raw)) == "" {
 		return nil, false
 	}
@@ -23,7 +22,7 @@ func parseCategoryApply(raw []byte) ([]database.CategoryApplyItem, bool) {
 	if !ok || len(list) == 0 {
 		return nil, false
 	}
-	items := make([]database.CategoryApplyItem, 0, len(list))
+	items := make([]dbcatalog.CategoryApplyItem, 0, len(list))
 	for _, rawItem := range list {
 		item, ok := parseCategoryApplyItem(rawItem)
 		if !ok {
@@ -34,33 +33,33 @@ func parseCategoryApply(raw []byte) ([]database.CategoryApplyItem, bool) {
 	return items, true
 }
 
-func parseCategoryApplyItem(raw any) (database.CategoryApplyItem, bool) {
+func parseCategoryApplyItem(raw any) (dbcatalog.CategoryApplyItem, bool) {
 	object, ok := raw.(map[string]any)
 	if !ok {
-		return database.CategoryApplyItem{}, false
+		return dbcatalog.CategoryApplyItem{}, false
 	}
 	id, ok := requiredString(object, "id")
 	if !ok {
-		return database.CategoryApplyItem{}, false
+		return dbcatalog.CategoryApplyItem{}, false
 	}
 	parent, ok := requiredString(object, "parentId")
 	if !ok {
-		return database.CategoryApplyItem{}, false
+		return dbcatalog.CategoryApplyItem{}, false
 	}
 	label, ok := requiredString(object, "label")
 	if !ok {
-		return database.CategoryApplyItem{}, false
+		return dbcatalog.CategoryApplyItem{}, false
 	}
 	keywords, ok := optionalStringList(object, "keywords")
 	if !ok {
-		return database.CategoryApplyItem{}, false
+		return dbcatalog.CategoryApplyItem{}, false
 	}
 	anatomy := ""
 	if value, exists := object["anatomy"]; exists {
 		anatomy, ok = value.(string)
 		if !ok {
-			return database.CategoryApplyItem{}, false
+			return dbcatalog.CategoryApplyItem{}, false
 		}
 	}
-	return database.CategoryApplyItem{ID: id, ParentID: parent, Label: label, Keywords: keywords, Anatomy: anatomy}, true
+	return dbcatalog.CategoryApplyItem{ID: id, ParentID: parent, Label: label, Keywords: keywords, Anatomy: anatomy}, true
 }

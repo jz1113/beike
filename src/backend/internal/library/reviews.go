@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func deconstructReviewsHandler(cfg config.Config) http.HandlerFunc {
@@ -23,7 +23,7 @@ func deconstructReviewsHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		rows, err := database.ListDeconstructReviews(r.Context(), db, httpx.WorkspaceFrom(r), status)
+		rows, err := dblibrary.ListDeconstructReviews(r.Context(), db, httpx.WorkspaceFrom(r), status)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取审核列表失败"})
 			return
@@ -65,7 +65,7 @@ func deconstructReviewsPostHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		if err := database.UpdateDeconstructReviewStatus(r.Context(), db, httpx.WorkspaceFrom(r), id, from, to); err != nil {
+		if err := dblibrary.UpdateDeconstructReviewStatus(r.Context(), db, httpx.WorkspaceFrom(r), id, from, to); err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "服务器内部错误", "code": "internal_error"})
 			return
 		}

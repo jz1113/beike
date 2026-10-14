@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
@@ -9,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 var durableImageURL = regexp.MustCompile(`^https?://|^/[^/]`)
@@ -21,7 +21,7 @@ func commitDeconstructReview(cfg config.Config, w http.ResponseWriter, r *http.R
 		return
 	}
 	defer db.Close()
-	_, payload, status, ok, err := database.GetDeconstructReview(r.Context(), db, httpx.WorkspaceFrom(r), id)
+	_, payload, status, ok, err := dblibrary.GetDeconstructReview(r.Context(), db, httpx.WorkspaceFrom(r), id)
 	if err != nil {
 		writeReviewFailure(w, "审核失败")
 		return
@@ -65,7 +65,7 @@ func commitDeconstructReview(cfg config.Config, w http.ResponseWriter, r *http.R
 			return
 		}
 	}
-	if err := database.UpdateDeconstructReviewStatus(r.Context(), db, httpx.WorkspaceFrom(r), id, "pending", "approved"); err != nil {
+	if err := dblibrary.UpdateDeconstructReviewStatus(r.Context(), db, httpx.WorkspaceFrom(r), id, "pending", "approved"); err != nil {
 		writeReviewFailure(w, "审核失败")
 		return
 	}

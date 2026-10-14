@@ -1,13 +1,13 @@
 package library
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func saveLibraryFolderRules(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) {
@@ -22,7 +22,7 @@ func saveLibraryFolderRules(cfg config.Config, w http.ResponseWriter, r *http.Re
 		return
 	}
 	defer db.Close()
-	organization, err := database.SavePromptFolderRules(r.Context(), db, httpx.WorkspaceFrom(r), id, keywords, anatomy)
+	organization, err := dbcatalog.SavePromptFolderRules(r.Context(), db, httpx.WorkspaceFrom(r), id, keywords, anatomy)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -42,7 +42,7 @@ func importLibraryFolderRules(cfg config.Config, w http.ResponseWriter, r *http.
 		return
 	}
 	defer db.Close()
-	result, err := database.ImportPromptFolderRules(r.Context(), db, httpx.WorkspaceFrom(r), parentID, mode, items)
+	result, err := dbcatalog.ImportPromptFolderRules(r.Context(), db, httpx.WorkspaceFrom(r), parentID, mode, items)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -74,7 +74,7 @@ func parseFolderRuleSave(body []byte) (string, []string, []string, string) {
 	return id, keywords, anatomy, ""
 }
 
-func parseFolderRuleImport(body []byte) (string, string, []database.FolderRuleItem, string) {
+func parseFolderRuleImport(body []byte) (string, string, []dbcatalog.FolderRuleItem, string) {
 	var object map[string]any
 	if json.Unmarshal(body, &object) != nil {
 		return "", "", nil, "分类操作失败"
@@ -95,7 +95,7 @@ func parseFolderRuleImport(body []byte) (string, string, []database.FolderRuleIt
 	if len(list) > 100 {
 		return "", "", nil, "一次最多导入 100 个文件夹"
 	}
-	items := []database.FolderRuleItem{}
+	items := []dbcatalog.FolderRuleItem{}
 	names := map[string]struct{}{}
 	for _, raw := range list {
 		item, ok := raw.(map[string]any)
@@ -126,7 +126,7 @@ func parseFolderRuleImport(body []byte) (string, string, []database.FolderRuleIt
 				return "", "", nil, message
 			}
 		}
-		items = append(items, database.FolderRuleItem{Name: name, Keywords: keywords, Anatomy: anatomy, HasAnatomy: hasAnatomy})
+		items = append(items, dbcatalog.FolderRuleItem{Name: name, Keywords: keywords, Anatomy: anatomy, HasAnatomy: hasAnatomy})
 	}
 	return parentID, mode, items, ""
 }

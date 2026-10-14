@@ -1,6 +1,7 @@
 package library
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,7 +14,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type liveDeconstructJob struct {
@@ -56,22 +56,22 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 		"concurrency": concurrency, "reviewBeforeSave": reviewBefore,
 	}
 	rawConfig, _ := json.Marshal(scrubJob(configBody, apiKey))
-	hash := database.JobInputHash(items, configBody, baseURL)
+	hash := dbworkshop.JobInputHash(items, configBody, baseURL)
 	db, err := httpx.OpenDB(cfg)
 	if err != nil {
 		writeJobError(w, http.StatusInternalServerError, "后台反推提交失败", "internal_error")
 		return
 	}
 	defer db.Close()
-	created, err := database.CreateDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg), database.DeconstructJobCreate{
+	created, err := dbworkshop.CreateDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg), dbworkshop.DeconstructJobCreate{
 		JobID: stringValue(payload["jobId"]), InputHash: hash, ConfigJSON: string(rawConfig),
 		Concurrency: concurrency, ReviewBeforeSave: reviewBefore, Items: jobRecords(items),
 	})
-	if err == database.ErrJobConflict {
+	if err == dbworkshop.ErrJobConflict {
 		writeJobError(w, http.StatusConflict, "任务 ID 已对应另一批图集，请核对原任务", "job_input_conflict")
 		return
 	}
-	if err == database.ErrJobCapacity {
+	if err == dbworkshop.ErrJobCapacity {
 		writeJobError(w, http.StatusConflict, "当前已有 5 个后台反推任务，请等待完成或停止后继续", "job_capacity_reached")
 		return
 	}
@@ -102,14 +102,14 @@ func stopDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	defer db.Close()
-	if err := database.StopDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), payload.JobID); err == database.ErrJobMissing {
+	if err := dbworkshop.StopDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), payload.JobID); err == dbworkshop.ErrJobMissing {
 		writeJobError(w, http.StatusNotFound, "后台反推任务不存在", "job_not_found")
 		return
 	} else if err != nil {
 		writeJobError(w, http.StatusInternalServerError, "后台反推提交失败", "internal_error")
 		return
 	}
-	job, _, err := database.GetDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg), payload.JobID)
+	job, _, err := dbworkshop.GetDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg), payload.JobID)
 	if err != nil {
 		writeJobError(w, http.StatusInternalServerError, "后台反推提交失败", "internal_error")
 		return
@@ -158,7 +158,7 @@ func runDeconstructJob(cfg config.Config, workspace, key string, live *liveDecon
 		return
 	}
 	defer db.Close()
-	_ = database.FinalizeDeconstructJob(context.Background(), db, workspace, jobID)
+	_ = dbworkshop.FinalizeDeconstructJob(context.Background(), db, workspace, jobID)
 }
 
 func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstructJob, jobID string, configBody map[string]any, baseURL, apiKey string) {
@@ -168,7 +168,7 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 	}
 	defer db.Close()
 	for !live.stopping {
-		claimed, err := database.ClaimDeconstructJobItem(context.Background(), db, workspace, jobID)
+		claimed, err := dbworkshop.ClaimDeconstructJobItem(context.Background(), db, workspace, jobID)
 		if err != nil || claimed == nil {
 			return
 		}
@@ -191,10 +191,10 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 				if live.stopping {
 					return false, nil
 				}
-				return database.CommitDeconstructDispatch(context.Background(), db, workspace, jobID, claimed.ItemID)
+				return dbworkshop.CommitDeconstructDispatch(context.Background(), db, workspace, jobID, claimed.ItemID)
 			},
 			onProgress: func(progress deconstructProgress) {
-				_ = database.UpdateDeconstructItemProgress(context.Background(), db, workspace, jobID, claimed.ItemID, progress)
+				_ = dbworkshop.UpdateDeconstructItemProgress(context.Background(), db, workspace, jobID, claimed.ItemID, progress)
 			},
 		})
 		resultStatus := "error"
@@ -215,7 +215,7 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 		if body["code"] == "job_stopped" {
 			resultStatus = "stopped"
 		}
-		_ = database.FinishDeconstructJobItem(context.Background(), db, workspace, jobID, claimed.ItemID, resultStatus, scrubJob(result, apiKey), stringValue(result["error"]))
+		_ = dbworkshop.FinishDeconstructJobItem(context.Background(), db, workspace, jobID, claimed.ItemID, resultStatus, scrubJob(result, apiKey), stringValue(result["error"]))
 	}
 }
 
@@ -240,10 +240,10 @@ func normalizeJobItems(value any) ([]map[string]any, error) {
 	return items, nil
 }
 
-func jobRecords(items []map[string]any) []database.DeconstructJobItem {
-	records := make([]database.DeconstructJobItem, 0, len(items))
+func jobRecords(items []map[string]any) []dbworkshop.DeconstructJobItem {
+	records := make([]dbworkshop.DeconstructJobItem, 0, len(items))
 	for _, item := range items {
-		records = append(records, database.DeconstructJobItem{ID: stringValue(item["id"]), Input: item})
+		records = append(records, dbworkshop.DeconstructJobItem{ID: stringValue(item["id"]), Input: item})
 	}
 	return records
 }
@@ -289,7 +289,7 @@ func RecoverDeconstructJobs(cfg config.Config) (int, error) {
 		return 0, err
 	}
 	defer db.Close()
-	return database.RecoverDeconstructJobs(context.Background(), db)
+	return dbworkshop.RecoverDeconstructJobs(context.Background(), db)
 }
 
 func DrainDeconstructJobs(timeout time.Duration) {

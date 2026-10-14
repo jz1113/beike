@@ -1,13 +1,13 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"io"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func promptRecordsHandler(cfg config.Config) http.HandlerFunc {
@@ -18,7 +18,7 @@ func promptRecordsHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		records, err := database.ListRecentPromptRecords(r.Context(), db, httpx.WorkspaceFrom(r))
+		records, err := dbcatalog.ListRecentPromptRecords(r.Context(), db, httpx.WorkspaceFrom(r))
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取提示词记录失败"})
 			return
@@ -39,7 +39,7 @@ func promptRecordsCreateHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "请求数据格式异常"})
 			return
 		}
-		draft := database.PromptDraft{
+		draft := dbcatalog.PromptDraft{
 			ProductID:    emptyAsNil(raw["productId"]),
 			ProductTitle: textOr(raw["productTitle"], "未命名商品"),
 			Fingerprint:  textOr(raw["productFingerprint"], ""),
@@ -53,7 +53,7 @@ func promptRecordsCreateHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		record, err := database.CreatePromptRecord(r.Context(), db, httpx.WorkspaceFrom(r), draft)
+		record, err := dbcatalog.CreatePromptRecord(r.Context(), db, httpx.WorkspaceFrom(r), draft)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return
@@ -75,7 +75,7 @@ func promptRecordsDeleteHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		if err := database.DeletePromptRecord(r.Context(), db, httpx.WorkspaceFrom(r), id); err != nil {
+		if err := dbcatalog.DeletePromptRecord(r.Context(), db, httpx.WorkspaceFrom(r), id); err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return
 		}

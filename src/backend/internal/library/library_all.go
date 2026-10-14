@@ -1,12 +1,12 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryAll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
@@ -17,7 +17,7 @@ func serveLibraryAll(cfg config.Config, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	defer db.Close()
-	all, err := database.ListAllLibraryAssets(r.Context(), db, httpx.WorkspaceFrom(r), page, r.URL.Query().Get("slim") == "1")
+	all, err := dblibrary.ListAllLibraryAssets(r.Context(), db, httpx.WorkspaceFrom(r), page, r.URL.Query().Get("slim") == "1")
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 		return

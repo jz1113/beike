@@ -1,12 +1,12 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func libraryGetHandler(cfg config.Config) http.HandlerFunc {
@@ -53,7 +53,7 @@ func serveLibraryOrganization(cfg config.Config, w http.ResponseWriter, r *http.
 		return
 	}
 	defer db.Close()
-	organization, err := database.ListAssetOrganization(r.Context(), db, httpx.WorkspaceFrom(r))
+	organization, err := dblibrary.ListAssetOrganization(r.Context(), db, httpx.WorkspaceFrom(r))
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 		return

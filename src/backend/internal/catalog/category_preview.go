@@ -1,10 +1,9 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"strings"
-
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 var categoryParentIDs = map[string]struct{}{
@@ -12,7 +11,7 @@ var categoryParentIDs = map[string]struct{}{
 	"shoes": {}, "beauty": {}, "eyewear": {}, "universal": {},
 }
 
-func parseCategoryPreview(raw []byte) ([]database.LocalCategoryReport, bool) {
+func parseCategoryPreview(raw []byte) ([]dbcatalog.LocalCategoryReport, bool) {
 	if strings.TrimSpace(string(raw)) == "" {
 		return nil, true
 	}
@@ -32,7 +31,7 @@ func parseCategoryPreview(raw []byte) ([]database.LocalCategoryReport, bool) {
 	if !ok {
 		return nil, false
 	}
-	parsed := make([]database.LocalCategoryReport, 0, len(reports))
+	parsed := make([]dbcatalog.LocalCategoryReport, 0, len(reports))
 	for _, report := range reports {
 		item, ok := parseLocalReport(report)
 		if !ok {
@@ -43,77 +42,77 @@ func parseCategoryPreview(raw []byte) ([]database.LocalCategoryReport, bool) {
 	return parsed, true
 }
 
-func parseLocalReport(raw any) (database.LocalCategoryReport, bool) {
+func parseLocalReport(raw any) (dbcatalog.LocalCategoryReport, bool) {
 	object, ok := raw.(map[string]any)
 	if !ok {
-		return database.LocalCategoryReport{}, false
+		return dbcatalog.LocalCategoryReport{}, false
 	}
 	parent, ok := object["parentId"].(string)
 	if !ok {
-		return database.LocalCategoryReport{}, false
+		return dbcatalog.LocalCategoryReport{}, false
 	}
 	if _, known := categoryParentIDs[parent]; !known {
-		return database.LocalCategoryReport{}, false
+		return dbcatalog.LocalCategoryReport{}, false
 	}
-	categories := []database.LocalCategory{}
+	categories := []dbcatalog.LocalCategory{}
 	if value, exists := object["categories"]; exists {
 		list, ok := value.([]any)
 		if !ok {
-			return database.LocalCategoryReport{}, false
+			return dbcatalog.LocalCategoryReport{}, false
 		}
 		for _, item := range list {
 			category, ok := parseLocalCategory(item)
 			if !ok {
-				return database.LocalCategoryReport{}, false
+				return dbcatalog.LocalCategoryReport{}, false
 			}
 			categories = append(categories, category)
 		}
 	}
-	return database.LocalCategoryReport{ParentID: parent, Categories: categories}, true
+	return dbcatalog.LocalCategoryReport{ParentID: parent, Categories: categories}, true
 }
 
-func parseLocalCategory(raw any) (database.LocalCategory, bool) {
+func parseLocalCategory(raw any) (dbcatalog.LocalCategory, bool) {
 	object, ok := raw.(map[string]any)
 	if !ok {
-		return database.LocalCategory{}, false
+		return dbcatalog.LocalCategory{}, false
 	}
 	id, ok := requiredString(object, "id")
 	if !ok {
-		return database.LocalCategory{}, false
+		return dbcatalog.LocalCategory{}, false
 	}
 	parent, ok := requiredString(object, "parentId")
 	if !ok {
-		return database.LocalCategory{}, false
+		return dbcatalog.LocalCategory{}, false
 	}
 	label, ok := requiredString(object, "label")
 	if !ok {
-		return database.LocalCategory{}, false
+		return dbcatalog.LocalCategory{}, false
 	}
 	shortLabel := ""
 	if value, exists := object["shortLabel"]; exists {
 		shortLabel, ok = value.(string)
 		if !ok {
-			return database.LocalCategory{}, false
+			return dbcatalog.LocalCategory{}, false
 		}
 	}
 	if value, exists := object["isCustom"]; exists {
 		if _, ok := value.(bool); !ok {
-			return database.LocalCategory{}, false
+			return dbcatalog.LocalCategory{}, false
 		}
 	}
 	keywords, ok := optionalStringList(object, "keywords")
 	if !ok {
-		return database.LocalCategory{}, false
+		return dbcatalog.LocalCategory{}, false
 	}
 	var anatomy *string
 	if value, exists := object["anatomy"]; exists {
 		text, ok := value.(string)
 		if !ok {
-			return database.LocalCategory{}, false
+			return dbcatalog.LocalCategory{}, false
 		}
 		anatomy = &text
 	}
-	return database.LocalCategory{
+	return dbcatalog.LocalCategory{
 		ID: id, ParentID: parent, Label: label, ShortLabel: shortLabel, Keywords: keywords, Anatomy: anatomy,
 	}, true
 }

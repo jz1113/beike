@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const officialWorkspace = "official"
+const OfficialWorkspace = "official"
 
 type RecordCounts struct {
 	ImageTaskCount       int
@@ -46,7 +46,7 @@ func countRows(ctx context.Context, db *sql.DB, table, workspace string, shared 
 	args := []any{workspace}
 	if shared {
 		query = `SELECT COUNT(*) FROM "` + table + `" WHERE "workspaceId" IN (?, ?)`
-		args = []any{workspace, officialWorkspace}
+		args = []any{workspace, OfficialWorkspace}
 	}
 	var count int
 	if err := db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {

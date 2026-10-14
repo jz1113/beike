@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func libraryPutHandler(cfg config.Config) http.HandlerFunc {
@@ -49,7 +49,7 @@ func libraryPutHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		item, err := database.UpdateLibraryAsset(r.Context(), db, httpx.WorkspaceFrom(r), assetType, id, data)
+		item, err := dblibrary.UpdateLibraryAsset(r.Context(), db, httpx.WorkspaceFrom(r), assetType, id, data)
 		if err != nil {
 			writeLibraryUpdateError(w, err)
 			return
@@ -192,12 +192,12 @@ func jsonTruthy(value any) bool {
 }
 
 func writeLibraryUpdateError(w http.ResponseWriter, err error) {
-	var client database.LibraryUpdateError
+	var client dblibrary.LibraryUpdateError
 	if errors.As(err, &client) {
 		writeLibraryPutClient(w, client.Message)
 		return
 	}
-	if errors.Is(err, database.ErrLibraryRecordMissing) {
+	if errors.Is(err, dblibrary.ErrLibraryRecordMissing) {
 		writeLibraryPutFailure(w, "请求的资源不存在")
 		return
 	}

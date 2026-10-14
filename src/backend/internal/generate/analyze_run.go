@@ -1,13 +1,13 @@
 package generate
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
@@ -101,7 +101,7 @@ func saveAnalysis(cfg config.Config, r *http.Request, title, fingerprint, model 
 	if title == "" {
 		title = "未命名商品"
 	}
-	_, _ = database.CreatePromptRecord(r.Context(), db, workspaceOf(r), database.PromptDraft{
+	_, _ = dbcatalog.CreatePromptRecord(r.Context(), db, workspaceOf(r), dbcatalog.PromptDraft{
 		ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "📱 真实手机买家秀", PromptsJSON: string(raw),
 	})
 }

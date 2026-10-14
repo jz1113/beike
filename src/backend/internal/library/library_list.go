@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryList(cfg config.Config, w http.ResponseWriter, r *http.Request, assetType string) {
@@ -22,7 +22,7 @@ func serveLibraryList(cfg config.Config, w http.ResponseWriter, r *http.Request,
 		return
 	}
 	defer db.Close()
-	list, err := database.ListLibraryAssets(r.Context(), db, httpx.WorkspaceFrom(r), assetType, page, pageSize,
+	list, err := dblibrary.ListLibraryAssets(r.Context(), db, httpx.WorkspaceFrom(r), assetType, page, pageSize,
 		strings.TrimSpace(query.Get("keyword")), query.Get("isFavorite") == "true", query.Get("albumId"),
 		query.Get("productCategoryId"), query.Get("includeUniversal") != "false", query.Get("category"))
 	if err != nil {

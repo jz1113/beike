@@ -1,6 +1,8 @@
 package library
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func libraryPostHandler(cfg config.Config) http.HandlerFunc {
@@ -70,7 +71,7 @@ func saveLibraryReorder(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer db.Close()
-	organization, err := database.ReorderProductCategories(r.Context(), db, httpx.WorkspaceFrom(r), parentID, ids)
+	organization, err := dblibrary.ReorderProductCategories(r.Context(), db, httpx.WorkspaceFrom(r), parentID, ids)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -90,7 +91,7 @@ func saveLibraryCategory(cfg config.Config, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	defer db.Close()
-	organization, err := database.SaveProductCategory(r.Context(), db, httpx.WorkspaceFrom(r), input)
+	organization, err := dbcatalog.SaveProductCategory(r.Context(), db, httpx.WorkspaceFrom(r), input)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -98,7 +99,7 @@ func saveLibraryCategory(cfg config.Config, w http.ResponseWriter, r *http.Reque
 	writeLibraryOrganization(w, organization)
 }
 
-func writeLibraryOrganization(w http.ResponseWriter, organization database.AssetOrganization) {
+func writeLibraryOrganization(w http.ResponseWriter, organization dblibrary.AssetOrganization) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"success": true, "categories": organization.Categories, "albums": organization.Albums,
 	})
@@ -116,7 +117,7 @@ func classifyLibraryAlbums(cfg config.Config, w http.ResponseWriter, r *http.Req
 		return
 	}
 	defer db.Close()
-	organization, err := database.ClassifyAlbums(r.Context(), db, httpx.WorkspaceFrom(r), ids, categoryID)
+	organization, err := dblibrary.ClassifyAlbums(r.Context(), db, httpx.WorkspaceFrom(r), ids, categoryID)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -146,7 +147,7 @@ func parseAssetClassify(body []byte) (string, []string, []string, bool, string) 
 		return "", nil, nil, false, "分类操作失败"
 	}
 	assetType, _ := object["assetType"].(string)
-	if !database.ClassifiableAssetType(assetType) {
+	if !dblibrary.ClassifiableAssetType(assetType) {
 		return "", nil, nil, false, "完整提示词请按图集调整归属"
 	}
 	ids, err := assetIDs(object["ids"])
@@ -294,21 +295,21 @@ func parseCategoryReorder(body []byte) ([]string, *string, string) {
 	return ids, parentID, ""
 }
 
-func parseCategorySave(body []byte) (database.CategorySave, string) {
+func parseCategorySave(body []byte) (dbcatalog.CategorySave, string) {
 	var object map[string]any
 	if json.Unmarshal(body, &object) != nil {
-		return database.CategorySave{}, "分类操作失败"
+		return dbcatalog.CategorySave{}, "分类操作失败"
 	}
 	name, _ := object["name"].(string)
 	id, ok := optionalCategoryID(object["id"], hasKey(object, "id"))
 	if !ok {
-		return database.CategorySave{}, "分类操作失败"
+		return dbcatalog.CategorySave{}, "分类操作失败"
 	}
 	parentID, ok := reorderParentID(object["parentId"], hasKey(object, "parentId"))
 	if !ok {
-		return database.CategorySave{}, "分类操作失败"
+		return dbcatalog.CategorySave{}, "分类操作失败"
 	}
-	return database.CategorySave{ID: id, Name: name, ParentID: parentID}, ""
+	return dbcatalog.CategorySave{ID: id, Name: name, ParentID: parentID}, ""
 }
 
 func optionalCategoryID(value any, exists bool) (*string, bool) {

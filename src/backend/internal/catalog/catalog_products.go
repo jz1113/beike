@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"errors"
 	"io"
@@ -8,7 +9,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/media"
 )
 
@@ -31,7 +31,7 @@ func productsHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		total, products, err := database.ListProducts(r.Context(), db, httpx.WorkspaceFrom(r), page, pageSize)
+		total, products, err := dbcatalog.ListProducts(r.Context(), db, httpx.WorkspaceFrom(r), page, pageSize)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "products": []any{}, "error": "读取商品失败"})
 			return
@@ -72,7 +72,7 @@ func productsCreateHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		product, err := database.SaveCollectedProduct(r.Context(), db, httpx.WorkspaceFrom(r), platform, itemID, title, media.NormalizeImageURLToStandardJpg(textOr(raw["picUrl"], "")), saved)
+		product, err := dbcatalog.SaveCollectedProduct(r.Context(), db, httpx.WorkspaceFrom(r), platform, itemID, title, media.NormalizeImageURLToStandardJpg(textOr(raw["picUrl"], "")), saved)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return
@@ -118,8 +118,8 @@ func productsUpdateHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		product, err := database.UpdateProduct(r.Context(), db, httpx.WorkspaceFrom(r), id, title, itemID, picURL, detailURLs)
-		if errors.Is(err, database.ErrProductMissing) || err != nil {
+		product, err := dbcatalog.UpdateProduct(r.Context(), db, httpx.WorkspaceFrom(r), id, title, itemID, picURL, detailURLs)
+		if errors.Is(err, dbcatalog.ErrProductMissing) || err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return
 		}

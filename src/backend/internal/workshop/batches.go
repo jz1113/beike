@@ -1,6 +1,7 @@
 package workshop
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 var batchIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
@@ -25,12 +25,12 @@ func Batches(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		active, err := database.EnsureActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
+		active, err := dbworkshop.EnsureActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
 		}
-		rows, err := database.ListWorkshopBatches(r.Context(), db, httpx.WorkspaceFrom(r))
+		rows, err := dbworkshop.ListWorkshopBatches(r.Context(), db, httpx.WorkspaceFrom(r))
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -55,7 +55,7 @@ func ActiveBatch(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		row, err := database.EnsureActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
+		row, err := dbworkshop.EnsureActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -78,7 +78,7 @@ func Batch(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		row, err := database.GetWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id)
+		row, err := dbworkshop.GetWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id)
 		if err != nil || row.ID == "" {
 			writeFail(w, http.StatusNotFound, "批次不存在或已删除", "not_found")
 			return
@@ -95,8 +95,8 @@ func DuplicateBatch(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "批次标识不正确", "bad_request")
 			return
 		}
-		row, status, message, code := replaceBatch(cfg, r, func(db *sql.DB) (database.WorkshopBatchRow, error) {
-			return database.DuplicateWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id)
+		row, status, message, code := replaceBatch(cfg, r, func(db *sql.DB) (dbworkshop.WorkshopBatchRow, error) {
+			return dbworkshop.DuplicateWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id)
 		})
 		if status != 0 {
 			writeFail(w, status, message, code)
@@ -112,8 +112,8 @@ func ArchiveBatch(cfg config.Config) http.Handler {
 		payload := map[string]any{}
 		_ = json.Unmarshal(body, &payload)
 		force, _ := payload["force"].(bool)
-		row, status, message, code := replaceBatch(cfg, r, func(db *sql.DB) (database.WorkshopBatchRow, error) {
-			return database.ArchiveActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), force)
+		row, status, message, code := replaceBatch(cfg, r, func(db *sql.DB) (dbworkshop.WorkshopBatchRow, error) {
+			return dbworkshop.ArchiveActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), force)
 		})
 		if status != 0 {
 			writeFail(w, status, message, code)
@@ -123,18 +123,18 @@ func ArchiveBatch(cfg config.Config) http.Handler {
 	})
 }
 
-func replaceBatch(cfg config.Config, r *http.Request, run func(*sql.DB) (database.WorkshopBatchRow, error)) (database.WorkshopBatchRow, int, string, string) {
+func replaceBatch(cfg config.Config, r *http.Request, run func(*sql.DB) (dbworkshop.WorkshopBatchRow, error)) (dbworkshop.WorkshopBatchRow, int, string, string) {
 	db, err := httpx.OpenDB(cfg)
 	if err != nil {
-		return database.WorkshopBatchRow{}, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error"
+		return dbworkshop.WorkshopBatchRow{}, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error"
 	}
 	defer db.Close()
 	row, err := run(db)
-	if errors.Is(err, database.ErrBatchMissing) {
-		return database.WorkshopBatchRow{}, http.StatusNotFound, "批次不存在或已删除", "not_found"
+	if errors.Is(err, dbworkshop.ErrBatchMissing) {
+		return dbworkshop.WorkshopBatchRow{}, http.StatusNotFound, "批次不存在或已删除", "not_found"
 	}
 	if err != nil {
-		return database.WorkshopBatchRow{}, http.StatusConflict, err.Error(), "conflict"
+		return dbworkshop.WorkshopBatchRow{}, http.StatusConflict, err.Error(), "conflict"
 	}
 	return row, 0, "", ""
 }
@@ -168,7 +168,7 @@ func CreateBatch(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		row, err := database.CreateWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), name, named)
+		row, err := dbworkshop.CreateWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), name, named)
 		if err != nil {
 			writeFail(w, http.StatusConflict, err.Error(), "conflict")
 			return
@@ -223,13 +223,13 @@ func SaveBatch(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		next, updatedAt, err := database.WriteWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id, revision, string(encoded), batchStatus(snapshot))
+		next, updatedAt, err := dbworkshop.WriteWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id, revision, string(encoded), batchStatus(snapshot))
 		if err != nil {
-			if errors.Is(err, database.ErrBatchMissing) {
+			if errors.Is(err, dbworkshop.ErrBatchMissing) {
 				writeFail(w, http.StatusNotFound, "批次不存在或已删除", "not_found")
 				return
 			}
-			if errors.Is(err, database.ErrBatchConflict) {
+			if errors.Is(err, dbworkshop.ErrBatchConflict) {
 				writeFail(w, http.StatusConflict, err.Error(), "conflict")
 				return
 			}
@@ -291,8 +291,8 @@ func RenameBatch(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		row, err := database.RenameWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id, name)
-		if errors.Is(err, database.ErrBatchMissing) {
+		row, err := dbworkshop.RenameWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r), id, name)
+		if errors.Is(err, dbworkshop.ErrBatchMissing) {
 			writeFail(w, http.StatusNotFound, "批次不存在或已删除", "not_found")
 			return
 		}
@@ -322,13 +322,13 @@ func historyHandler(cfg config.Config, clear bool) http.Handler {
 		defer db.Close()
 		var deleted int64
 		if clear {
-			active, err := database.EnsureActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
+			active, err := dbworkshop.EnsureActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
 			if err != nil {
 				writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 				return
 			}
-			deleted, err = database.ClearWorkshopHistory(r.Context(), db, httpx.WorkspaceFrom(r), active.ID)
-			if errors.Is(err, database.ErrBatchConflict) {
+			deleted, err = dbworkshop.ClearWorkshopHistory(r.Context(), db, httpx.WorkspaceFrom(r), active.ID)
+			if errors.Is(err, dbworkshop.ErrBatchConflict) {
 				writeFail(w, http.StatusConflict, "当前批次已在其他窗口切换，请刷新后再清空历史", "conflict")
 				return
 			}
@@ -338,12 +338,12 @@ func historyHandler(cfg config.Config, clear bool) http.Handler {
 				writeFail(w, http.StatusBadRequest, "批次标识不正确", "bad_request")
 				return
 			}
-			deleted, err = database.DeleteWorkshopHistory(r.Context(), db, httpx.WorkspaceFrom(r), id)
-			if errors.Is(err, database.ErrBatchConflict) {
+			deleted, err = dbworkshop.DeleteWorkshopHistory(r.Context(), db, httpx.WorkspaceFrom(r), id)
+			if errors.Is(err, dbworkshop.ErrBatchConflict) {
 				writeFail(w, http.StatusConflict, "当前批次不能在历史记录中删除", "conflict")
 				return
 			}
-			if errors.Is(err, database.ErrBatchMissing) {
+			if errors.Is(err, dbworkshop.ErrBatchMissing) {
 				writeFail(w, http.StatusNotFound, "批次不存在或已删除", "not_found")
 				return
 			}
@@ -356,7 +356,7 @@ func historyHandler(cfg config.Config, clear bool) http.Handler {
 	})
 }
 
-func summarizeBatch(row database.WorkshopBatchRow) map[string]any {
+func summarizeBatch(row dbworkshop.WorkshopBatchRow) map[string]any {
 	items, ready, tasks := batchCounts(row.Snapshot)
 	return map[string]any{
 		"id": row.ID, "name": row.Name, "status": row.Status, "revision": row.Revision,
@@ -365,7 +365,7 @@ func summarizeBatch(row database.WorkshopBatchRow) map[string]any {
 	}
 }
 
-func batchPayload(row database.WorkshopBatchRow) map[string]any {
+func batchPayload(row dbworkshop.WorkshopBatchRow) map[string]any {
 	var snapshot any
 	if json.Unmarshal([]byte(row.Snapshot), &snapshot) != nil {
 		snapshot = map[string]any{}

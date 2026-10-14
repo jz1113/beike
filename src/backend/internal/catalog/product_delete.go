@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -12,7 +13,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
@@ -30,7 +30,7 @@ func productsDeleteHandler(cfg config.Config) http.HandlerFunc {
 		}
 		defer db.Close()
 		deleteRemoteProductMedia(r.Context(), db, httpx.WorkspaceFrom(r), id)
-		if err := database.DeleteProduct(r.Context(), db, httpx.WorkspaceFrom(r), id, productStorageRoot(cfg)); err != nil {
+		if err := dbcatalog.DeleteProduct(r.Context(), db, httpx.WorkspaceFrom(r), id, productStorageRoot(cfg)); err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return
 		}

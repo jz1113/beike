@@ -1,13 +1,13 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"io"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
@@ -38,8 +38,8 @@ func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		recipe, copied, err := database.SaveStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id, changes)
-		if err == database.ErrStyleMissing {
+		recipe, copied, err := dbcatalog.SaveStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id, changes)
+		if err == dbcatalog.ErrStyleMissing {
 			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{
 				"success": false, "code": "recipe_not_found",
 				"error": "该架构已不存在，请刷新列表。编辑内容已保留，可另存为新架构。",
@@ -54,8 +54,8 @@ func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
 	}
 }
 
-func styleChanges(object map[string]any) (database.StyleChanges, bool) {
-	var changes database.StyleChanges
+func styleChanges(object map[string]any) (dbcatalog.StyleChanges, bool) {
+	var changes dbcatalog.StyleChanges
 	var ok bool
 	if changes.Name, ok = optionalChangeString(object, "name"); !ok {
 		return changes, false

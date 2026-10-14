@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -16,7 +17,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type deconstructHooks struct {
@@ -119,7 +119,7 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 			return http.StatusInternalServerError, map[string]any{"success": false, "error": scrubText(err.Error(), apiKey), "code": "internal_error"}
 		}
 		defer db.Close()
-		if err := database.InsertDeconstructReview(r.Context(), db, workspace, reviewID, album, string(raw)); err != nil {
+		if err := dblibrary.InsertDeconstructReview(r.Context(), db, workspace, reviewID, album, string(raw)); err != nil {
 			report("failed", "反推未完成，请查看任务错误信息")
 			return http.StatusInternalServerError, map[string]any{"success": false, "error": scrubText(err.Error(), apiKey), "code": "internal_error"}
 		}
@@ -232,7 +232,7 @@ func existingReview(cfg config.Config, r *http.Request, id string) (map[string]a
 		return nil, false
 	}
 	defer db.Close()
-	_, payload, status, ok, err := database.GetDeconstructReview(r.Context(), db, httpx.WorkspaceFrom(r), id)
+	_, payload, status, ok, err := dblibrary.GetDeconstructReview(r.Context(), db, httpx.WorkspaceFrom(r), id)
 	if err != nil || !ok {
 		return nil, false
 	}

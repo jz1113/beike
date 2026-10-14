@@ -1,12 +1,12 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryBulkImport(cfg config.Config, w http.ResponseWriter, r *http.Request, items []any, registries, replacements, categories, albums any) {
@@ -16,7 +16,7 @@ func serveLibraryBulkImport(cfg config.Config, w http.ResponseWriter, r *http.Re
 		return
 	}
 	defer db.Close()
-	imported, err := database.BulkImportLibrary(r.Context(), db, httpx.WorkspaceFrom(r), items, registries, replacements, categories, albums)
+	imported, err := dblibrary.BulkImportLibrary(r.Context(), db, httpx.WorkspaceFrom(r), items, registries, replacements, categories, albums)
 	if err != nil {
 		writeLibraryCreateError(w, err)
 		return

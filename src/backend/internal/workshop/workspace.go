@@ -1,6 +1,7 @@
 package workshop
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func WorkspaceGet(cfg config.Config) http.Handler {
@@ -25,7 +25,7 @@ func WorkspaceGet(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		row, err := database.ReadWorkshopWorkspace(r.Context(), db, httpx.WorkspaceFrom(r), mode)
+		row, err := dbworkshop.ReadWorkshopWorkspace(r.Context(), db, httpx.WorkspaceFrom(r), mode)
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "工作区读取失败，已保留原记录，请检查本地服务", "internal_error")
 			return
@@ -96,8 +96,8 @@ func WorkspacePut(cfg config.Config) http.Handler {
 		}
 		defer db.Close()
 		updatedAt := time.Now().UTC().Format(time.RFC3339Nano)
-		next, err := database.WriteWorkshopWorkspace(r.Context(), db, httpx.WorkspaceFrom(r), mode, revision, string(encoded), updatedAt)
-		if errors.Is(err, database.ErrWorkspaceConflict) {
+		next, err := dbworkshop.WriteWorkshopWorkspace(r.Context(), db, httpx.WorkspaceFrom(r), mode, revision, string(encoded), updatedAt)
+		if errors.Is(err, dbworkshop.ErrWorkspaceConflict) {
 			writeFail(w, http.StatusConflict, err.Error(), "conflict")
 			return
 		}

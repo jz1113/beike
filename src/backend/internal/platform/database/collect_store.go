@@ -18,7 +18,7 @@ func LoadCollectedProduct(ctx context.Context, db *sql.DB, workspace, platform, 
 	if err != nil {
 		return "", "", "", "", "", false, err
 	}
-	return id, stringValue(title), stringValue(picURL), stringValue(detailURLs), formatSQLiteTime(createdAt), true, nil
+	return id, StringValue(title), StringValue(picURL), StringValue(detailURLs), FormatSQLiteTime(createdAt), true, nil
 }
 
 func SaveCollectDetail(ctx context.Context, db *sql.DB, workspace, platform, itemID, title, picURL, detailURLs string) (string, string, error) {
@@ -27,7 +27,7 @@ func SaveCollectDetail(ctx context.Context, db *sql.DB, workspace, platform, ite
 		SELECT "id", "createdAt" FROM "Product"
 		WHERE "workspaceId" = ? AND "platform" = ? AND "itemId" = ?`, workspace, platform, itemID).Scan(&id, &createdAt)
 	if err == sql.ErrNoRows {
-		id, err = randomHex()
+		id, err = RandomHex()
 		if err != nil {
 			return "", "", err
 		}
@@ -43,5 +43,5 @@ func SaveCollectDetail(ctx context.Context, db *sql.DB, workspace, platform, ite
 	_, err = db.ExecContext(ctx, `
 		UPDATE "Product" SET "title" = ?, "picUrl" = ?, "detailUrls" = ?
 		WHERE "id" = ? AND "workspaceId" = ?`, title, picURL, detailURLs, id, workspace)
-	return id, formatSQLiteTime(createdAt), err
+	return id, FormatSQLiteTime(createdAt), err
 }

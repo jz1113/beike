@@ -1,12 +1,12 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func libraryDeleteHandler(cfg config.Config) http.HandlerFunc {
@@ -46,7 +46,7 @@ func libraryDeleteHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		count, err := database.DeleteLibraryAssets(r.Context(), db, httpx.WorkspaceFrom(r), assetType, ids, cfg.MediaReviewRoot())
+		count, err := dblibrary.DeleteLibraryAssets(r.Context(), db, httpx.WorkspaceFrom(r), assetType, ids, cfg.MediaReviewRoot())
 		if err != nil {
 			message := "操作失败，请稍后重试"
 			if err.Error() == "所选母组不存在或不可删除" {

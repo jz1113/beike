@@ -1,6 +1,7 @@
 package workshop
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func Review(cfg config.Config) http.Handler {
@@ -34,7 +34,7 @@ func Review(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		batch, err := database.ReadActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
+		batch, err := dbworkshop.ReadActiveWorkshopBatch(r.Context(), db, httpx.WorkspaceFrom(r))
 		if err != nil || batch.ID == "" || batch.Status == "archived" {
 			writeFail(w, http.StatusNotFound, "当前没有活跃批次", "not_found")
 			return
@@ -53,7 +53,7 @@ func Review(cfg config.Config) http.Handler {
 		review.ProductID = productID
 		review.TaskID = taskID
 		review.AssetIDs = assetIDs
-		if err := database.InsertOutputReview(r.Context(), db, httpx.WorkspaceFrom(r), review); err != nil {
+		if err := dbworkshop.InsertOutputReview(r.Context(), db, httpx.WorkspaceFrom(r), review); err != nil {
 			writeFail(w, http.StatusBadRequest, "审核提交失败", "bad_request")
 			return
 		}
@@ -61,37 +61,37 @@ func Review(cfg config.Config) http.Handler {
 	})
 }
 
-func parseReview(body []byte) (database.OutputReview, string) {
+func parseReview(body []byte) (dbworkshop.OutputReview, string) {
 	var raw map[string]any
 	if json.Unmarshal(body, &raw) != nil {
-		return database.OutputReview{}, "invalid"
+		return dbworkshop.OutputReview{}, "invalid"
 	}
 	decision, _ := raw["decision"].(string)
 	if decision != "accepted" && decision != "retry_requested" && decision != "rejected" {
-		return database.OutputReview{}, "invalid"
+		return dbworkshop.OutputReview{}, "invalid"
 	}
-	review := database.OutputReview{Decision: decision}
+	review := dbworkshop.OutputReview{Decision: decision}
 	if scores, ok := raw["scores"].(map[string]any); ok {
 		review.Fidelity, review.Composition, review.Aesthetic, review.Consistency = score(scores, "productFidelity"), score(scores, "composition"), score(scores, "aesthetic"), score(scores, "consistency")
 		if review.Fidelity == nil && scores["productFidelity"] != nil || review.Composition == nil && scores["composition"] != nil || review.Aesthetic == nil && scores["aesthetic"] != nil || review.Consistency == nil && scores["consistency"] != nil {
-			return database.OutputReview{}, "invalid"
+			return dbworkshop.OutputReview{}, "invalid"
 		}
 	}
 	if codes, ok := raw["reasonCodes"].([]any); ok {
 		if len(codes) > 32 {
-			return database.OutputReview{}, "invalid"
+			return dbworkshop.OutputReview{}, "invalid"
 		}
 		for _, code := range codes {
 			text, ok := code.(string)
 			if !ok {
-				return database.OutputReview{}, "invalid"
+				return dbworkshop.OutputReview{}, "invalid"
 			}
 			review.ReasonCodes = append(review.ReasonCodes, text)
 		}
 	}
 	if note, ok := raw["note"].(string); ok {
 		if utf8.RuneCountInString(note) > 2000 {
-			return database.OutputReview{}, "invalid"
+			return dbworkshop.OutputReview{}, "invalid"
 		}
 		review.Note = note
 	}

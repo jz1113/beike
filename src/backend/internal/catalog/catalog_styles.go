@@ -1,11 +1,11 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func styleRecipesHandler(cfg config.Config) http.HandlerFunc {
@@ -27,7 +27,7 @@ func styleRecipesHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		pageResult, err := database.ListStyleRecipes(r.Context(), db, httpx.WorkspaceFrom(r), r.URL.Query().Get("category"), page, pageSize)
+		pageResult, err := dbcatalog.ListStyleRecipes(r.Context(), db, httpx.WorkspaceFrom(r), r.URL.Query().Get("category"), page, pageSize)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
@@ -52,7 +52,7 @@ func styleRecipesDeleteHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		if err := database.DeleteStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id); err != nil {
+		if err := dbcatalog.DeleteStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id); err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
 		}

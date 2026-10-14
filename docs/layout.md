@@ -72,7 +72,7 @@ backend/
   internal/keywordreview/    关键词审核与提交保护；review 子包做提示词、结果校验与补救
   internal/modelgw/          上游模型提交
   internal/platform/collect  采集上游请求与响应
-  internal/platform/database 数据访问；migrate 做版本化迁移、checksum、备份与官方种子
+  internal/platform/database 连接与共用工具；library / catalog / workshop 子包按领域访问数据；migrate 做版本化迁移、checksum、备份与官方种子
   internal/platform/media    图片地址规范化
   internal/platform/mediasign 媒体读取签名
   internal/platform/network  出站拨号与私网拦截

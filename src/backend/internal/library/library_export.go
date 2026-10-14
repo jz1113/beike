@@ -1,12 +1,12 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryExport(cfg config.Config, w http.ResponseWriter, r *http.Request) {
@@ -16,7 +16,7 @@ func serveLibraryExport(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer db.Close()
-	exported, err := database.ExportLibrary(r.Context(), db, httpx.WorkspaceFrom(r))
+	exported, err := dblibrary.ExportLibrary(r.Context(), db, httpx.WorkspaceFrom(r))
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 		return

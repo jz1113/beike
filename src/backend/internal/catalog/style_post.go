@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func styleRecipesPostHandler(cfg config.Config) http.HandlerFunc {
@@ -38,12 +38,12 @@ func seedOfficialStyles(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer db.Close()
-	recipes, err := database.LoadOfficialMasterRecipes(filepath.Join(cfg.Root, "src/shared/data/officialMasterRecipes.json"))
+	recipes, err := dbcatalog.LoadOfficialMasterRecipes(filepath.Join(cfg.Root, "src/shared/data/officialMasterRecipes.json"))
 	if err != nil {
 		writeStyleFailure(w)
 		return
 	}
-	if err := database.UpsertOfficialMasterRecipes(r.Context(), db, recipes); err != nil {
+	if err := dbcatalog.UpsertOfficialMasterRecipes(r.Context(), db, recipes); err != nil {
 		writeStyleFailure(w)
 		return
 	}
@@ -68,7 +68,7 @@ func restoreStyleRecipe(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer db.Close()
-	status, err := database.RestoreOfficialStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id)
+	status, err := dbcatalog.RestoreOfficialStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id)
 	if err != nil {
 		writeStyleFailure(w)
 		return
@@ -99,7 +99,7 @@ func createStyleRecipe(cfg config.Config, w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer db.Close()
-	recipe, err := database.CreateStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), input)
+	recipe, err := dbcatalog.CreateStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), input)
 	if err != nil {
 		writeStyleFailure(w)
 		return
@@ -107,21 +107,21 @@ func createStyleRecipe(cfg config.Config, w http.ResponseWriter, r *http.Request
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "recipe": recipe})
 }
 
-func parseStyleCreate(body []byte) (database.StyleRecipeInput, int, string) {
+func parseStyleCreate(body []byte) (dbcatalog.StyleRecipeInput, int, string) {
 	var object map[string]any
 	if json.Unmarshal(body, &object) != nil {
-		return database.StyleRecipeInput{}, http.StatusInternalServerError, "架构操作失败，请稍后重试。"
+		return dbcatalog.StyleRecipeInput{}, http.StatusInternalServerError, "架构操作失败，请稍后重试。"
 	}
 	name, _ := object["name"].(string)
 	snippet, _ := object["promptSnippet"].(string)
 	if name == "" || snippet == "" {
-		return database.StyleRecipeInput{}, http.StatusBadRequest, "缺少风格名称或提示词配方内容"
+		return dbcatalog.StyleRecipeInput{}, http.StatusBadRequest, "缺少风格名称或提示词配方内容"
 	}
 	category := "general"
 	if text, ok := object["category"].(string); ok {
 		category = text
 	}
-	return database.StyleRecipeInput{
+	return dbcatalog.StyleRecipeInput{
 		Name: name, Category: category, Tag: stringOrEmpty(object["tag"]), Desc: stringOrEmpty(object["desc"]),
 		PromptSnippet: snippet, CoverURL: stringOrEmpty(object["coverUrl"]),
 		SampleImages: sampleImagesValue(object["sampleImages"]), SourceURL: stringOrEmpty(object["sourceUrl"]),

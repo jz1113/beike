@@ -1,6 +1,7 @@
 package assets
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func assetLifecycleHandler(cfg config.Config, action string) http.HandlerFunc {
@@ -40,9 +40,9 @@ func assetLifecycleHandler(cfg config.Config, action string) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		registry, err := database.ApplyAssetLifecycle(r.Context(), db, httpx.WorkspaceFrom(r), assetType, r.PathValue("id"), action, reason)
+		registry, err := dblibrary.ApplyAssetLifecycle(r.Context(), db, httpx.WorkspaceFrom(r), assetType, r.PathValue("id"), action, reason)
 		if err != nil {
-			var lifecycle *database.LifecycleError
+			var lifecycle *dblibrary.LifecycleError
 			if errors.As(err, &lifecycle) {
 				httpx.WriteJSON(w, lifecycle.Status, map[string]any{
 					"success": false, "error": lifecycle.Message, "code": lifecycle.Code,

@@ -1,13 +1,14 @@
 package library
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func classifyLibraryAssets(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) {
@@ -22,7 +23,7 @@ func classifyLibraryAssets(cfg config.Config, w http.ResponseWriter, r *http.Req
 		return
 	}
 	defer db.Close()
-	organization, err := database.ClassifyAssets(r.Context(), db, httpx.WorkspaceFrom(r), assetType, ids, categories, universal)
+	organization, err := dblibrary.ClassifyAssets(r.Context(), db, httpx.WorkspaceFrom(r), assetType, ids, categories, universal)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -42,7 +43,7 @@ func moveLibraryPromptGroups(cfg config.Config, w http.ResponseWriter, r *http.R
 		return
 	}
 	defer db.Close()
-	result, err := database.MovePromptGroups(r.Context(), db, httpx.WorkspaceFrom(r), ids, categoryID, subcategory)
+	result, err := dbcatalog.MovePromptGroups(r.Context(), db, httpx.WorkspaceFrom(r), ids, categoryID, subcategory)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return
@@ -108,7 +109,7 @@ func archiveLibraryFolders(cfg config.Config, w http.ResponseWriter, r *http.Req
 		return
 	}
 	defer db.Close()
-	result, err := database.ArchivePromptFolders(r.Context(), db, httpx.WorkspaceFrom(r), ids, parentID)
+	result, err := dbcatalog.ArchivePromptFolders(r.Context(), db, httpx.WorkspaceFrom(r), ids, parentID)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return

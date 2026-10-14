@@ -1,11 +1,11 @@
 package assets
 
 import (
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func assetTasksHandler(cfg config.Config) http.HandlerFunc {
@@ -17,7 +17,7 @@ func assetTasksHandler(cfg config.Config) http.HandlerFunc {
 		}
 		defer db.Close()
 		if id := r.URL.Query().Get("id"); id != "" {
-			task, ok, err := database.FindImageTask(r.Context(), db, httpx.WorkspaceFrom(r), id)
+			task, ok, err := dbworkshop.FindImageTask(r.Context(), db, httpx.WorkspaceFrom(r), id)
 			if err != nil {
 				httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "获取任务失败"})
 				return
@@ -31,7 +31,7 @@ func assetTasksHandler(cfg config.Config) http.HandlerFunc {
 		}
 		page := boundedInt(httpx.QueryInt(r, "page", 1), 1, 1_000_000)
 		pageSize := boundedInt(httpx.QueryInt(r, "pageSize", 100), 1, 200)
-		total, tasks, err := database.ListImageTasks(r.Context(), db, httpx.WorkspaceFrom(r), database.TaskQuery{
+		total, tasks, err := dbworkshop.ListImageTasks(r.Context(), db, httpx.WorkspaceFrom(r), dbworkshop.TaskQuery{
 			ProductID: r.URL.Query().Get("productId"),
 			Status:    r.URL.Query().Get("status"),
 			Search:    r.URL.Query().Get("search"),

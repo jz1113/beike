@@ -89,7 +89,7 @@ func PublishKeywordRules(ctx context.Context, db *sql.DB, workspace string, base
 		return RuleRevision{}, err
 	}
 	created := time.Now().UTC()
-	id, err := newID()
+	id, err := NewID()
 	if err != nil {
 		return RuleRevision{}, err
 	}
@@ -109,11 +109,11 @@ func PublishKeywordRules(ctx context.Context, db *sql.DB, workspace string, base
 	return RuleRevision{Version: current + 1, Entries: entries, Note: note, CreatedAt: created.Format("2006-01-02T15:04:05.000Z")}, nil
 }
 
-type scanner interface {
+type Scanner interface {
 	Scan(dest ...any) error
 }
 
-func scanRevision(row scanner) (RuleRevision, error) {
+func scanRevision(row Scanner) (RuleRevision, error) {
 	var version int
 	var entriesJSON, note, created string
 	if err := row.Scan(&version, &entriesJSON, &note, &created); err != nil {
@@ -126,10 +126,10 @@ func scanRevision(row scanner) (RuleRevision, error) {
 	if entries == nil {
 		entries = []RuleEntry{}
 	}
-	return RuleRevision{Version: version, Entries: entries, Note: note, CreatedAt: formatSQLiteTime(created)}, nil
+	return RuleRevision{Version: version, Entries: entries, Note: note, CreatedAt: FormatSQLiteTime(created)}, nil
 }
 
-func formatSQLiteTime(raw string) string {
+func FormatSQLiteTime(raw string) string {
 	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05.000Z"} {
 		if parsed, err := time.Parse(layout, raw); err == nil {
 			return parsed.UTC().Format("2006-01-02T15:04:05.000Z")
@@ -138,7 +138,7 @@ func formatSQLiteTime(raw string) string {
 	return raw
 }
 
-func newID() (string, error) {
+func NewID() (string, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
 		return "", err

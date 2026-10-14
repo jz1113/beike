@@ -1,13 +1,13 @@
 package catalog
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"io"
 	"net/http"
 	"path/filepath"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func categoriesHandler(cfg config.Config) http.HandlerFunc {
@@ -18,7 +18,7 @@ func categoriesHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		categories, err := database.ListServerSubCategories(r.Context(), db, httpx.WorkspaceFrom(r), filepath.Join(cfg.Root, "src/shared/data/defaultSubCategories.json"))
+		categories, err := dbcatalog.ListServerSubCategories(r.Context(), db, httpx.WorkspaceFrom(r), filepath.Join(cfg.Root, "src/shared/data/defaultSubCategories.json"))
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
@@ -45,7 +45,7 @@ func categoryPreviewHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		preview, err := database.PreviewCategoryMigration(r.Context(), db, httpx.WorkspaceFrom(r), filepath.Join(cfg.Root, "src/shared/data/defaultSubCategories.json"), local)
+		preview, err := dbcatalog.PreviewCategoryMigration(r.Context(), db, httpx.WorkspaceFrom(r), filepath.Join(cfg.Root, "src/shared/data/defaultSubCategories.json"), local)
 		if err != nil {
 			writeCategoryPreviewError(w)
 			return
@@ -72,7 +72,7 @@ func categoryApplyHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		categories, err := database.ApplyCategoryMigration(r.Context(), db, httpx.WorkspaceFrom(r), filepath.Join(cfg.Root, "src/shared/data/defaultSubCategories.json"), items)
+		categories, err := dbcatalog.ApplyCategoryMigration(r.Context(), db, httpx.WorkspaceFrom(r), filepath.Join(cfg.Root, "src/shared/data/defaultSubCategories.json"), items)
 		if err != nil {
 			writeCategoryApplyError(w)
 			return

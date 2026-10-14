@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -14,7 +15,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -83,7 +83,7 @@ func checkOneSource(ctx context.Context, db *sql.DB, workspace, rawURL string, s
 		reason := "短链接未能识别笔记，请复制笔记的完整链接后重试"
 		return sourceCheckItem{URL: rawURL, State: "error", Reason: &reason}
 	}
-	row, err := database.LookupImportSource(ctx, db, workspace, key)
+	row, err := dblibrary.LookupImportSource(ctx, db, workspace, key)
 	if err != nil {
 		reason := "查重失败"
 		return sourceCheckItem{URL: rawURL, State: "error", Reason: &reason}

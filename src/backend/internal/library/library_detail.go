@@ -1,13 +1,13 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"errors"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryDetail(cfg config.Config, w http.ResponseWriter, r *http.Request, assetType, id string) {
@@ -19,13 +19,13 @@ func serveLibraryDetail(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	defer db.Close()
 	var item json.RawMessage
 	if assetType == "scene" || assetType == "scene_bundle" {
-		item, err = database.LibrarySceneDetail(r.Context(), db, httpx.WorkspaceFrom(r), id)
+		item, err = dblibrary.LibrarySceneDetail(r.Context(), db, httpx.WorkspaceFrom(r), id)
 	} else if assetType == "full_prompt" {
-		item, err = database.LibraryPromptDetail(r.Context(), db, httpx.WorkspaceFrom(r), id)
+		item, err = dblibrary.LibraryPromptDetail(r.Context(), db, httpx.WorkspaceFrom(r), id)
 	} else {
-		item, err = database.LibraryDetail(r.Context(), db, httpx.WorkspaceFrom(r), assetType, id)
+		item, err = dblibrary.LibraryDetail(r.Context(), db, httpx.WorkspaceFrom(r), assetType, id)
 	}
-	if errors.Is(err, database.ErrLibraryDetailMissing) {
+	if errors.Is(err, dblibrary.ErrLibraryDetailMissing) {
 		httpx.WriteJSON(w, http.StatusNotFound, struct {
 			Success bool   `json:"success"`
 			Error   string `json:"error"`

@@ -1,13 +1,13 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"database/sql"
 	"fmt"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func serveLibraryPurge(cfg config.Config, w http.ResponseWriter, r *http.Request) {
@@ -17,7 +17,7 @@ func serveLibraryPurge(cfg config.Config, w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer db.Close()
-	result, err := database.PurgeSeedAssets(r.Context(), db, httpx.WorkspaceFrom(r))
+	result, err := dblibrary.PurgeSeedAssets(r.Context(), db, httpx.WorkspaceFrom(r))
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 		return
@@ -50,7 +50,7 @@ func serveLibraryDedup(cfg config.Config, w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer db.Close()
-	migrated, cleaned, err := database.DeduplicateLibrary(r.Context(), db, httpx.WorkspaceFrom(r))
+	migrated, cleaned, err := dblibrary.DeduplicateLibrary(r.Context(), db, httpx.WorkspaceFrom(r))
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 		return
@@ -65,13 +65,13 @@ func serveLibraryDedup(cfg config.Config, w http.ResponseWriter, r *http.Request
 
 func serveLibraryClearType(cfg config.Config, w http.ResponseWriter, r *http.Request, target string) {
 	serveLibraryClear(cfg, w, r, func(db *sql.DB) (int, error) {
-		return database.ClearLibraryType(r.Context(), db, httpx.WorkspaceFrom(r), target)
+		return dblibrary.ClearLibraryType(r.Context(), db, httpx.WorkspaceFrom(r), target)
 	}, "已彻底清空 %d 条资产")
 }
 
 func serveLibraryClearWorkspace(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 	serveLibraryClear(cfg, w, r, func(db *sql.DB) (int, error) {
-		return database.ClearLocalWorkspace(r.Context(), db, httpx.WorkspaceFrom(r))
+		return dblibrary.ClearLocalWorkspace(r.Context(), db, httpx.WorkspaceFrom(r))
 	}, "已清空当前工作区的 %d 条记录，官方资产保留")
 }
 

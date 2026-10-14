@@ -1,13 +1,13 @@
 package library
 
 import (
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func saveLibrarySubcategory(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) {
@@ -22,7 +22,7 @@ func saveLibrarySubcategory(cfg config.Config, w http.ResponseWriter, r *http.Re
 		return
 	}
 	defer db.Close()
-	organization, err := database.SavePromptSubcategory(r.Context(), db, httpx.WorkspaceFrom(r), parentID, value, name)
+	organization, err := dbcatalog.SavePromptSubcategory(r.Context(), db, httpx.WorkspaceFrom(r), parentID, value, name)
 	if err != nil {
 		writeLibraryMutationError(w, err.Error())
 		return

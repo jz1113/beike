@@ -1,11 +1,11 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func motherReplacementHandler(cfg config.Config) http.HandlerFunc {
@@ -21,7 +21,7 @@ func motherReplacementHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		state, err := database.MotherReplacementState(r.Context(), db, httpx.WorkspaceFrom(r), id)
+		state, err := dblibrary.MotherReplacementState(r.Context(), db, httpx.WorkspaceFrom(r), id)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取母组换图状态失败"})
 			return
