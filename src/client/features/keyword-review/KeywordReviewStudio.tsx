@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  BookOpen, Download, FileSpreadsheet, Layers, Loader2, Play,
+  BookOpen, Download, FilePen, FileSpreadsheet, Layers, Loader2, Play,
   RefreshCcw, Settings2, Square, UploadCloud,
 } from 'lucide-react';
+import { ToolSuiteMark } from '@client/shared/icons';
 import { KeywordReviewRulesDialog } from './components/KeywordReviewRulesDialog';
 import { KeywordReviewSettingsDialog } from './components/KeywordReviewSettingsDialog';
 import { useKeywordReview } from './hooks/useKeywordReview';
@@ -64,7 +65,9 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-slate-900">
       <header className="flex min-h-[72px] shrink-0 flex-wrap items-center justify-between py-3 gap-3 px-4 sm:px-6 lg:px-8">
         <button type="button" onClick={onBack} aria-label="词包审核，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white">
-          <img src="/brand/keyword-pack.jpg" alt="" draggable={false} className="h-8 w-auto max-w-16 shrink-0 object-contain" />
+          <ToolSuiteMark>
+            <FilePen className="h-4 w-4 stroke-[2]" />
+          </ToolSuiteMark>
           <span className="text-sm font-black tracking-tight">词包审核</span>
         </button>
         <div className="flex min-w-0 flex-wrap items-center gap-2">

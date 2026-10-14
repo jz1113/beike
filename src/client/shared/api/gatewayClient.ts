@@ -51,6 +51,52 @@ export function getGatewayClientOverrides(): {
   };
 }
 
+/** 根据模型 ID 获取其绑定的专属服务商凭证 */
+export function getModelCredentials(modelId?: string): {
+  baseUrl?: string;
+  apiKey?: string;
+} {
+  if (!modelId || typeof window === 'undefined') return {};
+  try {
+    const rawModels = localStorage.getItem('custom_models');
+    if (rawModels) {
+      const models = JSON.parse(rawModels);
+      if (Array.isArray(models)) {
+        const target = models.find((m: { id?: string; routeId?: string; customBaseUrl?: string; customApiKey?: string; providerId?: string; channel?: string }) =>
+          m.id === modelId || m.routeId === modelId
+        );
+        if (target) {
+          if (target.customBaseUrl || target.customApiKey) {
+            return {
+              baseUrl: target.customBaseUrl || undefined,
+              apiKey: target.customApiKey || undefined,
+            };
+          }
+          const providerId = target.providerId || target.channel;
+          if (providerId) {
+            const rawProviders = localStorage.getItem('beike_api_providers_v2');
+            if (rawProviders) {
+              const providers = JSON.parse(rawProviders);
+              if (Array.isArray(providers)) {
+                const p = providers.find((item: { id?: string; baseUrl?: string; apiKey?: string }) => item.id === providerId);
+                if (p && (p.baseUrl || p.apiKey)) {
+                  return {
+                    baseUrl: p.baseUrl || undefined,
+                    apiKey: p.apiKey || undefined,
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // 忽略存储读取异常
+  }
+  return {};
+}
+
 /** Visual requests follow the selected model route, never the vendor name or bare model ID. */
 export function getMultimodalClientOverrides(modelId: string): {
   customBaseUrl?: string;
@@ -58,12 +104,23 @@ export function getMultimodalClientOverrides(modelId: string): {
   apiFormat?: 'openai-responses';
   allowInsecureHttp?: boolean;
 } {
+  // 1. 优先检查模型是否配置了专属服务商凭证
+  const modelCreds = getModelCredentials(modelId);
+  if (modelCreds.baseUrl || modelCreds.apiKey) {
+    return {
+      customBaseUrl: modelCreds.baseUrl,
+      customApiKey: modelCreds.apiKey,
+    };
+  }
+
+  // 2. DeepSeek 原生路由
   if (isDeepSeekRoute(modelId)) {
     if (!deepSeekModel(modelId)) throw new Error('此 DeepSeek 官方模型尚未适配');
     const key = localStorage.getItem('deepseek_api_key')?.trim();
     if (!key) throw new Error('请先在渠道管理中保存 DeepSeek 官方 API Key');
     return { customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: key };
   }
+
   const primary = getGatewayClientOverrides();
   if (!isOpenAIModelRouteId(modelId)) return primary;
   if (typeof localStorage === 'undefined' || localStorage.getItem('openai_responses_enabled') !== 'true') {
@@ -82,11 +139,15 @@ export function getMultimodalClientOverrides(modelId: string): {
   };
 }
 
-export function getGatewayClientHeaders(): Record<string, string> {
+export function getGatewayClientHeaders(modelId?: string): Record<string, string> {
+  const modelCreds = getModelCredentials(modelId);
   const { customBaseUrl, customApiKey, customWanbangKey, customWanbangSecret } = getGatewayClientOverrides();
+  const effectiveBaseUrl = modelCreds.baseUrl || customBaseUrl;
+  const effectiveApiKey = modelCreds.apiKey || customApiKey;
+
   const headers: Record<string, string> = {};
-  if (customBaseUrl) headers['x-custom-base-url'] = customBaseUrl;
-  if (customApiKey) headers['x-custom-api-key'] = customApiKey;
+  if (effectiveBaseUrl) headers['x-custom-base-url'] = effectiveBaseUrl;
+  if (effectiveApiKey) headers['x-custom-api-key'] = effectiveApiKey;
   const lianchiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('lianchi_api_key')?.trim() : '';
   if (lianchiKey) headers['x-lianchi-api-key'] = lianchiKey;
   if (customWanbangKey) headers['x-wanbang-key'] = customWanbangKey;

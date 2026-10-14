@@ -11,7 +11,11 @@ export interface WorkflowModel {
   routeId?: string;
   /** Whether this route is offered in business model selectors; capabilities remain unchanged. */
   enabled?: boolean;
-  channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi';
+  channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi' | (string & {});
+  providerId?: string;
+  customBaseUrl?: string;
+  customApiKey?: string;
+  apiTemplate?: string;
   name: string;
   shortName: string;
   badge?: string;

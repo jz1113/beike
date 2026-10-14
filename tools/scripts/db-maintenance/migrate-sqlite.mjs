@@ -11,7 +11,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const databaseFile = resolveSqliteFile(process.argv[2]);
 
 function resolveGo() {
-  const candidates = [process.env.GO_BIN, 'go', join(homedir(), '.local/go/bin/go')].filter(Boolean);
+  const candidates = [
+    process.env.GO_BIN,
+    'go',
+    join(homedir(), '.local/go/bin/go'),
+    ...(process.platform === 'win32'
+      ? ['C:\\Program Files\\Go\\bin\\go.exe', 'C:\\Go\\bin\\go.exe', join(homedir(), 'go/bin/go.exe')]
+      : []),
+  ].filter(Boolean);
   for (const candidate of candidates) {
     if (candidate === 'go' || existsSync(candidate)) {
       if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;

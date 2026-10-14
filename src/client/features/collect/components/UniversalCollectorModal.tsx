@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, FileSpreadsheet, FileVideo } from 'lucide-react';
+import { Download, Sparkles, FileSpreadsheet, FileVideo } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
+import { ToolSuiteMark } from '@client/shared/icons';
 import {
   type BatchTaskItem,
   buildCollectorAIAssistantPayload,
@@ -188,7 +189,9 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             aria-label="返回首页"
             title="返回首页"
           >
-            <img src="/brand/content-collect.jpg" alt="" draggable={false} className="h-8 w-8 shrink-0 object-contain" />
+            <ToolSuiteMark>
+              <Download className="h-4 w-4 stroke-[2]" />
+            </ToolSuiteMark>
             <span className="text-sm font-black tracking-tight">内容采集</span>
           </button>
         </header>

@@ -1,7 +1,7 @@
-import { Frame, PanelLeft, PanelLeftClose, Settings } from 'lucide-react';
+import { FolderOpen, PanelLeft, PanelLeftClose, Settings, Sparkle, Wrench } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import type { AppView } from '@client/store/appView';
-import { NavHomeIcon } from '@client/shared/icons';
+import { useToast } from '@client/shared/hooks/useToast';
 import { SidebarHistory } from './SidebarHistory';
 
 const SIDEBAR_COLLAPSED_KEY = 'beike.sidebar.collapsed';
@@ -9,12 +9,10 @@ const SIDEBAR_COLLAPSED_KEY = 'beike.sidebar.collapsed';
 interface Props {
   currentView: AppView;
   onNavigateHub: () => void;
-  onNavigateCanvas: () => void;
   onNavigateAssets: () => void;
   onOpenSettings: () => void;
   onOpenSession: (id: string) => void;
   onCreateConversation: () => void;
-  onOpenCanvasProject: (id: string) => void;
 }
 
 function readCollapsed() {
@@ -31,17 +29,6 @@ function SidebarTooltip({ children, desktopHidden = false }: { children: string;
     <span aria-hidden="true" className={`pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 translate-x-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-white opacity-0 shadow-lg transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 ${desktopHidden ? 'md:hidden' : ''}`}>
       {children}
     </span>
-  );
-}
-
-function NavAssetsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-[20px] w-[20px]">
-      <rect x="2.5" y="5.5" width="19" height="15" rx="3.5" className="stroke-current" strokeWidth="1.8" />
-      <path d="M6 3.5H18" className="stroke-current" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="8" cy="10.5" r="1.5" className="fill-current" />
-      <path d="M21 16.5L15.5 12L6.5 19.5" className="stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
@@ -82,15 +69,14 @@ function NavItem({
 export default function AppSidebar({
   currentView,
   onNavigateHub,
-  onNavigateCanvas,
   onNavigateAssets,
   onOpenSettings,
   onOpenSession,
   onCreateConversation,
-  onOpenCanvasProject,
 }: Props) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [logoHover, setLogoHover] = useState(false);
+  const { message: toastMsg, show: showToast } = useToast(2500);
   const showLabel = !collapsed;
   const showExpandOnLogo = collapsed && logoHover;
 
@@ -161,21 +147,21 @@ export default function AppSidebar({
             active={currentView === 'home'}
             onClick={onNavigateHub}
             showLabel={showLabel}
-            icon={<NavHomeIcon active={currentView === 'home'} className="h-[20px] w-[20px]" />}
+            icon={<Sparkle className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
-            label="画布"
-            active={currentView === 'canvas'}
-            onClick={onNavigateCanvas}
+            label="技能"
+            active={false}
+            onClick={() => showToast('技能功能建设中，敬请期待')}
             showLabel={showLabel}
-            icon={<Frame className="h-[20px] w-[20px]" strokeWidth={1.8} />}
+            icon={<Wrench className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
             label="资产"
             active={currentView === 'assets'}
             onClick={onNavigateAssets}
             showLabel={showLabel}
-            icon={<NavAssetsIcon />}
+            icon={<FolderOpen className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
         </nav>
       </div>
@@ -186,7 +172,6 @@ export default function AppSidebar({
             currentView={currentView}
             onOpenSession={onOpenSession}
             onCreateConversation={onCreateConversation}
-            onOpenCanvasProject={onOpenCanvasProject}
           />
         </div>
       )}
@@ -200,6 +185,16 @@ export default function AppSidebar({
           icon={<Settings className="h-[20px] w-[20px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />}
         />
       </div>
+
+      {toastMsg && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-xl bg-slate-900/90 backdrop-blur text-white text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700/80 pointer-events-none animate-fade-in"
+        >
+          <span>{toastMsg}</span>
+        </div>
+      )}
     </aside>
   );
 }

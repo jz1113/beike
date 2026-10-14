@@ -16,7 +16,7 @@ export function modelChannel(model: Pick<WorkflowModel, 'channel' | 'id'>): Mode
   return model.channel ?? (model.id === 'openai/gpt-image-2' ? 'lianchi' : 'comfly');
 }
 export function channelName(channel: ModelChannel): string {
-  return MODEL_CHANNELS.find(item => item.id === channel)!.name;
+  return MODEL_CHANNELS.find(item => item.id === channel)?.name || channel;
 }
 export function matchesCapability(model: WorkflowModel, filter: CapabilityFilter): boolean {
   if (model.channel === 'deepseek') return filter === 'all' || (filter === 'text' ? !!model.isAssistant : filter === 'multimodal' && !!model.isVision);

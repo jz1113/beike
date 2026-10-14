@@ -1,6 +1,8 @@
 import React from 'react';
+import { ShoppingBag } from 'lucide-react';
 import type { WorkshopTab } from '@client/store/types';
 import { useAppStore } from '@client/store';
+import { ToolSuiteMark } from '@client/shared/icons';
 
 export interface WorkshopTopBarProps {
   assetToolbarRef?: React.Ref<HTMLDivElement>;
@@ -29,7 +31,9 @@ export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarPro
         className="group flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-black tracking-tight text-slate-900 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white select-none cursor-pointer active:scale-98"
         title={`${studioTitle} · 点击返回首页`}
       >
-        <img src="/brand/commerce-workshop.jpg" alt="" draggable={false} className="h-8 w-8 shrink-0 object-contain" />
+        <ToolSuiteMark>
+          <ShoppingBag className="h-4 w-4 stroke-[2]" />
+        </ToolSuiteMark>
         <span className="truncate leading-none">{studioTitle}</span>
       </button>
 

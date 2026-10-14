@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useAppStore } from '@client/store';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { useQuickRefMediaDrop } from '@client/shared/hooks/useQuickRefMediaDrop';
+import { useToast } from '@client/shared/hooks/useToast';
 import PromptActionBar from '@client/shared/prompt-bar';
 import FeatureCapsules from './components/FeatureCapsules';
 import InspirationFeed from './components/inspiration/InspirationFeed';
@@ -33,7 +34,9 @@ export default function HomePage({
   const setQuickVideoAspectId = useAppStore((s) => s.setQuickVideoAspectId);
   const setQuickVideoResolution = useAppStore((s) => s.setQuickVideoResolution);
 
-  const { dropZoneProps: pageMediaDropProps, toastMsg } = useQuickRefMediaDrop();
+  const { dropZoneProps: pageMediaDropProps, toastMsg: dropToastMsg } = useQuickRefMediaDrop();
+  const { message: featureToastMsg, show: showFeatureToast } = useToast();
+  const activeToast = featureToastMsg || dropToastMsg;
 
   const handleUsePrompt = (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => {
     setHomeMode('generate');
@@ -67,9 +70,9 @@ export default function HomePage({
       {...pageMediaDropProps}
       className="flex-1 min-w-0 w-full overflow-y-auto bg-transparent text-slate-900 select-none pb-16 relative"
     >
-      {toastMsg && (
+      {activeToast && (
         <div className="pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold shadow-xl">
-          {toastMsg}
+          {activeToast}
         </div>
       )}
       <div className="w-full px-4 pb-5 pt-7 sm:px-6 sm:pt-10 lg:px-8 2xl:px-10">
@@ -112,6 +115,7 @@ export default function HomePage({
                   onOpenHeadlinePoster={onOpenHeadlinePoster}
                   onOpenKeywordReview={onOpenKeywordReview}
                   onOpenCollectorHub={onOpenCollectorHub}
+                  onPlaceholderClick={(title) => showFeatureToast(`「${title}」功能正在开发中，敬请期待`)}
                 />
               </div>
             </div>

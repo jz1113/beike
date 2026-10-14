@@ -234,10 +234,6 @@ export default function App() {
             <AppSidebar
               currentView={currentView}
               onNavigateHub={() => setCurrentView('home')}
-              onNavigateCanvas={() => {
-                useCanvasStore.getState().selectProject(null);
-                setCurrentView('canvas');
-              }}
               onNavigateAssets={() => setCurrentView('assets')}
               onOpenSettings={navigateToSettings}
               onOpenSession={(id) => {
@@ -247,10 +243,6 @@ export default function App() {
               onCreateConversation={() => {
                 useAppStore.getState().createSession();
                 setCurrentView('generate');
-              }}
-              onOpenCanvasProject={(id) => {
-                useCanvasStore.getState().selectProject(id);
-                setCurrentView('canvas');
               }}
             />
           )}

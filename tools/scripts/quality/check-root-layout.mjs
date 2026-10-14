@@ -12,7 +12,7 @@ const workspaceRoot = path.resolve(scriptDir, '../../..');
 
 const REQUIRED_DIRS = ['src/client', 'src/backend', 'src/shared/contracts', 'src/shared/domain', 'database', 'src/client/public', 'tools/configs', 'tools/scripts', 'docs', 'tools/deploy'];
 const FORBIDDEN_DIRS = ['public', 'deploy', 'dist', '工程', '依赖', 'docs/API文档', 'docs/打包', 'app', 'db', 'desktop', 'works', 'apps', 'packages', 'pnpm-workspace.yaml', 'database/backups'];
-const ROOT_CHINESE_ALLOWLIST = new Set(['启动贝壳云图.command']);
+const ROOT_CHINESE_ALLOWLIST = new Set(['启动贝壳云图.command', '启动贝壳云图.bat', '启动贝壳云图.ps1']);
 const ROOT_DIRECTORIES = new Set(['src', 'database', 'node_modules', 'docs', 'tools', 'api', 'tests']);
 
 const errors = [];

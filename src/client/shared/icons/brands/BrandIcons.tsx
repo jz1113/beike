@@ -1,8 +1,8 @@
 import React from 'react';
 
 /**
- * 创作工具统一标识底座：三个工作台以不同线性图标区分功能，
- * 但共享尺寸、圆角与品牌渐变，避免在顶部出现三套不相干的 Logo。
+ * 创作工具统一标识底座：各工作台以不同线性图标区分功能，
+ * 共享尺寸、圆角与中性色调底座，与首页功能胶囊风格保持一致。
  */
 export function ToolSuiteMark({
   children,
@@ -12,7 +12,7 @@ export function ToolSuiteMark({
   className?: string;
 }) {
   return (
-    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 text-white shadow-sm shadow-indigo-500/25 transition-transform group-hover:scale-105 ${className}`}>
+    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-800 transition-transform group-hover:scale-105 ${className}`}>
       {children}
     </span>
   );

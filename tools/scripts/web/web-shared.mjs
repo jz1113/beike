@@ -180,15 +180,26 @@ export function buildApiEnv({ apiPort, appDataDir, accessToken, extra = {} }) {
 }
 
 export function gatewayBinary(workspaceRoot) {
-  return join(workspaceRoot, 'tools/build/beike-api');
+  const binary = process.platform === 'win32' ? 'beike-api.exe' : 'beike-api';
+  return join(workspaceRoot, 'tools/build', binary);
 }
 
 export function resolveGo() {
-  const candidates = [process.env.GO_BIN, 'go', join(homedir(), '.local/go/bin/go')].filter(Boolean);
+  const candidates = [
+    process.env.GO_BIN,
+    'go',
+    join(homedir(), '.local/go/bin/go'),
+    ...(process.platform === 'win32'
+      ? ['C:\\Program Files\\Go\\bin\\go.exe', 'C:\\Go\\bin\\go.exe', join(homedir(), 'go/bin/go.exe')]
+      : []),
+  ].filter(Boolean);
   for (const candidate of candidates) {
     if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;
   }
-  throw new Error('未找到 Go 1.23 或更高版本。可安装到 ~/.local/go，或设置 GO_BIN');
+  const hint = process.platform === 'win32'
+    ? '未找到 Go 1.23 或更高版本。请安装 Go（https://golang.google.cn/dl/）或设置 GO_BIN 环境变量'
+    : '未找到 Go 1.23 或更高版本。可安装到 ~/.local/go，或设置 GO_BIN';
+  throw new Error(hint);
 }
 
 export function buildGateway(workspaceRoot) {

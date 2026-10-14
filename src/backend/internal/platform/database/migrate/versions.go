@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"strings"
 )
 
 //go:embed sources
@@ -14,7 +15,7 @@ func sourceText(name string) string {
 	if err != nil {
 		panic(err)
 	}
-	return string(raw)
+	return strings.ReplaceAll(string(raw), "\r\n", "\n")
 }
 
 type migration struct {

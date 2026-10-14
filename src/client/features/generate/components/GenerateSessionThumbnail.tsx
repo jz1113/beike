@@ -131,10 +131,11 @@ export function GenerateSessionThumbnail({ sess }: {
     );
   }
 
-  // 🌟 2. 无图片/草稿对话（对齐图 2）：白底细边框 1:1 正方形卡片，居中圆润气泡图标
+  // 🌟 2. 无图片/草稿对话：透明背景无边框，居中气泡图标
   return (
-    <div className="w-11 h-11 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center flex-shrink-0 shadow-2xs">
-      <MessageSquare className="w-5 h-5 text-slate-400 stroke-[1.8]" />
+    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+      <MessageSquare className="h-5 w-5 stroke-[1.8] text-slate-400" />
+      {sess.isPinned && <div className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-500 z-10" />}
     </div>
   );
 }

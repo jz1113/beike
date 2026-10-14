@@ -162,7 +162,7 @@ export async function submitImageGenTaskResult(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getGatewayClientHeaders(),
+          ...getGatewayClientHeaders(typeof payload.model === 'string' ? payload.model : undefined),
           ...storageConfigHeaders(),
           ...(deps.idempotencyKey ? { 'x-idempotency-key': deps.idempotencyKey } : {}),
         },

@@ -18,6 +18,7 @@ const files = {
   'src/backend/internal/assistant/assistantTools.json': OPENAI_TOOLS,
 };
 const write = process.argv.includes('--write');
+const normalizeLf = (s) => s.replace(/\r\n/g, '\n');
 for (const [relative, value] of Object.entries(files)) {
   const target = path.join(root, relative);
   const rendered = `${JSON.stringify(value, null, 2)}\n`;
@@ -25,7 +26,7 @@ for (const [relative, value] of Object.entries(files)) {
     fs.writeFileSync(target, rendered);
     continue;
   }
-  if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8') !== rendered) {
+  if (!fs.existsSync(target) || normalizeLf(fs.readFileSync(target, 'utf8')) !== normalizeLf(rendered)) {
     console.error(`[shared-data] ${relative} 与当前目录不一致。运行 node --import tsx tools/scripts/quality/check-shared-data.mjs --write`);
     process.exit(1);
   }

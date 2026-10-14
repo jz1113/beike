@@ -3,31 +3,24 @@ import { createPortal } from 'react-dom';
 import { ChevronRight, MoreHorizontal, Pencil, Pin, SquarePen, Trash2, X } from 'lucide-react';
 import { useAppStore } from '@client/store';
 import { GenerateSessionThumbnail } from '@client/features/generate/components/GenerateSessionThumbnail';
-import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
-import { visibleCanvasProjects } from '@client/features/canvas/store/canvasProjectDefaults';
 
 interface Props {
   currentView: string;
   onOpenSession: (id: string) => void;
   onCreateConversation: () => void;
-  onOpenCanvasProject: (id: string) => void;
 }
 
 export function SidebarHistory({
   currentView,
   onOpenSession,
   onCreateConversation,
-  onOpenCanvasProject,
 }: Props) {
   const sessions = useAppStore((s) => s.sessions);
   const currentSessionId = useAppStore((s) => s.currentSessionId);
   const renameSession = useAppStore((s) => s.renameSession);
   const pinSession = useAppStore((s) => s.pinSession);
   const deleteSession = useAppStore((s) => s.deleteSession);
-  const projects = useCanvasStore((s) => s.projects);
-  const canvases = visibleCanvasProjects(projects);
   const [chatsOpen, setChatsOpen] = useState(true);
-  const [canvasesOpen, setCanvasesOpen] = useState(true);
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -113,27 +106,6 @@ export function SidebarHistory({
                 </div>
               );
             })}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <button type="button" onClick={() => setCanvasesOpen((open) => !open)} className="flex items-center gap-1 px-1 text-[13px] font-medium text-slate-500" aria-expanded={canvasesOpen}>
-          画布
-          <ChevronRight className={`h-3.5 w-3.5 transition-transform ${canvasesOpen ? 'rotate-90' : ''}`} />
-        </button>
-        {canvasesOpen && (
-          <div className="mt-1 space-y-0.5">
-            {canvases.length === 0 ? (
-              <p className="px-2 py-2 text-[12px] text-slate-400">暂无历史画布</p>
-            ) : canvases.slice(0, 8).map((project) => (
-              <button key={project.id} type="button" onClick={() => onOpenCanvasProject(project.id)} className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-left hover:bg-white">
-                <span className="h-7 w-7 shrink-0 overflow-hidden rounded-md bg-slate-200">
-                  {project.thumbnail && <img src={project.thumbnail} alt="" className="h-full w-full object-cover" />}
-                </span>
-                <span className="truncate text-[13px] text-slate-800">{project.title}</span>
-              </button>
-            ))}
           </div>
         )}
       </section>

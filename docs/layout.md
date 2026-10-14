@@ -21,7 +21,7 @@
 
 根目录仅保留入口和项目配置。依赖 `node_modules`、构建结果 `tools/build/ui` 由工具生成。
 
-macOS 根目录入口 `启动贝壳云图.command` 调用 `tools/scripts/web/dev-web.mjs`，由同一流程启动本地 API 与 Vite；只复用启动器记录且 PID、启动时间、工作目录和配置匹配的本项目开发服务。未记录的端口占用需先关闭对应启动终端，启动器不会按端口或模糊进程名停止服务。它是浏览器版的入口，不依赖已停用的桌面端。
+根目录入口 `启动贝壳云图.bat` / `启动贝壳云图.ps1`（Windows）与 `启动贝壳云图.command`（macOS）调用 `tools/scripts/web/dev-web.mjs`，由同一流程启动本地 API 与 Vite；只复用启动器记录且 PID、启动时间、工作目录和配置匹配的本项目开发服务。未记录的端口占用需先关闭对应启动终端，启动器不会按端口或模糊进程名停止服务。它是浏览器版的入口，不依赖已停用的桌面端。
 
 日常入口保留历史用户数据目录与访问令牌，不迁移或复制已有库。代码验证可运行 `BEIKE_ISOLATED_DEV=1 pnpm dev:web`：默认使用用户数据目录下的 `development/`、独立令牌、API 空闲端口和 UI `5174`；不读取根 `.env`、旧根令牌或日常 API 端口缓存。可显式指定 `AZHUO_DATA_DIR`，应选择独立目录。隔离与日常模式的 PID 记录分别保存在本项目 `.local/`；新库仅由同一版本化运行时迁移链初始化，不复制 `database/dev.db`。
 
@@ -56,7 +56,7 @@ client/
 
 ## 对外 API
 
-`pnpm dev`、`pnpm start` 与 `启动贝壳云图.command` 编译 `src/backend/cmd/api`，由 Go 监听 API、静态页和存储读取。启动时在进程内执行 `internal/platform/database/migrate`：校验 `_BeikeMigration` 的版本和 checksum，有待执行版本时先备份再写入，然后同步官方种子。
+`pnpm dev`、`pnpm start`、`启动贝壳云图.bat` 与 `启动贝壳云图.command` 编译 `src/backend/cmd/api`，由 Go 监听 API、静态页和存储读取。启动时在进程内执行 `internal/platform/database/migrate`：校验 `_BeikeMigration` 的版本和 checksum，有待执行版本时先备份再写入，然后同步官方种子。
 
 ```text
 backend/

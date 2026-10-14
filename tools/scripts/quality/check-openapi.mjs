@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { collectRoutes, renderOpenApi } from './openapi-routes.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const normalizeLf = (text) => text.replace(/\r\n/g, '\n');
 const rendered = renderOpenApi(collectRoutes(root));
 const target = path.join(root, 'api/openapi.yaml');
 
@@ -15,7 +16,7 @@ if (process.argv.includes('--write')) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, rendered);
   console.log(`[openapi] wrote ${collectRoutes(root).length} routes`);
-} else if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8') !== rendered) {
+} else if (!fs.existsSync(target) || normalizeLf(fs.readFileSync(target, 'utf8')) !== normalizeLf(rendered)) {
   console.error('[openapi] api/openapi.yaml 与当前路由不一致。运行 node tools/scripts/quality/check-openapi.mjs --write');
   process.exit(1);
 } else {
@@ -24,9 +25,10 @@ if (process.argv.includes('--write')) {
 
 const typesPath = path.join(root, 'src/client/shared/api/openapi-types.ts');
 const generatedTypes = path.join(os.tmpdir(), 'beike-openapi-types.ts');
-const generated = spawnSync('pnpm', ['exec', 'openapi-typescript', path.join(root, 'api/openapi.yaml'), '-o', generatedTypes], {
+const generated = spawnSync('pnpm', ['exec', 'openapi-typescript', 'api/openapi.yaml', '-o', generatedTypes], {
   cwd: root,
   encoding: 'utf8',
+  shell: true,
 });
 if (generated.status !== 0) {
   console.error(generated.stderr || generated.stdout || '[openapi] 类型生成失败');
@@ -36,7 +38,7 @@ const freshTypes = fs.readFileSync(generatedTypes, 'utf8');
 if (process.argv.includes('--write')) {
   fs.writeFileSync(typesPath, freshTypes);
   console.log('[openapi] wrote client types');
-} else if (!fs.existsSync(typesPath) || fs.readFileSync(typesPath, 'utf8') !== freshTypes) {
+} else if (!fs.existsSync(typesPath) || normalizeLf(fs.readFileSync(typesPath, 'utf8')) !== normalizeLf(freshTypes)) {
   console.error('[openapi] src/client/shared/api/openapi-types.ts 已过期。运行 pnpm openapi:write');
   process.exit(1);
 } else {

@@ -62,7 +62,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const [showModelBoard, setShowModelBoard] = useState(false);
 
   // 2. 中间选中的 API 接口
-  const [selectedServiceId, setSelectedServiceId] = useState<string>('comfly_gateway');
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('google');
   const [serviceSearch, setServiceSearch] = useState('');
 
   // 3. 用量统计面板状态

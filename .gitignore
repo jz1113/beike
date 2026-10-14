@@ -47,7 +47,7 @@ database/*.db*
 dev.db*
 
 # Runtime local media cache & data
-storage/
+/storage/
 **/.azhuo_storage/
 **/app_data/
 

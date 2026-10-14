@@ -23,6 +23,7 @@
 │   ├── deploy/          服务、Nginx 与部署环境模板
 │   └── build/ui/        自动生成的前端构建产物
 ├── index.html           浏览器 HTML 入口
+├── 启动贝壳云图.bat      Windows 双击启动浏览器版
 ├── 启动贝壳云图.command   macOS 双击启动浏览器版
 ├── vite.config.ts       前端开发代理与构建
 ├── tsconfig.json        类型检查与源码别名
@@ -50,7 +51,7 @@ pnpm dev                     # 同时启动前端和 API
 
 浏览器打开 http://127.0.0.1:5173。`pnpm dev` 同时启动 Vite 与 Go API。单独启动前端用 `pnpm dev:ui`；`dev:web` / `start:web` 与 `dev` / `start` 相同。
 
-macOS 也可在 Finder 中双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)：它选用 `.nvmrc` 的 Node.js 22，首次缺依赖时按锁文件安装，然后启动 API 与前端并打开浏览器。重复双击会打开已运行的页面；在启动器的终端窗口按 Ctrl+C 停止服务。现有 `.env` 和本机数据不会被启动器覆盖。
+Windows 可在资源管理器中双击根目录的 [启动贝壳云图.bat](启动贝壳云图.bat) 或右键运行 [启动贝壳云图.ps1](启动贝壳云图.ps1)，macOS 也可在 Finder 中双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)：它们选用 Node.js 22，首次缺依赖时按锁文件安装，然后启动 API 与前端并打开浏览器。重复双击会打开已运行的页面；在启动器的终端窗口按 Ctrl+C 停止服务。现有 `.env` 和本机数据不会被启动器覆盖。
 
 在 `.env` 填写模型网关和采集配置；不要提交密钥。前端通过开发代理访问 API。生产由 Go 进程托管页面与 API：`pnpm start` 先编译 `src/backend/cmd/api`，启动时再用现有 Node 脚本执行数据库迁移和官方种子。
 

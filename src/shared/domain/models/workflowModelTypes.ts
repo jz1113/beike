@@ -3,7 +3,7 @@ export type WorkflowCapability = {
   /** Upstream model ID stays bare; routeId distinguishes equal IDs on separate gateways. */
   routeId?: string;
   enabled?: boolean;
-  channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi';
+  channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi' | (string & {});
   name?: string;
   shortName?: string;
   provider?: string;

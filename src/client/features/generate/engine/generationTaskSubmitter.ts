@@ -116,7 +116,7 @@ export async function submitSingleGenerationTask(
   }
 
   const localUrl = getGatewayBaseUrl();
-  const gatewayHeaders = getGatewayClientHeaders();
+  const gatewayHeaders = getGatewayClientHeaders(t.model);
   const video = isVideoTask(t);
   const clientT0 = Date.now();
   const refCount = Array.isArray(t.referenceImages)
@@ -175,7 +175,7 @@ export async function submitSingleGenerationTask(
           camera_motion: (t as any).cameraMotion,
           audio: (t as any).generateAudio,
           watermark: false,
-          customBaseUrl: localUrl,
+          customBaseUrl: gatewayHeaders['x-custom-base-url'] || localUrl,
           storageConfig: readClientStorageConfig(),
         }),
         signal,
@@ -197,7 +197,7 @@ export async function submitSingleGenerationTask(
         referenceImageUrl: primaryRefUrl,
         useReferenceImage: t.useReferenceImage ?? Boolean(primaryRefUrl || combinedImages.length),
         source: 'home',
-        customBaseUrl: localUrl,
+        customBaseUrl: gatewayHeaders['x-custom-base-url'] || localUrl,
         ...(t.taskType ? { taskType: t.taskType } : {}),
         ...(t.angleName ? { angleName: t.angleName } : {}),
         ...(t.sourceImageUrl ? { sourceImageUrl: t.sourceImageUrl } : {}),

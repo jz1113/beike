@@ -59,7 +59,6 @@ export const CANVAS_SETTINGS_PAGES: { id: CanvasSettingsPage; label: string; cou
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'profile', label: '创作档案', icon: Activity, keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
-  { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点', '图床', '桌宠'] },
   { id: 'api', label: 'API 接入', icon: Plug, keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦', '奇云'] },
   { id: 'chat', label: '对话', icon: MessageSquare, keywords: ['对话', '视觉', '默认', '助手'] },
   { id: 'image', label: '绘画', icon: Palette, keywords: ['绘画', '生图', '默认'] },
@@ -69,6 +68,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'voice', label: '语音', icon: AudioLines, keywords: ['语音', '配音'] },
   { id: 'storage', label: '存储', icon: HardDrive, keywords: ['存储', 'oss', 'r2', 's3'] },
   { id: 'language', label: '语言', icon: Languages, keywords: ['语言', '中文'] },
+  { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点', '图床', '桌宠'] },
 ];
 
 export function settingsSectionLabel(section: SettingsNavSection, canvasPage: CanvasSettingsPage) {

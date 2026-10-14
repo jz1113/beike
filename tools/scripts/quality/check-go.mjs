@@ -9,7 +9,14 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 function resolveGo() {
-  const candidates = [process.env.GO_BIN, 'go', path.join(os.homedir(), '.local/go/bin/go')].filter(Boolean);
+  const candidates = [
+    process.env.GO_BIN,
+    'go',
+    path.join(os.homedir(), '.local/go/bin/go'),
+    ...(process.platform === 'win32'
+      ? ['C:\\Program Files\\Go\\bin\\go.exe', 'C:\\Go\\bin\\go.exe', path.join(os.homedir(), 'go/bin/go.exe')]
+      : []),
+  ].filter(Boolean);
   for (const candidate of candidates) {
     if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;
   }
@@ -72,5 +79,8 @@ if (dirty) {
   process.exit(1);
 }
 run(go, ['vet', './src/backend/...']);
-run(go, ['test', '-race', './src/backend/...']);
-console.log('[go] fmt, vet, max-lines and race tests OK');
+const testArgs = process.platform === 'win32' && process.env.CGO_ENABLED !== '1'
+  ? ['test', './src/backend/...']
+  : ['test', '-race', './src/backend/...'];
+run(go, testArgs);
+console.log('[go] fmt, vet, max-lines and tests OK');

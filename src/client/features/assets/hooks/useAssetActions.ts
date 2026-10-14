@@ -101,5 +101,31 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
     }
   };
 
-  return { isBusy, isDeleting, isDownloadingZip, zipProgressLabel, setIsDownloadingZip, handleDeleteTask, handleBatchDelete, handleClearFailedAndStuck, handleDeleteBatch, handleBatchDownload };
+  const handleBatchDeleteTasks = (ids: string[]) => {
+    const targets = mergedTasks.filter(task => ids.includes(task.id));
+    return deleteTargets(targets, `确定彻底删除选中的 ${targets.length} 条记录吗？`, `已删除选中的 ${targets.length} 条记录`, true);
+  };
+
+  const handleBatchDownloadTasks = async (ids: string[]) => {
+    if (lock.current || isBusy) return;
+    const tasks = mergedTasks.filter(task => ids.includes(task.id) && task.resultUrl && task.status !== 'FAILURE');
+    if (!tasks.length) { showToast('选中的记录中没有可下载的媒体文件'); return; }
+    lock.current = true;
+    setIsDownloadingZip(true);
+    setZipProgressLabel('正在打包…');
+    showToast(`正在将 ${tasks.length} 个媒体打包为 ZIP…`);
+    try {
+      const images = tasks.map((task, index) => ({ url: task.resultUrl, filename: `${String(index + 1).padStart(3, '0')}_${(task.prompt || 'asset').slice(0, 20).replace(/[/\\?%*:|"<>]/g, '_')}.${getAssetDownloadExtension(task.mediaType, task.resultUrl)}` }));
+      const result = await exportZipDownload({ images, folderName: `beike_batch_${Date.now()}` }, `beike_batch_${new Date().toISOString().slice(0, 10)}.zip`, progress => setZipProgressLabel(formatExportProgress(progress)));
+      showToast(result.partial ? `已导出 ${result.succeeded} 项，${result.failed} 项失败；压缩包内附失败清单，可重试` : 'ZIP 已打包，已发起浏览器下载');
+    } catch (error) {
+      showToast(`打包下载失败：${formatUserError(error, '请稍后重试')}`);
+    } finally {
+      lock.current = false;
+      setIsDownloadingZip(false);
+      setZipProgressLabel('');
+    }
+  };
+
+  return { isBusy, isDeleting, isDownloadingZip, zipProgressLabel, setIsDownloadingZip, handleDeleteTask, handleBatchDelete, handleBatchDeleteTasks, handleBatchDownloadTasks, handleClearFailedAndStuck, handleDeleteBatch, handleBatchDownload };
 }
