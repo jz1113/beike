@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 .pnp
 .pnp.*
 .yarn/*
@@ -36,7 +37,6 @@ yarn-debug.log*
 
 # TypeScript
 *.tsbuildinfo
-src/generated/prisma
 
 # SQLite Databases & Local Storage
 *.db
@@ -48,10 +48,6 @@ dev.db*
 
 # Runtime local media cache & data
 storage/
-!src/server/routes/assets/storage/
-!src/server/routes/assets/storage/**
-!src/server/infrastructure/storage/
-!src/server/infrastructure/storage/**
 **/.azhuo_storage/
 **/app_data/
 

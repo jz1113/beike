@@ -16,7 +16,6 @@
 | `tools/deploy` | 服务与反向代理模板、服务器安装入口 |
 | `tools/build/ui` | 自动生成的前端产物，不提交 |
 | `api` | OpenAPI 契约，前后端接口的唯一来源 |
-| `tests` | 跨层接口行为测试与端到端测试 |
 | `docs/deployment.md` | 部署与运维说明 |
 | `docs` | 当前架构、产品操作和厂商接口 |
 
@@ -26,7 +25,7 @@ macOS 根目录入口 `启动贝壳云图.command` 调用 `tools/scripts/web/dev
 
 日常入口保留历史用户数据目录与访问令牌，不迁移或复制已有库。代码验证可运行 `BEIKE_ISOLATED_DEV=1 pnpm dev:web`：默认使用用户数据目录下的 `development/`、独立令牌、API 空闲端口和 UI `5174`；不读取根 `.env`、旧根令牌或日常 API 端口缓存。可显式指定 `AZHUO_DATA_DIR`，应选择独立目录。隔离与日常模式的 PID 记录分别保存在本项目 `.local/`；新库仅由同一版本化运行时迁移链初始化，不复制 `database/dev.db`。
 
-`database/migrations/` 留存历史 SQL，不参与新库初始化。当前运行的版本化迁移在 `src/backend/internal/platform/database/migrate`，由 `beike-api migrate` 执行。`dev.db` 与同名的 `-wal`、`-shm` 是同一开发数据库的文件组，不能拆开整理。`database-backups/` 是当前备份和迁移快照的统一目录；旧的 `backups/` 已完整归档到其中的 `legacy-20260920/`，备份文件没有删除。生产数据库及其备份位于配置的数据目录，不要求搬入仓库。
+`database/migrations/` 留存历史 SQL，不参与新库初始化。当前运行的版本化迁移在 `src/backend/internal/platform/database/migrate`，由 `beike-api migrate` 执行。`dev.db` 与同名的 `-wal`、`-shm` 是同一开发数据库的文件组，不能拆开整理。备份写在数据库文件旁边的 `database-backups/`；本地开发库对应 `database/database-backups/`，旧的 `backups/` 已完整归档到其中的 `legacy-20260920/`，备份文件没有删除。生产数据库及其备份位于配置的数据目录，不要求搬入仓库。
 
 ## 浏览器端
 
@@ -72,8 +71,14 @@ backend/
   internal/workshop/         工坊批次与输出审核
   internal/assistant/        会话、回合、文档抽取与沙箱
   internal/keywordreview/    关键词审核与提交保护
+  internal/service/keywordreview  审核提示词、结果校验与补救
   internal/modelgw/          上游模型提交
-  internal/platform/database/migrate  版本化迁移、checksum、备份与官方种子
+  internal/platform/collect  采集上游请求与响应
+  internal/platform/database 数据访问；migrate 做版本化迁移、checksum、备份与官方种子
+  internal/platform/media    图片地址规范化
+  internal/platform/mediasign 媒体读取签名
+  internal/platform/network  出站拨号与私网拦截
+  internal/platform/storage  本地与对象存储路径
 ```
 
 `GET /api/health`、模型报价、深度环境、本地存储统计和派生缓存清理、本地媒体读取、未开启云存储时的媒体上传、存储配置不完整时的连通性检查和迁移拦截、内存与 WAL 清理、媒体待核列表、系统配置读取和连通性测试、网关账户额度、模型目录拉取、关键词审核规则、提示词记录、类目列表和类目迁移预览、类目迁移写入、风格配方的列表、新建、修改、恢复、删除和官方预置导入，商品的读取、保存、修改和删除、商品采集、生图任务列表和删除、素材来源查重结果和链接查重、反推审核的列表、驳回和恢复、素材库组织视图、穿搭动作人物场景和完整提示词详情、一次返回全部类型的素材列表和全量导出、按编号删除、素材修改、素材新建（场景、穿搭、动作、人物、完整提示词）、批量导入素材、审核记录、换图记录、商品品类和图集、种子清理、按类型清空、去重提纯和清空当前工作区、品类排序、品类保存、图集归类、素材归类、母组移动和文件夹归档、文件夹规则保存、规则导入和细分文件夹保存、母组换图状态、后台反推任务查询、素材表现，由 Go 直接处理。未登记的 `/api` 返回不存在。系统配置里的模型清单和类目默认值来自 `src/shared/data`。类目读取包含当前工作区与官方类目。
@@ -122,7 +127,7 @@ shared/
 ## 文件生命周期
 
 - 长期源码、资源、接口文档和部署工具放入对应目录。
-- 正式测试保留：`*.test.ts` 与 `tests/api`。不保留 QA fixture、截图、一次性核查结果和 Agent 计划；临时验证放项目外。
+- 正式测试保留在源码旁边：`*.test.ts` 与 Go 的 `*_test.go`。不保留 QA fixture、截图、一次性核查结果和 Agent 计划；临时验证放项目外。
 - `.agents/skills`、`.cursor/rules`、`AGENTS.md` 是长期技能和工程规则，保留。
 - 数据库、迁移、种子、密钥、备份和用户素材具有运行或恢复用途，不能按“没有 import”删除。
 - 未引用源码先核查入口、动态加载和样式关联；只对确认不使用的模块做清理。
