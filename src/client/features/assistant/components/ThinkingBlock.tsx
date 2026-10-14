@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, Check, Loader2 } from 'lucide-react';
-import { getShowThinkingPreference } from '../utils/assistantTurnTypes';
+import { getShowThinkingPreference } from '../model/assistantTurnTypes';
 
 interface Props { content: string; defaultOpen?: boolean; isRunning?: boolean }
 export default function ThinkingBlock({ content, defaultOpen = false, isRunning = false }: Props) {

@@ -7,8 +7,8 @@ import DepthCarousel from '@client/shared/media/DepthCarousel';
 import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager';
 import { exportZipDownload, formatExportProgress } from '@client/shared/api/exportZipDownload';
 import type { GenerationTask } from '@client/store/appStoreTypes';
-import type { AssetTaskBatch } from '../utils/assetBatch';
-import { getAssetMediaKind, isAssetTaskRunning } from '../utils/assetMedia';
+import type { AssetTaskBatch } from '../model/assetBatch';
+import { getAssetMediaKind, isAssetTaskRunning } from '../model/assetMedia';
 import AssetMediaPreview from './AssetMediaPreview';
 
 interface Props {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
-import { CanvasVideoPopover } from './CanvasVideoPopover';
+import { CanvasVideoPopover } from './video/CanvasVideoPopover';
 
 type Config = { aspect: string; quality: string; count: number };
 const qualities = [{ id: 'high', label: '高画质' }, { id: 'medium', label: '标准画质' }, { id: 'low', label: '低画质' }];

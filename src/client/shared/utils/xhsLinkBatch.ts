@@ -5,7 +5,7 @@ import {
   MIN_IMAGES_PER_SET,
 } from '@shared/domain/assets/assetDeconstruct/prompts';
 import { RateLimiter } from '@client/shared/utils/rateLimiter';
-import type { ImageSetQueueItem } from '@client/shared/types/imageSetQueue';
+import type { ImageSetQueueItem } from '@client/types/imageSetQueue';
 import { parseXhsUrlsFromText } from './xhsLinkFormatting';
 
 export { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from './xhsLinkFormatting';

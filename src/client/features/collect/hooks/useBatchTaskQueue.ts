@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { getCollectorRateLimiter } from '../utils/collectorRateLimiter';
-import { type BatchTaskItem, detectPlatformFromText, extractUrlsFromRawText } from '../utils/collectorTypes';
-import { collectSourceMedia, type CollectedSourceItem } from '../utils/collectSourceMedia';
-import { readCollectorFile, type CollectorImportEntry } from '../utils/collectorFileImport';
-import { COLLECTOR_BATCH_LIMIT, collectorTaskIdentity } from '../utils/collectorTaskIdentity';
+import { getCollectorRateLimiter } from '../model/collectorRateLimiter';
+import { type BatchTaskItem, detectPlatformFromText, extractUrlsFromRawText } from '../model/collectorTypes';
+import { collectSourceMedia, type CollectedSourceItem } from '../api/collectSourceMedia';
+import { readCollectorFile, type CollectorImportEntry } from '../model/collectorFileImport';
+import { COLLECTOR_BATCH_LIMIT, collectorTaskIdentity } from '../model/collectorTaskIdentity';
 
 interface UseBatchTaskQueueOptions {
   isOpen: boolean;

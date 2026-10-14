@@ -8,7 +8,7 @@ import {
   collectedVideos,
   handleImgError,
   mediaAssetCount,
-} from '@client/features/collect/utils/collectorTypes';
+} from '@client/features/collect/model/collectorTypes';
 
 export interface CollectorResultPanelProps {
   inspectingItem: any;

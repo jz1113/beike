@@ -7,7 +7,7 @@ import {
   displayMediaSrc,
   collectedVideos,
   handleImgError,
-} from '@client/features/collect/utils/collectorTypes';
+} from '@client/features/collect/model/collectorTypes';
 
 export interface BatchTaskCardProps {
   task: BatchTaskItem;

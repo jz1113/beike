@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useAppStore } from '@client/store';
 import type { MediaAttachment } from '@client/store/appStoreTypes';
-import { buildAssistantBatch, extractImageBatch } from '../utils/batchImagePrompts';
+import { buildAssistantBatch, extractImageBatch } from '../model/batchImagePrompts';
 
 export function AssistantImageBatch({ content, referenceMedia }: { content: string; referenceMedia: MediaAttachment[] }) {
   const entries = extractImageBatch(content);

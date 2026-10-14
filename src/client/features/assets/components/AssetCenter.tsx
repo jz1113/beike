@@ -1,7 +1,7 @@
-import { mergeAssetTasks } from '../utils/mergeAssetTasks';
+import { mergeAssetTasks } from '../model/mergeAssetTasks';
 import { useAssetHistoryQuery } from '../hooks/useAssetHistoryQuery';
-import { buildCanvasAssets, type AssetCanvasProject } from '../utils/canvasAssets';
-import { getAssetRecreationState } from '../utils/recreateAsset';
+import { buildCanvasAssets, type AssetCanvasProject } from '../model/canvasAssets';
+import { getAssetRecreationState } from '../model/recreateAsset';
 import { useAssetActions } from '../hooks/useAssetActions';
 import { getAssetTime, type AssetTimeFilter } from '@client/shared/utils/assetTaskData';
 import type { AssetHistoryTask } from '@client/shared/api/mapDbTask';
@@ -16,14 +16,14 @@ import {
 import { useAppStore } from '@client/store';
 import '@client/store/persist/generation';
 import '@shared/domain/media/drawing';
-import { groupTasksIntoBatches, type AssetTaskBatch } from '../utils/assetBatch';
+import { groupTasksIntoBatches, type AssetTaskBatch } from '../model/assetBatch';
 import AssetGenerationHistory from './AssetGenerationHistory';
 import AssetGenerationActions from './AssetGenerationActions';
 import AssetFolderOverlay from './AssetFolderOverlay';
 import { pageRoot } from '@client/shared/ui/layoutClasses';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 
-export type { AssetTaskBatch } from '../utils/assetBatch';
+export type { AssetTaskBatch } from '../model/assetBatch';
 
 const EMPTY_ASSET_ITEMS: never[] = [];
 

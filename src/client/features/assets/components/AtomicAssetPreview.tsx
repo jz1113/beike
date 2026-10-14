@@ -6,8 +6,8 @@ import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/d
 import { Check, Copy, ExternalLink, ImageOff, Tags, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { getAssetPreviewText } from '../utils/assetApply';
-import type { GalleryAtomType } from '../utils/assetGalleryLabels';
+import { getAssetPreviewText } from '../model/assetApply';
+import type { GalleryAtomType } from '../model/assetGalleryLabels';
 
 interface Props {
   item: AssetLibrarySlim;

@@ -1,8 +1,8 @@
 import { useCanvasHistory } from '../hooks/useCanvasHistory';
 import { useCanvasSelectionActions } from '../hooks/useCanvasSelectionActions';
-import { CanvasEditorChrome } from './CanvasEditorChrome';
-import { CanvasEditorBoard } from './CanvasEditorBoard';
-import { CanvasEditorOverlays } from './CanvasEditorOverlays';
+import { CanvasEditorChrome } from './editor/CanvasEditorChrome';
+import { CanvasEditorBoard } from './editor/CanvasEditorBoard';
+import { CanvasEditorOverlays } from './editor/CanvasEditorOverlays';
 import { useCanvasPromptSubmit } from '../hooks/useCanvasPromptSubmit';
 import { retryCanvasGeneration } from '../hooks/canvasGenerationActions';
 import { useCanvasTitleEditing } from '../hooks/useCanvasTitleEditing';

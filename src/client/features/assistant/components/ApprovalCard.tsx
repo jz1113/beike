@@ -1,6 +1,6 @@
 import { getToolDefinition } from '@shared/domain/assistant/tools/defs';
 import { Check, X, Shield } from 'lucide-react';
-import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/utils/assistantTurnTypes';
+import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/model/assistantTurnTypes';
 
 interface Props {
   approval: PendingApproval;

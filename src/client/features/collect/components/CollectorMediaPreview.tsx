@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { X } from 'lucide-react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
-import { displayMediaSrc, displayVideoSrc, handleImgError, isLikelyVideoUrl } from '../utils/collectorTypes';
+import { displayMediaSrc, displayVideoSrc, handleImgError, isLikelyVideoUrl } from '../model/collectorTypes';
 
 interface Props {
   url: string;

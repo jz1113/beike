@@ -1,6 +1,6 @@
 import { ChevronRight, Trash2 } from 'lucide-react';
 import type { BatchProductItem, TypedProductImage } from '../model/batchTypes';
-import BatchProductImageGrid from './BatchProductImageGrid';
+import BatchProductImageGrid from './product/BatchProductImageGrid';
 import ImageTypeFilterTabs from './ImageTypeFilterTabs';
 
 export interface BatchSelectionDetailProps {

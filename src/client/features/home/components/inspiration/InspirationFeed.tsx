@@ -1,9 +1,9 @@
-import {justifiedRows} from '../../utils/justifiedRows';
+import {justifiedRows} from '../../model/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { handleImgError } from '@client/shared/media/imageError';
 import type { InspirationItem, InspirationUseOptions } from './InspirationModal';
 import { INSPIRATION_ITEMS } from '../../data/inspirationData';
-import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../utils/inspirationMedia';
+import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../model/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
 import { INSPIRATION_MEDIA_FILTERS, isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
 import { HOME_PUBLISHED_EVENT, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/homePublish/homePublish';

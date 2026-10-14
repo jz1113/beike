@@ -1,7 +1,7 @@
 import { CanvasImageControls } from './CanvasImageControls';
 import { mediaReferenceSlots } from '@client/shared/media/videoReferences';
-import { CanvasVideoPromptGuide } from './CanvasVideoPromptGuide';
-import { CanvasVideoControls } from './CanvasVideoControls';
+import { CanvasVideoPromptGuide } from './video/CanvasVideoPromptGuide';
+import { CanvasVideoControls } from './video/CanvasVideoControls';
 import { videoInputError, videoModes, resolveVideoMode, videoDurationOptions } from '@shared/domain/media/videoCapabilities';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { CanvasDrawingEditor } from './CanvasDrawingEditor';
@@ -20,7 +20,7 @@ import { calculateImageDimensions } from '@client/shared/prompt-bar/promptBarDis
 import { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
 import type { CanvasNode } from '../model/types';
 import { canReference, isTextSource, referenceReady, linkedPrompt } from '../model/canvasGraph';
-import { CanvasPromptInput, type CanvasPromptInputRef } from './CanvasPromptInput';
+import { CanvasPromptInput, type CanvasPromptInputRef } from './prompt/CanvasPromptInput';
 import { CanvasModelPicker } from './CanvasModelPicker';
 import { HomeSyncToggle } from '@client/shared/homePublish/HomeSyncToggle';
 

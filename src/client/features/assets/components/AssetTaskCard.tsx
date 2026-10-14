@@ -6,8 +6,8 @@ import { downloadMedia } from '@client/shared/media/downloadMedia';
 import { getAssetDownloadExtension } from '@client/shared/utils/assetTaskData';
 import { cardContainer } from '@client/shared/ui/layoutClasses';
 import AssetMediaPreview from './AssetMediaPreview';
-import { getAssetMediaKind, isAssetTaskRunning } from '../utils/assetMedia';
-import type { AssetTaskBatch } from '../utils/assetBatch';
+import { getAssetMediaKind, isAssetTaskRunning } from '../model/assetMedia';
+import type { AssetTaskBatch } from '../model/assetBatch';
 
 type Task = AssetTaskBatch['tasks'][number];
 interface Props {

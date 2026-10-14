@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { parseVideoSheet, type VideoSheetItem } from '../utils/collectorVideoSheet';
+import { parseVideoSheet, type VideoSheetItem } from '../model/collectorVideoSheet';
 
 export type VideoDownloadStatus = 'pending' | 'running' | 'success' | 'failed';
 

@@ -5,7 +5,7 @@ import {
   type PersonaLayers,
   parsePersonaLayers,
   formatPersonaPrompt,
-} from '../utils/assetPromptConstants';
+} from '../model/assetPromptConstants';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import { PromptGroupCategoryEditor } from './PromptGroupCategoryEditor';
 

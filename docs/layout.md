@@ -37,7 +37,6 @@ client/
     hooks/                   React 状态、订阅与流程组合
     api/                     当前功能专属请求
     model/                   纯规则、转换、校验与类型
-    utils/                   已有功能私有辅助函数
     store/                   画布局部状态
     views/                   工坊视图
     engine/                  生成引擎的阶段实现
@@ -49,7 +48,7 @@ client/
   types/                     跨功能类型
 ```
 
-功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。
+功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如工坊的 `stage / history / settings / product`，画布的 `editor / prompt / stage / video`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。
 
 工坊 `model/` 再按 `collection / analysis / generation / delivery / workspace` 分组；React hook 不进入 model。采编、视觉分析和生图状态由 `workshop/hooks` 的独立 hook 协调。画布的导入、几何、图层和任务规则在 `canvas/model`；设置的模型目录、报价、存储和连接状态规则在 `settings/model`。
 

@@ -8,7 +8,7 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
-import { getFilesFromDataTransfer } from '../utils/assetFolderImport';
+import { getFilesFromDataTransfer } from '../model/assetFolderImport';
 import { QueueImageSet } from './QueueImageSet';
 import { formatXhsLinksToOnePerLine, parseXhsUrlsFromText } from '@client/shared/utils/xhsLinkBatch';
 import type { DeconstructQueueApi } from '../hooks/useDeconstructQueue';

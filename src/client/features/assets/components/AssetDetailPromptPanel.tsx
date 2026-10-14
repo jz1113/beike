@@ -1,5 +1,5 @@
 import { Check, Copy, FileCode } from 'lucide-react';
-import { parseAssetDimensions, parsePersonaLayers } from '../utils/assetPromptConstants';
+import { parseAssetDimensions, parsePersonaLayers } from '../model/assetPromptConstants';
 import type { AssetDetailModalProps } from './assetDetailTypes';
 
 type Props = Pick<AssetDetailModalProps,

@@ -1,10 +1,10 @@
 import { canRetryAssistantMessage } from './assistantMessagePresentation';
-import { getAssistantProductIdeaPrompt } from '../utils/assistantSuggestions';
+import { getAssistantProductIdeaPrompt } from '../model/assistantSuggestions';
 import AssistantApprovalNotice from './AssistantApprovalNotice';
 import AssistantWelcome from './AssistantWelcome';
 import AssistantLiveStatus from './AssistantLiveStatus';
-import { duplicateCollectionCards } from '../utils/collectionCardVisibility';
-import { AssistantSkillIcon } from './AssistantSkillIcon';
+import { duplicateCollectionCards } from '../model/collectionCardVisibility';
+import { AssistantSkillIcon } from './skill/AssistantSkillIcon';
 import { useAssistantAutoScroll } from '../hooks/useAssistantAutoScroll';
 import { AssistantReplyFooter } from './AssistantReplyFooter';
 import React, { useState, useMemo, useRef, useLayoutEffect } from 'react';
@@ -14,11 +14,11 @@ import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import FormattedMarkdown from '@client/features/assistant/components/FormattedMarkdown';
-import { getReplyReferenceMedia } from '../utils/assistantPromptReferences';
+import { getReplyReferenceMedia } from '../model/assistantPromptReferences';
 import ProductCardWidget from '@client/features/assistant/components/ProductCardWidget';
 import TurnTimeline from '@client/features/assistant/components/TurnTimeline';
 import CodexAssistantBubble from './CodexAssistantBubble';
-import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/utils/assistantTurnTypes';
+import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/model/assistantTurnTypes';
 
 export interface AssistantMessageListProps {
   onUpload: () => void;

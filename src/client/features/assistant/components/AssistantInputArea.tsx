@@ -1,8 +1,8 @@
 import { useAssistantImageMentions } from '../hooks/useAssistantImageMentions';
-import { removeImageMention } from '../utils/assistantMentions';
+import { removeImageMention } from '../model/assistantMentions';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { ArrowUp, FileText, Play, Square, X, PanelsTopLeft } from 'lucide-react';
-import { AssistantSkillIcon } from '@client/features/assistant/components/AssistantSkillIcon';
+import { AssistantSkillIcon } from '@client/features/assistant/components/skill/AssistantSkillIcon';
 import { MediaAttachment } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import AssistantModelPicker from './AssistantModelPicker';
@@ -10,8 +10,8 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import {
   FILE_ACCEPT,
-} from '@client/features/assistant/utils/assistantConstants';
-import AssistantSkillsMenu from '@client/features/assistant/components/AssistantSkillsMenu';
+} from '@client/features/assistant/model/assistantConstants';
+import AssistantSkillsMenu from '@client/features/assistant/components/skill/AssistantSkillsMenu';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import type { AssistantSkillInputRequirement } from '@shared/domain/assistant/skills/types';

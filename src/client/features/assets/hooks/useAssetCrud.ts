@@ -13,9 +13,9 @@ async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Respon
 }
 import { useAppStore } from '@client/store';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
-import { resolveAssetApiType } from '../utils/assetPromptConstants';
-import { buildBackupData, parseBackupDataToBulkItems } from '../utils/assetBackup';
-import { parsePersonaLayers, formatPersonaPrompt } from '../utils/assetPromptConstants';
+import { resolveAssetApiType } from '../model/assetPromptConstants';
+import { buildBackupData, parseBackupDataToBulkItems } from '../model/assetBackup';
+import { parsePersonaLayers, formatPersonaPrompt } from '../model/assetPromptConstants';
 
 export interface UseAssetCrudOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';

@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import type { AssetSubTab } from '../utils/assetPromptConstants';
+import type { AssetSubTab } from '../model/assetPromptConstants';
 
 export interface AssetDetailModalProps {
   detailItem: any | null;

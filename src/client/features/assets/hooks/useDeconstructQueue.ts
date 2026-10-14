@@ -13,9 +13,9 @@ import {
   exportDeconstructRecordsToCsv,
   transformQueueItemToRecordRow,
   type DeconstructedRecordRow,
-} from '../utils/assetDeconstructCsvExport';
-import { buildQueueItemsFromFiles } from '../utils/assetFolderImport';
-import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
+} from '../model/assetDeconstructCsvExport';
+import { buildQueueItemsFromFiles } from '../model/assetFolderImport';
+import type { ImageSetQueueItem } from '../model/assetPromptConstants';
 import { selectableDeconstructSubcategory } from '../model/deconstructImportTarget';
 import {
   clearDeconstructQueueDraft,
@@ -24,7 +24,7 @@ import {
   readDeconstructQueueDraft,
   readQueueConcurrency,
   persistDeconstructJobReceipt, readDeconstructJobReceiptState,
-} from '../utils/deconstructQueueStorage';
+} from '../model/deconstructQueueStorage';
 import {
   categoryForQueueItem,
   resolveActionCategory,

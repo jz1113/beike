@@ -1,7 +1,7 @@
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
-import { promptGroupSubcategoryOptions, recognizedPromptGroupSubcategory } from '../utils/promptGroupSubcategory';
-import { promptGroupCategoryKey, topLevelCategories } from '../utils/promptGroupCategory';
+import { promptGroupSubcategoryOptions, recognizedPromptGroupSubcategory } from '../model/promptGroupSubcategory';
+import { promptGroupCategoryKey, topLevelCategories } from '../model/promptGroupCategory';
 
 export function PromptGroupCategoryEditor({
   item,

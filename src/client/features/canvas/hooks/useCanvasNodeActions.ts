@@ -1,5 +1,5 @@
 import { persistCanvasMedia } from '../model/canvasMediaImport';
-import { buildLightingDerivedNode, buildMultiAngleDerivedNode } from '../utils/canvasNodeHelpers';
+import { buildLightingDerivedNode, buildMultiAngleDerivedNode } from '../model/canvasNodeHelpers';
 import { enqueueCanvasImageTool } from './canvasGenerationActions';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { type CanvasQuickNodeType } from '../components/CanvasNodeMenu';

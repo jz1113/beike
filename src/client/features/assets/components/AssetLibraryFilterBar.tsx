@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import type { ActionCategoryId, SubCategoryDef } from '@shared/domain/products/productCategory';
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
-import type { AssetSubTab } from '../utils/assetPromptConstants';
+import type { AssetSubTab } from '../model/assetPromptConstants';
 import { AssetLibrarySortControls } from './AssetLibrarySortControls';
 import { AssetTagFilter } from './AssetTagFilter';
 

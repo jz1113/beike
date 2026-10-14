@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { X } from 'lucide-react';
 import { QueueImageTile } from './QueueImageTile';
-import { formatDeconstructSummary, type ImageSetQueueItem } from '../utils/assetPromptConstants';
+import { formatDeconstructSummary, type ImageSetQueueItem } from '../model/assetPromptConstants';
 import type { ProductCategoryOption } from '../hooks/deconstructQueueOps';
 
 type Props = {

@@ -5,8 +5,8 @@ import { autoFillGrid } from '@client/shared/ui/layoutClasses';
 import Folder from '@client/shared/media/Folder';
 import AssetMediaPreview from './AssetMediaPreview';
 import AssetTaskCard from './AssetTaskCard';
-import { getAssetMediaKind, isAssetTaskRunning } from '../utils/assetMedia';
-import type { AssetTaskBatch } from '../utils/assetBatch';
+import { getAssetMediaKind, isAssetTaskRunning } from '../model/assetMedia';
+import type { AssetTaskBatch } from '../model/assetBatch';
 
 type Task = AssetTaskBatch['tasks'][number];
 interface Props {

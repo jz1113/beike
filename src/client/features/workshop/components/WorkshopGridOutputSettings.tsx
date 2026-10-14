@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { OUTPUT_MAX_EDGE, outputAspectLabel, parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { resolveWorkshopImageSize } from '../model/generation/workshopImageSize';
 import { savedWorkshopOutputSize } from '../model/generation/workshopOutputSize';
-import type { WorkshopSettingsModalProps } from './workshopSettingsTypes';
+import type { WorkshopSettingsModalProps } from './settings/workshopSettingsTypes';
 
 const ratios = ['3:4', '1:1', '9:16', '16:9', '4:3', '4:5', '2:3'];
 const fieldClass = 'mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-100';

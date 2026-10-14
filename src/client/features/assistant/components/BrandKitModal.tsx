@@ -1,4 +1,4 @@
-import { createAssistantBrandKit } from '../utils/assistantBrandKitDefaults';
+import { createAssistantBrandKit } from '../model/assistantBrandKitDefaults';
 import BrandKitEditor from './BrandKitEditor';
 import { useAssistantDialog } from './useAssistantDialog';
 import React, { useState } from 'react';

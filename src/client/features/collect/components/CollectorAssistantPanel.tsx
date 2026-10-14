@@ -1,5 +1,5 @@
 import { Bot, Film, Send, X } from 'lucide-react';
-import { collectedVideos, displayMediaSrc, handleImgError } from '../utils/collectorTypes';
+import { collectedVideos, displayMediaSrc, handleImgError } from '../model/collectorTypes';
 import type { CollectorSinglePanelProps } from './collectorSinglePanelTypes';
 
 type Props = Pick<CollectorSinglePanelProps, 'singleCollectedResult' | 'selectedSingleImages' | 'setSelectedSingleImages' | 'selectedVideo' | 'setSelectedVideo' | 'aiAssistantPrompt' | 'setAiAssistantPrompt' | 'handleImportToAIAssistant'>;

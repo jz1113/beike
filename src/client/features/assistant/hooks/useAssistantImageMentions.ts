@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { RefObject, KeyboardEvent } from 'react';
 import { useAppStore, type MediaAttachment } from '@client/store';
-import { findImageMention, nextImageMention } from '../utils/assistantMentions';
+import { findImageMention, nextImageMention } from '../model/assistantMentions';
 import { resolveRefMediaName } from '@client/shared/media/refMediaRegistry';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 

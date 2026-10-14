@@ -12,7 +12,7 @@ import {
   SUPPORTED_DOC_FORMATS,
   isDocumentFile,
   truncateDocText,
-} from '@client/features/assistant/utils/assistantConstants';
+} from '@client/features/assistant/model/assistantConstants';
 import { useAppStore, type MediaAttachment } from '@client/store';
 
 interface UseAssistantMediaUploadOptions {

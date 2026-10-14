@@ -9,7 +9,7 @@ import {
   handleImgError,
   mediaAssetCount,
   secondaryBtnClass,
-} from '@client/features/collect/utils/collectorTypes';
+} from '@client/features/collect/model/collectorTypes';
 import Skeleton from '@client/shared/ui/Skeleton';
 import CollectorMediaGallery from './CollectorMediaGallery';
 import CollectorAssistantPanel from './CollectorAssistantPanel';

@@ -1,4 +1,4 @@
-import type { AssetSubTab } from '../utils/assetPromptConstants';
+import type { AssetSubTab } from '../model/assetPromptConstants';
 import DynamicTagDropdown from './DynamicTagDropdown';
 
 const colors: Record<AssetSubTab, string> = {

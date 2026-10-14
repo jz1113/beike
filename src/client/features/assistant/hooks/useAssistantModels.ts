@@ -3,7 +3,7 @@ import { useAppStore } from '@client/store';
 import {
   DEFAULT_ASSISTANT_MODELS,
   enrichAssistantModelDisplay,
-} from '@client/features/assistant/utils/assistantConstants';
+} from '@client/features/assistant/model/assistantConstants';
 import {
   hasWorkflowModelConfiguration,
   getEnabledMultimodalModelsFromSettings,

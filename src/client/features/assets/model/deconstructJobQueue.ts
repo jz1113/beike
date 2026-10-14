@@ -1,5 +1,5 @@
 import type { DeconstructJobSnapshot } from '@shared/contracts/deconstructJobs';
-import type { ImageSetQueueItem } from '../utils/assetPromptConstants';
+import type { ImageSetQueueItem } from './assetPromptConstants';
 
 export function applyDeconstructJobToQueue(job: DeconstructJobSnapshot, queue: ImageSetQueueItem[]): ImageSetQueueItem[] {
   const existing = new Map(queue.map(item => [item.id, item]));

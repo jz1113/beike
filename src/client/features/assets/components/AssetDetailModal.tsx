@@ -13,7 +13,7 @@ import {
 import {
   humanizeShotType,
   humanizeImageType,
-} from '../utils/assetPromptConstants';
+} from '../model/assetPromptConstants';
 import { resolveActionCardDisplayBadges } from '@shared/domain/products/productCategory';
 import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';

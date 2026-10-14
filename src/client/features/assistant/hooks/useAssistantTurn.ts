@@ -3,20 +3,20 @@ import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/
 import { useCallback, useRef } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
-import { approveAssistantTool, executeClientToolAction } from '@client/features/assistant/utils/assistantClientActions';
+import { approveAssistantTool, executeClientToolAction } from '@client/features/assistant/api/assistantClientActions';
 import type {
   TurnStreamState,
   ApprovalDecision,
   ToolActivityEntry,
-} from '@client/features/assistant/utils/assistantTurnTypes';
+} from '@client/features/assistant/model/assistantTurnTypes';
 import type {
   AssistantItem,
   ApprovalRequestItem,
 } from '@shared/domain/assistant/types';
 import { initialState, applyItemEvent, deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
 import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
-import { readAssistantEvents } from '../utils/readAssistantEvents';
-import { submitPreparedAssistantTurn } from '../utils/assistantTurnRecovery';
+import { readAssistantEvents } from '../model/readAssistantEvents';
+import { submitPreparedAssistantTurn } from '../model/assistantTurnRecovery';
 import { fetchAssistantTurnSnapshot } from '../api/runs';
 export { deriveLegacyState } from './assistantTurnItems';
 

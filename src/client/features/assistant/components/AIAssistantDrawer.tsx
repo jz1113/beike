@@ -1,8 +1,8 @@
-import { buildAssistantWorkspaceSnapshot } from '../utils/assistantWorkspaceContext';
+import { buildAssistantWorkspaceSnapshot } from '../model/assistantWorkspaceContext';
 import { useAssistantDialog } from './useAssistantDialog';
 import { useAssistantNarrowViewport } from './useAssistantViewport';
 import { useAssistantOutputLanguage } from './useAssistantOutputLanguage';
-import { getAssistantSuggestions } from '../utils/assistantSuggestions';
+import { getAssistantSuggestions } from '../model/assistantSuggestions';
 import { useAssistantReasoning } from '../hooks/useAssistantReasoning';
 import '../assistantWorkspace.css';
 import { normalizeReasoningEffort } from '@shared/domain/assistant/reasoning';
@@ -18,7 +18,7 @@ import AssistantInputArea from '@client/features/assistant/components/AssistantI
 import AssistantDrawerHeader from '@client/features/assistant/components/AssistantDrawerHeader';
 import AssistantMediaLightbox, { ChatPreviewState } from '@client/features/assistant/components/AssistantMediaLightbox';
 import BrandKitModal from '@client/features/assistant/components/BrandKitModal';
-import { DEFAULT_ASSISTANT_MODELS } from '@client/features/assistant/utils/assistantConstants';
+import { DEFAULT_ASSISTANT_MODELS } from '@client/features/assistant/model/assistantConstants';
 import { useAssistantModels } from '@client/features/assistant/hooks/useAssistantModels';
 import { useAssistantMediaUpload } from '@client/features/assistant/hooks/useAssistantMediaUpload';
 import { useAssistantChatStream } from '@client/features/assistant/hooks/useAssistantChatStream';

@@ -13,7 +13,7 @@ import { useCompactLayout } from '@client/shared/hooks/useCompactLayout';
 import AppSidebar from '@client/app/AppSidebar';
 import AIAssistantButton from '@client/features/assistant/components/AIAssistantButton';
 import AppErrorBoundary from '@client/shared/ui/AppErrorBoundary';
-import GlobalContextMenu from '@client/app/GlobalContextMenu';
+import GlobalContextMenu from '@client/app/context-menu/GlobalContextMenu';
 import { DeconstructJobsHost } from '@client/app/DeconstructJobsHost';
 import { GeneratingEffectsProvider } from '@client/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@client/app/ViewKeepAlive';
@@ -68,7 +68,7 @@ const HomePage = lazyWithRetry(() => import('@client/features/home/HomePage'));
 const SettingsWorkspaceView = lazyWithRetry(() => import('@client/features/settings/SettingsWorkspaceView'));
 const UniversalCollectorModal = lazyWithRetry(() => import('@client/features/collect/components/UniversalCollectorModal'));
 const AIAssistantDrawer = lazyWithRetry(() => import('@client/features/assistant/components/AIAssistantDrawer'));
-const ImageLightboxModal = lazyWithRetry(() => import('@client/app/ImageLightboxModal'));
+const ImageLightboxModal = lazyWithRetry(() => import('@client/app/lightbox/ImageLightboxModal'));
 const CanvasWorkspaceView = lazyWithRetry(() => import('@client/features/canvas/CanvasWorkspaceView'));
 // 首页只下载创作入口。完整工作区及其 xlsx、jszip、动画等依赖，在实际进入时再下载。
 const GenerateWorkspace = lazyWithRetry(() => import('@client/features/generate/GenerateWorkspace'));

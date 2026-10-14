@@ -4,8 +4,8 @@ import { permanentDeleteGeneration } from '@client/shared/api/permanentDeleteGen
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { getAssetDownloadExtension } from '@client/shared/utils/assetTaskData';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import type { AssetCanvasProject } from '../utils/canvasAssets';
-import type { AssetTaskBatch } from '../utils/assetBatch';
+import type { AssetCanvasProject } from '../model/canvasAssets';
+import type { AssetTaskBatch } from '../model/assetBatch';
 
 type Task = AssetTaskBatch['tasks'][number];
 interface Params {

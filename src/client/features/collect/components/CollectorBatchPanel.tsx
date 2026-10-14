@@ -6,9 +6,9 @@ import { ArrowUp, Loader2, Download, Trash2, Upload, UploadCloud, ListPlus, Play
 import {
   BatchTaskItem,
   extractUrlsFromRawText,
-} from '@client/features/collect/utils/collectorTypes';
+} from '@client/features/collect/model/collectorTypes';
 import BatchTaskCard from './BatchTaskCard';
-import { COLLECTOR_BATCH_LIMIT } from '../utils/collectorTaskIdentity';
+import { COLLECTOR_BATCH_LIMIT } from '../model/collectorTaskIdentity';
 
 export interface CollectorBatchPanelProps {
   batchInputMode: 'text' | 'file';

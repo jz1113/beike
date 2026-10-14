@@ -13,8 +13,8 @@ import {
   Tag,
   FolderInput,
 } from 'lucide-react';
-import { getAssetCardSummary } from '../utils/assetPromptConstants';
-import { type AssetSubTab } from '../utils/assetPromptConstants';
+import { getAssetCardSummary } from '../model/assetPromptConstants';
+import { type AssetSubTab } from '../model/assetPromptConstants';
 import { resolveActionCardDisplayBadges } from '@shared/domain/products/productCategory';
 import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';
 import { FullPromptCardMosaic } from './FullPromptCardMosaic';

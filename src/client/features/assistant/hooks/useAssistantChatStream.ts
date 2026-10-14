@@ -1,20 +1,20 @@
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
-import { persistAssistantImages } from '../utils/persistAssistantImages';
+import { persistAssistantImages } from '../api/persistAssistantImages';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { recordAssistantChatUsage } from '../utils/assistantUsage';
+import { recordAssistantChatUsage } from '../model/assistantUsage';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { buildBrandKitSystemPrompt } from '@shared/domain/products/brandKitModels';
 import { composeSkillRuntime } from '@shared/domain/assistant/skills';
 import { useAppStore, AssistantMessage, MediaAttachment } from '@client/store';
 import { useAssistantTurn } from '@client/features/assistant/hooks/useAssistantTurn';
-import type { PendingApproval } from '@client/features/assistant/utils/assistantTurnTypes';
+import type { PendingApproval } from '@client/features/assistant/model/assistantTurnTypes';
 import { createStreamPatchBatcher } from './streamPatchBatcher';
-import { readAssistantTurnReceipt, saveAssistantTurnReceipt } from '../utils/assistantTurnRecovery';
+import { readAssistantTurnReceipt, saveAssistantTurnReceipt } from '../model/assistantTurnRecovery';
 import { deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
 import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
-import { buildAssistantRequestMessages, validateAssistantSubmission } from '../utils/assistantSubmission';
+import { buildAssistantRequestMessages, validateAssistantSubmission } from '../model/assistantSubmission';
 
 interface UseAssistantChatStreamOptions {
   currentSession: any;

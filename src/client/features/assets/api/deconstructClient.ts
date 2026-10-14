@@ -2,8 +2,8 @@ import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
-import type { ImageSetQueueItem } from '@client/features/assets/utils/assetPromptConstants';
-import { resolveQueueItemPartial } from '@client/features/assets/utils/assetDeconstructCsvExport';
+import type { ImageSetQueueItem } from '@client/features/assets/model/assetPromptConstants';
+import { resolveQueueItemPartial } from '@client/features/assets/model/assetDeconstructCsvExport';
 
 /**
  * A vision POST is billable and its outcome can be unknown when its response is

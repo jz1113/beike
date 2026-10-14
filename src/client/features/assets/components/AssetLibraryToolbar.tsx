@@ -8,10 +8,10 @@ import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
 import { AssetLibraryMoreMenu } from './AssetLibraryMoreMenu';
 import { AssetLibraryFilterBar } from './AssetLibraryFilterBar';
 import type { ReactNode } from 'react';
-import { ASSET_TAB_HINT } from '../utils/promptLibraryEmptyCopy';
+import { ASSET_TAB_HINT } from '../model/promptLibraryEmptyCopy';
 
-import type { AssetSubTab } from '../utils/assetPromptConstants';
-export type { AssetSubTab } from '../utils/assetPromptConstants';
+import type { AssetSubTab } from '../model/assetPromptConstants';
+export type { AssetSubTab } from '../model/assetPromptConstants';
 
 export type AssetLibraryToolbarProps = {
   toolbarTarget?: HTMLElement | null;

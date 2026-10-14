@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Copy, Check, Zap } from 'lucide-react';
 import { useAppStore } from '@client/store';
 import type { MediaAttachment } from '@client/store/appStoreTypes';
-import { prepareAssistantImagePrompt } from '../utils/assistantPromptReferences';
-import { isImagePrompt } from '../utils/batchImagePrompts';
+import { prepareAssistantImagePrompt } from '../model/assistantPromptReferences';
+import { isImagePrompt } from '../model/batchImagePrompts';
 
 export default function AssistantCodeBlock({ 
   code, 

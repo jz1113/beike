@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, ImageOff, Music, RotateCw } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import LazyVideoCover from '@client/shared/media/LazyVideoCover';
-import { getAssetMediaKind } from '../utils/assetMedia';
+import { getAssetMediaKind } from '../model/assetMedia';
 
 interface Props {
   src: string;

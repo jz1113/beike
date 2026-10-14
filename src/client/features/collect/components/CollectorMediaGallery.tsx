@@ -1,5 +1,5 @@
 import { Check, Film, Maximize2, Square } from 'lucide-react';
-import { collectedVideos, displayMediaSrc, displayVideoSrc, handleImgError } from '../utils/collectorTypes';
+import { collectedVideos, displayMediaSrc, displayVideoSrc, handleImgError } from '../model/collectorTypes';
 import type { CollectorSinglePanelProps } from './collectorSinglePanelTypes';
 
 type Props = Pick<CollectorSinglePanelProps, 'singleCollectedResult' | 'singleImageFilter' | 'selectedSingleImages' | 'setSelectedSingleImages' | 'selectedVideo' | 'setSelectedVideo' | 'setPreviewImageUrl'>;

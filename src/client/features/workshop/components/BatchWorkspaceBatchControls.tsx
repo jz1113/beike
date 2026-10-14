@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WorkshopBatchSummary } from '@shared/contracts/workshopBatches';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
-import { BatchHistoryPanel } from './BatchHistoryPanel';
+import { BatchHistoryPanel } from './history/BatchHistoryPanel';
 import { useWorkshopDockActions } from './WorkshopDockActionsContext';
 
 interface Props {

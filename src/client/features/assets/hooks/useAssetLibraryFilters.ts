@@ -1,6 +1,6 @@
-import type { FilterableAsset } from '../utils/assetFilterTags';
-import { buildAssetTagList } from '../utils/assetFilterTags';
-import { isMacroOrCloseUp, isHalfBody, isFullBody } from '../utils/assetShotScale';
+import type { FilterableAsset } from '../model/assetFilterTags';
+import { buildAssetTagList } from '../model/assetFilterTags';
+import { isMacroOrCloseUp, isHalfBody, isFullBody } from '../model/assetShotScale';
 import { appearanceAudience, type AppearanceAudience } from '@shared/domain/assets/appearanceAudience';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -15,11 +15,11 @@ import {
 } from '@shared/domain/products/productCategory';
 import {
   type AssetSubTab,
-} from '../utils/assetPromptConstants';
-import { compareAssetGalleryOrder } from '../utils/assetGalleryLabels';
+} from '../model/assetPromptConstants';
+import { compareAssetGalleryOrder } from '../model/assetGalleryLabels';
 import { compareFullPromptGroupOrder } from '@shared/domain/assets/fullPromptGroupLabel';
-import { recognizedPromptGroupSubcategory, type PromptGroupSubcategoryFilter } from '../utils/promptGroupSubcategory';
-import { promptGroupCategoryIds, promptGroupCategoryKey } from '../utils/promptGroupCategory';
+import { recognizedPromptGroupSubcategory, type PromptGroupSubcategoryFilter } from '../model/promptGroupSubcategory';
+import { promptGroupCategoryIds, promptGroupCategoryKey } from '../model/promptGroupCategory';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 
 function readCategoryLists() {

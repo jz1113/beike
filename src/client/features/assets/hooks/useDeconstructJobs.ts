@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
 import { listDeconstructJobs, stopDeconstructJob } from '../api/deconstructJobsClient';
-import { readDeconstructJobReceiptState } from '../utils/deconstructQueueStorage';
+import { readDeconstructJobReceiptState } from '../model/deconstructQueueStorage';
 import {
   getDeconstructJobsState, subscribeDeconstructJobs, updateDeconstructJobsState,
   upsertDeconstructJob, isDeconstructJobActive, mergeDeconstructJobSnapshot,

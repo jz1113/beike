@@ -8,7 +8,7 @@ import {
   invalidateGlobalAssetCache,
   subscribeAssetInvalidation,
 } from '@client/shared/api/assetLibraryCache';
-import { isNonHumanPlaceholderAsset } from '../utils/assetPromptConstants';
+import { isNonHumanPlaceholderAsset } from '../model/assetPromptConstants';
 
 export interface UseAssetListOptions {
   activeSubTab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action';

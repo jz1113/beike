@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { getCollectorRateLimiter } from '../utils/collectorRateLimiter';
-import { detectPlatformFromText, extractUrlsFromRawText, type BatchTaskItem } from '../utils/collectorTypes';
-import { collectSourceMedia, type CollectedSourceItem } from '../utils/collectSourceMedia';
+import { getCollectorRateLimiter } from '../model/collectorRateLimiter';
+import { detectPlatformFromText, extractUrlsFromRawText, type BatchTaskItem } from '../model/collectorTypes';
+import { collectSourceMedia, type CollectedSourceItem } from '../api/collectSourceMedia';
 
 interface UseSingleCollectOptions {
   isOpen?: boolean;

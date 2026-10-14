@@ -7,10 +7,10 @@ import {
   type BatchTaskItem,
   buildCollectorAIAssistantPayload,
   collectedVideos,
-} from '@client/features/collect/utils/collectorTypes';
+} from '@client/features/collect/model/collectorTypes';
 import CollectorMediaPreview from './CollectorMediaPreview';
 import { useCollectorDownloads } from '../hooks/useCollectorDownloads';
-import { buildCollectorWorkshopPayload } from '../utils/collectorWorkshopImport';
+import { buildCollectorWorkshopPayload } from '../model/collectorWorkshopImport';
 import CollectorSinglePanel from '@client/features/collect/components/CollectorSinglePanel';
 import CollectorBatchPanel from '@client/features/collect/components/CollectorBatchPanel';
 import CollectorVideoDownloadPanel from '@client/features/collect/components/CollectorVideoDownloadPanel';
@@ -24,7 +24,7 @@ import {
   downloadBatchSuccessTasks,
   downloadSingleVideo,
   downloadSingleZip,
-} from '../utils/collectorDownloads';
+} from '../api/collectorDownloads';
 
 interface Props {
   isOpen: boolean;
