@@ -1,7 +1,7 @@
 import type { GenerationTask } from '@client/store';
 import { cleanPromptText, stripWorkshopPromptGuards } from '@shared/domain/media/drawing';
 import type { DepthQuality, DepthVideoStyle } from '@shared/domain/media/depthVideo';
-import { peekDepthSubmit, registerDepthSubmit, resolveDepthSubmit } from '@client/shared/api/depthGeneration';
+import { peekDepthSubmit, registerDepthSubmit, resolveDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { registerRefMedia, resolveRefMediaFile } from '@client/shared/media/refMediaRegistry';
 import { isDepthImageTask, isDepthVideoTask } from './generationTaskMedia';
 

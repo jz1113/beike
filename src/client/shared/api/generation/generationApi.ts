@@ -10,9 +10,9 @@ import {
   isTransientPollError,
   nonRetryableError,
   classifyGenerationPollResult,
-} from '@client/shared/api/generationErrors';
+} from '@client/shared/api/generation/generationErrors';
 import { generationRecoveryError } from './generationRecovery';
-import { isGenerationCancelled, sleepWhilePolling, throwIfGenerationAborted } from '@client/shared/api/generationAbort';
+import { isGenerationCancelled, sleepWhilePolling, throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
 
 export async function fetchAssetTasks(page = 1, pageSize = 40, signal?: AbortSignal): Promise<{
   tasks: AssetHistoryTask[];

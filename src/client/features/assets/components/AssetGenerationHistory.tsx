@@ -2,7 +2,7 @@ import { AlertCircle, Check, Film, ImageIcon, Layers, Loader2, Music, Trash2 } f
 import { formatDisplayModelCompact } from '@shared/domain/media/drawing';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
 import { autoFillGrid } from '@client/shared/ui/layoutClasses';
-import Folder from '@client/shared/media/Folder';
+import Folder from '@client/shared/media/widgets/Folder';
 import AssetMediaPreview from './AssetMediaPreview';
 import AssetTaskCard from './AssetTaskCard';
 import { getAssetMediaKind, isAssetTaskRunning } from '../model/assetMedia';

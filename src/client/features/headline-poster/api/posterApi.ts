@@ -1,9 +1,9 @@
 import { storageConfigHeaders } from '@client/shared/api/apiClient';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { retryWhenLocalApiUnavailable } from '@client/shared/api/localApiRetry';
-import { pollSingleTask, submitImageGenTask } from '@client/shared/api/generationApi';
-import { generationRecoveryError } from '@client/shared/api/generationRecovery';
-import { classifyGenerationPollResult, imageGenBusinessError } from '@client/shared/api/generationErrors';
+import { pollSingleTask, submitImageGenTask } from '@client/shared/api/generation/generationApi';
+import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
+import { classifyGenerationPollResult, imageGenBusinessError } from '@client/shared/api/generation/generationErrors';
 import type { ReservedArtDirection } from '../model/reservedArtDirections';
 import { exportCoverJpeg, loadImageForCanvas } from '../model/coverExport';
 import {

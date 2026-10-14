@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { AssistantSkillCardIcon, AssistantSkillIcon } from './AssistantSkillIcon';
-import FormattedMarkdown from '../FormattedMarkdown';
+import FormattedMarkdown from '../message/FormattedMarkdown';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
 
 interface Props {

@@ -1,6 +1,6 @@
 import { savedWorkshopOutputSize } from './workshopOutputSize';
-import { requiresGenerationRecovery } from '@client/shared/api/generationRecovery';
-import { waitWhilePaused } from '@client/shared/api/generationAbort';
+import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
+import { waitWhilePaused } from '@client/shared/api/generation/generationAbort';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import type { BatchProductItem, BatchTaskItem } from '../batchTypes';
 import { executeSingleImageTask, type TaskExecutionConfig } from './batchTaskExecution';

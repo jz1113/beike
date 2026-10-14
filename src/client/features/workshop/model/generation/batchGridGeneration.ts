@@ -1,7 +1,7 @@
-import { requiresGenerationRecovery } from '@client/shared/api/generationRecovery';
+import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import { resolveWorkshopImageSize, verifyWorkshopImageSize } from './workshopImageSize';
-import { submitImageGenTaskResult, compressProductImageIfNeeded } from '@client/shared/api/generationApi';
+import { submitImageGenTaskResult, compressProductImageIfNeeded } from '@client/shared/api/generation/generationApi';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { sliceGridImage2x2Blobs } from '@client/shared/media/imageGridSlicer';
 import type { BatchProductItem } from '../batchTypes';

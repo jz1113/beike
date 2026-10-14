@@ -3,7 +3,7 @@ import { Download, Eye, Layers, LayoutGrid, Loader2, Sparkles, X } from 'lucide-
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { downloadMedia } from '@client/shared/media/downloadMedia';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
-import DepthCarousel from '@client/shared/media/DepthCarousel';
+import DepthCarousel from '@client/shared/media/widgets/DepthCarousel';
 import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager';
 import { exportZipDownload, formatExportProgress } from '@client/shared/api/exportZipDownload';
 import type { GenerationTask } from '@client/store/appStoreTypes';

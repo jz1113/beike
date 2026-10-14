@@ -1,6 +1,6 @@
 import { useAssistantDialog } from './useAssistantDialog';
-import AssistantRuntimeInfo from './AssistantRuntimeInfo';
-import AssistantSessionMenu from './AssistantSessionMenu';
+import AssistantRuntimeInfo from './panels/AssistantRuntimeInfo';
+import AssistantSessionMenu from './panels/AssistantSessionMenu';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, SlidersHorizontal, Minus, Minimize2, MessageSquarePlus, Maximize2, ListFilter } from 'lucide-react';
 

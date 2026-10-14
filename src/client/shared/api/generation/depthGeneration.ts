@@ -5,12 +5,12 @@ import { DEPTH_MODEL_SETUP_COMMAND, type DepthQuality, type DepthVideoStyle } fr
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { getDerived, putDerived } from '@client/shared/media/idbMediaCache';
 import { resolveRefMediaFile } from '@client/shared/media/refMediaRegistry';
-import { throwIfGenerationAborted } from '@client/shared/api/generationAbort';
-import { generationRecoveryError, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generationRecovery';
+import { throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
+import { generationRecoveryError, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 import {
   type DepthSubmitPayload,
   depthSubmitMap,
-} from '@client/shared/api/depthSubmitRegistry';
+} from '@client/shared/api/generation/depthSubmitRegistry';
 
 export type { DepthSubmitPayload };
 

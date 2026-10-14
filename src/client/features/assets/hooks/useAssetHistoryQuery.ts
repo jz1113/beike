@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchAssetTasks } from '@client/shared/api/generationApi';
+import { fetchAssetTasks } from '@client/shared/api/generation/generationApi';
 import { assetTasksQueryKey } from '@client/shared/api/assetQueryKeys';
 import { getAssetPollingPages, getNextAssetPage, hasAssetPageMembershipChanged, loadAssetPollingPages } from '@client/shared/utils/assetTaskData';
 import { useDocumentHidden } from '@client/shared/hooks/useDocumentHidden';

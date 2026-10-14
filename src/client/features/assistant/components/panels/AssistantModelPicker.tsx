@@ -1,10 +1,10 @@
-import { useAssistantDialog } from './useAssistantDialog';
+import { useAssistantDialog } from '../useAssistantDialog';
 import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { getModelIcon } from '@client/shared/ui/ModelIcons';
-import { groupAssistantModels } from '../model/groupAssistantModels';
-import { resolveAssistantModelLabel } from '../model/assistantConstants';
+import { groupAssistantModels } from '../../model/groupAssistantModels';
+import { resolveAssistantModelLabel } from '../../model/assistantConstants';
 import { normalizeReasoningEffort, reasoningCapability, type ReasoningEffort } from '@shared/domain/assistant/reasoning';
 
 export interface AssistantModelOption { id: string; name?: string; shortName?: string; provider?: string; badge?: string }

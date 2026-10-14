@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, Images, Link, RefreshCw, ScanLine, WandSparkles } from 'lucide-react';
-import AssistantMark from './AssistantMark';
+import AssistantMark from '../AssistantMark';
 
 interface Props { onUpload: () => void; onPrompt: (prompt: string) => void }
 

@@ -2,7 +2,7 @@ import { type GenerationTask } from '@client/store';
 import { getAspectRatioClass, getBatchGridClass } from '../model/generateCanvasLayout';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
-import LazyVideoCover from '@client/shared/media/LazyVideoCover';
+import LazyVideoCover from '@client/shared/media/widgets/LazyVideoCover';
 import { isGenerateVideoTask } from '../model/generateWorkspaceLayout';
 import { getFeedImageUrl } from './FeedSingleCard';
 import { AlertCircle, RotateCw, Maximize2, Trash2, X } from 'lucide-react';

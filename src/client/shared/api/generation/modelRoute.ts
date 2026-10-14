@@ -1,5 +1,5 @@
 import { isDeepSeekRoute, deepSeekModel } from '@shared/domain/models/deepseek';
-import { getMultimodalClientOverrides } from './gatewayClient';
+import { getMultimodalClientOverrides } from '../gatewayClient';
 const endpoints = new Set(['/api/assistant/turn/start', '/api/generate/analyze', '/api/generate/copywriting',
   '/api/catalog/assets/deconstruct', '/api/catalog/styles/extract', '/api/generate/headline-design', '/api/generate/headline-title']);
 export function withModelRoute(input: RequestInfo | URL, init?: RequestInit): RequestInit | undefined {

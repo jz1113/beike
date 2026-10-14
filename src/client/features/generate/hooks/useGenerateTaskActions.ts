@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useAppStore, type GenerationTask } from '@client/store';
 import { cleanPromptText, getAspectRatioFromSize, stripWorkshopPromptGuards } from '@shared/domain/media/drawing';
-import { peekDepthSubmit } from '@client/shared/api/depthGeneration';
+import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { registerRefMedia } from '@client/shared/media/refMediaRegistry';
 import { createGenerationAttemptId, prepareGenerationAttempt } from '../model/generationAttempt';
 import { isDepthImageTask, isDepthVideoTask } from '../model/generationTaskMedia';

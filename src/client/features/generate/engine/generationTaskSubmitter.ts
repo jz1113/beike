@@ -8,8 +8,8 @@ import { prepareVideoReferences } from './prepareVideoReferences';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { logLatencyAudit } from '@shared/domain/core/latencyAudit';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled, throwIfGenerationAborted } from '@client/shared/api/generationAbort';
-import { requiresGenerationRecovery, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generationRecovery';
+import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled, throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
+import { requiresGenerationRecovery, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import {
   clearDepthSubmit,
@@ -17,7 +17,7 @@ import {
   resolveDepthSubmit,
   submitDepthImage,
   submitDepthVideo,
-} from '@client/shared/api/depthGeneration';
+} from '@client/shared/api/generation/depthGeneration';
 import {
   isDepthVideoTask,
   isDepthImageTask,

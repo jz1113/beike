@@ -3,8 +3,8 @@ import { useAppStore, type AssistantMessage, type MediaAttachment } from '@clien
 import AssistantTurnList from './AssistantTurnList';
 import { AssistantReplyFooter } from './AssistantReplyFooter';
 import { canRetryAssistantMessage, getAssistantMessageText } from './assistantMessagePresentation';
-import { getAssistantProductIdeaPrompt } from '../model/assistantSuggestions';
-import type { PendingApproval, ApprovalDecision } from '../model/assistantTurnTypes';
+import { getAssistantProductIdeaPrompt } from '../../model/assistantSuggestions';
+import type { PendingApproval, ApprovalDecision } from '../../model/assistantTurnTypes';
 
 /**
  * CodexAssistantBubble — assistant 消息的 item-based 渲染壳。

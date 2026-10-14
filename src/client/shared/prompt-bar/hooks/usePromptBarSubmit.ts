@@ -3,7 +3,7 @@ import { TOAST_DURATION_MS } from '@client/shared/constants/timing';
 import { registerRefMedia } from '@client/shared/media/refMediaRegistry';
 import { useAppStore } from '@client/store';
 import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '@client/shared/prompt-bar/promptBarSubmit';
-import { registerDepthSubmit } from '@client/shared/api/depthGeneration';
+import { registerDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
 import { claimPromptBarShortcut } from '../promptBarShortcut';

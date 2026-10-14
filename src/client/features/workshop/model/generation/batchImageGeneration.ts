@@ -1,4 +1,4 @@
-import { waitWhilePaused } from '@client/shared/api/generationAbort';
+import { waitWhilePaused } from '@client/shared/api/generation/generationAbort';
 
 /** 并发槽位对应实际生图请求；每次完成立即补充下一任务。 */
 export async function runGenerationJobs<T>(opts: {

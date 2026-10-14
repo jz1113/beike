@@ -14,7 +14,7 @@ import {
 } from '../engine/generationTaskPolling';
 import { submitSingleGenerationTask } from '../engine/generationTaskSubmitter';
 import { GenerationSubmissionQueue } from '../engine/generationSubmissionQueue';
-import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@client/shared/api/generationAbort';
+import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@client/shared/api/generation/generationAbort';
 
 export {
   isDepthVideoTask,

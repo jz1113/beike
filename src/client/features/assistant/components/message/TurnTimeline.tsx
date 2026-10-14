@@ -1,7 +1,7 @@
 import AssistantExecution from './AssistantExecution';
 import ApprovalCard from './ApprovalCard';
 import type { AssistantTaskState } from '@shared/domain/assistant/taskPolicy';
-import type { ToolActivityEntry, PendingApproval, ApprovalDecision } from '../model/assistantTurnTypes';
+import type { ToolActivityEntry, PendingApproval, ApprovalDecision } from '../../model/assistantTurnTypes';
 
 interface Props {
   toolActivity: ToolActivityEntry[]; thinking?: string; task?: AssistantTaskState; startedAt?: number;

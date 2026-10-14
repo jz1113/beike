@@ -88,7 +88,7 @@ function AssetCenterWithCanvas() {
 }
 const CanvasRecentProjects = lazyWithRetry(() => import('@client/features/canvas/components/CanvasRecentProjects'));
 // 点阵背景为纯装饰，延后下载，使首页核心控件和灵感流优先可用。
-const GlobalDynamicBackground = lazyWithRetry(() => import('@client/shared/media/GlobalDynamicBackground'));
+const GlobalDynamicBackground = lazyWithRetry(() => import('@client/shared/media/widgets/GlobalDynamicBackground'));
 
 export default function App() {
   const [isCollectorOpen, setIsCollectorOpen] = useState(false);

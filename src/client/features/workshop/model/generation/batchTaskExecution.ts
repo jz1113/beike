@@ -5,7 +5,7 @@ import { resolveWorkshopImageSize } from './workshopImageSize';
 import { assertOutputDimensions, parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { isActionAllowedForProduct } from '@shared/domain/products/phoneProductPolicy';
-import { submitImageGenTaskResult } from '@client/shared/api/generationApi';
+import { submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
 import type { BatchProductItem } from '../batchTypes';
 import { compressProductImageIfNeeded } from './batchImageTasks';
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 're
 import { ArrowRight, Check, Settings2, X } from 'lucide-react';
 import { apiFetch, proxyMediaUrl } from '@client/shared/api/apiClient';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
-import Folder from '@client/shared/media/Folder';
+import Folder from '@client/shared/media/widgets/Folder';
 import { PromptFolderDeleteDialog } from './PromptFolderDeleteDialog';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import type { PromptGroupFolder } from '../model/promptGroupFolder';

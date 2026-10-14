@@ -1,4 +1,4 @@
-import { imageGenBusinessError } from '@client/shared/api/generationErrors';
+import { imageGenBusinessError } from '@client/shared/api/generation/generationErrors';
 
 export const GENERATION_CANCELLED_MESSAGE = '已取消生图任务';
 

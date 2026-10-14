@@ -13,7 +13,7 @@ import { useAppLayoutMode } from '@client/shared/hooks/useCompactLayout';
 
 import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
 import { IMAGE_RATIO_ITEMS, type SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
-import { useDepthEnvCheck } from '@client/shared/api/depthGeneration';
+import { useDepthEnvCheck } from '@client/shared/api/generation/depthGeneration';
 import { isDepthGenMode, type QuickGenMode } from '@shared/domain/media/depthVideo';
 import {
   resolvePromptPlaceholder,

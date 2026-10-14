@@ -1,6 +1,6 @@
 import { savedWorkshopOutputSize } from '../model/generation/workshopOutputSize';
 import { prepareTaskRetry } from '../model/generation/taskRetry';
-import { requiresGenerationRecovery } from '@client/shared/api/generationRecovery';
+import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import { checkWorkshopReadiness } from '../model/generation/workshopReadiness';
 import { runGridImageTask } from '../model/generation/batchGridGeneration';
 import { runSelectedShots } from '../model/generation/batchSingleGeneration';

@@ -1,6 +1,6 @@
 import { normalizeOpenAiImageRequest } from '@shared/domain/models/model-adapters/image/normalizeOpenAiImageModel';
 import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
-import { generationRecoveryError } from '@client/shared/api/generationRecovery';
+import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 
 /** Use the same normalized pixel contract as the API, not the pre-normalized preset. */

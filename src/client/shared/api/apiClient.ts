@@ -1,5 +1,5 @@
-import { withModelRoute } from './modelRoute';
-import { withFallbackOrder } from './fallbackOrder';
+import { withModelRoute } from './generation/modelRoute';
+import { withFallbackOrder } from './generation/fallbackOrder';
 
 import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
 import { getClientAccessToken, syncAppTokenCookie } from '@client/shared/api/apiToken';

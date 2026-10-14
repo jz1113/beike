@@ -2,7 +2,7 @@ import type { WorkflowCapability } from '@shared/domain/models/workflowModels';
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, GripVertical, RotateCcw } from 'lucide-react';
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
-import { FALLBACK_ORDER_KEY, readFallbackOrder, resolveFallbackOrder } from '@client/shared/api/fallbackOrder';
+import { FALLBACK_ORDER_KEY, readFallbackOrder, resolveFallbackOrder } from '@client/shared/api/generation/fallbackOrder';
 
 export function FallbackOrderEditor({ showToast, customModels }: { customModels: WorkflowCapability[]; showToast: (message: string) => void }) {
   const [custom, setCustom] = useState(readFallbackOrder);

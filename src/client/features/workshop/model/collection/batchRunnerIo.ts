@@ -16,4 +16,4 @@ export {
   isTransientPollError,
   imageGenBusinessError,
   nonRetryableError,
-} from '@client/shared/api/generationErrors';
+} from '@client/shared/api/generation/generationErrors';

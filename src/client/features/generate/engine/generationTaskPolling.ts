@@ -10,10 +10,10 @@ import {
   type TaskUpdater,
   SLOW_POLL_HINT,
 } from './generationTaskTypes';
-import { peekDepthSubmit } from '@client/shared/api/depthGeneration';
-import { classifyGenerationPollResult, isTransientPollError, accumulateTransientPollFailure } from '@client/shared/api/generationErrors';
+import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
+import { classifyGenerationPollResult, isTransientPollError, accumulateTransientPollFailure } from '@client/shared/api/generation/generationErrors';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
-import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generationRecovery';
+import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 
 const pollingTaskIds = new Set<string>();
 

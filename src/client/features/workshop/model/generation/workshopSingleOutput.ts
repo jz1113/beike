@@ -1,6 +1,6 @@
 import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
-import { generationRecoveryError } from '@client/shared/api/generationRecovery';
+import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { resizeImageBlob } from '@client/shared/media/imageResize';
 import { verifyWorkshopImageSize } from './workshopImageSize';

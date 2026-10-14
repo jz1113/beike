@@ -5,7 +5,7 @@ import { ArrowUp, FileText, Play, Square, X, PanelsTopLeft } from 'lucide-react'
 import { AssistantSkillIcon } from '@client/features/assistant/components/skill/AssistantSkillIcon';
 import { MediaAttachment } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
-import AssistantModelPicker from './AssistantModelPicker';
+import AssistantModelPicker from './panels/AssistantModelPicker';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import {

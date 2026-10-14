@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { deleteDerived, getDerived, putDerived } from '@client/shared/media/idbMediaCache';
 import { saveToDownloadDir } from '@client/shared/media/saveDownload';
-import { requiresGenerationRecovery } from '@client/shared/api/generationRecovery';
+import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';

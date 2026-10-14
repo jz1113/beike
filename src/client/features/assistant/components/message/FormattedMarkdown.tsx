@@ -1,4 +1,4 @@
-import { AssistantImageBatch } from './AssistantBatchPanel';
+import { AssistantImageBatch } from '../panels/AssistantBatchPanel';
 import React from 'react';
 import AssistantCodeBlock from './AssistantCodeBlock';
 import type { MediaAttachment } from '@client/store/appStoreTypes';

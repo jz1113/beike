@@ -1,4 +1,4 @@
-import { dedupeUrls } from '../model/assistantProductImages';
+import { dedupeUrls } from '../../model/assistantProductImages';
 import { useState, useEffect } from 'react';
 import SocialCollectionGallery from './SocialCollectionGallery';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';

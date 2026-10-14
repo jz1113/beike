@@ -1,6 +1,6 @@
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
-import { readEffectiveFallbackOrder } from '@client/shared/api/fallbackOrder';
+import { readEffectiveFallbackOrder } from '@client/shared/api/generation/fallbackOrder';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import type { DeconstructJobSnapshot } from '@shared/contracts/deconstructJobs';

@@ -48,7 +48,9 @@ client/
   types/                     跨功能类型
 ```
 
-功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如工坊的 `stage / history / settings / product`，画布的 `editor / prompt / stage / video`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。
+功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如工坊的 `stage / history / settings / product`，画布的 `editor / prompt / stage / video`。助手组件按 `message / panels / brand-kit` 分组，抽屉和按钮留在 `components`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。
+
+`shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。
 
 工坊 `model/` 再按 `collection / analysis / generation / delivery / workspace` 分组；React hook 不进入 model。采编、视觉分析和生图状态由 `workshop/hooks` 的独立 hook 协调。画布的导入、几何、图层和任务规则在 `canvas/model`；设置的模型目录、报价、存储和连接状态规则在 `settings/model`。
 
