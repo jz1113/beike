@@ -15,9 +15,9 @@ import { BatchArchitectureConfirmDialog } from './BatchArchitectureConfirmDialog
 import { useAppStore } from '@client/store';
 import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
-import { isAutoPromptGroupSelection } from '@shared/domain/workshop/workshopPipeline';
+import { isAutoPromptGroupSelection } from '@shared/domain/workshop/workshop-pipeline';
 import { BatchWorkshopHistoryPreview } from './history/BatchWorkshopHistoryPreview';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
 export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?: (type: PromptAssetType) => void }) {

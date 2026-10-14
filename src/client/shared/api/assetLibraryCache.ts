@@ -2,7 +2,7 @@ import { apiFetch } from '@client/shared/api/apiClient';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import { categoryIds, type AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 import { builtinSubcategoryFolderId, isPromptGroupSubcategory, PROMPT_GROUP_SUBCATEGORY_LABELS } from '@shared/domain/assets/promptGroupSubcategory';
-import type { PromptAssetType as AssetSubTab } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType as AssetSubTab } from '@shared/domain/prompts/prompt-asset/states';
 
 export interface GlobalAssetStore {
   personas: AssetLibrarySlim[];

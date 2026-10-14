@@ -10,7 +10,7 @@ import {
   workshopBatchSchema as transportBatchSchema,
   workshopBatchWriteSchema as transportBatchWriteSchema,
 } from './contracts/workshopBatches';
-import { legacyStageToStatus } from './domain/workshop/workshopPipeline/viewStage';
+import { legacyStageToStatus } from './domain/workshop/workshop-pipeline/viewStage';
 
 export function emptyPipelineState(status: WorkshopPipelineState['status'] = 'draft'): WorkshopPipelineState {
   return {

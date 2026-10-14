@@ -5,8 +5,8 @@ import { isPromptGroupSubcategory, PROMPT_GROUP_SUBCATEGORY_LABELS } from '@shar
 import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 import { filterPromptGroupsByFolder, promptGroupSourceFolders } from '@shared/domain/assets/promptGroupFolders';
 import { uniqueSceneAssets } from '@shared/domain/assets/scenePresentation';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
-import { eligiblePromptGroups, isAutoPromptGroupSelection, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, promptGroupCategoryFit, promptGroupDeclaredSubcategoryConflict, promptGroupExplicitMajorCategoryConflict, promptGroupExplicitSubcategoryConflict, promptGroupMatchesMajorCategory } from '@shared/domain/workshop/workshopPipeline';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
+import { eligiblePromptGroups, isAutoPromptGroupSelection, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, promptGroupCategoryFit, promptGroupDeclaredSubcategoryConflict, promptGroupExplicitMajorCategoryConflict, promptGroupExplicitSubcategoryConflict, promptGroupMatchesMajorCategory } from '@shared/domain/workshop/workshop-pipeline';
 import { ArrowUpRight, Check, ChevronDown, Search } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { WorkshopAssetLockRow, type WorkshopAssetLockOption } from './WorkshopAssetLockRow';

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IMAGE_GEN_MODELS } from '../../../src/shared/domain/media/drawing.ts';
-import { DEFAULT_SUBCATEGORIES_MAP } from '../../../src/shared/domain/products/productCategory/defs.ts';
+import { DEFAULT_SUBCATEGORIES_MAP } from '../../../src/shared/domain/products/product-category/defs';
 import { OFFICIAL_MASTER_RECIPES } from '../../../src/shared/domain/prompts/masterRecipes.ts';
 import { VISION_MODELS } from '../../../src/shared/domain/prompts/vision.ts';
 import { OPENAI_TOOLS } from '../../../src/shared/domain/assistant/tools/defs.ts';

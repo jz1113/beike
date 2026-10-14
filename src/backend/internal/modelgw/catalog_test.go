@@ -7,7 +7,7 @@ import (
 )
 
 func TestImageCatalogMatchesSource(t *testing.T) {
-	source, err := os.ReadFile("../../../../src/shared/domain/models/modelCatalog/approvedImage.ts")
+	source, err := os.ReadFile("../../../../src/shared/domain/models/model-catalog/approvedImage.ts")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestImageAliasIsApproved(t *testing.T) {
 }
 
 func TestVideoCatalogMatchesSource(t *testing.T) {
-	source, err := os.ReadFile("../../../../src/shared/domain/models/modelCatalog/approvedVideo.ts")
+	source, err := os.ReadFile("../../../../src/shared/domain/models/model-catalog/approvedVideo.ts")
 	if err != nil {
 		t.Fatal(err)
 	}

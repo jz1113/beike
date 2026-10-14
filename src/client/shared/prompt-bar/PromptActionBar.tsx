@@ -1,5 +1,5 @@
 import { Plus, ArrowUp } from 'lucide-react';
-import { HomeSyncToggle } from '@client/shared/homePublish/HomeSyncToggle';
+import { HomeSyncToggle } from '@client/shared/home-publish/HomeSyncToggle';
 import { densityComposerPad, composerContainer } from '@client/shared/ui/layoutClasses';
 import { RichPromptInput } from './RichPromptInput';
 import { PromptBarAtMenu } from './controls/PromptBarAtMenu';

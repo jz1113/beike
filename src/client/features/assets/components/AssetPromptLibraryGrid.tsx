@@ -2,7 +2,7 @@ import type { ComponentProps, Dispatch, MouseEvent, RefObject, SetStateAction } 
 import { ChevronRight, Layers } from 'lucide-react';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import type { PromptGroupFolder } from '../model/promptGroupFolder';
 import type { GalleryAtomType } from '../model/assetGalleryLabels';
 import { promptGroupCategoryLabel } from '../model/promptGroupCategory';

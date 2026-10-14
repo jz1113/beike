@@ -9,9 +9,9 @@ import {
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import CategoryManagerModal from './CategoryManagerModal';
-import { RecipeEditorPanel } from './styleExtract/RecipeEditorPanel';
-import { StyleExtractSourcePanel } from './styleExtract/StyleExtractSourcePanel';
-import { useStyleExtractWorkflow } from './styleExtract/useStyleExtractWorkflow';
+import { RecipeEditorPanel } from './style-extract/RecipeEditorPanel';
+import { StyleExtractSourcePanel } from './style-extract/StyleExtractSourcePanel';
+import { useStyleExtractWorkflow } from './style-extract/useStyleExtractWorkflow';
 
 interface Props {
   isOpen: boolean;

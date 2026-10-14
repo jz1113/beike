@@ -1,5 +1,5 @@
 import { savedWorkshopOutputSize } from './workshopOutputSize';
-import { buildImageTaskKey, resolveTaskMergeAction } from '@shared/domain/workshop/workshopPipeline';
+import { buildImageTaskKey, resolveTaskMergeAction } from '@shared/domain/workshop/workshop-pipeline';
 import type { BatchProductItem, BatchTaskItem } from '../batchTypes';
 
 export interface MergeTaskContext {

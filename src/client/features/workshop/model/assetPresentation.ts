@@ -1,4 +1,4 @@
-import { sourcePromptSection } from '@shared/domain/workshop/workshopPipeline';
+import { sourcePromptSection } from '@shared/domain/workshop/workshop-pipeline';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 
 type AssetShot = Pick<ShotPrompt, 'prompt' | 'applied_scene' | 'applied_outfit' | 'applied_persona'>

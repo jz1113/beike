@@ -1,6 +1,6 @@
 # 模型接入索引
 
-模型目录统一引用本页。模型 ID、适配器和能力以 `src/shared/domain/models/modelCatalog/` 与 `modelAdapters/` 为准；官网链接与网关文档标识集中保存在 本页的模型与来源、网关文档标识两节。
+模型目录统一引用本页。模型 ID、适配器和能力以 `src/shared/domain/models/model-catalog/` 与 `model-adapters/` 为准；官网链接与网关文档标识集中保存在 本页的模型与来源、网关文档标识两节。
 
 ## 调用约定
 

@@ -1,5 +1,5 @@
-import { normalizeOpenAiImageRequest } from '@shared/domain/models/modelAdapters/image/normalizeOpenAiImageModel';
-import { resolveGptImageSizeForModel } from '@shared/domain/models/modelAdapters/image/gptImageSafeSizes';
+import { normalizeOpenAiImageRequest } from '@shared/domain/models/model-adapters/image/normalizeOpenAiImageModel';
+import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
 import { generationRecoveryError } from '@client/shared/api/generationRecovery';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 

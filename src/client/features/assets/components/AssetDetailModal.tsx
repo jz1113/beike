@@ -1,4 +1,4 @@
-import { workshopAssetBlockReason } from '@shared/domain/workshop/workshopPipeline';
+import { workshopAssetBlockReason } from '@shared/domain/workshop/workshop-pipeline';
 import React from 'react';
 import {
   X,

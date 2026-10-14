@@ -1,4 +1,4 @@
-import { buildBoundGroupGridPrompt } from '@shared/domain/workshop/workshopPipeline';
+import { buildBoundGroupGridPrompt } from '@shared/domain/workshop/workshop-pipeline';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import {
   assembleOriginalShotPrompt,

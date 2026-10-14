@@ -1,6 +1,6 @@
 import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayUrl';
 import { cleanPromptText, formatModelPayload, getAspectRatioFromSize } from '@shared/domain/media/drawing';
-import { normalizeOpenAiImageRequest } from '@shared/domain/models/modelAdapters/image/normalizeOpenAiImageModel';
+import { normalizeOpenAiImageRequest } from '@shared/domain/models/model-adapters/image/normalizeOpenAiImageModel';
 import type { GatewayEndpoints, ImageAdapterInput, ImageModelAdapter } from '../types';
 
 /** Grok Image API 仅支持 aspect_ratio，不支持 size / quality / negative_prompt */

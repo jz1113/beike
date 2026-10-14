@@ -1,7 +1,7 @@
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { fetchAssetDetail } from '@client/shared/api/assetLibraryCache';
-import { parseGroupShotSkeleton } from '@shared/domain/workshop/workshopPipeline/storyboardSlots';
-import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshopPipeline';
+import { parseGroupShotSkeleton } from '@shared/domain/workshop/workshop-pipeline/storyboardSlots';
+import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshop-pipeline';
 import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';
 import { parseAssetDimensions } from '../model/assetPromptConstants';
 import { recognizedPromptGroupSubcategory, promptGroupSubcategoryLabel } from '../model/promptGroupSubcategory';

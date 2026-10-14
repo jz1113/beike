@@ -2,7 +2,7 @@ import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { fetchAssetDetail } from '@client/shared/api/assetLibraryCache';
 import { audienceLabel } from '@shared/domain/assets/appearanceAudience';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
-import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshopPipeline';
+import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshop-pipeline';
 import { Check, Copy, ExternalLink, ImageOff, Tags, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';

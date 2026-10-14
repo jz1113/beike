@@ -1,4 +1,4 @@
-import { REVERSE_ENGINE_CORE_SPEC } from '../../assets/assetDeconstruct/prompts';
+import { REVERSE_ENGINE_CORE_SPEC } from '../../assets/asset-deconstruct/prompts';
 
 const BUILTIN_REFERENCE_CONTENT: Record<string, string> = {
   'assetDeconstruct/REVERSE_ENGINE_CORE_SPEC': REVERSE_ENGINE_CORE_SPEC,

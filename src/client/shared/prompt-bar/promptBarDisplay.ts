@@ -1,5 +1,5 @@
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
-import { resolveGptImageSizeForModel } from '@shared/domain/models/modelAdapters/image/gptImageSafeSizes';
+import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
 
 /**
  * 解析输入框提示文案 (Placeholder)

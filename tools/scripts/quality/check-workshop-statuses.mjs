@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const contract = path.join(root, 'src/shared/contracts/workshopPipeline.ts');
-const domain = path.join(root, 'src/shared/domain/workshop/workshopPipeline/states.ts');
+const domain = path.join(root, 'src/shared/domain/workshop/workshop-pipeline/states.ts');
 
 function values(file, name) {
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);

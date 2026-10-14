@@ -6,7 +6,7 @@ import { WorkshopTopBar } from './components/WorkshopTopBar';
 import { WorkshopSideCapsuleBar } from './components/WorkshopSideCapsuleBar';
 import { WorkshopDockActionsProvider } from './components/WorkshopDockActionsContext';
 import WorkshopRecipeView from './views/WorkshopRecipeView';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 
 interface Props {
   onOpenSettings?: () => void;

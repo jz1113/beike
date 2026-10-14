@@ -1,5 +1,5 @@
-import { initialRegistryStatus, type PromptAssetType } from '../../prompts/promptAsset/states';
-import { visualAssetIssue } from '../../assets/assetDeconstruct/visualEvidence';
+import { initialRegistryStatus, type PromptAssetType } from '../../prompts/prompt-asset/states';
+import { visualAssetIssue } from '../../assets/asset-deconstruct/visualEvidence';
 import { isCompletePromptGroup, type PromptGroupCandidate } from './groupAssetSelection';
 
 export interface WorkshopAssetCandidate extends PromptGroupCandidate {

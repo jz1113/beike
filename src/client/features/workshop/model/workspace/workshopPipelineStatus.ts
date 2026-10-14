@@ -1,4 +1,4 @@
-import type { WorkshopBatchStatus } from '@shared/domain/workshop/workshopPipeline';
+import type { WorkshopBatchStatus } from '@shared/domain/workshop/workshop-pipeline';
 import type { BatchProductItem } from '../batchTypes';
 import { isUsableWorkshopResult } from '../generation/workshopReadiness';
 

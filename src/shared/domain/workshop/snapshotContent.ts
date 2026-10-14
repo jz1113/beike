@@ -1,4 +1,4 @@
-import type { WorkshopBatchStatus } from './workshopPipeline/states';
+import type { WorkshopBatchStatus } from './workshop-pipeline/states';
 
 type SnapshotContent = {
   currentStage: number;

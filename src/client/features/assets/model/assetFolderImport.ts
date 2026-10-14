@@ -2,7 +2,7 @@ import { compressImageToDataUrl } from '@client/shared/media/image-utils';
 import {
   MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
-} from '@shared/domain/assets/assetDeconstruct/prompts';
+} from '@shared/domain/assets/asset-deconstruct/prompts';
 import type { ImageSetQueueItem } from './assetPromptConstants';
 
 export interface FolderImportSkipRecord {

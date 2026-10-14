@@ -3,7 +3,7 @@ import { appearanceAudience, audiencesCompatible, audiencesCompatibleWithInherit
 import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 import { filterPromptGroupsByFolder, promptGroupSourceFolders } from '@shared/domain/assets/promptGroupFolders';
 import { recipeKind, resolveRecipeForProduct, type RecipeForProduct } from '@shared/domain/products/productRecipeSelection';
-import { eligiblePromptGroups, isAutoPromptGroupSelection, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, promptGroupCategoryFit, promptGroupExplicitMajorCategoryConflict, promptGroupExplicitSubcategoryConflict, promptGroupMatchesMajorCategory, sourcePromptSection, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshopPipeline';
+import { eligiblePromptGroups, isAutoPromptGroupSelection, isWorkshopAssetEligible, parseGroupShotSkeleton, promptGroupAppearance, promptGroupAppearanceFilter, promptGroupCategoryFit, promptGroupExplicitMajorCategoryConflict, promptGroupExplicitSubcategoryConflict, promptGroupMatchesMajorCategory, sourcePromptSection, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshop-pipeline';
 import { productPropsWithCategory, type BatchProductItem } from '../batchTypes';
 
 type GroupWithAppearance = WorkshopAssetCandidate & {

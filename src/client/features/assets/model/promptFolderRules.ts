@@ -1,5 +1,5 @@
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
-import { DEFAULT_SUBCATEGORIES_MAP, SUBCATEGORY_STORAGE_KEY_PREFIX, type ActionCategoryId } from '@shared/domain/products/productCategory/defs';
+import { DEFAULT_SUBCATEGORIES_MAP, SUBCATEGORY_STORAGE_KEY_PREFIX, type ActionCategoryId } from '@shared/domain/products/product-category/defs';
 
 export interface FolderRuleValues { keywords: string[]; anatomy: string[] }
 export interface FolderRuleImport { name: string; keywords: string[]; anatomy?: string[] }

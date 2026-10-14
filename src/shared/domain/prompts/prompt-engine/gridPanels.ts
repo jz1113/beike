@@ -10,7 +10,7 @@ import {
   normalizeOriginalProductRole,
   stripGarmentsFromAction,
 } from './roles';
-import { sanitizeScenePrompt } from '../../assets/assetDeconstruct/sanitize';
+import { sanitizeScenePrompt } from '../../assets/asset-deconstruct/sanitize';
 import { isJewelryAnatomy } from './jewelryFraming';
 
 export interface Grid2x2Options {

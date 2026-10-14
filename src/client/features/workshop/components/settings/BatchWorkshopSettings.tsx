@@ -1,5 +1,5 @@
 import type { useBatchWorkshopRunner } from '../../hooks/useBatchWorkshopRunner';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import { productPropsWithCategory } from '../../model/batchTypes';
 import { WorkshopSettingsModal } from './WorkshopSettingsModal';
 

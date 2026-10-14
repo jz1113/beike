@@ -1,4 +1,4 @@
-import { visualAssetIssue } from '@shared/domain/assets/assetDeconstruct/visualEvidence';
+import { visualAssetIssue } from '@shared/domain/assets/asset-deconstruct/visualEvidence';
 import { type MouseEvent, useMemo, useState } from 'react';
 import {
   Star,

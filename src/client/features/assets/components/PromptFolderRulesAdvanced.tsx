@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
-import { DEFAULT_SUBCATEGORIES_MAP, SUBCATEGORY_STORAGE_KEY_PREFIX } from '@shared/domain/products/productCategory/defs';
+import { DEFAULT_SUBCATEGORIES_MAP, SUBCATEGORY_STORAGE_KEY_PREFIX } from '@shared/domain/products/product-category/defs';
 import { isLegacyRuleRoot, previewFolderRuleImport, previewLegacyFolderRules, type FolderRuleImport, type FolderRulePreview } from '../model/promptFolderRules';
 
 interface Props {

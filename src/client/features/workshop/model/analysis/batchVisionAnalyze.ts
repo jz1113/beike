@@ -8,7 +8,7 @@ import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/work
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@shared/domain/products/jewelryArch';
 import { recipeKind, resolveRecipeForProduct } from '@shared/domain/products/productRecipeSelection';
-import { isAutoPromptGroupSelection, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshopPipeline';
+import { isAutoPromptGroupSelection, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshop-pipeline';
 import { productPropsWithCategory, type BatchProductItem } from '../batchTypes';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
 export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';

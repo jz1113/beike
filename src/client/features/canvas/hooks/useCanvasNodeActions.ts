@@ -4,7 +4,7 @@ import { enqueueCanvasImageTool } from './canvasGenerationActions';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { type CanvasQuickNodeType } from '../components/CanvasNodeMenu';
 import { type LightingParams } from '../components/CanvasLightingModal';
-import { type MultiAngleParams } from '@client/shared/modals/multiAngle';
+import { type MultiAngleParams } from '@client/shared/modals/multi-angle';
 import type { CanvasNode, CanvasProject, CanvasSubject } from '../model/types';
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import type { useCanvasStore } from '../store/useCanvasStore';

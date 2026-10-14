@@ -3,7 +3,7 @@ import { mapWithConcurrency } from '@shared/domain/core/asyncPool';
 import {
   MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
-} from '@shared/domain/assets/assetDeconstruct/prompts';
+} from '@shared/domain/assets/asset-deconstruct/prompts';
 import { RateLimiter } from '@client/shared/utils/rateLimiter';
 import type { ImageSetQueueItem } from '@client/types/imageSetQueue';
 import { parseXhsUrlsFromText } from './xhsLinkFormatting';

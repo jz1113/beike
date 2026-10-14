@@ -1,9 +1,9 @@
-import { isPlaceholderIdentity } from '@shared/domain/workshop/workshopPipeline';
+import { isPlaceholderIdentity } from '@shared/domain/workshop/workshop-pipeline';
 export {
   OFFICIAL_REVERSE_SYSTEM_PROMPT,
   MIN_IMAGES_PER_SET,
   MAX_IMAGES_PER_SET,
-} from '@shared/domain/assets/assetDeconstruct/prompts';
+} from '@shared/domain/assets/asset-deconstruct/prompts';
 import type { ImageSetQueueItem } from './assetQueueTypes';
 export type { ImageSetQueueItem } from './assetQueueTypes';
 
@@ -381,7 +381,7 @@ export function resolveAssetApiType(activeSubTab: AssetSubTab): string {
   return activeSubTab;
 }
 
-import { sanitizeScenePrompt, sanitizeActionPrompt } from '@shared/domain/assets/assetDeconstruct/validate';
+import { sanitizeScenePrompt, sanitizeActionPrompt } from '@shared/domain/assets/asset-deconstruct/validate';
 
 function extractSubjectPreview(text: string): string {
   const marker = '【主体】';

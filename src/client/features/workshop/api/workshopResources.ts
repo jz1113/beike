@@ -1,4 +1,4 @@
-import { isWorkshopAssetEligible } from '@shared/domain/workshop/workshopPipeline';
+import { isWorkshopAssetEligible } from '@shared/domain/workshop/workshop-pipeline';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { useAppStore } from '@client/store';
 import { getGlobalAssetLibrary } from '@client/shared/api/assetLibraryCache';

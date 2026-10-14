@@ -1,6 +1,6 @@
 import type { CanvasNode } from './types';
 import type { LightingParams } from './lighting';
-import type { MultiAngleParams } from '@client/shared/modals/multiAngle';
+import type { MultiAngleParams } from '@client/shared/modals/multi-angle';
 
 export function calculateDisplayResolution(node: CanvasNode) {
   if (node.type === 'drawing') {

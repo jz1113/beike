@@ -6,7 +6,7 @@ import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../model/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
 import { INSPIRATION_MEDIA_FILTERS, isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
-import { HOME_PUBLISHED_EVENT, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/homePublish/homePublish';
+import { HOME_PUBLISHED_EVENT, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 import { CanvasShowcase } from './CanvasShowcase';
 import { getStoryboardPresetById, persistStoryboardPreset } from '@shared/domain/prompts/prompt-engine/storyboardPreset';
 import { useAppStore } from '@client/store';

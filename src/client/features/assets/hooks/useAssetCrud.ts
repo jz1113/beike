@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiFetch as rawApiFetch } from '@client/shared/api/apiClient';
 import { pickAssetEditFields } from '@shared/domain/assets/assetEdit';
 import { appearanceAudience } from '@shared/domain/assets/appearanceAudience';
-import { isCompletePromptGroup, workshopAssetBlockReason } from '@shared/domain/workshop/workshopPipeline';
+import { isCompletePromptGroup, workshopAssetBlockReason } from '@shared/domain/workshop/workshop-pipeline';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
 async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Response> {

@@ -1,5 +1,5 @@
 import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
-import { GPT_IMAGE_GATEWAY_SAFE_SIZES } from '@shared/domain/models/modelAdapters/image/gptImageSafeSizes';
+import { GPT_IMAGE_GATEWAY_SAFE_SIZES } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
 
 /** Pick the supported canvas closest to an arbitrary delivered aspect to minimize cropping. */
 export function closestWorkshopOutputAspect(size: string): string {

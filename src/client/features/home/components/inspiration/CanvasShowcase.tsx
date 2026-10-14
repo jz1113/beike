@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import type { HomeCanvasNode, PublishedHomeItem } from '@client/shared/homePublish/homePublish';
+import type { HomeCanvasNode, PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 
 interface Props {
   item: PublishedHomeItem;

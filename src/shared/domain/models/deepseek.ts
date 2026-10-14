@@ -1,4 +1,4 @@
-import type { ApprovedModel } from './modelCatalog/defs';
+import type { ApprovedModel } from './model-catalog/defs';
 
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 export const DEEPSEEK_ROUTE_PREFIX = 'deepseek-official:';

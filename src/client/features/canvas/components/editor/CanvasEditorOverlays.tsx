@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import CanvasAssetImportModal from '../CanvasAssetImportModal';
 import CanvasLightingModal, { type LightingParams } from '../CanvasLightingModal';
-import { CanvasMultiAngleModal, type MultiAngleParams } from '@client/shared/modals/multiAngle';
+import { CanvasMultiAngleModal, type MultiAngleParams } from '@client/shared/modals/multi-angle';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { CanvasNode } from '../../model/types';
 import type { GenerationTask } from '@client/store/appStoreTypes';

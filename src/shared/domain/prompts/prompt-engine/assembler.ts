@@ -15,7 +15,7 @@ import {
 } from './roles';
 import { getOriginalDiversityForShot } from './storyboard';
 import { cleanPromptText, harmonizeOriginalPrompt } from './guards';
-import { sanitizeScenePrompt } from '../../assets/assetDeconstruct/sanitize';
+import { sanitizeScenePrompt } from '../../assets/asset-deconstruct/sanitize';
 import { resolveJewelryShotOptics } from './jewelryFraming';
 import { buildGridCollagePrompt, type Grid2x2Options } from './gridPanels';
 import { ensureOriginalPromptSlots } from './slots';

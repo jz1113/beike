@@ -39,7 +39,7 @@ func loadApprovedModels(root string) []catalogModel {
 	models := []catalogModel{}
 	byID := map[string]catalogModel{}
 	for _, name := range []string{"approvedImage.ts", "approvedVideo.ts", "approvedChat.ts"} {
-		raw, err := os.ReadFile(filepath.Join(root, "src/shared/domain/models/modelCatalog", name))
+		raw, err := os.ReadFile(filepath.Join(root, "src/shared/domain/models/model-catalog", name))
 		if err != nil {
 			continue
 		}

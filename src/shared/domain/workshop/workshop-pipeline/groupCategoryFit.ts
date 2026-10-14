@@ -1,4 +1,4 @@
-import { inferProductCategoryAndAnatomy } from '../../products/productCategory/infer';
+import { inferProductCategoryAndAnatomy } from '../../products/product-category/infer';
 import { isPhoneProduct } from '../../products/phoneProductPolicy';
 import { builtinSubcategoryFolderId, isPromptGroupSubcategory, isPromptGroupSubcategoryFolderId, PROMPT_GROUP_SUBCATEGORIES, PROMPT_GROUP_SUBCATEGORY_LABELS, type PromptGroupSubcategory } from '../../assets/promptGroupSubcategory';
 import { detectJewelryAnatomy } from '../../prompts/prompt-engine/roles';

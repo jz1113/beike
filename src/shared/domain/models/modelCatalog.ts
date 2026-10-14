@@ -3,12 +3,12 @@
  * 网关拉取、提交校验、设置页预设、展示名均从此派生，禁止再各自硬编码一份。
  */
 import { approvedDeepSeekModel, isDeepSeekRoute } from './deepseek';
-import { APPROVED_CHAT_MODELS } from './modelCatalog/approvedChat';
-import { APPROVED_IMAGE_MODELS } from './modelCatalog/approvedImage';
-import { APPROVED_VIDEO_MODELS } from './modelCatalog/approvedVideo';
-import type { ApprovedModel, ModelCapability, ModelVendorId } from './modelCatalog/defs';
+import { APPROVED_CHAT_MODELS } from './model-catalog/approvedChat';
+import { APPROVED_IMAGE_MODELS } from './model-catalog/approvedImage';
+import { APPROVED_VIDEO_MODELS } from './model-catalog/approvedVideo';
+import type { ApprovedModel, ModelCapability, ModelVendorId } from './model-catalog/defs';
 
-export type { ApprovedModel, ModelCapability, ModelVendorId, VideoAudioSupportType } from './modelCatalog/defs';
+export type { ApprovedModel, ModelCapability, ModelVendorId, VideoAudioSupportType } from './model-catalog/defs';
 
 export const DEFAULT_IMAGE_MODEL_ID = 'gpt-image-2';
 export const DEFAULT_VIDEO_MODEL_ID = 'doubao-seedance-2.0-mini';

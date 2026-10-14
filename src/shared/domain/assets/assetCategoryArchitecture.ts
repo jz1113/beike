@@ -1,5 +1,5 @@
 import type { AssetProductCategory } from './assetOrganization';
-import type { ActionCategoryId } from '../products/productCategory/defs';
+import type { ActionCategoryId } from '../products/product-category/defs';
 
 export const CATEGORY_ARCHITECTURES: Record<ActionCategoryId, { label: string; focus: string }> = {
   universal: { label: '通用商品', focus: '依据可见主体判断使用方式，记录轮廓、接触关系、构图与光影；不套用首饰佩戴或手机握持模板。' },

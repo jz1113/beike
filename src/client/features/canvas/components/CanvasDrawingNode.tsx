@@ -22,7 +22,7 @@ import type { CanvasNode } from '../model/types';
 import { canReference, isTextSource, referenceReady, linkedPrompt } from '../model/canvasGraph';
 import { CanvasPromptInput, type CanvasPromptInputRef } from './prompt/CanvasPromptInput';
 import { CanvasModelPicker } from './CanvasModelPicker';
-import { HomeSyncToggle } from '@client/shared/homePublish/HomeSyncToggle';
+import { HomeSyncToggle } from '@client/shared/home-publish/HomeSyncToggle';
 
 const loadModels = (video = false) => (video ? getEnabledVideoModelsFromSettings : getEnabledImageModelsFromSettings)(readWorkflowModelsFromStorage())
   .filter(item => typeof item.id === 'string' && item.id)

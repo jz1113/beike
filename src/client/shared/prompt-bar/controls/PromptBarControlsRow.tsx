@@ -14,7 +14,7 @@ import {
 } from './PromptBarVideoControls';
 import PromptBarAspectPicker from './PromptBarAspectPicker';
 import { PromptBarAtMenu } from './PromptBarAtMenu';
-import { HomeSyncToggle } from '@client/shared/homePublish/HomeSyncToggle';
+import { HomeSyncToggle } from '@client/shared/home-publish/HomeSyncToggle';
 import type { DepthVideoStyle, DepthQuality, QuickGenMode } from '@shared/domain/media/depthVideo';
 
 interface PromptBarControlsRowProps {

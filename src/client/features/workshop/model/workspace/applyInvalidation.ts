@@ -2,7 +2,7 @@ import {
   computeInvalidation,
   shouldInvalidateTarget,
   type InvalidationChange,
-} from '@shared/domain/workshop/workshopPipeline';
+} from '@shared/domain/workshop/workshop-pipeline';
 import type { BatchProductItem, BatchTaskItem } from '../batchTypes';
 
 export function applyInvalidationToItems(

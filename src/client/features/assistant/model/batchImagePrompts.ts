@@ -1,4 +1,4 @@
-import { resolveGptImageSizeForModel } from '@shared/domain/models/modelAdapters/image/gptImageSafeSizes';
+import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
 import type { GenerationTask, MediaAttachment } from '@client/store/appStoreTypes';
 import { prepareAssistantImagePrompt } from './assistantPromptReferences';
 

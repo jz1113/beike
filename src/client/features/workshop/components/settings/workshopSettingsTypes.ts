@@ -1,5 +1,5 @@
 import type { GenerationStrategy } from '../../model/batchTypes';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 
 export interface WorkshopSettingsModalProps {

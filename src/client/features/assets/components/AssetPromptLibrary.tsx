@@ -16,7 +16,7 @@ import { useAssetDetail } from '../hooks/useAssetDetail';
 import { useAssetCrud } from '../hooks/useAssetCrud';
 import { getAssetPreviewText as getAssetPreviewTextHelper } from '../model/assetApply';
 import { AssetLifecycleFilter } from './AssetLifecycleFilter';
-import type { PromptAssetType } from '@shared/domain/prompts/promptAsset/states';
+import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import { buildAssetGalleryLabels, type GalleryAtomType } from '../model/assetGalleryLabels';
 import { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders } from './PromptGroupCategoryFolders';
 import { MovePromptGroupsDialog } from './MovePromptGroupsDialog';

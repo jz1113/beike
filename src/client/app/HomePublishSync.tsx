@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore } from '@client/store';
 import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
-import { publishCanvasResult, publishMediaResult, readHomeSync, type HomeCanvasNode } from '@client/shared/homePublish/homePublish';
+import { publishCanvasResult, publishMediaResult, readHomeSync, type HomeCanvasNode } from '@client/shared/home-publish/homePublish';
 
 type CompletionDetail = {
   id?: string;
