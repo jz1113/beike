@@ -217,15 +217,14 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     let targetSessionId = state.currentSessionId;
     let currentSessionTitle = task.title ? task.title.slice(0, 18) : 'AI 生图创作';
 
-    const shouldCreateNew = isNewSession || targetSessionId === '__all__' || sessions.length === 0 || !sessions.some(s => s.id === targetSessionId);
+    const matched = sessions.find(s => s.id === targetSessionId);
+    const reuseEmpty = Boolean(matched && matched.tasks.length === 0);
+    const shouldCreateNew = !reuseEmpty && (isNewSession || targetSessionId === '__all__' || !matched);
 
     if (shouldCreateNew) {
       targetSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    } else {
-      const matched = sessions.find(s => s.id === targetSessionId);
-      if (matched?.title) {
-        currentSessionTitle = matched.title;
-      }
+    } else if (matched && matched.tasks.length > 0 && matched.title) {
+      currentSessionTitle = matched.title;
     }
 
     const taskWithSession: GenerationTask = {
@@ -249,6 +248,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
         if (s.id === targetSessionId) {
           return {
             ...s,
+            title: s.tasks.length === 0 ? currentSessionTitle : s.title,
             tasks: [taskWithSession, ...s.tasks.filter(t => t.id !== taskWithSession.id && (!taskWithSession.taskId || t.taskId !== taskWithSession.taskId))]
           };
         }
@@ -272,15 +272,14 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     let targetSessionId = state.currentSessionId;
     let resolvedTitle = customTitle || tasks[0]?.title?.slice(0, 18) || 'AI 批量分镜生图';
 
-    const shouldCreateNew = isNewSession || targetSessionId === '__all__' || sessions.length === 0 || !sessions.some(s => s.id === targetSessionId);
+    const matched = sessions.find(s => s.id === targetSessionId);
+    const reuseEmpty = Boolean(matched && matched.tasks.length === 0);
+    const shouldCreateNew = !reuseEmpty && (isNewSession || targetSessionId === '__all__' || !matched);
 
     if (shouldCreateNew) {
       targetSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    } else {
-      const matched = sessions.find(s => s.id === targetSessionId);
-      if (matched?.title) {
-        resolvedTitle = matched.title;
-      }
+    } else if (matched && matched.tasks.length > 0 && matched.title) {
+      resolvedTitle = matched.title;
     }
 
     const normalizedTasks: GenerationTask[] = tasks.map(t => ({
@@ -307,6 +306,7 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
         if (s.id === targetSessionId) {
           return {
             ...s,
+            title: s.tasks.length === 0 ? resolvedTitle : s.title,
             tasks: [...normalizedTasks, ...s.tasks.filter(t => !taskIds.has(t.id) && (!t.taskId || !taskIds.has(t.taskId)))]
           };
         }

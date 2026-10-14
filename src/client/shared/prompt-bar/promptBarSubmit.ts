@@ -303,7 +303,7 @@ export function buildPromptBarGenerationTasks(
       tasks: [task],
       cleanedPrompt: task.prompt,
       sessionTitle: task.title,
-      shouldCreateNewSession: true,
+      shouldCreateNewSession: input.currentView !== 'generate' && input.currentView !== 'canvas',
     };
   }
 
@@ -354,7 +354,7 @@ export function buildPromptBarGenerationTasks(
     cleanedPrompt,
     sessionTitle:
       cleanedPrompt.slice(0, 18) || (quickGenMode === 'video' ? '智能视频创作' : '快速商用生图'),
-    shouldCreateNewSession: true,
+    shouldCreateNewSession: input.currentView !== 'generate' && input.currentView !== 'canvas',
   };
 }
 

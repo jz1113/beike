@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ExternalLink, Download, Copy, Link2, Scissors, Clipboard, CheckSquare } from 'lucide-react';
-import { openExternalUrl, downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
+import { Download, Copy, Home, Link2, Scissors, Clipboard, CheckSquare } from 'lucide-react';
+import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
+import { isMediaPublishedOnHome } from '@client/shared/home-publish/homePublish';
+import { toggleHomeShowcase } from '../homeShowcaseAction';
 
 import type { ContextMenuState } from './contextMenuTypes';
 import { cleanOriginalMediaUrl, copyImageToClipboard } from './contextMenuMedia';
@@ -51,19 +53,20 @@ export default function GlobalContextMenu() {
     }
   }
 
-  // 1. 在新窗口中打开图像/媒体
-  const handleOpenInNewWindow = async () => {
-    if (!menu.mediaUrl) return;
-    const fullUrl = cleanOriginalMediaUrl(menu.mediaUrl);
+  const showcaseUrl = menu.mediaUrl ? cleanOriginalMediaUrl(menu.mediaUrl) : '';
+  const showcasePublished = Boolean(showcaseUrl && isMediaPublishedOnHome(showcaseUrl));
+  const showcaseLabel = menu.type === 'video'
+    ? (showcasePublished ? '取消首页展示' : '设为首页展示视频')
+    : (showcasePublished ? '取消首页展示' : '设为首页展示图');
+
+  const handleToggleShowcase = () => {
+    if (!menu.mediaUrl || (menu.type !== 'image' && menu.type !== 'video')) return;
+    const published = toggleHomeShowcase(menu.mediaUrl, menu.type);
     closeMenu();
-    try {
-      await openExternalUrl(fullUrl);
-    } catch {
-      window.open(fullUrl, '_blank', 'noopener,noreferrer');
-    }
+    showToast(published === 'removed' ? '已取消首页展示' : menu.type === 'video' ? '已设为首页展示视频' : '已设为首页展示图');
   };
 
-  // 2. 下载图像/媒体
+  // 1. 下载图像/媒体
   const handleDownloadMedia = async () => {
     if (!menu.mediaUrl) return;
     const fullUrl = cleanOriginalMediaUrl(menu.mediaUrl);
@@ -193,11 +196,11 @@ export default function GlobalContextMenu() {
             <div className="space-y-0.5">
               <button
                 type="button"
-                onClick={handleOpenInNewWindow}
+                onClick={handleToggleShowcase}
                 className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-blue-600 hover:text-white transition-colors duration-100 group"
               >
-                <ExternalLink className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
-                <span className="font-medium">在新窗口中打开图像</span>
+                <Home className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
+                <span className="font-medium">{showcaseLabel}</span>
               </button>
 
               <button
@@ -236,11 +239,11 @@ export default function GlobalContextMenu() {
             <div className="space-y-0.5">
               <button
                 type="button"
-                onClick={handleOpenInNewWindow}
+                onClick={handleToggleShowcase}
                 className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-blue-600 hover:text-white transition-colors duration-100 group"
               >
-                <ExternalLink className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
-                <span className="font-medium">在新窗口中打开视频</span>
+                <Home className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
+                <span className="font-medium">{showcaseLabel}</span>
               </button>
 
               <button

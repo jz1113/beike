@@ -23,7 +23,6 @@ import { usePerformanceMode } from '@client/shared/utils/performancePreference';
 import { useDesktopShortcuts } from '@client/shared/hooks/useDesktopShortcuts';
 import { parseViewFromSearchParams, parseWorkshopTabFromSearchParams, syncViewToUrl } from '@client/app/routes';
 import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
-import { HomePublishSync } from '@client/app/HomePublishSync';
 import '@client/features/canvas/store/registerCanvasWorkspace';
 
 // 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
@@ -211,7 +210,6 @@ export default function App() {
 
   return (
     <GeneratingEffectsProvider>
-    <HomePublishSync />
     <GenerationEngineHost />
     <div className="h-screen w-screen bg-[#FAFAFC] text-slate-900 flex flex-col overflow-hidden selection:bg-blue-100 selection:text-blue-900" data-density={density}>
       {/* 设置全屏独立视图 */}

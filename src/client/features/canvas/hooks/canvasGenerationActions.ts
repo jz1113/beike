@@ -45,7 +45,7 @@ export function enqueueCanvasImageTool(projectId: string, node: Omit<CanvasNode,
   const nodeId = `canvas-node-${crypto.randomUUID()}`;
   canvas.addNode(projectId, { ...node, id: nodeId, taskId: task.id, status: 'generating', progress: 0,
     drawing: { ...config, model, aspect: ratio.id }, generationSize: sizeStr });
-  try { store.addGenerationTask(task, true); }
+  try { store.addGenerationTask(task, false); }
   catch (error) { canvas.deleteNode(projectId, nodeId); throw error; }
 }
 
@@ -65,6 +65,6 @@ export async function retryCanvasGeneration(projectId: string, node: CanvasNode)
   if (!current || current.taskId !== node.taskId || current.status === 'generating') return;
   if (!useAppStore.getState().generationHistoryReady) throw new Error('正在恢复生成历史，请稍后重试');
   canvas.updateNode(projectId, node.id, { taskId: attempt.id, status: 'generating', progress: 0, imageUrl: undefined, videoUrl: undefined });
-  try { store.addGenerationTask(attempt, true); }
+  try { store.addGenerationTask(attempt, false); }
   catch (error) { canvas.updateNode(projectId, node.id, current); throw error; }
 }

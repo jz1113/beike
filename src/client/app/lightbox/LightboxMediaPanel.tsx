@@ -52,14 +52,10 @@ export function LightboxMediaPanel({
       {/* 中间媒体展示区 */}
       <div className="relative flex flex-col items-center justify-center h-full max-w-full min-w-0 flex-1 pointer-events-none">
         <div
-          className="w-full flex-1 flex items-center justify-center overflow-hidden cursor-pointer min-h-0 relative group/view pointer-events-auto"
+          className="w-full flex-1 flex items-center justify-center overflow-hidden min-h-0 relative group/view pointer-events-auto"
           onClick={(e) => {
             e.stopPropagation();
-            if (!isVideo && resultUrl) {
-              void openExternalUrl(resultUrl);
-            }
           }}
-          title={isVideo ? undefined : "点击在新窗口查看原图"}
         >
           {isVideo ? (
             <div className="relative max-h-full max-w-full inline-flex items-center justify-center rounded-2xl overflow-hidden shadow-2xl">

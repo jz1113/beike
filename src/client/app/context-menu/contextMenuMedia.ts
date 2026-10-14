@@ -4,11 +4,15 @@ import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 export function cleanOriginalMediaUrl(rawUrl: string): string {
   if (!rawUrl) return '';
   try {
-    const parsed = new URL(rawUrl, window.location.href);
+    const base = typeof window !== 'undefined' ? window.location.href : 'http://local.invalid';
+    const parsed = new URL(rawUrl, base);
+    const wrapped = parsed.searchParams.get('url');
+    if (wrapped && parsed.pathname.includes('proxy-image')) return cleanOriginalMediaUrl(wrapped);
     parsed.searchParams.delete('x-oss-process');
     parsed.searchParams.delete('thumb');
     parsed.searchParams.delete('width');
     parsed.searchParams.delete('height');
+    parsed.searchParams.delete('w');
     return parsed.toString();
   } catch {
     return rawUrl.replace(/[?&]x-oss-process=[^&]+/, '').replace(/[?&]thumb=[^&]+/, '');

@@ -14,7 +14,6 @@ import {
 } from './PromptBarVideoControls';
 import PromptBarAspectPicker from './PromptBarAspectPicker';
 import { PromptBarAtMenu } from './PromptBarAtMenu';
-import { HomeSyncToggle } from '@client/shared/home-publish/HomeSyncToggle';
 import type { DepthVideoStyle, DepthQuality, QuickGenMode } from '@shared/domain/media/depthVideo';
 
 interface PromptBarControlsRowProps {
@@ -288,7 +287,6 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow({
       </div>
 
       <div className="flex items-center ml-auto shrink-0 gap-2">
-        <HomeSyncToggle />
         <button
           type="button"
           onClick={handleSendPrompt}

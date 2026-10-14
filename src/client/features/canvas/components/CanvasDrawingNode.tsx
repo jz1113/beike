@@ -22,8 +22,6 @@ import type { CanvasNode } from '../model/types';
 import { canReference, isTextSource, referenceReady, linkedPrompt } from '../model/canvasGraph';
 import { CanvasPromptInput, type CanvasPromptInputRef } from './prompt/CanvasPromptInput';
 import { CanvasModelPicker } from './CanvasModelPicker';
-import { HomeSyncToggle } from '@client/shared/home-publish/HomeSyncToggle';
-
 const loadModels = (video = false) => (video ? getEnabledVideoModelsFromSettings : getEnabledImageModelsFromSettings)(readWorkflowModelsFromStorage())
   .filter(item => typeof item.id === 'string' && item.id)
   .map(item => ({ ...item,
@@ -165,10 +163,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
 
         {isVideo ? <CanvasVideoControls config={{...config, references: refs, refMode: videoMode, duration}} model={selectedModel} onChange={change} /> : <CanvasImageControls config={config} onChange={change} />}
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-        <HomeSyncToggle />
-        <button type="button" aria-label={isVideo ? '开始生成视频' : '开始绘图'} disabled={busy || uploading || Boolean(videoValidation) || (!linkedPrompt(node, nodes) && !(isVideo && refs.length)) || !models.some(item => item.id === selectedModel)} onClick={generate} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white transition hover:bg-slate-700 disabled:bg-slate-100 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
-        </div>
+        <button type="button" aria-label={isVideo ? '开始生成视频' : '开始绘图'} disabled={busy || uploading || Boolean(videoValidation) || (!linkedPrompt(node, nodes) && !(isVideo && refs.length)) || !models.some(item => item.id === selectedModel)} onClick={generate} className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white transition hover:bg-slate-700 disabled:bg-slate-100 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
       </div>
       {(error || !models.length) && <p role="alert" className="mt-3 text-xs text-amber-700">{error || `请先在设置中配置并启用${isVideo ? '视频' : '绘图'}模型。`}</p>}
     </CanvasDrawingEditor>}

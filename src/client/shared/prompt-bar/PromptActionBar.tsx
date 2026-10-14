@@ -1,5 +1,4 @@
 import { Plus, ArrowUp } from 'lucide-react';
-import { HomeSyncToggle } from '@client/shared/home-publish/HomeSyncToggle';
 import { densityComposerPad, composerContainer } from '@client/shared/ui/layoutClasses';
 import { RichPromptInput } from './RichPromptInput';
 import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
@@ -336,7 +335,6 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
 
             {/* 右侧圆形发送按钮 (对齐截图2红框) */}
             <div className="shrink-0 flex items-center gap-2">
-              <HomeSyncToggle />
               <button
                 type="button"
                 onClick={handleSendPrompt}
