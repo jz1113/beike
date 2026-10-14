@@ -10,7 +10,7 @@ import (
 func turnMessages(r *http.Request, threadID string, payload map[string]json.RawMessage) ([]map[string]any, []attachedDoc) {
 	var raw []map[string]any
 	_ = json.Unmarshal(payload["messages"], &raw)
-	record, err := loadMemory(memoryPath(r, threadID))
+	record, err := loadMemory(MemoryPath(r, threadID))
 	if err != nil {
 		record = emptyMemory()
 	}

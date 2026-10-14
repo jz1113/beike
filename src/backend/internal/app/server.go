@@ -9,6 +9,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/assets"
 	"beike.local/cloud/src/backend/internal/assistant"
+	"beike.local/cloud/src/backend/internal/assistant/extract"
+	"beike.local/cloud/src/backend/internal/assistant/sessions"
 	"beike.local/cloud/src/backend/internal/catalog"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
@@ -31,10 +33,10 @@ type route struct {
 func nativeRoutes(cfg config.Config) []route {
 	return []route{
 		{"GET /api/health", false, health(cfg)},
-		{"GET /api/assistant/sessions", true, assistant.Sessions(cfg)},
-		{"PUT /api/assistant/sessions", true, assistant.SaveSessions(cfg)},
-		{"DELETE /api/assistant/sessions", true, assistant.DeleteSession(cfg)},
-		{"POST /api/assistant/extract-document", true, assistant.ExtractDocument(cfg)},
+		{"GET /api/assistant/sessions", true, sessions.Sessions(cfg)},
+		{"PUT /api/assistant/sessions", true, sessions.SaveSessions(cfg)},
+		{"DELETE /api/assistant/sessions", true, sessions.DeleteSession(cfg)},
+		{"POST /api/assistant/extract-document", true, extract.ExtractDocument(cfg)},
 		{"POST /api/assistant/media", true, assistant.Media(cfg)},
 		{"POST /api/assistant/chat", true, assistant.Chat(cfg)},
 		{"POST /api/assistant/turn/start", true, assistant.StartTurn(cfg)},

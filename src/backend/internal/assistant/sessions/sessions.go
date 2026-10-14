@@ -1,15 +1,13 @@
-package assistant
+package sessions
 
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
+	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
-
-const deletedThreadMessages = `{"version":1,"deleted":true}`
 
 func Sessions(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +21,7 @@ func Sessions(cfg config.Config) http.Handler {
 			SELECT "id", "title", "messagesJson", "allowedToolsJson", "createdAt", "updatedAt"
 			FROM "AssistantThread"
 			WHERE "workspaceId" = ? AND "messagesJson" != ?
-			ORDER BY "updatedAt" DESC`, httpx.WorkspaceFrom(r), deletedThreadMessages)
+			ORDER BY "updatedAt" DESC`, httpx.WorkspaceFrom(r), assistant.DeletedThreadMessages)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "会话操作失败，请稍后重试"})
 			return
@@ -38,7 +36,7 @@ func Sessions(cfg config.Config) http.Handler {
 			}
 			sessions = append(sessions, map[string]any{
 				"id": id, "title": title,
-				"createdAt": threadTime(createdAt), "updatedAt": threadTime(updatedAt),
+				"createdAt": assistant.ThreadTime(createdAt), "updatedAt": assistant.ThreadTime(updatedAt),
 				"messages": parseMessages(messagesJSON), "allowedTools": parseAllowedTools(toolsJSON),
 			})
 		}
@@ -88,17 +86,4 @@ func stringList(values []any) []string {
 		}
 	}
 	return names
-}
-
-func threadTime(raw string) int64 {
-	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
-		return parsed.UnixMilli()
-	}
-	if parsed, err := time.Parse("2006-01-02 15:04:05", raw); err == nil {
-		return parsed.UnixMilli()
-	}
-	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
-		return parsed.UnixMilli()
-	}
-	return 0
 }

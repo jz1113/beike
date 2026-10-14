@@ -96,7 +96,7 @@ func scanSnapshotItem(rows *sql.Rows) (map[string]any, error) {
 	if err := rows.Scan(&id, &kind, &status, &started, &content, &reasoning, &toolName, &displayName, &args, &summary, &action, &visual, &meta); err != nil {
 		return nil, err
 	}
-	base := map[string]any{"id": id, "kind": kind, "createdAt": threadTime(started)}
+	base := map[string]any{"id": id, "kind": kind, "createdAt": ThreadTime(started)}
 	metaMap := map[string]any{}
 	if meta.Valid {
 		_ = json.Unmarshal([]byte(meta.String), &metaMap)
@@ -245,20 +245,20 @@ func listRunRows(ctx context.Context, cfg config.Config, workspace, threadID str
 		}
 		var completedAt any
 		if completed.Valid {
-			completedAt = threadTime(completed.String)
+			completedAt = ThreadTime(completed.String)
 		}
 		run := map[string]any{
 			"turnId": id, "threadId": owner, "status": effective, "model": nullText(model),
-			"startedAt": threadTime(started), "completedAt": completedAt,
+			"startedAt": ThreadTime(started), "completedAt": completedAt,
 			"usage": map[string]any{"inputTokens": nullInt(input), "outputTokens": nullInt(output)},
 		}
 		if threadID == "" {
 			var count int
 			var last sql.NullString
 			_ = db.QueryRowContext(ctx, `SELECT COUNT(*), MAX("startedAt") FROM "AssistantTurnItem" WHERE "turnId" = ?`, id).Scan(&count, &last)
-			lastAt := threadTime(started)
+			lastAt := ThreadTime(started)
 			if last.Valid {
-				lastAt = threadTime(last.String)
+				lastAt = ThreadTime(last.String)
 			}
 			run["lastItemAt"] = lastAt
 			run["itemCount"] = count

@@ -1,4 +1,4 @@
-package assistant
+package sessions
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/assistant"
 )
 
 func sessionBatchError(payload map[string]any) string {
@@ -47,7 +49,7 @@ func saveSessionBatch(ctx context.Context, db *sql.DB, workspace string, payload
 			return 0, currentID, err
 		}
 		exists := err == nil
-		if messagesJSON == deletedThreadMessages {
+		if messagesJSON == assistant.DeletedThreadMessages {
 			continue
 		}
 		updatedAt := now

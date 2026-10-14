@@ -1,4 +1,4 @@
-package assistant
+package sessions
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
@@ -87,7 +88,7 @@ func workspaceHasMessages(r *http.Request, cfg config.Config) bool {
 	defer db.Close()
 	rows, err := db.QueryContext(r.Context(), `
 		SELECT "messagesJson" FROM "AssistantThread"
-		WHERE "workspaceId" = ? AND "messagesJson" != ?`, httpx.WorkspaceFrom(r), deletedThreadMessages)
+		WHERE "workspaceId" = ? AND "messagesJson" != ?`, httpx.WorkspaceFrom(r), assistant.DeletedThreadMessages)
 	if err != nil {
 		return false
 	}

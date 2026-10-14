@@ -20,7 +20,7 @@ func TestThreadTurnsRejectsMissingAndDeleted(t *testing.T) {
 	if _, err := db.Exec(`CREATE TABLE AssistantThread (id TEXT, workspaceId TEXT, messagesJson TEXT)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO AssistantThread VALUES ('gone','local',?)`, deletedThreadMessages); err != nil {
+	if _, err := db.Exec(`INSERT INTO AssistantThread VALUES ('gone','local',?)`, DeletedThreadMessages); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()

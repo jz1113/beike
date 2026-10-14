@@ -70,7 +70,7 @@ backend/
   internal/assets/           存储、生图任务、素材生命周期与表现
   internal/generate/         图片、视频、分析、文案与画布文字；depth、headline、export 是子包
   internal/workshop/         工坊批次与输出审核
-  internal/assistant/        会话、回合、文档抽取与沙箱
+  internal/assistant/        回合、记忆、沙箱与运行时；extract 做文档抽取，sessions 做会话读写。runtime 留在本包：循环、工具和状态共用未导出类型
   internal/keywordreview/    关键词审核与提交保护；review 子包做提示词、结果校验与补救
   internal/modelgw/          上游模型提交
   internal/platform/collect  采集上游请求与响应

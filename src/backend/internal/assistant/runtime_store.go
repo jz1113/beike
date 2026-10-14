@@ -94,7 +94,7 @@ func threadGone(ctx context.Context, db *sql.DB, threadID string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	return messages == deletedThreadMessages, nil
+	return messages == DeletedThreadMessages, nil
 }
 
 func saveTurnState(ctx context.Context, cfg config.Config, workspace, turnID, status, model string, usageIn, usageOut int, snapshot map[string]any) error {
@@ -259,10 +259,10 @@ func scanTurnSummary(rows *sql.Rows) (map[string]any, error) {
 	}
 	var completedAt any
 	if completed.Valid {
-		completedAt = threadTime(completed.String)
+		completedAt = ThreadTime(completed.String)
 	}
 	return map[string]any{
-		"id": id, "status": status, "model": nullText(model), "startedAt": threadTime(started), "completedAt": completedAt,
+		"id": id, "status": status, "model": nullText(model), "startedAt": ThreadTime(started), "completedAt": completedAt,
 		"usage": map[string]any{"inputTokens": nullInt(input), "outputTokens": nullInt(output)},
 	}, nil
 }

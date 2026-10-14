@@ -1,4 +1,4 @@
-package assistant
+package sessions
 
 import (
 	"database/sql"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
@@ -28,7 +29,7 @@ func DeleteSession(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "会话操作失败，请稍后重试"})
 			return
 		}
-		_ = os.Remove(memoryPath(r, id))
+		_ = os.Remove(assistant.MemoryPath(r, id))
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true})
 	})
 }
@@ -40,7 +41,7 @@ func tombstoneSession(r *http.Request, db *sql.DB, id string) error {
 		UPDATE "AssistantThread"
 		SET "title" = ?, "messagesJson" = ?, "allowedToolsJson" = ?, "updatedAt" = ?
 		WHERE "id" = ? AND "workspaceId" = ?`,
-		"已删除对话", deletedThreadMessages, `{"version":1,"tools":[]}`, now, id, workspace)
+		"已删除对话", assistant.DeletedThreadMessages, `{"version":1,"tools":[]}`, now, id, workspace)
 	if err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func tombstoneSession(r *http.Request, db *sql.DB, id string) error {
 		if _, err := db.ExecContext(r.Context(), `
 			INSERT INTO "AssistantThread" ("id", "workspaceId", "title", "messagesJson", "allowedToolsJson", "createdAt", "updatedAt")
 			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			id, workspace, "已删除对话", deletedThreadMessages, `{"version":1,"tools":[]}`, now, now); err != nil {
+			id, workspace, "已删除对话", assistant.DeletedThreadMessages, `{"version":1,"tools":[]}`, now, now); err != nil {
 			return err
 		}
 	}

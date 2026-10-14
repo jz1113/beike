@@ -95,11 +95,11 @@ func threadDeleted(cfg config.Config, r *http.Request, threadID string) (bool, e
 	if err != nil {
 		return false, err
 	}
-	return messages == deletedThreadMessages, nil
+	return messages == DeletedThreadMessages, nil
 }
 
 func readMemory(r *http.Request, threadID string) (map[string]any, error) {
-	record, err := loadMemory(memoryPath(r, threadID))
+	record, err := loadMemory(MemoryPath(r, threadID))
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func readMemory(r *http.Request, threadID string) (map[string]any, error) {
 }
 
 func configureMemory(r *http.Request, threadID string, enabled *bool, clear *bool) (map[string]any, error) {
-	path := memoryPath(r, threadID)
+	path := MemoryPath(r, threadID)
 	lock := memoryLock(path)
 	lock.Lock()
 	defer lock.Unlock()
@@ -189,7 +189,7 @@ func saveMemory(path string, record memoryRecord) error {
 	return nil
 }
 
-func memoryPath(r *http.Request, threadID string) string {
+func MemoryPath(r *http.Request, threadID string) string {
 	sum := sha256.Sum256([]byte(threadID))
 	base := os.Getenv("AZHUO_USER_DATA_DIR")
 	if base == "" {
