@@ -21,7 +21,7 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
 	urls := videoPollURLs(root, taskID, r.URL.Query().Get("model"))
 	for _, endpoint := range urls {
-		status, raw, err := postModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second)
+		status, raw, err := PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second)
 		if err != nil || status < 200 || status >= 300 {
 			continue
 		}

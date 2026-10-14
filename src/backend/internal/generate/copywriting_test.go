@@ -32,9 +32,9 @@ func TestCopywritingWithKeyUsesModel(t *testing.T) {
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"title\":\"台灯做工超出预期\",\"content\":\"收到后连续用了两周，原图直出，没有滤镜。\\n\\n灯罩边缘打磨整齐，开关手感清楚，桌面反光也比较自然。晚上阅读时光线铺得开，不刺眼。\\n\\n按正常桌面高度摆放就好，清洁时避开插座进水。\",\"tags\":[\"#台灯\"]}"}}]}`))
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	handler := Copywriting(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/copywriting", strings.NewReader(`{"productTitle":"台灯","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))

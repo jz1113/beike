@@ -27,7 +27,7 @@ func pollImageTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		root + "/v1/query/image_generation?task_id=" + taskID,
 	}
 	for _, endpoint := range urls {
-		status, raw, err := postModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 3500*time.Millisecond)
+		status, raw, err := PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 3500*time.Millisecond)
 		if err != nil || status < 200 || status >= 300 {
 			continue
 		}
@@ -138,7 +138,7 @@ func pollCredentials(cfg config.Config, r *http.Request) (string, string) {
 		return lianchiImageBase, strings.TrimSpace(r.Header.Get("x-lianchi-api-key"))
 	}
 	clientBase := strings.TrimSpace(r.Header.Get("x-custom-base-url"))
-	base := imageDefaultBase()
+	base := ImageDefaultBase()
 	if clientBase != "" {
 		base = system.NormalizeGatewayBaseURL(clientBase)
 	}
@@ -212,7 +212,7 @@ func progressText(data map[string]any) string {
 	}
 	switch value := raw.(type) {
 	case float64:
-		return itoa(int(value)) + "%"
+		return Itoa(int(value)) + "%"
 	case string:
 		value = strings.TrimSpace(value)
 		if value == "" {

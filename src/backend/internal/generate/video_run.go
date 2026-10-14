@@ -26,7 +26,7 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	result := modelgw.SubmitVideo(r.Context(), modelgw.SubmitCommand{
 		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), Headers: adapted.headers,
 		ReadTaskID: func(data map[string]any) string { return readVideoTaskID(data, adapted.family) },
-		Client:     modelHTTP(),
+		Client:     ModelHTTP(),
 	})
 	if result.Outcome != modelgw.Accepted {
 		unknown := result.Outcome == modelgw.Unknown
@@ -197,7 +197,7 @@ func videoCredentials(cfg config.Config, r *http.Request, payload map[string]jso
 	if clientBase == "" {
 		clientBase = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
 	}
-	base := imageDefaultBase()
+	base := ImageDefaultBase()
 	if clientBase != "" {
 		base = system.NormalizeGatewayBaseURL(clientBase)
 	}

@@ -14,7 +14,7 @@ import (
 	"beike.local/cloud/src/backend/internal/assets"
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/keywordreview"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/platform/database"
@@ -70,7 +70,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
 	library.DrainDeconstructJobs(5 * time.Second)
-	generate.DrainDepthVideo(5 * time.Second)
+	depth.DrainDepthVideo(5 * time.Second)
 	assistant.FlushTelemetry()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

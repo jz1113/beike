@@ -66,7 +66,7 @@ backend/
   internal/catalog/          类目、商品、提示词、风格、采集
   internal/library/          素材库、审核、查重、母组、反推任务
   internal/assets/           存储、生图任务、素材生命周期与表现
-  internal/generate/         图片、视频、深度、分析、文案、大字报、画布文字、导出
+  internal/generate/         图片、视频、分析、文案与画布文字；depth、headline、export 是子包
   internal/workshop/         工坊批次与输出审核
   internal/assistant/        会话、回合、文档抽取与沙箱
   internal/keywordreview/    关键词审核与提交保护；review 子包做提示词、结果校验与补救

@@ -12,7 +12,7 @@ import (
 )
 
 const lianchiImageBase = "https://api.gapnet.ai/endpoint"
-const imageGatewayMismatch = "当前接口地址与服务器允许的视觉网关不一致。请在设置 → 服务接口配置中改为服务器配置的网关地址，或联系管理员配置该网关；密钥未发送到其他网关。"
+const ImageGatewayMismatch = "当前接口地址与服务器允许的视觉网关不一致。请在设置 → 服务接口配置中改为服务器配置的网关地址，或联系管理员配置该网关；密钥未发送到其他网关。"
 
 func imageGatewayError(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model string) (int, map[string]any) {
 	if model == "openai/gpt-image-2" {
@@ -31,9 +31,9 @@ func imageGatewayError(cfg config.Config, r *http.Request, payload map[string]js
 	format := rawString(payload, "apiFormat")
 	allowHTTP := rawBool(payload, "allowInsecureHttp")
 	if clientBase != "" && !system.AllowCustomBase(cfg) && !system.SafeHTTPSGateway(clientBase) && !(format == "openai-responses" && allowHTTP && system.PublicHTTPGateway(clientBase)) {
-		return http.StatusBadRequest, map[string]any{"success": false, "error": imageGatewayMismatch, "code": "gateway_base_url"}
+		return http.StatusBadRequest, map[string]any{"success": false, "error": ImageGatewayMismatch, "code": "gateway_base_url"}
 	}
-	base := imageDefaultBase()
+	base := ImageDefaultBase()
 	if clientBase != "" {
 		base = system.NormalizeGatewayBaseURL(clientBase)
 	}
@@ -51,7 +51,7 @@ func imageAPIKey(cfg config.Config, r *http.Request, payload map[string]json.Raw
 	if key == "" {
 		key = strings.TrimSpace(r.Header.Get("x-custom-api-key"))
 	}
-	defaults := imageDefaultBase()
+	defaults := ImageDefaultBase()
 	thirdParty := clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != system.NormalizeGatewayBaseURL(defaults)
 	if key == "" && !thirdParty && !cfg.Production() {
 		key = strings.TrimSpace(os.Getenv("AI_DRAWING_API_KEY"))
@@ -62,7 +62,7 @@ func imageAPIKey(cfg config.Config, r *http.Request, payload map[string]json.Raw
 	return key
 }
 
-func imageDefaultBase() string {
+func ImageDefaultBase() string {
 	for _, key := range []string{"AI_DRAWING_BASE_URL", "AI_DRAWING_API_BASE_URL", "AI_API_BASE", "AI_BASE_URL"} {
 		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 			return value

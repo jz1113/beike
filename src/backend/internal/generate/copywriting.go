@@ -37,10 +37,10 @@ func copyNeedsUpstream(cfg config.Config, r *http.Request, payload map[string]an
 	if strings.HasPrefix(strings.TrimSpace(model), "deepseek-official:") {
 		return true
 	}
-	if strings.TrimSpace(stringField(payload, "customApiKey")) != "" || strings.TrimSpace(r.Header.Get("x-custom-api-key")) != "" {
+	if strings.TrimSpace(StringField(payload, "customApiKey")) != "" || strings.TrimSpace(r.Header.Get("x-custom-api-key")) != "" {
 		return true
 	}
-	if strings.TrimSpace(stringField(payload, "customBaseUrl")) != "" || strings.TrimSpace(r.Header.Get("x-custom-base-url")) != "" {
+	if strings.TrimSpace(StringField(payload, "customBaseUrl")) != "" || strings.TrimSpace(r.Header.Get("x-custom-base-url")) != "" {
 		return true
 	}
 	if cfg.Production() {
@@ -58,10 +58,10 @@ func writeCopyFallback(w http.ResponseWriter, payload map[string]any) {
 }
 
 func localCopy(payload map[string]any) map[string]any {
-	titleText := stringField(payload, "productTitle")
-	role := stringField(payload, "productRole")
+	titleText := StringField(payload, "productTitle")
+	role := StringField(payload, "productRole")
 	name := sanitizeProductTitle(titleText)
-	existing := stringListField(payload, "existingTitles")
+	existing := StringListField(payload, "existingTitles")
 	source := titleText + " " + role
 	var title, content string
 	switch {
@@ -125,10 +125,10 @@ func formatCleanTitle(raw, defaultName string, existing []string) string {
 	title = strings.Join(strings.Fields(title), "")
 	title = titleBan.ReplaceAllString(title, "")
 	title = strings.TrimSpace(title)
-	if title == "" || utf16Len(title) < 5 {
+	if title == "" || Utf16Len(title) < 5 {
 		title = "实测这件" + defaultName + "质感超出预期"
 	}
-	if utf16Len(title) > 20 {
+	if Utf16Len(title) > 20 {
 		title = utf16Slice(title, 20)
 	}
 	if len(existing) > 0 && containsString(existing, title) {
@@ -150,7 +150,7 @@ func stripEmojis(text string) string {
 	return strings.TrimSpace(emojiPattern.ReplaceAllString(text, ""))
 }
 
-func utf16Len(value string) int {
+func Utf16Len(value string) int {
 	units := 0
 	for _, r := range value {
 		if r > 0xFFFF {
@@ -194,12 +194,12 @@ func utf16Slice(value string, max int) string {
 	return string(runes[:count])
 }
 
-func stringField(payload map[string]any, key string) string {
+func StringField(payload map[string]any, key string) string {
 	value, _ := payload[key].(string)
 	return value
 }
 
-func stringListField(payload map[string]any, key string) []string {
+func StringListField(payload map[string]any, key string) []string {
 	items, _ := payload[key].([]any)
 	out := make([]string, 0, len(items))
 	for _, item := range items {

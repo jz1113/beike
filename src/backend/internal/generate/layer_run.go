@@ -31,18 +31,18 @@ func runLayer(cfg config.Config, w http.ResponseWriter, r *http.Request, payload
 		"model": model, "image": payload["image"], "prompt": payload["prompt"], "size": size,
 		"layer_decomposition": true, "output_format": "png", "response_format": "url", "watermark": false,
 	}
-	status, raw, err := postModel(r.Context(), http.MethodPost, base+"/images/generations", apiKey, body, 300*time.Second)
+	status, raw, err := PostModel(r.Context(), http.MethodPost, base+"/images/generations", apiKey, body, 300*time.Second)
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "图层拆分失败；请核对平台任务记录后再重试"})
 		return
 	}
 	var data map[string]any
 	if json.Unmarshal(raw, &data) != nil {
-		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "图层接口返回非 JSON（HTTP " + itoa(status) + "），请检查平台接口是否开放"})
+		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "图层接口返回非 JSON（HTTP " + Itoa(status) + "），请检查平台接口是否开放"})
 		return
 	}
 	if status < 200 || status >= 300 {
-		message := "图层拆分失败（" + itoa(status) + "）"
+		message := "图层拆分失败（" + Itoa(status) + "）"
 		if nested, ok := data["error"].(map[string]any); ok {
 			if text, ok := nested["message"].(string); ok && text != "" {
 				message = text
@@ -73,11 +73,11 @@ func layerTarget(cfg config.Config, r *http.Request, payload map[string]any) (st
 		}
 		return "https://ark.cn-beijing.volces.com/api/v3", key, model
 	}
-	clientBase := strings.TrimSpace(stringField(payload, "customBaseUrl"))
+	clientBase := strings.TrimSpace(StringField(payload, "customBaseUrl"))
 	if clientBase == "" {
 		clientBase = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
 	}
-	base := imageDefaultBase()
+	base := ImageDefaultBase()
 	if clientBase != "" {
 		base = system.NormalizeGatewayBaseURL(clientBase)
 	}
@@ -85,7 +85,7 @@ func layerTarget(cfg config.Config, r *http.Request, payload map[string]any) (st
 	if model == "" {
 		model = "seedream-v5-pro/layer-decomposition"
 	}
-	return strings.TrimRight(base, "/") + "/v1", headlineAPIKey(cfg, r, payload, clientBase), model
+	return strings.TrimRight(base, "/") + "/v1", HeadlineAPIKey(cfg, r, payload, clientBase), model
 }
 
 func parseLayers(data map[string]any) ([]map[string]any, string) {
@@ -109,7 +109,7 @@ func parseLayers(data map[string]any) ([]map[string]any, string) {
 		if separate {
 			name, _ := item["name"].(string)
 			if name == "" {
-				name = "图层 " + itoa(index+1)
+				name = "图层 " + Itoa(index+1)
 			}
 			layers = append(layers, map[string]any{"url": url, "name": name, "zIndex": index, "width": width, "height": height, "placement": "separate"})
 			continue
@@ -120,7 +120,7 @@ func parseLayers(data map[string]any) ([]map[string]any, string) {
 		}
 		name, _ := item["name"].(string)
 		if name == "" {
-			name = "图层 " + itoa(int(zIndex))
+			name = "图层 " + Itoa(int(zIndex))
 			if zIndex == 0 {
 				name = "底图"
 			}

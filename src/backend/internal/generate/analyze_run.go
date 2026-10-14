@@ -22,7 +22,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 	}
 	title := rawString(payload, "productTitle")
 	messages := []any{map[string]any{"role": "user", "content": analyzePrompt(title, rawString(payload, "productProps"), shotCount, rawString(payload, "extraRequirements"))}}
-	text, _, status, err := chatCompletion(r.Context(), base, apiKey, model, messages, 0.4, 90*time.Second)
+	text, _, status, err := ChatCompletion(r.Context(), base, apiKey, model, messages, 0.4, 90*time.Second)
 	if err != nil || status >= 300 || text == "" {
 		message := "视觉分析失败"
 		if err != nil {
@@ -31,7 +31,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": message})
 		return
 	}
-	parsed := decodeObject(text)
+	parsed := DecodeObject(text)
 	if parsed == nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "视觉模型没有返回合法 JSON"})
 		return
@@ -40,13 +40,13 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 	if prompts == nil {
 		prompts = []any{}
 	}
-	fingerprint := textField(parsed, "productFingerprint", "product_fingerprint")
-	role := textField(parsed, "productRole", "product_role")
-	scene := textField(parsed, "masterScene", "master_scene")
-	look := textField(parsed, "lookBible", "look_bible")
-	style := textField(parsed, "styleBible", "style_bible")
-	identity := textField(parsed, "identityBible", "identity_bible")
-	action := textField(parsed, "actionDigest")
+	fingerprint := TextField(parsed, "productFingerprint", "product_fingerprint")
+	role := TextField(parsed, "productRole", "product_role")
+	scene := TextField(parsed, "masterScene", "master_scene")
+	look := TextField(parsed, "lookBible", "look_bible")
+	style := TextField(parsed, "styleBible", "style_bible")
+	identity := TextField(parsed, "identityBible", "identity_bible")
+	action := TextField(parsed, "actionDigest")
 	saveAnalysis(cfg, r, title, fingerprint, model, prompts)
 	var group any
 	if scene != "" {
@@ -71,11 +71,11 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 
 func analyzePrompt(title, props string, shots int, extra string) string {
 	return "你是商品买家秀分镜策划。只返回 JSON，字段包括 productFingerprint、productRole、masterScene、lookBible、styleBible、identityBible、actionDigest、prompts。" +
-		"prompts 为长度 " + itoa(shots) + " 的数组，每项含 shot、prompt、shotType。" +
+		"prompts 为长度 " + Itoa(shots) + " 的数组，每项含 shot、prompt、shotType。" +
 		"商品标题：" + title + "。商品属性：" + props + "。补充要求：" + extra + "。不要编造无法从标题确认的参数。"
 }
 
-func textField(data map[string]any, keys ...string) string {
+func TextField(data map[string]any, keys ...string) string {
 	for _, key := range keys {
 		if text, ok := data[key].(string); ok {
 			return text

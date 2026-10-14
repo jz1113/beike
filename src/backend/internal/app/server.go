@@ -12,6 +12,9 @@ import (
 	"beike.local/cloud/src/backend/internal/catalog"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/generate/depth"
+	"beike.local/cloud/src/backend/internal/generate/export"
+	"beike.local/cloud/src/backend/internal/generate/headline"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/keywordreview"
 	"beike.local/cloud/src/backend/internal/library"
@@ -121,19 +124,19 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/upload-ref", true, generate.UploadRef()},
 		{"POST /api/generate/canvas-text", true, generate.CanvasText(cfg)},
 		{"POST /api/generate/layer-decomposition", true, generate.LayerDecomposition(cfg)},
-		{"POST /api/generate/headline-title", true, generate.HeadlineTitle(cfg)},
-		{"POST /api/generate/headline-design", true, generate.HeadlineDesign(cfg)},
+		{"POST /api/generate/headline-title", true, headline.HeadlineTitle(cfg)},
+		{"POST /api/generate/headline-design", true, headline.HeadlineDesign(cfg)},
 		{"POST /api/generate/analyze", true, generate.Analyze(cfg)},
 		{"POST /api/generate/copywriting", true, generate.Copywriting(cfg)},
 		{"POST /api/generate/image", true, generate.Image(cfg)},
 		{"GET /api/generate/image", true, generate.Image(cfg)},
 		{"POST /api/generate/video", true, generate.Video(cfg)},
 		{"GET /api/generate/video", true, generate.Video(cfg)},
-		{"POST /api/generate/depth-image", true, generate.DepthImage(cfg)},
-		{"POST /api/generate/depth-video", true, generate.DepthVideo(cfg)},
-		{"GET /api/generate/depth-video", true, generate.DepthVideo(cfg)},
-		{"GET /api/generate/depth-image", true, generate.DepthImage(cfg)},
-		{"POST /api/generate/export-zip", true, generate.ExportZip(cfg)},
+		{"POST /api/generate/depth-image", true, depth.DepthImage(cfg)},
+		{"POST /api/generate/depth-video", true, depth.DepthVideo(cfg)},
+		{"GET /api/generate/depth-video", true, depth.DepthVideo(cfg)},
+		{"GET /api/generate/depth-image", true, depth.DepthImage(cfg)},
+		{"POST /api/generate/export-zip", true, export.ExportZip(cfg)},
 		{"POST /api/workshop/tasks/{taskId}/review", true, workshop.Review(cfg)},
 	}
 }

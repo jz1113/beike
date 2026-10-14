@@ -50,7 +50,7 @@ func postImageEdit(ctx context.Context, endpoint, apiKey string, payload map[str
 	if apiKey != "" {
 		request.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	response, err := modelHTTP().Do(request)
+	response, err := ModelHTTP().Do(request)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -153,7 +153,7 @@ func downloadEditImage(ctx context.Context, ref string) (editImageFile, error) {
 	if err != nil {
 		return editImageFile{}, errors.New("参考图下载失败")
 	}
-	response, err := modelHTTP().Do(request)
+	response, err := ModelHTTP().Do(request)
 	if err != nil {
 		return editImageFile{}, errors.New("参考图下载失败")
 	}

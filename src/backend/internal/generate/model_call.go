@@ -13,9 +13,9 @@ import (
 	"beike.local/cloud/src/backend/internal/system"
 )
 
-var modelHTTP = func() *http.Client { return network.SafeClient() }
+var ModelHTTP = func() *http.Client { return network.SafeClient() }
 
-func postModel(ctx context.Context, method, endpoint, apiKey string, payload any, timeout time.Duration) (int, []byte, error) {
+func PostModel(ctx context.Context, method, endpoint, apiKey string, payload any, timeout time.Duration) (int, []byte, error) {
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
@@ -36,7 +36,7 @@ func postModel(ctx context.Context, method, endpoint, apiKey string, payload any
 	if apiKey != "" {
 		request.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	response, err := modelHTTP().Do(request)
+	response, err := ModelHTTP().Do(request)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -45,7 +45,7 @@ func postModel(ctx context.Context, method, endpoint, apiKey string, payload any
 	return response.StatusCode, raw, err
 }
 
-func chatCompletion(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration) (string, map[string]any, int, error) {
+func ChatCompletion(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration) (string, map[string]any, int, error) {
 	payload := map[string]any{
 		"model":           wireModel(model),
 		"messages":        messages,
@@ -55,7 +55,7 @@ func chatCompletion(ctx context.Context, base, apiKey, model string, messages an
 	if strings.HasPrefix(model, "deepseek-official:") {
 		payload["thinking"] = map[string]any{"type": "disabled"}
 	}
-	status, raw, err := postModel(ctx, http.MethodPost, strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")+"/v1/chat/completions", apiKey, payload, timeout)
+	status, raw, err := PostModel(ctx, http.MethodPost, strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")+"/v1/chat/completions", apiKey, payload, timeout)
 	if err != nil {
 		return "", nil, status, err
 	}
@@ -91,7 +91,7 @@ func chatContent(data map[string]any) string {
 	return strings.TrimSpace(text)
 }
 
-func decodeObject(text string) map[string]any {
+func DecodeObject(text string) map[string]any {
 	text = strings.TrimSpace(text)
 	text = strings.TrimPrefix(text, "```json")
 	text = strings.TrimPrefix(text, "```")
@@ -111,6 +111,6 @@ func decodeObject(text string) map[string]any {
 
 type statusError int
 
-func (e statusError) Error() string { return "HTTP " + itoa(int(e)) }
+func (e statusError) Error() string { return "HTTP " + Itoa(int(e)) }
 
 func errStatus(status int) error { return statusError(status) }

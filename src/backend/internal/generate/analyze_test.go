@@ -55,9 +55,9 @@ func TestAnalyzeReturnsStoryboard(t *testing.T) {
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"productFingerprint\":\"台灯\",\"productRole\":\"主体\",\"masterScene\":\"书桌\",\"prompts\":[{\"shot\":1,\"prompt\":\"近景\"}]}"}}]}`))
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	handler := Analyze(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/analyze", strings.NewReader(`{"productTitle":"台灯","shotCount":1,"customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))

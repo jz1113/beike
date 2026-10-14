@@ -147,7 +147,7 @@ func boundedString(raw json.RawMessage, max int, minOne bool, empty string) stri
 		return "String must contain at least 1 character(s)"
 	}
 	if max > 0 && utf8.RuneCountInString(value) > max {
-		return "String must contain at most " + itoa(max) + " character(s)"
+		return "String must contain at most " + Itoa(max) + " character(s)"
 	}
 	return ""
 }
@@ -165,7 +165,7 @@ func stringList(payload map[string]json.RawMessage, key string, max int) string 
 		return "Expected array, received array"
 	}
 	if len(items) > max {
-		return "Array must contain at most " + itoa(max) + " element(s)"
+		return "Array must contain at most " + Itoa(max) + " element(s)"
 	}
 	for _, item := range items {
 		if message := boundedString(item, 0, true, ""); message != "" {

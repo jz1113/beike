@@ -89,9 +89,9 @@ func TestVideoSubmitAndPollUseGateway(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status":"SUCCESS","video_url":"https://cdn.example.com/a.mp4"}`))
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	dbPath := filepath.Join(t.TempDir(), "videos.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {

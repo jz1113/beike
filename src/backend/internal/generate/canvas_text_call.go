@@ -124,7 +124,7 @@ func completeCanvasText(ctx context.Context, base, key, model string, deepseek b
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", http.StatusBadGateway, "文本生成失败（HTTP " + itoa(response.StatusCode) + "），请检查模型配置后重试"
+		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试"
 	}
 	text, message := canvasTextFromChat(raw)
 	if message != "" {
@@ -179,7 +179,7 @@ func completeCanvasResponses(ctx context.Context, base, key, model, prompt strin
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", http.StatusBadGateway, "文本生成失败（HTTP " + itoa(response.StatusCode) + "），请检查模型配置后重试"
+		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试"
 	}
 	text, message := canvasTextFromResponses(raw)
 	if message != "" {

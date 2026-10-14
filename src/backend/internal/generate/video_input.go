@@ -52,7 +52,7 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 			maxImages, maxVideos = 30, 10
 		}
 		if len(images) > maxImages || len(videos) > maxVideos {
-			return "当前模型最多支持 " + itoa(maxImages) + " 张参考图、" + itoa(maxVideos) + " 个参考视频"
+			return "当前模型最多支持 " + Itoa(maxImages) + " 张参考图、" + Itoa(maxVideos) + " 个参考视频"
 		}
 	}
 	resolution := "720P"

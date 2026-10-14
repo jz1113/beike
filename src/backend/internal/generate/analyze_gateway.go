@@ -31,7 +31,7 @@ func analyzeGatewayError(cfg config.Config, r *http.Request, payload map[string]
 	format := rawString(payload, "apiFormat")
 	allowHTTP := rawBool(payload, "allowInsecureHttp")
 	if clientBase != "" && !system.AllowCustomBase(cfg) && !system.SafeHTTPSGateway(clientBase) && !(format == "openai-responses" && allowHTTP && system.PublicHTTPGateway(clientBase)) {
-		return http.StatusBadRequest, map[string]any{"success": false, "error": imageGatewayMismatch, "code": "gateway_base_url"}
+		return http.StatusBadRequest, map[string]any{"success": false, "error": ImageGatewayMismatch, "code": "gateway_base_url"}
 	}
 	if imageAPIKey(cfg, r, payload, clientBase) == "" {
 		return analyzeMissingKey()

@@ -145,9 +145,9 @@ func TestImageSubmitAndPollUseGateway(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":{"status":"SUCCESS","url":"https://cdn.example.com/out.jpg"}}`))
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	dbPath := filepath.Join(t.TempDir(), "images.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {
@@ -223,9 +223,9 @@ func TestImageEditSubmitsMultipart(t *testing.T) {
 		_, _ = w.Write([]byte(`{"task_id":"edit-1"}`))
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	body := `{"prompt":"改封面","model":"gpt-image-2","size":"1024x1024","quality":"high","customApiKey":"secret","customBaseUrl":"` + server.URL + `","images":["data:image/png;base64,` + tinyPNG + `"]}`
@@ -247,9 +247,9 @@ func TestImageGenerationStaysJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`{"task_id":"json-1"}`))
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
@@ -265,9 +265,9 @@ func TestImageEditRejectsBadDataURL(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
-	previous := modelHTTP
-	modelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { modelHTTP = previous })
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
 	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	body := `{"prompt":"改封面","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"` + server.URL + `","images":["data:image/png;base64,%%%"]}`

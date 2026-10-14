@@ -9,7 +9,7 @@ import (
 	"beike.local/cloud/src/backend/internal/system"
 )
 
-func headlineAccessError(cfg config.Config, r *http.Request, payload map[string]any, missingKey string) string {
+func HeadlineAccessError(cfg config.Config, r *http.Request, payload map[string]any, missingKey string) string {
 	model, _ := payload["model"].(string)
 	model = strings.TrimSpace(model)
 	clientBase, _ := payload["customBaseUrl"].(string)
@@ -25,26 +25,26 @@ func headlineAccessError(cfg config.Config, r *http.Request, payload map[string]
 		if clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != "https://api.deepseek.com" {
 			return "DeepSeek 官方模型只能使用官方接口地址"
 		}
-		if strings.TrimSpace(stringField(payload, "customApiKey")) == "" {
+		if strings.TrimSpace(StringField(payload, "customApiKey")) == "" {
 			return missingKey
 		}
 		return ""
 	}
 	if clientBase != "" && !system.AllowCustomBase(cfg) && !system.SafeHTTPSGateway(clientBase) {
-		return imageGatewayMismatch
+		return ImageGatewayMismatch
 	}
-	if headlineAPIKey(cfg, r, payload, clientBase) == "" {
+	if HeadlineAPIKey(cfg, r, payload, clientBase) == "" {
 		return missingKey
 	}
 	return ""
 }
 
-func headlineAPIKey(cfg config.Config, r *http.Request, payload map[string]any, clientBase string) string {
-	key := strings.TrimSpace(stringField(payload, "customApiKey"))
+func HeadlineAPIKey(cfg config.Config, r *http.Request, payload map[string]any, clientBase string) string {
+	key := strings.TrimSpace(StringField(payload, "customApiKey"))
 	if key == "" {
 		key = strings.TrimSpace(r.Header.Get("x-custom-api-key"))
 	}
-	defaults := imageDefaultBase()
+	defaults := ImageDefaultBase()
 	thirdParty := clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != system.NormalizeGatewayBaseURL(defaults)
 	if key == "" && !thirdParty && !cfg.Production() {
 		key = strings.TrimSpace(os.Getenv("AI_DRAWING_API_KEY"))

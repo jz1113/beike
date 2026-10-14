@@ -55,8 +55,8 @@ func optionalAnalyzeString(payload map[string]json.RawMessage, key string, max i
 	if json.Unmarshal(raw, &value) != nil {
 		return key + ": Expected string, received string"
 	}
-	if utf16Len(value) > max {
-		return key + ": String must contain at most " + itoa(max) + " character(s)"
+	if Utf16Len(value) > max {
+		return key + ": String must contain at most " + Itoa(max) + " character(s)"
 	}
 	return ""
 }
@@ -78,11 +78,11 @@ func analyzeURLList(payload map[string]json.RawMessage, key string) string {
 	}
 	for index, item := range items {
 		if analyzeKind(item) != "string" {
-			return key + "." + itoa(index) + ": Expected string, received " + analyzeKind(item)
+			return key + "." + Itoa(index) + ": Expected string, received " + analyzeKind(item)
 		}
 		var value string
-		if json.Unmarshal(item, &value) != nil || utf16Len(value) > 8192 {
-			return key + "." + itoa(index) + ": String must contain at most 8192 character(s)"
+		if json.Unmarshal(item, &value) != nil || Utf16Len(value) > 8192 {
+			return key + "." + Itoa(index) + ": String must contain at most 8192 character(s)"
 		}
 	}
 	return ""

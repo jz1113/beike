@@ -22,14 +22,14 @@ func TestLayerDecompositionRequiresGatewayKey(t *testing.T) {
 		t.Fatalf("key %d %s", missing.Code, missing.Body.String())
 	}
 	t.Setenv("ARK_LAYER_API_KEY", "official")
-	previous := modelHTTP
-	modelHTTP = func() *http.Client {
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client {
 		return &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			body := `{"data":[{"url":"https://cdn.example.com/a.png","size":"100x80"},{"url":"https://cdn.example.com/b.png","size":"100x80"}]}`
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 		})}
 	}
-	t.Cleanup(func() { modelHTTP = previous })
+	t.Cleanup(func() { ModelHTTP = previous })
 	official := httptest.NewRecorder()
 	handler.ServeHTTP(official, httptest.NewRequest(http.MethodPost, "/api/generate/layer-decomposition", strings.NewReader(body)))
 	if official.Code != http.StatusOK || !strings.Contains(official.Body.String(), "https://cdn.example.com/a.png") || !strings.Contains(official.Body.String(), `"temporaryUrls":true`) {

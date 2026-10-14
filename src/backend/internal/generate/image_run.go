@@ -53,7 +53,7 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		return
 	}
 	if taskID == "" {
-		taskID = "direct_" + itoa(int(time.Now().UnixMilli()))
+		taskID = "direct_" + Itoa(int(time.Now().UnixMilli()))
 	}
 	recordID, reusedURL, statusCode, message := persistSubmittedImage(cfg, r, payload, adapted, taskID, direct, quality, size)
 	if statusCode != 0 {
@@ -160,7 +160,7 @@ func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[st
 		if isImageEditEndpoint(endpoint) {
 			status, raw, err = postImageEdit(r.Context(), endpoint, apiKey, payload, workspace, production, timeout)
 		} else {
-			status, raw, err = postModel(r.Context(), http.MethodPost, endpoint, apiKey, payload, timeout)
+			status, raw, err = PostModel(r.Context(), http.MethodPost, endpoint, apiKey, payload, timeout)
 		}
 		if err != nil {
 			return 0, nil, err
@@ -236,7 +236,7 @@ func imageUpstreamError(data map[string]any, status int) string {
 			return text
 		}
 	}
-	return "HTTP " + itoa(status) + " 提交失败"
+	return "HTTP " + Itoa(status) + " 提交失败"
 }
 
 func imageReferences(payload map[string]json.RawMessage) []string {
@@ -279,7 +279,7 @@ func imageSubmitCredentials(cfg config.Config, r *http.Request, payload map[stri
 	if clientBase == "" {
 		clientBase = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
 	}
-	base := imageDefaultBase()
+	base := ImageDefaultBase()
 	if clientBase != "" {
 		base = system.NormalizeGatewayBaseURL(clientBase)
 	}
