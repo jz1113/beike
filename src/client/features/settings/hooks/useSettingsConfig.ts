@@ -87,6 +87,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     let active = true;
     setConfigLoaded(false);
     setConfigLoadError('');
+    setSavedConfig(null);
     void readSettingsConfig().then(config => {
       if (!active) return;
       setBaseUrl(config.baseUrl); setApiKey(config.apiKey); setDeepSeekApiKey(config.deepSeekApiKey);
@@ -188,13 +189,19 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const currentConfig: SettingsConfigSnapshot = { apiKey, baseUrl, deepSeekApiKey, wanbangKey, wanbangSecret, isWanbangEnabled,
     scraperId, scraperSecret, isApiaEnabled, qiyunAppId, qiyunAppKey, isQiyunEnabled, appAccessToken, storageEnabled,
     storageProvider, storageAccountId, storageEndpoint, storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain };
+  const configLoaded = mainConfigLoaded && independentProviders.independentConfigLoaded;
+  const mainHasUnsavedChanges = Boolean(
+    configLoaded
+    && savedConfig
+    && settingsConfigFingerprint(currentConfig) !== settingsConfigFingerprint(savedConfig),
+  );
 
   return {
-    configLoaded: mainConfigLoaded && independentProviders.independentConfigLoaded,
+    configLoaded,
     configLoadError: mainConfigLoadError || independentProviders.independentConfigLoadError,
     reloadConfig,
     isSavingConfig: saves.isSaving || independentProviders.independentIsSavingConfig,
-    hasUnsavedChanges: Boolean(savedConfig && settingsConfigFingerprint(currentConfig) !== settingsConfigFingerprint(savedConfig)) || independentProviders.independentHasUnsavedChanges,
+    hasUnsavedChanges: mainHasUnsavedChanges || independentProviders.independentHasUnsavedChanges,
     gatewaySaveState: saves.states.comfly_gateway || 'idle',
     gatewaySavedConfig: savedConfig ? { baseUrl: savedConfig.baseUrl, apiKey: savedConfig.apiKey } : null,
     isSavingGateway: saves.states.comfly_gateway === 'saving',

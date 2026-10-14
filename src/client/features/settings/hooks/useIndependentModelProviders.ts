@@ -8,9 +8,32 @@ import { isPublicHttpGatewayIpUrl } from '@shared/domain/models/gatewayCreds';
 import { useConfigSaveState } from './useConfigSaveState';
 
 type ProviderSnapshot = {
-  openAIBaseUrl: string; openAIApiKey: string; openAIEnabled: boolean;
-  openAIAllowInsecureHttp: boolean; lianchiApiKey: string;
+  openAIBaseUrl: string;
+  openAIApiKey: string;
+  openAIEnabled: boolean;
+  openAIInsecureHttpConsentUrl: string;
+  lianchiApiKey: string;
 };
+
+function buildIndependentProviderSnapshot(
+  openAIBaseUrl: string,
+  openAIApiKey: string,
+  openAIEnabled: boolean,
+  openAIInsecureHttpConsentUrl: string,
+  lianchiApiKey: string,
+): ProviderSnapshot {
+  return {
+    openAIBaseUrl: openAIBaseUrl.trim().replace(/\/+$/, ''),
+    openAIApiKey: openAIApiKey.trim(),
+    openAIEnabled,
+    openAIInsecureHttpConsentUrl: openAIInsecureHttpConsentUrl.trim(),
+    lianchiApiKey: lianchiApiKey.trim(),
+  };
+}
+
+function independentProviderFingerprint(snapshot: ProviderSnapshot): string {
+  return JSON.stringify(snapshot);
+}
 
 export function useIndependentModelProviders(isOpen: boolean, showToast: (message: string) => void, reloadVersion = 0) {
   const [independentConfigLoaded, setConfigLoaded] = useState(false);
@@ -47,11 +70,12 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     let active = true;
     setConfigLoaded(false);
     setConfigLoadError('');
+    setSavedConfig(null);
     void (async () => {
       await waitForCredentialSaves();
       const baseUrl = (localStorage.getItem('openai_base_url') || 'https://api.openai.com').trim().replace(/\/+$/, '');
       const enabled = localStorage.getItem('openai_responses_enabled') === 'true';
-      const consentUrl = localStorage.getItem('openai_insecure_http_consent_url') || '';
+      const consentUrl = (localStorage.getItem('openai_insecure_http_consent_url') || '').trim();
       const [key, lianchiKey] = await Promise.all([credentialGet('openai_api_key', true), credentialGet('lianchi_api_key', true)]);
       if (!active) return;
       setOpenAIBaseUrl(baseUrl);
@@ -59,8 +83,7 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
       setOpenAIInsecureHttpConsentUrl(consentUrl);
       setOpenAIApiKey(key);
       setLianchiApiKey(lianchiKey);
-      setSavedConfig({ openAIBaseUrl: baseUrl, openAIApiKey: key, openAIEnabled: enabled,
-        openAIAllowInsecureHttp: /^http:\/\//i.test(baseUrl) && consentUrl === baseUrl, lianchiApiKey: lianchiKey });
+      setSavedConfig(buildIndependentProviderSnapshot(baseUrl, key, enabled, consentUrl, lianchiKey));
       setConfigLoaded(true);
     })().catch(error => { if (active) setConfigLoadError(formatUserError(error, '独立渠道配置加载失败，请重试')); });
     return () => { active = false; };
@@ -81,9 +104,19 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
       if (url.protocol === 'http:' && !openAIAllowInsecureHttp) throw new Error('HTTP 网关需先勾选明文传输选项');
       if (url.protocol === 'http:' && !isPublicHttpGatewayIpUrl(url.toString())) throw new Error('HTTP 网关只支持公网 IPv4 地址，不支持内网地址或域名');
       if (openAIEnabled && !openAIApiKey.trim()) throw new Error('启用前请填写 OpenAI API Key');
-      const snapshot = { openAIBaseUrl: normalizedOpenAIBaseUrl, openAIApiKey: openAIApiKey.trim(), openAIEnabled, openAIAllowInsecureHttp };
+      const snapshot = buildIndependentProviderSnapshot(
+        openAIBaseUrl,
+        openAIApiKey,
+        openAIEnabled,
+        openAIAllowInsecureHttp ? normalizedOpenAIBaseUrl : '',
+        lianchiApiKey,
+      );
       await saves.save('openai_official', snapshot, () => persistOpenAIConfig(snapshot.openAIBaseUrl, snapshot.openAIApiKey,
-        { enabled: snapshot.openAIEnabled, allowInsecureHttp: snapshot.openAIAllowInsecureHttp }), 'OpenAI Responses 接口配置已保存');
+        {
+          enabled: snapshot.openAIEnabled,
+          allowInsecureHttp: /^http:\/\//i.test(snapshot.openAIBaseUrl)
+            && snapshot.openAIInsecureHttpConsentUrl === snapshot.openAIBaseUrl,
+        }), 'OpenAI Responses 接口配置已保存');
     } catch (error) {
       showToast(`OpenAI 配置保存失败：${formatUserError(error, '请检查接口地址')}`);
     }
@@ -103,10 +136,14 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     independentIsSavingConfig: saves.isSaving,
     isSavingOpenAI: saves.states.openai_official === 'saving',
     isSavingLianchi: saves.states.lianchi_images === 'saving',
-    independentHasUnsavedChanges: Boolean(savedConfig && (
-      normalizedOpenAIBaseUrl !== savedConfig.openAIBaseUrl || openAIApiKey.trim() !== savedConfig.openAIApiKey.trim() ||
-      openAIEnabled !== savedConfig.openAIEnabled || openAIAllowInsecureHttp !== savedConfig.openAIAllowInsecureHttp ||
-      lianchiApiKey.trim() !== savedConfig.lianchiApiKey.trim()
+    independentHasUnsavedChanges: Boolean(independentConfigLoaded && savedConfig && (
+      independentProviderFingerprint(buildIndependentProviderSnapshot(
+        openAIBaseUrl,
+        openAIApiKey,
+        openAIEnabled,
+        openAIInsecureHttpConsentUrl,
+        lianchiApiKey,
+      )) !== independentProviderFingerprint(savedConfig)
     )),
     connectionResults: connectionChecks.results,
     openAIBaseUrl, setOpenAIBaseUrl, openAIApiKey, setOpenAIApiKey,
