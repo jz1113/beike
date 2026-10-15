@@ -60,7 +60,11 @@ function getModelLogoDataUri(modelId: string): string | null {
 export function getModelLogoPath(modelId: string = ''): string {
   const m = (modelId || '').toLowerCase();
 
-  // 1. Google (Gemini / Imagen / Veo / Omni Flash / Gemma / PaLM / Banana / NanoBanana)
+  if (m === 'google') {
+    return '/logo/google.svg';
+  }
+
+  // 1. Gemini / Imagen / Veo / Omni Flash / Gemma / PaLM / Banana / NanoBanana
   if (m.includes('gemini') || m.includes('google') || m.includes('gemma') || m.includes('imagen') || m.includes('veo') || m.includes('omni_flash') || m.includes('omni-flash') || m.includes('palm') || m.includes('bard') || m.includes('banana') || m.includes('nanobanana')) {
     return '/logo/gemini.svg';
   }
@@ -80,8 +84,12 @@ export function getModelLogoPath(modelId: string = ''): string {
     return '/logo/mistral.svg';
   }
 
-  // 5. 字节跳动 / 即梦 / 豆包 (Seedream / Seedance / Jimeng / Doubao / Volcengine)
-  if (m.includes('seedream') || m.includes('seedance') || m.includes('jimeng') || m.includes('doubao') || m.includes('bytedance') || m.includes('volc') || m.includes('skylark')) {
+  if (m === 'bytedance' || m.includes('bytedance')) {
+    return '/logo/bytedance.svg';
+  }
+
+  // 5. 即梦 / 豆包 (Seedream / Seedance / Jimeng / Doubao / Volcengine)
+  if (m.includes('seedream') || m.includes('seedance') || m.includes('jimeng') || m.includes('doubao') || m.includes('volc') || m.includes('skylark')) {
     return '/logo/jimeng.svg';
   }
 
@@ -175,8 +183,12 @@ export function getModelLogoPath(modelId: string = ''): string {
     return '/logo/ideogram.svg';
   }
 
-  // 23. Kimi / Moonshot
-  if (m.includes('kimi') || m.includes('moonshot')) {
+  if (m === 'moonshot' || m.includes('moonshot')) {
+    return '/logo/moonshot.svg';
+  }
+
+  // 23. Kimi
+  if (m.includes('kimi')) {
     return '/logo/kimi.svg';
   }
 
@@ -228,6 +240,16 @@ export function getModelLogoPath(modelId: string = ''): string {
   // 33. Replicate
   if (m.includes('replicate')) {
     return '/logo/replicate.svg';
+  }
+
+  if (m.includes('xiaomi') || m.includes('mimo')) {
+    return '/logo/xiaomi.svg';
+  }
+  if (m.includes('topaz')) {
+    return '/logo/topaz.svg';
+  }
+  if (m.includes('eleven')) {
+    return '/logo/elevenlabs.svg';
   }
 
   // 34. 其他厂商 / 社区开源模型 (HuggingFace 开放模型图标)

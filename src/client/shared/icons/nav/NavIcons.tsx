@@ -31,38 +31,21 @@ export function NavHomeIcon({ active = false, className = 'w-full h-full', ...pr
 /**
  * 全局导航 · 生成创作双星图标 (支持 active 实心与非 active 描边)
  */
-export function NavGenerateIcon({ active = false, className = 'w-full h-full', ...props }: NavIconProps) {
+export function NavGenerateIcon({ active = false, className = 'w-full h-full', strokeWidth = 1.8, ...props }: NavIconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} {...props}>
-      {active ? (
-        <>
-          <path
-            d="M10 2L12.39 7.61L18 10L12.39 12.39L10 18L7.61 12.39L2 10L7.61 7.61L10 2Z"
-            fill="currentColor"
-          />
-          <path
-            d="M18.5 14L19.7 16.8L22.5 18L19.7 19.2L18.5 22L17.3 19.2L14.5 18L17.3 16.8L18.5 14Z"
-            fill="currentColor"
-          />
-        </>
-      ) : (
-        <>
-          <path
-            d="M10 2L12.39 7.61L18 10L12.39 12.39L10 18L7.61 12.39L2 10L7.61 7.61L10 2Z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M18.5 14L19.7 16.8L22.5 18L19.7 19.2L18.5 22L17.3 19.2L14.5 18L17.3 16.8L18.5 14Z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </>
-      )}
+    <svg
+      viewBox="0 0 24 24"
+      fill={active ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+      {...props}
+    >
+      <path d="M9.5 5Q9.5 13.5 18 13.5Q9.5 13.5 9.5 22Q9.5 13.5 1 13.5Q9.5 13.5 9.5 5Z" />
+      <path d="M18 1.5Q18 5.5 22 5.5Q18 5.5 18 9.5Q18 5.5 14 5.5Q18 5.5 18 1.5Z" />
     </svg>
   );
 }

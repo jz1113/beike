@@ -26,7 +26,16 @@ func ProxyVideo(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "error": "未授权：缺少有效的访问凭证或媒体签名"})
 			return
 		}
-		target, status, message := normalizeVideoProxyURL(cfg, strings.TrimSpace(r.URL.Query().Get("url")))
+		rawURL := strings.TrimSpace(r.URL.Query().Get("url"))
+		if strings.HasPrefix(rawURL, "/storage/") {
+			http.Redirect(w, r, strings.SplitN(rawURL, "?", 2)[0], http.StatusFound)
+			return
+		}
+		if parsed, err := url.Parse(rawURL); err == nil && parsed.User == nil && strings.HasPrefix(parsed.Path, "/storage/") {
+			http.Redirect(w, r, strings.SplitN(parsed.Path, "?", 2)[0], http.StatusFound)
+			return
+		}
+		target, status, message := normalizeVideoProxyURL(cfg, rawURL)
 		if status != 0 {
 			writeProxyText(w, status, message)
 			return

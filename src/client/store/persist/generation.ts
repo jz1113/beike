@@ -4,44 +4,25 @@ import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import { retainGenerationTasks, STARTUP_TASK_SUMMARY_COUNT } from '../generationLimits';
 import { hasDrawingArchive, mapTaskMedia, readDrawingArchive, restoreArchivedMedia, saveDrawingArchive, type DrawingSnapshot } from './generationArchive';
 import { mergeDrawingSnapshots } from './generationSnapshotMerge';
+import {
+  generationDeletedKeys,
+  isSessionDeleted,
+  markSessionDeleted,
+  isGenerationDeleted,
+  loadGenerationTombstones,
+  persistGenerationTombstones,
+  markGenerationDeleted,
+} from './generationTombstones';
 
-export const generationDeletedKeys = new Set<string>();
-const GENERATION_TOMBSTONE_KEY = 'drawing_deleted_keys';
-
-export function isGenerationDeleted(
-  id?: string | null,
-  taskId?: string | null,
-  resultUrl?: string | null,
-  dbId?: string | null,
-): boolean {
-  return [id, taskId, resultUrl, dbId].some((k) => k && generationDeletedKeys.has(k));
-}
-
-export function loadGenerationTombstones() {
-  if (typeof window === 'undefined') return;
-  try {
-    const raw = sessionStorage.getItem(GENERATION_TOMBSTONE_KEY);
-    if (!raw) return;
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) arr.forEach((k: string) => k && generationDeletedKeys.add(k));
-  } catch {}
-}
-
-function persistGenerationTombstones() {
-  if (typeof window === 'undefined') return;
-  try {
-    sessionStorage.setItem(
-      GENERATION_TOMBSTONE_KEY,
-      JSON.stringify(Array.from(generationDeletedKeys).slice(-200)),
-    );
-  } catch {}
-}
-
-export function markGenerationDeleted(ids: string[], urls?: string[]) {
-  (ids || []).filter(Boolean).forEach((k) => generationDeletedKeys.add(k));
-  (urls || []).filter(Boolean).forEach((k) => generationDeletedKeys.add(k));
-  persistGenerationTombstones();
-}
+export {
+  generationDeletedKeys,
+  isSessionDeleted,
+  markSessionDeleted,
+  isGenerationDeleted,
+  loadGenerationTombstones,
+  persistGenerationTombstones,
+  markGenerationDeleted,
+};
 
 const SNAPSHOT_KEY = 'drawing_history_v2';
 const LEGACY_KEYS = ['drawing_all_generations', 'drawing_sessions', 'drawing_current_session_id'];
@@ -104,13 +85,21 @@ function storageError(message = '对话历史保存失败，请检查本地存�
   }));
 }
 
+let nextFlushDirect = false;
+
 export function flushDrawingStateToStorage() {
   if (!latestSnapshot) return;
   if (saveDrawingTimer) clearTimeout(saveDrawingTimer);
   saveDrawingTimer = null;
   const snapshot = latestSnapshot;
   const base = flushedLocalSnapshot || snapshot;
-  const lightweight = mergeDrawingSnapshots(lightSnapshot(base), lightSnapshot(snapshot), readStoredSnapshot());
+  const direct = nextFlushDirect;
+  nextFlushDirect = false;
+
+  const lightweight = direct
+    ? lightSnapshot(snapshot)
+    : mergeDrawingSnapshots(lightSnapshot(base), lightSnapshot(snapshot), readStoredSnapshot());
+
   let cached = false;
   try {
     // One write commits sessions, current selection and task IDs together.
@@ -119,7 +108,7 @@ export function flushDrawingStateToStorage() {
     flushedLocalSnapshot = snapshot;
     LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
   } catch { /* Keep the previous valid snapshot instead of trimming history. */ }
-  if (hasDrawingArchive()) void saveDrawingArchive(snapshot, base).then(() => {
+  if (hasDrawingArchive()) void saveDrawingArchive(snapshot, direct ? undefined : base).then(() => {
     if (!flushedLocalSnapshot || flushedLocalSnapshot.updatedAt < snapshot.updatedAt) flushedLocalSnapshot = snapshot;
   }).catch(() => storageError(cached
     ? '参考素材归档失败，请暂时保留当前页面，刷新后可能需要重新上传素材' : undefined));
@@ -129,8 +118,11 @@ export function flushDrawingStateToStorage() {
 function lightSnapshot(snapshot: DrawingSnapshot): DrawingSnapshot {
   return {
     ...snapshot,
-    tasks: snapshot.tasks.map(sanitizeTaskForStorage),
-    sessions: snapshot.sessions.map(session => ({ ...session, tasks: session.tasks.map(sanitizeTaskForStorage) })),
+    tasks: snapshot.tasks.filter(t => !isGenerationDeleted(t.id, t.taskId, t.resultUrl, t.dbId)).map(sanitizeTaskForStorage),
+    sessions: snapshot.sessions.filter(s => !isSessionDeleted(s.id)).map(session => ({
+      ...session,
+      tasks: (session.tasks || []).filter(t => !isGenerationDeleted(t.id, t.taskId, t.resultUrl, t.dbId)).map(sanitizeTaskForStorage)
+    })),
   };
 }
 
@@ -142,6 +134,7 @@ export function persistDrawingStateToStorage(
 ) {
   if (typeof window === 'undefined') return;
   if (!isProjectAutosaveEnabled() && !options?.force) return;
+  if (options?.force) nextFlushDirect = true;
   const previous = latestSnapshot || readStoredSnapshot();
   latestSnapshot = {
     tasks: allGens ?? previous.tasks,
@@ -157,9 +150,11 @@ export function persistDrawingStateToStorage(
 function drawingState(snapshot: DrawingSnapshot, sanitize: boolean, failMissingMedia = true) {
   const prepare = (task: GenerationTask) => sanitizeTaskForStartup(task, sanitize, failMissingMedia);
   const valid = (task: GenerationTask) => !isGenerationDeleted(task.id, task.taskId, task.resultUrl, task.dbId);
-  const sessions = snapshot.sessions.map(session => ({
-    ...session, tasks: (session.tasks || []).filter(valid).map(prepare),
-  }));
+  const sessions = snapshot.sessions
+    .filter(session => !isSessionDeleted(session.id))
+    .map(session => ({
+      ...session, tasks: (session.tasks || []).filter(valid).map(prepare),
+    }));
   const map = new Map<string, GenerationTask>();
   [...snapshot.tasks, ...sessions.flatMap(session => session.tasks)].filter(valid).forEach(task => {
     const key = task.id || task.taskId;

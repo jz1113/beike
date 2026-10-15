@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import FeedCardActionBar from './FeedCardActionBar';
+import AgentTurn from './AgentTurn';
 
 export function getFeedImageUrl(
   url?: string | null,
@@ -62,12 +63,14 @@ export default function FeedSingleCard({
   onRetryWithFile,
   onDelete,
 }: FeedSingleCardProps) {
+  if (primaryTask.id.startsWith('agent-task-') || primaryTask.mediaType === 'agent') {
+    return <AgentTurn task={primaryTask} onRegenerate={onRegenerate} onDelete={onDelete} />;
+  }
+
   return (
     <div className="w-full space-y-3">
       <div
-        className={`relative w-full rounded-2xl overflow-hidden shadow-xs hover:shadow-lg border border-slate-200/90 bg-white transition-all duration-300 ${getAspectRatioClass(
-          primaryTask.size
-        )}`}
+        className={`relative w-full rounded-2xl overflow-hidden shadow-xs hover:shadow-lg border border-slate-200/90 bg-white transition-all duration-300 ${getAspectRatioClass(primaryTask.size)}`}
       >
         {primaryTask.status === 'FAILURE' ? (
           /* 失败状态 */

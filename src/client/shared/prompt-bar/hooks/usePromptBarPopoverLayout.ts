@@ -16,7 +16,7 @@ interface PopoverLayout {
 export function usePromptBarPopoverLayout(
   isOpen: boolean,
   preferUp: boolean,
-  anchorRef: RefObject<HTMLDivElement | null>,
+  anchorRef: RefObject<HTMLElement | null>,
   panelWidth = PANEL_WIDTH,
   panelMaxHeight = PANEL_MAX_HEIGHT,
 ) {

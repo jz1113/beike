@@ -5,7 +5,7 @@ import type { useAppStore } from '@client/store';
 
 type AppState = ReturnType<typeof useAppStore.getState>;
 
-interface MergedAssetTask {
+export interface MergedAssetTask {
   id: string;
   dbId?: string;
   taskId?: string;
@@ -32,6 +32,9 @@ interface MergedAssetTask {
   rawTask?: { id?: string; status?: string; resultUrl?: string; referenceImages?: string[] };
   batchTitle?: string;
   canvasProjectTitle?: string;
+  duration?: number | string;
+  coverUrl?: string;
+  isUploaded?: boolean;
 }
 
 interface MergeAssetTaskInput {

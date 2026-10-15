@@ -101,7 +101,14 @@ export function repairWorkflowModelList(value: unknown): WorkflowCapability[] {
       repaired.push(normalizeWorkflowModel({ ...item, id: deepSeekModelId(canonicalId), routeId, channel: 'deepseek' }));
       continue;
     }
-    if (!isApprovedModel(canonicalId)) continue;
+    if (!isApprovedModel(canonicalId)) {
+      const keepCustom = item.isCustom === true && (item.isImage === true || item.isVideo === true || item.isMultimodal === true || item.isVision === true);
+      const customKey = canonicalId.toLowerCase();
+      if (!keepCustom || seen.has(customKey)) continue;
+      seen.add(customKey);
+      repaired.push(normalizeWorkflowModel({ ...item, id: canonicalId, routeId: undefined, channel: item.channel || 'comfly', enabled: item.enabled !== false, isCustom: true, name: item.name || canonicalId, shortName: item.shortName || item.name || canonicalId }));
+      continue;
+    }
     const routeId = item.channel === 'openai' || isOpenAIModelRouteId(item.id) || isOpenAIModelRouteId(item.routeId || '')
       ? openAIModelRouteId(canonicalId) : canonicalId;
     if (seen.has(routeId.toLowerCase())) continue;
@@ -337,7 +344,7 @@ export function getEnabledImageModelsFromSettings(
   const seen = new Set<string>();
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
-    .filter((m) => m.enabled !== false && m.isImage && isApprovedModel(m.id, 'image'))
+    .filter((m) => m.enabled !== false && m.isImage && (isApprovedModel(m.id, 'image') || m.isCustom === true))
     .filter((m) => {
       const key = m.id.toLowerCase();
       if (seen.has(key)) return false;
@@ -368,7 +375,7 @@ export function getEnabledVideoModelsFromSettings(
 ) {
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
-    .filter((m) => m.enabled !== false && m.isVideo && isApprovedModel(m.id, 'video'))
+    .filter((m) => m.enabled !== false && m.isVideo && (isApprovedModel(m.id, 'video') || m.isCustom === true))
     .map((m) => {
       const builtin = VIDEO_GEN_MODELS.find((x) => x.id === getApprovedModel(m.id)?.id);
       return {
@@ -395,7 +402,7 @@ export function getEnabledMultimodalModelsFromSettings(
   return sortModelsByMultimodalPriority(
     list.filter((m) => m.enabled !== false && (m.channel === 'deepseek'
       ? !!deepSeekModel(m.id) && (purpose === 'assistant' ? !!m.isAssistant : !!m.isVision)
-      : isMultimodalWorkflowModel(m) && isApprovedModel(m.id, 'multimodal')))
+      : isMultimodalWorkflowModel(m) && (isApprovedModel(m.id, 'multimodal') || m.isCustom === true)))
       .map((m) => ({ ...m, id: workflowModelRouteId(m),
         name: `${m.name || m.id} · ${m.channel === 'deepseek' ? 'DeepSeek 官方' : m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道'}`,
         shortName: `${m.shortName || m.id} · ${m.channel === 'deepseek' ? '官方' : m.channel === 'openai' ? 'OpenAI' : 'Comfly'}`,

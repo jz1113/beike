@@ -23,7 +23,15 @@ func RemoteHostAllowed(cfg config.Config, host string) bool {
 
 func proxyHostAllowed(cfg config.Config, host string) bool {
 	host = strings.ToLower(strings.Trim(strings.TrimSuffix(host, "."), "[]"))
-	if host == "" || network.PrivateIP(host) {
+	if host == "" {
+		return false
+	}
+	if !cfg.Production() {
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "172.") {
+			return true
+		}
+	}
+	if network.PrivateIP(host) {
 		return false
 	}
 	for _, suffix := range configuredProxyHosts() {
@@ -41,7 +49,14 @@ func proxyHostAllowed(cfg config.Config, host string) bool {
 
 func configuredProxyHosts() []string {
 	hosts := []string{}
-	for _, key := range []string{"S3_PUBLIC_DOMAIN", "S3_ENDPOINT", "R2_PUBLIC_DOMAIN"} {
+	for _, key := range []string{
+		"S3_PUBLIC_DOMAIN", "S3_ENDPOINT", "R2_PUBLIC_DOMAIN",
+		"AI_DRAWING_BASE_URL", "AI_DRAWING_API_BASE_URL", "AI_API_BASE", "AI_BASE_URL", "AI_GATEWAY_URL",
+		"OPENAI_BASE_URL", "OPENAI_API_BASE",
+		"ANTHROPIC_BASE_URL", "GEMINI_BASE_URL", "DEEPSEEK_BASE_URL",
+		"MIDJOURNEY_BASE_URL", "COMFYUI_BASE_URL",
+		"ONEAPI_BASE_URL", "NEWAPI_BASE_URL",
+	} {
 		raw := strings.TrimSpace(os.Getenv(key))
 		if raw == "" {
 			continue

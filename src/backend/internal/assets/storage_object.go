@@ -108,7 +108,7 @@ func putObjectBytes(ctx context.Context, config storage.ObjectConfig, body []byt
 			category = "generated/videos"
 		}
 	}
-	key := storage.ObjectKey(category, ext, filename)
+	key := storage.ObjectKeyWithConfig(config, category, ext, filename)
 	if err := storage.Objects.Put(ctx, config, key, contentType, body); err != nil {
 		return "", err
 	}

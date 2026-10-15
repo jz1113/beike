@@ -17,6 +17,7 @@ export interface RichPromptInputProps {
   variant?: 'default' | 'composer';
   expanded?: boolean;
   singleLine?: boolean;
+  onOpenManual?: () => void;
 }
 
 export interface RichPromptInputRef {

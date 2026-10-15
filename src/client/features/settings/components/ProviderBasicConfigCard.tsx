@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Save } from 'lucide-react';
 import { type ApiProvider, PROTOCOL_OPTIONS, type ApiProviderProtocol } from '../model/apiProviderTypes';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   onTest: () => void;
   isTesting: boolean;
   isSaving: boolean;
+  testOutcome?: { ok: boolean; message: string; timestamp: number };
 }
 
 export function ProviderBasicConfigCard({
@@ -18,6 +19,7 @@ export function ProviderBasicConfigCard({
   onTest,
   isTesting,
   isSaving,
+  testOutcome,
 }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -34,12 +36,17 @@ export function ProviderBasicConfigCard({
 
   return (
     <div className="bg-white dark:bg-[#1a1c20] rounded-2xl border border-slate-200/80 dark:border-white/10 p-5 space-y-4 shadow-sm">
-      <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-        基础配置
+      <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-white/5">
+        <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+          连接配置
+        </div>
+        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+          修改后点击「保存配置」即时生效
+        </span>
       </div>
 
       <div className="space-y-4">
-        {/* 服务商名称 */}
+        {/* 1. 服务商名称 */}
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
             服务商名称
@@ -49,47 +56,59 @@ export function ProviderBasicConfigCard({
             value={provider.name}
             onChange={e => onUpdate({ name: e.target.value })}
             className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
-            placeholder="例如：Google"
+            placeholder="例如：Comfly 网关 / OpenAI"
           />
         </div>
 
-        {/* 服务商类型 */}
+        {/* 2. API 地址 (Base URL) */}
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            服务商类型
+            API 地址
           </label>
-          <select
-            value={provider.providerType}
-            onChange={e => handleTypeChange(e.target.value as ApiProviderProtocol)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
-          >
-            {PROTOCOL_OPTIONS.map(opt => (
-              <option key={opt.id} value={opt.id} className="dark:bg-slate-800">
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <input
+            type="text"
+            value={provider.baseUrl}
+            onChange={e => onUpdate({ baseUrl: e.target.value })}
+            placeholder="https://api.example.com"
+            className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
+          />
           <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-            新建模型的调用协议模板（系统原生走标准 OpenAI 兼容协议，支持各类聚合网关与中转服务）。
+            可粘贴基础地址或常见完整接口地址，保存时会自动规范端点。
           </p>
         </div>
 
-        {/* API 密钥 */}
+        {/* 3. API 密钥 (API Key) */}
         <div>
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            API 密钥
-          </label>
-          <p className="mb-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-            独立域名必须填写该服务商密钥；仅同一中转地址可留空沿用全局 Key
-          </p>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              API 密钥
+            </label>
+            {testOutcome && (
+              <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                testOutcome.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {testOutcome.ok ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    连接正常
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    连接异常
+                  </>
+                )}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
               <input
                 type={showKey ? 'text' : 'password'}
                 value={provider.apiKey}
                 onChange={e => onUpdate({ apiKey: e.target.value })}
-                placeholder="输入 API Key"
-                className="w-full pl-3 pr-9 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
+                placeholder="sk-..."
+                className="w-full pl-3 pr-9 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
               />
               <button
                 type="button"
@@ -104,80 +123,88 @@ export function ProviderBasicConfigCard({
               type="button"
               onClick={onTest}
               disabled={isTesting || !provider.apiKey.trim()}
+              title="测试当前地址与密钥连通性"
               className="px-3.5 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 disabled:opacity-50 transition-all shrink-0 inline-flex items-center gap-1.5"
             >
               {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              {isTesting ? '检测中…' : '检测'}
+              {isTesting ? '检测中…' : '检测连接'}
             </button>
           </div>
+          {testOutcome && !testOutcome.ok && (
+            <p className="mt-1 text-[11px] text-rose-500 dark:text-rose-400 leading-tight">
+              {testOutcome.message}
+            </p>
+          )}
         </div>
 
-        {/* 接口地址 (Base URL) */}
+        {/* 4. 服务商类型 / 调用协议 */}
         <div>
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            接口地址 (Base URL)
-          </label>
-          <input
-            type="text"
-            value={provider.baseUrl}
-            onChange={e => onUpdate({ baseUrl: e.target.value })}
-            placeholder="https://..."
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              服务商类型
+            </label>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {currentProtocol.formatHint}
+            </span>
+          </div>
+          <select
+            value={provider.providerType}
+            onChange={e => handleTypeChange(e.target.value as ApiProviderProtocol)}
             className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
-          />
-          <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-            目录只用于发现模型；不提供目录的接口也可手动添加模型。
-          </p>
+          >
+            {PROTOCOL_OPTIONS.map(opt => (
+              <option key={opt.id} value={opt.id} className="dark:bg-slate-800">
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* 接口格式说明提示 */}
-        <div className="text-[11px] text-slate-400 dark:text-slate-500">
-          接口格式: {currentProtocol.formatHint}
-        </div>
-
-        {/* 模型目录设置折叠面板 */}
+        {/* 模型目录设置高级折叠面板 */}
         <div className="border border-slate-200/60 dark:border-white/5 rounded-xl overflow-hidden">
           <button
             type="button"
             onClick={() => setCatalogOpen(!catalogOpen)}
-            className="w-full px-3 py-2.5 flex items-center justify-between text-left text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+            className="w-full px-3.5 py-2.5 flex items-center justify-between text-left text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
           >
             <span className="flex items-center gap-1.5">
               {catalogOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              模型目录设置
+              高级设置：模型目录端点路径
             </span>
-            <span className="text-[10px] text-slate-400">
-              {provider.catalogPath || '默认端点'}
+            <span className="text-[10px] text-slate-400 font-mono">
+              {provider.catalogPath || '默认 (/v1/models)'}
             </span>
           </button>
           {catalogOpen && (
-            <div className="p-3 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-200/60 dark:border-white/5 space-y-2">
+            <div className="p-3.5 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-200/60 dark:border-white/5 space-y-2">
               <label className="block text-[11px] text-slate-500 dark:text-slate-400">
-                获取模型目录端点相对路径 (例如 /v1/models 或 /v1beta/models)
+                获取模型目录的相对路径（通常为 `/v1/models` 或 `/v1beta/models`）：
               </label>
               <input
                 type="text"
                 value={provider.catalogPath || ''}
                 onChange={e => onUpdate({ catalogPath: e.target.value })}
                 placeholder={currentProtocol.defaultCatalog}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 outline-none focus:border-indigo-500"
+                className="w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 outline-none focus:border-indigo-500"
               />
             </div>
           )}
         </div>
 
-        {/* 保存配置与提示行 */}
-        <div className="pt-2 flex items-center gap-3">
+        {/* 保存配置与提示行：右对齐操作按钮 */}
+        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            保存后该服务商下的所有接口请求将自动使用新配置
+          </span>
           <button
             type="button"
             onClick={onSave}
             disabled={isSaving}
-            className="px-4 py-2 text-xs font-medium rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-sm"
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 self-end sm:self-auto"
           >
-            {isSaving ? '保存中…' : '保存配置'}
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            <span>{isSaving ? '保存中…' : '保存配置'}</span>
           </button>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
-            新模型默认使用服务商地址和密钥
-          </span>
         </div>
       </div>
     </div>

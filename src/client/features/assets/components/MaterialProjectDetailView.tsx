@@ -15,6 +15,7 @@ interface Props {
   setPreviewTask: (task: Task, queue?: Task[]) => void;
   onBatchDelete: (ids: string[]) => void;
   onBatchDownload: (ids: string[]) => void;
+  onDeleteProject?: (project: ProjectFolderItem) => void;
   isDownloadingZip?: boolean;
   isDeleting?: boolean;
 }

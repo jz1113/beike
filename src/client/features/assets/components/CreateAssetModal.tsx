@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Music, Upload, X } from 'lucide-react';
+import { useI18n } from '@client/shared/i18n';
 import {
   addCustomAsset,
   type CustomAssetCategory,
@@ -21,6 +22,7 @@ const CATEGORY_NAMES: Record<CustomAssetCategory, string> = {
 };
 
 export default function CreateAssetModal({ category, isOpen, onClose, onSuccess }: Props) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -83,7 +85,7 @@ export default function CreateAssetModal({ category, isOpen, onClose, onSuccess 
         <button
           type="button"
           onClick={onClose}
-          aria-label="关闭"
+          aria-label={t('common.close')}
           className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
         >
           <X className="h-5 w-5" />
@@ -180,14 +182,14 @@ export default function CreateAssetModal({ category, isOpen, onClose, onSuccess 
               onClick={onClose}
               className="rounded-xl px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
               className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
-              确定保存
+              {t('common.save')}
             </button>
           </div>
         </form>

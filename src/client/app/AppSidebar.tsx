@@ -1,7 +1,9 @@
-import { FolderOpen, PanelLeft, PanelLeftClose, Settings, Sparkle, Wrench } from 'lucide-react';
+import { FolderOpen, PanelLeft, Settings, Wrench } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import type { AppView } from '@client/store/appView';
 import { useToast } from '@client/shared/hooks/useToast';
+import { useI18n } from '@client/shared/i18n';
+import { NavGenerateIcon } from '@client/shared/icons';
 import { SidebarHistory } from './SidebarHistory';
 
 const SIDEBAR_COLLAPSED_KEY = 'beike.sidebar.collapsed';
@@ -77,6 +79,7 @@ export default function AppSidebar({
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [logoHover, setLogoHover] = useState(false);
   const { message: toastMsg, show: showToast } = useToast(2500);
+  const { t } = useI18n();
   const showLabel = !collapsed;
   const showExpandOnLogo = collapsed && logoHover;
 
@@ -110,7 +113,7 @@ export default function AppSidebar({
               if (showExpandOnLogo) toggleCollapsed();
               else onNavigateHub();
             }}
-            aria-label={showExpandOnLogo ? '展开侧栏' : '贝壳云图首页'}
+            aria-label={showExpandOnLogo ? t('sidebar.expand') : '贝壳云图首页'}
             className={`group flex h-11 w-11 items-center justify-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 ${
               collapsed ? '' : 'md:h-[56px] md:min-w-0 md:flex-1 md:justify-start md:gap-[10px]'
             }`}
@@ -132,32 +135,32 @@ export default function AppSidebar({
             <button
               type="button"
               onClick={toggleCollapsed}
-              aria-label="收起侧栏"
+              aria-label={t('sidebar.collapse')}
               aria-expanded
               className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/25 md:flex"
             >
-              <PanelLeftClose className="h-4 w-4" strokeWidth={1.8} />
+              <PanelLeft className="h-5 w-5" strokeWidth={1.8} />
             </button>
           )}
         </div>
 
         <nav className={`flex w-full flex-col items-center gap-1 ${collapsed ? '' : 'md:items-stretch md:gap-[6px]'}`} aria-label="主导航">
           <NavItem
-            label="创作"
+            label={t('sidebar.create')}
             active={currentView === 'home'}
             onClick={onNavigateHub}
             showLabel={showLabel}
-            icon={<Sparkle className="h-[20px] w-[20px]" strokeWidth={1.8} />}
+            icon={<NavGenerateIcon className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
-            label="技能"
+            label={t('sidebar.skills')}
             active={false}
-            onClick={() => showToast('技能功能建设中，敬请期待')}
+            onClick={() => showToast(t('sidebar.skillsComingSoon'))}
             showLabel={showLabel}
             icon={<Wrench className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
-            label="资产"
+            label={t('sidebar.assets')}
             active={currentView === 'assets'}
             onClick={onNavigateAssets}
             showLabel={showLabel}
@@ -178,7 +181,7 @@ export default function AppSidebar({
 
       <div className={`mt-auto flex w-full flex-col items-center border-t border-slate-200/80 pt-3 ${collapsed ? '' : 'md:items-stretch md:pb-1 md:pt-4'}`}>
         <NavItem
-          label="设置"
+          label={t('sidebar.settings')}
           active={currentView === 'settings'}
           onClick={onOpenSettings}
           showLabel={showLabel}

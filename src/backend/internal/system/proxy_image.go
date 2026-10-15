@@ -48,7 +48,7 @@ func ProxyImage(cfg config.Config) http.Handler {
 			return
 		}
 		if strings.HasPrefix(raw, "/") && !strings.HasPrefix(raw, "//") {
-			if publicFileExists(cfg, raw) {
+			if strings.HasPrefix(raw, "/storage/") || publicFileExists(cfg, raw) {
 				http.Redirect(w, r, strings.SplitN(raw, "?", 2)[0], http.StatusFound)
 				return
 			}
@@ -70,11 +70,22 @@ func ProxyImage(cfg config.Config) http.Handler {
 			writeProxySVG(w, http.StatusBadRequest, "不支持的地址")
 			return
 		}
+		parsed, err := url.Parse(imageURL)
+		if err == nil && parsed.User == nil && strings.HasPrefix(parsed.Path, "/storage/") {
+			http.Redirect(w, r, strings.SplitN(parsed.Path, "?", 2)[0], http.StatusFound)
+			return
+		}
+		if err == nil && (strings.Contains(parsed.Path, "/api/system/proxy-image") || strings.Contains(parsed.Path, "/api/system/proxy-video")) {
+			innerURL := parsed.Query().Get("url")
+			if innerURL != "" {
+				http.Redirect(w, r, "/api/system/proxy-image?"+parsed.RawQuery, http.StatusFound)
+				return
+			}
+		}
 		if cfg.Production() && strings.HasPrefix(imageURL, "http://") {
 			writeProxySVG(w, http.StatusForbidden, "地址被安全策略拦截")
 			return
 		}
-		parsed, err := url.Parse(imageURL)
 		if err != nil || parsed.User != nil || !proxyHostAllowed(cfg, parsed.Hostname()) {
 			writeProxySVG(w, http.StatusForbidden, "地址被安全策略拦截")
 			return
@@ -298,4 +309,9 @@ func normalizeProxyURL(raw string) string {
 		return "https://img10.360buyimg.com/pcpubliccms/s1440x1440_" + trimmed
 	}
 	return trimmed
+}
+
+func isLocalHost(host string) bool {
+	host = strings.ToLower(strings.Trim(strings.TrimSuffix(host, "."), "[]"))
+	return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0"
 }

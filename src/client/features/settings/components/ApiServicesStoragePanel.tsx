@@ -1,13 +1,15 @@
-import { Database, Loader2, RotateCcw } from 'lucide-react';
-import { storageConfigError } from '../model/storageValidation';
+import { useContext } from 'react';
+import { Check, Loader2, RotateCcw } from 'lucide-react';
+import { storageConfigError, type StorageProvider } from '../model/storageValidation';
 import { useStorageMigration } from '../hooks/useStorageMigration';
-import { SettingsServiceHeader, SettingsField, SettingsSecretField, SettingsActions, SettingsToggle } from './SettingsControls';
+import { SettingsConnectionContext } from './SettingsControls';
+import { StorageProviderFieldsets } from './StorageProviderFieldsets';
 
 export interface ApiServicesStoragePanelProps {
   storageEnabled: boolean;
   setStorageEnabled: (v: boolean) => void;
-  storageProvider: 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase';
-  setStorageProvider: (v: 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase') => void;
+  storageProvider: StorageProvider;
+  setStorageProvider: (v: StorageProvider) => void;
   storageAccountId: string;
   setStorageAccountId: (v: string) => void;
   storageEndpoint: string;
@@ -22,6 +24,14 @@ export interface ApiServicesStoragePanelProps {
   setStorageBucketName: (v: string) => void;
   storagePublicDomain: string;
   setStoragePublicDomain: (v: string) => void;
+  storageApiPrefix?: string;
+  setStorageApiPrefix?: (v: string) => void;
+  storageMaterialsPrefix?: string;
+  setStorageMaterialsPrefix?: (v: string) => void;
+  storageCloudName?: string;
+  setStorageCloudName?: (v: string) => void;
+  storageZone?: string;
+  setStorageZone?: (v: string) => void;
   isTestingStorage: boolean;
   handleTestStorage: () => Promise<void>;
   isMigratingStorage: boolean;
@@ -30,42 +40,199 @@ export interface ApiServicesStoragePanelProps {
   showToast: (msg: string) => void;
 }
 
+const STORAGE_PROVIDERS = [
+  { id: 'oss', name: '阿里云 OSS' },
+  { id: 'cloudinary', name: 'Cloudinary (免费)' },
+  { id: 'qiniu', name: '七牛云' },
+] as const;
+
 export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
-  const config = { provider: p.storageProvider, accountId: p.storageAccountId, endpoint: p.storageEndpoint,
-    accessKeyId: p.storageAccessKeyId, secretAccessKey: p.storageSecretAccessKey,
-    bucketName: p.storageBucketName, publicDomain: p.storagePublicDomain };
-  const migration = useStorageMigration({ config, enabled: p.storageEnabled,
-    setIsMigratingStorage: p.setIsMigratingStorage, showToast: p.showToast });
+  const statusBadge = useContext(SettingsConnectionContext);
+
+  const config = {
+    provider: p.storageProvider,
+    accountId: p.storageAccountId,
+    endpoint: p.storageEndpoint,
+    accessKeyId: p.storageAccessKeyId,
+    secretAccessKey: p.storageSecretAccessKey,
+    bucketName: p.storageBucketName,
+    publicDomain: p.storagePublicDomain,
+    apiPrefix: p.storageApiPrefix || 'seedance/',
+    materialsPrefix: p.storageMaterialsPrefix || 'canvas-materials/',
+    cloudName: p.storageCloudName || '',
+    zone: p.storageZone || 'z2',
+  };
+
+  const migration = useStorageMigration({
+    config,
+    enabled: p.storageEnabled,
+    setIsMigratingStorage: p.setIsMigratingStorage,
+    showToast: p.showToast,
+  });
   const error = storageConfigError(config, { requirePublicDomain: p.storageEnabled });
-  const domainRequired = ['r2', 'supabase'].includes(p.storageProvider);
-  return <div className="settings-service-form">
-    <SettingsServiceHeader icon={<Database className="h-5 w-5 text-slate-600" />} title="对象存储" description="将生成的图片和视频保存到云端"
-      action={<SettingsToggle label="成品上传到对象存储" checked={p.storageEnabled} disabled={p.isMigratingStorage} onChange={p.setStorageEnabled} />}
-      actions={<SettingsActions onTest={() => void p.handleTestStorage()} onSave={p.handleSaveStorageConfig} testing={p.isTestingStorage} disabled={p.isMigratingStorage} testDisabled={Boolean(storageConfigError(config, { requirePublicDomain: false }))} />} />
-    <p className="settings-field-note">{p.storageEnabled ? '保存配置后，生成结果将转存到云端。' : '保存配置后，生成结果保存在本机。'}模型调用所需的参考文件仍可能临时上传。</p>
-    <fieldset disabled={p.isMigratingStorage} className="min-w-0 border-0 p-0 space-y-4">
-      <div className="settings-form-field"><label>存储服务商</label><div className="settings-provider-options">
-        {([{ id: 'oss', name: '阿里云 OSS' }, { id: 'cos', name: '腾讯云 COS' }, { id: 'r2', name: 'Cloudflare R2' },
-          { id: 's3', name: 'Amazon S3' }, { id: 'minio', name: 'MinIO' }, { id: 'supabase', name: 'Supabase' }] as const)
-          .map(provider => <button key={provider.id} type="button" aria-pressed={p.storageProvider === provider.id} onClick={() => p.setStorageProvider(provider.id)}>{provider.name}</button>)}
-      </div></div>
-      {p.storageProvider === 'r2' && <SettingsField id="storage-account" label="Cloudflare 账户 ID" value={p.storageAccountId} onChange={event => p.setStorageAccountId(event.target.value)} hint="填写账户 ID 后可自动生成 R2 Endpoint，也可直接填写完整端点。" />}
-      <div className="settings-fields-grid">
-        <SettingsField id="storage-endpoint" label="服务端点 · Endpoint" value={p.storageEndpoint} onChange={event => p.setStorageEndpoint(event.target.value)} placeholder={p.storageProvider === 'cos' ? 'https://cos.ap-guangzhou.myqcloud.com' : p.storageProvider === 'oss' ? 'https://oss-cn-hangzhou.aliyuncs.com' : 'https://s3.example.com'} />
-        <SettingsField id="storage-bucket" label="存储桶 · Bucket" value={p.storageBucketName} onChange={event => p.setStorageBucketName(event.target.value)} placeholder="存储桶名称" />
-        <SettingsField id="storage-access-id" label={p.storageProvider === 'cos' ? 'Secret ID' : 'Access Key ID'} value={p.storageAccessKeyId} onChange={event => p.setStorageAccessKeyId(event.target.value)} placeholder="输入访问密钥 ID" />
-        <SettingsSecretField id="storage-secret" label={p.storageProvider === 'cos' ? 'Secret Key' : 'Access Key Secret'} value={p.storageSecretAccessKey} onChange={event => p.setStorageSecretAccessKey(event.target.value)} visible={p.showStorageSecret} onVisibleChange={p.setShowStorageSecret} placeholder="输入访问密钥" />
+
+  return (
+    <div className="space-y-6 w-full max-w-3xl">
+      {/* 顶部标题行 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 select-none">
+            图床 / 媒体存储
+          </h1>
+          {statusBadge}
+        </div>
       </div>
-      <SettingsField id="storage-domain" label={`公开访问域名 / CDN${domainRequired ? '（成品上传必填）' : '（选填）'}`} value={p.storagePublicDomain} onChange={event => p.setStoragePublicDomain(event.target.value)} placeholder="https://cdn.example.com" hint={domainRequired ? '使用可公开读取媒体的域名，不能填写需要鉴权的 S3 API 端点。' : '留空时根据存储桶与服务端点生成访问地址，请确认存储桶允许公开读取。'} />
-    </fieldset>
-    {error && (p.storageAccessKeyId || p.storageEndpoint || p.storageAccountId) && <p role="alert" className="settings-alert settings-alert-warning">{error}</p>}
-    <details className="settings-details"><summary>历史文件迁移</summary><div className="settings-detail-content">
-      <p>逐批扫描所有历史任务，将临时链接转存到当前存储桶，可能产生存储与流量费用。</p>
-      {migration.progress && <p role="status">已扫描 {migration.progress.total} 条 · 转存 {migration.progress.migrated} 条 · 失败 {migration.progress.failed} 条</p>}
-      {migration.status && <p role="status" className="break-words">{migration.status}</p>}
-      <div className="flex flex-wrap gap-2"><button type="button" disabled={p.isMigratingStorage || p.isTestingStorage || !p.storageEnabled} onClick={() => void migration.migrate()} className="settings-button-secondary w-fit">{p.isMigratingStorage ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}{p.isMigratingStorage ? '迁移中…' : '迁移历史文件'}</button>
-        {p.isMigratingStorage && <button type="button" onClick={migration.stop} className="settings-button-secondary">停止后续批次</button>}
+
+      {/* 全局素材上传说明与 Switch 开关 */}
+      <div className="flex items-start justify-between gap-4 py-2 border-b border-slate-100">
+        <div className="space-y-1 pr-4">
+          <div className="text-sm font-bold text-slate-900">全局素材上传</div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            画布素材默认走当前图床。Cloudinary 免费额度有限，建议只在需要的节点单独上传。
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={p.storageEnabled}
+          aria-label="全局素材上传开关"
+          disabled={p.isMigratingStorage}
+          onClick={() => p.setStorageEnabled(!p.storageEnabled)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            p.storageEnabled ? 'bg-slate-900' : 'bg-slate-300'
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+              p.storageEnabled ? 'translate-x-5' : 'translate-x-0'
+            }`}
+          />
+        </button>
       </div>
-    </div></details>
-  </div>;
+
+      {/* 提供商切换组 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 pb-3">
+        <div className="space-y-1">
+          <div className="text-sm font-bold text-slate-900">提供商</div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {p.storageProvider === 'cloudinary'
+              ? '使用此方案建议不要开「全局素材上传」；免费版有流量额度，建议仅在节点勾选单独上传即可。'
+              : '选择图床服务。'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {STORAGE_PROVIDERS.map((provider) => {
+            const active = p.storageProvider === provider.id;
+            return (
+              <button
+                key={provider.id}
+                type="button"
+                onClick={() => p.setStorageProvider(provider.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                  active
+                    ? 'bg-[#18181b] text-white shadow-xs'
+                    : 'bg-[#f4f4f5] text-slate-700 hover:bg-[#e4e4e7] hover:text-slate-900'
+                }`}
+              >
+                {active && <Check className="h-3.5 w-3.5 stroke-[2.5]" />}
+                <span>{provider.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 服务商专属底线字段表单 */}
+      <fieldset disabled={p.isMigratingStorage} className="min-w-0 border-0 p-0">
+        <StorageProviderFieldsets
+          storageProvider={p.storageProvider}
+          storageBucketName={p.storageBucketName}
+          setStorageBucketName={p.setStorageBucketName}
+          storageEndpoint={p.storageEndpoint}
+          setStorageEndpoint={p.setStorageEndpoint}
+          storageAccessKeyId={p.storageAccessKeyId}
+          setStorageAccessKeyId={p.setStorageAccessKeyId}
+          storageSecretAccessKey={p.storageSecretAccessKey}
+          setStorageSecretAccessKey={p.setStorageSecretAccessKey}
+          showStorageSecret={p.showStorageSecret}
+          setShowStorageSecret={p.setShowStorageSecret}
+          storagePublicDomain={p.storagePublicDomain}
+          setStoragePublicDomain={p.setStoragePublicDomain}
+          storageApiPrefix={p.storageApiPrefix}
+          setStorageApiPrefix={p.setStorageApiPrefix}
+          storageMaterialsPrefix={p.storageMaterialsPrefix}
+          setStorageMaterialsPrefix={p.setStorageMaterialsPrefix}
+          storageCloudName={p.storageCloudName}
+          setStorageCloudName={p.setStorageCloudName}
+          storageZone={p.storageZone}
+          setStorageZone={p.setStorageZone}
+        />
+      </fieldset>
+
+      {/* 校验错误提示 */}
+      {error && (p.storageAccessKeyId || p.storageEndpoint || p.storageAccountId || p.storageCloudName) && (
+        <p role="alert" className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+          {error}
+        </p>
+      )}
+
+      {/* 底部操作行：左侧测试上传，右侧保存配置 */}
+      <div className="pt-4 pb-2 flex items-center justify-between border-t border-slate-100">
+        <button
+          type="button"
+          onClick={() => void p.handleTestStorage()}
+          disabled={p.isTestingStorage || p.isMigratingStorage}
+          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {p.isTestingStorage ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>测试中…</span>
+            </>
+          ) : (
+            <span>测试上传</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={p.handleSaveStorageConfig}
+          disabled={p.isMigratingStorage}
+          className="px-4 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium transition-all shadow-xs cursor-pointer"
+        >
+          保存配置
+        </button>
+      </div>
+
+      {/* 历史文件迁移（折叠） */}
+      <details className="settings-details text-xs text-slate-500">
+        <summary className="cursor-pointer hover:text-slate-700 select-none">历史文件迁移</summary>
+        <div className="settings-detail-content pt-3 space-y-2">
+          <p>逐批扫描所有历史任务，将临时链接转存到当前存储空间，可能产生存储与流量费用。</p>
+          {migration.progress && (
+            <p role="status">
+              已扫描 {migration.progress.total} 条 · 转存 {migration.progress.migrated} 条 · 失败 {migration.progress.failed} 条
+            </p>
+          )}
+          {migration.status && <p role="status" className="break-words">{migration.status}</p>}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              disabled={p.isMigratingStorage || p.isTestingStorage || !p.storageEnabled}
+              onClick={() => void migration.migrate()}
+              className="settings-button-secondary w-fit text-xs px-3 py-1.5"
+            >
+              {p.isMigratingStorage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+              {p.isMigratingStorage ? '迁移中…' : '迁移历史文件'}
+            </button>
+            {p.isMigratingStorage && (
+              <button type="button" onClick={migration.stop} className="settings-button-secondary text-xs px-3 py-1.5">
+                停止后续批次
+              </button>
+            )}
+          </div>
+        </div>
+      </details>
+    </div>
+  );
 }

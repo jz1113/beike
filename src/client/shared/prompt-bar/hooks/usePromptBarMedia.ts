@@ -4,11 +4,9 @@ import {
   isImageFile,
   isImageOrVideoFile,
   isVideoFile,
-  processDroppedMediaFiles,
-  readImageFileAsDataUrl,
-  readVideoPreviewUrl,
   type RefMediaKind,
 } from '@client/shared/api/mediaUpload';
+import { isAgentAttachmentFile, loadPromptBarUploads } from '../agentAttachments';
 import {
   registerRefMedia,
   resolveRefMediaFile,
@@ -212,30 +210,16 @@ export function usePromptBarMedia({
 
   // 上传文件处理 (参考图/参考视频素材，保留原始文件名，并批量将主体标号写入输入框)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const selected = isDepthMode ? [files[0]] : Array.from(files);
-
-    Promise.all(
-      selected.map(async (file) => {
-        const origName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name;
-        if (isVideoFile(file)) {
-          const previewUrl = await readVideoPreviewUrl(file);
-          return { previewUrl, origName, file };
-        }
-        const previewUrl = await readImageFileAsDataUrl(file);
-        return { previewUrl, origName, file };
-      }),
-    )
-      .then((items) => {
-        addMultipleRefMedia(items);
-      })
-      .catch((err) => {
-        console.error('无法读取上传的文件:', err);
-        showToast('无法读取上传的文件');
-      });
-
+    const list = e.target.files;
     e.target.value = '';
+    if (!list?.length) return;
+    const selected = isDepthMode ? [list[0]] : Array.from(list);
+    void loadPromptBarUploads(selected, quickGenMode === 'agent')
+      .then(({ media, agentUrls }) => {
+        if (media.length) addMultipleRefMedia(media);
+        agentUrls.forEach((url) => addQuickRefImage(url));
+      })
+      .catch(() => showToast('无法读取上传的文件'));
   };
 
   // 创建新主体
@@ -317,6 +301,7 @@ export function usePromptBarMedia({
     (file: File) => {
       if (quickGenMode === 'depth-image') return isImageFile(file);
       if (quickGenMode === 'depth-video') return isVideoFile(file);
+      if (quickGenMode === 'agent' && isAgentAttachmentFile(file)) return true;
       return isImageOrVideoFile(file);
     },
     [quickGenMode],
@@ -329,24 +314,16 @@ export function usePromptBarMedia({
         rejectDrop();
         return;
       }
-      const toProcess = isDepthMode ? [filtered[0]] : filtered;
-      const collected: Array<{ previewUrl: string; origName: string; file: File }> = [];
-
-      void processDroppedMediaFiles(
-        toProcess,
-        (url, origName, file) => {
-          collected.push({ previewUrl: url, origName, file });
-        },
-        { onAllSkipped: rejectDrop, onError: (msg) => showToast(msg) },
-      )
-        .then(() => {
-          if (collected.length > 0) {
-            addMultipleRefMedia(collected);
-          }
+      const selected = isDepthMode ? [filtered[0]] : filtered;
+      void loadPromptBarUploads(selected, quickGenMode === 'agent')
+        .then(({ media, agentUrls }) => {
+          if (media.length) addMultipleRefMedia(media);
+          agentUrls.forEach((url) => addQuickRefImage(url));
+          if (!media.length && !agentUrls.length) rejectDrop();
         })
         .catch(() => showToast('无法读取拖入的文件'));
     },
-    [acceptDropFile, addMultipleRefMedia, isDepthMode, rejectDrop, showToast],
+    [acceptDropFile, addMultipleRefMedia, addQuickRefImage, isDepthMode, quickGenMode, rejectDrop, showToast],
   );
 
   const { dropZoneProps } = useFileDropZone({
@@ -417,6 +394,8 @@ export function usePromptBarMedia({
     handleSelectSubject,
     handleRemoveRefImage,
     handleClearAllRefImages,
+    addRefImage: addQuickRefImage,
+    addQuickRefImage,
     clearComposerMedia,
     dropZoneProps,
     handlePasteFiles,

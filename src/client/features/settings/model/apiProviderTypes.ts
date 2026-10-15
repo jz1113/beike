@@ -47,47 +47,6 @@ export const PROTOCOL_OPTIONS: { id: ApiProviderProtocol; label: string; formatH
 
 export const DEFAULT_PROVIDERS: ApiProvider[] = [
   {
-    id: 'mita',
-    name: '秘塔科技',
-    providerType: 'openai',
-    baseUrl: 'https://api.metaso.cn',
-    apiKey: '',
-    enabled: true,
-    isRemovable: true,
-    isPromoted: true,
-    promoBadge: 'MiniMax H3 ¥0.09/秒起',
-    websiteUrl: 'https://metaso.cn',
-    iconType: 'mita',
-    description: 'MiniMax / 秘塔 AI 搜索与大模型服务',
-  },
-  {
-    id: 'soonstudio',
-    name: 'SoonStudio',
-    providerType: 'openai',
-    baseUrl: 'https://api.soonstudio.com',
-    apiKey: '',
-    enabled: true,
-    isRemovable: true,
-    isPromoted: true,
-    promoBadge: '多模态模型 API 平台',
-    websiteUrl: 'https://soonstudio.com',
-    iconType: 'soonstudio',
-    description: '专业多模态生图与生视频聚合网关',
-  },
-  {
-    id: 'google',
-    name: 'Google',
-    providerType: 'gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com',
-    apiKey: '',
-    enabled: true,
-    catalogPath: '/v1beta/models',
-    isRemovable: true,
-    websiteUrl: 'https://ai.google.dev',
-    iconType: 'google',
-    description: 'Gemini',
-  },
-  {
     id: 'comfly_gateway',
     name: 'Comfly 网关',
     providerType: 'openai',
@@ -145,6 +104,7 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
 
 export const API_PROVIDERS_STORAGE_KEY = 'beike_api_providers_v2';
 export const API_REMOVED_PROVIDERS_KEY = 'beike_api_removed_providers_v2';
+const DEPRECATED_PROVIDER_IDS = new Set(['mita', 'soonstudio', 'google']);
 
 export function loadStoredProviders(): ApiProvider[] {
   if (typeof window === 'undefined') return DEFAULT_PROVIDERS;
@@ -153,14 +113,15 @@ export function loadStoredProviders(): ApiProvider[] {
     const removedIds: string[] = removedRaw ? JSON.parse(removedRaw) : [];
     const savedRaw = localStorage.getItem(API_PROVIDERS_STORAGE_KEY);
     if (!savedRaw) {
-      return DEFAULT_PROVIDERS.filter(p => !removedIds.includes(p.id));
+      return DEFAULT_PROVIDERS.filter(p => !removedIds.includes(p.id) && !DEPRECATED_PROVIDER_IDS.has(p.id));
     }
     const saved: ApiProvider[] = JSON.parse(savedRaw);
-    if (!Array.isArray(saved)) return DEFAULT_PROVIDERS.filter(p => !removedIds.includes(p.id));
+    if (!Array.isArray(saved)) return DEFAULT_PROVIDERS.filter(p => !removedIds.includes(p.id) && !DEPRECATED_PROVIDER_IDS.has(p.id));
 
-    // 合并内置预设，保持新增字段同步
+    // 合并内置预设，保持新增字段同步并清洗废弃项
     const idMap = new Map<string, ApiProvider>();
     for (const item of saved) {
+      if (DEPRECATED_PROVIDER_IDS.has(item.id)) continue;
       if (!removedIds.includes(item.id)) {
         if (item.id === 'comfly_gateway' || item.id === 'openai_official' || item.id === 'deepseek_official') {
           item.providerType = 'openai';
@@ -169,11 +130,15 @@ export function loadStoredProviders(): ApiProvider[] {
       }
     }
     for (const def of DEFAULT_PROVIDERS) {
-      if (!removedIds.includes(def.id) && !idMap.has(def.id)) {
+      if (!removedIds.includes(def.id) && !DEPRECATED_PROVIDER_IDS.has(def.id) && !idMap.has(def.id)) {
         idMap.set(def.id, def);
       }
     }
-    return Array.from(idMap.values());
+    const result = Array.from(idMap.values());
+    if (saved.some(item => DEPRECATED_PROVIDER_IDS.has(item.id))) {
+      saveStoredProviders(result);
+    }
+    return result;
   } catch {
     return DEFAULT_PROVIDERS;
   }

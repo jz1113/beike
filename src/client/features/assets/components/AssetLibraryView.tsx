@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronDown, Plus, Search, Trash2, User, Package, Mic, FileText } from 'lucide-react';
+import { useI18n } from '@client/shared/i18n';
 import {
   loadCustomAssets,
   deleteCustomAsset,
@@ -16,43 +17,44 @@ interface CategoryConfig {
   addButton: string;
 }
 
-const CATEGORIES: CategoryConfig[] = [
-  {
-    id: 'character',
-    name: '角色',
-    emptyTitle: '暂无角色',
-    emptyDesc: '把常用的人物图片定义为你的角色资产',
-    addButton: '新增角色',
-  },
-  {
-    id: 'product',
-    name: '商品',
-    emptyTitle: '暂无商品',
-    emptyDesc: '把常用的商品图片定义为你的商品资产',
-    addButton: '新增商品',
-  },
-  {
-    id: 'voice',
-    name: '音色',
-    emptyTitle: '暂无音色',
-    emptyDesc: '把常用的声音音色定义为你的音色资产',
-    addButton: '新增音色',
-  },
-  {
-    id: 'file',
-    name: '文件',
-    emptyTitle: '暂无文件',
-    emptyDesc: '把常用的参考文件或文档沉淀为你的文件资产',
-    addButton: '新增文件',
-  },
-];
-
 export default function AssetLibraryView() {
+  const { t, locale } = useI18n();
   const [activeCategory, setActiveCategory] = useState<CustomAssetCategory>('character');
   const [items, setItems] = useState<CustomAssetItem[]>([]);
   const [searchInput, setSearchInput] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const categories: CategoryConfig[] = useMemo(() => [
+    {
+      id: 'character',
+      name: t('assets.categories.character'),
+      emptyTitle: t('assets.noAssets'),
+      emptyDesc: locale === 'zh-CN' ? '把常用的人物图片定义为你的角色资产' : locale === 'en-US' ? 'Define reusable character images for your creations' : locale === 'ja-JP' ? 'よく使うキャラクター画像をアセットとして登録できます' : '자주 사용하는 캐릭터 이미지를 에셋으로 등록하세요',
+      addButton: t('assets.categories.addCharacter'),
+    },
+    {
+      id: 'product',
+      name: t('assets.categories.product'),
+      emptyTitle: t('assets.noAssets'),
+      emptyDesc: locale === 'zh-CN' ? '把常用的商品图片定义为你的商品资产' : locale === 'en-US' ? 'Define reusable product images for your creations' : locale === 'ja-JP' ? 'よく使う商品画像をアセットとして登録できます' : '자주 사용하는 상품 이미지를 에셋으로 등록하세요',
+      addButton: t('assets.categories.addProduct'),
+    },
+    {
+      id: 'voice',
+      name: t('assets.categories.voice'),
+      emptyTitle: t('assets.noAssets'),
+      emptyDesc: locale === 'zh-CN' ? '把常用的声音音色定义为你的音色资产' : locale === 'en-US' ? 'Define reusable voice assets for your creations' : locale === 'ja-JP' ? 'よく使う音声をアセットとして登録できます' : '자주 사용하는 음성을 에셋으로 등록하세요',
+      addButton: t('assets.categories.addVoice'),
+    },
+    {
+      id: 'file',
+      name: t('assets.categories.file'),
+      emptyTitle: t('assets.noAssets'),
+      emptyDesc: locale === 'zh-CN' ? '把常用的参考文件或文档沉淀为你的文件资产' : locale === 'en-US' ? 'Store reference files and documents as reusable assets' : locale === 'ja-JP' ? '参考ファイルやドキュメントをアセットとして管理できます' : '참고 파일이나 문서를 에셋으로 관리하세요',
+      addButton: t('assets.categories.addFile'),
+    },
+  ], [t, locale]);
 
   const refreshItems = useCallback(() => {
     setItems(loadCustomAssets());
@@ -66,8 +68,8 @@ export default function AssetLibraryView() {
   }, [refreshItems]);
 
   const currentCategoryConfig = useMemo(() => {
-    return CATEGORIES.find((c) => c.id === activeCategory) || CATEGORIES[0];
-  }, [activeCategory]);
+    return categories.find((c) => c.id === activeCategory) || categories[0];
+  }, [categories, activeCategory]);
 
   const filteredItems = useMemo(() => {
     const list = items.filter((item) => item.category === activeCategory);
@@ -100,7 +102,7 @@ export default function AssetLibraryView() {
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 pb-4">
         {/* 左侧：分类胶囊 (角色 | 商品 | 音色 | 文件) */}
         <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200/60 shadow-2xs">
-          {CATEGORIES.map((c) => {
+          {categories.map((c) => {
             const isActive = activeCategory === c.id;
             return (
               <button
@@ -127,7 +129,7 @@ export default function AssetLibraryView() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="搜索资产"
+              placeholder={t('assets.searchPlaceholder')}
               className="w-40 pl-8 pr-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200/60 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all h-8"
             />
           </div>
@@ -138,9 +140,9 @@ export default function AssetLibraryView() {
               onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
               className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8"
             >
-              <option value="newest">排序: 最新</option>
-              <option value="oldest">排序: 最早</option>
-              <option value="name">排序: 名称</option>
+              <option value="newest">{t('assets.sort')}: {t('assets.sortNewest')}</option>
+              <option value="oldest">{t('assets.sort')}: {t('assets.sortOldest')}</option>
+              <option value="name">{t('assets.sort')}: {t('assets.sortName')}</option>
             </select>
             <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
           </div>
@@ -212,7 +214,7 @@ export default function AssetLibraryView() {
               <button
                 type="button"
                 onClick={(e) => handleDelete(item.id, e)}
-                title="删除资产"
+                title={t('common.delete')}
                 className="absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-lg bg-white/90 text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all shadow-xs"
               >
                 <Trash2 className="h-3 w-3" />

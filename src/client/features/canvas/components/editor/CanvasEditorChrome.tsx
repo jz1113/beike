@@ -1,5 +1,6 @@
 import { Plus, Minus, Scan, MousePointer2, Hand, Upload, Image, Video, Undo2, Redo2 } from 'lucide-react';
 import type { RefObject } from 'react';
+import { useI18n } from '@client/shared/i18n';
 import type { CanvasNode, CanvasProject } from '../../model/types';
 
 export interface CanvasEditorChromeProps {
@@ -38,6 +39,7 @@ export interface CanvasEditorChromeProps {
 }
 
 export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
+  const { t } = useI18n();
   const button = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-25';
   const surface = 'rounded-2xl border border-white/90 bg-white/95 shadow-[0_6px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl';
   const openPalette = () => {
@@ -65,10 +67,10 @@ export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
       <button className={button} title="视频资产库" onClick={()=>p.handleOpenAssetModal('video')}><Video size={17}/></button>
     </div>
     <div className={`canvas-fixed-ui absolute bottom-4 left-4 z-40 max-sm:bottom-20 flex items-center gap-0.5 p-1 ${surface}`}>
-      <button className={button} title="缩小" onClick={()=>p.handleZoom(-0.1)}><Minus size={15}/></button>
+      <button className={button} title={t('canvas.zoomOut')} onClick={()=>p.handleZoom(-0.1)}><Minus size={15}/></button>
       <span className="min-w-10 text-center text-[11px] tabular-nums text-slate-500">{Math.round(p.zoom*100)}%</span>
-      <button className={button} title="放大" onClick={()=>p.handleZoom(0.1)}><Plus size={15}/></button>
-      <button className={button} title="适应全部节点 · ⌘/Ctrl 0" onClick={p.handleResetView}><Scan size={16}/></button>
+      <button className={button} title={t('canvas.zoomIn')} onClick={()=>p.handleZoom(0.1)}><Plus size={15}/></button>
+      <button className={button} title={t('canvas.resetZoom')} onClick={p.handleResetView}><Scan size={16}/></button>
       <span className="mx-1 h-4 w-px bg-slate-100"/>
       <button className={button} title="撤销 · ⌘/Ctrl Z" disabled={!p.history.canUndo} onClick={p.history.undo}><Undo2 size={16}/></button>
       <button className={button} title="重做 · ⇧ ⌘/Ctrl Z" disabled={!p.history.canRedo} onClick={p.history.redo}><Redo2 size={16}/></button>

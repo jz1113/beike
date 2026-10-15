@@ -89,12 +89,13 @@ export default function PromptBarRefMediaPanel({
     let imagesCount = 0;
     let videosCount = 0;
     quickRefImages.forEach((url) => {
+      if (url.startsWith('agent-file:')) return;
       const kind = resolveMediaKind?.(url);
       if (kind === 'video') videosCount++;
       else imagesCount++;
     });
     return {
-      all: quickRefImages.length,
+      all: imagesCount + videosCount,
       image: imagesCount,
       video: videosCount,
       audio: 0,
@@ -103,15 +104,22 @@ export default function PromptBarRefMediaPanel({
 
   // 根据当前选中的 Tab 过滤展示的素材
   const displayedImages = useMemo(() => {
-    if (activeMediaTab === 'all') return quickRefImages;
+    const visual = quickRefImages.filter((url) => !url.startsWith('agent-file:'));
+    if (activeMediaTab === 'all') return visual;
     if (activeMediaTab === 'image') {
-      return quickRefImages.filter((url) => resolveMediaKind?.(url) !== 'video');
+      return visual.filter((url) => resolveMediaKind?.(url) !== 'video');
     }
     if (activeMediaTab === 'video') {
-      return quickRefImages.filter((url) => resolveMediaKind?.(url) === 'video');
+      return visual.filter((url) => resolveMediaKind?.(url) === 'video');
     }
     return [];
   }, [activeMediaTab, quickRefImages, resolveMediaKind]);
+  const visualRefImages = quickRefImages.filter((url) => !url.startsWith('agent-file:'));
+  const removeVisualRef = (index: number) => {
+    const url = visualRefImages[index];
+    const realIdx = url ? quickRefImages.indexOf(url) : -1;
+    if (realIdx >= 0) removeQuickRefImage(realIdx);
+  };
 
   const renderPanelBody = () => {
     if (quickGenMode === 'video' && (quickVideoRefMode === 'first_last_frame' || quickVideoRefMode === 'multi_frame')) {
@@ -136,7 +144,7 @@ export default function PromptBarRefMediaPanel({
     }
 
     // 🌟 3. 展开面板模式（完全符合图3样式）：全部展开卡片显示
-    if (isExpandedRefImages && quickRefImages.length > 0) {
+    if (isExpandedRefImages && visualRefImages.length > 0) {
       return (
         <div
           ref={refImagesContainerRef}
@@ -289,7 +297,7 @@ export default function PromptBarRefMediaPanel({
           onMouseLeave={onMouseLeaveRefImages}
           className="w-full select-none"
         >
-          {quickRefImages.length === 0 ? (
+          {visualRefImages.length === 0 ? (
             <StripEmptyUpload
               onClick={onUploadClick}
               label={refUploadLabel(quickGenMode).label}
@@ -297,18 +305,18 @@ export default function PromptBarRefMediaPanel({
             />
           ) : (
             <PromptBarRefImageStack
-              images={quickRefImages}
+              images={visualRefImages}
               isExpanded={isExpandedRefImages}
               setIsExpanded={setIsExpandedRefImages}
               frameExpanded={frameExpanded}
               onUploadClick={onUploadClick}
-              onRemove={removeQuickRefImage}
+              onRemove={removeVisualRef}
               addLabel="参考内容"
               resolveMediaFile={resolveMediaFile}
               resolveMediaKind={resolveMediaKind}
               onPreviewImage={(idx) => {
                 setLightboxState({
-                  items: quickRefImages,
+                  items: visualRefImages,
                   currentIndex: idx,
                 });
               }}
@@ -326,7 +334,7 @@ export default function PromptBarRefMediaPanel({
         onMouseLeave={onMouseLeaveRefImages}
         className="flex-shrink-0 relative select-none flex items-start"
       >
-        {quickRefImages.length === 0 ? (
+        {visualRefImages.length === 0 ? (
           <div className="pt-0.5 pb-1 px-1 flex-shrink-0 mr-2.5 sm:mr-3">
             {/* 🌟 空态便签卡片：向左微倾斜 -rotate-[6deg]，精致加号 + 参考内容文字（严格保持 3:4 修长拍立得便签比例） */}
             <button
@@ -344,18 +352,18 @@ export default function PromptBarRefMediaPanel({
           </div>
         ) : (
           <PromptBarRefImageStack
-            images={quickRefImages}
+            images={visualRefImages}
             isExpanded={isExpandedRefImages}
             setIsExpanded={setIsExpandedRefImages}
             frameExpanded={frameExpanded}
             onUploadClick={onUploadClick}
-            onRemove={removeQuickRefImage}
+            onRemove={removeVisualRef}
             addLabel="参考内容"
             resolveMediaFile={resolveMediaFile}
             resolveMediaKind={resolveMediaKind}
             onPreviewImage={(idx) => {
               setLightboxState({
-                items: quickRefImages,
+                items: visualRefImages,
                 currentIndex: idx,
               });
             }}

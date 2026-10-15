@@ -1,4 +1,5 @@
 import React from 'react';
+import { Sparkles } from 'lucide-react';
 
 interface FeedBatchHeaderProps {
   displayBatchTitle: string;
@@ -7,6 +8,7 @@ interface FeedBatchHeaderProps {
   displayModel: string;
   displayRatio: string;
   displayQuality: string;
+  isAgentTask?: boolean;
   isMultiAngle?: boolean;
   angleName?: string;
   isSmartEdit?: boolean;
@@ -22,6 +24,7 @@ export default function FeedBatchHeader({
   displayModel,
   displayRatio,
   displayQuality,
+  isAgentTask,
   isMultiAngle,
   angleName,
   isSmartEdit,
@@ -31,8 +34,21 @@ export default function FeedBatchHeader({
 }: FeedBatchHeaderProps) {
   return (
     <div className="flex items-center gap-x-2.5 w-full max-w-full px-0.5 text-xs select-none flex-wrap gap-y-1 min-h-10">
-      {/* 🌟 模式 1: 多角度视角转换任务，展示 [🎥 多角度] 与 [🖼 image] 胶囊 */}
-      {isMultiAngle ? (
+      {/* 🌟 模式 0: Agent 模式任务 */}
+      {isAgentTask ? (
+        <div className="flex items-center gap-1.5 shrink-0 min-w-0">
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/80 text-[11.5px] font-medium shadow-xs shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+            <span>Agent 模式</span>
+          </div>
+          <span
+            className="font-medium text-slate-800 text-[13px] sm:text-[13.5px] truncate shrink min-w-0 max-w-xs sm:max-w-md lg:max-w-lg"
+            title={batchPrompt}
+          >
+            {displayBatchTitle}
+          </span>
+        </div>
+      ) : isMultiAngle ? (
         <div className="flex items-center gap-1.5 shrink-0">
           {/* 胶囊 1: [ 🎥 多角度 ] */}
           <div
@@ -109,11 +125,23 @@ export default function FeedBatchHeader({
 
       {/* 参数规格: 模型 | 画幅比例 | 分辨率 | 详细信息 ⓘ */}
       <div className="flex items-center gap-x-2 text-[12px] sm:text-[12.5px] text-slate-600 dark:text-zinc-400 font-medium font-sans shrink-0 whitespace-nowrap">
-        <span>{isBatchVideo ? `视频 ${displayModel}` : displayModel}</span>
-        <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
-        <span>{displayRatio}</span>
-        <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
-        <span>{displayQuality}</span>
+        {isAgentTask ? (
+          <>
+            <span>{displayModel || 'DeepSeek Flash'}</span>
+            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span>需求对齐</span>
+            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span className="text-violet-600 font-medium">✦ 20/秒</span>
+          </>
+        ) : (
+          <>
+            <span>{isBatchVideo ? `视频 ${displayModel}` : displayModel}</span>
+            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span>{displayRatio}</span>
+            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span>{displayQuality}</span>
+          </>
+        )}
 
         {/* 详细信息 ⓘ (图3标杆同款) */}
         {onShowDetails && (

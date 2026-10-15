@@ -48,7 +48,7 @@ client/
   types/                     跨功能类型
 ```
 
-功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如工坊的 `stage / history / settings / product`，画布的 `editor / prompt / stage / video`。助手组件按 `message / panels / brand-kit` 分组，抽屉和按钮留在 `components`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。
+功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如资产组件按 `cards / dialogs / filters / deconstruct` 归类并设 `index.ts` 统一导出；设置组件按 `providers / models / vendors / creator / storage / modality` 归类导出；工坊按 `stage / history / settings / product`，画布按 `editor / prompt / stage / video`。助手组件按 `message / panels / brand-kit` 分组，抽屉和按钮留在 `components`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。跨平台启动器在 `tools/launchers` 归档。
 
 `shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。
 

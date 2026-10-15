@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -67,7 +68,7 @@ func storageTestHandler(cfg config.Config) http.HandlerFunc {
 		}
 		testURL, err := storage.ProbeObjectStore(r.Context(), *resolved)
 		if err != nil {
-			httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": "连接失败: 网络连接超时或凭证无效"})
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("连接失败: %v", err)})
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "🎉 存储桶连接与写入权限验证成功！", "testUrl": testURL})

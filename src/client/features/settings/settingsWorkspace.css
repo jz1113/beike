@@ -18,6 +18,9 @@
 .settings-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .settings-workspace select { font-size: 13px; min-height: 38px; border-radius: 9px; box-shadow: none; }
 .settings-workspace :is(input,select,textarea):focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+.settings-workspace .storage-underline-input { border: none !important; border-radius: 0 !important; min-height: 0 !important; outline: none !important; box-shadow: none !important; background: transparent !important; }
+.settings-workspace .storage-underline-input:focus,
+.settings-workspace .storage-underline-input:focus-visible { outline: none !important; box-shadow: none !important; }
 .settings-workspace :is(button,a,summary):focus-visible { outline: 2px solid #818cf8; outline-offset: 3px; }
 .settings-workspace :is(button,summary) { -webkit-tap-highlight-color: transparent; }
 .settings-workspace button:disabled { cursor: not-allowed; }

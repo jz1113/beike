@@ -7,7 +7,7 @@ type PreviewControl =
   | { kind: 'slider'; id: string; label: string; desc?: string; min: number; max: number; step: number; value: number; suffix?: string }
   | { kind: 'text'; id: string; label: string; desc?: string; placeholder: string; secret?: boolean };
 
-const CANVAS_CONTROLS: Record<Exclude<CanvasSettingsPage, 'media'>, { title: string; blurb?: string; controls: PreviewControl[] }> = {
+const CANVAS_CONTROLS: Record<CanvasSettingsPage, { title: string; blurb?: string; controls: PreviewControl[] }> = {
   connections: {
     title: '连线',
     controls: [
@@ -149,7 +149,7 @@ export function SettingsPreviewNotice() {
   return <p className="settings-preview-notice">界面预览，暂不生效</p>;
 }
 
-export function CanvasPreview({ page }: { page: Exclude<CanvasSettingsPage, 'media'> }) {
+export function CanvasPreview({ page }: { page: CanvasSettingsPage }) {
   const spec = CANVAS_CONTROLS[page];
   return (
     <section className="settings-preview">
@@ -159,15 +159,6 @@ export function CanvasPreview({ page }: { page: Exclude<CanvasSettingsPage, 'med
         {spec.blurb && <p>{spec.blurb}</p>}
       </header>
       <PreviewRows key={page} controls={spec.controls} />
-    </section>
-  );
-}
-
-export function LanguagePreview() {
-  return (
-    <section className="settings-preview">
-      <header><h2>语言</h2><SettingsPreviewNotice /></header>
-      <PreviewRows controls={[{ kind: 'segment', id: 'locale', label: '界面语言', desc: '当前产品界面仍为简体中文，切换不会改写文案。', options: ['简体中文', 'English'] }]} />
     </section>
   );
 }
@@ -192,16 +183,5 @@ export function ModalityPreview({ kind }: { kind: 'three_d' | 'music' | 'voice' 
         ))}
       </div>
     </section>
-  );
-}
-
-export function StoragePreviewNote() {
-  return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <SettingsPreviewNotice />
-      <span className="text-xs text-slate-500">Cloudinary 与七牛不会写入当前存储服务商。</span>
-      <button type="button" disabled className="settings-button-secondary opacity-60">Cloudinary（免费）</button>
-      <button type="button" disabled className="settings-button-secondary opacity-60">七牛云</button>
-    </div>
   );
 }

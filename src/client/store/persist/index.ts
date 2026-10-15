@@ -10,6 +10,8 @@ export {
 } from './assistant';
 
 export {
+  isSessionDeleted,
+  markSessionDeleted,
   isGenerationDeleted,
   loadGenerationTombstones,
   markGenerationDeleted,

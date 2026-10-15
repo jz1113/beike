@@ -20,7 +20,8 @@ interface Props {
 function ImagePreview({ src, objectFit, width, title, onUnavailable }: Props & { onUnavailable?: () => void }) {
   const thumbnail = proxyMediaUrl(src, { thumb: true, width: width || 480 });
   const original = proxyMediaUrl(src);
-  const [retried, setRetried] = useState(false);
+  const rawDirect = src?.startsWith('//') ? `https:${src}` : src;
+  const [retryStage, setRetryStage] = useState<0 | 1 | 2>(0);
   const [failed, setFailed] = useState(false);
 
   if (failed || !src) {
@@ -32,16 +33,21 @@ function ImagePreview({ src, objectFit, width, title, onUnavailable }: Props & {
     );
   }
 
+  const currentSrc = retryStage === 0 ? thumbnail : retryStage === 1 ? original : rawDirect;
+
   return (
     <img
-      src={retried ? original : thumbnail}
+      src={currentSrc}
       alt={title || '生成资产预览'}
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
       onError={() => {
-        if (!retried && thumbnail !== original) setRetried(true);
-        else {
+        if (retryStage === 0 && thumbnail !== original) {
+          setRetryStage(1);
+        } else if (retryStage < 2 && currentSrc !== rawDirect) {
+          setRetryStage(2);
+        } else {
           setFailed(true);
           onUnavailable?.();
         }

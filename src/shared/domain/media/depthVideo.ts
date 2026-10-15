@@ -44,7 +44,7 @@ export function formatDepthVideoProgress(frame: number, total: number): string {
 
 export const DEPTH_MODEL_SETUP_COMMAND = 'npm run setup:depth-model';
 
-export type QuickGenMode = 'image' | 'video' | 'depth-image' | 'depth-video';
+export type QuickGenMode = 'image' | 'video' | 'depth-image' | 'depth-video' | 'agent' | 'audio';
 
 export function isDepthGenMode(m: QuickGenMode): m is 'depth-image' | 'depth-video' {
   return m === 'depth-image' || m === 'depth-video';

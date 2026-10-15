@@ -1,8 +1,9 @@
 import { credentialGet } from '@client/shared/api/credentialClient';
 import { waitForCredentialSaves } from '@client/shared/api/persistCredentials';
+import type { StorageProvider } from '../model/storageValidation';
 
-export type StorageProvider = 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase';
-const providers: readonly string[] = ['r2', 'oss', 'cos', 's3', 'minio', 'supabase'];
+export type { StorageProvider };
+const providers: readonly string[] = ['oss', 'qiniu', 'cloudinary'];
 
 export async function readSettingsConfig() {
   await waitForCredentialSaves();
@@ -16,9 +17,15 @@ export async function readSettingsConfig() {
     appAccessToken: read('app_access_token', 'azhuo-local-dev'),
     storageEnabled: read('storage_enabled') === 'true',
     storageProvider: (providers.includes(rawProvider) ? rawProvider : 'oss') as StorageProvider,
-    storageAccountId: read('storage_account_id'), storageEndpoint: read('storage_endpoint'),
-    storageAccessKeyId: read('storage_access_key_id'), storageBucketName: read('storage_bucket_name'),
+    storageAccountId: read('storage_account_id'),
+    storageEndpoint: read('storage_endpoint'),
+    storageAccessKeyId: read('storage_access_key_id'),
+    storageBucketName: read('storage_bucket_name'),
     storagePublicDomain: read('storage_public_domain'),
+    storageApiPrefix: read('storage_api_prefix', 'seedance/'),
+    storageMaterialsPrefix: read('storage_materials_prefix', 'canvas-materials/'),
+    storageCloudName: read('storage_cloud_name'),
+    storageZone: read('storage_zone', 'z2'),
   };
   const [apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageSecretAccessKey] = await Promise.all([
     credentialGet('ai_api_key', true), credentialGet('deepseek_api_key', true),

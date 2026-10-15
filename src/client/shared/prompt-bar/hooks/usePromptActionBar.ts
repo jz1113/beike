@@ -241,7 +241,7 @@ export function usePromptActionBar({
     isSubmitting
   );
 
-  const isExpanded = !isCollapsible || isDockFocused || hasContent || anyDropdownOpen;
+  const isExpanded = !isCollapsible || isDockFocused || hasContent || anyDropdownOpen || quickGenMode === 'agent';
   const handleComposerFocus = usePromptBarFocus(isExpanded, richInputRef, setIsDockFocused, setIsComposerFocused);
 
   useEffect(() => {
@@ -341,5 +341,6 @@ export function usePromptActionBar({
     isSubmitting,
     fileAccept,
     toastMsg,
+    showToast,
   };
 }

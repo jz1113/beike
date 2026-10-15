@@ -1,5 +1,6 @@
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
+import { t } from '@client/shared/i18n';
 
 /**
  * 解析输入框提示文案 (Placeholder)
@@ -13,36 +14,38 @@ export function resolvePromptPlaceholder(params: {
 }): string {
   const { isDepthMode, quickGenMode, quickVideoRefMode, isGenerateDock, hasRefMedia } = params;
 
+  if (quickGenMode === 'agent') {
+    return t('promptBar.agent');
+  }
+
   // 🌟 当已有参考素材时，精准还原即梦图2原版操作指引文案
   if (hasRefMedia) {
     if (isGenerateDock) {
       return quickGenMode === 'image'
-        ? '结合参考、输入文字或 @ 参考内容，描述你想如何调整图片。'
-        : '使用 @ 快速调用参考内容...';
+        ? t('promptBar.refMedia')
+        : t('promptBar.refMediaVideo');
     }
-    return '使用 @ 快速调用参考内容，例如：@图片1 模仿 @视频1 的动作，参考 @视频1 的镜头节奏';
+    return t('promptBar.refMediaVideo');
   }
 
   if (isDepthMode) {
     return quickGenMode === 'depth-image'
-      ? '上传一张图片，提取空间深度图'
-      : '上传一段视频，生成深度动作捕捉';
+      ? t('promptBar.depthImage')
+      : t('promptBar.depthVideo');
   }
   if (quickGenMode === 'video') {
     if (quickVideoRefMode === 'multi_frame') {
-      return '请添加智能多帧的镜头';
+      return t('promptBar.videoMultiFrame');
     }
     if (quickVideoRefMode === 'first_last_frame') {
-      return isGenerateDock
-        ? '描述画面内容与运动过程...'
-        : '输入文字，描述你想创作的画面内容、运动过程...';
+      return t('promptBar.videoFirstLastFrame');
     }
     // 🌟 用户明确要求将“上传最多50个参考素材...”长文字删掉
     return '';
   }
   return isGenerateDock
-    ? '上传参考图、输入文字或 @ 主体...'
-    : '上传参考图、输入文字或 @ 主体，描述你想生成的图片。';
+    ? t('promptBar.imageDock')
+    : t('promptBar.imageDefault');
 }
 
 /**
@@ -51,6 +54,9 @@ export function resolvePromptPlaceholder(params: {
 export function resolveFileAccept(quickGenMode: QuickGenMode): string {
   if (quickGenMode === 'depth-image') return 'image/*';
   if (quickGenMode === 'depth-video') return 'video/*';
+  if (quickGenMode === 'agent') {
+    return 'image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.xls,.xlsx';
+  }
   return 'image/*,video/*';
 }
 
@@ -63,6 +69,11 @@ export function resolveModeButtonClass(params: {
   showModeDropdown: boolean;
 }): string {
   const { quickGenMode, isDepthMode, showModeDropdown } = params;
+  if (quickGenMode === 'agent') {
+    return showModeDropdown
+      ? 'bg-slate-100 text-slate-900 shadow-none'
+      : 'bg-transparent hover:bg-slate-50 text-slate-800 shadow-none';
+  }
   if (quickGenMode === 'video') {
     return showModeDropdown
       ? 'bg-cyan-50/70 text-cyan-800 shadow-none'

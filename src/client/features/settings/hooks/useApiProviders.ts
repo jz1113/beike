@@ -15,15 +15,19 @@ interface UseApiProvidersOptions {
 
 export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApiProvidersOptions) {
   const [providers, setProviders] = useState<ApiProvider[]>(() => loadStoredProviders());
-  const [selectedProviderId, setSelectedProviderId] = useState<string>('google');
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
+    const list = loadStoredProviders();
+    return list[0]?.id || 'comfly_gateway';
+  });
   const [isTesting, setIsTesting] = useState(false);
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string; timestamp: number }>>({});
 
   useEffect(() => {
     if (isOpen) {
       const list = loadStoredProviders();
       setProviders(list);
       if (!list.some(p => p.id === selectedProviderId)) {
-        setSelectedProviderId(list[0]?.id || 'google');
+        setSelectedProviderId(list[0]?.id || 'comfly_gateway');
       }
     }
   }, [isOpen]);
@@ -92,8 +96,24 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
         baseUrl: target.baseUrl.trim(),
         apiKey: target.apiKey.trim(),
       });
+      setTestResults(prev => ({
+        ...prev,
+        [target.id]: {
+          ok: outcome.ok,
+          message: outcome.message,
+          timestamp: Date.now(),
+        },
+      }));
       showToast(outcome.message);
     } catch {
+      setTestResults(prev => ({
+        ...prev,
+        [target.id]: {
+          ok: false,
+          message: `${target.name} 连接测试失败，请检查网络或参数`,
+          timestamp: Date.now(),
+        },
+      }));
       showToast(`${target.name} 连接测试失败，请检查网络或参数`);
     } finally {
       setIsTesting(false);
@@ -110,5 +130,6 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
     removeProvider,
     testProvider,
     isTesting,
+    testResults,
   };
 }

@@ -1,5 +1,5 @@
 import { apiFetch } from '@client/shared/api/apiClient';
-import { storageConfigError } from '../model/storageValidation';
+import { storageConfigError, type StorageProvider, normalizeStorageUrl, QINIU_ZONES } from '../model/storageValidation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   persistAiGatewayConfig,
@@ -54,9 +54,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
 
   // 云端永久对象存储
   const [storageEnabled, setStorageEnabled] = useState(false);
-  const [storageProvider, setStorageProvider] = useState<
-    'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase'
-  >('oss');
+  const [storageProvider, setStorageProvider] = useState<StorageProvider>('oss');
   const [storageAccountId, setStorageAccountId] = useState('');
   const [storageEndpoint, setStorageEndpoint] = useState('');
   const [storageAccessKeyId, setStorageAccessKeyId] = useState('');
@@ -64,17 +62,39 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [showStorageSecret, setShowStorageSecret] = useState(false);
   const [storageBucketName, setStorageBucketName] = useState('');
   const [storagePublicDomain, setStoragePublicDomain] = useState('');
+  const [storageApiPrefix, setStorageApiPrefix] = useState('seedance/');
+  const [storageMaterialsPrefix, setStorageMaterialsPrefix] = useState('canvas-materials/');
+  const [storageCloudName, setStorageCloudName] = useState('');
+  const [storageZone, setStorageZone] = useState('z2');
   const [isMigratingStorage, setIsMigratingStorage] = useState(false);
 
-  const storageDrafts=useRef<Record<string,{endpoint:string;accountId:string;key:string;secret:string;bucket:string;domain:string}>>({});
-  const changeStorageProvider=(next:typeof storageProvider)=>{
-    if(next===storageProvider)return;
-    storageDrafts.current[storageProvider]={endpoint:storageEndpoint,accountId:storageAccountId,key:storageAccessKeyId,secret:storageSecretAccessKey,bucket:storageBucketName,domain:storagePublicDomain};
-    const draft=storageDrafts.current[next];
+  const storageDrafts = useRef<Record<string, {
+    endpoint: string; accountId: string; key: string; secret: string;
+    bucket: string; domain: string; apiPrefix: string; materialsPrefix: string;
+    cloudName: string; zone: string;
+  }>>({});
+
+  const changeStorageProvider = (next: StorageProvider) => {
+    if (next === storageProvider) return;
+    storageDrafts.current[storageProvider] = {
+      endpoint: storageEndpoint, accountId: storageAccountId, key: storageAccessKeyId,
+      secret: storageSecretAccessKey, bucket: storageBucketName, domain: storagePublicDomain,
+      apiPrefix: storageApiPrefix, materialsPrefix: storageMaterialsPrefix,
+      cloudName: storageCloudName, zone: storageZone,
+    };
+    const draft = storageDrafts.current[next];
     setStorageProvider(next);
-    setStorageEndpoint(draft?.endpoint || '');setStorageAccountId(draft?.accountId || '');
-    setStorageAccessKeyId(draft?.key || '');setStorageSecretAccessKey(draft?.secret || '');
-    setStorageBucketName(draft?.bucket || '');setStoragePublicDomain(draft?.domain || '');setShowStorageSecret(false);
+    setStorageEndpoint(draft?.endpoint || (next === 'oss' ? 'https://oss-cn-beijing.aliyuncs.com' : ''));
+    setStorageAccountId(draft?.accountId || '');
+    setStorageAccessKeyId(draft?.key || '');
+    setStorageSecretAccessKey(draft?.secret || '');
+    setStorageBucketName(draft?.bucket || '');
+    setStoragePublicDomain(draft?.domain || '');
+    setStorageApiPrefix(draft?.apiPrefix ?? (next === 'cloudinary' ? 'seedance' : 'seedance/'));
+    setStorageMaterialsPrefix(draft?.materialsPrefix ?? 'canvas-materials/');
+    setStorageCloudName(draft?.cloudName || '');
+    setStorageZone(draft?.zone || 'z2');
+    setShowStorageSecret(false);
   };
 
   const onSaved = useCallback((snapshot: Partial<SettingsConfigSnapshot>) => {
@@ -100,15 +120,36 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
       setStorageAccountId(config.storageAccountId); setStorageEndpoint(config.storageEndpoint);
       setStorageAccessKeyId(config.storageAccessKeyId); setStorageSecretAccessKey(config.storageSecretAccessKey);
       setStorageBucketName(config.storageBucketName); setStoragePublicDomain(config.storagePublicDomain);
+      setStorageApiPrefix(config.storageApiPrefix || 'seedance/');
+      setStorageMaterialsPrefix(config.storageMaterialsPrefix || 'canvas-materials/');
+      setStorageCloudName(config.storageCloudName || '');
+      setStorageZone(config.storageZone || 'z2');
       storageDrafts.current = {};
       setSavedConfig(config); setConfigLoaded(true);
     }).catch(error => { if (active) setConfigLoadError(formatUserError(error, '设置加载失败，请重试')); });
     return () => { active = false; };
   }, [isOpen, reloadVersion]);
 
-  // 测试 Comfly 网关延迟 Ping
+  const currentStorageDraft = {
+    provider: storageProvider,
+    accountId: storageAccountId.trim(),
+    endpoint: normalizeStorageUrl(storageEndpoint),
+    accessKeyId: storageAccessKeyId.trim(),
+    secretAccessKey: storageSecretAccessKey.trim(),
+    bucketName: storageBucketName.trim(),
+    publicDomain: storagePublicDomain.trim(),
+    apiPrefix: storageApiPrefix.trim(),
+    materialsPrefix: storageMaterialsPrefix.trim(),
+    cloudName: storageCloudName.trim(),
+    zone: storageZone.trim(),
+  };
+
   const connectionChecks = useConnectionChecks({
-    cloud_storage: [storageEnabled, storageProvider, storageAccountId, storageEndpoint, storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain],
+    cloud_storage: [
+      storageEnabled, storageProvider, storageAccountId, storageEndpoint,
+      storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain,
+      storageApiPrefix, storageMaterialsPrefix, storageCloudName, storageZone,
+    ],
     comfly_gateway: [baseUrl.trim(), apiKey.trim()],
     deepseek_official: [deepSeekApiKey.trim()],
     wanbang_ecommerce: [wanbangKey.trim(), wanbangSecret.trim(), isWanbangEnabled],
@@ -117,20 +158,27 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   }, showToast, isOpen && mainConfigLoaded);
   const isTestingStorage = Boolean(connectionChecks.testing.cloud_storage);
   const handleTestStorage = () => connectionChecks.run('cloud_storage', async () => {
-    const config = { provider: storageProvider, accountId: storageAccountId, endpoint: storageEndpoint,
-      accessKeyId: storageAccessKeyId, secretAccessKey: storageSecretAccessKey, bucketName: storageBucketName, publicDomain: storagePublicDomain };
-    const error = storageConfigError(config, { requirePublicDomain: false });
+    let endpoint = currentStorageDraft.endpoint;
+    if (storageProvider === 'qiniu') {
+      const matched = QINIU_ZONES.find(z => z.id === storageZone);
+      endpoint = matched ? matched.endpoint : 'https://s3-cn-south-1.qiniucs.com';
+    }
+    const configToTest = {
+      ...currentStorageDraft,
+      endpoint,
+    };
+    const error = storageConfigError(configToTest, { requirePublicDomain: false });
     if (error) return { ok: false, message: error };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(new DOMException('存储测试超过 30 秒，请检查配置或网络后重试', 'TimeoutError')), 30_000);
     try {
       const response = await apiFetch('/api/assets/storage/test', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ config: { ...config, enabled: true, persistResults: false } }),
+        body: JSON.stringify({ config: { ...configToTest, enabled: true, persistResults: false } }),
       });
       const data = await response.json();
       const ok = response.ok && data.success === true;
-      return { ok, message: ok ? '存储桶连接成功' : `存储桶连接失败：${data.message || data.error || response.status}` };
+      return { ok, message: ok ? (data.message || '🎉 存储桶连接与写入权限验证成功！') : `存储连接失败：${data.message || data.error || response.status}` };
     } finally { clearTimeout(timeout); }
   });
   const isTesting = Boolean(connectionChecks.testing.comfly_gateway);
@@ -176,19 +224,41 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const handleTestQiyun = () => connectionChecks.run('qiyun_parser', () => testQiyunConnection(qiyunAppId, qiyunAppKey));
 
   const handleSaveStorageConfig = async () => {
-    const config = { enabled: storageEnabled, provider: storageProvider, accountId: storageAccountId.trim(), endpoint: storageEndpoint.trim(),
-      accessKeyId: storageAccessKeyId.trim(), secretAccessKey: storageSecretAccessKey.trim(), bucketName: storageBucketName.trim(), publicDomain: storagePublicDomain.trim() };
+    let endpoint = currentStorageDraft.endpoint;
+    if (storageProvider === 'qiniu') {
+      const matched = QINIU_ZONES.find(z => z.id === storageZone);
+      endpoint = matched ? matched.endpoint : 'https://s3-cn-south-1.qiniucs.com';
+    }
+    const config = {
+      ...currentStorageDraft,
+      enabled: storageEnabled,
+      endpoint,
+    };
     const error = config.enabled ? storageConfigError(config) : '';
     if (error) { showToast(error); return; }
-    const snapshot = { storageEnabled: config.enabled, storageProvider: config.provider, storageAccountId: config.accountId,
-      storageEndpoint: config.endpoint, storageAccessKeyId: config.accessKeyId, storageSecretAccessKey: config.secretAccessKey,
-      storageBucketName: config.bucketName, storagePublicDomain: config.publicDomain };
+    const snapshot = {
+      storageEnabled: config.enabled,
+      storageProvider: config.provider,
+      storageAccountId: config.accountId,
+      storageEndpoint: config.endpoint,
+      storageAccessKeyId: config.accessKeyId,
+      storageSecretAccessKey: config.secretAccessKey,
+      storageBucketName: config.bucketName,
+      storagePublicDomain: config.publicDomain,
+      storageApiPrefix: config.apiPrefix,
+      storageMaterialsPrefix: config.materialsPrefix,
+      storageCloudName: config.cloudName,
+      storageZone: config.zone,
+    };
     await saves.save('cloud_storage', snapshot, () => persistStorageConfig(config), '对象存储配置已保存');
   };
 
-  const currentConfig: SettingsConfigSnapshot = { apiKey, baseUrl, deepSeekApiKey, wanbangKey, wanbangSecret, isWanbangEnabled,
+  const currentConfig: SettingsConfigSnapshot = {
+    apiKey, baseUrl, deepSeekApiKey, wanbangKey, wanbangSecret, isWanbangEnabled,
     scraperId, scraperSecret, isApiaEnabled, qiyunAppId, qiyunAppKey, isQiyunEnabled, appAccessToken, storageEnabled,
-    storageProvider, storageAccountId, storageEndpoint, storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain };
+    storageProvider, storageAccountId, storageEndpoint, storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain,
+    storageApiPrefix, storageMaterialsPrefix, storageCloudName, storageZone,
+  };
   const configLoaded = mainConfigLoaded && independentProviders.independentConfigLoaded;
   const mainHasUnsavedChanges = Boolean(
     configLoaded
@@ -275,6 +345,14 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     setStorageBucketName,
     storagePublicDomain,
     setStoragePublicDomain,
+    storageApiPrefix,
+    setStorageApiPrefix,
+    storageMaterialsPrefix,
+    setStorageMaterialsPrefix,
+    storageCloudName,
+    setStorageCloudName,
+    storageZone,
+    setStorageZone,
     isTestingStorage,
     handleTestStorage,
     isMigratingStorage,

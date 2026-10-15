@@ -3,7 +3,7 @@ import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@client/shared/
 
 export interface StorageConfig {
   enabled?: boolean;
-  provider?: 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase';
+  provider?: 'oss' | 'qiniu' | 'cloudinary' | 'cos' | 'r2' | 's3' | 'minio' | 'supabase';
   accountId?: string;
   endpoint?: string;
   accessKeyId?: string;
@@ -11,6 +11,10 @@ export interface StorageConfig {
   bucketName?: string;
   publicDomain?: string;
   region?: string;
+  apiPrefix?: string;
+  materialsPrefix?: string;
+  cloudName?: string;
+  zone?: string;
 }
 
 class CredentialPersistError extends Error {
@@ -105,12 +109,23 @@ export function persistStorageConfig(config: {
   secretAccessKey: string;
   bucketName: string;
   publicDomain: string;
+  apiPrefix?: string;
+  materialsPrefix?: string;
+  cloudName?: string;
+  zone?: string;
 }): Promise<void> {
   return persistLocalConfig([['storage_secret_access_key', config.secretAccessKey.trim()]], {
-    storage_enabled: String(config.enabled), storage_provider: config.provider || 'r2',
-    storage_account_id: config.accountId.trim(), storage_endpoint: config.endpoint.trim(),
-    storage_access_key_id: config.accessKeyId.trim(), storage_bucket_name: config.bucketName.trim(),
+    storage_enabled: String(config.enabled),
+    storage_provider: config.provider || 'oss',
+    storage_account_id: config.accountId.trim(),
+    storage_endpoint: config.endpoint.trim(),
+    storage_access_key_id: config.accessKeyId.trim(),
+    storage_bucket_name: config.bucketName.trim(),
     storage_public_domain: config.publicDomain.trim(),
+    storage_api_prefix: (config.apiPrefix || 'seedance/').trim(),
+    storage_materials_prefix: (config.materialsPrefix || 'canvas-materials/').trim(),
+    storage_cloud_name: (config.cloudName || '').trim(),
+    storage_zone: (config.zone || 'z2').trim(),
   });
 }
 

@@ -222,15 +222,24 @@ func discoveredModels(root string, list []any) []catalogModel {
 	seen := map[string]struct{}{}
 	models := []catalogModel{}
 	for _, item := range list {
-		id := modelID(item)
+		id := strings.TrimSpace(modelID(item))
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[strings.ToLower(id)]; exists {
+			continue
+		}
+		seen[strings.ToLower(id)] = struct{}{}
 		approved, ok := approvedModel(root, id)
 		if !ok {
-			continue
+			approved = catalogModel{
+				ID:         id,
+				Name:       id,
+				ShortName:  id,
+				Category:   "text",
+				Capability: "custom",
+			}
 		}
-		if _, exists := seen[strings.ToLower(approved.ID)]; exists {
-			continue
-		}
-		seen[strings.ToLower(approved.ID)] = struct{}{}
 		models = append(models, approved)
 	}
 	return models

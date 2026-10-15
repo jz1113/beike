@@ -154,19 +154,24 @@ export function GenerateTaskFeed({
                       primaryTask?.images?.[0] ||
                       batch.tasks.find((t) => t.sourceImageUrl || t.referenceImageUrl)?.sourceImageUrl;
 
+                    const isAgentTask =
+                      primaryTask?.id.startsWith('agent-task-') ||
+                      batch.tasks.some((t) => t.id.startsWith('agent-task-'));
+
                     return (
                       <div
                         key={`${batch.batchId || 'batch'}-${bIdx}`}
                         className="space-y-2.5 w-full transition-all duration-300"
                       >
                         {/* 1. 对话轮次元信息标头 (图3标杆同款: 多角度/智能改图/原图胶囊与参数紧凑并列，同行不换行) */}
-                        <FeedBatchHeader
+                        {!isAgentTask && <FeedBatchHeader
                           displayBatchTitle={displayBatchTitle}
                           batchPrompt={batch.prompt}
                           isBatchVideo={isBatchVideo}
                           displayModel={displayModel}
                           displayRatio={displayRatio}
                           displayQuality={displayQuality}
+                          isAgentTask={isAgentTask}
                           isMultiAngle={isMultiAngle}
                           angleName={angleName}
                           isSmartEdit={isSmartEdit}
@@ -190,12 +195,12 @@ export function GenerateTaskFeed({
                             if (task) setPreviewTask(task, batch.tasks);
                             else onShowToast('本批次尚无可预览结果，可在卡片查看生成状态');
                           }}
-                        />
+                        />}
 
                         {/* 2. 媒体内容展示区域 */}
                         {isSingle ? (
                           /* 2.1 单张大图/视频卡片 (单图独立画幅，不限制上方标头宽度) */
-                          <div className="w-[280px] max-w-full">
+                          <div className={isAgentTask ? 'w-full max-w-3xl' : 'w-[280px] max-w-full'}>
                             <FeedSingleCard
                               primaryTask={primaryTask}
                               batchTasks={batch.tasks}

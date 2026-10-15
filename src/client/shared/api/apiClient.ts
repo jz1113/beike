@@ -37,9 +37,21 @@ export function proxyMediaUrl(
   if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
     return rawUrl;
   }
+  if (rawUrl.includes('/api/system/proxy-image') || rawUrl.includes('/api/system/proxy-video')) {
+    return rawUrl;
+  }
   if (rawUrl.startsWith('/storage')) {
     const base = getApiBase();
     return base ? `${base}${rawUrl}` : rawUrl;
+  }
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.pathname.startsWith('/storage/')) {
+        const base = getApiBase();
+        return base ? `${base}${parsed.pathname}${parsed.search}` : `${parsed.pathname}${parsed.search}`;
+      }
+    } catch {}
   }
   if (rawUrl.startsWith('/')) {
     return rawUrl;
@@ -87,32 +99,40 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 export interface ClientStorageConfig {
   enabled: boolean;
   persistResults: boolean;
-  provider: 'r2' | 'oss' | 'cos' | 's3' | 'minio' | 'supabase';
+  provider: 'oss' | 'qiniu' | 'cloudinary' | 'cos' | 'r2' | 's3' | 'minio' | 'supabase';
   accountId: string;
   endpoint: string;
   accessKeyId: string;
   secretAccessKey: string;
   bucketName: string;
   publicDomain: string;
+  apiPrefix?: string;
+  materialsPrefix?: string;
+  cloudName?: string;
+  zone?: string;
 }
 
-/** 读取设置页保存在本机的对象存储配置。storage_enabled 表示成品也上传 OSS。 */
+/** 读取设置页保存在本机的对象存储配置。storage_enabled 表示全局素材与成品上传。 */
 export function readClientStorageConfig(): ClientStorageConfig {
-  const read = (key: string) => {
-    try { return localStorage.getItem(key) || ''; } catch { return ''; }
+  const read = (key: string, fallback = '') => {
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
   };
   const provider = read('storage_provider');
-  const providers: readonly string[] = ['r2', 'oss', 'cos', 's3', 'minio', 'supabase'];
+  const providers: readonly string[] = ['oss', 'qiniu', 'cloudinary'];
   return {
     enabled: true,
     persistResults: read('storage_enabled') === 'true',
-    provider: providers.includes(provider) ? provider as ClientStorageConfig['provider'] : 'oss',
+    provider: providers.includes(provider) ? (provider as ClientStorageConfig['provider']) : 'oss',
     accountId: read('storage_account_id'),
     endpoint: read('storage_endpoint'),
     accessKeyId: read('storage_access_key_id'),
     secretAccessKey: read('storage_secret_access_key'),
     bucketName: read('storage_bucket_name'),
     publicDomain: read('storage_public_domain'),
+    apiPrefix: read('storage_api_prefix', 'seedance/'),
+    materialsPrefix: read('storage_materials_prefix', 'canvas-materials/'),
+    cloudName: read('storage_cloud_name'),
+    zone: read('storage_zone', 'z2'),
   };
 }
 

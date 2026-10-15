@@ -35,7 +35,7 @@ export const AssetTasksListResponseSchema = z.object({
 export type ImageTask = z.infer<typeof ImageTaskSchema>;
 export type AssetTasksListResponse = z.infer<typeof AssetTasksListResponseSchema>;
 
-export const GenerationMediaTypeSchema = z.enum(['image', 'video', 'depth-image', 'depth-video']);
+export const GenerationMediaTypeSchema = z.enum(['image', 'video', 'depth-image', 'depth-video', 'agent', 'audio']);
 export const GenerationTaskSchema = z.object({
   id: z.string(),
   batchId: z.string().optional(),

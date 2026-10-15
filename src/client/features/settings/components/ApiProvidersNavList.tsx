@@ -1,8 +1,8 @@
+import React from 'react';
 import { Search, Plus, Globe } from 'lucide-react';
 import { type ApiProvider } from '../model/apiProviderTypes';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
-import { ComflyLogo, LianchiLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@client/shared/icons';
-import { Database } from 'lucide-react';
+import { ComflyLogo, LianchiLogo, OpenAILogo, DeepSeekLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@client/shared/icons';
 
 interface Props {
   providers: ApiProvider[];
@@ -11,7 +11,7 @@ interface Props {
   onOpenAddModal: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  modelsCountByProvider: Record<string, number>;
+  testResults?: Record<string, { ok: boolean; message: string; timestamp: number }>;
 }
 
 export function ApiProvidersNavList({
@@ -21,7 +21,7 @@ export function ApiProvidersNavList({
   onOpenAddModal,
   searchQuery,
   onSearchChange,
-  modelsCountByProvider,
+  testResults = {},
 }: Props) {
   const q = searchQuery.trim().toLowerCase();
   const filtered = providers.filter(p =>
@@ -29,15 +29,15 @@ export function ApiProvidersNavList({
   );
 
   const renderProviderIcon = (provider: ApiProvider) => {
-    const iconCls = "w-4 h-4";
+    const iconCls = "w-5 h-5";
     if (provider.id === 'google' || provider.iconType === 'google') {
       return <ModelIcon modelId="gemini-3.1-pro-preview" className={iconCls} />;
     }
     if (provider.id === 'openai_official' || provider.iconType === 'openai') {
-      return <ModelIcon modelId="gpt-6-luna" className={iconCls} />;
+      return <OpenAILogo className={iconCls} />;
     }
     if (provider.id === 'deepseek_official' || provider.iconType === 'deepseek') {
-      return <ModelIcon modelId="deepseek-flash" className={iconCls} />;
+      return <DeepSeekLogo className={iconCls} />;
     }
     if (provider.id === 'comfly_gateway' || provider.iconType === 'comfly') {
       return <ComflyLogo className={iconCls} />;
@@ -59,7 +59,26 @@ export function ApiProvidersNavList({
         </span>
       );
     }
-    return <Globe className="w-4 h-4 text-slate-500" />;
+    return <Globe className="w-5 h-5 text-slate-500" />;
+  };
+
+  const renderStatusDot = (provider: ApiProvider) => {
+    const res = testResults[provider.id];
+    if (res) {
+      return res.ok ? (
+        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs" title="连接正常" />
+      ) : (
+        <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs" title={res.message || "连接异常"} />
+      );
+    }
+    if (!provider.apiKey) {
+      return (
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80" title="待配置 Key" />
+      );
+    }
+    return (
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-white/20" title="已配置 Key，未测试" />
+    );
   };
 
   return (
@@ -98,7 +117,6 @@ export function ApiProvidersNavList({
           <div className="space-y-1">
             {filtered.map(item => {
               const active = selectedId === item.id;
-              const modelCount = modelsCountByProvider[item.id] ?? 0;
               return (
                 <button
                   key={item.id}
@@ -111,21 +129,19 @@ export function ApiProvidersNavList({
                       : 'hover:bg-white/60 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <span className="w-7 h-7 shrink-0 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                  <span className="w-7 h-7 shrink-0 flex items-center justify-center">
                     {renderProviderIcon(item)}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold truncate">{item.name}</span>
-                      {item.isPromoted && (
-                        <span className="px-1 py-0.2 text-[9px] rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 leading-tight shrink-0">
-                          推广
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                      {item.promoBadge || `${modelCount} 个模型`}
-                    </div>
+                  <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                    <span className="text-xs font-semibold truncate">{item.name}</span>
+                    {item.isPromoted && (
+                      <span className="px-1 py-0.2 text-[9px] font-medium rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 shrink-0">
+                        推广
+                      </span>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-center pl-1">
+                    {renderStatusDot(item)}
                   </div>
                 </button>
               );
@@ -133,7 +149,7 @@ export function ApiProvidersNavList({
           </div>
         </div>
 
-        {/* 传统扩展服务（电商采集、内容解析、对象存储） */}
+        {/* 传统扩展服务（电商采集、内容解析） */}
         <div className="pt-2 border-t border-slate-200/60 dark:border-white/5">
           <div className="px-2 mb-1.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">
             集成服务
@@ -143,7 +159,6 @@ export function ApiProvidersNavList({
               { id: 'wanbang_ecommerce', name: '万邦电商采集', icon: <OneBoundLogo className="w-4 h-4" /> },
               { id: 'apia_parser', name: 'APIA 图集解析', icon: <ApiaLogo className="w-4 h-4" /> },
               { id: 'qiyun_parser', name: '奇云解析', icon: <QiyunLogo className="w-4 h-4" /> },
-              { id: 'cloud_storage', name: '云端对象存储', icon: <Database className="w-4 h-4 text-sky-500" /> },
             ].map(svc => {
               const active = selectedId === svc.id;
               return (
@@ -158,7 +173,7 @@ export function ApiProvidersNavList({
                       : 'hover:bg-white/60 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <span className="w-6 h-6 shrink-0 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                  <span className="w-6 h-6 shrink-0 flex items-center justify-center">
                     {svc.icon}
                   </span>
                   <span className="text-xs truncate">{svc.name}</span>

@@ -76,7 +76,7 @@ export default function GenerateWorkspace({
     return () => ro.disconnect();
   }, []);
 
-  const activeSession = sessions.find(s => s.id === currentSessionId) || sessions[0];
+  const activeSession = sessions.find(s => s.id === currentSessionId);
   const taskList = useMemo(() => {
     const rawTasks = activeSession?.tasks || [];
     const map = new Map<string, GenerationTask>();

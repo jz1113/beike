@@ -1,5 +1,6 @@
 import type { ChatSession, GenerationTask } from '../appStoreTypes';
 import type { DrawingSnapshot } from './generationSnapshotTypes';
+import { isSessionDeleted, isGenerationDeleted } from './generationTombstones';
 
 function changedFields<T extends object>(base: T, next: T, remote: T, skip: Array<keyof T> = []): T {
   const merged = { ...remote };
@@ -40,12 +41,16 @@ function mergeSession(base: ChatSession, next: ChatSession, remote: ChatSession)
 }
 
 export function mergeDrawingSnapshots(base: DrawingSnapshot, next: DrawingSnapshot, remote: DrawingSnapshot): DrawingSnapshot {
-  const sessions = mergeRows(base.sessions, next.sessions, remote.sessions, mergeSession)
+  const rawSessions = mergeRows(base.sessions, next.sessions, remote.sessions, mergeSession);
+  const sessions = rawSessions
+    .filter((session) => !isSessionDeleted(session.id))
     .sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || b.createdAt - a.createdAt);
+  const rawTasks = mergeRows(base.tasks, next.tasks, remote.tasks, mergeTask);
+  const tasks = rawTasks.filter((task) => !isGenerationDeleted(task.id, task.taskId, task.resultUrl, task.dbId));
   const selected = base.currentId !== next.currentId ? next.currentId : remote.currentId;
   return {
     sessions,
-    tasks: mergeRows(base.tasks, next.tasks, remote.tasks, mergeTask),
+    tasks,
     currentId: sessions.some(session => session.id === selected) ? selected : sessions[0]?.id || 'session-default',
     updatedAt: Math.max(next.updatedAt, remote.updatedAt + 1),
   };

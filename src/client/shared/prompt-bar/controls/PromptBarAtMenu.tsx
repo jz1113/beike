@@ -1,97 +1,28 @@
-import type { RefObject } from 'react';
-import { Plus, Check } from 'lucide-react';
+import { useState, type RefObject } from 'react';
+import {
+  Image as ImageIcon,
+  User,
+  Package,
+  ChevronRight,
+  Plus,
+  Check,
+} from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 
+export type SubjectCategory = 'material' | 'character' | 'product';
+
 export interface PromptBarAtMenuProps {
   atMenuRef?: RefObject<HTMLDivElement | null>;
-  anchorRef: RefObject<HTMLDivElement | null>;
+  anchorRef: RefObject<HTMLElement | null>;
   isUp: boolean;
   atMenuQuery: string;
   allSubjects: SubjectItem[];
   activeSubjects: SubjectItem[];
-  onCreateSubjectClick: () => void;
+  onCreateSubjectClick: (category?: SubjectCategory) => void;
   onSelectSubject: (subject: SubjectItem) => void;
-}
-
-/** 🌟 双卡片发光交叠插画（1:1 还原设计图1） */
-function AtMenuEmptyIllustration() {
-  return (
-    <div className="relative w-24 h-24 flex items-center justify-center my-2 select-none pointer-events-none">
-      <svg
-        className="w-24 h-24 overflow-visible"
-        viewBox="0 0 96 96"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id="atGlowBack" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.85" />
-            <stop offset="50%" stopColor="#60A5FA" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#818CF8" stopOpacity="0.2" />
-          </linearGradient>
-          <linearGradient id="atGlowFront" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#0284C7" stopOpacity="0.8" />
-          </linearGradient>
-          <filter id="atCardGlow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse">
-            <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="#38BDF8" floodOpacity="0.25" />
-          </filter>
-        </defs>
-
-        {/* 后层卡片：向左上方微倾斜 -8deg */}
-        <g transform="rotate(-8 40 48)">
-          <rect
-            x="18"
-            y="18"
-            width="44"
-            height="56"
-            rx="12"
-            stroke="url(#atGlowBack)"
-            strokeWidth="1.8"
-            fill="white"
-            fillOpacity="0.75"
-            filter="url(#atCardGlow)"
-          />
-        </g>
-
-        {/* 前层卡片：正立居中 */}
-        <rect
-          x="30"
-          y="20"
-          width="46"
-          height="58"
-          rx="13"
-          stroke="url(#atGlowFront)"
-          strokeWidth="2"
-          fill="white"
-          fillOpacity="0.95"
-          filter="url(#atCardGlow)"
-        />
-
-        {/* 前层卡片内衬：圆角微光容器 */}
-        <rect
-          x="38"
-          y="28"
-          width="30"
-          height="42"
-          rx="8"
-          stroke="#BAE6FD"
-          strokeWidth="1.2"
-          strokeDasharray="3 2"
-          fill="#F8FAFC"
-          fillOpacity="0.6"
-        />
-
-        {/* 向上粗箭头（居中直观指示主体上传） */}
-        <g stroke="#0284C7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M53 57V37" strokeWidth="2.4" />
-          <path d="M45 45L53 37L61 45" strokeWidth="2.4" />
-        </g>
-      </svg>
-    </div>
-  );
+  onClose?: () => void;
 }
 
 export function PromptBarAtMenu({
@@ -103,84 +34,150 @@ export function PromptBarAtMenu({
   activeSubjects,
   onCreateSubjectClick,
   onSelectSubject,
+  onClose,
 }: PromptBarAtMenuProps) {
-  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(true, isUp, anchorRef, 272);
-  const hasSubjects = allSubjects.length > 0;
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(true, isUp, anchorRef, 240);
+  const [activeCategory, setActiveCategory] = useState<SubjectCategory | null>('character');
 
+  // 分类归类算法
+  const categorizeSubject = (sub: SubjectItem): SubjectCategory => {
+    const text = (sub.name || '').toLowerCase();
+    if (text.includes('人') || text.includes('模') || text.includes('角') || text.includes('avatar') || text.includes('portrait')) {
+      return 'character';
+    }
+    if (text.includes('商') || text.includes('品') || text.includes('货') || text.includes('机') || text.includes('服') || text.includes('鞋') || text.includes('product') || text.includes('item')) {
+      return 'product';
+    }
+    return 'material';
+  };
+
+  const categories: Array<{ id: SubjectCategory; label: string; icon: typeof ImageIcon }> = [
+    { id: 'material', label: '素材', icon: ImageIcon },
+    { id: 'character', label: '角色', icon: User },
+    { id: 'product', label: '商品', icon: Package },
+  ];
+
+  // 如果有 query 搜索，跨分类过滤
+  const isSearching = Boolean(atMenuQuery.trim());
   const filteredSubjects = allSubjects.filter((sub, idx) => {
-    if (!atMenuQuery.trim()) return true;
+    if (!isSearching) return true;
     const q = atMenuQuery.toLowerCase();
-    const sName = sub.name.toLowerCase();
-    const sNameNoExt = sub.name.replace(/\.[^/.]+$/, '').toLowerCase();
+    const sName = (sub.name || '').toLowerCase();
     return (
       sName.includes(q) ||
-      sNameNoExt.includes(q) ||
       sub.id.toLowerCase().includes(q) ||
       `主体${idx + 1}`.includes(q) ||
       `图片${idx + 1}`.includes(q)
     );
   });
 
+  const getSubjectsByCategory = (cat: SubjectCategory) => {
+    const list = filteredSubjects.filter((sub) => categorizeSubject(sub) === cat);
+    // 如果该分类下没有，但全部主体里有未归类的，在素材中展示剩余项
+    if (cat === 'material') {
+      const rest = filteredSubjects.filter(
+        (sub) => categorizeSubject(sub) !== 'character' && categorizeSubject(sub) !== 'product'
+      );
+      return rest;
+    }
+    return list;
+  };
+
+  const currentCategoryList = activeCategory ? getSubjectsByCategory(activeCategory) : [];
+
   return (
     <div
-      ref={node => { panelRef.current = node; if (atMenuRef) atMenuRef.current = node; }}
+      ref={(node) => {
+        panelRef.current = node;
+        if (atMenuRef) atMenuRef.current = node;
+      }}
       style={panelStyle}
       role="dialog"
-      aria-label="选择参考素材或主体"
+      aria-label="选择主体或素材"
       className={`absolute left-0 ${
-        opensUp ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'
-      } w-[min(272px,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-4 z-50 animate-fade-in text-left select-none`}
+        opensUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
+      } flex items-start z-50 animate-fade-in text-left select-none`}
     >
-      {/* 顶部小标 */}
-      <div className="flex items-center justify-between text-xs font-normal text-slate-400 select-none">
-        <span>可能@的内容</span>
-        {atMenuQuery && <span className="text-amber-600 font-normal">匹配: {atMenuQuery}</span>}
+      {/* 🌟 一级分类菜单（1:1 还原图3：素材>、角色>、商品>） */}
+      <div className="w-44 rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-1.5 space-y-0.5">
+        {categories.map((cat) => {
+          const Icon = cat.icon;
+          const isActive = activeCategory === cat.id;
+          const count = getSubjectsByCategory(cat.id).length;
+
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onMouseEnter={() => setActiveCategory(cat.id)}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`w-full px-3 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between transition-colors cursor-pointer group ${
+                isActive
+                  ? 'bg-slate-100 text-slate-950 font-semibold'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Icon
+                  className={`w-4 h-4 transition-colors ${
+                    isActive ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-700'
+                  }`}
+                />
+                <span className="text-[13px]">{cat.label}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-400">
+                {count > 0 && <span className="text-[10px] text-slate-400 font-mono">{count}</span>}
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {!hasSubjects ? (
-        /* 🌟 空态（1:1 还原图 1）: 双卡片发光插画 + 说明文案 + 浅灰大药丸按钮 */
-        <div className="flex flex-col items-center justify-center pt-2 pb-1">
-          <AtMenuEmptyIllustration />
-          <div className="text-[13px] text-slate-500 font-normal mt-1.5 mb-4 text-center">
-            你还没有创建过主体
+      {/* 🌟 二级主体列表浮层 */}
+      {activeCategory && (
+        <div className="ml-1.5 w-60 rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.14)] p-2 space-y-1.5 animate-fade-in">
+          <div className="flex items-center justify-between px-1.5 py-0.5 text-xs">
+            <span className="text-slate-400 font-medium">
+              {categories.find((c) => c.id === activeCategory)?.label}库
+            </span>
+            <button
+              type="button"
+              onClick={() => onCreateSubjectClick(activeCategory)}
+              className="text-[11px] text-blue-600 hover:text-blue-700 flex items-center gap-0.5 font-medium cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />
+              <span>新建</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onCreateSubjectClick}
-            className="px-6 py-2.5 rounded-xl bg-[#F2F3F5] hover:bg-[#E5E7EB] text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
-          >
-            <Plus className="w-3.5 h-3.5 text-slate-800 stroke-[2.4]" />
-            <span>创建主体</span>
-          </button>
-        </div>
-      ) : (
-        /* 🌟 列表态: 保留快捷新建 + 滚动主体列表 */
-        <div className="space-y-2 mt-2">
-          <button
-            type="button"
-            onClick={onCreateSubjectClick}
-            className="w-full px-3 py-2 rounded-xl bg-[#F2F3F5] hover:bg-[#E5E7EB] text-slate-800 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-2xs"
-          >
-            <Plus className="w-3.5 h-3.5 text-slate-800 stroke-[2.4]" />
-            <span>创建主体</span>
-          </button>
 
-          <div className="max-h-52 overflow-y-auto scroll-contain space-y-1 pt-0.5">
-            {filteredSubjects.length === 0 ? (
-              <div className="px-3 py-3 text-xs text-slate-400 text-center">
-                无匹配主体
+          <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5">
+            {currentCategoryList.length === 0 ? (
+              <div className="py-6 px-2 text-center space-y-2">
+                <p className="text-xs text-slate-400">暂无{categories.find((c) => c.id === activeCategory)?.label}资产</p>
+                <button
+                  type="button"
+                  onClick={() => onCreateSubjectClick(activeCategory)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>立即添加</span>
+                </button>
               </div>
             ) : (
-              filteredSubjects.map((sub) => {
-                const isCurrent = activeSubjects.some((s) => s.id === sub.id || s.url === sub.url);
+              currentCategoryList.map((sub) => {
+                const isSelected = activeSubjects.some((s) => s.id === sub.id || s.url === sub.url);
                 return (
                   <button
                     key={sub.id}
                     type="button"
-                    onMouseDown={event => event.preventDefault()}
-                    onClick={() => onSelectSubject(sub)}
-                    className={`w-full px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
-                      isCurrent ? 'bg-slate-100 font-bold text-slate-900' : 'hover:bg-slate-50 text-slate-700'
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onSelectSubject(sub);
+                      onClose?.();
+                    }}
+                    className={`w-full px-2 py-1.5 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer group ${
+                      isSelected ? 'bg-slate-100 text-slate-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -195,13 +192,11 @@ export function PromptBarAtMenu({
                             target.src = proxyMediaUrl(sub.url);
                           }
                         }}
-                        className="w-7 h-7 rounded-md object-cover flex-shrink-0 border border-slate-200 bg-white shadow-2xs"
+                        className="w-7 h-7 rounded-lg object-cover flex-shrink-0 border border-slate-200 bg-slate-50 shadow-2xs"
                       />
-                      <div className="min-w-0 flex-1 text-left">
-                        <div className="truncate text-xs font-medium text-slate-800">{sub.name}</div>
-                      </div>
+                      <span className="truncate text-left max-w-[130px]">{sub.name || '未命名资产'}</span>
                     </div>
-                    {isCurrent && <Check className="w-3.5 h-3.5 text-slate-700 flex-shrink-0 stroke-[2.5]" />}
+                    {isSelected && <Check className="w-3.5 h-3.5 text-slate-900 stroke-[2.5]" />}
                   </button>
                 );
               })
@@ -212,3 +207,4 @@ export function PromptBarAtMenu({
     </div>
   );
 }
+export default PromptBarAtMenu;

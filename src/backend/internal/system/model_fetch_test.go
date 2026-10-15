@@ -21,7 +21,7 @@ func TestModelFetchUsesApprovedFallback(t *testing.T) {
 	}
 }
 
-func TestModelFetchKeepsApprovedGatewayModels(t *testing.T) {
+func TestModelFetchKeepsAllGatewayModels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" || r.Header.Get("Authorization") != "Bearer key" {
 			t.Errorf("request %s", r.URL.String())
@@ -31,7 +31,7 @@ func TestModelFetchKeepsApprovedGatewayModels(t *testing.T) {
 	defer server.Close()
 	status, body := fetchModelCatalog(context.Background(), config.Config{Root: repoRoot(t)}, httptest.NewRequest(http.MethodPost, "/", nil), map[string]any{"baseUrl": server.URL, "apiKey": "key"}, server.Client())
 	models, _ := body["models"].([]catalogModel)
-	if status != http.StatusOK || len(models) != 1 || models[0].ID != "gpt-image-2" {
+	if status != http.StatusOK || len(models) != 2 || !containsModel(models, "gpt-image-2") || !containsModel(models, "not-approved") {
 		t.Fatalf("status %d models %#v", status, body["models"])
 	}
 }

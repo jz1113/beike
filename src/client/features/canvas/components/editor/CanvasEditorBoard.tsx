@@ -8,6 +8,7 @@ import { CanvasStageNode } from '../stage/CanvasStageNode';
 import { CanvasLayersPanel } from '../CanvasLayersPanel';
 import CanvasPromptDock from '../prompt/CanvasPromptDock';
 import { useCanvasFileDrop } from '../../hooks/useCanvasFileDrop';
+import { useI18n } from '@client/shared/i18n';
 import type { CanvasNode, CanvasProject, CanvasSubject } from '../../model/types';
 import type { MutableRefObject, RefObject, MouseEvent, WheelEvent } from 'react';
 
@@ -63,6 +64,7 @@ export interface CanvasEditorBoardProps {
 }
 
 export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
+  const { t } = useI18n();
   const {
     canvasViewportRef, canvasFileDrop, handleMouseDownCanvas, closeNodeMenu, handleWheel, openNodeMenuAt,
     isPanning, isHandMode, pan, zoom, nodeMenu, handleCreateQuickNode, nodes, currentProject,
@@ -110,14 +112,14 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
           <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 -translate-y-1/2 px-6 pl-20 sm:px-20">
             <div className="mx-auto max-w-[880px] select-none text-center animate-in fade-in duration-200">
               <p className="mb-8 flex items-center justify-center gap-2.5 text-sm font-normal text-slate-500">
-                <MousePointer2 size={18} strokeWidth={1.5} />双击画布，自由生成节点
+                <MousePointer2 size={18} strokeWidth={1.5} />{t('canvas.doubleClickToCreate')}
               </p>
               <div className="pointer-events-auto grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {[
-                  { label: '图片生成', Icon: ImageIcon, action: () => handleCreateQuickNode('image-generation') },
-                  { label: '视频生成', Icon: VideoIcon, action: () => handleCreateQuickNode('video-generation') },
+                  { label: t('promptBar.modes.image'), Icon: ImageIcon, action: () => handleCreateQuickNode('image-generation') },
+                  { label: t('promptBar.modes.video'), Icon: VideoIcon, action: () => handleCreateQuickNode('video-generation') },
                   { label: '文本生成', Icon: Type, action: () => handleCreateQuickNode('prompt') },
-                  { label: '导入素材', Icon: Upload, action: () => { replacementNodeRef.current = null; fileInputRef.current?.click(); } },
+                  { label: t('assets.import'), Icon: Upload, action: () => { replacementNodeRef.current = null; fileInputRef.current?.click(); } },
                 ].map(({ label, Icon, action }) => <button key={label} type="button" onClick={action} className="group flex h-16 min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-2 text-left text-sm font-medium text-slate-700 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 motion-reduce:transform-none">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors group-hover:bg-slate-200/70"><Icon size={20} strokeWidth={1.6} /></span>
                   <span>{label}</span>

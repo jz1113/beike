@@ -12,8 +12,10 @@ import { useViewportDensity } from '@client/shared/hooks/useMediaQuery';
 import { useCompactLayout } from '@client/shared/hooks/useCompactLayout';
 import AppSidebar from '@client/app/AppSidebar';
 import AIAssistantButton from '@client/features/assistant/components/AIAssistantButton';
+import AgentDocumentHost from '@client/features/assistant/components/document/AgentDocumentHost';
 import AppErrorBoundary from '@client/shared/ui/AppErrorBoundary';
 import GlobalContextMenu from '@client/app/context-menu/GlobalContextMenu';
+import { ConfirmDialogHost } from '@client/shared/ui/ConfirmDialogHost';
 import { DeconstructJobsHost } from '@client/app/DeconstructJobsHost';
 import { GeneratingEffectsProvider } from '@client/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@client/app/ViewKeepAlive';
@@ -352,9 +354,11 @@ export default function App() {
       {/* 🌟 全局桌面级上下文右键菜单（接管图片/视频快捷操作，彻底消除检查元素与冗余项） */}
       <GlobalContextMenu />
       <DeconstructJobsHost />
+      <ConfirmDialogHost />
 
-      {/* 🌟 右下角常驻多模态 AI 问答助手与抽屉面板（设置视图时静默以保持沉浸） */}
-      {currentView !== 'settings' && <AIAssistantButton />}
+      {/* 🌟 右下角常驻多模态 AI 问答助手与抽屉面板（设置视图与主页时静默，主页已升级为输入框 Agent） */}
+      {currentView !== 'settings' && currentView !== 'home' && <AIAssistantButton />}
+      <AgentDocumentHost />
       <Suspense fallback={null}>
         {mountAssistant && <AppErrorBoundary
           title="AI 助手组件异常"

@@ -31,7 +31,6 @@ export type CanvasSettingsPage =
   | 'nodes'
   | 'actions'
   | 'token'
-  | 'media'
   | 'pet'
   | 'jimeng'
   | 'codex'
@@ -50,7 +49,6 @@ export const CANVAS_SETTINGS_PAGES: { id: CanvasSettingsPage; label: string; cou
   { id: 'nodes', label: '节点', count: 5, keywords: ['节点', '秒表', '开始'] },
   { id: 'actions', label: '操作', count: 1, keywords: ['删除', '确认'] },
   { id: 'token', label: '平台令牌', keywords: ['token', 'user id', '令牌'] },
-  { id: 'media', label: '图床', keywords: ['图床', 'oss', '存储', '素材'] },
   { id: 'pet', label: '桌宠', keywords: ['桌宠', '麻衣'] },
   { id: 'jimeng', label: '即梦', keywords: ['即梦', 'seedance'] },
   { id: 'codex', label: 'Codex', keywords: ['codex', 'openai'] },
@@ -60,7 +58,7 @@ export const CANVAS_SETTINGS_PAGES: { id: CanvasSettingsPage; label: string; cou
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'profile', label: '创作档案', icon: Activity, keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
   { id: 'api', label: 'API 接入', icon: Plug, keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦', '奇云'] },
-  { id: 'chat', label: '对话', icon: MessageSquare, keywords: ['对话', '视觉', '默认', '助手'] },
+  { id: 'chat', label: '多模态', icon: MessageSquare, keywords: ['多模态', '对话', '视觉', '默认', '助手'] },
   { id: 'image', label: '绘画', icon: Palette, keywords: ['绘画', '生图', '默认'] },
   { id: 'video', label: '视频', icon: Video, keywords: ['视频', '默认'] },
   { id: 'three_d', label: '3D', icon: Box, keywords: ['3d', '混元'] },
@@ -68,7 +66,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'voice', label: '语音', icon: AudioLines, keywords: ['语音', '配音'] },
   { id: 'storage', label: '存储', icon: HardDrive, keywords: ['存储', 'oss', 'r2', 's3'] },
   { id: 'language', label: '语言', icon: Languages, keywords: ['语言', '中文'] },
-  { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点', '图床', '桌宠'] },
+  { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点', '桌宠'] },
 ];
 
 export function settingsSectionLabel(section: SettingsNavSection, canvasPage: CanvasSettingsPage) {

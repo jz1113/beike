@@ -29,6 +29,8 @@ export {
   QiyunLogo,
   ComflyLogo,
   LianchiLogo,
+  OpenAILogo,
+  DeepSeekLogo,
   CollectorHubIcon,
   TaobaoIcon,
   ShellTechLogo,

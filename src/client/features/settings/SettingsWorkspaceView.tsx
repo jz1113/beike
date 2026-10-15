@@ -1,6 +1,8 @@
 import './settingsWorkspace.css';
 import { CANVAS_SETTINGS_PAGES, settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
-import { CanvasPreview, LanguagePreview, ModalityPreview, StoragePreviewNote } from './components/SettingsPreview';
+import { CanvasPreview } from './components/SettingsPreview';
+import { LanguageSettingsPanel } from './components/LanguageSettingsPanel';
+import { useI18n } from '@client/shared/i18n';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@client/shared/hooks/useToast';
 import { SettingsSidebar } from './components/SettingsSidebar';
@@ -12,7 +14,6 @@ import { getUsageSummary, type UsageRange, type UsageSummary } from '@client/sha
 import { getStoredMultimodalModelId, workflowModelRouteId } from '@shared/domain/models/workflowModels';
 import GatewayModelModal from './components/GatewayModelModal';
 import ApiServicesTab from './tabs/ApiServicesTab';
-import DefaultsTab from './tabs/DefaultsTab';
 import { ModelManagementPanel } from './components/ModelManagementPanel';
 import { MODEL_CHANNELS, type ModelChannel } from './model/modelManagement';
 import UsageTab from './tabs/UsageTab';
@@ -21,6 +22,8 @@ import { useSystemConfigQuery } from './hooks/useSystemConfigQuery';
 import { useSettingsConfig } from './hooks/useSettingsConfig';
 import { useCustomModels } from './hooks/useCustomModels';
 import { useGatewayUser } from './hooks/useGatewayUser';
+import { ModalityHubView } from './components/ModalityHubView';
+import type { ModalityKind } from './model/modalityModelTypes';
 
 interface Props {
   onBack?: () => void;
@@ -31,17 +34,11 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
 
   const {
     backFromSettings,
-    setSelectedVisionModel,
-    setSelectedImageGenModel,
     quickVideoModel,
-    setQuickVideoModel,
   } = useAppStore(
     useShallow((s) => ({
       backFromSettings: s.backFromSettings,
-      setSelectedVisionModel: s.setSelectedVisionModel,
-      setSelectedImageGenModel: s.setSelectedImageGenModel,
       quickVideoModel: s.quickVideoModel,
-      setQuickVideoModel: s.setQuickVideoModel,
     }))
   );
 
@@ -62,7 +59,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const [showModelBoard, setShowModelBoard] = useState(false);
 
   // 2. 中间选中的 API 接口
-  const [selectedServiceId, setSelectedServiceId] = useState<string>('google');
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('comfly_gateway');
   const [serviceSearch, setServiceSearch] = useState('');
 
   // 3. 用量统计面板状态
@@ -132,7 +129,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
 
   // 7. 业务默认模型路由状态
   const [activeVisionModel, setActiveVisionModel] = useState('gemini-3.1-pro-preview');
-  const [, setActiveAssistantModel] = useState('gpt-5.6-luna');
   const [activeImageGenModel, setActiveImageGenModel] = useState('gpt-image-2');
   const [activeVideoGenModel, setActiveVideoGenModel] = useState('doubao-seedance-2.5');
 
@@ -153,10 +149,28 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     }
   }, [quickVideoModel]);
 
-  const activeTitle = useMemo(() => showModelBoard ? '模型管理' : settingsSectionLabel(navSection, canvasPage), [showModelBoard, navSection, canvasPage]);
+  const { t } = useI18n();
+
+  const activeTitle = useMemo(() => {
+    if (showModelBoard) return '模型管理';
+    if (navSection === 'language') return t('settings.title');
+    const navKey = `settings.nav.${navSection}`;
+    const translated = t(navKey);
+    if (translated && translated !== navKey) return translated;
+    return settingsSectionLabel(navSection, canvasPage);
+  }, [showModelBoard, navSection, canvasPage, t]);
+
+  const modalityCounts: Partial<Record<SettingsNavSection, number>> = useMemo(() => ({
+    chat: 48,
+    image: 60,
+    video: 80,
+    three_d: 4,
+    music: 7,
+    voice: 22,
+  }), []);
 
   const gatewayBalanceFormatted = gatewayUser.userInfo?.balanceAvailable === false ? undefined : gatewayUser.userInfo?.quotaFormatted;
-  const storageOpen = navSection === 'storage' || (navSection === 'canvas' && canvasPage === 'media');
+  const storageOpen = navSection === 'storage';
 
   return (
     <div className="settings-workspace fixed inset-0 z-[80] flex items-center justify-center p-4 text-slate-900 font-sans sm:p-8" role="presentation">
@@ -170,7 +184,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         <button type="button" onClick={handleBackToApp} aria-label="关闭" className="absolute right-4 top-4 z-30 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900">
           <X className="h-4 w-4" />
         </button>
-        <SettingsSidebar navSection={navSection} setNavSection={changeSection} gatewayBalanceFormatted={gatewayBalanceFormatted} />
+        <SettingsSidebar navSection={navSection} setNavSection={changeSection} gatewayBalanceFormatted={gatewayBalanceFormatted} modalityCounts={modalityCounts} />
         {navSection === 'canvas' && (
           <nav aria-label="画布功能" className="settings-canvas-rail hidden md:flex w-44 shrink-0 h-full flex-col overflow-y-auto border-r border-slate-200/80 bg-[#f7f8fa] px-3 py-5">
             <div className="px-2 pb-3 text-[13px] font-medium text-slate-500">画布功能</div>
@@ -200,7 +214,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             </select>
             {navSection === 'canvas' && (
               <select aria-label="画布功能" value={canvasPage} onChange={event => setCanvasPage(event.target.value as CanvasSettingsPage)} className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white p-2 text-xs">
-                {['connections', 'board', 'nodes', 'actions', 'token', 'media', 'pet', 'jimeng', 'codex', 'upscale'].map(id => <option key={id} value={id}>{settingsSectionLabel('canvas', id as CanvasSettingsPage)}</option>)}
+                {['connections', 'board', 'nodes', 'actions', 'token', 'pet', 'jimeng', 'codex', 'upscale'].map(id => <option key={id} value={id}>{settingsSectionLabel('canvas', id as CanvasSettingsPage)}</option>)}
               </select>
             )}
           </div>
@@ -217,7 +231,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             </div>
           ) : navSection === 'api' || storageOpen ? (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden @container/settings-modal bg-white">
-              {storageOpen && <div className="px-4 pt-4 lg:px-5"><StoragePreviewNote /></div>}
               <div className="flex-1 min-h-0 flex overflow-hidden">
                 <ApiServicesTab config={config} models={models} group={storageOpen ? 'storage' : 'all'}
                   selectedServiceId={storageOpen ? 'cloud_storage' : selectedServiceId}
@@ -230,26 +243,14 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
-                {navSection === 'canvas' && canvasPage !== 'media' && <CanvasPreview page={canvasPage} />}
-                {(navSection === 'chat' || navSection === 'image' || navSection === 'video') && <DefaultsTab
-                  customModels={models.customModels}
-                  areModelsLoaded={models.areModelsLoaded}
-                  activeVisionModel={activeVisionModel}
-                  setActiveVisionModel={setActiveVisionModel}
-                  setActiveAssistantModel={setActiveAssistantModel}
-                  setSelectedVisionModel={setSelectedVisionModel}
-                  activeImageGenModel={activeImageGenModel}
-                  setActiveImageGenModel={setActiveImageGenModel}
-                  setSelectedImageGenModel={setSelectedImageGenModel}
-                  activeVideoGenModel={activeVideoGenModel}
-                  setActiveVideoGenModel={setActiveVideoGenModel}
-                  setQuickVideoModel={setQuickVideoModel}
-                  notifyModelsUpdated={models.notifyModelsUpdated}
-                  showToast={showToast}
-                  focus={navSection === 'chat' ? 'vision' : navSection === 'image' ? 'image' : 'video'}
-                />}
-                {(navSection === 'three_d' || navSection === 'music' || navSection === 'voice') && <ModalityPreview kind={navSection} />}
-                {navSection === 'language' && <LanguagePreview />}
+                {navSection === 'canvas' && <CanvasPreview page={canvasPage} />}
+                {['chat', 'image', 'video', 'three_d', 'music', 'voice'].includes(navSection) && (
+                  <ModalityHubView
+                    kind={navSection as ModalityKind}
+                    showToast={showToast}
+                  />
+                )}
+                {navSection === 'language' && <LanguageSettingsPanel />}
                 {navSection === 'profile' && (
                   <UsageTab
                     usageRange={usageRange}

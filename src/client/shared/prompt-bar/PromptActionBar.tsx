@@ -5,55 +5,22 @@ import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
 import PromptBarBrandHero from './PromptBarBrandHero';
 import PromptBarRefMediaPanel from './media/PromptBarRefMediaPanel';
 import { PromptBarControlsRow } from './controls/PromptBarControlsRow';
+import PromptOptimizeButton from './controls/PromptOptimizeButton';
+import { PromptBarAgentFileChips } from './controls/PromptBarAgentFileChips';
 import { usePromptActionBar, type PromptActionBarOptions } from './hooks/usePromptActionBar';
 
 export type { SubjectItem } from './promptBarConstants';
 
 export default function PromptActionBar(props: PromptActionBarOptions) {
   const {
-    store,
-    containerRef,
-    handleComposerFocus,
-    handleContainerBlur,
-    anyDropdownOpen,
-    isFloatingDock,
-    shouldShowBrandHero,
-    isExpanded,
-    useTopStrip,
-    media,
-    videoFrames,
-    showInlinePolaroid,
-    isGenerateDock,
-    isComposerExpanded,
-    richInputRef,
-    handleComposerKeyDown,
-    placeholder,
-    isUp,
-    isDepthMode,
-    modeMenu,
-    modeButtonClass,
-    handleModeSwitch,
-    modelMenu,
-    activeVideoModelObj,
-    activeImageModelObj,
-    availableVideoModels,
-    availableImageModels,
-    depthStyleMenu,
-    depthQualityMenu,
-    videoRefModeMenu,
-    activeVideoRefModeObj,
-    aspectMenu,
-    activeVideoRatioObj,
-    activeImageRatioObj,
-    currentW,
-    currentH,
-    durationMenu,
-    videoDurationBounds,
-    handleSendPrompt,
-    canSend,
-    isSubmitting,
-    fileAccept,
-    toastMsg,
+    store, containerRef, handleComposerFocus, handleContainerBlur, anyDropdownOpen,
+    isFloatingDock, shouldShowBrandHero, isExpanded, useTopStrip, media, videoFrames,
+    showInlinePolaroid, isGenerateDock, isComposerExpanded, richInputRef, handleComposerKeyDown,
+    placeholder, isUp, isDepthMode, modeMenu, modeButtonClass, handleModeSwitch, modelMenu,
+    activeVideoModelObj, activeImageModelObj, availableVideoModels, availableImageModels,
+    depthStyleMenu, depthQualityMenu, videoRefModeMenu, activeVideoRefModeObj, aspectMenu,
+    activeVideoRatioObj, activeImageRatioObj, currentW, currentH, durationMenu, videoDurationBounds,
+    handleSendPrompt, canSend, isSubmitting, fileAccept, toastMsg, showToast,
   } = usePromptActionBar(props);
   const {
     quickGenMode,
@@ -117,6 +84,27 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
       >
         {isExpanded ? (
           <div className="flex flex-col gap-2.5 sm:gap-3 h-full animate-fade-in">
+            {/* 🌟 顶部引导栏与右上角一键优化提示词 */}
+            <div className="flex items-center justify-between text-xs text-slate-400 select-none pb-0.5 px-0.5">
+              <div className="flex items-center gap-1.5 truncate text-[12px] sm:text-[12.5px]">
+                {quickGenMode !== 'agent' && (
+                  <span className="text-slate-500 font-normal">
+                    描述你想生成的画面内容、运动过程或结合素材调整
+                  </span>
+                )}
+              </div>
+
+              <div className="shrink-0 ml-auto">
+                <PromptOptimizeButton
+                  prompt={quickPrompt}
+                  onOptimized={(val) => setQuickPrompt(val)}
+                  onShowToast={showToast}
+                />
+              </div>
+            </div>
+            {quickGenMode === 'agent' && (
+              <PromptBarAgentFileChips urls={quickRefImages} onRemove={media.handleRemoveRefImage} />
+            )}
             {/* 🌟 展开面板（参考图3）：点击全部展开后在顶部展示全功能面板 */}
             {(useTopStrip || (media.isExpandedRefImages && quickRefImages.length > 0)) && (
               <div className="pb-2">
@@ -196,6 +184,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                   onKeyDown={handleComposerKeyDown}
                   onPasteFiles={media.handlePasteFiles}
                   placeholder={placeholder}
+                  onOpenManual={() => showToast('贝壳 Agent 模式：与 AI 深度对话推敲分镜与构思，支持多模态参考与模型自适应调度。')}
                   allSubjects={media.allSubjects}
                   quickRefImages={quickRefImages}
                   onTriggerAtMenu={(pos, query) => {
@@ -225,6 +214,10 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                 activeSubjects={media.activeSubjects}
                 onCreateSubjectClick={() => media.createSubjectInputRef.current?.click()}
                 onSelectSubject={media.handleSelectSubject}
+                onClose={() => {
+                  media.setShowAtMenu(false);
+                  media.setAtMenuTrigger?.(null);
+                }}
               />
             )}
 
@@ -316,6 +309,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                     ? 'Seedance 2.0全能参考，上传参考、输入文字或 @ 主体'
                     : placeholder
                 }
+                onOpenManual={() => showToast('贝壳 Agent 模式：与 AI 深度对话推敲分镜与构思，支持多模态参考与模型自适应调度。')}
                 allSubjects={media.allSubjects}
                 quickRefImages={quickRefImages}
                 onTriggerAtMenu={(pos, query) => {
@@ -362,43 +356,11 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
       </div>
 
       {/* 隐藏的系统文件选择器与拖拽入口 */}
-      <input
-        ref={media.fileInputRef}
-        type="file"
-        accept={fileAccept}
-        multiple={!isDepthMode}
-        className="hidden"
-        onChange={media.handleFileUpload}
-      />
-      <input
-        ref={media.createSubjectInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={media.handleCreateSubject}
-      />
-      <input
-        ref={videoFrames.firstFrameInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={videoFrames.handleUploadFirstFrame}
-      />
-      <input
-        ref={videoFrames.lastFrameInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={videoFrames.handleUploadLastFrame}
-      />
-      <input
-        ref={videoFrames.multiFrameInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={videoFrames.handleUploadMultiFrame}
-      />
+      <input ref={media.fileInputRef} type="file" accept={fileAccept} multiple={!isDepthMode} className="hidden" onChange={media.handleFileUpload} />
+      <input ref={media.createSubjectInputRef} type="file" accept="image/*" className="hidden" onChange={media.handleCreateSubject} />
+      <input ref={videoFrames.firstFrameInputRef} type="file" accept="image/*" className="hidden" onChange={videoFrames.handleUploadFirstFrame} />
+      <input ref={videoFrames.lastFrameInputRef} type="file" accept="image/*" className="hidden" onChange={videoFrames.handleUploadLastFrame} />
+      <input ref={videoFrames.multiFrameInputRef} type="file" accept="image/*" multiple className="hidden" onChange={videoFrames.handleUploadMultiFrame} />
 
       {toastMsg && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-medium shadow-xl">
