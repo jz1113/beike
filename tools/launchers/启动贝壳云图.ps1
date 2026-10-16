@@ -1,11 +1,18 @@
-# ==============================================================================
+﻿# ==============================================================================
 # 贝壳云图 (Beike Cloud Graph) - Windows PowerShell 本地一键启动器
 # ==============================================================================
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-$projectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (Test-Path (Join-Path $scriptDir "..\..\package.json")) {
+    $projectDir = (Resolve-Path (Join-Path $scriptDir "..\..")).Path
+} elseif (Test-Path (Join-Path $scriptDir "package.json")) {
+    $projectDir = (Resolve-Path $scriptDir).Path
+} else {
+    $projectDir = (Get-Location).Path
+}
 Set-Location $projectDir
 
 function Write-Info($msg)  { Write-Host "→ $msg" -ForegroundColor Cyan }

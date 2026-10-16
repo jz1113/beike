@@ -53,6 +53,17 @@ func videoEndpointSet(family, model string, images []string) ([]string, []string
 	case "grok-video":
 		submit = []string{root + "/xai/v1/videos/generations"}
 		query = []string{root + "/xai/v1/videos/{taskId}"}
+	case "minimax":
+		if strings.Contains(strings.ToLower(model), "t2v-01") {
+			submit = []string{root + "/minimax/v1/video_generation"}
+			query = []string{root + "/minimax/v1/query/video_generation?task_id={taskId}"}
+		} else {
+			submit = []string{root + "/v1/videos", root + "/v2/videos/generations", root + "/minimax/v1/video_generation"}
+			query = []string{root + "/v1/videos/{taskId}", root + "/v2/videos/generations/{taskId}", root + "/minimax/v1/query/video_generation?task_id={taskId}"}
+		}
+	case "veo":
+		submit = []string{root + "/v2/videos/generations", root + "/v1/videos", root + "/v1/video/generations"}
+		query = []string{root + "/v2/videos/generations/{taskId}", root + "/v1/videos/{taskId}", root + "/v1/video/generations/{taskId}"}
 	case "sora":
 		submit = []string{root + "/v2/videos/generations", root + "/v1/videos", root + "/v1/video/generations", root + "/xai/v1/videos/generations"}
 		query = []string{root + "/v2/videos/generations/{taskId}", root + "/v1/videos/{taskId}", root + "/v1/video/generations/{taskId}"}

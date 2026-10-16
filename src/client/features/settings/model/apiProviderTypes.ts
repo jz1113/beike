@@ -61,6 +61,20 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
     description: '企业级大模型聚合网关',
   },
   {
+    id: 'gpt_best_gateway',
+    name: 'gpt-best 网关',
+    providerType: 'openai',
+    baseUrl: 'https://api.gpt-best.com',
+    apiKey: '',
+    enabled: true,
+    catalogPath: '/v1/models',
+    isRemovable: true,
+    websiteUrl: 'https://gpt-best.com',
+    serviceId: 'gpt_best_gateway',
+    iconType: 'comfly',
+    description: '全模态大模型聚合网关 (gpt-best.apifox.cn)',
+  },
+  {
     id: 'openai_official',
     name: 'OpenAI',
     providerType: 'openai',
@@ -123,7 +137,7 @@ export function loadStoredProviders(): ApiProvider[] {
     for (const item of saved) {
       if (DEPRECATED_PROVIDER_IDS.has(item.id)) continue;
       if (!removedIds.includes(item.id)) {
-        if (item.id === 'comfly_gateway' || item.id === 'openai_official' || item.id === 'deepseek_official') {
+        if (item.id === 'comfly_gateway' || item.id === 'gpt_best_gateway' || item.id === 'openai_official' || item.id === 'deepseek_official') {
           item.providerType = 'openai';
         }
         idMap.set(item.id, item);

@@ -8,6 +8,7 @@ import {
 } from '@client/shared/api/mediaUpload';
 import { isAgentAttachmentFile, loadPromptBarUploads } from '../agentAttachments';
 import {
+  getRefMediaIdentity,
   registerRefMedia,
   resolveRefMediaFile,
   resolveRefMediaKind,
@@ -192,8 +193,24 @@ export function usePromptBarMedia({
       setRefImageNames((prev) => ({ ...prev, ...newNamesMap }));
       // 逐个追加至 quickRefImages
       items.forEach((item) => addQuickRefImage(item.previewUrl));
+
+      if (quickGenMode !== 'agent') {
+        const mentionTokens = items.map((item, idx) => {
+          const sub: SubjectItem = {
+            id: getRefMediaIdentity(item.previewUrl),
+            name: newMentionNames[idx] || `${currentTotal - items.length + idx + 1}`,
+            url: item.previewUrl,
+          };
+          return serializeSubjectMention(sub);
+        });
+        if (mentionTokens.length > 0) {
+          const mentionStr = mentionTokens.join(' ') + ' ';
+          const trimmed = quickPrompt.trim();
+          setQuickPrompt(trimmed ? `${trimmed} ${mentionStr}` : mentionStr);
+        }
+      }
     },
-    [isDepthMode, quickRefImages.length, bumpRefMediaVersion, setQuickRefImages, addQuickRefImage],
+    [isDepthMode, quickGenMode, quickPrompt, quickRefImages.length, bumpRefMediaVersion, setQuickRefImages, addQuickRefImage, setQuickPrompt],
   );
 
   const resolveMediaFile = useCallback(

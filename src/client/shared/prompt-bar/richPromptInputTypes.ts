@@ -24,5 +24,7 @@ export interface RichPromptInputRef {
   focus: () => void;
   getSelectionStart: () => number;
   insertMention: (subject: SubjectItem) => void;
+  insertSkill: (skillName: string) => void;
+  insertAtSymbol: () => void;
   setCursorToEnd: () => void;
 }

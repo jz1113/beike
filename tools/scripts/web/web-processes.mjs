@@ -8,11 +8,19 @@ function recordPath(root, isolated) {
   return join(root, '.local', isolated ? 'isolated-web-processes.json' : 'web-processes.json');
 }
 
+function samePath(a, b) {
+  if (!a || !b) return false;
+  if (process.platform === 'win32') {
+    return resolve(a).toLowerCase().replaceAll('/', '\\') === resolve(b).toLowerCase().replaceAll('/', '\\');
+  }
+  return a === b;
+}
+
 function processInfo(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return null;
   if (process.platform === 'win32') {
     const result = spawnSync('powershell.exe', ['-NoProfile', '-Command',
-      `$p=Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if($p){$p | Select-Object CommandLine,CreationDate | ConvertTo-Json -Compress}`], { encoding: 'utf8' });
+      `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $p=Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if($p){$p | Select-Object CommandLine,CreationDate | ConvertTo-Json -Compress}`], { encoding: 'utf8' });
     try {
       const value = JSON.parse(result.stdout);
       if (typeof value.CommandLine !== 'string' || !value.CreationDate) return null;
@@ -57,14 +65,19 @@ function writeRecords(root, isolated, records) {
 }
 
 function matches(root, kind, record, options) {
-  if (!record || record.root !== canonicalRoot(root)) return false;
+  if (!record || !samePath(record.root, canonicalRoot(root))) return false;
   for (const [key, value] of Object.entries(options)) if (record[key] !== value) return false;
   const info = processInfo(record.pid);
-  if (!info || info.started !== record.started || (info.cwd !== null && info.cwd !== record.root)) return false;
+  if (!info || info.started !== record.started || (info.cwd !== null && !samePath(info.cwd, record.root))) return false;
   if (kind !== 'gateway' && kind !== 'vite') return false;
+  const canonical = canonicalRoot(root);
   const marker = kind === 'gateway'
-    ? resolve(root, 'tools/build/beike-api')
-    : resolve(root, 'vite.config.ts');
+    ? resolve(canonical, 'tools/build/beike-api')
+    : resolve(canonical, 'vite.config.ts');
+  if (process.platform === 'win32') {
+    const normalize = (s) => s.toLowerCase().replaceAll('/', '\\');
+    return normalize(info.command).includes(normalize(marker));
+  }
   return info.command.includes(marker);
 }
 

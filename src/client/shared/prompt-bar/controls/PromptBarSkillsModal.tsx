@@ -1,75 +1,14 @@
-import { useState, useRef, useEffect, type RefObject } from 'react';
+import { useState, useRef, useEffect, type RefObject, type ChangeEvent } from 'react';
 import {
   Search,
   Star,
-  Plus,
   ArrowRight,
   Check,
+  CornerDownLeft,
+  ScanLine,
 } from 'lucide-react';
-
-interface SkillItem {
-  id: string;
-  title: string;
-  models: string;
-  category: string;
-  description: string;
-  tags: string[];
-  coverUrl?: string;
-  isFavorite?: boolean;
-}
-
-const DEMO_SKILLS: SkillItem[] = [
-  {
-    id: 'skill-mv',
-    title: '音乐MV分镜创作',
-    models: 'Seedance 2.5 · Seedream 5.0 Pro',
-    category: '专业影视',
-    description:
-      '以音乐为核心驱动力的智能 MV 创作，上传歌曲或直接描述想要的创意，会先理解歌词、节奏、曲风、情绪和演唱阵容，再匹配视觉方向，生成人物设定与完整分镜供确认。',
-    tags: ['视频', '音乐MV'],
-    coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'skill-viral',
-    title: '爆款复刻',
-    models: 'SD 2.5 · Seedream 5.0 Pro',
-    category: '营销广告',
-    description:
-      '精准拆解高热度爆款视频的画面运镜、构图与镜头转换节奏，1:1 复刻创意结构并支持替换主体与风格。',
-    tags: ['爆款', '短片'],
-    coverUrl: 'https://images.unsplash.com/photo-1536240478700-b869070f9279?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'skill-ecommerce',
-    title: '反转短剧带货视频',
-    models: 'SD 2.0 Fast VIP · Seedream 5.0 F',
-    category: '短剧漫剧',
-    description:
-      '打造戏剧性冲突与剧情反转，巧妙自然地将商品植入剧情高潮，提高完播率与转化率。',
-    tags: ['短剧', '电商'],
-    coverUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'skill-knowledge',
-    title: '知识讲解视频',
-    models: 'GLM 5.1 · Seedance 2.5',
-    category: '独家超创',
-    description:
-      '将枯燥的概念与长篇科普转化为生动具象的动态图解与视频叙事，配以高质感视觉与字幕。',
-    tags: ['科普', '图解'],
-    coverUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'skill-pets',
-    title: '《萌宠仙境》',
-    models: 'Seedance 2.5 · FLUX Pro',
-    category: '独家画风',
-    description:
-      '超萌拟人化宠物奇幻冒险世界，专属奇幻柔光色彩与毛发渲染，生成如梦似幻的童话微短片。',
-    tags: ['萌宠', '童话'],
-    coverUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600&auto=format&fit=crop&q=80',
-  },
-];
+import { STORE_SKILLS, type StoreSkillItem } from './PromptBarSkillStoreModal';
+import { useAppStore } from '@client/store';
 
 const SKILL_CATEGORIES = [
   '全部',
@@ -88,6 +27,10 @@ interface PromptBarSkillsModalProps {
   triggerRef: RefObject<HTMLElement | null>;
   onShowToast?: (msg: string) => void;
   isUp?: boolean;
+  onUseSkill: (skillTitle: string) => void;
+  onOpenStore: () => void;
+  onAgentCreate: () => void;
+  onManualCreate: () => void;
 }
 
 export default function PromptBarSkillsModal({
@@ -96,14 +39,28 @@ export default function PromptBarSkillsModal({
   triggerRef,
   onShowToast,
   isUp = true,
+  onUseSkill,
+  onOpenStore,
+  onAgentCreate,
+  onManualCreate,
 }: PromptBarSkillsModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const uploadFileInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSkillId, setActiveSkillId] = useState<string>('skill-mv');
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+
+  const customSkills = useAppStore((s) => s.assistantCustomSkills);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setShowCreateMenu(false);
+      return;
+    }
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
@@ -121,11 +78,27 @@ export default function PromptBarSkillsModal({
 
   if (!isOpen) return null;
 
-  const filteredSkills = DEMO_SKILLS.filter((s) => {
+  const allSkills: StoreSkillItem[] = [
+    ...customSkills.map((cs) => ({
+      id: cs.id,
+      title: cs.displayName || cs.name,
+      models: '平台自适应',
+      category: '我的',
+      description: cs.description || '自定义技能',
+      tags: ['我的技能'],
+      coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+    })),
+    ...STORE_SKILLS,
+  ];
+
+  const filteredSkills = allSkills.filter((s) => {
+    if (selectedCategory === '我的') {
+      return s.category === '我的';
+    }
+    if (selectedCategory === '收藏') {
+      return favorites[s.id];
+    }
     if (selectedCategory !== '全部' && s.category !== selectedCategory) {
-      if (selectedCategory === '我的' || selectedCategory === '收藏') {
-        return false;
-      }
       return false;
     }
     if (searchQuery.trim()) {
@@ -139,22 +112,67 @@ export default function PromptBarSkillsModal({
     return true;
   });
 
-  const activeSkill = DEMO_SKILLS.find((s) => s.id === activeSkillId) || DEMO_SKILLS[0];
+  const activeSkill = allSkills.find((s) => s.id === activeSkillId) || allSkills[0];
 
-  const handleUnderDevelopmentNotice = () => {
-    onShowToast?.('当前技能正在规划开发中，敬请期待');
+  const toggleFavorite = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSelectAndUse = (skill: StoreSkillItem) => {
+    onUseSkill(skill.title);
+    onClose();
+  };
+
+  const handleUploadLocalSkill = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+      const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+      const store = useAppStore.getState();
+      const now = Date.now();
+      const newSkill = {
+        id: `local-skill-${now}`,
+        name: fileNameWithoutExt,
+        displayName: fileNameWithoutExt,
+        description: `从本地导入的技能：${file.name}`,
+        prompt: text,
+        markdownDoc: text,
+        author: '本地导入',
+        isBuiltin: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.addAssistantSkill(newSkill);
+      onShowToast?.(`已成功导入本地技能「${fileNameWithoutExt}」`);
+      onUseSkill(fileNameWithoutExt);
+      setShowCreateMenu(false);
+      onClose();
+    };
+    reader.readAsText(file);
   };
 
   return (
     <div
       ref={modalRef}
-      className={`absolute left-0 ${
-        isUp ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'
-      } w-[760px] max-w-[calc(100vw-2rem)] rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_20px_50px_rgba(0,0,0,0.15)] p-4 z-50 animate-fade-in text-left select-none`}
+      className={`absolute left-1/2 -translate-x-1/2 ${
+        isUp ? 'bottom-full mb-2.5 origin-bottom' : 'top-full mt-2.5 origin-top'
+      } w-[780px] max-w-[calc(100vw-2rem)] rounded-3xl bg-white/98 backdrop-blur-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(0,0,0,0.16)] p-4 z-50 animate-fade-in text-left select-none text-slate-900`}
     >
-      {/* 🌟 顶部栏：搜索框 + 全部 -> */}
+      <input
+        type="file"
+        ref={uploadFileInputRef}
+        onChange={handleUploadLocalSkill}
+        accept=".md,.json,.txt"
+        className="hidden"
+      />
+
+      {/* 🌟 顶部栏：搜索框 + 全部 ->（图4） */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100/80 w-64 text-xs text-slate-700">
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100/90 w-64 text-xs text-slate-700">
           <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <input
             type="text"
@@ -165,25 +183,22 @@ export default function PromptBarSkillsModal({
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* 🌟 核心要求：当前没有技能，标为待开发 */}
-          <span className="px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200/70 text-amber-700 text-[11px] font-medium">
-            技能生态 · 待开发
-          </span>
-          <button
-            type="button"
-            onClick={handleUnderDevelopmentNotice}
-            className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium transition-colors cursor-pointer"
-          >
-            <span>全部</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onOpenStore();
+          }}
+          className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium transition-colors cursor-pointer group"
+        >
+          <span>全部</span>
+          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </button>
       </div>
 
-      {/* 🌟 主体两栏结构（1:1 还原图5） */}
-      <div className="grid grid-cols-12 gap-3 pt-3">
-        {/* 左侧分类导航 */}
+      {/* 🌟 主体三栏结构（图4） */}
+      <div className="grid grid-cols-12 gap-3.5 pt-3">
+        {/* 左栏：分类导航 (col-span-3) */}
         <div className="col-span-3 border-r border-slate-100 pr-2 space-y-1">
           {SKILL_CATEGORIES.map((cat) => {
             const isSelected = selectedCategory === cat;
@@ -194,7 +209,7 @@ export default function PromptBarSkillsModal({
                 onClick={() => setSelectedCategory(cat)}
                 className={`w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer ${
                   isSelected
-                    ? 'text-slate-950 font-bold bg-slate-100/90'
+                    ? 'text-slate-950 font-bold bg-slate-100'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -209,8 +224,8 @@ export default function PromptBarSkillsModal({
           })}
         </div>
 
-        {/* 中间技能列表 */}
-        <div className="col-span-4 space-y-1.5 max-h-[340px] overflow-y-auto pr-1">
+        {/* 中栏：技能卡片列表 (col-span-4) */}
+        <div className="col-span-4 space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
           {filteredSkills.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-400">
               暂无匹配技能
@@ -222,19 +237,30 @@ export default function PromptBarSkillsModal({
                 <div
                   key={skill.id}
                   onClick={() => setActiveSkillId(skill.id)}
+                  onDoubleClick={() => handleSelectAndUse(skill)}
                   className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
                     isActive
-                      ? 'border-slate-300 bg-slate-50/90 shadow-2xs'
-                      : 'border-transparent hover:bg-slate-50/60'
+                      ? 'border-slate-300 bg-slate-100/80 shadow-2xs'
+                      : 'border-transparent hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-900 line-clamp-1">
                       {skill.title}
                     </span>
-                    <span className="px-1.5 py-0.2 text-[9px] rounded bg-slate-200/80 text-slate-500 font-normal shrink-0">
-                      待开发
-                    </span>
+                    {isActive && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectAndUse(skill);
+                        }}
+                        title="使用此技能"
+                        className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/80 transition-colors"
+                      >
+                        <CornerDownLeft className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                   <span className="text-[10px] text-slate-400 line-clamp-1 mt-1 font-mono">
                     {skill.models}
@@ -245,8 +271,8 @@ export default function PromptBarSkillsModal({
           )}
         </div>
 
-        {/* 右侧技能卡片详情（图5同款封面与预览） */}
-        <div className="col-span-5 flex flex-col justify-between rounded-2xl bg-slate-50/70 p-3 border border-slate-100 relative">
+        {/* 右栏：当前技能详情预览卡片 (col-span-5) */}
+        <div className="col-span-5 flex flex-col justify-between rounded-2xl bg-slate-50/80 p-3 border border-slate-100 relative">
           <div>
             {/* 封面图片 */}
             <div className="w-full h-36 rounded-xl overflow-hidden relative shadow-sm bg-slate-200">
@@ -256,16 +282,20 @@ export default function PromptBarSkillsModal({
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2.5">
-                <span className="text-white text-base font-bold tracking-tight drop-shadow-md">
+                <span className="text-white text-sm font-bold tracking-tight drop-shadow-md">
                   《{activeSkill.title}》
                 </span>
               </div>
               <button
                 type="button"
-                onClick={handleUnderDevelopmentNotice}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 text-white/90 hover:text-white backdrop-blur-sm cursor-pointer"
+                onClick={(e) => toggleFavorite(activeSkill.id, e)}
+                className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-colors cursor-pointer ${
+                  favorites[activeSkill.id]
+                    ? 'bg-amber-400 text-white'
+                    : 'bg-black/40 text-white/90 hover:text-white'
+                }`}
               >
-                <Star className="w-3.5 h-3.5" />
+                <Star className="w-3.5 h-3.5 fill-current" />
               </button>
             </div>
 
@@ -275,38 +305,85 @@ export default function PromptBarSkillsModal({
             </p>
 
             {/* 标签 */}
-            <div className="flex items-center gap-1.5 mt-2">
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
               {activeSkill.tags.map((t) => (
                 <span
                   key={t}
-                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200/80 text-[10.5px] text-slate-600 font-medium"
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10.5px] text-slate-600 font-medium"
                 >
                   {t}
                 </span>
               ))}
-              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10.5px] font-medium ml-auto">
-                待开发
-              </span>
             </div>
           </div>
 
-          {/* 底部按钮栏 */}
-          <div className="pt-3 mt-2 border-t border-slate-200/60 flex items-center justify-between">
+          {/* 底部按钮栏（图4、图6） */}
+          <div className="pt-3 mt-2 border-t border-slate-200/60 flex items-center justify-between relative">
             <button
               type="button"
-              onClick={handleUnderDevelopmentNotice}
-              className="text-xs text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
+              onClick={() => handleSelectAndUse(activeSkill)}
+              className="text-xs text-slate-600 hover:text-slate-900 font-semibold cursor-pointer flex items-center gap-1"
             >
-              详情 ↗
+              <span>详情</span>
+              <ArrowRight className="w-3 h-3" />
             </button>
-            <button
-              type="button"
-              onClick={handleUnderDevelopmentNotice}
-              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>创建技能</span>
-            </button>
+
+            {/* 创建技能按钮与展开气泡菜单（图6） */}
+            <div className="relative">
+              <button
+                ref={createButtonRef}
+                type="button"
+                onClick={() => setShowCreateMenu(!showCreateMenu)}
+                className="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-medium flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+              >
+                <ScanLine className="w-3.5 h-3.5" />
+                <span>创建技能</span>
+              </button>
+
+              {/* 🌟 图6：点击创建技能后弹出的菜单气泡 */}
+              {showCreateMenu && (
+                <div
+                  className="absolute bottom-full mb-2 right-0 w-44 rounded-2xl bg-white border border-slate-200/90 shadow-[0_12px_32px_rgba(0,0,0,0.18)] p-2 z-50 animate-fade-in text-left space-y-1"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateMenu(false);
+                      onClose();
+                      onAgentCreate();
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-xs text-slate-700 hover:text-slate-950 hover:bg-slate-100 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>通过Agent创建</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      uploadFileInputRef.current?.click();
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-xs text-slate-700 hover:text-slate-950 hover:bg-slate-100 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>上传本地Skill</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateMenu(false);
+                      onClose();
+                      onManualCreate();
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-xs text-slate-700 hover:text-slate-950 hover:bg-slate-100 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>手动创建Skill</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

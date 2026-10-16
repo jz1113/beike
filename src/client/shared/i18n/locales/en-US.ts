@@ -27,7 +27,7 @@ export const enUS: TranslationSchema = {
     nav: {
       profile: 'Creator Profile',
       api: 'API Access',
-      chat: 'Chat',
+      chat: 'Multimodal',
       image: 'Image',
       video: 'Video',
       three_d: '3D',
@@ -75,9 +75,9 @@ export const enUS: TranslationSchema = {
     generate: 'Generate',
     generating: 'Generating',
     modes: {
-      image: 'Freeform Image',
+      image: 'Image Generation',
       video: 'Video Generation',
-      agent: 'AI Assistant',
+      agent: 'Agent Mode',
       depth: 'Spatial Depth',
     },
   },

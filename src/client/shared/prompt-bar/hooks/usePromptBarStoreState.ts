@@ -7,7 +7,7 @@ const EMPTY_ANY_ARRAY: any[] = [];
 export function usePromptBarStoreState() {
   return useAppStore(
     useShallow((s) => ({
-      quickGenMode: s.quickGenMode ?? 'image',
+      quickGenMode: s.quickGenMode ?? 'agent',
       setQuickGenMode: s.setQuickGenMode,
       quickDepthStyle: s.quickDepthStyle ?? 'mocap',
       setQuickDepthStyle: s.setQuickDepthStyle,

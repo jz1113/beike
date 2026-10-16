@@ -65,28 +65,13 @@ export function resolveFileAccept(quickGenMode: QuickGenMode): string {
  */
 export function resolveModeButtonClass(params: {
   quickGenMode: QuickGenMode;
-  isDepthMode: boolean;
+  isDepthMode?: boolean;
   showModeDropdown: boolean;
 }): string {
-  const { quickGenMode, isDepthMode, showModeDropdown } = params;
-  if (quickGenMode === 'agent') {
-    return showModeDropdown
-      ? 'bg-slate-100 text-slate-900 shadow-none'
-      : 'bg-transparent hover:bg-slate-50 text-slate-800 shadow-none';
-  }
-  if (quickGenMode === 'video') {
-    return showModeDropdown
-      ? 'bg-cyan-50/70 text-cyan-800 shadow-none'
-      : 'bg-transparent hover:bg-slate-50 text-cyan-600 shadow-none';
-  }
-  if (isDepthMode) {
-    return showModeDropdown
-      ? 'bg-violet-50/70 text-violet-800 shadow-none'
-      : 'bg-transparent hover:bg-slate-50 text-violet-600 shadow-none';
-  }
+  const { showModeDropdown } = params;
   return showModeDropdown
-    ? 'bg-sky-50/70 text-sky-800 shadow-none'
-    : 'bg-transparent hover:bg-slate-50 text-sky-600 shadow-none';
+    ? 'bg-slate-100 text-slate-900 font-medium'
+    : 'bg-transparent hover:bg-slate-100/70 text-slate-700 hover:text-slate-900 font-medium';
 }
 
 /**

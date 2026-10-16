@@ -1,11 +1,10 @@
 import { Plus, ArrowUp } from 'lucide-react';
-import { densityComposerPad, composerContainer } from '@client/shared/ui/layoutClasses';
+import { densityComposerPad, composerContainer, densityComposerRadius } from '@client/shared/ui/layoutClasses';
 import { RichPromptInput } from './RichPromptInput';
 import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
 import PromptBarBrandHero from './PromptBarBrandHero';
 import PromptBarRefMediaPanel from './media/PromptBarRefMediaPanel';
 import { PromptBarControlsRow } from './controls/PromptBarControlsRow';
-import PromptOptimizeButton from './controls/PromptOptimizeButton';
 import { PromptBarAgentFileChips } from './controls/PromptBarAgentFileChips';
 import { usePromptActionBar, type PromptActionBarOptions } from './hooks/usePromptActionBar';
 
@@ -60,6 +59,8 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
     setQuickVideoCount,
   } = store;
 
+  const hasVisualRefImages = quickRefImages.some((url) => !url.startsWith('agent-file:'));
+
   return (
     <div
       ref={containerRef}
@@ -76,32 +77,14 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
           anyDropdownOpen ? 'z-40' : 'z-20'
         } group/composer ${
           isExpanded
-            ? `bg-white border border-slate-200/90 shadow-none rounded-2xl ${
-                isFloatingDock ? 'pt-3 px-3 sm:px-3.5 pb-2 flex flex-col gap-2.5 sm:gap-3' : `${densityComposerPad} flex flex-col gap-2.5 sm:gap-3`
+            ? `bg-white border border-slate-200/80 shadow-[0_4px_24px_rgba(0,0,0,0.03)] ${densityComposerRadius} ${
+                isFloatingDock ? 'pt-3.5 px-3.5 sm:px-4 pb-2.5 flex flex-col gap-2.5 sm:gap-3' : `${densityComposerPad} flex flex-col gap-2.5 sm:gap-3`
               }`
             : 'bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.06)] rounded-full px-3.5 py-1.5 sm:py-2 flex flex-col hover:border-slate-300'
         }`}
       >
         {isExpanded ? (
           <div className="flex flex-col gap-2.5 sm:gap-3 h-full animate-fade-in">
-            {/* 🌟 顶部引导栏与右上角一键优化提示词 */}
-            <div className="flex items-center justify-between text-xs text-slate-400 select-none pb-0.5 px-0.5">
-              <div className="flex items-center gap-1.5 truncate text-[12px] sm:text-[12.5px]">
-                {quickGenMode !== 'agent' && (
-                  <span className="text-slate-500 font-normal">
-                    描述你想生成的画面内容、运动过程或结合素材调整
-                  </span>
-                )}
-              </div>
-
-              <div className="shrink-0 ml-auto">
-                <PromptOptimizeButton
-                  prompt={quickPrompt}
-                  onOptimized={(val) => setQuickPrompt(val)}
-                  onShowToast={showToast}
-                />
-              </div>
-            </div>
             {quickGenMode === 'agent' && (
               <PromptBarAgentFileChips urls={quickRefImages} onRemove={media.handleRemoveRefImage} />
             )}
@@ -140,7 +123,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
             )}
 
             <div className="flex items-start w-full relative">
-              {showInlinePolaroid && !media.isExpandedRefImages && (
+              {showInlinePolaroid && !media.isExpandedRefImages && hasVisualRefImages && (
                 <div className="shrink-0 relative z-20">
                   <PromptBarRefMediaPanel
                     layout="sidebar"

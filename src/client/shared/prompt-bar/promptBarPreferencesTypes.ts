@@ -1,3 +1,5 @@
+import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
+
 export type PromptPreferencesTab = 'video' | 'image' | 'reasoning';
 
 export type VideoAspectOption = 'smart' | '16:9' | '21:9' | '9:16' | '4:3' | '3:4' | '1:1';
@@ -14,7 +16,7 @@ export interface PromptVideoPreferences {
   generationMode: PreferenceGenerationMode;
 }
 
-export type ImageAspectOption = '21:9' | '9:16' | '4:3' | '3:4' | '1:1' | '16:9';
+export type ImageAspectOption = '21:9' | '16:9' | '4:3' | '3:4' | '1:1' | '9:16';
 export type ImageResolutionOption = '1K' | '2K' | '4K';
 export type ImageInferenceStrength = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -26,7 +28,8 @@ export interface PromptImagePreferences {
 }
 
 export interface PromptReasoningPreferences {
-  modelId: string; // 如 'doubao-seed-2.0-pro'
+  modelId: string; // 如 'deepseek-v4-flash' 或具体模型 id
+  reasoningEffort: ReasoningEffort;
   generationMode: PreferenceGenerationMode;
 }
 
@@ -38,21 +41,22 @@ export interface PromptComposerPreferences {
 
 export const DEFAULT_PROMPT_PREFERENCES: PromptComposerPreferences = {
   video: {
-    modelId: 'seedance-2.5',
+    modelId: 'smart',
     aspect: '16:9',
     resolution: '720P',
     durationMode: 'smart',
-    customDurationSec: 4,
+    customDurationSec: 5,
     generationMode: 'normal',
   },
   image: {
-    modelId: 'smart-image-2.5-pro',
+    modelId: 'smart',
     aspect: '9:16',
     resolution: '2K',
     inferenceStrength: 'low',
   },
   reasoning: {
-    modelId: 'doubao-seed-2.0-pro',
+    modelId: 'deepseek-v4-flash',
+    reasoningEffort: 'medium',
     generationMode: 'normal',
   },
 };
@@ -68,7 +72,11 @@ export function loadPromptPreferences(): PromptComposerPreferences {
     return {
       video: { ...DEFAULT_PROMPT_PREFERENCES.video, ...parsed.video },
       image: { ...DEFAULT_PROMPT_PREFERENCES.image, ...parsed.image },
-      reasoning: { ...DEFAULT_PROMPT_PREFERENCES.reasoning, ...parsed.reasoning },
+      reasoning: {
+        ...DEFAULT_PROMPT_PREFERENCES.reasoning,
+        ...parsed.reasoning,
+        reasoningEffort: parsed.reasoning?.reasoningEffort || DEFAULT_PROMPT_PREFERENCES.reasoning.reasoningEffort,
+      },
     };
   } catch {
     return DEFAULT_PROMPT_PREFERENCES;

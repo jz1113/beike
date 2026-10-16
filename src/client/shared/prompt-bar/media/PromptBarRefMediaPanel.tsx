@@ -1,11 +1,5 @@
 import { useState, useMemo } from 'react';
 import { Plus, X, Minimize2, AlertCircle } from 'lucide-react';
-import {
-  densityComposerPolaroidFrame,
-  densityComposerPolaroidFrameExpanded,
-  compactComposerPolaroidFrame,
-  compactComposerPolaroidFrameExpanded,
-} from '@client/shared/ui/layoutClasses';
 import { PromptBarRefImageStack } from './PromptBarRefImageStack';
 import { RefMediaThumb } from './PromptBarRefMediaThumb';
 import { PromptBarRefMediaLightbox } from './PromptBarRefMediaLightbox';
@@ -79,7 +73,6 @@ export default function PromptBarRefMediaPanel({
   onClearAll,
 }: PromptBarRefMediaPanelProps) {
   const isStrip = layout === 'strip';
-  const polaroidFrame = `${frameExpanded ? densityComposerPolaroidFrameExpanded : densityComposerPolaroidFrame} ${frameExpanded ? compactComposerPolaroidFrameExpanded : compactComposerPolaroidFrame}`;
 
   const [activeMediaTab, setActiveMediaTab] = useState<'all' | 'image' | 'video' | 'audio'>('all');
   const [lightboxState, setLightboxState] = useState<RefMediaLightboxState | null>(null);
@@ -274,14 +267,21 @@ export default function PromptBarRefMediaPanel({
               );
             })}
 
-            {/* 列表末尾浅灰 + 按钮 */}
+            {/* 列表末尾浅色精致槽位 + 按钮 */}
             <button
               type="button"
               onClick={onUploadClick}
-              className="w-16 h-20 sm:w-18 sm:h-22 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 group/add"
+              className="w-16 h-20 sm:w-18 sm:h-22 rounded-xl bg-white hover:bg-slate-50 border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] p-1 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 group/add"
               title="添加更多参考素材"
             >
-              <Plus className="w-6 h-6 stroke-[1.8] text-slate-400 group-hover/add:scale-110 transition-transform" />
+              <div className="w-full h-full rounded-lg border border-dashed border-slate-200/90 group-hover/add:border-slate-300 bg-slate-50/50 group-hover/add:bg-slate-100/70 flex flex-col items-center justify-center gap-1 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/add:text-slate-800 group-hover/add:border-slate-300 transition-all">
+                  <Plus className="w-3.5 h-3.5 stroke-[2.2] group-hover/add:rotate-90 transition-transform duration-300" />
+                </div>
+                <span className="text-[10px] font-medium text-slate-400 group-hover/add:text-slate-600 transition-colors">
+                  添加
+                </span>
+              </div>
             </button>
           </div>
         </div>
@@ -311,7 +311,6 @@ export default function PromptBarRefMediaPanel({
               frameExpanded={frameExpanded}
               onUploadClick={onUploadClick}
               onRemove={removeVisualRef}
-              addLabel="参考内容"
               resolveMediaFile={resolveMediaFile}
               resolveMediaKind={resolveMediaKind}
               onPreviewImage={(idx) => {
@@ -326,7 +325,11 @@ export default function PromptBarRefMediaPanel({
       );
     }
 
-    // 🌟 5. 默认折叠态（参考图2展示）：散落叠放卡片堆，上方带【查看全部】
+    // 🌟 5. 默认折叠态（参考图2展示）：散落叠放卡片堆；空态不渲染任何占位卡片
+    if (visualRefImages.length === 0) {
+      return null;
+    }
+
     return (
       <div
         ref={refImagesContainerRef}
@@ -334,41 +337,22 @@ export default function PromptBarRefMediaPanel({
         onMouseLeave={onMouseLeaveRefImages}
         className="flex-shrink-0 relative select-none flex items-start"
       >
-        {visualRefImages.length === 0 ? (
-          <div className="pt-0.5 pb-1 px-1 flex-shrink-0 mr-2.5 sm:mr-3">
-            {/* 🌟 空态便签卡片：向左微倾斜 -rotate-[6deg]，精致加号 + 参考内容文字（严格保持 3:4 修长拍立得便签比例） */}
-            <button
-              type="button"
-              onClick={onUploadClick}
-              className={`${polaroidFrame} rounded-xl bg-[#F8F9FA] hover:bg-white border border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:shadow-md hover:scale-105 transform -rotate-[6deg] hover:-rotate-[4deg] group/card flex-shrink-0 relative select-none`}
-              title={refUploadLabel(quickGenMode).title}
-              aria-label={refUploadLabel(quickGenMode).label}
-            >
-              <Plus className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-slate-400 group-hover/card:text-slate-700 transition-colors stroke-[1.8]" />
-              <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-500 group-hover/card:text-slate-800 leading-none tracking-tight">
-                参考内容
-              </span>
-            </button>
-          </div>
-        ) : (
-          <PromptBarRefImageStack
-            images={visualRefImages}
-            isExpanded={isExpandedRefImages}
-            setIsExpanded={setIsExpandedRefImages}
-            frameExpanded={frameExpanded}
-            onUploadClick={onUploadClick}
-            onRemove={removeVisualRef}
-            addLabel="参考内容"
-            resolveMediaFile={resolveMediaFile}
-            resolveMediaKind={resolveMediaKind}
-            onPreviewImage={(idx) => {
-              setLightboxState({
-                items: visualRefImages,
-                currentIndex: idx,
-              });
-            }}
-          />
-        )}
+        <PromptBarRefImageStack
+          images={visualRefImages}
+          isExpanded={isExpandedRefImages}
+          setIsExpanded={setIsExpandedRefImages}
+          frameExpanded={frameExpanded}
+          onUploadClick={onUploadClick}
+          onRemove={removeVisualRef}
+          resolveMediaFile={resolveMediaFile}
+          resolveMediaKind={resolveMediaKind}
+          onPreviewImage={(idx) => {
+            setLightboxState({
+              items: visualRefImages,
+              currentIndex: idx,
+            });
+          }}
+        />
       </div>
     );
   };

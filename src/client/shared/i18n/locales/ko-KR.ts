@@ -27,7 +27,7 @@ export const koKR: TranslationSchema = {
     nav: {
       profile: '창작 프로필',
       api: 'API 연동',
-      chat: '대화',
+      chat: '멀티모달',
       image: '이미지 생성',
       video: '동영상 생성',
       three_d: '3D',
@@ -75,9 +75,9 @@ export const koKR: TranslationSchema = {
     generate: '생성',
     generating: '생성 중',
     modes: {
-      image: '자유 드로잉',
+      image: '이미지 생성',
       video: '비디오 생성',
-      agent: 'AI 어시스턴트',
+      agent: 'Agent 모드',
       depth: '공간 뎁스',
     },
   },

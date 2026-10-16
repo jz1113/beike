@@ -50,11 +50,11 @@ export const densityDockPad =
 
 /** 画布式 Composer 卡片内边距（顶部与两侧保持优雅舒适，底部紧致收拢消除透明按钮大面积空隙） */
 export const densityComposerPad =
-  'pt-3.5 sm:pt-4 md:pt-4.5 xl:pt-5 px-4 sm:px-5 md:px-5.5 xl:px-6 pb-2 sm:pb-2.5 md:pb-2.5 xl:pb-3';
+  'pt-4 sm:pt-4.5 md:pt-5 xl:pt-5 px-5 sm:px-6 md:px-6.5 xl:px-7 pb-3 sm:pb-3.5 md:pb-3.5 xl:pb-4';
 
-/** 画布式 Composer 圆角 (统一平面 2D 规范圆角) */
+/** 画布式 Composer 圆角 (统一平面 2D 规范高级圆角，完全契合设计原案) */
 export const densityComposerRadius =
-  'rounded-2xl';
+  'rounded-[26px]';
 
 /** 画布式 Composer 输入区文字字号（精致清秀14px，长文本舒展排成2行） */
 export const densityComposerText =
@@ -153,13 +153,13 @@ export function computeRefImageFrameSize(
 export const densityComposerInputMaxH =
   'max-h-36 sm:max-h-40 md:max-h-44';
 
-/** 画布式 Composer 工具条药丸（略高于默认） */
+/** 画布式 Composer 工具条药丸（精致紧凑圆角胶囊规范） */
 export const densityComposerPill =
-  'h-10 sm:h-10 xl:h-11 text-xs sm:text-[13px] px-3 sm:px-3.5 xl:px-4';
+  'h-8 sm:h-8.5 xl:h-9 text-xs sm:text-[13px] px-3 sm:px-3.5';
 
-/** 画布式 Composer 发送按钮尺寸 */
+/** 画布式 Composer 发送按钮尺寸（与胶囊按钮等高 32~36px，精致对齐） */
 export const densityComposerSendBtn =
-  'w-10 h-10 sm:w-10 sm:h-10 xl:w-11 xl:h-11';
+  'w-8 h-8 sm:w-8.5 sm:h-8.5 xl:w-9 xl:h-9';
 
 /** 密度感知 Dock 圆角 */
 export const densityDockRadius =

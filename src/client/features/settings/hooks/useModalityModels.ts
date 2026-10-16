@@ -22,7 +22,7 @@ import {
 } from '../model/modalityDefaultSync';
 
 const MODALITY_LABEL: Record<ModalityKind, string> = {
-  chat: '对话',
+  chat: '多模态',
   image: '绘画',
   video: '视频',
   three_d: '3D',

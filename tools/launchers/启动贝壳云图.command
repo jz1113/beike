@@ -1,7 +1,14 @@
 #!/bin/bash
 # macOS Finder one-click launcher for the local browser app.
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
+if [[ -f "$SCRIPT_DIR/../../package.json" ]]; then
+  PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)" || exit 1
+elif [[ -f "$SCRIPT_DIR/package.json" ]]; then
+  PROJECT_DIR="$SCRIPT_DIR"
+else
+  PROJECT_DIR="$(pwd)"
+fi
 cd "$PROJECT_DIR" || exit 1
 
 pause_on_error() {

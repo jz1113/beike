@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect, type RefObject } from 'react';
+import React, { useState, useRef, useEffect, type RefObject } from 'react';
 import {
-  UploadCloud,
-  FolderArchive,
-  Link2,
-  Sparkles,
   ChevronRight,
   Info,
-  Check,
+  Search,
+  Plus,
+  BookOpen,
+  Download,
+  Upload,
 } from 'lucide-react';
 
 export interface PromptPresetItem {
@@ -71,16 +71,27 @@ export default function PromptBarUploadMenu({
   isUp = true,
 }: PromptBarUploadMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [showPresetsSubmenu, setShowPresetsSubmenu] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [videoUrlText, setVideoUrlText] = useState('');
-  const [copiedPresetId, setCopiedPresetId] = useState<string | null>(null);
 
-  // 点击外部自动关闭
+  // 状态模式：主菜单 | 视频链接气泡 (图4)
+  const [activeView, setActiveView] = useState<'main' | 'videoUrl'>('main');
+
+  // 预设提示词二级面板状态 (图5)
+  const [showPresetsSubmenu, setShowPresetsSubmenu] = useState(false);
+  const [presetSearch, setPresetSearch] = useState('');
+  const [customPresets, setCustomPresets] = useState<PromptPresetItem[]>([]);
+  const [isCreatingPreset, setIsCreatingPreset] = useState(false);
+  const [newPresetText, setNewPresetText] = useState('');
+
+  // 视频链接输入状态 (图4)
+  const [videoUrlText, setVideoUrlText] = useState('');
+
+  // 点击外部与 ESC 按键自动关闭
   useEffect(() => {
     if (!isOpen) {
+      setActiveView('main');
       setShowPresetsSubmenu(false);
-      setShowUrlInput(false);
+      setVideoUrlText('');
+      setIsCreatingPreset(false);
       return;
     }
 
@@ -96,121 +107,163 @@ export default function PromptBarUploadMenu({
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose, triggerRef]);
 
   if (!isOpen) return null;
 
   const handleApplyPreset = (item: PromptPresetItem) => {
     onSelectPresetPrompt(item.prompt);
-    setCopiedPresetId(item.id);
-    setTimeout(() => {
-      onClose();
-    }, 300);
+    onClose();
   };
 
   const handleConfirmUrl = () => {
     if (videoUrlText.trim() && onSubmitVideoUrl) {
       onSubmitVideoUrl(videoUrlText.trim());
       setVideoUrlText('');
-      setShowUrlInput(false);
       onClose();
     }
   };
 
+  const handleCreateNewPreset = () => {
+    if (!newPresetText.trim()) {
+      setIsCreatingPreset(true);
+      return;
+    }
+    const newItem: PromptPresetItem = {
+      id: `custom-preset-${Date.now()}`,
+      category: '自定义',
+      title: newPresetText.slice(0, 12),
+      prompt: newPresetText.trim(),
+    };
+    setCustomPresets((prev) => [newItem, ...prev]);
+    setNewPresetText('');
+    setIsCreatingPreset(false);
+  };
+
+  const filteredPresets = [...customPresets, ...DEFAULT_PROMPT_PRESETS].filter((p) =>
+    presetSearch.trim()
+      ? p.title.toLowerCase().includes(presetSearch.toLowerCase()) ||
+        p.prompt.toLowerCase().includes(presetSearch.toLowerCase())
+      : true
+  );
+
+  // 🌟 图 4：视频链接上传形式浮层
+  if (activeView === 'videoUrl') {
+    return (
+      <div
+        ref={menuRef}
+        className={`absolute left-0 ${
+          isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
+        } w-[360px] sm:w-[400px] rounded-[22px] bg-white border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.12)] p-4 z-50 animate-fade-in text-left select-none`}
+      >
+        {/* 顶部提示语与可点击“从本地上传” */}
+        <div className="text-[13px] text-slate-700 pb-3 flex items-center flex-wrap gap-1">
+          <span>仅支持抖音、头条、西瓜，你也可以</span>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onTriggerLocalUpload();
+            }}
+            className="text-indigo-600 hover:text-indigo-700 hover:underline font-medium cursor-pointer transition-colors"
+          >
+            从本地上传
+          </button>
+        </div>
+
+        {/* 胶囊输入行与确认按钮 (图4) */}
+        <div className="flex items-center gap-2">
+          <input
+            type="url"
+            placeholder="请输入参考内容的链接"
+            value={videoUrlText}
+            onChange={(e) => setVideoUrlText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleConfirmUrl();
+              if (e.key === 'Escape') setActiveView('main');
+            }}
+            className="flex-1 px-4 py-2 rounded-full border border-slate-300 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 transition-all bg-white"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleConfirmUrl}
+            disabled={!videoUrlText.trim()}
+            className={`px-5 py-2 rounded-full text-xs font-medium transition-all ${
+              videoUrlText.trim()
+                ? 'bg-slate-900 text-white hover:bg-black cursor-pointer shadow-xs'
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            }`}
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 🌟 图 1、2、3、5、6：标准主菜单（已彻底移除图 6 多余的图标符号）
   return (
     <div
       ref={menuRef}
       className={`absolute left-0 ${
         isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-      } w-52 rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-1.5 z-50 animate-fade-in text-left select-none`}
+      } w-[168px] sm:w-[176px] rounded-[22px] bg-white border border-slate-200/80 shadow-[0_16px_40px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] p-1.5 z-50 animate-fade-in text-left select-none`}
     >
-      {/* 1. 本地上传 */}
+      {/* 1. 本地上传 (无图6多余大图标，仅保留小圆点) */}
       <button
         type="button"
         onClick={() => {
           onClose();
           onTriggerLocalUpload();
         }}
-        className="w-full px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100/80 flex items-center gap-2.5 transition-colors cursor-pointer group"
+        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 hover:text-slate-950 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer group"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-600 transition-colors shrink-0" />
-        <UploadCloud className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
         <span>本地上传</span>
       </button>
 
-      {/* 2. 资产库 */}
+      {/* 2. 资产库 (点击调起资产库弹窗，无图6多余图标) */}
       <button
         type="button"
         onClick={() => {
           onClose();
           onOpenAssetLibrary();
         }}
-        className="w-full px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100/80 flex items-center gap-2.5 transition-colors cursor-pointer group"
+        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 hover:text-slate-950 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer group"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-600 transition-colors shrink-0" />
-        <FolderArchive className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
         <span>资产库</span>
       </button>
 
-      {/* 3. 视频链接上传 */}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setShowUrlInput(!showUrlInput)}
-          className={`w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-colors cursor-pointer group ${
-            showUrlInput
-              ? 'bg-slate-100/90 text-slate-950'
-              : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-600 transition-colors shrink-0" />
-            <Link2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
-            <span>视频链接上传</span>
-          </div>
-          <span title="支持粘贴直链 MP4 或主流短视频链接进行智能解析引用">
-            <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors" />
-          </span>
-        </button>
+      {/* 3. 视频链接上传 (右侧带 (i) 图标，点击切换图4输入浮层) */}
+      <button
+        type="button"
+        onClick={() => setActiveView('videoUrl')}
+        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 hover:text-slate-950 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer group"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
+          <span>视频链接上传</span>
+        </div>
+        <span title="支持抖音、头条、西瓜视频链接解析">
+          <Info className="w-4 h-4 text-slate-400 group-hover:text-slate-600 stroke-[1.8] transition-colors" />
+        </span>
+      </button>
 
-        {showUrlInput && (
-          <div className="p-2 mt-1 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5 animate-fade-in">
-            <input
-              type="url"
-              placeholder="粘贴视频 URL 链接..."
-              value={videoUrlText}
-              onChange={(e) => setVideoUrlText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleConfirmUrl();
-                if (e.key === 'Escape') setShowUrlInput(false);
-              }}
-              className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
-              autoFocus
-            />
-            <div className="flex items-center justify-end gap-1.5">
-              <button
-                type="button"
-                onClick={() => setShowUrlInput(false)}
-                className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-800 rounded cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmUrl}
-                disabled={!videoUrlText.trim()}
-                className="px-2.5 py-1 text-[11px] font-medium bg-slate-900 text-white rounded-md hover:bg-black disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-              >
-                导入
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 4. 预设提示词 > */}
+      {/* 4. 预设提示词 (右侧带 > 图标，悬停/点击展现图5二级面板) */}
       <div
         className="relative"
         onMouseEnter={() => setShowPresetsSubmenu(true)}
@@ -219,57 +272,131 @@ export default function PromptBarUploadMenu({
         <button
           type="button"
           onClick={() => setShowPresetsSubmenu(!showPresetsSubmenu)}
-          className={`w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-colors cursor-pointer group ${
-            showPresetsSubmenu
-              ? 'bg-slate-100/90 text-slate-950'
-              : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80'
+          className={`w-full px-3 py-2 rounded-xl text-[13px] font-normal flex items-center justify-between transition-colors cursor-pointer group ${
+            showPresetsSubmenu ? 'bg-slate-50 text-slate-950' : 'text-slate-800 hover:text-slate-950 hover:bg-slate-50'
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-600 transition-colors shrink-0" />
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 group-hover:text-amber-600" />
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
             <span>预设提示词</span>
           </div>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 stroke-[1.8]" />
         </button>
 
-        {/* 二级菜单 */}
+        {/* 🌟 图 5：预设提示词二级面板 */}
         {showPresetsSubmenu && (
           <div
-            className={`absolute left-full top-0 ml-1.5 w-64 rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.14)] p-1.5 z-50 animate-fade-in text-left`}
+            className={`absolute left-full top-0 ml-2 w-[340px] rounded-[24px] bg-white border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.14)] p-4 z-50 animate-fade-in text-left flex flex-col gap-3.5`}
           >
-            <div className="px-2.5 py-1 text-[10.5px] font-semibold text-slate-400 border-b border-slate-100/80 pb-1 mb-1">
-              精选爆款提示词模版
+            {/* 顶栏：标题 + 导入/导出小图标 (图5) */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-900">预设提示词</span>
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <button
+                  type="button"
+                  title="导入预设"
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  title="导出预设"
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <div className="space-y-0.5 max-h-60 overflow-y-auto">
-              {DEFAULT_PROMPT_PRESETS.map((item) => {
-                const isCopied = copiedPresetId === item.id;
-                return (
+
+            {/* 次级栏：搜索预设输入框 + 新建按钮 (图5) */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="搜索预设..."
+                  value={presetSearch}
+                  onChange={(e) => setPresetSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-slate-400 transition-all"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateNewPreset}
+                className="px-3.5 py-1.5 rounded-full bg-black text-white text-xs font-medium hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>新建</span>
+              </button>
+            </div>
+
+            {/* 新建预设简易录入框 */}
+            {isCreatingPreset && (
+              <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 animate-fade-in">
+                <textarea
+                  placeholder="输入自定义预设提示词内容..."
+                  rows={2}
+                  value={newPresetText}
+                  onChange={(e) => setNewPresetText(e.target.value)}
+                  className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
+                  autoFocus
+                />
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingPreset(false);
+                      setNewPresetText('');
+                    }}
+                    className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-800 rounded cursor-pointer"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateNewPreset}
+                    disabled={!newPresetText.trim()}
+                    className="px-3 py-1 text-xs font-medium bg-slate-900 text-white rounded-lg hover:bg-black disabled:opacity-40 cursor-pointer"
+                  >
+                    保存预设
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 内容区：如果无预设展现图 5 居中书本空态，否则展现列表 */}
+            {customPresets.length === 0 && !presetSearch.trim() ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-3">
+                <BookOpen className="w-7 h-7 text-slate-700 stroke-[1.6]" />
+                <span className="text-xs text-slate-500 font-normal">
+                  暂无预设，点击新建创建第一个预设
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-1 max-h-56 overflow-y-auto pr-0.5">
+                {filteredPresets.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => handleApplyPreset(item)}
-                    className="w-full px-2.5 py-1.5 rounded-xl text-xs flex flex-col text-left hover:bg-slate-50 transition-colors cursor-pointer group/item"
+                    className="w-full p-2 rounded-xl text-left hover:bg-slate-50 transition-colors cursor-pointer group/item flex flex-col"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-slate-800 group-hover/item:text-slate-950">
                         {item.title}
                       </span>
-                      {isCopied ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-normal">
-                          {item.category}
-                        </span>
-                      )}
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {item.category}
+                      </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 font-normal">
+                    <span className="text-[11px] text-slate-500 line-clamp-1 mt-0.5 font-normal">
                       {item.prompt}
                     </span>
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

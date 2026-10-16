@@ -2,9 +2,16 @@ import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback 
 import { densityComposerInputMaxH, densityComposerText } from '@client/shared/ui/layoutClasses';
 import type { SubjectItem } from './promptBarConstants';
 import { resolveSubjectByMention } from './promptMentions';
-import { createMentionNode, extractTextFromDOM, renderTextToDOM } from './promptMentionDom';
+import {
+  createMentionNode,
+  createSkillNode,
+  deleteAdjacentMention,
+  extractTextFromDOM,
+  insertPastedTextWithMentions,
+  renderTextToDOM,
+} from './promptMentionDom';
 import type { RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
-import { PROMPT_MENTION_REGEX } from '@shared/domain/prompts/prompt-engine/mentions';
+import { extractPromptMentions } from '@shared/domain/prompts/prompt-engine/mentions';
 
 export type { SubjectItem, RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
 export { resolveSubjectByMention } from './promptMentions';
@@ -49,9 +56,11 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
 
     const currentDOMText = extractTextFromDOM(editor);
     // 当值改变，或者当前 DOM 尚未正确渲染胶囊（例如刚加载完主体列表）时，进行重绘
-    const hasUnrenderedMention =
-      /@(?:insp_\d+|图片\d+|视频\d+|主体\d*|模特\d*|[a-zA-Z0-9_\u4e00-\u9fa5.-]+)/.test(editor.textContent || '') &&
-      editor.querySelectorAll('.inline-mention-pill').length < (value.match(/@/g)?.length || 0);
+    const promptMentionsCount = extractPromptMentions(value).length;
+    const renderedPillsCount = editor.querySelectorAll('.inline-mention-pill').length;
+    const skillMatches = value.match(/#\[skill:[^\]]+\]/g) || [];
+    const renderedSkillsCount = editor.querySelectorAll('.inline-skill-pill').length;
+    const hasUnrenderedMention = promptMentionsCount > renderedPillsCount || skillMatches.length > renderedSkillsCount;
 
     if (value !== lastSyncedValueRef.current || value !== currentDOMText || hasUnrenderedMention) {
       renderTextToDOM(value, editor, getSubjectByTag);
@@ -80,6 +89,40 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
       if (!editor) return 0;
       const text = extractTextFromDOM(editor);
       return text.length;
+    },
+    insertAtSymbol: () => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      editor.focus();
+      const sel = window.getSelection();
+      let range: Range;
+
+      if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+        range = sel.getRangeAt(0);
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+
+      const atNode = document.createTextNode('@');
+      range.deleteContents();
+      range.insertNode(atNode);
+
+      range = document.createRange();
+      range.setStartAfter(atNode);
+      range.collapse(true);
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
+      const newText = extractTextFromDOM(editor);
+      lastSyncedValueRef.current = newText;
+      onChange(newText);
+
+      onTriggerAtMenu?.(newText.length, '');
     },
     insertMention: (subject: SubjectItem) => {
       const editor = editorRef.current;
@@ -132,6 +175,48 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
       const newText = extractTextFromDOM(editor);
       lastSyncedValueRef.current = newText;
       onChange(newText);
+    },
+    insertSkill: (skillName: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      editor.focus();
+      // 如果已存在开头的技能胶囊，先清理掉原有的技能胶囊
+      const currentSkillPill = editor.querySelector('.inline-skill-pill');
+      if (currentSkillPill) {
+        currentSkillPill.remove();
+      }
+
+      const pill = createSkillNode(skillName);
+      // 插入在最前面
+      if (editor.firstChild) {
+        editor.insertBefore(pill, editor.firstChild);
+      } else {
+        editor.appendChild(pill);
+      }
+
+      // 在胶囊后追加一个空格节点（若没有的话）
+      const nextSibling = pill.nextSibling;
+      let targetNode: Node = pill;
+      if (!nextSibling || nextSibling.nodeType !== Node.TEXT_NODE) {
+        const spaceNode = document.createTextNode('\u00A0');
+        pill.after(spaceNode);
+        targetNode = spaceNode;
+      }
+
+      // 将光标移动到胶囊之后
+      const range = document.createRange();
+      range.setStartAfter(targetNode);
+      range.collapse(true);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
+      const newText = extractTextFromDOM(editor);
+      lastSyncedValueRef.current = newText;
+      onChange(newText);
     }
   }));
 
@@ -167,50 +252,18 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
     checkMentionAtCursor();
   };
 
-  // WebKit can leave the caret in the NBSP/empty text nodes beside a
-  // non-editable pill. Delete the pill and its caret spacer atomically.
-  const deleteAdjacentMention = (backward: boolean): boolean => {
+  const handleDeleteAdjacentMention = (backward: boolean): boolean => {
     const editor = editorRef.current;
-    const selection = window.getSelection();
-    if (!editor || !selection?.rangeCount || isComposingRef.current) return false;
-    const range = selection.getRangeAt(0);
-    if (!range.collapsed || !editor.contains(range.startContainer)) return false;
-    let container = range.startContainer;
-    const offset = range.startOffset;
-    let adjacent: Node | null;
-    if (container.nodeType === Node.TEXT_NODE) {
-      const text = container.textContent || '';
-      const remaining = backward ? text.slice(0, offset) : text.slice(offset);
-      if (!/^[\u00a0\u200b\ufeff]*$/.test(remaining)) return false;
-      adjacent = backward ? container.previousSibling : container.nextSibling;
-    } else {
-      adjacent = container.childNodes[offset - (backward ? 1 : 0)] || null;
+    if (!editor || isComposingRef.current) return false;
+    const deleted = deleteAdjacentMention(editor, backward);
+    if (deleted) {
+      const newText = extractTextFromDOM(editor);
+      lastSyncedValueRef.current = newText;
+      onChange(newText);
+      onCloseAtMenu?.();
+      return true;
     }
-    while (true) {
-      if (!adjacent) {
-        if (container === editor || !container.parentNode) return false;
-        adjacent = backward ? container.previousSibling : container.nextSibling;
-        container = container.parentNode;
-        continue;
-      }
-      if (adjacent instanceof HTMLElement && adjacent.classList.contains('inline-mention-pill')) {
-        const deletion = range.cloneRange();
-        if (backward) deletion.setStartBefore(adjacent);
-        else deletion.setEndAfter(adjacent);
-        deletion.deleteContents();
-        deletion.collapse(true);
-        selection.removeAllRanges(); selection.addRange(deletion);
-        const newText = extractTextFromDOM(editor);
-        lastSyncedValueRef.current = newText;
-        onChange(newText);
-        onCloseAtMenu?.();
-        return true;
-      }
-      if (adjacent.nodeType !== Node.TEXT_NODE || !/^[\u00a0\u200b\ufeff]*$/.test(adjacent.textContent || '')) return false;
-      const next: Node | null = backward ? adjacent.previousSibling : adjacent.nextSibling;
-      container = adjacent.parentNode!;
-      adjacent = next;
-    }
+    return false;
   };
 
   // beforeinput also covers virtual keyboards and native editing commands.
@@ -218,7 +271,7 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
     const editor = editorRef.current;
     const beforeInput = (event: InputEvent) => {
       if (!event.cancelable || event.isComposing) return;
-      if ((event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward') && deleteAdjacentMention(event.inputType === 'deleteContentBackward')) event.preventDefault();
+      if ((event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward') && handleDeleteAdjacentMention(event.inputType === 'deleteContentBackward')) event.preventDefault();
     };
     editor?.addEventListener('beforeinput', beforeInput);
     return () => editor?.removeEventListener('beforeinput', beforeInput);
@@ -226,7 +279,7 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
 
   const handleKeyDownInternal = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.nativeEvent.isComposing || isComposingRef.current) return;
-    if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'Backspace' || e.key === 'Delete') && deleteAdjacentMention(e.key === 'Backspace')) {
+    if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'Backspace' || e.key === 'Delete') && handleDeleteAdjacentMention(e.key === 'Backspace')) {
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -269,72 +322,7 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
     const editor = editorRef.current;
     if (!editor) return;
 
-    editor.focus();
-    const sel = window.getSelection();
-    let range: Range;
-
-    if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-      range = sel.getRangeAt(0);
-    } else {
-      range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-    }
-
-    range.deleteContents();
-
-    // 解析粘贴文本并逐个插入文本或胶囊
-    const regex = new RegExp(PROMPT_MENTION_REGEX.source, 'gi');
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    let lastInsertedNode: Node | null = null;
-
-    while ((match = regex.exec(pastedText)) !== null) {
-      const matchStart = match.index;
-      const matchText = match[0];
-
-      if (matchStart > lastIndex) {
-        const textNode = document.createTextNode(pastedText.slice(lastIndex, matchStart));
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        lastInsertedNode = textNode;
-      }
-
-      const sub = getSubjectByTag(matchText);
-      if (sub) {
-        const pill = createMentionNode(sub);
-        range.insertNode(pill);
-        range.setStartAfter(pill);
-        const spaceNode = document.createTextNode('\u00A0');
-        range.insertNode(spaceNode);
-        range.setStartAfter(spaceNode);
-        lastInsertedNode = spaceNode;
-      } else {
-        const tagNode = document.createTextNode(matchText);
-        range.insertNode(tagNode);
-        range.setStartAfter(tagNode);
-        lastInsertedNode = tagNode;
-      }
-
-      lastIndex = matchStart + matchText.length;
-    }
-
-    if (lastIndex < pastedText.length) {
-      const remainingNode = document.createTextNode(pastedText.slice(lastIndex));
-      range.insertNode(remainingNode);
-      range.setStartAfter(remainingNode);
-      lastInsertedNode = remainingNode;
-    }
-
-    if (lastInsertedNode && sel) {
-      range = document.createRange();
-      range.setStartAfter(lastInsertedNode);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-
-    const newText = extractTextFromDOM(editor);
+    const newText = insertPastedTextWithMentions(editor, pastedText, getSubjectByTag);
     lastSyncedValueRef.current = newText;
     onChange(newText);
   };
@@ -350,17 +338,8 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
     : isComposer
       ? densityComposerInputMaxH
       : 'max-h-48 xl:max-h-64';
-  const editorText = singleLine
-    ? 'text-xs sm:text-[13.5px]'
-    : isComposer
-      ? densityComposerText
-      : 'text-[14px] sm:text-[15px] md:text-[16px] xl:text-[17px]';
-  const placeholderText = singleLine
-    ? 'empty:before:text-xs sm:empty:before:text-[13.5px]'
-    : isComposer
-      ? 'empty:before:text-[14px] sm:empty:before:text-[14px] md:empty:before:text-[14.5px]'
-      : 'empty:before:text-[14px] sm:empty:before:text-[14px] md:empty:before:text-[14.5px]';
-
+  const editorText = singleLine ? 'text-xs sm:text-[13.5px]' : isComposer ? densityComposerText : 'text-[14px] sm:text-[15px] md:text-[16px] xl:text-[17px]';
+  const placeholderText = singleLine ? 'empty:before:text-xs sm:empty:before:text-[13.5px]' : 'empty:before:text-[14px] sm:empty:before:text-[14px] md:empty:before:text-[14.5px]';
   const isManualPlaceholder = Boolean(placeholder && placeholder.includes('产品手册 ↗'));
   const effectiveDataPlaceholder = isManualPlaceholder ? '' : placeholder;
 
@@ -393,18 +372,18 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
       {!value && isManualPlaceholder && (
         <div className={`absolute inset-0 pointer-events-none flex items-start text-slate-400 ${editorText} leading-relaxed select-none ${singleLine ? 'items-center pt-0' : isComposer ? 'pt-0' : 'pt-0.5'}`}>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span>开始创作前，先和助手把需求聊清楚，生成的结果会更符合预期。</span>
+            <span>{placeholder?.replace(/\s*(产品手册|Documentation)\s*↗\s*$/, '') || '想让每笔积分消耗都经你同意？去设置页开启积分扣除确认即可'}</span>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenManual?.();
               }}
-              className="pointer-events-auto inline-flex items-center gap-0.5 text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors"
-              title="查看 Agent 模式产品使用说明"
+              className="pointer-events-auto inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 font-normal cursor-pointer transition-colors"
+              title="查看产品使用手册"
             >
-              <span>产品手册</span>
-              <span className="text-[11px]">↗</span>
+              <span>{placeholder?.includes('Documentation') ? 'Documentation' : '产品手册'}</span>
+              <span className="text-[11px] ml-0.5">↗</span>
             </button>
           </div>
         </div>

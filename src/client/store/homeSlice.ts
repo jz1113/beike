@@ -2,7 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { AppState, HomeSlice } from '@client/store/types';
 
 export const createHomeSlice: StateCreator<AppState, [], [], HomeSlice> = (set) => ({
-  quickGenMode: 'image',
+  quickGenMode: 'agent',
   quickDepthStyle: 'mocap',
   quickDepthQuality: 'standard',
   quickPrompt: '',

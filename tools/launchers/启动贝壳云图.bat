@@ -2,7 +2,12 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-cd /d "%~dp0"
+:: 无论从 tools/launchers 还是仓库根目录启动，均定位到项目根目录
+if exist "%~dp0..\..\package.json" (
+    cd /d "%~dp0..\.."
+) else (
+    cd /d "%~dp0"
+)
 
 echo → 正在启动贝壳云图…
 
@@ -10,6 +15,7 @@ echo → 正在启动贝壳云图…
 if exist "C:\Program Files\Go\bin" set "PATH=C:\Program Files\Go\bin;!PATH!"
 if exist "C:\Go\bin" set "PATH=C:\Go\bin;!PATH!"
 if exist "%USERPROFILE%\go\bin" set "PATH=%USERPROFILE%\go\bin;!PATH!"
+if exist "%LOCALAPPDATA%\Programs\Go\bin" set "PATH=%LOCALAPPDATA%\Programs\Go\bin;!PATH!"
 
 :: 检查 Node.js 22
 where node >nul 2>nul

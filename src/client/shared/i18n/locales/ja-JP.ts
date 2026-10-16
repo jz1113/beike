@@ -27,7 +27,7 @@ export const jaJP: TranslationSchema = {
     nav: {
       profile: 'クリエイター履歴',
       api: 'API 連携',
-      chat: '対話',
+      chat: 'マルチモーダル',
       image: '画像生成',
       video: '動画生成',
       three_d: '3D',
@@ -75,9 +75,9 @@ export const jaJP: TranslationSchema = {
     generate: '生成',
     generating: '生成中',
     modes: {
-      image: '自由作画',
+      image: '画像生成',
       video: '動画生成',
-      agent: 'AI アシスタント',
+      agent: 'Agentモード',
       depth: '空間深度',
     },
   },
