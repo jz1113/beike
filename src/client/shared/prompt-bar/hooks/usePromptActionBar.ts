@@ -7,7 +7,7 @@ import {
   getVideoDurationBounds
 } from '@shared/domain/media/video';
 import { useVideoParameterConstraints } from './useVideoParameterConstraints';
-import { usePromptBarWorkflowModels } from './usePromptBarWorkflowModels';
+import { matchesStoredModel, usePromptBarWorkflowModels } from './usePromptBarWorkflowModels';
 import { usePromptBarStoreState } from './usePromptBarStoreState';
 import { useAppLayoutMode } from '@client/shared/hooks/useCompactLayout';
 
@@ -67,6 +67,8 @@ export function usePromptActionBar({
     quickCount,
     quickVideoModel,
     setQuickVideoModel,
+    quickAudioModel,
+    setQuickAudioModel,
     quickVideoDuration,
     quickVideoResolution,
     quickVideoAspectId,
@@ -103,17 +105,19 @@ export function usePromptActionBar({
   const depthEnv = useDepthEnvCheck(isDepthMode);
 
   // 动态加载生图与视频模型
-  const { availableImageModels, availableVideoModels } = usePromptBarWorkflowModels(
+  const { availableImageModels, availableVideoModels, availableAudioModels } = usePromptBarWorkflowModels(
     setQuickModel,
     setQuickVideoModel,
+    setQuickAudioModel,
   );
 
-  const activeImageModelObj = availableImageModels.find(m => m.id === quickModel) || availableImageModels[0] || { id: '', name: '请从网关拉取生图模型', provider: 'Gateway' };
+  const activeImageModelObj = availableImageModels.find(m => matchesStoredModel(m, quickModel)) || availableImageModels[0] || { id: '', name: '请从网关拉取生图模型', provider: 'Gateway' };
   const activeImageRatioObj = IMAGE_RATIO_ITEMS.find(r => r.id === quickAspectId) || IMAGE_RATIO_ITEMS[0];
-  const activeVideoModelObj = availableVideoModels.find(m => m.id === quickVideoModel) || availableVideoModels[0] || { id: '', name: '请从网关拉取视频模型', provider: 'Gateway' };
+  const activeVideoModelObj = availableVideoModels.find(m => matchesStoredModel(m, quickVideoModel)) || availableVideoModels[0] || { id: '', name: '请从网关拉取视频模型', provider: 'Gateway' };
   const activeVideoRefModeObj = VIDEO_REF_MODES.find(m => m.id === quickVideoRefMode) || VIDEO_REF_MODES[0];
   const activeVideoRatioObj = VIDEO_ASPECT_RATIOS.find(r => r.id === quickVideoAspectId) || VIDEO_ASPECT_RATIOS.find(item => item.id === '16:9')!;
-  const videoDurationBounds = getVideoDurationBounds(activeVideoModelObj?.id || quickVideoModel);
+  const videoModelId = ('upstreamId' in activeVideoModelObj ? activeVideoModelObj.upstreamId : undefined) || activeVideoModelObj.id || quickVideoModel;
+  const videoDurationBounds = getVideoDurationBounds(videoModelId);
 
   useVideoParameterConstraints();
 
@@ -184,6 +188,8 @@ export function usePromptActionBar({
     currentView,
     availableImageModelsLength: availableImageModels.length,
     availableVideoModelsLength: currentView === 'canvas' ? Math.max(availableVideoModels.length, 1) : availableVideoModels.length,
+    availableAudioModelsLength: availableAudioModels.length,
+    quickAudioModel,
     quickDepthStyle,
     quickDepthQuality,
     refMediaFile: media.refMediaFile,

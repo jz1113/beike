@@ -15,8 +15,8 @@
 .settings-workspace .settings-connection-status { white-space: nowrap; }
 .settings-workspace .settings-field { height: 42px; border: 1px solid #dce2e9; border-radius: 9px; padding-inline: 12px; background: #fff; font-size: 13px; color: #263449; outline: none; }
 .settings-workspace .settings-field.pr-11 { padding-right: 44px; }
-.settings-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-.settings-workspace select { font-size: 13px; min-height: 38px; border-radius: 9px; box-shadow: none; }
+.settings-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not(.studio-control-input),
+.settings-workspace select:not(.studio-control-input) { font-size: 13px; min-height: 38px; border-radius: 9px; box-shadow: none; }
 .settings-workspace :is(input,select,textarea):focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
 .settings-workspace .storage-underline-input { border: none !important; border-radius: 0 !important; min-height: 0 !important; outline: none !important; box-shadow: none !important; background: transparent !important; }
 .settings-workspace .storage-underline-input:focus,
@@ -243,4 +243,377 @@
 @media (max-width: 720px) {
   .settings-preview-row { align-items: flex-start; flex-direction: column; }
   .settings-slider, .settings-slider input, .settings-preview-row .settings-field { width: 100%; }
+}
+
+.dark .settings-workspace,
+html.dark .settings-workspace {
+  color: #ededed;
+}
+.dark .settings-workspace .settings-shell,
+html.dark .settings-workspace .settings-shell {
+  background: #141416;
+}
+.dark .settings-workspace .settings-sidebar,
+.dark .settings-workspace .settings-shell .settings-sidebar,
+html.dark .settings-workspace .settings-sidebar,
+html.dark .settings-workspace .settings-shell .settings-sidebar {
+  background: #101012;
+}
+.dark .settings-workspace .settings-sidebar button,
+.dark .settings-workspace .settings-shell .settings-sidebar button,
+html.dark .settings-workspace .settings-sidebar button,
+html.dark .settings-workspace .settings-shell .settings-sidebar button {
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-sidebar button[aria-current="page"],
+.dark .settings-workspace .settings-shell .settings-sidebar button[aria-current="page"],
+.dark .settings-workspace .settings-canvas-rail button[aria-current="page"],
+html.dark .settings-workspace .settings-sidebar button[aria-current="page"],
+html.dark .settings-workspace .settings-shell .settings-sidebar button[aria-current="page"],
+html.dark .settings-workspace .settings-canvas-rail button[aria-current="page"] {
+  background: #1f1f24;
+  color: #ffffff;
+  box-shadow: none;
+}
+.dark .settings-workspace .settings-page-scroll,
+.dark .settings-workspace .settings-shell .settings-page-scroll,
+html.dark .settings-workspace .settings-page-scroll,
+html.dark .settings-workspace .settings-shell .settings-page-scroll {
+  background: #141416;
+}
+.dark .settings-workspace .settings-service-nav,
+html.dark .settings-workspace .settings-service-nav {
+  background: #101012;
+}
+.dark .settings-workspace :is(.settings-config-card, .settings-model-panel, .settings-defaults, .settings-balance-card, .settings-usage-metrics > div, .settings-usage-more, .settings-default-rules, .settings-default-card, .settings-milestone, .settings-footprint, .settings-mix section),
+html.dark .settings-workspace :is(.settings-config-card, .settings-model-panel, .settings-defaults, .settings-balance-card, .settings-usage-metrics > div, .settings-usage-more, .settings-default-rules, .settings-default-card, .settings-milestone, .settings-footprint, .settings-mix section) {
+  background: #1b1b1e;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #ededed;
+}
+.dark .settings-workspace .settings-field,
+.dark .settings-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not(.storage-underline-input):not(.studio-control-input),
+.dark .settings-workspace select:not(.studio-control-input),
+.dark .settings-workspace textarea,
+html.dark .settings-workspace .settings-field,
+html.dark .settings-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not(.storage-underline-input):not(.studio-control-input),
+html.dark .settings-workspace select:not(.studio-control-input),
+html.dark .settings-workspace textarea {
+  background: #151518;
+  color: #ededed;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.dark .settings-workspace .settings-field:read-only,
+html.dark .settings-workspace .settings-field:read-only {
+  background: #101012;
+  color: #8e8e93;
+}
+.dark .settings-workspace .storage-underline-input,
+html.dark .settings-workspace .storage-underline-input {
+  background: transparent !important;
+  color: #ededed !important;
+  border: none !important;
+}
+.dark .settings-workspace .settings-button-primary,
+html.dark .settings-workspace .settings-button-primary {
+  background: #ffffff;
+  color: #121214;
+}
+.dark .settings-workspace .settings-button-primary:hover,
+html.dark .settings-workspace .settings-button-primary:hover {
+  background: #e5e5ea;
+}
+.dark .settings-workspace .settings-button-secondary,
+.dark .settings-workspace .settings-provider-options button,
+html.dark .settings-workspace .settings-button-secondary,
+html.dark .settings-workspace .settings-provider-options button {
+  background: #26262b;
+  color: #ededed;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.dark .settings-workspace .settings-button-secondary:hover,
+html.dark .settings-workspace .settings-button-secondary:hover {
+  background: #2f2f36;
+}
+.dark .settings-workspace .settings-provider-options button[aria-pressed="true"],
+html.dark .settings-workspace .settings-provider-options button[aria-pressed="true"] {
+  background: #2c2c32;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.dark .settings-workspace .settings-model-table,
+html.dark .settings-workspace .settings-model-table {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-model-table thead,
+html.dark .settings-workspace .settings-model-table thead {
+  background: #161619;
+}
+.dark .settings-workspace .settings-model-table th,
+.dark .settings-workspace .settings-price-values span,
+.dark .settings-workspace .settings-price summary,
+.dark .settings-workspace .settings-form-field > label,
+.dark .settings-workspace .settings-form-field > p,
+.dark .settings-workspace .settings-field-note,
+.dark .settings-workspace .settings-service-header p,
+.dark .settings-workspace .settings-service-links a,
+.dark .settings-workspace .settings-usage-metrics p,
+.dark .settings-workspace .settings-usage-metrics span,
+.dark .settings-workspace .settings-details,
+.dark .settings-workspace .settings-details > summary,
+html.dark .settings-workspace .settings-model-table th,
+html.dark .settings-workspace .settings-price-values span,
+html.dark .settings-workspace .settings-price summary,
+html.dark .settings-workspace .settings-form-field > label,
+html.dark .settings-workspace .settings-form-field > p,
+html.dark .settings-workspace .settings-field-note,
+html.dark .settings-workspace .settings-service-header p,
+html.dark .settings-workspace .settings-service-links a,
+html.dark .settings-workspace .settings-usage-metrics p,
+html.dark .settings-workspace .settings-usage-metrics span,
+html.dark .settings-workspace .settings-details,
+html.dark .settings-workspace .settings-details > summary {
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-service-header h2,
+.dark .settings-workspace .settings-config-card h2,
+.dark .settings-workspace .settings-price-values strong,
+.dark .settings-workspace .settings-usage-metrics strong,
+.dark .settings-workspace .settings-creator-card h2,
+.dark .settings-workspace .settings-milestone-head h3,
+.dark .settings-workspace .settings-footprint h3,
+.dark .settings-workspace .settings-mix h3,
+.dark .settings-workspace .settings-mix section > strong,
+.dark .settings-workspace .settings-token-split strong,
+.dark .settings-workspace .settings-preview header h2,
+html.dark .settings-workspace .settings-service-header h2,
+html.dark .settings-workspace .settings-config-card h2,
+html.dark .settings-workspace .settings-price-values strong,
+html.dark .settings-workspace .settings-usage-metrics strong,
+html.dark .settings-workspace .settings-creator-card h2,
+html.dark .settings-workspace .settings-milestone-head h3,
+html.dark .settings-workspace .settings-footprint h3,
+html.dark .settings-workspace .settings-mix h3,
+html.dark .settings-workspace .settings-mix section > strong,
+html.dark .settings-workspace .settings-token-split strong,
+html.dark .settings-workspace .settings-preview header h2 {
+  color: #ffffff;
+}
+.dark .settings-workspace .settings-service-icon,
+html.dark .settings-workspace .settings-service-icon {
+  background: #26262b;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e5e5ea;
+}
+.dark .settings-workspace .settings-creator-actions button,
+.dark .settings-workspace .settings-creator-edit button,
+.dark .settings-workspace .settings-range > button,
+html.dark .settings-workspace .settings-creator-actions button,
+html.dark .settings-workspace .settings-creator-edit button,
+html.dark .settings-workspace .settings-range > button {
+  background: #26262b;
+  color: #ededed;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.dark .settings-workspace .settings-creator-actions button[aria-expanded="true"],
+.dark .settings-workspace .settings-creator-edit button[type="submit"],
+html.dark .settings-workspace .settings-creator-actions button[aria-expanded="true"],
+html.dark .settings-workspace .settings-creator-edit button[type="submit"] {
+  background: #ffffff;
+  color: #121214;
+  border-color: #ffffff;
+}
+.dark .settings-workspace .settings-creator-edit,
+html.dark .settings-workspace .settings-creator-edit {
+  background: #161619;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-creator-edit input,
+html.dark .settings-workspace .settings-creator-edit input {
+  background: #151518;
+  color: #ededed;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.dark .settings-workspace .settings-creator-card p,
+.dark .settings-workspace .settings-footprint header p,
+.dark .settings-workspace .settings-mix p,
+.dark .settings-workspace .settings-creator-local,
+.dark .settings-workspace .settings-creator-pill,
+.dark .settings-workspace .settings-preview header p,
+.dark .settings-workspace .settings-mix footer,
+.dark .settings-workspace .settings-token-split span,
+html.dark .settings-workspace .settings-creator-card p,
+html.dark .settings-workspace .settings-footprint header p,
+html.dark .settings-workspace .settings-mix p,
+html.dark .settings-workspace .settings-creator-local,
+html.dark .settings-workspace .settings-creator-pill,
+html.dark .settings-workspace .settings-preview header p,
+html.dark .settings-workspace .settings-mix footer,
+html.dark .settings-workspace .settings-token-split span {
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-creator-pill,
+html.dark .settings-workspace .settings-creator-pill {
+  background: #26262b;
+}
+.dark .settings-workspace .settings-creator-camera,
+html.dark .settings-workspace .settings-creator-camera {
+  background: #26262b;
+  color: #e5e5ea;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.dark .settings-workspace .settings-range [role="listbox"],
+html.dark .settings-workspace .settings-range [role="listbox"] {
+  background: #1b1b1e;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-range [role="option"],
+html.dark .settings-workspace .settings-range [role="option"] {
+  color: #c7c7cc;
+}
+.dark .settings-workspace .settings-range [role="option"][aria-selected="true"],
+.dark .settings-workspace .settings-range [role="option"]:hover,
+html.dark .settings-workspace .settings-range [role="option"][aria-selected="true"],
+html.dark .settings-workspace .settings-range [role="option"]:hover {
+  background: #2c2c32;
+  color: #ffffff;
+}
+.dark .settings-workspace .settings-segment,
+.dark .settings-workspace .settings-mix-bar,
+html.dark .settings-workspace .settings-segment,
+html.dark .settings-workspace .settings-mix-bar {
+  background: #26262b;
+}
+.dark .settings-workspace .settings-segment button,
+html.dark .settings-workspace .settings-segment button {
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-segment button[aria-pressed="true"],
+html.dark .settings-workspace .settings-segment button[aria-pressed="true"] {
+  background: #2c2c32;
+  color: #ffffff;
+}
+.dark .settings-workspace .settings-switch,
+html.dark .settings-workspace .settings-switch {
+  background: #3a3a40;
+}
+.dark .settings-workspace .settings-preview-row,
+.dark .settings-workspace .settings-details,
+.dark .settings-workspace .settings-directory-list > div + div,
+html.dark .settings-workspace .settings-preview-row,
+html.dark .settings-workspace .settings-details,
+html.dark .settings-workspace .settings-directory-list > div + div {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-directory-search,
+.dark .settings-workspace .settings-directory-list,
+.dark .settings-workspace .settings-empty-state,
+html.dark .settings-workspace .settings-directory-search,
+html.dark .settings-workspace .settings-directory-list,
+html.dark .settings-workspace .settings-empty-state {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-footprint-grid button,
+.dark .settings-workspace .settings-footprint-scale i,
+html.dark .settings-workspace .settings-footprint-grid button,
+html.dark .settings-workspace .settings-footprint-scale i {
+  background: #26262b;
+}
+.dark .settings-workspace .settings-footprint-grid button:disabled,
+html.dark .settings-workspace .settings-footprint-grid button:disabled {
+  background: #1b1b1e;
+}
+.dark .settings-workspace .settings-footprint header [role="group"],
+html.dark .settings-workspace .settings-footprint header [role="group"] {
+  background: #26262b;
+}
+.dark .settings-workspace .settings-footprint header [role="group"] button,
+.dark .settings-workspace .settings-footprint-months,
+.dark .settings-workspace .settings-footprint footer,
+.dark .settings-workspace .settings-footprint-detail,
+html.dark .settings-workspace .settings-footprint header [role="group"] button,
+html.dark .settings-workspace .settings-footprint-months,
+html.dark .settings-workspace .settings-footprint footer,
+html.dark .settings-workspace .settings-footprint-detail {
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-footprint header [role="group"] button[aria-pressed="true"],
+html.dark .settings-workspace .settings-footprint header [role="group"] button[aria-pressed="true"] {
+  background: #2c2c32;
+  color: #ffffff;
+  box-shadow: none;
+}
+.dark .settings-workspace .settings-footprint-detail,
+html.dark .settings-workspace .settings-footprint-detail {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-footprint-detail strong,
+.dark .settings-workspace .settings-footprint-detail em,
+html.dark .settings-workspace .settings-footprint-detail strong,
+html.dark .settings-workspace .settings-footprint-detail em {
+  color: #ffffff;
+}
+.dark .settings-workspace .settings-milestone-value strong,
+html.dark .settings-workspace .settings-milestone-value strong,
+.dark .settings-workspace .settings-mix section > strong,
+html.dark .settings-workspace .settings-mix section > strong,
+.dark .settings-workspace .settings-token-split strong,
+html.dark .settings-workspace .settings-token-split strong {
+  color: #ffffff;
+}
+.dark .settings-workspace .settings-milestone-value small,
+.dark .settings-workspace .settings-milestone-grid span,
+html.dark .settings-workspace .settings-milestone-value small,
+html.dark .settings-workspace .settings-milestone-grid span {
+  color: #8e8e93;
+}
+.dark .settings-workspace .settings-milestone-grid > div + div,
+html.dark .settings-workspace .settings-milestone-grid > div + div {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-footprint-grid button.is-1,
+html.dark .settings-workspace .settings-footprint-grid button.is-1 { background: #0e4429; }
+.dark .settings-workspace .settings-footprint-grid button.is-2,
+html.dark .settings-workspace .settings-footprint-grid button.is-2 { background: #006d32; }
+.dark .settings-workspace .settings-footprint-grid button.is-3,
+html.dark .settings-workspace .settings-footprint-grid button.is-3 { background: #26a641; }
+.dark .settings-workspace .settings-footprint-grid button.is-4,
+html.dark .settings-workspace .settings-footprint-grid button.is-4 { background: #39d353; }
+
+/* Sync-model dialog sits inside the settings shell, whose input rules force 38px controls. */
+.settings-workspace .settings-sync-modal .settings-sync-field,
+.dark .settings-workspace .settings-sync-modal .settings-sync-field,
+html.dark .settings-workspace .settings-sync-modal .settings-sync-field {
+  min-height: 0;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 30px;
+  padding-top: 0;
+  padding-bottom: 0;
+  background: #f5f5f4;
+  color: #1c1917;
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+.settings-workspace .settings-sync-modal .settings-sync-field::placeholder { color: #a8a29e; }
+.settings-workspace .settings-sync-modal .settings-sync-field:focus,
+.settings-workspace .settings-sync-modal .settings-sync-field:focus-visible {
+  outline: none;
+  border-color: #d6d3d1;
+  background: #fff;
+}
+.dark .settings-workspace .settings-sync-modal .settings-sync-field,
+html.dark .settings-workspace .settings-sync-modal .settings-sync-field {
+  background: #101012;
+  color: #ededed;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus,
+.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus-visible,
+html.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus,
+html.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus-visible {
+  background: #161619;
+  border-color: rgba(255, 255, 255, 0.18);
 }

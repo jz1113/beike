@@ -23,6 +23,8 @@ import {
   createBatchGenerationTasksPayload,
 } from './generateSliceHelpers';
 
+let lastReplyPersistAt = 0;
+
 const initialDrawing = getStoredDrawingSessions();
 const sanitizedInitialSessions = (initialDrawing.sessions || []).map((session) => {
   const isDefaultTitle = !session.title || session.title === '新创作对话' || session.title === '未命名对话';
@@ -262,8 +264,13 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     const linked = Boolean(updates.taskId && updates.taskId !== current?.taskId) || Boolean(updates.dbId && updates.dbId !== current?.dbId);
     const statusChanged = Boolean(updates.status && updates.status !== current?.status);
     const recoveryChanged = updates.submissionRecoveryRequired !== undefined && updates.submissionRecoveryRequired !== current?.submissionRecoveryRequired;
-    if (shouldPersist && (isTerminal || linked || statusChanged || recoveryChanged)) {
-      persistDrawingStateToStorage(updatedGenTasks, updatedSessions, undefined, { immediate: linked || isTerminal || recoveryChanged });
+    const nextReply = updates.agentTurn?.reply?.trim() || '';
+    const previousReply = current?.agentTurn?.reply?.trim() || '';
+    const now = Date.now();
+    const replyDue = Boolean(nextReply) && nextReply !== previousReply && (!previousReply || now - lastReplyPersistAt >= 1000);
+    if (shouldPersist && (isTerminal || linked || statusChanged || recoveryChanged || replyDue)) {
+      if (replyDue) lastReplyPersistAt = now;
+      persistDrawingStateToStorage(updatedGenTasks, updatedSessions, undefined, { immediate: linked || isTerminal || recoveryChanged || replyDue });
     }
     if (shouldPersist && isTerminal) {
       if (typeof window !== 'undefined') {

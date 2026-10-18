@@ -114,8 +114,8 @@ export default function AssetLibraryToolbar({
       }}
       className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
         activeSubTab === tab
-          ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/10'
-          : 'text-slate-600 hover:text-slate-900'
+          ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/10 dark:text-slate-100 dark:bg-[#18191c]'
+          : 'text-slate-600 hover:text-slate-900 dark:hover:text-white dark:text-slate-300'
       }`}
       aria-pressed={activeSubTab === tab}
       title={ASSET_TAB_HINT[tab]}
@@ -128,14 +128,14 @@ export default function AssetLibraryToolbar({
   // 和右侧管理操作抢占同一条顶栏。
   const tabNavigation = (
     <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-      <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl" aria-label="资产类型">
+      <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl dark:bg-white/10" aria-label="资产类型">
         {tabBtn('full_prompt', '图组母本')}
-        <span className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden="true" />
+        <span className="w-px h-4 bg-slate-200 mx-0.5 dark:bg-white/10" aria-hidden="true" />
         {tabBtn('persona', '人物')}
         {tabBtn('outfit', '穿搭')}
         {tabBtn('scene', '场景')}
       </div>
-      <span className="text-xs text-slate-500">{ASSET_TAB_HINT[activeSubTab]}</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400">{ASSET_TAB_HINT[activeSubTab]}</span>
     </div>
   );
 

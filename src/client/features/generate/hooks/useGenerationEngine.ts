@@ -82,6 +82,8 @@ export function useGenerationEngine() {
       generationHistoryReady ? generationTasks
         .filter(
           (t) =>
+            t.mediaType !== 'agent' &&
+            !t.id.startsWith('agent-task-') &&
             isImageTaskActive(t.status) &&
             (t.taskId || t.submissionRecoveryRequired) &&
             !t.resultUrl &&
@@ -98,6 +100,8 @@ export function useGenerationEngine() {
       generationHistoryReady ? generationTasks
         .filter(
           (t) =>
+            t.mediaType !== 'agent' &&
+            !t.id.startsWith('agent-task-') &&
             isImageTaskActive(t.status) &&
             t.taskId &&
             !t.resultUrl &&
@@ -113,6 +117,8 @@ export function useGenerationEngine() {
       generationHistoryReady ? generationTasks
         .filter(
           (t) =>
+            t.mediaType !== 'agent' &&
+            !t.id.startsWith('agent-task-') &&
             t.status === 'FAILURE' &&
             t.taskId &&
             (!t.resultUrl || t.resultUrl.trim() === '') &&
@@ -128,6 +134,8 @@ export function useGenerationEngine() {
       generationHistoryReady ? generationTasks
         .filter(
           (t) =>
+            t.mediaType !== 'agent' &&
+            !t.id.startsWith('agent-task-') &&
             t.status === 'FAILURE' &&
             t.taskId &&
             (!t.resultUrl || t.resultUrl.trim() === '') &&

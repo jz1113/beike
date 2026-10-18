@@ -184,19 +184,19 @@ export default function BatchStage4Queue({
             selectedVisionModel={selectedVisionModel}
             onReviewTask={onReviewTask}
             productNavigation={successfulItems.length > 1 ? (
-              <nav aria-label="切换交付商品" className="min-w-0 rounded-xl border border-slate-200/60 bg-transparent p-3">
+              <nav aria-label="切换交付商品" className="min-w-0 rounded-xl border border-slate-200/60 bg-transparent p-3 dark:border-white/10">
                 <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                  <h3 className="text-sm font-semibold text-slate-800">商品列表 <span className="ml-1 text-xs font-normal text-slate-500">{successfulItems.length} 款</span></h3>
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">商品列表 <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{successfulItems.length} 款</span></h3>
                   <div className="flex items-center gap-1">
                     <button type="button" aria-label="上一个商品" title="上一个商品" disabled={safeIndex === 0}
                       onClick={() => setActiveItemIndex(safeIndex - 1)}
-                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300">
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-slate-400 dark:hover:bg-white/10">
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="text-xs tabular-nums text-slate-500">{safeIndex + 1}/{successfulItems.length}</span>
+                    <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">{safeIndex + 1}/{successfulItems.length}</span>
                     <button type="button" aria-label="下一个商品" title="下一个商品" disabled={safeIndex === successfulItems.length - 1}
                       onClick={() => setActiveItemIndex(safeIndex + 1)}
-                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300">
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-slate-400 dark:hover:bg-white/10">
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
@@ -209,13 +209,13 @@ export default function BatchStage4Queue({
                     const imageStatus = describeImageStatus(product);
                     return <button key={product.id} type="button" aria-current={index === safeIndex ? 'true' : undefined}
                       onClick={() => setActiveItemIndex(index)} title={product.title}
-                      className={`w-full min-w-0 flex items-center gap-2.5 rounded-lg p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}>
-                      <span className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50">
+                      className={`w-full min-w-0 flex items-center gap-2.5 rounded-lg p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'}`}>
+                      <span className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50 dark:bg-white/5">
                         {cover && <LazyProxyImage src={cover} alt="" thumb width={80} className="!object-contain" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-medium">{index + 1}. {product.title}</span>
-                        <span className={`block mt-1 text-[11px] ${imageStatus.failed ? 'text-rose-600' : 'text-slate-500'}`}>{imageStatus.label}</span>
+                        <span className={`block mt-1 text-[11px] ${imageStatus.failed ? 'text-rose-600' : 'text-slate-500 dark:text-slate-400'}`}>{imageStatus.label}</span>
                         <span className={`block text-[11px] ${copyFailed ? 'text-rose-600' : 'text-slate-400'}`}>
                           {copyFailed ? '文案失败，待重试' : copyReady ? '文案已就绪' : '文案待生成'}
                         </span>

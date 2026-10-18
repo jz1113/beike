@@ -20,8 +20,8 @@ export function FeedImage({ src, alt = '', className, eager = false, onAspectRat
     {!failed && <img key={`${src}:${attempt}`} src={retrySrc} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className={className}
       onLoad={event => { const img = event.currentTarget; if (img.naturalHeight) onAspectRatio?.(img.naturalWidth / img.naturalHeight); }}
       onError={() => { setFailed(true); if (attempt >= 2) onUnavailable?.(); }} />}
-    {failed && <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-100 text-xs text-slate-500" role="status">
-      {attempt < 2 ? '素材重新加载中…' : <><span>素材暂时无法加载</span><button type="button" className="rounded-lg border bg-white px-3 py-1" onClick={event => { event.stopPropagation(); setAttempt(0); setFailed(false); }}>重新加载</button></>}
+    {failed && <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-100 text-xs text-slate-500 dark:text-slate-400 dark:bg-white/10" role="status">
+      {attempt < 2 ? '素材重新加载中…' : <><span>素材暂时无法加载</span><button type="button" className="rounded-lg border bg-white px-3 py-1 dark:bg-[#18191c]" onClick={event => { event.stopPropagation(); setAttempt(0); setFailed(false); }}>重新加载</button></>}
     </div>}
   </>;
 }

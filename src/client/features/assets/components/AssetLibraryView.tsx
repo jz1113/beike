@@ -101,7 +101,7 @@ export default function AssetLibraryView() {
       {/* 顶部控制栏 (对应图3) */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 pb-4">
         {/* 左侧：分类胶囊 (角色 | 商品 | 音色 | 文件) */}
-        <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200/60 shadow-2xs">
+        <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shadow-2xs">
           {categories.map((c) => {
             const isActive = activeCategory === c.id;
             return (
@@ -111,8 +111,8 @@ export default function AssetLibraryView() {
                 onClick={() => setActiveCategory(c.id)}
                 className={`px-3.5 py-1 rounded-lg text-xs transition-all ${
                   isActive
-                    ? 'bg-white text-slate-900 font-bold shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 font-medium'
+                    ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white font-bold shadow-2xs'
+                    : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white font-medium'
                 }`}
               >
                 {c.name}
@@ -124,13 +124,13 @@ export default function AssetLibraryView() {
         {/* 右侧：搜索 + 排序 */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="relative flex items-center">
-            <Search className="w-3.5 h-3.5 absolute left-3 pointer-events-none text-slate-400" />
+            <Search className="w-3.5 h-3.5 absolute left-3 pointer-events-none text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t('assets.searchPlaceholder')}
-              className="w-40 pl-8 pr-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200/60 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all h-8"
+              className="w-40 pl-8 pr-3 py-1 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200/60 dark:hover:bg-white/10 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 border border-transparent dark:border-white/10 outline-none transition-all h-8"
             />
           </div>
 
@@ -138,20 +138,20 @@ export default function AssetLibraryView() {
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
-              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8"
+              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-transparent dark:border-white/10 text-xs font-medium outline-none cursor-pointer h-8"
             >
               <option value="newest">{t('assets.sort')}: {t('assets.sortNewest')}</option>
               <option value="oldest">{t('assets.sort')}: {t('assets.sortOldest')}</option>
               <option value="name">{t('assets.sort')}: {t('assets.sortName')}</option>
             </select>
-            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
+            <ChevronDown className="w-3 h-3 text-slate-400 dark:text-slate-500 absolute right-2 pointer-events-none" />
           </div>
 
           {filteredItems.length > 0 && (
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-1 rounded-full bg-slate-900 px-3.5 py-1 text-xs font-semibold text-white hover:bg-slate-800 transition-colors h-8"
+              className="flex items-center gap-1 rounded-full bg-slate-900 dark:bg-white px-3.5 py-1 text-xs font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors h-8"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>{currentCategoryConfig.addButton}</span>
@@ -166,11 +166,11 @@ export default function AssetLibraryView() {
           {/* 精美卡片叠放插图 (对应图3效果) */}
           <div className="relative flex h-24 w-32 items-center justify-center mb-4">
             {/* 底层斜卡片 */}
-            <div className="absolute h-16 w-20 rounded-lg bg-amber-800/40 rotate-12 shadow-sm transform -translate-x-1 translate-y-1" />
+            <div className="absolute h-16 w-20 rounded-lg bg-amber-800/40 dark:bg-amber-700/30 rotate-12 shadow-sm transform -translate-x-1 translate-y-1" />
             {/* 中层斜卡片 */}
-            <div className="absolute h-16 w-20 rounded-lg bg-slate-400/50 -rotate-6 shadow-sm transform translate-x-1" />
+            <div className="absolute h-16 w-20 rounded-lg bg-slate-400/50 dark:bg-slate-600/30 -rotate-6 shadow-sm transform translate-x-1" />
             {/* 顶层主卡片 */}
-            <div className="relative h-16 w-20 rounded-lg bg-white border border-slate-200 shadow-md flex items-center justify-center overflow-hidden">
+            <div className="relative h-16 w-20 rounded-lg bg-white dark:bg-[#1E1E22] border border-slate-200 dark:border-white/10 shadow-md flex items-center justify-center overflow-hidden">
               {activeCategory === 'character' ? (
                 <User className="h-7 w-7 text-slate-400" />
               ) : activeCategory === 'product' ? (
@@ -184,12 +184,12 @@ export default function AssetLibraryView() {
           </div>
 
           {/* 标题 */}
-          <h3 className="text-sm font-bold text-slate-800">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
             {currentCategoryConfig.emptyTitle}
           </h3>
 
           {/* 引导文案 */}
-          <p className="mt-1 text-xs text-slate-400 max-w-sm">
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-400 max-w-sm">
             {currentCategoryConfig.emptyDesc}
           </p>
 
@@ -197,7 +197,7 @@ export default function AssetLibraryView() {
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-1.5 rounded-full bg-slate-950 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
+            className="mt-5 flex items-center gap-1.5 rounded-full bg-slate-950 dark:bg-white px-5 py-2 text-xs font-semibold text-white dark:text-slate-900 shadow-sm hover:bg-slate-800 dark:hover:bg-slate-200 active:scale-95 transition-all cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>{currentCategoryConfig.addButton}</span>
@@ -208,20 +208,20 @@ export default function AssetLibraryView() {
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-2xs hover:shadow-md transition-all"
+              className="group relative flex flex-col rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#1B1B1E] p-2.5 shadow-2xs hover:shadow-md transition-all"
             >
               {/* 删除按钮 */}
               <button
                 type="button"
                 onClick={(e) => handleDelete(item.id, e)}
                 title={t('common.delete')}
-                className="absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-lg bg-white/90 text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all shadow-xs"
+                className="absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-lg bg-white/90 dark:bg-[#141416]/90 text-slate-400 dark:text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-all shadow-xs"
               >
                 <Trash2 className="h-3 w-3" />
               </button>
 
               {/* 封面或媒体缩略图 */}
-              <div className="aspect-square w-full overflow-hidden rounded-xl bg-slate-100 flex items-center justify-center">
+              <div className="aspect-square w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center">
                 {item.coverUrl ? (
                   <img src={item.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : activeCategory === 'voice' ? (
@@ -237,7 +237,7 @@ export default function AssetLibraryView() {
 
               {/* 信息 */}
               <div className="mt-2 w-full px-0.5">
-                <p className="truncate text-xs font-semibold text-slate-800" title={item.name}>
+                <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200" title={item.name}>
                   {item.name}
                 </p>
                 {item.description && (
@@ -250,7 +250,7 @@ export default function AssetLibraryView() {
                     {item.tags.slice(0, 2).map((t, idx) => (
                       <span
                         key={idx}
-                        className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500"
+                        className="rounded-md bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-slate-400"
                       >
                         {t}
                       </span>

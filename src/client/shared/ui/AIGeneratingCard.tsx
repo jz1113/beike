@@ -77,34 +77,34 @@ function SoftSkyGeneratingCard({
 }) {
   return (
     <div
-      className={`relative w-full h-full overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#E6F1FE] via-[#D8E8FD] to-[#EDF4FE] select-none border border-sky-200/60 shadow-2xs ${className}`.trim()}
+      className={`relative w-full h-full overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#E6F1FE] via-[#D8E8FD] to-[#EDF4FE] dark:from-[#0F172A] dark:via-[#161B26] dark:to-[#0B0F19] select-none border border-sky-200/60 dark:border-indigo-500/20 shadow-2xs ${className}`.trim()}
     >
       {/* 1. 柔和呼吸微光光晕 */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-1/4 -left-1/4 w-4/5 h-4/5 rounded-full bg-sky-200/50 blur-2xl animate-pulse" />
-        <div className="absolute -bottom-1/4 -right-1/4 w-4/5 h-4/5 rounded-full bg-indigo-200/40 blur-2xl animate-pulse [animation-delay:1.2s]" />
+        <div className="absolute -top-1/4 -left-1/4 w-4/5 h-4/5 rounded-full bg-sky-200/50 dark:bg-indigo-600/20 blur-2xl animate-pulse" />
+        <div className="absolute -bottom-1/4 -right-1/4 w-4/5 h-4/5 rounded-full bg-indigo-200/40 dark:bg-purple-600/20 blur-2xl animate-pulse [animation-delay:1.2s]" />
       </div>
 
       {/* 2. 表面白光流动扫光 (Shimmer) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/35 to-transparent -translate-x-full animate-[shimmerMove_3s_ease-in-out_infinite]" />
+        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/35 dark:via-white/10 to-transparent -translate-x-full animate-[shimmerMove_3s_ease-in-out_infinite]" />
       </div>
 
       {/* 3. 底部极细动态进度光条 */}
-      <div className="absolute inset-x-0 bottom-0 h-1 bg-sky-200/40 overflow-hidden">
-        <div className="h-full w-1/3 bg-gradient-to-r from-sky-400 to-indigo-400 rounded-full animate-[shimmerMove_2s_ease-in-out_infinite]" />
+      <div className="absolute inset-x-0 bottom-0 h-1 bg-sky-200/40 dark:bg-indigo-950/60 overflow-hidden">
+        <div className="h-full w-1/3 bg-gradient-to-r from-sky-400 to-indigo-500 rounded-full animate-[shimmerMove_2s_ease-in-out_infinite]" />
       </div>
 
       {/* 4. 根据真实进度展示百分比 */}
       {showProgressBadge && (
-        <div className={`absolute top-2.5 ${badgePosition === 'right' ? 'right-2.5' : 'left-2.5'} z-20 px-2 py-0.5 rounded-lg bg-white/80 backdrop-blur-md border border-white/80 shadow-2xs select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150`}>
-          <span className="text-slate-800 font-semibold text-[11px] leading-tight font-sans tracking-tight">
+        <div className={`absolute top-2.5 ${badgePosition === 'right' ? 'right-2.5' : 'left-2.5'} z-20 px-2 py-0.5 rounded-lg bg-white/80 dark:bg-black/60 backdrop-blur-md border border-white/80 dark:border-white/10 shadow-2xs select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150`}>
+          <span className="text-slate-800 dark:text-slate-100 font-semibold text-[11px] leading-tight font-mono-nums tabular-nums tracking-tight">
             {formattedProgress}
           </span>
         </div>
       )}
       {statusHint && (
-        <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg bg-white/85 px-2 py-1.5 text-[11px] leading-relaxed text-slate-600" role="status">
+        <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg bg-white/85 dark:bg-slate-900/85 px-2 py-1.5 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300" role="status">
           {statusHint}
         </div>
       )}

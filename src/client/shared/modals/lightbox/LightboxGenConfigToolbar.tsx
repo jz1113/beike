@@ -94,8 +94,8 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                 ? 'bg-zinc-800 border-zinc-500 text-white shadow-xs'
                 : 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700/60 text-zinc-200'
               : showModelDropdown
-                ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs'
-                : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
+                ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/10 dark:border-white/10'
           }`}
           disabled={!availableImageModels.length}
           title={availableImageModels.length ? "点击切换生图模型" : "请在设置中启用生图模型"}
@@ -115,14 +115,14 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
             className={`absolute left-0 sm:left-auto sm:right-0 bottom-full mb-2 w-64 sm:w-72 rounded-2xl border shadow-2xl p-2.5 z-50 animate-fade-in origin-bottom space-y-1.5 text-left ${
               isDark
                 ? 'bg-[#1e1f22] border-zinc-700/90 text-zinc-200'
-                : 'bg-white border-slate-200/90 text-slate-800'
+                : 'bg-white border-slate-200/90 text-slate-800 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]'
             }`}
           >
             <div
               className={`px-2 py-1 text-[11px] font-mono border-b pb-1.5 flex items-center justify-between ${
                 isDark
                   ? 'text-zinc-400 border-zinc-800'
-                  : 'text-slate-400 border-slate-100'
+                  : 'text-slate-400 border-slate-100 dark:border-white/10'
               }`}
             >
               <span>生图模型配置</span>
@@ -148,8 +148,8 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                           ? 'bg-zinc-800 border border-zinc-700 text-white font-semibold shadow-xs'
                           : 'hover:bg-zinc-800/60 text-zinc-300'
                         : isSelected
-                          ? 'bg-slate-50 border border-slate-200 text-slate-900 font-semibold shadow-2xs'
-                          : 'hover:bg-slate-50 text-slate-700'
+                          ? 'bg-slate-50 border border-slate-200 text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-white/5 dark:border-white/10'
+                          : 'hover:bg-slate-50 text-slate-700 dark:text-slate-200 dark:hover:bg-white/5'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -157,7 +157,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                         className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 p-0.5 group-hover:scale-105 transition-transform border ${
                           isDark
                             ? 'bg-zinc-800/80 border-zinc-700/60'
-                            : 'bg-slate-50 border-slate-100'
+                            : 'bg-slate-50 border-slate-100 dark:bg-white/5 dark:border-white/10'
                         }`}
                       >
                         {getModelIcon(m.id, 'w-4 h-4')}
@@ -165,7 +165,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                       <div className="min-w-0 flex-1">
                         <span
                           className={`truncate text-[11px] font-bold ${
-                            isDark ? 'text-zinc-100' : 'text-slate-900'
+                            isDark ? 'text-zinc-100' : 'text-slate-900 dark:text-slate-100'
                           }`}
                         >
                           {label}
@@ -175,7 +175,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                     {isSelected && (
                       <Check
                         className={`w-3.5 h-3.5 stroke-[2.5] shrink-0 ml-1.5 ${
-                          isDark ? 'text-white' : 'text-slate-900'
+                          isDark ? 'text-white' : 'text-slate-900 dark:text-slate-100'
                         }`}
                       />
                     )}
@@ -201,18 +201,18 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                 ? 'bg-zinc-800 border-zinc-500 text-white shadow-xs'
                 : 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700/60 text-zinc-200'
               : showSizeDropdown
-                ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs'
-                : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
+                ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/10 dark:border-white/10'
           }`}
           title="点击切换尺寸与分辨率"
         >
-          <span className={`font-mono font-bold ${isDark ? 'text-zinc-100' : 'text-slate-800'}`}>
+          <span className={`font-mono font-bold ${isDark ? 'text-zinc-100' : 'text-slate-800 dark:text-slate-100'}`}>
             {selectedQuality}
           </span>
           {!hideAspect && selectedAspectId && selectedAspectId !== 'smart' && (
             <span
               className={`text-[10px] font-mono ${
-                isDark ? 'text-zinc-400' : 'text-slate-500'
+                isDark ? 'text-zinc-400' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
               · {selectedAspectId}
@@ -227,14 +227,14 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
             className={`absolute right-0 bottom-full mb-2 w-64 rounded-2xl border shadow-2xl p-3 z-50 animate-fade-in origin-bottom space-y-3 text-left ${
               isDark
                 ? 'bg-[#1e1f22] border-zinc-700/90 text-zinc-200'
-                : 'bg-white border-slate-200/90 text-slate-800'
+                : 'bg-white border-slate-200/90 text-slate-800 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]'
             }`}
           >
             {/* 清晰度 / 画质 */}
             <div className="space-y-1.5">
               <div
                 className={`text-[11px] font-bold flex items-center justify-between ${
-                  isDark ? 'text-zinc-200' : 'text-slate-700'
+                  isDark ? 'text-zinc-200' : 'text-slate-700 dark:text-slate-200'
                 }`}
               >
                 <span>清晰度 / 分辨率</span>
@@ -248,7 +248,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
               </div>
               <div
                 className={`grid grid-cols-3 gap-1.5 p-1 rounded-xl ${
-                  isDark ? 'bg-zinc-900/90 border border-zinc-800/80' : 'bg-slate-100/80'
+                  isDark ? 'bg-zinc-900/90 border border-zinc-800/80' : 'bg-slate-100/80 dark:bg-white/10'
                 }`}
               >
                 {(['1K', '2K', '4K'] as const).map((q) => {
@@ -264,8 +264,8 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                             ? 'bg-zinc-700 text-white shadow-xs'
                             : 'text-zinc-400 hover:text-zinc-200'
                           : isSelected
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-slate-500 hover:text-slate-800'
+                            ? 'bg-white text-slate-900 shadow-xs dark:text-slate-100 dark:bg-[#18191c]'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
                       }`}
                     >
                       {q}
@@ -280,7 +280,7 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
               <div className="space-y-1.5">
                 <div
                   className={`text-[11px] font-bold flex items-center justify-between ${
-                    isDark ? 'text-zinc-200' : 'text-slate-700'
+                    isDark ? 'text-zinc-200' : 'text-slate-700 dark:text-slate-200'
                   }`}
                 >
                   <span>输出尺寸比例</span>
@@ -306,11 +306,11 @@ export const LightboxGenConfigToolbar: React.FC<LightboxGenConfigToolbarProps> =
                         className={`py-1 px-1.5 rounded-lg text-[11px] font-mono font-medium transition-all text-center cursor-pointer ${
                           isDark
                             ? isSelected
-                              ? 'bg-white text-zinc-950 font-bold shadow-xs'
+                              ? 'bg-white text-zinc-950 font-bold shadow-xs dark:bg-[#18191c]'
                               : 'bg-zinc-800/70 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-300'
                             : isSelected
-                              ? 'bg-slate-900 text-white font-bold shadow-xs'
-                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                              ? 'bg-slate-900 text-white font-bold shadow-xs dark:bg-white dark:text-slate-950'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/5'
                         }`}
                       >
                         {ratio.label}

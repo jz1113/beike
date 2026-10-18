@@ -9,7 +9,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 func Video(cfg config.Config) http.Handler {
@@ -55,11 +54,11 @@ func videoRequestedModel(payload map[string]json.RawMessage) string {
 }
 
 func videoModelError(payload map[string]json.RawMessage) string {
-	model := videoRequestedModel(payload)
-	if modelgw.IsApprovedVideo(model) {
-		return ""
+	model := strings.TrimSpace(videoRequestedModel(payload))
+	if model == "" {
+		return "模型名称不能为空"
 	}
-	return "模型 " + model + " 不在当前生视频白名单中"
+	return ""
 }
 
 func videoPoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
@@ -138,6 +137,12 @@ func boundedString(raw json.RawMessage, max int, minOne bool, empty string) stri
 	var value string
 	if json.Unmarshal(raw, &value) != nil {
 		return "Expected string, received string"
+	}
+	if minOne && len(value) == 0 {
+		if empty != "" {
+			return empty
+		}
+		return "String must contain at least 1 character(s)"
 	}
 	value = strings.TrimSpace(value)
 	if minOne && value == "" {

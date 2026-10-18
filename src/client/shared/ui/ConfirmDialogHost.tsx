@@ -61,7 +61,7 @@ export function ConfirmDialogHost() {
       onClick={() => handleClose(false)}
     >
       <div
-        className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150"
+        className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 dark:border-white/10 bg-white dark:bg-[#1B1B1E] text-slate-900 dark:text-white p-6 shadow-2xl animate-in zoom-in-95 duration-150"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -72,17 +72,17 @@ export function ConfirmDialogHost() {
           type="button"
           aria-label="取消"
           onClick={() => handleClose(false)}
-          className="absolute right-5 top-5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+          className="absolute right-5 top-5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
 
         {/* 标题 */}
-        <h3 className="pr-8 text-[16px] font-semibold text-slate-900">{title}</h3>
+        <h3 className="pr-8 text-[16px] font-semibold text-slate-900 dark:text-white">{title}</h3>
 
         {/* 描述文案 */}
         {description && (
-          <p className="mt-3 text-[13px] leading-relaxed text-slate-500">{description}</p>
+          <p className="mt-3 text-[13px] leading-relaxed text-slate-500 dark:text-[#8E8E93]">{description}</p>
         )}
 
         {/* 底部按钮组 */}
@@ -90,7 +90,7 @@ export function ConfirmDialogHost() {
           <button
             type="button"
             onClick={() => handleClose(false)}
-            className="rounded-xl bg-[#F2F3F5] px-5 py-2 text-[13px] font-medium text-slate-800 hover:bg-[#E5E6EB] transition-colors cursor-pointer"
+            className="rounded-xl bg-[#F2F3F5] dark:bg-white/10 px-5 py-2 text-[13px] font-medium text-slate-800 dark:text-[#EDEDED] hover:bg-[#E5E6EB] dark:hover:bg-white/15 transition-colors cursor-pointer"
           >
             {cancelText}
           </button>
@@ -98,7 +98,7 @@ export function ConfirmDialogHost() {
             ref={confirmBtnRef}
             type="button"
             onClick={() => handleClose(true)}
-            className="rounded-xl bg-black px-5 py-2 text-[13px] font-medium text-white hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
+            className="rounded-xl bg-slate-900 hover:bg-black text-white dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-white px-5 py-2 text-[13px] font-medium transition-colors cursor-pointer shadow-xs active:scale-[0.98] dark:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
           >
             {confirmText}
           </button>

@@ -1,4 +1,4 @@
 {
-  "max": 176,
+  "max": 159,
   "note": "Ceiling for @typescript-eslint/no-explicit-any. New warnings fail. A lower count must lower max; do not raise it."
 }

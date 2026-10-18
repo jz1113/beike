@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -20,27 +19,31 @@ func newRuntimeID(prefix string) string {
 }
 
 type agentLoop struct {
-	ctx       context.Context
-	creds     gatewayCreds
-	models    []string
-	effort    string
-	messages  []map[string]any
-	tools     []map[string]any
-	names     []string
-	budget    *execBudget
-	plan      *taskPlan
-	results   *resultStore
-	box       *toolBox
-	send      func(map[string]any)
-	persist   func(map[string]any)
-	granted   map[string]bool
-	turnID    string
-	threadID  string
-	space     string
-	items     []map[string]any
-	maxRounds int
-	depth     int
-	mu        *sync.Mutex
+	ctx            context.Context
+	creds          gatewayCreds
+	models         []string
+	effort         string
+	generationMode string
+	messages       []map[string]any
+	tools          []map[string]any
+	names          []string
+	budget         *execBudget
+	plan           *taskPlan
+	results        *resultStore
+	box            *toolBox
+	send           func(map[string]any)
+	persist        func(map[string]any)
+	granted        map[string]bool
+	turnID         string
+	threadID       string
+	space          string
+	items          []map[string]any
+	toolNotes      []string
+	maxRounds      int
+	depth          int
+	mu             *sync.Mutex
+	reasonItemID   string
+	messageItemID  string
 }
 
 func (loop *agentLoop) run() (string, string, bool, error) {
@@ -168,6 +171,8 @@ func (loop *agentLoop) complete(final, withTools bool) (modelRound, error) {
 	if err := loop.budget.consumeModel(final); err != nil {
 		return modelRound{}, err
 	}
+	loop.reasonItemID = ""
+	loop.messageItemID = ""
 	var last error
 	for _, model := range loop.models {
 		tools := loop.tools
@@ -178,54 +183,24 @@ func (loop *agentLoop) complete(final, withTools bool) (modelRound, error) {
 		if err != nil {
 			return modelRound{}, err
 		}
-		response, err := postModel(loop.ctx, loop.creds, body, true)
+		round, err := loop.streamModel(body, withTools)
+		if errors.Is(err, errToolsUnsupported) {
+			return loop.complete(final, false)
+		}
 		if err != nil {
 			last = err
+			loop.reasonItemID = ""
+			loop.messageItemID = ""
 			continue
-		}
-		payload, _ := io.ReadAll(io.LimitReader(response.Body, 8<<20))
-		response.Body.Close()
-		if response.StatusCode >= 300 {
-			if withTools && unsupportedTools(response.StatusCode, string(payload)) {
-				return loop.complete(final, false)
-			}
-			last = errors.New("模型请求失败，未获得有效响应")
-			continue
-		}
-		round, err := readModelStream(bytesReader(payload))
-		if err != nil {
-			return modelRound{}, err
 		}
 		round.model = model
 		loop.budget.recordUsage(round.prompt, round.completion, round.usageOK)
-		loop.send(map[string]any{"type": "status", "phase": "streaming", "message": "已连接模型，正在接收回复…"})
 		return round, nil
 	}
 	if last == nil {
 		last = errors.New("模型请求失败，未获得有效响应")
 	}
 	return modelRound{}, last
-}
-
-func bytesReader(body []byte) io.Reader { return strings.NewReader(string(body)) }
-
-func (loop *agentLoop) noteMessage(round modelRound) {
-	if strings.TrimSpace(round.content) == "" && round.reasoning == "" {
-		return
-	}
-	if round.reasoning != "" {
-		item := map[string]any{"id": newRuntimeID("reason"), "kind": "agentReasoning", "content": round.reasoning, "createdAt": time.Now().UnixMilli()}
-		loop.items = append(loop.items, item)
-		loop.persist(item)
-		loop.send(map[string]any{"type": "thinking", "content": round.reasoning})
-	}
-	if strings.TrimSpace(round.content) != "" {
-		item := map[string]any{"id": newRuntimeID("msg"), "kind": "agentMessage", "content": round.content, "createdAt": time.Now().UnixMilli()}
-		loop.items = append(loop.items, item)
-		loop.persist(item)
-		loop.send(map[string]any{"type": "item/agentMessage/completed", "turnId": loop.turnID, "itemId": item["id"], "content": round.content})
-		loop.send(map[string]any{"type": "delta", "content": round.content})
-	}
 }
 
 func (loop *agentLoop) pushAssistant(round modelRound) {
@@ -263,6 +238,8 @@ func (loop *agentLoop) executeCall(call modelToolCall) string {
 	itemID := newRuntimeID("tool")
 	item := map[string]any{"id": itemID, "kind": "toolCall", "name": call.name, "displayName": display, "args": call.arguments, "callId": call.id, "status": "running", "createdAt": time.Now().UnixMilli()}
 	loop.mu.Lock()
+	loop.send(map[string]any{"type": "item/started", "turnId": loop.turnID, "itemId": itemID, "kind": "toolCall"})
+	loop.send(map[string]any{"type": "item/toolCall/started", "turnId": loop.turnID, "itemId": itemID, "name": call.name, "displayName": display, "args": call.arguments})
 	loop.send(map[string]any{"type": "tool_call", "name": call.name, "displayName": display, "status": "running"})
 	args, err := parseToolArguments(call.name, call.arguments)
 	if err != nil {
@@ -273,7 +250,10 @@ func (loop *agentLoop) executeCall(call modelToolCall) string {
 		defer loop.mu.Unlock()
 		return loop.finishCall(item, toolJSON(false, message), "error")
 	}
-	needsApproval := needsToolApproval(call.name, loop.granted)
+	needsApproval := false
+	if loop.generationMode != "auto" {
+		needsApproval = needsToolApproval(call.name, loop.granted)
+	}
 	loop.mu.Unlock()
 	if needsApproval {
 		approvalID := newRuntimeID("appr")
@@ -283,6 +263,7 @@ func (loop *agentLoop) executeCall(call modelToolCall) string {
 		loop.mu.Unlock()
 		decision := waitForApproval(loop.ctx, loop.space, loop.turnID, approvalID)
 		loop.mu.Lock()
+		loop.send(map[string]any{"type": "item/approval/resolved", "turnId": loop.turnID, "approvalId": approvalID, "decision": decision})
 		approval := map[string]any{"id": "appr_" + approvalID, "kind": "approvalRequest", "approvalId": approvalID, "toolName": call.name, "displayName": display, "args": args, "decision": decision, "createdAt": time.Now().UnixMilli()}
 		switch decision {
 		case "accept", "acceptForSession":
@@ -301,11 +282,15 @@ func (loop *agentLoop) executeCall(call modelToolCall) string {
 		}
 		if decision == "decline" || decision == "cancel" {
 			message := "用户拒绝了此操作"
+			outcome := "declined"
+			callStatus := "declined"
 			if decision == "cancel" {
 				message = "审批已取消或任务已停止"
+				outcome = "cancelled"
+				callStatus = "cancelled"
 			}
 			defer loop.mu.Unlock()
-			return loop.finishCall(item, toolJSON(false, message), "error")
+			return loop.finishCall(item, toolOutcome(false, outcome, message), callStatus)
 		}
 		_ = saveTurnState(loop.ctx, loop.box.cfg, loop.space, loop.turnID, "running", loop.models[0], loop.budget.inputTokens, loop.budget.outputTokens, nil)
 		loop.mu.Unlock()
@@ -326,8 +311,19 @@ func (loop *agentLoop) finishCall(item map[string]any, result, status string) st
 	item["status"] = status
 	item["summary"] = summarizeToolResult(result)
 	loop.items = append(loop.items, item)
-	loop.persist(item)
-	loop.send(map[string]any{"type": "tool_result", "name": item["name"], "displayName": item["displayName"], "status": status, "detail": item["summary"]})
+	if loop.persist != nil {
+		loop.persist(item)
+	}
+	completed := map[string]any{
+		"type": "item/toolCall/completed", "turnId": loop.turnID, "itemId": item["id"],
+		"name": item["name"], "displayName": item["displayName"], "status": status, "summary": item["summary"],
+	}
+	if action := clientAction(result); action != nil {
+		completed["action"] = action
+		item["action"] = action
+	}
+	loop.send(completed)
+	loop.send(map[string]any{"type": "tool_result", "name": item["name"], "displayName": item["displayName"], "status": status, "detail": item["summary"], "action": completed["action"]})
 	if created, ok := item["createdAt"].(int64); ok {
 		noteTurnEvent(loop.space, "item/completed", loop.turnID, loop.threadID, loop.models[0], fmt.Sprint(item["name"]), "", time.UnixMilli(created))
 	}

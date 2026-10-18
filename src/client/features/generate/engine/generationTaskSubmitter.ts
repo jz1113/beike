@@ -2,12 +2,14 @@ import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@shared/domain/media/drawing';
+import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { prepareImageSubmission } from './prepareImageSubmission';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { prepareVideoReferences } from './prepareVideoReferences';
-import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
+import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
 import { logLatencyAudit } from '@shared/domain/core/latencyAudit';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
+import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled, throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
 import { requiresGenerationRecovery, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
@@ -25,6 +27,7 @@ import {
   getGatewayBaseUrl,
   type TaskUpdater,
 } from './generationTaskTypes';
+import { submitAgentTask } from './submitAgentTask';
 
 export async function submitSingleGenerationTask(
   t: GenerationTask,
@@ -64,6 +67,11 @@ export async function submitSingleGenerationTask(
     requireRecovery();
     return true;
   };
+
+  if (t.mediaType === 'agent') {
+    await submitAgentTask(t, updateGenerationTask, signal);
+    return;
+  }
 
   if (isDepthImageTask(t) || isDepthVideoTask(t)) {
     let payload = peekDepthSubmit(t.id);
@@ -116,8 +124,9 @@ export async function submitSingleGenerationTask(
   }
 
   const localUrl = getGatewayBaseUrl();
-  const gatewayHeaders = getGatewayClientHeaders(t.model);
+  const gatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
   const video = isVideoTask(t);
+  const isAudio = t.mediaType === 'audio';
   const clientT0 = Date.now();
   const refCount = Array.isArray(t.referenceImages)
     ? t.referenceImages.length
@@ -130,7 +139,33 @@ export async function submitSingleGenerationTask(
   let submissionDispatched = false;
   let res: Response;
   try {
-    if (video) {
+    if (isAudio) {
+      throwIfGenerationAborted(() => Boolean(signal?.aborted));
+      if (!claimSubmission()) return;
+      submissionDispatched = true;
+      const audioPrefs = loadPromptPreferences().audio;
+      res = await apiFetch('/api/generate/audio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-idempotency-key': t.id,
+          ...gatewayHeaders,
+          ...storageConfigHeaders(),
+        },
+        body: JSON.stringify({
+          clientTaskId: t.id,
+          prompt: t.prompt,
+          text: t.prompt,
+          model: t.model || 'speech-2.8-hd',
+          format: audioPrefs?.format || 'mp3',
+          voice: audioPrefs?.voice || 'zh-female-commercial',
+          speed: audioPrefs?.speed || 1,
+          customBaseUrl: gatewayHeaders['x-custom-base-url'] || localUrl,
+          storageConfig: readClientStorageConfig(),
+        }),
+        signal,
+      });
+    } else if (video) {
       const rawRefs: string[] =
         Array.isArray(t.referenceImages) && t.referenceImages.length > 0
           ? t.referenceImages.filter(Boolean)
@@ -163,17 +198,20 @@ export async function submitSingleGenerationTask(
           model: t.model || 'doubao-seedance-2.5',
           duration: t.videoDuration || 5,
           aspect_ratio: t.size || '16:9',
-          resolution: t.videoResolution || '480P',
+          resolution: resolveVideoResolution(t.videoResolution, getVideoModelById(t.model)?.supportedResolutions),
           ref_mode: t.videoRefMode || 'omni',
           images: imageRefs,
           videos: finalVideoRefs,
-          first_frame_image: t.videoRefMode === 'first_last_frame' ? imageRefs[0] || undefined : undefined,
-          last_frame_image:
-            t.videoRefMode === 'first_last_frame' && imageRefs.length >= 2
-              ? imageRefs[imageRefs.length - 1]
+          first_frame_image:
+            t.videoRefMode === 'first_frame' || t.videoRefMode === 'first_last_frame'
+              ? (('firstFrameImage' in t && typeof t.firstFrameImage === 'string' ? t.firstFrameImage : '') || imageRefs[0] || undefined)
               : undefined,
-          camera_motion: (t as any).cameraMotion,
-          audio: (t as any).generateAudio,
+          last_frame_image:
+            t.videoRefMode === 'first_last_frame'
+              ? (('lastFrameImage' in t && typeof t.lastFrameImage === 'string' ? t.lastFrameImage : '') || (imageRefs.length >= 2 ? imageRefs[imageRefs.length - 1] : undefined))
+              : undefined,
+          camera_motion: 'cameraMotion' in t && typeof t.cameraMotion === 'string' ? t.cameraMotion : undefined,
+          audio: 'generateAudio' in t && typeof t.generateAudio === 'boolean' ? t.generateAudio : undefined,
           watermark: false,
           customBaseUrl: gatewayHeaders['x-custom-base-url'] || localUrl,
           storageConfig: readClientStorageConfig(),
@@ -194,6 +232,7 @@ export async function submitSingleGenerationTask(
         model: t.model || 'gpt-image-2',
         size: t.size || '2448x3264',
         quality: t.quality || 'medium',
+        ...(t.inferenceStrength ? { inferenceStrength: t.inferenceStrength } : {}),
         referenceImageUrl: primaryRefUrl,
         useReferenceImage: t.useReferenceImage ?? Boolean(primaryRefUrl || combinedImages.length),
         source: 'home',
@@ -205,6 +244,9 @@ export async function submitSingleGenerationTask(
           ? { productImageUrl: primaryRefUrl, productTitle: t.title, workshopMode: (t as any).workshopMode }
           : {}),
       };
+      if (gatewayHeaders['x-custom-api-key']) {
+        imgBody.customApiKey = gatewayHeaders['x-custom-api-key'];
+      }
       if (combinedImages.length > 0) {
         imgBody.images = combinedImages;
         // The server accepts images as the canonical array; do not send the same base64 list twice.
@@ -290,7 +332,17 @@ export async function submitSingleGenerationTask(
     },
   });
 
-  if (!data?.taskId && !data?.resultUrl && (data?.submissionUnknown || res.status >= 500 || res.ok)) {
+  // 服务端明确拒绝（包括参数错误、未配置密钥、上游拒绝）时，直接置为 FAILURE，避免误入恢复死循环
+  if (data?.submissionRejected || ((!res.ok || data?.success === false) && data?.error && !data?.taskId && !data?.submissionUnknown)) {
+    updateGenerationTask(t.id, {
+      status: 'FAILURE',
+      submissionRecoveryRequired: false,
+      failReason: formatUserError(data?.error || `生成任务已被拒绝 (HTTP ${res.status})`),
+    });
+    return;
+  }
+
+  if (!data?.taskId && !data?.resultUrl && (data?.submissionUnknown || (res.status >= 500 && !data) || (res.ok && !data))) {
     requireRecovery();
     return;
   }
@@ -304,23 +356,24 @@ export async function submitSingleGenerationTask(
 
   (pollCounts as any)[`_start_${t.id}`] = Date.now();
 
-  const resolvedModelId = data.model || t.model || (video ? 'doubao-seedance-2.5' : 'gpt-image-2');
+  const resolvedModelId = data.model || t.model || (video ? 'doubao-seedance-2.5' : isAudio ? 'speech-2.8-hd' : 'gpt-image-2');
 
-  recordModelUsage({
+  recordMediaTaskUsage({
+    taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
     modelId: resolvedModelId,
     modelName: formatDisplayModel(resolvedModelId, video),
-    provider: resolveModelVendor(resolvedModelId),
-    type: video ? 'video' : 'image',
+    type: isAudio ? 'audio' : video ? 'video' : 'image',
     mediaCount: 1,
     duration: video ? (t.videoDuration || 5) : undefined,
-    success: true,
+    usage: data.usage,
   });
 
-  if (data.resultUrl) {
+  const finalResultUrl = data.resultUrl || data.audioUrl;
+  if (finalResultUrl) {
     updateGenerationTask(t.id, {
       status: 'SUCCESS',
       progress: '100%',
-      resultUrl: data.resultUrl,
+      resultUrl: finalResultUrl,
       taskId: data.taskId,
       submissionRecoveryRequired: false,
       ...(data.model ? { model: data.model } : {}),

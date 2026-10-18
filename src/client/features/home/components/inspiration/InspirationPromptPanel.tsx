@@ -29,7 +29,7 @@ export function InspirationPromptPanel({ itemId, prompt, isVideo }: Props) {
           <button
             type="button"
             onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-            className="inline-flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-indigo-50"
+            className="inline-flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
             title={isPromptExpanded ? '收起长文本' : '展开查看完整提示词'}
           >
             <span>{isPromptExpanded ? '收起' : '展开全文'}</span>
@@ -44,7 +44,7 @@ export function InspirationPromptPanel({ itemId, prompt, isVideo }: Props) {
 
       <div className="relative">
         <div
-          className={`text-[13px] sm:text-[13.5px] text-slate-800 leading-relaxed font-normal select-text transition-all duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 pr-1 space-y-2.5 ${
+          className={`text-[13px] sm:text-[13.5px] text-slate-800 dark:text-[#EDEDED] leading-relaxed font-normal select-text transition-all duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 pr-1 space-y-2.5 ${
             isPromptExpanded
               ? 'max-h-[50vh] pb-2'
               : 'max-h-40'
@@ -61,7 +61,7 @@ export function InspirationPromptPanel({ itemId, prompt, isVideo }: Props) {
         {!isPromptExpanded && isLongPrompt && (
           <div
             onClick={() => setIsPromptExpanded(true)}
-            className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-auto cursor-pointer"
+            className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent dark:from-[#1B1B1E] dark:via-[#1B1B1E]/70 dark:to-transparent pointer-events-auto cursor-pointer"
             title="点击展开全文"
           />
         )}

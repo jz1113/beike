@@ -5,6 +5,7 @@ import {
   MIN_IMAGES_PER_SET,
 } from '@shared/domain/assets/asset-deconstruct/prompts';
 import { RateLimiter } from '@client/shared/utils/rateLimiter';
+import type { PreferredScraper } from '@client/shared/utils/externalScraperCredentials';
 import type { ImageSetQueueItem } from '@client/types/imageSetQueue';
 import { parseXhsUrlsFromText } from './xhsLinkFormatting';
 
@@ -91,6 +92,7 @@ export function toXhsQueueItem(
 export interface ParseLinkRequestOptions {
   qiyunAppId?: string;
   qiyunAppKey?: string;
+  preferredScraper?: PreferredScraper;
   shouldStop?: () => boolean;
   signal?: AbortSignal;
   onSubmitted?: () => void;
@@ -121,11 +123,12 @@ export async function fetchParseLinkWithRateLimit(
   checkDispatch();
   try {
     extra?.onSubmitted?.();
+    const preferredScraper = extra?.preferredScraper;
     const res = await apiFetch('/api/catalog/styles/parse-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: requestSignal,
-      body: JSON.stringify({ url, scraperId, scraperSecret, qiyunAppId, qiyunAppKey }),
+      body: JSON.stringify({ url, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, preferredScraper }),
     });
     requestSignal?.throwIfAborted();
     const data = await res.json().catch(() => ({}));
@@ -202,7 +205,7 @@ export async function parseSocialLinkWithRateLimit(
   rateLimiter?: RateLimiter,
   optionsOrSignal?: ParseLinkRequestOptions | AbortSignal,
   extra?: ParseLinkRequestOptions,
-): Promise<{ success: true; data: ParseLinkMedia } | { success: false; error: string }> {
+): Promise<{ success: true; data: ParseLinkMedia; apiUsed?: string } | { success: false; error: string }> {
   const isSignal = optionsOrSignal && 'aborted' in optionsOrSignal;
   const options = isSignal ? { ...extra, signal: optionsOrSignal as AbortSignal } : { ...extra, ...optionsOrSignal };
   const limiter = rateLimiter ?? new RateLimiter(8.5);
@@ -211,5 +214,5 @@ export async function parseSocialLinkWithRateLimit(
   const media = result.media;
   const images = Array.isArray(media.images) ? media.images.filter(Boolean) : [];
   if (media.cover && !images.includes(media.cover)) images.unshift(media.cover);
-  return { success: true, data: { ...media, images } };
+  return { success: true, data: { ...media, images }, apiUsed: result.apiUsed };
 }

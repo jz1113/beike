@@ -62,13 +62,14 @@ export function normalizeAssistantItems(value: unknown): AssistantItem[] {
         item = {
           ...base, kind: raw.kind, name, displayName,
           args: text(raw.args), callId: text(raw.callId, raw.id),
-          status: status(raw.status, ['running', 'done', 'error'], 'error'),
+          status: status(raw.status, ['running', 'done', 'error', 'declined', 'cancelled'], 'error'),
+          summary: text(raw.summary) || undefined,
         };
         break;
       case 'toolResult':
         item = {
           ...base, kind: raw.kind, name, displayName, summary: text(raw.summary),
-          status: status(raw.status, ['done', 'error'], 'error'),
+          status: status(raw.status, ['done', 'error', 'declined', 'cancelled'], 'error'),
           action: isRecord(raw.action) ? raw.action : undefined,
           visualImages: Array.isArray(raw.visualImages) ? raw.visualImages
             .filter((image) => isRecord(image) && typeof image.url === 'string' && image.url)

@@ -20,7 +20,7 @@ function PreviewTile({ url, index }: { url: string; index: number }) {
   const proxyUrl = proxyMediaUrl(directUrl, { thumb: true, width: 320 });
 
   if (failed) {
-    return <div className="flex min-h-0 min-w-0 items-center justify-center bg-slate-100 text-slate-300"><ImageIcon className="h-5 w-5" /></div>;
+    return <div className="flex min-h-0 min-w-0 items-center justify-center bg-slate-100 text-slate-300 dark:bg-white/10"><ImageIcon className="h-5 w-5" /></div>;
   }
 
   return (

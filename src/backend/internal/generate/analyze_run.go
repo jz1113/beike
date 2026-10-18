@@ -22,7 +22,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 	}
 	title := rawString(payload, "productTitle")
 	messages := []any{map[string]any{"role": "user", "content": analyzePrompt(title, rawString(payload, "productProps"), shotCount, rawString(payload, "extraRequirements"))}}
-	text, _, status, err := ChatCompletion(r.Context(), base, apiKey, model, messages, 0.4, 90*time.Second)
+	text, data, status, err := ChatCompletionJSON(r.Context(), base, apiKey, model, messages, 0.4, 90*time.Second)
 	if err != nil || status >= 300 || text == "" {
 		message := "视觉分析失败"
 		if err != nil {
@@ -52,7 +52,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 	if scene != "" {
 		group = map[string]any{"scene": scene, "actionDigest": action}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"success":             true,
 		"product_fingerprint": fingerprint, "productFingerprint": fingerprint,
 		"product_role": role, "productRole": role,
@@ -64,9 +64,11 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		"actionDigest": action, "groupSignature": group,
 		"prompts": prompts, "modelUsed": model, "requestedModel": model,
 		"modelSwitched": false, "triedModels": []string{model}, "rawOutput": text,
-		"usage": usageOf(parsed), "usedActionIds": []any{}, "assetTrace": nil,
+		"usedActionIds": []any{}, "assetTrace": nil,
 		"qualityChecks": []any{}, "usedAssetLibrary": false, "assemblySource": "model",
-	})
+	}
+	attachUsage(body, data)
+	httpx.WriteJSON(w, http.StatusOK, body)
 }
 
 func analyzePrompt(title, props string, shots int, extra string) string {
@@ -82,13 +84,6 @@ func TextField(data map[string]any, keys ...string) string {
 		}
 	}
 	return ""
-}
-
-func usageOf(data map[string]any) any {
-	if usage, ok := data["usage"]; ok {
-		return usage
-	}
-	return nil
 }
 
 func saveAnalysis(cfg config.Config, r *http.Request, title, fingerprint, model string, prompts []any) {

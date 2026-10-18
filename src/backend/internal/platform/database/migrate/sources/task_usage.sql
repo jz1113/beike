@@ -1,0 +1,1 @@
+ALTER TABLE "ImageTask" ADD COLUMN "usage" TEXT;

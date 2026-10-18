@@ -8,9 +8,9 @@ export function CanvasVideoPromptGuide({ model, mode }: { model: string; mode: s
   const timing = isSeedance25(model) ? '多镜头可用 0–5 秒、5–10 秒等整数时间段；安排要与所选总时长一致。'
     : isSeedance(model) ? '多镜头按“镜头一、镜头二”描述先后关系，不依赖精确秒点控制。'
     : '一个镜头聚焦一个主要动作，避免同时给出相互矛盾的运镜要求。';
-  return <details className="mb-2 text-[11px] leading-relaxed text-slate-500">
+  return <details className="mb-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
     <summary className="w-fit cursor-pointer select-none text-slate-400 hover:text-slate-700">提示词写法</summary>
-    <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-3"><p>{workflow}</p><p>{timing}</p>
+    <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-3 dark:bg-white/5"><p>{workflow}</p><p>{timing}</p>
       <p>图片与视频分别编号；用 @ 选择素材，例如“@图片1 提供人物外观，@视频1 提供动作参考”。台词注明说话人，并用引号包围。</p>
     </div>
   </details>;

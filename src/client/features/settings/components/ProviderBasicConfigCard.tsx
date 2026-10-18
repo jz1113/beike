@@ -200,7 +200,7 @@ export function ProviderBasicConfigCard({
             type="button"
             onClick={onSave}
             disabled={isSaving}
-            className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 self-end sm:self-auto"
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition-all shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 self-end sm:self-auto active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-white dark:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
           >
             {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             <span>{isSaving ? '保存中…' : '保存配置'}</span>

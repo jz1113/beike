@@ -209,7 +209,7 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
               actionShotScale !== 'all' ||
               actionAnchor !== null))
       ),
-    [audienceFilter, lifecycleFilter, promptGroupCategoryFilter, promptGroupSubcategoryFilter, selectedTag, activeSubTab, actionCategory, actionSubCategory, actionShotScale, actionAnchor]
+    [audienceFilter, lifecycleFilter, promptGroupCategoryFilter, selectedTag, activeSubTab, actionCategory, actionSubCategory, actionShotScale, actionAnchor]
   );
 
   const displayedItems = useMemo<T[]>(() => {

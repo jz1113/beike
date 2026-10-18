@@ -38,6 +38,9 @@ export function sanitizeTaskForStorage(task: GenerationTask): GenerationTask {
 
 function sanitizeTaskForStartup(task: GenerationTask, stripMedia = true, failMissingMedia = true): GenerationTask {
   const clean = stripMedia ? sanitizeTaskForStorage(task) : task;
+  if ((clean.mediaType === 'agent' || clean.id.startsWith('agent-task-')) && isImageTaskActive(clean.status)) {
+    return { ...clean, status: 'FAILURE', progress: '0%', submissionRecoveryRequired: false, failReason: '对话已中断，可重试' };
+  }
   // A missing local input cannot be resubmitted with the original operation ID.
   if (failMissingMedia && isImageTaskActive(clean.status) && !clean.submissionRecoveryRequired && !clean.taskId && clean.useReferenceImage
     && (clean.referenceMediaMissing || (!clean.referenceImageUrl && !clean.referenceImages?.length && !clean.images?.length && !clean.productImageUrl && !clean.sourceImageUrl))) {

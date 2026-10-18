@@ -19,14 +19,16 @@ export async function prepareGenerationAttempt(
 ): Promise<GenerationTask | null> {
   if (task.submissionRecoveryRequired) return null;
   if (task.referenceMediaMissing && !isDepthImageTask(task) && !isDepthVideoTask(task)) return null;
+  const isAgent = task.mediaType === 'agent' || task.id.startsWith('agent-task-');
   const attempt: GenerationTask = {
     ...task,
-    id: createGenerationAttemptId(),
+    id: createGenerationAttemptId(isAgent ? 'agent-task' : 'hub-gen'),
     batchId,
+    mediaType: isAgent ? 'agent' : task.mediaType,
     taskId: undefined,
     dbId: undefined,
-    sessionId: undefined,
-    sessionTitle: undefined,
+    sessionId: task.sessionId,
+    sessionTitle: task.sessionTitle,
     prompt: stripWorkshopPromptGuards(cleanPromptText(task.prompt || '')),
     status: 'IN_PROGRESS',
     progress: '15%',
@@ -35,6 +37,16 @@ export async function prepareGenerationAttempt(
     referenceMediaMissing: false,
     submissionRecoveryRequired: undefined,
     createdAt: Date.now(),
+    agentTurn: isAgent ? {
+      turnId: `turn-agent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      threadId: task.sessionId || `session-${batchId}`,
+      modelUsed: task.model,
+      thinking: '',
+      reply: '',
+      steps: [],
+      toolActivity: [],
+      suggestions: [],
+    } : undefined,
   };
   if (!isDepthImageTask(task) && !isDepthVideoTask(task)) return attempt;
 

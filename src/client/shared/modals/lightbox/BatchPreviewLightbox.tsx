@@ -108,7 +108,7 @@ export function BatchPreviewLightbox({
                 handleDownloadSingleTaskImage(currentImageUrl, `beike_preview_${Date.now()}`);
               }
             }}
-            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-md"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-md dark:bg-[#18191c]/95"
             title="下载当前原图"
           >
             <Download className="w-4 h-4" />
@@ -120,7 +120,7 @@ export function BatchPreviewLightbox({
             onClick={() => {
               if (currentImageUrl) window.open(currentImageUrl, '_blank');
             }}
-            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-md"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-md dark:bg-[#18191c]/95"
             title="在新标签页打开"
           >
             <ExternalLink className="w-4 h-4" />
@@ -130,7 +130,7 @@ export function BatchPreviewLightbox({
           <button
             type="button"
             onClick={closeGalleryPreview}
-            className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white transition-all cursor-pointer backdrop-blur-md ml-1"
+            className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white transition-all cursor-pointer backdrop-blur-md ml-1 dark:bg-[#18191c]/95"
             title="关闭预览 (Esc)"
           >
             <X className="w-5 h-5" />
@@ -147,7 +147,7 @@ export function BatchPreviewLightbox({
               e.stopPropagation();
               setGalleryIndex(previewGallery.currentIndex - 1);
             }}
-            className="w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shrink-0 shadow-lg"
+            className="w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shrink-0 shadow-lg dark:bg-[#18191c]/95"
             title="上一张 (← 键盘左方向键)"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -176,7 +176,7 @@ export function BatchPreviewLightbox({
               e.stopPropagation();
               setGalleryIndex(previewGallery.currentIndex + 1);
             }}
-            className="w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shrink-0 shadow-lg"
+            className="w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shrink-0 shadow-lg dark:bg-[#18191c]/95"
             title="下一张 (→ 键盘右方向键)"
           >
             <ChevronRight className="w-6 h-6" />

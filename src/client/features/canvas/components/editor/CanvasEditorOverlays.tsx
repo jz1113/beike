@@ -48,7 +48,7 @@ export function CanvasEditorOverlays(p: Props) {
             ) : (
               <img src={proxyMediaUrl(p.previewMedia.url) || p.previewMedia.url} alt="素材全屏预览" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl select-none" />
             )}
-            <button type="button" onClick={() => p.setPreviewMedia(null)} className="absolute -top-12 right-0 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer transition-colors backdrop-blur-md" title="关闭预览">
+            <button type="button" onClick={() => p.setPreviewMedia(null)} className="absolute -top-12 right-0 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer transition-colors backdrop-blur-md dark:bg-[#18191c]/95" title="关闭预览">
               <X className="w-5 h-5" />
             </button>
           </div>

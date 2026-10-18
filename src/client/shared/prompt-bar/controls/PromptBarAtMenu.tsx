@@ -58,10 +58,9 @@ export function PromptBarAtMenu({
       aria-label="选择主体或素材"
       className={`absolute left-3 sm:left-4 ${
         opensUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-      } w-64 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.10),0_2px_8px_rgba(0,0,0,0.04)] p-1.5 z-50 text-left select-none animate-fade-in`}
+      } w-64 rounded-2xl bg-white/95 dark:bg-[#18191c]/95 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.10),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] p-1.5 z-50 text-left select-none animate-fade-in`}
     >
-      {/* 🌟 顶部小标题（与系统浅色风格统一） */}
-      <div className="text-[11px] font-medium text-slate-400 px-2.5 pt-1.5 pb-1 tracking-wide">
+      <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2.5 pt-1.5 pb-1 tracking-wide">
         可能@的内容
       </div>
 
@@ -72,9 +71,9 @@ export function PromptBarAtMenu({
           onCreateSubjectClick?.();
           onClose?.();
         }}
-        className="w-full px-2.5 py-2 rounded-xl flex items-center gap-2.5 text-[13px] font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-50 transition-colors cursor-pointer group"
+        className="w-full px-2.5 py-2 rounded-xl flex items-center gap-2.5 text-[13px] font-medium text-slate-700 dark:text-slate-100 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 transition-colors cursor-pointer group"
       >
-        <Plus className="w-4 h-4 text-slate-400 group-hover:text-slate-800 stroke-[2.2] transition-colors" />
+        <Plus className="w-4 h-4 text-slate-400 group-hover:text-slate-800 dark:group-hover:text-white stroke-[2.2] transition-colors" />
         <span>创建主体</span>
       </button>
 
@@ -94,11 +93,11 @@ export function PromptBarAtMenu({
                 }}
                 className={`w-full p-1.5 rounded-xl flex items-center gap-3 transition-colors cursor-pointer text-left group ${
                   isSelected
-                    ? 'bg-slate-100 text-slate-950 font-medium'
-                    : 'hover:bg-slate-50 text-slate-700 hover:text-slate-950'
+                    ? 'bg-slate-100 dark:bg-white/15 text-slate-950 dark:text-white font-medium'
+                    : 'hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
-                <div className="w-9 h-9 rounded-lg overflow-hidden bg-slate-100 border border-slate-200/80 shrink-0 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg overflow-hidden bg-slate-100 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 shrink-0 flex items-center justify-center">
                   <img
                     src={sub.url}
                     alt={sub.name}
@@ -113,7 +112,7 @@ export function PromptBarAtMenu({
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <span className="truncate text-left text-[13px] font-normal text-slate-800 group-hover:text-slate-950 flex-1">
+                <span className="truncate text-left text-[13px] font-normal text-slate-800 dark:text-slate-100 group-hover:text-slate-950 dark:group-hover:text-white flex-1">
                   {sub.name || '未命名主体'}
                 </span>
               </button>
@@ -121,7 +120,7 @@ export function PromptBarAtMenu({
           })}
         </div>
       ) : isSearching ? (
-        <div className="py-4 px-2 text-center text-xs text-slate-400">
+        <div className="py-4 px-2 text-center text-xs text-slate-400 dark:text-slate-500">
           未找到匹配主体
         </div>
       ) : null}

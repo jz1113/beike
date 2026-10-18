@@ -7,7 +7,7 @@ export const MEDIA_FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(
   <rect x="2" y="2" width="396" height="396" rx="14" stroke="#E2E8F0" stroke-width="2"/>
   <path d="M140 260L180 200L210 240L250 180L280 260H140Z" fill="#CBD5E1"/>
   <circle cx="175" cy="165" r="18" fill="#CBD5E1"/>
-  <text x="200" y="300" text-anchor="middle" fill="#94A3B8" font-size="14" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-weight="600">素材加载失败</text>
+  <text x="200" y="300" text-anchor="middle" fill="#94A3B8" font-size="14" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif" font-weight="600">素材加载失败</text>
 </svg>
 `)}`;
 

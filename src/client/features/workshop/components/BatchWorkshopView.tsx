@@ -226,7 +226,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-transparent relative">
       <WorkshopTopBar activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />
       {workspaceStatus && workspaceStatus !== '当前批次已就绪' && workspaceStatus !== '当前批次已保存' && !workspaceError ? (
-        <p className="px-4 sm:px-6 text-xs text-slate-500">{workspaceStatus}</p>
+        <p className="px-4 sm:px-6 text-xs text-slate-500 dark:text-slate-400">{workspaceStatus}</p>
       ) : null}
       <WorkspaceSaveNotice error={workspaceError} status={workspaceStatus} onRetry={runner.workspaceSaveActions.retry} onDownload={runner.workspaceSaveActions.download} onReload={reloadWorkspace} />
       <BatchWorkspaceBatchControls

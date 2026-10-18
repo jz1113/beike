@@ -30,7 +30,7 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
         setSelectedProviderId(list[0]?.id || 'comfly_gateway');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, selectedProviderId]);
 
   const currentProvider = useMemo(() => {
     return providers.find(p => p.id === selectedProviderId) || providers[0];

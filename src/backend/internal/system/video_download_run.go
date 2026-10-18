@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -147,11 +149,15 @@ func saveVideoFile(ctx context.Context, cfg config.Config, dir, name, rawURL str
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return errors.New("视频下载失败")
+		return errors.New("网络连接失败")
 	}
 	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 || response.ContentLength == 0 {
-		return errors.New("视频下载失败")
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 2048))
+		return errors.New(videoDownloadFailure(response.StatusCode, response.ContentLength, body))
+	}
+	if message := videoDownloadFailure(response.StatusCode, response.ContentLength, nil); message != "" {
+		return errors.New(message)
 	}
 	if response.ContentLength > maxVideoProxyBytes {
 		return errors.New("视频超过 200MB")
@@ -171,6 +177,9 @@ func saveVideoFile(ctx context.Context, cfg config.Config, dir, name, rawURL str
 		if errors.Is(copyErr, errVideoTooLarge) {
 			return errors.New("视频超过 200MB")
 		}
+		if written == 0 && copyErr == nil {
+			return errors.New("视频内容为空")
+		}
 		return errors.New("视频下载失败")
 	}
 	_ = os.Remove(dest)
@@ -179,4 +188,24 @@ func saveVideoFile(ctx context.Context, cfg config.Config, dir, name, rawURL str
 		return errors.New("无法写入保存文件夹")
 	}
 	return nil
+}
+
+func videoDownloadFailure(status int, contentLength int64, body []byte) string {
+	if status >= 200 && status < 300 {
+		if contentLength == 0 {
+			return "视频内容为空"
+		}
+		return ""
+	}
+	text := string(body)
+	switch {
+	case strings.Contains(text, "<Code>NoSuchKey</Code>") || status == http.StatusNotFound:
+		return "OSS 上没有这个文件"
+	case strings.Contains(text, "<Code>AccessDenied</Code>") || status == http.StatusForbidden:
+		return "没有下载权限"
+	case status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable:
+		return "对方繁忙，请稍后重试"
+	default:
+		return "视频下载失败"
+	}
 }

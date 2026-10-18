@@ -25,7 +25,7 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	if (mode == "edit" || mode == "extend") && len(videos) == 0 {
 		return "请添加需要编辑或延长的参考视频"
 	}
-	if len(videos) > 0 && !regexp.MustCompile(`(?i)seedance`).MatchString(model) && !regexp.MustCompile(`^wan3`).MatchString(model) {
+	if len(videos) > 0 && !referenceVideoAllowed(model) {
 		return "当前模型的参考视频尚未接入，请使用图片或文字"
 	}
 	if regexp.MustCompile(`^viduq3(?:-mix)?$`).MatchString(model) && len(images) == 0 {
@@ -40,8 +40,11 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	if regexp.MustCompile(`^wan3`).MatchString(model) && (len(images) > 10 || len(videos) > 5) {
 		return "万相最多支持 10 张参考图、5 个参考视频"
 	}
-	if regexp.MustCompile(`(?i)minimax-h3`).MatchString(model) && len(images) > 9 {
-		return "H3 最多支持 9 张参考图片"
+	if regexp.MustCompile(`(?i)minimax-h3`).MatchString(model) && (len(images) > 9 || len(videos) > 3 || len(images)+len(videos) > 12) {
+		return "H3 最多支持 9 张参考图、3 个参考视频，合计不超过 12 个素材"
+	}
+	if regexp.MustCompile(`(?i)grok-imagine-video`).MatchString(model) && mode == "omni" && len(images) > 14 {
+		return "Grok 最多支持 14 张参考图片"
 	}
 	if regexp.MustCompile(`kling.*omni`).MatchString(model) && len(images) > 7 {
 		return "可灵 Omni 最多支持 7 张参考图片"
@@ -55,7 +58,7 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 			return "当前模型最多支持 " + Itoa(maxImages) + " 张参考图、" + Itoa(maxVideos) + " 个参考视频"
 		}
 	}
-	resolution := "720P"
+	resolution := defaultVideoResolution(model)
 	if value := rawStringValue(payload["resolution"]); value != "" {
 		resolution = strings.ToUpper(value)
 	}
@@ -139,19 +142,39 @@ func videoModeAllowed(model, mode string) bool {
 	return false
 }
 
+func referenceVideoAllowed(model string) bool {
+	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || regexp.MustCompile(`(?i)minimax-h3`).MatchString(model)
+}
+
 func videoModes(model string) []string {
 	id := strings.ToLower(model)
+	full := []string{"omni", "first_frame", "first_last_frame", "text"}
+	framed := []string{"first_frame", "first_last_frame", "text"}
 	switch {
-	case regexp.MustCompile(`seedance-2[.-]5`).MatchString(id):
-		return []string{"text", "first_frame", "first_last_frame", "omni", "edit", "extend"}
+	case regexp.MustCompile(`seedance`).MatchString(id):
+		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case id == "viduq3" || id == "viduq3-mix":
 		return []string{"omni"}
-	case regexp.MustCompile(`sora|grok`).MatchString(id):
-		return []string{"text", "first_frame"}
-	case regexp.MustCompile(`kling`).MatchString(id) && !strings.Contains(id, "omni"):
-		return []string{"text", "first_frame", "first_last_frame"}
+	case id == "viduq3-turbo" || id == "viduq3-pro":
+		return full
+	case regexp.MustCompile(`omni[_-]flash`).MatchString(id):
+		return []string{"first_frame", "text"}
+	case regexp.MustCompile(`^veo3\.1`).MatchString(id):
+		return full
+	case regexp.MustCompile(`sora`).MatchString(id):
+		return []string{"first_frame", "text"}
+	case regexp.MustCompile(`grok`).MatchString(id):
+		return full
+	case regexp.MustCompile(`kling`).MatchString(id) && strings.Contains(id, "omni"):
+		return full
+	case regexp.MustCompile(`kling`).MatchString(id):
+		return framed
+	case regexp.MustCompile(`wan`).MatchString(id):
+		return full
+	case regexp.MustCompile(`minimax|hailuo`).MatchString(id) || id == "h3":
+		return full
 	default:
-		return []string{"text", "first_frame", "first_last_frame", "omni"}
+		return []string{"first_frame", "text"}
 	}
 }
 

@@ -22,6 +22,7 @@ import {
   hydrateWorkshopSessionFromDraft,
 } from './workshopSession';
 import type { AppState } from '@client/store/types';
+import { mergeAndSortTasks, mergeRestoredSessions } from './generateSliceHelpers';
 
 if (typeof window !== 'undefined') {
   loadGenerationTombstones();
@@ -64,8 +65,13 @@ export const useAppStore = create<AppState>()((...a) => ({
 
 if (typeof window !== 'undefined') {
   void restoreDrawingArchive().then(restored => {
+    const current = useAppStore.getState();
     useAppStore.setState({
-      ...(restored ? { sessions: restored.sessions, currentSessionId: restored.currentId, generationTasks: restored.tasks } : {}),
+      ...(restored ? {
+        sessions: mergeRestoredSessions(current.sessions, restored.sessions),
+        currentSessionId: restored.currentId,
+        generationTasks: mergeAndSortTasks(current.generationTasks, restored.tasks),
+      } : {}),
       generationHistoryReady: true,
     });
     finishDrawingHydration();

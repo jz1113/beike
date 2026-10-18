@@ -50,10 +50,10 @@ const AssetCardItem = React.memo<AssetCardItemProps>(
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         style={{ contain: 'content', transform: 'translateZ(0)' }}
-        className={`group relative aspect-square rounded-2xl overflow-hidden border bg-slate-100/90 cursor-pointer transition-all duration-150 select-none ${
+        className={`group relative aspect-square rounded-2xl overflow-hidden border bg-slate-100/90 dark:bg-white/5 cursor-pointer transition-all duration-150 select-none ${
           isSelected
             ? 'border-indigo-500 ring-2 ring-indigo-500 shadow-md'
-            : 'border-slate-200/80 hover:border-slate-300 hover:shadow-xs'
+            : 'border-slate-200/80 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:shadow-xs'
         }`}
       >
         {/* 🌟 左上角复选框 (严格对齐设计稿与测试用例) */}
@@ -82,7 +82,7 @@ const AssetCardItem = React.memo<AssetCardItemProps>(
             } ${isSelected ? 'scale-98' : 'group-hover:scale-102'}`}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100">
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/5">
             {isVid ? <VideoIcon className="w-6 h-6 stroke-[1.5]" /> : <ImageIcon className="w-6 h-6 stroke-[1.5]" />}
           </div>
         )}
@@ -216,16 +216,16 @@ export const CanvasAssetImportModal: React.FC<CanvasAssetImportModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
       <div
-        className="w-full max-w-3xl xl:max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[85vh]"
+        className="w-full max-w-3xl xl:max-w-4xl bg-white dark:bg-[#1B1B1E] rounded-3xl shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-white/10 p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[85vh] text-slate-900 dark:text-[#EDEDED]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 弹窗顶栏：标题与关闭 */}
         <div className="flex items-center justify-between pb-1">
-          <h3 className="text-base font-bold text-slate-900 tracking-tight">资产选取</h3>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">资产选取</h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center cursor-pointer transition-colors"
             title="关闭"
           >
             <X className="w-4 h-4" />
@@ -236,7 +236,7 @@ export const CanvasAssetImportModal: React.FC<CanvasAssetImportModalProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-900 transition-all cursor-default"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white transition-all cursor-default"
           >
             {isImageMode ? '所有图片' : '所有视频'}
           </button>
@@ -249,11 +249,11 @@ export const CanvasAssetImportModal: React.FC<CanvasAssetImportModalProps> = ({
           className="flex-1 overflow-y-auto min-h-72 max-h-[58vh] pr-1"
         >
           {filteredAssets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400 text-xs gap-2 select-none">
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400 dark:text-slate-500 text-xs gap-2 select-none">
               {isImageMode ? (
-                <ImageIcon className="w-10 h-10 text-slate-300 stroke-[1.4]" />
+                <ImageIcon className="w-10 h-10 text-slate-300 dark:text-slate-600 stroke-[1.4]" />
               ) : (
-                <VideoIcon className="w-10 h-10 text-slate-300 stroke-[1.4]" />
+                <VideoIcon className="w-10 h-10 text-slate-300 dark:text-slate-600 stroke-[1.4]" />
               )}
               <span>暂无符合条件的{isImageMode ? '图片' : '视频'}资产</span>
               {onUploadLocalFile && (
@@ -263,7 +263,7 @@ export const CanvasAssetImportModal: React.FC<CanvasAssetImportModalProps> = ({
                     onClose();
                     onUploadLocalFile();
                   }}
-                  className="mt-2 px-4 py-1.5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 cursor-pointer transition-colors"
+                  className="mt-2 px-4 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-slate-800 dark:hover:bg-slate-200 cursor-pointer transition-colors"
                 >
                   本地上传{isImageMode ? '图片' : '视频'}
                 </button>
@@ -295,16 +295,16 @@ export const CanvasAssetImportModal: React.FC<CanvasAssetImportModalProps> = ({
         </div>
 
         {/* 弹窗底栏：已选数量与确认按钮 */}
-        <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+        <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-white/10">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium select-none">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium select-none">
               已选 {selectedAssetIds.size} {isImageMode ? '张图片' : '个视频'}
             </span>
             {selectedAssetIds.size > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedAssetIds(new Set())}
-                className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer font-medium transition-colors"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline cursor-pointer font-medium transition-colors"
               >
                 清空
               </button>
@@ -318,8 +318,8 @@ export const CanvasAssetImportModal: React.FC<CanvasAssetImportModalProps> = ({
               onClick={handleConfirm}
               className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${
                 selectedAssetIds.size > 0
-                  ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md cursor-pointer active:scale-95'
-                  : 'bg-slate-200/70 text-slate-400 cursor-not-allowed'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 shadow-md cursor-pointer active:scale-95'
+                  : 'bg-slate-200/70 dark:bg-white/10 text-slate-400 dark:text-slate-600 cursor-not-allowed'
               }`}
             >
               确认

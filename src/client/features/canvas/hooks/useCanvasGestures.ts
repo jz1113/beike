@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useCallback, type RefObject, type MouseEve
 import { useCanvasStore } from '../store/useCanvasStore';
 import { nodeBounds } from '../model/canvasGraph';
 import { canvasGroupSelection, expandCanvasGroups } from '../model/canvasGroups';
+import { computeSnapGuides, type AlignmentGuide } from './useCanvasSnapping';
 import type { CanvasNode, CanvasProject } from '../model/types';
 
+export type { AlignmentGuide };
 type Point = {x:number; y:number};
 type Box = Point & {width:number; height:number};
 const intersects = (a:Box,b:Box) => a.x <= b.x+b.width && a.x+a.width >= b.x && a.y <= b.y+b.height && a.y+a.height >= b.y;
@@ -24,6 +26,7 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
   const [selectionBox,setSelectionBox]=useState<Box|null>(null);
   const [dragPositions,setDragPositions]=useState<Record<string,Point>>({});
   const [draggingNodeId,setDraggingNodeId]=useState<string|null>(null);
+  const [alignmentGuides, setAlignmentGuides]=useState<AlignmentGuide[]>([]);
   const live=useRef({pan,zoom}); live.current={pan,zoom};
   const cleanup=useRef<(() => void)|null>(null);
   const suppressClick=useRef(false);
@@ -60,7 +63,7 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
     setPan(view.pan);setZoom(view.zoom);
   },[currentProject,viewportRef,onBackgroundSelect]);
   useEffect(()=>{
-    cleanup.current?.();setIsPanning(false);suppressClick.current=false;setSelectedNodeIds([]);setDragPositions({});setDraggingNodeId(null);setSelectionBox(null);setPan({x:0,y:0});setZoom(1);fitted.current=null;
+    cleanup.current?.();setIsPanning(false);suppressClick.current=false;setSelectedNodeIds([]);setDragPositions({});setDraggingNodeId(null);setSelectionBox(null);setAlignmentGuides([]);setPan({x:0,y:0});setZoom(1);fitted.current=null;
     return ()=>cleanup.current?.();
   },[currentProject?.id]);
   useEffect(()=>{
@@ -137,11 +140,18 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
     const moving=nodes.filter(n=>selected.has(n.id) && !n.layerLocked && !n.layerHidden);
     const start={x:event.clientX,y:event.clientY}, dragZoom=zoom;let latest:Record<string,Point>={};let moved=false;
     track(e=>{
-      const dx=(e.clientX-start.x)/dragZoom,dy=(e.clientY-start.y)/dragZoom;
-      if(!moved && Math.hypot(dx,dy)*zoom<3)return;
+      const rawDx=(e.clientX-start.x)/dragZoom, rawDy=(e.clientY-start.y)/dragZoom;
+      if(!moved && Math.hypot(rawDx,rawDy)*zoom<3)return;
       moved=true;setDraggingNodeId(node.id);
-      latest=Object.fromEntries(moving.map(n=>[n.id,{x:n.x+Math.round(dx),y:n.y+Math.round(dy)}]));setDragPositions(latest);
+
+      // Smart snapping calculation
+      const snap = computeSnapGuides(moving, nodes, rawDx, rawDy, zoom);
+      setAlignmentGuides(snap.guides);
+
+      latest=Object.fromEntries(moving.map(n=>[n.id,{x:n.x+Math.round(snap.dx),y:n.y+Math.round(snap.dy)}]));
+      setDragPositions(latest);
     },()=>{
+      setAlignmentGuides([]);
       if(moved && currentProject)useCanvasStore.getState().patchNodes(currentProject.id,latest);
       suppressClick.current=moved;setDraggingNodeId(null);setDragPositions({});
     });
@@ -152,11 +162,19 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
   };
   const handleWheel=(event:WheelEvent)=>{
     if(cleanup.current)return;
-    if((event.target as HTMLElement).closest('textarea,[contenteditable="true"],.canvas-fixed-ui,[data-drawing-settings]'))return;
+    const targetEl = event.target as HTMLElement | null;
+    if(targetEl?.closest('textarea,[contenteditable="true"],.canvas-fixed-ui,[data-drawing-settings],[role="dialog"]'))return;
     if(event.ctrlKey || event.metaKey){
       const rect=viewportRef.current?.getBoundingClientRect();
       zoomAt(live.current.zoom*Math.exp(-event.deltaY*0.002),{x:event.clientX-(rect?.left || 0),y:event.clientY-(rect?.top || 0)});
-    }else setPan(prev=>({x:prev.x-event.deltaX,y:prev.y-event.deltaY}));
+    }else {
+      // If user is scrolling an internal scrollable container, don't pan canvas
+      if (targetEl && targetEl !== viewportRef.current) {
+        const scrollContainer = targetEl.closest('.overflow-y-auto, .overflow-auto, .overflow-y-scroll');
+        if (scrollContainer && scrollContainer !== viewportRef.current) return;
+      }
+      setPan(prev=>({x:prev.x-event.deltaX,y:prev.y-event.deltaY}));
+    }
   };
   useEffect(()=>{
     const element=viewportRef.current;
@@ -165,5 +183,12 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
     return()=>element?.removeEventListener('wheel',prevent);
   },[viewportRef]);
   const centerAt=(x:number,y:number)=>setPan({x:(viewportRef.current?.clientWidth || 900)/2-x*zoom,y:(viewportRef.current?.clientHeight || 600)/2-y*zoom});
-  return {centerAt,pan,zoom,isPanning,isHandMode,handTool,setHandTool,selectedNodeIds,setSelectedNodeIds,selectedNodeId,setSelectedNodeId,selectionBox,dragPositions,draggingNodeId,draggingNodePos:draggingNodeId?dragPositions[draggingNodeId]:null,handleZoom,handleResetView,handleWheel,handleMouseDownCanvas,handleNodeDragStart,handleNodeClick};
+  return {
+    centerAt,pan,zoom,isPanning,isHandMode,handTool,setHandTool,
+    selectedNodeIds,setSelectedNodeIds,selectedNodeId,setSelectedNodeId,
+    selectionBox,dragPositions,draggingNodeId,
+    draggingNodePos:draggingNodeId?dragPositions[draggingNodeId]:null,
+    alignmentGuides,
+    handleZoom,handleResetView,handleWheel,handleMouseDownCanvas,handleNodeDragStart,handleNodeClick
+  };
 }

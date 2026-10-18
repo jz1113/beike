@@ -21,7 +21,7 @@ export function PromptBarAgentFileChips({
   return (
     <div className="flex flex-wrap gap-1.5 px-0.5">
       {chips.map((item) => (
-        <span key={item.url} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700">
+        <span key={item.url} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 dark:text-slate-200 dark:bg-white/5 dark:border-white/10">
           <Icon kind={item.meta?.kind || 'file'} />
           <span className="truncate">{item.meta?.name || '附件'}</span>
           <span className="text-slate-400">{agentFileLabel(item.meta?.kind || 'file')}</span>

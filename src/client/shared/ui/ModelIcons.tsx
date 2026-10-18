@@ -30,6 +30,47 @@ function logoFileFromPath(logoPath: string): string {
 const ALLOWED_LOGO_FILES = new Set(Object.keys(logoRawByFile));
 
 /**
+ * 在深色模式下需自适应转为纯白高对比度的厂商 Logo 集合
+ */
+const ADAPTIVE_DARK_LOGOS = new Set([
+  'openai.svg',
+  'grok.svg',
+  'midjourney.svg',
+  'flux.svg',
+  'runway.svg',
+  'ideogram.svg',
+  'replicate.svg',
+  'recraft.svg',
+  'suno.svg',
+  'pika.svg',
+  'moonshot.svg',
+  'tripo.svg',
+  'viggle.svg',
+  'baai.svg',
+  'kimi.svg',
+  'yi.svg',
+  'topaz.svg',
+  'elevenlabs.svg',
+  'groq.svg',
+]);
+
+function makeDarkSvg(raw: string): string {
+  return raw
+    .replace(/fill="currentColor"/g, 'fill="#FFFFFF"')
+    .replace(/fill="#000000"/gi, 'fill="#FFFFFF"')
+    .replace(/fill="#000"/gi, 'fill="#FFFFFF"')
+    .replace(/fill="#111111"/gi, 'fill="#FFFFFF"')
+    .replace(/fill="#111"/gi, 'fill="#FFFFFF"');
+}
+
+const logoRawByFileDark: Record<string, string> = {};
+for (const [file, raw] of Object.entries(logoRawByFile)) {
+  if (ADAPTIVE_DARK_LOGOS.has(file)) {
+    logoRawByFileDark[file] = makeDarkSvg(raw);
+  }
+}
+
+/**
  * 将内联 SVG 字符串转成 `<img src="data:image/svg+xml;base64,...">` 可直接消费的 base64 URI。
  * 任何 modelId 不在白名单内都会被拒绝（返回 null），上层走 LetterBadgeIcon。
  */
@@ -45,11 +86,13 @@ function svgRawToDataUri(raw: string): string {
   return `data:image/svg+xml;base64,${encoded}`;
 }
 
-function getModelLogoDataUri(modelId: string): string | null {
+function getModelLogoDataUri(modelId: string, isDark = false): string | null {
   const file = logoFileFromPath(getModelLogoPath(modelId));
   // 严格白名单：不在构建期内联资源表中的 file 一律拒绝
   if (!ALLOWED_LOGO_FILES.has(file)) return null;
-  const raw = logoRawByFile[file] || logoRawByFile['huggingface.svg'] || null;
+  const raw = isDark && logoRawByFileDark[file]
+    ? logoRawByFileDark[file]
+    : (logoRawByFile[file] || logoRawByFile['huggingface.svg'] || null);
   if (!raw) return null;
   return svgRawToDataUri(raw);
 }
@@ -251,6 +294,30 @@ export function getModelLogoPath(modelId: string = ''): string {
   if (m.includes('eleven')) {
     return '/logo/elevenlabs.svg';
   }
+  if (m.includes('meshy')) {
+    return '/logo/meshy.svg';
+  }
+  if (m.includes('fal') || m.includes('fal-ai')) {
+    return '/logo/fal.svg';
+  }
+  if (m.includes('siliconflow') || m.includes('siliconcloud') || m.includes('silicon')) {
+    return '/logo/siliconflow.svg';
+  }
+  if (m.includes('together')) {
+    return '/logo/together.svg';
+  }
+  if (m.includes('openrouter')) {
+    return '/logo/openrouter.svg';
+  }
+  if (m.includes('groq')) {
+    return '/logo/groq.svg';
+  }
+  if (m.includes('cohere')) {
+    return '/logo/cohere.svg';
+  }
+  if (m.includes('comfly')) {
+    return '/logo/comfly.svg';
+  }
 
   // 34. 其他厂商 / 社区开源模型 (HuggingFace 开放模型图标)
   if (m === 'other' || m.includes('other') || m.includes('community') || m.includes('huggingface')) {
@@ -262,7 +329,7 @@ export function getModelLogoPath(modelId: string = ''): string {
 }
 
 /**
- * 官方 AI 模型矢量图标组件（内联 SVG）
+ * 官方 AI 模型矢量图标组件（内联 SVG，内置深浅色自适应反白）
  */
 export function ModelIcon({
   modelId,
@@ -271,9 +338,34 @@ export function ModelIcon({
   modelId: string;
   className?: string;
 }) {
-  const dataUri = getModelLogoDataUri(modelId);
+  const file = logoFileFromPath(getModelLogoPath(modelId));
+  const isAdaptive = ADAPTIVE_DARK_LOGOS.has(file);
+  const dataUri = getModelLogoDataUri(modelId, false);
+
   if (!dataUri) {
     return <LetterBadgeIcon name={modelId || 'A'} className={className} />;
+  }
+
+  if (isAdaptive) {
+    const darkDataUri = getModelLogoDataUri(modelId, true) || dataUri;
+    return (
+      <>
+        <img
+          src={dataUri}
+          alt={modelId || 'AI Model'}
+          role="img"
+          draggable={false}
+          className={`${className} dark:hidden inline-flex items-center justify-center flex-shrink-0 select-none pointer-events-none object-contain`}
+        />
+        <img
+          src={darkDataUri}
+          alt={modelId || 'AI Model'}
+          role="img"
+          draggable={false}
+          className={`${className} hidden dark:inline-flex items-center justify-center flex-shrink-0 select-none pointer-events-none object-contain`}
+        />
+      </>
+    );
   }
 
   return (
@@ -304,7 +396,7 @@ export function LetterBadgeIcon({
 }) {
   const firstLetter = (name.replace(/[^a-zA-Z0-9]/g, '')[0] || 'A').toUpperCase();
   return (
-    <div className={`${className} rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-mono font-bold text-xs shadow-2xs flex-shrink-0 select-none`}>
+    <div className={`${className} rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 font-mono font-bold text-xs shadow-2xs flex-shrink-0 select-none`}>
       {firstLetter}
     </div>
   );

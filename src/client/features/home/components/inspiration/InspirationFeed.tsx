@@ -141,8 +141,8 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
 
   return (
     <div className="w-full space-y-3.5 pt-2 select-none">
-      <h2 className="text-base font-semibold tracking-tight text-slate-900">精选作品</h2>
-      <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1">
+      <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white">精选作品</h2>
+      <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1 dark:bg-[#1B1B1E]">
         {INSPIRATION_MEDIA_FILTERS.map((item) => {
           const selected = mediaFilter === item.id;
           return (
@@ -152,7 +152,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
               role="tab"
               aria-selected={selected}
               onClick={() => setMediaFilter(item.id)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selected ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selected ? 'bg-white text-slate-900 shadow-sm dark:bg-[#2C2C32] dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-[#8E8E93] dark:hover:text-[#EDEDED]'}`}
             >
               {item.label}
             </button>
@@ -186,7 +186,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                       }
                     }}
                     style={{flex:`${ratios[index]} 1 0%`}}
-                    className="min-w-0 h-full rounded-xl bg-slate-100 shadow-2xs hover:shadow-md transition-[box-shadow,border-color] duration-200 overflow-hidden group cursor-pointer relative border border-slate-100/80"
+                    className="min-w-0 h-full rounded-xl bg-slate-100 dark:bg-[#13161C] shadow-2xs hover:shadow-lg dark:shadow-[0_4px_24px_rgba(0,0,0,0.6)] transition-all duration-300 overflow-hidden group cursor-pointer relative border border-slate-200/80 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5"
                   >
                     <div
                       className="relative w-full h-full overflow-hidden rounded-lg"
@@ -197,7 +197,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                           src={item.video || item.image}
                           poster={item.poster}
                           onAspectRatio={ratio=>rememberRatio(item.id,ratio)}
-                          className="w-full h-full object-contain block rounded-lg bg-slate-100"
+                          className="w-full h-full object-contain block rounded-lg bg-slate-100 dark:bg-slate-800"
                         />
                       ) : (
                         <img
@@ -209,7 +209,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                           decoding="async"
                           referrerPolicy="no-referrer"
                           onError={(e) => handleImgError(e, item.image)}
-                          className="w-full h-full object-cover block transition-transform duration-300 group-hover:scale-[1.02] bg-slate-100"
+                          className="w-full h-full object-cover block transition-transform duration-500 ease-out group-hover:scale-[1.04] bg-slate-100 dark:bg-slate-800"
                         />
                       )}
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/55 to-transparent px-2.5 pb-2 pt-8 opacity-0 transition-opacity group-hover:opacity-100">

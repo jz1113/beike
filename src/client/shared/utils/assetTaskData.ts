@@ -1,4 +1,4 @@
-export type AssetMediaCategory = 'image' | 'video' | 'audio' | 'canvas';
+export type AssetMediaCategory = 'image' | 'video' | 'audio' | 'canvas' | 'all' | 'document';
 export type AssetTimeFilter = 'all' | 'today' | 'yesterday' | '7days' | '30days';
 
 export function getAssetTime(createdAt: unknown): number {
@@ -14,7 +14,7 @@ export function resolveAssetMediaType(mediaType: unknown, model: unknown, result
   }
   const path = String(resultUrl || '').split(/[?#]/)[0].toLowerCase();
   if (/\.(mp3|wav|m4a|aac|ogg|flac)$/.test(path)) return 'audio';
-  if (/\.(pdf|docx?|txt)$/.test(path)) return 'doc';
+  if (/\.(pdf|docx?|txt|md|markdown|pptx?)$/.test(path)) return 'doc';
   if (/\.(mp4|webm|mov|m4v)$/.test(path)) return 'video';
   if (/video|seedance|veo|kling|sora|minimax|h3|wan|vidu|omni_flash/i.test(String(model || ''))) return 'video';
   return 'image';
@@ -81,9 +81,9 @@ export async function loadAssetPollingPages<T>(pages: number[], load: (page: num
 
 export function getAssetDownloadExtension(mediaType: unknown, url: unknown): string {
   const extension = String(url || '').split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
-  if (extension && ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'mp4', 'webm', 'mov', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'pdf', 'docx'].includes(extension)) return extension;
+  if (extension && ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'mp4', 'webm', 'mov', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'pdf', 'docx', 'pptx', 'md', 'txt'].includes(extension)) return extension;
   if (mediaType === 'video' || mediaType === 'depth-video') return 'mp4';
   if (mediaType === 'audio') return 'mp3';
-  if (mediaType === 'doc') return 'pdf';
+  if (mediaType === 'doc' || mediaType === 'document') return 'md';
   return 'jpg';
 }

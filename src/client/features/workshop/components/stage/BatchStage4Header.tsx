@@ -80,28 +80,28 @@ export function BatchStage4Header({
     <div className="flex flex-wrap items-center justify-between gap-4 py-2">
       <div className="min-w-[180px] flex-1 space-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h2 className="text-sm font-semibold text-slate-900">{status}</h2>
-          <span className="text-xs text-slate-500">{successfulItems.length} 款商品 · 已出图 {displaySuccessCount} 张</span>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{status}</h2>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{successfulItems.length} 款商品 · 已出图 {displaySuccessCount} 张</span>
           {recoveryTaskCount > 0 && <span className="text-xs text-amber-700">待核对 {recoveryTaskCount} 张</span>}
           {displayFailCount > 0 && <span className="text-xs text-rose-600">失败 {displayFailCount} 张</span>}
         </div>
         {busy && totalTaskCount > 0 && <div className="flex max-w-sm items-center gap-3">
-          <div role="progressbar" aria-label="生图进度" aria-valuemin={0} aria-valuemax={totalTaskCount} aria-valuenow={Math.min(completedTaskCount, totalTaskCount)} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+          <div role="progressbar" aria-label="生图进度" aria-valuemin={0} aria-valuemax={totalTaskCount} aria-valuenow={Math.min(completedTaskCount, totalTaskCount)} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
             <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <span className="text-[11px] tabular-nums text-slate-500">{completedTaskCount}/{totalTaskCount}</span>
+          <span className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{completedTaskCount}/{totalTaskCount}</span>
         </div>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <div className="mr-1 flex rounded-xl border border-slate-200/60 bg-slate-100 p-1" role="group" aria-label="成图视图">
+        <div className="mr-1 flex rounded-xl border border-slate-200/60 bg-slate-100 p-1 dark:bg-white/10 dark:border-white/10" role="group" aria-label="成图视图">
           {([['single', '单品', Columns3], ['gallery', '画廊', ImageIcon]] as const).map(([value, label, Icon]) => (
-            <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${viewMode === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+            <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${viewMode === value ? 'bg-white text-slate-900 shadow-sm dark:text-slate-100 dark:bg-[#18191c]' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'}`}>
               <Icon className="h-3.5 w-3.5" />{label}
             </button>
           ))}
         </div>
         {!readOnly && busy && (runControlStatus === 'paused' ? onResumeRun : onPauseRun) && (
-          <button type="button" onClick={runControlStatus === 'paused' ? onResumeRun : onPauseRun} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={runControlStatus === 'paused' ? onResumeRun : onPauseRun} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]">
             {runControlStatus === 'paused' ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
             {runControlStatus === 'paused' ? '继续生成' : '暂停'}
           </button>
@@ -115,7 +115,7 @@ export function BatchStage4Header({
           {generateAllCopywriting && <button type="button" className={workshopMenuItemClass} disabled={!hasExportableSuccess || copyBusy} onClick={generateCopy}><Sparkles className="h-4 w-4" />{copyBusy ? '文案生成中…' : '批量生成文案'}</button>}
           {onBackToPrompts && <button type="button" className={workshopMenuItemClass} onClick={onBackToPrompts} disabled={busy}><ArrowLeft className="h-4 w-4" />返回修改提示词</button>}
           {onCompleteBatch && <button type="button" className={workshopMenuItemClass} onClick={onCompleteBatch} disabled={busy || copyBusy || pipelineStatus === 'completed'} title={busy ? '请等待生成结束后归档' : '归档当前批次，并开始空白新批次'}><CheckCircle2 className="h-4 w-4" />完成并归档本批次</button>}
-          {busy && onCancelRun && <div className="mt-1 border-t border-slate-100 pt-1"><button type="button" className={`${workshopMenuItemClass} text-rose-600`} onClick={onCancelRun}><Square className="h-4 w-4" />停止生成</button></div>}
+          {busy && onCancelRun && <div className="mt-1 border-t border-slate-100 pt-1 dark:border-white/10"><button type="button" className={`${workshopMenuItemClass} text-rose-600`} onClick={onCancelRun}><Square className="h-4 w-4" />停止生成</button></div>}
         </WorkshopActionMenu>}
       </div>
     </div>

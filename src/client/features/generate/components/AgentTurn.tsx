@@ -1,33 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { RotateCcw, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Bot,
-  Check,
-  Copy,
-  FileAudio,
-  FileText,
-  Film,
-  Presentation,
-  RotateCcw,
-  Sparkles,
-  Trash2,
-} from 'lucide-react';
+  Alert02Icon,
+  CheckmarkCircle02Icon,
+  Copy01Icon,
+  FileAudioIcon,
+  File01Icon,
+  Film01Icon,
+  Loading03Icon,
+  Presentation01Icon,
+  StopIcon,
+  Tick02Icon,
+  Wrench01Icon,
+} from '@hugeicons/core-free-icons';
 import type { GenerationTask } from '@client/store';
-import { useAppStore } from '@client/store';
-import { openAgentDocument } from '@client/shared/ui/agentDocumentBus';
-import AgentArtifactCard from './AgentArtifactCard';
-import {
-  agentArtifact,
-  agentMultimodalInsights,
-  parseAgentAttachments,
-  visibleAgentPrompt,
-  type ParsedAttachment,
-} from '../model/agentArtifact';
-
-const SUGGESTIONS = [
-  '你能帮我做哪些创作',
-  '根据刚才的结构扩写第二幕分镜',
-  '先生成一张概念图看看效果',
-];
+import { apiFetch } from '@client/shared/api/apiClient';
+import ThoughtLine from '@client/shared/ui/ThoughtLine';
+import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
+import { getApprovedModel } from '@shared/domain/models/modelCatalog';
+import type { ApprovalRequestItem, AssistantItem, ToolCallItem, ToolResultItem } from '@shared/domain/assistant/types';
+import { stopAgentTask } from '../engine/submitAgentTask';
+import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '../model/agentArtifact';
 
 interface Props {
   task: GenerationTask;
@@ -35,48 +30,46 @@ interface Props {
   onDelete: (task: GenerationTask) => void;
 }
 
+function relativeTime(createdAt: number | undefined, now: number): string {
+  if (!createdAt) return '';
+  const minutes = Math.floor(Math.max(0, now - createdAt) / 60_000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
+}
+
+function usedModelName(task: GenerationTask): string {
+  const id = task.agentTurn?.modelUsed || task.model || '';
+  if (!id) return '';
+  return getApprovedModel(id)?.shortName || id;
+}
+
 function AttachmentPill({ item }: { item: ParsedAttachment }) {
   if (item.kind === 'image') {
     return (
-      <div className="relative group overflow-hidden rounded-xl border border-black/10 bg-black/5 shadow-2xs">
-        <img
-          src={item.url}
-          alt={item.name}
-          className="h-20 w-20 object-cover transition-transform group-hover:scale-105"
-        />
-        <span className="absolute bottom-0 inset-x-0 truncate bg-black/60 px-1 py-0.5 text-[10px] text-white backdrop-blur-xs text-center">
-          参考图
-        </span>
+      <div className="group relative overflow-hidden rounded-xl border border-black/10 bg-black/5 shadow-2xs">
+        <img src={item.url} alt={item.name} className="h-20 w-20 object-cover transition-transform group-hover:scale-105" />
+        <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-center text-[10px] text-white backdrop-blur-xs">参考图</span>
       </div>
     );
   }
-
   if (item.kind === 'video') {
     return (
-      <div className="flex h-20 w-28 flex-col items-center justify-center rounded-xl border border-black/10 bg-slate-900 text-white shadow-2xs">
-        <Film className="h-6 w-6 text-cyan-400" />
-        <span className="mt-1 max-w-[90%] truncate text-[10px] text-slate-300">
-          {item.name}
-        </span>
+      <div className="flex h-20 w-28 flex-col items-center justify-center rounded-xl border border-black/10 bg-slate-900 text-white shadow-2xs dark:bg-white dark:text-slate-950">
+        <HugeiconsIcon icon={Film01Icon} size={22} className="text-cyan-400" />
+        <span className="mt-1 max-w-[90%] truncate text-[10px] text-slate-300">{item.name}</span>
       </div>
     );
   }
-
-  const iconMap = {
-    audio: <FileAudio className="h-4 w-4 text-emerald-600" />,
-    ppt: <Presentation className="h-4 w-4 text-amber-600" />,
-    word: <FileText className="h-4 w-4 text-indigo-600" />,
-    pdf: <FileText className="h-4 w-4 text-rose-600" />,
-    sheet: <FileText className="h-4 w-4 text-teal-600" />,
-    text: <FileText className="h-4 w-4 text-slate-600" />,
-    file: <FileText className="h-4 w-4 text-slate-600" />,
-  };
-
+  const icon = item.kind === 'audio' ? FileAudioIcon : item.kind === 'ppt' ? Presentation01Icon : File01Icon;
   return (
-    <div className="inline-flex max-w-[260px] items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-3 py-2 shadow-2xs">
-      <span className="shrink-0">{iconMap[item.kind] || iconMap.file}</span>
+    <div className="inline-flex max-w-[260px] items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-3 py-2 shadow-2xs dark:border-white/10 dark:bg-white/10">
+      <HugeiconsIcon icon={icon} size={16} className="shrink-0 text-slate-600 dark:text-slate-200" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium text-slate-800">{item.name}</p>
+        <p className="truncate text-xs font-medium text-slate-800 dark:text-slate-100">{item.name}</p>
         <p className="text-[10px] text-slate-400">
           {item.kind.toUpperCase()}
           {item.size ? ` · ${(item.size / 1024).toFixed(1)} KB` : ''}
@@ -86,26 +79,54 @@ function AttachmentPill({ item }: { item: ParsedAttachment }) {
   );
 }
 
+function ToolRow({ call, result }: { call: ToolCallItem; result?: ToolResultItem }) {
+  const status = result?.status || call.status;
+  const icon = status === 'running' ? Loading03Icon : status === 'error' ? Alert02Icon : CheckmarkCircle02Icon;
+  const tone = status === 'running' ? 'text-blue-600 dark:text-blue-400' : status === 'error' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400';
+  const label = status === 'running' ? '运行中' : status === 'error' ? '失败' : '完成';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="py-1 text-xs text-slate-500 dark:text-slate-400"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <HugeiconsIcon icon={Wrench01Icon} size={14} className="shrink-0 text-slate-400" />
+        <span className="min-w-0 truncate text-slate-700 dark:text-slate-200">{call.displayName || call.name || '工具'}</span>
+        <span className={`inline-flex shrink-0 items-center gap-1 ${tone}`}>
+          <HugeiconsIcon icon={icon} size={13} className={status === 'running' ? 'animate-spin' : ''} />
+          {label}
+        </span>
+      </div>
+      {result?.summary ? <p className="mt-1 line-clamp-2 pl-6 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{result.summary}</p> : null}
+    </motion.div>
+  );
+}
+
 export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const prompt = visibleAgentPrompt(task.prompt || '');
   const attachments = parseAgentAttachments(task);
-  const insights = agentMultimodalInsights(attachments);
-  const artifact = agentArtifact(task);
   const writing = task.status === 'IN_PROGRESS';
-
-  const reply = artifact
-    ? '收到！我已经结合你的构想与多模态素材进行了深度解析，把核心框架与分节执行草案整理如下。你可以点击查看完整文档，也可以继续追问进行局部调优。'
-    : '嗨！你来啦～今天想搞点什么？上传图片、视频、音频或方案文档，我随时帮你分析、出图或推演剧本。';
-
-  const fillSuggestion = (text: string) => {
-    useAppStore.getState().setQuickPrompt(text);
-  };
+  const items = task.agentTurn?.items || [];
+  const itemReply = items
+    .filter((item): item is Extract<AssistantItem, { kind: 'agentMessage' }> => item.kind === 'agentMessage' && Boolean(item.content?.trim()))
+    .map((item) => item.content.trim())
+    .join('\n\n');
+  const reply = itemReply || task.agentTurn?.reply?.trim() || '';
+  const statusText = task.agentTurn?.statusText?.trim();
+  const failure = task.status === 'FAILURE' ? task.failReason : '';
+  const stamp = relativeTime(task.createdAt, now);
+  const modelName = usedModelName(task);
 
   const copyReply = async () => {
     try {
-      const full = artifact ? `${reply}\n\n${artifact.markdown}` : reply;
-      await navigator.clipboard.writeText(full);
+      await navigator.clipboard.writeText(reply || failure || '');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -113,135 +134,136 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
     }
   };
 
+  const decide = async (approval: ApprovalRequestItem, decision: 'accept' | 'decline') => {
+    const turnId = task.agentTurn?.turnId || task.taskId;
+    if (!turnId) return;
+    await apiFetch('/api/assistant/turn/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turnId, approvalId: approval.approvalId, decision }),
+    }).catch(() => undefined);
+  };
+
+  const results = new Map(
+    items.filter((item): item is ToolResultItem => item.kind === 'toolResult').map((item) => [item.id, item]),
+  );
+
   return (
     <div className="w-full max-w-3xl space-y-6 py-2 select-text">
-      {/* 1. 用户消息端 (右对齐气泡 + 多模态输入附件卡片) */}
       <div className="flex flex-col items-end gap-2.5">
         {attachments.length > 0 && (
-          <div className="flex flex-wrap justify-end gap-2 max-w-[85%]">
+          <div className="flex max-w-[85%] flex-wrap justify-end gap-2">
             {attachments.map((item, idx) => (
               <AttachmentPill key={`${item.url}-${idx}`} item={item} />
             ))}
           </div>
         )}
-
         {(prompt || attachments.length === 0) && (
-          <div className="max-w-[80%] rounded-2xl bg-[#F2F3F5] px-4 py-2.5 text-sm leading-6 text-slate-900 shadow-2xs whitespace-pre-wrap select-text">
+          <div className="max-w-[80%] rounded-2xl bg-[#F2F3F5] px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap text-slate-900 shadow-2xs select-text dark:bg-white/10 dark:text-slate-100">
             {prompt || '（多模态素材解析）'}
           </div>
         )}
       </div>
 
-      {/* 2. Agent 智能体回复端 (左对齐 + 身份标识 + 分析感知 + 交付物卡片 + 操作栏) */}
-      <div className="space-y-4 pr-4">
-        {/* 头部身份指示 */}
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-2xs">
-            <Bot className="h-3.5 w-3.5" />
-          </div>
-          <span className="text-xs font-semibold text-slate-800">贝壳云图 Agent</span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-            {writing ? (
-              <>
-                <Sparkles className="h-3 w-3 animate-spin text-amber-500" />
-                正在构思与拆解…
-              </>
-            ) : (
-              '思考完成'
-            )}
-          </span>
-        </div>
-
-        {/* 多模态感知提炼报告 */}
-        {insights.length > 0 && (
-          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-1">
-            <p className="text-[11px] font-semibold text-blue-900 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-blue-600" />
-              多模态感知输入分析
-            </p>
-            {insights.map((msg, i) => (
-              <p key={i} className="text-xs text-blue-800/90 leading-relaxed">
-                {msg}
-              </p>
-            ))}
-          </div>
+      <div className="space-y-3 pr-4">
+        {writing && items.length === 0 && (
+          <ThoughtLine label={statusText || '正在思考…'} working collapseOnSettle={false} collapsible={false} fontSize={13.5} className="text-slate-600 dark:text-slate-300" />
         )}
 
-        {/* 文本回复 */}
-        <p className="text-sm leading-7 text-slate-800 whitespace-pre-wrap">
-          {reply}
-        </p>
-
-        {/* 产出物卡片 (MD / PPT / Word) */}
-        {artifact && (
-          <AgentArtifactCard
-            filename={artifact.filename}
-            kind={artifact.kind}
-            sizeLabel={artifact.sizeLabel}
-            writing={writing}
-            onOpen={() =>
-              openAgentDocument({
-                filename: artifact.filename,
-                content: artifact.markdown,
-                createdAt: typeof task.createdAt === 'number' ? task.createdAt : Date.now(),
-              })
+        <AnimatePresence initial={false}>
+          {items.map((item, index) => {
+            if (item.kind === 'toolResult' || item.kind === 'userMessage') return null;
+            if (item.kind === 'agentReasoning') {
+              const stillThinking = writing && !items.slice(index + 1).some((later) => later.kind === 'agentMessage' && later.content);
+              return (
+                <ThoughtLine
+                  key={item.id}
+                  label="正在思考…"
+                  doneLabel="已深度思考"
+                  working={stillThinking}
+                  collapseOnSettle
+                  fontSize={13.5}
+                  className="text-slate-700 dark:text-slate-200"
+                >
+                  {item.content ? (
+                    <p className="mt-2 max-h-60 overflow-y-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-slate-600 select-text dark:text-slate-300">{item.content}</p>
+                  ) : null}
+                </ThoughtLine>
+              );
             }
-          />
-        )}
+            if (item.kind === 'toolCall') {
+              const call = item as ToolCallItem;
+              return <ToolRow key={item.id} call={call} result={results.get(`${call.id}__result`)} />;
+            }
+            if (item.kind === 'approvalRequest') {
+              const approval = item as ApprovalRequestItem;
+              if (approval.status !== 'pending') return null;
+              return (
+                <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+                  <span>需要确认：{approval.displayName || approval.toolName}</span>
+                  <button type="button" className="rounded-lg bg-amber-600 px-2 py-1 text-white" onClick={() => void decide(approval, 'accept')}>允许</button>
+                  <button type="button" className="rounded-lg border border-amber-300 px-2 py-1" onClick={() => void decide(approval, 'decline')}>拒绝</button>
+                </div>
+              );
+            }
+            if (item.kind === 'agentMessage') {
+              const message = item as Extract<AssistantItem, { kind: 'agentMessage' }>;
+              if (!message.content?.trim()) return null;
+              const streaming = writing && index === items.findLastIndex((entry) => entry.kind === 'agentMessage');
+              return <MarkdownBody key={item.id} content={message.content} accentColor="slate" streaming={streaming} />;
+            }
+            return null;
+          })}
+        </AnimatePresence>
 
-        {/* 智能追问建议 */}
-        <div className="space-y-1.5 pt-1">
-          <p className="text-xs text-slate-400">你可以继续向 Agent 提问：</p>
-          <div className="flex flex-wrap gap-1.5">
-            {SUGGESTIONS.map((item) => (
+        {!itemReply && reply ? <MarkdownBody content={reply} accentColor="slate" streaming={writing} /> : null}
+
+        {failure ? <p className="text-sm leading-6 text-rose-600 dark:text-rose-400">{failure}</p> : null}
+
+        <div className="flex items-center gap-2.5 pt-0.5 text-xs text-slate-400 dark:text-slate-500">
+          {writing ? (
+            <button
+              type="button"
+              aria-label="停止"
+              title="停止"
+              onClick={() => stopAgentTask(task.id)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200"
+            >
+              <HugeiconsIcon icon={StopIcon} size={14} />
+            </button>
+          ) : (
+            <>
               <button
-                key={item}
                 type="button"
-                onClick={() => fillSuggestion(item)}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 shadow-2xs hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                aria-label="复制回答"
+                title="复制回答"
+                onClick={() => void copyReply()}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200"
               >
-                {item}
+                <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} className={copied ? 'text-emerald-600' : ''} />
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 底部操作与管理栏 (重新生成、复制、删除单条对话) */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onRegenerate(task)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
-              重新生成
-            </button>
-            <button
-              type="button"
-              aria-label="复制回答"
-              title="复制回答"
-              onClick={() => void copyReply()}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
-            >
-              {copied ? (
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-              ) : (
-                <Copy className="h-3.5 w-3.5 text-slate-500" />
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label="删除本轮对话"
-              title="删除本轮对话"
-              onClick={() => onDelete(task)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-400 shadow-2xs hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-colors cursor-pointer"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <span className="text-[11px] text-slate-400">内容由 AI 生成</span>
+              <button
+                type="button"
+                aria-label="重新生成"
+                title="重新生成"
+                onClick={() => onRegenerate(task)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label="删除"
+                title="删除"
+                onClick={() => onDelete(task)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-400/10 dark:hover:text-rose-300"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+          {stamp ? <span>{stamp}</span> : null}
+          {modelName ? <span className="truncate">{modelName}</span> : null}
         </div>
       </div>
     </div>

@@ -38,12 +38,12 @@ export function PosterCoverGallery({ items, isRunning, compact = false, onPrevie
     galleryRef.current?.scrollIntoView({ block: 'start' });
   };
   const pageControls = pageCount > 1 && (
-    <nav aria-label="封面清单分页" className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs text-slate-500">
+    <nav aria-label="封面清单分页" className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs text-slate-500 dark:text-slate-400">
       <span>共 {items.length} 条 · 第 {currentPage} / {pageCount} 页{editingId ? ' · 保存或取消标题后可翻页' : ''}</span>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1 || Boolean(editingId)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 hover:bg-slate-50 disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />上一页</button>
-        <select value={currentPage} onChange={(event) => changePage(Number(event.target.value))} disabled={Boolean(editingId)} aria-label="跳转到封面页" className="max-w-24 rounded-lg border border-slate-200 bg-white px-2 py-1.5 disabled:opacity-40">{Array.from({ length: pageCount }, (_, index) => <option key={index} value={index + 1}>第 {index + 1} 页</option>)}</select>
-        <button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === pageCount || Boolean(editingId)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 hover:bg-slate-50 disabled:opacity-40">下一页<ChevronRight className="h-3.5 w-3.5" /></button>
+        <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1 || Boolean(editingId)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 hover:bg-slate-50 disabled:opacity-40 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"><ChevronLeft className="h-3.5 w-3.5" />上一页</button>
+        <select value={currentPage} onChange={(event) => changePage(Number(event.target.value))} disabled={Boolean(editingId)} aria-label="跳转到封面页" className="max-w-24 rounded-lg border border-slate-200 bg-white px-2 py-1.5 disabled:opacity-40 dark:border-white/10 dark:bg-[#18191c]">{Array.from({ length: pageCount }, (_, index) => <option key={index} value={index + 1}>第 {index + 1} 页</option>)}</select>
+        <button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === pageCount || Boolean(editingId)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 hover:bg-slate-50 disabled:opacity-40 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]">下一页<ChevronRight className="h-3.5 w-3.5" /></button>
       </div>
     </nav>
   );

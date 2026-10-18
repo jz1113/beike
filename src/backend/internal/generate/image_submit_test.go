@@ -23,8 +23,8 @@ func TestImageRejectsEmptyPromptAndUnknownModel(t *testing.T) {
 		t.Fatalf("empty prompt %d %s", empty.Code, empty.Body.String())
 	}
 	unknown := httptest.NewRecorder()
-	handler.ServeHTTP(unknown, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"not-a-model"}`)))
-	if unknown.Code != http.StatusBadRequest || !strings.Contains(unknown.Body.String(), "模型 not-a-model 不在当前生图白名单中") {
+	handler.ServeHTTP(unknown, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"   "}`)))
+	if unknown.Code != http.StatusBadRequest || !strings.Contains(unknown.Body.String(), "模型名称不能为空") {
 		t.Fatalf("model %d %s", unknown.Code, unknown.Body.String())
 	}
 }
@@ -349,4 +349,25 @@ func TestLianchiEditUsesImageArrayField(t *testing.T) {
 func boundaryOf(contentType string) string {
 	_, value, _ := strings.Cut(contentType, "boundary=")
 	return strings.Trim(value, `"`)
+}
+
+func TestImageUpstreamRejectionReturns400WithSubmissionRejected(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"code":"invalid_request","message":"令牌不合法","type":"new_api_error"}}`))
+	}))
+	defer server.Close()
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"invalid-key","customBaseUrl":"`+server.URL+`"}`)))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request, got %d", response.Code)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, `"submissionRejected":true`) || !strings.Contains(body, "令牌不合法") {
+		t.Fatalf("expected submissionRejected and upstream error message, got %s", body)
+	}
 }

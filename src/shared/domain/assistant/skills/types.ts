@@ -14,6 +14,25 @@ export interface AssistantSkillReference {
   label?: string;
 }
 
+/** SKILL.md 以外的附属文件，运行时跟在主指令后面注入 */
+export interface AssistantSkillFile {
+  path: string;
+  content: string;
+}
+
+/** 技能工作室里填写的展示信息与默认模型 */
+export interface AssistantSkillMeta {
+  genres: string[];
+  tags: string[];
+  defaultVideoModel?: string;
+  defaultImageModel?: string;
+  coverUrl?: string;
+  showcaseUrls?: string[];
+  promptGuide?: string;
+  assetGuide?: string;
+  isPublic?: boolean;
+}
+
 export interface AssistantSkill {
   id: string;
   name: string;
@@ -43,6 +62,10 @@ export interface AssistantSkill {
   colorTheme?: string;
   /** 完整的 Markdown 文档，用于详情页展示 */
   markdownDoc?: string;
+  /** 除根目录 SKILL.md 以外的附属文件 */
+  files?: AssistantSkillFile[];
+  /** 封面、标签、默认模型等工作室信息 */
+  meta?: AssistantSkillMeta;
 }
 
 export interface ParsedSkillFile {

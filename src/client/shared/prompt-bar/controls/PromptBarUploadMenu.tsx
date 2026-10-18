@@ -166,10 +166,9 @@ export default function PromptBarUploadMenu({
         ref={menuRef}
         className={`absolute left-0 ${
           isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-        } w-[360px] sm:w-[400px] rounded-[22px] bg-white border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.12)] p-4 z-50 animate-fade-in text-left select-none`}
+        } w-[360px] sm:w-[400px] rounded-[22px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] p-4 z-50 animate-fade-in text-left select-none`}
       >
-        {/* 顶部提示语与可点击“从本地上传” */}
-        <div className="text-[13px] text-slate-700 pb-3 flex items-center flex-wrap gap-1">
+        <div className="text-[13px] text-slate-700 dark:text-slate-200 pb-3 flex items-center flex-wrap gap-1">
           <span>仅支持抖音、头条、西瓜，你也可以</span>
           <button
             type="button"
@@ -194,7 +193,7 @@ export default function PromptBarUploadMenu({
               if (e.key === 'Enter') handleConfirmUrl();
               if (e.key === 'Escape') setActiveView('main');
             }}
-            className="flex-1 px-4 py-2 rounded-full border border-slate-300 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 transition-all bg-white"
+            className="flex-1 px-4 py-2 rounded-full border border-slate-300 dark:border-white/15 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-slate-500 dark:focus:border-white/30 focus:ring-1 focus:ring-slate-400 transition-all bg-white dark:bg-white/5"
             autoFocus
           />
           <button
@@ -203,8 +202,8 @@ export default function PromptBarUploadMenu({
             disabled={!videoUrlText.trim()}
             className={`px-5 py-2 rounded-full text-xs font-medium transition-all ${
               videoUrlText.trim()
-                ? 'bg-slate-900 text-white hover:bg-black cursor-pointer shadow-xs'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                ? 'bg-slate-900 text-white hover:bg-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 cursor-pointer shadow-xs'
+                : 'bg-slate-100 text-slate-400 dark:bg-white/10 dark:text-slate-500 cursor-not-allowed'
             }`}
           >
             确认
@@ -220,44 +219,36 @@ export default function PromptBarUploadMenu({
       ref={menuRef}
       className={`absolute left-0 ${
         isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-      } w-[168px] sm:w-[176px] rounded-[22px] bg-white border border-slate-200/80 shadow-[0_16px_40px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] p-1.5 z-50 animate-fade-in text-left select-none`}
+      } w-[168px] sm:w-[176px] rounded-[22px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] p-1.5 z-50 animate-fade-in text-left select-none`}
     >
-      {/* 1. 本地上传 (无图6多余大图标，仅保留小圆点) */}
       <button
         type="button"
         onClick={() => {
           onClose();
           onTriggerLocalUpload();
         }}
-        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 hover:text-slate-950 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer group"
+        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 dark:text-slate-100 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 flex items-center transition-colors cursor-pointer"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
         <span>本地上传</span>
       </button>
 
-      {/* 2. 资产库 (点击调起资产库弹窗，无图6多余图标) */}
       <button
         type="button"
         onClick={() => {
           onClose();
           onOpenAssetLibrary();
         }}
-        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 hover:text-slate-950 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer group"
+        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 dark:text-slate-100 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 flex items-center transition-colors cursor-pointer"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
         <span>资产库</span>
       </button>
 
-      {/* 3. 视频链接上传 (右侧带 (i) 图标，点击切换图4输入浮层) */}
       <button
         type="button"
         onClick={() => setActiveView('videoUrl')}
-        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 hover:text-slate-950 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer group"
+        className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 dark:text-slate-100 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 flex items-center justify-between transition-colors cursor-pointer group"
       >
-        <div className="flex items-center gap-2.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
-          <span>视频链接上传</span>
-        </div>
+        <span>视频链接上传</span>
         <span title="支持抖音、头条、西瓜视频链接解析">
           <Info className="w-4 h-4 text-slate-400 group-hover:text-slate-600 stroke-[1.8] transition-colors" />
         </span>
@@ -273,36 +264,34 @@ export default function PromptBarUploadMenu({
           type="button"
           onClick={() => setShowPresetsSubmenu(!showPresetsSubmenu)}
           className={`w-full px-3 py-2 rounded-xl text-[13px] font-normal flex items-center justify-between transition-colors cursor-pointer group ${
-            showPresetsSubmenu ? 'bg-slate-50 text-slate-950' : 'text-slate-800 hover:text-slate-950 hover:bg-slate-50'
+            showPresetsSubmenu
+              ? 'bg-slate-50 dark:bg-white/10 text-slate-950 dark:text-white'
+              : 'text-slate-800 dark:text-slate-100 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10'
           }`}
         >
-          <div className="flex items-center gap-2.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors shrink-0" />
-            <span>预设提示词</span>
-          </div>
+          <span>预设提示词</span>
           <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 stroke-[1.8]" />
         </button>
 
         {/* 🌟 图 5：预设提示词二级面板 */}
         {showPresetsSubmenu && (
           <div
-            className={`absolute left-full top-0 ml-2 w-[340px] rounded-[24px] bg-white border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.14)] p-4 z-50 animate-fade-in text-left flex flex-col gap-3.5`}
+            className="absolute left-full top-0 ml-2 w-[340px] rounded-[24px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.14)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] p-4 z-50 animate-fade-in text-left flex flex-col gap-3.5"
           >
-            {/* 顶栏：标题 + 导入/导出小图标 (图5) */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-900">预设提示词</span>
-              <div className="flex items-center gap-1.5 text-slate-500">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">预设提示词</span>
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                 <button
                   type="button"
                   title="导入预设"
-                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                  className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 transition-colors cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
                   title="导出预设"
-                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                  className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 transition-colors cursor-pointer"
                 >
                   <Upload className="w-4 h-4" />
                 </button>
@@ -318,13 +307,13 @@ export default function PromptBarUploadMenu({
                   placeholder="搜索预设..."
                   value={presetSearch}
                   onChange={(e) => setPresetSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-slate-400 transition-all"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-full border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-white dark:focus:bg-white/10 focus:border-slate-400 dark:focus:border-white/25 transition-all"
                 />
               </div>
               <button
                 type="button"
                 onClick={handleCreateNewPreset}
-                className="px-3.5 py-1.5 rounded-full bg-black text-white text-xs font-medium hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                className="px-3.5 py-1.5 rounded-full bg-black text-white dark:bg-white dark:text-slate-900 text-xs font-medium hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>新建</span>
@@ -333,13 +322,13 @@ export default function PromptBarUploadMenu({
 
             {/* 新建预设简易录入框 */}
             {isCreatingPreset && (
-              <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 animate-fade-in">
+              <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-2 animate-fade-in">
                 <textarea
                   placeholder="输入自定义预设提示词内容..."
                   rows={2}
                   value={newPresetText}
                   onChange={(e) => setNewPresetText(e.target.value)}
-                  className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
+                  className="w-full p-2 text-xs bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
                   autoFocus
                 />
                 <div className="flex items-center justify-end gap-1.5">
@@ -349,7 +338,7 @@ export default function PromptBarUploadMenu({
                       setIsCreatingPreset(false);
                       setNewPresetText('');
                     }}
-                    className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-800 rounded cursor-pointer"
+                    className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-800 rounded cursor-pointer dark:hover:text-slate-100 dark:text-slate-400"
                   >
                     取消
                   </button>
@@ -357,7 +346,7 @@ export default function PromptBarUploadMenu({
                     type="button"
                     onClick={handleCreateNewPreset}
                     disabled={!newPresetText.trim()}
-                    className="px-3 py-1 text-xs font-medium bg-slate-900 text-white rounded-lg hover:bg-black disabled:opacity-40 cursor-pointer"
+                    className="px-3 py-1 text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-lg hover:bg-black dark:hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
                   >
                     保存预设
                   </button>
@@ -368,8 +357,8 @@ export default function PromptBarUploadMenu({
             {/* 内容区：如果无预设展现图 5 居中书本空态，否则展现列表 */}
             {customPresets.length === 0 && !presetSearch.trim() ? (
               <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-3">
-                <BookOpen className="w-7 h-7 text-slate-700 stroke-[1.6]" />
-                <span className="text-xs text-slate-500 font-normal">
+                <BookOpen className="w-7 h-7 text-slate-700 dark:text-slate-200 stroke-[1.6]" />
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">
                   暂无预设，点击新建创建第一个预设
                 </span>
               </div>
@@ -380,17 +369,17 @@ export default function PromptBarUploadMenu({
                     key={item.id}
                     type="button"
                     onClick={() => handleApplyPreset(item)}
-                    className="w-full p-2 rounded-xl text-left hover:bg-slate-50 transition-colors cursor-pointer group/item flex flex-col"
+                    className="w-full p-2 rounded-xl text-left hover:bg-slate-50 dark:hover:bg-white/10 transition-colors cursor-pointer group/item flex flex-col"
                   >
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-800 group-hover/item:text-slate-950">
+                      <span className="font-medium text-slate-800 dark:text-slate-100 group-hover/item:text-slate-950 dark:group-hover/item:text-white">
                         {item.title}
                       </span>
                       <span className="text-[10px] text-slate-400 font-normal">
                         {item.category}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-500 line-clamp-1 mt-0.5 font-normal">
+                    <span className="text-[11px] text-slate-500 line-clamp-1 mt-0.5 font-normal dark:text-slate-400">
                       {item.prompt}
                     </span>
                   </button>

@@ -16,18 +16,27 @@ function explicitWorkflowFlags(capability: ExplicitWorkflowCapability): Pick<Wor
 /** 把模态线路里设为默认的模型补进工作流列表。已有条目只确保启用，不改能力标签。 */
 export function upsertExplicitWorkflowModel(
   models: readonly WorkflowCapability[],
-  entry: { id: string; name?: string; capability: ExplicitWorkflowCapability },
+  entry: { id: string; name?: string; capability: ExplicitWorkflowCapability; providerId?: string },
 ): WorkflowCapability[] {
   const id = repairWorkflowModelId(entry.id.trim());
   if (!id) return [...models];
+  const providerId = entry.providerId?.trim() || undefined;
   const index = models.findIndex((model) => {
     const sameId = repairWorkflowModelId(upstreamModelId(model.id)).toLowerCase() === id.toLowerCase();
     const channel = model.channel || 'comfly';
     return sameId && channel !== 'deepseek' && channel !== 'openai';
   });
   if (index >= 0) {
-    if (models[index]?.enabled !== false) return [...models];
-    return models.map((model, itemIndex) => itemIndex === index ? { ...model, enabled: true } : model);
+    const current = models[index];
+    const providerChanged = (current?.providerId || undefined) !== providerId;
+    if (current?.enabled !== false && !providerChanged) return [...models];
+    return models.map((model, itemIndex) => {
+      if (itemIndex !== index) return model;
+      const next = { ...model, enabled: true };
+      if (providerId) next.providerId = providerId;
+      else delete next.providerId;
+      return next;
+    });
   }
   const name = entry.name?.trim() || id;
   return [{
@@ -37,6 +46,7 @@ export function upsertExplicitWorkflowModel(
     channel: 'comfly',
     enabled: true,
     isCustom: !isApprovedModel(id),
+    ...(providerId ? { providerId } : {}),
     ...explicitWorkflowFlags(entry.capability),
   }, ...models];
 }

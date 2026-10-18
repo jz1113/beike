@@ -1,3 +1,10 @@
 {
-  "files": []
+  "files": [
+    { "file": "src/client/shared/media/widgets/backgrounds/AeroShards.tsx", "lines": 2228 },
+    { "file": "src/client/shared/media/widgets/backgrounds/Beams.tsx", "lines": 678 },
+    { "file": "src/client/shared/media/widgets/backgrounds/DotGrid.tsx", "lines": 677 },
+    { "file": "src/client/shared/media/widgets/backgrounds/Galaxy.tsx", "lines": 657 },
+    { "file": "src/client/shared/media/widgets/backgrounds/LightRays.tsx", "lines": 634 },
+    { "file": "src/client/shared/media/widgets/backgrounds/Particles.tsx", "lines": 953 }
+  ]
 }

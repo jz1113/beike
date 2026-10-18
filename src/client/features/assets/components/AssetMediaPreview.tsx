@@ -26,7 +26,7 @@ function ImagePreview({ src, objectFit, width, title, onUnavailable }: Props & {
 
   if (failed || !src) {
     return (
-      <div role="img" aria-label="图片暂时无法加载" className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-100 p-3 text-center text-slate-500">
+      <div role="img" aria-label="图片暂时无法加载" className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-100 p-3 text-center text-slate-500 dark:text-slate-400 dark:bg-white/10">
         <ImageOff className="h-6 w-6 shrink-0" />
         <span className="text-[11px]">图片暂时无法加载</span>
       </div>
@@ -78,11 +78,11 @@ function AudioPreview({ src, title }: Props) {
   }, [attempt]);
   return (
     <>
-      <p className="w-full truncate text-center text-[11px] font-medium text-slate-700" title={title}>{title || '音频资产'}</p>
+      <p className="w-full truncate text-center text-[11px] font-medium text-slate-700 dark:text-slate-200" title={title}>{title || '音频资产'}</p>
       {failed ? (
         <div className="flex flex-col items-center gap-2">
-          <span role="status" className="text-[11px] text-slate-500">音频暂时无法加载</span>
-          <button type="button" onClick={event => { event.stopPropagation(); playRequested.current = false; setFailed(false); setAttempt(0); setRetry(previous => previous + 1); }} className="flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-200"><RotateCw className="h-3 w-3" />重新加载</button>
+          <span role="status" className="text-[11px] text-slate-500 dark:text-slate-400">音频暂时无法加载</span>
+          <button type="button" onClick={event => { event.stopPropagation(); playRequested.current = false; setFailed(false); setAttempt(0); setRetry(previous => previous + 1); }} className="flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-white/10 dark:bg-[#18191c]"><RotateCw className="h-3 w-3" />重新加载</button>
         </div>
       ) : (
         <audio
@@ -117,7 +117,7 @@ export default function AssetMediaPreview(props: Props) {
   const { src, className = '', audioControls = false } = props;
   const kind = getAssetMediaKind({ ...props, resultUrl: src });
   return (
-    <div className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-slate-100 ${className}`}>
+    <div className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-white/10 ${className}`}>
       {kind === 'image' ? (
         <ImagePreview key={src} {...props} />
       ) : kind === 'video' ? (
@@ -128,7 +128,7 @@ export default function AssetMediaPreview(props: Props) {
           {audioControls ? <AudioPreview key={src} {...props} /> : <span className="text-[11px]">音频资产</span>}
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-2 p-3 text-slate-500"><FileText className="h-7 w-7" /><span className="text-[11px]">文档资产</span></div>
+        <div className="flex flex-col items-center gap-2 p-3 text-slate-500 dark:text-slate-400"><FileText className="h-7 w-7" /><span className="text-[11px]">文档资产</span></div>
       )}
     </div>
   );

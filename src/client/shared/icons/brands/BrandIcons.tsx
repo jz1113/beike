@@ -12,7 +12,7 @@ export function ToolSuiteMark({
   className?: string;
 }) {
   return (
-    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-800 transition-transform group-hover:scale-105 ${className}`}>
+    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-800 transition-transform group-hover:scale-105 dark:bg-white/10 dark:text-slate-100 ${className}`}>
       {children}
     </span>
   );
@@ -223,7 +223,7 @@ export function TaobaoIcon({ className = "w-4 h-4" }: { className?: string }) {
         fill="#FFFFFF" 
         fontSize="12.5" 
         fontWeight="800" 
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+        fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', 'Source Han Sans SC', 'PingFang SC', sans-serif"
       >
         淘
       </text>

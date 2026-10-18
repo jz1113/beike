@@ -152,15 +152,15 @@ export function StorageProviderFieldsets(p: StorageProviderFieldsetsProps) {
 
           {/* 存储区域下拉 */}
           <div className="space-y-1">
-            <label htmlFor="qiniu-zone" className="block text-sm font-bold text-slate-900 select-none">
+            <label htmlFor="qiniu-zone" className="block text-sm font-bold text-slate-900 select-none dark:text-slate-100">
               存储区域
             </label>
-            <div className="relative flex items-center border-b border-slate-200/90 focus-within:border-slate-800 transition-colors">
+            <div className="relative flex items-center border-b border-slate-200/90 focus-within:border-slate-800 transition-colors dark:border-white/10">
               <select
                 id="qiniu-zone"
                 value={p.storageZone || 'z2'}
                 onChange={(e) => p.setStorageZone?.(e.target.value)}
-                className="storage-underline-input w-full bg-transparent border-0 px-0 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-0 leading-relaxed cursor-pointer appearance-none pr-8"
+                className="storage-underline-input w-full bg-transparent border-0 px-0 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-0 leading-relaxed cursor-pointer appearance-none pr-8 dark:text-slate-100"
               >
                 {QINIU_ZONES.map((zone) => (
                   <option key={zone.id} value={zone.id}>

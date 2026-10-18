@@ -23,7 +23,7 @@ export default function AssistantSessionMenu({ id, onClose }: { id: string; onCl
   const editRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     rootRef.current?.querySelector<HTMLButtonElement>('[aria-current="true"]')?.focus({ preventScroll: true });
-  }, []);
+  }, [rootRef]);
   useEffect(() => { if (editingId) { editRef.current?.focus(); editRef.current?.select(); } }, [editingId]);
   const restoreRowFocus = (sessionId: string) => requestAnimationFrame(() => {
     rootRef.current?.querySelectorAll<HTMLButtonElement>('.agent-session-select').forEach(button => {

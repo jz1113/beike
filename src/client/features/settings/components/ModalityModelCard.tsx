@@ -16,8 +16,10 @@ import {
 interface Props {
   kind: ModalityKind;
   model: ModalityModelItem;
-  globalBaseUrl: string;
-  globalApiKey: string;
+  inheritedBaseUrl: string;
+  inheritedApiKey: string;
+  channelName?: string;
+  channelMissing?: boolean;
   remoteModelCandidates: string[];
   onUpdate: (updates: Partial<ModalityModelItem>) => void;
   onSetDefault: () => void;
@@ -27,8 +29,10 @@ interface Props {
 export function ModalityModelCard({
   kind,
   model,
-  globalBaseUrl,
-  globalApiKey,
+  inheritedBaseUrl,
+  inheritedApiKey,
+  channelName,
+  channelMissing = false,
   remoteModelCandidates,
   onUpdate,
   onSetDefault,
@@ -44,13 +48,17 @@ export function ModalityModelCard({
     return () => window.removeEventListener('pointerdown', close);
   }, [showIdDropdown]);
 
-  // 格式化全局 Key 的掩码占位符
-  const inheritedKeyPlaceholder = globalApiKey
-    ? `${globalApiKey.slice(0, 3)}••••••••${globalApiKey.slice(-4)} (已继承全局)`
-    : 'sk-... (未设置全局Key)';
-  const inheritedUrlPlaceholder = globalBaseUrl
-    ? `${globalBaseUrl} (已继承全局)`
-    : 'https://... (未设置全局地址)';
+  const inheritLabel = channelMissing
+    ? '渠道已移除，已继承全局'
+    : model.channelId
+      ? `已继承渠道 ${channelName || '未命名渠道'}`
+      : '';
+  const inheritedKeyPlaceholder = inheritedApiKey
+    ? `${inheritedApiKey.slice(0, 3)}••••••••${inheritedApiKey.slice(-4)} (${inheritLabel || '已继承全局'})`
+    : `sk-... (${inheritLabel || '未设置全局Key'})`;
+  const inheritedUrlPlaceholder = inheritedBaseUrl
+    ? `${inheritedBaseUrl} (${inheritLabel || '已继承全局'})`
+    : `https://... (${inheritLabel || '未设置全局地址'})`;
 
   // 按模态智能过滤，避免跨模态混杂（如在绘画卡片内出现视频模型）
   const relevantCandidates = useMemo(() => {
@@ -100,7 +108,16 @@ export function ModalityModelCard({
           )}
           {model.isCustom && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/40">
-              自定义
+              已同步
+            </span>
+          )}
+          {(model.isCustom || model.channelId) && (
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+              channelMissing
+                ? 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/40'
+                : 'bg-slate-100 text-slate-600 border-slate-200/80 dark:bg-white/10 dark:text-slate-300 dark:border-white/10'
+            }`}>
+              {channelMissing ? '渠道已移除' : (channelName || '全局默认')}
             </span>
           )}
         </div>
@@ -117,14 +134,15 @@ export function ModalityModelCard({
             </button>
           )}
 
-          {model.isCustom && onRemove && (
+          {onRemove && (
             <button
               type="button"
               onClick={onRemove}
-              className="text-[11px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-              title="删除该自定义模型"
+              className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+              title="解除该模型的同步接入"
             >
               <Trash2 className="w-3 h-3" />
+              <span className="hidden sm:inline">解除同步</span>
             </button>
           )}
         </div>

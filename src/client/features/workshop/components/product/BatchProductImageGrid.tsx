@@ -69,7 +69,7 @@ function BatchProductImageGrid({
     return (
       <div className={gridClass}>
         {Array.from({ length: Math.min(8, images.length) }).map((_, i) => (
-          <div key={i} className="aspect-square rounded-2xl bg-slate-100 animate-pulse" />
+          <div key={i} className="aspect-square rounded-2xl bg-slate-100 animate-pulse dark:bg-white/10" />
         ))}
       </div>
     );

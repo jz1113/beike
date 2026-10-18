@@ -13,7 +13,7 @@ export default function CollectorMediaGallery({ singleCollectedResult, singleIma
                         key={videoUrl}
                         className={`group relative aspect-square rounded-2xl overflow-hidden border bg-slate-900 col-span-2 sm:col-span-2 cursor-pointer transition-all ${selectedVideo
                             ? 'border-blue-500 ring-2 ring-blue-500/30 shadow-xs'
-                            : 'border-rose-200 ring-1 ring-rose-100'
+                            : 'border-slate-200/90 dark:border-white/10 ring-1 ring-slate-100/50 dark:ring-white/5'
                           }`}
                         onClick={() => setSelectedVideo(v => !v)}
                       >
@@ -69,9 +69,9 @@ export default function CollectorMediaGallery({ singleCollectedResult, singleIma
                                 setSelectedSingleImages(prev => [...prev, imgUrl]);
                               }
                             }}
-                            className={`group relative aspect-square rounded-2xl overflow-hidden border cursor-pointer transition-all bg-slate-100 ${isSelected
+                            className={`group relative aspect-square rounded-2xl overflow-hidden border cursor-pointer transition-all bg-slate-100 dark:bg-white/5 ${isSelected
                                 ? 'border-blue-500 ring-2 ring-blue-500/30 shadow-xs'
-                                : 'border-slate-200 hover:border-slate-300'
+                                : 'border-slate-200/90 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
                               }`}
                           >
                             <img

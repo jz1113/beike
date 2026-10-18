@@ -21,12 +21,12 @@ export function DeconstructCategoryPicker({
     .sort((a, b) => a.position - b.position);
   const subcategories = deconstructSubcategoryOptions(value, categories);
   const controlClass = 'flex min-w-0 flex-col gap-1.5';
-  const selectClass = 'h-10 w-full min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-400';
+  const selectClass = 'h-10 w-full min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-400 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]';
 
   return (
     <>
       <label className={controlClass}>
-        <span className="text-[11px] font-medium text-slate-500">归档大类</span>
+        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">归档大类</span>
         <select
           aria-label="反推商品大类"
           value={value}
@@ -41,7 +41,7 @@ export function DeconstructCategoryPicker({
         </select>
       </label>
       <label className={controlClass}>
-        <span className="text-[11px] font-medium text-slate-500">子文件夹</span>
+        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">子文件夹</span>
         <select
           aria-label="反推二级文件夹"
           value={subcategory}

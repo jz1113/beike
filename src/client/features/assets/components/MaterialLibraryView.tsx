@@ -9,6 +9,8 @@ import MaterialFloatingDock from './MaterialFloatingDock';
 import MaterialAssetCard from './MaterialAssetCard';
 import MaterialLibraryToolbar from './MaterialLibraryToolbar';
 import { groupTasksByTimeline, filterMaterialTasks } from '../model/materialTimeline';
+import { getAssetMediaKind } from '../model/assetMedia';
+import { openAgentDocument } from '@client/shared/ui/agentDocumentBus';
 
 interface Props {
   sessions: ChatSession[];
@@ -88,7 +90,7 @@ export default function MaterialLibraryView({
       statusFilter: 'all',
       timeFilter: 'all',
     });
-  }, [mergedTasks, sourceType, mediaCategory, searchInput, sortOrder, locale]);
+  }, [mergedTasks, sourceType, mediaCategory, searchInput, sortOrder]);
 
   // 按日期时间分组
   const timelineGroups = useMemo(
@@ -108,7 +110,7 @@ export default function MaterialLibraryView({
     const items: ProjectFolderItem[] = [];
 
     for (const s of sessions) {
-      const count = sessionCountMap.get(s.id) || s.tasks?.length || 0;
+      const count = sessionCountMap.get(s.id) || 0;
       items.push({
         id: s.id,
         title: s.title || '新创作对话',
@@ -178,6 +180,15 @@ export default function MaterialLibraryView({
   }, []);
 
   const handleCardClick = useCallback((task: MergedAssetTask) => {
+    if (getAssetMediaKind(task) === 'document') {
+      const title = (task.title || task.prompt || 'AI交付方案').replace(/[\\/:*?"<>|]/g, '').slice(0, 24);
+      openAgentDocument({
+        filename: `${title}.md`,
+        content: task.prompt || '方案内容',
+        createdAt: typeof task.createdAt === 'number' ? task.createdAt : Date.now(),
+      });
+      return;
+    }
     const valid = flatTasks.filter((t) => t.resultUrl && t.status !== 'FAILURE');
     setPreviewTask(task, valid.length > 0 ? valid : [task]);
   }, [flatTasks, setPreviewTask]);
@@ -298,7 +309,7 @@ export default function MaterialLibraryView({
             <div className="space-y-7 pb-24 pt-1">
               {timelineGroups.map((group) => (
                 <section key={group.key} className="space-y-3">
-                  <h2 className="text-xl font-bold tracking-tight text-slate-900 select-none">
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white select-none">
                     {group.label}
                   </h2>
 

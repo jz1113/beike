@@ -1,3 +1,7 @@
+import { API_PROVIDERS_STORAGE_KEY } from '@shared/domain/models/modalityStorage';
+
+export { API_PROVIDERS_STORAGE_KEY };
+
 export type ApiProviderProtocol = 'gemini' | 'openai' | 'anthropic' | 'custom';
 
 export interface ApiProvider {
@@ -116,7 +120,6 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
   },
 ];
 
-export const API_PROVIDERS_STORAGE_KEY = 'beike_api_providers_v2';
 export const API_REMOVED_PROVIDERS_KEY = 'beike_api_removed_providers_v2';
 const DEPRECATED_PROVIDER_IDS = new Set(['mita', 'soonstudio', 'google']);
 

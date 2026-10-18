@@ -112,7 +112,7 @@ export default function BatchImageSelectionPanel({
   }
 
   return (
-    <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/70 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] overflow-hidden h-[calc(100vh-175px)] min-h-[520px] max-h-[960px] flex flex-col transition-all duration-300">
+    <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/70 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] overflow-hidden h-[calc(100vh-175px)] min-h-[520px] max-h-[960px] flex flex-col transition-all duration-300 dark:border-white/10 dark:bg-[#18191c]/95">
       {/* ===== 纯净独占全宽：当前商品选图大画幅核心区 ===== */}
       <BatchSelectionDetail
         currentItem={currentItem}

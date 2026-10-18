@@ -11,6 +11,7 @@ import {
   getApprovedModel,
 } from '@shared/domain/models/modelCatalog';
 import { deepSeekModel, deepSeekRouteId, isDeepSeekRoute, deepSeekModelId } from './deepseek';
+import { channelBadge, channelDisplayName } from './modelChannels';
 import { domainStorage } from '../core/runtime';
 import { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
 import { parseWorkflowModelList, isValidWorkflowModelList } from './workflowModelStorage';
@@ -102,9 +103,9 @@ export function repairWorkflowModelList(value: unknown): WorkflowCapability[] {
       continue;
     }
     if (!isApprovedModel(canonicalId)) {
-      const keepCustom = item.isCustom === true && (item.isImage === true || item.isVideo === true || item.isMultimodal === true || item.isVision === true);
+      const hasCapability = item.isImage === true || item.isVideo === true || item.isMultimodal === true || item.isVision === true || item.isCustom === true;
       const customKey = canonicalId.toLowerCase();
-      if (!keepCustom || seen.has(customKey)) continue;
+      if (!hasCapability || seen.has(customKey)) continue;
       seen.add(customKey);
       repaired.push(normalizeWorkflowModel({ ...item, id: canonicalId, routeId: undefined, channel: item.channel || 'comfly', enabled: item.enabled !== false, isCustom: true, name: item.name || canonicalId, shortName: item.shortName || item.name || canonicalId }));
       continue;
@@ -206,7 +207,7 @@ export function repairWorkflowModelsForSettings(value?: unknown) {
       isAssistant: m.isAssistant ?? caps.isAssistant,
       isDistill: m.isDistill,
       isThinking: m.isThinking ?? caps.isThinking,
-      isCustom: m.isCustom ?? true,
+      isCustom: m.isCustom ?? true, ...(m.providerId ? { providerId: m.providerId } : {}),
     };
   });
 }
@@ -344,7 +345,7 @@ export function getEnabledImageModelsFromSettings(
   const seen = new Set<string>();
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
-    .filter((m) => m.enabled !== false && m.isImage && (isApprovedModel(m.id, 'image') || m.isCustom === true))
+    .filter((m) => m.enabled !== false && m.isImage)
     .filter((m) => {
       const key = m.id.toLowerCase();
       if (seen.has(key)) return false;
@@ -375,7 +376,7 @@ export function getEnabledVideoModelsFromSettings(
 ) {
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
-    .filter((m) => m.enabled !== false && m.isVideo && (isApprovedModel(m.id, 'video') || m.isCustom === true))
+    .filter((m) => m.enabled !== false && m.isVideo)
     .map((m) => {
       const builtin = VIDEO_GEN_MODELS.find((x) => x.id === getApprovedModel(m.id)?.id);
       return {
@@ -393,6 +394,29 @@ export function getEnabledVideoModelsFromSettings(
     });
 }
 
+/** 设置中属于「音频」的模型 → Hub 音频列表 */
+export function getEnabledAudioModelsFromSettings(models?: WorkflowCapability[]) {
+  const seen = new Set<string>();
+  const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
+  return list
+    .filter((m) => m.enabled !== false && (m.isAudio || inferWorkflowCapabilitiesFromId(m.id).isAudio))
+    .filter((m) => {
+      const key = m.id.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((m) => ({
+      id: m.id,
+      name: m.name || m.id,
+      shortName: m.shortName || m.name || m.id,
+      provider: providerGuess(m.id),
+      badge: m.badge,
+      description: m.desc || m.description || '',
+      modelId: m.id,
+    }));
+}
+
 /** 设置中勾选「多模态」的模型 → 助手 / 提示词工作室 */
 export function getEnabledMultimodalModelsFromSettings(
   models?: WorkflowCapability[],
@@ -402,12 +426,12 @@ export function getEnabledMultimodalModelsFromSettings(
   return sortModelsByMultimodalPriority(
     list.filter((m) => m.enabled !== false && (m.channel === 'deepseek'
       ? !!deepSeekModel(m.id) && (purpose === 'assistant' ? !!m.isAssistant : !!m.isVision)
-      : isMultimodalWorkflowModel(m) && (isApprovedModel(m.id, 'multimodal') || m.isCustom === true)))
+      : isMultimodalWorkflowModel(m)))
       .map((m) => ({ ...m, id: workflowModelRouteId(m),
-        name: `${m.name || m.id} · ${m.channel === 'deepseek' ? 'DeepSeek 官方' : m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道'}`,
-        shortName: `${m.shortName || m.id} · ${m.channel === 'deepseek' ? '官方' : m.channel === 'openai' ? 'OpenAI' : 'Comfly'}`,
+        name: `${m.name || m.id} · ${channelDisplayName(m.channel || 'comfly')}`,
+        shortName: `${m.shortName || m.id} · ${channelBadge(m.channel || 'comfly')}`,
         badge: m.channel === 'deepseek' && !deepSeekModel(m.id)?.vision ? '仅文本' : m.badge,
-        provider: m.channel === 'deepseek' ? 'DeepSeek 官方' : m.channel === 'openai' ? 'OpenAI 渠道' : 'Comfly 渠道',
+        provider: channelDisplayName(m.channel || 'comfly'),
       })),
   );
 }

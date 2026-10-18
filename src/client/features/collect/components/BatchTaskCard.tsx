@@ -58,28 +58,28 @@ const BatchTaskCard = memo(function BatchTaskCard({
             alt=""
             referrerPolicy="no-referrer"
             onError={(e) => handleImgError(e, task.coverImage)}
-            className="w-9 h-9 rounded-xl object-cover border border-slate-200 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+            className="w-9 h-9 rounded-xl object-cover border border-slate-200 dark:border-white/10 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
           />
           </button>
         ) : (
-          <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 uppercase flex-shrink-0 text-[10px]">
+          <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300 uppercase flex-shrink-0 text-[10px]">
             {task.platform}
           </div>
         )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
-            <span className="font-bold text-slate-900 break-words whitespace-normal leading-snug">
+            <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal leading-snug">
               {task.title || task.url}
             </span>
             {task.images && (
-              <span className="px-1.5 py-0.2 rounded-md bg-blue-50 text-blue-700 text-[10px] font-mono font-bold shrink-0">
+              <span className="px-1.5 py-0.2 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-mono font-bold shrink-0">
                 {task.images.length} 张图
               </span>
             )}
           </div>
           {task.status === 'failed' && task.error && (
-            <p className="text-[11px] text-rose-600 break-words mt-0.5" role="alert">
+            <p className="text-[11px] text-rose-600 dark:text-rose-400 break-words mt-0.5" role="alert">
               失败原因: {task.error}
             </p>
           )}
@@ -89,18 +89,18 @@ const BatchTaskCard = memo(function BatchTaskCard({
       {/* 状态徽标与单项操作 */}
       <div className="flex items-center gap-2 flex-shrink-0" role="status" aria-live="polite">
         {task.status === 'pending' && (
-          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+          <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-xs font-medium">
             等待中
           </span>
         )}
         {task.status === 'running' && (
-          <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1">
+          <span className="px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 text-xs font-bold flex items-center gap-1">
             <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
             <span>采集解析中...</span>
           </span>
         )}
         {task.status === 'success' && (
-          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1">
+          <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-xs font-bold flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
             <span>采集成功</span>
           </span>
@@ -111,7 +111,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
             onClick={handleRetry}
             disabled={retryDisabled}
             title={retryDisabled ? '请等待本轮采集结束后重试' : '重新采集此任务'}
-            className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 text-xs font-bold flex items-center gap-1 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={`重新采集任务 ${task.title || task.url}`}
           >
             <RefreshCw className="w-3 h-3" aria-hidden="true" />
@@ -124,7 +124,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
           <button
             type="button"
             onClick={handleDownload}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
             aria-label={`下载 ${task.title || '商品'} ZIP`}
             title="单独下载该商品 ZIP"
           >
@@ -136,7 +136,7 @@ const BatchTaskCard = memo(function BatchTaskCard({
         <button
           type="button"
           onClick={handleRemove}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+          className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
           aria-label="移除此任务"
         >
           <X className="w-3.5 h-3.5" aria-hidden="true" />

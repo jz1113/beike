@@ -9,9 +9,10 @@ import {
   saveStoredModalityGlobalConfig,
   appendImportedModalityModels,
   loadStoredModalityModels,
+  planModalityChannelSync,
   saveStoredModalityModels,
+  resetStoredModalityModels,
 } from '../model/modalityModelStorage';
-import { apiFetch } from '@client/shared/api/apiClient';
 import { inferVendorFromModelId } from '../model/modalityMeta';
 import {
   modalityHasWorkflowPool,
@@ -28,6 +29,7 @@ const MODALITY_LABEL: Record<ModalityKind, string> = {
   three_d: '3D',
   music: '音乐',
   voice: '语音',
+  avatar: '数字人',
 };
 
 export function useModalityModels(kind: ModalityKind, showToast: (msg: string) => void) {
@@ -37,19 +39,15 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
   // 2. 当前模态模型列表
   const [models, setModels] = useState<ModalityModelItem[]>(() => loadStoredModalityModels(kind));
 
-  // 3. 远端拉取到的模型列表（用于下拉补全与导入）
-  const [remoteModels, setRemoteModels] = useState<string[]>([]);
-  const [isSyncingRemote, setIsSyncingRemote] = useState(false);
-
-  // 4. 当前聚焦的模型 ID（用于单卡片聚焦控制台）
+  // 3. 当前聚焦的模型 ID（用于单卡片聚焦控制台）
   const [focusedModelId, setFocusedModelId] = useState<string>('');
   const registerTimer = useRef<number | null>(null);
 
-  const publishDefault = useCallback((model: Pick<ModalityModelItem, 'modelId' | 'name'>, registerNow: boolean) => {
+  const publishDefault = useCallback((model: Pick<ModalityModelItem, 'modelId' | 'name' | 'channelId'>, registerNow: boolean) => {
     const storedId = writeModalityDefaultKey(kind, model.modelId);
     if (!storedId || !modalityHasWorkflowPool(kind)) return;
     const run = () => {
-      registerWorkflowDefault(kind, { modelId: storedId, name: model.name });
+      registerWorkflowDefault(kind, { modelId: storedId, name: model.name, channelId: model.channelId });
       notifyWorkflowModels(kind);
     };
     if (registerTimer.current !== null) window.clearTimeout(registerTimer.current);
@@ -177,6 +175,7 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
       }
       const next = prev.map(m => m.id === modelId ? nextModel : m);
       saveStoredModalityModels(kind, next);
+      notifyWorkflowModels(kind);
       return next;
     });
     const changedDefault = changedDefaults[0];
@@ -199,57 +198,27 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
     showToast(`已将「${targetModel.name}」(${modelId}) 设为当前${MODALITY_LABEL[kind]}默认模型`);
   }, [kind, publishDefault, showToast]);
 
-  // 删除自定义模型
+  // 解除该模型的同步。官方种子和自定义模型都可移除。
   const removeModel = useCallback((modelId: string) => {
+    let fallbackDefault: ModalityModelItem | undefined;
     setModels(prev => {
       const target = prev.find(m => m.id === modelId);
-      if (!target?.isCustom) return prev;
-      const next = prev.filter(m => m.id !== modelId);
+      if (!target) return prev;
+      let next = prev.filter(m => m.id !== modelId);
+      // 如果删除的是默认模型，平滑指定下一个有效模型为默认
+      if (target.isDefault && next.length > 0) {
+        fallbackDefault = next.find(m => !m.isCustom) || next[0];
+        next = next.map(m => ({ ...m, isDefault: m.id === fallbackDefault?.id }));
+      }
       saveStoredModalityModels(kind, next);
+      notifyWorkflowModels(kind);
       return next;
     });
-    showToast('已移除该自定义模型');
-  }, [kind, showToast]);
-
-  // 🔄 同步模型（从远端拉取）
-  const syncRemoteModels = useCallback(async () => {
-    const targetUrl = globalConfig.baseUrl.trim();
-    const targetKey = globalConfig.apiKey.trim();
-    if (!targetUrl) {
-      showToast('请先配置全局地址');
-      return;
+    if (fallbackDefault) {
+      publishDefault(fallbackDefault, true);
     }
-    setIsSyncingRemote(true);
-    try {
-      const response = await apiFetch('/api/system/models/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: targetUrl,
-          apiKey: targetKey,
-          strict: false,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data?.models && Array.isArray(data.models)) {
-        const extractedIds: string[] = [];
-        for (const m of data.models) {
-          if (typeof m === 'string') extractedIds.push(m);
-          else if (m && typeof m.id === 'string') extractedIds.push(m.id);
-        }
-        const unique = Array.from(new Set(extractedIds));
-        setRemoteModels(unique);
-        showToast(`成功同步远端模型目录，发现 ${unique.length} 个模型`);
-      } else {
-        const errorMsg = data?.error || data?.warning || '同步失败，请检查地址与密钥';
-        showToast(`模型同步提示：${errorMsg}`);
-      }
-    } catch {
-      showToast('同步网络连接失败，请检查网络或跨域设置');
-    } finally {
-      setIsSyncingRemote(false);
-    }
-  }, [globalConfig.baseUrl, globalConfig.apiKey, showToast]);
+    showToast('已解除该模型的同步');
+  }, [kind, publishDefault, showToast]);
 
   const addCustomModel = useCallback((remoteModelId: string, customName?: string, vendor?: string) => {
     const trimmedId = remoteModelId.trim();
@@ -264,6 +233,7 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
       createdId = planned.firstId;
       if (!planned.added) return prev;
       saveStoredModalityModels(kind, planned.models);
+      notifyWorkflowModels(kind);
       return planned.models;
     });
     if (!createdId) return;
@@ -271,23 +241,72 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
     showToast(`已添加模型「${customName?.trim() || trimmedId}」`);
   }, [kind, showToast]);
 
-  const batchAddModels = useCallback((entries: Array<{ modelId: string; vendor?: string }>) => {
+  const batchAddModels = useCallback((
+    entries: Array<{ modelId: string; vendor?: string }>,
+    channelId = '',
+    channelName = '',
+  ) => {
     let added = 0;
     let skipped = 0;
     let firstId = '';
     setModels(prev => {
-      const planned = appendImportedModalityModels(prev, kind, entries);
+      const planned = appendImportedModalityModels(prev, kind, entries, channelId, channelName);
       added = planned.added;
       skipped = planned.skipped;
       firstId = planned.firstId;
       if (!planned.added) return prev;
       saveStoredModalityModels(kind, planned.models);
+      notifyWorkflowModels(kind);
       return planned.models;
     });
     if (firstId) setFocusedModelId(firstId);
     if (added) showToast(skipped ? `已同步 ${added} 个模型，${skipped} 个未能识别厂商` : `已同步 ${added} 个模型到对应厂商`);
     else showToast(skipped ? `${skipped} 个模型未能识别厂商，未导入` : '所选模型已在列表中');
   }, [kind, showToast]);
+
+  // 只改当前渠道：勾选的导入，取消勾选的自定义模型解除同步。计数在纯函数里算完，避免重复执行时翻倍。
+  const batchSyncModels = useCallback((
+    selectedModelIds: string[],
+    candidateEntries: Array<{ modelId: string; vendor?: string }>,
+    channelId = '',
+    channelName = '',
+  ) => {
+    let planned: ReturnType<typeof planModalityChannelSync> | undefined;
+    setModels(prev => {
+      const next = planModalityChannelSync(prev, kind, channelId, selectedModelIds, candidateEntries, channelName);
+      planned = next;
+      if (!next.added && !next.removed && !next.fallbackDefault) return prev;
+      saveStoredModalityModels(kind, next.models);
+      notifyWorkflowModels(kind);
+      return next.models;
+    });
+    if (!planned) return;
+    if (planned.fallbackDefault) publishDefault(planned.fallbackDefault, true);
+    const where = channelName ? `到「${channelName}」` : '';
+    const from = channelName ? `从「${channelName}」` : '';
+    if (planned.added > 0 && planned.removed > 0) {
+      showToast(`已同步接入 ${planned.added} 个模型${where}，并解除 ${planned.removed} 个模型的同步`);
+    } else if (planned.added > 0) {
+      showToast(from ? `已${from}同步接入 ${planned.added} 个模型` : `已同步接入 ${planned.added} 个模型`);
+    } else if (planned.removed > 0) {
+      showToast(`已解除 ${planned.removed} 个已同步模型的接入`);
+    } else {
+      showToast('模型接入列表未发生变动');
+    }
+  }, [kind, publishDefault, showToast]);
+
+  // 一键恢复官方默认（解除全部已同步自定义模型）
+  const resetToDefaultModels = useCallback(() => {
+    const defaults = resetStoredModalityModels(kind);
+    setModels(defaults);
+    const defaultItem = defaults.find(m => m.isDefault) || defaults[0];
+    if (defaultItem) {
+      setFocusedModelId(defaultItem.id);
+      publishDefault(defaultItem, true);
+    }
+    notifyWorkflowModels(kind);
+    showToast(`已恢复${MODALITY_LABEL[kind]}官方默认模型，已解除全部渠道同步的模型`);
+  }, [kind, publishDefault, showToast]);
 
   // 统计模型数量
   const countSummary = useMemo(() => {
@@ -314,9 +333,8 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
     removeModel,
     addCustomModel,
     batchAddModels,
-    remoteModels,
-    isSyncingRemote,
-    syncRemoteModels,
+    batchSyncModels,
+    resetToDefaultModels,
     countSummary,
   };
 }

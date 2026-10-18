@@ -32,17 +32,7 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		if !videoPollReady(data) {
 			continue
 		}
-		parsed := readVideoPoll(data)
-		if parsed.status == "SUCCESS" || parsed.status == "FAILURE" {
-			if db, err := openTaskDB(cfg); err == nil {
-				updateTaskTerminal(r.Context(), db, taskID, parsed.status, parsed.result, parsed.reason)
-				_ = db.Close()
-			}
-		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"success": true, "taskId": taskID, "status": parsed.status, "progress": parsed.progress,
-			"resultUrl": parsed.result, "failReason": parsed.reason,
-		})
+		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, readVideoPoll(data), data))
 		return
 	}
 	writeProbeMiss(cfg, w, r, taskID, "视频任务失败", "暂时无法查询云端视频任务状态")

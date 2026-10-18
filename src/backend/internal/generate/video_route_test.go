@@ -37,8 +37,8 @@ func TestVideoBodyMatchesContract(t *testing.T) {
 func TestVideoRejectsUnknownModel(t *testing.T) {
 	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/video", strings.NewReader(`{"prompt":"海边","model":"not-a-video"}`)))
-	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "模型 not-a-video 不在当前生视频白名单中") {
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/video", strings.NewReader(`{"prompt":"海边","model":"   "}`)))
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "String must contain at least 1 character(s)") {
 		t.Fatalf("model %d %s", response.Code, response.Body.String())
 	}
 }

@@ -209,11 +209,20 @@ func navigateTool(target, reason string) string {
 }
 
 func toolJSON(success bool, message string) string {
+	return toolOutcome(success, "", message)
+}
+
+func toolOutcome(success bool, outcome, message string) string {
+	payload := map[string]any{"success": success}
 	key := "message"
 	if !success {
 		key = "error"
 	}
-	body, _ := json.Marshal(map[string]any{"success": success, key: message})
+	payload[key] = message
+	if outcome != "" {
+		payload["outcome"] = outcome
+	}
+	body, _ := json.Marshal(payload)
 	return string(body)
 }
 

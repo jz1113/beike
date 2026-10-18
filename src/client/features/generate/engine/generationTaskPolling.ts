@@ -14,8 +14,21 @@ import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { classifyGenerationPollResult, isTransientPollError, accumulateTransientPollFailure } from '@client/shared/api/generation/generationErrors';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
+import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
 
 const pollingTaskIds = new Set<string>();
+
+function recordFinishedTaskUsage(task: GenerationTask, data: { taskId?: unknown; usage?: unknown } | null) {
+  const reportedId = typeof data?.taskId === 'string' ? data.taskId : '';
+  recordMediaTaskUsage({
+    taskId: reportedId || task.taskId,
+    modelId: task.model || 'unknown',
+    type: task.mediaType === 'audio' ? 'audio' : isVideoTask(task) ? 'video' : 'image',
+    mediaCount: 1,
+    duration: task.videoDuration,
+    usage: data?.usage,
+  });
+}
 
 export async function pollTasksOnce(
   tasks: GenerationTask[],
@@ -31,11 +44,11 @@ export async function pollTasksOnce(
 ) {
   const noPersist = { persist: false as const };
   const localUrl = getGatewayBaseUrl();
-  const gatewayHeaders = getGatewayClientHeaders();
   const pollFailureCounts = options?.pollFailureCounts || {};
 
   await Promise.allSettled(
     tasks.map(async (t) => {
+      if (t.mediaType === 'agent' || t.id.startsWith('agent-task-')) return;
       if (pollingTaskIds.has(t.id)) return;
       pollingTaskIds.add(t.id);
       try {
@@ -48,6 +61,20 @@ export async function pollTasksOnce(
       if (!options?.skipCountIncrement) {
         count += 1;
         pollCounts[t.id] = count;
+      }
+
+      // 核对任务熔断：若已核对超过 5 次（约 10 秒）仍未在服务端找到原任务记录，判定为未成功创建并停止死锁
+      if (recovering && count > 5) {
+        slowPollIds.delete(t.id);
+        delete pollCounts[t.id];
+        delete pollFailureCounts[t.id];
+        update(t.id, {
+          status: 'FAILURE',
+          progress: '0%',
+          failReason: '原任务核对超时：未在服务端找到记录，任务可能已被拒绝或网络中断。请检查服务接口配置后重试。',
+          submissionRecoveryRequired: false,
+        });
+        return;
       }
 
       if (!recovering && !options?.skipTimeout && count > maxCount) {
@@ -74,18 +101,22 @@ export async function pollTasksOnce(
       }
 
       try {
+        const isAudio = t.mediaType === 'audio';
         const pollEndpoint = depthVideo
           ? '/api/generate/depth-video'
           : isDepthImageTask(t)
             ? '/api/generate/depth-image'
           : video
             ? '/api/generate/video'
+          : isAudio
+            ? '/api/generate/audio'
             : '/api/generate/image';
         const queryParams = new URLSearchParams(recovering ? { taskKey: t.id, model: t.model } : { taskId: t.taskId! });
+        const taskGatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
-            ...gatewayHeaders,
+            ...taskGatewayHeaders,
             ...storageConfigHeaders(),
             ...(localUrl && !depthVideo ? { 'x-custom-base-url': localUrl } : {}),
           },
@@ -106,6 +137,7 @@ export async function pollTasksOnce(
           slowPollIds.delete(t.id);
           delete pollCounts[t.id];
           delete pollFailureCounts[t.id];
+          recordFinishedTaskUsage(t, data);
           update(t.id, {
             status: 'SUCCESS',
             resultUrl: data.resultUrl,
@@ -168,7 +200,7 @@ export async function pollTasksOnce(
 export function getOngoingGenerationTasks(): GenerationTask[] {
   return useAppStore
     .getState()
-    .generationTasks.filter((t) => isImageTaskActive(t.status) && (t.taskId || t.submissionRecoveryRequired) && !t.resultUrl);
+    .generationTasks.filter((t) => t.mediaType !== 'agent' && !t.id.startsWith('agent-task-') && isImageTaskActive(t.status) && (t.taskId || t.submissionRecoveryRequired) && !t.resultUrl);
 }
 
 export function isLocalUnsubmittedTask(t: GenerationTask): boolean {
@@ -188,6 +220,14 @@ export function getUnsubmittedGenerationTasks(): GenerationTask[] {
   return useAppStore.getState().generationTasks.filter(isLocalUnsubmittedTask);
 }
 
+export function failedTaskPollEndpoint(task: GenerationTask): string {
+  if (isDepthVideoTask(task)) return '/api/generate/depth-video';
+  if (isDepthImageTask(task)) return '/api/generate/depth-image';
+  if (isVideoTask(task)) return '/api/generate/video';
+  if (task.mediaType === 'audio') return '/api/generate/audio';
+  return '/api/generate/image';
+}
+
 export async function probeFailedTasks(
   tasks: GenerationTask[],
   update: TaskUpdater,
@@ -195,24 +235,19 @@ export async function probeFailedTasks(
   slowPollIds: Set<string>,
 ) {
   const localUrl = getGatewayBaseUrl();
-  const gatewayHeaders = getGatewayClientHeaders();
 
   await Promise.allSettled(
     tasks.map(async (t) => {
+      if (t.mediaType === 'agent' || t.id.startsWith('agent-task-')) return;
       if (recoveredOnce.has(t.id)) return;
       try {
-        const depthVideo = isDepthVideoTask(t);
-        const video = isVideoTask(t);
-        const pollEndpoint = depthVideo
-          ? '/api/generate/depth-video'
-          : video
-            ? '/api/generate/video'
-            : '/api/generate/image';
+        const pollEndpoint = failedTaskPollEndpoint(t);
         const queryParams = new URLSearchParams({ taskId: t.taskId! });
+        const taskGatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
-            ...gatewayHeaders,
+            ...taskGatewayHeaders,
             ...storageConfigHeaders(),
             ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
           },
@@ -223,6 +258,7 @@ export async function probeFailedTasks(
         if (classifyGenerationPollResult(data, { httpOk: res.ok, httpStatus: res.status }) === 'success') {
           recoveredOnce.add(t.id);
           slowPollIds.delete(t.id);
+          recordFinishedTaskUsage(t, data);
           update(t.id, {
             status: 'SUCCESS',
             resultUrl: data.resultUrl,

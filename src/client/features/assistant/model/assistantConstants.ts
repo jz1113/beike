@@ -60,6 +60,8 @@ export const DEFAULT_ASSISTANT_MODELS = listApprovedModels('multimodal').map((m)
 
 export type AssistantModelDisplay = {
   id: string;
+  /** 上游模型 ID。渠道重复时 id 是条目 id，分组和图标仍用这个字段。 */
+  modelId?: string;
   name: string;
   shortName: string;
   badge?: string;

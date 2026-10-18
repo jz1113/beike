@@ -173,10 +173,8 @@ func itemFields(item map[string]any) itemColumns {
 		}
 		meta, _ := json.Marshal(map[string]any{"callId": textField(item, "callId")})
 		fields.meta = string(meta)
-		fields.status = textField(item, "status")
-		if fields.status != "done" && fields.status != "error" {
-			fields.status = "running"
-		}
+		fields.summary = textField(item, "summary")
+		fields.status = storedToolStatus(textField(item, "status"))
 	case "approvalRequest":
 		fields.toolName = textField(item, "toolName")
 		fields.displayName = textField(item, "displayName")
@@ -199,6 +197,15 @@ func itemFields(item map[string]any) itemColumns {
 		fields.summary = textField(item, "summary")
 	}
 	return fields
+}
+
+func storedToolStatus(status string) string {
+	switch status {
+	case "done", "error", "declined", "cancelled":
+		return status
+	default:
+		return "running"
+	}
 }
 
 func textField(item map[string]any, key string) string {

@@ -1,0 +1,96 @@
+.prompt-effort-slider {
+  position: relative;
+  height: 44px;
+  margin-top: 2px;
+  --effort-progress: 0;
+}
+.prompt-effort-rail {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  left: 15px;
+  height: 22px;
+  border-radius: 999px;
+  background: #e7e9ef;
+  box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.06);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.prompt-effort-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--effort-progress) * 100%);
+  border-radius: 999px;
+  background: #7c3aed;
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.38);
+  transition: width .24s cubic-bezier(.2, .85, .25, 1.06);
+}
+.prompt-effort-ticks {
+  position: absolute;
+  inset: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.prompt-effort-ticks i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c5cad3;
+}
+.prompt-effort-ticks i[data-filled="true"] { background: rgba(255, 255, 255, 0.92); }
+.prompt-effort-thumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--effort-progress) * 100%);
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(124, 58, 237, 0.08);
+  transform: translate(-50%, -50%);
+  transition: left .24s cubic-bezier(.2, .85, .25, 1.06), transform .18s, box-shadow .18s;
+}
+.prompt-effort-slider:active .prompt-effort-thumb {
+  transform: translate(-50%, -50%) scale(1.06);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.42);
+}
+.prompt-effort-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  opacity: 0;
+  cursor: ew-resize;
+  touch-action: pan-y;
+}
+.prompt-effort-range::-webkit-slider-thumb { appearance: none; width: 30px; height: 30px; }
+.prompt-effort-range::-moz-range-thumb { width: 30px; height: 30px; border: 0; }
+.dark .prompt-effort-rail,
+html.dark .prompt-effort-rail {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.dark .prompt-effort-fill,
+html.dark .prompt-effort-fill {
+  background: #a855f7;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.5);
+}
+.dark .prompt-effort-ticks i,
+html.dark .prompt-effort-ticks i { background: rgba(255, 255, 255, 0.28); }
+.dark .prompt-effort-ticks i[data-filled="true"],
+html.dark .prompt-effort-ticks i[data-filled="true"] { background: rgba(255, 255, 255, 0.95); }
+.dark .prompt-effort-thumb,
+html.dark .prompt-effort-thumb {
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.dark .prompt-effort-slider:active .prompt-effort-thumb,
+html.dark .prompt-effort-slider:active .prompt-effort-thumb {
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.55);
+}

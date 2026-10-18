@@ -93,9 +93,7 @@ export function ModalityVendorNav({
                   : 'bg-slate-100/80 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white border-transparent font-medium'
               }`}
             >
-              <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white">
-                <ModelIcon modelId={vendor.logoKey} className="h-3.5 w-3.5 object-contain" />
-              </div>
+              <ModelIcon modelId={vendor.logoKey} className="h-3.5 w-3.5 shrink-0 object-contain" />
               <span>{vendor.name}</span>
             </button>
           );

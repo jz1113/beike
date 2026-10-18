@@ -49,8 +49,14 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     lower.includes('text-search') ||
     lower.includes('similarity');
 
+  // 多模态全双工与语音交互对话模型（如 qwen-audio-chat、gpt-4o-audio），属于多模态大模型而非纯音频生成
+  const isMultimodalAudioChat =
+    !isEmbedding &&
+    /(?:gpt-4o.*audio|qwen.*audio.*chat|qwen2-audio|gemini.*audio)/.test(lower);
+
   const isAudio =
     !isEmbedding &&
+    !isMultimodalAudioChat &&
     (lower.includes('audio') ||
       lower.includes('tts') ||
       lower.includes('whisper') ||
@@ -59,6 +65,9 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
       lower.includes('voice') ||
       lower.includes('music') ||
       lower.includes('sound') ||
+      lower.includes('chirp') ||
+      lower.includes('cosyvoice') ||
+      /minimax-m\d/.test(lower) ||
       lower.includes('elevenlabs'));
 
   const isVideo =
@@ -67,10 +76,23 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     (lower.includes('video') ||
       lower.includes('seedance') ||
       lower.includes('veo') ||
-      lower.includes('kling') ||
+      (lower.includes('kling') && !lower.includes('image')) ||
       lower.includes('sora') ||
       lower.includes('vidu') ||
-      lower.includes('minimax') ||
+      lower.includes('hailuo') ||
+      lower.includes('minimax-h3') ||
+      /(?:^|[^a-z0-9])h3(?:[^a-z0-9]|$)/.test(lower) ||
+      lower.includes('i2v') ||
+      lower.includes('t2v') ||
+      lower.includes('s2v') ||
+      /wan2?\.1.*(?:t2v|i2v|video)/.test(lower) ||
+      /gen-?[234]/.test(lower) ||
+      lower.includes('cogvideox') ||
+      lower.includes('cogvideo') ||
+      lower.includes('hunyuan-video') ||
+      lower.includes('pixverse') ||
+      lower.includes('ltx-video') ||
+      lower.includes('skyreels') ||
       isKnownVideoOnlyModel(id));
 
   const isImage =
@@ -80,14 +102,27 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     (lower.includes('image') ||
       lower.includes('flux') ||
       lower.includes('seedream') ||
+      lower.includes('jimeng') ||
       lower.includes('midjourney') ||
+      lower.includes('mj_') ||
       lower.includes('mjv') ||
+      lower.includes('dall') ||
+      lower.includes('sdxl') ||
+      /sd-?3(?:\.5)?/.test(lower) ||
+      lower.includes('stable-diffusion') ||
+      lower.includes('recraft') ||
+      lower.includes('ideogram') ||
+      lower.includes('kolors') ||
+      lower.includes('wanx') ||
+      lower.includes('z-image') ||
       lower.includes('nano-banana') ||
       isKnownImageOnlyModel(id));
 
   const isThinking =
     lower.includes('thinking') ||
     lower.includes('reasoner') ||
+    lower.includes('qwq') ||
+    /(?:^|[^a-z0-9])o[134](?:-mini|-preview)?(?:[^a-z0-9]|$)/.test(lower) ||
     lower.includes('luna');
 
   const isMultimodal =
@@ -95,14 +130,21 @@ export function inferWorkflowCapabilitiesFromId(id: string): InferredWorkflowCap
     !isAudio &&
     !isVideo &&
     !isImage &&
-    (lower.includes('vision') ||
+    (isMultimodalAudioChat ||
+      lower.includes('vision') ||
       lower.includes('gemini') ||
       lower.includes('claude') ||
-      /gpt-[45]/.test(lower) ||
-      lower.includes('grok-4') ||
-      lower.includes('qwen3') ||
+      /gpt-[456]/.test(lower) ||
+      /(?:^|[^a-z0-9])o[134](?:-mini|-preview)?(?:[^a-z0-9]|$)/.test(lower) ||
+      lower.includes('grok') ||
+      lower.includes('qwen') ||
+      lower.includes('qwq') ||
       lower.includes('deepseek') ||
-      lower.includes('kimi'));
+      lower.includes('kimi') ||
+      lower.includes('abab') ||
+      lower.includes('doubao') ||
+      lower.includes('glm-') ||
+      lower.includes('internvl'));
 
   return {
     isImage,

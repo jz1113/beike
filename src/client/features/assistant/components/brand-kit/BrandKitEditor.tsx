@@ -12,15 +12,15 @@ interface Props {
 export default function BrandKitEditor({ formData, setFormData, onSave, onCancel }: Props) {
   return (
   <form onSubmit={onSave} className="space-y-5">
-    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
+      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 dark:text-slate-100">
         <Edit3 className="w-4 h-4 text-red-500" /> 编辑品牌资产
       </h4>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 cursor-pointer"
+          className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 cursor-pointer dark:text-slate-300 dark:hover:bg-white/5 dark:border-white/10"
         >
           取消
         </button>
@@ -36,27 +36,27 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
     {/* 基础信息 */}
     <div className="grid grid-cols-2 gap-4">
       <div>
-        <label className="block text-xs font-semibold text-slate-700 mb-1">
+        <label className="block text-xs font-semibold text-slate-700 mb-1 dark:text-slate-200">
           品牌资产名称
         </label>
         <input
           type="text"
           value={formData.name}
           onChange={e => setFormData({ ...formData, name: e.target.value })}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none dark:border-white/10"
           placeholder="如: 数码科技 · 极简冷灰"
           required
         />
       </div>
       <div>
-        <label className="block text-xs font-semibold text-slate-700 mb-1">
+        <label className="block text-xs font-semibold text-slate-700 mb-1 dark:text-slate-200">
           分类标签 / 品类
         </label>
         <input
           type="text"
           value={formData.badge || ''}
           onChange={e => setFormData({ ...formData, badge: e.target.value })}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none dark:border-white/10"
           placeholder="如: 3C数码 / 美妆护肤"
         />
       </div>
@@ -64,7 +64,7 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
 
     {/* 品牌视觉基调 */}
     <div>
-      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5 dark:text-slate-200">
         <Sparkles className="w-3.5 h-3.5 text-amber-500" /> 品牌视觉基调 (Brand Tone)
       </label>
       <textarea
@@ -77,13 +77,13 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
     </div>
 
     {/* 专属虚拟模特 DNA */}
-    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
-      <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3 dark:bg-white/5 dark:border-white/10">
+      <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 dark:text-slate-100">
         <User className="w-3.5 h-3.5 text-indigo-500" /> 专属虚拟模特 DNA (锁定人物一致性)
       </h5>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-[11px] text-slate-500 mb-1">年龄与群体</label>
+          <label className="block text-[11px] text-slate-500 mb-1 dark:text-slate-400">年龄与群体</label>
           <input
             type="text"
             value={formData.modelDna?.ageGroup || ''}
@@ -91,12 +91,12 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
               ...formData,
               modelDna: { ...formData.modelDna!, ageGroup: e.target.value }
             })}
-            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200"
+            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200 dark:border-white/10 dark:bg-[#18191c]"
             placeholder="如: 25~28岁东亚干练职场人"
           />
         </div>
         <div>
-          <label className="block text-[11px] text-slate-500 mb-1">面容五官特征</label>
+          <label className="block text-[11px] text-slate-500 mb-1 dark:text-slate-400">面容五官特征</label>
           <input
             type="text"
             value={formData.modelDna?.ethnicity || ''}
@@ -104,12 +104,12 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
               ...formData,
               modelDna: { ...formData.modelDna!, ethnicity: e.target.value }
             })}
-            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200"
+            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200 dark:border-white/10 dark:bg-[#18191c]"
             placeholder="如: 自然清秀东亚面孔，高鼻梁"
           />
         </div>
         <div>
-          <label className="block text-[11px] text-slate-500 mb-1">发型发色</label>
+          <label className="block text-[11px] text-slate-500 mb-1 dark:text-slate-400">发型发色</label>
           <input
             type="text"
             value={formData.modelDna?.hairStyle || ''}
@@ -117,12 +117,12 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
               ...formData,
               modelDna: { ...formData.modelDna!, hairStyle: e.target.value }
             })}
-            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200"
+            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200 dark:border-white/10 dark:bg-[#18191c]"
             placeholder="如: 黑色及肩内扣短发"
           />
         </div>
         <div>
-          <label className="block text-[11px] text-slate-500 mb-1">妆容与穿搭体系</label>
+          <label className="block text-[11px] text-slate-500 mb-1 dark:text-slate-400">妆容与穿搭体系</label>
           <input
             type="text"
             value={formData.modelDna?.makeupAndOutfit || ''}
@@ -130,7 +130,7 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
               ...formData,
               modelDna: { ...formData.modelDna!, makeupAndOutfit: e.target.value }
             })}
-            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200"
+            className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200 dark:border-white/10 dark:bg-[#18191c]"
             placeholder="如: 清爽通透职场淡妆，浅灰色修身西装"
           />
         </div>
@@ -139,7 +139,7 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
 
     {/* 全局避坑负向规约 */}
     <div>
-      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5 dark:text-slate-200">
         <ShieldAlert className="w-3.5 h-3.5 text-red-500" /> 全局避坑规约 (用逗号分隔)
       </label>
       <input
@@ -149,7 +149,7 @@ export default function BrandKitEditor({ formData, setFormData, onSave, onCancel
           ...formData,
           negativeRules: e.target.value.split(/[，,、]/).map(s => s.trim()).filter(Boolean)
         })}
-        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none"
+        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-red-500 focus:outline-none dark:border-white/10"
         placeholder="如: 严禁塑料反光感、严禁暗角、严禁假人假脸"
       />
     </div>

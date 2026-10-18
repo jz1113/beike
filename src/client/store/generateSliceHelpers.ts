@@ -1,4 +1,4 @@
-import type { ChatSession, GenerationTask } from '@client/store/appStoreTypes';
+import type { AgentTurnTaskData, ChatSession, GenerationTask } from '@client/store/appStoreTypes';
 import { isGenerationDeleted } from './persist/index';
 import { retainGenerationTasks } from './generationLimits';
 
@@ -10,6 +10,62 @@ export const EMPTY_COMPOSER_MEDIA = {
   quickVideoLastFrame: null,
   quickVideoMultiFrames: [],
 };
+
+function agentTurnText(turn?: AgentTurnTaskData): string {
+  const reply = turn?.reply?.trim() || '';
+  if (reply) return reply;
+  return (turn?.items || [])
+    .flatMap((item) => (item.kind === 'agentMessage' && item.content?.trim() ? [item.content.trim()] : []))
+    .join('\n\n');
+}
+
+/** An empty database or archive record must not erase a reply already on screen. */
+export function mergeAgentTurn(current?: AgentTurnTaskData, incoming?: AgentTurnTaskData): AgentTurnTaskData | undefined {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  const incomingText = agentTurnText(incoming);
+  const currentText = agentTurnText(current);
+  if (currentText && !incomingText) {
+    return {
+      ...incoming,
+      reply: current.reply?.trim() ? current.reply : currentText,
+      items: current.items?.length ? current.items : incoming.items,
+      thinking: current.thinking || incoming.thinking,
+      modelUsed: incoming.modelUsed || current.modelUsed,
+    };
+  }
+  if (incomingText && !(incoming.items || []).some((item) => item.kind === 'agentMessage' && item.content?.trim()) && current.items?.length) {
+    return { ...current, ...incoming, reply: incoming.reply?.trim() ? incoming.reply : current.reply, items: current.items };
+  }
+  return { ...current, ...incoming };
+}
+
+function mergeRestoredTask(current: GenerationTask | undefined, incoming: GenerationTask): GenerationTask {
+  if (!current) return incoming;
+  return {
+    ...current,
+    ...incoming,
+    id: current.id || incoming.id,
+    agentTurn: mergeAgentTurn(current.agentTurn, incoming.agentTurn),
+  };
+}
+
+export function mergeRestoredSessions(current: ChatSession[], incoming: ChatSession[]): ChatSession[] {
+  const seen = new Set(incoming.map((session) => session.id));
+  const merged = incoming.map((session) => {
+    const previous = current.find((item) => item.id === session.id);
+    const previousTasks = previous?.tasks || [];
+    const sessionTasks = session.tasks || [];
+    const incomingIds = new Set(sessionTasks.flatMap((task) => [task.id, task.taskId].filter((id): id is string => Boolean(id))));
+    const tasks = sessionTasks.map((task) => mergeRestoredTask(
+      previousTasks.find((item) => item.id === task.id || (Boolean(item.taskId) && item.taskId === task.taskId)),
+      task,
+    ));
+    const extras = previousTasks.filter((task) => !incomingIds.has(task.id) && !(task.taskId && incomingIds.has(task.taskId)));
+    return { ...session, tasks: [...tasks, ...extras] };
+  });
+  return [...merged, ...current.filter((session) => !seen.has(session.id))];
+}
 
 export function capGenerationTasks(tasks: GenerationTask[]): GenerationTask[] {
   return retainGenerationTasks(tasks);
@@ -57,6 +113,7 @@ export function mergeAndSortTasks(existing: GenerationTask[], incoming: Generati
         resultUrl: dt.resultUrl || prev.resultUrl,
         progress: isIncomingSuccess ? '100%' : (dt.progress || prev.progress),
         failReason: isIncomingSuccess ? undefined : (dt.failReason || prev.failReason),
+        agentTurn: mergeAgentTurn(prev.agentTurn, dt.agentTurn),
       };
       mergedList[matchIdx] = merged;
       // 补充更新索引

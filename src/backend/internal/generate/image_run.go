@@ -49,7 +49,23 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	}
 	taskID, direct := imageOutcome(data)
 	if status < 200 || status >= 300 || (taskID == "" && direct == "") {
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": imageUpstreamError(data, status)})
+		upstreamErr := imageUpstreamError(data, status)
+		rejected := status >= 400 && status < 500
+		outStatus := http.StatusBadGateway
+		outcome := "unknown"
+		if rejected {
+			outStatus = http.StatusBadRequest
+			outcome = "rejected"
+		}
+		body := map[string]any{
+			"success":           false,
+			"submissionOutcome": outcome,
+			"error":             upstreamErr,
+		}
+		if rejected {
+			body["submissionRejected"] = true
+		}
+		httpx.WriteJSON(w, outStatus, body)
 		return
 	}
 	if taskID == "" {
@@ -74,6 +90,10 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		body["status"] = "SUCCESS"
 		body["resultUrl"] = direct
 		body["temporaryUrl"] = strings.HasPrefix(direct, "http://") || strings.HasPrefix(direct, "https://")
+	}
+	if usage := NormalizeUsage(data); usage != nil {
+		body["usage"] = usage
+		rememberTaskUsage(r.Context(), cfg, taskID, usage)
 	}
 	httpx.WriteJSON(w, http.StatusOK, body)
 }
@@ -227,6 +247,9 @@ func imageUpstreamError(data map[string]any, status int) string {
 		if text, ok := data["fail_reason"].(string); ok && text != "" {
 			return text
 		}
+		if text, ok := data["detail"].(string); ok && text != "" {
+			return text
+		}
 		if nested, ok := data["error"].(map[string]any); ok {
 			if text, ok := nested["message"].(string); ok && text != "" {
 				return text
@@ -236,7 +259,13 @@ func imageUpstreamError(data map[string]any, status int) string {
 			return text
 		}
 	}
-	return "HTTP " + Itoa(status) + " 提交失败"
+	if status == http.StatusUnauthorized {
+		return "API 凭证未配置或令牌不合法，请前往「⚙️ 设置 -> 服务接口配置」检查并填入有效凭证"
+	}
+	if status == http.StatusPaymentRequired {
+		return "AI 服务商账户余额不足，请充值后重试"
+	}
+	return "上游接口响应异常 (HTTP " + Itoa(status) + ")"
 }
 
 func imageReferences(payload map[string]json.RawMessage) []string {

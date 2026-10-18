@@ -49,11 +49,11 @@ export const CanvasPromptInput = forwardRef<CanvasPromptInputRef, {value: string
         }
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {event.preventDefault(); onSubmit();}
       }} />
-    {mention && <div id={listId} role="listbox" aria-label="引用参考图片" style={{top: menuTop}} className="absolute left-0 z-40 max-h-56 w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" onMouseDown={event => event.preventDefault()}>
-      {choices.map((item, index) => <button key={item.name} id={`${listId}-${index}`} type="button" role="option" aria-selected={index === Math.min(active, choices.length - 1)} onMouseEnter={() => setActive(index)} onClick={() => insert(item.name)} className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${index === Math.min(active, choices.length - 1) ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600'}`}>
-        {isVideoMediaUrl(item.url) ? <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-100">▶</span> : <img src={proxyMediaUrl(item.url, {thumb: true, width: 80})} alt="" className="h-8 w-8 rounded object-cover" />}{item.name}
+    {mention && <div id={listId} role="listbox" aria-label="引用参考图片" style={{top: menuTop}} className="absolute left-0 z-40 max-h-56 w-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1B1B1E] p-1.5 shadow-lg dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] text-slate-700 dark:text-[#C7C7CC]" onMouseDown={event => event.preventDefault()}>
+      {choices.map((item, index) => <button key={item.name} id={`${listId}-${index}`} type="button" role="option" aria-selected={index === Math.min(active, choices.length - 1)} onMouseEnter={() => setActive(index)} onClick={() => insert(item.name)} className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${index === Math.min(active, choices.length - 1) ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 font-medium' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.06]'}`}>
+        {isVideoMediaUrl(item.url) ? <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-100 dark:bg-white/10">▶</span> : <img src={proxyMediaUrl(item.url, {thumb: true, width: 80})} alt="" className="h-8 w-8 rounded object-cover" />}{item.name}
       </button>)}
-      {!choices.length && <p className="px-2 py-3 text-xs text-slate-500">{references.length ? '没有匹配的参考图片' : '先添加参考图片，再用 @ 引用'}</p>}
+      {!choices.length && <p className="px-2 py-3 text-xs text-slate-500 dark:text-slate-400">{references.length ? '没有匹配的参考图片' : '先添加参考图片，再用 @ 引用'}</p>}
     </div>}
   </div>;
 });

@@ -1,3 +1,4 @@
+import { videoInputError } from '@shared/domain/media/videoCapabilities';
 import { buildSeedanceOfficialPayload } from './seedance';
 import type { VideoAdapterInput, VideoModelAdapter } from '../types';
 import {
@@ -13,6 +14,7 @@ import {
 } from './endpoints';
 import {
   adaptWan26ModelId,
+  applyExclusiveFrameFields,
   baseVideoPayload,
   buildWan26Payload,
   buildWanOfficialPayload,
@@ -20,6 +22,11 @@ import {
   isWan26,
   normalizeVideoModelId,
 } from './payloads';
+
+function assertVideoInput(input: VideoAdapterInput, modelId: string, mode: string) {
+  const error = videoInputError({ ...input, model: modelId, images: collectVideoImages(input), refMode: mode });
+  if (error) throw new Error(error);
+}
 
 export const seedanceVideoAdapter: VideoModelAdapter = {
   id: 'seedance',
@@ -43,9 +50,15 @@ export const veoVideoAdapter: VideoModelAdapter = {
   },
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
+    const mode = input.refMode || 'omni';
+    assertVideoInput(input, modelId, mode);
     const payload = baseVideoPayload(input, modelId);
+    applyExclusiveFrameFields(payload, input, mode);
+    if (mode === 'omni') {
+      delete payload.images;
+      delete payload.image_urls;
+    }
     payload.enable_upsample = true;
-    // Preserve the selected duration for the gateway instead of silently dropping it.
     return { family: 'veo', modelId, payload, endpoints: unifiedVideoEndpoints };
   },
 };
@@ -82,15 +95,18 @@ export const minimaxVideoAdapter: VideoModelAdapter = {
     if (/hailuo-2\.3/i.test(modelId) && resolution.includes('1080') && Number(input.duration) === 10) {
       throw new Error('Hailuo 2.3 在 1080P 下仅支持 6 秒');
     }
+    const mode = input.refMode || 'omni';
+    assertVideoInput(input, modelId, mode);
     const payload = baseVideoPayload(input, modelId);
-    const images = (payload.images as string[] | undefined) || [];
-    payload.mode = images.length > 1 || (images.length > 0 && ['omni', 'reference_image', 'multi_frame'].includes(input.refMode || 'omni')) ? 'multimodal-to-video' : images.length === 1 ? 'image-to-video' : 'text-to-video';
+    const images = applyExclusiveFrameFields(payload, input, mode);
+    payload.mode = mode === 'text' ? 'text-to-video' : mode === 'first_frame' ? 'image-to-video' : mode === 'first_last_frame' ? 'first-last-frame' : 'reference-to-video';
     payload.resolution = payload.resolution === '1080p' ? '2k' : '768P';
     if (images.length > 0 && (!input.aspectRatio || input.aspectRatio === 'adaptive')) {
       payload.aspect_ratio = 'adaptive';
       payload.ratio = 'adaptive';
     }
     if (images.length > 0) payload.imageUrls = images;
+    else delete payload.imageUrls;
     if (/h3/i.test(modelId)) payload.seconds = payload.duration;
     if (input.audio === false && typeof payload.prompt === 'string') {
       const p = payload.prompt.trim();
@@ -121,11 +137,23 @@ export const soraVideoAdapter: VideoModelAdapter = {
 
 function klingRequestMode(input: VideoAdapterInput, modelId: string): string {
   if (modelId.toLowerCase().includes('omni')) return 'omni-video';
-  if (input.refMode === 'first_last_frame' || (input.firstFrame && input.lastFrame)) return 'image2video';
+  const mode = input.refMode || 'text';
+  if (mode === 'text') return 'text2video';
+  if (mode === 'first_frame' || mode === 'first_last_frame') return 'image2video';
   const images = collectVideoImages(input);
   if (images.length >= 2) return 'multi-image2video';
   if (images.length === 1) return 'image2video';
   return 'text2video';
+}
+
+function klingImageList(input: VideoAdapterInput, images: string[]) {
+  const mode = input.refMode || '';
+  return images.map((image_url, index) => {
+    if (mode === 'first_frame' && index === 0) return { image_url, type: 'first_frame' };
+    if (mode === 'first_last_frame' && index === 0) return { image_url, type: 'first_frame' };
+    if (mode === 'first_last_frame' && index === images.length - 1) return { image_url, type: 'end_frame' };
+    return { image_url };
+  });
 }
 
 export const klingVideoAdapter: VideoModelAdapter = {
@@ -136,21 +164,29 @@ export const klingVideoAdapter: VideoModelAdapter = {
   },
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
+    const refMode = input.refMode || (input.lastFrame ? 'first_last_frame' : input.firstFrame ? 'first_frame' : 'text');
+    assertVideoInput(input, modelId, refMode);
     const payload = baseVideoPayload(input, modelId);
     const images = collectVideoImages(input);
-    const mode = klingRequestMode(input, modelId);
+    const mode = klingRequestMode({ ...input, refMode }, modelId);
     payload.mode = input.resolution === '4K' ? '4k' : input.resolution === '1080P' ? 'pro' : 'std';
     payload.model_name = modelId.replace('kling-video-v', 'kling-v');
     payload.duration = String(payload.duration);
     if (/v3|v2-6/.test(modelId)) payload.sound = input.audio === false ? 'off' : 'on';
     payload.cfg_scale = 0.5;
     if (mode === 'omni-video') {
-      payload.image_list = images.map((image_url, index) => ({ image_url,
-        ...(['first_frame', 'first_last_frame'].includes(input.refMode || '') ? { type: index === 0 ? 'first_frame' : 'end_frame' } : {}),
-      }));
-    } else if (input.firstFrame && input.lastFrame) {
-      payload.image = input.firstFrame;
-      payload.image_tail = input.lastFrame;
+      payload.image_list = klingImageList({ ...input, refMode }, images);
+      if (refMode === 'omni') {
+        delete payload.image;
+        delete payload.image_url;
+        delete payload.first_frame_image;
+        delete payload.last_frame_image;
+        delete payload.end_frame_image;
+        delete payload.image_tail;
+      }
+    } else if (refMode === 'first_last_frame') {
+      payload.image = input.firstFrame || images[0];
+      payload.image_tail = input.lastFrame || images[images.length - 1];
     }
     return { family: 'kling', modelId, payload, endpoints: klingModeEndpoints(mode) };
   },
@@ -187,12 +223,11 @@ export const viduVideoAdapter: VideoModelAdapter = {
   match: (modelId) => modelId.toLowerCase().includes('vidu'),
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
+    const mode = input.refMode || (collectVideoImages(input).length ? 'omni' : 'text');
+    assertVideoInput(input, modelId, mode);
     const payload = baseVideoPayload(input, modelId);
-    const images = (payload.images as string[] | undefined) || [];
-    if (input.refMode === 'first_last_frame') payload.mode = 'start-end';
-    else if (images.length && input.refMode !== 'first_frame') payload.mode = 'reference';
-    else if (images.length === 1) payload.mode = 'img2video';
-    else payload.mode = 'text2video';
+    applyExclusiveFrameFields(payload, input, mode);
+    payload.mode = mode === 'first_last_frame' ? 'start-end' : mode === 'first_frame' ? 'img2video' : mode === 'text' ? 'text2video' : 'reference';
     return { family: 'vidu', modelId, payload, endpoints: (baseUrl) => viduVideoEndpoints(baseUrl, String(payload.mode || 'text2video')) };
   },
 };
@@ -205,13 +240,27 @@ export const grokVideoAdapter: VideoModelAdapter = {
   },
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
+    const mode = input.refMode || 'text';
+    assertVideoInput(input, modelId, mode);
     const payload = baseVideoPayload(input, modelId);
     const imagine = modelId.toLowerCase().includes('grok-imagine');
     if (imagine) {
-      const url = typeof payload.image === 'string' ? payload.image : undefined;
-      const allowed = new Set(['model', 'prompt', 'duration', 'aspect_ratio', 'resolution', 'generate_audio']);
-      for (const key of Object.keys(payload)) if (!allowed.has(key)) delete payload[key];
-      if (url) payload.image = { url };
+      const images = applyExclusiveFrameFields(payload, input, mode);
+      const official: Record<string, unknown> = {
+        model: payload.model,
+        prompt: payload.prompt,
+        duration: payload.duration,
+        aspect_ratio: payload.aspect_ratio,
+        resolution: payload.resolution,
+      };
+      if (payload.generate_audio !== undefined) official.generate_audio = payload.generate_audio;
+      if (mode === 'first_frame' || mode === 'first_last_frame') {
+        const first = typeof payload.image === 'string' ? payload.image : images[0];
+        if (first) official.image = { url: first };
+      }
+      if (mode === 'first_last_frame' && typeof payload.last_frame_image === 'string') official.last_frame = { url: payload.last_frame_image };
+      if (mode === 'omni' && images.length) official.reference_images = images.map((url) => ({ url }));
+      return { family: 'grok-video', modelId, payload: official, endpoints: grokImagineVideoEndpoints };
     }
     return {
       family: 'grok-video',

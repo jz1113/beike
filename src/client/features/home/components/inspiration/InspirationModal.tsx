@@ -243,7 +243,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
                 referrerPolicy="no-referrer"
                 onError={(e) => handleImgError(e, item.image)}
                 onClick={(e) => e.stopPropagation()}
-                className="max-h-[86vh] w-auto max-w-full object-contain rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.18)] border border-white/60 select-none transition-all duration-300 bg-slate-100 cursor-default pointer-events-auto"
+                className="max-h-[86vh] w-auto max-w-full object-contain rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.18)] border border-white/60 select-none transition-all duration-300 bg-slate-100 cursor-default pointer-events-auto dark:bg-white/10"
               />
             )}
           </div>
@@ -266,15 +266,15 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
 
         {/* 🌟 2. 右侧：精致大方的信息与操作面板 */}
         <div
-          className={`w-full ${wideVideo ? 'md:w-[300px] lg:w-[320px] xl:w-[340px]' : 'md:w-[350px] lg:w-[380px] xl:w-[400px]'} max-h-[86vh] bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 flex flex-col justify-between flex-shrink-0 overflow-y-auto relative pointer-events-auto`}
+          className={`w-full ${wideVideo ? 'md:w-[300px] lg:w-[320px] xl:w-[340px]' : 'md:w-[350px] lg:w-[380px] xl:w-[400px]'} max-h-[86vh] bg-white dark:bg-[#1B1B1E] text-slate-900 dark:text-[#EDEDED] rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 dark:border-white/10 flex flex-col justify-between flex-shrink-0 overflow-y-auto relative pointer-events-auto`}
           onClick={(e) => e.stopPropagation()}
         >
 
           <div className="space-y-4">
             {/* 顶部 Header: 左侧贝壳云图官方作者信息，右侧仅保留下载按钮（点击空白处退出全屏，无需关闭叉） */}
-            <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100 dark:border-white/[0.06]">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-white border border-slate-200/80 flex items-center justify-center shadow-xs shrink-0 select-none p-0.5">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-[#26262B] border border-slate-200/80 dark:border-white/10 flex items-center justify-center shadow-xs shrink-0 select-none p-0.5">
                   <img
                     src="/app_logo.png"
                     alt={authorName}
@@ -282,7 +282,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <span className="text-[14px] font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-[180px]">
+                <span className="text-[14px] font-semibold text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[180px]">
                   {authorName}
                 </span>
               </div>
@@ -293,7 +293,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
                   type="button"
                   onClick={handleDownload}
                   disabled={isDownloading}
-                  className="w-9 h-9 rounded-xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-700 flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                  className="w-9 h-9 rounded-xl bg-transparent hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-[#C7C7CC] hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   title={isVideo ? '下载高清视频' : '下载高清原图'}
                 >
                   {downloadSuccess ? (
@@ -306,33 +306,33 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
             </div>
 
             {/* 日期与生成标记 */}
-            <div className="text-xs text-slate-400 font-sans">
+            <div className="text-xs text-slate-400 dark:text-[#8E8E93] font-sans">
               <span>{item.date || '2026-08-19 | 内容由 AI 生成'}</span>
             </div>
 
             <InspirationPromptPanel itemId={item.id} prompt={item.prompt} isVideo={isVideo} />
 
-            <div className="pt-3 border-t border-slate-100 flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-[12px] sm:text-[12.5px] text-slate-500 select-none">
+            <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-[12px] sm:text-[12.5px] text-slate-500 dark:text-[#8E8E93] select-none">
               {!!item.referenceImages?.length && <>
                 <InspirationReferences key={item.id} images={item.referenceImages} labels={item.referenceLabels} mode={item.videoRefMode}/>
-                <span className="text-slate-300">|</span>
+                <span className="text-slate-300 dark:text-white/20">|</span>
               </>}
               {/* 2. 模型名称 (图 1: 即梦 Seedance 1.0 Fast / GPT Image 2，纯文本无边框无胶囊) */}
-              <span className="text-slate-600 font-normal truncate max-w-[160px]">{modelLabel}</span>
+              <span className="text-slate-600 dark:text-[#EDEDED] font-normal truncate max-w-[160px]">{modelLabel}</span>
 
               {/* 3. 视频时长 或 图片画质 (图 1: 5s / 2K) */}
               {isVideo ? (
                 durationLabel && (
                   <>
-                    <span className="text-slate-300 font-light select-none">|</span>
-                    <span className="text-slate-500 font-normal">{durationLabel}</span>
+                    <span className="text-slate-300 dark:text-white/20 font-light select-none">|</span>
+                    <span className="text-slate-500 dark:text-[#8E8E93] font-normal">{durationLabel}</span>
                   </>
                 )
               ) : (
                 qualityLabel && (
                   <>
-                    <span className="text-slate-300 font-light select-none">|</span>
-                    <span className="text-slate-500 font-normal">{qualityLabel}</span>
+                    <span className="text-slate-300 dark:text-white/20 font-light select-none">|</span>
+                    <span className="text-slate-500 dark:text-[#8E8E93] font-normal">{qualityLabel}</span>
                   </>
                 )
               )}
@@ -340,15 +340,15 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
               {/* 4. 画幅比例 (图 1: 9:16 / 3:4) */}
               {aspectRatio && (
                 <>
-                  <span className="text-slate-300 font-light select-none">|</span>
-                  <span className="text-slate-500 font-normal">{aspectRatio}</span>
+                  <span className="text-slate-300 dark:text-white/20 font-light select-none">|</span>
+                  <span className="text-slate-500 dark:text-[#8E8E93] font-normal">{aspectRatio}</span>
                 </>
               )}
             </div>
           </div>
 
           {/* 🌟 底部双按钮 (做同款 / 用作参考图) */}
-          <div className="pt-5 mt-4 border-t border-slate-100 flex items-center gap-3">
+          <div className="pt-5 mt-4 border-t border-slate-100 dark:border-white/[0.06] flex items-center gap-3">
             {/* 做同款 */}
             <button
               type="button"
@@ -362,9 +362,9 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
                 }
                 onClose();
               }}
-              className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-800 font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+              className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-[#EDEDED] font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4 text-slate-700 stroke-[2.2]" />
+              <RotateCcw className="w-4 h-4 text-slate-700 dark:text-[#E5E5EA] stroke-[2.2]" />
               <span>做同款</span>
             </button>
 
@@ -380,9 +380,9 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
                 );
                 onClose();
               }}
-              className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-800 font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+              className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-[#EDEDED] font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
             >
-              <ImageIcon className="w-4 h-4 text-slate-700 stroke-[2.2]" />
+              <ImageIcon className="w-4 h-4 text-slate-700 dark:text-[#E5E5EA] stroke-[2.2]" />
               <span>{isVideo ? '用作参考素材' : '用作参考图'}</span>
             </button>
           </div>

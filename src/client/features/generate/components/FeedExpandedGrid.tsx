@@ -13,8 +13,6 @@ interface FeedExpandedGridProps {
   primaryTask: GenerationTask;
   isBatchVideo: boolean;
   premiumGeneratingTaskId: string | null;
-  openMenuTaskId: string | null;
-  setOpenMenuTaskId: (id: string | null) => void;
   onPreview: (task: GenerationTask, allTasks: GenerationTask[]) => void;
   onReuse: (task: GenerationTask) => void;
   onRegenerate: (tasks: GenerationTask[]) => void;
@@ -31,8 +29,6 @@ export default function FeedExpandedGrid({
   primaryTask,
   isBatchVideo,
   premiumGeneratingTaskId,
-  openMenuTaskId,
-  setOpenMenuTaskId,
   onPreview,
   onReuse,
   onRegenerate,
@@ -41,8 +37,6 @@ export default function FeedExpandedGrid({
   onDeleteFailedTasks,
   onRetryTask,
 }: FeedExpandedGridProps) {
-  const isMenuOpen = openMenuTaskId === `batch-${batch.batchId}`;
-
   // 仅清理确定失败的任务，进行中的任务继续生成。
   const failedTasks = batch.tasks.filter(
     (t) => t.status === 'FAILURE'
@@ -56,7 +50,7 @@ export default function FeedExpandedGrid({
     typeof onDeleteFailedTasks === 'function';
 
   return (
-    <div className="w-full space-y-2.5">
+    <div className="w-full space-y-2">
       {/* 1. 多图网格（4 张图在一行等分排列，带轻微圆角与间隙） */}
       <div className={`${getBatchGridClass(batch.tasks.length)} gap-2 sm:gap-2.5 w-full`}>
         {batch.tasks.map((task, idx) => {
@@ -72,7 +66,7 @@ export default function FeedExpandedGrid({
           return (
             <div
               key={`${task.id || 't'}-${idx}`}
-              className={`relative w-full rounded-xl sm:rounded-2xl overflow-hidden shadow-2xs hover:shadow-md border border-slate-200/80 bg-slate-50 transition-all duration-300 group/card ${getAspectRatioClass(
+              className={`relative w-full rounded-xl sm:rounded-2xl overflow-hidden ring-1 ring-black/[0.08] dark:ring-white/[0.08] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_24px_-6px_rgba(0,0,0,0.1)] bg-slate-50 dark:bg-zinc-900/60 max-h-[350px] transition-all duration-300 group/card ${getAspectRatioClass(
                 task.size
               )}`}
             >
@@ -131,7 +125,7 @@ export default function FeedExpandedGrid({
                           e.stopPropagation();
                           onDeleteTask(task);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-white/90 hover:bg-white text-[11px] text-slate-700 hover:text-red-600 font-medium transition-colors cursor-pointer border border-slate-200 shadow-xs active:scale-95 flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-white/90 hover:bg-white text-[11px] text-slate-700 hover:text-red-600 font-medium transition-colors cursor-pointer border border-slate-200 shadow-xs active:scale-95 flex items-center gap-1 dark:text-slate-200 dark:hover:bg-white/10 dark:border-white/10 dark:bg-[#18191c]/95"
                         title="清除此失败卡片"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -171,9 +165,10 @@ export default function FeedExpandedGrid({
                     title="点击放大查看"
                   />}
 
-                  {/* 左上角轻量「AI生成」标识 (图同款) */}
-                  <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded bg-black/35 backdrop-blur-xs text-[10px] text-white/90 font-medium select-none pointer-events-none tracking-tight">
-                    AI生成
+                  {/* 左上角轻量透光「✦ AI生成」微胶囊 */}
+                  <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[10px] text-white/95 font-medium select-none pointer-events-none tracking-tight shadow-xs flex items-center gap-1">
+                    <span className="text-[9px] text-amber-300">✦</span>
+                    <span>AI生成</span>
                   </div>
 
                   {/* 悬停放大指引 */}
@@ -193,19 +188,10 @@ export default function FeedExpandedGrid({
         })}
       </div>
 
-      {/* 2. 底部整组通用操作条 (参考图2规格: 高度40px、正方形更多按钮、冷灰质感底色) */}
       <FeedCardActionBar
         onReuse={() => onReuse(primaryTask)}
         onRegenerate={() => onRegenerate(batch.tasks)}
-        isMenuOpen={isMenuOpen}
-        onToggleMenu={(e) => {
-          e.stopPropagation();
-          setOpenMenuTaskId(isMenuOpen ? null : `batch-${batch.batchId}`);
-        }}
-        onDelete={() => {
-          onDeleteBatch(batch.tasks);
-          setOpenMenuTaskId(null);
-        }}
+        onDelete={() => onDeleteBatch(batch.tasks)}
         deleteText="删除该批次结果"
         reEditTitle="重新编辑提示词与参数"
         regenerateTitle="在当前对话中再次生成这组图"

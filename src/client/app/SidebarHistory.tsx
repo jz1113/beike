@@ -32,7 +32,7 @@ function sessionThumbnail(session: ChatSession): string | null {
 
 function ChatBubbleIcon() {
   return (
-    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-black/[0.05] text-slate-600">
+    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-black/[0.05] text-slate-600 dark:bg-white/10 dark:text-[#C7C7CC]">
       <MessageSquare className="h-3.5 w-3.5 stroke-[1.8]" />
     </div>
   );
@@ -43,7 +43,7 @@ function SessionLeadingMark({ session }: { session: ChatSession }) {
   const thumbnail = sessionThumbnail(session);
   if (!thumbnail || failed) return <ChatBubbleIcon />;
   const src = displayMediaUrl(thumbnail);
-  const box = 'h-6 w-6 shrink-0 rounded-[7px] border border-black/5 object-cover';
+  const box = 'h-6 w-6 shrink-0 rounded-[7px] border border-black/5 object-cover dark:border-white/10';
   if (isVideoUrl(thumbnail)) {
     return <video src={src} muted playsInline preload="metadata" className={box} onError={() => setFailed(true)} />;
   }
@@ -106,7 +106,7 @@ export function SidebarHistory({
           <button
             type="button"
             onClick={() => setChatsOpen((open) => !open)}
-            className="flex items-center gap-1 text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-[13px] font-medium text-slate-500 hover:text-slate-800 dark:text-[#8E8E93] dark:hover:text-[#EDEDED] transition-colors cursor-pointer"
             aria-expanded={chatsOpen}
           >
             对话
@@ -117,7 +117,7 @@ export function SidebarHistory({
             aria-label="新建对话"
             title="新建对话"
             onClick={onCreateConversation}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-950 transition-colors cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-950 dark:text-[#8E8E93] dark:hover:bg-white/10 dark:hover:text-white transition-colors cursor-pointer"
           >
             <SquarePen className="h-4 w-4" />
           </button>
@@ -125,7 +125,7 @@ export function SidebarHistory({
         {chatsOpen && (
           <div className="mt-1.5 space-y-1">
             {ordered.length === 0 ? (
-              <div className="px-2 py-3 text-[12px] text-slate-400 select-none">
+              <div className="px-2 py-3 text-[12px] text-slate-400 dark:text-[#636366] select-none">
                 暂无历史对话
               </div>
             ) : (
@@ -137,7 +137,7 @@ export function SidebarHistory({
                       <div
                         key={session.id}
                         className={`group flex items-center justify-between gap-1.5 rounded-xl px-2 py-1.5 transition-colors ${
-                          active ? 'bg-[#ECEDEF] font-medium text-slate-950' : 'hover:bg-white text-slate-800'
+                          active ? 'bg-[#ECEDEF] font-medium text-slate-950 dark:bg-[#1F1F24] dark:text-white' : 'hover:bg-white text-slate-800 dark:text-[#E5E5EA] dark:hover:bg-white/[0.06] dark:hover:text-white'
                         }`}
                       >
                         <button
@@ -161,7 +161,7 @@ export function SidebarHistory({
                                 if (event.key === 'Enter') saveRename(session.id);
                                 if (event.key === 'Escape') setEditingId(null);
                               }}
-                              className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[13px] text-slate-900 outline-none"
+                              className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[13px] text-slate-900 outline-none dark:border-white/15 dark:bg-[#151518] dark:text-[#EDEDED]"
                             />
                           ) : (
                             <span className="truncate text-[13px] leading-5">{title}</span>
@@ -170,7 +170,7 @@ export function SidebarHistory({
                         <button
                           type="button"
                           aria-label={`${title}更多操作`}
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 hover:bg-slate-200/80 hover:text-slate-800 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 hover:bg-slate-200/80 hover:text-slate-800 dark:hover:bg-white/10 dark:hover:text-white group-hover:opacity-100 transition-opacity cursor-pointer"
                           onClick={(event) => {
                             event.stopPropagation();
                             const rect = event.currentTarget.getBoundingClientRect();
@@ -189,11 +189,11 @@ export function SidebarHistory({
       </section>
 
       {menu && createPortal(
-        <div className="fixed z-[70] w-32 rounded-xl border border-slate-100 bg-white p-1 text-[13px] shadow-lg" style={{ top: menu.top, left: menu.left }} onClick={(event) => event.stopPropagation()}>
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700" onClick={() => { pinSession(menu.id); setMenu(null); }}>
+        <div className="fixed z-[70] w-32 rounded-xl border border-slate-100 bg-white p-1 text-[13px] shadow-lg dark:border-white/[0.08] dark:bg-[#1B1B1E]" style={{ top: menu.top, left: menu.left }} onClick={(event) => event.stopPropagation()}>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-white/10" onClick={() => { pinSession(menu.id); setMenu(null); }}>
             <Pin className="h-3.5 w-3.5" />置顶
           </button>
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700" onClick={() => {
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-white/10" onClick={() => {
             const session = sessions.find((item) => item.id === menu.id);
             setEditingId(menu.id);
             setEditTitle(session?.title || '');
@@ -201,7 +201,7 @@ export function SidebarHistory({
           }}>
             <Pencil className="h-3.5 w-3.5" />重命名
           </button>
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-rose-50 hover:text-rose-600 cursor-pointer text-slate-700" onClick={() => {
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-rose-50 hover:text-rose-600 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-rose-950/40 dark:hover:text-rose-400" onClick={() => {
             const session = sessions.find((item) => item.id === menu.id);
             setDeleteTarget({ id: menu.id, title: session?.title || '未命名对话' });
             setMenu(null);
@@ -214,15 +214,15 @@ export function SidebarHistory({
 
       {deleteTarget && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()} role="dialog" aria-label={`确认删除「${deleteTarget.title}」`}>
-            <button type="button" aria-label="取消" onClick={() => setDeleteTarget(null)} className="absolute right-5 top-5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <div className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-white/[0.08] dark:bg-[#1B1B1E]" onClick={(event) => event.stopPropagation()} role="dialog" aria-label={`确认删除「${deleteTarget.title}」`}>
+            <button type="button" aria-label="取消" onClick={() => setDeleteTarget(null)} className="absolute right-5 top-5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white">
               <X className="h-4 w-4" />
             </button>
-            <h3 className="pr-8 text-[16px] font-semibold text-slate-900">确认删除「{deleteTarget.title}」</h3>
-            <p className="mt-3 text-[13px] leading-relaxed text-slate-500">此操作无法撤回，删除对话后，仍可在「资产」中找回已生成的内容，确认删除么？</p>
+            <h3 className="pr-8 text-[16px] font-semibold text-slate-900 dark:text-white">确认删除「{deleteTarget.title}」</h3>
+            <p className="mt-3 text-[13px] leading-relaxed text-slate-500 dark:text-[#8E8E93]">此操作无法撤回，删除对话后，仍可在「资产」中找回已生成的内容，确认删除么？</p>
             <div className="mt-7 flex justify-end gap-3">
-              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-xl bg-[#F2F3F5] px-5 py-2 text-[13px] text-slate-800 hover:bg-[#E5E6EB]">取消</button>
-              <button type="button" onClick={() => { deleteSession(deleteTarget.id); setDeleteTarget(null); }} className="rounded-xl bg-black px-5 py-2 text-[13px] text-white hover:bg-slate-800">删除</button>
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-xl bg-[#F2F3F5] px-5 py-2 text-[13px] text-slate-800 hover:bg-[#E5E6EB] dark:bg-[#26262B] dark:text-[#EDEDED] dark:hover:bg-[#2F2F36]">取消</button>
+              <button type="button" onClick={() => { deleteSession(deleteTarget.id); setDeleteTarget(null); }} className="rounded-xl bg-red-600 hover:bg-red-500 text-white px-5 py-2 text-[13px] font-medium transition-colors cursor-pointer shadow-xs active:scale-[0.98] dark:bg-red-600 dark:hover:bg-red-500 dark:text-white dark:shadow-[0_0_14px_rgba(239,68,68,0.25)]">删除</button>
             </div>
           </div>
         </div>,

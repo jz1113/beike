@@ -32,6 +32,8 @@ interface UsePromptBarSubmitOptions {
   currentView: string;
   availableImageModelsLength: number;
   availableVideoModelsLength?: number;
+  availableAudioModelsLength?: number;
+  quickAudioModel?: string;
   quickDepthStyle: any;
   quickDepthQuality: any;
   refMediaFile: File | null;
@@ -66,6 +68,8 @@ export function usePromptBarSubmit({
   currentView,
   availableImageModelsLength,
   availableVideoModelsLength,
+  availableAudioModelsLength,
+  quickAudioModel,
   quickDepthStyle,
   quickDepthQuality,
   refMediaFile,
@@ -127,6 +131,9 @@ export function usePromptBarSubmit({
       currentView,
       hasImageModels: availableImageModelsLength > 0,
       hasVideoModels: (availableVideoModelsLength ?? 0) > 0,
+      hasAudioModels: (availableAudioModelsLength ?? 0) > 0,
+      quickAudioModel,
+      assistantModel: useAppStore.getState().assistantModel,
       quickDepthStyle,
       quickDepthQuality,
       refMediaFile,
@@ -190,7 +197,7 @@ export function usePromptBarSubmit({
       setIsSubmitting(false);
       submittingLockTimerRef.current = null;
     }, 2000);
-  }, [quickGenMode, quickPrompt, quickRefImages, activeSubjects, allSubjects, quickVideoRefMode, quickVideoFirstFrame, quickVideoLastFrame, quickVideoMultiFrames, quickCount, quickVideoCount, quickModel, quickVideoModel, sizeStr, quickQuality, quickVideoAspectId, quickVideoResolution, quickVideoDuration, currentView, availableImageModelsLength, availableVideoModelsLength, quickDepthStyle, quickDepthQuality, refMediaFile, depthModelReady, isDepthMode, onSubmitSuccess, clearComposerMedia, showToast, setupCommand]);
+  }, [quickGenMode, quickPrompt, quickRefImages, activeSubjects, allSubjects, quickVideoRefMode, quickVideoFirstFrame, quickVideoLastFrame, quickVideoMultiFrames, quickCount, quickVideoCount, quickModel, quickVideoModel, quickAudioModel, sizeStr, quickQuality, quickVideoAspectId, quickVideoResolution, quickVideoDuration, currentView, availableImageModelsLength, availableVideoModelsLength, availableAudioModelsLength, quickDepthStyle, quickDepthQuality, refMediaFile, depthModelReady, isDepthMode, onSubmitSuccess, clearComposerMedia, showToast, setupCommand]);
 
   const handleSendPromptRef = useRef(handleSendPrompt);
   useEffect(() => {
@@ -256,6 +263,8 @@ export function usePromptBarSubmit({
     currentView,
     hasImageModels: availableImageModelsLength > 0,
     hasVideoModels: (availableVideoModelsLength ?? 0) > 0,
+    hasAudioModels: (availableAudioModelsLength ?? 0) > 0,
+    quickAudioModel,
     isSubmitting,
     quickDepthStyle,
     quickDepthQuality,

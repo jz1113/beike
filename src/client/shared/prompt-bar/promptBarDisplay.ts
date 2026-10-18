@@ -70,8 +70,8 @@ export function resolveModeButtonClass(params: {
 }): string {
   const { showModeDropdown } = params;
   return showModeDropdown
-    ? 'bg-slate-100 text-slate-900 font-medium'
-    : 'bg-transparent hover:bg-slate-100/70 text-slate-700 hover:text-slate-900 font-medium';
+    ? 'bg-slate-100 text-slate-900 dark:bg-white/20 dark:text-white font-medium'
+    : 'bg-transparent hover:bg-slate-100/70 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white font-medium';
 }
 
 /**

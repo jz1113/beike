@@ -1,5 +1,6 @@
 import type { AssetTaskBatch } from './assetBatch';
 import { getAssetMediaKind } from './assetMedia';
+import { isPureAgentDialogue } from './agentAssetFilter';
 import { useI18nStore, TRANSLATIONS, type SupportedLocale } from '@client/shared/i18n';
 
 type Task = AssetTaskBatch['tasks'][number];
@@ -21,7 +22,7 @@ export interface MaterialFilterOptions {
 }
 
 export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions): Task[] {
-  let list = [...tasks];
+  let list = tasks.filter((t) => !isPureAgentDialogue(t));
   if (opts.sourceType === 'uploaded') {
     list = list.filter((t) => t.isUploaded || t.sourceImageUrl || t.referenceImageUrl);
   }
@@ -30,7 +31,7 @@ export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions):
   }
   if (opts.statusFilter && opts.statusFilter !== 'all') {
     if (opts.statusFilter === 'completed') {
-      list = list.filter((t) => t.resultUrl && t.status !== 'FAILURE');
+      list = list.filter((t) => (t.resultUrl || getAssetMediaKind(t) === 'document') && t.status !== 'FAILURE');
     } else if (opts.statusFilter === 'failed') {
       list = list.filter((t) => t.status === 'FAILURE');
     }

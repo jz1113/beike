@@ -250,12 +250,12 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     onKeyDown={event => { if (event.key === 'Escape') setSelectedFolderIds([]); }}>
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="text-[15px] font-bold text-slate-900">{parentId ? '商品细分' : '商品大类'}</h2><p className="mt-0.5 text-xs text-slate-500">{total} 组母本，按商品{parentId ? '细分' : '大类'}归档</p>
+        <h2 className="text-[15px] font-bold text-slate-900 dark:text-slate-100">{parentId ? '商品细分' : '商品大类'}</h2><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{total} 组母本，按商品{parentId ? '细分' : '大类'}归档</p>
         {selectedFolderIds.length > 0 && <p className="mt-1 text-[11px] text-indigo-600">已选 {selectedFolderIds.length} 个文件夹 · 右键操作，按 Esc 清除</p>}
       </div>
       <div className="flex items-center gap-2">
         {defaultRulesId && ruleCategories.some(category => category.id === defaultRulesId) && <button type="button" onClick={() => setRulesId(defaultRulesId)}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-white hover:text-indigo-700">
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-white hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-white/10">
           <Settings2 className="h-3.5 w-3.5" />分类规则
         </button>}
         {total > 0 && onOpenAll && <button type="button" onClick={onOpenAll}
@@ -317,21 +317,21 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
               }
               void commitInlineRename(false);
             }}
-            className="mt-0.5 block w-full rounded-md border border-indigo-400 bg-white px-1 py-0.5 text-center text-sm font-semibold text-slate-900 outline-none ring-2 ring-indigo-100 disabled:opacity-60"
+            className="mt-0.5 block w-full rounded-md border border-indigo-400 bg-white px-1 py-0.5 text-center text-sm font-semibold text-slate-900 outline-none ring-2 ring-indigo-100 disabled:opacity-60 dark:text-slate-100 dark:bg-[#18191c]"
           /> : <button type="button" ref={element => {
             if (element) nameButtonRefs.current.set(folder.id, element);
             else nameButtonRefs.current.delete(folder.id);
           }} onClick={event => selectOrOpen(event, folder)}
-            className="mt-1 flex w-full items-center justify-center gap-1 text-sm font-semibold text-slate-800 hover:text-indigo-600 focus-visible:outline-none focus-visible:underline focus-visible:decoration-2 focus-visible:decoration-indigo-500 focus-visible:underline-offset-4"
+            className="mt-1 flex w-full items-center justify-center gap-1 text-sm font-semibold text-slate-800 hover:text-indigo-600 focus-visible:outline-none focus-visible:underline focus-visible:decoration-2 focus-visible:decoration-indigo-500 focus-visible:underline-offset-4 dark:text-slate-100"
             aria-label={isSelected ? `${folder.name}，已选中` : undefined} title={folder.name}>
             <span className="min-w-0 truncate">{folder.name}</span>{isSelected && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-indigo-600" />}
           </button>}
           {editing?.id === folder.id && editing.error && <p id={`prompt-folder-rename-error-${folder.id}`} role="alert"
             className="mt-1 text-[11px] leading-4 text-rose-600">{editing.error}</p>}
-          <p className="mt-0.5 text-[11px] text-slate-500">{folder.items.length} 组母本</p>
+          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{folder.items.length} 组母本</p>
         </div>;
       })}
-    </div> : <div className="rounded-xl border border-dashed border-slate-200 px-6 py-12 text-center text-sm text-slate-500">
+    </div> : <div className="rounded-xl border border-dashed border-slate-200 px-6 py-12 text-center text-sm text-slate-500 dark:text-slate-400 dark:border-white/10">
       还没有商品{parentId ? '细分' : '大类'}，右键空白处可新建文件夹。
     </div>}
 
@@ -350,18 +350,18 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     {createDialogOpen && <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateDialogOpen(false); }}>
       <form role="dialog" aria-modal="true" aria-label="新建文件夹" onSubmit={saveFolder}
         onKeyDown={event => { if (event.key === 'Escape' && !saving) setCreateDialogOpen(false); }}
-        className="w-full max-w-sm rounded-2xl border border-white bg-white p-5 shadow-2xl">
+        className="w-full max-w-sm rounded-2xl border border-white bg-white p-5 shadow-2xl dark:bg-[#18191c]">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900">新建文件夹</h3>
-          <button type="button" aria-label="关闭" disabled={saving} onClick={() => setCreateDialogOpen(false)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">新建文件夹</h3>
+          <button type="button" aria-label="关闭" disabled={saving} onClick={() => setCreateDialogOpen(false)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>
         </div>
-        <label htmlFor="prompt-folder-name" className="mt-5 block text-xs font-semibold text-slate-600">{parentId ? '商品细分名称' : '商品大类名称'}</label>
+        <label htmlFor="prompt-folder-name" className="mt-5 block text-xs font-semibold text-slate-600 dark:text-slate-300">{parentId ? '商品细分名称' : '商品大类名称'}</label>
         <input ref={createInputRef} id="prompt-folder-name" value={name} maxLength={40} onChange={event => setName(event.target.value)}
-          className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 dark:border-white/10"
           placeholder={parentId ? '例如：手机本体、手机壳' : '例如：手机数码、珠宝首饰'} />
         {error && <p role="alert" className="mt-2 text-xs text-rose-600">{error}</p>}
         <div className="mt-6 flex justify-end gap-2">
-          <button type="button" disabled={saving} onClick={() => setCreateDialogOpen(false)} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">取消</button>
+          <button type="button" disabled={saving} onClick={() => setCreateDialogOpen(false)} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">取消</button>
           <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
         </div>
       </form>

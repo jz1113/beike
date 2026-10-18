@@ -46,9 +46,12 @@ export interface TranslationSchema {
       three_d: string;
       music: string;
       voice: string;
+      avatar: string;
       storage: string;
+      appearance: string;
       language: string;
       canvas: string;
+      pet: string;
     };
   };
   sidebar: {
@@ -72,6 +75,8 @@ export interface TranslationSchema {
   };
   promptBar: {
     agent: string;
+    agentTips: string[];
+    manualBadge: string;
     refMedia: string;
     refMediaVideo: string;
     depthImage: string;

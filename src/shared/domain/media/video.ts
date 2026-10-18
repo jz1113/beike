@@ -65,16 +65,35 @@ export interface VideoRefModeItem {
 }
 
 export const VIDEO_REF_MODES: VideoRefModeItem[] = [
-  { id: 'text', name: '文生视频', desc: '用文字描述主体、动作与镜头' },
+  { id: 'omni', name: '全能参考', desc: '参考图片或视频的主体、场景或动作，可混合使用' },
   { id: 'first_frame', name: '首帧生视频', desc: '以一张图片作为视频第一帧' },
   { id: 'first_last_frame', name: '首尾帧', desc: '两张图片分别作为开始与结束画面' },
-  { id: 'omni', name: '参考生视频', desc: '参考素材的主体、场景或动作' },
+  { id: 'text', name: '文生视频', desc: '用文字描述主体、动作与镜头' },
   { id: 'edit', name: '视频编辑', desc: '描述参考视频中需要修改的内容' },
   { id: 'extend', name: '视频延长', desc: '描述原视频之后发生的内容' },
 ];
 
 export const VIDEO_RESOLUTIONS: ('480P' | '720P' | '1080P' | '4K')[] = ['480P', '720P', '1080P', '4K'];
+export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
 export const VIDEO_DURATIONS: number[] = [4, 5, 8, 10, 15, 30];
+
+/** 480P，否则 720P，否则支持列表里的最低档。未知模型默认 480P。 */
+export function defaultVideoResolution(supported?: readonly string[]): VideoResolution {
+  const allowed = new Set((supported ?? []).map((value) => value.toUpperCase()));
+  if (allowed.size === 0 || allowed.has('480P')) return '480P';
+  if (allowed.has('720P')) return '720P';
+  return VIDEO_RESOLUTIONS.find((value) => allowed.has(value)) ?? '720P';
+}
+
+/** 当前档仍受支持时保留；否则改用该模型的默认清晰度。 */
+export function resolveVideoResolution(current: string | null | undefined, supported?: readonly string[]): VideoResolution {
+  const normalized = (current ?? '').toUpperCase();
+  const allowed = (supported ?? []).map((value) => value.toUpperCase());
+  if ((VIDEO_RESOLUTIONS as readonly string[]).includes(normalized) && (allowed.length === 0 || allowed.includes(normalized))) {
+    return normalized as VideoResolution;
+  }
+  return defaultVideoResolution(supported);
+}
 
 /** 按模型 id 查找视频模型配置 */
 export function getVideoModelById(modelId?: string | null): VideoGenModel | undefined {

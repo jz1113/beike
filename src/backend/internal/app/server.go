@@ -11,12 +11,15 @@ import (
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/assistant/extract"
 	"beike.local/cloud/src/backend/internal/assistant/sessions"
+	"beike.local/cloud/src/backend/internal/avatar"
 	"beike.local/cloud/src/backend/internal/catalog"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/generate/export"
 	"beike.local/cloud/src/backend/internal/generate/headline"
+	"beike.local/cloud/src/backend/internal/generate/ppt"
+	"beike.local/cloud/src/backend/internal/generate/videosales"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/keywordreview"
 	"beike.local/cloud/src/backend/internal/library"
@@ -128,18 +131,39 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/layer-decomposition", true, generate.LayerDecomposition(cfg)},
 		{"POST /api/generate/headline-title", true, headline.HeadlineTitle(cfg)},
 		{"POST /api/generate/headline-design", true, headline.HeadlineDesign(cfg)},
+		{"POST /api/generate/headline-deconstruct", true, headline.HeadlineDeconstruct(cfg)},
 		{"POST /api/generate/analyze", true, generate.Analyze(cfg)},
 		{"POST /api/generate/copywriting", true, generate.Copywriting(cfg)},
 		{"POST /api/generate/image", true, generate.Image(cfg)},
 		{"GET /api/generate/image", true, generate.Image(cfg)},
 		{"POST /api/generate/video", true, generate.Video(cfg)},
 		{"GET /api/generate/video", true, generate.Video(cfg)},
+		{"POST /api/generate/audio", true, generate.Audio(cfg)},
+		{"GET /api/generate/audio", true, generate.Audio(cfg)},
 		{"POST /api/generate/depth-image", true, depth.DepthImage(cfg)},
 		{"POST /api/generate/depth-video", true, depth.DepthVideo(cfg)},
 		{"GET /api/generate/depth-video", true, depth.DepthVideo(cfg)},
 		{"GET /api/generate/depth-image", true, depth.DepthImage(cfg)},
 		{"POST /api/generate/export-zip", true, export.ExportZip(cfg)},
+		{"POST /api/generate/ppt-outline", true, ppt.PptOutline(cfg)},
+		{"POST /api/generate/ppt-detail", true, ppt.PptDetail(cfg)},
+		{"POST /api/generate/ppt-slide", true, ppt.PptSlide(cfg)},
+		{"POST /api/generate/ppt-narration", true, ppt.PptNarration(cfg)},
+		{"POST /api/generate/video-sales/analyze", true, videosales.Analyze(cfg)},
+		{"POST /api/generate/video-sales/script", true, videosales.Script(cfg)},
+		{"POST /api/generate/video-sales/compose", true, videosales.Compose(cfg)},
 		{"POST /api/workshop/tasks/{taskId}/review", true, workshop.Review(cfg)},
+		{"GET /api/avatar/characters", true, avatar.Characters(cfg)},
+		{"POST /api/avatar/characters", true, avatar.CreateCharacter(cfg)},
+		{"DELETE /api/avatar/characters/{id}", true, avatar.DeleteCharacterHandler(cfg)},
+		{"GET /api/avatar/voices", true, avatar.Voices(cfg)},
+		{"POST /api/avatar/voices", true, avatar.CreateVoice(cfg)},
+		{"DELETE /api/avatar/voices/{id}", true, avatar.DeleteVoiceHandler(cfg)},
+		{"GET /api/avatar/fonts", true, avatar.Fonts(cfg)},
+		{"GET /api/avatar/tasks", true, avatar.Tasks(cfg)},
+		{"GET /api/avatar/tasks/{id}", true, avatar.TaskDetail(cfg)},
+		{"DELETE /api/avatar/tasks/{id}", true, avatar.DeleteTaskHandler(cfg)},
+		{"POST /api/avatar/render", true, avatar.Render(cfg)},
 	}
 }
 

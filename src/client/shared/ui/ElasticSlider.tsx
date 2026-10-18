@@ -194,7 +194,7 @@ const Slider: React.FC<SliderProps> = ({
             className="flex flex-grow"
           >
             <div
-              className={`relative h-full flex-grow overflow-visible rounded-full ${tone === 'light' ? 'bg-slate-100' : 'bg-[#17151b]'}`}
+              className={`relative h-full flex-grow overflow-visible rounded-full ${tone === 'light' ? 'bg-slate-100 dark:bg-white/10' : 'bg-[#17151b]'}`}
               style={{ backgroundImage: tone === 'light' ? 'repeating-linear-gradient(90deg, transparent 0, transparent 15px, rgba(148, 163, 184, 0.62) 15px, rgba(148, 163, 184, 0.62) 16px)' : 'repeating-linear-gradient(90deg, transparent 0, transparent 15px, rgba(117, 109, 130, 0.42) 15px, rgba(117, 109, 130, 0.42) 16px)' }}
             >
               <div className={`absolute h-full rounded-full ${tone === 'light' ? 'bg-slate-300' : 'bg-[#4a4650]'}`} style={{ width: `${getRangePercentage()}%` }} />

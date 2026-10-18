@@ -51,7 +51,7 @@ export function PromptBarVideoFramesPanel({
                     currentIndex: 0,
                   });
                 }}
-                className="relative w-16 h-20 sm:w-18 sm:h-22 rounded-2xl border border-slate-200 shadow-sm bg-white -rotate-[3deg] transition-all group-hover/first:rotate-0 group-hover/first:scale-105 cursor-zoom-in"
+                className="relative w-16 h-20 sm:w-18 sm:h-22 rounded-2xl border border-slate-200 shadow-sm bg-white -rotate-[3deg] transition-all group-hover/first:rotate-0 group-hover/first:scale-105 cursor-zoom-in dark:border-white/15 dark:bg-[#222328]"
                 title="点击放大查看首帧"
               >
                 <div className="w-full h-full rounded-2xl overflow-hidden pointer-events-none">
@@ -85,11 +85,11 @@ export function PromptBarVideoFramesPanel({
               <button
                 type="button"
                 onClick={onFirstFrameClick}
-                className="w-16 h-20 sm:w-18 sm:h-22 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer -rotate-[3deg] hover:rotate-0 group/card"
+                className="w-16 h-20 sm:w-18 sm:h-22 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer -rotate-[3deg] hover:rotate-0 group/card dark:border-white/15 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/25 dark:hover:bg-white/10 dark:hover:text-slate-200"
                 title="上传视频第 1 帧起始图 (首帧)"
               >
                 <Plus className="w-5 h-5 group-hover/card:scale-110 transition-transform stroke-[1.8]" />
-                <span className="text-[11px] font-bold text-slate-500">首帧</span>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">首帧</span>
               </button>
             )}
           </div>
@@ -97,7 +97,7 @@ export function PromptBarVideoFramesPanel({
           <button
             type="button"
             onClick={swapVideoFirstLastFrames}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all cursor-pointer self-center flex-shrink-0"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all cursor-pointer self-center flex-shrink-0 dark:hover:bg-white/10"
             title="交换首尾帧顺序"
           >
             <ArrowLeftRight className="w-4 h-4" />
@@ -112,7 +112,7 @@ export function PromptBarVideoFramesPanel({
                     currentIndex: quickVideoFirstFrame ? 1 : 0,
                   });
                 }}
-                className="relative w-16 h-20 sm:w-18 sm:h-22 rounded-2xl border border-slate-200 shadow-sm bg-white rotate-[3deg] transition-all group-hover/last:rotate-0 group-hover/last:scale-105 cursor-zoom-in"
+                className="relative w-16 h-20 sm:w-18 sm:h-22 rounded-2xl border border-slate-200 shadow-sm bg-white rotate-[3deg] transition-all group-hover/last:rotate-0 group-hover/last:scale-105 cursor-zoom-in dark:border-white/15 dark:bg-[#222328]"
                 title="点击放大查看尾帧"
               >
                 <div className="w-full h-full rounded-2xl overflow-hidden pointer-events-none">
@@ -146,11 +146,11 @@ export function PromptBarVideoFramesPanel({
               <button
                 type="button"
                 onClick={onLastFrameClick}
-                className="w-16 h-20 sm:w-18 sm:h-22 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer rotate-[3deg] hover:rotate-0 group/card"
+                className="w-16 h-20 sm:w-18 sm:h-22 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer rotate-[3deg] hover:rotate-0 group/card dark:border-white/15 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/25 dark:hover:bg-white/10 dark:hover:text-slate-200"
                 title="上传视频结束图 (尾帧)"
               >
                 <Plus className="w-5 h-5 group-hover/card:scale-110 transition-transform stroke-[1.8]" />
-                <span className="text-[11px] font-bold text-slate-500">尾帧</span>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">尾帧</span>
               </button>
             )}
           </div>
@@ -169,7 +169,7 @@ export function PromptBarVideoFramesPanel({
                   currentIndex: 0,
                 });
               }}
-              className="relative w-15 h-19 sm:w-17 sm:h-21 rounded-2xl border border-slate-200 shadow-sm bg-white -rotate-[4deg] transition-all group-hover/first:rotate-0 group-hover/first:scale-105 cursor-zoom-in"
+              className="relative w-15 h-19 sm:w-17 sm:h-21 rounded-2xl border border-slate-200 shadow-sm bg-white -rotate-[4deg] transition-all group-hover/first:rotate-0 group-hover/first:scale-105 cursor-zoom-in dark:border-white/15 dark:bg-[#222328]"
               title="点击放大查看首帧"
             >
               <div className="w-full h-full rounded-2xl overflow-hidden pointer-events-none">
@@ -203,11 +203,11 @@ export function PromptBarVideoFramesPanel({
             <button
               type="button"
               onClick={onFirstFrameClick}
-              className="w-15 h-19 sm:w-17 sm:h-21 rounded-2xl bg-[#F8F9FA] hover:bg-slate-100 border border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs -rotate-[4deg] hover:rotate-0 group/card"
+              className="w-15 h-19 sm:w-17 sm:h-21 rounded-2xl bg-[#F8F9FA] hover:bg-slate-100 border border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs -rotate-[4deg] hover:rotate-0 group/card dark:border-white/15 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/25 dark:hover:bg-white/10 dark:hover:text-slate-200"
               title="上传视频第 1 帧起始图 (首帧)"
             >
               <Plus className="w-5 h-5 text-slate-400 group-hover/card:scale-110 transition-transform stroke-[1.8]" />
-              <span className="text-[11px] font-bold text-slate-500">首帧</span>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">首帧</span>
             </button>
           )}
         </div>
@@ -215,7 +215,7 @@ export function PromptBarVideoFramesPanel({
         <button
           type="button"
           onClick={swapVideoFirstLastFrames}
-          className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all cursor-pointer self-center"
+          className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all cursor-pointer self-center dark:hover:bg-white/10"
           title="交换首尾帧顺序"
         >
           <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -230,7 +230,7 @@ export function PromptBarVideoFramesPanel({
                   currentIndex: quickVideoFirstFrame ? 1 : 0,
                 });
               }}
-              className="relative w-15 h-19 sm:w-17 sm:h-21 rounded-2xl border border-slate-200 shadow-sm bg-white rotate-[4deg] transition-all group-hover/last:rotate-0 group-hover/last:scale-105 cursor-zoom-in"
+              className="relative w-15 h-19 sm:w-17 sm:h-21 rounded-2xl border border-slate-200 shadow-sm bg-white rotate-[4deg] transition-all group-hover/last:rotate-0 group-hover/last:scale-105 cursor-zoom-in dark:border-white/15 dark:bg-[#222328]"
               title="点击放大查看尾帧"
             >
               <div className="w-full h-full rounded-2xl overflow-hidden pointer-events-none">
@@ -264,11 +264,11 @@ export function PromptBarVideoFramesPanel({
             <button
               type="button"
               onClick={onLastFrameClick}
-              className="w-15 h-19 sm:w-17 sm:h-21 rounded-2xl bg-[#F8F9FA] hover:bg-slate-100 border border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs rotate-[4deg] hover:rotate-0 group/card"
+              className="w-15 h-19 sm:w-17 sm:h-21 rounded-2xl bg-[#F8F9FA] hover:bg-slate-100 border border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs rotate-[4deg] hover:rotate-0 group/card dark:border-white/15 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/25 dark:hover:bg-white/10 dark:hover:text-slate-200"
               title="上传视频结束图 (尾帧)"
             >
               <Plus className="w-5 h-5 text-slate-400 group-hover/card:scale-110 transition-transform stroke-[1.8]" />
-              <span className="text-[11px] font-bold text-slate-500">尾帧</span>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">尾帧</span>
             </button>
           )}
         </div>
@@ -289,7 +289,7 @@ export function PromptBarVideoFramesPanel({
                   currentIndex: idx,
                 });
               }}
-              className="relative w-15 h-19 sm:w-17 sm:h-21 rounded-2xl border border-slate-200 shadow-sm bg-white transition-all group-hover/mframe:scale-105 cursor-zoom-in"
+              className="relative w-15 h-19 sm:w-17 sm:h-21 rounded-2xl border border-slate-200 shadow-sm bg-white transition-all group-hover/mframe:scale-105 cursor-zoom-in dark:border-white/15 dark:bg-[#222328]"
               title={`点击放大查看第${idx + 1}帧`}
             >
               <div className="w-full h-full rounded-2xl overflow-hidden pointer-events-none">
@@ -326,13 +326,13 @@ export function PromptBarVideoFramesPanel({
           <button
             type="button"
             onClick={onMultiFrameClick}
-            className={`w-15 h-19 sm:w-17 sm:h-21 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs ${
+            className={`w-15 h-19 sm:w-17 sm:h-21 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200/90 hover:border-slate-300 text-slate-400 hover:text-slate-700 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs dark:border-white/15 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/25 dark:hover:bg-white/10 dark:hover:text-slate-200 ${
               quickVideoMultiFrames.length === 0 ? '-rotate-[4deg] hover:rotate-0' : ''
             } group/card flex-shrink-0`}
             title={`添加第 ${quickVideoMultiFrames.length + 1} 帧镜头`}
           >
             <Plus className="w-5 h-5 text-slate-400 group-hover/card:scale-110 transition-transform stroke-[1.8]" />
-            <span className="text-[11px] font-bold text-slate-500">第{quickVideoMultiFrames.length + 1}帧</span>
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">第{quickVideoMultiFrames.length + 1}帧</span>
           </button>
         )}
       </>

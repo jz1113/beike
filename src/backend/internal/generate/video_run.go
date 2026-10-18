@@ -85,7 +85,7 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	}
 	resolution := strings.ToLower(rawString(payload, "resolution"))
 	if resolution == "" {
-		resolution = "720p"
+		resolution = strings.ToLower(defaultVideoResolution(model))
 	}
 	duration := int(rawNumber(payload, "duration"))
 	if duration == 0 {

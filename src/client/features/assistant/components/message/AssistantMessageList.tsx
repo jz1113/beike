@@ -104,7 +104,7 @@ export default function AssistantMessageList({
               <button
                 type="button"
                 onClick={() => { const list = scrollRef.current; if (list) historyAnchor.current = { sessionId, height: list.scrollHeight, top: list.scrollTop }; setMessageWindow(n => n + 40); }}
-                className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 cursor-pointer"
+                className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 cursor-pointer dark:text-slate-400 dark:hover:bg-white/10"
               >
                 显示更早的 {hiddenMessageCount} 条消息
               </button>
@@ -188,13 +188,13 @@ export default function AssistantMessageList({
                             const imgUrl = att.url || att.thumbnailUrl;
                             if (imgUrl) setChatPreview({ url: imgUrl, type: 'image' });
                           }}
-                          className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-xl overflow-hidden border border-slate-200/90 shadow-2xs aspect-square bg-slate-100 group/att cursor-pointer hover:border-red-500 transition-all hover:scale-102 flex-shrink-0"
+                          className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-xl overflow-hidden border border-slate-200/90 shadow-2xs aspect-square bg-slate-100 group/att cursor-pointer hover:border-red-500 transition-all hover:scale-102 flex-shrink-0 dark:bg-white/10 dark:border-white/10"
                           title={att.type === 'document' ? (att.name || '文档') : att.type === 'video' ? '点击播放视频' : `点击放大查看 @图片${msg.attachments!.slice(0, attIdx + 1).filter((item) => item.type !== 'document').length}`}
                         >
                           {att.type === 'document' ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-slate-50 px-1">
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-slate-50 px-1 dark:bg-white/5">
                               <FileText className="w-6 h-6 text-indigo-600" />
-                              <span className="text-[9px] text-slate-600 font-medium truncate max-w-full px-0.5">{att.name || '文档'}</span>
+                              <span className="text-[9px] text-slate-600 font-medium truncate max-w-full px-0.5 dark:text-slate-300">{att.name || '文档'}</span>
                             </div>
                           ) : att.type === 'video' ? (
                             <div className="relative w-full h-full bg-slate-900">
@@ -265,7 +265,7 @@ export default function AssistantMessageList({
                       {isUser ? (
                         <div className="whitespace-pre-wrap break-all leading-relaxed">
                           {msg.usedSkill && (
-                            <span title={`本条消息使用技能：${msg.usedSkill.name}`} className="mr-1.5 inline-flex max-w-full items-center gap-1 rounded-md border border-slate-300/70 bg-white/70 px-1.5 py-0.5 align-middle text-xs leading-4 text-slate-700">
+                            <span title={`本条消息使用技能：${msg.usedSkill.name}`} className="mr-1.5 inline-flex max-w-full items-center gap-1 rounded-md border border-slate-300/70 bg-white/70 px-1.5 py-0.5 align-middle text-xs leading-4 text-slate-700 dark:text-slate-200 dark:bg-[#18191c]/95">
                               <AssistantSkillIcon className="h-3 w-3 shrink-0 text-amber-500" />
                               <span className="truncate">{msg.usedSkill.name}</span>
                             </span>

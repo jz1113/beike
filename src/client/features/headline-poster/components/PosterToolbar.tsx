@@ -1,4 +1,4 @@
-import { Brush, Check, ClipboardList, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, X } from 'lucide-react';
+import { BrainCircuit, Brush, Check, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, X } from 'lucide-react';
 import Dock, { type DockItemData } from '@client/shared/ui/Dock';
 import { ToolSuiteMark } from '@client/shared/icons';
 
@@ -16,7 +16,8 @@ interface Props {
   historyCount: number;
   isNewBatchConfirming: boolean;
   onOpenSettings: () => void;
-  onOpenRules: () => void;
+  onOpenRules?: () => void;
+  onOpenMemory?: () => void;
   onOpenHistory: () => void;
   onRetryFailed: () => void;
   onExport: () => void;
@@ -29,11 +30,12 @@ interface Props {
 
 export function PosterToolbar({
   onBack, failedCount, completedCount, pendingCount, isRunning, isExporting,
-  isRestoring, isImporting, isReady, hasItems, historyCount, isNewBatchConfirming, onOpenSettings, onOpenRules, onOpenHistory, onRetryFailed, onExport, onStartBatch, onStop,
+  isRestoring, isImporting, isReady, hasItems, historyCount, isNewBatchConfirming, onOpenSettings, onOpenRules, onOpenMemory, onOpenHistory, onRetryFailed, onExport, onStartBatch, onStop,
   onRequestNewBatch, onCancelNewBatch, onConfirmNewBatch,
 }: Props) {
   const isBusy = !isReady || isRunning || isExporting || isRestoring || isImporting;
-  const dockButtonClass = '!border-slate-200 !bg-white !text-slate-950 shadow-sm hover:!border-slate-300 hover:!bg-slate-50';
+  const dockButtonClass = '!border-slate-200 !bg-white !text-slate-950 shadow-sm hover:!border-slate-300 hover:!bg-slate-50 dark:!border-white/10 dark:!bg-[#1B1B1E] dark:!text-white dark:hover:!bg-[#26262B] dark:hover:!border-white/20';
+  const handleOpenAction = onOpenMemory || onOpenRules;
   const generationControl: DockItemData = isRunning
     ? { icon: <Square className="h-4 w-4 fill-current" />, label: '停止生成', onClick: onStop, className: dockButtonClass }
     : failedCount > 0 && pendingCount === 0
@@ -49,19 +51,19 @@ export function PosterToolbar({
 
   return (
     <header className="relative flex min-h-[72px] flex-wrap items-center justify-between gap-3 pb-2">
-      <button type="button" onClick={onBack} className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white" title="返回首页">
+      <button type="button" onClick={onBack} className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#26262B] text-slate-900 dark:text-white" title="返回首页">
         <ToolSuiteMark>
           <Brush className="h-4 w-4 stroke-[2]" />
         </ToolSuiteMark>
         <span className="text-sm font-black tracking-tight">封面生成</span>
       </button>
       <div className="contents sm:ml-auto sm:flex sm:max-w-full sm:items-center sm:justify-end sm:gap-2">
-        <button type="button" onClick={onOpenRules} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-950" aria-label="查看生成规则" title="查看当前大字报生成规则"><ClipboardList className="h-3.5 w-3.5" /><span className="hidden sm:inline">生成规则</span></button>
+        <button type="button" onClick={handleOpenAction} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/40 px-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-indigo-500/10" aria-label="封面风格记忆与灵感中枢" title="上传优质样张，反推拆解并沉淀风格 Skill"><BrainCircuit className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" /><span className="hidden sm:inline">风格记忆与灵感</span></button>
         <div className="ml-auto max-w-full">
         {isNewBatchConfirming ? (
           <div className="flex items-center gap-2 rounded-2xl border border-rose-300/30 bg-[#121116] p-2 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)]">
             <span className="hidden px-1 text-xs font-bold text-rose-100 sm:inline">清空当前批次？</span>
-            <button type="button" onClick={onCancelNewBatch} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.055] text-slate-300 transition-colors hover:bg-white/10 hover:text-white" aria-label="取消新建批次" title="取消"><X className="h-4 w-4" /></button>
+            <button type="button" onClick={onCancelNewBatch} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.055] text-slate-300 transition-colors hover:bg-white/10 hover:text-white dark:bg-[#18191c]/95" aria-label="取消新建批次" title="取消"><X className="h-4 w-4" /></button>
             <button type="button" onClick={onConfirmNewBatch} disabled={isBusy} className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500 text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-40" aria-label="确认新建批次" title={isBusy ? '请等待当前操作结束后新建批次' : '确认新建批次'}><Check className="h-4 w-4" /></button>
           </div>
         ) : <Dock items={dockItems} positioned={false} expandsOnHover={false} showLabels labelPlacement="bottom" panelHeight={56} dockHeight={56} baseItemSize={42} magnification={58} distance={140} className="!border-transparent !bg-transparent !shadow-none" />}

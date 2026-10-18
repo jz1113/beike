@@ -2,19 +2,44 @@ import { domainStorage, type DomainStorage } from '../core/runtime';
 import {
   getEnabledImageModelsFromSettings, getEnabledVideoModelsFromSettings,
   getEnabledMultimodalModelsFromSettings, repairWorkflowModelId,
-  upstreamModelId, isOpenAIModelRouteId, type WorkflowCapability,
+  upstreamModelId, type WorkflowCapability,
 } from './workflowModels';
+import { canonicalModelId } from './modelCatalog';
 
 export function resolveEnabledModelId(storedId: string | null | undefined, models: readonly { id: string }[]): string {
-  if (storedId && models.some(model => model.id === storedId)) return storedId;
-  const repaired = storedId ? repairWorkflowModelId(upstreamModelId(storedId)) : '';
-  const sameRoute = models.find(model => model.id.toLowerCase() === (isOpenAIModelRouteId(storedId || '') ? `openai-responses:${repaired}` : repaired).toLowerCase());
-  return sameRoute?.id || models[0]?.id || '';
+  if (!storedId) return models[0]?.id || '';
+  // 1. 精确匹配
+  const exact = models.find(model => model.id === storedId || model.id.toLowerCase() === storedId.toLowerCase());
+  if (exact) return exact.id;
+
+  // 2. 去除前缀和别名后的规范化核心 ID 双向比对
+  const cleanStored = upstreamModelId(storedId).trim().toLowerCase();
+  const canonicalStored = canonicalModelId(cleanStored).toLowerCase();
+  const repairedStored = repairWorkflowModelId(cleanStored).toLowerCase();
+
+  const matched = models.find((model) => {
+    const rawId = model.id.toLowerCase();
+    const cleanModel = upstreamModelId(model.id).trim().toLowerCase();
+    const canonicalModel = canonicalModelId(cleanModel).toLowerCase();
+    const repairedModel = repairWorkflowModelId(cleanModel).toLowerCase();
+
+    return (
+      cleanModel === cleanStored ||
+      canonicalModel === canonicalStored ||
+      repairedModel === repairedStored ||
+      rawId === `openai-responses:${cleanStored}` ||
+      rawId === `openai-responses:${repairedStored}` ||
+      rawId === `openai-responses:${canonicalStored}` ||
+      `openai-responses:${rawId}` === cleanStored
+    );
+  });
+
+  return matched?.id || models[0]?.id || '';
 }
 
 export interface WorkflowDefaults { vision: string; assistant: string; image: string; video: string }
 
-/** Keep defaults in enabled routes; the Responses channel is deliberately excluded from assistant. */
+/** Keep defaults in enabled routes; supports all configured multimodal models. */
 export function reconcileStoredWorkflowDefaults(
   models: WorkflowCapability[],
   storage: DomainStorage | null | undefined = domainStorage(),
@@ -22,7 +47,7 @@ export function reconcileStoredWorkflowDefaults(
 ): WorkflowDefaults {
   if (!storage) throw new Error('浏览器存储不可用');
   const visionModels = getEnabledMultimodalModelsFromSettings(models);
-  const assistantModels = getEnabledMultimodalModelsFromSettings(models, 'assistant').filter(model => model.channel !== 'openai');
+  const assistantModels = getEnabledMultimodalModelsFromSettings(models, 'assistant');
   const vision = resolveEnabledModelId(requested.vision ?? storage.getItem('ai_multimodal_model') ?? storage.getItem('ai_vision_model'), visionModels);
   const syncAssistant = requested.vision !== undefined && assistantModels.some(model => model.id === vision);
   const assistant = resolveEnabledModelId(requested.assistant ?? (syncAssistant ? vision : storage.getItem('ai_assistant_model')), assistantModels);

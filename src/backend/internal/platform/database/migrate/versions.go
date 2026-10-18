@@ -56,6 +56,8 @@ func mustMigrations() []migration {
 		{version: "20260930_01_prompt_folder_archiving", checksum: label("AssetProductCategory.isArchived:v1"), apply: applyFolderArchiving},
 		{version: "20260930_02_deconstruct_background_jobs", checksum: file("deconstruct_jobs.sql"), apply: script("deconstruct_jobs.sql", false)},
 		{version: "20261001_01_workspace_full_prompt_numbers", checksum: label("workspace-full-prompt-library-numbers-v1"), apply: applyWorkspaceFullPromptNumbers},
+		{version: "20261018_01_avatar_studio", checksum: file("avatar_studio.sql"), apply: script("avatar_studio.sql", false)},
+		{version: "20261018_02_task_usage", checksum: file("task_usage.sql"), apply: script("task_usage.sql", true)},
 	}
 }
 

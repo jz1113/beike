@@ -143,8 +143,8 @@ export function AssetLibraryDialogs({ activeSubTab, copiedId, promptGroupCategor
         >
           <div className="relative max-w-5xl max-h-[92vh] flex flex-col items-center cursor-default" onClick={(event) => event.stopPropagation()}>
             <div className="w-full flex items-center justify-between pb-3 text-white/80">
-              <span className="text-xs font-medium text-white/60 bg-white/10 px-2.5 py-1 rounded-full backdrop-blur-xs">原图高清预览 (按 Esc 或点击背景关闭)</span>
-              <button type="button" onClick={() => window.open(preview.zoomUrl!, '_blank')} className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 text-xs font-medium cursor-pointer" title="在新标签页打开">新标签页打开</button>
+              <span className="text-xs font-medium text-white/60 bg-white/10 px-2.5 py-1 rounded-full backdrop-blur-xs dark:bg-[#18191c]/95">原图高清预览 (按 Esc 或点击背景关闭)</span>
+              <button type="button" onClick={() => window.open(preview.zoomUrl!, '_blank')} className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 text-xs font-medium cursor-pointer dark:bg-[#18191c]/95" title="在新标签页打开">新标签页打开</button>
             </div>
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/15 bg-black/40">
               <img src={preview.zoomUrl} alt="参考原图大图" className="max-w-full max-h-[80vh] sm:max-h-[84vh] object-contain rounded-2xl" />

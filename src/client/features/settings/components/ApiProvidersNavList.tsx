@@ -59,7 +59,7 @@ export function ApiProvidersNavList({
         </span>
       );
     }
-    return <Globe className="w-5 h-5 text-slate-500" />;
+    return <Globe className="w-5 h-5 text-slate-500 dark:text-slate-400" />;
   };
 
   const renderStatusDot = (provider: ApiProvider) => {

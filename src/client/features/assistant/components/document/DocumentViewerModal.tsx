@@ -100,41 +100,41 @@ export default function DocumentViewerModal({ filename, content, createdAt, onCl
       <div
         role="dialog"
         aria-label={filename}
-        className="flex h-[min(940px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200/80"
+        className="flex h-[min(940px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200/80 dark:border-white/10 dark:bg-[#18191c]"
         onClick={(event) => event.stopPropagation()}
       >
         {/* 1. 顶部 Header 元信息导航栏 */}
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200/80 px-4 py-3 sm:px-6 bg-slate-50/70">
-          <div className="flex min-w-0 items-center gap-2.5 text-xs text-slate-500">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200/80 px-4 py-3 sm:px-6 bg-slate-50/70 dark:bg-white/5 dark:border-white/10">
+          <div className="flex min-w-0 items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
             <span className={`inline-flex h-6 shrink-0 items-center rounded-md px-1.5 text-[11px] font-bold tracking-wider ${badge.bg}`}>
               {badge.label}
             </span>
-            <span className="truncate text-sm font-semibold text-slate-900">{filename}</span>
+            <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{filename}</span>
             <span className="hidden shrink-0 sm:inline text-slate-400">|</span>
-            <span className="hidden shrink-0 sm:inline font-medium text-slate-600">{countChars(content)} 字</span>
+            <span className="hidden shrink-0 sm:inline font-medium text-slate-600 dark:text-slate-300">{countChars(content)} 字</span>
             <span className="hidden shrink-0 md:inline text-slate-400">·</span>
             <span className="hidden shrink-0 md:inline">创建于 {formatCreatedAt(createdAt)}</span>
-            <span className="hidden shrink-0 lg:inline-flex items-center gap-1 rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] text-slate-600">
+            <span className="hidden shrink-0 lg:inline-flex items-center gap-1 rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-300">
               内容由 AI 生成
             </span>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 text-slate-600">
+          <div className="flex shrink-0 items-center gap-1.5 text-slate-600 dark:text-slate-300">
             <button
               type="button"
               onClick={download}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer dark:hover:text-white dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"
             >
-              <Download className="h-3.5 w-3.5 text-slate-500" />
+              <Download className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               <span>下载</span>
             </button>
 
             <button
               type="button"
               onClick={() => void copy('已复制全文内容', content)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer dark:hover:text-white dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"
             >
-              <Copy className="h-3.5 w-3.5 text-slate-500" />
+              <Copy className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               <span>复制全文</span>
             </button>
 
@@ -142,7 +142,7 @@ export default function DocumentViewerModal({ filename, content, createdAt, onCl
               type="button"
               aria-pressed={starred}
               onClick={() => setStarred((value) => !value)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer dark:text-slate-300 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"
               title={starred ? '已收藏' : '收藏'}
             >
               <Star className={`h-4 w-4 ${starred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
@@ -152,7 +152,7 @@ export default function DocumentViewerModal({ filename, content, createdAt, onCl
               type="button"
               aria-label="关闭"
               onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-2xs hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-2xs hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer dark:hover:text-white dark:text-slate-400 dark:hover:bg-white/10 dark:border-white/10 dark:bg-[#18191c]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -167,12 +167,12 @@ export default function DocumentViewerModal({ filename, content, createdAt, onCl
         )}
 
         {/* 2. 排版控制与格式标识条 */}
-        <div className="flex items-center gap-3 overflow-x-auto border-b border-slate-200/80 px-6 py-2 text-slate-400 bg-white">
+        <div className="flex items-center gap-3 overflow-x-auto border-b border-slate-200/80 px-6 py-2 text-slate-400 bg-white dark:border-white/10 dark:bg-[#18191c]">
           <div className="flex items-center gap-1">
             {[Heading1, List, ListOrdered, Quote, Table, AlignLeft, Bold, Strikethrough, Italic, Underline, Code].map((Icon, index) => (
               <span
                 key={index}
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg hover:bg-slate-100 hover:text-slate-700 transition-colors dark:hover:bg-white/10"
               >
                 <Icon className="h-4 w-4" />
               </span>
@@ -183,7 +183,7 @@ export default function DocumentViewerModal({ filename, content, createdAt, onCl
 
         {/* 3. 沉浸式 Markdown 文档正文 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-16 bg-[#FAFAFC]">
-          <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 sm:p-12 shadow-xs border border-slate-200/80 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-slate-900 [&_h1]:pb-3 [&_h1]:border-b [&_h1]:border-slate-200 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-6 [&_h2]:mb-3 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-800 [&_p]:text-sm [&_p]:leading-7 [&_p]:text-slate-700 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-blue-50/40 [&_blockquote]:px-4 [&_blockquote]:py-2.5 [&_blockquote]:rounded-r-xl [&_blockquote]:text-slate-700 [&_table]:w-full [&_table]:text-[13px] [&_table]:border-collapse [&_th]:bg-slate-50 [&_th]:text-slate-900 [&_th]:font-semibold [&_th]:p-3 [&_th]:border [&_th]:border-slate-200 [&_td]:p-3 [&_td]:border [&_td]:border-slate-200 [&_td]:text-slate-700 [&_tr:nth-child(even)]:bg-slate-50/30 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:text-sm [&_li]:leading-7 [&_li]:text-slate-700">
+          <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 sm:p-12 shadow-xs border border-slate-200/80 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-slate-900 [&_h1]:pb-3 [&_h1]:border-b [&_h1]:border-slate-200 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-6 [&_h2]:mb-3 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-800 [&_p]:text-sm [&_p]:leading-7 [&_p]:text-slate-700 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-blue-50/40 [&_blockquote]:px-4 [&_blockquote]:py-2.5 [&_blockquote]:rounded-r-xl [&_blockquote]:text-slate-700 [&_table]:w-full [&_table]:text-[13px] [&_table]:border-collapse [&_th]:bg-slate-50 [&_th]:text-slate-900 [&_th]:font-semibold [&_th]:p-3 [&_th]:border [&_th]:border-slate-200 [&_td]:p-3 [&_td]:border [&_td]:border-slate-200 [&_td]:text-slate-700 [&_tr:nth-child(even)]:bg-slate-50/30 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:text-sm [&_li]:leading-7 [&_li]:text-slate-700 dark:border-white/10 dark:bg-[#18191c]">
             <FormattedMarkdown content={content} accentColor="slate" />
           </div>
         </div>

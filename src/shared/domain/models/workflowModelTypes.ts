@@ -4,6 +4,8 @@ export type WorkflowCapability = {
   routeId?: string;
   enabled?: boolean;
   channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi' | (string & {});
+  /** 服务商配置中的 ApiProvider.id，用于按渠道取地址和 Key。 */
+  providerId?: string;
   name?: string;
   shortName?: string;
   provider?: string;
@@ -14,6 +16,7 @@ export type WorkflowCapability = {
   isImage?: boolean;
   isVideo?: boolean;
   isVision?: boolean;
+  isAudio?: boolean;
   isAssistant?: boolean;
   isDistill?: boolean;
   isThinking?: boolean;

@@ -1,3 +1,4 @@
+import { videoInputError } from '@shared/domain/media/videoCapabilities';
 import { clampVideoDuration } from '@shared/domain/media/video';
 import type { VideoAdapterInput } from '../types';
 
@@ -60,12 +61,42 @@ export function calcVideoSize(aspectRatio: string, resolution: string): string {
 }
 
 export function normalizeResolution(resolution?: string): string {
-  const rUpper = (resolution || '720P').toString().toUpperCase();
+  const rUpper = (resolution || '480P').toString().toUpperCase();
   if (rUpper.includes('480')) return '480p';
   if (rUpper.includes('720')) return '720p';
   if (rUpper.includes('1080')) return '1080p';
   if (rUpper.includes('4K')) return '4k';
   return '720p';
+}
+
+const FRAME_FIELD_KEYS = ['images', 'image_urls', 'image', 'image_url', 'first_frame_image', 'last_frame_image', 'end_frame_image', 'image_tail', 'reference_images'];
+
+/** Keep first-frame, first-last-frame, and reference images in separate fields. */
+export function applyExclusiveFrameFields(payload: Record<string, unknown>, input: VideoAdapterInput, mode: string) {
+  const images = collectVideoImages(input);
+  for (const key of FRAME_FIELD_KEYS) delete payload[key];
+  if (mode === 'first_frame' && images[0]) {
+    payload.image = images[0];
+    payload.image_url = images[0];
+    payload.first_frame_image = images[0];
+    payload.images = [images[0]];
+  } else if (mode === 'first_last_frame') {
+    const first = input.firstFrame || images[0];
+    const last = input.lastFrame || images[1];
+    payload.first_frame_image = first;
+    payload.last_frame_image = last;
+    payload.end_frame_image = last;
+    payload.image = first;
+    payload.image_url = first;
+    payload.image_tail = last;
+    payload.images = [first, last].filter(Boolean);
+  } else if (mode === 'omni' || mode === 'edit' || mode === 'extend') {
+    if (images.length) {
+      payload.reference_images = images;
+      payload.images = images;
+    }
+  }
+  return images;
 }
 
 export function collectVideoImages(input: VideoAdapterInput): string[] {
@@ -148,7 +179,7 @@ export function baseVideoPayload(input: VideoAdapterInput, modelId: string): Rec
 }
 
 function normalizeWanResolution(resolution?: string): '1080P' | '720P' | '480P' {
-  const rUpper = (resolution || '1080P').toString().toUpperCase();
+  const rUpper = (resolution || '480P').toString().toUpperCase();
   if (rUpper.includes('480')) return '480P';
   if (rUpper.includes('720')) return '720P';
   return '1080P';
@@ -161,12 +192,14 @@ function normalizeWanRatio(ratio?: string, hasMedia?: boolean): string {
 }
 
 export function buildWanOfficialPayload(input: VideoAdapterInput, modelId: string): Record<string, unknown> {
-  const rawImages = input.images || [];
+  const rawImages = collectVideoImages(input);
   const rawVideos = input.videos || [];
-  const refMode = input.refMode || 'omni';
+  const refMode = input.refMode || (input.lastFrame ? 'first_last_frame' : input.firstFrame ? 'first_frame' : 'omni');
+  const error = videoInputError({ ...input, model: modelId, images: rawImages, videos: rawVideos, refMode });
+  if (error) throw new Error(error);
   const prompt = (input.prompt || '').trim();
   const media: Array<{ type: string; url: string }> = [];
-  const isFirstLastMode = refMode === 'first_last_frame' || Boolean(input.firstFrame && input.lastFrame);
+  const isFirstLastMode = refMode === 'first_last_frame';
 
   if (isFirstLastMode) {
     const first = input.firstFrame || rawImages[0];

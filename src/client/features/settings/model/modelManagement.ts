@@ -1,5 +1,6 @@
 import { comflyTokenPrice } from './comflyReferencePrice';
 import { isMultimodalWorkflowModel, workflowModelRouteId } from '@shared/domain/models/workflowModels';
+import { channelDisplayName } from '@shared/domain/models/modelChannels';
 import type { WorkflowModel } from '../components/settingsShared';
 import { type ComflyPriceMap } from './multimodalPriceSort';
 
@@ -7,16 +8,16 @@ export type ModelChannel = NonNullable<WorkflowModel['channel']>;
 export type CapabilityFilter = 'all' | 'text' | 'multimodal' | 'image' | 'video';
 export type ModelDisplaySort = 'configured' | 'name' | 'price';
 export const MODEL_CHANNELS: { id: ModelChannel; name: string; serviceId: string }[] = [
-  { id: 'comfly', name: 'Comfly 网关', serviceId: 'comfly_gateway' },
-  { id: 'deepseek', name: 'DeepSeek 官方', serviceId: 'deepseek_official' },
-  { id: 'openai', name: 'OpenAI / Responses', serviceId: 'openai_official' },
-  { id: 'lianchi', name: '联池图像', serviceId: 'lianchi_images' },
+  { id: 'comfly', name: channelDisplayName('comfly'), serviceId: 'comfly_gateway' },
+  { id: 'deepseek', name: channelDisplayName('deepseek'), serviceId: 'deepseek_official' },
+  { id: 'openai', name: channelDisplayName('openai'), serviceId: 'openai_official' },
+  { id: 'lianchi', name: channelDisplayName('lianchi'), serviceId: 'lianchi_images' },
 ];
 export function modelChannel(model: Pick<WorkflowModel, 'channel' | 'id'>): ModelChannel {
   return model.channel ?? (model.id === 'openai/gpt-image-2' ? 'lianchi' : 'comfly');
 }
 export function channelName(channel: ModelChannel): string {
-  return MODEL_CHANNELS.find(item => item.id === channel)?.name || channel;
+  return MODEL_CHANNELS.find(item => item.id === channel)?.name || channelDisplayName(channel);
 }
 export function matchesCapability(model: WorkflowModel, filter: CapabilityFilter): boolean {
   if (model.channel === 'deepseek') return filter === 'all' || (filter === 'text' ? !!model.isAssistant : filter === 'multimodal' && !!model.isVision);

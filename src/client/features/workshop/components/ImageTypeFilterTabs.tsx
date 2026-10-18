@@ -30,7 +30,7 @@ export default function ImageTypeFilterTabs({
   ];
 
   return (
-    <div className={`flex items-center justify-between border-b border-slate-100 pb-2 ${className}`}>
+    <div className={`flex items-center justify-between border-b border-slate-100 pb-2 dark:border-white/10 ${className}`}>
       <div className="flex items-center gap-4">
         {tabs.map(tab => (
           <button

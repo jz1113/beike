@@ -31,6 +31,8 @@ export interface PromptBarControlsRowProps {
   availableImageModels: PromptBarModel[];
   quickVideoModel: string;
   quickModel: string;
+  quickAudioModel: string;
+  setQuickAudioModel: (modelId: string) => void;
   quickVideoDuration: number;
   setQuickVideoModel: (m: string) => void;
   setQuickVideoDuration: (d: number) => void;

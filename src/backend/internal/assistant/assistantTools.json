@@ -233,7 +233,7 @@
     "type": "function",
     "function": {
       "name": "deconstruct_image",
-      "description": "对图片 URL 进行视觉反推，提取可复用的生图提示词。当用户要求反推/拆解参考图时调用。",
+      "description": "对图片调用反推引擎，提取可写入资产库的生图提示词。附图已经在对话里时直接根据画面作答，不要调用本工具。只有用户明确要求反推引擎或写入资产库时才调用。",
       "parameters": {
         "type": "object",
         "properties": {

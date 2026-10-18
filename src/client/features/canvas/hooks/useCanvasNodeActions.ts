@@ -220,7 +220,7 @@ export function useCanvasNodeActions(options: {
         ? { model: '', quality: 'medium', aspect: '1:1', count: 1, references: [] }
         : {
             model: '',
-            quality: '720P',
+            quality: '480P',
             aspect: '16:9',
             count: 1,
             references: [],
@@ -248,14 +248,32 @@ export function useCanvasNodeActions(options: {
     const isVideoGeneration = kind === 'video-generation';
     const type = isImageGeneration || isVideoGeneration ? 'drawing' : kind;
     const id = crypto.randomUUID();
-    const dimensions = kind === 'prompt' ? { width: 300, height: 280 } : kind === 'file'
-      ? { width: 252, height: 252 }
-      : { width: 560, height: 500 };
-    const title = isImageGeneration
-      ? '图片生成'
-      : isVideoGeneration
-        ? '视频生成'
-        : kind === 'prompt' ? '文本' : '导入素材';
+    let dimensions = { width: 560, height: 500 };
+    let title = '新建节点';
+
+    if (kind === 'prompt') {
+      dimensions = { width: 300, height: 280 };
+      title = '文本 / 提示词';
+    } else if (kind === 'file') {
+      dimensions = { width: 252, height: 252 };
+      title = '导入素材';
+    } else if (kind === 'compare') {
+      dimensions = { width: 480, height: 400 };
+      title = '前后画质对比';
+    } else if (kind === 'save') {
+      dimensions = { width: 320, height: 280 };
+      title = '批量导出保存';
+    } else if (kind === 'preview') {
+      dimensions = { width: 480, height: 340 };
+      title = '导演监视器';
+    } else if (kind === 'audio') {
+      dimensions = { width: 320, height: 220 };
+      title = 'AI 配音 / 音频';
+    } else if (isImageGeneration) {
+      title = '图片生成';
+    } else if (isVideoGeneration) {
+      title = '视频生成';
+    }
 
     addNode(currentProject.id, {
       id,

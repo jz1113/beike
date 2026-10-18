@@ -1,4 +1,4 @@
-export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'keyword_review' | 'assets' | 'canvas' | 'settings';
+export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'keyword_review' | 'assets' | 'canvas' | 'settings' | 'skills' | 'ppt_generator' | 'avatar' | 'video_sales';
 
 const LEGACY_VIEW: Record<string, AppView> = {
   hub: 'home',
@@ -11,6 +11,12 @@ const LEGACY_VIEW: Record<string, AppView> = {
   assets: 'assets',
   canvas: 'canvas',
   settings: 'settings',
+  skills: 'skills',
+  ppt_generator: 'ppt_generator',
+  avatar: 'avatar',
+  digital_human: 'avatar',
+  video_sales: 'video_sales',
+  daihuo: 'video_sales',
 };
 
 export function normalizeAppView(raw: string | null | undefined): AppView | null {
@@ -27,6 +33,10 @@ export function isAppView(value: string): value is AppView {
     value === 'keyword_review' ||
     value === 'assets' ||
     value === 'canvas' ||
-    value === 'settings'
+    value === 'settings' ||
+    value === 'skills' ||
+    value === 'ppt_generator' ||
+    value === 'avatar' ||
+    value === 'video_sales'
   );
 }

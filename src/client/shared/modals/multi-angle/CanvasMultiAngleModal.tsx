@@ -6,6 +6,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { LightboxGenConfigToolbar } from '@client/shared/modals/lightbox/LightboxGenConfigToolbar';
+import { useAppTheme } from '@client/shared/hooks/useAppTheme';
 import { useCanvasToolConfig } from '@client/shared/hooks/useCanvasToolConfig';
 import { useCanvasToolSubmission } from '@client/shared/hooks/useCanvasToolSubmission';
 
@@ -45,6 +46,7 @@ export const CanvasMultiAngleModal: React.FC<CanvasMultiAngleModalProps> = ({
   node,
   onSubmit,
 }) => {
+  const { isDark } = useAppTheme();
   const { selectedModelId, selectedQuality, selectedAspectId, handleSelectModel, handleSelectQuality, handleSelectAspect } = useCanvasToolConfig(isOpen);
 
   const [params, setParams] = useState<MultiAngleParams>(DEFAULT_MULTI_ANGLE_PARAMS);
@@ -101,7 +103,7 @@ export const CanvasMultiAngleModal: React.FC<CanvasMultiAngleModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[720px] max-h-[calc(100dvh-32px)] overflow-y-auto rounded-2xl bg-white text-zinc-900 shadow-2xl border border-zinc-200/90 overflow-hidden select-none"
+        className="relative w-full max-w-[720px] max-h-[calc(100dvh-32px)] overflow-y-auto rounded-2xl bg-white text-zinc-900 shadow-2xl border border-zinc-200/90 overflow-hidden select-none dark:bg-[#18191c]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 顶部标题栏 */}
@@ -316,14 +318,14 @@ export const CanvasMultiAngleModal: React.FC<CanvasMultiAngleModalProps> = ({
           </div>
         </div>
 
-        {submitError && <p role="alert" className="px-5 pb-3 text-xs text-rose-600">{submitError}</p>}
+        {submitError && <p role="alert" className="px-5 pb-3 text-xs text-rose-600 dark:text-rose-400">{submitError}</p>}
         {/* 底部控制栏 (Footer) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-zinc-100 bg-zinc-50/80">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-zinc-100 bg-zinc-50/80 dark:border-white/10 dark:bg-[#18181b]">
           {/* 重置参数 */}
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer dark:text-zinc-400 dark:hover:text-white"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>重置参数</span>
@@ -332,7 +334,7 @@ export const CanvasMultiAngleModal: React.FC<CanvasMultiAngleModalProps> = ({
           {/* 右侧：模型切换、清晰度与提交按钮 (按要求彻底移除算力 14 徽章，改用亮色工具栏) */}
           <div className="flex items-center gap-2 sm:gap-3">
             <LightboxGenConfigToolbar
-              theme="light"
+              theme={isDark ? 'dark' : 'light'}
               selectedModelId={selectedModelId}
               onSelectModel={handleSelectModel}
               selectedQuality={selectedQuality}
@@ -345,13 +347,13 @@ export const CanvasMultiAngleModal: React.FC<CanvasMultiAngleModalProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-9 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 bg-zinc-900 hover:bg-black text-white shadow-sm disabled:opacity-50"
+              className="w-9 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 bg-zinc-900 hover:bg-black text-white shadow-sm disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
               title="应用多角度效果并生成"
             >
               {isSubmitting ? (
-                <Loader2 className="w-4 h-4 text-white animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <ArrowUp className="w-4 h-4 text-white stroke-[2.5]" />
+                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
               )}
             </button>
           </div>

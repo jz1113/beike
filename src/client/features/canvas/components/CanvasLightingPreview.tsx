@@ -198,7 +198,7 @@ export function CanvasLightingPreview({ node, params, setParams }: {
 
               {/* 球体中央立式素材卡片 */}
               <div
-                className="relative z-10 w-[70px] h-[90px] rounded-xs overflow-hidden shadow-xl border border-zinc-200 bg-white transition-transform duration-300 pointer-events-none"
+                className="relative z-10 w-[70px] h-[90px] rounded-xs overflow-hidden shadow-xl border border-zinc-200 bg-white transition-transform duration-300 pointer-events-none dark:bg-[#18191c]"
                 style={{
                   transform:
                     params.viewMode === 'perspective'
@@ -255,7 +255,7 @@ export function CanvasLightingPreview({ node, params, setParams }: {
                 }}
               >
                 <div
-                  className="w-5 h-5 rounded-full bg-white border-2 border-zinc-800 shadow-md flex items-center justify-center transition-transform scale-100 hover:scale-110"
+                  className="w-5 h-5 rounded-full bg-white border-2 border-zinc-800 shadow-md flex items-center justify-center transition-transform scale-100 hover:scale-110 dark:bg-[#18191c]"
                   style={{
                     boxShadow: `0 0 12px 2px ${currentLightColorHex}88, 0 3px 8px rgba(0,0,0,0.25)`,
                   }}

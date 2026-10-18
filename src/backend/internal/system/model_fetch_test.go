@@ -36,6 +36,18 @@ func TestModelFetchKeepsAllGatewayModels(t *testing.T) {
 	}
 }
 
+func TestModelFetchKeepsPrefixedGatewayID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"vendor/gpt-image-2"},{"id":"custom/not-approved"}]}`))
+	}))
+	defer server.Close()
+	status, body := fetchModelCatalog(context.Background(), config.Config{Root: repoRoot(t)}, httptest.NewRequest(http.MethodPost, "/", nil), map[string]any{"baseUrl": server.URL, "apiKey": "key"}, server.Client())
+	models, _ := body["models"].([]catalogModel)
+	if status != http.StatusOK || !containsModel(models, "vendor/gpt-image-2") || !containsModel(models, "custom/not-approved") || containsModel(models, "gpt-image-2") {
+		t.Fatalf("status %d models %#v", status, body["models"])
+	}
+}
+
 func containsModel(models []catalogModel, id string) bool {
 	for _, model := range models {
 		if model.ID == id {

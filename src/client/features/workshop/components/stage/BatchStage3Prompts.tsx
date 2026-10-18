@@ -137,7 +137,7 @@ export default function BatchStage3Prompts({
             <p className="font-semibold">{generationStrategy === 'grid_first' ? '四宫格生成 4 镜 · 整组提示词生成，再拆分为 4 张' : '单张逐镜生成 · 每镜使用独立提示词生成完整图片'}</p>
             {autoMatchMotherTemplate && <p>同类完整四图母本按生产设置的出镜范围依次轮换，用完一轮后再重复；每款实际使用的母本类型见下方商品行。</p>}
           </div>
-          <button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 rounded-lg bg-white px-3 py-2 font-bold">生产设置</button>
+          <button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 rounded-lg bg-white px-3 py-2 font-bold dark:bg-[#18191c]">生产设置</button>
         </div>
       {/* 极简高密度商品分镜列表 */}
       <div className="space-y-3">
@@ -163,7 +163,7 @@ export default function BatchStage3Prompts({
       </div>
 
       {pageCount > 1 && (
-        <nav aria-label="提示词商品分页" className="flex flex-wrap items-center justify-end gap-3 text-sm text-slate-600">
+        <nav aria-label="提示词商品分页" className="flex flex-wrap items-center justify-end gap-3 text-sm text-slate-600 dark:text-slate-300">
           <span>共 {successfulItems.length} 款 · 第 {currentPage + 1}/{pageCount} 页</span>
           <button type="button" disabled={currentPage === 0}
             className="rounded-lg border px-3 py-2 disabled:opacity-40"

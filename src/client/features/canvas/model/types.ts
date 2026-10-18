@@ -1,3 +1,26 @@
+export interface NodeRunHistory {
+  id: string;
+  taskId?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  prompt?: string;
+  model?: string;
+  status: 'generating' | 'success' | 'error';
+  createdAt: number;
+}
+
+export type CanvasPortType = 'image' | 'video' | 'audio' | 'prompt' | 'any';
+
+export interface CanvasEdge {
+  id: string;
+  sourceNodeId: string;
+  sourceHandle?: string;
+  targetNodeId: string;
+  targetHandle?: string;
+  createdAt?: number;
+}
+
 export interface CanvasNode {
   id: string;
   taskId?: string;
@@ -15,8 +38,18 @@ export interface CanvasNode {
   foldedInGroupId?: string;
   foldedCount?: number;
   referenceNodeIds?: string[];
+  runs?: NodeRunHistory[];
+  activeRunIndex?: number;
   missingMedia?: boolean;
-  type: 'image' | 'video' | 'audio' | 'file' | 'drawing' | 'prompt' | 'note' | 'group' | 'frame';
+  type: 'image' | 'video' | 'audio' | 'file' | 'drawing' | 'prompt' | 'note' | 'group' | 'frame' | 'compare' | 'save' | 'preview';
+  compareMode?: 'split' | 'side-by-side';
+  compareBeforeUrl?: string;
+  compareAfterUrl?: string;
+  compareSplit?: number;
+  saveFormat?: 'png' | 'jpg' | 'mp4' | 'zip';
+  savePrefix?: string;
+  previewFit?: 'contain' | 'cover';
+  previewAutoPlay?: boolean;
   generationKind?: 'image' | 'video';
   drawing?: { duration?: number; refMode?: string; model: string; quality: string; aspect: string; count: number; references: string[]; audio?: boolean };
   audioUrl?: string;
@@ -49,6 +82,7 @@ export interface CanvasProject {
   updatedAt: number;
   createdAt: number;
   nodes: CanvasNode[];
+  edges?: CanvasEdge[];
 }
 
 export interface CanvasSubject {

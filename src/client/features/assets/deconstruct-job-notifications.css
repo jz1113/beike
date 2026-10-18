@@ -79,3 +79,21 @@
   .deconstruct-job-dock *, .deconstruct-job-dock *::before, .deconstruct-job-dock *::after { transition: none !important; }
   .deconstruct-job-actions button:active:not(:disabled), .deconstruct-job-icon-button:active { transform: none; }
 }
+.dark .deconstruct-job-dock { color: #cbd5e1; }
+.dark .deconstruct-job-dock-surface { border-color: rgba(255, 255, 255, .1); background: rgba(24, 25, 28, .97); box-shadow: 0 16px 48px -12px rgba(0, 0, 0, .45); }
+.dark .deconstruct-job-toggle:hover,
+.dark .deconstruct-job-icon-button:hover,
+.dark .deconstruct-job-stop:hover:not(:disabled) { background: rgba(255, 255, 255, .06); color: #e2e8f0; }
+.dark .deconstruct-job-dock-title strong,
+.dark .deconstruct-job-card-title strong { color: #f1f5f9; }
+.dark .deconstruct-job-dock-title > span,
+.dark .deconstruct-job-card-title > span,
+.dark .deconstruct-job-description,
+.dark .deconstruct-job-details summary { color: #94a3b8; }
+.dark .deconstruct-job-card { border-color: rgba(255, 255, 255, .1); background: #1c1c1f; }
+.dark .deconstruct-job-progress { background: rgba(255, 255, 255, .08); }
+.dark .deconstruct-job-view:hover { background: rgba(91, 63, 249, .18); }
+.dark .deconstruct-job-details { border-top-color: rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .03); }
+.dark .deconstruct-job-details li { border-top-color: rgba(255, 255, 255, .08); }
+.dark .deconstruct-job-details li strong { color: #cbd5e1; }
+.dark .deconstruct-job-connection-error { background: rgba(120, 53, 15, .35); color: #fdba74; }

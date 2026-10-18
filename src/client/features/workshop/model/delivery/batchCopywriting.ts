@@ -1,6 +1,6 @@
 import { apiFetch } from '@client/shared/api/apiClient';
 import { getEnabledMultimodalModelsFromSettings, isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
-import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
+import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import type { BatchProductItem } from '../batchTypes';
 import { isDeliverableWorkshopResult } from '../generation/workshopReadiness';
 
@@ -77,16 +77,10 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
       return false;
     }
 
-    const usage = data.usage || {};
-    recordModelUsage({
+    recordChatTokens({
       modelId: data.model || ctx.selectedVisionModel || 'gpt-5.4-mini',
-      modelName: data.model || ctx.selectedVisionModel || 'gpt-5.4-mini',
-      provider: resolveModelVendor(data.model || ctx.selectedVisionModel || 'gpt-5.4-mini'),
       type: 'chat',
-      promptTokens: usage.promptTokens ?? usage.prompt_tokens ?? 0,
-      completionTokens: usage.completionTokens ?? usage.completion_tokens ?? 0,
-      totalTokens: usage.totalTokens ?? usage.total_tokens ?? 0,
-      success: true,
+      usage: data.usage,
     });
     // A requested rewrite may replace the starting copy, but never edits made
     // while the request was in flight. Compare inside the state update itself.

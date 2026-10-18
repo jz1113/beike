@@ -19,6 +19,17 @@ import {
 } from './promptBarValidation';
 import type { PromptBarSubmitInput, PromptBarSubmitResult } from './promptBarSubmitTypes';
 import { formatAgentAttachmentNote } from './agentAttachments';
+import { loadPromptPreferences } from './promptBarPreferencesTypes';
+import { upstreamModalityModelId, type ModalityStorageKind } from '@shared/domain/models/modalityStorage';
+
+function resolvedModel(kind: ModalityStorageKind, selection: string) {
+  const trimmed = selection.trim();
+  const modelId = upstreamModalityModelId(kind, trimmed);
+  return {
+    model: modelId || trimmed,
+    modelRouteKey: trimmed && trimmed !== modelId ? trimmed : undefined,
+  };
+}
 
 export type { PromptBarSubmitInput, PromptBarSubmitResult } from './promptBarSubmitTypes';
 export { buildPromptBarSubjects };
@@ -30,6 +41,7 @@ export function canSubmitPromptBar(
   if (input.isSubmitting) return false;
   if (input.quickGenMode === 'image' && !input.hasImageModels) return false;
   if (input.quickGenMode === 'video' && input.hasVideoModels === false) return false;
+  if (input.quickGenMode === 'audio' && input.hasAudioModels === false) return false;
   if (isDepthGenMode(input.quickGenMode) && input.depthModelReady === false) return false;
   const effectiveImages = collectEffectiveImages(input);
   return validateSubmitInput(input, effectiveImages) === null;
@@ -69,7 +81,7 @@ export function buildPromptBarGenerationTasks(
     const attachmentNote = formatAgentAttachmentNote(input.quickRefImages);
     const prompt = attachmentNote ? `${cleaned}\n\n${attachmentNote}` : cleaned;
     const title = cleaned.slice(0, 32) || 'Agent 创作对话';
-    const activeModel = 'deepseek-flash';
+    const active = resolvedModel('chat', input.assistantModel || '');
     const task: GenerationTask = {
       id: `agent-task-${batchTimestamp}-0`,
       batchId,
@@ -77,13 +89,46 @@ export function buildPromptBarGenerationTasks(
       title,
       prompt,
       mediaType: 'agent',
-      model: activeModel,
+      model: active.model || 'gemini-3.7-flash',
+      ...(active.modelRouteKey ? { modelRouteKey: active.modelRouteKey } : {}),
       size: '-',
       quality: 'high',
       useReferenceImage: effectiveImages.length > 0,
       referenceImages: effectiveImages,
-      status: 'SUCCESS',
-      progress: '100%',
+      status: 'IN_PROGRESS',
+      progress: '15%',
+      createdAt: batchTimestamp,
+    };
+    return {
+      ok: true,
+      tasks: [task],
+      cleanedPrompt: cleaned,
+      sessionTitle: title,
+      shouldCreateNewSession: input.currentView !== 'generate' && input.currentView !== 'canvas',
+    };
+  }
+
+  if (quickGenMode === 'audio') {
+    const batchTimestamp = Date.now();
+    const batchId = `audio-batch-${batchTimestamp}`;
+    const cleaned = quickPrompt.trim();
+    const title = cleaned.slice(0, 25) || '智能语音合成';
+    const audio = resolvedModel('voice', input.quickAudioModel || '');
+    const task: GenerationTask = {
+      id: `hub-gen-${batchTimestamp}-0`,
+      batchId,
+      shotNo: 1,
+      title,
+      prompt: cleaned,
+      mediaType: 'audio',
+      model: audio.model,
+      ...(audio.modelRouteKey ? { modelRouteKey: audio.modelRouteKey } : {}),
+      size: '-',
+      quality: 'high',
+      useReferenceImage: false,
+      referenceImages: [],
+      status: 'IN_PROGRESS',
+      progress: '15%',
       createdAt: batchTimestamp,
     };
     return {
@@ -148,6 +193,7 @@ export function buildPromptBarGenerationTasks(
   const refImg = effectiveImages[0] || undefined;
   const tasksToCreate: GenerationTask[] = [];
 
+  const visual = resolvedModel(quickGenMode === 'video' ? 'video' : 'image', quickGenMode === 'video' ? quickVideoModel : quickModel);
   for (let i = 0; i < countToGen; i++) {
     const taskId = `hub-gen-${batchTimestamp}-${i}`;
     tasksToCreate.push({
@@ -157,9 +203,11 @@ export function buildPromptBarGenerationTasks(
       title: cleanedPrompt.slice(0, 25) || (quickGenMode === 'video' ? '智能视频创作' : '快速商用生图'),
       prompt: cleanedPrompt,
       mediaType: quickGenMode === 'video' ? 'video' : 'image',
-      model: quickGenMode === 'video' ? quickVideoModel : quickModel,
+      model: visual.model,
+      ...(visual.modelRouteKey ? { modelRouteKey: visual.modelRouteKey } : {}),
       size: quickGenMode === 'video' ? quickVideoAspectId : sizeStr,
       quality: quickGenMode === 'video' ? quickVideoResolution : quickQuality,
+      inferenceStrength: quickGenMode === 'image' ? loadPromptPreferences().image.inferenceStrength : undefined,
       videoDuration: quickGenMode === 'video' ? quickVideoDuration : undefined,
       videoResolution: quickGenMode === 'video' ? quickVideoResolution : undefined,
       videoRefMode: quickGenMode === 'video' ? quickVideoRefMode : undefined,

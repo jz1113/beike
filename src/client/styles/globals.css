@@ -6,14 +6,33 @@
  */
 
 @custom-variant compact (&:is(:where(html[data-layout="compact"]) *));
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #FAFAFC;
+  --background: #F7F7F8;
   --foreground: #0F172A;
-  /* 正文使用系统无衬线字体，保证小字号中文在桌面端清晰可读。 */
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  /* 手写字体仅用于少量品牌展示文字。 */
-  --font-handwritten: "STKaiti", "KaiTi", "Kaiti SC", cursive;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #0F172A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0F1F3;
+  --secondary-foreground: #0F172A;
+  --muted: #F0F1F3;
+  --muted-foreground: #8E8E93;
+  --accent: #F0F1F3;
+  --accent-foreground: #0F172A;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(0, 0, 0, 0.06);
+  --input: rgba(0, 0, 0, 0.06);
+  --ring: #3B82F6;
+
+  /* 正文使用开源与系统通用无衬线字体，保证小字号中文在桌面端清晰可读，杜绝专有商用版权风险。 */
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  /* 展示字体统一采用免费可商用开源字体体系（霞鹜文楷/思源宋体），杜绝商业版权风险。 */
+  --font-handwritten: "LXGW WenKai", "Source Han Serif SC", "Noto Serif SC", serif, cursive;
   --ui-density: 1;
   --ui-space: 1;
 
@@ -36,7 +55,7 @@
   --space-6: 1.5rem;        /* 24px */
 
   /* 阴影 */
-  --shadow-panel: 0 25px 70px rgba(0, 0, 0, 0.2);
+  --shadow-panel: 0 25px 70px rgba(0, 0, 0, 0.12);
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-popover: 0 8px 24px rgba(15, 23, 42, 0.12);
 
@@ -59,9 +78,54 @@
   --color-warning-600: #D97706;
 }
 
+.dark,
+html.dark {
+  --background: #121214;
+  --foreground: #EDEDED;
+  --card: #1B1B1E;
+  --card-foreground: #EDEDED;
+  --popover: #1B1B1E;
+  --popover-foreground: #EDEDED;
+  --primary: #4F46E5;
+  --primary-foreground: #FFFFFF;
+  --secondary: #26262B;
+  --secondary-foreground: #E5E5EA;
+  --muted: #26262B;
+  --muted-foreground: #8E8E93;
+  --accent: #26262B;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: #60A5FA;
+
+  --shadow-panel: 0 25px 70px rgba(0, 0, 0, 0.75);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.65);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
   --font-sans: var(--font-ui);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -73,10 +137,17 @@
 }
 
 html {
+  color-scheme: light;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
   font-size: clamp(12.5px, calc(16px * var(--ui-density, 1)), 16px);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+html.dark {
+  color-scheme: dark;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
 }
 
 .text-\[10px\] {
@@ -139,6 +210,25 @@ select {
   opacity: 0.65;
 }
 
+.dark .soft-textarea,
+html.dark .soft-textarea {
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #ededed;
+}
+
+.dark .soft-textarea:hover,
+html.dark .soft-textarea:hover {
+  border-color: rgba(147, 197, 253, 0.55);
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+.dark .soft-textarea:focus,
+html.dark .soft-textarea:focus {
+  border-color: rgba(96, 165, 250, 0.75);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
 /* 禁用浏览器默认的图片拖拽幽灵（Logo / 图标 / UI 配图） */
 img {
   -webkit-user-drag: none;
@@ -165,6 +255,16 @@ img {
     transparent
   );
   animation: skeleton-shimmer 1.6s infinite;
+}
+
+.dark .skeleton-shimmer,
+html.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -209,6 +309,21 @@ button:active:not(:disabled), [role="button"]:active:not([aria-disabled="true"])
   background: rgba(99, 102, 241, 0.6);
 }
 
+.dark ::-webkit-scrollbar-track,
+html.dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dark ::-webkit-scrollbar-thumb,
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.7);
+}
+
 .no-scrollbar,
 .scrollbar-none,
 .rich-mention-contenteditable,
@@ -227,6 +342,21 @@ button:active:not(:disabled), [role="button"]:active:not([aria-disabled="true"])
   background: transparent !important;
 }
 
+/* 当富文本输入框非空或处于正在输入状态时，隐藏紧随其后的占位浮层，防止输入法合成期出现重叠文字 */
+.rich-mention-contenteditable:not(:empty) ~ .prompt-placeholder-carousel,
+.rich-mention-contenteditable[data-has-content="true"] ~ .prompt-placeholder-carousel {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Tabular numbers for clean, non-jittering timers and counters */
+.font-mono-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
 /* Light Luxury Glassmorphism & Card Utilities */
 .glass-panel {
   background: rgba(255, 255, 255, 0.85);
@@ -236,11 +366,39 @@ button:active:not(:disabled), [role="button"]:active:not([aria-disabled="true"])
   box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.04);
 }
 
+.dark .glass-panel,
+html.dark .glass-panel {
+  background: rgba(19, 22, 28, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 28px -2px rgba(0, 0, 0, 0.5);
+}
+
 .glass-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.02);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
   transition: all 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.dark .glass-card:hover,
+html.dark .glass-card:hover {
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(99, 102, 241, 0.15);
+}
+
+/* React Bits: Star Border Glow Animation */
+@keyframes star-border-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-star-border {
+  animation: star-border-spin 6s linear infinite;
 }
 
 .glass-card:hover {

@@ -76,7 +76,7 @@ export type TurnSSEEvent =
       itemId: string;
       name: string;
       displayName: string;
-      status: 'done' | 'error';
+      status: 'done' | 'error' | 'declined' | 'cancelled';
       summary: string;
       action?: Record<string, unknown>;
       visualImages?: Array<{ url: string; label?: string }>;
@@ -101,7 +101,7 @@ export interface TurnSnapshotPayload {
   items: Array<{
     id: string;
     kind: string;
-    status: 'running' | 'done' | 'error' | 'cancelled';
+    status: 'running' | 'done' | 'error' | 'cancelled' | 'declined';
     startedAt: number;
     completedAt?: number;
     payload: Record<string, unknown>;

@@ -147,8 +147,8 @@ func loadKeywordRules(cfg config.Config, r *http.Request, version *int) ([]revie
 
 func keywordCredentials(cfg config.Config, r *http.Request, provider, model, baseURL, apiKey string) (string, string, int, string) {
 	if provider == "deepseek" {
-		if model != "deepseek-flash" {
-			return "", "", http.StatusBadRequest, "关键词审核仅支持 deepseek-flash"
+		if strings.TrimSpace(model) == "" {
+			return "", "", http.StatusBadRequest, "请选择有效的 DeepSeek 模型"
 		}
 		baseURL = system.NormalizeGatewayBaseURL(baseURL)
 		if baseURL != keywordDeepSeekBaseURL {
@@ -160,9 +160,8 @@ func keywordCredentials(cfg config.Config, r *http.Request, provider, model, bas
 		}
 		return baseURL, apiKey, 0, ""
 	}
-	approved, ok := system.ApprovedModel(cfg.Root, model)
-	if !ok || approved.Capability != "multimodal" {
-		return "", "", http.StatusBadRequest, "请选择设置中已支持的多模态模型"
+	if strings.TrimSpace(model) == "" {
+		return "", "", http.StatusBadRequest, "请选择有效的多模态模型"
 	}
 	baseURL, apiKey, err := resolveKeywordGateway(cfg, r, baseURL, apiKey)
 	if err != nil {

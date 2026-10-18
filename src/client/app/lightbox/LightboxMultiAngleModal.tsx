@@ -235,16 +235,16 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 max-w-[840px] w-full relative animate-scale-up"
+        className="bg-white dark:bg-[#1B1B1E] text-slate-900 dark:text-[#EDEDED] rounded-3xl p-6 sm:p-7 shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-100 dark:border-white/10 max-w-[840px] w-full relative animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 顶部标题栏与关闭键 */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <h3 className="text-[17px] font-bold text-slate-900 tracking-tight">多角度编辑</h3>
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-white/10">
+          <h3 className="text-[17px] font-bold text-slate-900 dark:text-white tracking-tight">多角度编辑</h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
             title="关闭 (Esc)"
           >
             <X className="w-5 h-5 stroke-[2.2]" />
@@ -254,18 +254,18 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
         {/* 主体两栏布局：左侧 3D 球体视角视口 + 右侧参数方位控制器 */}
         <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           {/* 左侧 3D 球体视口 */}
-          <div className="md:col-span-7 bg-[#F8F9FA] rounded-2xl p-6 relative flex flex-col items-center justify-center min-h-[380px] overflow-hidden border border-slate-100/80">
+          <div className="md:col-span-7 bg-[#F8F9FA] dark:bg-[#151518] rounded-2xl p-6 relative flex flex-col items-center justify-center min-h-[380px] overflow-hidden border border-slate-100/80 dark:border-white/10">
             {/* 球体外围 4 个微小方位指示箭头 */}
-            <div className="absolute top-3 text-slate-300 pointer-events-none">
+            <div className="absolute top-3 text-slate-300 dark:text-slate-600 pointer-events-none">
               <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
-            <div className="absolute bottom-3 text-slate-300 pointer-events-none">
+            <div className="absolute bottom-3 text-slate-300 dark:text-slate-600 pointer-events-none">
               <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
-            <div className="absolute left-3 text-slate-300 pointer-events-none">
+            <div className="absolute left-3 text-slate-300 dark:text-slate-600 pointer-events-none">
               <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
-            <div className="absolute right-3 text-slate-300 pointer-events-none">
+            <div className="absolute right-3 text-slate-300 dark:text-slate-600 pointer-events-none">
               <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
 
@@ -310,7 +310,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
               </svg>
 
               {/* 🌟 1. 中心正立的目标原图卡片 (尺寸优化为 74x100px，饱满立体且为外环留出充足呼吸空间) */}
-              <div className="relative z-10 w-[74px] h-[100px] rounded-2xl overflow-hidden shadow-[0_16px_36px_rgba(15,23,42,0.16),0_4px_12px_rgba(15,23,42,0.06)] bg-white select-none transition-transform duration-300">
+              <div className="relative z-10 w-[74px] h-[100px] rounded-2xl overflow-hidden shadow-[0_16px_36px_rgba(15,23,42,0.16),0_4px_12px_rgba(15,23,42,0.06)] bg-white select-none transition-transform duration-300 dark:bg-[#18191c]">
                 {!hasImgError && currentImgSrc ? (
                   <img
                     src={currentImgSrc}
@@ -321,7 +321,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
                     onError={handleImgLoadError}
                   />
                 ) : (
-                  <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-1 p-2">
+                  <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-1 p-2 dark:bg-white/10">
                     <Sparkles className="w-5 h-5 text-slate-300" />
                     <span className="text-[10px] text-slate-400 font-medium">当前画面</span>
                   </div>
@@ -348,7 +348,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
             <button
               type="button"
               onClick={handleReset}
-              className="absolute bottom-3 left-4 flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors cursor-pointer py-1 px-2 rounded-lg hover:bg-slate-200/60"
+              className="absolute bottom-3 left-4 flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors cursor-pointer py-1 px-2 rounded-lg hover:bg-slate-200/60 dark:hover:text-slate-100 dark:text-slate-400"
             >
               <span>重置参数</span>
               <RotateCcw className="w-3.5 h-3.5 stroke-[2]" />
@@ -359,7 +359,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
           <div className="md:col-span-5 flex flex-col justify-between h-full space-y-5">
             {/* 摄像机方位 9 宫格预设 */}
             <div>
-              <div className="text-[13px] font-bold text-slate-800 mb-3">摄像机方位</div>
+              <div className="text-[13px] font-bold text-slate-800 mb-3 dark:text-slate-100">摄像机方位</div>
               <div className="grid grid-cols-3 gap-2">
                 {PRESET_ANGLES.map((preset) => {
                   const isSelected = activePreset?.id === preset.id;
@@ -371,11 +371,11 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
                       onClick={() => handleSelectPreset(preset)}
                       className={`h-9 rounded-xl text-[12px] font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
                         isSelected
-                          ? 'bg-[#EAECEF] text-slate-900 font-semibold shadow-2xs'
-                          : 'bg-[#F4F5F7] hover:bg-[#EAECEF] text-slate-700'
+                          ? 'bg-[#EAECEF] text-slate-900 font-semibold shadow-2xs dark:text-slate-100'
+                          : 'bg-[#F4F5F7] hover:bg-[#EAECEF] text-slate-700 dark:text-slate-200'
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5 text-slate-600 stroke-[2.2]" />
+                      <Icon className="w-3.5 h-3.5 text-slate-600 stroke-[2.2] dark:text-slate-300" />
                       <span>{preset.label}</span>
                     </button>
                   );
@@ -387,9 +387,9 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
             <div className="space-y-4 pt-1">
               {/* 水平方位角滑块 (0° ~ 360°) */}
               <div>
-                <div className="flex items-center justify-between text-[12px] text-slate-700 mb-1.5">
-                  <span className="font-medium text-slate-800">水平</span>
-                  <span className="font-mono text-slate-500 text-[11px]">{azimuth}°</span>
+                <div className="flex items-center justify-between text-[12px] text-slate-700 dark:text-slate-300 mb-1.5">
+                  <span className="font-medium text-slate-800 dark:text-white">水平</span>
+                  <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">{azimuth}°</span>
                 </div>
                 <input
                   type="range"
@@ -398,15 +398,15 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
                   step="1"
                   value={azimuth}
                   onChange={(e) => setAzimuth(Number(e.target.value))}
-                  className="w-full h-1.5 bg-[#E2E8F0] rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(0,0,0,0.2)] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-slate-200/80 transition-all"
+                  className="w-full h-1.5 bg-[#E2E8F0] dark:bg-white/10 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white dark:[&::-webkit-slider-thumb]:bg-[#2C2C32] [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(0,0,0,0.2)] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-slate-200/80 dark:[&::-webkit-slider-thumb]:border-white/30 transition-all"
                 />
               </div>
 
               {/* 垂直俯仰角滑块 (-60° ~ 80°) */}
               <div>
-                <div className="flex items-center justify-between text-[12px] text-slate-700 mb-1.5">
-                  <span className="font-medium text-slate-800">垂直</span>
-                  <span className="font-mono text-slate-500 text-[11px]">{elevation}°</span>
+                <div className="flex items-center justify-between text-[12px] text-slate-700 dark:text-slate-300 mb-1.5">
+                  <span className="font-medium text-slate-800 dark:text-white">垂直</span>
+                  <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">{elevation}°</span>
                 </div>
                 <input
                   type="range"
@@ -415,7 +415,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
                   step="1"
                   value={elevation}
                   onChange={(e) => setElevation(Number(e.target.value))}
-                  className="w-full h-1.5 bg-[#E2E8F0] rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(0,0,0,0.2)] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-slate-200/80 transition-all"
+                  className="w-full h-1.5 bg-[#E2E8F0] dark:bg-white/10 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white dark:[&::-webkit-slider-thumb]:bg-[#2C2C32] [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(0,0,0,0.2)] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-slate-200/80 dark:[&::-webkit-slider-thumb]:border-white/30 transition-all"
                 />
               </div>
             </div>
@@ -434,7 +434,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="px-5 py-2 rounded-xl bg-black hover:bg-slate-800 text-white text-[13px] font-medium transition-all active:scale-95 cursor-pointer shadow-sm flex items-center justify-center shrink-0 min-w-[76px]"
+                className="px-5 py-2 rounded-xl bg-black dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-[13px] font-medium transition-all active:scale-95 cursor-pointer shadow-sm flex items-center justify-center shrink-0 min-w-[76px]"
               >
                 <span>生成</span>
               </button>

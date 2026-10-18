@@ -1,6 +1,8 @@
 export type {
   AssistantSkill,
+  AssistantSkillFile,
   AssistantSkillInputRequirement,
+  AssistantSkillMeta,
   AssistantSkillOutputFormat,
   AssistantSkillReference,
   AssistantSkillRuntime,

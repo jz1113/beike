@@ -19,6 +19,7 @@ export function usePromptBarPopoverLayout(
   anchorRef: RefObject<HTMLElement | null>,
   panelWidth = PANEL_WIDTH,
   panelMaxHeight = PANEL_MAX_HEIGHT,
+  shrinkToContent = false,
 ) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<PopoverLayout | null>(null);
@@ -55,7 +56,15 @@ export function usePromptBarPopoverLayout(
       }
 
       const rect = anchor.getBoundingClientRect();
-      const width = Math.min(panelWidth, Math.max(0, bounds.right - bounds.left - EDGE_PADDING * 2));
+      const available = Math.max(0, bounds.right - bounds.left - EDGE_PADDING * 2);
+      let width = Math.min(panelWidth, available);
+      if (shrinkToContent) {
+        const previousWidth = panel.style.width;
+        panel.style.width = 'max-content';
+        const natural = Math.ceil(panel.getBoundingClientRect().width);
+        panel.style.width = previousWidth;
+        if (natural > 0) width = Math.min(width, natural);
+      }
       const above = Math.max(0, rect.top - bounds.top - EDGE_PADDING - PANEL_GAP);
       const below = Math.max(0, bounds.bottom - rect.bottom - EDGE_PADDING - PANEL_GAP);
       const desiredHeight = Math.min(panelMaxHeight, panel.scrollHeight + panel.offsetHeight - panel.clientHeight);
@@ -86,7 +95,7 @@ export function usePromptBarPopoverLayout(
       viewport?.removeEventListener('resize', update);
       viewport?.removeEventListener('scroll', update);
     };
-  }, [isOpen, preferUp, anchorRef, panelWidth, panelMaxHeight]);
+  }, [isOpen, preferUp, anchorRef, panelWidth, panelMaxHeight, shrinkToContent]);
 
   return {
     panelRef,

@@ -277,7 +277,7 @@ export default function AddModelModal({
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors shadow-sm"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition hover:shadow-indigo-500/20 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-white dark:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
           >
             保存模型
           </button>

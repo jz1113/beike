@@ -48,7 +48,7 @@ export default function MaterialFloatingDock({
             type="button"
             disabled={isDownloading || isDeleting}
             onClick={onBatchDownload}
-            className="flex items-center gap-1.5 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-white dark:text-slate-900 active:scale-95 transition-all disabled:opacity-50 shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 text-xs font-semibold active:scale-95 transition-all disabled:opacity-50 shadow-xs cursor-pointer dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-white dark:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
           >
             {isDownloading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

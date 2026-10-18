@@ -27,7 +27,7 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 	for _, image := range images {
 		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image}})
 	}
-	text, _, status, err := generate.ChatCompletion(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.35, 90*time.Second)
+	text, usageData, status, err := generate.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.35, 90*time.Second)
 	if err != nil || status >= 300 {
 		httpx.WriteJSON(w, headlineFailure(err, status), map[string]any{"success": false, "error": headlineErrorText(err, status, "标题改写模型 "+model+" 返回 HTTP "+generate.Itoa(status))})
 		return
@@ -42,7 +42,11 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "标题改写模型未返回 7–12 字的有效主标题，未截断或提交后续任务"})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "data": map[string]any{"title": title}, "model": model})
+	body := map[string]any{"success": true, "data": map[string]any{"title": title}, "model": model}
+	if usage := generate.NormalizeUsage(usageData); usage != nil {
+		body["usage"] = usage
+	}
+	httpx.WriteJSON(w, http.StatusOK, body)
 }
 
 func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
@@ -68,11 +72,13 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 	if ratio != "1:1" {
 		ratio = "3:4"
 	}
-	content := []any{map[string]any{"type": "text", "text": coverDirectorPrompt(original, cover, ratio, generate.StringField(payload, "productName"))}}
+	stylePrompt := strings.TrimSpace(generate.StringField(payload, "stylePrompt"))
+	negativeRules := generate.StringListField(payload, "negativeRules")
+	content := []any{map[string]any{"type": "text", "text": coverDirectorPromptWithStyle(original, cover, ratio, generate.StringField(payload, "productName"), stylePrompt, negativeRules)}}
 	for _, image := range images {
 		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image}})
 	}
-	text, _, status, err := generate.ChatCompletion(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.65, 90*time.Second)
+	text, usageData, status, err := generate.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.65, 90*time.Second)
 	if err != nil || status >= 300 || strings.TrimSpace(text) == "" {
 		code := headlineFailure(err, status)
 		if strings.TrimSpace(text) == "" && err == nil && status < 300 {
@@ -91,7 +97,11 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": message})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v4"})
+	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v4"}
+	if usage := generate.NormalizeUsage(usageData); usage != nil {
+		body["usage"] = usage
+	}
+	httpx.WriteJSON(w, http.StatusOK, body)
 }
 
 func headlineCredentials(cfg config.Config, r *http.Request, payload map[string]any, model string) (string, string) {
@@ -130,9 +140,16 @@ func headlineTitlePrompt(original, product string) string {
 	return "你是中文短视频封面的标题编辑。只返回 JSON：{\"title\":\"7-12个纯中文字符\"}。原标题：" + original + "。商品名：" + product + "。标题必须是 7 到 12 个纯中文字符，保留可验证结论，不要套话。"
 }
 
-func coverDirectorPrompt(original, cover, ratio, product string) string {
-	return "你是中文短视频封面美术指导。画布比例 " + ratio + "。原标题：" + original + "。封面标题：" + cover + "。商品名：" + product +
-		"。只返回 JSON，字段 title、titleLines、productNameLine、composition、material、palette、artDirectionId、typographySystem、typography、visualAnchor、styleFamily、imagePrompt。titleLines 拼接必须等于封面标题。imagePrompt 为 450 到 1000 字，并用「」逐行列出标题。"
+func coverDirectorPromptWithStyle(original, cover, ratio, product, stylePrompt string, negativeRules []string) string {
+	base := "你是中文短视频封面美术指导。画布比例 " + ratio + "。原标题：" + original + "。封面标题：" + cover + "。商品名：" + product + "。"
+	if strings.TrimSpace(stylePrompt) != "" {
+		base += "【核心风格指定】" + strings.TrimSpace(stylePrompt) + "。"
+	}
+	if len(negativeRules) > 0 {
+		base += "【负向严格避坑约束】" + strings.Join(negativeRules, "；") + "。"
+	}
+	base += "只返回 JSON，字段 title、titleLines、productNameLine、composition、material、palette、artDirectionId、typographySystem、typography、visualAnchor、styleFamily、imagePrompt。titleLines 拼接必须等于封面标题。imagePrompt 为 450 到 1000 字，并用「」逐行列出标题。"
+	return base
 }
 
 func normalizeHeadline(value string) string {

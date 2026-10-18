@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { CanvasNode } from '../store/useCanvasStore';
 import { LightboxGenConfigToolbar } from '@client/shared/modals/lightbox/LightboxGenConfigToolbar';
+import { useAppTheme } from '@client/shared/hooks/useAppTheme';
 import { useCanvasToolConfig } from '@client/shared/hooks/useCanvasToolConfig';
 import { useCanvasToolSubmission } from '@client/shared/hooks/useCanvasToolSubmission';
 
@@ -32,6 +33,7 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
   node,
   onSubmit,
 }) => {
+  const { isDark } = useAppTheme();
   const { selectedModelId, selectedQuality, selectedAspectId, handleSelectModel, handleSelectQuality, handleSelectAspect } = useCanvasToolConfig(isOpen);
 
   const [params, setParams] = useState<LightingParams>(DEFAULT_LIGHTING_PARAMS);
@@ -85,19 +87,19 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[560px] rounded-2xl bg-white text-zinc-900 shadow-2xl border border-zinc-200/90 overflow-hidden select-none"
+        className="relative w-full max-w-[560px] rounded-2xl bg-white dark:bg-[#1B1B1E] text-zinc-900 dark:text-[#EDEDED] shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-zinc-200/90 dark:border-white/10 overflow-hidden select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 顶部标题栏 */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-zinc-100">
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-zinc-100 dark:border-white/10">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-zinc-900 tracking-wide">打光效果</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wide">打光效果</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="关闭弹窗"
-            className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
             title="关闭"
           >
             <X className="w-4 h-4" />
@@ -109,12 +111,12 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
           <CanvasLightingPreview node={node} params={params} setParams={setParams} />
 
           {/* 右侧：参数控制面板 */}
-          <div className="w-[260px] flex flex-col gap-3.5 text-xs text-zinc-700">
+          <div className="w-[260px] flex flex-col gap-3.5 text-xs text-zinc-700 dark:text-zinc-300">
             {/* 1. 全局 / 智能模式 */}
             <div className="flex items-center justify-between">
-              <span className="font-medium text-zinc-800">全局</span>
+              <span className="font-medium text-zinc-800 dark:text-white">全局</span>
               <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-zinc-500 text-[11px]">智能模式</span>
+                <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">智能模式</span>
                 <input
                   type="checkbox"
                   role="switch"
@@ -123,7 +125,7 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
                   onChange={(e) => setParams((prev) => ({ ...prev, smartMode: e.target.checked }))}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-zinc-900 relative" />
+                <div className="w-8 h-4 bg-zinc-200 dark:bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-indigo-600 relative" />
               </label>
             </div>
 
@@ -161,7 +163,7 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowColorPicker(!showColorPicker)}
-                  className="w-12 h-6 rounded border border-zinc-300 bg-white relative overflow-hidden shadow-xs cursor-pointer hover:border-zinc-400 transition-colors"
+                  className="w-12 h-6 rounded border border-zinc-300 dark:border-white/20 bg-white dark:bg-[#151518] relative overflow-hidden shadow-xs cursor-pointer hover:border-zinc-400 dark:hover:border-white/40 transition-colors"
                   title="点击选择光照颜色"
                 >
                   {params.color === 'original' ? (
@@ -179,8 +181,8 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
 
                 {/* 颜色选择预设浮层 */}
                 {showColorPicker && (
-                  <div className="absolute right-0 top-8 z-30 bg-white border border-zinc-200 rounded-xl p-2.5 shadow-xl flex flex-col gap-2 w-48">
-                    <div className="text-[11px] font-medium text-zinc-500">推荐光源色彩</div>
+                  <div className="absolute right-0 top-8 z-30 bg-white dark:bg-[#202024] border border-zinc-200 dark:border-white/10 rounded-xl p-2.5 shadow-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] flex flex-col gap-2 w-48">
+                    <div className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">推荐光源色彩</div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {PRESET_LIGHT_COLORS.map((item) => (
                         <button
@@ -192,24 +194,24 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
                           }}
                           className={`flex flex-col items-center gap-1 p-1 rounded-lg border transition-all cursor-pointer ${
                             params.color === item.value
-                              ? 'border-zinc-900 bg-zinc-100 font-medium'
-                              : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/60'
+                              ? 'border-zinc-900 dark:border-white bg-zinc-100 dark:bg-white/15 font-medium'
+                              : 'border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 bg-zinc-50/60 dark:bg-white/5'
                           }`}
                           title={item.name}
                         >
                           {item.value === 'original' ? (
-                            <div className="w-5 h-5 rounded-full bg-white relative overflow-hidden border border-zinc-300">
+                            <div className="w-5 h-5 rounded-full bg-white dark:bg-[#1B1B1E] relative overflow-hidden border border-zinc-300 dark:border-white/20">
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="w-full h-[2px] bg-red-600 rotate-[-30deg]" />
                               </div>
                             </div>
                           ) : (
                             <div
-                              className="w-5 h-5 rounded-full border border-zinc-300 shadow-xs"
+                              className="w-5 h-5 rounded-full border border-zinc-300 dark:border-white/20 shadow-xs"
                               style={{ backgroundColor: item.color }}
                             />
                           )}
-                          <span className="text-[9px] text-zinc-700 truncate w-full text-center">
+                          <span className="text-[9px] text-zinc-700 dark:text-zinc-300 truncate w-full text-center">
                             {item.name}
                           </span>
                         </button>
@@ -267,8 +269,8 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
             {/* 5. 轮廓光 */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-1">
-                <span className="font-medium text-zinc-800">轮廓光</span>
-                <HelpCircle className="w-3 h-3 text-zinc-400 hover:text-zinc-600 cursor-help" />
+                <span className="font-medium text-zinc-800 dark:text-white">轮廓光</span>
+                <HelpCircle className="w-3 h-3 text-zinc-400 dark:text-slate-500 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-help" />
               </div>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -279,20 +281,20 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
                   onChange={(e) => setParams((prev) => ({ ...prev, rimLight: e.target.checked }))}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-zinc-900 relative" />
+                <div className="w-8 h-4 bg-zinc-200 dark:bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-indigo-600 relative" />
               </label>
             </div>
           </div>
         </div>
 
-        {submitError && <p role="alert" className="px-5 pb-3 text-xs text-rose-600">{submitError}</p>}
+        {submitError && <p role="alert" className="px-5 pb-3 text-xs text-rose-600 dark:text-rose-400">{submitError}</p>}
         {/* 底部控制栏 (Footer) */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-100 bg-zinc-50/80">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-100 dark:border-white/10 bg-zinc-50/80 dark:bg-[#18181b]">
           {/* 重置参数 */}
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>重置参数</span>
@@ -301,7 +303,7 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
           {/* 右侧：模型切换、清晰度与提交按钮 (按要求彻底移除算力 14 徽章，改用亮色工具栏) */}
           <div className="flex items-center gap-2 sm:gap-3">
             <LightboxGenConfigToolbar
-              theme="light"
+              theme={isDark ? 'dark' : 'light'}
               selectedModelId={selectedModelId}
               onSelectModel={handleSelectModel}
               selectedQuality={selectedQuality}
@@ -314,13 +316,13 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-9 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 bg-zinc-900 hover:bg-black text-white shadow-sm disabled:opacity-50"
+              className="w-9 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 bg-zinc-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 text-white dark:text-zinc-900 shadow-sm disabled:opacity-50"
               title="应用打光效果并生成"
             >
               {isSubmitting ? (
-                <Loader2 className="w-4 h-4 text-white animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <ArrowUp className="w-4 h-4 text-white stroke-[2.5]" />
+                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
               )}
             </button>
           </div>

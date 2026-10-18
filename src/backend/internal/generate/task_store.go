@@ -75,25 +75,82 @@ func productExists(ctx context.Context, db *sql.DB, id string) bool {
 	return err == nil && found != ""
 }
 
-func taskStatus(ctx context.Context, db *sql.DB, taskID string) (status, result, reason string, ok bool, err error) {
+func taskStatus(ctx context.Context, db *sql.DB, taskID string) (status, result, reason, usage string, ok bool, err error) {
 	var state, url, fail sql.NullString
 	err = db.QueryRowContext(ctx, `SELECT "status", "resultUrl", "failReason" FROM "ImageTask" WHERE "taskId" = ? LIMIT 1`, taskID).
 		Scan(&state, &url, &fail)
 	if err == sql.ErrNoRows {
-		return "", "", "", false, nil
+		return "", "", "", "", false, nil
 	}
 	if err != nil {
-		return "", "", "", false, err
+		return "", "", "", "", false, err
 	}
-	return state.String, url.String, fail.String, true, nil
+	return state.String, url.String, fail.String, readTaskUsage(ctx, db, taskID), true, nil
 }
 
-func updateTaskTerminal(ctx context.Context, db *sql.DB, taskID, status, result, reason string) {
+func readTaskUsage(ctx context.Context, db *sql.DB, taskID string) string {
+	var usage sql.NullString
+	err := db.QueryRowContext(ctx, `SELECT "usage" FROM "ImageTask" WHERE "taskId" = ? LIMIT 1`, taskID).Scan(&usage)
+	if err != nil {
+		return ""
+	}
+	return usage.String
+}
+
+func updateTaskTerminal(ctx context.Context, db *sql.DB, taskID, status, result, reason, usageJSON string) {
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	if usageJSON != "" {
+		_, err := db.ExecContext(ctx, `
+			UPDATE "ImageTask" SET "status" = ?, "resultUrl" = ?, "failReason" = ?, "usage" = ?, "updatedAt" = ?
+			WHERE "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS')`,
+			status, emptyNull(result), emptyNull(reason), usageJSON, now, taskID)
+		if err == nil {
+			return
+		}
+	}
 	_, _ = db.ExecContext(ctx, `
 		UPDATE "ImageTask" SET "status" = ?, "resultUrl" = ?, "failReason" = ?, "updatedAt" = ?
 		WHERE "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS')`,
 		status, emptyNull(result), emptyNull(reason), now, taskID)
+}
+
+func rememberTaskUsage(ctx context.Context, cfg config.Config, taskID string, usage map[string]any) {
+	raw := EncodeUsage(usage)
+	if raw == "" || taskID == "" {
+		return
+	}
+	db, err := openTaskDB(cfg)
+	if err != nil {
+		return
+	}
+	defer db.Close()
+	_, _ = db.ExecContext(ctx, `
+		UPDATE "ImageTask" SET "usage" = ?
+		WHERE "taskId" = ? AND ("usage" IS NULL OR "usage" = '')`, raw, taskID)
+}
+
+func polledTaskBody(ctx context.Context, cfg config.Config, taskID string, parsed pollParsed, upstream map[string]any) map[string]any {
+	usage := NormalizeUsage(upstream)
+	if parsed.status == "SUCCESS" || parsed.status == "FAILURE" {
+		if db, err := openTaskDB(cfg); err == nil {
+			updateTaskTerminal(ctx, db, taskID, parsed.status, parsed.result, parsed.reason, EncodeUsage(usage))
+			_ = db.Close()
+		}
+	}
+	body := map[string]any{
+		"success": true, "taskId": taskID, "status": parsed.status, "progress": parsed.progress,
+		"resultUrl": parsed.result, "failReason": parsed.reason,
+	}
+	if usage != nil {
+		body["usage"] = usage
+	}
+	return body
+}
+
+func putStoredUsage(body map[string]any, raw string) {
+	if usage := DecodeUsage(raw); usage != nil {
+		body["usage"] = usage
+	}
 }
 
 func randomTaskID() (string, error) {

@@ -17,10 +17,10 @@ export const ImageGridTile = memo(function ImageGridTile({
     <div
       onClick={() => onToggle(img)}
       style={{ contain: 'layout paint' }}
-      className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all duration-150 group bg-slate-100/80 ${
+      className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all duration-150 group bg-slate-100/80 dark:bg-white/10 ${
         isChosen 
           ? 'border-indigo-600 ring-2 ring-indigo-500/25 shadow-md scale-[0.98]' 
-          : 'border-slate-200/80 hover:border-indigo-400 hover:shadow-sm'
+          : 'border-slate-200/80 hover:border-indigo-400 hover:shadow-sm dark:border-white/10'
       }`}
     >
       <img 

@@ -51,12 +51,15 @@ export interface AgentMessageItem extends AssistantItemBase {
   content: string;
 }
 
+export type ToolRunStatus = 'running' | 'done' | 'error' | 'declined' | 'cancelled';
+
 export interface ToolCallItem extends AssistantItemBase {
   kind: 'toolCall';
   name: string;
   displayName: string;
   args: string;
-  status: 'running' | 'done' | 'error';
+  status: ToolRunStatus;
+  summary?: string;
   callId: string;
 }
 
@@ -65,7 +68,7 @@ export interface ToolResultItem extends AssistantItemBase {
   kind: 'toolResult';
   name: string;
   displayName: string;
-  status: 'done' | 'error';
+  status: Exclude<ToolRunStatus, 'running'>;
   summary: string;
   /** Structured payload for client-side actions */
   action?: Record<string, unknown>;

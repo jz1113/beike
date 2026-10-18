@@ -68,7 +68,7 @@ export interface BatchTaskItem {
 }
 
 export const secondaryBtnClass =
-  'h-9 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0';
+  'h-9 px-3 rounded-xl bg-white/90 hover:bg-white dark:bg-[#202024] dark:hover:bg-[#28282D] border border-slate-200/90 dark:border-white/10 text-slate-800 dark:text-slate-100 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0';
 
 export const COLLECTOR_FALLBACK_IMG = MEDIA_FALLBACK_IMG;
 export const INSPIRATION_FALLBACK_IMG = COLLECTOR_FALLBACK_IMG;

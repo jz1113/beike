@@ -3,7 +3,7 @@ import { AlertCircle, Bot, Check, ChevronRight, FileText, Globe, ListChecks, Pau
 import type { AssistantItem } from '@shared/domain/assistant/types';
 import type { AssistantTaskState } from '@shared/domain/assistant/taskPolicy';
 import type { ToolActivityEntry } from '../../model/assistantTurnTypes';
-import { activityEntries, activityStage, formatActivityDuration, type ActivityEntry } from '../../model/assistantActivity';
+import { activityEntries, activityStage, activityStateLabel, executionFailed, executionSettledLabel, formatActivityDuration, type ActivityEntry } from '../../model/assistantActivity';
 import AssistantMark from '../AssistantMark';
 import ThinkingBlock from './ThinkingBlock';
 import AssistantTaskCard from './AssistantTaskCard';
@@ -20,7 +20,7 @@ function ActivityIcon({ entry }: { entry: ActivityEntry }) {
 }
 function ActivityRow({ entry }: { entry: ActivityEntry }) {
   const hasDetails = Boolean(entry.summary || entry.args || entry.action || entry.images?.length);
-  const state = entry.status === 'running' ? '进行中' : entry.status === 'error' ? '失败' : entry.status === 'interrupted' ? '已中断' : '已完成';
+  const state = activityStateLabel(entry.status);
   const title = <><ActivityIcon entry={entry} /><span className="agent-activity-name">{entry.label}{entry.target && <span className="agent-activity-target"> · {entry.target}</span>}</span><span className="agent-activity-state">{state}</span>{hasDetails && <ChevronRight size={12} className="agent-disclosure" />}</>;
   return <details className="agent-activity-row" data-state={entry.status} open={entry.status === 'error' ? true : undefined}>
     <summary>{title}</summary>
@@ -35,7 +35,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
 export default function AssistantExecution({ items = [], legacy = [], thinking, task, isSending = false, active = isSending, startedAt, message, awaitingApproval }: Props) {
   const entries = useMemo(() => activityEntries(items, isSending, legacy), [items, legacy, isSending]);
   const reasoning = thinking || items.filter(item => item.kind === 'agentReasoning').map(item => item.content).join('\n\n');
-  const failed = entries.some(entry => entry.status === 'error') || task?.status === 'failed';
+  const failed = executionFailed(entries, task?.status);
   const interrupted = entries.some(entry => entry.status === 'interrupted') || task?.status === 'cancelled';
   const [expanded, setExpanded] = useState(failed);
   const [mountedAt] = useState(Date.now);
@@ -48,10 +48,9 @@ export default function AssistantExecution({ items = [], legacy = [], thinking, 
     return () => clearInterval(timer);
   }, [active]);
   const current = entries.findLast(entry => entry.status === 'running');
-  const completed = entries.filter(entry => entry.status === 'done').length;
+  const settled = executionSettledLabel(entries, task?.status);
   const label = awaitingApproval ? '等待你的确认' : active ? current ? `${current.label}${current.target ? ` · ${current.target}` : ''}…` : activityStage(message)
-    : current && isSending ? `${current.label}${current.target ? ` · ${current.target}` : ''}…` : failed ? `${completed ? `已完成 ${completed} 个操作，` : ''}有步骤失败` : interrupted ? '执行已中断'
-    : entries.length ? `已完成 ${completed} 个操作` : '已思考';
+    : current && isSending ? `${current.label}${current.target ? ` · ${current.target}` : ''}…` : settled;
   const start = startedAt || entries[0]?.startedAt || mountedAt;
   const ends = entries.map(entry => entry.endedAt).filter((value): value is number => typeof value === 'number');
   const duration = start && active ? now - start : entries.length && entries[0].startedAt && ends.length ? Math.max(...ends) - entries[0].startedAt : undefined;

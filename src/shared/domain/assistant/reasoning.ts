@@ -3,6 +3,13 @@ import { deepSeekModel, isDeepSeekRoute } from '../models/deepseek';
 export const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const;
 /** auto is accepted only for legacy preferences and unsupported-model defaults. */
 export type ReasoningEffort = typeof REASONING_EFFORTS[number] | 'auto';
+export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
+  auto: '默认',
+  low: '低',
+  medium: '中',
+  high: '高',
+  xhigh: '极高',
+};
 interface ReasoningCapability {
   levels: readonly ReasoningEffort[];
   description: string;
@@ -20,6 +27,9 @@ const full: ReasoningCapability = { levels: REASONING_EFFORTS, description: '支
 const max: ReasoningCapability = { levels: ['low', 'high', 'xhigh'], description: '支持低、高、极高三档；极高使用模型的最大推理强度。', maxEffort: true, preserveReasoning: true };
 export function reasoningCapability(model: string): ReasoningCapability {
   const id = model.toLowerCase();
+  if (id === 'smart-reasoning' || id === 'smart') {
+    return { levels: ['low', 'medium', 'high'], description: '支持低、中、高三档；智能匹配将自动选配合适的推理预算。' };
+  }
   if (gptModels.has(id) || ['grok-4.6', 'grok-4.7'].includes(id)) return full;
   if (geminiModels.has(id)) return { levels: ['low', 'medium', 'high'], description: '支持低、中、高三档；高为此模型的最高强度。' };
   if (id === 'qwen3.8-max') return { levels: ['low', 'medium', 'xhigh'], description: '支持低、中、极高三档；官方将高映射为极高。', preserveReasoning: true };

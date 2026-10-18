@@ -39,20 +39,26 @@ export function writeModalityDefaultKey(kind: ModalityKind, modelId: string): st
   return storedId;
 }
 
-export function registerWorkflowDefault(kind: ModalityKind, model: Pick<ModalityModelItem, 'modelId' | 'name'>) {
+export function registerWorkflowDefault(kind: ModalityKind, model: Pick<ModalityModelItem, 'modelId' | 'name' | 'channelId'>) {
   const capability = WORKFLOW_CAPABILITY[kind];
   const storedId = storedDefaultModelId(model.modelId);
   if (!capability || !storedId || typeof localStorage === 'undefined') return;
   if (localStorage.getItem('custom_models') === null) return;
   const current = readWorkflowModelsFromStorage();
-  const next = upsertExplicitWorkflowModel(current, { id: storedId, name: model.name, capability });
+  const next = upsertExplicitWorkflowModel(current, {
+    id: storedId,
+    name: model.name,
+    capability,
+    providerId: model.channelId,
+  });
   if (JSON.stringify(next) === JSON.stringify(current)) return;
   persistCustomModels(repairWorkflowModelsForSettings(next));
 }
 
 export function notifyWorkflowModels(kind: ModalityKind) {
-  if ((kind === 'chat' || kind === 'image' || kind === 'video') && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('models_updated'));
+    window.dispatchEvent(new CustomEvent('modality_models_updated', { detail: { kind } }));
   }
 }
 

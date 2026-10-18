@@ -41,7 +41,7 @@ export function ApiProviderDetailPanel({
     if (provider.id === 'lianchi_images' || provider.iconType === 'lianchi') {
       return <LianchiLogo className={cls} />;
     }
-    return <Globe className="w-7 h-7 text-slate-500" />;
+    return <Globe className="w-7 h-7 text-slate-500 dark:text-slate-400" />;
   };
 
   const handleConfirmRemove = () => {

@@ -29,7 +29,7 @@ export function KeywordReviewRecoveryStatus({ saving, savedAt, error, onRetry, h
   );
   if (!saving && savedAt === null) return null;
   return (
-    <p role="status" aria-live="polite" className="mt-2 flex items-center gap-1.5 text-xs leading-5 text-slate-500">
+    <p role="status" aria-live="polite" className="mt-2 flex items-center gap-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
       {saving ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" /> : <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />}
       {saving ? '正在保存至本机…' : `已保存至本机 · ${new Date(savedAt!).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`}
     </p>

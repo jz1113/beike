@@ -9,10 +9,13 @@ import { CanvasLayersPanel } from '../CanvasLayersPanel';
 import CanvasPromptDock from '../prompt/CanvasPromptDock';
 import { useCanvasFileDrop } from '../../hooks/useCanvasFileDrop';
 import { useI18n } from '@client/shared/i18n';
+import { useAppTheme } from '@client/shared/hooks/useAppTheme';
 import type { CanvasNode, CanvasProject, CanvasSubject } from '../../model/types';
+import type { AlignmentGuide } from '../../hooks/useCanvasSnapping';
 import type { MutableRefObject, RefObject, MouseEvent, WheelEvent } from 'react';
 
 export interface CanvasEditorBoardProps {
+  alignmentGuides?: AlignmentGuide[];
   centerAt: (x:number,y:number) => void;
   selectedNodeIds: string[];
   setSelectedNodeIds: (ids: string[]) => void;
@@ -65,7 +68,9 @@ export interface CanvasEditorBoardProps {
 
 export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
   const { t } = useI18n();
+  const { isDark } = useAppTheme();
   const {
+    alignmentGuides,
     canvasViewportRef, canvasFileDrop, handleMouseDownCanvas, closeNodeMenu, handleWheel, openNodeMenuAt,
     isPanning, isHandMode, pan, zoom, nodeMenu, handleCreateQuickNode, nodes, currentProject,
     draggingNodeId, draggingNodePos,  replacementNodeRef, fileInputRef,
@@ -98,20 +103,20 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
           pan={pan}
           zoom={zoom}
           isPanning={isPanning}
-          baseColor="#cbd5e1"
+          baseColor={isDark ? '#27272a' : '#cbd5e1'}
           activeColor="#818cf8"
           proximity={130}
         />
 
         {nodeMenu && <CanvasNodeMenu x={nodeMenu.screenX} y={nodeMenu.screenY} onClose={closeNodeMenu} onSelect={handleCreateQuickNode} />}
-        {canvasFileDrop.dragging && <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/70"><span className="rounded-xl bg-white px-5 py-3 text-sm text-indigo-600 shadow-sm">松开以导入图片、视频或音频</span></div>}
-        {canvasFileDrop.pending > 0 && <div role="status" className="pointer-events-none absolute right-4 top-4 z-50 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 shadow-sm">素材上传中 · 剩余 {canvasFileDrop.pending} 个</div>}
-        {canvasFileDrop.errors.length > 0 && <div role="alert" className="absolute right-4 top-16 z-50 max-h-48 max-w-sm overflow-auto rounded-xl border border-red-100 bg-white p-3 text-xs text-red-600 shadow-sm">{canvasFileDrop.errors.map((error, index) => <p key={index}>{error}</p>)}<button type="button" onClick={canvasFileDrop.dismissErrors} className="mt-2 text-slate-500">关闭</button></div>}
+        {canvasFileDrop.dragging && <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/70"><span className="rounded-xl bg-white px-5 py-3 text-sm text-indigo-600 shadow-sm dark:bg-[#18191c]">松开以导入图片、视频或音频</span></div>}
+        {canvasFileDrop.pending > 0 && <div role="status" className="pointer-events-none absolute right-4 top-4 z-50 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 shadow-sm dark:text-slate-300 dark:border-white/10 dark:bg-[#18191c]">素材上传中 · 剩余 {canvasFileDrop.pending} 个</div>}
+        {canvasFileDrop.errors.length > 0 && <div role="alert" className="absolute right-4 top-16 z-50 max-h-48 max-w-sm overflow-auto rounded-xl border border-red-100 bg-white p-3 text-xs text-red-600 shadow-sm dark:bg-[#18191c]">{canvasFileDrop.errors.map((error, index) => <p key={index}>{error}</p>)}<button type="button" onClick={canvasFileDrop.dismissErrors} className="mt-2 text-slate-500 dark:text-slate-400">关闭</button></div>}
         {/* 空画布启动器：参考工作台式引导，直接提供可执行的创作起点。 */}
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 -translate-y-1/2 px-6 pl-20 sm:px-20">
             <div className="mx-auto max-w-[880px] select-none text-center animate-in fade-in duration-200">
-              <p className="mb-8 flex items-center justify-center gap-2.5 text-sm font-normal text-slate-500">
+              <p className="mb-8 flex items-center justify-center gap-2.5 text-sm font-normal text-slate-500 dark:text-slate-400">
                 <MousePointer2 size={18} strokeWidth={1.5} />{t('canvas.doubleClickToCreate')}
               </p>
               <div className="pointer-events-auto grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -120,8 +125,8 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
                   { label: t('promptBar.modes.video'), Icon: VideoIcon, action: () => handleCreateQuickNode('video-generation') },
                   { label: '文本生成', Icon: Type, action: () => handleCreateQuickNode('prompt') },
                   { label: t('assets.import'), Icon: Upload, action: () => { replacementNodeRef.current = null; fileInputRef.current?.click(); } },
-                ].map(({ label, Icon, action }) => <button key={label} type="button" onClick={action} className="group flex h-16 min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-2 text-left text-sm font-medium text-slate-700 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 motion-reduce:transform-none">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors group-hover:bg-slate-200/70"><Icon size={20} strokeWidth={1.6} /></span>
+                ].map(({ label, Icon, action }) => <button key={label} type="button" onClick={action} className="group flex h-16 min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 p-2 text-left text-sm font-medium text-slate-700 dark:text-slate-200 shadow-[0_2px_8px_rgba(15,23,42,0.03)] dark:shadow-none transition hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#26262B] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 motion-reduce:transform-none">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 transition-colors group-hover:bg-slate-200/70 dark:group-hover:bg-white/15"><Icon size={20} strokeWidth={1.6} /></span>
                   <span>{label}</span>
                 </button>)}
               </div>
@@ -136,6 +141,42 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           }}
         >
+          {/* 磁吸对齐辅助虚线 */}
+          {alignmentGuides && alignmentGuides.length > 0 && (
+            <svg className="pointer-events-none absolute left-0 top-0 h-px w-px overflow-visible z-40" aria-label="对齐吸附辅助线">
+              {alignmentGuides.map((guide, idx) => {
+                if (guide.type === 'vertical') {
+                  return (
+                    <line
+                      key={`snap-v-${idx}-${guide.coordinate}`}
+                      x1={guide.coordinate}
+                      y1={guide.start}
+                      x2={guide.coordinate}
+                      y2={guide.end}
+                      stroke="#6366f1"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 4"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  );
+                }
+                return (
+                  <line
+                    key={`snap-h-${idx}-${guide.coordinate}`}
+                    x1={guide.start}
+                    y1={guide.coordinate}
+                    x2={guide.end}
+                    y2={guide.coordinate}
+                    stroke="#6366f1"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+          )}
+
           <CanvasConnections projectId={currentProject.id} zoom={zoom} nodes={nodes.filter(node=>!node.layerHidden).map(node => p.dragPositions[node.id] ? {...node, ...p.dragPositions[node.id]} : node)} />
           {p.selectionBox && <div className="pointer-events-none absolute z-50 border border-indigo-400 bg-indigo-400/10" style={{left:p.selectionBox.x,top:p.selectionBox.y,width:p.selectionBox.width,height:p.selectionBox.height}} />}
           {nodes.map((node) => (

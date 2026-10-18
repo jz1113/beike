@@ -26,6 +26,7 @@ import {
   getCanvasWorkspaceAttachments,
   useCanvasWorkspaceSelection,
 } from '@client/shared/workspace/canvasWorkspace';
+import { visibleMarkdownText } from '@client/shared/ui/markdown/visibleMarkdownText';
 import { Sparkles, UploadCloud } from 'lucide-react';
 
 interface Props {
@@ -285,7 +286,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
   }, [isAssistantOpen, setShowModelMenu]);
 
   const handleCopyText = async (content: string, id: string) => {
-    try { await navigator.clipboard.writeText(content);
+    try { await navigator.clipboard.writeText(visibleMarkdownText(content));
     setCopiedMsgId(id);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => {

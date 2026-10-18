@@ -17,18 +17,18 @@ export default function BatchProgressBar({
   variant = 'indigo',
 }: Props) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-  const barBg = variant === 'indigo' ? 'bg-indigo-100' : 'bg-slate-100';
+  const barBg = variant === 'indigo' ? 'bg-indigo-100 dark:bg-indigo-950/60' : 'bg-slate-100 dark:bg-white/10';
   const barFill = variant === 'indigo' ? 'bg-indigo-600' : 'bg-indigo-500';
 
   return (
     <div className="space-y-1.5">
       {(label || total > 0) && (
-        <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+        <div className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
           <span className="flex items-center gap-1.5">
-            {showSpinner && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />}
+            {showSpinner && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />}
             {label && <span>{label}</span>}
           </span>
-          <span className="font-mono text-slate-500">
+          <span className="font-mono text-slate-500 dark:text-slate-400">
             {current} / {total} ({pct}%)
           </span>
         </div>

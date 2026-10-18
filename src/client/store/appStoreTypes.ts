@@ -6,12 +6,56 @@ import type { AssistantItem } from '@shared/domain/assistant/types';
 import type { GenerationTask as ContractGenerationTask, GenerationMediaType } from '@shared/contracts/generate';
 
 export type { GenerationMediaType };
+export interface AgentTurnTaskData {
+  threadId?: string;
+  turnId?: string;
+  modelUsed?: string;
+  thinking?: string;
+  reply?: string;
+  statusText?: string;
+  steps?: Array<{
+    id: string;
+    category: string;
+    label?: string;
+    detail?: string;
+    status?: 'pending' | 'in_progress' | 'completed' | 'blocked';
+    defaultExpanded?: boolean;
+  }>;
+  toolActivity?: Array<{
+    name: string;
+    displayName: string;
+    status: 'running' | 'done' | 'error' | 'declined' | 'cancelled';
+    detail?: string;
+    action?: Record<string, unknown>;
+    visualImages?: Array<{ url: string; label?: string }>;
+  }>;
+  items?: AssistantItem[];
+  suggestions?: string[];
+  cards?: Array<{
+    title: string;
+    badge?: string;
+    description?: string;
+    actionPrompt?: string;
+  }>;
+  deliverable?: {
+    filename: string;
+    kind: 'md' | 'ppt' | 'word';
+    title: string;
+    markdown: string;
+    sizeLabel?: string;
+  };
+}
+
 export type GenerationTask = ContractGenerationTask & {
   depthStyle?: DepthVideoStyle;
   /** Local cache fallback omitted input media; require restoration before a new attempt. */
   referenceMediaMissing?: boolean;
   /** The original submission may have been accepted; only query it until reconciled. */
   submissionRecoveryRequired?: boolean;
+  /** Real runtime data when mediaType === 'agent' */
+  agentTurn?: AgentTurnTaskData;
+  /** 模态条目 id。与 model 不同时，请求凭证按这个条目而不是上游 ID 的第一条匹配。 */
+  modelRouteKey?: string;
 };
 
 export interface ChatSession {
@@ -78,7 +122,7 @@ export interface AssistantMessage {
   toolActivity?: Array<{
     name: string;
     displayName: string;
-    status: 'running' | 'done' | 'error';
+    status: 'running' | 'done' | 'error' | 'declined' | 'cancelled';
     detail?: string;
     action?: Record<string, unknown>;
     visualImages?: Array<{ url: string; label?: string }>;

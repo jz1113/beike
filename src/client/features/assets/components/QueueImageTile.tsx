@@ -22,7 +22,7 @@ export const QueueImageTile = memo(function QueueImageTile({
   const failed = attempt === 2;
 
   return (
-    <div className={`group relative w-[124px] shrink-0 aspect-[3/4] overflow-hidden rounded-2xl bg-slate-100 sm:w-[132px] xl:w-[140px] ${
+    <div className={`group relative w-[124px] shrink-0 aspect-[3/4] overflow-hidden rounded-2xl bg-slate-100 sm:w-[132px] xl:w-[140px] dark:bg-white/10 ${
       selected ? 'ring-2 ring-indigo-500 ring-offset-2 shadow-md shadow-indigo-100/70' : 'opacity-40 grayscale hover:opacity-70'
     }`}>
       <button
@@ -35,7 +35,7 @@ export const QueueImageTile = memo(function QueueImageTile({
         className="h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
       >
         {failed ? (
-          <span className="block px-3 text-xs text-slate-500">图片暂时无法加载</span>
+          <span className="block px-3 text-xs text-slate-500 dark:text-slate-400">图片暂时无法加载</span>
         ) : (
           <img
             key={retry}
@@ -58,7 +58,7 @@ export const QueueImageTile = memo(function QueueImageTile({
       {failed && <button
         type="button"
         onClick={() => { setAttempt(0); setRetry((value) => value + 1); }}
-        className="absolute inset-x-2 top-[60%] flex items-center justify-center gap-1 rounded-lg bg-white px-2 py-2 text-xs font-semibold text-indigo-600 shadow-sm"
+        className="absolute inset-x-2 top-[60%] flex items-center justify-center gap-1 rounded-lg bg-white px-2 py-2 text-xs font-semibold text-indigo-600 shadow-sm dark:bg-[#18191c]"
         aria-label={`重新加载图 ${imageIndex + 1}`}
       >
         <RefreshCw className="h-3 w-3" />重新加载

@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { ModalityKind } from '../model/modalityModelTypes';
+import type { ModalityKind, ModalityModelItem } from '../model/modalityModelTypes';
 import {
   MODALITY_TITLES,
   MODALITY_VENDORS_BY_KIND,
   modelMatchesVendor,
 } from '../model/modalityMeta';
 import { useModalityModels } from '../hooks/useModalityModels';
+import { useModalityChannelCatalog } from '../hooks/useModalityChannelCatalog';
 import { ModalityModelCard } from './ModalityModelCard';
 import { ModalityGlobalConfigCard } from './ModalityGlobalConfigCard';
 import { ModalityVendorNav } from './ModalityVendorNav';
@@ -37,10 +38,10 @@ export function ModalityHubView({ kind, showToast }: Props) {
     setModelAsDefault,
     removeModel,
     batchAddModels,
-    remoteModels,
-    isSyncingRemote,
-    syncRemoteModels,
+    batchSyncModels,
+    resetToDefaultModels,
   } = useModalityModels(kind, showToast);
+  const catalog = useModalityChannelCatalog(globalConfig, showToast);
 
   const [selectedVendor, setSelectedVendor] = useState<string | null>(
     () => MODALITY_VENDORS_BY_KIND[kind][0]?.id ?? null,
@@ -56,11 +57,20 @@ export function ModalityHubView({ kind, showToast }: Props) {
   }, [kind]);
 
   const handleOpenSync = () => {
+    catalog.refreshChannels();
     setIsSyncModalOpen(true);
-    if (remoteModels.length === 0) {
-      void syncRemoteModels();
+    const channelId = catalog.selectedChannelId;
+    if (!catalog.remoteModelsByChannel[channelId]?.length) {
+      void catalog.syncChannel(channelId);
     }
   };
+
+  const channelOf = (model: ModalityModelItem) => catalog.describeChannel(model.channelId);
+  const candidatesOf = (model: ModalityModelItem) => (
+    catalog.remoteModelsByChannel[model.channelId || '']
+    || catalog.remoteModelsByChannel[catalog.selectedChannelId]
+    || []
+  );
 
   const filteredModels = useMemo(() => {
     return models.filter((m) => !activeVendor || modelMatchesVendor(m, activeVendor));
@@ -104,7 +114,7 @@ export function ModalityHubView({ kind, showToast }: Props) {
         selectApiKey={selectApiKey}
         removeApiKeyFromHistory={removeApiKeyFromHistory}
         onSyncModels={handleOpenSync}
-        isSyncingModels={isSyncingRemote}
+        isSyncingModels={catalog.isSyncingRemote}
       />
 
       {/* 2. 厂商快捷药丸导航栏（全量展示 + 左右平滑滚动 + 滚轮横移） */}
@@ -154,16 +164,14 @@ export function ModalityHubView({ kind, showToast }: Props) {
               key={activeFocusedModel.id}
               kind={kind}
               model={activeFocusedModel}
-              globalBaseUrl={globalConfig.baseUrl}
-              globalApiKey={globalConfig.apiKey}
-              remoteModelCandidates={remoteModels}
+              inheritedBaseUrl={channelOf(activeFocusedModel).baseUrl}
+              inheritedApiKey={channelOf(activeFocusedModel).apiKey}
+              channelName={activeFocusedModel.channelId ? channelOf(activeFocusedModel).name : undefined}
+              channelMissing={Boolean(activeFocusedModel.channelId) && channelOf(activeFocusedModel).missing}
+              remoteModelCandidates={candidatesOf(activeFocusedModel)}
               onUpdate={(updates) => updateModel(activeFocusedModel.id, updates)}
               onSetDefault={() => setModelAsDefault(activeFocusedModel)}
-              onRemove={
-                activeFocusedModel.isCustom
-                  ? () => removeModel(activeFocusedModel.id)
-                  : undefined
-              }
+              onRemove={() => removeModel(activeFocusedModel.id)}
             />
           ) : (
             <div className="py-12 text-center rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] border border-dashed border-slate-200 dark:border-white/10 space-y-3">
@@ -184,19 +192,24 @@ export function ModalityHubView({ kind, showToast }: Props) {
       ) : (
         <div className="space-y-3">
           {filteredModels.length > 0 ? (
-            filteredModels.map((item) => (
+            filteredModels.map((item) => {
+              const channel = channelOf(item);
+              return (
               <ModalityModelCard
                 key={item.id}
                 kind={kind}
                 model={item}
-                globalBaseUrl={globalConfig.baseUrl}
-                globalApiKey={globalConfig.apiKey}
-                remoteModelCandidates={remoteModels}
+                inheritedBaseUrl={channel.baseUrl}
+                inheritedApiKey={channel.apiKey}
+                channelName={item.channelId ? channel.name : undefined}
+                channelMissing={Boolean(item.channelId) && channel.missing}
+                remoteModelCandidates={candidatesOf(item)}
                 onUpdate={(updates) => updateModel(item.id, updates)}
                 onSetDefault={() => setModelAsDefault(item)}
-                onRemove={item.isCustom ? () => removeModel(item.id) : undefined}
+                onRemove={() => removeModel(item.id)}
               />
-            ))
+              );
+            })
           ) : (
             <div className="py-12 text-center rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] border border-dashed border-slate-200 dark:border-white/10 space-y-3">
               <Sparkles className="w-6 h-6 text-slate-400 mx-auto" />
@@ -218,13 +231,27 @@ export function ModalityHubView({ kind, showToast }: Props) {
         isOpen={isSyncModalOpen}
         onClose={() => setIsSyncModalOpen(false)}
         kind={kind}
-        baseUrl={globalConfig.baseUrl}
-        remoteModels={remoteModels}
-        isSyncing={isSyncingRemote}
-        onReSync={() => void syncRemoteModels()}
+        baseUrl={catalog.channels.find((channel) => channel.id === catalog.selectedChannelId)?.baseUrl || globalConfig.baseUrl}
+        channels={catalog.channels}
+        channelId={catalog.selectedChannelId}
+        onChannelChange={(channelId) => {
+          catalog.setSelectedChannelId(channelId);
+          if (!catalog.remoteModelsByChannel[channelId]?.length) void catalog.syncChannel(channelId);
+        }}
+        remoteModels={catalog.remoteModelsByChannel[catalog.selectedChannelId] || []}
+        isSyncing={catalog.syncingChannelId === catalog.selectedChannelId}
+        onReSync={() => void catalog.syncChannel(catalog.selectedChannelId)}
         activeModel={activeFocusedModel}
+        currentModels={models}
+        onBatchSync={(selectedIds, candidateEntries) => {
+          const channel = catalog.channels.find((item) => item.id === catalog.selectedChannelId);
+          batchSyncModels(selectedIds, candidateEntries, catalog.selectedChannelId, channel?.name || '');
+          setIsSyncModalOpen(false);
+        }}
+        onResetDefaults={resetToDefaultModels}
         onBatchImport={(entries) => {
-          batchAddModels(entries);
+          const channel = catalog.channels.find((item) => item.id === catalog.selectedChannelId);
+          batchAddModels(entries, catalog.selectedChannelId, channel?.name || '');
           setIsSyncModalOpen(false);
         }}
       />

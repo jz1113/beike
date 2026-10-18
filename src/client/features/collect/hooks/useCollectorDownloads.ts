@@ -10,16 +10,17 @@ export function useCollectorDownloads(isOpen: boolean, showToast: (message: stri
   const openRef = useRef(isOpen);
 
   useEffect(() => {
+    const pending = controllers.current;
     openRef.current = isOpen;
     if (!isOpen) {
-      for (const controller of controllers.current.values()) controller.abort();
-      controllers.current.clear();
+      for (const controller of pending.values()) controller.abort();
+      pending.clear();
       setIsDownloadingZip(false);
       setIsDownloadingVideo(false);
     }
     return () => {
       openRef.current = false;
-      for (const controller of controllers.current.values()) controller.abort();
+      for (const controller of pending.values()) controller.abort();
     };
   }, [isOpen]);
 

@@ -34,7 +34,7 @@ export const QueueImageSet = memo(function QueueImageSet({
             {index + 1}
           </div>
           <div className="min-w-0">
-            <div className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5">
+            <div className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5 dark:text-slate-100">
               <span>{item.name}</span>
               {item.sourceUrl && <span className="shrink-0 text-rose-500 text-[10px] font-semibold">小红书图集</span>}
               {item.status === 'done' && categoryName && (

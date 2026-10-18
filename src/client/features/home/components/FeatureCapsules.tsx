@@ -1,9 +1,13 @@
 import { Brush, ShoppingBag, FilePen, Download, ScanFace, Captions, FileType } from 'lucide-react';
+import { SpotlightCard } from '@client/shared/ui/SpotlightCard';
 
 interface Props {
   onEnterWorkshop: () => void;
   onOpenHeadlinePoster: () => void;
   onOpenKeywordReview: () => void;
+  onOpenPptGenerator?: () => void;
+  onOpenAvatarStudio?: () => void;
+  onOpenVideoSales?: () => void;
   onOpenCollectorHub?: () => void;
   onPlaceholderClick?: (title: string) => void;
 }
@@ -11,17 +15,20 @@ interface Props {
 const capsules = [
   { id: 'headline_poster', title: '封面生成', hint: '商品与标题，一次生成吸睛封面', icon: Brush },
   { id: 'workshop', title: '电商工坊', hint: '从灵感到批量成片的一站式创作', icon: ShoppingBag },
+  { id: 'digital_human', title: '数字人', hint: '高颜值数字人克隆与口播视频生成', icon: ScanFace },
+  { id: 'video_sales', title: '视频带货', hint: '上传商品图，AI 自动生成短视频带货脚本与成片', icon: Captions },
   { id: 'keyword_review', title: '词包审核', hint: '批量语义分类，审核内容是否值得制作', icon: FilePen },
+  { id: 'ppt_generator', title: 'PPT生成', hint: '一句话/大纲，AI 视觉渲染高保真演示文稿', icon: FileType },
   { id: 'collector_hub', title: '内容采集', hint: '聚合商品与社媒内容，沉淀可用素材库', icon: Download },
-  { id: 'digital_human', title: '数字人', hint: 'AI 数字人形象与口播视频生成（即将上线）', icon: ScanFace },
-  { id: 'video_sales', title: '视频带货', hint: '电商带货短视频与分镜智能生成（即将上线）', icon: Captions },
-  { id: 'ppt_generator', title: 'ppt生成', hint: '一键生成高品质演讲演示文稿（即将上线）', icon: FileType },
 ] as const;
 
 export default function FeatureCapsules({
   onEnterWorkshop,
   onOpenHeadlinePoster,
   onOpenKeywordReview,
+  onOpenPptGenerator,
+  onOpenAvatarStudio,
+  onOpenVideoSales,
   onOpenCollectorHub,
   onPlaceholderClick,
 }: Props) {
@@ -33,10 +40,10 @@ export default function FeatureCapsules({
     headline_poster: onOpenHeadlinePoster,
     workshop: onEnterWorkshop,
     keyword_review: onOpenKeywordReview,
+    ppt_generator: onOpenPptGenerator || (() => handlePlaceholder('PPT生成')),
     collector_hub: onOpenCollectorHub || (() => {}),
-    digital_human: () => handlePlaceholder('数字人'),
-    video_sales: () => handlePlaceholder('视频带货'),
-    ppt_generator: () => handlePlaceholder('ppt生成'),
+    digital_human: onOpenAvatarStudio || (() => handlePlaceholder('数字人')),
+    video_sales: onOpenVideoSales || (() => handlePlaceholder('视频带货')),
   };
 
   return (
@@ -51,12 +58,17 @@ export default function FeatureCapsules({
               onClick={actions[item.id]}
               title={item.hint}
               aria-label={`${item.title}：${item.hint}`}
-              className="group flex w-[4.75rem] flex-col items-center gap-2 border-0 bg-transparent p-0 text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+              className="group flex w-[4.75rem] flex-col items-center gap-2 border-0 bg-transparent p-0 text-slate-600 dark:text-slate-300 outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 cursor-pointer transition-transform duration-200 active:scale-95"
             >
-              <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80 transition group-hover:bg-slate-50 group-hover:shadow-md group-hover:scale-[1.02]">
-                <Icon className="h-6 w-6 text-slate-800 transition-transform group-hover:scale-110 stroke-[2]" />
+              <SpotlightCard
+                className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-black/[0.06] transition-all duration-300 group-hover:scale-105 group-hover:shadow-md dark:bg-[#1B1B1E] dark:ring-white/[0.08] dark:shadow-none"
+                spotlightColor="rgba(255, 255, 255, 0.08)"
+              >
+                <Icon className="h-6 w-6 text-slate-800 dark:text-[#E5E5EA] transition-transform duration-300 group-hover:scale-110 stroke-[2]" />
+              </SpotlightCard>
+              <span className="text-center text-[12px] leading-4 text-slate-500 transition-colors duration-200 group-hover:text-slate-900 dark:text-[#8E8E93] dark:group-hover:text-[#EDEDED] font-medium">
+                {item.title}
               </span>
-              <span className="text-center text-[12px] leading-4 text-slate-500 group-hover:text-slate-800">{item.title}</span>
             </button>
           );
         })}

@@ -28,7 +28,7 @@ export function WorkshopTopBar({ assetToolbarRef, activeTab }: WorkshopTopBarPro
       <button
         type="button"
         onClick={() => setCurrentView('home')}
-        className="group flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-black tracking-tight text-slate-900 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white select-none cursor-pointer active:scale-98"
+        className="group flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-black tracking-tight text-slate-900 dark:text-white shadow-sm backdrop-blur transition-colors hover:border-slate-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#26262B] select-none cursor-pointer active:scale-98"
         title={`${studioTitle} · 点击返回首页`}
       >
         <ToolSuiteMark>

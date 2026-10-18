@@ -1,8 +1,16 @@
 import type { ModalityGlobalConfig, ModalityKind, ModalityModelItem } from './modalityModelTypes';
 import { DEFAULT_MODALITY_MODELS } from './modalityModelDefaults';
 import { inferVendorFromModelId, normalizeModelVendor } from './modalityMeta';
+import {
+  MODALITY_STORAGE_KEY_PREFIX,
+  clearDismissedDefaultIds,
+  noteRemovedDefaultModels,
+  readEffectiveModalityModels,
+  readStoredModalityModels,
+  type StoredModalityModelItem,
+} from '@shared/domain/models/modalityStorage';
 
-const STORAGE_KEY_PREFIX = 'beike_modality_models_v1_';
+const STORAGE_KEY_PREFIX = MODALITY_STORAGE_KEY_PREFIX;
 const GLOBAL_CONFIG_KEY = 'beike_modality_global_config_v1';
 
 export const DEFAULT_BASE_URL_RECOMMENDATIONS = [
@@ -71,53 +79,91 @@ export function saveStoredModalityGlobalConfig(config: ModalityGlobalConfig): vo
   }
 }
 
-export function loadStoredModalityModels(kind: ModalityKind): ModalityModelItem[] {
-  const defaults = DEFAULT_MODALITY_MODELS[kind] || [];
-  if (typeof window === 'undefined') return defaults;
-  try {
-    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${kind}`);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return defaults;
+const LEGACY_PLACEHOLDER_IDS = new Set([
+  'chat_bytedance',
+  'chat_xiaomi',
+  'img_meta',
+  'img_bytedance',
+  '3d_tripo',
+]);
 
-    // 保障字段完整并保留新增默认模型
-    const itemMap = new Map<string, ModalityModelItem>();
-    for (const item of parsed) {
-      if (item && item.id) {
-        itemMap.set(item.id, item);
-      }
+export function isInvalidPlaceholderModel(item: ModalityModelItem): boolean {
+  if (item.isCustom) return false;
+  return LEGACY_PLACEHOLDER_IDS.has(item.id);
+}
+
+function toSettingsModel(kind: ModalityKind, item: StoredModalityModelItem): ModalityModelItem {
+  return normalizeModelVendor(kind, {
+    ...item,
+    name: item.name || item.modelId,
+    modality: kind,
+    vendor: item.vendor || 'custom',
+  });
+}
+
+export function loadStoredModalityModels(kind: ModalityKind): ModalityModelItem[] {
+  const read = readEffectiveModalityModels(kind);
+  if (read.persist && typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${kind}`, JSON.stringify(read.persist.map((item) => toSettingsModel(kind, item))));
+    } catch {
+      // 忽略存储异常
     }
-    const knownModelIds = new Set(Array.from(itemMap.values()).map((item) => item.modelId));
-    for (const def of defaults) {
-      if (!itemMap.has(def.id) && !knownModelIds.has(def.modelId)) {
-        itemMap.set(def.id, def);
-      }
-    }
-    return Array.from(itemMap.values()).map((item) => normalizeModelVendor(kind, item));
-  } catch {
-    return defaults;
   }
+  return read.models.map((item) => toSettingsModel(kind, item));
+}
+
+export function resetStoredModalityModels(kind: ModalityKind): ModalityModelItem[] {
+  const defaults = (DEFAULT_MODALITY_MODELS[kind] || []).filter((item) => !isInvalidPlaceholderModel(item));
+  clearDismissedDefaultIds(kind);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${kind}`, JSON.stringify(defaults));
+    } catch {
+      // 忽略存储异常
+    }
+  }
+  return defaults;
+}
+
+function channelModelKey(channelId: string | undefined, modelId: string): string {
+  return `${channelId || ''}::${modelId}`;
 }
 
 export function appendImportedModalityModels(
   prev: ModalityModelItem[],
   kind: ModalityKind,
   entries: Array<{ modelId: string; name?: string; vendor?: string }>,
+  channelId = '',
+  channelName = '',
 ): { models: ModalityModelItem[]; added: number; skipped: number; firstId: string } {
-  const existing = new Set(prev.map((item) => item.modelId));
+  const existing = new Set(prev.map((item) => channelModelKey(item.channelId, item.modelId)));
+  const otherChannelIds = new Set(
+    prev.filter((item) => (item.channelId || '') !== channelId).map((item) => item.modelId),
+  );
   const created: ModalityModelItem[] = [];
   let skipped = 0;
   for (const entry of entries) {
     const modelId = entry.modelId.trim();
-    if (!modelId || existing.has(modelId)) continue;
+    const key = channelModelKey(channelId, modelId);
+    if (!modelId || existing.has(key)) {
+      skipped += 1;
+      continue;
+    }
     const vendor = (entry.vendor || inferVendorFromModelId(modelId, kind) || 'custom').trim();
-    existing.add(modelId);
+    const baseName = entry.name?.trim() || modelId;
+    const name = otherChannelIds.has(modelId) && channelName && !baseName.includes(`· ${channelName}`)
+      ? `${baseName} · ${channelName}`
+      : baseName;
+    existing.add(key);
+    otherChannelIds.add(modelId);
     created.push({
-      id: `${kind}_sync_${Date.now().toString(36)}_${created.length}`,
-      name: entry.name?.trim() || modelId,
+      id: `${kind}_sync_${Date.now().toString(36)}_${channelId || 'global'}_${created.length}`,
+      name,
       modality: kind,
       vendor,
       modelId,
+      ...(channelId ? { channelId } : {}),
       isCustom: true,
       isInfrequent: false,
     });
@@ -130,9 +176,40 @@ export function appendImportedModalityModels(
   };
 }
 
+export function planModalityChannelSync(
+  prev: ModalityModelItem[],
+  kind: ModalityKind,
+  channelId: string,
+  selectedModelIds: readonly string[],
+  candidateEntries: Array<{ modelId: string; vendor?: string; name?: string }>,
+  channelName = '',
+): { models: ModalityModelItem[]; added: number; removed: number; fallbackDefault?: ModalityModelItem } {
+  const selectedSet = new Set(selectedModelIds);
+  const candidateSet = new Set(candidateEntries.map((entry) => entry.modelId));
+  let removed = 0;
+  const remaining = prev.filter((item) => {
+    if ((item.channelId || '') !== channelId) return true;
+    if (candidateSet.has(item.modelId) && !selectedSet.has(item.modelId)) {
+      removed += 1;
+      return false;
+    }
+    return true;
+  });
+  const toAdd = candidateEntries.filter((entry) => selectedSet.has(entry.modelId));
+  const planned = appendImportedModalityModels(remaining, kind, toAdd, channelId, channelName);
+  let models = planned.models;
+  let fallbackDefault: ModalityModelItem | undefined;
+  if (!models.some((item) => item.isDefault) && models.length > 0) {
+    fallbackDefault = models.find((item) => !item.isCustom) || models[0];
+    models = models.map((item) => ({ ...item, isDefault: item.id === fallbackDefault?.id }));
+  }
+  return { models, added: planned.added, removed, fallbackDefault };
+}
+
 export function saveStoredModalityModels(kind: ModalityKind, models: ModalityModelItem[]): void {
   if (typeof window === 'undefined') return;
   try {
+    noteRemovedDefaultModels(kind, readStoredModalityModels(kind), models);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}${kind}`, JSON.stringify(models));
   } catch {
     // 忽略存储异常

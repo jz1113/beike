@@ -1,10 +1,10 @@
 .glide-select {
-  --gs-accent: #f5f5f5;
-  --gs-surface: #27272a;
-  --gs-highlight: #3f3f46;
-  --gs-text: #f5f5f5;
-  --gs-radius: 10px;
-  --gs-inner-radius: 6px;
+  --gs-accent: var(--color-brand-600, #2563eb);
+  --gs-surface: #f1f5f9;
+  --gs-highlight: #e2e8f0;
+  --gs-text: #0f172a;
+  --gs-radius: 12px;
+  --gs-inner-radius: 8px;
   --gs-chip: 32px;
   --gs-row: 30px;
   --gs-font: 13px;
@@ -17,6 +17,13 @@
 
   position: relative;
   display: inline-block;
+}
+
+:is(.dark, html.dark) .glide-select {
+  --gs-accent: var(--color-brand-500, #3b82f6);
+  --gs-surface: #1e232b;
+  --gs-highlight: #2a313d;
+  --gs-text: #f8fafc;
 }
 
 .glide-select[data-disabled] {

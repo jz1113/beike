@@ -7,6 +7,8 @@ import {
   createBatchGenerationTasksPayload,
   collectSessionDeletion,
   omitDeletedGenerationTasks,
+  mergeAndSortTasks,
+  mergeRestoredSessions,
 } from './generateSliceHelpers';
 
 describe('generateSliceHelpers - session optimization', () => {
@@ -115,6 +117,33 @@ describe('generateSliceHelpers - session optimization', () => {
     const kept = resolveSessionsAfterDelete(only, false, 'other');
     expect(kept.sessions.map((session) => session.id)).toEqual(['last']);
     expect(kept.currentSessionId).toBe('other');
+  });
+
+  it('keeps an on-screen agent reply when an empty record arrives', () => {
+    const current = {
+      id: 'agent-task-1',
+      prompt: '反推',
+      model: 'gpt-4o-mini',
+      status: 'SUCCESS',
+      createdAt: 10,
+      agentTurn: {
+        reply: '画面是一只白猫。',
+        items: [{ id: 'm1', kind: 'agentMessage' as const, createdAt: 1, content: '画面是一只白猫。' }],
+      },
+    } as GenerationTask;
+    const incoming = {
+      ...current,
+      agentTurn: { modelUsed: 'gpt-4o-mini', reply: '', items: [] },
+    } as GenerationTask;
+    const [merged] = mergeAndSortTasks([current], [incoming]);
+    expect(merged.agentTurn?.reply).toBe('画面是一只白猫。');
+    expect(merged.agentTurn?.items?.[0]?.kind).toBe('agentMessage');
+
+    const sessions = mergeRestoredSessions(
+      [{ id: 's1', title: '对话', createdAt: 1, tasks: [current] }],
+      [{ id: 's1', title: '对话', createdAt: 1, tasks: [incoming] }],
+    );
+    expect(sessions[0].tasks[0].agentTurn?.reply).toBe('画面是一只白猫。');
   });
 
   it('marks and recognizes deleted session tombstones correctly', async () => {

@@ -107,14 +107,14 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
   const rollAngle = params.preset === 'tilted' ? -15 : 0;
 
   return (
-    <div className="flex-1 flex flex-col items-center bg-zinc-50 rounded-xl border border-zinc-200/80 p-3 relative overflow-hidden">
+    <div className="flex-1 flex flex-col items-center bg-zinc-50 dark:bg-[#151518] rounded-xl border border-zinc-200/80 dark:border-white/10 p-3 relative overflow-hidden">
       {/* 上微调箭头 ^ */}
       <button
         type="button"
         onClick={() => handleNudge('up')}
         aria-label="向上微调"
         title="向上俯仰微调"
-        className="absolute top-2 left-1/2 -translate-x-1/2 p-1 text-zinc-400 hover:text-zinc-800 hover:bg-zinc-200/50 rounded-md transition-colors z-20 cursor-pointer"
+        className="absolute top-2 left-1/2 -translate-x-1/2 p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-white/10 rounded-md transition-colors z-20 cursor-pointer"
       >
         <ChevronUp className="w-4 h-4" />
       </button>
@@ -125,7 +125,7 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
         onClick={() => handleNudge('down')}
         aria-label="向下微调"
         title="向下俯仰微调"
-        className="absolute bottom-2 left-1/2 -translate-x-1/2 p-1 text-zinc-400 hover:text-zinc-800 hover:bg-zinc-200/50 rounded-md transition-colors z-20 cursor-pointer"
+        className="absolute bottom-2 left-1/2 -translate-x-1/2 p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-white/10 rounded-md transition-colors z-20 cursor-pointer"
       >
         <ChevronDown className="w-4 h-4" />
       </button>
@@ -136,7 +136,7 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
         onClick={() => handleNudge('left')}
         aria-label="向左微调"
         title="向左环绕微调"
-        className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-800 hover:bg-zinc-200/50 rounded-md transition-colors z-20 cursor-pointer"
+        className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-white/10 rounded-md transition-colors z-20 cursor-pointer"
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
@@ -147,7 +147,7 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
         onClick={() => handleNudge('right')}
         aria-label="向右微调"
         title="向右环绕微调"
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-800 hover:bg-zinc-200/50 rounded-md transition-colors z-20 cursor-pointer"
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-white/10 rounded-md transition-colors z-20 cursor-pointer"
       >
         <ChevronRight className="w-4 h-4" />
       </button>
@@ -161,8 +161,8 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
         className="relative w-[210px] h-[210px] my-auto flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
         title="可直接在球体上拖动调整视角"
       >
-        {/* 球体背景渐变微凹浅色底盘 */}
-        <div className="absolute inset-0 rounded-full border border-zinc-200/90 bg-radial from-white via-zinc-100 to-zinc-200/70 shadow-inner pointer-events-none" />
+        {/* 球体背景渐变微凹底盘 */}
+        <div className="absolute inset-0 rounded-full border border-zinc-200/90 dark:border-white/10 bg-radial from-white via-zinc-100 to-zinc-200/70 dark:from-[#25252A] dark:via-[#1B1B1E] dark:to-[#121214] shadow-inner pointer-events-none" />
 
         {/* 空间球经纬线 SVG */}
         <svg
@@ -206,7 +206,7 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
 
         {/* 球体中央立式素材卡片 (3D 动态旋转变化) */}
         <div
-          className="relative z-10 w-[64px] h-[84px] rounded-xs overflow-hidden shadow-xl border border-zinc-200 bg-white transition-transform duration-300 pointer-events-none"
+          className="relative z-10 w-[64px] h-[84px] rounded-xs overflow-hidden shadow-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#1B1B1E] transition-transform duration-300 pointer-events-none"
           style={{
             transform: `perspective(400px) rotateY(${params.azimuth > 180 ? 360 - params.azimuth : -params.azimuth}deg) rotateX(${params.elevation}deg) rotateZ(${rollAngle}deg) scale(${scaleMultiplier})`,
             boxShadow: '0 8px 18px rgba(0,0,0,0.22)',
@@ -219,7 +219,7 @@ export function MultiAngleViewport({ node, params, setParams }: MultiAngleViewpo
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-zinc-100 text-[10px] text-zinc-500">
+            <div className="w-full h-full flex items-center justify-center bg-zinc-100 dark:bg-white/5 text-[10px] text-zinc-500 dark:text-zinc-400">
               素材
             </div>
           )}

@@ -3,12 +3,16 @@ import { useAppStore } from '@client/store';
 import {
   DEFAULT_ASSISTANT_MODELS,
   enrichAssistantModelDisplay,
+  type AssistantModelDisplay,
 } from '@client/features/assistant/model/assistantConstants';
 import {
   hasWorkflowModelConfiguration,
   getEnabledMultimodalModelsFromSettings,
   repairWorkflowModelsInStorage,
+  upstreamModelId,
 } from '@shared/domain/models/workflowModels';
+import { canonicalModelId } from '@shared/domain/models/modelCatalog';
+import { modalityPickerSelections } from '@shared/domain/models/modalityStorage';
 
 interface UseAssistantModelsOptions {
   assistantModel: string;
@@ -19,7 +23,7 @@ export function useAssistantModels({
   assistantModel,
   setAssistantModel,
 }: UseAssistantModelsOptions) {
-  const [availableAssistantModels, setAvailableAssistantModels] = useState<any[]>(DEFAULT_ASSISTANT_MODELS);
+  const [availableAssistantModels, setAvailableAssistantModels] = useState<AssistantModelDisplay[]>(DEFAULT_ASSISTANT_MODELS);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
 
@@ -27,9 +31,18 @@ export function useAssistantModels({
     const loadCustomAssistantModels = () => {
       repairWorkflowModelsInStorage();
 
+      const syncedChat = modalityPickerSelections('chat');
       let modelsList = DEFAULT_ASSISTANT_MODELS.map(enrichAssistantModelDisplay);
-      const multimodalFromSettings = getEnabledMultimodalModelsFromSettings(undefined, 'assistant').filter(m => m.channel !== 'openai');
-      if (multimodalFromSettings.length > 0 || hasWorkflowModelConfiguration()) {
+      const multimodalFromSettings = getEnabledMultimodalModelsFromSettings(undefined, 'assistant');
+      if (syncedChat) {
+        modelsList = syncedChat.map((model) => ({
+          id: model.id,
+          modelId: model.modelId,
+          name: model.name,
+          shortName: model.name,
+          provider: model.provider,
+        }));
+      } else if (multimodalFromSettings.length > 0 || hasWorkflowModelConfiguration()) {
         modelsList = multimodalFromSettings.map((m) =>
           enrichAssistantModelDisplay({
             id: m.id,
@@ -44,9 +57,30 @@ export function useAssistantModels({
       setAvailableAssistantModels(modelsList);
 
       const savedAssistantModel = localStorage.getItem('beike_assistant_selected_model') || localStorage.getItem('ai_assistant_model') || '';
-      const resolvedModel = modelsList.some(m => m.id === savedAssistantModel)
-        ? savedAssistantModel : modelsList[0]?.id || '';
-      if (useAppStore.getState().assistantModel !== resolvedModel) {
+      let resolvedModel = '';
+      if (savedAssistantModel) {
+        const cleanSaved = upstreamModelId(savedAssistantModel).toLowerCase().trim();
+        const canonicalSaved = canonicalModelId(cleanSaved).toLowerCase();
+        const matched = modelsList.find((m) => {
+          const identity = m.modelId || m.id;
+          const raw = identity.toLowerCase().trim();
+          const clean = upstreamModelId(identity).toLowerCase().trim();
+          const canonical = canonicalModelId(clean).toLowerCase();
+          return (
+            m.id.toLowerCase().trim() === savedAssistantModel.toLowerCase().trim() ||
+            raw === savedAssistantModel.toLowerCase().trim() ||
+            clean === cleanSaved ||
+            canonical === canonicalSaved
+          );
+        });
+        if (matched) {
+          resolvedModel = matched.id;
+        }
+      }
+      if (!resolvedModel) {
+        resolvedModel = modelsList[0]?.id || '';
+      }
+      if (resolvedModel && useAppStore.getState().assistantModel !== resolvedModel) {
         setAssistantModel(resolvedModel);
       }
     };
@@ -56,8 +90,13 @@ export function useAssistantModels({
       if (!event.key || ['custom_models', 'beike_assistant_selected_model', 'ai_assistant_model', 'ai_multimodal_model', 'ai_vision_model'].includes(event.key)) loadCustomAssistantModels();
     };
     window.addEventListener('models_updated', loadCustomAssistantModels);
+    window.addEventListener('modality_models_updated', loadCustomAssistantModels);
     window.addEventListener('storage', onStorage);
-    return () => { window.removeEventListener('models_updated', loadCustomAssistantModels); window.removeEventListener('storage', onStorage); };
+    return () => {
+      window.removeEventListener('models_updated', loadCustomAssistantModels);
+      window.removeEventListener('modality_models_updated', loadCustomAssistantModels);
+      window.removeEventListener('storage', onStorage);
+    };
   }, [setAssistantModel]);
 
   // 全局点击空白处关闭模型下拉菜单

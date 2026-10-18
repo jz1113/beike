@@ -1,0 +1,320 @@
+import type {
+  AssistantItem,
+  ToolCallItem,
+  ToolResultItem,
+  ToolRunStatus,
+  ApprovalRequestItem,
+  AgentMessageItem,
+  AgentReasoningItem,
+  UserMessageItem,
+  SubAgentItem,
+} from '@shared/domain/assistant/types';
+
+export interface TurnToolActivity {
+  name: string;
+  displayName: string;
+  status: ToolRunStatus;
+  detail?: string;
+  action?: Record<string, unknown>;
+  visualImages?: Array<{ url: string; label?: string }>;
+}
+
+export interface TurnPendingApproval {
+  turnId: string;
+  approvalId: string;
+  toolName: string;
+  displayName: string;
+  args: Record<string, unknown>;
+}
+
+export interface DerivedTurnView {
+  content: string;
+  thinking: string;
+  toolActivity: TurnToolActivity[];
+  pendingApprovals: TurnPendingApproval[];
+}
+
+/** The client cannot receive further item events once its stream is cancelled or disconnected. */
+export function finishInterruptedItems(items: AssistantItem[], cancelled: boolean): AssistantItem[] {
+  const next = items.map((item): AssistantItem => {
+    if (item.kind === 'toolCall' && item.status === 'running') return { ...item, status: 'error' };
+    if (item.kind === 'subAgent' && ['running', 'spawning'].includes(item.status)) return { ...item, status: 'failed' };
+    if (item.kind === 'approvalRequest' && item.status === 'pending') return { ...item, status: 'expired', decision: 'cancel' };
+    return item;
+  });
+  if (cancelled && next.length && !next.some((item) => item.id === 'client_stop_note')) {
+    next.push({ id: 'client_stop_note', kind: 'agentMessage', createdAt: Date.now(), content: '⏹ *用户已停止生成*' });
+  }
+  return next;
+}
+
+/** Apply an item-lifecycle event to the in-memory item list and return the resulting AssistantItem[] */
+export function applyItemEvent(
+  items: AssistantItem[],
+  evt: { type: string; [k: string]: any },
+): AssistantItem[] {
+  const next = [...items];
+  const findById = (id: string) => next.findIndex((x) => x.id === id);
+  const baseTime = Date.now();
+
+  switch (evt.type) {
+    case 'item/started': {
+      const { itemId, kind, meta } = evt;
+      if (findById(itemId) >= 0) return items;
+      const item = makeEmptyItem(kind, itemId, baseTime, meta);
+      next.push(item);
+      return next;
+    }
+    case 'item/completed': {
+      const { itemId, status } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'toolCall') {
+        next[idx] = { ...existing, status: settledToolStatus(status) };
+      } else if (existing.kind === 'subAgent') {
+        next[idx] = { ...existing, ...evt.meta, status: status === 'done' ? 'completed' : 'failed' } as SubAgentItem;
+      }
+      return next;
+    }
+    case 'item/agentMessage/delta': {
+      const { itemId, delta } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'agentMessage') {
+        next[idx] = { ...existing, content: (existing as AgentMessageItem).content + delta };
+      }
+      return next;
+    }
+    case 'item/agentReasoning/delta': {
+      const { itemId, delta } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'agentReasoning') {
+        next[idx] = { ...existing, content: (existing as AgentReasoningItem).content + delta };
+      }
+      return next;
+    }
+    case 'item/agentMessage/completed': {
+      const { itemId, content } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'agentMessage' && keptItemText(content)) {
+        next[idx] = { ...existing, content: keptItemText(content) } as AgentMessageItem;
+      }
+      return next;
+    }
+    case 'item/agentReasoning/completed': {
+      const { itemId, content } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'agentReasoning' && keptItemText(content)) {
+        next[idx] = { ...existing, content: keptItemText(content) } as AgentReasoningItem;
+      }
+      return next;
+    }
+    case 'item/toolCall/started': {
+      const { itemId, name, displayName, args } = evt;
+      const idx = findById(itemId);
+      if (idx >= 0) {
+        next[idx] = {
+          ...next[idx],
+          kind: 'toolCall',
+          name,
+          displayName: displayName || name,
+          args: args || '{}',
+          callId: itemId,
+          status: 'running',
+        } as ToolCallItem;
+      }
+      return next;
+    }
+    case 'item/toolCall/delta': {
+      const { itemId, argsDelta } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'toolCall') {
+        next[idx] = { ...existing, args: (existing as ToolCallItem).args + argsDelta } as ToolCallItem;
+      }
+      return next;
+    }
+    case 'item/toolCall/completed': {
+      const { itemId, name, displayName, status, summary, action, visualImages } = evt;
+      const idx = findById(itemId);
+      if (idx < 0) return items;
+      const resultId = `${itemId}__result`;
+      const toolResultItem: ToolResultItem = {
+        id: resultId,
+        kind: 'toolResult',
+        createdAt: Date.now(),
+        name,
+        displayName: displayName || name,
+        status: settledToolStatus(status),
+        summary: summary || '',
+        ...(action ? { action } : {}),
+        ...(visualImages ? { visualImages } : {}),
+      };
+      next[idx] = {
+        ...next[idx],
+        kind: 'toolCall',
+        status: settledToolStatus(status),
+      } as ToolCallItem;
+      const existingResultIdx = next.findIndex((x) => x.id === resultId);
+      if (existingResultIdx >= 0) {
+        next[existingResultIdx] = toolResultItem;
+      } else {
+        next.push(toolResultItem);
+      }
+      return next;
+    }
+    case 'item/approval/request': {
+      const { approvalId, toolName, displayName, args } = evt;
+      const id = `appr_${approvalId}`;
+      if (findById(id) >= 0) return items;
+      const item: ApprovalRequestItem = {
+        id,
+        kind: 'approvalRequest',
+        createdAt: Date.now(),
+        approvalId,
+        toolName,
+        displayName: displayName || toolName,
+        args: args || {},
+        status: 'pending',
+      };
+      next.push(item);
+      return next;
+    }
+    case 'item/approval/resolved': {
+      const { approvalId, decision } = evt;
+      const id = `appr_${approvalId}`;
+      const idx = findById(id);
+      if (idx < 0) return items;
+      const existing = next[idx];
+      if (existing.kind === 'approvalRequest') {
+        next[idx] = {
+          ...existing,
+          status:
+            decision === 'accept'
+              ? 'accepted'
+              : decision === 'decline'
+                ? 'declined'
+                : decision === 'cancel'
+                  ? 'expired'
+                  : 'accepted',
+          decision,
+        } as ApprovalRequestItem;
+      }
+      return next;
+    }
+    default:
+      return items;
+  }
+}
+
+export function makeEmptyItem(
+  kind: string,
+  id: string,
+  ts: number,
+  meta?: Record<string, unknown>,
+): AssistantItem {
+  const base = { id, createdAt: ts };
+  switch (kind) {
+    case 'agentMessage':
+      return { ...base, kind: 'agentMessage', content: '' } as AgentMessageItem;
+    case 'agentReasoning':
+      return { ...base, kind: 'agentReasoning', content: '' } as AgentReasoningItem;
+    case 'userMessage':
+      return { ...base, kind: 'userMessage', content: '' } as UserMessageItem;
+    case 'toolResult':
+      return { ...base, kind: 'toolResult', name: '', displayName: '', status: 'done', summary: '' } as ToolResultItem;
+    case 'toolCall':
+      return {
+        ...base,
+        kind: 'toolCall',
+        name: '',
+        displayName: '',
+        args: '{}',
+        callId: id,
+        status: 'running',
+      } as ToolCallItem;
+    case 'subAgent':
+      return {
+        ...base,
+        kind: 'subAgent',
+        skillId: String(meta?.skillId || ''),
+        prompt: String(meta?.prompt || ''),
+        status: meta?.status === 'running' ? 'running' : 'spawning',
+      } as SubAgentItem;
+    default:
+      return { ...base, kind: 'userMessage', content: '' } as UserMessageItem;
+  }
+}
+
+function settledToolStatus(status: unknown): Exclude<ToolRunStatus, 'running'> {
+  if (status === 'done' || status === 'declined' || status === 'cancelled') return status;
+  return 'error';
+}
+
+function keptItemText(content: unknown): string {
+  return typeof content === 'string' && content.trim() ? content : '';
+}
+
+/** Derive the reply, reasoning and tool rows from the item list. */
+export function deriveTurnView(items: AssistantItem[]): DerivedTurnView {
+  let content = '';
+  let thinking = '';
+  const toolActivity: TurnToolActivity[] = [];
+  const pendingApprovals: TurnPendingApproval[] = [];
+
+  const pairedResults = new Map(items.filter((item): item is ToolResultItem => item.kind === 'toolResult').map((item) => [item.id, item]));
+  for (const item of items) {
+    if (item.kind === 'agentMessage') {
+      if (item.content) content += `${content ? '\n\n' : ''}${item.content}`;
+    } else if (item.kind === 'agentReasoning') {
+      if (item.content) thinking += `${thinking ? '\n\n' : ''}${item.content}`;
+    } else if (item.kind === 'toolCall') {
+      const tc = item as ToolCallItem;
+      const result = pairedResults.get(`${tc.id}__result`);
+      toolActivity.push({
+        name: tc.name,
+        displayName: tc.displayName || tc.name,
+        status: result?.status || tc.status,
+        detail: result?.summary || (tc.args ? tc.args.slice(0, 120) : undefined),
+        action: result?.action,
+        visualImages: result?.visualImages,
+      });
+    } else if (item.kind === 'toolResult') {
+      const tr = item as ToolResultItem;
+      if (items.some((call) => call.kind === 'toolCall' && `${call.id}__result` === tr.id)) continue;
+      const idx = toolActivity.findIndex((t) => t.name === tr.name && t.status === 'running');
+      const entry: TurnToolActivity = {
+        name: tr.name,
+        displayName: tr.displayName || tr.name,
+        status: settledToolStatus(tr.status),
+        detail: tr.summary,
+        action: tr.action,
+        visualImages: tr.visualImages,
+      };
+      if (idx >= 0) toolActivity[idx] = entry;
+      else toolActivity.push(entry);
+    } else if (item.kind === 'approvalRequest') {
+      const ap = item as ApprovalRequestItem;
+      if (ap.status === 'pending') {
+        pendingApprovals.push({
+          turnId: '',
+          approvalId: ap.approvalId,
+          toolName: ap.toolName,
+          displayName: ap.displayName,
+          args: ap.args,
+        });
+      }
+    }
+  }
+
+  return { content, thinking, toolActivity, pendingApprovals };
+}

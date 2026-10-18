@@ -31,7 +31,7 @@ function ReferenceThumbnail({ url, video }: { url: string; video: boolean }) {
     else setFailed(true);
   };
   return (
-    <span className="relative w-5 h-5 shrink-0 rounded-xs overflow-hidden inline-flex items-center justify-center bg-slate-100 text-slate-400">
+    <span className="relative w-5 h-5 shrink-0 rounded-xs overflow-hidden inline-flex items-center justify-center bg-slate-100 dark:bg-white/10 text-slate-400">
       {(!ready || failed) && (video ? <Film className="w-3.5 h-3.5" /> : <ImageIcon className="w-3.5 h-3.5" />)}
       {!failed && (video ? (
         <video key={source} src={source} muted playsInline preload="auto" aria-label="参考视频缩略图"
@@ -188,10 +188,10 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
   }, [isVideo, previewTask, actualVideoDuration]);
 
   return (
-    <div className="w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col justify-between flex-shrink-0 select-none relative animate-fade-in">
+    <div className="w-full bg-white dark:bg-[#1B1B1E] rounded-3xl p-6 shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-100 dark:border-white/10 flex flex-col justify-between flex-shrink-0 select-none relative animate-fade-in text-slate-900 dark:text-[#EDEDED]">
       <div className="space-y-4">
         {/* 🌟 1. 顶部 Header: 左侧贝壳云图官方作者信息，右侧方形浅灰圆角下载按钮 (1:1 对齐图 1) */}
-        <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
+        <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100 dark:border-white/10">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-transparent flex items-center justify-center shrink-0 select-none p-0.5">
               <img
@@ -201,7 +201,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
                 className="w-full h-full object-contain"
               />
             </div>
-            <span className="text-[14px] font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-[180px]">
+            <span className="text-[14px] font-semibold text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[180px]">
               {authorName}
             </span>
           </div>
@@ -212,7 +212,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
               type="button"
               onClick={handleDownload}
               disabled={isDownloading}
-              className="w-9 h-9 rounded-xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-700 flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              className="w-9 h-9 rounded-xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
               title={isVideo ? '下载高清视频' : '下载高清原图'}
             >
               {downloadSuccess ? (
@@ -225,7 +225,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
         </div>
 
         {/* 🌟 2. 日期与 AI 标记 */}
-        <div className="text-xs text-slate-400 font-sans">
+        <div className="text-xs text-slate-400 dark:text-slate-500 font-sans">
           <span>{`${displayDateStr} | 内容由 AI 生成`}</span>
         </div>
 
@@ -233,7 +233,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs font-normal text-slate-400 shrink-0">
+              <span className="text-xs font-normal text-slate-400 dark:text-slate-500 shrink-0">
                 {isVideo ? '视频提示词' : '图片提示词'}
               </span>
             </div>
@@ -241,7 +241,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
               <button
                 type="button"
                 onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                className="inline-flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-indigo-50"
+                className="inline-flex items-center gap-0.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
                 title={isPromptExpanded ? '收起长文本' : '展开查看完整提示词'}
               >
                 <span>{isPromptExpanded ? '收起' : '展开全文'}</span>
@@ -256,7 +256,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
 
           <div className="relative">
             <div
-              className={`text-[13px] sm:text-[13.5px] text-slate-800 leading-relaxed font-normal select-text transition-all duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 pr-1 space-y-2.5 ${
+              className={`text-[13px] sm:text-[13.5px] text-slate-800 dark:text-slate-200 leading-relaxed font-normal select-text transition-all duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 pr-1 space-y-2.5 ${
                 isPromptExpanded ? 'max-h-[36vh] pb-2' : 'max-h-36'
               }`}
             >
@@ -271,7 +271,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
             {!isPromptExpanded && isLongPrompt && (
               <div
                 onClick={() => setIsPromptExpanded(true)}
-                className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-auto cursor-pointer"
+                className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent dark:from-[#1B1B1E] dark:via-[#1B1B1E]/70 pointer-events-auto cursor-pointer"
                 title="点击展开全文"
               />
             )}
@@ -279,7 +279,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
         </div>
 
         {/* 🌟 4. 参数规格内联展示条 (1:1 严格对齐图 1：无边框无胶囊，细竖线分割，纯净扁平) */}
-        <div className="pt-3 border-t border-slate-100 flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-[12px] sm:text-[12.5px] text-slate-500 select-none">
+        <div className="pt-3 border-t border-slate-100 dark:border-white/10 flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-[12px] sm:text-[12.5px] text-slate-500 dark:text-slate-400 select-none">
           {/* 素材统一在参数行展示，保留所有参考图的查看入口。 */}
           {referenceImagesList.map((refUrl, index) => {
             const referenceIsVideo = isVideoMediaUrl(refUrl);
@@ -295,29 +295,29 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
                   title={referenceIsVideo ? '点击在新窗口查看参考视频' : '点击在新窗口查看参考素材原图'}
                 >
                   <ReferenceThumbnail key={refUrl} url={refUrl} video={referenceIsVideo} />
-                  <span className="text-slate-600 font-normal">{label}</span>
+                  <span className="text-slate-600 dark:text-slate-300 font-normal">{label}</span>
                 </button>
-                <span className="text-slate-300 font-light select-none">|</span>
+                <span className="text-slate-300 dark:text-slate-600 font-light select-none">|</span>
               </React.Fragment>
             );
           })}
 
           {/* 4.2 模型名称 (图 1: 即梦 Seedance 1.0 Fast / GPT Image 2，纯文本无边框无胶囊) */}
-          <span className="text-slate-600 font-normal truncate max-w-[160px]">{modelLabel}</span>
+          <span className="text-slate-600 dark:text-slate-300 font-normal truncate max-w-[160px]">{modelLabel}</span>
 
           {/* 4.3 视频时长 或 图片画质 (图 1: 5s / 2K) */}
           {isVideo ? (
             durationLabel && (
               <>
-                <span className="text-slate-300 font-light select-none">|</span>
-                <span className="text-slate-500 font-normal">{durationLabel}</span>
+                <span className="text-slate-300 dark:text-slate-600 font-light select-none">|</span>
+                <span className="text-slate-500 dark:text-slate-400 font-normal">{durationLabel}</span>
               </>
             )
           ) : (
             qualityLabel && (
               <>
-                <span className="text-slate-300 font-light select-none">|</span>
-                <span className="text-slate-500 font-normal">{qualityLabel}</span>
+                <span className="text-slate-300 dark:text-slate-600 font-light select-none">|</span>
+                <span className="text-slate-500 dark:text-slate-400 font-normal">{qualityLabel}</span>
               </>
             )
           )}
@@ -325,23 +325,23 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
           {/* 4.4 画幅比例 (图 1: 9:16 / 3:4) */}
           {aspectRatio && (
             <>
-              <span className="text-slate-300 font-light select-none">|</span>
-              <span className="text-slate-500 font-normal">{aspectRatio}</span>
+              <span className="text-slate-300 dark:text-slate-600 font-light select-none">|</span>
+              <span className="text-slate-500 dark:text-slate-400 font-normal">{aspectRatio}</span>
             </>
           )}
         </div>
       </div>
 
       {/* 🌟 5. 底部双按钮：[ ↺ 做同款 ] 与 [ 🖼 用作参考图 ] (1:1 对齐图 1) */}
-      <div className="pt-5 mt-4 border-t border-slate-100 flex items-center gap-3">
+      <div className="pt-5 mt-4 border-t border-slate-100 dark:border-white/10 flex items-center gap-3">
         {/* 做同款 */}
         <button
           type="button"
           onClick={onUsePromptOnly}
-          className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-800 font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+          className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-800 dark:text-slate-200 font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
           title="将当前提示词带入输入框做同款"
         >
-          <RotateCcw className="w-4 h-4 text-slate-700 stroke-[2.2]" />
+          <RotateCcw className="w-4 h-4 text-slate-700 dark:text-slate-300 stroke-[2.2]" />
           <span>做同款</span>
         </button>
 
@@ -349,10 +349,10 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
         <button
           type="button"
           onClick={onUseAsReference}
-          className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-800 font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+          className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-transparent hover:opacity-70 text-slate-800 dark:text-slate-200 font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
           title="将当前大图作为生图参考图"
         >
-          <ImageIcon className="w-4 h-4 text-slate-700 stroke-[2.2]" />
+          <ImageIcon className="w-4 h-4 text-slate-700 dark:text-slate-300 stroke-[2.2]" />
           <span>{isVideo ? '用作参考素材' : '用作参考图'}</span>
         </button>
       </div>

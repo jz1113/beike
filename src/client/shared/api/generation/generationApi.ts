@@ -4,7 +4,7 @@ import { AssetTasksListResponseSchema } from '@shared/contracts/generate';
 import type { AssetHistoryTask } from '@client/shared/api/mapDbTask';
 import { mapDbTaskToGenerationTask } from '@client/shared/api/mapDbTask';
 import { compressImageToDataUrl } from '@client/shared/media/image-utils';
-import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
+import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
 import {
   imageGenBusinessError,
   isTransientPollError,
@@ -200,13 +200,12 @@ export async function submitImageGenTaskResult(
 
   try {
     const resolvedModelId = data.model || payload.model || 'gpt-image-2';
-    recordModelUsage({
+    recordMediaTaskUsage({
+      taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
       modelId: String(resolvedModelId),
-      modelName: String(resolvedModelId),
-      provider: resolveModelVendor(String(resolvedModelId)),
       type: 'image',
       mediaCount: 1,
-      success: true,
+      usage: data.usage,
     });
   } catch {}
 

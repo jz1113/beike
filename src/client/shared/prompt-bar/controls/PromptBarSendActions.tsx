@@ -26,8 +26,8 @@ export const PromptBarSendActions = React.memo(function PromptBarSendActions({
         disabled={!canSend}
         className={`${densityComposerSendBtn} rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shrink-0 ${
           canSend
-            ? 'bg-slate-900 hover:bg-black text-white shadow-sm'
-            : 'bg-[#E5E7EB] text-slate-400 cursor-not-allowed'
+            ? 'bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
+            : 'bg-[#E5E7EB] dark:bg-white/10 text-slate-400 dark:text-slate-500 cursor-not-allowed'
         }`}
         title={
           isAgentMode
@@ -38,7 +38,9 @@ export const PromptBarSendActions = React.memo(function PromptBarSendActions({
                 ? '生成深度动作捕捉'
                 : quickGenMode === 'video'
                   ? '开始生成视频'
-                  : '立即生成图片'
+                  : quickGenMode === 'audio'
+                    ? '开始生成音频'
+                    : '立即生成图片'
         }
       >
         {isSubmitting ? (

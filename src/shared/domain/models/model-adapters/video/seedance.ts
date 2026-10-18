@@ -1,4 +1,4 @@
-import { isSeedance25, videoInputError } from '@shared/domain/media/videoCapabilities';
+import { isSeedance, isSeedance25, videoInputError } from '@shared/domain/media/videoCapabilities';
 import type { VideoAdapterInput } from '../types';
 import { normalizeResolution } from './payloads';
 
@@ -28,7 +28,7 @@ export function buildSeedanceOfficialPayload(input: VideoAdapterInput, model: st
     resolution: normalizeResolution(input.resolution),
     generate_audio: input.audio ?? true,
   };
-  if (isSeedance25(model) && (mode === 'edit' || mode === 'extend')) payload.omni_reference_task_type = mode;
+  if (isSeedance(model) && (mode === 'edit' || mode === 'extend')) payload.omni_reference_task_type = mode;
   if (input.watermark !== undefined) payload.watermark = input.watermark;
   if (input.seed !== undefined && Number.isFinite(Number(input.seed))) payload.seed = Number(input.seed);
   return payload;

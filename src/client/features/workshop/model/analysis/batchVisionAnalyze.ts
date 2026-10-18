@@ -5,6 +5,7 @@ import { PreviousGroupSignature } from '@shared/domain/prompts/vision';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
+import { readReportedUsage } from '@client/shared/utils/modelUsage';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
 import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@shared/domain/products/jewelryArch';
 import { recipeKind, resolveRecipeForProduct } from '@shared/domain/products/productRecipeSelection';
@@ -212,19 +213,15 @@ export async function analyzeBatchProduct(
     // 🌟 记录多模态视觉模型真实调用与 Token 吞吐
     try {
       const usedModel = data?.modelUsed || deps.selectedVisionModel;
-      const usageTokens = data?.usage || {};
-      const promptTokens = usageTokens.promptTokens || usageTokens.prompt_tokens || 0;
-      const completionTokens = usageTokens.completionTokens || usageTokens.completion_tokens || 0;
-      const totalTokens = usageTokens.totalTokens || usageTokens.total_tokens || (promptTokens + completionTokens);
-
+      const tokens = readReportedUsage(data?.usage);
       recordModelUsage({
         modelId: isOpenAIModelRouteId(deps.selectedVisionModel) ? deps.selectedVisionModel : usedModel,
         modelName: isOpenAIModelRouteId(deps.selectedVisionModel) ? `${usedModel} · OpenAI 渠道` : usedModel,
         provider: resolveModelVendor(usedModel),
         type: 'vision',
-        promptTokens,
-        completionTokens,
-        totalTokens,
+        promptTokens: tokens?.promptTokens,
+        completionTokens: tokens?.completionTokens,
+        totalTokens: tokens?.totalTokens,
         mediaCount: imagePayload.length,
         success: true,
       });

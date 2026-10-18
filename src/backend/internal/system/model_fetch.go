@@ -239,6 +239,14 @@ func discoveredModels(root string, list []any) []catalogModel {
 				Category:   "text",
 				Capability: "custom",
 			}
+		} else {
+			approved.ID = id
+			if approved.Name == "" {
+				approved.Name = id
+			}
+			if approved.ShortName == "" {
+				approved.ShortName = id
+			}
 		}
 		models = append(models, approved)
 	}
@@ -258,14 +266,14 @@ func openAIModels(root string, list []any) []map[string]any {
 		}
 		seen[id] = struct{}{}
 		approved, ok := approvedModel(root, id)
-		supported := ok && approved.Capability == "multimodal" && (strings.HasPrefix(id, "gpt-5.6") || strings.HasPrefix(id, "gpt-6"))
+		supported := true
 		name := id
 		short := id
 		if ok {
 			name = approved.Name
 			short = approved.ShortName
 		}
-		models = append(models, map[string]any{"id": id, "name": name, "shortName": short, "supported": supported, "owned_by": "openai", "isCustom": false})
+		models = append(models, map[string]any{"id": id, "name": name, "shortName": short, "supported": supported, "owned_by": "openai", "isCustom": !ok})
 	}
 	return models
 }

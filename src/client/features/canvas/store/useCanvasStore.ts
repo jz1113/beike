@@ -2,8 +2,9 @@ import {normalizeCanvasProjects} from './canvasProjectDefaults';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { canvasStorage, finishCanvasHydration } from './canvasPersistence';
-export type { CanvasProject, CanvasNode } from '../model/types';
-import type { CanvasProject, CanvasNode } from '../model/types';
+export type { CanvasProject, CanvasNode, CanvasEdge, NodeRunHistory } from '../model/types';
+import type { CanvasProject, CanvasNode, CanvasEdge, NodeRunHistory } from '../model/types';
+import { appendNodeRun, rollbackNodeRun } from '../model/canvasGraph';
 
 interface CanvasStoreState {
   projects: CanvasProject[];
@@ -19,6 +20,10 @@ interface CanvasStoreState {
   updateNode: (projectId: string, nodeId: string, patch: Partial<CanvasNode>) => void;
   patchNodes: (projectId: string, patches: Record<string, Partial<CanvasNode>>) => void;
   deleteNode: (projectId: string, nodeId: string) => void;
+  addEdge: (projectId: string, edge: Omit<CanvasEdge, 'id'> & { id?: string }) => void;
+  deleteEdge: (projectId: string, edgeId: string) => void;
+  recordNodeRun: (projectId: string, nodeId: string, run: Omit<NodeRunHistory, 'id' | 'createdAt'>) => void;
+  switchNodeRun: (projectId: string, nodeId: string, runIndex: number) => void;
 }
 
 export const useCanvasStore = create<CanvasStoreState>()(
@@ -76,8 +81,8 @@ export const useCanvasStore = create<CanvasStoreState>()(
       addNode: (projectId, nodeData) => {
         const newNode: CanvasNode = {
           ...nodeData,
-          id: (nodeData as any).id || `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          createdAt: (nodeData as any).createdAt || Date.now(),
+          id: nodeData.id || `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          createdAt: nodeData.createdAt || Date.now(),
         };
 
         set((state) => ({
@@ -124,9 +129,87 @@ export const useCanvasStore = create<CanvasStoreState>()(
               ...p,
               updatedAt: Date.now(),
               nodes: p.nodes.filter((n) => n.id !== nodeId).map(n => n.referenceNodeIds?.includes(nodeId) ? {...n, referenceNodeIds: n.referenceNodeIds.filter(id => id !== nodeId)} : n),
+              edges: (p.edges || []).filter(e => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId),
             };
           }),
           activeNodeId: state.activeNodeId === nodeId ? null : state.activeNodeId,
+        }));
+      },
+
+      addEdge: (projectId, edgeData) => {
+        const newEdge: CanvasEdge = {
+          ...edgeData,
+          id: edgeData.id || `edge-${edgeData.sourceNodeId}-${edgeData.targetNodeId}-${Date.now().toString(36)}`,
+          createdAt: edgeData.createdAt || Date.now(),
+        };
+        set((state) => ({
+          projects: state.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            const edges = [...(p.edges || []).filter(e => !(e.sourceNodeId === newEdge.sourceNodeId && e.targetNodeId === newEdge.targetNodeId)), newEdge];
+            const nodes = p.nodes.map(n => {
+              if (n.id === newEdge.targetNodeId) {
+                const refs = Array.from(new Set([...(n.referenceNodeIds || []), newEdge.sourceNodeId]));
+                return { ...n, referenceNodeIds: refs };
+              }
+              return n;
+            });
+            return { ...p, edges, nodes, updatedAt: Date.now() };
+          }),
+        }));
+      },
+
+      deleteEdge: (projectId, edgeId) => {
+        set((state) => ({
+          projects: state.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            const targetEdge = (p.edges || []).find(e => e.id === edgeId);
+            const edges = (p.edges || []).filter(e => e.id !== edgeId);
+            let nodes = p.nodes;
+            if (targetEdge) {
+              const stillConnected = edges.some(e => e.sourceNodeId === targetEdge.sourceNodeId && e.targetNodeId === targetEdge.targetNodeId);
+              if (!stillConnected) {
+                nodes = nodes.map(n => n.id === targetEdge.targetNodeId ? {
+                  ...n,
+                  referenceNodeIds: (n.referenceNodeIds || []).filter(id => id !== targetEdge.sourceNodeId),
+                } : n);
+              }
+            }
+            return { ...p, edges, nodes, updatedAt: Date.now() };
+          }),
+        }));
+      },
+
+      recordNodeRun: (projectId, nodeId, run) => {
+        set((state) => ({
+          projects: state.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            return {
+              ...p,
+              updatedAt: Date.now(),
+              nodes: p.nodes.map(n => {
+                if (n.id !== nodeId) return n;
+                const patch = appendNodeRun(n, run);
+                return { ...n, ...patch };
+              }),
+            };
+          }),
+        }));
+      },
+
+      switchNodeRun: (projectId, nodeId, runIndex) => {
+        set((state) => ({
+          projects: state.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            return {
+              ...p,
+              updatedAt: Date.now(),
+              nodes: p.nodes.map(n => {
+                if (n.id !== nodeId) return n;
+                const patch = rollbackNodeRun(n, runIndex);
+                return patch ? { ...n, ...patch } : n;
+              }),
+            };
+          }),
         }));
       },
     }),

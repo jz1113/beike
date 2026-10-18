@@ -157,7 +157,7 @@ function WorkshopGroupPicker({ value, onChange, groups, products, noPeople, scop
 
   return <div ref={rootRef}>
     <div className="flex items-center justify-between gap-2">
-      <span className="shrink-0 text-xs font-semibold text-slate-800">图组母本</span>
+      <span className="shrink-0 text-xs font-semibold text-slate-800 dark:text-slate-100">图组母本</span>
       <div className="flex items-center gap-2.5 text-[11px]">
         <span className="text-slate-400">{products.length ? `本批次可固定 ${availableToLock} / ${groups.length} 组` : scopeKnown ? `范围内 ${groups.length} 组 · 待商品匹配` : '添加商品后筛选母本'}</span>
         {onOpenLibrary && <button type="button" onClick={onOpenLibrary} className="inline-flex items-center gap-0.5 font-medium text-indigo-600 hover:text-indigo-800">去资产库挑选 <ArrowUpRight className="h-3 w-3" /></button>}
@@ -166,13 +166,13 @@ function WorkshopGroupPicker({ value, onChange, groups, products, noPeople, scop
     <div className="mt-2">
       <button ref={triggerRef} type="button" aria-label={`图组母本：${selected?.label || '原选择已失效，请重新选择'}`}
         aria-expanded={open} aria-controls={panelId} onClick={() => { setQuery(''); setOpen(!open); }}
-        className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-xs font-semibold text-slate-800 outline-none hover:border-indigo-300 focus:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-100">
+        className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-xs font-semibold text-slate-800 outline-none hover:border-indigo-300 focus:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-100 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]">
         <span className="truncate">{selected?.label || '原选择已失效，请重新选择'}</span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
     </div>
-    {open && <div id={panelId} className="mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-      <div className="flex items-center gap-2 rounded-md border border-slate-200 px-2.5 text-slate-400">
+    {open && <div id={panelId} className="mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-[#18191c]">
+      <div className="flex items-center gap-2 rounded-md border border-slate-200 px-2.5 text-slate-400 dark:border-white/10">
         <Search className="h-3.5 w-3.5 shrink-0" />
         <input ref={searchRef} type="search" aria-label="搜索图组母本" placeholder="搜索组号、分类或图组内容" value={query}
           onChange={event => setQuery(event.target.value)}
@@ -183,18 +183,18 @@ function WorkshopGroupPicker({ value, onChange, groups, products, noPeople, scop
               if (first) choose(first.id);
             }
           }}
-          className="min-w-0 flex-1 bg-transparent py-2 text-xs text-slate-800 outline-none placeholder:text-slate-400" />
+          className="min-w-0 flex-1 bg-transparent py-2 text-xs text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500" />
       </div>
       <ul className="mt-2 max-h-60 space-y-0.5 overflow-y-auto" aria-label="可选图组母本">
         {visibleOptions.map(option => <li key={option.id}>
           <button type="button" onClick={() => choose(option.id)} disabled={option.disabled} aria-current={option.id === value ? 'true' : undefined}
-            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-amber-700 ${option.id === value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}`}>
+            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-amber-700 dark:hover:bg-white/5 ${option.id === value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 dark:text-slate-200'}`}>
             {option.coverUrl && <img src={option.coverUrl} alt="" loading="lazy" className="h-9 w-9 shrink-0 rounded object-cover" />}
             <span className="min-w-0 flex-1"><span className="block">{option.label}</span>{option.reason && <span className="mt-0.5 block text-[10px] text-amber-700">{option.reason}</span>}</span>
             {option.id === value && <Check className="h-3.5 w-3.5 shrink-0" />}
           </button>
         </li>)}
-        {visibleOptions.length === 0 && <li className="px-2 py-3 text-center text-xs text-slate-500">{scopeKnown ? '当前架构或商品没有匹配的图组' : '添加商品后显示可选母本'}</li>}
+        {visibleOptions.length === 0 && <li className="px-2 py-3 text-center text-xs text-slate-500 dark:text-slate-400">{scopeKnown ? '当前架构或商品没有匹配的图组' : '添加商品后显示可选母本'}</li>}
       </ul>
     </div>}
   </div>;
@@ -255,10 +255,10 @@ export function WorkshopAssetBindings(props: {
   const replacementSummary = [replacementCount ? `已替换 ${replacementCount} 项` : '', suspendedCount ? `${suspendedCount} 项暂不生效` : ''].filter(Boolean).join(' · ') || '可选 · 默认沿用母本';
   const groupsNeedingReview = scopedGroups.filter(item => promptGroupDeclaredSubcategoryConflict(item));
   return <section>
-    <div className="rounded-lg bg-slate-50/70 p-3">
+    <div className="rounded-lg bg-slate-50/70 p-3 dark:bg-white/5">
       <WorkshopGroupFolderPicker value={folderId} onChange={id => props.onFolderChange?.(id)} folders={folders} categories={categories} groups={architectureGroups} />
       <WorkshopGroupPicker value={props.groupId} onChange={props.onGroupChange} groups={scopedGroups} products={props.products || []} noPeople={noPeople} scopeKnown={scopeKnown} selectedOutsideScope={groupOutsideScope ? group : undefined} onOpenLibrary={() => props.onOpenAssets?.('full_prompt')} />
-      <p className="mt-2 text-[11px] leading-5 text-slate-500">复用母本的四镜顺序、构图与描述；生成图片以本批次商品图为商品身份参考，母本原图不直接提交生图。</p>
+      <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">复用母本的四镜顺序、构图与描述；生成图片以本批次商品图为商品身份参考，母本原图不直接提交生图。</p>
       {groupsNeedingReview.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700">{groupsNeedingReview.slice(0, 4).map(item => fullPromptGroupLabel(item.displayNumber)).join('、')}{groupsNeedingReview.length > 4 ? `等 ${groupsNeedingReview.length} 组` : ''}的文件夹归属与内容不一致，已暂停轮换；请到资产库核对细分文件夹。</p>}
       {scopeKnown && scopedGroups.length === 0 && !invalidFolder && <p className="mt-2 text-xs leading-5 text-amber-700">当前文件夹与拍摄架构下暂无已发布完整四图母本，请调整文件夹或在资产库补充母本。</p>}
       {invalidFolder
@@ -272,8 +272,8 @@ export function WorkshopAssetBindings(props: {
         : !automatic && !group
         ? <p className="mt-2 text-xs text-amber-700">选定图组已失效或尚未加载，请重新选择。</p>
         : !scopeKnown
-        ? <p className="mt-2 text-[11px] leading-5 text-slate-500">先采集商品，系统才能按商品大类和细分匹配图组母本。</p>
-        : <p className="mt-2 text-[11px] leading-5 text-slate-500">{!props.products?.length
+        ? <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">先采集商品，系统才能按商品大类和细分匹配图组母本。</p>
+        : <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">{!props.products?.length
           ? '文件夹数量表示已发布完整母本；采集商品后确认实际候选，再选择固定图组。'
           : group
           ? `本批次全部商品固定使用此${appearance === 'human' ? '含人物镜头' : appearance === 'product' ? '全组无人物' : '出镜类型待判定'}图组。保留逐镜顺序、构图、动作和出镜范围。`
@@ -285,23 +285,23 @@ export function WorkshopAssetBindings(props: {
         : '人物与穿搭仅在轮到含人物母本时生效。'}全组无人物或待判定母本保持原出镜范围。若每款都需人物，请选“含人物镜头”。{appearanceSelected && candidatePools.length > 0 && productsWithPortraitCandidates === 0 ? ' 当前商品没有可应用人物替换的候选母本。' : ''}</p>}
       {!noPeople && !automatic && appearance === 'unknown' && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-[11px] leading-5 text-amber-700">此母本出镜类型待判定，人物与穿搭暂不应用。请先在素材库修正母版标注。</p>}
       {!hasPortrait && appearanceSelected && appearance !== 'unknown' && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-[11px] leading-5 text-amber-700">当前使用全组无人物母本，已选人物与穿搭暂不生效；切回含人物镜头的母本后会恢复。</p>}
-      {shots.length > 0 && <ol className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-600">
+      {shots.length > 0 && <ol className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
         {shots.map((shot, index) => <li key={index} className="truncate" title={shot.title}>{index + 1}. {shot.title || '未命名镜头'} · {shot.shot_type === 'hand_held_only' ? '仅手部' : shot.has_human === true ? '人物' : shot.has_human === false ? '静物' : '待判定'}</li>)}
       </ol>}
 
     </div>
-    <details className="mt-3 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5" open={replacementCount + suspendedCount > 0 ? true : undefined}>
-      <summary className="cursor-pointer text-xs font-semibold text-slate-800">自定义替换 <span className="ml-2 font-normal text-slate-500">{replacementSummary}</span></summary>
+    <details className="mt-3 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-[#18191c]" open={replacementCount + suspendedCount > 0 ? true : undefined}>
+      <summary className="cursor-pointer text-xs font-semibold text-slate-800 dark:text-slate-100">自定义替换 <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{replacementSummary}</span></summary>
     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-      <span className="text-xs font-semibold text-slate-700">替换哪些内容</span>
+      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">替换哪些内容</span>
       <button type="button" className="text-[11px] text-indigo-600 hover:text-indigo-800" onClick={() => {
         props.onPersonaChange('auto'); props.onSceneChange('auto'); props.onOutfitChange('auto');
       }}>重置为沿用母本</button>
     </div>
     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <div className="min-w-0 rounded-xl border border-slate-200/80 bg-white p-3">
+      <div className="min-w-0 rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-[#18191c]">
         <WorkshopAssetLockRow label="场景" autoLabel="沿用母本逐镜场景" prefix="S" value={props.sceneId} onChange={props.onSceneChange} options={visibleScenes} onOpenLibrary={() => props.onOpenAssets?.('scene')} />
-        {props.sceneId !== 'auto' && <p className="mt-2 text-[11px] text-slate-500">应用于全部镜头，并替换原场景光线。</p>}
+        {props.sceneId !== 'auto' && <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">应用于全部镜头，并替换原场景光线。</p>}
       </div>
       {hasPortrait && <>
         <WorkshopAppearanceSelection value={props.personaId} onChange={props.onPersonaChange} options={props.personas} onOpenLibrary={() => props.onOpenAssets?.('persona')} />
@@ -312,20 +312,20 @@ export function WorkshopAssetBindings(props: {
       <p className="font-semibold">已保存的人物与穿搭替换暂不生效</p>
       <p className="mt-1 text-[11px] leading-5">当前母本没有明确的人物镜头；这些选择会保留，切回含人物母本后恢复。</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {props.personaId !== 'auto' && <button type="button" onClick={() => props.onPersonaChange('auto')} className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-[11px]">人物：{isAppearanceRotation(props.personaId) ? '范围轮换' : props.personas.find(item => item.id === props.personaId)?.name || '已选资产'} · 清除</button>}
-        {props.outfitId !== 'auto' && <button type="button" onClick={() => props.onOutfitChange('auto')} className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-[11px]">穿搭：{isAppearanceRotation(props.outfitId) ? '范围轮换' : props.outfits.find(item => item.id === props.outfitId)?.title || '已选资产'} · 清除</button>}
+        {props.personaId !== 'auto' && <button type="button" onClick={() => props.onPersonaChange('auto')} className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-[11px] dark:bg-[#18191c]">人物：{isAppearanceRotation(props.personaId) ? '范围轮换' : props.personas.find(item => item.id === props.personaId)?.name || '已选资产'} · 清除</button>}
+        {props.outfitId !== 'auto' && <button type="button" onClick={() => props.onOutfitChange('auto')} className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-[11px] dark:bg-[#18191c]">穿搭：{isAppearanceRotation(props.outfitId) ? '范围轮换' : props.outfits.find(item => item.id === props.outfitId)?.title || '已选资产'} · 清除</button>}
       </div>
     </div>}
-    {hasPortrait && <p className="mt-3 text-[11px] leading-5 text-slate-500">人物与穿搭仅用于母本中的人物镜头；仅在勾选范围内轮换，同款人物镜头保持一致。男性仅配男装或通用款；女性可配男装、女装或通用款。年龄段必须匹配，待分类素材不参与。</p>}
-    <details className="mt-4 rounded-lg border border-slate-200 px-3 py-2.5">
-      <summary className="cursor-pointer text-xs font-medium text-slate-600">查看本批次替换规则</summary>
-      <ul className="mt-2 space-y-1.5 text-[11px] leading-5 text-slate-600">
+    {hasPortrait && <p className="mt-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">人物与穿搭仅用于母本中的人物镜头；仅在勾选范围内轮换，同款人物镜头保持一致。男性仅配男装或通用款；女性可配男装、女装或通用款。年龄段必须匹配，待分类素材不参与。</p>}
+    <details className="mt-4 rounded-lg border border-slate-200 px-3 py-2.5 dark:border-white/10">
+      <summary className="cursor-pointer text-xs font-medium text-slate-600 dark:text-slate-300">查看本批次替换规则</summary>
+      <ul className="mt-2 space-y-1.5 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
         <li>场景：{props.sceneId === 'auto' ? '保留各镜头原场景与光线。' : `所有镜头替换为「${props.scenes.find(item => item.id === props.sceneId)?.title || '所选场景'}」，使用新场景光线。`}</li>
         <li>人物：{!hasPortrait ? '当前母本无明确人物镜头，不应用人物替换。' : isAppearanceRotation(props.personaId) ? '仅有人物镜头的母本轮换兼容人物，同款人物镜头保持一致。' : props.personaId === 'auto' ? '人物镜头保留母本人物。' : `人物镜头统一使用「${props.personas.find(item => item.id === props.personaId)?.name || '所选人物'}」，静物与仅手部镜头不加人脸。`}</li>
         <li>穿搭：{!hasPortrait ? '当前母本无明确人物镜头，不应用穿搭替换。' : isAppearanceRotation(props.outfitId) ? '仅有人物镜头的母本按人物性别和年龄段轮换穿搭，男性不匹配女装。' : props.outfitId === 'auto' ? '人物镜头保留母本穿搭。' : `人物镜头统一使用「${props.outfits.find(item => item.id === props.outfitId)?.title || '所选穿搭'}」，不改变原镜头出镜范围。`}</li>
       </ul>
     </details>
-    <p className="mt-3 text-[11px] leading-5 text-slate-500">修改后需重新分析提示词并生成图片，已有图片不会改变。</p>
+    <p className="mt-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">修改后需重新分析提示词并生成图片，已有图片不会改变。</p>
     </details>
   </section>;
 }

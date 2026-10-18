@@ -21,7 +21,7 @@ func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, p
 		map[string]any{"role": "system", "content": copySystemPrompt},
 		map[string]any{"role": "user", "content": prompt},
 	}
-	text, data, status, err := ChatCompletion(r.Context(), base, key, model, messages, 0.7, 18*time.Second)
+	text, data, status, err := ChatCompletionJSON(r.Context(), base, key, model, messages, 0.7, 18*time.Second)
 	parsed := DecodeObject(text)
 	if err != nil || status >= 300 || parsed == nil {
 		if status == 404 {
@@ -42,7 +42,7 @@ func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, p
 	if list, ok := parsed["tags"].([]any); ok && len(list) > 0 {
 		tags = list
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"success": true,
 		"data": map[string]any{
 			"title":   formatCleanTitle(title, sanitizeProductTitle(StringField(payload, "productTitle")), StringListField(payload, "existingTitles")),
@@ -50,8 +50,9 @@ func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, p
 			"tags":    tags,
 		},
 		"model": model,
-		"usage": chatUsage(data),
-	})
+	}
+	attachUsage(body, data)
+	httpx.WriteJSON(w, http.StatusOK, body)
 }
 
 const copySystemPrompt = "你是一位拥有丰富真实自用经验的小红书生活买家秀博主。标题 5 到 20 个字且不含表情符号，正文大于 100 字并用双换行分段。只返回 JSON：{\"title\":\"\",\"content\":\"\",\"tags\":[]}。"
@@ -89,37 +90,4 @@ func formatCleanContent(raw, fallback string) string {
 		content = strings.ReplaceAll(content, "\n\n\n", "\n\n")
 	}
 	return strings.TrimSpace(content)
-}
-
-func chatUsage(data map[string]any) map[string]any {
-	if data == nil {
-		data = map[string]any{}
-	}
-	usage, _ := data["usage"].(map[string]any)
-	prompt := numberField(usage, "prompt_tokens", "promptTokens")
-	completion := numberField(usage, "completion_tokens", "completionTokens")
-	total := numberField(usage, "total_tokens", "totalTokens")
-	if prompt == 0 {
-		prompt = 150
-	}
-	if completion == 0 {
-		completion = 350
-	}
-	if total == 0 {
-		total = 500
-	}
-	return map[string]any{"promptTokens": prompt, "completionTokens": completion, "totalTokens": total}
-}
-
-func numberField(data map[string]any, keys ...string) float64 {
-	if data == nil {
-		return 0
-	}
-	for _, key := range keys {
-		switch value := data[key].(type) {
-		case float64:
-			return value
-		}
-	}
-	return 0
 }

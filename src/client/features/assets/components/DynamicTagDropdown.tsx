@@ -33,7 +33,7 @@ export default function DynamicTagDropdown({
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer select-none ${
           selectedTag
             ? `${activeColorClass} shadow-2xs ring-1 ring-black/5`
-            : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700'
+            : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]'
         }`}
       >
         <Tag className="w-3.5 h-3.5 opacity-70" />
@@ -55,7 +55,7 @@ export default function DynamicTagDropdown({
             e.stopPropagation();
             onSelectTag(null);
           }}
-          className="absolute -top-1 -right-1 p-0.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-full cursor-pointer shadow-xs"
+          className="absolute -top-1 -right-1 p-0.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-full cursor-pointer shadow-xs dark:text-slate-300 dark:bg-white/10"
           title="清除标签筛选"
         >
           <X className="w-2.5 h-2.5" />
@@ -65,8 +65,8 @@ export default function DynamicTagDropdown({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full mt-1.5 z-50 w-64 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100 max-h-80 overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-slate-500 border-b border-slate-100 mb-1.5">
+          <div className="absolute left-0 top-full mt-1.5 z-50 w-64 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100 max-h-80 overflow-y-auto no-scrollbar dark:border-white/10 dark:bg-[#18191c]">
+            <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-slate-500 border-b border-slate-100 mb-1.5 dark:text-slate-400 dark:border-white/10">
               <span>动态标签词库 ({tagList.length} 种分类标签)</span>
               {selectedTag && (
                 <button
@@ -89,7 +89,7 @@ export default function DynamicTagDropdown({
                   placeholder="搜索标签..."
                   value={filterKw}
                   onChange={(e) => setFilterKw(e.target.value)}
-                  className="w-full px-2.5 py-1 text-xs bg-slate-100 rounded-lg border-none focus:outline-none placeholder-slate-400"
+                  className="w-full px-2.5 py-1 text-xs bg-slate-100 rounded-lg border-none focus:outline-none placeholder-slate-400 dark:bg-white/10"
                 />
               </div>
             )}
@@ -108,13 +108,13 @@ export default function DynamicTagDropdown({
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5'
                     }`}
                   >
                     <span className="truncate">{tag}</span>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded-full ml-2 shrink-0 ${
-                        active ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-400 font-normal'
+                        active ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-400 font-normal dark:bg-white/10'
                       }`}
                     >
                       {count}

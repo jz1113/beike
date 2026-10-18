@@ -199,6 +199,22 @@ func StringField(payload map[string]any, key string) string {
 	return value
 }
 
+func IntField(payload map[string]any, key string) int {
+	if val, ok := payload[key]; ok {
+		switch v := val.(type) {
+		case float64:
+			return int(v)
+		case int:
+			return v
+		case json.Number:
+			if i, err := v.Int64(); err == nil {
+				return int(i)
+			}
+		}
+	}
+	return 0
+}
+
 func StringListField(payload map[string]any, key string) []string {
 	items, _ := payload[key].([]any)
 	out := make([]string, 0, len(items))

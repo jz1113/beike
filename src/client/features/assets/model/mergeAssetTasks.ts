@@ -2,6 +2,7 @@ import { isGenerationDeleted } from '@client/store/persist/generation';
 import { getAspectRatioFromSize } from '@shared/domain/media/drawing';
 import { getAssetTime, matchesAssetTime, resolveAssetMediaType, type AssetMediaCategory, type AssetTimeFilter } from '@client/shared/utils/assetTaskData';
 import type { useAppStore } from '@client/store';
+import { isPureAgentDialogue } from './agentAssetFilter';
 
 type AppState = ReturnType<typeof useAppStore.getState>;
 
@@ -57,11 +58,13 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
   const activeDbTasks = dbTasks.filter((task) => !isGenerationDeleted(task.id, task.taskId, task.resultUrl, task.dbId));
   const archivedIds = new Set(activeDbTasks.map((task) => task.id));
   for (const task of generationTasks || []) {
+    if (isPureAgentDialogue(task)) continue;
     const key = task.id || task.dbId || task.taskId;
     if (key) memoryTasks.set(key, task);
   }
   for (const session of sessions || []) {
     for (const task of session.tasks || []) {
+      if (isPureAgentDialogue(task)) continue;
       const key = task.id || task.dbId || task.taskId;
       if (key && !memoryTasks.has(key)) memoryTasks.set(key, task);
       const info = { sessionId: session.id, sessionTitle: session.title };
@@ -116,6 +119,7 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
       || sessionFor(memory?.dbId) || (db.taskId ? sessionByTaskId.get(db.taskId) : undefined);
     const referenceImages = db.referenceImages || memory?.referenceImages || db.images || memory?.images || combined.rawTask?.referenceImages;
     const referenceImageUrl = db.referenceImageUrl || memory?.referenceImageUrl || db.sourceImageUrl || memory?.sourceImageUrl;
+    const resolvedType = resolveAssetMediaType(db.mediaType || memory?.mediaType, db.model || memory?.model, resultUrl);
 
     return {
       ...combined,
@@ -135,7 +139,7 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
       quality: db.quality || memory?.quality,
       createdAt: getAssetTime(db.createdAt ?? memory?.createdAt),
       model: db.model || memory?.model,
-      mediaType: resolveAssetMediaType(db.mediaType || memory?.mediaType, db.model || memory?.model, resultUrl),
+      mediaType: resolvedType,
       aspectRatio: db.aspectRatio || (db.size ? getAspectRatioFromSize(db.size) : memory?.aspectRatio || (memory?.size ? getAspectRatioFromSize(memory.size) : '1:1')),
       referenceImages,
       referenceImageUrl,
@@ -148,12 +152,14 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
 
   const tasksById = new Map<string, MergedAssetTask>();
   for (const db of activeDbTasks) {
+    if (isPureAgentDialogue(db)) continue;
     const memory = matchMemory(db);
     if (memory) matchedMemory.add(memory);
     const task = normalizeTask(db, memory, true);
     if (task.id) tasksById.set(task.id, task);
   }
   for (const memory of memoryTasks.values()) {
+    if (isPureAgentDialogue(memory)) continue;
     if (isGenerationDeleted(memory.id, memory.taskId, memory.resultUrl, memory.dbId)) continue;
     if (serverHistoryComplete && memory.dbId && !archivedIds.has(memory.dbId)
       && (memory.status === 'SUCCESS' || memory.status === 'FAILURE')) continue;
@@ -163,12 +169,14 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
   }
 
   let list = mediaCategory === 'canvas' ? [...canvasTasks] : Array.from(tasksById.values());
-  if (mediaCategory !== 'canvas') {
-    list = list.filter((task) => mediaCategory === 'image'
-      ? task.mediaType === 'image' || task.mediaType === 'depth-image'
-      : mediaCategory === 'video'
-        ? task.mediaType === 'video' || task.mediaType === 'depth-video'
-        : task.mediaType === 'audio');
+  if (mediaCategory !== 'canvas' && mediaCategory !== 'all') {
+    list = list.filter((task) => {
+      if (mediaCategory === 'image') return task.mediaType === 'image' || task.mediaType === 'depth-image';
+      if (mediaCategory === 'video') return task.mediaType === 'video' || task.mediaType === 'depth-video';
+      if (mediaCategory === 'audio') return task.mediaType === 'audio';
+      if (mediaCategory === 'document') return task.mediaType === 'doc' || task.mediaType === 'document';
+      return true;
+    });
   }
   const keyword = searchKeyword.trim().toLowerCase();
   if (keyword) {

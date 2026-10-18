@@ -125,6 +125,69 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/avatar/characters:
+    get:
+      operationId: get_api_avatar_characters
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_avatar_characters
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/avatar/characters/{id}':
+    delete:
+      operationId: delete_api_avatar_characters_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/fonts:
+    get:
+      operationId: get_api_avatar_fonts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/render:
+    post:
+      operationId: post_api_avatar_render
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/tasks:
+    get:
+      operationId: get_api_avatar_tasks
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/avatar/tasks/{id}':
+    delete:
+      operationId: delete_api_avatar_tasks_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_avatar_tasks_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/voices:
+    get:
+      operationId: get_api_avatar_voices
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_avatar_voices
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/avatar/voices/{id}':
+    delete:
+      operationId: delete_api_avatar_voices_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   '/api/catalog/assets/{type}/{id}/create-version':
     post:
       operationId: post_api_catalog_assets_type_id_create_version
@@ -406,6 +469,17 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/generate/audio:
+    get:
+      operationId: get_api_generate_audio
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_audio
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/canvas-text:
     post:
       operationId: post_api_generate_canvas_text
@@ -443,6 +517,12 @@ paths:
   /api/generate/export-zip:
     post:
       operationId: post_api_generate_export_zip
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-deconstruct:
+    post:
+      operationId: post_api_generate_headline_deconstruct
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
@@ -498,6 +578,30 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-detail:
+    post:
+      operationId: post_api_generate_ppt_detail
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-narration:
+    post:
+      operationId: post_api_generate_ppt_narration
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-outline:
+    post:
+      operationId: post_api_generate_ppt_outline
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-slide:
+    post:
+      operationId: post_api_generate_ppt_slide
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/upload-ref:
     post:
       operationId: post_api_generate_upload_ref
@@ -512,6 +616,24 @@ paths:
           description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_generate_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video-sales/analyze:
+    post:
+      operationId: post_api_generate_video_sales_analyze
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video-sales/compose:
+    post:
+      operationId: post_api_generate_video_sales_compose
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video-sales/script:
+    post:
+      operationId: post_api_generate_video_sales_script
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应

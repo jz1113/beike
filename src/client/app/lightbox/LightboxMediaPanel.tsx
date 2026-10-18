@@ -81,7 +81,7 @@ export function LightboxMediaPanel({
                   <button
                     type="button"
                     onClick={() => void openExternalUrl(resultUrl!)}
-                    className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors cursor-pointer"
+                    className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors cursor-pointer dark:bg-[#18191c]/95"
                   >
                     在新窗口打开原视频
                   </button>

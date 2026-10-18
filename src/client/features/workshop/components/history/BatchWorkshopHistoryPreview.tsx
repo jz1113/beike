@@ -26,10 +26,10 @@ export function BatchWorkshopHistoryPreview({ batch, runner, isHistoryExporting,
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-sm font-black text-slate-900">历史批次生成查看 · {batch.name}</p>
-          <p className="mt-0.5 text-xs text-slate-500">历史批次内容只读；此前已采用的完整四镜仍可提炼为新母本。</p>
+          <p className="text-sm font-black text-slate-900 dark:text-slate-100">历史批次生成查看 · {batch.name}</p>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">历史批次内容只读；此前已采用的完整四镜仍可提炼为新母本。</p>
         </div>
-        <button type="button" onClick={() => onClose()} className="shrink-0 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50">返回当前批次</button>
+        <button type="button" onClick={() => onClose()} className="shrink-0 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 dark:bg-[#18191c]">返回当前批次</button>
       </div>
       <BatchStage4Queue
         successfulItems={batch.snapshot.items.filter(item => item.status === 'success' && item.selected) as BatchProductItem[]}

@@ -70,7 +70,7 @@ export default function AssistantMediaLightbox({
         <button
           type="button"
           onClick={onClose}
-          className="mt-3 px-5 py-2 rounded-full bg-slate-900/90 text-white text-xs font-bold border border-white/10 hover:bg-slate-800 transition-colors shadow-lg cursor-pointer"
+          className="mt-3 px-5 py-2 rounded-full bg-slate-900/90 text-white text-xs font-bold border border-white/10 hover:bg-slate-800 transition-colors shadow-lg cursor-pointer dark:hover:bg-slate-200"
         >
           关闭预览
         </button>

@@ -178,7 +178,32 @@ export function resolveModelVendor(modelId: string = '', rawProvider?: string): 
     return 'Suno';
   }
 
-  // 27. 若传入了明确的 rawProvider 且非通用网关词，则使用规范化后的 rawProvider
+  // 27. Topaz Labs
+  if (m.includes('topaz')) {
+    return 'Topaz';
+  }
+
+  // 28. ElevenLabs
+  if (m.includes('eleven')) {
+    return 'ElevenLabs';
+  }
+
+  // 29. Meshy 3D
+  if (m.includes('meshy')) {
+    return 'Meshy';
+  }
+
+  // 30. Fal.ai
+  if (m.includes('fal') || m.includes('fal-ai')) {
+    return 'Fal.ai';
+  }
+
+  // 31. 硅基流动 (SiliconFlow)
+  if (m.includes('siliconflow') || m.includes('siliconcloud') || m.includes('silicon')) {
+    return '硅基流动';
+  }
+
+  // 32. 若传入了明确的 rawProvider 且非通用网关词，则使用规范化后的 rawProvider
   if (rawProvider && rawProvider !== 'Gateway' && rawProvider !== 'Comfly 网关' && rawProvider !== 'unknown') {
     const rawLower = rawProvider.toLowerCase();
     if (rawLower.includes('google')) return 'Google';

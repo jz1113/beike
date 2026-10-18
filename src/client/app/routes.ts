@@ -16,6 +16,10 @@ export const VIEW_TO_URL: Record<AppView, string> = {
   assets: 'assets',
   canvas: 'canvas',
   settings: 'settings',
+  skills: 'skills',
+  ppt_generator: 'ppt_generator',
+  avatar: 'avatar',
+  video_sales: 'video_sales',
 };
 
 export function parseViewFromSearchParams(search: string): AppView {

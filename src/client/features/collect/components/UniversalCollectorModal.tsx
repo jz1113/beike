@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download, Sparkles, FileSpreadsheet, FileVideo } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
+import GlobalDynamicBackground from '@client/shared/media/widgets/GlobalDynamicBackground';
 import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
 import { ToolSuiteMark } from '@client/shared/icons';
 import {
@@ -20,6 +21,7 @@ import { useCollectorToast } from '@client/features/collect/hooks/useCollectorTo
 import { useFocusTrap } from '@client/features/collect/hooks/useFocusTrap';
 import { useBatchTaskQueue } from '../hooks/useBatchTaskQueue';
 import { useSingleCollect } from '../hooks/useSingleCollect';
+import { useVideoDownloadQueue } from '../hooks/useVideoDownloadQueue';
 import {
   downloadCsvTemplate,
   downloadBatchSuccessTasks,
@@ -34,6 +36,14 @@ interface Props {
 }
 
 export type { BatchTaskItem };
+
+function collectorTabClass(active: boolean) {
+  return `inline-flex min-w-[150px] shrink-0 items-center justify-center gap-1.5 rounded-full px-5 py-2.5 font-bold transition-all ${
+    active
+      ? 'bg-white text-slate-950 shadow-sm dark:bg-[#2C2C32] dark:text-white'
+      : 'text-slate-600 hover:bg-white/60 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
+  }`;
+}
 
 export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorkshop }: Props) {
   const {
@@ -55,7 +65,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
   );
 
   // 当前主 Tab
-  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'video'>('single');
+  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'video'>('video');
 
   // 详情查看模态状态
   const [inspectingItem, setInspectingItem] = useState<any | null>(null);
@@ -71,6 +81,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
 
   // Toast 提示
   const { toastMsg, showToast } = useCollectorToast();
+  const videoQueue = useVideoDownloadQueue(showToast);
 
   const { isDownloadingZip, isDownloadingVideo, runZipDownload, runVideoDownload } = useCollectorDownloads(isOpen, showToast);
   const ignoreLoading = () => {};
@@ -158,8 +169,9 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
 
   return (
     <div
-      className="fixed inset-0 z-50 animate-fade-in select-none bg-[#fbfcfe] text-slate-900"
+      className="fixed inset-0 z-50 animate-fade-in select-none bg-[#F7F7F8] text-slate-900 dark:bg-[#121214] dark:text-slate-100"
     >
+      <GlobalDynamicBackground />
       <input
         ref={batch.fileInputRef}
         type="file"
@@ -176,7 +188,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
         aria-describedby="collector-modal-desc"
         aria-hidden={Boolean(inspectingItem || previewImageUrl || isStyleExtractOpen)}
         tabIndex={-1}
-        className="relative flex h-full w-full flex-col overflow-hidden bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.38)_1px,transparent_1.4px)] bg-[size:24px_24px] text-left"
+        className="relative z-10 flex h-full w-full flex-col overflow-hidden text-left"
       >
         {/* 轻量顶部操作条：与大字报页面保持一致 */}
         <header
@@ -185,7 +197,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
           <button
             type="button"
             onClick={handleBackHome}
-            className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
+            className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-black tracking-tight text-slate-900 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:border-white/10 dark:bg-[#1B1B1E]/90 dark:text-white dark:hover:border-white/20 dark:hover:bg-[#26262B]"
             aria-label="返回首页"
             title="返回首页"
           >
@@ -200,12 +212,12 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
         <div className="flex-1 overflow-y-auto px-4 pb-10 pt-8 sm:px-6 sm:pt-12 lg:px-8">
           <section className="mx-auto w-full max-w-[1120px]">
             <div className="mx-auto max-w-[980px] text-center">
-              <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px]">内容采集</h1>
-              <p id="collector-modal-desc" className="mt-3 text-sm text-slate-500">{activeTab === 'batch' ? '粘贴多条链接或导入表格，批量收集商品图片与社媒素材。' : activeTab === 'video' ? '导入含标题和视频链接的表格，按标题批量下载到本地文件夹。' : '一个链接，收集商品图片与社媒素材。'}</p>
-              <div role="tablist" aria-label="采集模式选择" className="mt-6 inline-flex max-w-full overflow-x-auto rounded-full bg-slate-100 p-1 shadow-inner text-sm font-medium">
-                <button type="button" role="tab" aria-selected={activeTab === 'single'} onClick={() => setActiveTab('single')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'single' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><Sparkles className="h-3.5 w-3.5" />单条采集</button>
-                <button type="button" role="tab" aria-selected={activeTab === 'batch'} onClick={() => setActiveTab('batch')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'batch' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileSpreadsheet className="h-3.5 w-3.5" />批量采集{batch.batchTasks.length > 0 ? ` (${batch.batchTasks.length})` : ''}</button>
-                <button type="button" role="tab" aria-selected={activeTab === 'video'} onClick={() => setActiveTab('video')} className={`inline-flex shrink-0 items-center justify-center gap-1.5 min-w-[150px] rounded-full px-5 py-2.5 transition-all ${activeTab === 'video' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}><FileVideo className="h-3.5 w-3.5" />oss视频下载</button>
+              <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px] dark:text-slate-100">内容采集</h1>
+              <p id="collector-modal-desc" className="mt-3 text-sm text-slate-500 dark:text-slate-400">{activeTab === 'batch' ? '粘贴多条链接或导入表格，批量收集商品图片与社媒素材。' : activeTab === 'video' ? '导入含标题和视频链接的表格，按标题批量下载到本地文件夹。' : '一个链接，收集商品图片与社媒素材。'}</p>
+              <div role="tablist" aria-label="采集模式选择" className="mt-6 inline-flex max-w-full overflow-x-auto rounded-full bg-slate-200/70 p-1 text-sm font-medium ring-1 ring-black/[0.06] dark:bg-[#1B1B1E] dark:ring-white/[0.08]">
+                <button type="button" role="tab" aria-selected={activeTab === 'video'} onClick={() => setActiveTab('video')} className={collectorTabClass(activeTab === 'video')}><FileVideo className="h-3.5 w-3.5" />oss视频下载{videoQueue.items.length > 0 ? ` (${videoQueue.items.length})` : ''}</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'single'} onClick={() => setActiveTab('single')} className={collectorTabClass(activeTab === 'single')}><Sparkles className="h-3.5 w-3.5" />单条采集</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'batch'} onClick={() => setActiveTab('batch')} className={collectorTabClass(activeTab === 'batch')}><FileSpreadsheet className="h-3.5 w-3.5" />批量采集{batch.batchTasks.length > 0 ? ` (${batch.batchTasks.length})` : ''}</button>
               </div>
             </div>
 
@@ -214,6 +226,8 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             <CollectorSinglePanel
               singlePlatform={single.singlePlatform}
               setSinglePlatform={single.setSinglePlatform}
+              preferredScraper={single.preferredScraper}
+              setPreferredScraper={single.setPreferredScraper}
               singleInput={single.singleInput}
               setSingleInput={single.setSingleInput}
               handleSingleCollect={single.handleSingleCollect}
@@ -245,6 +259,8 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             <CollectorBatchPanel
               batchInputMode={batch.batchInputMode}
               setBatchInputMode={batch.setBatchInputMode}
+              preferredScraper={single.preferredScraper}
+              setPreferredScraper={single.setPreferredScraper}
               batchTextarea={batch.batchTextarea}
               setBatchTextarea={batch.setBatchTextarea}
               handleAddTasksFromText={batch.handleAddTasksFromText}
@@ -275,7 +291,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             />
           )}
 
-          {activeTab === 'video' && <CollectorVideoDownloadPanel showToast={showToast} />}
+          {activeTab === 'video' && <CollectorVideoDownloadPanel showToast={showToast} queue={videoQueue} />}
 
             </div>
           </section>
@@ -317,7 +333,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-80 px-4 py-2.5 rounded-2xl bg-slate-900/95 text-white text-xs font-semibold shadow-2xl border border-slate-700/80 backdrop-blur-md animate-fade-in flex items-center gap-2 pointer-events-none"
+          className="fixed bottom-8 left-1/2 z-80 flex -translate-x-1/2 animate-fade-in items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-900/95 px-4 py-2.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md pointer-events-none dark:border-white/10 dark:bg-[#20232A]/95 dark:text-[#EDEDED]"
         >
           <span>{toastMsg}</span>
         </div>

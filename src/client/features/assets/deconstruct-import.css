@@ -1,6 +1,7 @@
 .deconstruct-import-overlay { animation: deconstruct-overlay-in 160ms ease-out; }
 .deconstruct-import-dialog { animation: deconstruct-dialog-in 240ms cubic-bezier(.23, 1, .32, 1); }
 .deconstruct-import-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.dark .deconstruct-import-content { scrollbar-color: rgba(255, 255, 255, .24) transparent; }
 .deconstruct-source-tab, .deconstruct-action-button, .deconstruct-icon-button { -webkit-tap-highlight-color: transparent; }
 .deconstruct-action-button:focus-visible, .deconstruct-icon-button:focus-visible, .deconstruct-source-tab:focus-visible {
   outline: 2px solid #818cf8; outline-offset: 3px;

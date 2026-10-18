@@ -21,7 +21,7 @@ export function isVideoRef(
 function VideoPlaceholder({ className, alt }: { className?: string; alt?: string }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-400 ${className ?? ''}`}
+      className={`flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-400 dark:bg-white/10 ${className ?? ''}`}
       aria-label={alt || '参考视频'}
     >
       <Film className="w-6 h-6 stroke-[1.5]" />

@@ -37,12 +37,12 @@ export default function FeedBatchHeader({
       {/* 🌟 模式 0: Agent 模式任务 */}
       {isAgentTask ? (
         <div className="flex items-center gap-1.5 shrink-0 min-w-0">
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/80 text-[11.5px] font-medium shadow-xs shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200/80 dark:border-violet-800/60 text-[11.5px] font-medium shadow-xs shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
             <span>Agent 模式</span>
           </div>
           <span
-            className="font-medium text-slate-800 text-[13px] sm:text-[13.5px] truncate shrink min-w-0 max-w-xs sm:max-w-md lg:max-w-lg"
+            className="font-medium text-slate-800 dark:text-zinc-200 text-[13px] sm:text-[13.5px] truncate shrink min-w-0 max-w-xs sm:max-w-md lg:max-w-lg"
             title={batchPrompt}
           >
             {displayBatchTitle}

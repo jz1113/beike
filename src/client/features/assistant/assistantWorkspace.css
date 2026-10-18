@@ -227,6 +227,98 @@
 .agent-image-mention-list small { display:block; color:#8b929c; font-size:10px; margin-top:3px; }
 .agent-mention-upload { padding:9px 8px; margin-top:4px; border-top:1px solid #eef0f3; color:#697686; text-align:left; font-size:12px; flex-shrink:0; }
 
+/* Dark mode rules for Assistant Workspace */
+.dark .agent-shell,
+html.dark .agent-shell {
+  color: #ededed;
+}
+.dark .agent-panel,
+html.dark .agent-panel {
+  background: #141416;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: -12px 0 50px rgba(0, 0, 0, 0.5);
+}
+.dark .agent-panel[data-expanded=true],
+html.dark .agent-panel[data-expanded=true] {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #141416;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.6);
+}
+.dark .agent-panel[data-expanded=true] .agent-header,
+html.dark .agent-panel[data-expanded=true] .agent-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-panel[data-expanded=true] .agent-composer-wrap,
+html.dark .agent-panel[data-expanded=true] .agent-composer-wrap {
+  background: linear-gradient(rgba(20, 20, 22, 0), #141416 14px);
+}
+.dark .agent-icon-button:hover,
+html.dark .agent-icon-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.dark .agent-popover,
+html.dark .agent-popover {
+  background: #1b1b1e;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  color: #ededed;
+}
+.dark .agent-header-menu>button:hover,
+html.dark .agent-header-menu>button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.dark .agent-composer,
+html.dark .agent-composer {
+  background: #18181b;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.dark .agent-composer:focus-within,
+html.dark .agent-composer:focus-within {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.dark .agent-composer textarea,
+html.dark .agent-composer textarea {
+  color: #ededed;
+}
+.dark .agent-composer textarea::placeholder,
+html.dark .agent-composer textarea::placeholder {
+  color: #71717a;
+}
+.dark .agent-send-button,
+html.dark .agent-send-button {
+  background: #ffffff;
+  color: #121214;
+}
+.dark .agent-send-button:hover,
+html.dark .agent-send-button:hover {
+  background: #e4e4e7;
+}
+.dark .agent-send-button:disabled,
+html.dark .agent-send-button:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: #71717a;
+}
+.dark .agent-panel[data-expanded=true] .agent-markdown,
+html.dark .agent-panel[data-expanded=true] .agent-markdown {
+  color: #ededed;
+}
+.dark .agent-image-mentions,
+html.dark .agent-image-mentions {
+  background: #1b1b1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.dark .agent-image-mention-list button[aria-selected=true],
+html.dark .agent-image-mention-list button[aria-selected=true] {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-mention-upload,
+html.dark .agent-mention-upload {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+}
+
 /* Compact effort control: four snapped positions, native pointer/keyboard semantics. */
 .agent-effort-heading { display:flex; align-items:center; justify-content:center; min-height:24px; color:#9198a1; }
 .agent-effort-summary { display:flex; justify-content:center; align-items:center; gap:8px; min-width:0; }
@@ -284,6 +376,9 @@ button.agent-execution-summary:hover { color:#454e55; }
 .agent-disclosure { flex-shrink:0; transition:transform .16s; }
 .agent-execution-summary[aria-expanded=true]>.agent-disclosure, .agent-activity-row[open]>summary>.agent-disclosure { transform:rotate(90deg); }
 .agent-execution[data-state=error]>.agent-execution-summary { color:#a95b43; }
+.agent-activity-row[data-state=declined]>summary,.agent-activity-row[data-state=declined] .agent-activity-state,
+.agent-activity-row[data-state=cancelled]>summary,.agent-activity-row[data-state=cancelled] .agent-activity-state { color:#7e868c; }
+.agent-step-verdict { margin:0; color:#6d757c; font-size:13px; line-height:1.7; }
 .agent-execution-steps { margin:8px 0 6px 7px; padding-left:17px; border-left:1px solid #e0e3e4; display:flex; flex-direction:column; gap:5px; }
 .agent-activity-row { min-width:0; }
 .agent-activity-row>summary { display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; list-style:none; }
@@ -317,3 +412,138 @@ button.agent-execution-summary:hover { color:#454e55; }
 
 .agent-approval-notice { margin:0 var(--agent-gutter) 2px; display:flex; flex-shrink:0; flex-wrap:wrap; align-items:center; gap:8px; border:1px solid #deded5; border-radius:10px; background:#f6f6f0; padding:8px 10px; color:#646d5f; font-size:11px; }
 .agent-approval-notice>span { flex:1; }
+
+.dark .agent-welcome h2,
+html.dark .agent-welcome h2 {
+  color: #ededed;
+}
+.dark .agent-start-cards::before,
+html.dark .agent-start-cards::before {
+  background: #ededed;
+  opacity: 0.06;
+}
+.dark .agent-start-card,
+html.dark .agent-start-card,
+.dark .agent-start-card:nth-child(2),
+html.dark .agent-start-card:nth-child(2) {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(155deg, #1b1b1e, #141416);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 14px 22px -17px rgba(0, 0, 0, 0.55);
+  color: #ededed;
+}
+.dark .agent-start-card::after,
+html.dark .agent-start-card::after {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #101012;
+}
+.dark .agent-start-card strong,
+html.dark .agent-start-card strong {
+  color: #f4f4f5;
+}
+.dark .agent-start-description,
+html.dark .agent-start-description,
+.dark .agent-start-category,
+html.dark .agent-start-category {
+  color: #a1a1aa;
+}
+.dark .agent-shell .agent-start-card:hover,
+html.dark .agent-shell .agent-start-card:hover,
+.dark .agent-shell .agent-start-card:focus-visible,
+html.dark .agent-shell .agent-start-card:focus-visible {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 28px -17px rgba(0, 0, 0, 0.65);
+}
+.dark .agent-welcome-bottom button:hover,
+html.dark .agent-welcome-bottom button:hover {
+  color: #ededed;
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-effort-trigger:hover,
+html.dark .agent-effort-trigger:hover,
+.dark .agent-effort-trigger[aria-expanded=true],
+html.dark .agent-effort-trigger[aria-expanded=true] {
+  color: #93c5fd;
+  background: rgba(255, 255, 255, 0.06);
+}
+.dark .agent-effort-rail,
+html.dark .agent-effort-rail {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-effort-ticks i,
+html.dark .agent-effort-ticks i {
+  background: rgba(255, 255, 255, 0.28);
+}
+.dark .agent-effort-thumb,
+html.dark .agent-effort-thumb {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #f4f4f5;
+}
+.dark .agent-session-row[data-current=true],
+html.dark .agent-session-row[data-current=true] {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-session-row:hover,
+html.dark .agent-session-row:hover,
+.dark .agent-session-row[data-current=true]:hover,
+html.dark .agent-session-row[data-current=true]:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark .agent-session-select,
+html.dark .agent-session-select {
+  color: #e4e4e7;
+}
+.dark .agent-session-action:hover,
+html.dark .agent-session-action:hover {
+  color: #f4f4f5;
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-session-delete:hover,
+html.dark .agent-session-delete:hover {
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.35);
+}
+.dark .agent-session-edit input,
+html.dark .agent-session-edit input {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #141416;
+  color: #ededed;
+}
+.dark .agent-response-body,
+html.dark .agent-response-body {
+  color: #ededed;
+}
+.dark .agent-execution,
+html.dark .agent-execution,
+.dark button.agent-execution-summary:hover,
+html.dark button.agent-execution-summary:hover,
+.dark .agent-activity-row[data-state=running]>summary,
+html.dark .agent-activity-row[data-state=running]>summary {
+  color: #a1a1aa;
+}
+.dark .agent-step-verdict,
+html.dark .agent-step-verdict {
+  color: #d4d4d8;
+}
+.dark .agent-execution-steps,
+html.dark .agent-execution-steps,
+.dark .agent-activity-detail,
+html.dark .agent-activity-detail {
+  border-left-color: rgba(255, 255, 255, 0.08);
+}
+.dark .agent-activity-technical pre,
+html.dark .agent-activity-technical pre {
+  background: #101012;
+  color: #e4e4e7;
+}
+.dark .agent-approval-card,
+html.dark .agent-approval-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #1b1b1e;
+  color: #e4e4e7;
+}
+.dark .agent-approval-notice,
+html.dark .agent-approval-notice {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #d4d4d8;
+}

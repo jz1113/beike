@@ -5,6 +5,8 @@ import type { ProjectFolderItem } from './MaterialProjectView';
 import AssetMediaPreview from './AssetMediaPreview';
 import MaterialFloatingDock from './MaterialFloatingDock';
 import { getAssetMediaKind } from '../model/assetMedia';
+import { DocumentAssetCardCover } from './MaterialAssetCard';
+import { openAgentDocument } from '@client/shared/ui/agentDocumentBus';
 
 type Task = AssetTaskBatch['tasks'][number];
 
@@ -34,7 +36,7 @@ export default function MaterialProjectDetailView({
 }: Props) {
   const [sourceType, setSourceType] = useState<'ai' | 'uploaded'>('ai');
   const [searchInput, setSearchInput] = useState('');
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'audio'>('all');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'audio' | 'document'>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest');
   const [displaySize, setDisplaySize] = useState<DisplaySize>('medium');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -90,6 +92,15 @@ export default function MaterialProjectDetailView({
   };
 
   const handleCardClick = (task: Task) => {
+    if (getAssetMediaKind(task) === 'document') {
+      const title = (task.title || task.prompt || 'AI交付方案').replace(/[\\/:*?"<>|]/g, '').slice(0, 24);
+      openAgentDocument({
+        filename: `${title}.md`,
+        content: task.prompt || '方案内容',
+        createdAt: typeof task.createdAt === 'number' ? task.createdAt : Date.now(),
+      });
+      return;
+    }
     const valid = filteredTasks.filter((t) => t.resultUrl && t.status !== 'FAILURE');
     setPreviewTask(task, valid.length > 0 ? valid : [task]);
   };
@@ -110,21 +121,21 @@ export default function MaterialProjectDetailView({
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-slate-950 transition-colors"
+            className="flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-slate-950 transition-colors dark:hover:text-white dark:text-slate-100"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>{project.title}</span>
           </button>
 
           {/* AI生成 / 我上传的 胶囊 */}
-          <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 border border-slate-200/60 shadow-2xs">
+          <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 border border-slate-200/60 shadow-2xs dark:bg-white/10 dark:border-white/10">
             <button
               type="button"
               onClick={() => setSourceType('ai')}
               className={`px-3 py-1 rounded-full text-xs transition-all ${
                 sourceType === 'ai'
-                  ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
               }`}
             >
               AI 生成
@@ -134,8 +145,8 @@ export default function MaterialProjectDetailView({
               onClick={() => setSourceType('uploaded')}
               className={`px-3 py-1 rounded-full text-xs transition-all ${
                 sourceType === 'uploaded'
-                  ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
               }`}
             >
               我上传的
@@ -153,7 +164,7 @@ export default function MaterialProjectDetailView({
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="搜索资产"
-              className="w-36 pl-8 pr-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200/60 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all h-8"
+              className="w-36 pl-8 pr-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200/60 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all h-8 dark:text-slate-100 dark:bg-white/10"
             />
           </div>
 
@@ -162,12 +173,13 @@ export default function MaterialProjectDetailView({
             <select
               value={mediaFilter}
               onChange={(e) => setMediaFilter(e.target.value as typeof mediaFilter)}
-              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8"
+              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8 dark:text-slate-200 dark:bg-white/10"
             >
               <option value="all">筛选: 全部</option>
               <option value="image">图片</option>
               <option value="video">视频</option>
               <option value="audio">音频</option>
+              <option value="document">文档</option>
             </select>
             <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
           </div>
@@ -177,7 +189,7 @@ export default function MaterialProjectDetailView({
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
-              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8"
+              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8 dark:text-slate-200 dark:bg-white/10"
             >
               <option value="newest">排序: 最新</option>
               <option value="oldest">排序: 最早</option>
@@ -191,7 +203,7 @@ export default function MaterialProjectDetailView({
             <select
               value={displaySize}
               onChange={(e) => setDisplaySize(e.target.value as DisplaySize)}
-              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8"
+              className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8 dark:text-slate-200 dark:bg-white/10"
             >
               <option value="medium">展示尺寸: 中</option>
               <option value="large">展示尺寸: 大</option>
@@ -226,10 +238,10 @@ export default function MaterialProjectDetailView({
               >
                 {/* 缩略图容器 */}
                 <div
-                  className={`relative aspect-video w-full overflow-hidden rounded-xl bg-slate-100 transition-all ${
+                  className={`relative aspect-video w-full overflow-hidden rounded-xl bg-slate-100 transition-all dark:bg-white/10 ${
                     isSelected
                       ? 'ring-2 ring-purple-600 border border-purple-500 shadow-md'
-                      : 'border border-slate-200/70 hover:border-slate-300'
+                      : 'border border-slate-200/70 hover:border-slate-300 dark:border-white/10'
                   }`}
                 >
                   {/* 左上角勾选框 (对应图5) */}
@@ -239,15 +251,17 @@ export default function MaterialProjectDetailView({
                     aria-label={isSelected ? '取消勾选' : '勾选'}
                     className={`absolute left-2 top-2 z-20 flex h-4 w-4 items-center justify-center rounded-sm transition-all ${
                       isSelected
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'border border-slate-300 bg-white/80 hover:bg-white text-transparent'
+                        ? 'bg-slate-900 text-white shadow-xs dark:bg-white dark:text-slate-950'
+                        : 'border border-slate-300 bg-white/80 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
                     }`}
                   >
                     {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
                   </button>
 
                   {/* 媒体内容 */}
-                  {task.resultUrl ? (
+                  {kind === 'document' ? (
+                    <DocumentAssetCardCover task={task} />
+                  ) : task.resultUrl ? (
                     <AssetMediaPreview
                       src={task.resultUrl}
                       mediaType={task.mediaType}
@@ -276,7 +290,7 @@ export default function MaterialProjectDetailView({
 
                 {/* 缩略图下方文件名/标题 */}
                 <p
-                  className="mt-1.5 truncate text-[11px] font-medium text-slate-700 px-0.5"
+                  className="mt-1.5 truncate text-[11px] font-medium text-slate-700 px-0.5 dark:text-slate-200"
                   title={title}
                 >
                   {title}

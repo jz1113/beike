@@ -41,8 +41,8 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
   showToast,
 }) => {
   return (
-    <div className="p-5 rounded-3xl bg-slate-50 border border-indigo-100 space-y-4 animate-fade-in shadow-inner">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+    <div className="p-5 rounded-3xl bg-slate-50 border border-indigo-100 space-y-4 animate-fade-in shadow-inner dark:bg-white/5">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
         <span className="text-xs font-bold text-indigo-900 flex items-center gap-2">
           <BookmarkCheck className="w-4 h-4 text-indigo-600" />
           架构推理结果与配方配置 (可直接在线修改)
@@ -55,19 +55,19 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* 风格名称 */}
         <div className="space-y-1">
-          <label className="text-[11px] font-bold text-slate-700">品类架构名称：</label>
+          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200">品类架构名称：</label>
           <input
             type="text"
             value={extractedRecipe.name}
             onChange={e => setExtractedRecipe({ ...extractedRecipe, name: e.target.value })}
-            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500"
+            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]"
           />
         </div>
 
         {/* 归属品类 */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold text-slate-700">归属行业品类：</label>
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200">归属行业品类：</label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -80,7 +80,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCategoryManagerOpen(true)}
-                className="text-[10px] text-slate-500 hover:text-red-600 font-bold flex items-center gap-0.5 cursor-pointer hover:underline"
+                className="text-[10px] text-slate-500 hover:text-red-600 font-bold flex items-center gap-0.5 cursor-pointer hover:underline dark:text-slate-400"
                 title="管理与删除品类（可删除内置或自定义分类）"
               >
                 <Trash2 className="w-3 h-3" />
@@ -96,7 +96,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
                 value={newCategoryName}
                 onChange={e => setNewCategoryName(e.target.value)}
                 placeholder="如：⛺ 户外露营 / 运动装备"
-                className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-indigo-300 text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-indigo-500 shadow-xs"
+                className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-indigo-300 text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-indigo-500 shadow-xs dark:text-slate-100 dark:bg-[#18191c]"
                 autoFocus
               />
               <button
@@ -109,7 +109,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCreatingCategory(false)}
-                className="px-2 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-medium cursor-pointer"
+                className="px-2 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-medium cursor-pointer dark:text-slate-300 dark:bg-white/10"
               >
                 取消
               </button>
@@ -126,7 +126,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
                   setExtractedRecipe({ ...extractedRecipe, category: e.target.value });
                 }
               }}
-              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 outline-none focus:border-indigo-500 cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 outline-none focus:border-indigo-500 cursor-pointer dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]"
             >
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -140,12 +140,12 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
 
       {/* 特征标签 */}
       <div className="space-y-1">
-        <label className="text-[11px] font-bold text-slate-700">场景特色标签：</label>
+        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200">场景特色标签：</label>
         <input
           type="text"
           value={extractedRecipe.tag}
           onChange={e => setExtractedRecipe({ ...extractedRecipe, tag: e.target.value })}
-          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 outline-none focus:border-indigo-500"
+          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 outline-none focus:border-indigo-500 dark:text-slate-200 dark:border-white/10 dark:bg-[#18191c]"
         />
       </div>
 
@@ -164,18 +164,18 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
         </div>
 
         {/* 架构核心理念说明 */}
-        <div className="p-2.5 rounded-xl bg-white/90 border border-indigo-100 text-[11px] text-slate-700 leading-relaxed space-y-1 shadow-2xs">
+        <div className="p-2.5 rounded-xl bg-white/90 border border-indigo-100 text-[11px] text-slate-700 leading-relaxed space-y-1 shadow-2xs dark:text-slate-200 dark:bg-[#18191c]/95">
           <p className="font-bold text-indigo-900 flex items-center gap-1">
             <span>💡 架构如何指导后续分镜规划？</span>
           </p>
-          <p className="text-[10px] text-slate-600">
+          <p className="text-[10px] text-slate-600 dark:text-slate-300">
             架构推理产出的是针对该特定品类的<b>「提示词构建方法论与置景光影法则」</b>。后续在工坊中载入该品类的任意新商品实物图后，大模型将严格依据此套架构指南，为新商品规划出场景、机位、氛围各不相同的高质量分镜提示词！
           </p>
         </div>
 
         {/* 结构化构建步骤展示 */}
         <div className="space-y-2">
-          <div className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+          <div className="text-[11px] font-bold text-slate-700 flex items-center gap-1 dark:text-slate-200">
             <Layers className="w-3.5 h-3.5 text-indigo-600" />
             <span>Prompt 构建层级逻辑与拆解顺序：</span>
           </div>
@@ -183,39 +183,39 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
             {extractedRecipe.architecture?.structure_steps && Array.isArray(extractedRecipe.architecture.structure_steps) ? (
               extractedRecipe.architecture.structure_steps.map((step: any, sIdx: number) => (
-                <div key={sIdx} className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs">
+                <div key={sIdx} className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                   <div className="flex items-center gap-1.5 font-bold text-indigo-900 text-xs">
                     <span className="w-4 h-4 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center text-[10px]">
                       {step.step_no || sIdx + 1}
                     </span>
                     <span>[{step.title}]</span>
                   </div>
-                  <p className="text-[10px] text-slate-600 leading-relaxed pl-5">
+                  <p className="text-[10px] text-slate-600 leading-relaxed pl-5 dark:text-slate-300">
                     {step.rule}
                   </p>
                 </div>
               ))
             ) : (
               <>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                   <span className="font-bold text-indigo-900 text-xs">1. [主体物理特征与材质工艺]</span>
-                  <p className="text-[10px] text-slate-600">提取目标商品真实三维物理特征与微观材质（保留原装装甲结构/版型材质不变）</p>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300">提取目标商品真实三维物理特征与微观材质（保留原装装甲结构/版型材质不变）</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                   <span className="font-bold text-indigo-900 text-xs">2. [核心配件/服饰细节]</span>
-                  <p className="text-[10px] text-slate-600">描写 [颜色 + 材质工艺 + 版型/装配关系]，与主体形成协调呼应</p>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300">描写 [颜色 + 材质工艺 + 版型/装配关系]，与主体形成协调呼应</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                   <span className="font-bold text-indigo-900 text-xs">3. [周边生态/道具搭配]</span>
-                  <p className="text-[10px] text-slate-600">自然点缀生活化/专业化道具生态池与摆放细节</p>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300">自然点缀生活化/专业化道具生态池与摆放细节</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                   <span className="font-bold text-indigo-900 text-xs">4. [场景空间与物理背景]</span>
-                  <p className="text-[10px] text-slate-600">真实物理场景环境与背景质感，严禁非现实或脏乱杂物</p>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300">真实物理场景环境与背景质感，严禁非现实或脏乱杂物</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs sm:col-span-2">
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs sm:col-span-2 dark:border-white/10 dark:bg-[#18191c]">
                   <span className="font-bold text-indigo-900 text-xs">5. [光影色彩与光学质感]</span>
-                  <p className="text-[10px] text-slate-600">模拟真实手机后置主摄买家秀实拍，浅景深虚化、物理接触阴影与自然微噪点</p>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300">模拟真实手机后置主摄买家秀实拍，浅景深虚化、物理接触阴影与自然微噪点</p>
                 </div>
               </>
             )}
@@ -224,8 +224,8 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
 
         {/* 输出拼接范式 */}
         {extractedRecipe.architecture?.prompt_formula && (
-          <div className="p-2.5 rounded-xl bg-white border border-indigo-100 flex items-center justify-between gap-2 shadow-2xs">
-            <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">最终 Prompt 格式范式：</span>
+          <div className="p-2.5 rounded-xl bg-white border border-indigo-100 flex items-center justify-between gap-2 shadow-2xs dark:bg-[#18191c]">
+            <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap dark:text-slate-300">最终 Prompt 格式范式：</span>
             <code className="text-[10px] font-mono text-indigo-800 bg-indigo-50/70 px-2 py-1 rounded-lg border border-indigo-200/60 truncate flex-1">
               {extractedRecipe.architecture.prompt_formula}
             </code>
@@ -236,7 +236,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
       {/* 核心提示词元架构指南 (可按需直接在线编辑) */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+          <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 dark:text-slate-200">
             <span>提示词元架构系统指令 (Prompt Architecture Blueprint · 可自由编辑与调整)：</span>
           </label>
           <span className="text-[10px] text-slate-400 font-mono">将直接作为 System Instruction 指导大模型生成分镜</span>
@@ -245,7 +245,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
           value={extractedRecipe.promptSnippet}
           onChange={e => setExtractedRecipe({ ...extractedRecipe, promptSnippet: e.target.value })}
           rows={6}
-          className="soft-textarea w-full p-3 text-xs leading-relaxed text-slate-800 font-mono resize-y custom-scrollbar"
+          className="soft-textarea w-full p-3 text-xs leading-relaxed text-slate-800 font-mono resize-y custom-scrollbar dark:text-slate-100"
         />
 
         {/* 快捷微调增强标签 */}

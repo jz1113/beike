@@ -119,7 +119,7 @@ export default function AssetCenter({
         serverHistoryComplete,
         dbTasks: activeDbTasks,
         generationTasks: activeGenerationTasks,
-        mediaCategory: 'image',
+        mediaCategory: 'all',
         searchKeyword: '',
         timeFilter: 'all',
         sessions: activeSessions,
@@ -238,14 +238,14 @@ export default function AssetCenter({
         <div className="flex items-center justify-between gap-4">
           {/* 左侧：图 2 上移的【AI 生成 | 我上传的】 */}
           {mainTab === 'material' ? (
-            <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100/90 border border-slate-200/60 shadow-2xs">
+            <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100/90 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setSourceType('ai')}
                 className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   sourceType === 'ai'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 {t('assets.aiGenerated')}
@@ -255,8 +255,8 @@ export default function AssetCenter({
                 onClick={() => setSourceType('uploaded')}
                 className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   sourceType === 'uploaded'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 {t('assets.myUploads')}
@@ -268,14 +268,14 @@ export default function AssetCenter({
 
           {/* 右侧：图 1 移到右边的【素材库 | 资产库】 + 刷新按钮 */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100/90 border border-slate-200/60 shadow-2xs">
+            <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100/90 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setMainTab('material')}
                 className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   mainTab === 'material'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 {t('assets.materialLibrary')}
@@ -285,8 +285,8 @@ export default function AssetCenter({
                 onClick={() => setMainTab('asset')}
                 className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   mainTab === 'asset'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 {t('assets.assetLibrary')}
@@ -299,7 +299,7 @@ export default function AssetCenter({
               disabled={isBusy || historyQuery.isFetching}
               aria-label={t('common.refresh')}
               title={t('common.refresh')}
-              className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors disabled:opacity-50"
+              className="rounded-full p-2 text-slate-400 dark:text-[#8E8E93] hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-white transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 className={`h-4 w-4 ${historyQuery.isFetching ? 'animate-spin' : ''}`}

@@ -23,6 +23,15 @@ func TestParseLinkRejectsBadBody(t *testing.T) {
 	}
 }
 
+func TestParseLinkRejectsWanbangForSocial(t *testing.T) {
+	handler := parseLinkHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "production"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/parse-link", strings.NewReader(`{"url":"https://www.xiaohongshu.com/discovery/item/abc","preferredScraper":"wanbang"}`)))
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "万邦只解析电商商品链接") {
+		t.Fatalf("wanbang %d %s", response.Code, response.Body.String())
+	}
+}
+
 func TestStyleExtractDeepSeekGate(t *testing.T) {
 	handler := extractStyleHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	unknown := httptest.NewRecorder()

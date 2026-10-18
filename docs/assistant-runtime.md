@@ -18,6 +18,10 @@
 
 流式工具调用按上游索引组装，保留参数与模型附加字段。空回复、缺少结束标记、长度截断及上游中止均不算成功，不执行截断的工具参数。非流式降级遵守相同结束状态检查；通道不支持工具时明确报错。
 
+上游 Chat Completions 的 SSE 在读到每个 `reasoning_content` 或 `content` 片段时就转发给客户端：先发 `item/started`，再发 `item/agentReasoning/delta` 或 `item/agentMessage/delta`，回合文本收齐后用同一个 `itemId` 发 `item/agentReasoning/completed` 与 `item/agentMessage/completed`。完整思考文本仍会再发一次 `thinking`，供尚未接增量事件的界面使用。工具开始与结束同时发送 `item/toolCall/started`、`item/toolCall/completed` 和原有的 `tool_call`、`tool_result`；审批结束发送 `item/approval/resolved`。
+
+网络错误、429 和 5xx 只在首个片段写出之前重试，最多 2 次，间隔按 `Retry-After` 或 400ms 起的指数退避，上限 8 秒。已经向客户端输出片段后不再重试，避免把同一段回复写两遍。
+
 ## DeepSeek 兼容
 
 官方路由的思考模式移除不支持的 `tool_choice`，并将工具调用消息的空 content 规范为字符串。连续工具轮保留 `reasoning_content`，普通历史中的已保存思考内容也通过消息构建器回传；非流式回复使用相同规则。早期对话仍可能由会话记忆压缩，未保存的历史思考不能恢复。

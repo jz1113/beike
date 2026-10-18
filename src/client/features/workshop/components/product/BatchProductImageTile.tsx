@@ -28,15 +28,15 @@ function BatchProductImageTile({ imgObj, imgIdx, isChecked, variant, onToggle, o
     <div
       className={
         isFocus
-          ? `aspect-square rounded-2xl border overflow-hidden relative cursor-pointer group transition-all duration-200 bg-slate-50 shadow-2xs ${
+          ? `aspect-square rounded-2xl border overflow-hidden relative cursor-pointer group transition-all duration-200 bg-slate-50 shadow-2xs dark:bg-white/5 ${
               isChecked
                 ? 'border-indigo-600 ring-2 ring-indigo-500/40 bg-indigo-50/15 shadow-md scale-[1.01]'
-                : 'border-slate-200/80 hover:border-slate-300 hover:shadow-xs'
+                : 'border-slate-200/80 hover:border-slate-300 hover:shadow-xs dark:border-white/10'
             }`
           : `aspect-square rounded-xl border cursor-pointer overflow-hidden relative transition-all group ${
               isChecked
                 ? 'border-indigo-600 ring-2 ring-indigo-600/30 shadow-xs'
-                : 'border-slate-200 opacity-85 hover:opacity-100 hover:border-slate-300'
+                : 'border-slate-200 opacity-85 hover:opacity-100 hover:border-slate-300 dark:border-white/10'
             }`
       }
       title={isFocus ? undefined : '点击直接选定此图'}

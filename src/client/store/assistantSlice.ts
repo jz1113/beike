@@ -54,11 +54,27 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
   let lastStreamMessageId = '';
   let hydrationPromise: Promise<void> | null = null;
 
+  const getInitialAssistantModel = (): string => {
+    if (typeof window === 'undefined') return 'gemini-3.7-flash';
+    try {
+      const saved = localStorage.getItem('beike_assistant_selected_model') || localStorage.getItem('ai_assistant_model');
+      if (saved) return saved;
+      const prefRaw = localStorage.getItem('beike_prompt_bar_preferences_v1');
+      if (prefRaw) {
+        const parsed = JSON.parse(prefRaw);
+        if (parsed?.reasoning?.modelId) return parsed.reasoning.modelId;
+      }
+    } catch {
+      // ignore
+    }
+    return 'gemini-3.7-flash';
+  };
+
   return {
     isAssistantOpen: false,
     assistantSessions: initial.sessions,
     currentAssistantSessionId: initial.currentId,
-    assistantModel: 'gemini-3.7-flash',
+    assistantModel: getInitialAssistantModel(),
     assistantHistoryLimit: getStoredHistoryLimit(),
     assistantAttachments: [],
     assistantInputDraft: '',

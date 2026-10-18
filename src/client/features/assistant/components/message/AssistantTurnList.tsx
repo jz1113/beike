@@ -3,7 +3,7 @@ import { Check, Shield } from 'lucide-react';
 import type { AssistantItem } from '@shared/domain/assistant/types';
 import type { AssistantTaskState } from '@shared/domain/assistant/taskPolicy';
 import type { ApprovalDecision, PendingApproval } from '../../model/assistantTurnTypes';
-import { groupTurnItems } from '../../model/assistantActivity';
+import { answerVerdicts, groupTurnItems } from '../../model/assistantActivity';
 import AssistantExecution from './AssistantExecution';
 import ApprovalCard from './ApprovalCard';
 import FormattedMarkdown from './FormattedMarkdown';
@@ -34,6 +34,7 @@ export default function AssistantTurnList({ items, startedAt, task, referenceMed
   productWidget, livePendingApprovals = [], onApprovalDecision, onAnalyzeImages, onSetAsReference,
   onLoadToStudio, onGenerateShotsForProduct, onPreviewImage }: AssistantTurnListProps) {
   const groups = useMemo(() => groupTurnItems(items), [items]);
+  const verdicts = useMemo(() => answerVerdicts(items), [items]);
   const pendingIds = new Set(items.filter(item => item.kind === 'approvalRequest').map(item => item.approvalId));
   const extraApprovals = livePendingApprovals.filter(item => !pendingIds.has(item.approvalId));
   const awaiting = isSending && (livePendingApprovals.length > 0 || items.some(item => item.kind === 'approvalRequest' && item.status === 'pending'));
@@ -42,6 +43,7 @@ export default function AssistantTurnList({ items, startedAt, task, referenceMed
   return <div className="agent-turn-content">
     <AssistantExecution items={items} isSending={isSending} active={executionActive}
       startedAt={startedAt} task={task} message={streamingStatus} awaitingApproval={awaiting} />
+    {verdicts.map((line, index) => <p key={`${index}-${line}`} className="agent-step-verdict" role="status">{line}</p>)}
     {groups.map(group => {
       if (group.kind === 'activity') return null;
       const item = group.item;

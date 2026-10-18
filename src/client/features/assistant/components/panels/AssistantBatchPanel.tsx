@@ -37,7 +37,7 @@ export function AssistantImageBatch({ content, referenceMedia }: { content: stri
       lock.current = false;
     }
   };
-  return <div className="sticky top-0 z-10 my-3 rounded-xl border border-zinc-200 bg-white p-3 text-xs">
+  return <div className="sticky top-0 z-10 my-3 rounded-xl border border-zinc-200 bg-white p-3 text-xs dark:bg-[#18191c]">
     <div className="flex items-center justify-between gap-3">
       <span>{source ? `第 ${batches.indexOf(source) + 1} 版 · ` : '本条回复包含 '}{entries.length} 张生图提示词{superseded ? ' · 已有新版' : ''}</span>
       <button type="button" disabled={superseded && !resultSession} className="rounded-lg bg-zinc-900 px-3 py-2 text-white disabled:opacity-40" onClick={() => {

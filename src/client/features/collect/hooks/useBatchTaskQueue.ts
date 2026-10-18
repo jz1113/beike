@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
+import { getPreferredScraperSync } from '@client/shared/utils/externalScraperCredentials';
 import { getCollectorRateLimiter } from '../model/collectorRateLimiter';
 import { type BatchTaskItem, detectPlatformFromText, extractUrlsFromRawText } from '../model/collectorTypes';
 import { collectSourceMedia, type CollectedSourceItem } from '../api/collectSourceMedia';
@@ -172,6 +173,7 @@ export function useBatchTaskQueue({ isOpen, showToast, saveToCollectorHistory }:
       const result = await collectSourceMedia(task.url, task.platform, false, socialRateLimiterRef.current, controller.signal, {
         shouldStop: () => Boolean(runSignal?.aborted) || !isOpenRef.current || !aliveRef.current,
         onSubmitted: () => submittedTaskIdsRef.current.add(task.id),
+        preferredScraper: getPreferredScraperSync(),
       });
       if (!isRetained()) return updated;
       updated = { ...task, status: 'success', error: undefined, title: result.title, coverImage: result.coverImage,

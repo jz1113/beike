@@ -26,9 +26,6 @@ func NormalizeGatewayBaseURL(raw string) string { return normalizeGatewayBaseURL
 func AllowCustomBase(cfg config.Config) bool    { return allowCustomBase(cfg) }
 func SafeHTTPSGateway(raw string) bool          { return safeHTTPSGateway(raw) }
 func PublicHTTPGateway(raw string) bool         { return publicHTTPGateway(raw) }
-func ApprovedModel(root, id string) (CatalogModel, bool) {
-	return approvedModel(root, id)
-}
 func GatewayGET(ctx context.Context, client *http.Client, rawURL, token, userID string) (map[string]any, int, error) {
 	return gatewayGET(ctx, client, rawURL, token, userID)
 }

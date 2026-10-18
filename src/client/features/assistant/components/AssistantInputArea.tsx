@@ -186,10 +186,10 @@ export default function AssistantInputArea({
         >
           {/* 附件缩略图预览（位于输入卡片内部顶部，整齐紧凑） */}
           {workspaceContext && (
-            <div className="mb-2 flex min-w-0 items-center gap-1.5 text-[11px] text-slate-500">
-              <span className="inline-flex min-w-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1">
-                <PanelsTopLeft className="h-3 w-3 shrink-0 text-slate-500" />
-                <span className="shrink-0 font-medium text-slate-600">{workspaceContext.label}</span>
+            <div className="mb-2 flex min-w-0 items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="inline-flex min-w-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 dark:bg-white/5 dark:border-white/10">
+                <PanelsTopLeft className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
+                <span className="shrink-0 font-medium text-slate-600 dark:text-slate-300">{workspaceContext.label}</span>
                 <span className="min-w-0 truncate text-slate-400">{workspaceContext.detail}</span>
               </span>
             </div>
@@ -197,7 +197,7 @@ export default function AssistantInputArea({
           {assistantAttachments.length > 0 && (
             <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2 animate-fade-in">
               {assistantAttachments.map((att, idx) => (
-                <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 group/att shadow-2xs">
+                <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 group/att shadow-2xs dark:bg-white/10 dark:border-white/10">
                   {att.type === 'document' ? (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-indigo-50 px-0.5">
                       <FileText className="w-5 h-5 text-indigo-600" />
@@ -247,7 +247,7 @@ export default function AssistantInputArea({
                       )}
                     </button>
                   )}
-                  {att.type !== 'document' && <span className="absolute bottom-0 inset-x-0 bg-white/90 px-1.5 py-1 text-[9px] text-slate-600 truncate pointer-events-none" title={att.name}>{att.mentionName ? `@${att.mentionName} · ${att.name || '图片'}` : att.name || (att.type === 'video' ? '视频附件' : '图片附件')}</span>}
+                  {att.type !== 'document' && <span className="absolute bottom-0 inset-x-0 bg-white/90 px-1.5 py-1 text-[9px] text-slate-600 truncate pointer-events-none dark:text-slate-300 dark:bg-[#18191c]/95" title={att.name}>{att.mentionName ? `@${att.mentionName} · ${att.name || '图片'}` : att.name || (att.type === 'video' ? '视频附件' : '图片附件')}</span>}
                   <button
                     type="button"
                     aria-label={`移除附件 ${att.name || idx + 1}`}
@@ -276,7 +276,7 @@ export default function AssistantInputArea({
                 title={`${activeSkill.displayName || activeSkill.name}（输入为空时按退格键可移除）`}
               >
                 <AssistantSkillIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" strokeWidth={1.8} />
-                <span className="min-w-0 truncate text-xs text-slate-900">{activeSkill.displayName || activeSkill.name}</span>
+                <span className="min-w-0 truncate text-xs text-slate-900 dark:text-slate-100">{activeSkill.displayName || activeSkill.name}</span>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -311,7 +311,7 @@ export default function AssistantInputArea({
               }
               rows={1}
               aria-label="消息内容"
-              className="block w-full min-w-0 max-h-40 bg-transparent border-0 text-slate-800 placeholder-slate-400 text-xs sm:text-sm resize-none outline-none leading-6 p-0 m-0 pt-1 overflow-x-hidden overflow-y-auto"
+              className="block w-full min-w-0 max-h-40 bg-transparent border-0 text-slate-800 placeholder-slate-400 text-xs sm:text-sm resize-none outline-none leading-6 p-0 m-0 pt-1 overflow-x-hidden overflow-y-auto dark:text-slate-100"
             />
           </div>
 

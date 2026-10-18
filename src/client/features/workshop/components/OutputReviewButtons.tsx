@@ -7,9 +7,9 @@ export function OutputReviewButtons({
 }) {
   return (
     <div className="flex items-center gap-1">
-      <button type="button" onClick={() => onDecide('accepted')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${decision === 'accepted' ? 'bg-emerald-500 text-white' : 'bg-white/90 text-emerald-700'}`}>采用</button>
-      <button type="button" onClick={() => onDecide('retry_requested')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${decision === 'retry_requested' ? 'bg-amber-500 text-white' : 'bg-white/90 text-amber-700'}`}>重做</button>
-      <button type="button" onClick={() => onDecide('rejected')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${decision === 'rejected' ? 'bg-rose-500 text-white' : 'bg-white/90 text-rose-700'}`}>淘汰</button>
+      <button type="button" onClick={() => onDecide('accepted')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${decision === 'accepted' ? 'bg-emerald-500 text-white' : 'bg-white/90 text-emerald-700 dark:bg-[#18191c]/95'}`}>采用</button>
+      <button type="button" onClick={() => onDecide('retry_requested')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${decision === 'retry_requested' ? 'bg-amber-500 text-white' : 'bg-white/90 text-amber-700 dark:bg-[#18191c]/95'}`}>重做</button>
+      <button type="button" onClick={() => onDecide('rejected')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${decision === 'rejected' ? 'bg-rose-500 text-white' : 'bg-white/90 text-rose-700 dark:bg-[#18191c]/95'}`}>淘汰</button>
     </div>
   );
 }

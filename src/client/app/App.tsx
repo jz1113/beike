@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, clearWorkshopStudioDraft } from '@client/store';
 import { GenerationEngineHost } from '@client/features/generate/components/GenerationEngineHost';
@@ -21,49 +21,11 @@ import { GeneratingEffectsProvider } from '@client/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@client/app/ViewKeepAlive';
 import { useMountedAfterFirstOpen } from '@client/app/hooks/useMountedAfterFirstOpen';
 import { usePerformanceMode } from '@client/shared/utils/performancePreference';
-
 import { useDesktopShortcuts } from '@client/shared/hooks/useDesktopShortcuts';
 import { parseViewFromSearchParams, parseWorkshopTabFromSearchParams, syncViewToUrl } from '@client/app/routes';
 import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 import '@client/features/canvas/store/registerCanvasWorkspace';
-
-// 🌟 React.lazy 动态代码分割与自动容错重试机制（模态框/抽屉按需加载，防无限循环刷新）
-function lazyWithRetry<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T }>
-) {
-  return lazy(async () => {
-    try {
-      return await factory();
-    } catch (err: unknown) {
-      console.warn('[Vite Lazy] Chunk import failed, retrying in 300ms...', err);
-      await new Promise(r => setTimeout(r, 300));
-      try {
-        return await factory();
-      } catch (retryErr: unknown) {
-        console.warn('[Vite Lazy] Second retry in 800ms...', retryErr);
-        await new Promise(r => setTimeout(r, 800));
-        try {
-          return await factory();
-        } catch (finalErr) {
-          // 防御性保护：10 秒内至多自动刷新一次，杜绝开发态 HMR 闪断时的无限死循环刷新
-          if (typeof window !== 'undefined') {
-            try {
-              const lastReload = Number(sessionStorage.getItem('__vite_lazy_reload_ts') || '0');
-              const now = Date.now();
-              if (now - lastReload > 10000) {
-                sessionStorage.setItem('__vite_lazy_reload_ts', String(now));
-                window.location.reload();
-              }
-            } catch {
-              /* ignore storage errors */
-            }
-          }
-          throw finalErr;
-        }
-      }
-    }
-  });
-}
+import { lazyWithRetry } from './lazyWithRetry';
 
 const HomePage = lazyWithRetry(() => import('@client/features/home/HomePage'));
 const SettingsWorkspaceView = lazyWithRetry(() => import('@client/features/settings/SettingsWorkspaceView'));
@@ -76,16 +38,20 @@ const GenerateWorkspace = lazyWithRetry(() => import('@client/features/generate/
 const WorkshopStudio = lazyWithRetry(() => import('@client/features/workshop/WorkshopStudio'));
 const HeadlinePosterStudio = lazyWithRetry(() => import('@client/features/headline-poster/HeadlinePosterStudio'));
 const KeywordReviewStudio = lazyWithRetry(() => import('@client/features/keyword-review/KeywordReviewStudio'));
+const PptStudioView = lazyWithRetry(() => import('@client/features/ppt-generator/PptStudioView'));
+const VideoSalesStudio = lazyWithRetry(() => import('@client/features/video-sales/VideoSalesStudio'));
+const AvatarStudioView = lazyWithRetry(() => import('@client/features/avatar/AvatarStudioView'));
 const AssetCenter = lazyWithRetry(() => import('@client/features/assets/components/AssetCenter'));
 const AssetPromptLibrary = lazyWithRetry(() => import('@client/features/assets/components/AssetPromptLibrary'));
+const SkillsWorkspaceView = lazyWithRetry(() => import('@client/features/skills/SkillsWorkspaceView'));
 
 function AssetCenterWithCanvas() {
   const canvasProjects = useCanvasStore((state) => state.projects);
   return <AssetCenter
     canvasProjects={canvasProjects}
-    onDeleteCanvasProject={(projectId) => useCanvasStore.getState().deleteProject(projectId)}
-    onDeleteCanvasNode={(projectId, nodeId) => useCanvasStore.getState().deleteNode(projectId, nodeId)}
-    onSelectCanvasProject={(projectId) => useCanvasStore.getState().selectProject(projectId)}
+    onDeleteCanvasProject={(projectId: string) => useCanvasStore.getState().deleteProject(projectId)}
+    onDeleteCanvasNode={(projectId: string, nodeId: string) => useCanvasStore.getState().deleteNode(projectId, nodeId)}
+    onSelectCanvasProject={(projectId: string) => useCanvasStore.getState().selectProject(projectId)}
   />;
 }
 const CanvasRecentProjects = lazyWithRetry(() => import('@client/features/canvas/components/CanvasRecentProjects'));
@@ -180,7 +146,7 @@ export default function App() {
   // 🌟 画布独立全屏工作台：进入项目后隐藏全局 Sidebar，呈现完全独立的画板创作界面
   const activeCanvasProjectId = useCanvasStore((s) => s.activeProjectId);
   const isCanvasFullscreen = currentView === 'canvas' && !!activeCanvasProjectId;
-  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review';
+  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review' || currentView === 'video_sales' || currentView === 'avatar' || currentView === 'ppt_generator';
   const isDedicatedFullscreen = isCanvasFullscreen || isWorkshopFullscreen;
 
   useEffect(() => {
@@ -198,6 +164,13 @@ export default function App() {
     );
   }, [routeReady, currentView, batchStage, activeWorkshopTab, activeCanvasProjectId]);
 
+  // 🌟 AI 助手仅在画布视图开放，离开画布时自动收起助手抽屉
+  useEffect(() => {
+    if (currentView !== 'canvas' && useAppStore.getState().isAssistantOpen) {
+      useAppStore.getState().setIsAssistantOpen(false);
+    }
+  }, [currentView]);
+
   const enterOriginalWorkshop = () => {
     const store = useAppStore.getState();
     store.setWorkshopMode('storyboard_generate');
@@ -213,7 +186,7 @@ export default function App() {
   return (
     <GeneratingEffectsProvider>
     <GenerationEngineHost />
-    <div className="h-screen w-screen bg-[#FAFAFC] text-slate-900 flex flex-col overflow-hidden selection:bg-blue-100 selection:text-blue-900" data-density={density}>
+    <div className="h-screen w-screen bg-[#F7F7F8] dark:bg-[#121214] text-slate-900 dark:text-[#EDEDED] flex flex-col overflow-hidden selection:bg-blue-100 dark:selection:bg-indigo-900 selection:text-blue-900 dark:selection:text-indigo-200" data-density={density}>
       {/* 设置全屏独立视图 */}
       {currentView === 'settings' && (
         <Suspense fallback={null}>
@@ -229,7 +202,7 @@ export default function App() {
         <div className="flex-1 min-w-0 flex overflow-hidden relative">
           {/* 🌟 全局轻奢自适应动态背景（首页右上角流体粒子 + 工作区交互式点阵微澜 + 智能降级兜底） */}
           <Suspense fallback={null}>
-            {(!isDedicatedFullscreen || isWorkshopFullscreen) && <GlobalDynamicBackground />}
+            {(!isDedicatedFullscreen || isWorkshopFullscreen) && !isCollectorOpen && <GlobalDynamicBackground />}
           </Suspense>
 
           {!isDedicatedFullscreen && (
@@ -237,6 +210,7 @@ export default function App() {
               currentView={currentView}
               onNavigateHub={() => setCurrentView('home')}
               onNavigateAssets={() => setCurrentView('assets')}
+              onNavigateSkills={() => setCurrentView('skills')}
               onOpenSettings={navigateToSettings}
               onOpenSession={(id) => {
                 useAppStore.getState().switchSession(id);
@@ -265,6 +239,9 @@ export default function App() {
                       onEnterWorkshop={enterOriginalWorkshop}
                       onOpenHeadlinePoster={enterHeadlinePoster}
                       onOpenKeywordReview={() => setCurrentView('keyword_review')}
+                      onOpenPptGenerator={() => setCurrentView('ppt_generator')}
+                      onOpenVideoSales={() => setCurrentView('video_sales')}
+                      onOpenAvatarStudio={() => setCurrentView('avatar')}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
                       recentProjects={<CanvasRecentProjects lead="square" onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
@@ -283,29 +260,13 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="assets" currentView={pageView}>
-                  <AppErrorBoundary
-                    title="资产中心异常"
-                    resetLabel="重新加载"
-                    onReset={() => {
-                      if (typeof window !== 'undefined') {
-                        window.location.reload();
-                      }
-                    }}
-                  >
+                  <AppErrorBoundary title="资产中心异常" resetLabel="重新加载" onReset={() => { if (typeof window !== 'undefined') window.location.reload(); }}>
                     <AssetCenterWithCanvas />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="canvas" currentView={pageView}>
-                  <AppErrorBoundary
-                    title="画布异常"
-                    resetLabel="重新加载"
-                    onReset={() => {
-                      if (typeof window !== 'undefined') {
-                        window.location.reload();
-                      }
-                    }}
-                  >
+                  <AppErrorBoundary title="画布异常" resetLabel="重新加载" onReset={() => { if (typeof window !== 'undefined') window.location.reload(); }}>
                     <CanvasWorkspaceView />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
@@ -317,28 +278,38 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="workshop" currentView={pageView}>
-                  <AppErrorBoundary
-                    title="电商工坊异常"
-                    resetLabel="重置工坊"
-                    onReset={() => {
-                      clearWorkshopStudioDraft();
-                      const store = useAppStore.getState();
-                      store.resetModeSession('storyboard_generate');
-                    }}
-                  >
-                    <WorkshopStudio 
-                      onOpenSettings={navigateToSettings}
-                      AssetPromptLibraryComponent={AssetPromptLibrary}
-                    />
+                  <AppErrorBoundary title="电商工坊异常" resetLabel="重置工坊" onReset={() => { clearWorkshopStudioDraft(); useAppStore.getState().resetModeSession('storyboard_generate'); }}>
+                    <WorkshopStudio onOpenSettings={navigateToSettings} AssetPromptLibraryComponent={AssetPromptLibrary} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
+
                 <ViewKeepAlivePanel view="headline_poster" currentView={pageView}>
-                  <AppErrorBoundary
-                    title="封面生成异常"
-                    resetLabel="返回首页"
-                    onReset={() => setCurrentView('home')}
-                  >
+                  <AppErrorBoundary title="封面生成异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <HeadlinePosterStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                  </AppErrorBoundary>
+                </ViewKeepAlivePanel>
+
+                <ViewKeepAlivePanel view="skills" currentView={pageView}>
+                  <AppErrorBoundary title="技能中心异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <SkillsWorkspaceView />
+                  </AppErrorBoundary>
+                </ViewKeepAlivePanel>
+
+                <ViewKeepAlivePanel view="ppt_generator" currentView={pageView}>
+                  <AppErrorBoundary title="PPT生成工坊异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <PptStudioView onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                  </AppErrorBoundary>
+                </ViewKeepAlivePanel>
+
+                <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
+                  <AppErrorBoundary title="带货剪手工作室异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <VideoSalesStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                  </AppErrorBoundary>
+                </ViewKeepAlivePanel>
+
+                <ViewKeepAlivePanel view="avatar" currentView={pageView}>
+                  <AppErrorBoundary title="数字人工作室异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <AvatarStudioView onBackToHome={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
               </Suspense>
@@ -356,11 +327,11 @@ export default function App() {
       <DeconstructJobsHost />
       <ConfirmDialogHost />
 
-      {/* 🌟 右下角常驻多模态 AI 问答助手与抽屉面板（设置视图与主页时静默，主页已升级为输入框 Agent） */}
-      {currentView !== 'settings' && currentView !== 'home' && <AIAssistantButton />}
+      {/* 🌟 仅在无限画布视图中常驻多模态 AI 问答助手与抽屉面板 */}
+      {currentView === 'canvas' && <AIAssistantButton />}
       <AgentDocumentHost />
       <Suspense fallback={null}>
-        {mountAssistant && <AppErrorBoundary
+        {currentView === 'canvas' && mountAssistant && <AppErrorBoundary
           title="AI 助手组件异常"
           resetLabel="关闭助手"
           onReset={() => {

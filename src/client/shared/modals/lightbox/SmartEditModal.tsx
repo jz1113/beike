@@ -53,7 +53,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden p-4 sm:p-6 space-y-3 sm:space-y-4"
+        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden p-4 sm:p-6 space-y-3 sm:space-y-4 dark:border-white/10 dark:bg-[#18191c]"
         onClick={(e) => e.stopPropagation()}
       >
         <SmartEditToolbar
@@ -64,7 +64,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
         />
 
         {/* 🌟 2. 中间大图交互工作区（100% 纯净无遮挡，任何工具条均不压在图片上） */}
-        <div className="relative flex-1 min-h-[360px] sm:min-h-[440px] bg-slate-50/80 rounded-2xl overflow-hidden flex items-center justify-center border border-slate-200/60 p-3 sm:p-4 group">
+        <div className="relative flex-1 min-h-[360px] sm:min-h-[440px] bg-slate-50/80 rounded-2xl overflow-hidden flex items-center justify-center border border-slate-200/60 p-3 sm:p-4 group dark:bg-white/5 dark:border-white/10">
           {/* 图像视口 */}
           <div
             ref={imageContainerRef}
@@ -148,7 +148,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleRemoveMarker(marker.id, e)}
-                      className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-slate-900/80 hover:bg-black text-white flex items-center justify-center shadow-sm cursor-pointer opacity-80 hover:opacity-100 transition-opacity"
+                      className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-slate-900/80 hover:bg-black text-white flex items-center justify-center shadow-sm cursor-pointer opacity-80 hover:opacity-100 transition-opacity dark:hover:bg-slate-200"
                       title="删除此框选区域"
                     >
                       <X className="w-3 h-3 stroke-[2.5]" />
@@ -184,7 +184,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleRemoveMarker(marker.id, e)}
-                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-900/80 hover:bg-black text-white flex items-center justify-center shadow-sm cursor-pointer opacity-80 group-hover/marker:opacity-100 transition-opacity"
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-900/80 hover:bg-black text-white flex items-center justify-center shadow-sm cursor-pointer opacity-80 group-hover/marker:opacity-100 transition-opacity dark:hover:bg-slate-200"
                       title="删除此标记点"
                     >
                       <Minus className="w-2.5 h-2.5 stroke-[3]" />
@@ -197,12 +197,12 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
         </div>
 
         {/* 🌟 3. 底部输入框与参数栏 */}
-        <div className="shrink-0 bg-white rounded-2xl border border-slate-200/90 p-2.5 sm:p-3 shadow-xs space-y-2">
+        <div className="shrink-0 bg-white rounded-2xl border border-slate-200/90 p-2.5 sm:p-3 shadow-xs space-y-2 dark:border-white/10 dark:bg-[#18191c]">
           <div className="flex items-center gap-2">
             {/* 当前选中标记/框选徽标胶囊 */}
             {markers.length > 0 && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/90 text-slate-800 text-xs font-medium shrink-0 border border-slate-200/80">
-                <div className="w-4 h-4 rounded-full overflow-hidden bg-slate-200 shrink-0">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/90 text-slate-800 text-xs font-medium shrink-0 border border-slate-200/80 dark:text-slate-100 dark:bg-white/10 dark:border-white/10">
+                <div className="w-4 h-4 rounded-full overflow-hidden bg-slate-200 shrink-0 dark:bg-white/10">
                   <img
                     src={currentImgSrc}
                     alt="选区"
@@ -237,7 +237,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                   ? '按住鼠标在图片上拖拽即可框选区域，描述修改需求，如：把框选区域的文字去掉...'
                   : '点击图片放置标记点，描述你想如何调整该位置，如：把头发换成粉色...'
               }
-              className="flex-1 bg-transparent text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none min-w-0"
+              className="flex-1 bg-transparent text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none min-w-0 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
 
             {/* 参数与提交按钮组 */}
@@ -252,8 +252,8 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                   }}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer border ${
                     showModelDropdown
-                      ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs'
-                      : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
+                      ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                      : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/10 dark:border-white/10'
                   }`}
                   disabled={!availableImageModels.length}
                   title={availableImageModels.length ? "点击切换生图模型" : "请在设置中启用生图模型"}
@@ -269,7 +269,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
 
                 {/* 模型下拉浮层 */}
                 {showModelDropdown && (
-                  <div className="absolute right-0 bottom-full mb-2 w-52 py-1.5 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 flex flex-col text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 bottom-full mb-2 w-52 py-1.5 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 flex flex-col text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-100 dark:text-slate-200 dark:border-white/10 dark:bg-[#18191c]">
                     <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                       生图模型配置
                     </div>
@@ -283,7 +283,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                           className={`flex items-center justify-between px-3 py-2 text-left font-medium transition-colors cursor-pointer ${
                             isSelected
                               ? 'bg-indigo-50/80 text-indigo-700'
-                              : 'hover:bg-slate-50 text-slate-700'
+                              : 'hover:bg-slate-50 text-slate-700 dark:text-slate-200 dark:hover:bg-white/5'
                           }`}
                         >
                           <div className="flex items-center gap-2 truncate">
@@ -310,21 +310,21 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                   }}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer border ${
                     showSizeDropdown
-                      ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs'
-                      : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700'
+                      ? 'bg-slate-100 border-slate-300 text-slate-950 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                      : 'bg-slate-100/80 hover:bg-slate-100 border-slate-200/60 text-slate-700 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/10 dark:border-white/10'
                   }`}
                   title="点击切换尺寸与分辨率"
                   aria-label="点击切换尺寸与分辨率"
                 >
-                  <span className="font-bold text-slate-900">{selectedQuality}</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{selectedQuality}</span>
                   <span className="text-slate-300">·</span>
-                  <span className="font-mono text-slate-600">{selectedAspectId}</span>
+                  <span className="font-mono text-slate-600 dark:text-slate-300">{selectedAspectId}</span>
                   <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
                 </button>
 
                 {/* 尺寸下拉浮层 */}
                 {showSizeDropdown && (
-                  <div className="absolute right-0 bottom-full mb-2 w-48 p-2 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 bottom-full mb-2 w-48 p-2 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-100 dark:border-white/10 dark:bg-[#18191c]">
                     <div>
                       <span className="block text-[10px] font-bold text-slate-400 mb-1">清晰度 / 分辨率</span>
                       <div className="grid grid-cols-3 gap-1">
@@ -336,8 +336,8 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                             onClick={() => handleSelectQuality(q)}
                             className={`py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                               selectedQuality === q
-                                ? 'bg-slate-900 text-white shadow-2xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                                ? 'bg-slate-900 text-white shadow-2xs dark:bg-white dark:text-slate-950'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70 dark:text-slate-300 dark:bg-white/10'
                             }`}
                           >
                             {q}
@@ -357,7 +357,7 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                             className={`py-1 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer ${
                               selectedAspectId === aspect
                                 ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200'
-                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 dark:bg-white/5'
                             }`}
                           >
                             {aspect}
@@ -376,8 +376,8 @@ export const SmartEditModal: React.FC<SmartEditModalProps> = ({
                 disabled={!canSubmit}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
                   canSubmit
-                    ? 'bg-slate-900 hover:bg-black text-white hover:scale-105 active:scale-95 shadow-md shadow-slate-900/20'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    ? 'bg-slate-900 hover:bg-black text-white hover:scale-105 active:scale-95 shadow-md shadow-slate-900/20 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-white/10'
                 }`}
                 title={canSubmit ? '提交智能改图任务' : availableImageModels.length ? '请先输入局部改图描述' : '请在设置中启用生图模型'}
               >

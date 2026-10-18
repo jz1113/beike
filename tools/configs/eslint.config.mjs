@@ -33,6 +33,7 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn',
       '@typescript-eslint/no-require-imports': 'off',
+      'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
       'prefer-const': 'warn',
@@ -61,8 +62,6 @@ export default defineConfig([
   },
   {
     files: [
-      'src/server/**/*.{ts,tsx}',
-      'src/server/infrastructure/**/*.{ts,tsx}',
       'src/shared/domain/**/*.{ts,tsx}',
       'src/shared/contracts/**/*.{ts,tsx}',
       'tools/scripts/**/*.{js,mjs,ts}',
@@ -80,15 +79,6 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/server/routes/**/*.ts'],
-    rules: {
-      'no-restricted-imports': ['error', {
-        paths: [{ name: '@server/infrastructure/database/prisma', message: '路由层不得直接访问 Prisma，改走 repositories/' }],
-      }],
-      'no-restricted-globals': ['error', { name: 'fetch', message: '外部 HTTP 调用移至 gateways/' }],
-    },
-  },
-  {
     files: ['src/shared/domain/**/*.ts'],
     rules: {
       'no-restricted-globals': ['error',
@@ -100,7 +90,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/server/**/*.ts', 'src/server/infrastructure/**/*.ts', 'src/shared/contracts/**/*.ts'],
+    files: ['src/shared/contracts/**/*.ts'],
     rules: {
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
     },

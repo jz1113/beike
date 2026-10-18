@@ -88,7 +88,7 @@ export default function CategoryManagerModal({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px] animate-fade-in select-none">
       <div 
-        className="w-full max-w-[680px] max-h-[90vh] overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] flex flex-col animate-scale-up"
+        className="w-full max-w-[680px] max-h-[90vh] overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] flex flex-col animate-scale-up dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -111,7 +111,7 @@ export default function CategoryManagerModal({
           </div>
           <button 
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer dark:hover:bg-white/10"
           >
             <X className="w-4 h-4" />
           </button>
@@ -126,7 +126,7 @@ export default function CategoryManagerModal({
         )}
 
         {/* Add Category Section */}
-        <div className="border-y border-slate-100 px-5 py-3 sm:px-6">
+        <div className="border-y border-slate-100 px-5 py-3 sm:px-6 dark:border-white/10">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Tag className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -136,7 +136,7 @@ export default function CategoryManagerModal({
                 onChange={e => setNewCatName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
                 placeholder="输入新分类名称 (如：⛺ 户外露营 / 运动装备)"
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 shadow-xs"
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 shadow-xs dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]"
               />
             </div>
             <button
@@ -154,10 +154,10 @@ export default function CategoryManagerModal({
           {categories.map(cat => (
             <div 
               key={cat.id}
-              className="flex items-center justify-between p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-indigo-200 hover:shadow-xs transition-all group"
+              className="flex items-center justify-between p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-indigo-200 hover:shadow-xs transition-all group dark:border-white/10 dark:bg-[#18191c]"
             >
               <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-slate-800">{cat.name}</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{cat.name}</span>
                 {cat.isCustom && (
                   <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 text-[10px] font-bold border border-amber-200">
                     自定义
@@ -167,7 +167,7 @@ export default function CategoryManagerModal({
               <button
                 type="button"
                 onClick={() => handleDelete(cat.id, cat.name)}
-                className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-all cursor-pointer border border-transparent hover:border-red-200"
+                className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-all cursor-pointer border border-transparent hover:border-red-200 dark:bg-white/10"
                 title={`删除分类【${cat.name}】`}
               >
                 <Trash2 className="w-4 h-4" />
@@ -177,11 +177,11 @@ export default function CategoryManagerModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3 sm:px-6">
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-[#18181b]">
           <button
             type="button"
             onClick={handleReset}
-            className="text-xs text-slate-500 hover:text-slate-800 font-bold flex items-center gap-1.5 cursor-pointer hover:underline transition-colors"
+            className="text-xs text-slate-500 hover:text-slate-800 font-bold flex items-center gap-1.5 cursor-pointer hover:underline transition-colors dark:hover:text-slate-100 dark:text-slate-400"
             title="将分类重置为系统出厂默认值"
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
@@ -190,7 +190,7 @@ export default function CategoryManagerModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm cursor-pointer transition-colors hover:bg-slate-800"
+            className="rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm cursor-pointer transition-colors hover:bg-slate-800 dark:hover:bg-slate-200"
           >
             完成
           </button>

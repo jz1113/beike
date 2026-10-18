@@ -304,7 +304,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
   };
 
   return (
-    <div className="flex flex-col h-full bg-transparent text-slate-800 select-none">
+    <div className="flex flex-col h-full bg-transparent text-slate-800 select-none dark:text-slate-100">
       {/* 浮动 Toast 提示 */}
       {toastMsg && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[130] px-4 py-2 bg-slate-900/90 text-white text-xs font-semibold rounded-2xl shadow-xl backdrop-blur-md animate-in fade-in duration-200">

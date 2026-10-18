@@ -102,16 +102,16 @@ export function AssetPromptLibraryGrid({
         </div>}
         {activeSubTab === 'full_prompt' && !folderRootVisible && !isBatchMode && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <nav aria-label="商品文件夹路径" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            <nav aria-label="商品文件夹路径" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
               <button type="button" onClick={returnToCategoryFolders} className="font-medium text-indigo-600 hover:text-indigo-800">商品大类</button>
               <ChevronRight className="h-3.5 w-3.5" />
               {promptGroupSubcategoryFilter !== 'all' && promptGroupCategoryFilter !== 'all' ? <>
                 <button type="button" onClick={returnToSubcategoryFolders} className="font-medium text-indigo-600 hover:text-indigo-800">{currentFolderName}</button>
                 <ChevronRight className="h-3.5 w-3.5" />
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
                   {subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.name || '待分类'}
                 </span>
-              </> : <span className="font-semibold text-slate-800">{currentFolderName}</span>}
+              </> : <span className="font-semibold text-slate-800 dark:text-slate-100">{currentFolderName}</span>}
             </nav>
             {!subcategoryFoldersVisible && <div className="flex flex-wrap items-center gap-2">
               {showLifecycleFilters && <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} items={items} />}
@@ -122,7 +122,7 @@ export function AssetPromptLibraryGrid({
         )}
         {folderRootVisible && isLoading && !items.length && !promptGroupCategories.length ? (
           <div className="flex flex-wrap gap-5 animate-pulse" aria-label="正在加载商品大类">
-            {[1, 2, 3].map(n => <div key={n} className="h-40 w-[164px] rounded-2xl bg-slate-100/70" />)}
+            {[1, 2, 3].map(n => <div key={n} className="h-40 w-[164px] rounded-2xl bg-slate-100/70 dark:bg-white/10" />)}
           </div>
         ) : folderRootVisible ? (
           <PromptGroupCategoryFolders
@@ -256,14 +256,14 @@ export function AssetPromptLibraryGrid({
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
             {[1, 2, 3, 4].map((n) => (
-              <div key={n} className="aspect-[3/4] bg-white/50 rounded-2xl" />
+              <div key={n} className="aspect-[3/4] bg-white/50 rounded-2xl dark:bg-[#18191c]/95" />
             ))}
           </div>
         ) : loadError ? null : (
           <div className="mx-auto flex min-h-[320px] w-full max-w-xl flex-col items-center justify-center px-6 py-16 text-center">
             <Layers className="w-10 h-10 text-slate-300 mx-auto mb-5" />
-            <h3 className="text-sm font-bold text-slate-700">{promptLibraryEmptyCopy(activeSubTab, isAnyFilterActive).title}</h3>
-            <p className="mt-2 text-balance text-sm leading-6 text-slate-500">{promptLibraryEmptyCopy(activeSubTab, isAnyFilterActive).body}</p>
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">{promptLibraryEmptyCopy(activeSubTab, isAnyFilterActive).title}</h3>
+            <p className="mt-2 text-balance text-sm leading-6 text-slate-500 dark:text-slate-400">{promptLibraryEmptyCopy(activeSubTab, isAnyFilterActive).body}</p>
             {isAnyFilterActive && (
               <button type="button" onClick={handleResetAllFilters} className="mt-6 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500">
                 清空筛选

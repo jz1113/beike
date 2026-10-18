@@ -17,10 +17,28 @@ interface VideoJobSnapshot {
 }
 
 const VIDEO_DOWNLOAD_LIMIT = 500;
+const DIRECTORY_STORAGE_KEY = 'beike_oss_video_directory';
 
 type Toast = (message: string) => void;
 
-export const VIDEO_CONCURRENCY_TIERS = [100] as const;
+function readRememberedDirectory() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return localStorage.getItem(DIRECTORY_STORAGE_KEY)?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+function rememberDirectory(directory: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (directory) localStorage.setItem(DIRECTORY_STORAGE_KEY, directory);
+    else localStorage.removeItem(DIRECTORY_STORAGE_KEY);
+  } catch {
+    // 记住路径失败不影响本次下载。
+  }
+}
 
 function clampConcurrency(value: number) {
   return value === 100 ? value : 100;
@@ -38,13 +56,15 @@ async function readApiBody<T>(response: Response): Promise<T> {
 }
 
 export function useVideoDownloadQueue(showToast: Toast) {
+  const rememberedDirectory = readRememberedDirectory();
   const [items, setItems] = useState<VideoDownloadItem[]>([]);
   const [concurrency, setConcurrencyState] = useState(100);
   const [running, setRunning] = useState(false);
-  const [folderName, setFolderName] = useState('');
-  const [directory, setDirectory] = useState('');
+  const [folderName, setFolderName] = useState(() => (rememberedDirectory ? folderLabel(rememberedDirectory) : ''));
+  const [directory, setDirectory] = useState(rememberedDirectory);
+  const [importEpoch, setImportEpoch] = useState(0);
   const itemsRef = useRef<VideoDownloadItem[]>([]);
-  const directoryRef = useRef('');
+  const directoryRef = useRef(rememberedDirectory);
   const jobRef = useRef('');
   const pausedRef = useRef(false);
   const runningRef = useRef(false);
@@ -66,7 +86,10 @@ export function useVideoDownloadQueue(showToast: Toast) {
   const importFile = async (file: File) => {
     if (runningRef.current) return;
     try {
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: false });
+      const isCsv = /\.csv$/i.test(file.name) || file.type.includes('csv');
+      const workbook = isCsv
+        ? XLSX.read((await file.text()).replace(/^\uFEFF/, ''), { type: 'string', raw: false })
+        : XLSX.read(await file.arrayBuffer(), { type: 'array', raw: false });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = sheet ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', raw: false }) : [];
       const parsed = parseVideoSheet(rows);
@@ -76,6 +99,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
       }
       const accepted = parsed.items.slice(0, VIDEO_DOWNLOAD_LIMIT).map((item) => ({ ...item, status: 'pending' as const }));
       replaceItems(accepted);
+      setImportEpoch((value) => value + 1);
       const omitted = parsed.items.length - accepted.length;
       showToast(omitted > 0 ? `已识别 ${accepted.length} 条，超出部分未加入` : `已识别 ${accepted.length} 条视频`);
     } catch (error) {
@@ -90,6 +114,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
       directoryRef.current = body.directory;
       setDirectory(body.directory);
       setFolderName(folderLabel(body.directory));
+      rememberDirectory(body.directory);
       return true;
     } catch (error) {
       const message = formatUserError(error);
@@ -120,7 +145,10 @@ export function useVideoDownloadQueue(showToast: Toast) {
       showToast('请先导入含标题和视频链接的表格');
       return;
     }
-    if (!directoryRef.current && !await pickFolder()) return;
+    if (!directoryRef.current) {
+      showToast('请先选择保存文件夹');
+      return;
+    }
     const selected = source.filter((item) => item.status === 'pending' || (retryFailed && item.status === 'failed'));
     if (!selected.length) {
       showToast(retryFailed ? '没有失败项需要重试' : '没有待下载的视频');
@@ -152,7 +180,16 @@ export function useVideoDownloadQueue(showToast: Toast) {
         showToast(failed ? `下载结束：成功 ${success}，失败 ${failed}` : `已下载 ${success} 个视频到「${folderLabel(directoryRef.current)}」`);
       }
     } catch (error) {
-      if (!pausedRef.current) showToast(formatUserError(error));
+      if (!pausedRef.current) {
+        const message = formatUserError(error);
+        if (message.includes('保存文件夹不存在') || message.includes('请选择本机文件夹')) {
+          directoryRef.current = '';
+          setDirectory('');
+          setFolderName('');
+          rememberDirectory('');
+        }
+        showToast(message);
+      }
     } finally {
       runningRef.current = false;
       setRunning(false);
@@ -172,9 +209,6 @@ export function useVideoDownloadQueue(showToast: Toast) {
 
   const clearItems = () => {
     if (runningRef.current) void pause();
-    directoryRef.current = '';
-    setDirectory('');
-    setFolderName('');
     replaceItems([]);
   };
 
@@ -186,6 +220,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
     folderName,
     directory,
     importFile,
+    importEpoch,
     pickFolder,
     start,
     pause,

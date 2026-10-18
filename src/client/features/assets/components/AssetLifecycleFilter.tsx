@@ -21,7 +21,7 @@ export function AssetLifecycleFilter({
           type="button"
           aria-pressed={value === option.id}
           onClick={() => onChange(option.id)}
-          className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${value === option.id ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}
+          className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${value === option.id ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500 dark:text-slate-400 dark:bg-white/10'}`}
         >
           {option.label} <span className="ml-1 opacity-60">{option.id === 'all' ? items.length : items.filter((item) => (item.registry?.status || item.lifecycleStatus) === option.id).length}</span>
         </button>

@@ -34,13 +34,13 @@ function StripEmptyUpload({
     <button
       type="button"
       onClick={onClick}
-      className="w-full min-h-[72px] rounded-2xl bg-[#F2F4F7] hover:bg-[#EAECEF] border border-slate-200/60 hover:border-slate-300/80 text-slate-400 hover:text-slate-600 flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer group/upload shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-xs"
+      className="w-full min-h-[72px] rounded-2xl bg-[#F2F4F7] hover:bg-[#EAECEF] border border-slate-200/60 hover:border-slate-300/80 text-slate-400 hover:text-slate-600 flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer group/upload shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-xs dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200"
       title={title}
     >
-      <div className="w-8 h-8 rounded-xl bg-white/90 border border-slate-200/80 flex items-center justify-center shadow-2xs group-hover/upload:scale-105 transition-transform">
-        <Plus className="w-4.5 h-4.5 text-[#98A2B3] group-hover/upload:text-slate-700 stroke-[1.6]" />
+      <div className="w-8 h-8 rounded-xl bg-white/90 border border-slate-200/80 flex items-center justify-center shadow-2xs group-hover/upload:scale-105 transition-transform dark:border-white/15 dark:bg-white/10">
+        <Plus className="w-4.5 h-4.5 text-[#98A2B3] group-hover/upload:text-slate-700 stroke-[1.6] dark:text-slate-300 dark:group-hover/upload:text-slate-100" />
       </div>
-      <span className="text-xs font-semibold text-slate-500 group-hover/upload:text-slate-700">{label}</span>
+      <span className="text-xs font-semibold text-slate-500 group-hover/upload:text-slate-700 dark:text-slate-400">{label}</span>
     </button>
   );
 }
@@ -146,7 +146,7 @@ export default function PromptBarRefMediaPanel({
           className="w-full select-none pt-2 pb-3 px-1 space-y-2.5 animate-fade-in"
         >
           {/* 顶部栏：分类 Tab + 清空全部素材 + 收起图标按钮 */}
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100/80 pb-2">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100/80 pb-2 dark:border-white/10">
             {/* 左侧 Tab 列表 */}
             <div className="flex items-center gap-1 sm:gap-1.5">
               <button
@@ -154,8 +154,8 @@ export default function PromptBarRefMediaPanel({
                 onClick={() => setActiveMediaTab('all')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeMediaTab === 'all'
-                    ? 'bg-slate-100 text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-100 text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
                 }`}
               >
                 全部 ({mediaStats.all})
@@ -165,8 +165,8 @@ export default function PromptBarRefMediaPanel({
                 onClick={() => setActiveMediaTab('image')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeMediaTab === 'image'
-                    ? 'bg-slate-100 text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-100 text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
                 }`}
               >
                 图片 ({mediaStats.image})
@@ -176,8 +176,8 @@ export default function PromptBarRefMediaPanel({
                 onClick={() => setActiveMediaTab('video')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeMediaTab === 'video'
-                    ? 'bg-slate-100 text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-100 text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
                 }`}
               >
                 视频{mediaStats.video > 0 ? ` (${mediaStats.video})` : ''}
@@ -187,8 +187,8 @@ export default function PromptBarRefMediaPanel({
                 onClick={() => setActiveMediaTab('audio')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeMediaTab === 'audio'
-                    ? 'bg-slate-100 text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-100 text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-white/10'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
                 }`}
               >
                 音频
@@ -208,7 +208,7 @@ export default function PromptBarRefMediaPanel({
               <button
                 type="button"
                 onClick={() => setIsExpandedRefImages(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-all cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-all cursor-pointer dark:hover:text-slate-100 dark:hover:bg-white/10"
                 title="收起素材卡片"
               >
                 <Minimize2 className="w-4 h-4 stroke-[2.2]" />
@@ -231,7 +231,7 @@ export default function PromptBarRefMediaPanel({
                       currentIndex: idx,
                     });
                   }}
-                  className="relative group/card flex-shrink-0 w-16 h-20 sm:w-18 sm:h-22 rounded-xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden transition-all duration-200 hover:scale-105 hover:shadow-md cursor-zoom-in active:scale-98"
+                  className="relative group/card flex-shrink-0 w-16 h-20 sm:w-18 sm:h-22 rounded-xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden transition-all duration-200 hover:scale-105 hover:shadow-md cursor-zoom-in active:scale-98 dark:border-white/15 dark:bg-[#222328]"
                   title="点击放大查看素材"
                 >
                   <RefMediaThumb
@@ -271,14 +271,14 @@ export default function PromptBarRefMediaPanel({
             <button
               type="button"
               onClick={onUploadClick}
-              className="w-16 h-20 sm:w-18 sm:h-22 rounded-xl bg-white hover:bg-slate-50 border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] p-1 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 group/add"
+              className="w-16 h-20 sm:w-18 sm:h-22 rounded-xl bg-white hover:bg-slate-50 border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] p-1 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 group/add dark:border-white/15 dark:bg-[#222328] dark:hover:bg-[#2a2b30]"
               title="添加更多参考素材"
             >
-              <div className="w-full h-full rounded-lg border border-dashed border-slate-200/90 group-hover/add:border-slate-300 bg-slate-50/50 group-hover/add:bg-slate-100/70 flex flex-col items-center justify-center gap-1 transition-colors">
-                <div className="w-6 h-6 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/add:text-slate-800 group-hover/add:border-slate-300 transition-all">
+              <div className="w-full h-full rounded-lg border border-dashed border-slate-200/90 group-hover/add:border-slate-300 bg-slate-50/50 group-hover/add:bg-slate-100/70 flex flex-col items-center justify-center gap-1 transition-colors dark:border-white/15 dark:bg-white/[0.04] dark:group-hover/add:border-white/30 dark:group-hover/add:bg-white/[0.08]">
+                <div className="w-6 h-6 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/add:text-slate-800 group-hover/add:border-slate-300 transition-all dark:border-white/15 dark:bg-white/10 dark:text-slate-100 dark:group-hover/add:border-white/30 dark:group-hover/add:text-white">
                   <Plus className="w-3.5 h-3.5 stroke-[2.2] group-hover/add:rotate-90 transition-transform duration-300" />
                 </div>
-                <span className="text-[10px] font-medium text-slate-400 group-hover/add:text-slate-600 transition-colors">
+                <span className="text-[10px] font-medium text-slate-400 group-hover/add:text-slate-600 transition-colors dark:text-slate-400 dark:group-hover/add:text-slate-200">
                   添加
                 </span>
               </div>

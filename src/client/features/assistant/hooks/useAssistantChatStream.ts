@@ -361,7 +361,7 @@ export function useAssistantChatStream({
       });
       setLivePendingApprovals([]);
 
-      recordAssistantChatUsage(allMsgs, accumulated, modelUsed);
+      recordAssistantChatUsage(modelUsed, finalState.usage);
 
       useAppStore.getState().persistAssistantNow();
     } catch (err: any) {

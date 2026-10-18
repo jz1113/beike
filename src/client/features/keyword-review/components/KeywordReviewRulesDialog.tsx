@@ -65,8 +65,8 @@ interface Props {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-xs font-bold tracking-[0.08em] text-slate-700">{title}</h3>
-      <div className="mt-2 space-y-1.5 text-sm leading-6 text-slate-700">{children}</div>
+      <h3 className="text-xs font-bold tracking-[0.08em] text-slate-700 dark:text-slate-200">{title}</h3>
+      <div className="mt-2 space-y-1.5 text-sm leading-6 text-slate-700 dark:text-slate-200">{children}</div>
     </section>
   );
 }
@@ -77,18 +77,18 @@ export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/15 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="keyword-review-rules-title" aria-describedby="keyword-review-rules-description" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[820px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] outline-none" onMouseDown={(event) => event.stopPropagation()}>
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="keyword-review-rules-title" aria-describedby="keyword-review-rules-description" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[820px] flex-col overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] outline-none dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]" onMouseDown={(event) => event.stopPropagation()}>
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6 dark:border-white/10">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100">
               <BookOpen className="h-4 w-4 text-amber-600" />
             </span>
             <div>
               <h2 id="keyword-review-rules-title" tabIndex={-1} data-dialog-initial-focus className="text-sm font-black tracking-tight outline-none">{mode === 'video' ? '视频关键词审核规则' : '图文关键词审核规则'}</h2>
-              <p id="keyword-review-rules-description" className="mt-0.5 text-xs text-slate-600">{mode === 'video' ? '保留视频原表全部列，新增最终垂类、制作判断与低价值标记' : '保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面'}</p>
+              <p id="keyword-review-rules-description" className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{mode === 'video' ? '保留视频原表全部列，新增最终垂类、制作判断与低价值标记' : '保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面'}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="关闭审核规则" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10">
             <X className="h-5 w-5" />
           </button>
         </header>
@@ -99,7 +99,7 @@ export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
               <p>识别「序号、query、相关拓展q、分类、需上传数量、已上传数量、下发时间」。原列原值保留；旧「分类」只作参考，不作为最终垂类。审核结果增加「最终垂类、垂类依据、是否可制作、不制作依据、低价值关键词」。</p>
             </Section>
             <Section title={`允许垂类 · ${KEYWORD_VIDEO_CATEGORIES.length}`}>
-              <div className="flex flex-wrap gap-1.5">{KEYWORD_VIDEO_CATEGORIES.map((category) => <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{category}</span>)}</div>
+              <div className="flex flex-wrap gap-1.5">{KEYWORD_VIDEO_CATEGORIES.map((category) => <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:bg-white/10">{category}</span>)}</div>
               <p className="pt-2">按完整语义归唯一垂类。狗狗日常健康、猫猫喂养及宠物基础护理归「动物」；电影、电视剧、动漫、漫画、综艺、小说分别归类。仅确实无法对应时用「其他」。</p>
             </Section>
             <Section title="低价值 · 标记是并判不制作">
@@ -121,15 +121,15 @@ export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
           <Section title="允许垂类 · 34">
             <div className="flex flex-wrap gap-1.5">
               {KEYWORD_REVIEW_CATEGORIES.map((category) => (
-                <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{category}</span>
+                <span key={category} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:bg-white/10">{category}</span>
               ))}
             </div>
             <ul className="mt-3 list-disc space-y-1.5 pl-5">
               {VERTICAL_BOUNDARIES.map((item) => <li key={item}>{item}</li>)}
             </ul>
-            <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">
+            <div className="mt-3 overflow-hidden rounded-xl border border-slate-100 dark:border-white/10">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-700">
+                <thead className="bg-slate-50 text-slate-700 dark:text-slate-200 dark:bg-white/5">
                   <tr>
                     <th className="px-3 py-2 font-bold">Query</th>
                     <th className="px-3 py-2 font-bold">最终垂类</th>
@@ -138,10 +138,10 @@ export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
                 </thead>
                 <tbody>
                   {VERTICAL_EXAMPLES.map((row) => (
-                    <tr key={row.query} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-semibold text-slate-800">{row.query}</td>
-                      <td className="px-3 py-2 font-bold text-slate-700">{row.category}</td>
-                      <td className="px-3 py-2 text-slate-700">{row.reason}</td>
+                    <tr key={row.query} className="border-t border-slate-100 dark:border-white/10">
+                      <td className="px-3 py-2 font-semibold text-slate-800 dark:text-slate-100">{row.query}</td>
+                      <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-200">{row.category}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-200">{row.reason}</td>
                     </tr>
                   ))}
                 </tbody>

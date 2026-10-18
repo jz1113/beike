@@ -57,7 +57,7 @@ export default function PromptBarModeSelector({
         <div
           className={`absolute left-0 ${
             isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-          } w-44 rounded-2xl bg-white border border-slate-200/90 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-1.5 z-50 animate-fade-in text-left space-y-0.5 select-none`}
+          } w-44 rounded-2xl bg-white dark:bg-[#18191c]/95 dark:backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-1.5 z-50 animate-fade-in text-left space-y-0.5 select-none text-slate-900 dark:text-slate-100`}
         >
           {/* 1. Agent 模式 */}
           <button
@@ -65,13 +65,13 @@ export default function PromptBarModeSelector({
             onClick={() => onSelectMode('agent')}
             className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
               quickGenMode === 'agent'
-                ? 'bg-slate-100/90 text-slate-950 font-semibold'
-                : 'text-slate-800 hover:bg-slate-50'
+                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
+                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
             }`}
           >
-            <span className="text-[13.5px] font-medium text-slate-900">Agent模式</span>
+            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">Agent模式</span>
             {quickGenMode === 'agent' && (
-              <Check className="w-4 h-4 text-slate-900 stroke-[2.2]" />
+              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
             )}
           </button>
 
@@ -81,13 +81,13 @@ export default function PromptBarModeSelector({
             onClick={() => onSelectMode('video')}
             className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
               quickGenMode === 'video'
-                ? 'bg-slate-100/90 text-slate-950 font-semibold'
-                : 'text-slate-800 hover:bg-slate-50'
+                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
+                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
             }`}
           >
-            <span className="text-[13.5px] font-medium text-slate-900">视频生成</span>
+            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">视频生成</span>
             {quickGenMode === 'video' && (
-              <Check className="w-4 h-4 text-slate-900 stroke-[2.2]" />
+              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
             )}
           </button>
 
@@ -97,13 +97,13 @@ export default function PromptBarModeSelector({
             onClick={() => onSelectMode('image')}
             className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
               quickGenMode === 'image'
-                ? 'bg-slate-100/90 text-slate-950 font-semibold'
-                : 'text-slate-800 hover:bg-slate-50'
+                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
+                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
             }`}
           >
-            <span className="text-[13.5px] font-medium text-slate-900">图片生成</span>
+            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">图片生成</span>
             {quickGenMode === 'image' && (
-              <Check className="w-4 h-4 text-slate-900 stroke-[2.2]" />
+              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
             )}
           </button>
 
@@ -113,13 +113,13 @@ export default function PromptBarModeSelector({
             onClick={() => onSelectMode('audio')}
             className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
               quickGenMode === 'audio'
-                ? 'bg-slate-100/90 text-slate-950 font-semibold'
-                : 'text-slate-800 hover:bg-slate-50'
+                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
+                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
             }`}
           >
-            <span className="text-[13.5px] font-medium text-slate-900">音频生成</span>
+            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">音频生成</span>
             {quickGenMode === 'audio' && (
-              <Check className="w-4 h-4 text-slate-900 stroke-[2.2]" />
+              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
             )}
           </button>
         </div>

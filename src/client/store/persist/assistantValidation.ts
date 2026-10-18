@@ -62,7 +62,7 @@ export function normalizeAssistantSessions(value: unknown): AssistantSession[] {
         toolActivity: Array.isArray(message.toolActivity) ? message.toolActivity.filter(isRecord).map((activity) => ({
           name: typeof activity.name === 'string' ? activity.name : '',
           displayName: typeof activity.displayName === 'string' ? activity.displayName : '',
-          status: activity.status === 'running' || activity.status === 'done' ? activity.status : 'error',
+          status: activity.status === 'running' || activity.status === 'done' || activity.status === 'declined' || activity.status === 'cancelled' ? activity.status : 'error',
           detail: typeof activity.detail === 'string' ? activity.detail : undefined,
           action: isRecord(activity.action) ? activity.action : undefined,
           visualImages: Array.isArray(activity.visualImages) ? activity.visualImages.filter(isRecord)

@@ -29,6 +29,12 @@ import type { UsageLogItem } from './usageLog';
 export type { UsageLogItem } from './usageLog';
 
 const STORAGE_KEY = 'app_real_usage_logs';
+export const USAGE_LOG_EVENT = 'beike-usage-updated';
+
+function notifyUsageLogs(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(USAGE_LOG_EVENT));
+}
 
 /**
  * 🌟 根据本地参考单价估算调用成本 ($USD)；实际扣费以网关账单为准。
@@ -40,7 +46,7 @@ const STORAGE_KEY = 'app_real_usage_logs';
  */
 export function estimateModelCost(
   modelId: string,
-  type: 'image' | 'video' | 'chat' | 'vision' | 'distill',
+  type: 'image' | 'video' | 'chat' | 'vision' | 'distill' | 'audio',
   params: { promptTokens?: number; completionTokens?: number; totalTokens?: number; mediaCount?: number; duration?: number }
 ): number {
   const m = modelId.toLowerCase().trim();
@@ -144,6 +150,7 @@ function safeSaveUsageLogs(logs: UsageLogItem[]): void {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(targetList));
+      notifyUsageLogs();
       return;
     } catch (e: any) {
       const isQuota =
@@ -181,6 +188,22 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
   if (typeof window !== 'undefined') {
     try {
       const logs = getUsageLogs();
+      const promptTokens = item.promptTokens || 0;
+      const completionTokens = item.completionTokens || 0;
+      const totalTokens = item.totalTokens || (promptTokens + completionTokens) || 0;
+      const taskId = item.taskId?.trim();
+      if (taskId) {
+        const existing = logs.find(log => log.taskId === taskId);
+        if (existing) {
+          if (totalTokens > 0 && !(existing.totalTokens || 0)) {
+            existing.promptTokens = promptTokens;
+            existing.completionTokens = completionTokens;
+            existing.totalTokens = totalTokens;
+            safeSaveUsageLogs(logs);
+          }
+          return;
+        }
+      }
       const calculatedCostUsd = item.costUsd !== undefined
         ? item.costUsd
         : estimateModelCost(item.modelId, item.type, {
@@ -201,13 +224,14 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
       const newLog: UsageLogItem = {
         id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         timestamp: item.timestamp ?? Date.now(),
+        ...(taskId ? { taskId } : {}),
         modelId: item.modelId,
         modelName: item.modelName || item.modelId,
         provider: vendor,
         type: item.type,
-        promptTokens: item.promptTokens || 0,
-        completionTokens: item.completionTokens || 0,
-        totalTokens: item.totalTokens || ((item.promptTokens || 0) + (item.completionTokens || 0)) || 0,
+        promptTokens,
+        completionTokens,
+        totalTokens,
         mediaCount: item.mediaCount ?? ((item.type === 'image' || item.type === 'video') && item.success !== false ? 1 : 0),
         costUsd,
         costRmb,
@@ -227,6 +251,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
 export function clearUsageLogs(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
+  notifyUsageLogs();
 }
 
 export { type UsageSummary, type UsageRange } from './usageSummary';

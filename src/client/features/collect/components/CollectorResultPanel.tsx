@@ -45,20 +45,20 @@ export default function CollectorResultPanel({
         aria-hidden={hasPreview}
         aria-labelledby="collector-result-title"
         tabIndex={-1}
-        className="relative w-full max-w-4xl max-h-[90dvh] rounded-3xl bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden text-left p-4 sm:p-6 space-y-4"
+        className="relative w-full max-w-4xl max-h-[90dvh] rounded-3xl bg-white/95 dark:bg-[#18181B]/95 border border-slate-200/90 dark:border-white/10 shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden text-left p-4 sm:p-6 space-y-4"
       >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-white/5">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <img
               src={displayMediaSrc(inspectingItem.coverImage || inspectingItem.images?.[0]) || inspectingItem.coverImage || inspectingItem.images?.[0] || undefined}
               alt=""
               referrerPolicy="no-referrer"
               onError={(e) => handleImgError(e, inspectingItem.coverImage || inspectingItem.images?.[0])}
-              className="w-12 h-12 shrink-0 rounded-xl object-cover border border-slate-200"
+              className="w-12 h-12 shrink-0 rounded-xl object-cover border border-slate-200/80 dark:border-white/10"
             />
             <div className="min-w-0">
-              <h3 id="collector-result-title" className="font-bold text-base text-slate-900 break-words whitespace-normal leading-snug">{inspectingItem.title}</h3>
-              <p className="text-xs text-slate-400">共 {mediaAssetCount(inspectingItem)} 项素材{videos.length ? `（含 ${videos.length} 条视频/动态）` : ''}</p>
+              <h3 id="collector-result-title" className="font-bold text-base text-slate-900 dark:text-white break-words whitespace-normal leading-snug">{inspectingItem.title}</h3>
+              <p className="text-xs text-slate-400 dark:text-slate-500">共 {mediaAssetCount(inspectingItem)} 项素材{videos.length ? `（含 ${videos.length} 条视频/动态）` : ''}</p>
             </div>
           </div>
 
@@ -90,7 +90,7 @@ export default function CollectorResultPanel({
               type="button"
               onClick={() => setInspectingItem(null)}
               aria-label="关闭素材详情"
-              className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              className="w-8 h-8 rounded-xl text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -125,7 +125,7 @@ export default function CollectorResultPanel({
               key={`${u}-${idx}`}
               aria-label={`预览第 ${idx + 1} 张素材`}
               onClick={() => setPreviewImageUrl(u)}
-              className="group relative aspect-square rounded-2xl overflow-hidden border border-slate-200 hover:border-blue-400 cursor-pointer transition-all bg-slate-100"
+              className="group relative aspect-square rounded-2xl overflow-hidden border border-slate-200 hover:border-blue-400 cursor-pointer transition-all bg-slate-100 dark:bg-white/10 dark:border-white/10"
             >
               <img
                 src={displayMediaSrc(u) || u}

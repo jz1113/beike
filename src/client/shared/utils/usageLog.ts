@@ -1,10 +1,11 @@
 export interface UsageLogItem {
   id: string;
   timestamp: number; // Date.now()
+  taskId?: string;
   modelId: string;
   modelName: string;
   provider: string;
-  type: 'image' | 'video' | 'chat' | 'vision' | 'distill';
+  type: 'image' | 'video' | 'chat' | 'vision' | 'distill' | 'audio';
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;

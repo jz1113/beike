@@ -1,0 +1,105 @@
+import { colorPresets } from './palette';
+import { colorField, grouped, selectField, slider, switchField, type StudioSchema } from './types';
+
+export const particlesSchema: StudioSchema = {
+  fields: [
+    ...grouped('appearance', [
+      colorField('color', '颜色'),
+      colorField('colorAlt', '辅色'),
+      selectField('shape', '形状', [
+        { id: 'circle', label: '圆形' },
+        { id: 'square', label: '方形' },
+        { id: 'ring', label: '圆环' },
+        { id: 'sparkle', label: '星点' },
+      ]),
+      slider('glow', '辉光', 0, 2, 0.05),
+      slider('opacity', '不透明度', 0, 1, 0.01),
+      switchField('alphaParticles', '柔和粒子'),
+    ]),
+    ...grouped('layout', [
+      slider('particleCount', '数量', 20, 600, 10),
+      slider('particleSpread', '扩散', 1, 30, 0.5),
+      slider('particleBaseSize', '大小', 20, 300, 1),
+      slider('sizeRandomness', '大小随机', 0, 2, 0.05),
+      slider('cameraDistance', '相机距离', 5, 50, 1),
+    ]),
+    ...grouped('motion', [
+      slider('speed', '速度', 0, 2, 0.05),
+      selectField('drift', '漂移', [
+        { id: 'none', label: '无' },
+        { id: 'up', label: '向上' },
+        { id: 'down', label: '向下' },
+        { id: 'forward', label: '向前' },
+      ]),
+      slider('driftSpeed', '漂移速度', 0, 3, 0.05),
+      selectField('hoverEffect', '悬停效果', [
+        { id: 'parallax', label: '视差' },
+        { id: 'repel', label: '排斥' },
+        { id: 'attract', label: '吸引' },
+      ]),
+      slider('particleHoverFactor', '悬停系数', 0, 3, 0.05),
+      slider('hoverRadius', '悬停半径', 20, 300, 1),
+      slider('connectionDistance', '连线距离', 20, 240, 1),
+      switchField('connections', '连线'),
+      switchField('moveParticlesOnHover', '悬停移动'),
+      switchField('clickBurst', '点击迸发'),
+      switchField('intro', '入场动画'),
+    ]),
+    ...grouped('advanced', [
+      slider('twinkle', '闪烁', 0, 1, 0.01),
+      slider('depthOfField', '景深', 0, 1, 0.01),
+      slider('variation', '变化', 0, 1, 0.01),
+      switchField('disableRotation', '禁用旋转'),
+    ]),
+  ],
+  defaults: {
+    color: '#38bdf8',
+    colorAlt: '#e2e8f0',
+    shape: 'circle',
+    particleCount: 120,
+    particleSpread: 10,
+    particleBaseSize: 100,
+    sizeRandomness: 1,
+    speed: 0.35,
+    glow: 0.5,
+    twinkle: 0.3,
+    depthOfField: 0,
+    drift: 'none',
+    driftSpeed: 1,
+    connectionDistance: 110,
+    hoverEffect: 'parallax',
+    particleHoverFactor: 1,
+    hoverRadius: 140,
+    cameraDistance: 20,
+    variation: 0,
+    opacity: 0.9,
+    connections: true,
+    moveParticlesOnHover: true,
+    clickBurst: true,
+    alphaParticles: false,
+    disableRotation: false,
+    intro: true,
+  },
+  presets: colorPresets({ accent: 'color', main: 'colorAlt' }, {
+    amethyst: {
+      label: '紫晶迸发',
+      values: { particleCount: 220, speed: 0.9, glow: 1.1, clickBurst: true, particleBaseSize: 80 },
+    },
+    glacier: {
+      label: '冰川飘雪',
+      values: { drift: 'down', driftSpeed: 0.6, speed: 0.15, particleCount: 160, alphaParticles: true, glow: 0.3 },
+    },
+    copper: {
+      label: '铜橙连线',
+      values: { connections: true, connectionDistance: 160, particleCount: 90, hoverEffect: 'attract', glow: 0.7 },
+    },
+    graphite: {
+      label: '石墨稀疏',
+      values: { particleCount: 40, glow: 0.1, connections: false, opacity: 0.45, speed: 0.1, clickBurst: false },
+    },
+    halo: {
+      label: '光晕闪烁',
+      values: { shape: 'sparkle', glow: 1.5, twinkle: 0.8, particleBaseSize: 140, opacity: 0.8 },
+    },
+  }),
+};

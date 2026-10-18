@@ -1,31 +1,6 @@
 import { useRef, useState } from 'react';
 import { Camera, Download, Lock, Pencil, RefreshCw, Sparkles, Wallet } from 'lucide-react';
-
-const STORAGE_KEY = 'beike_creator_profile';
-const DEFAULT_PROFILE = { name: '创作者', signature: '把灵感，变成看得见的作品。' };
-
-interface CreatorProfile {
-  name: string;
-  signature: string;
-  avatar?: string;
-}
-
-function readProfile(): CreatorProfile {
-  if (typeof window === 'undefined') return DEFAULT_PROFILE;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
-    if (!parsed || typeof parsed !== 'object') return DEFAULT_PROFILE;
-    const name = typeof parsed.name === 'string' ? parsed.name.trim().slice(0, 24) : '';
-    const signature = typeof parsed.signature === 'string' ? parsed.signature.trim().slice(0, 48) : '';
-    return {
-      name: name || DEFAULT_PROFILE.name,
-      signature: signature || DEFAULT_PROFILE.signature,
-      avatar: typeof parsed.avatar === 'string' ? parsed.avatar : undefined,
-    };
-  } catch {
-    return DEFAULT_PROFILE;
-  }
-}
+import { DEFAULT_CREATOR_PROFILE, useCreatorProfile } from '../hooks/useCreatorProfile';
 
 async function readAvatar(file: File) {
   const bitmap = await createImageBitmap(file);
@@ -69,14 +44,10 @@ export function CreatorProfileHeader({
   onToggleGateway?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [profile, setProfile] = useState<CreatorProfile>(readProfile);
+  const { profile, saveProfile } = useCreatorProfile();
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(profile.name);
   const [draftSignature, setDraftSignature] = useState(profile.signature);
-  const saveProfile = (next: CreatorProfile) => {
-    setProfile(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
   const badge = imageCount + videoCount > 0
     ? `已留下 ${imageCount.toLocaleString()} 张图片、${videoCount.toLocaleString()} 支视频`
     : '灵感，从第一件作品开始';
@@ -128,7 +99,7 @@ export function CreatorProfileHeader({
           className="settings-creator-edit"
           onSubmit={(event) => {
             event.preventDefault();
-            saveProfile({ ...profile, name: draftName.trim() || DEFAULT_PROFILE.name, signature: draftSignature.trim() || DEFAULT_PROFILE.signature });
+            saveProfile({ ...profile, name: draftName.trim() || DEFAULT_CREATOR_PROFILE.name, signature: draftSignature.trim() || DEFAULT_CREATOR_PROFILE.signature });
             setEditing(false);
           }}
         >

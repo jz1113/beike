@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/system"
@@ -39,13 +40,17 @@ func extractStyle(cfg config.Config, w http.ResponseWriter, r *http.Request, pay
 			content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": text}})
 		}
 	}
-	text, status, err := styleChat(r.Context(), base, key, model, content)
+	text, status, usage, err := styleChat(r.Context(), base, key, model, content)
 	if err != nil || status >= 300 || text == "" {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "风格架构提炼失败，请重试"})
 		return
 	}
 	recipe := styleRecipe(text, images)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "recipe": recipe})
+	body := map[string]any{"success": true, "recipe": recipe, "model": model}
+	if usage != nil {
+		body["usage"] = usage
+	}
+	httpx.WriteJSON(w, http.StatusOK, body)
 }
 
 func styleCredentials(cfg config.Config, r *http.Request, payload map[string]any) (string, string, string) {
@@ -76,7 +81,7 @@ func styleCredentials(cfg config.Config, r *http.Request, payload map[string]any
 	return system.NormalizeGatewayBaseURL(base), key, model
 }
 
-func styleChat(ctx context.Context, base, key, model string, content []any) (string, int, error) {
+func styleChat(ctx context.Context, base, key, model string, content []any) (string, int, map[string]any, error) {
 	body := map[string]any{
 		"model": model, "temperature": 0.4,
 		"messages": []any{map[string]any{"role": "user", "content": content}},
@@ -89,13 +94,13 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, strings.TrimRight(base, "/")+"/v1/chat/completions", bytes.NewReader(encoded))
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+key)
 	response, err := styleHTTP().Do(request)
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
@@ -103,12 +108,12 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	_ = json.Unmarshal(raw, &data)
 	choices, _ := data["choices"].([]any)
 	if len(choices) == 0 {
-		return "", response.StatusCode, nil
+		return "", response.StatusCode, nil, nil
 	}
 	choice, _ := choices[0].(map[string]any)
 	message, _ := choice["message"].(map[string]any)
 	text, _ := message["content"].(string)
-	return strings.TrimSpace(text), response.StatusCode, nil
+	return strings.TrimSpace(text), response.StatusCode, generate.NormalizeUsage(data), nil
 }
 
 func stylePrompt(hint string, count int) string {

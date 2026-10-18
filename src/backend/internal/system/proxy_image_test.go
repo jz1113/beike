@@ -50,3 +50,13 @@ func TestProxyImageRequiresURLAndAllowlist(t *testing.T) {
 		t.Fatalf("auth %d", response.Code)
 	}
 }
+
+func TestProxyImageAllowsAnyRoutesHost(t *testing.T) {
+	cfg := config.Config{AccessToken: "secret", Root: repoRoot(t)}
+	if !proxyHostAllowed(cfg, "files.anyroutes.cn") {
+		t.Fatal("expected files.anyroutes.cn to be allowed by allowlist")
+	}
+	if !proxyHostAllowed(cfg, "cdn.anyroutes.com") {
+		t.Fatal("expected cdn.anyroutes.com to be allowed by allowlist")
+	}
+}

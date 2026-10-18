@@ -31,7 +31,7 @@ export function CanvasVideoControls({ config, model, onChange }: { config: Confi
     { id: 'count', label: '视频数量', value: `${config.count} 个` },
   ];
   return <>
-    {items.map(item => <button key={item.id} type="button" data-video-control aria-label={item.label} aria-expanded={panel === item.id} aria-haspopup="dialog" onClick={event => { anchor.current = event.currentTarget; setPanel(panel === item.id ? null : item.id); }} className={`flex h-8 shrink-0 items-center whitespace-nowrap rounded-md px-2 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-slate-400 ${panel === item.id ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100'}`}>
+    {items.map(item => <button key={item.id} type="button" data-video-control aria-label={item.label} aria-expanded={panel === item.id} aria-haspopup="dialog" onClick={event => { anchor.current = event.currentTarget; setPanel(panel === item.id ? null : item.id); }} className={`flex h-8 shrink-0 items-center whitespace-nowrap rounded-md px-2 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-slate-400 ${panel === item.id ? 'bg-slate-100 text-slate-900 dark:text-slate-100 dark:bg-white/10' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'}`}>
       {item.value}
     </button>)}
     {panel && <CanvasVideoPopover key={panel} anchor={anchor} width={panel === 'aspect' ? 312 : panel === 'reference' ? 280 : panel === 'count' ? 176 : 136}><div data-video-control>

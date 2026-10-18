@@ -28,11 +28,11 @@ export function BatchHistoryRecord({ batch, disabled, onView }: {
   batch: WorkshopBatchSummary; disabled: boolean; onView: () => void;
 }) {
   return <button type="button" disabled={disabled} onClick={onView} aria-label={`查看 ${batch.name}`}
-    className="group flex w-full min-w-0 items-center gap-3 rounded-xl border border-white/80 bg-white/65 p-4 shadow-[0_2px_12px_-8px_rgba(15,23,42,0.15)] text-left transition-colors hover:border-indigo-200 hover:bg-white focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-40">
+    className="group flex w-full min-w-0 items-center gap-3 rounded-xl border border-white/80 bg-white/65 p-4 shadow-[0_2px_12px_-8px_rgba(15,23,42,0.15)] text-left transition-colors hover:border-indigo-200 hover:bg-white focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-40 dark:hover:bg-white/10 dark:bg-[#18191c]/95">
     <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-center gap-2">
-        <h3 className="truncate text-sm font-semibold text-slate-900" title={batch.name}>{batch.name}</h3>
-        <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-[11px] text-slate-600">{batchHistoryStatus(batch)}</span>
+        <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100" title={batch.name}>{batch.name}</h3>
+        <span className="shrink-0 rounded-full bg-slate-100/80 px-2 py-0.5 text-[11px] text-slate-600 dark:text-slate-300 dark:bg-white/10">{batchHistoryStatus(batch)}</span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-slate-400">
         <span>{formatBatchHistoryDate(batch.updatedAt)}</span><span aria-hidden="true">·</span>
@@ -48,10 +48,10 @@ export function BatchHistoryStats({ batch }: { batch: WorkshopBatch }) {
   const tasks = items.flatMap(item => item.tasks).filter(task => task.resultStatus !== 'superseded');
   const stats = [[items.length, '商品'], [tasks.filter(isUsableWorkshopResult).length, '已成图'],
     [items.filter(hasCompletedCopy).length, '文案完成'], [tasks.filter(task => task.status === 'FAILURE').length, '失败分镜']] as const;
-  return <dl className="mt-4 grid grid-cols-4 gap-1 rounded-xl bg-slate-50 px-2 py-3 text-center">
+  return <dl className="mt-4 grid grid-cols-4 gap-1 rounded-xl bg-slate-50 px-2 py-3 text-center dark:bg-white/5">
     {stats.map(([count, label]) => <div key={label} className="min-w-0">
-      <dt className="text-[11px] text-slate-500">{label}</dt>
-      <dd className={`mt-1 text-xl font-bold ${label === '失败分镜' && count > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{count}</dd>
+      <dt className="text-[11px] text-slate-500 dark:text-slate-400">{label}</dt>
+      <dd className={`mt-1 text-xl font-bold ${label === '失败分镜' && count > 0 ? 'text-rose-600' : 'text-slate-800 dark:text-slate-100'}`}>{count}</dd>
     </div>)}
   </dl>;
 }
@@ -65,15 +65,15 @@ export function BatchHistoryProduct({ item, index }: { item: HistoryProduct; ind
   const title = item.title?.trim() || `商品 ${item.itemId || index + 1}`;
   return <li className="flex min-w-0 items-start gap-3 py-4">
     {/* LazyProxyImage owns a full-size wrapper; constrain that wrapper, not only its img. */}
-    <div data-history-thumbnail className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
+    <div data-history-thumbnail className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50 dark:bg-white/5 dark:border-white/10">
       {thumb ? <LazyProxyImage src={thumb} width={160} alt={title} className="object-contain" />
         : <div className="flex h-full items-center justify-center" aria-label="暂无商品图片"><ImageIcon className="h-6 w-6 text-slate-300" /></div>}
     </div>
     <div className="min-w-0 flex-1">
-      <p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-800" title={title}>{title}</p>
+      <p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-800 dark:text-slate-100" title={title}>{title}</p>
       <p className="mt-1 truncate text-[11px] text-slate-400" title={item.itemId}>SKU {item.itemId || '未提供'}</p>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5">
-        <span className="text-slate-600">{tasks.length ? `成图 ${images.length}/${tasks.length} 张` : '尚未生成'}</span>
+        <span className="text-slate-600 dark:text-slate-300">{tasks.length ? `成图 ${images.length}/${tasks.length} 张` : '尚未生成'}</span>
         <span className={hasCopy ? 'text-emerald-700' : 'text-slate-400'}>{hasCopy ? '文案已完成' : '文案待完善'}</span>
         {failed > 0 && <span className="text-rose-600">{failed} 个分镜失败</span>}
       </div>

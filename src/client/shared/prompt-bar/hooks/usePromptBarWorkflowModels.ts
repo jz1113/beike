@@ -1,15 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAppStore } from '@client/store';
+import { modalityPickerSelections, type ModalityStorageKind } from '@shared/domain/models/modalityStorage';
 import {
+  getEnabledAudioModelsFromSettings,
   getEnabledImageModelsFromSettings,
   getEnabledVideoModelsFromSettings,
   getEnabledMultimodalModelsFromSettings,
   readWorkflowModelsFromStorage,
   repairWorkflowModelsInStorage,
 } from '@shared/domain/models/workflowModels';
-import { VIDEO_GEN_MODELS } from '@shared/domain/media/video';
-import { IMAGE_GEN_MODELS } from '@shared/domain/media/drawing';
-import { listApprovedModels, vendorLabel } from '@shared/domain/models/modelCatalog';
 
 export interface PreferenceModelItem {
   id: string;
@@ -25,164 +24,135 @@ export interface PreferenceModelItem {
   supportedAspectRatios?: string[];
   supportedResolutions?: string[];
   supportedDurations?: number[];
+  /** 分组和凭证还原用的上游模型 ID。与 id 不同时，id 是渠道条目。 */
+  upstreamId?: string;
 }
 
-export const SMART_VIDEO_MODEL: PreferenceModelItem = {
-  id: 'smart',
-  name: '智能匹配模型',
-  desc: '当识别到视频生成诉求时为你智能选择视频模型',
-  isSmart: true,
-  isDiamond: true,
-  isNew: true,
-};
+function modalityPreferenceModels(kind: ModalityStorageKind, fallbackDesc: string): PreferenceModelItem[] | null {
+  const options = modalityPickerSelections(kind);
+  if (!options) return null;
+  return options.map((option) => ({
+    id: option.id,
+    name: option.name,
+    desc: fallbackDesc,
+    provider: option.provider,
+    upstreamId: option.modelId,
+  }));
+}
 
-export const SMART_IMAGE_MODEL: PreferenceModelItem = {
-  id: 'smart',
-  name: '智能匹配模型',
-  desc: '当识别到图片生成诉求时为你智能选择图片模型',
-  isSmart: true,
-  isDiamond: true,
-  isNew: true,
-};
+export function matchesStoredModel(model: { id: string; upstreamId?: string; modelId?: string }, selected: string) {
+  return model.id === selected || model.upstreamId === selected || model.modelId === selected;
+}
+
+function toPreferenceModel(
+  model: {
+    id: string;
+    name?: string;
+    shortName?: string;
+    description?: string;
+    desc?: string;
+    badge?: string;
+    provider?: string;
+    isThinking?: boolean;
+    supportedDurations?: number[];
+    supportedResolutions?: string[];
+    supportedAspectRatios?: string[];
+  },
+  fallbackDesc: string,
+): PreferenceModelItem {
+  return {
+    id: model.id,
+    name: model.shortName || model.name || model.id,
+    desc: model.description || model.desc || fallbackDesc,
+    badge: model.badge,
+    provider: model.provider,
+    isThinking: Boolean(model.isThinking),
+    supportedAspectRatios: model.supportedAspectRatios,
+    supportedResolutions: model.supportedResolutions,
+    supportedDurations: model.supportedDurations,
+  };
+}
 
 export function usePreferenceModels() {
+  const [ready, setReady] = useState(false);
   const [videoModels, setVideoModels] = useState<PreferenceModelItem[]>([]);
   const [imageModels, setImageModels] = useState<PreferenceModelItem[]>([]);
+  const [audioModels, setAudioModels] = useState<PreferenceModelItem[]>([]);
   const [multimodalModels, setMultimodalModels] = useState<PreferenceModelItem[]>([]);
 
   const reload = useCallback(() => {
     repairWorkflowModelsInStorage();
     const all = readWorkflowModelsFromStorage();
 
-    // 1. 视频模型
-    const customVideo = getEnabledVideoModelsFromSettings(all);
-    const videoSource: PreferenceModelItem[] = customVideo.length > 0
-      ? customVideo.map((m) => ({
-          id: m.id,
-          name: m.shortName || m.name || m.id,
-          desc: m.description || '高品质视频生成模型，动作流畅稳定',
-          badge: m.badge,
-          tag: m.badge || (m.isPrimary ? '推荐' : undefined),
-          isDiamond: Boolean(m.isPrimary || ['kling', 'seedance', 'hailuo', 'smart', 'sora', 'veo'].some((k) => m.id.toLowerCase().includes(k))),
-          isNew: Boolean(m.id.toLowerCase().includes('3.5') || m.id.toLowerCase().includes('2.6') || m.id.toLowerCase().includes('2.5') || m.id.toLowerCase().includes('01')),
-          provider: m.provider,
-          supportedDurations: m.supportedDurations,
-          supportedResolutions: m.supportedResolutions,
-          supportedAspectRatios: m.supportedAspectRatios,
-        }))
-      : VIDEO_GEN_MODELS.map((m) => ({
-          id: m.id,
-          name: m.shortName || m.name || m.id,
-          desc: m.description || '高品质视频生成模型，动作流畅稳定',
-          badge: m.badge,
-          tag: m.badge || (m.isPrimary ? '推荐' : undefined),
-          isDiamond: Boolean(m.isPrimary || ['kling', 'seedance', 'hailuo', 'sora', 'veo'].some((k) => m.id.toLowerCase().includes(k))),
-          isNew: Boolean(m.isNew || m.id.toLowerCase().includes('3.5') || m.id.toLowerCase().includes('2.6') || m.id.toLowerCase().includes('2.5')),
-          provider: m.provider,
-          supportedDurations: m.supportedDurations,
-          supportedResolutions: m.supportedResolutions as string[],
-          supportedAspectRatios: m.supportedAspectRatios,
-        }));
-    setVideoModels([SMART_VIDEO_MODEL, ...videoSource]);
-
-    // 2. 生图模型
-    const customImage = getEnabledImageModelsFromSettings(all);
-    const imageSource: PreferenceModelItem[] = customImage.length > 0
-      ? customImage.map((m) => ({
-          id: m.id,
-          name: m.shortName || m.name || m.id,
-          desc: m.description || '超高质感商用生图，设计表现极佳',
-          badge: m.badge,
-          tag: m.badge || (m.isPrimary ? '推荐' : undefined),
-          isDiamond: Boolean(m.isPrimary || ['recraft', 'smart', 'flux', 'ideogram', 'gpt-image'].some((k) => m.id.toLowerCase().includes(k))),
-          isNew: Boolean(m.id.toLowerCase().includes('v3') || m.id.toLowerCase().includes('2.5') || m.id.toLowerCase().includes('ultra')),
-          provider: m.provider,
-          supportedResolutions: ['1K', '2K', '4K'],
-        }))
-      : IMAGE_GEN_MODELS.map((m) => ({
-          id: m.id,
-          name: m.shortName || m.name || m.id,
-          desc: m.description || '超高质感商用生图，设计表现极佳',
-          badge: m.badge,
-          tag: m.badge || (m.isPrimary ? '推荐' : undefined),
-          isDiamond: Boolean(m.isPrimary || ['recraft', 'smart', 'flux', 'ideogram', 'gpt-image'].some((k) => m.id.toLowerCase().includes(k))),
-          isNew: Boolean(m.id.toLowerCase().includes('v3') || m.id.toLowerCase().includes('2.5') || m.id.toLowerCase().includes('ultra')),
-          provider: m.provider,
-          supportedResolutions: ['1K', '2K', '4K'],
-        }));
-    setImageModels([SMART_IMAGE_MODEL, ...imageSource]);
-
-    // 3. 推理 / 多模态模型
-    const customMultimodal = getEnabledMultimodalModelsFromSettings(all, 'assistant');
-    const multimodalSource: PreferenceModelItem[] = customMultimodal.length > 0
-      ? customMultimodal.map((m) => ({
-          id: m.id,
-          name: m.shortName || m.name || m.id,
-          desc: m.description || m.desc || (m.isThinking ? '深度思考模型，复杂问题从容应对' : '高智能多模态对话模型，快速响应日常创作'),
-          badge: m.badge,
-          tag: m.badge || (m.channel === 'deepseek' ? 'DeepSeek 官方' : m.channel === 'openai' ? 'OpenAI 渠道' : m.isThinking ? '深度思考' : '会员限免'),
-          isDiamond: Boolean(m.isThinking || ['gpt-6', 'gpt-5.6', 'claude-3-7', 'deepseek'].some((k) => m.id.toLowerCase().includes(k))),
-          isNew: Boolean(m.id.toLowerCase().includes('5.6') || m.id.toLowerCase().includes('6-') || m.id.toLowerCase().includes('v4') || m.id.toLowerCase().includes('k3') || m.id.toLowerCase().includes('3.8')),
-          isThinking: Boolean(m.isThinking),
-          provider: m.provider,
-        }))
-      : listApprovedModels('multimodal').map((m) => ({
-          id: m.id,
-          name: m.shortName || m.name,
-          desc: m.description || (m.isThinking ? '深度思考模型，复杂问题从容应对' : '高智能多模态对话模型，快速响应日常创作'),
-          badge: m.badge,
-          tag: m.badge || (m.isThinking ? '深度思考' : '会员限免'),
-          isDiamond: Boolean(m.isThinking || ['gpt-6', 'gpt-5.6', 'claude-3-7', 'deepseek'].some((k) => m.id.toLowerCase().includes(k))),
-          isNew: Boolean(m.id.toLowerCase().includes('5.6') || m.id.toLowerCase().includes('6-') || m.id.toLowerCase().includes('v4') || m.id.toLowerCase().includes('k3') || m.id.toLowerCase().includes('3.8')),
-          isThinking: Boolean(m.isThinking),
-          provider: vendorLabel(m.vendor),
-        }));
-    setMultimodalModels(multimodalSource);
+    setVideoModels(modalityPreferenceModels('video', '已同步的视频模型')
+      ?? getEnabledVideoModelsFromSettings(all).map((model) => toPreferenceModel(model, '已同步的视频模型')));
+    setImageModels(modalityPreferenceModels('image', '已同步的图片模型')
+      ?? getEnabledImageModelsFromSettings(all).map((model) => toPreferenceModel({
+        ...model,
+        supportedResolutions: ['1K', '2K', '4K'],
+      }, '已同步的图片模型')));
+    setAudioModels(modalityPreferenceModels('voice', '已同步的音频模型')
+      ?? getEnabledAudioModelsFromSettings(all).map((model) => toPreferenceModel(model, '已同步的音频模型')));
+    setMultimodalModels(modalityPreferenceModels('chat', '已同步的对话模型')
+      ?? getEnabledMultimodalModelsFromSettings(all, 'assistant').map((model) => toPreferenceModel(
+        model,
+        model.isThinking ? '深度思考模型' : '已同步的对话模型',
+      )));
+    setReady(true);
   }, []);
 
   useEffect(() => {
     reload();
     const handleStorage = (e: StorageEvent) => {
-      if (!e.key || ['custom_models', 'ai_image_gen_model', 'ai_video_gen_model', 'beike_assistant_selected_model'].includes(e.key)) {
+      if (!e.key || ['custom_models', 'ai_image_gen_model', 'ai_video_gen_model', 'ai_audio_gen_model', 'beike_assistant_selected_model'].includes(e.key)) {
         reload();
       }
     };
     window.addEventListener('models_updated', reload);
+    window.addEventListener('modality_models_updated', reload);
     window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('models_updated', reload);
+      window.removeEventListener('modality_models_updated', reload);
       window.removeEventListener('storage', handleStorage);
     };
   }, [reload]);
 
-  return { videoModels, imageModels, multimodalModels, reload };
+  return { ready, videoModels, imageModels, audioModels, multimodalModels, reload };
 }
 
 export function usePromptBarWorkflowModels(
   setQuickModel?: (id: string) => void,
   setQuickVideoModel?: (id: string) => void,
+  setQuickAudioModel?: (id: string) => void,
 ) {
-  const [availableImageModels, setAvailableImageModels] = useState<ReturnType<typeof getEnabledImageModelsFromSettings>>([]);
-  const [availableVideoModels, setAvailableVideoModels] = useState<ReturnType<typeof getEnabledVideoModelsFromSettings>>([]);
-  const [availableMultimodalModels, setAvailableMultimodalModels] = useState<ReturnType<typeof getEnabledMultimodalModelsFromSettings>>([]);
+  const [availableImageModels, setAvailableImageModels] = useState<Array<PreferenceModelItem | ReturnType<typeof getEnabledImageModelsFromSettings>[number]>>([]);
+  const [availableVideoModels, setAvailableVideoModels] = useState<Array<PreferenceModelItem | ReturnType<typeof getEnabledVideoModelsFromSettings>[number]>>([]);
+  const [availableAudioModels, setAvailableAudioModels] = useState<Array<PreferenceModelItem | ReturnType<typeof getEnabledAudioModelsFromSettings>[number]>>([]);
+  const [availableMultimodalModels, setAvailableMultimodalModels] = useState<Array<PreferenceModelItem | ReturnType<typeof getEnabledMultimodalModelsFromSettings>[number]>>([]);
 
   useEffect(() => {
     const loadCustomModels = () => {
       const all = readWorkflowModelsFromStorage();
-      const customImage = getEnabledImageModelsFromSettings(all);
-      const customVideo = getEnabledVideoModelsFromSettings(all);
-      const customMultimodal = getEnabledMultimodalModelsFromSettings(all, 'assistant');
+      const syncedImage = modalityPreferenceModels('image', '已同步的图片模型');
+      const syncedVideo = modalityPreferenceModels('video', '已同步的视频模型');
+      const syncedAudio = modalityPreferenceModels('voice', '已同步的音频模型');
+      const syncedMultimodal = modalityPreferenceModels('chat', '已同步的对话模型');
+      const customImage = syncedImage ?? getEnabledImageModelsFromSettings(all);
+      const customVideo = syncedVideo ?? getEnabledVideoModelsFromSettings(all);
+      const customAudio = syncedAudio ?? getEnabledAudioModelsFromSettings(all);
+      const customMultimodal = syncedMultimodal ?? getEnabledMultimodalModelsFromSettings(all, 'assistant');
 
       setAvailableImageModels(customImage);
       if (setQuickModel) {
         if (!customImage.length) setQuickModel('');
         if (customImage.length > 0) {
           const activeModel = useAppStore.getState().quickModel;
-          if (activeModel && customImage.some((m) => m.id === activeModel)) {
+          if (activeModel && customImage.some((m) => matchesStoredModel(m, activeModel))) {
             /* keep */
           } else {
             const savedImg = localStorage.getItem('ai_image_gen_model');
-            if (savedImg && customImage.some((m) => m.id === savedImg)) {
+            if (savedImg && customImage.some((m) => matchesStoredModel(m, savedImg))) {
               setQuickModel(savedImg);
             } else {
               setQuickModel(customImage[0].id as string);
@@ -196,11 +166,11 @@ export function usePromptBarWorkflowModels(
         if (!customVideo.length) setQuickVideoModel('');
         if (customVideo.length > 0) {
           const activeVid = useAppStore.getState().quickVideoModel;
-          if (activeVid && customVideo.some((m) => m.id === activeVid)) {
+          if (activeVid && customVideo.some((m) => matchesStoredModel(m, activeVid))) {
             /* keep */
           } else {
             const savedVid = localStorage.getItem('ai_video_gen_model');
-            if (savedVid && customVideo.some((m) => m.id === savedVid)) {
+            if (savedVid && customVideo.some((m) => matchesStoredModel(m, savedVid))) {
               setQuickVideoModel(savedVid);
             } else {
               setQuickVideoModel(customVideo[0].id as string);
@@ -209,13 +179,26 @@ export function usePromptBarWorkflowModels(
         }
       }
 
+      setAvailableAudioModels(customAudio);
+      if (setQuickAudioModel) {
+        if (!customAudio.length) setQuickAudioModel('');
+        else if (!customAudio.some((model) => matchesStoredModel(model, useAppStore.getState().quickAudioModel))) {
+          const savedAudio = localStorage.getItem('ai_audio_gen_model');
+          setQuickAudioModel(savedAudio && customAudio.some((model) => matchesStoredModel(model, savedAudio)) ? savedAudio : customAudio[0].id);
+        }
+      }
+
       setAvailableMultimodalModels(customMultimodal);
     };
 
     loadCustomModels();
     window.addEventListener('models_updated', loadCustomModels);
-    return () => window.removeEventListener('models_updated', loadCustomModels);
-  }, [setQuickModel, setQuickVideoModel]);
+    window.addEventListener('modality_models_updated', loadCustomModels);
+    return () => {
+      window.removeEventListener('models_updated', loadCustomModels);
+      window.removeEventListener('modality_models_updated', loadCustomModels);
+    };
+  }, [setQuickModel, setQuickVideoModel, setQuickAudioModel]);
 
-  return { availableImageModels, availableVideoModels, availableMultimodalModels };
+  return { availableImageModels, availableVideoModels, availableAudioModels, availableMultimodalModels };
 }

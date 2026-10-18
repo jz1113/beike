@@ -1,4 +1,5 @@
 import { DEEPSEEK_BASE_URL, isDeepSeekRoute, deepSeekModel } from '@shared/domain/models/deepseek';
+import { API_PROVIDERS_STORAGE_KEY, credentialsForModalityItem, findConfiguredModalityModel } from '@shared/domain/models/modalityStorage';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 
 // 三态缓存：undefined=未显式设置（允许初始兼容加载），null=显式清空（严格禁止回退 localStorage），string=有效密钥
@@ -74,7 +75,7 @@ export function getModelCredentials(modelId?: string): {
           }
           const providerId = target.providerId || target.channel;
           if (providerId) {
-            const rawProviders = localStorage.getItem('beike_api_providers_v2');
+            const rawProviders = localStorage.getItem(API_PROVIDERS_STORAGE_KEY);
             if (rawProviders) {
               const providers = JSON.parse(rawProviders);
               if (Array.isArray(providers)) {
@@ -93,6 +94,11 @@ export function getModelCredentials(modelId?: string): {
     }
   } catch {
     // 忽略存储读取异常
+  }
+  const modality = findConfiguredModalityModel(modelId);
+  if (modality) {
+    const creds = credentialsForModalityItem(modality);
+    if (creds.baseUrl || creds.apiKey) return creds;
   }
   return {};
 }

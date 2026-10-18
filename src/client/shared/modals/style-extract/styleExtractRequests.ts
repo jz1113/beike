@@ -3,7 +3,7 @@ import { getExternalScraperCredentials } from '@client/shared/utils/externalScra
 import { normalizeImageSource } from '@shared/domain/media/drawing';
 import { pickOrderedMultimodalFallbacks } from '@shared/domain/models/workflowModels';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
-import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
+import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import type { ExtractedRecipeData } from './types';
 
 function currentSessionGuard(signal: AbortSignal, isCurrent: () => boolean) {
@@ -74,10 +74,7 @@ export async function extractStyleRecipe(input: {
   assertCurrent();
   if (!response.ok || !data.success) throw new Error(data.error || '风格提炼失败');
   try {
-    const model = data.model || input.model;
-    const promptTokens = data.usage?.promptTokens || 500, completionTokens = data.usage?.completionTokens || 300;
-    recordModelUsage({ modelId: model, modelName: model, provider: resolveModelVendor(model), type: 'vision',
-      promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, mediaCount: input.images.length, success: true });
+    recordChatTokens({ modelId: data.model || input.model, type: 'vision', usage: data.usage, mediaCount: input.images.length });
   } catch {}
   return data.recipe;
 }

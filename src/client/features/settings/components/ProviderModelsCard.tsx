@@ -271,7 +271,7 @@ export function ProviderModelsCard({
               <button
                 type="button"
                 onClick={onGoToConfig}
-                className="px-3.5 py-1.5 text-xs font-medium rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90 transition-opacity"
+                className="px-3.5 py-1.5 text-xs font-medium rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-white transition-colors"
               >
                 前往配置 API 密钥
               </button>

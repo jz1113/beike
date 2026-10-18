@@ -3,6 +3,7 @@ import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { getCollectorRateLimiter } from '../model/collectorRateLimiter';
 import { detectPlatformFromText, extractUrlsFromRawText, type BatchTaskItem } from '../model/collectorTypes';
 import { collectSourceMedia, type CollectedSourceItem } from '../api/collectSourceMedia';
+import { getPreferredScraperSync, type PreferredScraper } from '@client/shared/utils/externalScraperCredentials';
 
 interface UseSingleCollectOptions {
   isOpen?: boolean;
@@ -12,6 +13,7 @@ interface UseSingleCollectOptions {
 
 export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHistory }: UseSingleCollectOptions) {
   const [singlePlatform, setSinglePlatform] = useState<BatchTaskItem['platform']>('auto');
+  const [preferredScraper, setPreferredScraper] = useState<PreferredScraper>(getPreferredScraperSync);
   const [singleInput, setSingleInput] = useState('');
   const [isCollectingSingle, setIsCollectingSingle] = useState(false);
   const [singleCollectedResult, setSingleCollectedResult] = useState<CollectedSourceItem | null>(null);
@@ -72,6 +74,7 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
       const result = await collectSourceMedia(query, platform, forceRefresh, socialRateLimiterRef.current, request.signal, {
         shouldStop: () => !isOpenRef.current || !aliveRef.current,
         onSubmitted: () => { submittedRef.current = true; },
+        preferredScraper,
       });
       if (!isCurrent()) return;
       setSingleCollectedResult(result);
@@ -80,7 +83,8 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
       setSingleImageFilter('all');
       setAiAssistantPrompt('');
       saveToCollectorHistory?.(result);
-      if (isOpenRef.current) showToast(`已采集「${result.title}」：${result.images.length} 张图片${result.videos?.length ? ` + ${result.videos.length} 条原视频/动态` : ''}`);
+      const apiBadge = result.apiUsed ? ` [${result.apiUsed}]` : '';
+      if (isOpenRef.current) showToast(`已采集「${result.title}」：${result.images.length} 张图片${result.videos?.length ? ` + ${result.videos.length} 条原视频/动态` : ''}${apiBadge}`);
     } catch (error) {
       if (isCurrent() && isOpenRef.current) showToast(`采集失败：${formatUserError(error, '请检查链接与网络')}`);
     } finally {
@@ -93,7 +97,7 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
   };
 
   return {
-    singlePlatform, setSinglePlatform, singleInput, setSingleInput, isCollectingSingle,
+    singlePlatform, setSinglePlatform, preferredScraper, setPreferredScraper, singleInput, setSingleInput, isCollectingSingle,
     singleCollectedResult, setSingleCollectedResult, selectedSingleImages, setSelectedSingleImages,
     selectedVideo, setSelectedVideo, singleImageFilter, setSingleImageFilter, forceRefresh, setForceRefresh,
     aiAssistantPrompt, setAiAssistantPrompt, handleSingleCollect,

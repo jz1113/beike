@@ -110,7 +110,7 @@ export default function PromptAssetCard({
       {/* 图组名称与详情入口放在封面上方，利用列表顶部空间。 */}
       <div className={`${headerAboveImage ? 'order-1 mb-1.5 min-h-6' : 'order-2 mt-2 min-h-7'} flex items-center gap-1.5 select-none`}>
         <h3
-          className={`min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-slate-900 transition-colors ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
+          className={`min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-slate-900 transition-colors dark:text-slate-100 ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
           title={item.title || item.name || displayTitle}
         >
           {displayTitle}
@@ -129,7 +129,7 @@ export default function PromptAssetCard({
             <div className="relative">
               <button
                 onClick={onToggleMenu}
-                className="p-1 rounded-lg text-slate-400 opacity-60 hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 opacity-60 hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer dark:hover:bg-white/10"
                 title="更多操作"
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
@@ -137,21 +137,21 @@ export default function PromptAssetCard({
 
               {isMenuOpen && (
                 <div
-                  className="absolute right-0 top-full mt-1 z-20 w-28 bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-[11px]"
+                  className="absolute right-0 top-full mt-1 z-20 w-28 bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-[11px] dark:border-white/10 dark:bg-[#18191c]"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {activeSubTab !== 'full_prompt' && (
                     <>
                       <button
                         onClick={onToggleFavorite}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer dark:text-slate-200 dark:hover:bg-white/5"
                       >
                         <Star className={`w-3.5 h-3.5 ${item.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
                         <span>{item.isFavorite ? '取消收藏' : '加入收藏'}</span>
                       </button>
                       <button
                         onClick={onCopy}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer dark:text-slate-200 dark:hover:bg-white/5"
                       >
                         {copiedId === item.id ? (
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -167,21 +167,21 @@ export default function PromptAssetCard({
                       e.stopPropagation();
                       if (onQuickEditTag) onQuickEditTag(item, e);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer dark:text-slate-200 dark:hover:bg-white/5"
                   >
                     <Tag className="w-3.5 h-3.5 text-purple-600" />
                     <span>修改标签</span>
                   </button>
                   {activeSubTab === 'full_prompt' && onMove && <button
                     onClick={onMove}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer dark:text-slate-200 dark:hover:bg-white/5"
                   >
                     <FolderInput className="w-3.5 h-3.5" />
                     <span>移动到分类</span>
                   </button>}
                   <button
                     onClick={onEdit}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 cursor-pointer dark:text-slate-200 dark:hover:bg-white/5"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     <span>编辑</span>
@@ -219,7 +219,7 @@ export default function PromptAssetCard({
                 onPreviewImage(visibleImageUrl, e);
               }
             }}
-            className={`group/thumb relative aspect-[3/4] w-full rounded-2xl overflow-hidden bg-white/40 ring-1 ring-slate-200/60 shadow-sm transition-shadow hover:shadow-lg ${isBatchMode ? 'cursor-pointer' : 'cursor-zoom-in'}`}
+            className={`group/thumb relative aspect-[3/4] w-full rounded-2xl overflow-hidden bg-white/40 ring-1 ring-slate-200/60 shadow-sm transition-shadow hover:shadow-lg dark:bg-[#18191c]/95 ${isBatchMode ? 'cursor-pointer' : 'cursor-zoom-in'}`}
             title={isBatchMode ? (isSelected ? '取消选择' : '选择资产') : activeSubTab === 'full_prompt' ? '查看四张母版图与提示词' : '查看原图与提示词'}
           >
             {activeSubTab === 'full_prompt' ? (
@@ -247,15 +247,15 @@ export default function PromptAssetCard({
             )}
             {activeSubTab === 'full_prompt' && (item.imageReplaced === true || item.imageReplaceable === true) && (
               <span className={`pointer-events-none absolute left-2 top-2 rounded-full px-2 py-1 text-[10px] font-semibold shadow-sm backdrop-blur-sm ${
-                item.imageReplaced === true ? 'bg-emerald-50/95 text-emerald-700' : 'bg-white/90 text-slate-600'
+                item.imageReplaced === true ? 'bg-emerald-50/95 text-emerald-700' : 'bg-white/90 text-slate-600 dark:text-slate-300 dark:bg-[#18191c]/95'
               }`}>{item.imageReplaced === true ? '已换图' : '待换图'}</span>
             )}
           </div>
         ) : (
-          <div className="aspect-[3/4] w-full rounded-2xl bg-slate-50/90 ring-1 ring-slate-200/60 flex flex-col items-center justify-center gap-3 p-6 text-slate-400">
+          <div className="aspect-[3/4] w-full rounded-2xl bg-slate-50/90 ring-1 ring-slate-200/60 flex flex-col items-center justify-center gap-3 p-6 text-slate-400 dark:bg-white/[0.04] dark:ring-white/10">
             <ImageIcon className="w-5 h-5" />
             <span className="text-xs font-medium">{imageUrl ? '图片暂不可用' : '暂无参考图片'}</span>
-            <p className="line-clamp-4 text-center text-xs leading-5 text-slate-500">{summary || item.title || item.name || '暂无详细描述'}</p>
+            <p className="line-clamp-4 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">{summary || item.title || item.name || '暂无详细描述'}</p>
           </div>
         )}
         {isBatchMode && (
@@ -264,7 +264,7 @@ export default function PromptAssetCard({
             onClick={onToggleSelect}
             aria-label={`${isSelected ? '取消选择' : '选择'}${displayTitle}`}
             aria-pressed={isSelected}
-            className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition-colors cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white/95 text-slate-500 hover:border-indigo-400 hover:text-indigo-600'}`}
+            className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition-colors cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white/95 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 dark:text-slate-400 dark:border-white/10 dark:bg-[#18191c]/95'}`}
           >
             {isSelected ? <Check className="h-5 w-5" strokeWidth={3} /> : <Square className="h-5 w-5" />}
           </button>
@@ -293,7 +293,7 @@ export default function PromptAssetCard({
                 e.stopPropagation();
                 if (onQuickEditTag) onQuickEditTag(item, e);
               }}
-              className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium shrink-0 transition-all truncate max-w-[120px] flex items-center gap-0.5 bg-slate-50 text-slate-600 ${isBatchMode ? '' : 'cursor-pointer hover:bg-slate-100'}`}
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium shrink-0 transition-all truncate max-w-[120px] flex items-center gap-0.5 bg-slate-50 text-slate-600 dark:text-slate-300 dark:bg-white/5 ${isBatchMode ? '' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10'}`}
               title={isBatchMode ? undefined : `点击修改标签: ${b.label}`}
             >
               <span className="truncate">{b.label}</span>
@@ -305,7 +305,7 @@ export default function PromptAssetCard({
 
       {/* 底部操作栏 */}
       {!isBatchMode && !inlineDetail && (
-        <div className="order-6 mt-2 border-t border-slate-200/70 pt-2">
+        <div className="order-6 mt-2 border-t border-slate-200/70 pt-2 dark:border-white/10">
           <button
             onClick={onViewDetail}
             className="flex w-full items-center gap-1 text-xs font-medium text-indigo-700 transition-colors hover:text-indigo-900 cursor-pointer"

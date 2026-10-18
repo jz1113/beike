@@ -2,18 +2,21 @@
 export default {
   forbidden: [
     {
-      name: 'domain-no-server-kit',
-      comment: 'domain stays browser-safe and free of Node infrastructure',
+      name: 'no-orphans',
+      comment: 'every source file must be imported, except entrypoints, tests and feature barrels',
       severity: 'error',
-      from: { path: '^src/shared/domain' },
-      to: { path: '^src/server/infrastructure' },
-    },
-    {
-      name: 'web-no-server-kit',
-      comment: 'web may not import server-kit',
-      severity: 'error',
-      from: { path: '^src/client' },
-      to: { path: '^src/server/infrastructure' },
+      from: {
+        orphan: true,
+        pathNot: [
+          '\\.test\\.tsx?$',
+          '(^|/)main\\.tsx$',
+          '(^|/)vite-env\\.d\\.ts$',
+          '^src/client/public/',
+          '^src/client/features/[^/]+/index\\.ts$',
+          '^src/client/features/(assets|settings)/components/index\\.ts$',
+        ],
+      },
+      to: {},
     },
     {
       name: 'shared-no-features',

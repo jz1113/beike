@@ -2,7 +2,8 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { useCallback, useRef } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
+import { getGatewayClientOverrides, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import { approveAssistantTool, executeClientToolAction } from '@client/features/assistant/api/assistantClientActions';
 import type {
   TurnStreamState,
@@ -16,8 +17,10 @@ import type {
 import { initialState, applyItemEvent, deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
 import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
 import { readAssistantEvents } from '../model/readAssistantEvents';
+import { readReportedUsage } from '@client/shared/utils/modelUsage';
 import { submitPreparedAssistantTurn } from '../model/assistantTurnRecovery';
 import { fetchAssistantTurnSnapshot } from '../api/runs';
+import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 export { deriveLegacyState } from './assistantTurnItems';
 
 export interface RunTurnParams {
@@ -136,7 +139,10 @@ export function useAssistantTurn() {
     turnIdForApprovalRef.current = nextTurnId;
     patch({}, onUpdate);
 
-    const { customBaseUrl: localUrl } = getGatewayClientOverrides();
+    const { customBaseUrl: localUrl, customApiKey: localKey } = getGatewayClientOverrides();
+    const modalityCreds = getModelCredentials(model);
+    const upstreamModel = upstreamModalityModelId('chat', model);
+    const prefs = loadPromptPreferences();
 
     const res = await submitPreparedAssistantTurn(nextTurnId, params.onTurnPrepared, () => apiFetch('/api/assistant/turn/start', {
       method: 'POST',
@@ -147,13 +153,15 @@ export function useAssistantTurn() {
         threadId: sessionId,
         turnId: nextTurnId,
         messages,
-        model,
-        reasoningEffort: params.reasoningEffort,
+        model: upstreamModel || model,
+        reasoningEffort: params.reasoningEffort || prefs.reasoning?.reasoningEffort || 'medium',
+        generationMode: prefs.reasoning?.generationMode || 'normal',
         fallbackModels,
         historyLimit,
         runMode: params.runMode,
         referenceScope: params.referenceScope,
-        customBaseUrl: localUrl,
+        customBaseUrl: modalityCreds.baseUrl || localUrl,
+        ...(modalityCreds.apiKey || localKey ? { customApiKey: modalityCreds.apiKey || localKey } : {}),
         systemPrompt,
         skillId,
         allowedTools,
@@ -183,6 +191,10 @@ export function useAssistantTurn() {
     const executedActions = new Set<string>();
     try {
       for await (const evt of readAssistantEvents(res.body, signal)) {
+        if (evt.type === 'usage' || (evt.type === 'turn/snapshot' && evt.snapshot?.usage)) {
+          const reported = readReportedUsage(evt.type === 'usage' ? evt.usage : evt.snapshot.usage);
+          if (reported) stateRef.current = { ...stateRef.current, usage: reported };
+        }
         if (evt.type === 'done' || evt.type === 'turn/completed') receivedTerminal = true;
         if (evt.type === 'turn/interrupted') throw new Error('对话已中断，已生成内容已保留，请重试。');
 
@@ -299,7 +311,7 @@ export function useAssistantTurn() {
           const entry: ToolActivityEntry = {
             name: evt.name,
             displayName: evt.displayName || evt.name,
-            status: (evt.status === 'error' ? 'error' : evt.status === 'done' ? 'done' : 'running') as ToolActivityEntry['status'],
+            status: (evt.status === 'done' || evt.status === 'error' || evt.status === 'declined' || evt.status === 'cancelled' ? evt.status : 'running') as ToolActivityEntry['status'],
             detail: evt.detail,
             action: evt.action,
             ...(visualImages ? { visualImages } : {}),
@@ -310,7 +322,7 @@ export function useAssistantTurn() {
               ...entry,
               visualImages: visualImages || prev[idx].visualImages,
             };
-            if (evt.action && evt.status !== 'error') {
+            if (evt.action && evt.status === 'done') {
               executeClientToolAction(evt.action, showToast, sessionId);
             }
           } else if (evt.type === 'tool_call') {

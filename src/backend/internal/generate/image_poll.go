@@ -32,35 +32,36 @@ func writeDirectImagePoll(cfg config.Config, w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer db.Close()
-	var resultURL, status, failReason sql.NullString
-	err = db.QueryRowContext(r.Context(), `
-		SELECT "resultUrl", "status", "failReason" FROM "ImageTask" WHERE "taskId" = ? LIMIT 1`, taskID).
-		Scan(&resultURL, &status, &failReason)
-	if err == sql.ErrNoRows {
-		httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "taskId": taskID, "error": "未找到同步任务记录"})
-		return
-	}
-	if err != nil {
+	state, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, taskID)
+	if queryErr != nil || !ok {
+		if queryErr == nil && !ok {
+			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "taskId": taskID, "error": "未找到同步任务记录"})
+			return
+		}
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "taskId": taskID, "error": "查询同步任务失败，请稍后重试"})
 		return
 	}
-	if resultURL.Valid && resultURL.String != "" {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{
+	if result != "" {
+		body := map[string]any{
 			"success": true, "taskId": taskID, "status": "SUCCESS", "progress": "100%",
-			"resultUrl": resultURL.String, "failReason": "",
-		})
+			"resultUrl": result, "failReason": "",
+		}
+		putStoredUsage(body, usage)
+		httpx.WriteJSON(w, http.StatusOK, body)
 		return
 	}
-	reason := "同步任务未返回结果图"
-	state := "FAILURE"
-	if status.String == "FAILURE" {
-		reason = "同步任务失败"
-		if failReason.Valid && failReason.String != "" {
-			reason = failReason.String
+	failReason := "同步任务未返回结果图"
+	failState := "FAILURE"
+	if state == "FAILURE" {
+		failReason = "同步任务失败"
+		if reason != "" {
+			failReason = reason
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"success": true, "taskId": taskID, "status": state, "progress": "0%",
-		"resultUrl": "", "failReason": reason,
-	})
+	body := map[string]any{
+		"success": true, "taskId": taskID, "status": failState, "progress": "0%",
+		"resultUrl": "", "failReason": failReason,
+	}
+	putStoredUsage(body, usage)
+	httpx.WriteJSON(w, http.StatusOK, body)
 }

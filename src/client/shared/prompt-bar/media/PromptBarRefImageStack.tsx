@@ -24,12 +24,10 @@ export function PromptBarRefImageStack({
   resolveMediaKind,
   onPreviewImage,
 }: Props) {
-  const count = images.length;
-  if (count === 0) return null;
-
-  // 🌟 鼠标悬浮在整个卡片堆叠区域的状态
   const [isStackHovered, setIsStackHovered] = useState(false);
   const [hoveredCardIdx, setHoveredCardIdx] = useState<number | null>(null);
+  const count = images.length;
+  if (count === 0) return null;
 
   // 卡片标准尺寸（标准 3:4 竖版拍立得卡片，精致灵巧）
   const cardW = 'w-[68px] sm:w-[72px] md:w-[74px]';
@@ -62,7 +60,7 @@ export function PromptBarRefImageStack({
         {/* 🌟 未悬浮时微露右上角层叠白边，呈现立体真实感；悬浮展开时优雅淡出 */}
         {count > 1 && (
           <div
-            className={`absolute left-1 top-0 ${cardW} ${cardH} rounded-xl bg-white/90 border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] transform rotate-[2deg] z-10 pointer-events-none transition-all duration-300 ${
+            className={`absolute left-1 top-0 ${cardW} ${cardH} rounded-xl bg-white/90 border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] transform rotate-[2deg] z-10 pointer-events-none transition-all duration-300 dark:border-white/15 dark:bg-[#222328]/95 ${
               isStackHovered ? 'opacity-0 scale-95' : 'opacity-100'
             }`}
             aria-hidden="true"
@@ -70,7 +68,7 @@ export function PromptBarRefImageStack({
         )}
         {count > 2 && (
           <div
-            className={`absolute left-2 -top-1 ${cardW} ${cardH} rounded-xl bg-white/80 border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] transform rotate-[4deg] z-5 pointer-events-none transition-all duration-300 ${
+            className={`absolute left-2 -top-1 ${cardW} ${cardH} rounded-xl bg-white/80 border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] transform rotate-[4deg] z-5 pointer-events-none transition-all duration-300 dark:border-white/15 dark:bg-[#222328]/95 ${
               isStackHovered ? 'opacity-0 scale-95' : 'opacity-100'
             }`}
             aria-hidden="true"
@@ -93,7 +91,7 @@ export function PromptBarRefImageStack({
                 setIsExpanded(true);
               }
             }}
-            className="w-full h-full rounded-xl overflow-hidden bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.12)] cursor-zoom-in relative"
+            className="w-full h-full rounded-xl overflow-hidden bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.12)] cursor-zoom-in relative dark:border-white/15 dark:bg-[#222328]"
             title="点击放大查看素材"
           >
             <RefMediaThumb
@@ -127,7 +125,7 @@ export function PromptBarRefImageStack({
               e.stopPropagation();
               onUploadClick();
             }}
-            className={`absolute -bottom-1 -right-1 w-[22px] h-[22px] rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 shadow-[0_2px_8px_rgba(0,0,0,0.14)] border border-slate-200/90 flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer z-35 ${
+            className={`absolute -bottom-1 -right-1 w-[22px] h-[22px] rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 shadow-[0_2px_8px_rgba(0,0,0,0.14)] border border-slate-200/90 flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer z-35 dark:border-white/20 dark:bg-[#2c2d31] dark:text-white dark:hover:bg-white/15 dark:hover:text-white ${
               isStackHovered ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 pointer-events-auto scale-100'
             }`}
             title="添加参考素材"
@@ -175,7 +173,7 @@ export function PromptBarRefImageStack({
                   setIsExpanded(true);
                 }
               }}
-              className="w-full h-full rounded-xl overflow-hidden bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.12)] cursor-zoom-in relative"
+              className="w-full h-full rounded-xl overflow-hidden bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.12)] cursor-zoom-in relative dark:border-white/15 dark:bg-[#222328]"
               title="点击放大查看第2张素材"
             >
               <RefMediaThumb
@@ -219,14 +217,14 @@ export function PromptBarRefImageStack({
           <div
             onClick={() => setIsExpanded(true)}
             style={fanTransition}
-            className={`absolute top-0.5 ${cardW} ${cardH} rounded-xl bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.08)] transform -rotate-[0.5deg] hover:rotate-0 hover:scale-105 hover:z-40 cursor-pointer z-20 group/second p-1 ${
+            className={`absolute top-0.5 ${cardW} ${cardH} rounded-xl bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.08)] transform -rotate-[0.5deg] hover:rotate-0 hover:scale-105 hover:z-40 cursor-pointer z-20 group/second p-1 dark:border-white/15 dark:bg-[#222328] ${
               isStackHovered
                 ? 'left-[62px] sm:left-[66px] md:left-[70px] opacity-100 scale-100 pointer-events-auto'
                 : 'left-0 opacity-0 scale-95 pointer-events-none'
             }`}
             title={`共 ${count} 个素材，点击展开全部素材卡片`}
           >
-            <div className="w-full h-full rounded-lg overflow-hidden bg-slate-50/80 relative flex items-center justify-center">
+            <div className="w-full h-full rounded-lg overflow-hidden bg-slate-50/80 relative flex items-center justify-center dark:bg-white/5">
               {secondImg && (
                 <RefMediaThumb
                   url={secondImg}
@@ -237,11 +235,11 @@ export function PromptBarRefImageStack({
                 />
               )}
 
-              <div className="absolute inset-0 bg-slate-50/60 backdrop-blur-[0.5px] flex flex-col items-center justify-center gap-1">
-                <div className="w-7 h-7 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/second:text-slate-800 group-hover/second:border-slate-300 transition-all">
-                  <Maximize2 className="w-3.5 h-3.5 text-slate-600 stroke-[2.2] group-hover/second:scale-110 transition-transform" />
+              <div className="absolute inset-0 bg-slate-50/60 backdrop-blur-[0.5px] flex flex-col items-center justify-center gap-1 dark:bg-white/5">
+                <div className="w-7 h-7 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/second:text-slate-800 group-hover/second:border-slate-300 transition-all dark:border-white/15 dark:bg-white/10 dark:text-slate-100 dark:group-hover/second:border-white/30 dark:group-hover/second:text-white">
+                  <Maximize2 className="w-3.5 h-3.5 text-slate-600 stroke-[2.2] group-hover/second:scale-110 transition-transform dark:text-slate-300" />
                 </div>
-                <span className="text-[10px] font-semibold text-slate-500 group-hover/second:text-slate-700 transition-colors">
+                <span className="text-[10px] font-semibold text-slate-500 group-hover/second:text-slate-700 transition-colors dark:text-slate-400">
                   +{count - 1}
                 </span>
               </div>
@@ -256,7 +254,7 @@ export function PromptBarRefImageStack({
             onUploadClick();
           }}
           style={fanTransition}
-          className={`absolute top-1 ${cardW} ${cardH} rounded-xl bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.08)] transform rotate-[7deg] hover:rotate-[5deg] hover:scale-105 hover:z-40 flex items-center justify-center cursor-pointer z-10 group/add select-none p-1 ${
+          className={`absolute top-1 ${cardW} ${cardH} rounded-xl bg-white border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.08)] transform rotate-[7deg] hover:rotate-[5deg] hover:scale-105 hover:z-40 flex items-center justify-center cursor-pointer z-10 group/add select-none p-1 dark:border-white/15 dark:bg-[#222328] ${
             isStackHovered
               ? count === 1
                 ? 'left-[62px] sm:left-[66px] md:left-[70px] opacity-100 scale-100 pointer-events-auto'
@@ -266,11 +264,11 @@ export function PromptBarRefImageStack({
           title="添加更多参考素材"
           aria-label="添加更多参考素材"
         >
-          <div className="w-full h-full rounded-lg border border-dashed border-slate-200/90 group-hover/add:border-slate-300 bg-slate-50/50 group-hover/add:bg-slate-100/70 flex flex-col items-center justify-center gap-1 transition-colors">
-            <div className="w-7 h-7 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/add:text-slate-800 group-hover/add:border-slate-300 transition-all">
+          <div className="w-full h-full rounded-lg border border-dashed border-slate-200/90 group-hover/add:border-slate-300 bg-slate-50/50 group-hover/add:bg-slate-100/70 flex flex-col items-center justify-center gap-1 transition-colors dark:border-white/15 dark:bg-white/[0.04] dark:group-hover/add:border-white/30 dark:group-hover/add:bg-white/[0.08]">
+            <div className="w-7 h-7 rounded-full bg-white shadow-xs border border-slate-200/60 flex items-center justify-center text-slate-500 group-hover/add:text-slate-800 group-hover/add:border-slate-300 transition-all dark:border-white/15 dark:bg-white/10 dark:text-slate-100 dark:group-hover/add:border-white/30 dark:group-hover/add:text-white">
               <Plus className="w-3.5 h-3.5 stroke-[2.2] group-hover/add:rotate-90 transition-transform duration-300" />
             </div>
-            <span className="text-[10px] font-medium text-slate-400 group-hover/add:text-slate-600 transition-colors">
+            <span className="text-[10px] font-medium text-slate-400 group-hover/add:text-slate-600 transition-colors dark:text-slate-400 dark:group-hover/add:text-slate-200">
               添加
             </span>
           </div>

@@ -10,9 +10,28 @@ export interface VideoSheetParseResult {
   error?: string;
 }
 
-const TITLE_HEADERS = new Set(['新标题', '标题', 'title', '视频标题', '名称']);
-const URL_HEADERS = new Set(['链接', '视频链接', 'url', '视频地址', 'oss链接', '视频url', '下载链接']);
+const TITLE_HEADERS = new Set(['新标题', '标题', 'title', '视频标题', '名称', '商品标题', '文件名', '视频文件名']);
+const URL_HEADERS = new Set(['链接', '视频链接', 'url', '视频地址', 'oss链接', '视频url', '下载链接', '商品链接']);
 const RESERVED_WINDOWS_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const FILENAME_CHAR_LIMIT = 80;
+const FILENAME_BYTE_LIMIT = 240;
+
+function utf8Size(value: string) {
+  return new TextEncoder().encode(value).length;
+}
+
+function trimVideoStem(stem: string, extra = '') {
+  let next = Array.from(stem).slice(0, FILENAME_CHAR_LIMIT).join('');
+  while (next && utf8Size(`${next}${extra}.mp4`) > FILENAME_BYTE_LIMIT) {
+    next = Array.from(next).slice(0, -1).join('');
+  }
+  return next;
+}
+
+function normalizeSheetUrl(raw: string) {
+  const url = raw.trim().replace(/ /g, '%20');
+  return /^https?:\/\//i.test(url) ? url : '';
+}
 
 function sanitizeVideoTitle(title: string) {
   let cleaned = '';
@@ -40,13 +59,15 @@ export function videoDownloadFilename(title: string, used: Set<string>): string 
   const cleaned = sanitizeVideoTitle(title);
   let stem = cleaned;
   while (/\.mp4$/i.test(stem)) stem = stem.slice(0, -4);
-  stem = stem.replace(/[. ]+$/g, '').slice(0, 180);
+  stem = trimVideoStem(stem.replace(/[. ]+$/g, ''));
   if (!stem) stem = '视频';
   if (RESERVED_WINDOWS_NAME.test(stem)) stem = `_${stem}`;
   let filename = `${stem}.mp4`;
   let index = 2;
   while (used.has(filename.toLowerCase())) {
-    filename = `${stem} (${index}).mp4`;
+    const marker = ` (${index})`;
+    const candidate = trimVideoStem(stem, marker) || '视频';
+    filename = `${candidate}${marker}.mp4`;
     index += 1;
   }
   used.add(filename.toLowerCase());
@@ -78,9 +99,9 @@ export function parseVideoSheet(rows: unknown[][]): VideoSheetParseResult {
   for (let rowIndex = columns.header + 1; rowIndex < rows.length; rowIndex += 1) {
     const row = Array.isArray(rows[rowIndex]) ? rows[rowIndex] : [];
     const title = cellText(row[columns.title]);
-    const url = cellText(row[columns.url]);
+    const url = normalizeSheetUrl(cellText(row[columns.url]));
     if (!title && !url) continue;
-    if (!/^https?:\/\//i.test(url)) continue;
+    if (!url) continue;
     items.push({
       id: `video-${rowIndex + 1}`,
       title: title || '视频',

@@ -50,43 +50,16 @@ const CANVAS_CONTROLS: Record<CanvasSettingsPage, { title: string; blurb?: strin
       { kind: 'toggle', id: 'confirmDelete', label: '删除前确认', desc: '删除节点或连线前先弹出确认。', defaultOn: true },
     ],
   },
-  token: {
-    title: '平台 API 令牌',
-    controls: [
-      { kind: 'text', id: 'userId', label: 'USER ID', desc: '平台用户 ID。', placeholder: '平台用户 ID' },
-      { kind: 'text', id: 'token', label: 'TOKEN', desc: '平台系统 Token，形如 Bearer …', placeholder: '平台系统 Token，形如 Bearer …', secret: true },
-    ],
-  },
-  pet: {
-    title: '麻衣桌宠',
-    controls: [
-      { kind: 'toggle', id: 'show', label: '显示桌宠', desc: '在画布上显示麻衣桌宠。', defaultOn: true },
-      { kind: 'segment', id: 'preview', label: '快捷预览', desc: '预览待机、跑动或视线动作。', options: ['待机', '跑动', '视线'] },
-      { kind: 'segment', id: 'size', label: '显示大小', desc: '画布上桌宠的显示尺寸。', options: ['小', '中', '大'], defaultIndex: 1 },
-      { kind: 'segment', id: 'link', label: '画布联动', desc: '关闭后暂停画布与任务通知。', options: ['全开', '仅生成', '关闭'] },
-    ],
-  },
-  jimeng: {
-    title: '即梦',
-    blurb: '即梦渠道的开关预览。密钥仍在 API 接入里配置。',
-    controls: [
-      { kind: 'toggle', id: 'enabled', label: '在视频页显示即梦模型', desc: '只影响这份预览，不会改动已保存的视频模型。' },
-    ],
-  },
-  codex: {
-    title: 'Codex',
-    controls: [
-      { kind: 'text', id: 'base', label: 'BASE URL', desc: 'Codex 兼容接口地址。', placeholder: 'https://api.openai.com/v1' },
-      { kind: 'text', id: 'key', label: 'API KEY', desc: '不会写入 OpenAI 渠道。', placeholder: 'sk-…', secret: true },
-    ],
-  },
-  upscale: {
-    title: '即梦智能超清',
-    controls: [
-      { kind: 'text', id: 'base', label: 'BASE URL', desc: '桌面版转发地址。不会发起连接测试。', placeholder: 'https://visual.volcengineapi.com' },
-      { kind: 'text', id: 'key', label: 'API KEY', desc: '填写 AK:SK 或普通 API Key。关闭面板后丢弃。', placeholder: '填写 AK:SK 或普通 API Key', secret: true },
-    ],
-  },
+};
+
+const PET_SPEC: { title: string; blurb?: string; controls: PreviewControl[] } = {
+  title: '麻衣桌宠',
+  controls: [
+    { kind: 'toggle', id: 'show', label: '显示桌宠', desc: '在画布上显示麻衣桌宠。', defaultOn: true },
+    { kind: 'segment', id: 'preview', label: '快捷预览', desc: '预览待机、跑动或视线动作。', options: ['待机', '跑动', '视线'] },
+    { kind: 'segment', id: 'size', label: '显示大小', desc: '画布上桌宠的显示尺寸。', options: ['小', '中', '大'], defaultIndex: 1 },
+    { kind: 'segment', id: 'link', label: '画布联动', desc: '关闭后暂停画布与任务通知。', options: ['全开', '仅生成', '关闭'] },
+  ],
 };
 
 const MODALITY_MODELS: Record<'three_d' | 'music' | 'voice', { title: string; models: { name: string; id: string }[] }> = {
@@ -114,8 +87,8 @@ function PreviewRows({ controls }: { controls: PreviewControl[] }) {
         return (
           <div key={control.id} className="settings-preview-row">
             <div className="min-w-0">
-              <div className="text-sm font-medium text-slate-900">{control.label}</div>
-              {control.desc && <p className="mt-1 text-xs leading-5 text-slate-500">{control.desc}</p>}
+              <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{control.label}</div>
+              {control.desc && <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{control.desc}</p>}
             </div>
             {control.kind === 'toggle' && (
               <button type="button" role="switch" aria-checked={value === '1'} aria-label={control.label} onClick={() => set(control.id, value === '1' ? '0' : '1')} className={`settings-switch ${value === '1' ? 'is-on' : ''}`}>
@@ -149,8 +122,13 @@ export function SettingsPreviewNotice() {
   return <p className="settings-preview-notice">界面预览，暂不生效</p>;
 }
 
+const DEFAULT_SPEC: { title: string; blurb?: string; controls: PreviewControl[] } = {
+  title: '设置',
+  controls: [],
+};
+
 export function CanvasPreview({ page }: { page: CanvasSettingsPage }) {
-  const spec = CANVAS_CONTROLS[page];
+  const spec = CANVAS_CONTROLS[page] ?? CANVAS_CONTROLS.board ?? DEFAULT_SPEC;
   return (
     <section className="settings-preview">
       <header>
@@ -159,6 +137,20 @@ export function CanvasPreview({ page }: { page: CanvasSettingsPage }) {
         {spec.blurb && <p>{spec.blurb}</p>}
       </header>
       <PreviewRows key={page} controls={spec.controls} />
+    </section>
+  );
+}
+
+export function PetPreview() {
+  const spec = PET_SPEC;
+  return (
+    <section className="settings-preview">
+      <header>
+        <h2>{spec.title}</h2>
+        <SettingsPreviewNotice />
+        {spec.blurb && <p>{spec.blurb}</p>}
+      </header>
+      <PreviewRows key="pet" controls={spec.controls} />
     </section>
   );
 }
@@ -175,7 +167,7 @@ export function ModalityPreview({ kind }: { kind: 'three_d' | 'music' | 'voice' 
       <div className="space-y-3">
         {spec.models.map(model => (
           <article key={model.id} className="settings-config-card space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900">{model.name}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{model.name}</h3>
             <label className="settings-form-field">MODEL ID<input className="settings-field" defaultValue={model.id} aria-label={`${model.name} MODEL ID`} /></label>
             <label className="settings-form-field">API KEY<input className="settings-field" type="password" placeholder="sk-…" aria-label={`${model.name} API KEY`} /></label>
             <label className="settings-form-field">BASE URL<input className="settings-field" placeholder="https://" aria-label={`${model.name} BASE URL`} /></label>

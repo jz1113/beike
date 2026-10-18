@@ -25,13 +25,13 @@ export function BatchStage4GalleryView({
         return (
           <div
             key={item.id}
-            className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow dark:border-white/10 dark:bg-[#18191c]"
           >
             {/* 商品头部 */}
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 dark:border-white/10">
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-slate-900 truncate">{item.title}</h4>
-                <p className="text-[11px] text-slate-500">
+                <h4 className="text-sm font-bold text-slate-900 truncate dark:text-slate-100">{item.title}</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {successTasks.length}/{tasks.length} 张已完成
                 </p>
               </div>
@@ -58,7 +58,7 @@ export function BatchStage4GalleryView({
                         setPreviewImageUrl(url);
                       }
                     }}
-                    className="aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 cursor-pointer group"
+                    className="aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 cursor-pointer group dark:bg-white/10"
                   >
                     <LazyProxyImage
                       src={url}
@@ -70,7 +70,7 @@ export function BatchStage4GalleryView({
                   </button>
                 ))}
                 {previewUrls.length > 4 && (
-                  <div className="aspect-[3/4] rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                  <div className="aspect-[3/4] rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold dark:text-slate-400 dark:bg-white/10">
                     +{previewUrls.length - 4}
                   </div>
                 )}
@@ -83,9 +83,9 @@ export function BatchStage4GalleryView({
 
             {/* 文案预览 */}
             {item.copywriting?.title && (
-              <div className="px-4 py-3 border-t border-slate-100">
-                <p className="text-xs font-bold text-slate-800 truncate">{item.copywriting.title}</p>
-                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+              <div className="px-4 py-3 border-t border-slate-100 dark:border-white/10">
+                <p className="text-xs font-bold text-slate-800 truncate dark:text-slate-100">{item.copywriting.title}</p>
+                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 dark:text-slate-400">
                   {item.copywriting.content}
                 </p>
               </div>

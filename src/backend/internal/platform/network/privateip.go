@@ -83,24 +83,6 @@ func privateDotted(mapped string) bool {
 	return first >= 224
 }
 
-func dottedIPv4(value string) bool {
-	parts := strings.Split(value, ".")
-	if len(parts) != 4 {
-		return false
-	}
-	for _, part := range parts {
-		if part == "" || len(part) > 3 {
-			return false
-		}
-		for _, char := range part {
-			if char < '0' || char > '9' {
-				return false
-			}
-		}
-	}
-	return true
-}
-
 func decimalByte(value string) (int, bool) {
 	if value == "" || (len(value) > 1 && value[0] == '0') {
 		return 0, false

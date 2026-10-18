@@ -111,15 +111,14 @@ func scanSnapshotItem(rows *sql.Rows) (map[string]any, error) {
 		if callID == "" {
 			callID = id
 		}
-		toolStatus := "running"
-		if status == "done" || status == "error" {
-			toolStatus = status
-		}
 		base["name"] = toolName.String
 		base["displayName"] = firstText(displayName.String, toolName.String)
 		base["args"] = args
 		base["callId"] = callID
-		base["status"] = toolStatus
+		base["status"] = storedToolStatus(status)
+		if summary.Valid && summary.String != "" {
+			base["summary"] = summary.String
+		}
 	case "approvalRequest":
 		approvalID, _ := metaMap["approvalId"].(string)
 		if approvalID == "" {

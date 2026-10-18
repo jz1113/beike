@@ -11,8 +11,58 @@ type videoSpec struct {
 var videoRatios = []string{"16:9", "9:16", "1:1", "4:3", "3:4", "21:9"}
 
 func videoSpecFor(model string) (videoSpec, bool) {
-	spec, ok := videoSpecs[model]
-	return spec, ok
+	if spec, ok := videoSpecs[model]; ok {
+		return spec, true
+	}
+	id := strings.ToLower(strings.TrimSpace(model))
+	if spec, ok := videoSpecs[id]; ok {
+		return spec, true
+	}
+	switch {
+	case strings.Contains(id, "seedance-2.5") || strings.Contains(id, "seedance-2-5"):
+		return videoSpecs["doubao-seedance-2.5"], true
+	case strings.Contains(id, "seedance"):
+		return videoSpecs["doubao-seedance-2.0-mini"], true
+	case strings.Contains(id, "wan"):
+		return videoSpecs["wan3.0-video"], true
+	case strings.Contains(id, "sora") && strings.Contains(id, "pro"):
+		return videoSpecs["sora-2-pro"], true
+	case strings.Contains(id, "sora"):
+		return videoSpecs["sora-2"], true
+	case strings.Contains(id, "veo"):
+		return videoSpecs["veo3.1"], true
+	case strings.Contains(id, "kling"):
+		return videoSpecs["kling-video-v3"], true
+	case strings.Contains(id, "vidu"):
+		return videoSpecs["viduq3"], true
+	case strings.Contains(id, "minimax") || strings.Contains(id, "hailuo") || strings.Contains(id, "video-01"):
+		return videoSpecs["MiniMax-H3"], true
+	case strings.Contains(id, "grok"):
+		return videoSpecs["grok-imagine-video-1.5"], true
+	}
+	return videoSpec{}, false
+}
+
+var videoResolutionOrder = []string{"480P", "720P", "1080P", "4K"}
+
+// defaultVideoResolution picks 480P, then 720P, then the lowest listed tier.
+func defaultVideoResolution(model string) string {
+	spec, ok := videoSpecFor(model)
+	if !ok || len(spec.resolutions) == 0 {
+		return "480P"
+	}
+	if containsString(spec.resolutions, "480P") {
+		return "480P"
+	}
+	if containsString(spec.resolutions, "720P") {
+		return "720P"
+	}
+	for _, value := range videoResolutionOrder {
+		if containsString(spec.resolutions, value) {
+			return value
+		}
+	}
+	return spec.resolutions[0]
 }
 
 func videoSpecError(model, mode, resolution, aspect string, duration float64) string {
@@ -36,16 +86,17 @@ func videoSpecError(model, mode, resolution, aspect string, duration float64) st
 }
 
 func videoDurations(model, resolution, mode string) []int {
-	if strings.HasPrefix(model, "veo3.1") && (resolution != "720P" || mode == "omni") {
+	id := strings.ToLower(model)
+	if strings.Contains(id, "veo") && !strings.Contains(id, "omni_flash") && !strings.Contains(id, "omni-flash") && (resolution != "720P" || mode == "omni" || mode == "first_last_frame") {
 		return []int{8}
 	}
 	if spec, ok := videoSpecFor(model); ok {
-		if strings.HasPrefix(model, "vidu") && mode == "omni" {
+		if strings.Contains(id, "vidu") && mode == "omni" {
 			return filterMin(spec.durations, 3)
 		}
 		return spec.durations
 	}
-	return []int{5}
+	return []int{4, 5, 8, 10, 15}
 }
 
 func filterMin(values []int, min int) []int {

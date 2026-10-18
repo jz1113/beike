@@ -28,7 +28,7 @@ function ImageContent({
   const originalUrl = src?.startsWith('//') ? `https:${src}` : src;
 
   if (!src) {
-    return <div className={`bg-slate-100/80 ${className}`} />;
+    return <div className={`bg-slate-100/80 dark:bg-white/10 ${className}`} />;
   }
 
   // 默认走后端轻量 WebP 代理，若代理请求失败，立即无感降级为原始直链
@@ -37,7 +37,7 @@ function ImageContent({
     : proxyMediaUrl(originalUrl, { thumb, width });
 
   return (
-    <div className="w-full h-full relative bg-slate-100/70 overflow-hidden select-none">
+    <div className="w-full h-full relative bg-slate-100/70 overflow-hidden select-none dark:bg-white/10">
       {/* 优雅低对比度骨架加载动画 */}
       {!loaded && !loadError && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200/50 animate-pulse" />
@@ -45,7 +45,7 @@ function ImageContent({
 
       {/* 彻底加载失败时的极简降级保底图 */}
       {loadError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-2 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-2 text-center dark:bg-white/10">
           <svg className="w-6 h-6 stroke-[1.5] text-slate-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
           </svg>

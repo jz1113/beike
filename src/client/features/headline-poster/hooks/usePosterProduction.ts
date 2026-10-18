@@ -11,6 +11,13 @@ import { loadSystemConfiguredModels } from '@client/shared/models/configuredMode
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 import { reservedArtDirectionFor, sourceKey } from '../model/reservedArtDirections';
 import { directCoverDesign, generateFinalCover, rewriteCoverTitle } from '../api/posterApi';
+import {
+  getActiveCoverStyleId,
+  getAllCoverStyles,
+  getStyleCorrections,
+  setActiveCoverStyleId as persistActiveCoverStyleId,
+} from '../model/coverMemoryStorage';
+import { logMemoryAudit } from '../model/coverAuditStorage';
 import { parseTable } from '../model/parsePosterTable';
 import { assertPosterPasteSize, assertPosterSheetImportRange } from '../model/posterImportLimits';
 import { mergePosterItems } from '../model/mergePosterItems';
@@ -66,6 +73,13 @@ export function usePosterProduction() {
   const [titleHandling, setTitleHandling] = useState<PosterProductionSettings['titleHandling']>('rewrite');
   const [imageQuality, setImageQuality] = useState<ImageQuality>('high');
   const [concurrency, setConcurrency] = useState<number>(POSTER_CONCURRENCY_OPTIONS[0]);
+  const [activeStyleId, setActiveStyleIdState] = useState<string>(getActiveCoverStyleId);
+  const activeStyleIdRef = useRef(activeStyleId);
+  const setActiveStyleId = (styleId: string) => {
+    setActiveStyleIdState(styleId);
+    activeStyleIdRef.current = styleId;
+    persistActiveCoverStyleId(styleId);
+  };
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<PosterProductionSettings | null>(null);
   const [previewState, setPreviewState] = useState<{ itemId: string; index: number } | null>(null);
@@ -757,13 +771,29 @@ export function usePosterProduction() {
       if (!recoveringImage) {
         const occurrence = itemsRef.current.slice(0, index).filter((row) => sourceKey(row.sourceImageUrl) === sourceKey(item.sourceImageUrl)).length;
         const artDirection = reservedArtDirectionFor(item.sourceImageUrl, occurrence);
+        const currentStyle = getAllCoverStyles().find((s) => s.id === activeStyleIdRef.current);
+        const styleCorrections = getStyleCorrections(activeStyleIdRef.current).map((c) => c.negativeRule);
+        const mergedNegativeRules = [...(currentStyle?.negativeRules || []), ...styleCorrections];
         const directorResult = await runWithModelFallback(
           '封面设计', 'prompting', titleResult.modelId,
-          (modelId) => directCoverDesign(item, coverTitle, artDirection, modelId, signal),
+          (modelId) => directCoverDesign(item, coverTitle, artDirection, modelId, {
+            stylePrompt: currentStyle?.directorPrompt,
+            negativeRules: mergedNegativeRules,
+            signal,
+          }),
         );
         if (itemAborted()) throw new Error('已取消大字报任务');
         designPlan = buildDesignPlan(coverTitle, directorResult.value);
         prompt = designPlan.generationDirection;
+        logMemoryAudit({
+          styleName: currentStyle?.name || '默认风格',
+          itemTitle: item.originalTitle || item.productName || '商品封面',
+          adoptedRules: [
+            directorResult.value.composition || '居中咬合构图',
+            directorResult.value.typography || '粗黑字效',
+          ].filter(Boolean),
+          blockedNegatives: mergedNegativeRules.slice(0, 3),
+        });
         updateItem(item.id, {
           status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'integrated-cover-v4',
           modelFallbackNote: directorResult.fallbackNote || titleResult.fallbackNote,
@@ -966,6 +996,7 @@ export function usePosterProduction() {
     items, isReady, isRunning, isImporting, isRestoring, isExporting, notice,
     availableImageModels, availableTitleModels,
     imageModel, titleModel, titleHandling, imageQuality, concurrency,
+    activeStyleId, setActiveStyleId, styles: getAllCoverStyles(),
     isSettingsOpen, settingsDraft, setSettingsDraft,
     previewState, setPreviewState, previewItem, previewImages,
     completedCount, failedCount, historyBatches, activeBatchId: activeBatchIdRef.current,

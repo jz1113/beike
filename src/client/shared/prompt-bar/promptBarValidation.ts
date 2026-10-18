@@ -209,6 +209,19 @@ export function validateSubmitInput(
     return '请先在设置中从网关拉取视频模型';
   }
 
+  if (quickGenMode === 'audio') {
+    if (input.hasAudioModels === false) {
+      return '请先在设置中配置音频模型';
+    }
+    if (!input.quickAudioModel?.trim()) {
+      return '请先选择已同步的音频模型';
+    }
+    if (!quickPrompt.trim()) {
+      return '请输入你想朗读或合成的音频文本内容';
+    }
+    return null;
+  }
+
   if (!quickPrompt.trim() && effectiveImages.length === 0) {
     if (quickGenMode === 'video' && quickVideoRefMode === 'first_last_frame') {
       return '请输入描述你想生成的视频提示词，或上传首帧/尾帧图片';

@@ -51,13 +51,13 @@ export function SubCategoryManagerContent({
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 dark:text-slate-100">
                   <span>智能聚类规整建议</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-semibold">
                     {consolidationResult.originalCount} ➔ {consolidationResult.consolidatedCount} 个标准类目
                   </span>
                 </h4>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5 dark:text-slate-400">
                   已按身体解剖机位部位与饰品形态聚类，碎片名称已沉淀至反推匹配词库。
                 </p>
               </div>
@@ -73,11 +73,11 @@ export function SubCategoryManagerContent({
           </div>
 
           {/* 规整结果分组卡片 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] overflow-y-auto p-1 bg-white/70 rounded-xl border border-purple-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] overflow-y-auto p-1 bg-white/70 rounded-xl border border-purple-100 dark:bg-[#18191c]/95">
             {consolidationResult.groups.map((group) => (
               <div
                 key={group.clusterId}
-                className="p-2.5 rounded-xl border border-purple-100 bg-white space-y-1 shadow-2xs"
+                className="p-2.5 rounded-xl border border-purple-100 bg-white space-y-1 shadow-2xs dark:bg-[#18191c]"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-purple-950 flex items-center gap-1.5">
@@ -89,12 +89,12 @@ export function SubCategoryManagerContent({
                   </span>
                 </div>
 
-                <div className="text-[11px] text-slate-500">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
                   <span className="text-slate-400">吸收原类目: </span>
                   {group.absorbedLabels.map((itemLabel) => (
                     <span
                       key={itemLabel}
-                      className="inline-block text-[10px] px-1.5 py-0.2 mr-1 mb-1 rounded bg-slate-100 text-slate-700"
+                      className="inline-block text-[10px] px-1.5 py-0.2 mr-1 mb-1 rounded bg-slate-100 text-slate-700 dark:text-slate-200 dark:bg-white/10"
                     >
                       {itemLabel}
                     </span>
@@ -108,7 +108,7 @@ export function SubCategoryManagerContent({
             <button
               type="button"
               onClick={() => setConsolidationResult(null)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer dark:text-slate-300 dark:hover:bg-white/10"
             >
               放弃规整
             </button>
@@ -129,7 +129,7 @@ export function SubCategoryManagerContent({
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-800">已生效类目清单</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">已生效类目清单</span>
               <span className="text-[11px] text-slate-400">({categoriesList.length} 个)</span>
             </div>
             <div className="flex items-center gap-2">
@@ -155,7 +155,7 @@ export function SubCategoryManagerContent({
               <button
                 type="button"
                 onClick={handleResetDefaults}
-                className="text-[11px] text-slate-500 hover:text-slate-800 px-2 py-1 flex items-center gap-1 cursor-pointer transition-colors"
+                className="text-[11px] text-slate-500 hover:text-slate-800 px-2 py-1 flex items-center gap-1 cursor-pointer transition-colors dark:hover:text-slate-100 dark:text-slate-400"
                 title="恢复为系统预设类目表"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -165,9 +165,9 @@ export function SubCategoryManagerContent({
           </div>
 
           {categoriesList.length === 0 ? (
-            <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+            <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 dark:border-white/10 dark:bg-white/[0.03]">
               <Layers className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs text-slate-600 font-bold">当前暂无二级细分类目</p>
+              <p className="text-xs text-slate-600 font-bold dark:text-slate-300">当前暂无二级细分类目</p>
               <p className="text-[11px] text-slate-400 mt-1">
                 点击右上角「批量导入」即可一键快速填入推荐模板
               </p>
@@ -185,11 +185,11 @@ export function SubCategoryManagerContent({
               {categoriesList.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start justify-between p-3 rounded-xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-xs transition-all group"
+                  className="flex items-start justify-between p-3 rounded-xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-xs transition-all group dark:border-white/10 dark:bg-[#18191c]"
                 >
                   <div className="min-w-0 flex-1 pr-2">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs text-slate-800 truncate">{item.label}</span>
+                      <span className="font-bold text-xs text-slate-800 truncate dark:text-slate-100">{item.label}</span>
                       {item.anatomy && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium shrink-0 border border-amber-200/60">
                           部位: {item.anatomy}
@@ -226,7 +226,7 @@ export function SubCategoryManagerContent({
         <div className="space-y-3 animate-in fade-in duration-150">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 dark:text-slate-100">
                 <UploadCloud className="w-4 h-4 text-amber-600" />
                 <span>批量导入二级细分类目</span>
               </h3>
@@ -254,8 +254,8 @@ export function SubCategoryManagerContent({
 
           {/* 导入模式配置与预览 */}
           <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
-            <div className="flex items-center gap-4 text-xs text-slate-600">
-              <span className="text-[11px] font-medium text-slate-500">导入策略:</span>
+            <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-300">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">导入策略:</span>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="radio"

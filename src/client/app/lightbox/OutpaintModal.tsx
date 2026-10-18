@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { useAppStore } from '@client/store';
+import { useAppTheme } from '@client/shared/hooks/useAppTheme';
 import { LightboxGenConfigToolbar } from '../../shared/modals/lightbox/LightboxGenConfigToolbar';
 
 export interface OutpaintModalProps {
@@ -42,14 +43,16 @@ const RATIO_OPTIONS: RatioOption[] = [
   { id: '16:9', label: '16:9', widthRatio: 16, heightRatio: 9, Icon: Monitor },
 ];
 
-/** 棋盘格透明背景 CSS */
-const CHECKERBOARD_BG = {
-  backgroundImage:
-    'linear-gradient(45deg, #e8e8e8 25%, transparent 25%), linear-gradient(-45deg, #e8e8e8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e8e8e8 75%), linear-gradient(-45deg, transparent 75%, #e8e8e8 75%)',
-  backgroundSize: '14px 14px',
-  backgroundPosition: '0 0, 0 7px, 7px -7px, -7px 0px',
-  backgroundColor: '#f5f5f5',
-} as React.CSSProperties;
+function checkerboardStyle(isDark: boolean): React.CSSProperties {
+  const square = isDark ? '#3f3f46' : '#e8e8e8';
+  const board = isDark ? '#27272a' : '#f5f5f5';
+  return {
+    backgroundImage: `linear-gradient(45deg, ${square} 25%, transparent 25%), linear-gradient(-45deg, ${square} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${square} 75%), linear-gradient(-45deg, transparent 75%, ${square} 75%)`,
+    backgroundSize: '14px 14px',
+    backgroundPosition: '0 0, 0 7px, 7px -7px, -7px 0px',
+    backgroundColor: board,
+  };
+}
 
 /** 画布可用区域最大尺寸 */
 const CANVAS_MAX_W = 560;
@@ -62,6 +65,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
   originalPrompt = '',
   onSubmitOutpaint,
 }) => {
+  const { isDark } = useAppTheme();
   const [selectedRatio, setSelectedRatio] = useState<string>('original');
   const [scale, setScale] = useState<number>(1.5);
   const [prompt, setPrompt] = useState<string>('');
@@ -279,16 +283,16 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-100 max-w-[860px] w-full relative animate-scale-up flex flex-col max-h-[92vh] overflow-hidden"
+        className="bg-white dark:bg-[#1B1B1E] text-slate-900 dark:text-[#EDEDED] rounded-3xl p-5 sm:p-6 shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-100 dark:border-white/10 max-w-[860px] w-full relative animate-scale-up flex flex-col max-h-[92vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 顶部标题栏与关闭键 */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-          <h3 className="text-[17px] font-bold text-slate-900 tracking-tight">扩图</h3>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10 shrink-0">
+          <h3 className="text-[17px] font-bold text-slate-900 dark:text-white tracking-tight">扩图</h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
             title="关闭 (Esc)"
           >
             <X className="w-5 h-5 stroke-[2.2]" />
@@ -296,19 +300,19 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
         </div>
 
         {/* 中间核心画布与扩图预览框 */}
-        <div className="relative flex-1 min-h-[360px] sm:min-h-[440px] max-h-[58vh] bg-[#F8F9FA] rounded-2xl my-3 flex flex-col items-center justify-center overflow-hidden border border-slate-100/90 p-6">
+        <div className="relative flex-1 min-h-[360px] sm:min-h-[440px] max-h-[58vh] bg-[#F8F9FA] dark:bg-[#151518] rounded-2xl my-3 flex flex-col items-center justify-center overflow-hidden border border-slate-100/90 dark:border-white/10 p-6">
           {/* 左上角倍率尺寸标注 */}
-          <div className="absolute top-4 left-5 text-[12px] font-mono font-medium text-slate-400 select-none">
+          <div className="absolute top-4 left-5 text-[12px] font-mono font-medium text-slate-400 dark:text-slate-500 select-none">
             {outpaintInfo.label}
           </div>
 
           {/* 扩图外扩框 + 棋盘格 + 居中原图 */}
           <div
-            className="relative flex items-center justify-center transition-all duration-300 ease-out border-2 border-slate-900/90 rounded-sm"
+            className="relative flex items-center justify-center transition-all duration-300 ease-out border-2 border-slate-900/90 dark:border-white/90 rounded-sm"
             style={{
               width: `${outerBoxSize.w}px`,
               height: `${outerBoxSize.h}px`,
-              ...CHECKERBOARD_BG,
+              ...checkerboardStyle(isDark),
             }}
           >
             {/* 8 个黑白控制手柄 */}
@@ -327,7 +331,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
               style={{
                 width: `${innerImgSize.w}px`,
                 height: `${innerImgSize.h}px`,
-                backgroundColor: '#fff',
+                backgroundColor: isDark ? '#18191c' : '#ffffff',
               }}
             >
               {imgError ? (
@@ -358,7 +362,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
           {/* 原比例下的快速倍率浮动切换胶囊 */}
           {selectedRatio === 'original' && (
             <div className="absolute bottom-3 inset-x-0 flex items-center justify-center pointer-events-none">
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/95 backdrop-blur-md shadow-md border border-slate-200/90 pointer-events-auto">
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/95 dark:bg-[#1B1B1E]/95 backdrop-blur-md shadow-md border border-slate-200/90 dark:border-white/10 pointer-events-auto">
                 {[1.5, 2, 3].map((s) => (
                   <button
                     key={s}
@@ -366,8 +370,8 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
                     onClick={() => setScale(s)}
                     className={`px-3 py-1 rounded-xl text-xs font-semibold font-mono transition-all cursor-pointer ${
                       scale === s
-                        ? 'bg-slate-100 text-slate-900 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-slate-100 dark:bg-white/15 text-slate-900 dark:text-white shadow-2xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
                     }`}
                   >
                     {s}x
@@ -381,7 +385,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
         {/* 底部控制区：比例胶囊行 + 扩图提示词 + 生成按钮 */}
         <div className="shrink-0 space-y-3 pt-1">
           {/* 比例选择胶囊行 */}
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#F4F5F7] w-fit">
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#F4F5F7] dark:bg-white/5 w-fit">
             {RATIO_OPTIONS.map((opt) => {
               const isSelected = selectedRatio === opt.id;
               const Icon = opt.Icon;
@@ -392,8 +396,8 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
                   onClick={() => setSelectedRatio(opt.id)}
                   className={`flex flex-col items-center justify-center gap-1 w-14 h-12 rounded-xl transition-all cursor-pointer active:scale-95 ${
                     isSelected
-                      ? 'bg-white text-slate-900 font-bold shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-white dark:bg-[#2C2C32] text-slate-900 dark:text-white font-bold shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
                   }`}
                 >
                   <Icon className={`w-4 h-4 ${isSelected ? 'stroke-[2.2]' : 'stroke-[1.6]'}`} />
@@ -405,7 +409,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
 
           {/* 扩图提示词输入框与参数配置及生成按钮行 */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex-1 bg-[#F4F5F7] rounded-2xl px-4 py-2 border border-transparent focus-within:border-slate-300 focus-within:bg-white transition-all">
+            <div className="flex-1 bg-[#F4F5F7] dark:bg-[#151518] rounded-2xl px-4 py-2 border border-transparent focus-within:border-slate-300 dark:focus-within:border-white/30 focus-within:bg-white dark:focus-within:bg-[#18181b] transition-all">
               <input
                 type="text"
                 value={prompt}
@@ -417,7 +421,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
                   }
                 }}
                 placeholder="描述想要扩图的内容，不填将基于原图生成"
-                className="w-full bg-transparent text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                className="w-full bg-transparent text-[13px] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
               />
             </div>
 
@@ -436,7 +440,7 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit}
-              className="flex items-center justify-center px-5 py-2 rounded-2xl bg-black hover:bg-slate-800 text-white text-[13px] font-medium transition-all active:scale-95 cursor-pointer shadow-sm shrink-0 min-w-[76px]"
+              className="flex items-center justify-center px-5 py-2 rounded-2xl bg-black dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-[13px] font-medium transition-all active:scale-95 cursor-pointer shadow-sm shrink-0 min-w-[76px]"
             >
               <span>生成</span>
             </button>

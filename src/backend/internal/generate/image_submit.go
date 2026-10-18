@@ -9,7 +9,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 func Image(cfg config.Config) http.Handler {
@@ -41,8 +40,8 @@ func Image(cfg config.Config) http.Handler {
 		if raw, exists := payload["model"]; exists {
 			model = jsString(raw)
 		}
-		if !modelgw.IsApprovedImage(model) {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "模型 " + model + " 不在当前生图白名单中"})
+		if strings.TrimSpace(model) == "" {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "模型名称不能为空"})
 			return
 		}
 		if status, fields := imageGatewayError(cfg, r, payload, model); status != 0 {

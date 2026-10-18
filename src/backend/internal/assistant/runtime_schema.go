@@ -40,20 +40,6 @@ func assistantTools() []assistantTool {
 	return tools
 }
 
-func objectSchema(properties map[string]any, required []any, closed bool) map[string]any {
-	if properties == nil {
-		properties = map[string]any{}
-	}
-	schema := map[string]any{"type": "object", "properties": properties}
-	if required != nil {
-		schema["required"] = required
-	}
-	if closed {
-		schema["additionalProperties"] = false
-	}
-	return schema
-}
-
 func toolByName(name string) (assistantTool, bool) {
 	for _, tool := range assistantTools() {
 		if tool.Name == name {

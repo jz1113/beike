@@ -30,16 +30,21 @@ func writeCanvasText(cfg config.Config, w http.ResponseWriter, r *http.Request, 
 	}
 	format, _ := payload["apiFormat"].(string)
 	var text string
+	var usage map[string]any
 	if format == "openai-responses" {
-		text, status, message = completeCanvasResponses(r.Context(), base, key, upstream, prompt)
+		text, status, message, usage = completeCanvasResponses(r.Context(), base, key, upstream, prompt)
 	} else {
-		text, status, message = completeCanvasText(r.Context(), base, key, upstream, strings.HasPrefix(model, "deepseek-official:"), prompt)
+		text, status, message, usage = completeCanvasText(r.Context(), base, key, upstream, strings.HasPrefix(model, "deepseek-official:"), prompt)
 	}
 	if message != "" {
 		httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "text": text})
+	body := map[string]any{"success": true, "text": text, "model": upstream}
+	if usage != nil {
+		body["usage"] = usage
+	}
+	httpx.WriteJSON(w, http.StatusOK, body)
 }
 
 func canvasCredentials(cfg config.Config, r *http.Request, payload map[string]any, model string) (string, string, string, int, string) {
@@ -95,7 +100,7 @@ func defaultCanvasBase() string {
 	return "https://ai.comfly.org"
 }
 
-func completeCanvasText(ctx context.Context, base, key, model string, deepseek bool, prompt string) (string, int, string) {
+func completeCanvasText(ctx context.Context, base, key, model string, deepseek bool, prompt string) (string, int, string, map[string]any) {
 	content := "根据以下要求生成可直接使用的文字。仅返回正文，可以使用 Markdown 排版。\n\n" + prompt
 	body := map[string]any{
 		"model": model,
@@ -113,49 +118,49 @@ func completeCanvasText(ctx context.Context, base, key, model string, deepseek b
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, strings.TrimRight(base, "/")+"/v1/chat/completions", bytes.NewReader(encoded))
 	if err != nil {
-		return "", http.StatusBadGateway, "文本生成失败，请重试"
+		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+key)
 	response, err := canvasHTTP().Do(request)
 	if err != nil {
-		return "", http.StatusBadGateway, "文本生成失败，请重试"
+		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
 	}
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试"
+		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试", nil
 	}
-	text, message := canvasTextFromChat(raw)
+	text, usage, message := canvasTextFromChat(raw)
 	if message != "" {
-		return "", http.StatusBadGateway, message
+		return "", http.StatusBadGateway, message, nil
 	}
-	return text, 0, ""
+	return text, 0, "", usage
 }
 
-func canvasTextFromChat(raw []byte) (string, string) {
+func canvasTextFromChat(raw []byte) (string, map[string]any, string) {
 	var data map[string]any
 	if json.Unmarshal(raw, &data) != nil {
-		return "", "模型没有返回文字"
+		return "", nil, "模型没有返回文字"
 	}
 	choices, _ := data["choices"].([]any)
 	if len(choices) == 0 {
-		return "", "模型没有返回文字"
+		return "", nil, "模型没有返回文字"
 	}
 	choice, _ := choices[0].(map[string]any)
 	if choice["finish_reason"] != "stop" {
-		return "", "模型未完整返回正文，请调整要求后重试"
+		return "", nil, "模型未完整返回正文，请调整要求后重试"
 	}
 	message, _ := choice["message"].(map[string]any)
 	text, _ := message["content"].(string)
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return "", "模型没有返回文字"
+		return "", nil, "模型没有返回文字"
 	}
-	return text, ""
+	return text, NormalizeUsage(data), ""
 }
 
-func completeCanvasResponses(ctx context.Context, base, key, model, prompt string) (string, int, string) {
+func completeCanvasResponses(ctx context.Context, base, key, model, prompt string) (string, int, string, map[string]any) {
 	content := "根据以下要求生成可直接使用的文字。仅返回正文，可以使用 Markdown 排版。\n\n" + prompt
 	body := map[string]any{
 		"model":             model,
@@ -168,39 +173,40 @@ func completeCanvasResponses(ctx context.Context, base, key, model, prompt strin
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, strings.TrimRight(base, "/")+"/v1/responses", bytes.NewReader(encoded))
 	if err != nil {
-		return "", http.StatusBadGateway, "文本生成失败，请重试"
+		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+key)
 	response, err := canvasHTTP().Do(request)
 	if err != nil {
-		return "", http.StatusBadGateway, "文本生成失败，请重试"
+		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
 	}
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试"
+		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试", nil
 	}
-	text, message := canvasTextFromResponses(raw)
+	text, usage, message := canvasTextFromResponses(raw)
 	if message != "" {
-		return "", http.StatusBadGateway, message
+		return "", http.StatusBadGateway, message, nil
 	}
-	return text, 0, ""
+	return text, 0, "", usage
 }
 
-func canvasTextFromResponses(raw []byte) (string, string) {
+func canvasTextFromResponses(raw []byte) (string, map[string]any, string) {
 	var data map[string]any
 	if json.Unmarshal(raw, &data) != nil {
-		return "", "OpenAI 未返回可用正文"
+		return "", nil, "OpenAI 未返回可用正文"
 	}
 	if data["error"] != nil || data["status"] == "failed" {
-		return "", "OpenAI 返回错误响应"
+		return "", nil, "OpenAI 返回错误响应"
 	}
 	if data["status"] == "incomplete" {
-		return "", "OpenAI 输出不完整，请增加输出 token 上限"
+		return "", nil, "OpenAI 输出不完整，请增加输出 token 上限"
 	}
+	usage := NormalizeUsage(data)
 	if text, ok := data["output_text"].(string); ok && strings.TrimSpace(text) != "" {
-		return strings.TrimSpace(text), ""
+		return strings.TrimSpace(text), usage, ""
 	}
 	var builder strings.Builder
 	output, _ := data["output"].([]any)
@@ -218,7 +224,7 @@ func canvasTextFromResponses(raw []byte) (string, string) {
 	}
 	text := strings.TrimSpace(builder.String())
 	if text == "" {
-		return "", "OpenAI 未返回可用正文"
+		return "", nil, "OpenAI 未返回可用正文"
 	}
-	return text, ""
+	return text, usage, ""
 }

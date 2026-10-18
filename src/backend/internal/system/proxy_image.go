@@ -119,16 +119,6 @@ func ProxyImage(cfg config.Config) http.Handler {
 	})
 }
 
-func ClearProxyCache() int {
-	count := 0
-	proxyCache.Range(func(key, _ any) bool {
-		proxyCache.Delete(key)
-		count++
-		return true
-	})
-	return count
-}
-
 func proxyAuthorized(r *http.Request, cfg config.Config) bool {
 	if httpx.Authorized(r, cfg) {
 		return true
@@ -309,9 +299,4 @@ func normalizeProxyURL(raw string) string {
 		return "https://img10.360buyimg.com/pcpubliccms/s1440x1440_" + trimmed
 	}
 	return trimmed
-}
-
-func isLocalHost(host string) bool {
-	host = strings.ToLower(strings.Trim(strings.TrimSuffix(host, "."), "[]"))
-	return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0"
 }

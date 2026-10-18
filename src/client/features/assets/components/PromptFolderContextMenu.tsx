@@ -19,7 +19,7 @@ export function PromptFolderContextMenu({ menu, menuRef, folders, onOpen, onRena
   const selected = folders.filter(folder => menu.ids.includes(folder.id));
   const movableGroupIds = [...new Set(selected.flatMap(folder => folder.items.map(item => item.id)))];
   return createPortal(<div ref={menuRef} role="menu" aria-label={menu.folder ? `${menu.ids.length}个文件夹操作` : '文件夹空白区域操作'}
-    className="fixed z-[135] min-w-44 rounded-xl border border-slate-200/90 bg-white/95 p-1.5 shadow-xl backdrop-blur-md"
+    className="fixed z-[135] min-w-44 rounded-xl border border-slate-200/90 bg-white/95 p-1.5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-[#18191c]/95"
     style={{ left: menu.x, top: menu.y }}>
     {menu.folder ? <>
       {menu.ids.length === 1 && <button type="button" role="menuitem" onClick={() => onOpen(menu.folder!.id)}
@@ -39,7 +39,7 @@ export function PromptFolderContextMenu({ menu, menuRef, folders, onOpen, onRena
         <Settings2 className="h-3.5 w-3.5" />分类规则
       </button>}
       {!selected.some(folder => folder.isVirtual) && <button type="button" role="menuitem" onClick={() => onDelete(menu.ids)}
-        className="mt-1 flex w-full items-center gap-2 border-t border-slate-100 px-2.5 py-2 text-left text-xs text-rose-600 hover:bg-rose-50">
+        className="mt-1 flex w-full items-center gap-2 border-t border-slate-100 px-2.5 py-2 text-left text-xs text-rose-600 hover:bg-rose-50 dark:border-white/10">
         <Trash2 className="h-3.5 w-3.5" />删除{menu.ids.length > 1 ? ` ${menu.ids.length} 个` : ''}文件夹
       </button>}
     </> : <button type="button" role="menuitem" onClick={onCreate}

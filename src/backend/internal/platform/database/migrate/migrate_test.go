@@ -30,6 +30,8 @@ func TestChecksumsMatchNodeLedger(t *testing.T) {
 		"20260930_01_prompt_folder_archiving":                  "2f379136ca702bbf3702179f4cba83179538243a35a88869ada6029443d24f22",
 		"20260930_02_deconstruct_background_jobs":              "18575b9cc31c8ab45645cba2564c85ce7dd63629071743cf5f6460af2c3fcd0f",
 		"20261001_01_workspace_full_prompt_numbers":            "50b40901efbbb90f00694abde3a3ea0c6a8ca56353974698aa53f9929c4dae0d",
+		"20261018_01_avatar_studio":                            "67904d61ea56444e812df3abb9eff00867ce1e27f458a729db6b5490db9e941b",
+		"20261018_02_task_usage":                               "7a252a01e2e6f478d9dbd817b30ad4829d74f626c3f94100f08d4398fadf90d2",
 	}
 	items := mustMigrations()
 	if len(items) != len(want) {

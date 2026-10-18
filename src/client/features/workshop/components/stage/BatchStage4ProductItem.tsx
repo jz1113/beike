@@ -112,14 +112,14 @@ export function BatchStage4ProductItem({
       {/* ===================== 中间栏 (5/12 宽度)：成图展台 ===================== */}
       {productNavigation}
       </div>
-      <div className="workshop-image-gallery lg:col-start-2 min-w-0 bg-transparent rounded-xl border border-slate-200/60 p-4 sm:p-5 space-y-4">
+      <div className="workshop-image-gallery lg:col-start-2 min-w-0 bg-transparent rounded-xl border border-slate-200/60 p-4 sm:p-5 space-y-4 dark:border-white/10">
         <WorkshopPromoteGroup item={item} visionModel={selectedVisionModel} />
         {/* 切片成图展台 (4 张大图) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-800">
-                生成图片 <span className="ml-2 text-xs font-normal tabular-nums text-slate-500">{successTasks.length}/{tasks.length} 已完成</span>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                生成图片 <span className="ml-2 text-xs font-normal tabular-nums text-slate-500 dark:text-slate-400">{successTasks.length}/{tasks.length} 已完成</span>
               </h3>
             </div>
 
@@ -132,7 +132,7 @@ export function BatchStage4ProductItem({
                     onPreviewGallery(previewUrls, 0, `${item.title} - 全部成图`);
                   }
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer dark:text-slate-300 dark:hover:bg-white/10"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>预览全部</span>
@@ -143,9 +143,9 @@ export function BatchStage4ProductItem({
 
           {/* 4 栏等高大图网格 */}
           {tasks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center dark:bg-white/5 dark:border-white/10">
               <LayoutGrid className="w-6 h-6 text-slate-400 mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-600">暂无生成图片</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">暂无生成图片</p>
               <p className="text-xs text-slate-400 mt-1">生成任务创建后，将在这里展示进度与成图。</p>
             </div>
           )}
@@ -172,12 +172,12 @@ export function BatchStage4ProductItem({
                     }}
                     className={`aspect-[3/4] rounded-xl border overflow-hidden relative flex items-center justify-center transition-colors group ${hasImage || (!readOnly && isGenFailure) ? 'cursor-pointer' : 'cursor-default'} ${
                       hasImage
-                        ? 'border-slate-200 hover:border-indigo-400 bg-slate-50'
+                        ? 'border-slate-200 hover:border-indigo-400 bg-slate-50 dark:bg-white/5 dark:border-white/10'
                         : task.recoveryRequired
                         ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-100/50'
                         : isGenFailure
                         ? 'border-rose-300 bg-rose-50/50 hover:bg-rose-100/50'
-                        : 'border-slate-200 bg-slate-50/90'
+                        : 'border-slate-200 bg-slate-50/90 dark:border-white/10'
                     }`}
                   >
                     {hasImage && task.resultUrl ? (
@@ -201,7 +201,7 @@ export function BatchStage4ProductItem({
                                 setPreviewImageUrl(task.resultUrl!);
                               }
                             }}
-                            className="w-10 h-10 rounded-full bg-white/95 text-slate-800 flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 cursor-pointer"
+                            className="w-10 h-10 rounded-full bg-white/95 text-slate-800 flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 cursor-pointer dark:text-slate-100 dark:hover:bg-white/10 dark:bg-[#18191c]/95"
                             title="放大全屏预览"
                           >
                             <ZoomIn className="w-5 h-5" />
@@ -216,7 +216,7 @@ export function BatchStage4ProductItem({
                                   `${item.itemId || item.id}_分镜${task.shot_no}`
                                 );
                               }}
-                              className="w-10 h-10 rounded-full bg-white/95 text-slate-800 flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 cursor-pointer"
+                              className="w-10 h-10 rounded-full bg-white/95 text-slate-800 flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 cursor-pointer dark:text-slate-100 dark:hover:bg-white/10 dark:bg-[#18191c]/95"
                               title="下载原图"
                             >
                               <Download className="w-5 h-5" />
@@ -242,7 +242,7 @@ export function BatchStage4ProductItem({
                         {task.upstreamTaskId && <p className="break-all text-[10px] text-slate-400 select-text">任务 ID：{task.upstreamTaskId}</p>}
                         {!readOnly && canRecover && onRecheckTask && <button type="button" disabled={recheckingId !== null}
                           onClick={async (event) => { event.stopPropagation(); setRecheckingId(task.id); try { await onRecheckTask(item.id, task.id); } finally { setRecheckingId(null); } }}
-                          className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-600 disabled:opacity-40">{recheckingId === task.id ? '核对中…' : '核对原任务'}</button>}
+                          className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-600 disabled:opacity-40 dark:bg-[#18191c]">{recheckingId === task.id ? '核对中…' : '核对原任务'}</button>}
                         {!readOnly && retrySingleShotTask && <button
                           type="button"
                           disabled={recheckingId !== null}
@@ -250,7 +250,7 @@ export function BatchStage4ProductItem({
                             e.stopPropagation();
                             retrySingleShotTask?.(item.id, shotIdx);
                           }}
-                          className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm"
+                          className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm dark:bg-[#18191c]"
                         >
                           {task.recoveryRequired ? '放弃恢复并重做' : '重新生成'}
                         </button>}
@@ -258,26 +258,26 @@ export function BatchStage4ProductItem({
                     ) : task.status === 'PENDING' ? (
                       <div role="status" className="p-4 text-center space-y-2">
                         <Clock3 className="w-6 h-6 mx-auto text-slate-300" />
-                        <div className="text-xs font-medium text-slate-500">排队中</div>
+                        <div className="text-xs font-medium text-slate-500 dark:text-slate-400">排队中</div>
                       </div>
                     ) : (
                       <div role="status" aria-label={`分镜 ${task.shot_no} 生成中`} className="flex flex-col items-center gap-3 p-4 text-center">
                         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
                           <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" />
                         </span>
-                        <span className="text-xs font-medium text-slate-600">正在生成</span>
-                        <span className="text-[11px] text-slate-500">完成后自动显示</span>
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">正在生成</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">完成后自动显示</span>
                       </div>
                     )}
 
                     {/* 角标：分镜编号 */}
-                    <div className="absolute top-2.5 left-2.5 flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200/80 bg-white/90 px-1 text-[11px] font-medium tabular-nums text-slate-600 pointer-events-none">
+                    <div className="absolute top-2.5 left-2.5 flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200/80 bg-white/90 px-1 text-[11px] font-medium tabular-nums text-slate-600 pointer-events-none dark:text-slate-300 dark:border-white/10 dark:bg-[#18191c]/95">
                       {task.shot_no}
                     </div>
                   </div>
 
                   <div className="text-center space-y-1">
-                    <span className="text-xs font-medium text-slate-600 truncate block">
+                    <span className="text-xs font-medium text-slate-600 truncate block dark:text-slate-300">
                       {task.title || `分镜 ${task.shot_no}`}
                     </span>
                     {!readOnly && hasImage && onReviewTask ? (

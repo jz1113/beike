@@ -115,6 +115,14 @@
 | `viduq3-pro` | `374481802` → `vidu-text2video`<br>`374481817` → `vidu-query` |
 | `multimodal-chat` | `139393491` → `chat-completions`<br>`287782723` → `chat-stream`<br>`139453850` → `chat-vision`<br>`321040299` → `chat-video`<br>`287782788` → `chat-structured`<br>`223322111` → `chat-tools`<br>`228980408` → `claude-messages`<br>`350079690` → `gemini-official`<br>`321434971` → `responses-create` |
 
+## 渠道显示
+
+模型选择器上的短名来自 `src/shared/domain/models/modelChannels.ts`。新增渠道时只加一行登记：
+
+- 官方接口设置 `kind: 'official'`，触发器显示「官方」。
+- 第三方网关默认显示渠道 id 的首字母大写。两个网关首字母相同时，给后接入的渠道写上明确的 `badge`。
+- 未登记的自定义渠道 id 也回退为首字母大写。完整渠道名仍用在设置页和提示信息里。
+
 ## DeepSeek 接入约定
 
 从原 DeepSeek 接入参考（整理于 2026-09-22）提炼；这里只保留项目接入要点，参数适配以 [思考强度](reasoning.md) 与 [助手执行机制](assistant-runtime.md) 为准，不将历史型号示例当作永久白名单。
@@ -127,3 +135,21 @@
 - 原参考中的 Beta 前缀续写、FIM 与 Responses 示例不代表助手已接入这些执行路径，因此不再保留通用教程代码。
 
 参考：[Chat Completions](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[图像理解](https://api-docs.deepseek.com/zh-cn/guides/vision)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[模型列表](https://api-docs.deepseek.com/zh-cn/api/list-models)、[查询余额](https://api-docs.deepseek.com/zh-cn/api/get-user-balance)。
+
+## 数字人驱动与语音合成
+
+数字人口播把配音和驱动拆成两套凭证。配音模型在设置「语音」线路拉取，对口型驱动模型在设置「数字人」线路拉取。模型 ID 决定协议，404/405 才尝试下一条网关路径。环境变量 `AVATAR_LIPSYNC_SUBMIT_URLS` 与 `AVATAR_LIPSYNC_POLL_URLS` 仍可覆盖驱动地址。
+
+| 家族 | 识别 | 输入 | 提交路径 | 轮询路径 |
+| --- | --- | --- | --- | --- |
+| MiniMax 语音 | `speech-*`、`minimax`、`t2a` | 文本 + voice id | `/v1/t2a_v2`，失败再走 `/v1/audio/speech` | 同步返回音频 |
+| ElevenLabs | `eleven*` | 文本 + voice id | `/v1/text-to-speech/{voice_id}` | 同步返回音频 |
+| CosyVoice | `cosyvoice` | 文本 + voice | `/api/v1/services/aigc/text2audio/generation` | 同步返回音频 |
+| 豆包语音 | `doubao` 且含 `tts` | 文本 + voice_type | `/api/v1/tts` | 同步返回音频 |
+| 可灵对口型 | `kling` 且含 lip/avatar/ident | 照片或视频 + 音频 | `/kling/v1/videos/lip-sync` | `/kling/v1/videos/lip-sync/{id}` |
+| OmniHuman | `omnihuman` | 照片 + 音频 | `/v1/videos/omnihuman` | `/v1/videos/omnihuman/{id}` |
+| 万相对口型 | `wanx-avatar`、`videoretalk`、`emo-v` | 照片或视频 + 音频 | DashScope `image2video/video-synthesis` | `/api/v1/tasks/{id}` |
+| Hedra | `hedra` | 照片 + 音频 | `/hedra/v1/generations` | `/hedra/v1/generations/{id}` |
+| LatentSync | `latentsync`、`musetalk` | 视频 + 音频 | `/fal/latentsync` | `/fal/latentsync/{id}` |
+
+Seedance 等普通视频模型不能当作数字人驱动。声音克隆走 MiniMax `/v1/voice_clone` 或 ElevenLabs `/v1/voices/add`，状态分为处理中、就绪和失败。

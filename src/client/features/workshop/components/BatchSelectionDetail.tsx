@@ -41,29 +41,29 @@ export const BatchSelectionDetail: React.FC<BatchSelectionDetailProps> = ({
   canContinue = false,
 }) => {
   return (
-    <div className="flex-1 flex flex-col min-w-0 p-3 sm:p-5 lg:p-6 space-y-3 bg-white h-full overflow-hidden w-full">
+    <div className="flex-1 flex flex-col min-w-0 p-3 sm:p-5 lg:p-6 space-y-3 bg-white h-full overflow-hidden w-full dark:bg-[#18191c]">
       {/* 顶部商品信息条（纯净极简大标题与属性，操作全部汇聚至底部） */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 shrink-0 dark:border-white/10">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-lg bg-slate-900 text-white font-mono text-[10px] font-black shrink-0 shadow-2xs">
+            <span className="px-2 py-0.5 rounded-lg bg-slate-900 text-white font-mono text-[10px] font-black shrink-0 shadow-2xs dark:bg-white dark:text-slate-950">
               NO.{focusedIndex + 1}
             </span>
-            <h4 className="text-sm sm:text-base font-black text-slate-900 truncate" title={currentItem.title}>
+            <h4 className="text-sm sm:text-base font-black text-slate-900 truncate dark:text-slate-100" title={currentItem.title}>
               {currentItem.title}
             </h4>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono flex-wrap">
-            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold">
+            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold dark:text-slate-200 dark:bg-white/5 dark:border-white/10">
               SKU: {currentItem.itemId}
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold">
+            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold dark:text-slate-200 dark:bg-white/5 dark:border-white/10">
               平台: {currentItem.platform?.toUpperCase()}
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold">
+            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold dark:text-slate-200 dark:bg-white/5 dark:border-white/10">
               类目: {currentItem.category}
             </span>
-            <span className="text-slate-900 font-black text-xs">¥{currentItem.price}</span>
+            <span className="text-slate-900 font-black text-xs dark:text-slate-100">¥{currentItem.price}</span>
             <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100/80">
               当前已选 {currentItem.selectedProductImages.length} 张
             </span>
@@ -97,7 +97,7 @@ export const BatchSelectionDetail: React.FC<BatchSelectionDetailProps> = ({
       </div>
 
       {/* 底部综合流转与选图控制台：始终常驻可视区，操作全部汇聚在下方 */}
-      <div className="pt-2.5 flex items-center justify-end border-t border-slate-100 shrink-0 bg-white">
+      <div className="pt-2.5 flex items-center justify-end border-t border-slate-100 shrink-0 bg-white dark:border-white/10 dark:bg-[#18191c]">
         {/* 仅保留实际会改变当前选图结果的操作，避免与商品进度信息重复。 */}
         <div className="flex items-center justify-end gap-1.5 flex-wrap">
           {/* 下一步与完成按钮 */}

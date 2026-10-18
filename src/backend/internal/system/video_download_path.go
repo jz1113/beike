@@ -24,7 +24,7 @@ func cleanVideoDirectory(raw string) (string, error) {
 
 func safeVideoDestination(dir, name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 180 || name != filepath.Base(name) || strings.ContainsAny(name, `/\`) || strings.HasPrefix(name, ".") {
+	if name == "" || len(name) > 240 || name != filepath.Base(name) || strings.ContainsAny(name, `/\`) || strings.HasPrefix(name, ".") {
 		return "", errors.New("文件名不合法")
 	}
 	stem := strings.TrimSuffix(name, filepath.Ext(name))

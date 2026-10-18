@@ -42,12 +42,12 @@ export function CanvasModelPicker({ models, value, onChange, disabled = false, l
   return <>
     <button ref={trigger} type="button" aria-label={label} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled}
       onClick={() => {setOpen(!open);}}
-      className="flex max-w-[220px] items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-indigo-400 disabled:opacity-50">
+      className="flex max-w-[220px] items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-indigo-400 disabled:opacity-50">
       <span aria-hidden="true"><ModelIcon modelId={value} className="h-4 w-4" /></span>
       <span className="truncate" title={current?.name}>{current?.name || (value ? '模型已停用，请重新选择' : `选择${label}`)}</span>
-      <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
-    {open && createPortal(<div ref={popup} id={id} role="dialog" aria-label={`选择${label}`} className="fixed z-[200] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl" style={{left:position.left, top:position.top, bottom:position.bottom, width:position.width, maxHeight:position.height}}
+    {open && createPortal(<div ref={popup} id={id} role="dialog" aria-label={`选择${label}`} className="fixed z-[200] flex flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1B1B1E] p-1.5 text-slate-700 dark:text-[#C7C7CC] shadow-xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)]" style={{left:position.left, top:position.top, bottom:position.bottom, width:position.width, maxHeight:position.height}}
       onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onWheel={event => event.stopPropagation()}
       onKeyDown={event => {
         event.stopPropagation();
@@ -66,12 +66,12 @@ export function CanvasModelPicker({ models, value, onChange, disabled = false, l
       }}>
       <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain">
         {models.map(model => <button key={model.id} type="button" data-model-choice aria-pressed={model.id === value} onClick={() => {onChange(model.id); close();}}
-          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-300 ${model.id === value ? 'bg-slate-100 text-slate-900' : 'hover:bg-slate-50'}`}>
+          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-300 ${model.id === value ? 'bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white font-semibold' : 'text-slate-700 dark:text-[#C7C7CC] hover:bg-slate-50 dark:hover:bg-white/[0.06] hover:text-slate-900 dark:hover:text-white'}`}>
           <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center"><ModelIcon modelId={model.id} className="h-3.5 w-3.5" /></span>
           <span className="min-w-0 flex-1 text-xs font-medium leading-5" title={model.name}>{model.name}</span>
           {model.id === value && <Check className="h-3 w-3 shrink-0" />}
         </button>)}
-        {!models.length && <p className="px-3 py-6 text-center text-xs text-slate-500">请先在设置中配置并启用模型</p>}
+        {!models.length && <p className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">请先在设置中配置并启用模型</p>}
       </div>
     </div>, document.body)}
   </>;

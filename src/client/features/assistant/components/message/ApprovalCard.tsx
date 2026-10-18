@@ -25,7 +25,7 @@ export default function ApprovalCard({ approval, onDecision, disabled }: Props) 
           {argsPreview}
         </div>
       )}
-      <details className="mb-3"><summary className="cursor-pointer text-zinc-500">查看完整操作参数</summary><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-white/60 p-2">{JSON.stringify(approval.args, null, 2)}</pre></details>
+      <details className="mb-3"><summary className="cursor-pointer text-zinc-500">查看完整操作参数</summary><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-white/60 p-2 dark:bg-[#18191c]/95">{JSON.stringify(approval.args, null, 2)}</pre></details>
       <p className="mb-2 text-zinc-500">{canRemember ? '允许仅批准本次操作；本会话允许会在30分钟内批准此工具在当前对话中的后续操作。' : '允许仅批准本次操作，后续操作仍按工具规则确认。'}</p>
       <div className="flex flex-wrap gap-2">
         <button
@@ -49,7 +49,7 @@ export default function ApprovalCard({ approval, onDecision, disabled }: Props) 
           type="button"
           disabled={disabled}
           onClick={() => onDecision('decline')}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-zinc-600 text-[11px] font-medium hover:bg-zinc-100 disabled:opacity-50"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-zinc-600 text-[11px] font-medium hover:bg-zinc-100 disabled:opacity-50 dark:bg-[#18191c]"
         >
           <X className="w-3 h-3" />
           拒绝

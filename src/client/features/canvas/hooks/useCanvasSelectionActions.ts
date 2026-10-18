@@ -7,7 +7,7 @@ export function useCanvasSelectionActions(projectId: string, ids: string[], sele
   const remove = () => {
     const state = useCanvasStore.getState();
     const allowed = new Set(state.projects.find(p => p.id === projectId)?.nodes.filter(n => ids.includes(n.id) && !n.layerLocked && n.status !== 'generating').map(n => n.id));
-    useCanvasStore.setState({projects:state.projects.map(p => p.id === projectId ? {...p, updatedAt:Date.now(), nodes:p.nodes.filter(n => !allowed.has(n.id)).map(n => ({...n, referenceNodeIds:n.referenceNodeIds?.filter(id => !allowed.has(id))}))} : p)});
+    allowed.forEach(id => state.deleteNode(projectId, id));
     select(ids.filter(id => !allowed.has(id)));
   };
   const duplicate = () => {

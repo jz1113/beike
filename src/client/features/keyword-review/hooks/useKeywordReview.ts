@@ -9,6 +9,7 @@ import { runKeywordReviewBatches } from '../model/reviewRun';
 import { prepareReviewRun } from '../model/reviewRunPreparation';
 import { DEFAULT_KEYWORD_REVIEW_SETTINGS, normalizeKeywordReviewSettings, type KeywordReviewSettings } from '../model/keywordReviewSettings';
 import { addTokenUsage, estimateReviewYuan, formatReviewYuan, isDeepSeekPeakHour, readTokenUsage } from '../model/reviewCost';
+import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import { useKeywordReviewPreview, PREVIEW_LIMIT, type KeywordReviewFilter } from './useKeywordReviewPreview';
 import { useKeywordReviewConfig } from './useKeywordReviewConfig';
 import { useKeywordReviewBalance } from './useKeywordReviewBalance';
@@ -155,6 +156,7 @@ export function useKeywordReview() {
         },
         onUsage: (usage, date) => {
           const used = readTokenUsage(usage);
+          recordChatTokens({ modelId: runModel.model, modelName: runModel.label, type: 'chat', usage });
           setContext((current) => ({ ...current, tokenUsage: addTokenUsage(current.tokenUsage, used),
             estimatedYuan: current.estimatedYuan + estimateReviewYuan(used, date).yuan }));
         },

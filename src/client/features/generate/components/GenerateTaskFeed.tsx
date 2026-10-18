@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { RefObject } from 'react';
+import { ArrowDown } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, type GenerationTask } from '@client/store';
 import {
@@ -10,6 +11,7 @@ import {
   isDepthMediaType,
 } from '@shared/domain/media/drawing';
 import { isGenerateVideoTask, type FlatBatchItem } from '../model/generateWorkspaceLayout';
+import { getSingleMediaContainerClass } from '../model/generateCanvasLayout';
 import { useGenerateTaskActions } from '../hooks/useGenerateTaskActions';
 import { dockSafeArea } from '@client/shared/ui/layoutClasses';
 import FeedBatchHeader from './FeedBatchHeader';
@@ -45,7 +47,25 @@ export function GenerateTaskFeed({
     generationHistoryReady: state.generationHistoryReady,
   })));
 
-  const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollBottom(distanceToBottom > 220);
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [scrollContainerRef]);
+
+  const scrollToBottom = () => {
+    scrollContainerRef.current?.scrollTo({
+      top: scrollContainerRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  };
 
   const premiumGeneratingTaskId = useMemo(() => {
     for (let i = visibleFlatBatches.length - 1; i >= 0; i--) {
@@ -55,17 +75,6 @@ export function GenerateTaskFeed({
     }
     return null;
   }, [visibleFlatBatches]);
-
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      const target = e.target as Element;
-      if (!target.closest('[data-task-menu]')) {
-        setOpenMenuTaskId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
 
   const {
     handleReuseTask,
@@ -84,8 +93,8 @@ export function GenerateTaskFeed({
     >
       {taskBatches.length === 0 && (
         <div className="min-h-[45vh] flex flex-col items-center justify-center gap-2 text-center px-4" role="status" aria-live="polite">
-          <p className="text-base font-medium text-slate-600">{generationHistoryReady ? '从一个想法开始创作' : '正在恢复对话历史…'}</p>
-          {generationHistoryReady && <p className="text-sm text-slate-500">输入描述，或上传参考素材后开始生成。</p>}
+          <p className="text-base font-medium text-slate-600 dark:text-slate-300">{generationHistoryReady ? '从一个想法开始创作' : '正在恢复对话历史…'}</p>
+          {generationHistoryReady && <p className="text-sm text-slate-500 dark:text-slate-400">输入描述，或上传参考素材后开始生成。</p>}
         </div>
       )}
       {taskBatches.length > 0 && (
@@ -155,13 +164,14 @@ export function GenerateTaskFeed({
                       batch.tasks.find((t) => t.sourceImageUrl || t.referenceImageUrl)?.sourceImageUrl;
 
                     const isAgentTask =
+                      primaryTask?.mediaType === 'agent' ||
                       primaryTask?.id.startsWith('agent-task-') ||
-                      batch.tasks.some((t) => t.id.startsWith('agent-task-'));
+                      batch.tasks.some((t) => t.mediaType === 'agent' || t.id.startsWith('agent-task-'));
 
                     return (
                       <div
                         key={`${batch.batchId || 'batch'}-${bIdx}`}
-                        className="space-y-2.5 w-full transition-all duration-300"
+                        className={`space-y-2.5 w-full transition-all duration-300 ${isAgentTask ? 'max-w-3xl xl:max-w-4xl mx-auto' : ''}`}
                       >
                         {/* 1. 对话轮次元信息标头 (图3标杆同款: 多角度/智能改图/原图胶囊与参数紧凑并列，同行不换行) */}
                         {!isAgentTask && <FeedBatchHeader
@@ -199,15 +209,13 @@ export function GenerateTaskFeed({
 
                         {/* 2. 媒体内容展示区域 */}
                         {isSingle ? (
-                          /* 2.1 单张大图/视频卡片 (单图独立画幅，不限制上方标头宽度) */
-                          <div className={isAgentTask ? 'w-full max-w-3xl' : 'w-[280px] max-w-full'}>
+                          /* 2.1 单张大图/视频卡片 (单图独立画幅，Agent 模式全居中显示) */
+                          <div className={isAgentTask ? 'w-full max-w-3xl xl:max-w-4xl mx-auto' : getSingleMediaContainerClass(batch.size)}>
                             <FeedSingleCard
                               primaryTask={primaryTask}
                               batchTasks={batch.tasks}
                               isBatchVideo={isBatchVideo}
                               premiumGeneratingTaskId={premiumGeneratingTaskId}
-                              openMenuTaskId={openMenuTaskId}
-                              setOpenMenuTaskId={setOpenMenuTaskId}
                               onPreview={setPreviewTask}
                               onReuse={handleReuseTask}
                               onRegenerate={handleRegenerateTask}
@@ -218,7 +226,6 @@ export function GenerateTaskFeed({
                                 if (task.taskId && task.taskId !== task.id) {
                                   deleteGenerationTask(task.taskId);
                                 }
-                                setOpenMenuTaskId(null);
                                 onShowToast('已从对话记录中移除此卡片');
                               }}
                             />
@@ -230,8 +237,6 @@ export function GenerateTaskFeed({
                             primaryTask={primaryTask}
                             isBatchVideo={isBatchVideo}
                             premiumGeneratingTaskId={premiumGeneratingTaskId}
-                            openMenuTaskId={openMenuTaskId}
-                            setOpenMenuTaskId={setOpenMenuTaskId}
                             onPreview={setPreviewTask}
                             onReuse={handleReuseTask}
                             onRegenerate={handleRegenerateBatch}
@@ -241,7 +246,6 @@ export function GenerateTaskFeed({
                                 if (t.taskId && t.taskId !== t.id)
                                   deleteGenerationTask(t.taskId);
                               });
-                              setOpenMenuTaskId(null);
                               onShowToast('已从对话记录中移除此组图');
                             }}
                             onDeleteTask={(task) => {
@@ -261,7 +265,6 @@ export function GenerateTaskFeed({
                                   deleteGenerationTask(t.taskId);
                                 }
                               });
-                              setOpenMenuTaskId(null);
                               onShowToast(`已清除 ${failedTasks.length} 个失败卡片`);
                             }}
                             onRetryTask={handleRetryTask}
@@ -277,6 +280,18 @@ export function GenerateTaskFeed({
           {/* 🌟 底部定位锚点与安全间距 */}
           <div className="col-span-full h-6 w-full pointer-events-none" aria-hidden />
         </div>
+      )}
+
+      {/* 🌟 3. 回到最新位置悬浮按钮 (对标图3底部居中向下箭头) */}
+      {showScrollBottom && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label="滚动到最新消息"
+          className="fixed bottom-[calc(var(--prompt-dock-h,10rem)+1rem)] left-1/2 -translate-x-1/2 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-600 shadow-md backdrop-blur-xs transition-all hover:bg-white hover:text-slate-900 hover:shadow-lg cursor-pointer animate-fade-in dark:hover:text-white dark:text-slate-300 dark:hover:bg-white/10 dark:border-white/10 dark:bg-[#18191c]/95"
+        >
+          <ArrowDown className="h-4 w-4" />
+        </button>
       )}
     </div>
   );

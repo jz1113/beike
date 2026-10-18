@@ -1,6 +1,9 @@
 package assistant
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+)
 
 var sequentialTools = map[string]bool{
 	"update_plan": true, "execute_code": true, "workspace_navigate": true,
@@ -39,6 +42,7 @@ func toolGroups(names []string) [][]int {
 }
 
 func (loop *agentLoop) runToolCalls(calls []modelToolCall) {
+	defer loop.flushToolNotes()
 	names := make([]string, len(calls))
 	for i, call := range calls {
 		names[i] = call.name
@@ -72,4 +76,31 @@ func (loop *agentLoop) recordTool(call modelToolCall, output string) {
 		loop.messages = append(loop.messages, map[string]any{"role": "user", "content": follow})
 	}
 	loop.messages = append(loop.messages, map[string]any{"role": "tool", "tool_call_id": call.id, "content": loop.results.forModel(output, toolStoreThreshold)})
+	if note := unfinishedToolNote(call.name, output); note != "" {
+		loop.toolNotes = append(loop.toolNotes, note)
+	}
+}
+
+func (loop *agentLoop) flushToolNotes() {
+	for _, note := range loop.toolNotes {
+		loop.messages = append(loop.messages, map[string]any{"role": "system", "content": note})
+	}
+	loop.toolNotes = nil
+}
+
+func unfinishedToolNote(name, output string) string {
+	var parsed map[string]any
+	if json.Unmarshal([]byte(output), &parsed) != nil {
+		return ""
+	}
+	success, ok := parsed["success"].(bool)
+	if !ok || success {
+		return ""
+	}
+	display := toolDisplayName(name)
+	outcome, _ := parsed["outcome"].(string)
+	if outcome == "declined" || outcome == "cancelled" {
+		return "「" + display + "」没有执行。下一句先说明未执行，不要把该操作写成已经完成。如果仍可根据已经附带的画面或其他已有信息直接回答，必须标明这是直接回答，不是该工具的结果。"
+	}
+	return "「" + display + "」没有完成。下一句先说明失败，不要把未完成的操作写成已经成功。"
 }

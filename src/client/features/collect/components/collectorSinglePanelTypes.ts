@@ -1,8 +1,11 @@
 import type React from 'react';
+import type { PreferredScraper } from '@client/shared/utils/externalScraperCredentials';
 
 export interface CollectorSinglePanelProps {
   singlePlatform: 'auto' | 'jd' | 'taobao' | '1688' | 'pinduoduo' | 'social';
   setSinglePlatform: (v: 'auto' | 'jd' | 'taobao' | '1688' | 'pinduoduo' | 'social') => void;
+  preferredScraper?: PreferredScraper;
+  setPreferredScraper?: (v: PreferredScraper) => void;
   singleInput: string;
   setSingleInput: (v: string) => void;
   handleSingleCollect: () => void;

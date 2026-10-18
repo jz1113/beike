@@ -23,11 +23,11 @@ export function DeconstructImportFooter({ queueApi, xhsImport }: {
     && item.images.some((_, index) => !item.excludedImageIndices?.includes(index))).length;
   const completedCount = queue.filter(item => item.status === 'done').length;
   const fieldClass = 'flex min-w-0 flex-col gap-1.5';
-  const selectClass = 'h-10 w-full min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-400';
+  const selectClass = 'h-10 w-full min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-400 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]';
   const busyLabel = isSubmittingJob ? '正在启动后台任务…' : '正在采集链接…';
 
   return (
-    <div className="deconstruct-import-footer shrink-0 border-t border-slate-100 bg-slate-50/80 px-5 py-4 sm:px-6">
+    <div className="deconstruct-import-footer shrink-0 border-t border-slate-100 bg-slate-50/80 px-5 py-4 sm:px-6 dark:bg-white/5 dark:border-white/10">
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_100px]">
           <DeconstructCategoryPicker
             value={targetCategory}
@@ -38,7 +38,7 @@ export function DeconstructImportFooter({ queueApi, xhsImport }: {
             disabled={isBusy}
           />
           <label className={fieldClass}>
-            <span className="text-[11px] font-medium text-slate-500">反推模型</span>
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">反推模型</span>
             <select
               aria-label="反推视觉模型"
               value={selectedVisionModel}
@@ -51,7 +51,7 @@ export function DeconstructImportFooter({ queueApi, xhsImport }: {
             </select>
           </label>
           <label className={fieldClass}>
-            <span className="text-[11px] font-medium text-slate-500">并发图集</span>
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">并发图集</span>
             <select
               aria-label="反推并发"
               value={queueConcurrency}
@@ -64,14 +64,14 @@ export function DeconstructImportFooter({ queueApi, xhsImport }: {
             </select>
           </label>
         </div>
-      <p className={`mt-2 text-[11px] leading-5 ${targetSelectionInvalid ? 'text-rose-600' : 'text-slate-500'}`} aria-live="polite">
+      <p className={`mt-2 text-[11px] leading-5 ${targetSelectionInvalid ? 'text-rose-600' : 'text-slate-500 dark:text-slate-400'}`} aria-live="polite">
         {targetSelectionInvalid ? '所选归档文件夹已删除或不再属于当前大类，请重新选择。'
           : deconstructImportTargetHint(targetCategory, targetSubcategory, productCategories)}
         {targetSelectionInvalid && <button type="button" onClick={() => setTargetCategory(targetCategory)}
           className="ml-2 font-medium text-indigo-600 hover:underline">清除失效选择</button>}
       </p>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3">
-        <p className="min-w-0 text-[11px] leading-5 text-slate-500">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3 dark:border-white/10">
+        <p className="min-w-0 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
           {isSubmittingJob ? '正在提交后台任务，请稍候…' : isDeconstructing ? '后台处理中 · 停止仅取消待派发图集，已派发请求继续收尾'
             : pendingCount > 0 ? `${pendingCount} 套待处理${completedCount ? ` · ${completedCount} 套已完成` : ''} · 右下角查看进度与结果`
               : completedCount > 0 ? `${completedCount} 套已完成 · 可查看图集或导出明细`
@@ -82,7 +82,7 @@ export function DeconstructImportFooter({ queueApi, xhsImport }: {
             <button
               type="button"
               onClick={exportQueueCsv}
-              className="deconstruct-action-button flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+              className="deconstruct-action-button flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 dark:border-white/10 dark:bg-[#18191c]"
               title={lastExportedCsvFilename ? `已导出：${lastExportedCsvFilename}` : '导出明细表格'}
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />导出表格
@@ -91,7 +91,7 @@ export function DeconstructImportFooter({ queueApi, xhsImport }: {
           {backgroundJobId && isDeconstructing && !isSubmittingJob && (
             <button type="button" onClick={handleStopBackgroundJob}
               title="取消尚未派发的图集；已经派发的请求继续收尾"
-              className="deconstruct-action-button flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200/70">
+              className="deconstruct-action-button flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200/70 dark:text-slate-300">
               <Square className="h-3 w-3" />停止待派发
             </button>
           )}

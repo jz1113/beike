@@ -23,6 +23,6 @@ export function CanvasVideoPopover({ anchor, children, width: preferredWidth = 3
     window.addEventListener('scroll', place, true);
     return () => { observer.disconnect(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
   }, [anchor, preferredWidth]);
-  return createPortal(<div ref={popup} data-drawing-settings style={position} className="fixed z-[200] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-[0_8px_28px_rgba(15,23,42,0.12)]"
+  return createPortal(<div ref={popup} data-drawing-settings style={position} className="fixed z-[200] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1B1B1E] text-slate-700 dark:text-[#C7C7CC] shadow-[0_8px_28px_rgba(15,23,42,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
     onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onWheel={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{children}</div>, document.body);
 }

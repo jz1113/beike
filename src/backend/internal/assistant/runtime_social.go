@@ -109,15 +109,6 @@ func collectSocialImages(r *http.Request, cfg config.Config, urls []string) (ima
 	return images, summaries, raws, widget
 }
 
-func xhsHost(raw string) bool {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return false
-	}
-	host := strings.ToLower(parsed.Hostname())
-	return host == "xiaohongshu.com" || host == "xhslink.com" || strings.HasSuffix(host, ".xiaohongshu.com") || strings.HasSuffix(host, ".xhslink.com")
-}
-
 func stringImages(value any) []string {
 	switch typed := value.(type) {
 	case []string:
@@ -134,12 +125,6 @@ func stringImages(value any) []string {
 	default:
 		return nil
 	}
-}
-
-func jsonMarshal(value any) ([]byte, error) { return json.Marshal(value) }
-
-func jsonUnmarshalMap(raw string, dest *map[string]any) error {
-	return json.Unmarshal([]byte(raw), dest)
 }
 
 func fallbackText(value, fallback string) string {

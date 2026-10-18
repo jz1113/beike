@@ -50,7 +50,7 @@ client/
 
 功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如资产组件按 `cards / dialogs / filters / deconstruct` 归类并设 `index.ts` 统一导出；设置组件按 `providers / models / vendors / creator / storage / modality` 归类导出；工坊按 `stage / history / settings / product`，画布按 `editor / prompt / stage / video`。助手组件按 `message / panels / brand-kit` 分组，抽屉和按钮留在 `components`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。跨平台启动器在 `tools/launchers` 归档。
 
-`shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。
+`shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。`shared/agent` 归并助手回合的 item 事件，生成页和助手抽屉共用。`shared/ui/markdown` 渲染模型 Markdown；助手抽屉在外面再包图片批次。`shared/ui/studio` 放数字人、PPT 和视频带货共用的全屏工作台外壳。
 
 工坊 `model/` 再按 `collection / analysis / generation / delivery / workspace` 分组；React hook 不进入 model。采编、视觉分析和生图状态由 `workshop/hooks` 的独立 hook 协调。画布的导入、几何、图层和任务规则在 `canvas/model`；设置的模型目录、报价、存储和连接状态规则在 `settings/model`。
 
@@ -107,22 +107,53 @@ shared/
 
 `client/shared` 只在浏览器使用；`src/shared` 同时服务前后端。共享业务规则不能依赖 Node、React 或某个前端功能。跨层使用 `@client/* / @server/* / @shared/*` 别名。
 
-## 功能导航
+## 功能导航与架构分类
 
-路径相对于 `src`。
+项目分为「全局核心视窗」与「垂直独立小工具」，前后端保持高度对称：
 
-| 功能 | 前端 | 后端主要实现 |
-| --- | --- | --- |
-| 首页与灵感 | client/features/home | backend/internal/catalog |
-| 图片/视频生成 | client/features/generate | backend/internal/generate |
-| 无限画布 | client/features/canvas | backend/internal/generate、catalog |
-| 资产与反推 | client/features/assets | backend/internal/library、assets |
-| 采集 | client/features/collect | backend/internal/catalog、platform/collect |
-| 种草工坊 | client/features/workshop | backend/internal/workshop、catalog |
-| 大字报封面 | client/features/headline-poster | backend/internal/generate |
-| 关键词审核 | client/features/keyword-review | backend/internal/keywordreview |
-| AI 助手 | client/features/assistant | backend/internal/assistant |
-| 设置与模型 | client/features/settings | backend/internal/system |
+### 1. 全局核心视窗 (Core Views)
+
+| 核心功能 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
+| --- | --- | --- | --- |
+| 首页与灵感 | `home` | `catalog` | 瀑布流、灵感案例、预置模版、推荐展示 |
+| 无限画布 | `canvas` | `generate` (节点执行)、`catalog` | 节点式自由编排、局部编辑与图层解构 |
+| 资产与历史中心 | `assets` | `assets`、`library` | 历史生成任务、原子资产（人物/场景/穿搭/动作/提示词）、查重、反推库 |
+| 系统设置与厂商 | `settings` | `system` | 模型目录、网关配置、密钥认证、配额与存储设置 |
+| AI 伴随助手 | `assistant` | `assistant` | 多轮对话、Agent 循环、文档与素材抽取、沙箱执行 |
+
+### 2. 垂直独立小工具 (Specialized Studios & Tools)
+
+每个工具独立文件夹，互不产生交叉依赖，按需挂载到工作区：
+
+| 小工具 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
+| --- | --- | --- | --- |
+| 封面大字报 | `headline-poster` | `generate/headline` | 爆款大字报封面批量排版、艺术字体与商品贴合 |
+| 电商工坊 | `workshop` | `workshop` | 多商品、多模特、多场景批量生图与矩阵化交付 |
+| 词包审核 | `keyword-review` | `keywordreview` | 关键词表批量导入、垂类判定、生产方向建议与合规导出 |
+| 内容采集 | `collect` | `platform/collect` | 跨平台图文视频采编、元数据抽取与无水印解析 |
+| PPT生成工坊 | `ppt-generator` | `generate/ppt` | 论断大纲、可编辑排版或整页视觉渲染、按图像家族路由配图并导出 PPTX |
+| 数字人工作室 | `avatar` | `avatar` | 照片数字人与视频对口型。驱动模型在设置「数字人」线路拉取，配音沿用「语音」线路 |
+| 视频带货 | `video-sales` | `generate/videosales` | 商品分析、分镜脚本、图生视频、数字人口播镜头、配音与 BGM 合成 |
+
+### 3. Feature 内部标准四元结构规范
+
+每个功能目录内严格遵循四元划分，避免代码平铺与职责混乱：
+- `components/`：专属业务组件、对话框、卡片及子拆分目录。
+- `hooks/`：React 状态机、交互流程驱动与事件监听组合。
+- `api/`：当前功能专属的后端 API 调用封装（只依赖 `@client/shared/api` 统一客户端）。
+- `model/`：纯业务规则、类型定义、校验计算与数据适配转换（严禁引用 UI 组件或 React hooks）。
+
+### 4. 统一多模态网关架构 (`src/backend/internal/modelgw`)
+
+所有外部 AI 上游调用（包括联池、Comfly、千问、SiliconFlow、OpenAI 等）均收敛至网关层，业务领域层严禁直接发起非标准外部 HTTP 请求：
+- `image/`：文生图、图生图、局部重绘、扩图与图层分离。
+- `video/`：文生视频、图生视频、首尾帧过渡、运镜控制。
+- `audio/`：TTS 文本朗读、声音克隆、配乐与音效生成。
+- `avatar/`：数字人姿态与唇形对齐（Lip-sync）驱动。
+- `threed/`：文本/图像转 3D 网格模型。
+- `multimodal/`：视觉大模型理解、OCR 识别、提示词反推与结构化解析。
+- `adapter.go`：统一的上游厂商适配器接口（超时、重试、错误映射、用量回传）。
+- `dispatcher.go`：渠道路由、健康探测与多服务商自动 Fallback 容灾。
 
 ## 文件生命周期
 
@@ -169,3 +200,33 @@ shared/
 助手先在当前工作区原子领取 turnId，再执行模型和工具。重复请求只查询或回放原任务；同一标识对应不同输入或凭据返回冲突。请求指纹只存摘要，私有领取信息不进入公共快照；结果条目保存后才写终态。浏览器在发送前保留最小恢复回执，断线或中断后继续核对同一任务。
 
 视频由请求契约校验参数，`src/backend/internal/generate` 编排模型规则和记录并写入数据。上游结果分为已接收、明确拒绝与待核实；仅 404、405、415 允许尝试另一提交端点，超时、5xx 和缺少任务 ID 的响应不会自动再次提交。
+
+## 后端领域包
+
+对外接口从 `src/backend/cmd/api` 启动，按领域放在 `src/backend/internal`。`app` 负责路由装配，`system` 负责厂商与密钥，`catalog` 负责预置内容，`assets` 与 `library` 负责素材和历史，`generate` 负责图像、视频、语音和封面，`workshop` 负责批量出图，`keywordreview` 负责词包审核，`assistant` 负责助手回合，`avatar` 负责数字人，`modelgw` 是内部统一模型网关，`platform` 负责数据库、存储和网络。
+
+`modelgw` 按模态拆成 `video_submit.go`、`audio_submit.go`、`avatar_submit.go`、`threed_submit.go`、`multimodal_submit.go`，公共调度在 `submit.go` 与 `adapter.go`。
+
+前端功能按 `components / hooks / api / model` 放置，功能根目录保留 `index.ts` 作为视窗导出入口。当前独立视窗包括首页、画布、素材、设置、助手、工坊、大字报、词包审核、采集、生成、数字人、视频带货、PPT 和技能。
+
+## 新功能与小工具接入指南 (5 步标准化开发)
+
+当为系统增加新的独立小工具（如数字人、视频带货、PPT 生成等）时，请严格按以下 5 步接入，确保团队任何程序员接手均能快速定位与审查：
+
+1. **第 1 步：契约定义与数据模型 (`src/shared/contracts`)**
+   - 新建该功能对应的数据 DTO，使用 Zod 声明强类型的请求体与响应格式；
+   - 在 `src/shared/domain` 中定义与界面无关的纯业务模型、枚举与默认参数。
+2. **第 2 步：后端领域服务实现 (`src/backend/internal/<studio>`)**
+   - 在 `internal` 下创建与功能名称对应的业务包（例如 `digitalhuman` 或 `videocommerce`）；
+   - 实现业务状态存取、本地队列管理；外部模型调用一律经由 `internal/modelgw` 的统一适配接口。
+3. **第 3 步：对外路由装配 (`src/backend/internal/app/routes.go`)**
+   - 登记对应的 `/api/<feature>` 路径并绑定中间件（鉴权、工作区隔离、超时保护）；
+   - 在 `api/openapi.yaml` 保持契约同步。各模态的请求样例写在 `docs` 根目录对应的调用参考文档末尾。
+4. **第 4 步：前端 Feature 模块构建 (`src/client/features/<feature>`)**
+   - 创建标准四元目录：`components/`（页面与组件）、`hooks/`（状态组合）、`api/`（接口请求）、`model/`（纯转换与表单状态）；
+   - 在功能根目录设立 `index.ts` 统一导出主视窗组件。
+5. **第 5 步：视窗注册与侧边栏挂载 (`src/client/app`)**
+   - 在 `src/client/store/appStoreTypes.ts` 中扩充视窗枚举 `CurrentView`；
+   - 在 `src/client/app/AppSidebar.tsx` 配置导航按钮与图标；
+   - 在 `src/client/app/App.tsx` 使用 `lazyWithRetry` 动态引入该视窗并完成条件渲染；
+   - 运行 `pnpm check` 确保所有架构门禁、依赖边界与单元测试全绿。

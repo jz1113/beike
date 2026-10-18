@@ -11,6 +11,7 @@ import {
   Maximize2,
   Trash2,
   X,
+  Volume2,
 } from 'lucide-react';
 import FeedCardActionBar from './FeedCardActionBar';
 import AgentTurn from './AgentTurn';
@@ -37,8 +38,6 @@ interface FeedSingleCardProps {
   batchTasks: GenerationTask[];
   isBatchVideo: boolean;
   premiumGeneratingTaskId: string | null;
-  openMenuTaskId: string | null;
-  setOpenMenuTaskId: (id: string | null) => void;
   onPreview: (task: GenerationTask, allTasks: GenerationTask[]) => void;
   onReuse: (task: GenerationTask) => void;
   onRegenerate: (task: GenerationTask) => void;
@@ -54,8 +53,6 @@ export default function FeedSingleCard({
   batchTasks,
   isBatchVideo,
   premiumGeneratingTaskId,
-  openMenuTaskId,
-  setOpenMenuTaskId,
   onPreview,
   onReuse,
   onRegenerate,
@@ -68,9 +65,9 @@ export default function FeedSingleCard({
   }
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-2">
       <div
-        className={`relative w-full rounded-2xl overflow-hidden shadow-xs hover:shadow-lg border border-slate-200/90 bg-white transition-all duration-300 ${getAspectRatioClass(primaryTask.size)}`}
+        className={`relative w-full rounded-2xl overflow-hidden ring-1 ring-black/[0.08] dark:ring-white/[0.08] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:shadow-[0_12px_28px_-6px_rgba(0,0,0,0.12)] bg-white dark:bg-zinc-900/60 max-h-[350px] transition-all duration-300 ${getAspectRatioClass(primaryTask.size)}`}
       >
         {primaryTask.status === 'FAILURE' ? (
           /* 失败状态 */
@@ -115,7 +112,7 @@ export default function FeedSingleCard({
                   <button
                     type="button"
                     onClick={() => onDelete(primaryTask)}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-xs text-slate-700 hover:text-red-600 font-bold transition-colors cursor-pointer shadow-xs active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0 border border-slate-200"
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-xs text-slate-700 hover:text-red-600 font-bold transition-colors cursor-pointer shadow-xs active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0 border border-slate-200 dark:bg-white/10 dark:border-white/10"
                     title="清除此失败卡片"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -140,7 +137,27 @@ export default function FeedSingleCard({
         ) : primaryTask.status === 'SUCCESS' && primaryTask.resultUrl ? (
           /* 生成成功状态 */
           <div className="relative w-full h-full group/media">
-            {isBatchVideo ? (
+            {primaryTask.mediaType === 'audio' || primaryTask.resultUrl.endsWith('.mp3') || primaryTask.resultUrl.endsWith('.wav') ? (
+              <div className="w-full h-full flex flex-col items-center justify-center p-5 bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 backdrop-blur-md">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center mb-3 text-indigo-400 shadow-lg">
+                  <Volume2 className="w-6 h-6" />
+                </div>
+                <div className="text-center px-4 max-w-full mb-3">
+                  <p className="text-xs sm:text-sm font-semibold text-white/95 truncate" title={primaryTask.title || primaryTask.prompt}>
+                    {primaryTask.title || 'AI 合成音频'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2" title={primaryTask.prompt}>
+                    {primaryTask.prompt}
+                  </p>
+                </div>
+                <audio
+                  src={proxyMediaUrl(primaryTask.resultUrl)}
+                  controls
+                  className="w-full max-w-[280px] h-9 outline-none rounded-lg"
+                  preload="metadata"
+                />
+              </div>
+            ) : isBatchVideo ? (
               <div
                 className="w-full h-full cursor-pointer bg-black"
                 onClick={() => onPreview(primaryTask, batchTasks)}
@@ -167,9 +184,10 @@ export default function FeedSingleCard({
               />
             )}
 
-            {/* 左上角轻量「AI生成」标识 (图1同款) */}
-            <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded bg-black/35 backdrop-blur-xs text-[10px] text-white/90 font-medium select-none pointer-events-none tracking-tight">
-              AI生成
+            {/* 左上角轻量透光「✦ AI生成」微胶囊 */}
+            <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[10px] text-white/95 font-medium select-none pointer-events-none tracking-tight shadow-xs flex items-center gap-1">
+              <span className="text-[9px] text-amber-300">✦</span>
+              <span>AI生成</span>
             </div>
 
             <div className="absolute inset-0 bg-slate-950/25 opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
@@ -197,21 +215,10 @@ export default function FeedSingleCard({
         )}
       </div>
 
-      {/* 卡片下方胶囊按钮操作栏 (参考图2规格: 高度40px、正方形更多按钮、冷灰质感底色) */}
       <FeedCardActionBar
         onReuse={() => onReuse(primaryTask)}
         onRegenerate={() => onRegenerate(primaryTask)}
-        isMenuOpen={openMenuTaskId === primaryTask.id}
-        onToggleMenu={(e) => {
-          e.stopPropagation();
-          setOpenMenuTaskId(
-            openMenuTaskId === primaryTask.id ? null : primaryTask.id
-          );
-        }}
-        onDelete={() => {
-          onDelete(primaryTask);
-          setOpenMenuTaskId(null);
-        }}
+        onDelete={() => onDelete(primaryTask)}
         deleteText="删除该批次结果"
         reEditTitle="重新编辑提示词与参数"
         regenerateTitle="在当前对话中再次生成"

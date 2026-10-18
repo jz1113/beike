@@ -102,10 +102,10 @@ function MaterialProjectCard({
         aria-label={isSelected ? `取消选择项目 ${project.title}` : `选择项目 ${project.title}`}
         className={`absolute left-1.5 top-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-sm transition-all cursor-pointer ${
           isSelected
-            ? 'bg-slate-900 text-white shadow-xs opacity-100'
+            ? 'bg-slate-900 text-white shadow-xs opacity-100 dark:bg-white dark:text-slate-950'
             : isBatchMode
-            ? 'border border-slate-300 bg-white/95 opacity-100 hover:bg-white text-transparent'
-            : 'border border-slate-300 bg-white/90 opacity-0 group-hover:opacity-100 hover:bg-white text-transparent'
+            ? 'border border-slate-300 bg-white/95 opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
+            : 'border border-slate-300 bg-white/90 opacity-0 group-hover:opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
         }`}
       >
         {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
@@ -128,7 +128,7 @@ function MaterialProjectCard({
       {/* 标题与素材数：z-10 确保层级置顶，与文件夹保持清晰间距 */}
       <div className="relative z-10 mt-1.5 w-full px-1">
         <h3
-          className="truncate text-xs font-semibold text-slate-800 group-hover:text-slate-950"
+          className="truncate text-xs font-semibold text-slate-800 group-hover:text-slate-950 dark:text-slate-100"
           title={project.title}
         >
           {project.title}
@@ -166,7 +166,7 @@ export default function MaterialProjectView({
 
     // 对话项目 / 创作项目
     for (const s of sessions) {
-      const count = sessionCountMap.get(s.id) || s.tasks?.length || 0;
+      const count = sessionCountMap.get(s.id) || 0;
       items.push({
         id: s.id,
         title: s.title || '未命名项目',
@@ -241,7 +241,7 @@ export default function MaterialProjectView({
   if (projectList.length === 0) {
     return (
       <div className="flex h-72 w-full flex-col items-center justify-center gap-3 text-slate-400">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-300">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-300 dark:bg-white/10">
           <svg className="h-9 w-9" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-1.5V9a3 3 0 0 0-3-3h-3.379a3 3 0 0 1-2.121-.879L8.379 3.999A3 3 0 0 0 6.257 3.12H4.5A3 3 0 0 0 1.5 6.12V18a3 3 0 0 0 3 3h15Z" />
           </svg>

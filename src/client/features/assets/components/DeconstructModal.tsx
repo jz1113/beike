@@ -134,18 +134,18 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
 
   return createPortal(
     <div className="deconstruct-import-overlay fixed inset-0 z-[140] flex items-center justify-center p-3 bg-slate-950/35 backdrop-blur-xs sm:p-5">
-      <div role="dialog" aria-modal="true" aria-labelledby="deconstruct-import-title" className="deconstruct-import-dialog relative flex max-h-[min(90dvh,900px)] w-full max-w-[1200px] flex-col overflow-hidden rounded-3xl border border-white/80 bg-white text-left shadow-[0_24px_80px_-20px_rgba(15,23,42,0.26)]">
+      <div role="dialog" aria-modal="true" aria-labelledby="deconstruct-import-title" className="deconstruct-import-dialog relative flex max-h-[min(90dvh,900px)] w-full max-w-[1200px] flex-col overflow-hidden rounded-3xl border border-white/80 bg-white text-left shadow-[0_24px_80px_-20px_rgba(15,23,42,0.26)] dark:bg-[#18191c]">
         
         <DeconstructImportHeader mode={deconstructSourceMode} onModeChange={setDeconstructSourceMode} onClose={handleCloseDeconstructModal} disabled={isBusy} />
 
         {/* 主内容区域 */}
-        <div className="deconstruct-import-content min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-white px-5 py-5 text-xs text-slate-700 sm:px-6">
+        <div className="deconstruct-import-content min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-white px-5 py-5 text-xs text-slate-700 sm:px-6 dark:text-slate-200 dark:bg-[#18191c]">
           {deconstructSourceMode === 'xhs' && shouldShowXhsLinkInput ? (
             /* 小红书链接输入区 */
-            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/65 p-4">
+            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/65 p-4 dark:border-white/10 dark:bg-white/[0.04]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <label htmlFor="deconstruct-note-links" className="text-slate-800 font-semibold text-xs">
+                  <label htmlFor="deconstruct-note-links" className="text-slate-800 font-semibold text-xs dark:text-slate-100">
                     <span>添加笔记链接</span>
                   </label>
                   {hasLinks && (
@@ -172,14 +172,14 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   )}
                 </div>
               </div>
-              <p className="text-[11px] leading-5 text-slate-500">支持批量粘贴分享文案，自动识别链接。跳过视频，至少 3 张图入选，每套最多 10 张。</p>
+              <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">支持批量粘贴分享文案，自动识别链接。跳过视频，至少 3 张图入选，每套最多 10 张。</p>
 
-              <div className="relative flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100/80">
+              <div className="relative flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100/80 dark:border-white/10 dark:bg-[#18191c]">
                 {/* 左侧行号栏 */}
                 <div
                   ref={gutterRef}
                   aria-hidden="true"
-                  className="py-3 pl-2.5 pr-2 bg-slate-50/80 border-r border-slate-100 select-none text-right font-mono text-[11px] text-slate-400 min-w-[36px] max-h-[160px] overflow-hidden leading-relaxed pointer-events-none"
+                  className="py-3 pl-2.5 pr-2 bg-slate-50/80 border-r border-slate-100 select-none text-right font-mono text-[11px] text-slate-400 min-w-[36px] max-h-[160px] overflow-hidden leading-relaxed pointer-events-none dark:bg-white/5 dark:border-white/10"
                 >
                   {Array.from({ length: Math.max(5, xhsLinksInput.split('\n').length) }).map((_, i) => (
                     <div key={i}>{i + 1}</div>
@@ -198,11 +198,11 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   wrap="off"
                   placeholder={`粘贴笔记链接或分享文案，每行一条\nhttps://www.xiaohongshu.com/explore/…\nhttps://xhslink.com/a/…`}
                   rows={6}
-                  className="min-w-0 flex-1 p-3 pb-9 bg-transparent border-0 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-mono whitespace-pre overflow-x-auto resize-none leading-relaxed min-h-[140px]"
+                  className="min-w-0 flex-1 p-3 pb-9 bg-transparent border-0 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-mono whitespace-pre overflow-x-auto resize-none leading-relaxed min-h-[140px] dark:text-slate-100"
                 />
 
                 {hasLinks && (
-                  <div className="absolute bottom-2.5 right-3 text-[11px] text-slate-500 font-medium pointer-events-none bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-2xs backdrop-blur-xs flex items-center gap-1.5">
+                  <div className="absolute bottom-2.5 right-3 text-[11px] text-slate-500 font-medium pointer-events-none bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-2xs backdrop-blur-xs flex items-center gap-1.5 dark:text-slate-400 dark:border-white/10 dark:bg-[#18191c]/95">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                     <span>已识别 {linkCount} 条链接</span>
                   </div>
@@ -238,7 +238,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
             /* 本地文件 / 文件夹导入区 */
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="text-slate-800 font-semibold flex items-center gap-1.5 text-xs">
+                <label className="text-slate-800 font-semibold flex items-center gap-1.5 text-xs dark:text-slate-100">
                   <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
                   <span>参考图集文件或文件夹</span>
                 </label>
@@ -261,10 +261,10 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 px-4 py-8 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 cursor-pointer group"
                   onClick={() => { if (!isBusy) fileInputRef.current?.click(); }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-all mb-2 shadow-2xs">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-all mb-2 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                     <FolderOpen className="w-5 h-5" />
                   </div>
-                  <span className="text-xs font-semibold text-slate-700">拖拽图集文件夹或多张参考图片至此</span>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">拖拽图集文件夹或多张参考图片至此</span>
                   <span className="text-[11px] text-slate-400 mt-1">
                     支持投入整套多层文件夹，系统自动按子文件夹拆分套组
                   </span>
@@ -273,9 +273,9 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isBusy}
-                      className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-2xs dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"
                     >
-                      <Upload className="w-3.5 h-3.5 text-slate-500" />
+                      <Upload className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                       <span>选择图片文件</span>
                     </button>
                     <button
@@ -290,8 +290,8 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-xs text-slate-600 font-medium">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/80 dark:bg-white/5 dark:border-white/10">
+                  <span className="text-xs text-slate-600 font-medium dark:text-slate-300">
                     已载入 {queue.length} 套本地参考图集
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
@@ -299,9 +299,9 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isBusy}
-                      className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-medium flex items-center gap-1 cursor-pointer shadow-2xs"
+                      className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-medium flex items-center gap-1 cursor-pointer shadow-2xs dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"
                     >
-                      <Upload className="w-3 h-3 text-slate-500" />
+                      <Upload className="w-3 h-3 text-slate-500 dark:text-slate-400" />
                       <span>追加图片</span>
                     </button>
                     <button
@@ -368,7 +368,7 @@ export default function DeconstructModal({ queueApi, xhsImport }: DeconstructMod
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2 text-slate-800">
+                <div className="flex flex-wrap items-center gap-2 text-slate-800 dark:text-slate-100">
                   <Layers className="w-4 h-4 text-indigo-500" />
                   <span className="text-sm font-semibold">图集选择</span>
                   <span className="text-[11px] text-slate-400">共 {queue.length} 套 · 点击图片保留或排除</span>

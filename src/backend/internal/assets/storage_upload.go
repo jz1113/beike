@@ -252,34 +252,6 @@ func randomSuffix() string {
 	return strings.ToLower(time.Now().Format("150405.000000"))
 }
 
-func remotePersistRequested(r *http.Request, raw []byte) bool {
-	if envRemotePersist() {
-		return true
-	}
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "multipart/form-data") {
-		_, params, err := mime.ParseMediaType(contentType)
-		if err != nil {
-			return false
-		}
-		form, err := multipart.NewReader(bytes.NewReader(raw), params["boundary"]).ReadForm(1 << 20)
-		if err != nil {
-			return false
-		}
-		defer form.RemoveAll()
-		if values := form.Value["customConfig"]; len(values) > 0 {
-			return remoteStorageConfigured(parseConfig(values[0]))
-		}
-		return false
-	}
-	var payload map[string]any
-	if json.Unmarshal(raw, &payload) != nil {
-		return false
-	}
-	custom, _ := payload["customConfig"].(map[string]any)
-	return remoteStorageConfigured(custom)
-}
-
 func storageConfigFromTest(raw []byte) map[string]any {
 	var payload map[string]any
 	if json.Unmarshal(raw, &payload) != nil || payload == nil {
@@ -291,47 +263,12 @@ func storageConfigFromTest(raw []byte) map[string]any {
 	return payload
 }
 
-func remoteStorageConfigured(config map[string]any) bool {
-	if config == nil {
-		return false
-	}
-	persist, _ := config["persistResults"].(bool)
-	if !persist {
-		return envRemotePersist()
-	}
-	return strings.TrimSpace(textField(config, "accessKeyId")) != "" && strings.TrimSpace(textField(config, "secretAccessKey")) != "" && strings.TrimSpace(textField(config, "bucketName")) != ""
-}
-
-func envRemotePersist() bool {
-	if os.Getenv("STORAGE_PERSIST_RESULTS") != "true" {
-		return false
-	}
-	key := firstEnv("S3_ACCESS_KEY_ID", "R2_ACCESS_KEY_ID")
-	secret := firstEnv("S3_SECRET_ACCESS_KEY", "R2_SECRET_ACCESS_KEY")
-	bucket := firstEnv("S3_BUCKET_NAME", "R2_BUCKET_NAME")
-	return key != "" && secret != "" && bucket != ""
-}
-
-func firstEnv(keys ...string) string {
-	for _, key := range keys {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
 func parseConfig(raw string) map[string]any {
 	var config map[string]any
 	if json.Unmarshal([]byte(raw), &config) != nil {
 		return nil
 	}
 	return config
-}
-
-func textField(config map[string]any, key string) string {
-	text, _ := config[key].(string)
-	return text
 }
 
 func storageAdmin(cfg config.Config, r *http.Request) bool {

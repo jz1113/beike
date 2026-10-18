@@ -8,6 +8,10 @@
   transform: translateY(-1px);
 }
 
+.dark .canvas-media-toolbar > button:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
 .canvas-media-toolbar > button:focus-visible {
   outline: 2px solid #94a3b8;
   outline-offset: 2px;

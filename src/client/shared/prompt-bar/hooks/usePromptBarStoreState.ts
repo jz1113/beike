@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 
 const EMPTY_STRING_ARRAY: string[] = [];
-const EMPTY_ANY_ARRAY: any[] = [];
+const EMPTY_ANY_ARRAY: unknown[] = [];
 
 export function usePromptBarStoreState() {
   return useAppStore(
@@ -27,11 +27,13 @@ export function usePromptBarStoreState() {
       setQuickQuality: s.setQuickQuality,
       quickCount: s.quickCount,
       setQuickCount: s.setQuickCount,
-      quickVideoModel: s.quickVideoModel ?? 'seedance-2.0-mini',
+      quickAudioModel: s.quickAudioModel ?? '',
+      setQuickAudioModel: s.setQuickAudioModel,
+      quickVideoModel: s.quickVideoModel ?? '',
       setQuickVideoModel: s.setQuickVideoModel,
       quickVideoDuration: s.quickVideoDuration ?? 5,
       setQuickVideoDuration: s.setQuickVideoDuration,
-      quickVideoResolution: s.quickVideoResolution ?? '720P',
+      quickVideoResolution: s.quickVideoResolution ?? '480P',
       setQuickVideoResolution: s.setQuickVideoResolution,
       quickVideoAspectId: s.quickVideoAspectId ?? '16:9',
       setQuickVideoAspectId: s.setQuickVideoAspectId,

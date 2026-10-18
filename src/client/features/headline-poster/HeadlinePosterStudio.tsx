@@ -7,7 +7,7 @@ import { PosterImportPanel } from './components/PosterImportPanel';
 import { PosterCoverGallery } from './components/PosterCoverGallery';
 import { PosterBatchHistoryDialog } from './components/PosterBatchHistoryDialog';
 import { PosterSettingsDialog } from './components/PosterSettingsDialog';
-import { PosterRulesDialog } from './components/PosterRulesDialog';
+import { CoverMemoryStudioDialog } from './components/CoverMemoryStudioDialog';
 import { PosterToolbar } from './components/PosterToolbar';
 import { usePosterProduction } from './hooks/usePosterProduction';
 import { safeBaseName, type PosterItem } from './model/posterTypes';
@@ -22,7 +22,7 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
   const [isGalleryMode, setIsGalleryMode] = useState(false);
   const [isNewBatchConfirming, setIsNewBatchConfirming] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [previewDownloadError, setPreviewDownloadError] = useState<string | null>(null);
   const isBusy = !studio.isReady || studio.isRunning || studio.isExporting || studio.isRestoring || studio.isImporting;
   const pendingCount = studio.items.filter((item) => item.status === 'idle' || item.status === 'interrupted').length;
@@ -62,7 +62,7 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
   };
 
   return (
-    <div className="flex-1 min-h-0 w-full overflow-y-auto bg-transparent text-slate-900">
+    <div className="flex-1 min-h-0 w-full overflow-y-auto bg-transparent text-slate-900 dark:text-slate-100">
       <div className="min-h-full w-full px-4 py-4 sm:px-6 lg:px-8">
         <PosterToolbar
           onBack={onBack}
@@ -78,7 +78,7 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
           historyCount={studio.historyBatches.length}
           isNewBatchConfirming={isNewBatchConfirming}
           onOpenSettings={studio.openProductionSettings}
-          onOpenRules={() => setIsRulesOpen(true)}
+          onOpenMemory={() => setIsMemoryOpen(true)}
           onOpenHistory={() => setIsHistoryOpen(true)}
           onRetryFailed={() => void studio.runBatch(true)}
           onExport={() => void studio.exportZip()}
@@ -91,11 +91,11 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
 
         <main className={`mx-auto w-full ${isGalleryMode ? 'max-w-none' : 'max-w-[1120px]'} space-y-5 pb-10 pt-1 sm:pt-2`}>
           {studio.notice && (
-            <div role="status" className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-xs leading-5 text-slate-700 [overflow-wrap:anywhere]"><WandSparkles className="mt-0.5 h-4 w-4 shrink-0" />{studio.notice}</div>
+            <div role="status" className="flex items-start gap-2 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-4 py-3 text-xs leading-5 text-slate-700 dark:text-slate-200 [overflow-wrap:anywhere]"><WandSparkles className="mt-0.5 h-4 w-4 shrink-0" />{studio.notice}</div>
           )}
-          {studio.isImporting && <p role="status" className="inline-flex items-center gap-2 text-xs text-slate-500"><WandSparkles className="h-4 w-4 animate-pulse" />正在解析文件并保存生产清单…</p>}
+          {studio.isImporting && <p role="status" className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><WandSparkles className="h-4 w-4 animate-pulse" />正在解析文件并保存生产清单…</p>}
           {previewDownloadError && (
-            <div role="alert" className={`rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700 ${studio.previewState ? 'fixed left-1/2 top-20 z-[210] max-w-[90vw] -translate-x-1/2 shadow-lg' : ''}`}>{previewDownloadError}</div>
+            <div role="alert" className={`rounded-2xl border border-rose-100 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-3 text-xs text-rose-700 dark:text-rose-300 ${studio.previewState ? 'fixed left-1/2 top-20 z-[210] max-w-[90vw] -translate-x-1/2 shadow-lg' : ''}`}>{previewDownloadError}</div>
           )}
           {isGalleryMode ? (
             <PosterCoverGallery
@@ -117,6 +117,10 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
                 pasteText={studio.pasteText}
                 isRunning={studio.isRunning}
                 isBusy={isBusy}
+                activeStyleId={studio.activeStyleId}
+                styles={studio.styles}
+                onSelectStyle={studio.setActiveStyleId}
+                onOpenMemory={() => setIsMemoryOpen(true)}
                 onImportMode={studio.setImportMode}
                 onImportFile={(event) => void studio.importFile(event)}
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; studio.setIsDraggingFile(true); }}
@@ -156,13 +160,11 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
             />
           )}
 
-          {isRulesOpen && (
-            <PosterRulesDialog
-              settings={{ imageModel: studio.imageModel, titleModel: studio.titleModel, titleHandling: studio.titleHandling, imageQuality: studio.imageQuality, concurrency: studio.concurrency }}
-              imageModels={studio.availableImageModels}
-              titleModels={studio.availableTitleModels}
-              onClose={() => setIsRulesOpen(false)}
-              onOpenSettings={() => { setIsRulesOpen(false); studio.openProductionSettings(); }}
+          {isMemoryOpen && (
+            <CoverMemoryStudioDialog
+              activeStyleId={studio.activeStyleId}
+              onSelectStyle={studio.setActiveStyleId}
+              onClose={() => setIsMemoryOpen(false)}
             />
           )}
 

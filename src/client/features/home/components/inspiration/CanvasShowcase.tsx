@@ -32,9 +32,9 @@ function ReadonlyCanvas({ nodes, onClose }: { nodes: HomeCanvasNode[]; onClose: 
   return (
     <div className="fixed inset-0 z-[90] bg-[#0c0c0e] text-white">
       <div className="absolute left-4 top-4 z-10 flex items-center gap-2 text-sm">
-        <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/80">只读模式</span>
+        <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/80 dark:bg-[#18191c]/95">只读模式</span>
       </div>
-      <button type="button" onClick={onClose} aria-label="关闭画布" className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+      <button type="button" onClick={onClose} aria-label="关闭画布" className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 dark:bg-[#18191c]/95">
         <X className="h-4 w-4" />
       </button>
       <div
@@ -74,7 +74,7 @@ function ReadonlyCanvas({ nodes, onClose }: { nodes: HomeCanvasNode[]; onClose: 
           ))}
         </div>
       </div>
-      <div className="absolute bottom-4 left-4 rounded-full bg-white/10 px-3 py-1 text-xs">{Math.round(zoom * 100)}%</div>
+      <div className="absolute bottom-4 left-4 rounded-full bg-white/10 px-3 py-1 text-xs dark:bg-[#18191c]/95">{Math.round(zoom * 100)}%</div>
     </div>
   );
 }
@@ -98,8 +98,8 @@ export function CanvasShowcase({ item, onClose }: Props) {
         <h2 className="text-3xl font-semibold tracking-tight sm:text-5xl">{item.title}</h2>
         {synopsis && <p className="mt-4 max-h-40 overflow-auto text-sm leading-6 text-white/80">{synopsis}</p>}
         <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={() => void share()} className="rounded-full bg-white/15 px-4 py-2 text-sm hover:bg-white/25">分享</button>
-          <button type="button" onClick={() => setOpenCanvas(true)} disabled={!item.canvasNodes?.length} className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50">查看画布</button>
+          <button type="button" onClick={() => void share()} className="rounded-full bg-white/15 px-4 py-2 text-sm hover:bg-white/25 dark:bg-[#18191c]/95">分享</button>
+          <button type="button" onClick={() => setOpenCanvas(true)} disabled={!item.canvasNodes?.length} className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50 dark:text-slate-100 dark:bg-[#18191c]">查看画布</button>
         </div>
       </div>
     </div>

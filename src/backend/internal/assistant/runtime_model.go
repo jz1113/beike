@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -29,10 +30,6 @@ type gatewayCreds struct {
 
 func resolveTurnCreds(r *http.Request, model, customBase, customKey string, production bool) (gatewayCreds, error) {
 	if strings.HasPrefix(model, "deepseek-official:") {
-		id := strings.TrimPrefix(model, "deepseek-official:")
-		if id != "deepseek-flash" && id != "deepseek-v4-pro" {
-			return gatewayCreds{}, errors.New("此 DeepSeek 官方模型尚未适配，请选择 Flash 或 V4 Pro")
-		}
 		if customBase != "" && normalizeBase(customBase) != "https://api.deepseek.com" {
 			return gatewayCreds{}, errors.New("DeepSeek 官方模型只能使用官方接口地址")
 		}
@@ -104,18 +101,15 @@ func completionBody(model string, messages []map[string]any, tools []map[string]
 		payload["tool_choice"] = "auto"
 	}
 	tokens := 16384
-	switch effort {
-	case "low":
+	if effort == "low" {
 		tokens = 8192
-	case "high", "xhigh":
-		tokens = 32768
 	}
 	if strings.HasPrefix(model, "gpt-") || model == "kimi-k3" {
 		payload["max_completion_tokens"] = tokens
 	} else {
 		payload["max_tokens"] = tokens
 	}
-	if effort != "" && effort != "auto" {
+	if effort != "" && effort != "auto" && effort != "none" && modelSupportsReasoning(model) {
 		payload["reasoning_effort"] = effort
 	}
 	if !strings.HasPrefix(model, "deepseek-official:") {
@@ -145,6 +139,23 @@ func completionBody(model string, messages []map[string]any, tools []map[string]
 	return json.Marshal(payload)
 }
 
+func modelSupportsReasoning(model string) bool {
+	id := strings.ToLower(strings.TrimSpace(model))
+	if strings.Contains(id, "4o") || strings.Contains(id, "gpt-4") || strings.Contains(id, "gpt-3") {
+		return false
+	}
+	if strings.HasPrefix(id, "o1") || strings.HasPrefix(id, "o3") || strings.HasPrefix(id, "o4") {
+		return true
+	}
+	if strings.Contains(id, "reason") || strings.Contains(id, "thinking") {
+		return true
+	}
+	if strings.HasPrefix(id, "gpt-5") || strings.HasPrefix(id, "gpt-6") || strings.Contains(id, "grok-4") || strings.Contains(id, "gemini-3") || strings.Contains(id, "qwen3.8") || strings.Contains(id, "kimi-k3") || strings.Contains(id, "deepseek") {
+		return true
+	}
+	return false
+}
+
 func preserveReasoning(model string) bool {
 	switch model {
 	case "qwen3.8-max", "kimi-k3", "deepseek-v4-flash", "deepseek-v4.1-flash":
@@ -154,6 +165,10 @@ func preserveReasoning(model string) bool {
 	}
 }
 
+var assistantHTTP = func() *http.Client {
+	return &http.Client{Timeout: 10 * time.Minute}
+}
+
 func postModel(ctx context.Context, creds gatewayCreds, body []byte, stream bool) (*http.Response, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, creds.baseURL+"/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
@@ -161,14 +176,20 @@ func postModel(ctx context.Context, creds gatewayCreds, body []byte, stream bool
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+creds.apiKey)
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := assistantHTTP()
 	return client.Do(request)
 }
 
-func readModelStream(body io.Reader) (modelRound, error) {
+func readModelStream(body io.Reader, onDelta func(kind, text string)) (modelRound, error) {
 	round := modelRound{}
 	calls := map[int]*modelToolCall{}
 	finish := ""
+	emit := func(kind, text string) {
+		if text == "" || onDelta == nil {
+			return
+		}
+		onDelta(kind, text)
+	}
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
 	for scanner.Scan() {
@@ -209,9 +230,11 @@ func readModelStream(body io.Reader) (modelRound, error) {
 		}
 		if text, _ := delta["reasoning_content"].(string); text != "" {
 			round.reasoning += text
+			emit("reasoning", text)
 		}
 		if text, _ := delta["content"].(string); text != "" {
 			round.content += text
+			emit("content", text)
 		}
 		rawCalls, exists := delta["tool_calls"]
 		if !exists || rawCalls == nil {
@@ -299,4 +322,37 @@ func unsupportedTools(status int, body string) bool {
 	lower := strings.ToLower(body)
 	return (strings.Contains(lower, "tool") || strings.Contains(lower, "function") || strings.Contains(lower, "stream")) &&
 		(strings.Contains(lower, "unsupported") || strings.Contains(lower, "not support") || strings.Contains(lower, "not allowed"))
+}
+
+func formatUpstreamModelError(payload []byte, status int) string {
+	if len(payload) > 0 {
+		var data map[string]any
+		if json.Unmarshal(payload, &data) == nil {
+			if nested, ok := data["error"].(map[string]any); ok {
+				if msg, ok := nested["message"].(string); ok && strings.TrimSpace(msg) != "" {
+					return strings.TrimSpace(msg)
+				}
+			}
+			if msg, ok := data["error"].(string); ok && strings.TrimSpace(msg) != "" {
+				return strings.TrimSpace(msg)
+			}
+			if msg, ok := data["message"].(string); ok && strings.TrimSpace(msg) != "" {
+				return strings.TrimSpace(msg)
+			}
+			if msg, ok := data["detail"].(string); ok && strings.TrimSpace(msg) != "" {
+				return strings.TrimSpace(msg)
+			}
+		}
+	}
+	switch status {
+	case http.StatusUnauthorized:
+		return "API 凭证未配置或令牌不合法，请前往「⚙️ 设置 -> 服务接口配置」检查并填入有效凭证"
+	case http.StatusPaymentRequired:
+		return "服务商账户余额不足，请充值后重试"
+	case http.StatusTooManyRequests:
+		return "模型请求频率超限 (429)，请稍后重试"
+	case http.StatusNotFound:
+		return "所请求的模型不存在或网关未开放该模型通道"
+	}
+	return "模型请求失败 (HTTP " + strconv.Itoa(status) + ")"
 }

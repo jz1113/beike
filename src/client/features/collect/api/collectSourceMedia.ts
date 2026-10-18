@@ -1,5 +1,5 @@
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getExternalScraperCredentials } from '@client/shared/utils/externalScraperCredentials';
+import { getExternalScraperCredentials, type PreferredScraper } from '@client/shared/utils/externalScraperCredentials';
 import { parseSocialLinkWithRateLimit } from '@client/shared/utils/xhsLinkBatch';
 import type { RateLimiter } from '@client/shared/utils/rateLimiter';
 import type { BatchTaskItem } from '../model/collectorTypes';
@@ -25,6 +25,18 @@ export interface CollectedSourceItem {
   price?: number;
   sourceUrl: string;
   time: string;
+  apiUsed?: string;
+}
+
+/** 显式指定的解析接口与链接类型不一致时，在发起付费请求前拦住。 */
+export function preferredScraperMismatch(platform: string, preferred: PreferredScraper): string | null {
+  if (preferred === 'wanbang' && platform === 'social') {
+    return '万邦只解析电商商品链接。社媒内容请切换为自动调度、APIA 或奇云。';
+  }
+  if ((preferred === 'apia' || preferred === 'qiyun') && platform !== 'social') {
+    return 'APIA 与奇云只解析社媒内容。商品链接请切换为自动调度或万邦。';
+  }
+  return null;
 }
 
 /** A shared, cancellable request path for both collector entry points. */
@@ -34,7 +46,7 @@ export async function collectSourceMedia(
   forceRefresh: boolean,
   rateLimiter: RateLimiter,
   signal: AbortSignal,
-  options?: { shouldStop?: () => boolean; onSubmitted?: () => void },
+  options?: { shouldStop?: () => boolean; onSubmitted?: () => void; preferredScraper?: PreferredScraper },
 ): Promise<CollectedSourceItem> {
   signal.throwIfAborted();
   const requestController = new AbortController();
@@ -55,10 +67,14 @@ export async function collectSourceMedia(
     const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
     let item: CollectedSourceItem;
     if (platform === 'social') {
-      const { scraperId, scraperSecret, qiyunAppId, qiyunAppKey } = await getExternalScraperCredentials();
+      const credentials = await getExternalScraperCredentials();
+      const preferredScraper = options?.preferredScraper ?? credentials.preferredScraper ?? 'auto';
+      const mismatch = preferredScraperMismatch(platform, preferredScraper);
+      if (mismatch) throw new Error(mismatch);
+      const { scraperId, scraperSecret, qiyunAppId, qiyunAppKey } = credentials;
       requestSignal.throwIfAborted();
       const parsed = await parseSocialLinkWithRateLimit(url, scraperId, scraperSecret, rateLimiter, {
-        signal: requestSignal, qiyunAppId, qiyunAppKey, shouldStop: options?.shouldStop, onSubmitted,
+        signal: requestSignal, qiyunAppId, qiyunAppKey, preferredScraper, shouldStop: options?.shouldStop, onSubmitted,
       });
       requestSignal.throwIfAborted();
       if (!parsed.success) throw new Error(parsed.error || '未能提取到社媒素材');
@@ -79,8 +95,12 @@ export async function collectSourceMedia(
         importOrder: Date.now(),
         sourceUrl: url,
         time,
+        apiUsed: parsed.apiUsed,
       });
     } else {
+      const preferredScraper = options?.preferredScraper ?? (await getExternalScraperCredentials()).preferredScraper ?? 'auto';
+      const mismatch = preferredScraperMismatch(platform, preferredScraper);
+      if (mismatch) throw new Error(mismatch);
       checkDispatch();
       onSubmitted();
       const response = await apiFetch('/api/catalog/collect', {

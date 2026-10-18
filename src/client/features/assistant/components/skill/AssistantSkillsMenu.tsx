@@ -5,22 +5,32 @@ import { AssistantSkillIcon } from './AssistantSkillIcon';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
-import AssistantSkillEditorModal from './AssistantSkillEditorModal';
 import AssistantSkillManageModal from './AssistantSkillManageModal';
+import {
+  ManualSkillStudioModal,
+  buildSkillFromStudio,
+  parseLocalSkillFiles,
+  studioStateFromSkill,
+  type SkillDraftData,
+  type SkillFileNode,
+  type SkillStudioPayload,
+} from '@client/shared/skills';
 
 interface Props { showToast: (msg: string) => void; onUploadFiles: () => void; hasContext?: boolean }
 
 export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props) {
   const store = useAppStore(useShallow(s => ({
     activeId: s.activeAssistantSkillId, setActive: s.setActiveAssistantSkillId,
-    getSkills: s.getAllAssistantSkills, customSkills: s.assistantCustomSkills,
+    getSkills: s.getAllAssistantSkills,
     add: s.addAssistantSkill, update: s.updateAssistantSkill, remove: s.deleteAssistantSkill,
-    importFile: s.importAssistantSkillFromFile,
   })));
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [editorSkill, setEditorSkill] = useState<AssistantSkill | null | undefined>(undefined);
   const [manage, setManage] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [studioFiles, setStudioFiles] = useState<SkillFileNode[] | null>(null);
+  const [studioDraft, setStudioDraft] = useState<Partial<SkillDraftData> | null>(null);
+  const [editingSkill, setEditingSkill] = useState<AssistantSkill | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -29,6 +39,23 @@ export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props)
   const skills = store.getSkills();
   const filtered = skills.filter(s => `${s.displayName || ''} ${s.name} ${s.description}`.toLowerCase().includes(query.trim().toLowerCase()));
   const close = () => { setOpen(false); setQuery(''); };
+  const openStudio = (files: SkillFileNode[] | null, draft: Partial<SkillDraftData> | null, editing: AssistantSkill | null) => {
+    setEditingSkill(editing);
+    setStudioFiles(files);
+    setStudioDraft(draft);
+    setStudioOpen(true);
+  };
+  const openEdit = (skill: AssistantSkill) => {
+    if (skill.isBuiltin) { showToast('内置技能不可修改，请创建自定义技能'); return; }
+    const state = studioStateFromSkill(skill);
+    openStudio(state.files, state.draft, skill);
+  };
+  const saveStudio = (payload: SkillStudioPayload) => {
+    const skill = buildSkillFromStudio(payload, editingSkill ? { id: editingSkill.id, createdAt: editingSkill.createdAt } : undefined);
+    if (editingSkill && !editingSkill.isBuiltin) store.update(skill.id, skill);
+    else store.add(skill);
+    showToast(editingSkill ? '技能已更新' : '技能已创建');
+  };
   useEffect(() => {
     if (!open) return;
     searchRef.current?.focus();
@@ -50,20 +77,32 @@ export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props)
         </div>
         <div className="agent-skills-footer">
           <button type="button" onClick={() => fileRef.current?.click()} title="导入 Markdown 或 JSON 技能文件"><Upload size={14} />上传技能文件</button>
-          <button type="button" onClick={() => { setEditorSkill(null); close(); }}><Plus size={14} />创建技能</button>
+          <button type="button" onClick={() => { openStudio(null, null, null); close(); }}><Plus size={14} />创建技能</button>
           <button type="button" onClick={() => { setManage(true); close(); }}><Settings size={14} />管理技能</button>
         </div>
       </section>}
     </div>
-    <input ref={fileRef} type="file" accept=".md,.json,text/markdown,application/json" className="hidden" onChange={async e => {
-      const file = e.target.files?.[0]; e.target.value = '';
-      if (!file) return;
-      try { const skill = await store.importFile(file); showToast(`已导入技能：${skill.displayName || skill.name}`); close(); }
-      catch (error) { showToast(error instanceof Error ? error.message : '技能文件解析失败'); }
+    <input ref={fileRef} type="file" multiple accept=".md,.txt,.zip,text/markdown,application/zip" className="hidden" onChange={async e => {
+      const selected = e.target.files; e.target.value = '';
+      if (!selected?.length) return;
+      try {
+        const parsed = await parseLocalSkillFiles(selected);
+        openStudio(parsed.files, parsed.draft, null);
+        close();
+        if (parsed.warnings[0]) showToast(parsed.warnings[0]);
+      } catch (error) { showToast(error instanceof Error ? error.message : '技能文件解析失败'); }
     }} />
-    <AssistantSkillEditorModal isOpen={editorSkill !== undefined} onClose={() => setEditorSkill(undefined)} showToast={showToast} initialSkill={editorSkill || null}
-      onSave={skill => { if (editorSkill?.id && !editorSkill.isBuiltin) store.update(skill.id, skill); else store.add(skill); }} onDelete={store.remove} />
+    <ManualSkillStudioModal
+      isOpen={studioOpen}
+      onClose={() => setStudioOpen(false)}
+      showToast={showToast}
+      initialFiles={studioFiles}
+      initialDraft={studioDraft}
+      heading={editingSkill ? '编辑技能' : '创建技能'}
+      mode={editingSkill ? 'edit' : 'create'}
+      onSave={saveStudio}
+    />
     <AssistantSkillManageModal isOpen={manage} onClose={() => setManage(false)} skills={skills} activeSkillId={store.activeId} onActivate={store.setActive}
-      onEdit={skill => { setManage(false); setEditorSkill(skill); }} onDelete={store.remove} showToast={showToast} />
+      onEdit={skill => { setManage(false); openEdit(skill); }} onDelete={store.remove} showToast={showToast} />
   </>;
 }

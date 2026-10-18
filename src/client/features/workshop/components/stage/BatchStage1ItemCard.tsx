@@ -28,16 +28,16 @@ export const BatchStage1ItemCard: React.FC<BatchStage1ItemCardProps> = ({
     <div
       className={`p-4 rounded-2xl border transition-all duration-200 flex items-start gap-3.5 relative group/itemcard ${
         item.status === 'success'
-          ? 'bg-transparent border-slate-200/60 hover:border-indigo-300'
+          ? 'bg-transparent border-slate-200/60 hover:border-indigo-300 dark:border-white/10'
           : item.status === 'failed'
           ? 'bg-rose-50/40 border-rose-200 opacity-80'
-          : 'bg-slate-50/80 border-slate-200'
+          : 'bg-slate-50/80 border-slate-200 dark:bg-white/5 dark:border-white/10'
       }`}
     >
       {/* 🌟 商品大号封面缩略图 (点击大图预览) */}
       <div 
         onClick={() => item.coverImage && onPreviewImage?.(item.coverImage)}
-        className={`w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-slate-100 border border-slate-200 shrink-0 overflow-hidden flex items-center justify-center shadow-2xs relative group ${item.coverImage ? 'cursor-zoom-in' : ''}`}
+        className={`w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-slate-100 border border-slate-200 shrink-0 overflow-hidden flex items-center justify-center shadow-2xs relative group dark:bg-white/10 dark:border-white/10 ${item.coverImage ? 'cursor-zoom-in' : ''}`}
         title={item.coverImage ? '点击查看高清大图' : undefined}
       >
         {item.coverImage ? (
@@ -66,7 +66,7 @@ export const BatchStage1ItemCard: React.FC<BatchStage1ItemCardProps> = ({
       {/* 🌟 核心信息区 */}
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-900 text-white uppercase tracking-wider font-mono">
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-900 text-white uppercase tracking-wider font-mono dark:bg-white dark:text-slate-950">
             {item.platform}
           </span>
           <span className="text-xs font-mono text-slate-400 truncate">
@@ -75,7 +75,7 @@ export const BatchStage1ItemCard: React.FC<BatchStage1ItemCardProps> = ({
         </div>
 
         <h4 
-          className="text-xs sm:text-[13px] font-bold text-slate-800 line-clamp-2 leading-snug group-hover/itemcard:text-indigo-950 transition-colors" 
+          className="text-xs sm:text-[13px] font-bold text-slate-800 line-clamp-2 leading-snug group-hover/itemcard:text-indigo-950 transition-colors dark:text-slate-100" 
           title={item.title}
         >
           {item.title}

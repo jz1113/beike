@@ -1,5 +1,6 @@
 import type { AssistantTaskState } from '@shared/domain/assistant/taskPolicy';
 import type { ProductWidgetData } from '@client/store/appStoreTypes';
+import type { ReportedUsage } from '@client/shared/utils/modelUsage';
 
 export type ApprovalDecision = 'accept' | 'decline' | 'acceptForSession' | 'cancel';
 
@@ -14,7 +15,7 @@ export interface PendingApproval {
 export interface ToolActivityEntry {
   name: string;
   displayName: string;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'declined' | 'cancelled';
   detail?: string;
   action?: Record<string, unknown>;
   visualImages?: Array<{ url: string; label?: string }>;
@@ -25,6 +26,7 @@ export interface TurnStreamState {
   content: string;
   thinking: string;
   modelUsed: string;
+  usage?: ReportedUsage;
   productWidget?: ProductWidgetData;
   toolActivity: ToolActivityEntry[];
   pendingApprovals: PendingApproval[];

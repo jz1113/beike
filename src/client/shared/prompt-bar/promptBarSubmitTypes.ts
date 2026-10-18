@@ -24,6 +24,9 @@ export interface PromptBarSubmitInput {
   currentView: string;
   hasImageModels: boolean;
   hasVideoModels?: boolean;
+  hasAudioModels?: boolean;
+  quickAudioModel?: string;
+  assistantModel?: string;
   quickDepthStyle: DepthVideoStyle;
   quickDepthQuality: DepthQuality;
   quickVideoGenerateAudio?: boolean;

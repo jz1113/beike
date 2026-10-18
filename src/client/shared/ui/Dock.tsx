@@ -150,7 +150,7 @@ function DockLabel({
           exit={{ opacity: 0, y: isBottom ? -4 : 0 }}
           transition={{ duration: reducedMotion ? 0 : 0.2 }}
           className={`${className} absolute ${isBottom
-            ? 'top-[calc(100%+8px)] text-[11px] font-medium leading-none text-slate-500'
+            ? 'top-[calc(100%+8px)] text-[11px] font-medium leading-none text-slate-500 dark:text-slate-400'
             : '-top-6 rounded-md border border-[#3a3540] bg-[#201d25] px-2 py-0.5 text-xs text-white shadow-lg'} left-1/2 w-fit whitespace-pre`}
           role="tooltip"
           style={{ x: '-50%' }}

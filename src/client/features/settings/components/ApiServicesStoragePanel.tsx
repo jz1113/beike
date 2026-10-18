@@ -76,7 +76,7 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
       {/* 顶部标题行 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 select-none">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white select-none">
             图床 / 媒体存储
           </h1>
           {statusBadge}
@@ -84,10 +84,10 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
       </div>
 
       {/* 全局素材上传说明与 Switch 开关 */}
-      <div className="flex items-start justify-between gap-4 py-2 border-b border-slate-100">
+      <div className="flex items-start justify-between gap-4 py-2 border-b border-slate-100 dark:border-white/[0.08]">
         <div className="space-y-1 pr-4">
-          <div className="text-sm font-bold text-slate-900">全局素材上传</div>
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">全局素材上传</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
             画布素材默认走当前图床。Cloudinary 免费额度有限，建议只在需要的节点单独上传。
           </p>
         </div>
@@ -99,7 +99,7 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
           disabled={p.isMigratingStorage}
           onClick={() => p.setStorageEnabled(!p.storageEnabled)}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-            p.storageEnabled ? 'bg-slate-900' : 'bg-slate-300'
+            p.storageEnabled ? 'bg-slate-900 dark:bg-indigo-600' : 'bg-slate-300 dark:bg-white/20'
           }`}
         >
           <span
@@ -113,8 +113,8 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
       {/* 提供商切换组 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 pb-3">
         <div className="space-y-1">
-          <div className="text-sm font-bold text-slate-900">提供商</div>
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">提供商</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
             {p.storageProvider === 'cloudinary'
               ? '使用此方案建议不要开「全局素材上传」；免费版有流量额度，建议仅在节点勾选单独上传即可。'
               : '选择图床服务。'}
@@ -130,8 +130,8 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
                 onClick={() => p.setStorageProvider(provider.id)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer ${
                   active
-                    ? 'bg-[#18181b] text-white shadow-xs'
-                    : 'bg-[#f4f4f5] text-slate-700 hover:bg-[#e4e4e7] hover:text-slate-900'
+                    ? 'bg-[#18181b] text-white shadow-xs dark:bg-white dark:text-slate-900'
+                    : 'bg-[#f4f4f5] text-slate-700 hover:bg-[#e4e4e7] hover:text-slate-900 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
                 }`}
               >
                 {active && <Check className="h-3.5 w-3.5 stroke-[2.5]" />}
@@ -171,18 +171,18 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
 
       {/* 校验错误提示 */}
       {error && (p.storageAccessKeyId || p.storageEndpoint || p.storageAccountId || p.storageCloudName) && (
-        <p role="alert" className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+        <p role="alert" className="text-xs text-rose-600 bg-rose-50 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-800/60 dark:text-rose-300 rounded-lg p-2.5">
           {error}
         </p>
       )}
 
       {/* 底部操作行：左侧测试上传，右侧保存配置 */}
-      <div className="pt-4 pb-2 flex items-center justify-between border-t border-slate-100">
+      <div className="pt-4 pb-2 flex items-center justify-between border-t border-slate-100 dark:border-white/[0.08]">
         <button
           type="button"
           onClick={() => void p.handleTestStorage()}
           disabled={p.isTestingStorage || p.isMigratingStorage}
-          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer disabled:opacity-50"
         >
           {p.isTestingStorage ? (
             <>
@@ -198,15 +198,15 @@ export function ApiServicesStoragePanel(p: ApiServicesStoragePanelProps) {
           type="button"
           onClick={p.handleSaveStorageConfig}
           disabled={p.isMigratingStorage}
-          className="px-4 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium transition-all shadow-xs cursor-pointer"
+          className="px-4 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-xs font-medium transition-all shadow-xs cursor-pointer"
         >
           保存配置
         </button>
       </div>
 
       {/* 历史文件迁移（折叠） */}
-      <details className="settings-details text-xs text-slate-500">
-        <summary className="cursor-pointer hover:text-slate-700 select-none">历史文件迁移</summary>
+      <details className="settings-details text-xs text-slate-500 dark:text-slate-400">
+        <summary className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 select-none">历史文件迁移</summary>
         <div className="settings-detail-content pt-3 space-y-2">
           <p>逐批扫描所有历史任务，将临时链接转存到当前存储空间，可能产生存储与流量费用。</p>
           {migration.progress && (

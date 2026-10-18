@@ -56,18 +56,18 @@ export function CanvasLayerDecomposition({node, projectId}: {node: CanvasNode; p
         setHost(event.currentTarget.closest<HTMLElement>('.canvas-node-card'));
         setOpen(true);
       }}
-      className="group/btn relative w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:pointer-events-none active:scale-95"
+      className="group/btn relative w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:pointer-events-none active:scale-95 dark:hover:text-white dark:text-slate-200 dark:hover:bg-white/10"
     >
       <Layers className="w-4 h-4" />
-      <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-white/98 text-slate-800 text-[11px] font-medium opacity-0 group-hover/btn:opacity-100 transition-all duration-150 scale-95 group-hover/btn:scale-100 pointer-events-none whitespace-nowrap shadow-[0_4px_16px_rgba(0,0,0,0.08)] border border-slate-200/90 z-40">
+      <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-white/98 text-slate-800 text-[11px] font-medium opacity-0 group-hover/btn:opacity-100 transition-all duration-150 scale-95 group-hover/btn:scale-100 pointer-events-none whitespace-nowrap shadow-[0_4px_16px_rgba(0,0,0,0.08)] border border-slate-200/90 z-40 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]/95">
         图层分离
       </span>
     </button>
     {open && host && createPortal(<div data-layer-editor className="pointer-events-none absolute left-0 top-0 z-50 w-full" style={{height:node.height}} onMouseDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape' && !busy)setOpen(false);}}>
-      <section role="region" aria-label="图层分离" className="relative h-full w-full text-slate-700">
-        <header className="pointer-events-auto absolute -top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-          <button autoFocus type="button" aria-label="关闭图层分离" disabled={busy} onClick={()=>setOpen(false)} className="rounded-lg p-1 hover:bg-slate-100"><X className="h-4 w-4" /></button>
-          <span className="h-5 w-px bg-slate-200" /><h2 className="flex items-center gap-2 text-xs font-medium"><Layers className="h-4 w-4" />图层分离</h2><span className="h-5 w-px bg-slate-200" />
+      <section role="region" aria-label="图层分离" className="relative h-full w-full text-slate-700 dark:text-slate-200">
+        <header className="pointer-events-auto absolute -top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-white/10 dark:bg-[#18191c]">
+          <button autoFocus type="button" aria-label="关闭图层分离" disabled={busy} onClick={()=>setOpen(false)} className="rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>
+          <span className="h-5 w-px bg-slate-200 dark:bg-white/10" /><h2 className="flex items-center gap-2 text-xs font-medium"><Layers className="h-4 w-4" />图层分离</h2><span className="h-5 w-px bg-slate-200 dark:bg-white/10" />
           <button type="button" aria-label="撤销框选" disabled={busy || !boxes.length} onClick={()=>{setRedo([...redo,boxes[boxes.length-1]]);setBoxes(boxes.slice(0,-1));operation.current='';}} className="p-1 disabled:opacity-30"><Undo2 className="h-4 w-4" /></button>
           <button type="button" aria-label="重做框选" disabled={busy || !redo.length} onClick={()=>{setBoxes([...boxes,redo[redo.length-1]]);setRedo(redo.slice(0,-1));operation.current='';}} className="p-1 disabled:opacity-30"><Redo2 className="h-4 w-4" /></button>
         </header>
@@ -90,10 +90,10 @@ export function CanvasLayerDecomposition({node, projectId}: {node: CanvasNode; p
           {!boxes.length && !draft && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="rounded-lg bg-black/65 px-3 py-2 text-xs text-white">框选你想要拆分的物体</span></div>}
           {[...boxes,...(draft?[draft]:[])].map((box,index)=><div key={index} className="pointer-events-none absolute border-2 border-indigo-500 bg-indigo-400/15" style={{left:`${box.x*100}%`,top:`${box.y*100}%`,width:`${box.w*100}%`,height:`${box.h*100}%`}}><span className="absolute left-0 top-0 bg-indigo-500 px-1 text-[10px] text-white">{index+1}</span></div>)}
         </div>
-        <div className="pointer-events-auto absolute top-full left-1/2 mt-3 w-[420px] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="pointer-events-auto absolute top-full left-1/2 mt-3 w-[420px] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#18191c]">
           <p className="mb-3 text-xs font-medium">图层分离</p>
           <textarea aria-label="拆分要求" disabled={busy} value={prompt} onChange={e=>{setPrompt(e.target.value);operation.current='';}} placeholder="描述或框选希望拆分的图层，留空将自动识别并拆分" className="soft-textarea h-20 w-full resize-none p-3 text-xs" />
-        <footer className="mt-3 flex gap-2"><button type="button" onClick={()=>setOpen(false)} className="flex-1 rounded-lg bg-slate-100 px-4 py-2 text-xs">取消</button><button type="button" onClick={run} className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-xs text-white">拆分</button></footer>
+        <footer className="mt-3 flex gap-2"><button type="button" onClick={()=>setOpen(false)} className="flex-1 rounded-lg bg-slate-100 px-4 py-2 text-xs dark:bg-white/10">取消</button><button type="button" onClick={run} className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-xs text-white dark:bg-white dark:text-slate-950">拆分</button></footer>
         </div>
       </section>
     </div>,host)}

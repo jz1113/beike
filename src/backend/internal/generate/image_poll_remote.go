@@ -39,17 +39,7 @@ func pollImageTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		if !ok {
 			continue
 		}
-		if parsed.status == "SUCCESS" || parsed.status == "FAILURE" {
-			if db, err := openTaskDB(cfg); err == nil {
-				updateTaskTerminal(r.Context(), db, taskID, parsed.status, parsed.result, parsed.reason)
-				_ = db.Close()
-			}
-		}
-		body := map[string]any{
-			"success": true, "taskId": taskID, "status": parsed.status, "progress": parsed.progress,
-			"resultUrl": parsed.result, "failReason": parsed.reason,
-		}
-		httpx.WriteJSON(w, http.StatusOK, body)
+		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, parsed, data))
 		return
 	}
 	writeProbeMiss(cfg, w, r, taskID, "生图任务失败", "暂时无法查询云端任务状态")
@@ -89,7 +79,7 @@ func savedTerminal(cfg config.Config, r *http.Request, taskID, failedFallback st
 		return nil, 0, false
 	}
 	defer db.Close()
-	status, result, reason, ok, queryErr := taskStatus(r.Context(), db, taskID)
+	status, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, taskID)
 	if queryErr != nil || !ok {
 		return nil, 0, false
 	}
@@ -103,7 +93,9 @@ func savedTerminal(cfg config.Config, r *http.Request, taskID, failedFallback st
 	if status == "FAILURE" && reason == "" {
 		reason = failedFallback
 	}
-	return map[string]any{"success": true, "taskId": taskID, "status": status, "progress": progress, "resultUrl": result, "failReason": reason}, http.StatusOK, true
+	body := map[string]any{"success": true, "taskId": taskID, "status": status, "progress": progress, "resultUrl": result, "failReason": reason}
+	putStoredUsage(body, usage)
+	return body, http.StatusOK, true
 }
 
 func writeProbeMiss(cfg config.Config, w http.ResponseWriter, r *http.Request, taskID, failedFallback, queryError string) {
@@ -113,20 +105,24 @@ func writeProbeMiss(cfg config.Config, w http.ResponseWriter, r *http.Request, t
 		return
 	}
 	defer db.Close()
-	status, result, reason, ok, queryErr := taskStatus(r.Context(), db, taskID)
+	status, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, taskID)
 	if queryErr != nil {
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "taskId": taskID, "error": "查询任务状态失败，请稍后重试"})
 		return
 	}
 	if ok && result != "" {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "taskId": taskID, "status": "SUCCESS", "progress": "100%", "resultUrl": result, "failReason": ""})
+		body := map[string]any{"success": true, "taskId": taskID, "status": "SUCCESS", "progress": "100%", "resultUrl": result, "failReason": ""}
+		putStoredUsage(body, usage)
+		httpx.WriteJSON(w, http.StatusOK, body)
 		return
 	}
 	if ok && status == "FAILURE" {
 		if reason == "" {
 			reason = failedFallback
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "taskId": taskID, "status": "FAILURE", "progress": "0%", "resultUrl": "", "failReason": reason})
+		body := map[string]any{"success": true, "taskId": taskID, "status": "FAILURE", "progress": "0%", "resultUrl": "", "failReason": reason}
+		putStoredUsage(body, usage)
+		httpx.WriteJSON(w, http.StatusOK, body)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "taskId": taskID, "status": "QUERY_FAILED", "retryable": true, "error": queryError})

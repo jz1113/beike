@@ -116,7 +116,7 @@ export default function BatchStage1Collect({
               onClick={onNextStage}
               title={`下一步：人工批量选图与提示词架构（${successfulItems.length} 款已就绪商品）`}
               aria-label={`下一步：人工批量选图与提示词架构（${successfulItems.length} 款已就绪商品）`}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-black text-white shadow-md transition-all hover:bg-black hover:shadow-xl active:scale-98 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2 text-sm font-black text-white shadow-md transition-all hover:bg-black hover:shadow-xl active:scale-98 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-200"
             >
               <span>下一步</span>
               <ArrowRight className="h-4 w-4" />
@@ -134,15 +134,15 @@ export default function BatchStage1Collect({
         )}
 
       {items.length > 0 && isAddingProducts && (
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200/60 px-1 pb-3">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-200/60 px-1 pb-3 dark:border-white/10">
           <div>
-            <h3 className="text-base font-black tracking-tight text-slate-900">添加新商品</h3>
-            <p className="mt-1 text-xs text-slate-500">当前采编清单已暂时收起，输入新的商品链接或 SKU 后会合并回清单。</p>
+            <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-slate-100">添加新商品</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">当前采编清单已暂时收起，输入新的商品链接或 SKU 后会合并回清单。</p>
           </div>
           <button
             type="button"
             onClick={() => setIsAddingProducts(false)}
-            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"
           >
             返回清单
           </button>
@@ -152,8 +152,8 @@ export default function BatchStage1Collect({
       {/* 🌟 采编清单与图库状态 (采集后成为大画幅核心主角) */}
       {items.length > 0 && !isAddingProducts && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200/60 px-1 pb-2">
-            <h3 className="text-base font-black tracking-tight text-slate-900">采编清单与图库状态</h3>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200/60 px-1 pb-2 dark:border-white/10">
+            <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-slate-100">采编清单与图库状态</h3>
             {(isCollecting || items.some(item => item.status === 'pending' || item.status === 'failed')) && (
               <button type="button" disabled={isCollecting} onClick={() => void startBatchCollect()}
                 className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">

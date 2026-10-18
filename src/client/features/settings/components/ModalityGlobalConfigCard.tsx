@@ -214,14 +214,14 @@ export function ModalityGlobalConfigCard({
             onClick={onSyncModels}
             disabled={isSyncingModels}
             className="h-8.5 px-4 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-            title="从生效的 Base URL 拉取远端模型目录"
+            title="按渠道拉取远端模型并勾选同步"
           >
             {isSyncingModels ? '正在同步…' : '同步模型'}
           </button>
           <button
             type="button"
             onClick={() => saveGlobalConfig()}
-            className="h-8.5 px-4 rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+            className="h-8.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-xs transition-all active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-white dark:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
           >
             保存全局配置
           </button>

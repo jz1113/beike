@@ -66,12 +66,12 @@ export default function AssistantCodeBlock({
   const displayLang = lang || (isPromptCode ? 'AI 提示词' : 'CODE');
 
   return (
-    <div className="rounded-xl overflow-hidden bg-zinc-100/80 border border-zinc-200/80 my-2 text-xs font-mono">
-      <div className="px-3 py-1.5 bg-zinc-100 border-b border-zinc-200/70 flex items-center justify-between text-zinc-500 gap-2 flex-wrap">
+    <div className="my-2 overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-100/80 font-mono text-xs dark:border-white/10 dark:bg-[#1c1c1f] dark:text-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/70 bg-zinc-100 px-3 py-1.5 text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{displayLang}</span>
+          <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-400">{displayLang}</span>
           {ar && (
-            <span className="px-1.5 py-0.2 rounded bg-zinc-200/80 text-zinc-600 font-mono text-[9.5px] font-bold">
+            <span className="rounded bg-zinc-200/80 px-1.5 py-0.2 font-mono text-[9.5px] font-bold text-zinc-600 dark:bg-white/10 dark:text-slate-200">
               --ar {ar}
             </span>
           )}
@@ -82,10 +82,10 @@ export default function AssistantCodeBlock({
             <button
               type="button"
               onClick={handleSendToGenerate}
-              className="flex items-center gap-1 text-[11px] font-bold text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-200/60 px-2 py-0.5 rounded-lg transition-colors cursor-pointer border border-zinc-300/70"
+              className="flex cursor-pointer items-center gap-1 rounded-lg border border-zinc-300/70 bg-white px-2 py-0.5 text-[11px] font-bold text-zinc-700 transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:border-white/15 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15 dark:hover:text-white"
               title="将提示词和对应参考图一起载入生图区，自动对应图片编号"
             >
-              <Zap className="w-3 h-3 text-zinc-500" />
+              <Zap className="h-3 w-3 text-zinc-500 dark:text-slate-300" />
               <span>{dispatched ? `已载入${loadedImageCount ? ` ${loadedImageCount} 张参考图` : '生图区'} ✓` : '一键载入生图'}</span>
             </button>
           )}
@@ -93,17 +93,17 @@ export default function AssistantCodeBlock({
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-zinc-800 transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-zinc-200/70"
+            className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-slate-400 transition-colors hover:bg-zinc-200/70 hover:text-zinc-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="h-3 w-3 text-emerald-500 dark:text-emerald-400" /> : <Copy className="h-3 w-3" />}
             <span>{copied ? '已复制' : '复制'}</span>
           </button>
         </div>
       </div>
-      {incomplete && <p className="px-3 py-1 text-[11px] text-zinc-500">代码块尚未结束，内容可能不完整。</p>}
-      {dispatchError && <p role="alert" className="px-3 py-2 text-xs text-rose-200 bg-rose-950/50">{dispatchError}</p>}
-      {copyError && <p role="alert" className="px-3 py-2 text-xs text-rose-700">{copyError}</p>}
-      <pre className="p-3 overflow-x-auto text-zinc-800 leading-6 selection:bg-zinc-300/60 text-[11.5px] whitespace-pre-wrap break-words">
+      {incomplete && <p className="px-3 py-1 text-[11px] text-zinc-500 dark:text-slate-400">代码块尚未结束，内容可能不完整。</p>}
+      {dispatchError && <p role="alert" className="bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/50 dark:text-rose-200">{dispatchError}</p>}
+      {copyError && <p role="alert" className="px-3 py-2 text-xs text-rose-700 dark:text-rose-300">{copyError}</p>}
+      <pre className="overflow-x-auto p-3 text-[11.5px] leading-6 break-words whitespace-pre-wrap text-zinc-800 selection:bg-zinc-300/60 dark:text-slate-100 dark:selection:bg-white/20">
         <code>{code}</code>
       </pre>
     </div>

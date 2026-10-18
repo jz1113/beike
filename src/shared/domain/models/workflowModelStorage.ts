@@ -1,6 +1,6 @@
 import type { WorkflowCapability } from './workflowModelTypes';
 
-const stringFields = ['routeId', 'name', 'shortName', 'provider', 'badge', 'desc', 'description'] as const;
+const stringFields = ['routeId', 'name', 'shortName', 'provider', 'providerId', 'badge', 'desc', 'description'] as const;
 const booleanFields = ['enabled', 'isMultimodal', 'isImage', 'isVideo', 'isVision', 'isAssistant', 'isDistill', 'isThinking', 'isCustom'] as const;
 const channels = new Set(['comfly', 'openai', 'deepseek', 'lianchi']);
 

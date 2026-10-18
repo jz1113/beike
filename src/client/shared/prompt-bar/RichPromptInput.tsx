@@ -367,7 +367,7 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
         onPaste={handlePaste}
         data-placeholder={effectiveDataPlaceholder}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        className={`rich-mention-contenteditable flex-1 min-w-[120px] w-full ${editorMaxH} overflow-x-hidden overflow-y-auto scrollbar-none no-scrollbar bg-transparent border-0 ring-0 text-slate-900 ${editorText} leading-relaxed outline-none font-normal p-0 select-text whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 ${placeholderText} empty:before:pointer-events-none ${singleLine ? 'self-center pt-0' : isComposer ? 'self-start pt-0' : 'self-start pt-0.5'}`}
+        className={`rich-mention-contenteditable flex-1 min-w-[120px] w-full ${editorMaxH} overflow-x-hidden overflow-y-auto scrollbar-none no-scrollbar bg-transparent border-0 ring-0 text-slate-900 dark:text-slate-100 ${editorText} leading-relaxed outline-none font-normal p-0 select-text whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 dark:empty:before:text-slate-400 ${placeholderText} empty:before:pointer-events-none ${singleLine ? 'self-center pt-0' : isComposer ? 'self-start pt-0' : 'self-start pt-0.5'}`}
       />
       {!value && isManualPlaceholder && (
         <div className={`absolute inset-0 pointer-events-none flex items-start text-slate-400 ${editorText} leading-relaxed select-none ${singleLine ? 'items-center pt-0' : isComposer ? 'pt-0' : 'pt-0.5'}`}>

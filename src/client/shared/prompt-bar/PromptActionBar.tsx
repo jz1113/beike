@@ -40,6 +40,8 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
     setQuickCount,
     quickVideoModel,
     setQuickVideoModel,
+    quickAudioModel,
+    setQuickAudioModel,
     quickVideoDuration,
     setQuickVideoDuration,
     quickVideoResolution,
@@ -77,10 +79,10 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
           anyDropdownOpen ? 'z-40' : 'z-20'
         } group/composer ${
           isExpanded
-            ? `bg-white border border-slate-200/80 shadow-[0_4px_24px_rgba(0,0,0,0.03)] ${densityComposerRadius} ${
+            ? `bg-white dark:bg-[#18191c]/90 dark:backdrop-blur-xl border border-slate-200/80 dark:border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] ${densityComposerRadius} ${
                 isFloatingDock ? 'pt-3.5 px-3.5 sm:px-4 pb-2.5 flex flex-col gap-2.5 sm:gap-3' : `${densityComposerPad} flex flex-col gap-2.5 sm:gap-3`
               }`
-            : 'bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.06)] rounded-full px-3.5 py-1.5 sm:py-2 flex flex-col hover:border-slate-300'
+            : 'bg-white/95 dark:bg-[#18191c]/90 dark:backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.06)] rounded-full px-3.5 py-1.5 sm:py-2 flex flex-col hover:border-slate-300 dark:hover:border-white/20'
         }`}
       >
         {isExpanded ? (
@@ -219,6 +221,8 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
               availableImageModels={availableImageModels}
               quickVideoModel={quickVideoModel}
               quickModel={quickModel}
+              quickAudioModel={quickAudioModel}
+              setQuickAudioModel={setQuickAudioModel}
               quickVideoDuration={quickVideoDuration}
               setQuickVideoModel={setQuickVideoModel}
               setQuickVideoDuration={setQuickVideoDuration}
@@ -269,7 +273,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
               <button
                 type="button"
                 onClick={() => media.fileInputRef.current?.click()}
-                className="w-[34px] h-[40px] -rotate-6 hover:rotate-0 hover:scale-105 active:scale-95 rounded-[7px] border border-slate-200/90 bg-slate-50/90 hover:bg-slate-100 flex flex-col items-center justify-center transition-all cursor-pointer shadow-2xs group/mini-add shrink-0"
+                className="w-[34px] h-[40px] -rotate-6 hover:rotate-0 hover:scale-105 active:scale-95 rounded-[7px] border border-slate-200/90 bg-slate-50/90 hover:bg-slate-100 flex flex-col items-center justify-center transition-all cursor-pointer shadow-2xs group/mini-add shrink-0 dark:hover:bg-white/10 dark:border-white/10"
                 title="上传参考素材"
               >
                 <Plus className="w-3.5 h-3.5 text-slate-400 group-hover/mini-add:text-slate-700 stroke-[1.8] transition-colors" />
@@ -318,7 +322,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                 disabled={!canSend}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all select-none active:scale-95 shrink-0 ${
                   canSend
-                    ? 'bg-slate-900 hover:bg-black text-white shadow-2xs cursor-pointer'
+                    ? 'bg-slate-900 hover:bg-black text-white shadow-2xs cursor-pointer dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200'
                     : 'bg-[#E3E5EB] text-slate-400 cursor-not-allowed'
                 }`}
                 title={
@@ -328,7 +332,9 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                       ? '生成深度动作捕捉'
                       : quickGenMode === 'video'
                         ? '开始生成视频'
-                        : '立即生成图片'
+                        : quickGenMode === 'audio'
+                          ? '开始生成音频'
+                          : '立即生成图片'
                 }
               >
                 <ArrowUp className="w-4 h-4 stroke-[2.2]" />
@@ -346,7 +352,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
       <input ref={videoFrames.multiFrameInputRef} type="file" accept="image/*" multiple className="hidden" onChange={videoFrames.handleUploadMultiFrame} />
 
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-medium shadow-xl">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-medium shadow-xl dark:bg-white dark:text-slate-950">
           {toastMsg}
         </div>
       )}

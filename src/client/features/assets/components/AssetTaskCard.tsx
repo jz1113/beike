@@ -86,7 +86,7 @@ export default function AssetTaskCard({ task, mergedTasks, isBatchMode, isBusy, 
 
   return (
     <div
-      className={`${cardContainer} group relative aspect-square min-w-0 overflow-hidden rounded-2xl border bg-slate-100 shadow-2xs transition-all focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-500 ${interactive ? 'cursor-pointer hover:shadow-md' : ''} ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-600' : 'border-slate-200/80'}`}
+      className={`${cardContainer} group relative aspect-square min-w-0 overflow-hidden rounded-2xl border bg-slate-100 shadow-2xs transition-all focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-500 dark:bg-white/10 ${interactive ? 'cursor-pointer hover:shadow-md' : ''} ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-600' : 'border-slate-200/80 dark:border-white/10'}`}
     >
       {interactive && <button type="button" onClick={openTask} disabled={isBusy} aria-label={`${isBatchMode ? '选择' : '预览'}：${title}`} aria-pressed={isBatchMode ? isSelected : undefined} className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-indigo-500 disabled:cursor-wait" />}
       <div className="absolute inset-0">
@@ -98,12 +98,12 @@ export default function AssetTaskCard({ task, mergedTasks, isBatchMode, isBusy, 
         ) : (
           <div role="status" className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 pb-10 text-center">
             <AlertCircle className="h-6 w-6 shrink-0 text-rose-500" />
-            <span className="text-xs font-semibold text-slate-700">{errorTitle}</span>
-            <span className="line-clamp-3 w-full break-words text-[11px] text-slate-500" title={task.failReason}>{task.failReason || '暂无可用结果，可重试或清理此记录'}</span>
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{errorTitle}</span>
+            <span className="line-clamp-3 w-full break-words text-[11px] text-slate-500 dark:text-slate-400" title={task.failReason}>{task.failReason || '暂无可用结果，可重试或清理此记录'}</span>
           </div>
         )}
       </div>
-      {isBatchMode && <div aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 z-20 flex h-5 w-5 items-center justify-center rounded-md shadow-xs ${isSelected ? 'bg-indigo-600 text-white' : 'border border-slate-300 bg-white/90'}`}>{isSelected && <Check className="h-3 w-3" />}</div>}
+      {isBatchMode && <div aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 z-20 flex h-5 w-5 items-center justify-center rounded-md shadow-xs ${isSelected ? 'bg-indigo-600 text-white' : 'border border-slate-300 bg-white/90 dark:bg-[#18191c]/95'}`}>{isSelected && <Check className="h-3 w-3" />}</div>}
       {isSuccess && kind !== 'audio' && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-6 text-white">
           <p className="truncate text-[11px] font-medium" title={title}>{title}</p>
@@ -112,12 +112,12 @@ export default function AssetTaskCard({ task, mergedTasks, isBatchMode, isBusy, 
       )}
       {!isBatchMode && (
         <div className={`absolute right-2 top-2 z-20 flex gap-1 ${isSuccess || isRunning ? 'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100' : ''}`}>
-          {isSuccess && (kind === 'audio' || kind === 'document') && <button type="button" disabled={isBusy || isDownloading} onClick={e => { void downloadTask(e); }} aria-label={`下载：${title}`} title="下载素材" className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/90 text-slate-600 shadow-xs hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50">{isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}</button>}
-          <button type="button" disabled={isBusy} onClick={e => { e.stopPropagation(); onDeleteTask(task, e); }} aria-label={`删除：${title}`} title="删除记录" className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/90 text-slate-600 shadow-xs hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-indigo-500"><Trash2 className="h-3.5 w-3.5" /></button>
+          {isSuccess && (kind === 'audio' || kind === 'document') && <button type="button" disabled={isBusy || isDownloading} onClick={e => { void downloadTask(e); }} aria-label={`下载：${title}`} title="下载素材" className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/90 text-slate-600 shadow-xs hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50 dark:bg-[#18191c]/95">{isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}</button>}
+          <button type="button" disabled={isBusy} onClick={e => { e.stopPropagation(); onDeleteTask(task, e); }} aria-label={`删除：${title}`} title="删除记录" className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/90 text-slate-600 shadow-xs hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-indigo-500 dark:bg-[#18191c]/95"><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       )}
       {!isSuccess && !isRunning && !isBatchMode && task.prompt && (kind === 'image' || kind === 'video') && (
-        <button type="button" disabled={isBusy} onClick={e => { e.stopPropagation(); onRegenerate(task, e); }} className="absolute inset-x-3 bottom-3 flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"><RotateCw className="h-3 w-3" />再次创作</button>
+        <button type="button" disabled={isBusy} onClick={e => { e.stopPropagation(); onRegenerate(task, e); }} className="absolute inset-x-3 bottom-3 flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10 dark:bg-[#18191c]"><RotateCw className="h-3 w-3" />再次创作</button>
       )}
     </div>
   );
