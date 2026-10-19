@@ -42,5 +42,7 @@ describe('qwen image credentials', () => {
     ]));
     expect(getModelCredentials('qwen-image-3.0-pro').baseUrl).toBe('https://ai.comfly.org');
     expect(getModelCredentials('qwen-image-max')).toEqual({});
+    expect(getModelCredentials('qwen-image')).toEqual({});
+    expect(getModelCredentials('qwen-image-edit')).toEqual({});
   });
 });

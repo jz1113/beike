@@ -21,19 +21,24 @@ export function isDashScopeBase(baseUrl?: string): boolean {
   }
 }
 
-/** 这些图像模型只走千问原生生图。聚合网关上的 qwen-image-max 仍走通用接口。 */
+/** 带版本号的千问图像模型和万相 2.6/2.7 只走原生生图。qwen-image、qwen-image-edit、qwen-image-max 仍走聚合网关。 */
 export function isNativeDashscopeImageModel(model = ''): boolean {
   const id = model.toLowerCase();
-  if (!id || id.includes('qwen-image-max')) return false;
-  return id.includes('qwen-image') || id.includes('wan2.7-image') || id.includes('wan2.6-image') || id.includes('wan2.6-t2i');
+  if (!id) return false;
+  if (id.includes('qwen-image-3') || id.includes('qwen-image-2.0') || id.includes('qwen-image-2.1') || id.includes('qwen-image-2-0') || id.includes('qwen-image-2-1')) return true;
+  return id.includes('wan2.7-image') || id.includes('wan2.6-image') || id.includes('wan2.6-t2i');
 }
 
 export function imageCapabilities(model = '', protocol?: string, baseUrl?: string): ImageCapability {
   const id = model.toLowerCase();
   if (id.includes('grok')) return { resolutions: [], strength: 'none', sendsQuality: false };
+  if (id.includes('gpt-image-2-4k')) return { resolutions: ['4K'], strength: 'none', sendsQuality: false };
+  if (id.includes('gpt-image-2-2k')) return { resolutions: ['2K'], strength: 'none', sendsQuality: false };
+  if (id.includes('gpt-image')) return { resolutions: ALL_RESOLUTIONS, strength: 'quality', sendsQuality: true };
+  if (id.includes('seedream-v5-pro')) return { resolutions: ['1K', '2K'], strength: 'none', sendsQuality: false };
   if (protocol === 'template') return { resolutions: ALL_RESOLUTIONS, strength: 'none', sendsQuality: false };
-  const dashscope = protocol === 'dashscope' || isDashScopeBase(baseUrl);
-  if (!dashscope) return { resolutions: ALL_RESOLUTIONS, strength: 'quality', sendsQuality: true };
+  const dashscope = protocol === 'dashscope' || isDashScopeBase(baseUrl) || isNativeDashscopeImageModel(model);
+  if (!dashscope) return { resolutions: ALL_RESOLUTIONS, strength: 'none', sendsQuality: false };
   if (id.includes('wan2.7-image-pro')) return { resolutions: ALL_RESOLUTIONS, strength: 'prompt-extend', sendsQuality: false };
   if (id.includes('wan2.7-image')) return { resolutions: ['1K', '2K'], strength: 'prompt-extend', sendsQuality: false };
   if (id.includes('wan2.6')) return { resolutions: ['1K'], strength: 'prompt-extend', sendsQuality: false };

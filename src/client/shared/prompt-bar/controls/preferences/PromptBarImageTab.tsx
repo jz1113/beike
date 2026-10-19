@@ -1,34 +1,34 @@
 import { IMAGE_RATIO_ITEMS } from '../../promptBarConstants';
-import type { ImageInferenceStrength, ImageResolutionOption } from '../../promptBarPreferencesTypes';
+import type { ImageInferenceStrength, ImageQualityTier, ImageResolutionOption } from '../../promptBarPreferencesTypes';
 import { AspectRatioCardGroup } from './AspectRatioCardGroup';
 
 const ASPECT_OPTIONS = IMAGE_RATIO_ITEMS.map((item) => ({ id: item.id, label: item.label }));
 
 const RESOLUTIONS: ImageResolutionOption[] = ['1K', '2K', '4K'];
 
-const STRENGTHS: { id: ImageInferenceStrength; label: string; desc: string }[] = [
+const QUALITIES: { id: ImageQualityTier; label: string; desc: string }[] = [
   { id: 'low', label: 'Low', desc: '更快出图，适合先看构图。' },
   { id: 'medium', label: 'Medium', desc: '速度和细节比较均衡。' },
   { id: 'high', label: 'High', desc: '更多精修，画面细节更清楚。' },
-  { id: 'xhigh', label: 'XHigh', desc: '最高细节，生成会更慢。' },
 ];
 
 const REWRITE_STRENGTHS: { id: ImageInferenceStrength; label: string; desc: string }[] = [
-  { id: 'low', label: 'Low', desc: '关闭提示词改写，按原文出图。' },
-  { id: 'medium', label: 'Medium', desc: '开启提示词改写，不启用思考。' },
-  { id: 'high', label: 'High', desc: '提示词改写和思考模式都开启。' },
-  { id: 'xhigh', label: 'XHigh', desc: '提示词改写和思考模式都开启，等待更久。' },
+  { id: 'low', label: '不改写', desc: '关闭提示词改写，按原文出图。' },
+  { id: 'medium', label: '改写', desc: '开启提示词改写，不启用思考。' },
+  { id: 'high', label: '改写+思考', desc: '提示词改写和思考模式都开启。' },
 ];
 
 interface Props {
   aspect: string;
   resolution: ImageResolutionOption;
   strength: ImageInferenceStrength;
+  quality: ImageQualityTier;
   allowedResolutions?: ImageResolutionOption[];
   strengthMode?: 'quality' | 'prompt-extend' | 'none';
   onAspect: (aspect: string) => void;
   onResolution: (resolution: ImageResolutionOption) => void;
   onStrength: (strength: ImageInferenceStrength) => void;
+  onQuality: (quality: ImageQualityTier) => void;
 }
 
 function choiceClass(selected: boolean) {
@@ -43,15 +43,17 @@ export function PromptBarImageTab({
   aspect,
   resolution,
   strength,
+  quality,
   allowedResolutions,
-  strengthMode = 'quality',
+  strengthMode = 'none',
   onAspect,
   onResolution,
   onStrength,
+  onQuality,
 }: Props) {
-  const active = strength === 'max' ? 'xhigh' : strength;
-  const strengths = strengthMode === 'prompt-extend' ? REWRITE_STRENGTHS : STRENGTHS;
-  const description = strengths.find((item) => item.id === active)?.desc || strengths[0].desc;
+  const rewriteActive: ImageInferenceStrength = strength === 'low' || strength === 'medium' ? strength : 'high';
+  const rewriteDescription = REWRITE_STRENGTHS.find((item) => item.id === rewriteActive)?.desc || REWRITE_STRENGTHS[2].desc;
+  const qualityDescription = QUALITIES.find((item) => item.id === quality)?.desc || QUALITIES[2].desc;
   const showResolution = !allowedResolutions || allowedResolutions.length > 0;
 
   return (
@@ -77,17 +79,31 @@ export function PromptBarImageTab({
         </div>
       )}
 
-      {strengthMode !== 'none' && (
+      {strengthMode === 'quality' && (
         <div className="space-y-1.5">
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{strengthMode === 'prompt-extend' ? '提示词改写' : '推理强度'}</div>
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400">画质</div>
           <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-white/5 rounded-2xl">
-            {strengths.map((item) => (
-              <button key={item.id} type="button" onClick={() => onStrength(item.id)} className={choiceClass(active === item.id)}>
+            {QUALITIES.map((item) => (
+              <button key={item.id} type="button" onClick={() => onQuality(item.id)} className={choiceClass(quality === item.id)}>
                 {item.label}
               </button>
             ))}
           </div>
-          <p className="px-1 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">{description}</p>
+          <p className="px-1 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">{qualityDescription}</p>
+        </div>
+      )}
+
+      {strengthMode === 'prompt-extend' && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400">提示词改写</div>
+          <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-white/5 rounded-2xl">
+            {REWRITE_STRENGTHS.map((item) => (
+              <button key={item.id} type="button" onClick={() => onStrength(item.id)} className={choiceClass(rewriteActive === item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="px-1 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">{rewriteDescription}</p>
         </div>
       )}
     </div>
@@ -106,15 +122,12 @@ export function qualityForResolution(resolution: ImageResolutionOption): 'low' |
   return 'high';
 }
 
-export function inferenceStrengthLabel(strength: ImageInferenceStrength): string {
-  return STRENGTHS.find((item) => item.id === (strength === 'max' ? 'xhigh' : strength))?.label || 'Low';
+export function imageQualityLabel(quality: string): string {
+  return QUALITIES.find((item) => item.id === quality)?.label || 'High';
 }
 
 export function promptRewriteStrengthLabel(strength: ImageInferenceStrength): string {
-  switch (strength === 'max' ? 'xhigh' : strength) {
-    case 'low': return '原文';
-    case 'medium': return '改写';
-    case 'high': return '思考';
-    default: return '改写思考';
-  }
+  if (strength === 'low') return '不改写';
+  if (strength === 'medium') return '改写';
+  return '改写+思考';
 }

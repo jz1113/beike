@@ -1,6 +1,7 @@
 import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@shared/domain/media/drawing';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { prepareImageSubmission } from './prepareImageSubmission';
@@ -231,12 +232,15 @@ export async function submitSingleGenerationTask(
       if (refUrl && !combinedImages.includes(refUrl)) combinedImages.unshift(refUrl);
       const primaryRefUrl = refUrl || combinedImages[0] || undefined;
       const isWorkshop = (t as any).source === 'workshop' || Boolean((t as any).workshopMode);
+      const modelCreds = getModelCredentials(t.model);
+      const imageCaps = imageCapabilities(t.model, modelCreds.protocol, modelCreds.baseUrl);
       const imgBody: Record<string, unknown> = {
         prompt: t.prompt,
         model: t.model || 'gpt-image-2',
         size: t.size || '2448x3264',
         quality: t.quality || 'medium',
-        ...(t.inferenceStrength ? { inferenceStrength: t.inferenceStrength } : {}),
+        ...(imageCaps.strength === 'quality' && t.imageQuality ? { imageQuality: t.imageQuality } : {}),
+        ...(imageCaps.strength === 'prompt-extend' && t.inferenceStrength ? { inferenceStrength: t.inferenceStrength } : {}),
         referenceImageUrl: primaryRefUrl,
         useReferenceImage: t.useReferenceImage ?? Boolean(primaryRefUrl || combinedImages.length),
         source: 'home',
@@ -254,7 +258,6 @@ export async function submitSingleGenerationTask(
       if (gatewayHeaders['x-custom-protocol']) {
         imgBody.customProtocol = gatewayHeaders['x-custom-protocol'];
       }
-      const modelCreds = getModelCredentials(t.model);
       if (gatewayHeaders['x-custom-protocol'] === 'template' && modelCreds.requestTemplate) {
         imgBody.requestTemplate = modelCreds.requestTemplate;
       }

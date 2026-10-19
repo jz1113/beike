@@ -19,12 +19,14 @@ export interface PromptVideoPreferences {
 export type ImageAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
 export type ImageResolutionOption = '1K' | '2K' | '4K';
 export type ImageInferenceStrength = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type ImageQualityTier = 'low' | 'medium' | 'high';
 
 export interface PromptImagePreferences {
   modelId: string; // 'smart' 或具体模型 id
   aspect: ImageAspectOption;
   resolution: ImageResolutionOption;
   inferenceStrength: ImageInferenceStrength;
+  quality: ImageQualityTier;
 }
 
 export interface PromptReasoningPreferences {
@@ -62,6 +64,7 @@ export const DEFAULT_PROMPT_PREFERENCES: PromptComposerPreferences = {
     aspect: '9:16',
     resolution: '2K',
     inferenceStrength: 'low',
+    quality: 'high',
   },
   reasoning: {
     modelId: 'deepseek-v4-flash',
@@ -83,7 +86,13 @@ export function loadPromptPreferences(): PromptComposerPreferences {
     const parsed = JSON.parse(raw);
     return {
       video: { ...DEFAULT_PROMPT_PREFERENCES.video, ...parsed.video },
-      image: { ...DEFAULT_PROMPT_PREFERENCES.image, ...parsed.image },
+      image: {
+        ...DEFAULT_PROMPT_PREFERENCES.image,
+        ...parsed.image,
+        quality: parsed.image?.quality === 'low' || parsed.image?.quality === 'medium' || parsed.image?.quality === 'high'
+          ? parsed.image.quality
+          : DEFAULT_PROMPT_PREFERENCES.image.quality,
+      },
       reasoning: {
         modelId: parsed.reasoning?.modelId || DEFAULT_PROMPT_PREFERENCES.reasoning.modelId,
         reasoningEffort: parsed.reasoning?.reasoningEffort || DEFAULT_PROMPT_PREFERENCES.reasoning.reasoningEffort,

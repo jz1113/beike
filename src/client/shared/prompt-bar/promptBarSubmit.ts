@@ -207,6 +207,7 @@ export function buildPromptBarGenerationTasks(
       ...(visual.modelRouteKey ? { modelRouteKey: visual.modelRouteKey } : {}),
       size: quickGenMode === 'video' ? quickVideoAspectId : sizeStr,
       quality: quickGenMode === 'video' ? quickVideoResolution : quickQuality,
+      imageQuality: quickGenMode === 'image' ? loadPromptPreferences().image.quality : undefined,
       inferenceStrength: quickGenMode === 'image' ? loadPromptPreferences().image.inferenceStrength : undefined,
       videoDuration: quickGenMode === 'video' ? quickVideoDuration : undefined,
       videoResolution: quickGenMode === 'video' ? quickVideoResolution : undefined,

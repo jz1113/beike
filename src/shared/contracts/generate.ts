@@ -51,6 +51,7 @@ export const GenerationTaskSchema = z.object({
   model: z.string(),
   size: z.string(),
   quality: z.string(),
+  imageQuality: z.string().optional(),
   inferenceStrength: z.string().optional(),
   has_human: z.boolean().optional(),
   shot_type: z.enum(['model_shot', 'hand_held_only', 'pure_product']).optional(),

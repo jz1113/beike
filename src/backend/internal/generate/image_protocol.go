@@ -11,20 +11,21 @@ import (
 )
 
 type imageRequest struct {
-	Ctx        context.Context
-	HTTP       *http.Request
-	Base       string
-	APIKey     string
-	Model      string
-	Prompt     string
-	Size       string
-	Quality    string
-	Strength   string
-	Negative   string
-	Refs       []string
-	Workspace  string
-	Production bool
-	Template   json.RawMessage
+	Ctx          context.Context
+	HTTP         *http.Request
+	Base         string
+	APIKey       string
+	Model        string
+	Prompt       string
+	Size         string
+	Quality      string
+	ImageQuality string
+	Strength     string
+	Negative     string
+	Refs         []string
+	Workspace    string
+	Production   bool
+	Template     json.RawMessage
 }
 
 func (req imageRequest) context() context.Context {
@@ -99,10 +100,13 @@ func resolveImageProtocol(base, explicit string) imageProtocol {
 
 func nativeDashscopeImageModel(model string) bool {
 	id := strings.ToLower(strings.TrimSpace(model))
-	if id == "" || strings.Contains(id, "qwen-image-max") {
+	if id == "" {
 		return false
 	}
-	return strings.Contains(id, "qwen-image") || strings.Contains(id, "wan2.7-image") || strings.Contains(id, "wan2.6-image") || strings.Contains(id, "wan2.6-t2i")
+	if strings.Contains(id, "qwen-image-3") || strings.Contains(id, "qwen-image-2.0") || strings.Contains(id, "qwen-image-2.1") || strings.Contains(id, "qwen-image-2-0") || strings.Contains(id, "qwen-image-2-1") {
+		return true
+	}
+	return strings.Contains(id, "wan2.7-image") || strings.Contains(id, "wan2.6-image") || strings.Contains(id, "wan2.6-t2i")
 }
 
 func normalizeImageProtocol(explicit string) string {

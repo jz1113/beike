@@ -305,12 +305,22 @@ func TestGptImageSizeStaysInsidePixelBudget(t *testing.T) {
 	if model != "gpt-image-2-4k" || size != "2880x2880" || quality != "" {
 		t.Fatalf("suffix %s %s %q", model, size, quality)
 	}
-	adapted := buildImagePayload("gpt-image-2", "一只猫", "3072x3072", "high", nil)
+	adapted := buildImagePayload("gpt-image-2", "一只猫", "3072x3072", "high", "", nil)
 	if adapted.payload["size"] != "2880x2880" || adapted.payload["quality"] != "high" {
 		t.Fatalf("payload %#v", adapted.payload)
 	}
-	if _, ok := buildImagePayload("gpt-image-2-4k", "一只猫", "3072x3072", "high", nil).payload["quality"]; ok {
+	if _, ok := buildImagePayload("gpt-image-2-4k", "一只猫", "3072x3072", "high", "high", nil).payload["quality"]; ok {
 		t.Fatal("4k suffix must omit quality")
+	}
+	chosen := buildImagePayload("gpt-image-2", "一只猫", "1024x1024", "low", "high", nil)
+	if chosen.payload["quality"] != "high" || chosen.payload["size"] != "1024x1024" {
+		t.Fatalf("imageQuality %#v", chosen.payload)
+	}
+	for _, model := range []string{"doubao-seedream-4-0-250828", "nano-banana-pro", "qwen-image-max"} {
+		payload := buildImagePayload(model, "一只猫", "1024x1024", "high", "high", nil).payload
+		if _, ok := payload["quality"]; ok {
+			t.Fatalf("%s sent quality %#v", model, payload)
+		}
 	}
 }
 
@@ -367,6 +377,25 @@ func TestNativeQwenImageRejectsNonDashscopeGateway(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), `"submissionRejected":true`) || !strings.Contains(response.Body.String(), "千问原生生图接口") {
 		t.Fatalf("body %s", response.Body.String())
+	}
+}
+
+func TestGatewayQwenImageIsNotForcedToDashscope(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"令牌不合法"}}`))
+	}))
+	defer server.Close()
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"qwen-image","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	if !called || strings.Contains(response.Body.String(), "千问原生生图接口") {
+		t.Fatalf("status %d called %v body %s", response.Code, called, response.Body.String())
 	}
 }
 

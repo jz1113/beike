@@ -14,7 +14,7 @@ type openaiImageProtocol struct{}
 func (openaiImageProtocol) ID() string { return "openai" }
 
 func (openaiImageProtocol) Submit(req imageRequest) (imageSubmitResult, error) {
-	adapted := buildImagePayload(req.Model, req.Prompt, req.Size, req.Quality, req.Refs)
+	adapted := buildImagePayload(req.Model, req.Prompt, req.Size, req.Quality, req.ImageQuality, req.Refs)
 	status, data, err := dispatchImage(req.httpRequest(), imageSubmitURLs(req.Base, adapted.useEdits, adapted.family, req.Model), req.APIKey, adapted.payload, req.Workspace, req.Production)
 	if err != nil {
 		return imageSubmitResult{}, err

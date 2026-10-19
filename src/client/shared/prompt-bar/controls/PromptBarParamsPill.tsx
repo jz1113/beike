@@ -5,12 +5,13 @@ import {
   loadPromptPreferences,
   savePromptPreferences,
   type ImageInferenceStrength,
+  type ImageQualityTier,
   type ImageResolutionOption,
   type PromptComposerPreferences,
   type VideoAspectOption,
 } from '../promptBarPreferencesTypes';
 import { PromptBarVideoTab } from './preferences/PromptBarVideoTab';
-import { PromptBarImageTab, imageResolutionLabel, inferenceStrengthLabel, promptRewriteStrengthLabel, qualityForResolution } from './preferences/PromptBarImageTab';
+import { PromptBarImageTab, imageQualityLabel, imageResolutionLabel, promptRewriteStrengthLabel, qualityForResolution } from './preferences/PromptBarImageTab';
 import { PromptBarAudioTab } from './preferences/PromptBarAudioTab';
 import { videoParamModeLabel } from './preferences/PromptBarVideoTab';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
@@ -95,7 +96,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     ? `${(prefs.audio?.format || 'mp3').toUpperCase()} · ${(prefs.audio?.speed ?? 1).toFixed(1)}x`
     : isVideo
       ? `${videoParamModeLabel(props.quickVideoRefMode)} · ${aspectLabel} · ${props.quickVideoResolution} · ${props.quickVideoDuration}秒`
-      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'none' ? '' : imageCaps.strength === 'prompt-extend' ? promptRewriteStrengthLabel(prefs.image.inferenceStrength) : inferenceStrengthLabel(prefs.image.inferenceStrength)].filter(Boolean).join(' · ');
+      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'prompt-extend' ? promptRewriteStrengthLabel(prefs.image.inferenceStrength) : imageCaps.strength === 'quality' ? imageQualityLabel(prefs.image.quality) : ''].filter(Boolean).join(' · ');
 
   return (
     <div className="relative min-w-0">
@@ -155,6 +156,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
               aspect={props.quickAspectId}
               resolution={imageResolutionLabel(props.quickQuality)}
               strength={prefs.image.inferenceStrength}
+              quality={prefs.image.quality || 'high'}
               allowedResolutions={allowedResolutions}
               strengthMode={imageCaps.strength}
               onAspect={(aspect) => {
@@ -166,6 +168,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
                 persist({ ...prefs, image: { ...prefs.image, resolution } });
               }}
               onStrength={(strength: ImageInferenceStrength) => persist({ ...prefs, image: { ...prefs.image, inferenceStrength: strength } })}
+              onQuality={(quality: ImageQualityTier) => persist({ ...prefs, image: { ...prefs.image, quality } })}
             />
           )}
         </div>

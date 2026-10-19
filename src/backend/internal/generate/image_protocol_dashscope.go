@@ -28,13 +28,17 @@ func (dashscopeImageProtocol) Submit(req imageRequest) (imageSubmitResult, error
 	if err != nil {
 		return imageSubmitResult{}, err
 	}
+	if message := dashscopeReferenceLimitError(req.Model, len(images)); message != "" {
+		return imageSubmitResult{}, imageEditPrepareError{message}
+	}
 	size := dashscopePixelSize(req.Model, req.Size, req.Quality)
 	adapted.size = strings.ReplaceAll(size, "*", "x")
 	body := dashscopeImageBody(req, kind, images, size)
-	endpoint := system.DashScopeRoot(req.Base) + dashscopeImagePath(kind)
+	async := dashscopeUsesAsync(req.Model, kind)
+	endpoint := system.DashScopeRoot(req.Base) + dashscopeImagePath(async)
 	headers := map[string]string{}
 	timeout := 180 * time.Second
-	if kind == "wan" {
+	if async {
 		headers["X-DashScope-Async"] = "enable"
 		timeout = 45 * time.Second
 		adapted.endpoint = "image-generation"
@@ -82,7 +86,7 @@ func (dashscopeImageProtocol) Poll(req imagePollRequest) (pollParsed, map[string
 		}
 		return pollParsed{status: "SUCCESS", result: image, progress: "100%"}, data, true
 	case "FAILED", "CANCELED", "CANCELLED", "UNKNOWN":
-		reason := dashscopeFailure(data, status)
+		reason := dashscopeTaskFailure(data)
 		if reason == "" {
 			reason = "上游明确返回任务失败"
 		}
@@ -109,11 +113,39 @@ func dashscopeImageKind(model string) (string, string) {
 	}
 }
 
-func dashscopeImagePath(kind string) string {
+func dashscopeUsesAsync(model, kind string) bool {
 	if kind == "wan" {
+		return true
+	}
+	id := strings.ToLower(model)
+	return strings.Contains(id, "qwen-image-3") || strings.Contains(id, "qwen-image-2.1") || strings.Contains(id, "qwen-image-2-1")
+}
+
+func dashscopeImagePath(async bool) string {
+	if async {
 		return "/api/v1/services/aigc/image-generation/generation"
 	}
 	return "/api/v1/services/aigc/multimodal-generation/generation"
+}
+
+func dashscopeReferenceLimit(model string) int {
+	id := strings.ToLower(model)
+	switch {
+	case strings.Contains(id, "qwen-image-2.1"), strings.Contains(id, "qwen-image-2-1"):
+		return 10
+	case strings.Contains(id, "qwen-image"):
+		return 3
+	default:
+		return 0
+	}
+}
+
+func dashscopeReferenceLimitError(model string, count int) string {
+	limit := dashscopeReferenceLimit(model)
+	if limit > 0 && count > limit {
+		return "该模型最多支持 " + Itoa(limit) + " 张参考图"
+	}
+	return ""
 }
 
 func dashscopeImageBody(req imageRequest, kind string, images []string, size string) map[string]any {
@@ -129,10 +161,10 @@ func dashscopeImageBody(req imageRequest, kind string, images []string, size str
 		parameters["thinking_mode"] = extend || thinking
 	} else {
 		parameters["prompt_extend"] = extend
-		if thinking && (strings.Contains(id, "qwen-image-3") || strings.Contains(id, "qwen-image-2.1-pro") || strings.Contains(id, "qwen-image-2-1-pro")) {
-			parameters["enable_thinking"] = true
+		if extend && dashscopeThinkingModel(id) {
+			parameters["enable_thinking"] = thinking
 		}
-		if text := strings.TrimSpace(req.Negative); text != "" {
+		if text := dashscopeNegativePrompt(id, req.Negative); text != "" {
 			parameters["negative_prompt"] = text
 		}
 	}
@@ -143,6 +175,25 @@ func dashscopeImageBody(req imageRequest, kind string, images []string, size str
 		},
 		"parameters": parameters,
 	}
+}
+
+func dashscopeThinkingModel(id string) bool {
+	return strings.Contains(id, "qwen-image-3") || strings.Contains(id, "qwen-image-2.1-pro") || strings.Contains(id, "qwen-image-2-1-pro")
+}
+
+func dashscopeNegativePrompt(id, negative string) string {
+	if strings.Contains(id, "qwen-image-2.1-pro") || strings.Contains(id, "qwen-image-2-1-pro") {
+		return ""
+	}
+	return truncateRunes(strings.TrimSpace(negative), 500)
+}
+
+func truncateRunes(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit])
 }
 
 func dashscopeRewrite(strength string) (extend bool, thinking bool) {
@@ -240,6 +291,22 @@ func dashscopeTaskStatus(data map[string]any) string {
 		return text
 	}
 	return ""
+}
+
+func dashscopeTaskFailure(data map[string]any) string {
+	code := dashscopeCode(data)
+	switch {
+	case code == "DataInspectionFailed":
+		return "内容审核未通过，请修改提示词后重试"
+	case strings.HasPrefix(code, "Throttling"):
+		return "触发限流，请稍后重试"
+	case code == "InvalidApiKey":
+		return "API 密钥无效，请检查千问服务商配置"
+	}
+	if text := dashscopeMessage(data); text != "" {
+		return text
+	}
+	return code
 }
 
 func dashscopeFailure(data map[string]any, status int) string {

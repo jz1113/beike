@@ -32,8 +32,8 @@ func TestDashscopeRoutesSyncAndAsync(t *testing.T) {
 	t.Cleanup(func() { ModelHTTP = previous })
 
 	syncResult, err := (dashscopeImageProtocol{}).Submit(imageRequest{
-		Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-3.0-pro",
-		Prompt: `海报"春季"`, Size: "3:4", Quality: "high", Strength: "high", Negative: "模糊",
+		Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-2.0",
+		Prompt: `海报"春季"`, Size: "1:1", Quality: "low", Strength: "medium", Negative: "模糊",
 	})
 	if err != nil || syncResult.Direct != "https://cdn.example/a.png" || syncResult.TaskID != "" {
 		t.Fatalf("sync %#v %v", syncResult, err)
@@ -41,8 +41,22 @@ func TestDashscopeRoutesSyncAndAsync(t *testing.T) {
 	if sawPath != "/api/v1/services/aigc/multimodal-generation/generation" || sawAsync != "" {
 		t.Fatalf("sync path %s async %s", sawPath, sawAsync)
 	}
-	if !strings.Contains(sawBody, `"size":"1488*2048"`) || !strings.Contains(sawBody, `"prompt_extend":true`) || !strings.Contains(sawBody, `"enable_thinking":true`) || !strings.Contains(sawBody, `"negative_prompt":"模糊"`) || !strings.Contains(sawBody, `海报\"春季\"`) {
+	if !strings.Contains(sawBody, `"size":"1280*1280"`) || !strings.Contains(sawBody, `"prompt_extend":true`) || strings.Contains(sawBody, `"enable_thinking"`) || !strings.Contains(sawBody, `"negative_prompt":"模糊"`) || !strings.Contains(sawBody, `海报\"春季\"`) {
 		t.Fatalf("sync body %s", sawBody)
+	}
+
+	qwenAsync, err := (dashscopeImageProtocol{}).Submit(imageRequest{
+		Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-3.0-pro",
+		Prompt: "海报", Size: "3:4", Quality: "high", Strength: "high", Negative: "模糊",
+	})
+	if err != nil || qwenAsync.TaskID != "task-1" || qwenAsync.Direct != "" {
+		t.Fatalf("qwen async %#v %v", qwenAsync, err)
+	}
+	if sawPath != "/api/v1/services/aigc/image-generation/generation" || sawAsync != "enable" {
+		t.Fatalf("qwen async path %s header %s", sawPath, sawAsync)
+	}
+	if !strings.Contains(sawBody, `"size":"1488*2048"`) || !strings.Contains(sawBody, `"enable_thinking":true`) || !strings.Contains(sawBody, `"negative_prompt":"模糊"`) {
+		t.Fatalf("qwen async body %s", sawBody)
 	}
 
 	asyncResult, err := (dashscopeImageProtocol{}).Submit(imageRequest{
@@ -65,6 +79,10 @@ func TestDashscopePollAndErrors(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/tasks/task-1":
 			_, _ = w.Write([]byte(`{"output":{"task_status":"SUCCEEDED","task_id":"task-1","choices":[{"message":{"content":[{"image":"https://cdn.example/b.png"}]}}]}}`))
+		case "/api/v1/tasks/task-failed":
+			_, _ = w.Write([]byte(`{"output":{"task_status":"FAILED","code":"DataInspectionFailed","message":"blocked"}}`))
+		case "/api/v1/tasks/task-invalid":
+			_, _ = w.Write([]byte(`{"output":{"task_status":"FAILED","code":"InvalidParameter","message":"size is invalid"}}`))
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"code":"DataInspectionFailed","message":"blocked"}`))
@@ -78,6 +96,14 @@ func TestDashscopePollAndErrors(t *testing.T) {
 	parsed, _, ok := (dashscopeImageProtocol{}).Poll(imagePollRequest{Ctx: context.Background(), Base: server.URL, APIKey: "secret", TaskID: "task-1"})
 	if !ok || parsed.status != "SUCCESS" || parsed.result != "https://cdn.example/b.png" {
 		t.Fatalf("poll %#v %v", parsed, ok)
+	}
+	failed, _, ok := (dashscopeImageProtocol{}).Poll(imagePollRequest{Ctx: context.Background(), Base: server.URL, APIKey: "secret", TaskID: "task-failed"})
+	if !ok || failed.status != "FAILURE" || failed.reason != "内容审核未通过，请修改提示词后重试" {
+		t.Fatalf("failed %#v %v", failed, ok)
+	}
+	invalid, _, ok := (dashscopeImageProtocol{}).Poll(imagePollRequest{Ctx: context.Background(), Base: server.URL, APIKey: "secret", TaskID: "task-invalid"})
+	if !ok || invalid.status != "FAILURE" || invalid.reason != "size is invalid" {
+		t.Fatalf("invalid %#v %v", invalid, ok)
 	}
 	rejected, err := (dashscopeImageProtocol{}).Submit(imageRequest{Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-2.0", Prompt: "猫", Size: "1:1", Quality: "low"})
 	if err != nil || rejected.Status != http.StatusBadRequest || rejected.Data["message"] != "内容审核未通过，请修改提示词后重试" {
@@ -102,6 +128,44 @@ func TestDashscopeSizeTable(t *testing.T) {
 		if got := dashscopePixelSize(item.model, item.size, item.quality); got != item.want {
 			t.Fatalf("%s %s %s got %s", item.model, item.size, item.quality, got)
 		}
+	}
+}
+
+func TestDashscopeThinkingAndReferenceLimits(t *testing.T) {
+	medium := dashscopeImageBody(imageRequest{
+		Model: "qwen-image-3.0-pro", Prompt: "猫", Strength: "medium", Negative: strings.Repeat("糊", 600),
+	}, "qwen", nil, "1024*1024")
+	params := medium["parameters"].(map[string]any)
+	negative, _ := params["negative_prompt"].(string)
+	if params["prompt_extend"] != true || params["enable_thinking"] != false || len([]rune(negative)) != 500 {
+		t.Fatalf("medium %#v", params)
+	}
+	pro := dashscopeImageBody(imageRequest{
+		Model: "qwen-image-2.1-pro", Prompt: "猫", Strength: "high", Negative: "模糊",
+	}, "qwen", nil, "1024*1024")
+	proParams := pro["parameters"].(map[string]any)
+	if _, ok := proParams["negative_prompt"]; ok || proParams["enable_thinking"] != true {
+		t.Fatalf("2.1-pro %#v", proParams)
+	}
+	refs := make([]string, 4)
+	for i := range refs {
+		refs[i] = "https://cdn.example/" + strings.Repeat("a", i+1) + ".png"
+	}
+	_, err := (dashscopeImageProtocol{}).Submit(imageRequest{
+		Ctx: context.Background(), Model: "qwen-image-3.0", Prompt: "猫", Refs: refs,
+	})
+	if err == nil || !strings.Contains(err.Error(), "最多支持 3 张参考图") {
+		t.Fatal(err)
+	}
+	refs = make([]string, 11)
+	for i := range refs {
+		refs[i] = "https://cdn.example/" + strings.Repeat("b", i+1) + ".png"
+	}
+	_, err = (dashscopeImageProtocol{}).Submit(imageRequest{
+		Ctx: context.Background(), Model: "qwen-image-2.1-turbo", Prompt: "猫", Refs: refs,
+	})
+	if err == nil || !strings.Contains(err.Error(), "最多支持 10 张参考图") {
+		t.Fatal(err)
 	}
 }
 

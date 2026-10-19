@@ -97,6 +97,15 @@ func legacyGptImageSuffix(lower string) string {
 	return "gpt-image-2-" + tier
 }
 
+func normalizeImageQuality(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "low", "medium", "high":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
+}
+
 func gptImageQualityTier(quality string) string {
 	switch strings.ToLower(strings.TrimSpace(quality)) {
 	case "low", "1k":

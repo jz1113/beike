@@ -37,6 +37,7 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 			quality = "high"
 		}
 	}
+	imageQuality := normalizeImageQuality(rawString(payload, "imageQuality"))
 	protocol := resolveImageProtocol(base, imageProtocolName(payload, r.Header.Get("x-custom-protocol")))
 	if protocol.ID() == "openai" && nativeDashscopeImageModel(model) {
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{
@@ -46,7 +47,7 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		return
 	}
 	result, err := protocol.Submit(imageRequest{
-		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality,
+		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality, ImageQuality: imageQuality,
 		Strength: rawString(payload, "inferenceStrength"), Negative: rawString(payload, "negativePrompt"),
 		Refs: refs, Workspace: workspaceOf(r), Production: cfg.Production(), Template: imageRequestTemplate(payload),
 	})
@@ -121,12 +122,19 @@ type imageAdapted struct {
 	payload                                 map[string]any
 }
 
-func buildImagePayload(model, prompt, size, quality string, refs []string) imageAdapted {
+func buildImagePayload(model, prompt, size, quality, imageQuality string, refs []string) imageAdapted {
 	model, size, quality = normalizeGptImageRequest(model, size, quality)
 	family := imageFamily(model)
 	payload := map[string]any{"model": model, "prompt": prompt, "size": size, "n": 1}
-	if family != "grok-image" && quality != "" {
-		payload["quality"] = quality
+	sentQuality := quality
+	if chosen := normalizeImageQuality(imageQuality); chosen != "" {
+		sentQuality = chosen
+		if omitGptImageQuality(model) {
+			sentQuality = ""
+		}
+	}
+	if isGptImageModel(model) && sentQuality != "" {
+		payload["quality"] = sentQuality
 	}
 	if family == "grok-image" {
 		delete(payload, "size")

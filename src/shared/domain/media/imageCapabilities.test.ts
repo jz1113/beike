@@ -9,10 +9,14 @@ describe('imageCapabilities', () => {
     expect(caps.sendsQuality).toBe(false);
   });
 
-  it('keeps gateway qwen models on the OpenAI quality scale', () => {
+  it('keeps gateway qwen models free of a quality tier', () => {
     const caps = imageCapabilities('qwen-image-max', 'openai', 'https://ai.comfly.org');
     expect(caps.resolutions).toEqual(['1K', '2K', '4K']);
-    expect(caps.sendsQuality).toBe(true);
+    expect(caps.strength).toBe('none');
+    expect(caps.sendsQuality).toBe(false);
+    expect(imageCapabilities('qwen-image', 'openai').strength).toBe('none');
+    expect(imageCapabilities('flux-pro-max', 'openai').strength).toBe('none');
+    expect(imageCapabilities('nano-banana-pro', 'openai').strength).toBe('none');
   });
 
   it('infers DashScope from the provider host', () => {
@@ -22,12 +26,27 @@ describe('imageCapabilities', () => {
     expect(imageCapabilities('qwen-image-3.0', 'openai', 'https://maas.qianwenaiapi.com').resolutions).toEqual(['1K', '2K']);
   });
 
-  it('treats qwen and wan image models as native, except the gateway max model', () => {
+  it('treats versioned qwen and wan image models as native', () => {
     expect(isNativeDashscopeImageModel('qwen-image-3.0-pro')).toBe(true);
+    expect(isNativeDashscopeImageModel('qwen-image-2.0-pro')).toBe(true);
+    expect(isNativeDashscopeImageModel('qwen-image-2.1-turbo')).toBe(true);
     expect(isNativeDashscopeImageModel('wan2.6-t2i')).toBe(true);
     expect(isNativeDashscopeImageModel('wan2.7-image-pro')).toBe(true);
+    expect(isNativeDashscopeImageModel('qwen-image')).toBe(false);
+    expect(isNativeDashscopeImageModel('qwen-image-edit')).toBe(false);
     expect(isNativeDashscopeImageModel('qwen-image-max')).toBe(false);
     expect(isNativeDashscopeImageModel('gpt-image-2')).toBe(false);
+  });
+
+  it('gives a quality tier only to gpt-image and locks suffix models', () => {
+    expect(imageCapabilities('gpt-image-2', 'openai')).toMatchObject({
+      resolutions: ['1K', '2K', '4K'], strength: 'quality', sendsQuality: true,
+    });
+    expect(imageCapabilities('openai/gpt-image-2', 'openai').strength).toBe('quality');
+    expect(imageCapabilities('gpt-image-2-2k', 'openai')).toMatchObject({ resolutions: ['2K'], strength: 'none', sendsQuality: false });
+    expect(imageCapabilities('gpt-image-2-4k', 'openai')).toMatchObject({ resolutions: ['4K'], strength: 'none', sendsQuality: false });
+    expect(imageCapabilities('seedream-v5-pro', 'openai')).toMatchObject({ resolutions: ['1K', '2K'], strength: 'none', sendsQuality: false });
+    expect(imageCapabilities('doubao-seedream-4-5-251128', 'openai').strength).toBe('none');
   });
 
   it('hides resolution for grok and allows 4K only on wan2.7 pro', () => {
