@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 type ratedImage struct {
@@ -136,7 +138,7 @@ func rateBatch(ctx context.Context, creds gatewayCreds, model, requirement strin
 	})
 	callCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
-	request, err := http.NewRequestWithContext(callCtx, http.MethodPost, strings.TrimRight(creds.baseURL, "/")+"/v1/chat/completions", strings.NewReader(string(payload)))
+	request, err := http.NewRequestWithContext(callCtx, http.MethodPost, system.ChatCompletionsURL(creds.baseURL), strings.NewReader(string(payload)))
 	if err != nil {
 		return err
 	}

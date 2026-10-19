@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 const (
@@ -86,7 +88,7 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if err != nil {
 		return Result{}, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(input.BaseURL, "/")+"/v1/chat/completions", bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, system.ChatCompletionsURL(input.BaseURL), bytes.NewReader(body))
 	if err != nil {
 		return Result{}, err
 	}

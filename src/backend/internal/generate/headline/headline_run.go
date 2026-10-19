@@ -72,9 +72,8 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 	if ratio != "1:1" {
 		ratio = "3:4"
 	}
-	stylePrompt := strings.TrimSpace(generate.StringField(payload, "stylePrompt"))
-	negativeRules := generate.StringListField(payload, "negativeRules")
-	content := []any{map[string]any{"type": "text", "text": coverDirectorPromptWithStyle(original, cover, ratio, generate.StringField(payload, "productName"), stylePrompt, negativeRules)}}
+	memoryLines, memoryIDs := adoptedMemory(r, cfg)
+	content := []any{map[string]any{"type": "text", "text": coverDirectorPrompt(original, cover, ratio, generate.StringField(payload, "productName"), generate.StringField(payload, "previousDesign"), memoryLines)}}
 	for _, image := range images {
 		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image}})
 	}
@@ -92,12 +91,13 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "设计模型没有返回合法 JSON"})
 		return
 	}
-	design, message := validateCoverDesign(parsed, cover, artDirectionID(payload), generate.StringField(payload, "productName"))
+	design, message := validateCoverDesign(parsed, cover, generate.StringField(payload, "productName"))
 	if message != "" {
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": message})
 		return
 	}
-	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v4"}
+	recordDesignUsage(r, cfg, generate.StringField(payload, "batchId"), generate.StringField(payload, "itemId"), generate.StringField(payload, "itemTitle"), memoryIDs, design)
+	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v5"}
 	if usage := generate.NormalizeUsage(usageData); usage != nil {
 		body["usage"] = usage
 	}
@@ -137,19 +137,29 @@ func headlineImages(r *http.Request, urls []string) ([]string, string) {
 }
 
 func headlineTitlePrompt(original, product string) string {
-	return "你是中文短视频封面的标题编辑。只返回 JSON：{\"title\":\"7-12个纯中文字符\"}。原标题：" + original + "。商品名：" + product + "。标题必须是 7 到 12 个纯中文字符，保留可验证结论，不要套话。"
+	return "你是小红书封面的标题编辑。只返回 JSON：{\"title\":\"7-12个纯中文字符\"}。原标题：" + original + "。商品名：" + product + "。标题必须是 7 到 12 个纯中文字，读起来像一条笔记封面：结论或使用场景放在前面，品类名能省则省。每个字都带信息，从对象、变化、感受、对比里留下两样。事实只来自原标题和商品图，没有依据就不写参数、价格、功效或品牌背书。出现必入、神器、绝绝子、yyds、真的绝了、实拍体验时整句重写。例如「洗衣效果很到位」写成「洗完衣服不发灰」。"
 }
 
-func coverDirectorPromptWithStyle(original, cover, ratio, product, stylePrompt string, negativeRules []string) string {
-	base := "你是中文短视频封面美术指导。画布比例 " + ratio + "。原标题：" + original + "。封面标题：" + cover + "。商品名：" + product + "。"
-	if strings.TrimSpace(stylePrompt) != "" {
-		base += "【核心风格指定】" + strings.TrimSpace(stylePrompt) + "。"
+func adoptedMemory(r *http.Request, cfg config.Config) ([]string, []string) {
+	db, ok := openCoverDB(cfg)
+	if !ok {
+		return nil, nil
 	}
-	if len(negativeRules) > 0 {
-		base += "【负向严格避坑约束】" + strings.Join(negativeRules, "；") + "。"
+	defer db.Close()
+	lines, ids, err := adoptedCoverLines(r.Context(), db, httpx.WorkspaceFrom(r))
+	if err != nil {
+		return nil, nil
 	}
-	base += "只返回 JSON，字段 title、titleLines、productNameLine、composition、material、palette、artDirectionId、typographySystem、typography、visualAnchor、styleFamily、imagePrompt。titleLines 拼接必须等于封面标题。imagePrompt 为 450 到 1000 字，并用「」逐行列出标题。"
-	return base
+	return lines, ids
+}
+
+func recordDesignUsage(r *http.Request, cfg config.Config, batchID, itemID, title string, entryIDs []string, design map[string]any) {
+	db, ok := openCoverDB(cfg)
+	if !ok {
+		return
+	}
+	defer db.Close()
+	_ = recordCoverUsage(r.Context(), db, httpx.WorkspaceFrom(r), batchID, itemID, title, entryIDs, coverDesignSheet(design))
 }
 
 func normalizeHeadline(value string) string {
@@ -181,10 +191,4 @@ func headlineErrorText(err error, status int, fallback string) string {
 		return fallback
 	}
 	return fallback
-}
-
-func artDirectionID(payload map[string]any) string {
-	raw, _ := payload["reservedArtDirection"].(map[string]any)
-	id, _ := raw["id"].(string)
-	return strings.TrimSpace(id)
 }

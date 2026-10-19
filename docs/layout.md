@@ -127,7 +127,7 @@ shared/
 
 | 小工具 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
 | --- | --- | --- | --- |
-| 封面大字报 | `headline-poster` | `generate/headline` | 爆款大字报封面批量排版、艺术字体与商品贴合 |
+| 封面大字报 | `headline-poster` | `generate/headline` | 一次出图的中文封面。技能硬约束和已采纳记忆写入设计提示词，样张反推与纠正存在封面记忆 |
 | 电商工坊 | `workshop` | `workshop` | 多商品、多模特、多场景批量生图与矩阵化交付 |
 | 词包审核 | `keyword-review` | `keywordreview` | 关键词表批量导入、垂类判定、生产方向建议与合规导出 |
 | 内容采集 | `collect` | `platform/collect` | 跨平台图文视频采编、元数据抽取与无水印解析 |

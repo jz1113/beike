@@ -155,7 +155,7 @@ export function useAssistantTurn() {
         messages,
         model: upstreamModel || model,
         reasoningEffort: params.reasoningEffort || prefs.reasoning?.reasoningEffort || 'medium',
-        generationMode: prefs.reasoning?.generationMode || 'normal',
+        generationMode: 'auto',
         fallbackModels,
         historyLimit,
         runMode: params.runMode,

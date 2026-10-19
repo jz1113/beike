@@ -20,6 +20,13 @@ export interface CoverDesignPlan {
   eyebrow: string;
   supportLine: string;
   titleLines: string[];
+  layout: string;
+  typeface: string;
+  textColor: string;
+  background: string;
+  subject: string;
+  harmony: string;
+  variation: string;
 }
 
 export interface PosterItem {
@@ -72,6 +79,13 @@ export interface HeadlineDesignResponse {
   visualAnchor?: string;
   imagePrompt?: string;
   styleFamily?: string;
+  layout?: string;
+  typeface?: string;
+  textColor?: string;
+  background?: string;
+  subject?: string;
+  harmony?: string;
+  variation?: string;
 }
 
 export interface HeadlineTitleResponse {
@@ -201,5 +215,17 @@ export function buildDesignPlan(coverTitle: string, director: HeadlineDesignResp
     visualAnchor: director.visualAnchor || '',
     generationDirection: director.imagePrompt.trim(),
     titleLines: director.titleLines, eyebrow: '', supportLine: '',
+    layout: director.layout || '',
+    typeface: director.typeface || '',
+    textColor: director.textColor || '',
+    background: director.background || '',
+    subject: director.subject || '',
+    harmony: director.harmony || '',
+    variation: director.variation || '',
   };
+}
+
+export function previousDesignSummary(plan: CoverDesignPlan | undefined): string {
+  if (!plan) return '';
+  return [plan.layout, plan.typeface, plan.textColor, plan.background, plan.subject].filter(Boolean).join('；').slice(0, 500);
 }

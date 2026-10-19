@@ -11,6 +11,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 // ProductAnalysisResult represents structured commodity intelligence
@@ -111,7 +112,7 @@ func Analyze(cfg config.Config) http.Handler {
 				"temperature":     0.3,
 				"response_format": map[string]string{"type": "json_object"},
 			}
-			status, respBytes, err := generate.PostModel(r.Context(), http.MethodPost, strings.TrimRight(base, "/")+"/v1/chat/completions", key, reqBody, 45*time.Second)
+			status, respBytes, err := generate.PostModel(r.Context(), http.MethodPost, system.ChatCompletionsURL(base), key, reqBody, 45*time.Second)
 			if err == nil && status >= 200 && status < 300 {
 				var chatResp struct {
 					Choices []struct {

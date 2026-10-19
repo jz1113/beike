@@ -153,35 +153,36 @@ export function SkillMetadataForm({
           </div>
         </div>
 
-        {/* 选择符合这个技能的类型标签 (0/3) * */}
-        <div>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-              选择符合这个技能的类型标签
-            </label>
-            <span className="text-[11px] text-slate-400">({draft.tags.length}/3)</span>
-            <span className="text-red-500">*</span>
+        {SKILL_TAG_OPTIONS.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                选择符合这个技能的类型标签
+              </label>
+              <span className="text-[11px] text-slate-400">({draft.tags.length}/3)</span>
+              <span className="text-red-500">*</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SKILL_TAG_OPTIONS.map((tag) => {
+                const isSelected = draft.tags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    className={`rounded-full px-3 py-1 text-xs transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-900 dark:bg-white font-medium text-white dark:text-slate-900'
+                        : 'border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.08]'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {SKILL_TAG_OPTIONS.map((tag) => {
-              const isSelected = draft.tags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  className={`rounded-full px-3 py-1 text-xs transition-colors cursor-pointer ${
-                    isSelected
-                      ? 'bg-slate-900 dark:bg-white font-medium text-white dark:text-slate-900'
-                      : 'border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.04] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.08]'
-                  }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        )}
 
         <SkillModelSelect
           label="默认视频模型"

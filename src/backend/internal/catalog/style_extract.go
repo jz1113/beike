@@ -92,7 +92,7 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	encoded, _ := json.Marshal(body)
 	requestCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, strings.TrimRight(base, "/")+"/v1/chat/completions", bytes.NewReader(encoded))
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, system.ChatCompletionsURL(base), bytes.NewReader(encoded))
 	if err != nil {
 		return "", 0, nil, err
 	}

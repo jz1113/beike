@@ -36,8 +36,14 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 			quality = "high"
 		}
 	}
-	adapted := buildImagePayload(model, prompt, size, quality, refs)
-	status, data, err := dispatchImage(r, imageSubmitURLs(base, adapted.useEdits, adapted.family, model), apiKey, adapted.payload, workspaceOf(r), cfg.Production())
+	protocol := resolveImageProtocol(base, imageProtocolName(payload, r.Header.Get("x-custom-protocol")))
+	result, err := protocol.Submit(imageRequest{
+		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality,
+		Strength: rawString(payload, "inferenceStrength"), Negative: rawString(payload, "negativePrompt"),
+		Refs: refs, Workspace: workspaceOf(r), Production: cfg.Production(), Template: imageRequestTemplate(payload),
+	})
+	adapted := result.Adapted
+	status, data := result.Status, result.Data
 	if err != nil {
 		var prepare imageEditPrepareError
 		if errors.As(err, &prepare) {
@@ -47,7 +53,10 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "提交响应未确认：" + err.Error() + "。请先在上游任务记录核实是否已创建任务，避免重复生成"})
 		return
 	}
-	taskID, direct := imageOutcome(data)
+	taskID, direct := result.TaskID, result.Direct
+	if taskID != "" {
+		rememberImageTemplate(base, taskID, imageRequestTemplate(payload))
+	}
 	if status < 200 || status >= 300 || (taskID == "" && direct == "") {
 		upstreamErr := imageUpstreamError(data, status)
 		rejected := status >= 400 && status < 500

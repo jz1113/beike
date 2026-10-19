@@ -1,8 +1,9 @@
 import { API_PROVIDERS_STORAGE_KEY } from '@shared/domain/models/modalityStorage';
+import type { ImageRequestTemplate } from '@shared/contracts/imageRequestTemplate';
 
 export { API_PROVIDERS_STORAGE_KEY };
 
-export type ApiProviderProtocol = 'gemini' | 'openai' | 'anthropic' | 'custom';
+export type ApiProviderProtocol = 'gemini' | 'openai' | 'anthropic' | 'custom' | 'dashscope' | 'template';
 
 export interface ApiProvider {
   id: string;
@@ -20,6 +21,7 @@ export interface ApiProvider {
   serviceId?: string;
   description?: string;
   iconType?: string;
+  requestTemplate?: ImageRequestTemplate;
 }
 
 export const PROTOCOL_OPTIONS: { id: ApiProviderProtocol; label: string; formatHint: string; defaultCatalog: string }[] = [
@@ -45,6 +47,18 @@ export const PROTOCOL_OPTIONS: { id: ApiProviderProtocol; label: string; formatH
     id: 'custom',
     label: '自定义 HTTP 网关',
     formatHint: '自定义端点 · 标准 REST 请求',
+    defaultCatalog: '/v1/models',
+  },
+  {
+    id: 'dashscope',
+    label: '千问 / DashScope 原生',
+    formatHint: '生图走 DashScope 原生接口，对话走 /compatible-mode/v1',
+    defaultCatalog: '/compatible-mode/v1/models',
+  },
+  {
+    id: 'template',
+    label: '自定义请求模板',
+    formatHint: '按粘贴的 curl 发送生图请求',
     defaultCatalog: '/v1/models',
   },
 ];
@@ -105,6 +119,20 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
     serviceId: 'deepseek_official',
     iconType: 'deepseek',
     description: 'DeepSeek 官方推理与图像理解',
+  },
+  {
+    id: 'qianwen_platform',
+    name: '千问 AI 平台',
+    providerType: 'dashscope',
+    baseUrl: 'https://maas.qianwenaiapi.com',
+    apiKey: '',
+    enabled: true,
+    catalogPath: '/compatible-mode/v1/models',
+    isRemovable: true,
+    websiteUrl: 'https://platform.qianwenai.com',
+    serviceId: 'qianwen_platform',
+    iconType: 'qwen',
+    description: '千问图像原生接口与 compatible-mode 对话',
   },
   {
     id: 'lianchi_images',

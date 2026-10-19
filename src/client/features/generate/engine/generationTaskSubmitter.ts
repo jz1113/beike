@@ -1,6 +1,6 @@
 import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
-import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
+import { getGatewayClientHeaders, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@shared/domain/media/drawing';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { prepareImageSubmission } from './prepareImageSubmission';
@@ -246,6 +246,13 @@ export async function submitSingleGenerationTask(
       };
       if (gatewayHeaders['x-custom-api-key']) {
         imgBody.customApiKey = gatewayHeaders['x-custom-api-key'];
+      }
+      if (gatewayHeaders['x-custom-protocol']) {
+        imgBody.customProtocol = gatewayHeaders['x-custom-protocol'];
+      }
+      const modelCreds = getModelCredentials(t.model);
+      if (gatewayHeaders['x-custom-protocol'] === 'template' && modelCreds.requestTemplate) {
+        imgBody.requestTemplate = modelCreds.requestTemplate;
       }
       if (combinedImages.length > 0) {
         imgBody.images = combinedImages;

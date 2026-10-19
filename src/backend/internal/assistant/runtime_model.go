@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 var approvedAssistantModels = map[string]bool{
@@ -170,7 +172,7 @@ var assistantHTTP = func() *http.Client {
 }
 
 func postModel(ctx context.Context, creds gatewayCreds, body []byte, stream bool) (*http.Response, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, creds.baseURL+"/v1/chat/completions", bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, system.ChatCompletionsURL(creds.baseURL), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

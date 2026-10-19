@@ -161,13 +161,9 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 	budget := newBudget()
 	plan := &taskPlan{}
 	results := &resultStore{}
-	genMode := optionalString(payload, "generationMode")
-	if genMode == "" {
-		genMode = "normal"
-	}
 	loop := &agentLoop{
 		ctx: ctx, creds: creds, models: []string{model}, effort: optionalString(payload, "reasoningEffort"),
-		generationMode: genMode,
+		generationMode: "auto",
 		messages:       messages, tools: tools, names: names, budget: budget, plan: plan, results: results,
 		box:  &toolBox{ctx: ctx, db: db, cfg: cfg, workspace: workspace, documents: documents, client: objectField(payload, "clientContext"), plan: plan, results: results, budget: budget, allowed: names},
 		send: send, persist: persist, granted: sessionTools(workspace, threadID), turnID: turnID, threadID: threadID, space: workspace,

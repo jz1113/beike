@@ -58,7 +58,7 @@ export function PosterToolbar({
         <span className="text-sm font-black tracking-tight">封面生成</span>
       </button>
       <div className="contents sm:ml-auto sm:flex sm:max-w-full sm:items-center sm:justify-end sm:gap-2">
-        <button type="button" onClick={handleOpenAction} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/40 px-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-indigo-500/10" aria-label="封面风格记忆与灵感中枢" title="上传优质样张，反推拆解并沉淀风格 Skill"><BrainCircuit className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" /><span className="hidden sm:inline">风格记忆与灵感</span></button>
+        <button type="button" onClick={handleOpenAction} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/40 px-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-indigo-500/10" aria-label="封面记忆" title="投喂样张，反推排版并采纳进封面技能"><BrainCircuit className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" /><span className="hidden sm:inline">封面记忆</span></button>
         <div className="ml-auto max-w-full">
         {isNewBatchConfirming ? (
           <div className="flex items-center gap-2 rounded-2xl border border-rose-300/30 bg-[#121116] p-2 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)]">

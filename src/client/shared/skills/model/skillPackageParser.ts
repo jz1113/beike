@@ -78,10 +78,6 @@ export function extractSkillDraftFromContent(
       if (matchedTags.length >= 3) break;
     }
   }
-  if (matchedTags.length === 0) {
-    matchedTags.push(genres.includes('视频') ? '专业影视' : '创意发散');
-  }
-
   return {
     title,
     description,

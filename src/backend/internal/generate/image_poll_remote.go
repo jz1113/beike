@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
@@ -18,31 +17,16 @@ func pollImageTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		return
 	}
 	base, apiKey := pollCredentials(cfg, r)
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
-	urls := []string{
-		root + "/v1/images/tasks/" + taskID,
-		root + "/v1/tasks/" + taskID,
-		root + "/v1/images/generations/" + taskID,
-		root + "/v1/images/" + taskID,
-		root + "/v1/query/image_generation?task_id=" + taskID,
-	}
-	for _, endpoint := range urls {
-		status, raw, err := PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 3500*time.Millisecond)
-		if err != nil || status < 200 || status >= 300 {
-			continue
-		}
-		var data map[string]any
-		if json.Unmarshal(raw, &data) != nil {
-			continue
-		}
-		parsed, ok := parseImagePoll(data)
-		if !ok {
-			continue
-		}
-		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, parsed, data))
+	protocol := resolveImageProtocol(base, r.Header.Get("x-custom-protocol"))
+	template := imageTemplateForPoll(base, taskID, r.Header.Get("x-request-template"))
+	parsed, data, ok := protocol.Poll(imagePollRequest{
+		HTTP: r, Base: base, APIKey: apiKey, TaskID: taskID, Model: r.URL.Query().Get("model"), Template: template,
+	})
+	if !ok {
+		writeProbeMiss(cfg, w, r, taskID, "生图任务失败", "暂时无法查询云端任务状态")
 		return
 	}
-	writeProbeMiss(cfg, w, r, taskID, "生图任务失败", "暂时无法查询云端任务状态")
+	httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, parsed, data))
 }
 
 type pollParsed struct {

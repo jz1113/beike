@@ -10,7 +10,7 @@
 
 ## 工具与上下文
 
-助手工具定义以 `src/shared/domain/assistant/tools/defs.ts` 为准，并导出到 `src/shared/data/assistantTools.json` 供 Go 运行时读取。图像反推、视频规格和抽帧在服务端执行；抽帧结果会作为下一轮的视觉上下文，单轮最多 20 张、合计 5MB。请求可以带 `mcpServers`，后端用 HTTP JSON-RPC 列出并调用工具，这类调用需要审批。`spawn_subagent` 在当前回合内启动最多 2 轮的子任务，子任务不能再拆分。
+助手工具定义以 `src/shared/domain/assistant/tools/defs.ts` 为准，并导出到 `src/shared/data/assistantTools.json` 供 Go 运行时读取。图像反推、视频规格和抽帧在服务端执行；抽帧结果会作为下一轮的视觉上下文，单轮最多 20 张、合计 5MB。请求可以带 `mcpServers`，后端用 HTTP JSON-RPC 列出并调用工具。生图、切页、载入工坊、改架构、图像反推和外部工具都直接执行，输入栏不再提供确认开关。`spawn_subagent` 在当前回合内启动最多 2 轮的子任务，子任务不能再拆分。
 
 相同参数重复调用超过上限会拒绝该次调用，并要求调整参数或复用结果，其他工具仍可使用。总轮次、调用数、截止时间限制仍有效；不会无限重试，也不会自动重放可能计费的生成操作。
 
@@ -30,6 +30,6 @@
 
 验证脚本放在项目外，使用模拟上游覆盖执行计划续跑、工具索引、推理回传、重复调用恢复、工具结果分页与异常结束，不调用付费模型。静态检查与构建使用 `pnpm check`。真实模型的任务质量仍需实际使用评估，模拟通过不代表达到 Codex 水平。
 
-当前内置工具主要覆盖商品采集、资产查询、文档读取、受限 JavaScript 数据处理及工作区操作，不具备通用联网搜索或任意系统终端能力。审批限制不会因执行计划而绕过。
+当前内置工具主要覆盖商品采集、资产查询、文档读取、受限 JavaScript 数据处理及工作区操作，不具备通用联网搜索或任意系统终端能力。工具直接执行，执行计划不能扩大可用工具范围。
 
 依据：[OpenAI Agents 架构](https://developers.openai.com/api/docs/guides/agents-api/architecture)、[DeepSeek 思考与工具调用](https://api-docs.deepseek.com/guides/thinking_mode/)、[DeepSeek Oh My Pi 集成](https://api-docs.deepseek.com/quick_start/agent_integrations/oh_my_pi/)。

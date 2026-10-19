@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
+import { uploadStudioFile } from '@client/shared/api/uploadStudioFile';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { deleteDerived, getDerived, putDerived } from '@client/shared/media/idbMediaCache';
 import { saveToDownloadDir } from '@client/shared/media/saveDownload';
@@ -9,17 +10,10 @@ import { requiresGenerationRecovery } from '@client/shared/api/generation/genera
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
-import { reservedArtDirectionFor, sourceKey } from '../model/reservedArtDirections';
 import { directCoverDesign, generateFinalCover, rewriteCoverTitle } from '../api/posterApi';
-import {
-  getActiveCoverStyleId,
-  getAllCoverStyles,
-  getStyleCorrections,
-  setActiveCoverStyleId as persistActiveCoverStyleId,
-} from '../model/coverMemoryStorage';
-import { logMemoryAudit } from '../model/coverAuditStorage';
 import { parseTable } from '../model/parsePosterTable';
-import { assertPosterPasteSize, assertPosterSheetImportRange } from '../model/posterImportLimits';
+import { isPosterImageFile, isPosterTableFile, posterItemFromUploadedImage } from '../model/posterImageTitle';
+import { assertPosterImportRowCount, assertPosterPasteSize, assertPosterSheetImportRange } from '../model/posterImportLimits';
 import { mergePosterItems } from '../model/mergePosterItems';
 import { usePosterInputDraft } from './usePosterInputDraft';
 import { loadPosterProductionSettings, persistPosterProductionSettings } from '../model/posterSettings';
@@ -34,6 +28,7 @@ import {
 import {
   POSTER_CONCURRENCY_OPTIONS,
   buildDesignPlan,
+  previousDesignSummary,
   normalizeConcurrency,
   normalizeCoverTitle,
   makeId,
@@ -73,13 +68,6 @@ export function usePosterProduction() {
   const [titleHandling, setTitleHandling] = useState<PosterProductionSettings['titleHandling']>('rewrite');
   const [imageQuality, setImageQuality] = useState<ImageQuality>('high');
   const [concurrency, setConcurrency] = useState<number>(POSTER_CONCURRENCY_OPTIONS[0]);
-  const [activeStyleId, setActiveStyleIdState] = useState<string>(getActiveCoverStyleId);
-  const activeStyleIdRef = useRef(activeStyleId);
-  const setActiveStyleId = (styleId: string) => {
-    setActiveStyleIdState(styleId);
-    activeStyleIdRef.current = styleId;
-    persistActiveCoverStyleId(styleId);
-  };
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<PosterProductionSettings | null>(null);
   const [previewState, setPreviewState] = useState<{ itemId: string; index: number } | null>(null);
@@ -476,38 +464,53 @@ export function usePosterProduction() {
 
   interruptActiveRef.current = markActiveItemsInterrupted;
 
-  const appendParsedRows = (rows: unknown[][]) => {
-    const parsed = parseTable(rows);
-    if (parsed.length === 0) {
-      setNoticeIfAlive('没有识别到可导入的行，请确认第一列为图片链接、第二列为标题、第三列为文字竖或文字横；第四列商品名称/型号可选。');
-      return;
-    }
-    ensureActiveBatch();
-    const next = mergePosterItems(itemsRef.current, parsed);
-    itemsRef.current = next;
-    setItemsIfAlive(next);
-    void persistActiveBatch(next);
-    setNoticeIfAlive(`已导入 ${parsed.length} 条：文字竖输出 720 × 960，文字横输出 1440 × 1440；商品名称/型号会作为可核验的标题锚点。`);
-  };
-
-  const importUploadFile = async (file: File) => {
-    if (runningRef.current || restoringRef.current || exportingRef.current || importingRef.current || !ensureWorkspaceReady()) return;
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      setNoticeIfAlive('仅支持导入 .xlsx、.xls 或 .csv 文件。');
-      return;
-    }
-    if (file.size > 20 * 1024 * 1024) {
-      setNoticeIfAlive('表格文件超过 20MB，请拆分后导入。');
+  const importUploadFiles = async (files: File[]) => {
+    if (runningRef.current || restoringRef.current || exportingRef.current || importingRef.current || !ensureWorkspaceReady() || files.length === 0) return;
+    const tables = files.filter((file) => isPosterTableFile(file.name));
+    const images = files.filter((file) => isPosterImageFile(file.name));
+    if (tables.length === 0 && images.length === 0) {
+      setNoticeIfAlive('请上传 .xlsx、.xls、.csv，或 jpg、png、webp 图片。图片文件名会作为原标题。');
       return;
     }
     importingRef.current = true;
     setIsImporting(true);
     try {
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: true, sheetRows: 2002 });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!firstSheet) throw new Error('文件中没有可读取的工作表');
-      assertPosterSheetImportRange(firstSheet);
-      if (aliveRef.current && ensureWorkspaceReady()) appendParsedRows(XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1, defval: '', raw: false }));
+      assertPosterImportRowCount(images.length);
+      let tableCount = 0;
+      for (const file of tables) {
+        if (file.size > 20 * 1024 * 1024) throw new Error('表格文件超过 20MB，请拆分后导入。');
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: true, sheetRows: 2002 });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        if (!firstSheet) throw new Error('文件中没有可读取的工作表');
+        assertPosterSheetImportRange(firstSheet);
+        const parsed = parseTable(XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1, defval: '', raw: false }));
+        if (parsed.length === 0) throw new Error('没有识别到可导入的行，请确认图片链接、标题和文字竖或文字横。');
+        ensureActiveBatch();
+        const next = mergePosterItems(itemsRef.current, parsed);
+        itemsRef.current = next;
+        setItemsIfAlive(next);
+        void persistActiveBatch(next);
+        tableCount += parsed.length;
+      }
+      const uploaded = [];
+      for (const file of images) {
+        if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name} 超过 20MB，请压缩后导入。`);
+        const url = await uploadStudioFile(file, 'headline-poster');
+        const absolute = /^https?:\/\//i.test(url) ? url : new URL(url, window.location.origin).href;
+        uploaded.push(posterItemFromUploadedImage(absolute, file.name));
+      }
+      if (uploaded.length > 0) {
+        ensureActiveBatch();
+        const next = mergePosterItems(itemsRef.current, uploaded);
+        itemsRef.current = next;
+        setItemsIfAlive(next);
+        void persistActiveBatch(next);
+      }
+      const parts = [
+        tableCount > 0 ? `表格 ${tableCount} 条` : '',
+        uploaded.length > 0 ? `图片 ${uploaded.length} 张，原标题取自文件名，版式为文字竖` : '',
+      ].filter(Boolean);
+      setNoticeIfAlive(`已导入 ${parts.join('，')}。`);
     } catch (error) {
       setNoticeIfAlive(`导入失败：${error instanceof Error ? error.message : '文件格式无法识别'}`);
     } finally {
@@ -518,16 +521,16 @@ export function usePosterProduction() {
 
   const importFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
-    const file = input.files?.[0];
-    if (file) await importUploadFile(file);
+    const files = Array.from(input.files || []);
+    if (files.length > 0) await importUploadFiles(files);
     input.value = '';
   };
 
   const handleFileDrop = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setIsDraggingFile(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) void importUploadFile(file);
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length > 0) void importUploadFiles(files);
   };
 
   const importPaste = () => {
@@ -769,33 +772,21 @@ export function usePosterProduction() {
       let designPlan = item.designPlan;
       let prompt = item.prompt;
       if (!recoveringImage) {
-        const occurrence = itemsRef.current.slice(0, index).filter((row) => sourceKey(row.sourceImageUrl) === sourceKey(item.sourceImageUrl)).length;
-        const artDirection = reservedArtDirectionFor(item.sourceImageUrl, occurrence);
-        const currentStyle = getAllCoverStyles().find((s) => s.id === activeStyleIdRef.current);
-        const styleCorrections = getStyleCorrections(activeStyleIdRef.current).map((c) => c.negativeRule);
-        const mergedNegativeRules = [...(currentStyle?.negativeRules || []), ...styleCorrections];
+        const previous = [...itemsRef.current.slice(0, index)].reverse().find((row) => row.designPlan);
+        const batchId = ensureActiveBatch();
         const directorResult = await runWithModelFallback(
           '封面设计', 'prompting', titleResult.modelId,
-          (modelId) => directCoverDesign(item, coverTitle, artDirection, modelId, {
-            stylePrompt: currentStyle?.directorPrompt,
-            negativeRules: mergedNegativeRules,
+          (modelId) => directCoverDesign(item, coverTitle, modelId, {
+            batchId,
+            previousDesign: previousDesignSummary(previous?.designPlan),
             signal,
           }),
         );
         if (itemAborted()) throw new Error('已取消大字报任务');
         designPlan = buildDesignPlan(coverTitle, directorResult.value);
         prompt = designPlan.generationDirection;
-        logMemoryAudit({
-          styleName: currentStyle?.name || '默认风格',
-          itemTitle: item.originalTitle || item.productName || '商品封面',
-          adoptedRules: [
-            directorResult.value.composition || '居中咬合构图',
-            directorResult.value.typography || '粗黑字效',
-          ].filter(Boolean),
-          blockedNegatives: mergedNegativeRules.slice(0, 3),
-        });
         updateItem(item.id, {
-          status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'integrated-cover-v4',
+          status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'integrated-cover-v5',
           modelFallbackNote: directorResult.fallbackNote || titleResult.fallbackNote,
         });
       }
@@ -996,7 +987,6 @@ export function usePosterProduction() {
     items, isReady, isRunning, isImporting, isRestoring, isExporting, notice,
     availableImageModels, availableTitleModels,
     imageModel, titleModel, titleHandling, imageQuality, concurrency,
-    activeStyleId, setActiveStyleId, styles: getAllCoverStyles(),
     isSettingsOpen, settingsDraft, setSettingsDraft,
     previewState, setPreviewState, previewItem, previewImages,
     completedCount, failedCount, historyBatches, activeBatchId: activeBatchIdRef.current,

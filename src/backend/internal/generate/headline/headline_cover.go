@@ -5,12 +5,9 @@ import (
 	"strings"
 )
 
-func validateCoverDesign(raw map[string]any, coverTitle, requiredArtID, productName string) (map[string]any, string) {
+func validateCoverDesign(raw map[string]any, coverTitle, productName string) (map[string]any, string) {
 	lines := titleLinesOf(raw, coverTitle)
-	if requiredArtID != "" && generate.TextField(raw, "artDirectionId") != requiredArtID {
-		return nil, "设计模型未遵守本商品的独立艺术字预留，未提交生图"
-	}
-	for _, field := range []string{"composition", "material", "palette", "typographySystem", "typography", "visualAnchor", "styleFamily", "imagePrompt"} {
+	for _, field := range []string{"composition", "material", "palette", "typographySystem", "typography", "visualAnchor", "styleFamily", "imagePrompt", "layout", "typeface", "textColor", "background", "subject", "harmony", "variation"} {
 		text := strings.TrimSpace(generate.TextField(raw, field))
 		if text == "" || len(text) > 6000 {
 			return nil, "设计方案缺少 " + field + "，未提交生图"
@@ -42,6 +39,10 @@ func validateCoverDesign(raw map[string]any, coverTitle, requiredArtID, productN
 		"palette": generate.TextField(raw, "palette"), "typography": generate.TextField(raw, "typography"),
 		"typographySystem": generate.TextField(raw, "typographySystem"), "artDirectionId": generate.TextField(raw, "artDirectionId"),
 		"visualAnchor": generate.TextField(raw, "visualAnchor"), "styleFamily": generate.TextField(raw, "styleFamily"),
+		"layout": generate.TextField(raw, "layout"), "typeface": generate.TextField(raw, "typeface"),
+		"textColor": generate.TextField(raw, "textColor"), "background": generate.TextField(raw, "background"),
+		"subject": generate.TextField(raw, "subject"), "harmony": generate.TextField(raw, "harmony"),
+		"variation":       generate.TextField(raw, "variation"),
 		"productNameLine": productLine, "eyebrow": "", "supportLine": "",
 	}, ""
 }

@@ -15,6 +15,8 @@ import { PromptBarAudioTab } from './preferences/PromptBarAudioTab';
 import { videoParamModeLabel } from './preferences/PromptBarVideoTab';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import { resolveVideoResolution } from '@shared/domain/media/video';
+import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
+import { getModelCredentials } from '@client/shared/api/gatewayClient';
 
 interface PromptBarParamsPillProps {
   isUp: boolean;
@@ -70,6 +72,21 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     savePromptPreferences(next);
   };
 
+  const credentials = getModelCredentials(props.modelId);
+  const imageCaps = imageCapabilities(props.modelId, credentials.protocol, credentials.baseUrl);
+  const allowedResolutions = imageCaps.resolutions;
+
+  useEffect(() => {
+    if (!allowedResolutions.length) return;
+    const current = imageResolutionLabel(props.quickQuality);
+    if (allowedResolutions.includes(current)) return;
+    const fallback = allowedResolutions[allowedResolutions.length - 1];
+    props.setQuickQuality(qualityForResolution(fallback));
+    persist({ ...prefs, image: { ...prefs.image, resolution: fallback } });
+    // 模型能力变化时把超出范围的分辨率退回该模型可用的最高档。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.modelId, allowedResolutions.join(','), props.quickQuality]);
+
   const isVideo = props.quickGenMode === 'video' || props.quickGenMode === 'depth-video';
   const isAudio = props.quickGenMode === 'audio';
   const aspectLabel = props.quickVideoAspectId === 'adaptive' || props.quickVideoAspectId === 'smart' ? '智能' : props.quickVideoAspectId;
@@ -78,7 +95,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     ? `${(prefs.audio?.format || 'mp3').toUpperCase()} · ${(prefs.audio?.speed ?? 1).toFixed(1)}x`
     : isVideo
       ? `${videoParamModeLabel(props.quickVideoRefMode)} · ${aspectLabel} · ${props.quickVideoResolution} · ${props.quickVideoDuration}秒`
-      : `${imageAspectLabel} · ${imageResolutionLabel(props.quickQuality)} · ${inferenceStrengthLabel(prefs.image.inferenceStrength)}`;
+      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'none' ? '' : inferenceStrengthLabel(prefs.image.inferenceStrength)].filter(Boolean).join(' · ');
 
   return (
     <div className="relative min-w-0">
@@ -138,6 +155,8 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
               aspect={props.quickAspectId}
               resolution={imageResolutionLabel(props.quickQuality)}
               strength={prefs.image.inferenceStrength}
+              allowedResolutions={allowedResolutions}
+              strengthMode={imageCaps.strength}
               onAspect={(aspect) => {
                 props.setQuickAspectId(aspect);
                 persist({ ...prefs, image: { ...prefs.image, aspect: aspect as PromptComposerPreferences['image']['aspect'] } });

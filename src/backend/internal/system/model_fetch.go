@@ -131,23 +131,24 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 }
 
 func readGatewayModels(ctx context.Context, client *http.Client, base, key string, openAI bool) ([]any, int, string) {
-	paths := []string{"/v1/models"}
-	if openAI {
-		paths = []string{"/v1/models", "/models"}
+	endpoints := []string{ModelsURL(base)}
+	if openAI && !IsDashScopeGateway(base) {
+		root := strings.TrimRight(normalizeGatewayBaseURL(base), "/")
+		endpoints = []string{root + "/v1/models", root + "/models"}
 	}
 	status := 0
 	message := ""
 	requestCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
 	defer cancel()
-	for _, path := range paths {
-		data, code, err := gatewayGET(requestCtx, client, base+path, key, "")
+	for index, endpoint := range endpoints {
+		data, code, err := gatewayGET(requestCtx, client, endpoint, key, "")
 		if err != nil {
 			return nil, 0, "网络连接失败"
 		}
 		status = code
 		if code >= 200 && code < 300 {
 			list := modelList(data)
-			if len(list) > 0 || path == paths[len(paths)-1] {
+			if len(list) > 0 || index == len(endpoints)-1 {
 				if len(list) == 0 {
 					message = "模型目录返回空列表或不兼容格式；可导入 CC Switch/Codex 目录，或手动填写模型 ID"
 				}
@@ -162,7 +163,7 @@ func readGatewayModels(ctx context.Context, client *http.Client, base, key strin
 		if message == "" {
 			message = "HTTP " + strconv.Itoa(code)
 		}
-		if (code != 404 && code != 405) || path == paths[len(paths)-1] {
+		if (code != 404 && code != 405) || index == len(endpoints)-1 {
 			break
 		}
 	}

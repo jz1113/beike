@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 const (
@@ -92,7 +94,7 @@ func plainCompletion(ctx context.Context, creds gatewayCreds, model, prompt stri
 	})
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	request, err := http.NewRequestWithContext(callCtx, http.MethodPost, strings.TrimRight(creds.baseURL, "/")+"/v1/chat/completions", bytes.NewReader(payload))
+	request, err := http.NewRequestWithContext(callCtx, http.MethodPost, system.ChatCompletionsURL(creds.baseURL), bytes.NewReader(payload))
 	if err != nil {
 		return "", err
 	}

@@ -18,6 +18,10 @@ import (
 var ModelHTTP = func() *http.Client { return network.SafeClient() }
 
 func PostModel(ctx context.Context, method, endpoint, apiKey string, payload any, timeout time.Duration) (int, []byte, error) {
+	return PostModelHeaders(ctx, method, endpoint, apiKey, payload, timeout, nil)
+}
+
+func PostModelHeaders(ctx context.Context, method, endpoint, apiKey string, payload any, timeout time.Duration, headers map[string]string) (int, []byte, error) {
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
@@ -35,7 +39,13 @@ func PostModel(ctx context.Context, method, endpoint, apiKey string, payload any
 	if payload != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	if apiKey != "" {
+	for key, value := range headers {
+		if strings.EqualFold(key, "Host") || strings.EqualFold(key, "Cookie") || strings.TrimSpace(value) == "" {
+			continue
+		}
+		request.Header.Set(key, value)
+	}
+	if apiKey != "" && request.Header.Get("Authorization") == "" {
 		request.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	response, err := ModelHTTP().Do(request)
@@ -67,7 +77,7 @@ func chatCompletion(ctx context.Context, base, apiKey, model string, messages an
 	if strings.HasPrefix(model, "deepseek-official:") {
 		payload["thinking"] = map[string]any{"type": "disabled"}
 	}
-	status, raw, err := PostModel(ctx, http.MethodPost, strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")+"/v1/chat/completions", apiKey, payload, timeout)
+	status, raw, err := PostModel(ctx, http.MethodPost, system.ChatCompletionsURL(base), apiKey, payload, timeout)
 	if err != nil {
 		return "", nil, status, err
 	}

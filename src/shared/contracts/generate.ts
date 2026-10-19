@@ -152,10 +152,10 @@ export const HeadlineDesignRequestSchema = z.object({
   productName: HeadlineProductNameSchema,
   imageUrls: z.array(HeadlineImageSchema).min(1, '封面设计需要商品图片').max(2, '最多使用两张商品图片'),
   aspectRatio: HeadlineAspectRatioSchema.optional(),
-  reservedArtDirection: z.object({
-    id: z.string().trim().max(160).optional(),
-    description: z.string().trim().max(2000).optional(),
-  }).optional(),
+  batchId: z.string().trim().max(128).optional(),
+  itemId: z.string().trim().max(128).optional(),
+  itemTitle: z.string().trim().max(200).optional(),
+  previousDesign: z.string().trim().max(2000, '上一张设计摘要最多 2000 字').optional(),
   ...HeadlineCredentials,
 });
 

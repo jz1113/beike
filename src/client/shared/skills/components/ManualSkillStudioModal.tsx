@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import type { SkillDraftData } from '../model/skillTypes';
+import { SKILL_TAG_OPTIONS, type SkillDraftData } from '../model/skillTypes';
 import type { SkillStudioPayload } from '../model/buildSkillFromStudio';
 import { extractYamlFrontmatter } from '../model/skillPackageParser';
 import {
@@ -174,7 +174,7 @@ export function ManualSkillStudioModal({
       showToast('请至少选择一个输出体裁');
       return;
     }
-    if (draft.tags.length === 0) {
+    if (SKILL_TAG_OPTIONS.length > 0 && draft.tags.length === 0) {
       showToast('需要选择 1 个类型标签');
       return;
     }

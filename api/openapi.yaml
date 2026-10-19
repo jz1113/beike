@@ -532,6 +532,30 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-memory:
+    get:
+      operationId: get_api_generate_headline_memory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-memory/corrections:
+    post:
+      operationId: post_api_generate_headline_memory_corrections
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/generate/headline-memory/entries/{id}':
+    patch:
+      operationId: patch_api_generate_headline_memory_entries_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-memory/trash:
+    delete:
+      operationId: delete_api_generate_headline_memory_trash
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/headline-title:
     post:
       operationId: post_api_generate_headline_title

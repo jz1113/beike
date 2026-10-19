@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Server } from 'lucide-react';
 import { PROTOCOL_OPTIONS, type ApiProviderProtocol, type ApiProvider } from '../model/apiProviderTypes';
+import { isDashScopeBase } from '@shared/domain/media/imageCapabilities';
 
 interface Props {
   isOpen: boolean;
@@ -28,7 +29,17 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
         setBaseUrl('https://api.anthropic.com');
       } else if (type === 'openai') {
         setBaseUrl('https://api.openai.com');
+      } else if (type === 'dashscope') {
+        setBaseUrl('https://maas.qianwenaiapi.com');
       }
+    }
+  };
+
+  const handleBaseUrl = (value: string) => {
+    setBaseUrl(value);
+    if (isDashScopeBase(value) && providerType !== 'template') {
+      setProviderType('dashscope');
+      setCatalogPath('/compatible-mode/v1/models');
     }
   };
 
@@ -109,7 +120,7 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
               type="text"
               required
               value={baseUrl}
-              onChange={e => setBaseUrl(e.target.value)}
+              onChange={e => handleBaseUrl(e.target.value)}
               placeholder="https://..."
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:bg-white dark:focus:bg-transparent focus:border-indigo-500 outline-none transition-all"
             />

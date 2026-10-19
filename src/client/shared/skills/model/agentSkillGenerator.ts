@@ -1,5 +1,4 @@
 import type { SkillDraftData, SkillOutputGenre } from './skillTypes';
-import { SKILL_TAG_OPTIONS } from './skillTypes';
 import type { SkillFileNode } from './skillFileTree';
 
 export interface GeneratedSkillResult {
@@ -28,31 +27,6 @@ export function generateSkillFromIdea(rawIdea: string): GeneratedSkillResult {
   }
   if (genres.length === 0) {
     genres.push('图片', '视频');
-  }
-
-  const matchedTags: string[] = [];
-  const tagKeywords: Record<string, RegExp> = {
-    专业影视: /影视|电影|胶片|光影|置景|大片/i,
-    营销广告: /电商|广告|带货|商品|营销|主图|品牌/i,
-    短剧漫剧: /短剧|漫剧|二次元|动漫|条漫|剧情/i,
-    独家画风: /画风|风格|水彩|赛博|国风|油画|艺术/i,
-    独家超创: /超创|脑洞|超现实|奇幻|科幻/i,
-    Skill大赛: /大赛|竞技|比拼/i,
-    创意发散: /发散|灵感|创意|头脑风暴/i,
-    特效玩法: /特效|变身|粒子|转场|炸裂/i,
-    社媒热点: /小红书|抖音|快手|社媒|爆款|流量|热点/i,
-    音乐MV: /mv|音乐|伴奏|歌词/i,
-  };
-
-  for (const [tag, regex] of Object.entries(tagKeywords)) {
-    if (regex.test(idea) && (SKILL_TAG_OPTIONS as readonly string[]).includes(tag)) {
-      matchedTags.push(tag);
-      if (matchedTags.length >= 3) break;
-    }
-  }
-
-  if (matchedTags.length === 0) {
-    matchedTags.push(genres.includes('视频') ? '专业影视' : '创意发散');
   }
 
   let title = idea.replace(/帮我做|想要一个|做一个|创建|生成|制作/g, '').trim();
@@ -142,7 +116,7 @@ description: ${description} 用于在涉及${idea}的任务中提供结构化提
     title,
     description,
     genres,
-    tags: matchedTags,
+    tags: [],
     defaultVideoModel: genres.includes('视频') ? 'seedance-2.5' : '',
     defaultImageModel: genres.includes('图片') ? 'seedream-3.0' : '',
     coverUrl: '',

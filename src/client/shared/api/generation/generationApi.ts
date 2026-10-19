@@ -1,5 +1,5 @@
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
-import { getGatewayClientHeaders, getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
+import { getGatewayClientHeaders, getGatewayClientOverrides, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { AssetTasksListResponseSchema } from '@shared/contracts/generate';
 import type { AssetHistoryTask } from '@client/shared/api/mapDbTask';
 import { mapDbTaskToGenerationTask } from '@client/shared/api/mapDbTask';
@@ -75,10 +75,11 @@ export async function pollSingleTaskResult(
   taskId: string,
   isAborted: () => boolean,
   isPaused?: () => boolean,
+  modelId?: string,
 ): Promise<{ url: string; temporary: boolean }> {
   const timeoutMs = 360000;
   const start = Date.now();
-  const gatewayHeaders = getGatewayClientHeaders();
+  const gatewayHeaders = getGatewayClientHeaders(modelId);
   const localUrl = gatewayHeaders['x-custom-base-url'];
 
   while (Date.now() - start < timeoutMs) {
@@ -148,13 +149,21 @@ export async function submitImageGenTaskResult(
 ): Promise<{ url: string; temporary: boolean }> {
   throwIfGenerationAborted(deps.isAborted);
   const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
+  const modelId = typeof payload.model === 'string' ? payload.model : undefined;
+  const modelCreds = getModelCredentials(modelId);
 
-  const finalPayload = {
+  const finalPayload: Record<string, unknown> = {
     ...payload,
     customBaseUrl: localUrl,
     customApiKey: localApiKey,
     storageConfig: readClientStorageConfig(),
   };
+  if ((modelCreds.protocol === 'dashscope' || modelCreds.protocol === 'template') && finalPayload.customProtocol == null) {
+    finalPayload.customProtocol = modelCreds.protocol;
+  }
+  if (modelCreds.protocol === 'template' && modelCreds.requestTemplate && finalPayload.requestTemplate == null) {
+    finalPayload.requestTemplate = modelCreds.requestTemplate;
+  }
 
   const submit = async () => {
     try {
@@ -216,7 +225,7 @@ export async function submitImageGenTaskResult(
   if (data.taskId) {
     try {
       throwIfGenerationAborted(deps.isAborted);
-      return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused);
+      return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused, modelId);
     } catch (error) {
       // Cancellation stops waiting, not the upstream generation or its billing.
       if (error instanceof Error && error.name === 'ImageGenBusinessError' && !isGenerationCancelled(error)) throw error;

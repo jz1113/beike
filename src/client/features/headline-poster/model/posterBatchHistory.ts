@@ -76,6 +76,13 @@ function designPlan(value: unknown): CoverDesignPlan | undefined {
     visualAnchor: plan.visualAnchor as string, generationDirection: plan.generationDirection as string,
     eyebrow: plan.eyebrow as string, supportLine: plan.supportLine as string,
     titleLines: plan.titleLines as string[],
+    layout: typeof plan.layout === 'string' ? plan.layout : '',
+    typeface: typeof plan.typeface === 'string' ? plan.typeface : '',
+    textColor: typeof plan.textColor === 'string' ? plan.textColor : '',
+    background: typeof plan.background === 'string' ? plan.background : '',
+    subject: typeof plan.subject === 'string' ? plan.subject : '',
+    harmony: typeof plan.harmony === 'string' ? plan.harmony : '',
+    variation: typeof plan.variation === 'string' ? plan.variation : '',
   };
 }
 

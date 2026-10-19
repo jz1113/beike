@@ -116,7 +116,7 @@ func completeCanvasText(ctx context.Context, base, key, model string, deepseek b
 	encoded, _ := json.Marshal(body)
 	requestCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
-	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, strings.TrimRight(base, "/")+"/v1/chat/completions", bytes.NewReader(encoded))
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, system.ChatCompletionsURL(base), bytes.NewReader(encoded))
 	if err != nil {
 		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
 	}

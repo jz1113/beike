@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Save } from 'lucide-react';
 import { type ApiProvider, PROTOCOL_OPTIONS, type ApiProviderProtocol } from '../model/apiProviderTypes';
+import type { ImageRequestTemplate } from '@shared/contracts/imageRequestTemplate';
+import { parseCurl, qwenAsyncPreset, qwenSyncPreset } from '../model/curlTemplate';
 
 interface Props {
   provider: ApiProvider;
@@ -23,6 +25,7 @@ export function ProviderBasicConfigCard({
 }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [curlText, setCurlText] = useState('');
 
   const currentProtocol = PROTOCOL_OPTIONS.find(p => p.id === provider.providerType) || PROTOCOL_OPTIONS[0];
 
@@ -160,6 +163,15 @@ export function ProviderBasicConfigCard({
           </select>
         </div>
 
+        {provider.providerType === 'template' && (
+          <TemplateFields
+            provider={provider}
+            curlText={curlText}
+            onCurlText={setCurlText}
+            onUpdate={onUpdate}
+          />
+        )}
+
         {/* 模型目录设置高级折叠面板 */}
         <div className="border border-slate-200/60 dark:border-white/5 rounded-xl overflow-hidden">
           <button
@@ -207,6 +219,62 @@ export function ProviderBasicConfigCard({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TemplateFields({
+  provider,
+  curlText,
+  onCurlText,
+  onUpdate,
+}: {
+  provider: ApiProvider;
+  curlText: string;
+  onCurlText: (value: string) => void;
+  onUpdate: (updates: Partial<ApiProvider>) => void;
+}) {
+  const template = provider.requestTemplate;
+  const fieldClass = 'w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 outline-none focus:border-indigo-500';
+  const update = (patch: Partial<ImageRequestTemplate>) => onUpdate({ requestTemplate: { submit: template?.submit || { url: provider.baseUrl }, result: template?.result || {}, ...template, ...patch } });
+
+  return (
+    <div className="space-y-3 rounded-xl border border-slate-200/70 dark:border-white/10 p-3.5">
+      <div className="text-xs font-medium text-slate-700 dark:text-slate-300">从 curl 导入</div>
+      <textarea
+        value={curlText}
+        onChange={(event) => onCurlText(event.target.value)}
+        placeholder="粘贴平台文档里的 curl 示例"
+        className={`${fieldClass} min-h-24`}
+      />
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => update(parseCurl(curlText))} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/10">解析 curl</button>
+        <button type="button" onClick={() => onUpdate({ requestTemplate: qwenSyncPreset(provider.baseUrl) })} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/10">千问同步</button>
+        <button type="button" onClick={() => onUpdate({ requestTemplate: qwenAsyncPreset(provider.baseUrl) })} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/10">千问异步</button>
+      </div>
+      <label className="block text-[11px] text-slate-500 dark:text-slate-400">
+        图片地址路径
+        <input value={template?.result.imageUrlPath || ''} onChange={(event) => update({ result: { ...template?.result, imageUrlPath: event.target.value } })} placeholder="output.choices.0.message.content.0.image" className={`${fieldClass} mt-1`} />
+      </label>
+      <label className="block text-[11px] text-slate-500 dark:text-slate-400">
+        任务号路径
+        <input value={template?.result.taskIdPath || ''} onChange={(event) => update({ result: { ...template?.result, taskIdPath: event.target.value } })} placeholder="output.task_id" className={`${fieldClass} mt-1`} />
+      </label>
+      <label className="block text-[11px] text-slate-500 dark:text-slate-400">
+        轮询地址
+        <input value={template?.poll?.url || ''} onChange={(event) => update({ poll: { ...template?.poll, url: event.target.value, successValues: template?.poll?.successValues || ['SUCCEEDED'], failureValues: template?.poll?.failureValues || ['FAILED'] } })} placeholder="https://example.com/tasks/{{taskId}}" className={`${fieldClass} mt-1`} />
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block text-[11px] text-slate-500 dark:text-slate-400">
+          状态路径
+          <input value={template?.poll?.statusPath || ''} onChange={(event) => update({ poll: { url: template?.poll?.url || '', ...template?.poll, statusPath: event.target.value } })} className={`${fieldClass} mt-1`} />
+        </label>
+        <label className="block text-[11px] text-slate-500 dark:text-slate-400">
+          错误路径
+          <input value={template?.poll?.errorPath || ''} onChange={(event) => update({ poll: { url: template?.poll?.url || '', ...template?.poll, errorPath: event.target.value } })} className={`${fieldClass} mt-1`} />
+        </label>
+      </div>
+      <p className="text-[11px] leading-relaxed text-slate-400">占位符：{'{{model}} {{prompt}} {{size}} {{width}} {{height}} {{n}} {{images}} {{negativePrompt}} {{taskId}}'}。{'{{apiKey}}'} 只能放在请求头。</p>
     </div>
   );
 }

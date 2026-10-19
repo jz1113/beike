@@ -30,7 +30,6 @@ export interface PromptImagePreferences {
 export interface PromptReasoningPreferences {
   modelId: string; // 如 'deepseek-v4-flash' 或具体模型 id
   reasoningEffort: ReasoningEffort;
-  generationMode: PreferenceGenerationMode;
 }
 
 export type AudioFormatOption = 'mp3' | 'wav' | 'aac' | 'flac';
@@ -67,7 +66,6 @@ export const DEFAULT_PROMPT_PREFERENCES: PromptComposerPreferences = {
   reasoning: {
     modelId: 'deepseek-v4-flash',
     reasoningEffort: 'medium',
-    generationMode: 'normal',
   },
   audio: {
     format: 'mp3',
@@ -87,8 +85,7 @@ export function loadPromptPreferences(): PromptComposerPreferences {
       video: { ...DEFAULT_PROMPT_PREFERENCES.video, ...parsed.video },
       image: { ...DEFAULT_PROMPT_PREFERENCES.image, ...parsed.image },
       reasoning: {
-        ...DEFAULT_PROMPT_PREFERENCES.reasoning,
-        ...parsed.reasoning,
+        modelId: parsed.reasoning?.modelId || DEFAULT_PROMPT_PREFERENCES.reasoning.modelId,
         reasoningEffort: parsed.reasoning?.reasoningEffort || DEFAULT_PROMPT_PREFERENCES.reasoning.reasoningEffort,
       },
       audio: { ...DEFAULT_PROMPT_PREFERENCES.audio, ...parsed.audio },

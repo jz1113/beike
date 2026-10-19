@@ -33,8 +33,16 @@ func headlineDesignSchemaError(body []byte) string {
 	if message := generate.OptionalEnum(obj, "aspectRatio", "'3:4' | '1:1'", "3:4", "1:1"); message != "" {
 		return "aspectRatio: " + message
 	}
-	if message := artDirectionError(obj); message != "" {
-		return message
+	for _, key := range []string{"batchId", "itemId"} {
+		if message := optionalTrimmed(obj, key, 128, ""); message != "" {
+			return key + ": " + message
+		}
+	}
+	if message := optionalTrimmed(obj, "itemTitle", 200, ""); message != "" {
+		return "itemTitle: " + message
+	}
+	if message := optionalTrimmed(obj, "previousDesign", 2000, "上一张设计摘要最多 2000 字"); message != "" {
+		return "previousDesign: " + message
 	}
 	if message := optionalTrimmed(obj, "customBaseUrl", 2048, ""); message != "" {
 		return "customBaseUrl: " + message
@@ -108,24 +116,6 @@ func boundedImageURLs(obj map[string]any, maxCount int, minMessage, maxMessage s
 		if generate.Utf16Len(text) > 36*1024*1024 {
 			return fmt.Sprintf("imageUrls.%d: 商品图片数据过大", index)
 		}
-	}
-	return ""
-}
-
-func artDirectionError(obj map[string]any) string {
-	value, ok := obj["reservedArtDirection"]
-	if !ok {
-		return ""
-	}
-	fields, ok := value.(map[string]any)
-	if !ok {
-		return "reservedArtDirection: Expected object, received " + generate.ZodReceived(value)
-	}
-	if message := optionalTrimmed(fields, "id", 160, ""); message != "" {
-		return "reservedArtDirection.id: " + message
-	}
-	if message := optionalTrimmed(fields, "description", 2000, ""); message != "" {
-		return "reservedArtDirection.description: " + message
 	}
 	return ""
 }

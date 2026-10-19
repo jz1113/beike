@@ -3,21 +3,12 @@ export type SkillMainTab = 'all' | 'my' | 'favorite';
 export const SKILL_GENRES = ['视频', '图片', '音频', '文本'] as const;
 export type SkillOutputGenre = typeof SKILL_GENRES[number];
 
+/** 内容分类留空。「全部」是筛选入口；在此补充名称后，会同时出现在筛选条和创建时的类型标签。 */
 export const SKILL_CATEGORIES = [
   '全部',
-  '专业影视',
-  '营销广告',
-  '短剧漫剧',
-  '独家画风',
-  '独家超创',
-  'Skill大赛',
-  '创意发散',
-  '特效玩法',
-  '社媒热点',
-  '音乐MV',
 ] as const;
 
-export const SKILL_TAG_OPTIONS = SKILL_CATEGORIES.filter((c) => c !== '全部');
+export const SKILL_TAG_OPTIONS: readonly string[] = SKILL_CATEGORIES.filter((category) => category !== '全部');
 
 export type SkillCategory = typeof SKILL_CATEGORIES[number];
 

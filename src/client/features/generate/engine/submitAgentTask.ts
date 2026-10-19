@@ -119,7 +119,7 @@ export async function submitAgentTask(
       },
     ],
     systemPrompt: [resolveAgentSystemPrompt(), skillRuntime?.systemPrompt || ''].filter(Boolean).join('\n\n'),
-    generationMode: prefs.reasoning?.generationMode || 'normal',
+    generationMode: 'auto',
     reasoningEffort: prefs.reasoning?.reasoningEffort || 'medium',
     ...(customBaseUrl ? { customBaseUrl } : {}),
     ...(customApiKey ? { customApiKey } : {}),

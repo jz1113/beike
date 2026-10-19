@@ -75,6 +75,24 @@ export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRu
           <button ref={editButtonRef} type="button" disabled={!canEdit} onClick={() => { setEditingTitle(item.coverTitle || item.originalTitle); setEditingError(null); onStartEdit(item.id); }} className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-30 dark:hover:text-slate-100 dark:hover:bg-white/10" aria-label={item.status === 'complete' || item.generatedSceneUrl ? '修改标题并重新生成' : '修改封面标题'} title={canEdit ? (item.status === 'complete' || item.generatedSceneUrl ? '修改标题并重新生成' : '修改封面标题') : item.importError ? '请修正表格后重新导入' : '请等待当前任务结束或先核对原任务'}><Pencil className="h-3 w-3" /></button>
         </div>
       )}
+      {item.designPlan?.layout && (
+        <details className="mt-1 text-left">
+          <summary className="cursor-pointer text-[10px] font-bold text-slate-400">设计单</summary>
+          <dl className="mt-1 space-y-0.5 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
+            {([
+              ['构图', item.designPlan.layout],
+              ['字体', item.designPlan.typeface],
+              ['字色', item.designPlan.textColor],
+              ['背景', item.designPlan.background],
+              ['主体', item.designPlan.subject],
+              ['搭配', item.designPlan.harmony],
+              ['排重', item.designPlan.variation],
+            ] as const).filter(([, value]) => value).map(([label, value]) => (
+              <div key={label}><dt className="inline font-bold text-slate-600 dark:text-slate-300">{label} </dt><dd className="inline">{value}</dd></div>
+            ))}
+          </dl>
+        </details>
+      )}
       {failed && item.error && <p className="mt-1 line-clamp-3 text-[11px] leading-4 text-rose-600" title={item.error}>{item.error}</p>}
     </article>
   );

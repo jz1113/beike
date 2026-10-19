@@ -1,4 +1,4 @@
-import { SKILL_CATEGORIES } from '@client/shared/skills';
+import { SKILL_CATEGORIES, SKILL_TAG_OPTIONS } from '@client/shared/skills';
 
 interface SkillsCategoryFilterProps {
   selectedCategory: string;
@@ -9,6 +9,8 @@ export function SkillsCategoryFilter({
   selectedCategory,
   onSelectCategory,
 }: SkillsCategoryFilterProps) {
+  if (SKILL_TAG_OPTIONS.length === 0) return null;
+
   return (
     <div className="flex w-full items-center gap-2 overflow-x-auto px-6 py-3.5 md:px-8 no-scrollbar">
       {SKILL_CATEGORIES.map((cat) => {

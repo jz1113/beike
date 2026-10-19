@@ -52,11 +52,40 @@ export function getGatewayClientOverrides(): {
   };
 }
 
-/** 根据模型 ID 获取其绑定的专属服务商凭证 */
-export function getModelCredentials(modelId?: string): {
+export interface ModelCredentials {
   baseUrl?: string;
   apiKey?: string;
-} {
+  protocol?: string;
+  requestTemplate?: unknown;
+}
+
+function readStoredProvider(providerId: string): ModelCredentials | null {
+  if (typeof window === 'undefined' || !providerId) return null;
+  try {
+    const rawProviders = localStorage.getItem(API_PROVIDERS_STORAGE_KEY);
+    if (!rawProviders) return null;
+    const providers = JSON.parse(rawProviders);
+    if (!Array.isArray(providers)) return null;
+    const provider = providers.find((item: { id?: string }) => item?.id === providerId) as {
+      baseUrl?: string;
+      apiKey?: string;
+      providerType?: string;
+      requestTemplate?: unknown;
+    } | undefined;
+    if (!provider) return null;
+    return {
+      baseUrl: provider.baseUrl || undefined,
+      apiKey: provider.apiKey || undefined,
+      protocol: provider.providerType || undefined,
+      requestTemplate: provider.requestTemplate,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 根据模型 ID 获取其绑定的专属服务商凭证 */
+export function getModelCredentials(modelId?: string): ModelCredentials {
   if (!modelId || typeof window === 'undefined') return {};
   try {
     const rawModels = localStorage.getItem('custom_models');
@@ -67,27 +96,14 @@ export function getModelCredentials(modelId?: string): {
           m.id === modelId || m.routeId === modelId
         );
         if (target) {
-          if (target.customBaseUrl || target.customApiKey) {
+          const provider = readStoredProvider(target.providerId || target.channel || '');
+          if (target.customBaseUrl || target.customApiKey || provider) {
             return {
-              baseUrl: target.customBaseUrl || undefined,
-              apiKey: target.customApiKey || undefined,
+              baseUrl: target.customBaseUrl || provider?.baseUrl,
+              apiKey: target.customApiKey || provider?.apiKey,
+              protocol: provider?.protocol,
+              requestTemplate: provider?.requestTemplate,
             };
-          }
-          const providerId = target.providerId || target.channel;
-          if (providerId) {
-            const rawProviders = localStorage.getItem(API_PROVIDERS_STORAGE_KEY);
-            if (rawProviders) {
-              const providers = JSON.parse(rawProviders);
-              if (Array.isArray(providers)) {
-                const p = providers.find((item: { id?: string; baseUrl?: string; apiKey?: string }) => item.id === providerId);
-                if (p && (p.baseUrl || p.apiKey)) {
-                  return {
-                    baseUrl: p.baseUrl || undefined,
-                    apiKey: p.apiKey || undefined,
-                  };
-                }
-              }
-            }
           }
         }
       }
@@ -98,7 +114,15 @@ export function getModelCredentials(modelId?: string): {
   const modality = findConfiguredModalityModel(modelId);
   if (modality) {
     const creds = credentialsForModalityItem(modality);
-    if (creds.baseUrl || creds.apiKey) return creds;
+    const provider = readStoredProvider(modality.channelId || '');
+    if (creds.baseUrl || creds.apiKey || provider) {
+      return {
+        baseUrl: creds.baseUrl || provider?.baseUrl,
+        apiKey: creds.apiKey || provider?.apiKey,
+        protocol: provider?.protocol,
+        requestTemplate: provider?.requestTemplate,
+      };
+    }
   }
   return {};
 }
@@ -154,6 +178,17 @@ export function getGatewayClientHeaders(modelId?: string): Record<string, string
   const headers: Record<string, string> = {};
   if (effectiveBaseUrl) headers['x-custom-base-url'] = effectiveBaseUrl;
   if (effectiveApiKey) headers['x-custom-api-key'] = effectiveApiKey;
+  if (modelCreds.protocol === 'dashscope' || modelCreds.protocol === 'template') {
+    headers['x-custom-protocol'] = modelCreds.protocol;
+  }
+  if (modelCreds.protocol === 'template' && modelCreds.requestTemplate) {
+    try {
+      const encoded = JSON.stringify(modelCreds.requestTemplate);
+      if (encoded.length <= 32768) headers['x-request-template'] = encoded;
+    } catch {
+      // 模板无法序列化时不附带，提交体会另行校验。
+    }
+  }
   const lianchiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('lianchi_api_key')?.trim() : '';
   if (lianchiKey) headers['x-lianchi-api-key'] = lianchiKey;
   if (customWanbangKey) headers['x-wanbang-key'] = customWanbangKey;

@@ -1,4 +1,6 @@
 export * from './generate';
+export * from './imageRequestTemplate';
+export * from './coverMemory';
 export * from './system';
 export * from './assistant';
 export * from './workshopWorkspace';

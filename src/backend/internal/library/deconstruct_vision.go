@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 type visionOutcome struct {
@@ -28,7 +30,7 @@ func callDeconstructVision(ctx context.Context, baseURL, apiKey, model string, i
 		"response_format": map[string]any{"type": "json_object"},
 	}
 	raw, _ := json.Marshal(body)
-	endpoint := strings.TrimRight(baseURL, "/") + "/v1/chat/completions"
+	endpoint := system.ChatCompletionsURL(baseURL)
 	reqCtx, cancel := context.WithTimeout(ctx, 240*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(raw))

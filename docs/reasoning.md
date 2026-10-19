@@ -11,7 +11,7 @@
 | DeepSeek V4 / V4.1 Flash、官方 Flash / V4 Pro | 低、高、极高 | `reasoning_effort: low / high / max`，开启 thinking |
 | Claude（当前 OpenAI 兼容通道） | 未适配 | 不发送强度参数；原生接口配置不能直接等同兼容接口 |
 
-界面仅保留手动档位。旧“自动”偏好和未设置值迁移为固定默认：支持中的模型使用中，Kimi / DeepSeek 使用高。不会再根据提示词复杂度调整强度。接口仍接受旧 auto 值以兼容已打开的客户端，但会执行同样的固定映射。切换模型或故障回退时归一化：Gemini 的极高降为高；Qwen 的高映射极高；Kimi / DeepSeek 的中映射高。极高是产品名称，在 Kimi / DeepSeek 上明确映射为 max。
+界面只保留手动档位。旧“自动”强度偏好和未设置值迁移为固定默认：支持中的模型使用中，Kimi / DeepSeek 使用高。不会再根据提示词复杂度调整强度。接口仍接受旧 auto 值以兼容已打开的客户端，但会执行同样的固定映射。切换模型或故障回退时归一化：Gemini 的极高降为高；Qwen 的高映射极高；Kimi / DeepSeek 的中映射高。极高是产品名称，在 Kimi / DeepSeek 上明确映射为 max。
 
 所有助手流式请求、工具兼容请求、最终回复、记忆摘要与图片筛选共享适配。推理模型使用供应商默认采样参数；Qwen 不同时发送 thinking_budget。工具轮次回传 Kimi / Qwen / DeepSeek reasoning_content，流式工具调用保留通道返回的 extra_content（如 Gemini 签名）。Kimi 输出预算使用 max_completion_tokens。
 

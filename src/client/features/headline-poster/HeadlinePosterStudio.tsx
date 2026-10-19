@@ -117,10 +117,6 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
                 pasteText={studio.pasteText}
                 isRunning={studio.isRunning}
                 isBusy={isBusy}
-                activeStyleId={studio.activeStyleId}
-                styles={studio.styles}
-                onSelectStyle={studio.setActiveStyleId}
-                onOpenMemory={() => setIsMemoryOpen(true)}
                 onImportMode={studio.setImportMode}
                 onImportFile={(event) => void studio.importFile(event)}
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; studio.setIsDraggingFile(true); }}
@@ -162,8 +158,7 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
 
           {isMemoryOpen && (
             <CoverMemoryStudioDialog
-              activeStyleId={studio.activeStyleId}
-              onSelectStyle={studio.setActiveStyleId}
+              titleModel={studio.titleModel}
               onClose={() => setIsMemoryOpen(false)}
             />
           )}

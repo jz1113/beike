@@ -11,6 +11,19 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 )
 
+func TestCoverPromptsDescribeXiaohongshuDesign(t *testing.T) {
+	title := headlineTitlePrompt("洗衣效果很到位", "洗衣机")
+	if !strings.Contains(title, "小红书") || !strings.Contains(title, "洗完衣服不发灰") {
+		t.Fatal(title)
+	}
+	design := coverDirectorPrompt("原标题", "洗完衣服不发灰", "3:4", "洗衣机", "上一张是深底", []string{"- [纠正] 不要挡住品牌"})
+	for _, phrase := range []string{"咬住", "三色分工", "先写标题怎么被读到"} {
+		if !strings.Contains(design, phrase) {
+			t.Fatalf("missing %s", phrase)
+		}
+	}
+}
+
 func TestHeadlineDesignSchemaOrder(t *testing.T) {
 	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1"})
 	missing := httptest.NewRecorder()
@@ -67,6 +80,9 @@ func TestHeadlineDesignReturnsPlan(t *testing.T) {
 		"title": "台灯", "titleLines": []string{"台灯"}, "productNameLine": "",
 		"composition": "居中", "material": "木桌", "palette": "暖白", "artDirectionId": "A",
 		"typographySystem": "A", "typography": "粗黑", "visualAnchor": "灯", "styleFamily": "桌面",
+		"layout": "居中压顶", "typeface": "超粗黑体两行", "textColor": "近黑字压在米白底上",
+		"background": "米白纸纹，左上柔光", "subject": "台灯居中，灯头不挡字",
+		"harmony": "米白、近黑、灯的暖铜三色", "variation": "第一张，取纸感编辑",
 		"imagePrompt": strings.Repeat("生成一张封面并保留商品真实颜色。", 20) + "「台灯」",
 	})
 	body, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(plan)}}}})
@@ -80,7 +96,7 @@ func TestHeadlineDesignReturnsPlan(t *testing.T) {
 	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "integrated-cover-v4") || !strings.Contains(response.Body.String(), "标题文字锁定") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "integrated-cover-v5") || !strings.Contains(response.Body.String(), "标题文字锁定") {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
 	}
 }

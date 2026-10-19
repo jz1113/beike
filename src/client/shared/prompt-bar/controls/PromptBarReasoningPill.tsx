@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useAssistantReasoning } from '@client/shared/hooks/useAssistantReasoning';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
-import { loadPromptPreferences, savePromptPreferences, type PreferenceGenerationMode } from '../promptBarPreferencesTypes';
+import { loadPromptPreferences, savePromptPreferences } from '../promptBarPreferencesTypes';
 import { normalizeReasoningEffort, REASONING_EFFORT_LABELS, reasoningCapability, type ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import './promptBarEffort.css';
 
@@ -17,7 +17,6 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
 }: PromptBarReasoningPillProps) {
   const [open, setOpen] = useState(false);
   const [effort, setEffort] = useAssistantReasoning(assistantModel);
-  const [generationMode, setGenerationMode] = useState<PreferenceGenerationMode>(() => loadPromptPreferences().reasoning.generationMode || 'normal');
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(open, isUp, buttonRef, 300, 132);
   const capability = reasoningCapability(assistantModel);
@@ -27,7 +26,7 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
   const label = supported ? REASONING_EFFORT_LABELS[resolved] : capability.unavailableLabel || '默认';
   const index = Math.max(0, levels.indexOf(resolved));
 
-  const persistReasoning = (patch: { reasoningEffort?: ReasoningEffort; generationMode?: PreferenceGenerationMode }) => {
+  const persistReasoning = (patch: { reasoningEffort?: ReasoningEffort }) => {
     const prefs = loadPromptPreferences();
     savePromptPreferences({
       ...prefs,
@@ -121,25 +120,6 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
           ) : (
             <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{capability.description}</p>
           )}
-          <div className="mt-2 flex items-center justify-center gap-1.5">
-            {(['normal', 'auto'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => {
-                  setGenerationMode(mode);
-                  persistReasoning({ generationMode: mode });
-                }}
-                className={`rounded-lg px-2.5 py-1 text-[11px] ${
-                  generationMode === mode
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'
-                }`}
-              >
-                {mode === 'normal' ? '普通' : '自动'}
-              </button>
-            ))}
-          </div>
         </div>
       )}
     </div>

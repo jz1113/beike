@@ -1,13 +1,11 @@
-import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
+import { storageConfigHeaders } from '@client/shared/api/apiClient';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { retryWhenLocalApiUnavailable } from '@client/shared/api/localApiRetry';
 import { pollSingleTask, submitImageGenTask } from '@client/shared/api/generation/generationApi';
 import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import { classifyGenerationPollResult, imageGenBusinessError } from '@client/shared/api/generation/generationErrors';
-import type { ReservedArtDirection } from '../model/reservedArtDirections';
 import { exportCoverJpeg, loadImageForCanvas } from '../model/coverExport';
-import type { CoverDeconstruction } from '../model/coverSkillTypes';
 import {
   normalizeCoverTitle,
   type CoverDesignPlan,
@@ -54,18 +52,14 @@ export async function rewriteCoverTitle(item: PosterItem, titleModel: string, si
 export async function directCoverDesign(
   item: PosterItem,
   coverTitle: string,
-  artDirection: ReservedArtDirection,
   titleModel: string,
   options?: {
-    stylePrompt?: string;
-    negativeRules?: string[];
+    batchId?: string;
+    previousDesign?: string;
     signal?: AbortSignal;
-  } | AbortSignal,
+  },
 ): Promise<HeadlineDesignResponse> {
-  const signal = options instanceof AbortSignal ? options : options?.signal;
-  const stylePrompt = options instanceof AbortSignal ? undefined : options?.stylePrompt;
-  const negativeRules = options instanceof AbortSignal ? undefined : options?.negativeRules;
-
+  const signal = options?.signal;
   try {
     const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-design', {
       headers: { 'Content-Type': 'application/json' },
@@ -75,9 +69,10 @@ export async function directCoverDesign(
         coverTitle,
         productName: item.productName,
         aspectRatio: item.format.aspectRatio,
-        reservedArtDirection: artDirection,
-        stylePrompt,
-        negativeRules,
+        batchId: options?.batchId,
+        itemId: item.id,
+        itemTitle: item.originalTitle || item.productName,
+        previousDesign: options?.previousDesign,
         imageUrls: [item.sourceImageUrl],
       }),
       signal,
@@ -88,31 +83,6 @@ export async function directCoverDesign(
     throw new Error(data?.error || '封面设计模型没有返回可用方案');
   } catch (error) {
     throw new Error(`封面设计阶段失败，已停止后续生图：${error instanceof Error ? error.message : '未知错误'}`);
-  }
-}
-
-export async function deconstructCoverSample(
-  images: string | string[],
-  model?: string,
-  signal?: AbortSignal,
-): Promise<CoverDeconstruction> {
-  const imageUrls = Array.isArray(images) ? images : [images];
-  try {
-    const response = await retryWhenLocalApiUnavailable(() => apiFetch('/api/generate/headline-deconstruct', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrls,
-        model: model || 'gemini-3.7-flash',
-      }),
-      signal,
-    }), { signal });
-    const data = await response.json().catch(() => ({}));
-    if (data?.success) recordChatTokens({ modelId: data.model || model || 'gemini-3.7-flash', type: 'vision', usage: data.usage });
-    if (data?.success && data?.data) return data.data as CoverDeconstruction;
-    throw new Error(data?.error || '视觉反推模型未能解析出结构化特征');
-  } catch (error) {
-    throw new Error(`反推拆解失败：${error instanceof Error ? error.message : '未知错误'}`);
   }
 }
 
@@ -174,7 +144,7 @@ export async function generateFinalCover(
       originalTitle,
       coverTitle,
       productName,
-      promptVersion: 'integrated-cover-v4',
+      promptVersion: 'integrated-cover-v5',
     },
   }, { isAborted, idempotencyKey: recovery.submissionKey, onTaskSubmitted: (id) => {
     if (!recovery.signal?.aborted) recovery.onTaskSubmitted?.(id);
