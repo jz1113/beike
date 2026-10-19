@@ -158,7 +158,11 @@ function humanizeGenericMessage(name: string, message: string, fallback: string)
  */
 export function formatUserError(err: unknown, fallback = '操作失败，请稍后重试'): string {
   const { name, message } = extractErrorMessage(err);
-  const trimmed = message.trim();
+  const trimmed = message.trim().replace(/context deadline exceeded/gi, '上游生图超时');
+
+  if (/上游生图超时/.test(trimmed) && !hasChineseText(message)) {
+    return '上游生图超时';
+  }
 
   if (trimmed && hasChineseText(trimmed)) {
     return trimmed;

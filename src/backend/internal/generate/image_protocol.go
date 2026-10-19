@@ -97,6 +97,14 @@ func resolveImageProtocol(base, explicit string) imageProtocol {
 	return openaiImageProtocol{}
 }
 
+func nativeDashscopeImageModel(model string) bool {
+	id := strings.ToLower(strings.TrimSpace(model))
+	if id == "" || strings.Contains(id, "qwen-image-max") {
+		return false
+	}
+	return strings.Contains(id, "qwen-image") || strings.Contains(id, "wan2.7-image") || strings.Contains(id, "wan2.6-image") || strings.Contains(id, "wan2.6-t2i")
+}
+
 func normalizeImageProtocol(explicit string) string {
 	switch strings.ToLower(strings.TrimSpace(explicit)) {
 	case "dashscope", "qwen", "qianwen":

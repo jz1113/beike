@@ -28,6 +28,7 @@ import {
   type TaskUpdater,
 } from './generationTaskTypes';
 import { submitAgentTask } from './submitAgentTask';
+import { claimSubmissionFlight, releaseSubmissionFlight } from './submissionFlight';
 
 export async function submitSingleGenerationTask(
   t: GenerationTask,
@@ -61,13 +62,16 @@ export async function submitSingleGenerationTask(
       failReason: SUBMISSION_RECOVERY_HINT,
     });
   };
+  let claimedFlight = false;
   const claimSubmission = () => {
     const current = currentTask();
     if (!current || !isImageTaskActive(current.status) || current.taskId || current.resultUrl || current.submissionRecoveryRequired) return false;
-    requireRecovery();
+    if (!claimSubmissionFlight(t.id)) return false;
+    claimedFlight = true;
     return true;
   };
 
+  try {
   if (t.mediaType === 'agent') {
     await submitAgentTask(t, updateGenerationTask, signal);
     return;
@@ -402,5 +406,8 @@ export async function submitSingleGenerationTask(
       status: 'FAILURE',
       failReason: '接口未返回任务 ID 或结果',
     });
+  }
+  } finally {
+    if (claimedFlight) releaseSubmissionFlight(t.id);
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { imageCapabilities, isDashScopeBase } from './imageCapabilities';
+import { imageCapabilities, isDashScopeBase, isNativeDashscopeImageModel } from './imageCapabilities';
 
 describe('imageCapabilities', () => {
   it('limits qwen image models on DashScope to 2K and prompt rewriting', () => {
@@ -20,6 +20,14 @@ describe('imageCapabilities', () => {
     expect(isDashScopeBase('https://dashscope-intl.aliyuncs.com/api/v1')).toBe(true);
     expect(isDashScopeBase('https://evil-dashscope.example.com')).toBe(false);
     expect(imageCapabilities('qwen-image-3.0', 'openai', 'https://maas.qianwenaiapi.com').resolutions).toEqual(['1K', '2K']);
+  });
+
+  it('treats qwen and wan image models as native, except the gateway max model', () => {
+    expect(isNativeDashscopeImageModel('qwen-image-3.0-pro')).toBe(true);
+    expect(isNativeDashscopeImageModel('wan2.6-t2i')).toBe(true);
+    expect(isNativeDashscopeImageModel('wan2.7-image-pro')).toBe(true);
+    expect(isNativeDashscopeImageModel('qwen-image-max')).toBe(false);
+    expect(isNativeDashscopeImageModel('gpt-image-2')).toBe(false);
   });
 
   it('hides resolution for grok and allows 4K only on wan2.7 pro', () => {

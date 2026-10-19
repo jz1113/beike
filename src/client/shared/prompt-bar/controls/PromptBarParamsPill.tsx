@@ -10,7 +10,7 @@ import {
   type VideoAspectOption,
 } from '../promptBarPreferencesTypes';
 import { PromptBarVideoTab } from './preferences/PromptBarVideoTab';
-import { PromptBarImageTab, imageResolutionLabel, inferenceStrengthLabel, qualityForResolution } from './preferences/PromptBarImageTab';
+import { PromptBarImageTab, imageResolutionLabel, inferenceStrengthLabel, promptRewriteStrengthLabel, qualityForResolution } from './preferences/PromptBarImageTab';
 import { PromptBarAudioTab } from './preferences/PromptBarAudioTab';
 import { videoParamModeLabel } from './preferences/PromptBarVideoTab';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
@@ -95,7 +95,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     ? `${(prefs.audio?.format || 'mp3').toUpperCase()} · ${(prefs.audio?.speed ?? 1).toFixed(1)}x`
     : isVideo
       ? `${videoParamModeLabel(props.quickVideoRefMode)} · ${aspectLabel} · ${props.quickVideoResolution} · ${props.quickVideoDuration}秒`
-      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'none' ? '' : inferenceStrengthLabel(prefs.image.inferenceStrength)].filter(Boolean).join(' · ');
+      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'none' ? '' : imageCaps.strength === 'prompt-extend' ? promptRewriteStrengthLabel(prefs.image.inferenceStrength) : inferenceStrengthLabel(prefs.image.inferenceStrength)].filter(Boolean).join(' · ');
 
   return (
     <div className="relative min-w-0">

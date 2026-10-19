@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -37,6 +38,13 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		}
 	}
 	protocol := resolveImageProtocol(base, imageProtocolName(payload, r.Header.Get("x-custom-protocol")))
+	if protocol.ID() == "openai" && nativeDashscopeImageModel(model) {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{
+			"success": false, "submissionRejected": true,
+			"error": "该模型需要使用千问原生生图接口。请在设置中把模型绑定到千问服务商，或将接口地址改为千问 / DashScope。",
+		})
+		return
+	}
 	result, err := protocol.Submit(imageRequest{
 		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality,
 		Strength: rawString(payload, "inferenceStrength"), Negative: rawString(payload, "negativePrompt"),
@@ -50,7 +58,7 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": prepare.Error()})
 			return
 		}
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "提交响应未确认：" + err.Error() + "。请先在上游任务记录核实是否已创建任务，避免重复生成"})
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": imageSubmitTransportError(err)})
 		return
 	}
 	taskID, direct := result.TaskID, result.Direct
@@ -307,6 +315,14 @@ func imageReferences(payload map[string]json.RawMessage) []string {
 		}
 	}
 	return out
+}
+
+func imageSubmitTransportError(err error) string {
+	message := err.Error()
+	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(strings.ToLower(message), "context deadline exceeded") {
+		message = "上游生图超时"
+	}
+	return "提交响应未确认：" + message + "。请先在上游任务记录核实是否已创建任务，避免重复生成"
 }
 
 func imageSubmitCredentials(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model string) (string, string) {

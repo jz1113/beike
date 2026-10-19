@@ -1,6 +1,7 @@
 import { DEEPSEEK_BASE_URL, isDeepSeekRoute, deepSeekModel } from '@shared/domain/models/deepseek';
 import { API_PROVIDERS_STORAGE_KEY, credentialsForModalityItem, findConfiguredModalityModel } from '@shared/domain/models/modalityStorage';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
+import { isDashScopeBase, isNativeDashscopeImageModel } from '@shared/domain/media/imageCapabilities';
 
 // 三态缓存：undefined=未显式设置（允许初始兼容加载），null=显式清空（严格禁止回退 localStorage），string=有效密钥
 let cachedApiKey: string | null | undefined = undefined;
@@ -124,7 +125,36 @@ export function getModelCredentials(modelId?: string): ModelCredentials {
       };
     }
   }
-  return {};
+  return dashscopeCredentialsForUnboundModel(modelId) || {};
+}
+
+function dashscopeCredentialsForUnboundModel(modelId?: string): ModelCredentials | null {
+  if (!isNativeDashscopeImageModel(modelId)) return null;
+  return readSavedDashscopeProvider();
+}
+
+function readSavedDashscopeProvider(): ModelCredentials | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const rawProviders = localStorage.getItem(API_PROVIDERS_STORAGE_KEY);
+    if (!rawProviders) return null;
+    const providers = JSON.parse(rawProviders);
+    if (!Array.isArray(providers)) return null;
+    const matches = providers.filter((item: { providerType?: string; baseUrl?: string }) => {
+      const protocol = String(item?.providerType || '').toLowerCase();
+      return protocol === 'dashscope' || protocol === 'qwen' || protocol === 'qianwen' || isDashScopeBase(item?.baseUrl);
+    });
+    const chosen = matches.find((item: { apiKey?: string; baseUrl?: string }) => item?.apiKey && item?.baseUrl) || matches.find((item: { baseUrl?: string }) => item?.baseUrl);
+    if (!chosen?.baseUrl) return null;
+    return {
+      baseUrl: chosen.baseUrl,
+      apiKey: chosen.apiKey || undefined,
+      protocol: 'dashscope',
+      requestTemplate: chosen.requestTemplate,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Visual requests follow the selected model route, never the vendor name or bare model ID. */

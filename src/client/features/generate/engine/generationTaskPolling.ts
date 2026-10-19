@@ -15,6 +15,7 @@ import { classifyGenerationPollResult, isTransientPollError, accumulateTransient
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
+import { isSubmissionInFlight, shouldAbandonSubmissionRecovery } from './submissionFlight';
 
 const pollingTaskIds = new Set<string>();
 
@@ -58,13 +59,19 @@ export async function pollTasksOnce(
       const recovering = Boolean(t.submissionRecoveryRequired && !t.taskId);
       let count = pollCounts[t.id] || 0;
 
+      // 原请求还在飞时不要累计核对次数。同步出图可能要几分钟，记录要等提交返回后才写入。
+      if (recovering && isSubmissionInFlight(t.id)) {
+        update(t.id, { failReason: SUBMISSION_RECOVERY_HINT }, noPersist);
+        return;
+      }
+
       if (!options?.skipCountIncrement) {
         count += 1;
         pollCounts[t.id] = count;
       }
 
       // 核对任务熔断：若已核对超过 5 次（约 10 秒）仍未在服务端找到原任务记录，判定为未成功创建并停止死锁
-      if (recovering && count > 5) {
+      if (shouldAbandonSubmissionRecovery(count, false)) {
         slowPollIds.delete(t.id);
         delete pollCounts[t.id];
         delete pollFailureCounts[t.id];

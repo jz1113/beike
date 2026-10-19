@@ -109,3 +109,12 @@ export function qualityForResolution(resolution: ImageResolutionOption): 'low' |
 export function inferenceStrengthLabel(strength: ImageInferenceStrength): string {
   return STRENGTHS.find((item) => item.id === (strength === 'max' ? 'xhigh' : strength))?.label || 'Low';
 }
+
+export function promptRewriteStrengthLabel(strength: ImageInferenceStrength): string {
+  switch (strength === 'max' ? 'xhigh' : strength) {
+    case 'low': return '原文';
+    case 'medium': return '改写';
+    case 'high': return '思考';
+    default: return '改写思考';
+  }
+}

@@ -351,6 +351,25 @@ func boundaryOf(contentType string) string {
 	return strings.Trim(value, `"`)
 }
 
+func TestNativeQwenImageRejectsNonDashscopeGateway(t *testing.T) {
+	called := false
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client {
+		called = true
+		return http.DefaultClient
+	}
+	t.Cleanup(func() { ModelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"qwen-image-3.0-pro","customApiKey":"secret","customBaseUrl":"https://ai.comfly.org"}`)))
+	if response.Code != http.StatusBadRequest || called {
+		t.Fatalf("status %d called %v body %s", response.Code, called, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"submissionRejected":true`) || !strings.Contains(response.Body.String(), "千问原生生图接口") {
+		t.Fatalf("body %s", response.Body.String())
+	}
+}
+
 func TestImageUpstreamRejectionReturns400WithSubmissionRejected(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

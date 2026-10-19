@@ -21,6 +21,13 @@ export function isDashScopeBase(baseUrl?: string): boolean {
   }
 }
 
+/** 这些图像模型只走千问原生生图。聚合网关上的 qwen-image-max 仍走通用接口。 */
+export function isNativeDashscopeImageModel(model = ''): boolean {
+  const id = model.toLowerCase();
+  if (!id || id.includes('qwen-image-max')) return false;
+  return id.includes('qwen-image') || id.includes('wan2.7-image') || id.includes('wan2.6-image') || id.includes('wan2.6-t2i');
+}
+
 export function imageCapabilities(model = '', protocol?: string, baseUrl?: string): ImageCapability {
   const id = model.toLowerCase();
   if (id.includes('grok')) return { resolutions: [], strength: 'none', sendsQuality: false };
