@@ -15,7 +15,12 @@ import { classifyGenerationPollResult, isTransientPollError, accumulateTransient
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
 import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
-import { isSubmissionInFlight, shouldAbandonSubmissionRecovery } from './submissionFlight';
+import {
+  forgetSubmissionRequestError,
+  isSubmissionInFlight,
+  nextSubmissionRecovery,
+  submissionRequestError,
+} from './submissionFlight';
 
 const pollingTaskIds = new Set<string>();
 
@@ -65,23 +70,9 @@ export async function pollTasksOnce(
         return;
       }
 
-      if (!options?.skipCountIncrement) {
+      if (!recovering && !options?.skipCountIncrement) {
         count += 1;
         pollCounts[t.id] = count;
-      }
-
-      // 核对任务熔断：若已核对超过 5 次（约 10 秒）仍未在服务端找到原任务记录，判定为未成功创建并停止死锁
-      if (shouldAbandonSubmissionRecovery(count, false)) {
-        slowPollIds.delete(t.id);
-        delete pollCounts[t.id];
-        delete pollFailureCounts[t.id];
-        update(t.id, {
-          status: 'FAILURE',
-          progress: '0%',
-          failReason: '原任务核对超时：未在服务端找到记录，任务可能已被拒绝或网络中断。请检查服务接口配置后重试。',
-          submissionRecoveryRequired: false,
-        });
-        return;
       }
 
       if (!recovering && !options?.skipTimeout && count > maxCount) {
@@ -130,10 +121,39 @@ export async function pollTasksOnce(
         });
 
         const data = await res.json().catch(() => null);
-        const recoveredTaskId = recovering && typeof data?.taskId === 'string' && data.taskId ? data.taskId : undefined;
+        if (recovering && data?.submissionPending === true) {
+          delete pollCounts[t.id];
+          update(t.id, {
+            status: 'IN_PROGRESS',
+            progress: '15%',
+            submissionRecoveryRequired: true,
+            failReason: SUBMISSION_RECOVERY_HINT,
+          }, noPersist);
+          return;
+        }
+        if (recovering && isUnrecordedSubmission(data)) {
+          const decision = nextSubmissionRecovery(pollCounts[t.id] || 0, 'missing', submissionRequestError(t.id));
+          if (decision.abandon) {
+            forgetSubmissionRequestError(t.id);
+            slowPollIds.delete(t.id);
+            delete pollCounts[t.id];
+            delete pollFailureCounts[t.id];
+            update(t.id, {
+              status: 'FAILURE',
+              progress: '0%',
+              failReason: decision.reason,
+              submissionRecoveryRequired: false,
+            });
+            return;
+          }
+          pollCounts[t.id] = decision.count;
+          update(t.id, { failReason: SUBMISSION_RECOVERY_HINT }, noPersist);
+          return;
+        }
+        const recoveredTaskId = recovering && typeof data?.taskId === 'string' && data.taskId && !String(data.taskId).startsWith('pending_') ? data.taskId : undefined;
         let outcome = classifyGenerationPollResult(data, { httpOk: res.ok, httpStatus: res.status });
         // Authentication/query errors cannot prove that an unknown POST was rejected.
-        if (recovering && outcome === 'failure' && !recoveredTaskId && data?.submissionRejected !== true) outcome = 'pending';
+        if (recovering && outcome === 'failure' && !recoveredTaskId && data?.submissionRejected !== true && !isStoredSubmissionFailure(data)) outcome = 'pending';
         const recoveredLink = recovering ? {
           ...(recoveredTaskId ? { taskId: recoveredTaskId, submissionRecoveryRequired: false } : {}),
           ...(typeof data?.recordId === 'string' ? { dbId: data.recordId } : {}),
@@ -141,6 +161,7 @@ export async function pollTasksOnce(
         } : {};
 
         if (outcome === 'success') {
+          forgetSubmissionRequestError(t.id);
           slowPollIds.delete(t.id);
           delete pollCounts[t.id];
           delete pollFailureCounts[t.id];
@@ -154,6 +175,7 @@ export async function pollTasksOnce(
             ...recoveredLink,
           });
         } else if (outcome === 'failure') {
+          forgetSubmissionRequestError(t.id);
           slowPollIds.delete(t.id);
           delete pollCounts[t.id];
           delete pollFailureCounts[t.id];
@@ -202,6 +224,16 @@ export async function pollTasksOnce(
       } finally { pollingTaskIds.delete(t.id); }
     }),
   );
+}
+
+function isUnrecordedSubmission(data: { status?: unknown; submissionPending?: unknown } | null): boolean {
+  if (!data || data.submissionPending === true) return false;
+  return typeof data.status === 'string' && data.status.toUpperCase() === 'QUERY_FAILED';
+}
+
+function isStoredSubmissionFailure(data: { status?: unknown } | null): boolean {
+  const status = typeof data?.status === 'string' ? data.status.trim().toUpperCase() : '';
+  return status === 'FAILURE' || status === 'FAILED' || status === 'ERROR';
 }
 
 export function getOngoingGenerationTasks(): GenerationTask[] {

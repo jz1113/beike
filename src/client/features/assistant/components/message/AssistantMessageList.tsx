@@ -76,7 +76,7 @@ export default function AssistantMessageList({
   setCurrentView,
   setIsAssistantOpen,
 }: AssistantMessageListProps) {
-  const { scrollRef, onScroll } = useAssistantAutoScroll(isOpen, sessionId, messages);
+  const { scrollRef, onScroll, releaseFollow } = useAssistantAutoScroll(isOpen, sessionId, messages);
   const [messageWindow, setMessageWindow] = useState(80);
   const historyAnchor = useRef<{ sessionId: string; height: number; top: number } | null>(null);
   useLayoutEffect(() => {
@@ -103,7 +103,7 @@ export default function AssistantMessageList({
             {hiddenMessageCount > 0 && (
               <button
                 type="button"
-                onClick={() => { const list = scrollRef.current; if (list) historyAnchor.current = { sessionId, height: list.scrollHeight, top: list.scrollTop }; setMessageWindow(n => n + 40); }}
+                onClick={() => { releaseFollow(); const list = scrollRef.current; if (list) historyAnchor.current = { sessionId, height: list.scrollHeight, top: list.scrollTop }; setMessageWindow(n => n + 40); }}
                 className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 cursor-pointer dark:text-slate-400 dark:hover:bg-white/10"
               >
                 显示更早的 {hiddenMessageCount} 条消息

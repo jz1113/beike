@@ -29,7 +29,7 @@ import {
   type TaskUpdater,
 } from './generationTaskTypes';
 import { submitAgentTask } from './submitAgentTask';
-import { claimSubmissionFlight, releaseSubmissionFlight } from './submissionFlight';
+import { claimSubmissionFlight, releaseSubmissionFlight, rememberSubmissionRequestError } from './submissionFlight';
 
 export async function submitSingleGenerationTask(
   t: GenerationTask,
@@ -53,11 +53,14 @@ export async function submitSingleGenerationTask(
     return state.generationTasks.find(task => task.id === t.id) ||
       state.sessions?.flatMap(session => session.tasks).find(task => task.id === t.id);
   };
-  const requireRecovery = () => {
+  const requireRecovery = (cause?: unknown) => {
     const current = currentTask();
     // A concurrent receipt query may have already linked or resolved this operation.
     if (current?.taskId || current?.resultUrl ||
       (current?.status === 'FAILURE' && current.submissionRecoveryRequired === false)) return;
+    if (cause !== undefined && !isGenerationCancelled(cause, signal)) {
+      rememberSubmissionRequestError(t.id, formatUserError(cause, '网络连接异常，请检查网络后重试'));
+    }
     updateGenerationTask(t.id, {
       status: 'IN_PROGRESS', progress: '15%', submissionRecoveryRequired: true,
       failReason: SUBMISSION_RECOVERY_HINT,
@@ -286,7 +289,7 @@ export async function submitSingleGenerationTask(
   } catch (networkErr: any) {
     // Once dispatch started, a lost or cancelled response may hide an accepted task.
     if (submissionDispatched) {
-      requireRecovery();
+      requireRecovery(networkErr);
       return;
     }
     if (isGenerationCancelled(networkErr, signal)) {
@@ -357,7 +360,7 @@ export async function submitSingleGenerationTask(
   }
 
   if (!data?.taskId && !data?.resultUrl && (data?.submissionUnknown || (res.status >= 500 && !data) || (res.ok && !data))) {
-    requireRecovery();
+    requireRecovery(typeof data?.error === 'string' ? data.error : undefined);
     return;
   }
   if ((!res.ok || !data?.success) && !data?.taskId) {

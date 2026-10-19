@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/platform/database"
@@ -417,5 +419,77 @@ func TestImageUpstreamRejectionReturns400WithSubmissionRejected(t *testing.T) {
 	body := response.Body.String()
 	if !strings.Contains(body, `"submissionRejected":true`) || !strings.Contains(body, "令牌不合法") {
 		t.Fatalf("expected submissionRejected and upstream error message, got %s", body)
+	}
+}
+
+func TestImageTaskKeySeesPendingSubmission(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			once.Do(func() { close(started) })
+			<-release
+			_, _ = w.Write([]byte(`{"task_id":"img-later"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	created := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`))
+	request.Header.Set("x-idempotency-key", "idem-pending")
+	done := make(chan struct{})
+	go func() {
+		handler.ServeHTTP(created, request)
+		close(done)
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("upstream submit did not start")
+	}
+	found := httptest.NewRecorder()
+	handler.ServeHTTP(found, httptest.NewRequest(http.MethodGet, "/api/generate/image?taskKey=idem-pending", nil))
+	if found.Code != http.StatusOK || !strings.Contains(found.Body.String(), `"submissionPending":true`) || !strings.Contains(found.Body.String(), `"status":"IN_PROGRESS"`) || strings.Contains(found.Body.String(), "尚未找到原任务记录") {
+		t.Fatalf("pending %d %s", found.Code, found.Body.String())
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("submit did not finish")
+	}
+	if created.Code != http.StatusOK || !strings.Contains(created.Body.String(), `"taskId":"img-later"`) {
+		t.Fatalf("submit %d %s", created.Code, created.Body.String())
+	}
+}
+
+func TestImageTaskKeyReturnsUpstreamFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"尺寸不合法"}}`))
+	}))
+	defer server.Close()
+	previous := ModelHTTP
+	ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { ModelHTTP = previous })
+	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	created := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`))
+	request.Header.Set("x-idempotency-key", "idem-fail")
+	handler.ServeHTTP(created, request)
+	if created.Code != http.StatusBadRequest || !strings.Contains(created.Body.String(), "尺寸不合法") {
+		t.Fatalf("submit %d %s", created.Code, created.Body.String())
+	}
+	found := httptest.NewRecorder()
+	handler.ServeHTTP(found, httptest.NewRequest(http.MethodGet, "/api/generate/image?taskKey=idem-fail", nil))
+	body := found.Body.String()
+	if found.Code != http.StatusOK || !strings.Contains(body, `"status":"FAILURE"`) || !strings.Contains(body, "尺寸不合法") || strings.Contains(body, "尚未找到原任务记录") {
+		t.Fatalf("key %d %s", found.Code, body)
 	}
 }

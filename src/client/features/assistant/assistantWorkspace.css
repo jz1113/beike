@@ -18,7 +18,7 @@
 .agent-header-menu>button { display: flex; justify-content: space-between; width: 100%; border-radius: 8px; padding: 10px 8px; font-size: 12px; }
 .agent-header-menu>button:hover { background: #f4f5f7; }
 .agent-header-menu span { color: #9297a0; font-size: 11px; }
-.agent-messages { padding-inline:var(--agent-gutter); overflow-x:hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #d9dce1 transparent; }
+.agent-messages { padding-inline:var(--agent-gutter); overflow-x:hidden; overflow-anchor:none; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #d9dce1 transparent; }
 .agent-composer-wrap { padding:10px var(--agent-gutter) 12px; flex-shrink: 0; }
 /* One shared gutter keeps the reply, attachments and composer on the same grid. */
 .agent-panel[data-expanded=true] .agent-header { min-height:60px; height:60px; padding-inline:24px; border-bottom:1px solid #eeefec; }

@@ -68,20 +68,36 @@ func imagePoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "任务标识无效"})
 			return
 		}
-		taskID, err := lookupImageTaskByKey(cfg, r, key)
+		row, err := lookupImageTaskByKey(cfg, r, key)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "retryable": true, "error": "原任务提交记录暂时无法核对，请稍后查询"})
 			return
 		}
-		if taskID == "" {
+		if !row.found {
 			httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "QUERY_FAILED", "retryable": true, "error": "尚未找到原任务记录，请稍后核对；不会自动重新提交"})
 			return
 		}
-		if strings.HasPrefix(taskID, "direct_") {
-			writeDirectImagePoll(cfg, w, r, taskID)
+		if strings.EqualFold(row.status, "FAILURE") {
+			reason := row.reason
+			if reason == "" {
+				reason = "生图任务失败"
+			}
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{
+				"success": true, "status": "FAILURE", "progress": "0%", "resultUrl": "", "failReason": reason,
+			})
 			return
 		}
-		pollImageTask(cfg, w, r, taskID)
+		if imageTaskStillSubmitting(row.taskID) {
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{
+				"success": true, "status": "IN_PROGRESS", "progress": "15%", "retryable": true, "submissionPending": true,
+			})
+			return
+		}
+		if strings.HasPrefix(row.taskID, "direct_") {
+			writeDirectImagePoll(cfg, w, r, row.taskID)
+			return
+		}
+		pollImageTask(cfg, w, r, row.taskID)
 		return
 	}
 	if query.Get("taskId") == "" && !query.Has("taskKey") {

@@ -30,19 +30,46 @@ func openTaskDB(cfg config.Config) (*sql.DB, error) {
 	return httpx.OpenDB(cfg)
 }
 
-func reuseImageTask(ctx context.Context, db *sql.DB, workspace, key string) (string, string, bool) {
+func reuseImageTask(ctx context.Context, db *sql.DB, workspace, key string) (string, string, string, bool) {
 	if key == "" {
-		return "", "", false
+		return "", "", "", false
 	}
-	var id, result string
+	var id, taskID, result string
 	err := db.QueryRowContext(ctx, `
-		SELECT "id", "resultUrl" FROM "ImageTask"
+		SELECT "id", COALESCE("taskId", ''), "resultUrl" FROM "ImageTask"
 		WHERE "workspaceId" = ? AND "idempotencyKey" = ? AND "status" = 'SUCCESS' AND COALESCE("resultUrl", '') != ''
-		ORDER BY "createdAt" DESC LIMIT 1`, workspace, key).Scan(&id, &result)
+		ORDER BY "createdAt" DESC LIMIT 1`, workspace, key).Scan(&id, &taskID, &result)
 	if err != nil || result == "" {
-		return "", "", false
+		return "", "", "", false
 	}
-	return id, result, true
+	return id, taskID, result, true
+}
+
+func settleImageSubmission(ctx context.Context, db *sql.DB, recordID string, patch imageTaskDraft) error {
+	if recordID == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	_, err := db.ExecContext(ctx, `
+		UPDATE "ImageTask" SET
+			"taskId" = CASE WHEN ? != '' THEN ? ELSE "taskId" END,
+			"status" = CASE WHEN ? != '' THEN ? ELSE "status" END,
+			"resultUrl" = CASE WHEN ? != '' THEN ? ELSE "resultUrl" END,
+			"failReason" = ?,
+			"model" = CASE WHEN ? != '' THEN ? ELSE "model" END,
+			"prompt" = CASE WHEN ? != '' THEN ? ELSE "prompt" END,
+			"size" = CASE WHEN ? != '' THEN ? ELSE "size" END,
+			"updatedAt" = ?
+		WHERE "id" = ?`,
+		patch.TaskID, patch.TaskID,
+		patch.Status, patch.Status,
+		patch.ResultURL, patch.ResultURL,
+		emptyNull(patch.FailReason),
+		patch.Model, patch.Model,
+		patch.Prompt, patch.Prompt,
+		patch.Size, patch.Size,
+		now, recordID)
+	return err
 }
 
 func insertImageTask(ctx context.Context, db *sql.DB, workspace string, draft imageTaskDraft) (string, error) {

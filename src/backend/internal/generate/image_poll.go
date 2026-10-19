@@ -3,26 +3,39 @@ package generate
 import (
 	"database/sql"
 	"net/http"
+	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
 
-func lookupImageTaskByKey(cfg config.Config, r *http.Request, key string) (string, error) {
+type keyedImageTask struct {
+	taskID, status, result, reason string
+	found                          bool
+}
+
+func lookupImageTaskByKey(cfg config.Config, r *http.Request, key string) (keyedImageTask, error) {
 	db, err := httpx.OpenDB(cfg)
 	if err != nil {
-		return "", err
+		return keyedImageTask{}, err
 	}
 	defer db.Close()
-	var taskID string
+	var taskID, status, result, reason sql.NullString
 	err = db.QueryRowContext(r.Context(), `
-		SELECT "taskId" FROM "ImageTask"
+		SELECT "taskId", "status", "resultUrl", "failReason" FROM "ImageTask"
 		WHERE "workspaceId" = ? AND "idempotencyKey" = ?
-		ORDER BY "createdAt" DESC LIMIT 1`, httpx.WorkspaceFrom(r), key).Scan(&taskID)
+		ORDER BY "createdAt" DESC LIMIT 1`, httpx.WorkspaceFrom(r), key).Scan(&taskID, &status, &result, &reason)
 	if err == sql.ErrNoRows {
-		return "", nil
+		return keyedImageTask{}, nil
 	}
-	return taskID, err
+	if err != nil {
+		return keyedImageTask{}, err
+	}
+	return keyedImageTask{taskID.String, status.String, result.String, reason.String, true}, nil
+}
+
+func imageTaskStillSubmitting(taskID string) bool {
+	return taskID == "" || strings.HasPrefix(taskID, "pending_")
 }
 
 func writeDirectImagePoll(cfg config.Config, w http.ResponseWriter, r *http.Request, taskID string) {

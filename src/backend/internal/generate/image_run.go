@@ -46,6 +46,15 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		})
 		return
 	}
+	claim, statusCode, message := claimImageSubmission(cfg, r, payload, model, prompt, quality, size)
+	if statusCode != 0 {
+		httpx.WriteJSON(w, statusCode, map[string]any{"success": false, "error": message})
+		return
+	}
+	if claim.reusedURL != "" {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "taskId": claim.reusedTaskID, "status": "SUCCESS", "resultUrl": claim.reusedURL, "reused": true})
+		return
+	}
 	result, err := protocol.Submit(imageRequest{
 		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality, ImageQuality: imageQuality,
 		Strength: rawString(payload, "inferenceStrength"), Negative: rawString(payload, "negativePrompt"),
@@ -56,10 +65,13 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	if err != nil {
 		var prepare imageEditPrepareError
 		if errors.As(err, &prepare) {
+			failImageSubmission(cfg, r, claim.recordID, prepare.Error())
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": prepare.Error()})
 			return
 		}
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": imageSubmitTransportError(err)})
+		transportErr := imageSubmitTransportError(err)
+		failImageSubmission(cfg, r, claim.recordID, transportErr)
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": transportErr})
 		return
 	}
 	taskID, direct := result.TaskID, result.Direct
@@ -68,6 +80,7 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	}
 	if status < 200 || status >= 300 || (taskID == "" && direct == "") {
 		upstreamErr := imageUpstreamError(data, status)
+		failImageSubmission(cfg, r, claim.recordID, upstreamErr)
 		rejected := status >= 400 && status < 500
 		outStatus := http.StatusBadGateway
 		outcome := "unknown"
@@ -89,15 +102,11 @@ func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	if taskID == "" {
 		taskID = "direct_" + Itoa(int(time.Now().UnixMilli()))
 	}
-	recordID, reusedURL, statusCode, message := persistSubmittedImage(cfg, r, payload, adapted, taskID, direct, quality, size)
-	if statusCode != 0 {
-		httpx.WriteJSON(w, statusCode, map[string]any{"success": false, "error": message, "taskId": taskID})
+	if err := finishImageSubmission(cfg, r, claim.recordID, adapted, taskID, direct, size); err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "任务持久化失败: " + err.Error(), "taskId": taskID})
 		return
 	}
-	if reusedURL != "" {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "taskId": taskID, "status": "SUCCESS", "resultUrl": reusedURL, "reused": true})
-		return
-	}
+	recordID := claim.recordID
 	body := map[string]any{
 		"success": true, "taskId": taskID, "recordId": recordID, "model": adapted.modelID,
 		"requestedModel": model, "size": adapted.size, "family": adapted.family,
@@ -348,26 +357,54 @@ func imageSubmitCredentials(cfg config.Config, r *http.Request, payload map[stri
 	return base, imageAPIKey(cfg, r, payload, clientBase)
 }
 
-func persistSubmittedImage(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, adapted imageAdapted, taskID, direct, quality, size string) (string, string, int, string) {
+type imageClaim struct {
+	recordID, reusedTaskID, reusedURL string
+}
+
+func claimImageSubmission(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model, prompt, quality, size string) (imageClaim, int, string) {
 	db, err := openTaskDB(cfg)
 	if err != nil {
-		return "", "", http.StatusInternalServerError, "任务持久化失败: " + err.Error()
+		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
 	}
 	defer db.Close()
 	key := strings.TrimSpace(r.Header.Get("x-idempotency-key"))
-	if id, result, ok := reuseImageTask(r.Context(), db, workspaceOf(r), key); ok {
-		return id, result, 0, ""
+	if id, taskID, result, ok := reuseImageTask(r.Context(), db, workspaceOf(r), key); ok {
+		return imageClaim{recordID: id, reusedTaskID: taskID, reusedURL: result}, 0, ""
 	}
+	placeholder, err := randomTaskID()
+	if err != nil {
+		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
+	}
+	recordID, err := insertImageTask(r.Context(), db, workspaceOf(r), imageTaskDraft{
+		ProductID: rawString(payload, "productId"), Prompt: prompt, TaskID: "pending_" + placeholder, Model: model,
+		Size: size, Quality: quality, Status: "IN_PROGRESS", MediaType: "image", IdempotencyKey: key,
+	})
+	if err != nil {
+		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
+	}
+	return imageClaim{recordID: recordID}, 0, ""
+}
+
+func finishImageSubmission(cfg config.Config, r *http.Request, recordID string, adapted imageAdapted, taskID, direct, size string) error {
+	db, err := openTaskDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
 	state := "IN_PROGRESS"
 	if direct != "" {
 		state = "SUCCESS"
 	}
-	recordID, err := insertImageTask(r.Context(), db, workspaceOf(r), imageTaskDraft{
-		ProductID: rawString(payload, "productId"), Prompt: adapted.prompt, TaskID: taskID, Model: adapted.modelID,
-		Size: size, Quality: quality, ResultURL: direct, Status: state, MediaType: "image", IdempotencyKey: key,
+	return settleImageSubmission(r.Context(), db, recordID, imageTaskDraft{
+		TaskID: taskID, Status: state, ResultURL: direct, Model: adapted.modelID, Prompt: adapted.prompt, Size: size,
 	})
+}
+
+func failImageSubmission(cfg config.Config, r *http.Request, recordID, reason string) {
+	db, err := openTaskDB(cfg)
 	if err != nil {
-		return "", "", http.StatusInternalServerError, "任务持久化失败: " + err.Error()
+		return
 	}
-	return recordID, "", 0, ""
+	defer db.Close()
+	_ = settleImageSubmission(r.Context(), db, recordID, imageTaskDraft{Status: "FAILURE", FailReason: reason})
 }
