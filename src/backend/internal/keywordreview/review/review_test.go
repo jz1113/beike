@@ -50,7 +50,7 @@ func TestReviewLeavesThinkingEnabledForOtherGatewayModels(t *testing.T) {
 	}))
 	defer server.Close()
 	_, err := Review(context.Background(), server.Client(), Input{
-		BaseURL: server.URL, APIKey: "secret", Model: "gemini-3.8-flash", Provider: "gateway",
+		BaseURL: server.URL, APIKey: "secret", Model: "gemini-3.8-flash", Provider: "gateway", TextProtocol: "openai",
 		Rows: []Row{{ID: "row-1", Query: "猫砂"}},
 	})
 	if err != nil {

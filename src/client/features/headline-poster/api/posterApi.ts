@@ -56,9 +56,10 @@ export async function directCoverDesign(
   options?: {
     batchId?: string;
     previousDesign?: string;
+    memorySampleId?: string;
     signal?: AbortSignal;
   },
-): Promise<HeadlineDesignResponse> {
+): Promise<{ design: HeadlineDesignResponse; memorySampleId: string; memoryEntryIds: string[] }> {
   const signal = options?.signal;
   try {
     const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-design', {
@@ -73,13 +74,20 @@ export async function directCoverDesign(
         itemId: item.id,
         itemTitle: item.originalTitle || item.productName,
         previousDesign: options?.previousDesign,
+        memorySampleId: options?.memorySampleId || 'auto',
         imageUrls: [item.sourceImageUrl],
       }),
       signal,
     }), { signal });
     const data = await response.json().catch(() => ({}));
     if (data?.success) recordChatTokens({ modelId: data.model || titleModel, type: 'chat', usage: data.usage });
-    if (data?.success && data?.data && typeof data.data === 'object') return data.data as HeadlineDesignResponse;
+    if (data?.success && data?.data && typeof data.data === 'object') {
+      return {
+        design: data.data as HeadlineDesignResponse,
+        memorySampleId: typeof data.memorySampleId === 'string' ? data.memorySampleId : '',
+        memoryEntryIds: Array.isArray(data.memoryEntryIds) ? data.memoryEntryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
+      };
+    }
     throw new Error(data?.error || '封面设计模型没有返回可用方案');
   } catch (error) {
     throw new Error(`封面设计阶段失败，已停止后续生图：${error instanceof Error ? error.message : '未知错误'}`);

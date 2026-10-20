@@ -41,27 +41,33 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
     return created;
   };
 
-  const startBatchCollect = async (itemsToCollect = items) => {
+  const startBatchCollect = async (itemsToCollect = items, forceRefresh = false) => {
     if (collectInFlight.current) return;
-    const pendingItems = itemsToCollect.filter((item) => item.status === 'pending' || item.status === 'failed');
+    const pendingItems = itemsToCollect.filter((item) => forceRefresh ? item.status === 'success' : item.status === 'pending' || item.status === 'failed');
     if (pendingItems.length === 0) {
       showToast('没有待采集或需要重试的商品');
       return;
     }
 
+    if (forceRefresh && !window.confirm(`重新采集这 ${pendingItems.length} 款商品会跳过缓存，可能产生接口计费。成功后替换采集图片，已有提示词和成片保留，是否继续？`)) return;
     collectInFlight.current = true;
     setIsCollecting(true);
     setCollectProgress({ total: pendingItems.length, current: 0, success: 0, failed: 0 });
 
     try {
       const result = await runBatchCollect(pendingItems, {
+        forceRefresh,
         onItemUpdate: (id, patch) => {
-          setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+          setItems((prev) => prev.map((item) => {
+            if (item.id !== id) return item;
+            if (forceRefresh && patch.status === 'failed') return { ...item, status: 'success', errorMsg: `刷新失败，保留原素材：${patch.errorMsg || '采集失败'}` };
+            return { ...item, ...patch };
+          }));
         },
         onProgress: (progress) => setCollectProgress(progress),
         concurrency: 3,
       });
-      showToast(`批量采编完成：已就绪 ${result.success} 款${result.failed ? `，失败 ${result.failed} 款` : ''}`);
+      showToast(`${forceRefresh ? '重新采集完成' : '批量采编完成'}：已就绪 ${result.success} 款${result.failed ? `，失败 ${result.failed} 款${forceRefresh ? '（保留原素材）' : ''}` : ''}`);
     } finally {
       collectInFlight.current = false;
       setIsCollecting(false);

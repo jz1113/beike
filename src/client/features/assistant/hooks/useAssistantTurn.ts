@@ -2,8 +2,8 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { useCallback, useRef } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getGatewayClientOverrides, getModelCredentials } from '@client/shared/api/gatewayClient';
-import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
+import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
+import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { approveAssistantTool, executeClientToolAction } from '@client/features/assistant/api/assistantClientActions';
 import type {
   TurnStreamState,
@@ -36,6 +36,15 @@ export interface RunTurnParams {
   systemPrompt: string;
   skillId?: string;
   allowedTools?: string[];
+  skillResources?: Array<{ path: string; content: string }>;
+  skillCatalog?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    prompt?: string;
+    tools?: string[];
+    resources?: Array<{ path: string; content: string }>;
+  }>;
   language: string;
   clientContext: Record<string, unknown>;
   sessionApprovals: string[];
@@ -120,6 +129,8 @@ export function useAssistantTurn() {
       systemPrompt,
       skillId,
       allowedTools,
+      skillResources,
+      skillCatalog,
       language,
       clientContext,
       sessionApprovals,
@@ -139,9 +150,8 @@ export function useAssistantTurn() {
     turnIdForApprovalRef.current = nextTurnId;
     patch({}, onUpdate);
 
-    const { customBaseUrl: localUrl, customApiKey: localKey } = getGatewayClientOverrides();
-    const modalityCreds = getModelCredentials(model);
-    const upstreamModel = upstreamModalityModelId('chat', model);
+    const routeOptions = getMultimodalClientOverrides(model);
+    const upstreamModel = model.startsWith('deepseek-official:') ? model : selectedTextModel(model).modelId;
     const prefs = loadPromptPreferences();
 
     const res = await submitPreparedAssistantTurn(nextTurnId, params.onTurnPrepared, () => apiFetch('/api/assistant/turn/start', {
@@ -160,11 +170,12 @@ export function useAssistantTurn() {
         historyLimit,
         runMode: params.runMode,
         referenceScope: params.referenceScope,
-        customBaseUrl: modalityCreds.baseUrl || localUrl,
-        ...(modalityCreds.apiKey || localKey ? { customApiKey: modalityCreds.apiKey || localKey } : {}),
+        ...routeOptions,
         systemPrompt,
         skillId,
         allowedTools,
+        ...(skillResources?.length ? { skillResources } : {}),
+        ...(skillCatalog?.length ? { skillCatalog } : {}),
         enableAgentTools: true,
         language,
         clientContext,
@@ -284,7 +295,7 @@ export function useAssistantTurn() {
 
           if (evt.type === 'item/toolCall/completed' && evt.action && evt.status === 'done' && !executedActions.has(evt.itemId)) {
             executedActions.add(evt.itemId);
-            executeClientToolAction(evt.action, showToast, sessionId);
+            executeClientToolAction(evt.action, showToast, sessionId, [...messages].reverse().find(message => message.role === 'user')?.content || '');
           }
           continue;
         }
@@ -323,7 +334,7 @@ export function useAssistantTurn() {
               visualImages: visualImages || prev[idx].visualImages,
             };
             if (evt.action && evt.status === 'done') {
-              executeClientToolAction(evt.action, showToast, sessionId);
+              executeClientToolAction(evt.action, showToast, sessionId, [...messages].reverse().find(message => message.role === 'user')?.content || '');
             }
           } else if (evt.type === 'tool_call') {
             prev.push(entry);

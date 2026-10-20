@@ -1,6 +1,7 @@
+import { selectedTextModel, selectedTextProtocol } from '@shared/domain/models/textModelRoute';
 import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getGatewayClientOverrides, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readSseEvents } from '@client/shared/api/sseStream';
 import { applyItemEvent, deriveTurnView } from '@client/shared/agent/turnItems';
 import type { AssistantItem } from '@shared/domain/assistant/types';
@@ -8,8 +9,10 @@ import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from
 import type { TaskUpdater } from './generationTaskTypes';
 import type { AgentTurnTaskData } from '@client/store/appStoreTypes';
 import { resolveAgentSystemPrompt } from '@client/shared/prompt-bar/agentDefinitions';
-import { composeSkillRuntime } from '@shared/domain/assistant/skills';
+import { composeSkillCatalog, composeSkillRuntime } from '@shared/domain/assistant/skills';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
+import { generationBatchContext, generationPromptSources } from '@client/shared/agent/generationBatchSources';
+import { executeGenerationBatchAction } from '@client/shared/agent/dispatchGenerationBatch';
 
 const HISTORY_TURNS = 10;
 const liveStops = new Map<string, AbortController>();
@@ -102,14 +105,13 @@ export async function submitAgentTask(
   const attachments = parseAgentAttachments(task);
   const skillRuntime = composeSkillRuntime(store.getActiveAssistantSkill());
   const prefs = loadPromptPreferences();
-  const overrides = getGatewayClientOverrides();
-  const modalityCreds = getModelCredentials(model);
-  const customBaseUrl = modalityCreds.baseUrl || overrides.customBaseUrl;
-  const customApiKey = modalityCreds.apiKey || overrides.customApiKey;
+  const { modelId: upstream, textProtocol } = selectedTextModel(model);
+  const routeOptions = getMultimodalClientOverrides(model);
   const requestBody: Record<string, unknown> = {
     turnId,
     threadId,
-    model,
+    model: model.startsWith('deepseek-official:') ? model : upstream,
+    textProtocol: textProtocol && textProtocol !== 'auto' ? textProtocol : selectedTextProtocol(model),
     messages: [
       ...priorMessages(task),
       {
@@ -120,14 +122,17 @@ export async function submitAgentTask(
     ],
     systemPrompt: [resolveAgentSystemPrompt(), skillRuntime?.systemPrompt || ''].filter(Boolean).join('\n\n'),
     generationMode: 'auto',
+    clientContext: { currentView: 'generate', generationBatches: generationBatchContext(generationPromptSources(store, 'agent', threadId, task.id)) },
     reasoningEffort: prefs.reasoning?.reasoningEffort || 'medium',
-    ...(customBaseUrl ? { customBaseUrl } : {}),
-    ...(customApiKey ? { customApiKey } : {}),
+    ...routeOptions,
   };
   if (skillRuntime) {
     requestBody.skillId = skillRuntime.skillId;
     if (skillRuntime.allowedTools?.length) requestBody.allowedTools = skillRuntime.allowedTools;
+    if (skillRuntime.resources.length) requestBody.skillResources = skillRuntime.resources;
   }
+  const skillCatalog = composeSkillCatalog(store.getAllAssistantSkills());
+  if (skillCatalog.length) requestBody.skillCatalog = skillCatalog;
 
   let response: Response;
   try {
@@ -168,6 +173,7 @@ export async function submitAgentTask(
   }
 
   let items: AssistantItem[] = [];
+  const executedBatchActions = new Set<string>();
   let lastUpdateTime = 0;
   let failed = false;
 
@@ -189,6 +195,13 @@ export async function submitAgentTask(
   try {
     for await (const event of readSseEvents(response.body, local.signal)) {
       if (local.signal.aborted) break;
+      if (event.type === 'item/toolCall/completed' && event.action?.action === 'generate_batch' && event.status === 'done' && !executedBatchActions.has(event.itemId)) {
+        executedBatchActions.add(event.itemId);
+        try {
+          const receipts = executeGenerationBatchAction(event.action, 'agent', threadId, currentPrompt);
+          agentTurn.generationNotice = `已保留 ${receipts.reduce((sum, receipt) => sum + receipt.taskIds.length, 0)} 项提交记录，可在对应回复清单或下方媒体卡片查看进度。`;
+        } catch (error) { agentTurn.generationNotice = `批量生成未提交：${error instanceof Error ? error.message : '请检查清单设置'}`; }
+      }
       if (typeof event.type === 'string' && event.type.startsWith('item/')) {
         items = applyItemEvent(items, event);
         flushUpdate(event.type.endsWith('/completed') || event.type.endsWith('/started'));

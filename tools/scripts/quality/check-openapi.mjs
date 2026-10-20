@@ -9,8 +9,8 @@ import { collectRoutes, renderOpenApi } from './openapi-routes.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const normalizeLf = (text) => text.replace(/\r\n/g, '\n');
-const rendered = renderOpenApi(collectRoutes(root));
 const target = path.join(root, 'api/openapi.yaml');
+const rendered = renderOpenApi(collectRoutes(root), fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '');
 
 if (process.argv.includes('--write')) {
   fs.mkdirSync(path.dirname(target), { recursive: true });

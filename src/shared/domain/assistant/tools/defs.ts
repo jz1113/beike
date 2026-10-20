@@ -1,3 +1,5 @@
+import { loadMcpTool, readSkillTool, searchMcpToolsTool } from './catalogTools';
+import { generationBatchTool } from './generationBatchTool';
 import { planTool } from './planTool';
 import type { ClientContext, ToolApprovalPolicy, ToolScope } from '../types';
 
@@ -29,6 +31,22 @@ export interface ToolDefinition {
 
 export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
   planTool,
+  readSkillTool,
+  {
+    type: 'function',
+    function: {
+      name: 'read_skill_file',
+      description: '读取当前已激活技能资料目录中的一个文件。path 必须与系统提示或 read_skill 返回的路径一致。只在需要样例、规范或细则时调用，不要一次读完全部文件。',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: '资料目录中的路径，例如 examples.md' },
+        },
+        required: ['path'],
+        additionalProperties: false,
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -215,6 +233,7 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
       },
     },
   },
+  generationBatchTool,
   {
     type: 'function',
     function: {
@@ -298,12 +317,14 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
       },
     },
   },
+  searchMcpToolsTool,
+  loadMcpTool,
   {
     type: 'function',
     function: {
       name: 'spawn_subagent',
       description:
-        '启动一个子智能体执行复杂子任务。当主智能体需要并行处理多个独立子任务、或需要借助特定技能（如数据分析、文案写作、提示词优化等）完成子目标时调用此工具。子智能体将在独立上下文中执行，结果回传后合并入主智能体回复。',
+        '启动一个子任务执行可分开的工作。主代理必须先自己读完相关技能，并把必要指令写进 prompt。子任务不能再读技能，也不能再拆分子任务。',
       parameters: {
         type: 'object',
         properties: {
@@ -317,6 +338,10 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
 ];
 
 export const TOOL_META: Record<string, { scope: ToolScope; approval: ToolApprovalPolicy }> = {
+  read_skill: { scope: 'server', approval: 'none' },
+  read_skill_file: { scope: 'server', approval: 'none' },
+  search_mcp_tools: { scope: 'server', approval: 'none' },
+  load_mcp_tool: { scope: 'server', approval: 'none' },
   parse_product_or_social_url: { scope: 'server', approval: 'none' },
   read_attached_document: { scope: 'server', approval: 'none' },
   list_user_products: { scope: 'server', approval: 'none' },
@@ -332,6 +357,7 @@ export const TOOL_META: Record<string, { scope: ToolScope; approval: ToolApprova
   workspace_navigate: { scope: 'client', approval: 'per_turn' },
   workspace_load_workshop_product: { scope: 'client', approval: 'per_turn' },
   trigger_generate: { scope: 'client', approval: 'per_turn' },
+  trigger_generate_batch: { scope: 'client', approval: 'per_turn' },
   set_workshop_arch: { scope: 'client', approval: 'per_turn' },
 };
 

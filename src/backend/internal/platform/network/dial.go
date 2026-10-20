@@ -13,19 +13,35 @@ var blockedHosts = map[string]struct{}{
 	"localhost": {}, "metadata.google.internal": {}, "metadata": {},
 }
 
+// safeTransport is shared so outbound keep-alive connections expire.
+// A transport created per request never hits IdleConnTimeout and pins a TLS
+// connection for each call.
+var safeTransport = &http.Transport{
+	DialContext:           dialPublicContext,
+	MaxIdleConns:          64,
+	MaxIdleConnsPerHost:   4,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
 func SafeClient() *http.Client {
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	return &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, networkName, address string) (net.Conn, error) {
-		return dialPublic(ctx, dialer, networkName, address)
-	}}, CheckRedirect: func(request *http.Request, via []*http.Request) error {
-		if len(via) >= 3 {
-			return errors.New("stopped after 3 redirects")
-		}
-		if blockedHost(request.URL.Hostname()) {
-			return errors.New("Host not allowed")
-		}
-		return nil
-	}}
+	return &http.Client{Transport: safeTransport, CheckRedirect: safeRedirect}
+}
+
+func dialPublicContext(ctx context.Context, networkName, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	return dialPublic(ctx, dialer, networkName, address)
+}
+
+func safeRedirect(request *http.Request, via []*http.Request) error {
+	if len(via) >= 3 {
+		return errors.New("stopped after 3 redirects")
+	}
+	if blockedHost(request.URL.Hostname()) {
+		return errors.New("Host not allowed")
+	}
+	return nil
 }
 
 func dialPublic(ctx context.Context, dialer *net.Dialer, networkName, address string) (net.Conn, error) {

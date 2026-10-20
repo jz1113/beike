@@ -93,6 +93,7 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
     try {
       const outcome = await testModelConnection(target.name, {
         provider: target.providerType,
+        providerType: target.providerType,
         baseUrl: target.baseUrl.trim(),
         apiKey: target.apiKey.trim(),
       });

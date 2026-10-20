@@ -9,6 +9,7 @@ import (
 
 type productInput struct {
 	platform, itemID string
+	requestedSKUID   string
 	forceRefresh     bool
 }
 
@@ -87,7 +88,14 @@ func resolveProductInput(body map[string]any) (productInput, string) {
 	if !productIDPattern.MatchString(itemID) {
 		return productInput{}, "链接中未找到商品 ID。请复制完整商品详情链接，或选择平台后输入商品 ID（短链请先在浏览器展开）"
 	}
-	return productInput{platform: detected, itemID: itemID, forceRefresh: force}, ""
+	requestedSKU := parsed.Query().Get("skuId")
+	if requestedSKU == "" {
+		requestedSKU = parsed.Query().Get("sku_id")
+	}
+	if !productIDPattern.MatchString(requestedSKU) {
+		requestedSKU = ""
+	}
+	return productInput{platform: detected, itemID: itemID, requestedSKUID: requestedSKU, forceRefresh: force}, ""
 }
 
 func firstProductRaw(body map[string]any) (string, bool) {

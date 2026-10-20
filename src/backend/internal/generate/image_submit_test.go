@@ -87,11 +87,11 @@ func TestImageTaskKeyResolvesDirectPoll(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`CREATE TABLE ImageTask (
-		taskId TEXT, workspaceId TEXT, idempotencyKey TEXT, resultUrl TEXT, status TEXT, failReason TEXT, createdAt TEXT
+		taskId TEXT, workspaceId TEXT, idempotencyKey TEXT, resultUrl TEXT, status TEXT, failReason TEXT, createdAt TEXT, mediaType TEXT
 	)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO ImageTask VALUES ('direct_from_key','local','idem-1','https://example.com/b.jpg','SUCCESS',NULL,'2026-01-01')`); err != nil {
+	if _, err := db.Exec(`INSERT INTO ImageTask VALUES ('direct_from_key','local','idem-1','https://example.com/b.jpg','SUCCESS',NULL,'2026-01-01','image')`); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()

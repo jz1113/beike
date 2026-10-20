@@ -44,6 +44,9 @@ func headlineDesignSchemaError(body []byte) string {
 	if message := optionalTrimmed(obj, "previousDesign", 2000, "上一张设计摘要最多 2000 字"); message != "" {
 		return "previousDesign: " + message
 	}
+	if message := optionalTrimmed(obj, "memorySampleId", 128, ""); message != "" {
+		return "memorySampleId: " + message
+	}
 	if message := optionalTrimmed(obj, "customBaseUrl", 2048, ""); message != "" {
 		return "customBaseUrl: " + message
 	}

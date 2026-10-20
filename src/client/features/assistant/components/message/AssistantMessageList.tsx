@@ -18,6 +18,7 @@ import { getReplyReferenceMedia } from '../../model/assistantPromptReferences';
 import ProductCardWidget from '@client/features/assistant/components/message/ProductCardWidget';
 import TurnTimeline from '@client/features/assistant/components/message/TurnTimeline';
 import CodexAssistantBubble from './CodexAssistantBubble';
+import { AssistantImageBatch } from '../panels/AssistantBatchPanel';
 import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/model/assistantTurnTypes';
 
 export interface AssistantMessageListProps {
@@ -121,6 +122,7 @@ export default function AssistantMessageList({
               return (
                 <CodexAssistantBubble
                   key={msg.id}
+                  sessionId={sessionId}
                   msg={hiddenCollectionCards.has(msg.id) ? { ...msg, productWidget: undefined } : msg}
                   onAnalyzeImages={canAnalyzeCollection ? () => { setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。'); textareaRef.current?.focus(); } : undefined}
                   referenceMedia={referenceMedia}
@@ -275,6 +277,7 @@ export default function AssistantMessageList({
                       ) : (
                         <div className="space-y-3">
                           <FormattedMarkdown content={msg.content} referenceMedia={referenceMedia} accentColor="slate" />
+                          <AssistantImageBatch sessionId={sessionId} replyId={msg.id} disabled={isSendingCurrent && streamingAssistantMsgId === msg.id} />
                           {isSendingCurrent && streamingAssistantMsgId === msg.id && (
                             <span className="inline-block w-1.5 h-3.5 bg-zinc-500 animate-pulse ml-1 align-middle rounded-xs" />
                           )}

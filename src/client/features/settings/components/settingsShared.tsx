@@ -16,6 +16,7 @@ export interface WorkflowModel {
   customBaseUrl?: string;
   customApiKey?: string;
   apiTemplate?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
   name: string;
   shortName: string;
   badge?: string;

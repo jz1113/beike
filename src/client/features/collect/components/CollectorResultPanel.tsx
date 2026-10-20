@@ -1,6 +1,7 @@
 
 import React, { useRef } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { CollectionSourceStatus } from './CollectionSourceStatus';
 import { X, Download, Maximize2, Film, Bot } from 'lucide-react';
 import {
   displayMediaSrc,
@@ -58,6 +59,7 @@ export default function CollectorResultPanel({
             />
             <div className="min-w-0">
               <h3 id="collector-result-title" className="font-bold text-base text-slate-900 dark:text-white break-words whitespace-normal leading-snug">{inspectingItem.title}</h3>
+              <CollectionSourceStatus fromCache={inspectingItem.fromCache} apiUsed={inspectingItem.apiUsed} detailsMissing={inspectingItem.detailsMissing} />
               <p className="text-xs text-slate-400 dark:text-slate-500">共 {mediaAssetCount(inspectingItem)} 项素材{videos.length ? `（含 ${videos.length} 条视频/动态）` : ''}</p>
             </div>
           </div>

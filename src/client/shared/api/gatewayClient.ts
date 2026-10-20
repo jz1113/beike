@@ -1,3 +1,5 @@
+import { selectedTextModel, selectedTextProtocol } from '@shared/domain/models/textModelRoute';
+import type { TextProtocol } from '@shared/domain/models/textProtocol';
 import { DEEPSEEK_BASE_URL, isDeepSeekRoute, deepSeekModel } from '@shared/domain/models/deepseek';
 import { API_PROVIDERS_STORAGE_KEY, credentialsForModalityItem, findConfiguredModalityModel } from '@shared/domain/models/modalityStorage';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
@@ -159,6 +161,7 @@ function readSavedDashscopeProvider(): ModelCredentials | null {
 
 /** Visual requests follow the selected model route, never the vendor name or bare model ID. */
 export function getMultimodalClientOverrides(modelId: string): {
+  textProtocol?: TextProtocol;
   customBaseUrl?: string;
   customApiKey?: string;
   apiFormat?: 'openai-responses';
@@ -166,8 +169,12 @@ export function getMultimodalClientOverrides(modelId: string): {
 } {
   // 1. 优先检查模型是否配置了专属服务商凭证
   const modelCreds = getModelCredentials(modelId);
+  const textProtocol = selectedTextProtocol(modelId);
+  const template = selectedTextModel(modelId).apiTemplate;
   if (modelCreds.baseUrl || modelCreds.apiKey) {
     return {
+      textProtocol,
+      ...(template === 'responses' ? { apiFormat: 'openai-responses' as const } : {}),
       customBaseUrl: modelCreds.baseUrl,
       customApiKey: modelCreds.apiKey,
     };
@@ -178,11 +185,11 @@ export function getMultimodalClientOverrides(modelId: string): {
     if (!deepSeekModel(modelId)) throw new Error('此 DeepSeek 官方模型尚未适配');
     const key = localStorage.getItem('deepseek_api_key')?.trim();
     if (!key) throw new Error('请先在渠道管理中保存 DeepSeek 官方 API Key');
-    return { customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: key };
+    return { textProtocol, customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: key };
   }
 
   const primary = getGatewayClientOverrides();
-  if (!isOpenAIModelRouteId(modelId)) return primary;
+  if (!isOpenAIModelRouteId(modelId)) return { ...primary, textProtocol, ...(template === 'responses' ? { apiFormat: 'openai-responses' as const } : {}) };
   if (typeof localStorage === 'undefined' || localStorage.getItem('openai_responses_enabled') !== 'true') {
     throw new Error('请先在 OpenAI 服务设置中启用 Responses 接口');
   }
@@ -195,6 +202,7 @@ export function getMultimodalClientOverrides(modelId: string): {
     customBaseUrl: baseUrl,
     customApiKey: key,
     apiFormat: 'openai-responses',
+    textProtocol: 'openai',
     ...(allowInsecureHttp ? { allowInsecureHttp: true } : {}),
   };
 }

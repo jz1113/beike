@@ -65,6 +65,9 @@ export interface BatchTaskItem {
   author?: string;
   error?: string;
   time?: string;
+  fromCache?: boolean;
+  apiUsed?: string;
+  detailsMissing?: boolean;
 }
 
 export const secondaryBtnClass =

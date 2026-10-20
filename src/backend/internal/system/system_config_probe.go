@@ -10,7 +10,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -97,6 +99,16 @@ func probeMediaCatalog(ctx context.Context, client *http.Client, baseURL, apiKey
 }
 
 func probeChat(ctx context.Context, client *http.Client, baseURL, apiKey, model string) (int, map[string]any) {
+	if protocol := modelgw.TextProtocol(ctx, model); protocol != "openai" {
+		status, _, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
+			BaseURL: baseURL, APIKey: apiKey, Protocol: protocol, Client: client, Timeout: 40 * time.Second,
+			Payload: map[string]any{"model": model, "max_tokens": 4096, "reasoning_effort": "low", "messages": []map[string]string{{"role": "user", "content": "Ping. Reply PONG only."}}},
+		})
+		if err != nil {
+			return http.StatusBadRequest, map[string]any{"success": false, "status": status, "error": err.Error(), "textProtocol": protocol}
+		}
+		return http.StatusOK, map[string]any{"success": true, "model": model, "textProtocol": protocol, "testedGeneration": true}
+	}
 	payload, _ := json.Marshal(map[string]any{
 		"model": model, "max_tokens": 10,
 		"messages": []map[string]string{{"role": "user", "content": "Ping. Reply \"PONG\" only."}},

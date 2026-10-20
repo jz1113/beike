@@ -1,3 +1,5 @@
+import type { TextProtocol } from './textProtocol';
+
 export type ModalityStorageKind = 'chat' | 'image' | 'video' | 'three_d' | 'music' | 'voice' | 'avatar';
 
 export interface StoredModalityModelItem {
@@ -6,6 +8,8 @@ export interface StoredModalityModelItem {
   modality: ModalityStorageKind;
   vendor?: string;
   modelId: string;
+  textProtocol?: TextProtocol;
+  apiTemplate?: string;
   apiKey?: string;
   baseUrl?: string;
   isInfrequent?: boolean;

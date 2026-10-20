@@ -1,4 +1,5 @@
 import { apiFetch } from '@client/shared/api/apiClient';
+import { catalogRequestProtocol } from './catalogRequestProtocol';
 import type { ConnectionTestOutcome } from './connectionStatus';
 
 /** Directory reachability only: this does not prove generation capability or balance. */
@@ -7,7 +8,7 @@ export async function testModelConnection(name: string, body: Record<string, unk
   const start = Date.now();
   const response = await apiFetch('/api/system/models/fetch', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, isPing: true, strict: true }),
+    body: JSON.stringify({ ...body, ...catalogRequestProtocol(body.providerType || body.provider, body.catalogProtocol), isPing: true, strict: true }),
   });
   const data = await response.json().catch(() => ({}));
   const ok = Boolean(response.ok && data.success && !data.isFallback);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Copy01Icon, SourceCodeIcon, TextWrapIcon, Tick02Icon } from '@hugeicons/core-free-icons';
 
@@ -14,10 +14,12 @@ export default function MarkdownCodeBlock({
   code,
   lang = '',
   incomplete = false,
+  action,
 }: {
   code: string;
   lang?: string;
   incomplete?: boolean;
+  action?: ReactNode;
 }) {
   const [wrap, setWrap] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -49,6 +51,7 @@ export default function MarkdownCodeBlock({
           <span className="truncate text-[10px] font-bold tracking-wide">{displayLanguage(lang, incomplete)}</span>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {action}
           <button
             type="button"
             aria-label={wrap ? '关闭自动换行' : '开启自动换行'}

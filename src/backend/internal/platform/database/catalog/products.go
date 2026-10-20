@@ -37,7 +37,7 @@ func ListProducts(ctx context.Context, db *sql.DB, workspace string, page, pageS
 		products = append(products, map[string]any{
 			"id": id, "workspaceId": workspaceID, "platform": platform,
 			"itemId": database.NullText(itemID), "title": database.NullText(title),
-			"picUrl":     media.NormalizeImageURLToStandardJpg(database.StringValue(picURL)),
+			"picUrl":     cleanProductCover(database.StringValue(picURL), cleaned),
 			"detailUrls": cleaned, "createdAt": database.FormatSQLiteTime(createdAt), "imageCount": count,
 		})
 	}
@@ -53,23 +53,26 @@ func cleanDetailURLs(raw any) (any, int) {
 	if err := json.Unmarshal([]byte(text), &parsed); err != nil {
 		return text, 0
 	}
-	count := 0
-	for _, key := range []string{"main", "skus", "details"} {
-		cleaned := []any{}
+	groups := [3][]string{}
+	keys := []string{"main", "skus", "details"}
+	for index, key := range keys {
 		if list, ok := parsed[key].([]any); ok {
 			for _, item := range list {
-				address, ok := item.(string)
-				if !ok {
-					continue
-				}
-				normalized := media.NormalizeImageURLToStandardJpg(address)
-				if media.IsProductImageURL(normalized) {
-					cleaned = append(cleaned, normalized)
+				if address, ok := item.(string); ok {
+					groups[index] = append(groups[index], address)
 				}
 			}
 		}
-		parsed[key] = cleaned
-		count += len(cleaned)
+	}
+	groups[0], groups[1], groups[2] = media.ProductImageGroups(groups[0], groups[1], groups[2])
+	count := 0
+	for index, key := range keys {
+		parsed[key] = groups[index]
+		count += len(groups[index])
+	}
+	if metadata := ReadProductVariantMetadata(parsed["variantMetadata"]); metadata != nil {
+		images := append(append(append([]string{}, groups[0]...), groups[1]...), groups[2]...)
+		parsed["variantMetadata"] = AlignProductVariantImages(metadata, images)
 	}
 	body, err := json.Marshal(parsed)
 	if err != nil {
@@ -84,10 +87,11 @@ func SaveCollectedProduct(ctx context.Context, db *sql.DB, workspace, platform, 
 		return nil, err
 	}
 	var id, createdAt string
-	var existingPic sql.NullString
+	var existingPic, existingDetail sql.NullString
 	err = db.QueryRowContext(ctx, `
-		SELECT "id", "createdAt", "picUrl" FROM "Product"
-		WHERE "workspaceId" = ? AND "platform" = ? AND "itemId" = ?`, workspace, platform, itemID).Scan(&id, &createdAt, &existingPic)
+		SELECT "id", "createdAt", "picUrl", "detailUrls" FROM "Product"
+		WHERE "workspaceId" = ? AND "platform" = ? AND "itemId" = ?`, workspace, platform, itemID).Scan(&id, &createdAt, &existingPic, &existingDetail)
+	mergedDetail := mergeProductDetail(database.StringValue(existingDetail), string(detailURLs))
 	picURL := cleanPicURL
 	if picURL == "" {
 		picURL = media.NormalizeImageURLToStandardJpg(database.StringValue(existingPic))
@@ -103,20 +107,20 @@ func SaveCollectedProduct(ctx context.Context, db *sql.DB, workspace, platform, 
 		}
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO "Product" ("id", "workspaceId", "platform", "itemId", "title", "picUrl", "detailUrls", "createdAt")
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, workspace, platform, itemID, title, picURL, string(detailURLs), createdAt)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, workspace, platform, itemID, title, picURL, mergedDetail, createdAt)
 	} else if err != nil {
 		return nil, err
 	} else {
 		_, err = db.ExecContext(ctx, `
 			UPDATE "Product" SET "title" = ?, "picUrl" = ?, "detailUrls" = ?
-			WHERE "id" = ? AND "workspaceId" = ?`, title, picURL, string(detailURLs), id, workspace)
+			WHERE "id" = ? AND "workspaceId" = ?`, title, picURL, mergedDetail, id, workspace)
 	}
 	if err != nil {
 		return nil, err
 	}
 	return map[string]any{
 		"id": id, "workspaceId": workspace, "platform": platform, "itemId": itemID,
-		"title": title, "picUrl": picURL, "detailUrls": string(detailURLs), "createdAt": database.FormatSQLiteTime(createdAt),
+		"title": title, "picUrl": picURL, "detailUrls": mergedDetail, "createdAt": database.FormatSQLiteTime(createdAt),
 	}, nil
 }
 
@@ -135,7 +139,8 @@ func UpdateProduct(ctx context.Context, db *sql.DB, workspace, id string, title,
 		current["picUrl"] = *picURL
 	}
 	if detailURLs != nil {
-		current["detailUrls"] = *detailURLs
+		previous, _ := current["detailUrls"].(string)
+		current["detailUrls"] = mergeProductDetail(previous, *detailURLs)
 	}
 	_, err = db.ExecContext(ctx, `
 		UPDATE "Product" SET "title" = ?, "itemId" = ?, "picUrl" = ?, "detailUrls" = ?

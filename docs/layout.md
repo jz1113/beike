@@ -50,7 +50,7 @@ client/
 
 功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如资产组件按 `cards / dialogs / filters / deconstruct` 归类并设 `index.ts` 统一导出；设置组件按 `providers / models / vendors / creator / storage / modality` 归类导出；工坊按 `stage / history / settings / product`，画布按 `editor / prompt / stage / video`。助手组件按 `message / panels / brand-kit` 分组，抽屉和按钮留在 `components`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。跨平台启动器在 `tools/launchers` 归档。
 
-`shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。`shared/agent` 归并助手回合的 item 事件，生成页和助手抽屉共用。`shared/ui/markdown` 渲染模型 Markdown；助手抽屉在外面再包图片批次。`shared/ui/studio` 放数字人、PPT 和视频带货共用的全屏工作台外壳。
+`shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。商品采集的图片字段合并与分类去重放在 `src/shared/domain/collection`，由采集页、工坊和视频带货共用；图片质量、缓存和重新采集规则见 [product-collection.md](product-collection.md)。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。`shared/agent` 归并助手回合的 item 事件，以及图片／视频提示词清单、来源与素材映射、编辑草稿、提交回执和并发偏好，生成页和助手抽屉共用；纯提示词识别与生成授权判断放在 `src/shared/domain/assistant`。`shared/ui/markdown` 渲染模型 Markdown，两种对话在整轮回复外接统一批量面板。`shared/ui/studio` 放数字人、PPT 和视频带货共用的全屏工作台外壳。
 
 工坊 `model/` 再按 `collection / analysis / generation / delivery / workspace` 分组；React hook 不进入 model。采编、视觉分析和生图状态由 `workshop/hooks` 的独立 hook 协调。画布的导入、几何、图层和任务规则在 `canvas/model`；设置的模型目录、报价、存储和连接状态规则在 `settings/model`。
 
@@ -81,11 +81,11 @@ backend/
   internal/platform/storage  本地与对象存储路径
 ```
 
-`GET /api/health`、模型报价、深度环境、本地存储统计和派生缓存清理、本地媒体读取、未开启云存储时的媒体上传、存储配置不完整时的连通性检查和迁移拦截、内存与 WAL 清理、媒体待核列表、系统配置读取和连通性测试、网关账户额度、模型目录拉取、关键词审核规则、提示词记录、类目列表和类目迁移预览、类目迁移写入、风格配方的列表、新建、修改、恢复、删除和官方预置导入，商品的读取、保存、修改和删除、商品采集、生图任务列表和删除、素材来源查重结果和链接查重、反推审核的列表、驳回和恢复、素材库组织视图、穿搭动作人物场景和完整提示词详情、一次返回全部类型的素材列表和全量导出、按编号删除、素材修改、素材新建（场景、穿搭、动作、人物、完整提示词）、批量导入素材、审核记录、换图记录、商品品类和图集、种子清理、按类型清空、去重提纯和清空当前工作区、品类排序、品类保存、图集归类、素材归类、母组移动和文件夹归档、文件夹规则保存、规则导入和细分文件夹保存、母组换图状态、后台反推任务查询、素材表现，由 Go 直接处理。未登记的 `/api` 返回不存在。系统配置里的模型清单和类目默认值来自 `src/shared/data`。类目读取包含当前工作区与官方类目。
+`GET /api/health`、模型报价、深度环境、本地存储统计和派生缓存清理、本地媒体读取、未开启云存储时的媒体上传、存储配置不完整时的连通性检查和迁移拦截、内存与 WAL 清理、媒体待核列表、系统配置读取和连通性测试、桌宠列表、命令导入和精灵图、网关账户额度、模型目录拉取、关键词审核规则、提示词记录、类目列表和类目迁移预览、类目迁移写入、风格配方的列表、新建、修改、恢复、删除和官方预置导入，商品的读取、保存、修改和删除、商品采集、生图任务列表和删除、素材来源查重结果和链接查重、反推审核的列表、驳回和恢复、素材库组织视图、穿搭动作人物场景和完整提示词详情、一次返回全部类型的素材列表和全量导出、按编号删除、素材修改、素材新建（场景、穿搭、动作、人物、完整提示词）、批量导入素材、审核记录、换图记录、商品品类和图集、种子清理、按类型清空、去重提纯和清空当前工作区、品类排序、品类保存、图集归类、素材归类、母组移动和文件夹归档、文件夹规则保存、规则导入和细分文件夹保存、母组换图状态、后台反推任务查询、素材表现，由 Go 直接处理。未登记的 `/api` 返回不存在。系统配置里的模型清单和类目默认值来自 `src/shared/data`。类目读取包含当前工作区与官方类目。
 
 工坊工作区、参考文件上传和生图任务列表由 Go 直接处理。深度图片、深度视频、反推请求、后台反推的提交与停止、反推进度，以及审核通过和换图，由 Go 直接处理。深度图和深度视频调用本机 Python 与 ffmpeg。后台反推在进程内派发；服务重启后未完成任务只标记中断，不自动重放付费请求。
 
-助手回合、会话、文档抽取、图像反推、视频规格检查和抽帧已在 Go 中处理。抽帧使用 ffmpeg，并把画面作为下一轮视觉上下文，单轮最多 20 张、合计 5MB。请求体里的 `mcpServers` 通过 HTTP JSON-RPC 接入，工具名带 `mcp_` 前缀，调用需要审批。`spawn_subagent` 在当前回合内最多再跑 2 轮，且不能再拆子任务。`POST /api/catalog/assets/seed` 返回「官方预置资产已禁用」；风格官方预置走 `POST /api/catalog/styles?action=seed`。官方资产种子在启动迁移后按缺失项补齐。
+助手回合、会话、文档抽取、图像反推、视频规格检查和抽帧已在 Go 中处理。抽帧使用 ffmpeg，并把画面作为下一轮视觉上下文，单轮最多 20 张、合计 5MB。请求体里的 `mcpServers` 通过 HTTP JSON-RPC 接入，先握手再列出工具，名称带 `mcp_` 前缀，调用直接执行。`spawn_subagent` 在当前回合内最多再跑 2 轮，不能再拆子任务，也不能读取技能。`POST /api/catalog/assets/seed` 返回「官方预置资产已禁用」；风格官方预置走 `POST /api/catalog/styles?action=seed`。官方资产种子在启动迁移后按缺失项补齐。
 
 ## 共享代码
 
@@ -107,6 +107,8 @@ shared/
 
 `client/shared` 只在浏览器使用；`src/shared` 同时服务前后端。共享业务规则不能依赖 Node、React 或某个前端功能。跨层使用 `@client/* / @server/* / @shared/*` 别名。
 
+文本协议与型号思考能力位于 `src/shared/domain/models`；`textModelCapabilities.json` 是浏览器安全的能力真源，由 `check-shared-data.mjs` 生成 Go `internal/modelgw` 的嵌入副本并校验一致性。Go `modelgw` 负责 Gemini、Anthropic 与 OpenAI 兼容文本请求转换，业务包只消费统一响应，图片与视频生成仍走独立适配器。
+
 ## 功能导航与架构分类
 
 项目分为「全局核心视窗」与「垂直独立小工具」，前后端保持高度对称：
@@ -118,7 +120,7 @@ shared/
 | 首页与灵感 | `home` | `catalog` | 瀑布流、灵感案例、预置模版、推荐展示 |
 | 无限画布 | `canvas` | `generate` (节点执行)、`catalog` | 节点式自由编排、局部编辑与图层解构 |
 | 资产与历史中心 | `assets` | `assets`、`library` | 历史生成任务、原子资产（人物/场景/穿搭/动作/提示词）、查重、反推库 |
-| 系统设置与厂商 | `settings` | `system` | 模型目录、网关配置、密钥认证、配额与存储设置 |
+| 系统设置与厂商 | `settings` | `system` | 模型目录、网关配置、密钥认证、配额、存储设置与桌宠 |
 | AI 伴随助手 | `assistant` | `assistant` | 多轮对话、Agent 循环、文档与素材抽取、沙箱执行 |
 
 ### 2. 垂直独立小工具 (Specialized Studios & Tools)
@@ -127,13 +129,13 @@ shared/
 
 | 小工具 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
 | --- | --- | --- | --- |
-| 封面大字报 | `headline-poster` | `generate/headline` | 一次出图的中文封面。技能硬约束和已采纳记忆写入设计提示词，样张反推与纠正存在封面记忆 |
+| 封面大字报 | `headline-poster` | `generate/headline` | 一次出图的中文封面。投喂样张接到全局桌宠；隐藏桌宠后仍可从工具栏打开喂图面板 |
 | 电商工坊 | `workshop` | `workshop` | 多商品、多模特、多场景批量生图与矩阵化交付 |
 | 词包审核 | `keyword-review` | `keywordreview` | 关键词表批量导入、垂类判定、生产方向建议与合规导出 |
 | 内容采集 | `collect` | `platform/collect` | 跨平台图文视频采编、元数据抽取与无水印解析 |
 | PPT生成工坊 | `ppt-generator` | `generate/ppt` | 论断大纲、可编辑排版或整页视觉渲染、按图像家族路由配图并导出 PPTX |
 | 数字人工作室 | `avatar` | `avatar` | 照片数字人与视频对口型。驱动模型在设置「数字人」线路拉取，配音沿用「语音」线路 |
-| 视频带货 | `video-sales` | `generate/videosales` | 商品分析、分镜脚本、图生视频、数字人口播镜头、配音与 BGM 合成 |
+| 视频带货 | `video-sales` | `generate/videosales` | 全品类确认商品与 SKU 颜色、前置时长/画幅后，经多模态创作口播分镜、按需自动生图并校验；图片完成后选择视频模型，依据实际参考图定稿整段提示词并一次出片。服饰鞋包使用专属叙事；历史逐镜任务保留查询与结果查看，操作与恢复规则见 [video-sales.md](video-sales.md) |
 
 ### 3. Feature 内部标准四元结构规范
 

@@ -35,6 +35,9 @@ func parseKeywordReview(raw []byte) (map[string]any, []reviewsvc.Row, string) {
 	if message := copyOptionalString(object, parsed, "customApiKey", 0); message != "" {
 		return nil, nil, message
 	}
+	if message := copyOptionalString(object, parsed, "textProtocol", 32); message != "" {
+		return nil, nil, message
+	}
 	if message := copyOptionalBool(object, parsed, "lookup"); message != "" {
 		return nil, nil, message
 	}

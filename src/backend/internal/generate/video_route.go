@@ -64,12 +64,7 @@ func videoModelError(payload map[string]json.RawMessage) string {
 func videoPoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if query.Get("taskId") == "" && query.Has("taskKey") {
-		key := query.Get("taskKey")
-		if strings.TrimSpace(key) == "" || len(key) > 256 {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "任务标识无效"})
-			return
-		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "QUERY_FAILED", "retryable": true, "error": "原任务提交结果待核对，请稍后查询；不会自动重新提交"})
+		pollVideoSubmission(cfg, w, r, query.Get("taskKey"))
 		return
 	}
 	if query.Get("taskId") == "" && !query.Has("taskKey") {
@@ -104,6 +99,7 @@ func videoBodyError(payload map[string]json.RawMessage) string {
 		func() string { return optionalString(payload, "customBaseUrl", 2048, false) },
 		func() string { return optionalString(payload, "customApiKey", 4096, false) },
 		func() string { return optionalString(payload, "clientTaskId", 256, false) },
+		func() string { return optionalString(payload, "idempotencyKey", 256, false) },
 	}
 	for _, step := range steps {
 		if message := step(); message != "" {

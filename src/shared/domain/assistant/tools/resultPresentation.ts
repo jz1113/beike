@@ -2,6 +2,14 @@ export function toolDisplayName(name: string): string {
   switch (name) {
     case 'update_plan':
       return '更新执行计划';
+    case 'read_skill':
+      return '读取技能';
+    case 'read_skill_file':
+      return '读取技能资料';
+    case 'search_mcp_tools':
+      return '检索外部工具';
+    case 'load_mcp_tool':
+      return '加载外部工具';
     case 'read_tool_result':
       return '读取工具结果';
     case 'execute_code':
@@ -26,6 +34,8 @@ export function toolDisplayName(name: string): string {
       return '载入种草工坊';
     case 'trigger_generate':
       return '准备生图';
+    case 'trigger_generate_batch':
+      return '请求批量生成';
     case 'set_workshop_arch':
       return '切换拍摄架构';
     case 'inspect_video_media':
@@ -35,6 +45,10 @@ export function toolDisplayName(name: string): string {
     case 'extract_video_detailed_frames':
       return '提取关键镜头特写画面';
     default:
+      if (name.startsWith('mcp_')) {
+        const tool = name.slice(4).split('__')[1]?.replaceAll('_', ' ').trim();
+        return tool ? `外部工具 ${tool}` : '外部工具';
+      }
       return name;
   }
 }
@@ -53,8 +67,12 @@ export function summarizeToolResult(raw: string): string {
     if (j.action === 'navigate') return `导航至 ${j.target_view}`;
     if (j.action === 'load_workshop_product') return `载入商品 ${j.itemId}`;
     if (j.action === 'trigger_generate') return '准备生图';
+    if (j.action === 'generate_batch') return '已请求批量提交，客户端将校验后执行';
     if (j.action === 'set_workshop_arch') return `切换架构 ${j.arch_id}`;
     if (j.workshopState) return '已读取工作台状态';
+    if (typeof j.text === 'string' && j.text.trim()) return j.text.trim().slice(0, 240);
+    if (typeof j.skillId === 'string' && j.skillId.trim()) return `已读取技能 ${String(j.name || j.skillId).trim()}`;
+    if (typeof j.path === 'string' && j.path.trim()) return `已读取 ${j.path.trim()}`;
     return '完成';
   } catch {
     return raw.slice(0, 80);

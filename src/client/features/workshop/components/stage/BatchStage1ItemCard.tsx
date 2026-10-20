@@ -108,6 +108,9 @@ export const BatchStage1ItemCard: React.FC<BatchStage1ItemCardProps> = ({
           );
         })()}
 
+        {item.fromCache !== undefined || item.apiUsed ? <p className="text-[10px] text-slate-500 dark:text-slate-400">{[item.fromCache === true ? '缓存结果' : item.fromCache === false ? '本次接口采集' : '', item.apiUsed].filter(Boolean).join(' · ')}</p> : null}
+        {item.status === 'success' && item.detailImages.length === 0 && <p className="text-[10px] text-amber-600 dark:text-amber-300">接口未返回详情图，仅展示已返回素材</p>}
+        {item.status === 'success' && item.errorMsg && <p className="text-xs text-rose-600">{item.errorMsg}</p>}
         {item.status === 'failed' && (
           <p className="text-xs text-rose-600 font-medium">
             ❌ 采集失败: {item.errorMsg || '未获取到数据'}

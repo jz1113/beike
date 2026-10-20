@@ -41,7 +41,7 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
     if (!isOpen && !submittedRef.current) activeRequestRef.current?.abort();
   }, [isOpen]);
 
-  const handleSingleCollect = async () => {
+  const handleSingleCollect = async (refresh = forceRefresh) => {
     if (activeRequestRef.current || !isOpenRef.current) return;
     const candidates = extractUrlsFromRawText(singleInput.trim());
     if (candidates.length !== 1) {
@@ -64,6 +64,8 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
       return;
     }
 
+    if (refresh && !window.confirm('重新采集会跳过缓存并调用外部接口，可能产生计费。成功后将替换当前采集素材，是否继续？')) return;
+    setForceRefresh(false);
     const request = new AbortController();
     activeRequestRef.current = request;
     submittedRef.current = false;
@@ -71,7 +73,7 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
     setSingleInput(query);
     const isCurrent = () => activeRequestRef.current === request && !request.signal.aborted && aliveRef.current;
     try {
-      const result = await collectSourceMedia(query, platform, forceRefresh, socialRateLimiterRef.current, request.signal, {
+      const result = await collectSourceMedia(query, platform, refresh, socialRateLimiterRef.current, request.signal, {
         shouldStop: () => !isOpenRef.current || !aliveRef.current,
         onSubmitted: () => { submittedRef.current = true; },
         preferredScraper,
@@ -83,8 +85,8 @@ export function useSingleCollect({ isOpen = true, showToast, saveToCollectorHist
       setSingleImageFilter('all');
       setAiAssistantPrompt('');
       saveToCollectorHistory?.(result);
-      const apiBadge = result.apiUsed ? ` [${result.apiUsed}]` : '';
-      if (isOpenRef.current) showToast(`已采集「${result.title}」：${result.images.length} 张图片${result.videos?.length ? ` + ${result.videos.length} 条原视频/动态` : ''}${apiBadge}`);
+      const apiBadge = [result.fromCache === true ? '缓存结果' : result.fromCache === false ? '本次接口采集' : '', result.apiUsed, result.detailsMissing ? '接口未返回详情图' : ''].filter(Boolean).join(' · ');
+      if (isOpenRef.current) showToast(`已采集「${result.title}」：${result.images.length} 张图片${result.videos?.length ? ` + ${result.videos.length} 条原视频/动态` : ''}${apiBadge ? ` · ${apiBadge}` : ''}`);
     } catch (error) {
       if (isCurrent() && isOpenRef.current) showToast(`采集失败：${formatUserError(error, '请检查链接与网络')}`);
     } finally {

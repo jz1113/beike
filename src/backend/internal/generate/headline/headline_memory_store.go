@@ -67,7 +67,11 @@ func finishCoverSample(ctx context.Context, db *sql.DB, workspace, id, status, d
 	return err
 }
 
-func insertCoverEntries(ctx context.Context, db *sql.DB, workspace string, entries []coverEntry) error {
+type coverExec interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func insertCoverEntries(ctx context.Context, db coverExec, workspace string, entries []coverEntry) error {
 	for _, entry := range entries {
 		if strings.TrimSpace(entry.Rule) == "" {
 			continue
@@ -195,34 +199,28 @@ func clearCoverTrash(ctx context.Context, db *sql.DB, workspace string) error {
 	return err
 }
 
-func adoptedCoverLines(ctx context.Context, db *sql.DB, workspace string) ([]string, []string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT "id","branch","rule","source" FROM "CoverMemoryEntry"
-		WHERE "workspaceId"=? AND "status"='adopted'
-		ORDER BY CASE WHEN "source"='correction' OR "branch"='correction' THEN 0 ELSE 1 END, "useCount" DESC, "createdAt" DESC
-		LIMIT 24`, workspace)
+func saveCoverDeconstruction(ctx context.Context, db *sql.DB, workspace, id, deconstruction string, entries []coverEntry) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	defer rows.Close()
-	lines := []string{}
-	ids := []string{}
-	for rows.Next() {
-		var id, branch, rule, source string
-		if err := rows.Scan(&id, &branch, &rule, &source); err != nil {
-			return nil, nil, err
-		}
-		rule = strings.TrimSpace(rule)
-		if rule == "" {
-			continue
-		}
-		label := coverBranchLabel(branch)
-		if source == "correction" {
-			label = "纠正"
-		}
-		lines = append(lines, "- ["+label+"] "+rule)
-		ids = append(ids, id)
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE "CoverMemorySample" SET "status"=?, "deconstruction"=?, "error"='', "updatedAt"=?
+		WHERE "id"=? AND "workspaceId"=? AND "status"='running'`, "completed", deconstruction, coverNow(), id, workspace)
+	if err != nil {
+		return err
 	}
-	return lines, ids, rows.Err()
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return fmt.Errorf("样张状态已变化")
+	}
+	if err := insertCoverEntries(ctx, tx, workspace, entries); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func recordCoverUsage(ctx context.Context, db *sql.DB, workspace, batchID, itemID, title string, entryIDs []string, design map[string]string) error {
@@ -291,9 +289,29 @@ func coverRuleOf(value any) (string, string) {
 	case string:
 		return strings.TrimSpace(item), ""
 	case map[string]any:
-		rule, _ := item["rule"].(string)
-		evidence, _ := item["evidence"].(string)
-		return strings.TrimSpace(rule), strings.TrimSpace(evidence)
+		method := strings.TrimSpace(textOf(item["method"]))
+		observation := strings.TrimSpace(textOf(item["observation"]))
+		uncertainty := strings.TrimSpace(textOf(item["uncertainty"]))
+		rule := strings.TrimSpace(textOf(item["rule"]))
+		evidence := strings.TrimSpace(textOf(item["evidence"]))
+		if method != "" || observation != "" {
+			chosen := method
+			if chosen == "" {
+				chosen = observation
+			}
+			parts := []string{}
+			if observation != "" {
+				parts = append(parts, observation)
+			}
+			if uncertainty != "" {
+				parts = append(parts, "不确定："+uncertainty)
+			}
+			if evidence != "" {
+				parts = append(parts, evidence)
+			}
+			return chosen, strings.Join(parts, "；")
+		}
+		return rule, evidence
 	default:
 		return "", ""
 	}

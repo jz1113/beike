@@ -1,4 +1,4 @@
-import { BrainCircuit, Brush, Check, History, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, X } from 'lucide-react';
+import { BookOpen, BrainCircuit, Brush, Check, History, Layers, Loader2, Package, Play, Plus, RotateCcw, Settings2, Square, X } from 'lucide-react';
 import Dock, { type DockItemData } from '@client/shared/ui/Dock';
 import { ToolSuiteMark } from '@client/shared/icons';
 
@@ -15,9 +15,13 @@ interface Props {
   hasItems: boolean;
   historyCount: number;
   isNewBatchConfirming: boolean;
+  isFeeding: boolean;
+  adoptedCount: number;
+  pendingMemoryCount: number;
   onOpenSettings: () => void;
-  onOpenRules?: () => void;
-  onOpenMemory?: () => void;
+  onOpenRules: () => void;
+  onOpenMemory: () => void;
+  onOpenFeed: () => void;
   onOpenHistory: () => void;
   onRetryFailed: () => void;
   onExport: () => void;
@@ -30,12 +34,12 @@ interface Props {
 
 export function PosterToolbar({
   onBack, failedCount, completedCount, pendingCount, isRunning, isExporting,
-  isRestoring, isImporting, isReady, hasItems, historyCount, isNewBatchConfirming, onOpenSettings, onOpenRules, onOpenMemory, onOpenHistory, onRetryFailed, onExport, onStartBatch, onStop,
+  isRestoring, isImporting, isReady, hasItems, historyCount, isNewBatchConfirming, isFeeding, adoptedCount, pendingMemoryCount, onOpenSettings, onOpenRules, onOpenMemory, onOpenFeed, onOpenHistory, onRetryFailed, onExport, onStartBatch, onStop,
   onRequestNewBatch, onCancelNewBatch, onConfirmNewBatch,
 }: Props) {
   const isBusy = !isReady || isRunning || isExporting || isRestoring || isImporting;
   const dockButtonClass = '!border-slate-200 !bg-white !text-slate-950 shadow-sm hover:!border-slate-300 hover:!bg-slate-50 dark:!border-white/10 dark:!bg-[#1B1B1E] dark:!text-white dark:hover:!bg-[#26262B] dark:hover:!border-white/20';
-  const handleOpenAction = onOpenMemory || onOpenRules;
+  const memoryLabel = pendingMemoryCount > 0 ? `封面记忆 · 已采纳 ${adoptedCount} · 待确认 ${pendingMemoryCount}` : `封面记忆 · 已采纳 ${adoptedCount}`;
   const generationControl: DockItemData = isRunning
     ? { icon: <Square className="h-4 w-4 fill-current" />, label: '停止生成', onClick: onStop, className: dockButtonClass }
     : failedCount > 0 && pendingCount === 0
@@ -58,7 +62,12 @@ export function PosterToolbar({
         <span className="text-sm font-black tracking-tight">封面生成</span>
       </button>
       <div className="contents sm:ml-auto sm:flex sm:max-w-full sm:items-center sm:justify-end sm:gap-2">
-        <button type="button" onClick={handleOpenAction} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/40 px-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-indigo-500/10" aria-label="封面记忆" title="投喂样张，反推排版并采纳进封面技能"><BrainCircuit className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" /><span className="hidden sm:inline">封面记忆</span></button>
+        <button type="button" onClick={onOpenRules} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-bold text-slate-600 shadow-sm transition hover:border-amber-300 hover:bg-white hover:text-slate-950 dark:border-amber-400/70 dark:bg-[#1B1B1E]/90 dark:text-slate-200 dark:hover:border-amber-300 dark:hover:bg-[#26262B] dark:hover:text-white" aria-label="封面规则" title="查看封面生成和样张反推规则">
+          <BookOpen className="h-4 w-4" />
+          封面规则
+        </button>
+        <button type="button" onClick={onOpenFeed} disabled={isFeeding} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/20 disabled:cursor-wait disabled:opacity-70" aria-label={isFeeding ? '反推中' : '投喂样张'} title="把封面样张交给小怪兽，逐张反推自己的特点">{isFeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}<span className="hidden sm:inline">{isFeeding ? '反推中' : '投喂样张'}</span></button>
+        <button type="button" onClick={onOpenMemory} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/20" aria-label={memoryLabel} title="查看已采纳的封面记忆"><BrainCircuit className="h-4 w-4" /><span className="hidden sm:inline">{memoryLabel}</span></button>
         <div className="ml-auto max-w-full">
         {isNewBatchConfirming ? (
           <div className="flex items-center gap-2 rounded-2xl border border-rose-300/30 bg-[#121116] p-2 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)]">

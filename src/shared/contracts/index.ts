@@ -1,3 +1,4 @@
+export * from './textRouting';
 export * from './generate';
 export * from './imageRequestTemplate';
 export * from './coverMemory';
@@ -13,3 +14,4 @@ export * from './deconstructJobs';
 export * from './pptGeneration';
 export * from './videoSales';
 export * from './avatar';
+export * from './pets';

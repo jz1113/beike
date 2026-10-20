@@ -45,18 +45,18 @@ func TestDashscopeRoutesSyncAndAsync(t *testing.T) {
 		t.Fatalf("sync body %s", sawBody)
 	}
 
-	qwenAsync, err := (dashscopeImageProtocol{}).Submit(imageRequest{
+	qwenSync, err := (dashscopeImageProtocol{}).Submit(imageRequest{
 		Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-3.0-pro",
 		Prompt: "海报", Size: "3:4", Quality: "high", Strength: "high", Negative: "模糊",
 	})
-	if err != nil || qwenAsync.TaskID != "task-1" || qwenAsync.Direct != "" {
-		t.Fatalf("qwen async %#v %v", qwenAsync, err)
+	if err != nil || qwenSync.Direct != "https://cdn.example/a.png" || qwenSync.TaskID != "" {
+		t.Fatalf("qwen sync %#v %v", qwenSync, err)
 	}
-	if sawPath != "/api/v1/services/aigc/image-generation/generation" || sawAsync != "enable" {
-		t.Fatalf("qwen async path %s header %s", sawPath, sawAsync)
+	if sawPath != "/api/v1/services/aigc/multimodal-generation/generation" || sawAsync != "" {
+		t.Fatalf("qwen sync path %s header %s", sawPath, sawAsync)
 	}
 	if !strings.Contains(sawBody, `"size":"1488*2048"`) || !strings.Contains(sawBody, `"enable_thinking":true`) || !strings.Contains(sawBody, `"negative_prompt":"模糊"`) {
-		t.Fatalf("qwen async body %s", sawBody)
+		t.Fatalf("qwen sync body %s", sawBody)
 	}
 
 	asyncResult, err := (dashscopeImageProtocol{}).Submit(imageRequest{

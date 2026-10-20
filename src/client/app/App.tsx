@@ -17,6 +17,7 @@ import AppErrorBoundary from '@client/shared/ui/AppErrorBoundary';
 import GlobalContextMenu from '@client/app/context-menu/GlobalContextMenu';
 import { ConfirmDialogHost } from '@client/shared/ui/ConfirmDialogHost';
 import { DeconstructJobsHost } from '@client/app/DeconstructJobsHost';
+import { AppPetHost } from '@client/app/AppPetHost';
 import { GeneratingEffectsProvider } from '@client/shared/ui/AIGeneratingCard';
 import { ViewKeepAlivePanel } from '@client/app/ViewKeepAlive';
 import { useMountedAfterFirstOpen } from '@client/app/hooks/useMountedAfterFirstOpen';
@@ -303,7 +304,7 @@ export default function App() {
 
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
                   <AppErrorBoundary title="带货剪手工作室异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <VideoSalesStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                    <VideoSalesStudio onBack={() => setCurrentView('home')} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -324,6 +325,7 @@ export default function App() {
 
       {/* 🌟 全局桌面级上下文右键菜单（接管图片/视频快捷操作，彻底消除检查元素与冗余项） */}
       <GlobalContextMenu />
+      <AppPetHost />
       <DeconstructJobsHost />
       <ConfirmDialogHost />
 

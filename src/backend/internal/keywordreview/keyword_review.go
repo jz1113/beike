@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	reviewsvc "beike.local/cloud/src/backend/internal/keywordreview/review"
 	"beike.local/cloud/src/backend/internal/platform/database"
@@ -46,6 +47,14 @@ func executeKeywordReview(cfg config.Config, r *http.Request, client *http.Clien
 	if message != "" {
 		return guardedResult{status: http.StatusBadRequest, body: map[string]any{"success": false, "error": message}}
 	}
+	protocol, protocolErr := generate.RequestTextProtocol(r, parsed)
+	if protocolErr != nil {
+		return guardedResult{status: http.StatusBadRequest, body: map[string]any{"success": false, "error": protocolErr.Error()}}
+	}
+	// Persist the resolved override in the guarded input as headers are not hashed.
+	if protocol != "" {
+		parsed["textProtocol"] = protocol
+	}
 	if lookupRequested(parsed) {
 		return guardedResult{status: http.StatusBadRequest, body: map[string]any{"success": false, "error": "联网补查已暂停：当前接口不会执行网页搜索。请关闭补查后重试。"}}
 	}
@@ -63,7 +72,7 @@ func executeKeywordReview(cfg config.Config, r *http.Request, client *http.Clien
 			return ruleStatus, ruleBody
 		}
 		reviewed, err := reviewsvc.Review(context.WithoutCancel(r.Context()), client, reviewsvc.Input{
-			BaseURL: baseURL, APIKey: apiKey, Model: model, Provider: provider, Mode: mode, Rows: rows, Rules: rules,
+			TextProtocol: protocol, BaseURL: baseURL, APIKey: apiKey, Model: model, Provider: provider, Mode: mode, Rows: rows, Rules: rules,
 		})
 		return keywordReviewResult(provider, reviewed, err)
 	})

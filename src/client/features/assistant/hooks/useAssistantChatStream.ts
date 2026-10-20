@@ -1,3 +1,4 @@
+import { generationBatchContext, generationPromptSources } from '@client/shared/agent/generationBatchSources';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { persistAssistantImages } from '../api/persistAssistantImages';
@@ -6,7 +7,7 @@ import { apiFetch } from '@client/shared/api/apiClient';
 import { recordAssistantChatUsage } from '../model/assistantUsage';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { buildBrandKitSystemPrompt } from '@shared/domain/products/brandKitModels';
-import { composeSkillRuntime } from '@shared/domain/assistant/skills';
+import { composeSkillCatalog, composeSkillRuntime, withSkillFileTool } from '@shared/domain/assistant/skills';
 import { useAppStore, AssistantMessage, MediaAttachment } from '@client/store';
 import { useAssistantTurn } from '@client/features/assistant/hooks/useAssistantTurn';
 import type { PendingApproval } from '@client/features/assistant/model/assistantTurnTypes';
@@ -86,8 +87,6 @@ export function useAssistantChatStream({
   const { runTurn, handleApprovalDecision, getItems, turnIdRef } = useAssistantTurn();
   const runTurnHook = useMemo(() => ({ getItems }), [getItems]);
 
-  useEffect(() => () => abortControllerRef.current?.abort(), []);
-
   const isSending = Boolean(sendingSessionId);
   const isSendingCurrent = sendingSessionId === currentSession?.id;
 
@@ -165,8 +164,18 @@ export function useAssistantChatStream({
     const selectedRuntime = composeSkillRuntime(selectedSkill);
     const usedSkill = retryUserMsg
       ? retryUserMsg.usedSkill
-      : selectedRuntime ? { ...selectedRuntime, name: selectedSkill.displayName || selectedSkill.name } : undefined;
+      : selectedSkill && selectedRuntime ? {
+          name: selectedSkill.displayName || selectedSkill.name,
+          skillId: selectedRuntime.skillId,
+          systemPrompt: selectedRuntime.systemPrompt,
+          allowedTools: selectedRuntime.allowedTools,
+        } : undefined;
     const skillRuntime = usedSkill;
+    const allSkills = useAppStore.getState().getAllAssistantSkills();
+    const skillResources = composeSkillRuntime(
+      allSkills.find((item) => item.id === skillRuntime?.skillId),
+    )?.resources;
+    const skillCatalog = composeSkillCatalog(allSkills);
 
     // 绑定发送时会话，避免中途切换导致串台
     const sessionId = currentSession.id;
@@ -277,7 +286,6 @@ export function useAssistantChatStream({
       addAssistantMessage(sessionId, placeholderMsg);
     }
 
-    setSendingSessionId(sessionId);
     setStreamingAssistantMsgId(assistantMsgId);
     turnIdRef.current = null;
 
@@ -300,11 +308,14 @@ export function useAssistantChatStream({
         referenceScope: userMsg.referenceScope || 'auto',
         systemPrompt: combinedSystemPrompt,
         skillId: skillRuntime?.skillId,
-        allowedTools: sessionAllowedTools === undefined
+        allowedTools: withSkillFileTool(sessionAllowedTools === undefined
           ? skillRuntime?.allowedTools
-          : skillRuntime?.allowedTools === undefined ? sessionAllowedTools : sessionAllowedTools.filter((name) => skillRuntime.allowedTools!.includes(name)),
+          : skillRuntime?.allowedTools === undefined ? sessionAllowedTools : sessionAllowedTools.filter((name) => skillRuntime.allowedTools!.includes(name)), skillResources),
+        skillResources,
+        skillCatalog,
         language: selectedLang,
         clientContext: {
+          generationBatches: generationBatchContext(generationPromptSources(useAppStore.getState(), 'assistant', sessionId, assistantMsgId)),
           currentView,
           workshopStep: currentStep,
           productTitle: product?.title,

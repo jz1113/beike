@@ -41,7 +41,7 @@ func TestTurnExecutesToolsAndPersists(t *testing.T) {
 	}
 	_ = db.Close()
 	cfg := config.Config{DatabaseURL: "file:" + dbPath, Upstream: "http://127.0.0.1:1"}
-	body := `{"threadId":"thread-1","customBaseUrl":"` + upstream.URL + `","customApiKey":"test-key","messages":[{"role":"user","content":"请整理这段说明"}]}`
+	body := `{"threadId":"thread-1","textProtocol":"openai","customBaseUrl":"` + upstream.URL + `","customApiKey":"test-key","messages":[{"role":"user","content":"请整理这段说明"}]}`
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/turn/start", strings.NewReader(body))
 	StartTurn(cfg).ServeHTTP(response, request)

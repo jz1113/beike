@@ -16,7 +16,7 @@ interface Props {
   collectProgress: { total: number; current: number; success: number; failed: number };
   successfulItems: BatchProductItem[];
   handleParseInput: () => BatchProductItem[];
-  startBatchCollect: (itemsToCollect?: BatchProductItem[]) => Promise<void>;
+  startBatchCollect: (itemsToCollect?: BatchProductItem[], forceRefresh?: boolean) => Promise<void>;
   handleRemoveItem: (id: string) => void;
   onPreviewImage?: (url: string) => void;
   onNextStage: () => void;
@@ -152,8 +152,9 @@ export default function BatchStage1Collect({
       {/* 🌟 采编清单与图库状态 (采集后成为大画幅核心主角) */}
       {items.length > 0 && !isAddingProducts && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200/60 px-1 pb-2 dark:border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/60 px-1 pb-2 dark:border-white/10">
             <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-slate-100">采编清单与图库状态</h3>
+            {successfulItems.length > 0 && <button type="button" disabled={isCollecting} title="跳过缓存，可能产生接口计费；保留已有提示词与成片" onClick={() => void startBatchCollect(successfulItems, true)} className="rounded-xl border border-amber-300 px-3 py-2 text-xs font-bold text-amber-700 disabled:opacity-50 dark:text-amber-300">重新采集已成功商品（可能计费）</button>}
             {(isCollecting || items.some(item => item.status === 'pending' || item.status === 'failed')) && (
               <button type="button" disabled={isCollecting} onClick={() => void startBatchCollect()}
                 className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">

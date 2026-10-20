@@ -8,6 +8,7 @@ import {
   collectedVideos,
   handleImgError,
 } from '@client/features/collect/model/collectorTypes';
+import { CollectionSourceStatus } from './CollectionSourceStatus';
 
 export interface BatchTaskCardProps {
   task: BatchTaskItem;
@@ -78,7 +79,8 @@ const BatchTaskCard = memo(function BatchTaskCard({
               </span>
             )}
           </div>
-          {task.status === 'failed' && task.error && (
+          <CollectionSourceStatus fromCache={task.fromCache} apiUsed={task.apiUsed} detailsMissing={task.detailsMissing} />
+          {task.error && (
             <p className="text-[11px] text-rose-600 dark:text-rose-400 break-words mt-0.5" role="alert">
               失败原因: {task.error}
             </p>
@@ -104,6 +106,9 @@ const BatchTaskCard = memo(function BatchTaskCard({
             <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
             <span>采集成功</span>
           </span>
+        )}
+        {task.status === 'success' && (
+          <button type="button" onClick={handleRetry} disabled={retryDisabled} title="跳过缓存调用接口，可能产生计费" className="text-xs font-semibold text-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-indigo-300">重新采集（可能计费）</button>
         )}
         {task.status === 'failed' && (
           <button

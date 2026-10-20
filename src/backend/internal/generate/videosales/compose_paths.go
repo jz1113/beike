@@ -14,6 +14,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/platform/storage"
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 var composeProjectID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
@@ -36,13 +37,18 @@ func prepareComposeOutput(workspace, projectID string) (string, string, error) {
 	return dir, "/storage/" + rel, nil
 }
 
-func materializeComposeInputs(ctx context.Context, payload *ComposePayload, destDir string) error {
+func materializeComposeInputs(ctx context.Context, root string, payload *ComposePayload, destDir string) error {
 	for i := range payload.Clips {
 		local, err := resolveComposeMedia(ctx, payload.Clips[i].FilePath, destDir, fmt.Sprintf("clip_%d", i))
 		if err != nil {
 			return fmt.Errorf("片段 %d：%w", i+1, err)
 		}
 		payload.Clips[i].FilePath = local
+		if payload.Clips[i].Type == "video" && payload.Clips[i].HasAudio && strings.TrimSpace(payload.Clips[i].AudioURL) == "" {
+			if probed, probeErr := system.ProbeVideo(root, local); probeErr == nil {
+				payload.Clips[i].HasAudio = probed.HasAudio
+			}
+		}
 		if strings.TrimSpace(payload.Clips[i].AudioURL) == "" {
 			continue
 		}
@@ -74,10 +80,9 @@ func resolveComposeMedia(ctx context.Context, raw, destDir, name string) (string
 	if strings.HasPrefix(raw, "data:") {
 		return writeDataURL(raw, destDir, name)
 	}
-	rel := strings.TrimPrefix(raw, "/storage/")
-	rel = strings.TrimPrefix(rel, "/")
-	if filepath.IsAbs(raw) || strings.Contains(rel, "..") {
-		return "", errors.New("只允许存储目录内的相对路径或 http(s) 链接")
+	rel, relErr := storageRelative(raw)
+	if relErr != nil {
+		return "", relErr
 	}
 	full := storage.SafeWithin(storage.ResolveRoot(), rel)
 	if full == "" {
@@ -88,6 +93,24 @@ func resolveComposeMedia(ctx context.Context, raw, destDir, name string) (string
 		return "", errors.New("素材文件不存在")
 	}
 	return full, nil
+}
+
+func storageRelative(raw string) (string, error) {
+	if filepath.IsAbs(raw) && !strings.HasPrefix(raw, "/storage/") {
+		return "", errors.New("只允许存储目录内的相对路径或 http(s) 链接")
+	}
+	rel := raw
+	switch {
+	case strings.HasPrefix(rel, "/storage/"):
+		rel = strings.TrimPrefix(rel, "/storage/")
+	case strings.HasPrefix(rel, "storage/"):
+		rel = strings.TrimPrefix(rel, "storage/")
+	}
+	rel = strings.TrimPrefix(rel, "/")
+	if rel == "" || rel == "." || filepath.IsAbs(rel) || strings.Contains(rel, "..") {
+		return "", errors.New("只允许存储目录内的相对路径或 http(s) 链接")
+	}
+	return rel, nil
 }
 
 func writeDataURL(raw, destDir, name string) (string, error) {

@@ -195,6 +195,7 @@ export const usePptStore = create<PptState>((set, get) => ({
         language: state.language,
         currentOutline: state.outlinePages,
         model: state.selectedChatModel ? route.modelId || undefined : undefined,
+        textProtocol: route.textProtocol,
         customBaseUrl: route.baseUrl || undefined,
         customApiKey: route.apiKey || undefined,
         allowFallback,
@@ -225,6 +226,7 @@ export const usePptStore = create<PptState>((set, get) => ({
         detailLevel: state.detailLevel,
         language: state.language,
         model: state.selectedChatModel ? route.modelId || undefined : undefined,
+        textProtocol: route.textProtocol,
         customBaseUrl: route.baseUrl || undefined,
         customApiKey: route.apiKey || undefined,
         renderMode: state.renderMode,
@@ -394,6 +396,7 @@ export const usePptStore = create<PptState>((set, get) => ({
           contentText: p.detail.contentText,
         })),
         model: state.selectedChatModel ? route.modelId || undefined : undefined,
+        textProtocol: route.textProtocol,
         customBaseUrl: route.baseUrl || undefined,
         customApiKey: route.apiKey || undefined,
       });

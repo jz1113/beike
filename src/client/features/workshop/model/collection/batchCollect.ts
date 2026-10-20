@@ -1,3 +1,4 @@
+import { normalizeCollectedProductImages } from '@shared/domain/collection/productImages';
 import { apiFetch } from '../../../../shared/api/apiClient';
 import type { BatchProductItem, TypedProductImage } from '../batchTypes';
 
@@ -84,41 +85,14 @@ export interface BuildTypedListResult {
 /**
  * 将接口返回的商品图片列表整合为带类型的图片分类池（纯函数）
  */
-export function buildTypedList(prod: any): BuildTypedListResult {
-  const mainImgs: string[] =
-    Array.isArray(prod?.mainImages) && prod.mainImages.length > 0
-      ? prod.mainImages
-      : prod?.picUrl
-        ? [prod.picUrl]
-        : [];
-  const skuImgs: string[] = Array.isArray(prod?.skuImages) ? prod.skuImages : [];
-  let detailImgs: string[] = Array.isArray(prod?.detailImages) ? prod.detailImages : [];
-  if (detailImgs.length === 0 && prod?.detailUrls) {
-    try {
-      const parsed =
-        typeof prod.detailUrls === 'string' ? JSON.parse(prod.detailUrls) : prod.detailUrls;
-      if (Array.isArray(parsed)) detailImgs = parsed;
-      else if (Array.isArray(parsed?.images)) detailImgs = parsed.images;
-    } catch {}
-  }
-  const cleanCover = prod?.picUrl || mainImgs[0] || '';
-
-  const typedList: TypedProductImage[] = [];
-  const seenUrls = new Set<string>();
-
-  const addImg = (url: string, type: 'main' | 'sku' | 'detail') => {
-    if (url && !seenUrls.has(url)) {
-      seenUrls.add(url);
-      typedList.push({ url, type });
-    }
-  };
-
-  if (cleanCover) addImg(cleanCover, 'main');
-  mainImgs.forEach(u => addImg(u, 'main'));
-  skuImgs.forEach(u => addImg(u, 'sku'));
-  detailImgs.forEach(u => addImg(u, 'detail'));
-
-  return { typedList, cleanCover, mainImgs, skuImgs, detailImgs };
+export function buildTypedList(prod: Record<string, unknown>, images?: unknown): BuildTypedListResult {
+  const { mainImgs, skuImgs, descImgs, coverImg } = normalizeCollectedProductImages({ product: prod, images });
+  const typedList: TypedProductImage[] = [
+    ...mainImgs.map(url => ({ url, type: 'main' as const })),
+    ...skuImgs.map(url => ({ url, type: 'sku' as const })),
+    ...descImgs.map(url => ({ url, type: 'detail' as const })),
+  ];
+  return { typedList, cleanCover: coverImg, mainImgs, skuImgs, detailImgs: descImgs };
 }
 
 export interface CollectProgress {
@@ -132,6 +106,7 @@ export interface RunBatchCollectDeps {
   onItemUpdate: (id: string, patch: Partial<BatchProductItem>) => void;
   onProgress: (progress: CollectProgress) => void;
   concurrency?: number;
+  forceRefresh?: boolean;
 }
 
 /**
@@ -158,7 +133,7 @@ export async function runBatchCollect(
           body: JSON.stringify({
             url: item.url || item.itemId,
             platform: 'auto',
-            forceRefresh: item.status === 'failed',
+            forceRefresh: deps.forceRefresh ?? item.status === 'failed',
           }),
         });
 
@@ -166,7 +141,7 @@ export async function runBatchCollect(
 
         if (res.ok && data.success && data.product) {
           const prod = data.product;
-          const { typedList, cleanCover, mainImgs, skuImgs, detailImgs } = buildTypedList(prod);
+          const { typedList, cleanCover, mainImgs, skuImgs, detailImgs } = buildTypedList(prod, data.images);
           if (typedList.length === 0) {
             deps.onItemUpdate(item.id, { status: 'failed', errorMsg: '采集成功但没有可用图片', selected: false });
             failedCount++;
@@ -184,6 +159,8 @@ export async function runBatchCollect(
             skuImages: skuImgs,
             detailImages: detailImgs,
             props: prod.props || {},
+            fromCache: data.fromCache === true,
+            apiUsed: typeof data.apiUsed === 'string' ? data.apiUsed : undefined,
             status: 'success',
             selected: true,
             allTypedImages: typedList,

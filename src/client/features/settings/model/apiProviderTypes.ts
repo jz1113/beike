@@ -33,14 +33,14 @@ export const PROTOCOL_OPTIONS: { id: ApiProviderProtocol; label: string; formatH
   },
   {
     id: 'gemini',
-    label: 'Gemini (中转/兼容)',
-    formatHint: 'Gemini · /v1/chat/completions 或兼容中转路由',
+    label: 'Gemini 原生文本协议',
+    formatHint: '文本 / 图片理解 · Gemini generateContent（模型可显式覆盖）',
     defaultCatalog: '/v1/models',
   },
   {
     id: 'anthropic',
-    label: 'Claude / Anthropic (中转/兼容)',
-    formatHint: 'Claude · /v1/chat/completions 或兼容中转路由',
+    label: 'Claude / Anthropic 原生文本协议',
+    formatHint: '文本 / 图片理解 · Anthropic /v1/messages（模型可显式覆盖）',
     defaultCatalog: '/v1/models',
   },
   {
@@ -78,78 +78,30 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
     iconType: 'comfly',
     description: '企业级大模型聚合网关',
   },
-  {
-    id: 'gpt_best_gateway',
-    name: 'gpt-best 网关',
-    providerType: 'openai',
-    baseUrl: 'https://api.gpt-best.com',
-    apiKey: '',
-    enabled: true,
-    catalogPath: '/v1/models',
-    isRemovable: true,
-    websiteUrl: 'https://gpt-best.com',
-    serviceId: 'gpt_best_gateway',
-    iconType: 'comfly',
-    description: '全模态大模型聚合网关 (gpt-best.apifox.cn)',
-  },
-  {
-    id: 'openai_official',
-    name: 'OpenAI',
-    providerType: 'openai',
-    baseUrl: 'https://api.openai.com',
-    apiKey: '',
-    enabled: true,
-    catalogPath: '/v1/models',
-    isRemovable: true,
-    websiteUrl: 'https://platform.openai.com',
-    serviceId: 'openai_official',
-    iconType: 'openai',
-    description: 'OpenAI 官方与 Responses API',
-  },
-  {
-    id: 'deepseek_official',
-    name: 'DeepSeek',
-    providerType: 'openai',
-    baseUrl: 'https://api.deepseek.com',
-    apiKey: '',
-    enabled: true,
-    catalogPath: '/v1/models',
-    isRemovable: true,
-    websiteUrl: 'https://platform.deepseek.com',
-    serviceId: 'deepseek_official',
-    iconType: 'deepseek',
-    description: 'DeepSeek 官方推理与图像理解',
-  },
-  {
-    id: 'qianwen_platform',
-    name: '千问 AI 平台',
-    providerType: 'dashscope',
-    baseUrl: 'https://maas.qianwenaiapi.com',
-    apiKey: '',
-    enabled: true,
-    catalogPath: '/compatible-mode/v1/models',
-    isRemovable: true,
-    websiteUrl: 'https://platform.qianwenai.com',
-    serviceId: 'qianwen_platform',
-    iconType: 'qwen',
-    description: '千问图像原生接口与 compatible-mode 对话',
-  },
-  {
-    id: 'lianchi_images',
-    name: '联池图像接口',
-    providerType: 'openai',
-    baseUrl: 'https://api.gapnet.ai/endpoint',
-    apiKey: '',
-    enabled: true,
-    isRemovable: true,
-    serviceId: 'lianchi_images',
-    iconType: 'lianchi',
-    description: '文生图与图像编辑接口',
-  },
 ];
 
 export const API_REMOVED_PROVIDERS_KEY = 'beike_api_removed_providers_v2';
 const DEPRECATED_PROVIDER_IDS = new Set(['mita', 'soonstudio', 'google']);
+
+/** 不再默认展示。密钥为空且地址仍是原默认值时，从已存列表清掉。 */
+const RETIRED_BUILTIN_BASE_URLS: Record<string, string> = {
+  gpt_best_gateway: 'https://api.gpt-best.com',
+  openai_official: 'https://api.openai.com',
+  deepseek_official: 'https://api.deepseek.com',
+  qianwen_platform: 'https://maas.qianwenaiapi.com',
+  lianchi_images: 'https://api.gapnet.ai/endpoint',
+};
+
+function normalizeProviderBaseUrl(value: string | undefined): string {
+  return (value || '').trim().replace(/\/+$/, '');
+}
+
+function isUntouchedRetiredProvider(item: ApiProvider): boolean {
+  const defaultBase = RETIRED_BUILTIN_BASE_URLS[item.id];
+  if (!defaultBase) return false;
+  return !(item.apiKey || '').trim()
+    && normalizeProviderBaseUrl(item.baseUrl) === normalizeProviderBaseUrl(defaultBase);
+}
 
 export function loadStoredProviders(): ApiProvider[] {
   if (typeof window === 'undefined') return DEFAULT_PROVIDERS;
@@ -163,16 +115,24 @@ export function loadStoredProviders(): ApiProvider[] {
     const saved: ApiProvider[] = JSON.parse(savedRaw);
     if (!Array.isArray(saved)) return DEFAULT_PROVIDERS.filter(p => !removedIds.includes(p.id) && !DEPRECATED_PROVIDER_IDS.has(p.id));
 
-    // 合并内置预设，保持新增字段同步并清洗废弃项
+    // 合并内置预设，清掉废弃项和未配置的旧默认服务商
     const idMap = new Map<string, ApiProvider>();
+    const droppedRetired: string[] = [];
+    let droppedDeprecated = false;
     for (const item of saved) {
-      if (DEPRECATED_PROVIDER_IDS.has(item.id)) continue;
-      if (!removedIds.includes(item.id)) {
-        if (item.id === 'comfly_gateway' || item.id === 'gpt_best_gateway' || item.id === 'openai_official' || item.id === 'deepseek_official') {
-          item.providerType = 'openai';
-        }
-        idMap.set(item.id, item);
+      if (DEPRECATED_PROVIDER_IDS.has(item.id)) {
+        droppedDeprecated = true;
+        continue;
       }
+      if (removedIds.includes(item.id)) continue;
+      if (isUntouchedRetiredProvider(item)) {
+        droppedRetired.push(item.id);
+        continue;
+      }
+      if (item.id === 'comfly_gateway' || item.id === 'gpt_best_gateway' || item.id === 'openai_official' || item.id === 'deepseek_official') {
+        item.providerType = 'openai';
+      }
+      idMap.set(item.id, item);
     }
     for (const def of DEFAULT_PROVIDERS) {
       if (!removedIds.includes(def.id) && !DEPRECATED_PROVIDER_IDS.has(def.id) && !idMap.has(def.id)) {
@@ -180,8 +140,9 @@ export function loadStoredProviders(): ApiProvider[] {
       }
     }
     const result = Array.from(idMap.values());
-    if (saved.some(item => DEPRECATED_PROVIDER_IDS.has(item.id))) {
+    if (droppedDeprecated || droppedRetired.length > 0) {
       saveStoredProviders(result);
+      for (const id of droppedRetired) recordRemovedProvider(id);
     }
     return result;
   } catch {

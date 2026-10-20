@@ -8,7 +8,7 @@ export interface CollectorSinglePanelProps {
   setPreferredScraper?: (v: PreferredScraper) => void;
   singleInput: string;
   setSingleInput: (v: string) => void;
-  handleSingleCollect: () => void;
+  handleSingleCollect: (forceRefresh?: boolean) => void;
   isCollectingSingle: boolean;
   singleCollectedResult: any | null;
   selectedSingleImages: string[];

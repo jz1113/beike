@@ -24,6 +24,7 @@ func lookupImageTaskByKey(cfg config.Config, r *http.Request, key string) (keyed
 	err = db.QueryRowContext(r.Context(), `
 		SELECT "taskId", "status", "resultUrl", "failReason" FROM "ImageTask"
 		WHERE "workspaceId" = ? AND "idempotencyKey" = ?
+			AND COALESCE(NULLIF("mediaType", ''), 'image') = 'image'
 		ORDER BY "createdAt" DESC LIMIT 1`, httpx.WorkspaceFrom(r), key).Scan(&taskID, &status, &result, &reason)
 	if err == sql.ErrNoRows {
 		return keyedImageTask{}, nil

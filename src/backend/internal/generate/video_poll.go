@@ -32,7 +32,9 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		if !videoPollReady(data) {
 			continue
 		}
-		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, readVideoPoll(data), data))
+		parsed := readVideoPoll(data)
+		settleUnknownVideoTerminal(cfg, r, taskID, parsed, EncodeUsage(NormalizeUsage(data)))
+		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, parsed, data))
 		return
 	}
 	writeProbeMiss(cfg, w, r, taskID, "视频任务失败", "暂时无法查询云端视频任务状态")
@@ -80,19 +82,9 @@ func readVideoPoll(data map[string]any) pollParsed {
 	if done {
 		progress = "100%"
 	}
-	result := firstString(data, "video_url", "url")
-	if result == "" {
-		result = firstString(task, "video_url", "url")
-	}
-	if output, ok := data["output"].(map[string]any); ok && result == "" {
-		result = firstString(output, "video_url", "url")
-	}
+	result := extractVideoResult(data, task)
 	state := "IN_PROGRESS"
 	reason := ""
-	if done || result != "" {
-		state = "SUCCESS"
-		progress = "100%"
-	}
 	if isFailure(raw) || raw == "FAILED" {
 		state = "FAILURE"
 		progress = "0%"
@@ -104,8 +96,68 @@ func readVideoPoll(data map[string]any) pollParsed {
 			reason = "视频生成失败"
 		}
 		result = ""
+	} else if result != "" {
+		state = "SUCCESS"
+		progress = "100%"
+	} else if done {
+		progress = "90%"
+		reason = "成片地址尚未返回"
 	}
 	return pollParsed{status: state, result: result, reason: reason, progress: progress}
+}
+
+func extractVideoResult(roots ...map[string]any) string {
+	for _, root := range roots {
+		if root == nil {
+			continue
+		}
+		if url := firstString(root, "video_url", "url"); url != "" {
+			return url
+		}
+		if content, ok := root["content"].(map[string]any); ok {
+			if url := firstString(content, "video_url", "url"); url != "" {
+				return url
+			}
+		}
+		if output, ok := root["output"].(map[string]any); ok {
+			if url := firstString(output, "video_url", "url"); url != "" {
+				return url
+			}
+		}
+		if url := firstMediaURL(root["creations"]); url != "" {
+			return url
+		}
+		if url := firstMediaURL(root["videos"]); url != "" {
+			return url
+		}
+		if result, ok := root["task_result"].(map[string]any); ok {
+			if url := firstMediaURL(result["videos"]); url != "" {
+				return url
+			}
+			if url := firstString(result, "video_url", "url"); url != "" {
+				return url
+			}
+		}
+	}
+	return ""
+}
+
+func firstMediaURL(value any) string {
+	switch items := value.(type) {
+	case []any:
+		for _, item := range items {
+			obj, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if url := firstString(obj, "video_url", "url"); url != "" {
+				return url
+			}
+		}
+	case map[string]any:
+		return firstString(items, "video_url", "url")
+	}
+	return ""
 }
 
 func firstString(data map[string]any, keys ...string) string {

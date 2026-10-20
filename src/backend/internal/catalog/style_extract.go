@@ -1,10 +1,8 @@
 package catalog
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/system"
 )
@@ -20,6 +19,11 @@ import (
 var styleHTTP = func() *http.Client { return network.SafeClient() }
 
 func extractStyle(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
+	var ok bool
+	r, ok = generate.BindTextProtocol(w, r, payload)
+	if !ok {
+		return
+	}
 	images, _ := payload["imageUrls"].([]any)
 	if len(images) == 0 {
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "请至少提供 1 张参考风格图片"})
@@ -89,31 +93,21 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	if strings.HasPrefix(model, "deepseek-") {
 		body["thinking"] = map[string]any{"type": "disabled"}
 	}
-	encoded, _ := json.Marshal(body)
-	requestCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, system.ChatCompletionsURL(base), bytes.NewReader(encoded))
+	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
+		BaseURL: base, APIKey: key, Protocol: modelgw.TextProtocol(ctx, model), Payload: body,
+		Client: styleHTTP(), Timeout: 90 * time.Second,
+	})
 	if err != nil {
-		return "", 0, nil, err
+		return "", status, nil, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+key)
-	response, err := styleHTTP().Do(request)
-	if err != nil {
-		return "", 0, nil, err
-	}
-	defer response.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	var data map[string]any
-	_ = json.Unmarshal(raw, &data)
 	choices, _ := data["choices"].([]any)
 	if len(choices) == 0 {
-		return "", response.StatusCode, nil, nil
+		return "", status, nil, nil
 	}
 	choice, _ := choices[0].(map[string]any)
 	message, _ := choice["message"].(map[string]any)
 	text, _ := message["content"].(string)
-	return strings.TrimSpace(text), response.StatusCode, generate.NormalizeUsage(data), nil
+	return strings.TrimSpace(text), status, generate.NormalizeUsage(data), nil
 }
 
 func stylePrompt(hint string, count int) string {

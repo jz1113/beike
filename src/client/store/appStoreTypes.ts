@@ -13,6 +13,7 @@ export interface AgentTurnTaskData {
   thinking?: string;
   reply?: string;
   statusText?: string;
+  generationNotice?: string;
   steps?: Array<{
     id: string;
     category: string;
@@ -47,6 +48,8 @@ export interface AgentTurnTaskData {
 }
 
 export type GenerationTask = ContractGenerationTask & {
+  /** Original assistant deliverable; kept across generation history restoration. */
+  generationOrigin?: { sourceId: string; entryId: string };
   depthStyle?: DepthVideoStyle;
   /** Local cache fallback omitted input media; require restoration before a new attempt. */
   referenceMediaMissing?: boolean;

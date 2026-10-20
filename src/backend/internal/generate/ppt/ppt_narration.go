@@ -29,6 +29,11 @@ func PptNarration(cfg config.Config) http.Handler {
 			return
 		}
 
+		var ok bool
+		r, ok = generate.BindTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		rawPages, _ := payload["pages"].([]any)
 		if len(rawPages) == 0 {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "页面列表不能为空"})
@@ -95,7 +100,7 @@ func PptNarration(cfg config.Config) http.Handler {
 			}
 		}
 
-		if !wantsFallback(payload) {
+		if !wantsFallback(payload) || !generate.TextFallbackAllowed(r.Context(), model) {
 			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "讲稿模型调用失败，请检查模型与密钥后重试"})
 			return
 		}

@@ -1316,6 +1316,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/video-sales/finalize-prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_video_sales_finalize_prompts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/generate/video-sales/script": {
         parameters: {
             query?: never;
@@ -1332,6 +1348,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/video-sales/select-images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_video_sales_select_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1342,6 +1374,54 @@ export interface paths {
         get: operations["get_api_health"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_pets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pets/{id}/spritesheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_pets_id_spritesheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pets/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_pets_import"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1607,7 +1687,198 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** @description 文本及图片理解模型路由；模型级显式协议优先，auto按真实上游模型识别Gemini或Anthropic原生协议，不改变渠道地址与密钥，也不自动回退协议。 */
+        TextModelRoute: {
+            model?: string;
+            /**
+             * @default auto
+             * @enum {string}
+             */
+            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
+            customBaseUrl?: string;
+            customApiKey?: string;
+        };
+        AssistantTurnStartRequest: components["schemas"]["TextModelRoute"] & ({
+            messages: ({
+                /** @enum {string} */
+                role: "user" | "assistant" | "system";
+                content: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            /**
+             * @default medium
+             * @enum {string}
+             */
+            reasoningEffort: "auto" | "low" | "medium" | "high" | "xhigh";
+        } & {
+            [key: string]: unknown;
+        });
+        VideoSalesCatalogImage: {
+            index: number;
+            url: string;
+            role: string;
+        };
+        /** @description workflowVersion为3时imageCatalog与eligibleImageIndexes必填，保留原始编号，仅处理允许集合 */
+        VideoSalesWorkflowRequest: {
+            /** @enum {integer} */
+            workflowVersion?: 3;
+            imageCatalog?: components["schemas"]["VideoSalesCatalogImage"][];
+            eligibleImageIndexes?: number[];
+            selectedColor?: string;
+            model?: string;
+            customBaseUrl?: string;
+            customApiKey?: string;
+            /**
+             * @default auto
+             * @enum {string}
+             */
+            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
+        } & (unknown | unknown);
+        VideoSalesAnalyzeRequest: components["schemas"]["VideoSalesWorkflowRequest"] & {
+            imageUrls?: string[];
+            productName?: string;
+            brand?: string;
+            priceRange?: string;
+            productDescription?: string;
+            category?: string;
+        };
+        /** @enum {string} */
+        VideoSalesAspectRatio: "9:16" | "16:9" | "3:4" | "4:3" | "1:1" | "21:9";
+        VideoSalesScriptRequest: components["schemas"]["VideoSalesWorkflowRequest"] & ({
+            productName: string;
+            /** @enum {string} */
+            category?: "beauty" | "food" | "home" | "fashion" | "tech" | "other";
+            productDescription?: string;
+            productAnalysis?: string;
+            productImages?: string[];
+            targetDuration?: number;
+            aspectRatio?: components["schemas"]["VideoSalesAspectRatio"];
+            priceRange?: string;
+            brand?: string;
+            targetAudience?: string;
+            /** @enum {string} */
+            videoMode?: "product_closeup" | "graphic_montage" | "scene_demo" | "live_presenter";
+            platforms?: string[];
+            templateId?: string;
+            characterId?: string;
+            fashionReferences?: {
+                person: boolean;
+                face: boolean;
+                scene: boolean;
+            };
+        } & (unknown | unknown));
+        /** @description 按需1至4张，依赖只能指向前序素材；衣服上身图usesProduct必须为true */
+        VideoSalesPlannedAsset: {
+            id: string;
+            /** @enum {string} */
+            kind: "person" | "face" | "scene" | "keyframe";
+            label: string;
+            prompt: string;
+            required: boolean;
+            referenceAssetIds?: string[];
+            usesProduct?: boolean;
+        };
+        VideoSalesShot: {
+            shotId: number;
+            type?: string;
+            duration?: number;
+            description?: string;
+            camera?: string;
+            voiceover?: string;
+            prompt?: string;
+            imageIndex?: number;
+            visualSource?: string;
+            transition?: string;
+            selectionReason?: string;
+        };
+        /** @description 新版deliveryMode和assets必有，时长必须精确匹配请求，旧版返回结构保留 */
+        VideoSalesScript: {
+            id: string;
+            title: string;
+            beat?: string;
+            /** @enum {string} */
+            deliveryMode?: "single";
+            assets?: components["schemas"]["VideoSalesPlannedAsset"][];
+            totalDuration: number;
+            shots: components["schemas"]["VideoSalesShot"][];
+            seo?: {
+                [key: string]: unknown;
+            };
+            fullPrompt?: string;
+        };
+        VideoSalesSelectRequest: components["schemas"]["VideoSalesWorkflowRequest"] & {
+            shots: components["schemas"]["VideoSalesShot"][];
+        };
+        VideoSalesActualReference: {
+            id: string;
+            /** @enum {string} */
+            kind: "product" | "person" | "face" | "scene" | "keyframe";
+            label: string;
+            url: string;
+        };
+        VideoSalesFinalizeRequest: components["schemas"]["VideoSalesWorkflowRequest"] & ({
+            /** @enum {string} */
+            operation?: "validate-assets" | "finalize";
+            shots: (components["schemas"]["VideoSalesShot"] & Record<string, never>)[];
+            actualReferences?: components["schemas"]["VideoSalesActualReference"][];
+            assets?: components["schemas"]["VideoSalesPlannedAsset"][];
+            targetDuration?: number;
+            aspectRatio?: components["schemas"]["VideoSalesAspectRatio"];
+            videoModel?: string;
+            videoRefMode?: string;
+            videoResolution?: string;
+            productAnalysis?: string;
+            /** @enum {string} */
+            category?: "beauty" | "food" | "home" | "fashion" | "tech" | "other";
+            referenceOrder?: {
+                /** @enum {string} */
+                slot: "person" | "face" | "garment" | "scene";
+                label: string;
+                url: string;
+                imageIndex?: number;
+            }[];
+        } & (unknown | {
+            /** @enum {unknown} */
+            operation: "validate-assets";
+        } | {
+            /** @enum {unknown} */
+            operation: "finalize";
+        }));
+        VideoSalesAssetValidation: {
+            id: string;
+            /** @enum {string} */
+            status: "passed" | "conflict" | "uncertain";
+            reason: string;
+        };
+        VideoSalesFinalizeResponse: {
+            success: boolean;
+            model?: string;
+            validations?: components["schemas"]["VideoSalesAssetValidation"][];
+            fullPrompt?: string;
+            prompts?: {
+                shotId: number;
+                prompt: string;
+                imagePrompt?: string;
+            }[];
+            personImagePrompt?: string;
+            sceneImagePrompt?: string;
+        };
+        CollectVariantMetadata: {
+            /** @enum {integer} */
+            version: 1;
+            variants: {
+                id: string;
+                label: string;
+                color?: string;
+                skuIds: string[];
+                imageUrls: string[];
+            }[];
+            requestedSkuId?: string;
+            selectedVariantId?: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -1947,7 +2218,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantTurnStartRequest"];
+            };
+        };
         responses: {
             /** @description 沿用现有 JSON 或二进制响应 */
             200: {
@@ -2597,12 +2872,26 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 采集结果保留商品规格与颜色元数据 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        product?: {
+                            variantMetadata?: components["schemas"]["CollectVariantMetadata"];
+                        } & {
+                            [key: string]: unknown;
+                        };
+                        images?: {
+                            variantMetadata?: components["schemas"]["CollectVariantMetadata"];
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
             };
         };
     };
@@ -3639,14 +3928,25 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoSalesAnalyzeRequest"];
+            };
+        };
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 仅分析允许的商品图 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        analysis?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
             };
         };
     };
@@ -3668,7 +3968,89 @@ export interface operations {
             };
         };
     };
+    post_api_generate_video_sales_finalize_prompts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoSalesFinalizeRequest"];
+            };
+        };
+        responses: {
+            /** @description validate-assets 返回逐ID视觉校验，finalize 返回一条整段提示词，无operation仍走旧接口 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoSalesFinalizeResponse"];
+                };
+            };
+        };
+    };
     post_api_generate_video_sales_script: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoSalesScriptRequest"];
+            };
+        };
+        responses: {
+            /** @description 新版每套脚本包含单条视频交付模式及自动素材计划，旧请求兼容 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                        scripts: components["schemas"]["VideoSalesScript"][];
+                    };
+                };
+            };
+        };
+    };
+    post_api_generate_video_sales_select_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoSalesSelectRequest"];
+            };
+        };
+        responses: {
+            /** @description 只能选取模型实际查看过且在允许集合内的商品图片 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        assignments?: {
+                            shotId: number;
+                            imageIndex: number;
+                            reason: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    get_api_health: {
         parameters: {
             query?: never;
             header?: never;
@@ -3686,7 +4068,43 @@ export interface operations {
             };
         };
     };
-    get_api_health: {
+    get_api_pets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_pets_id_spritesheet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_pets_import: {
         parameters: {
             query?: never;
             header?: never;

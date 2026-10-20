@@ -1,4 +1,5 @@
 import { apiFetch } from '@client/shared/api/apiClient';
+import { catalogRequestProtocol } from '../model/catalogRequestProtocol';
 import { parseCodexCatalog } from '../model/codexCatalog';
 import { parseGatewayModels, type GatewayModelItem, type GatewayChannel } from '../model/gatewayModelCatalog';
 
@@ -60,7 +61,7 @@ export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
     try {
       const response = await apiFetch('/api/system/models/fetch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body), signal: request.signal,
+        body: JSON.stringify({ ...catalogRequestProtocol(body.providerType, body.catalogProtocol), ...body }), signal: request.signal,
       });
       const data = await response.json().catch(() => ({}));
       if (!request.current()) return;

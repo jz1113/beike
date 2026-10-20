@@ -8,11 +8,12 @@ func coverDirectorPrompt(original, cover, ratio, product, previous string, memor
 	builder.WriteString("画布比例 " + ratio + "。原标题：" + original + "。封面标题：" + cover + "。商品名：" + product + "。")
 	builder.WriteString("硬约束：商品水平居中，占画面高度 62%–74%；标题至少一行咬住商品上沿；标题保持给定的 7–12 个汉字并逐字使用；颜色不超过三色，一色属于商品，一色属于标题，一色属于背景；禁止在背景新增文字、数字、字母、Logo、价格、水印或二维码；商品本体的标识、型号和丝印必须保留。")
 	if len(memory) > 0 {
-		builder.WriteString("已采纳的封面记忆，纠正优先于样张共性：")
+		builder.WriteString("已采纳的封面记忆。纠正优先于这一张样张，不要把其他样张的特点混进来：")
 		builder.WriteString(strings.Join(memory, ""))
 		builder.WriteString("。设计必须遵守这些记忆；没有对应记忆的栏位按硬约束自行判断。")
 	} else {
-		builder.WriteString("当前没有已采纳的封面记忆。按硬约束完成七栏，可参考冷启动示例，但不要套用固定风格名。")
+		builder.WriteString("当前没有已采纳的封面记忆。按硬约束完成七栏。")
+		builder.WriteString(coverColdStart())
 	}
 	if strings.TrimSpace(previous) != "" {
 		builder.WriteString("本批上一张封面：" + strings.TrimSpace(previous) + "。variation 必须写出和上一张相比只改了哪一个决定。")
@@ -29,32 +30,30 @@ func coverDirectorPrompt(original, cover, ratio, product, previous string, memor
 	return builder.String()
 }
 
-func coverDeconstructPrompt(imageCount int) string {
-	shared := `每栏都是对象，包含 rule 和 evidence。rule 是一句可直接执行的设计规则；evidence 写这张图的哪个位置支持这句话。
-{
-  "layout": {"rule":"构图、主体占高、锚点和标题压住商品的哪一条边","evidence":"图上位置"},
-  "typeface": {"rule":"字族、字重、行数、字距和这一张只用的一套修饰","evidence":"图上位置"},
-  "textColor": {"rule":"标题色、描边或衬底色，以及字色如何迁就背景明度才能读清","evidence":"图上位置"},
-  "background": {"rule":"只一种背景材质、光从哪来、接触阴影、哪里留出均匀底给标题","evidence":"图上位置"},
-  "subject": {"rule":"商品或人物怎么摆、哪些识别点不能挡、人和手是否出现","evidence":"图上位置"},
-  "harmony": {"rule":"标题色、商品色、背景色如何只留三色，以及为什么这样好看","evidence":"图上位置"},
-  "variation": {"rule":"这组封面允许变化的槽；单张就写这张最值得记住的取舍","evidence":"图上位置"},
-  "summary": "一句话概括这套封面语法，不超过60字"
-}`
-	if imageCount > 1 {
-		return "你是封面设计导演。对比这 " + itoa(imageCount) + " 张同类封面，提炼可以复用的排版、字体、字色、背景和主体规则。严格只输出 JSON，不要解释。\n" + shared
-	}
-	return "你是封面设计导演。拆解这张封面的排版、字体、字色、背景和主体，供以后生成封面时遵守。严格只输出 JSON，不要解释。\n" + shared
+func coverColdStart() string {
+	return "冷启动示例只供起稿，不能覆盖硬约束，也不要套用固定风格名：" +
+		"美妆、穿搭、食品用米白纸纹和近黑超粗字，左上两行错位；" +
+		"反差和结论用商品色对角色面，近黑超粗字加一条短下划线；" +
+		"强品牌数码用近黑哑光底，暖白或黄色描边字压住产品；" +
+		"高端小家电用有方向的柔光，近黑标题压住产品；" +
+		"配件测评用浅冷几何，近黑标题顶边错位；" +
+		"洗护和家电用纸感留白加一种真实材质，近黑标题咬住商品。"
 }
 
-func itoa(value int) string {
-	if value == 0 {
-		return "0"
-	}
-	digits := []byte{}
-	for value > 0 {
-		digits = append([]byte{byte('0' + value%10)}, digits...)
-		value /= 10
-	}
-	return string(digits)
+func coverDeconstructPrompt() string {
+	return `你是封面样张反推。只看这一张封面，保留它自己的特点。不要总结成多张封面的共性，也不要把它写成以后每次生成都要照做的通用规则。不要套用主体居中、标题压住商品、颜色不超过三色、背景只有一种材质这些生成限制。原样张是什么就写什么。看不清就写不确定，不要猜具体字体名称、材质或精确参数。
+每栏都是对象，包含 observation、method、uncertainty。observation 写看得见的事实。method 写可以参考的做法，要能执行：位置、层级、字重、字距、颜色、遮挡和独有装饰。不要写风格名，也不要写好看、高级、杂志感。uncertainty 写看不清的地方，没有就留空。独有装饰写进对应栏，不要只留在 summary。
+harmony 写这张图实际的配色分工，颜色可以超过三色，它会并入字色记忆。
+variation 只写这一张最不同的一点，不会变成记忆条目。
+{
+  "layout": {"observation":"图上的构图和标题层级","method":"可以参考的位置、占位和咬合关系","uncertainty":""},
+  "typeface": {"observation":"标题的行数、字重、字距和修饰","method":"可以参考的排版做法","uncertainty":""},
+  "textColor": {"observation":"标题色和它所在的背景明度","method":"可以参考的字色关系","uncertainty":""},
+  "background": {"observation":"背景里实际看见的材质、光和层次","method":"可以参考的背景做法","uncertainty":""},
+  "subject": {"observation":"主体位置、遮挡关系和独有装饰","method":"可以参考的主体处理","uncertainty":""},
+  "harmony": {"observation":"这张图实际出现的颜色","method":"这些颜色各自承担什么","uncertainty":""},
+  "variation": {"observation":"这一张最不同的地方","method":"这个差别是什么","uncertainty":""},
+  "summary": "用不超过60字概括这一张，保留独有特点"
+}
+严格只输出 JSON，不要解释。`
 }

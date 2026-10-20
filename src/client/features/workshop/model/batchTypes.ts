@@ -72,6 +72,8 @@ export interface BatchProductItem {
   props: Record<string, string>;
   status: 'pending' | 'collecting' | 'success' | 'failed';
   errorMsg?: string;
+  fromCache?: boolean;
+  apiUsed?: string;
   selected: boolean;
 
   // 全量分类图片池

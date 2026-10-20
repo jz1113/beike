@@ -25,7 +25,7 @@ func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]
 		return failureResult(http.StatusBadRequest, message)
 	}
 	if err := ctx.Err(); err != nil {
-		return failureResult(499, "采集已取消")
+		return collectionContextResult(ctx)
 	}
 	if !input.forceRefresh {
 		if result, ok := cachedProduct(ctx, db, workspace, input); ok {
@@ -33,7 +33,7 @@ func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]
 		}
 	}
 	if err := ctx.Err(); err != nil {
-		return failureResult(499, "采集已取消")
+		return collectionContextResult(ctx)
 	}
 	if strings.TrimSpace(apiKey) == "" || strings.TrimSpace(apiSecret) == "" {
 		return Result{Status: http.StatusBadRequest, Body: missingCredential{false, "未配置万邦 (OneBound) 电商数据采集接口凭证。请在「设置 -> 服务接口配置」中填入您的万邦 API Key 和 Secret 后再使用。", "wanbang"}}
@@ -51,13 +51,18 @@ func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]
 	last := collectionFailure{error: "万邦接口未返回有效商品数据", status: http.StatusBadGateway}
 	for _, apiName := range apis {
 		if err := ctx.Err(); err != nil {
-			return failureResult(499, "采集已取消")
+			return collectionContextResult(ctx)
 		}
 		apiUsed = "万邦 OneBound 官方专线 (" + input.platform + "." + apiName + ")"
 		data, err := fetchWanbang(ctx, client, buildWanbangURL(input, apiName, apiKey, apiSecret))
 		if err != nil {
 			if ctx.Err() != nil {
-				return failureResult(499, "采集已取消")
+				return collectionContextResult(ctx)
+			}
+			var bodyErr wanbangBodyError
+			if errors.As(err, &bodyErr) {
+				last = wanbangBodyFailure(bodyErr)
+				break
 			}
 			var statusErr wanbangStatusError
 			if errors.As(err, &statusErr) {
@@ -76,7 +81,7 @@ func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]
 		}
 		candidate, _ := data["item"].(map[string]any)
 		code := stringify(data["error_code"])
-		if data["error"] != nil || candidate == nil || candidate["error"] != nil || (code != "" && code != "0000" && code != "0") {
+		if candidate == nil || (code != "" && code != "0000" && code != "0") || wanbangReportedError(data["error"]) || wanbangReportedError(candidate["error"]) {
 			last = wanbangFailure(data)
 			if last.stop {
 				break
@@ -87,9 +92,7 @@ func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]
 			last = titleFailure
 			break
 		}
-		candidateMain := cleanProductImages(append([]any{candidate["pic_url"]}, asAny(extractURLs(candidate["item_imgs"], true))...))
-		candidateDetails := cleanProductImages(asAny(extractURLs(candidate["desc_img"], false)))
-		candidateSkus := cleanProductImages(append(append(asAny(extractURLs(candidate["prop_imgs"], true)), asAny(extractURLs(candidate["props_img"], true))...), asAny(extractURLs(candidate["skus"], true))...))
+		candidateMain, candidateSkus, candidateDetails := extractProductImages(candidate)
 		if len(candidateMain) == 0 && len(candidateDetails) == 0 && len(candidateSkus) == 0 {
 			last = wanbangFailure(data)
 			continue
@@ -119,15 +122,19 @@ func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]
 	} else if len(combined) > 0 {
 		picURL = combined[0]
 	}
-	detail, err := json.Marshal(imagePayload{main, details, skus, props, price, brand, category})
+	variants := extractProductVariants(item, input, combined)
+	detail, err := json.Marshal(imagePayload{main, details, skus, props, price, brand, category, variants})
 	if err != nil {
 		return failureResult(http.StatusInternalServerError, "采集遇到未知异常")
 	}
 	id, createdAt, err := database.SaveCollectDetail(ctx, db, workspace, input.platform, input.itemID, title, picURL, string(detail))
 	if err != nil {
+		if ctx.Err() != nil {
+			return collectionContextResult(ctx)
+		}
 		return failureResult(http.StatusInternalServerError, "采集遇到未知异常")
 	}
-	return Result{Status: http.StatusOK, Body: freshProduct(id, input, title, price, category, brand, picURL, combined, main, details, skus, props, createdAt, apiUsed)}
+	return Result{Status: http.StatusOK, Body: freshProduct(id, input, title, price, category, brand, picURL, combined, main, details, skus, props, createdAt, apiUsed, variants)}
 }
 
 var buildWanbangURL = func(input productInput, apiName, apiKey, apiSecret string) string {
@@ -139,7 +146,7 @@ var buildWanbangURL = func(input productInput, apiName, apiKey, apiSecret string
 	if input.forceRefresh {
 		values.Set("cache", "no")
 	}
-	if input.platform == "jd" {
+	if input.platform == "jd" && apiName == "item_get" {
 		values.Set("domain_type", "jd")
 	} else if input.platform == "taobao" || input.platform == "1688" {
 		values.Set("is_promotion", "1")
@@ -149,6 +156,8 @@ var buildWanbangURL = func(input productInput, apiName, apiKey, apiSecret string
 
 func httpFailure(status int) collectionFailure {
 	switch status {
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
+		return collectionFailure{error: "万邦采集接口 HTTP 请求超时，请稍后重试", status: http.StatusGatewayTimeout, upstream: status}
 	case http.StatusTooManyRequests:
 		return collectionFailure{error: "万邦采集接口请求受限，请稍后重试", status: status, stop: true}
 	case http.StatusUnauthorized, http.StatusForbidden:

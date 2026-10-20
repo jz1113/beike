@@ -12,8 +12,8 @@ export type VideoSalesMode =
 /** 商品品类 */
 export type VideoSalesCategory = 'beauty' | 'food' | 'home' | 'fashion' | 'tech' | 'other';
 
-/** 脚本叙事风格 */
-export type VideoSalesStyleType = 'pain_point' | 'scene' | 'comparison' | 'story' | 'unboxing' | 'custom';
+/** 服饰成片叙事。只在服饰鞋包使用。 */
+export type VideoSalesFashionBeat = 'unbox' | 'lifestyle' | 'accessory';
 
 /** 分镜类型 (AIDA 销售链路) */
 export type VideoSalesShotType =
@@ -59,14 +59,23 @@ export interface VideoSalesShot {
   visualSource: VideoSalesVisualSource;
   transition: VideoSalesTransition;
   voiceover: string; // 播报文案（约每秒 3-4 字）
-  prompt?: string; // 英文生图/视频 Prompt
+  prompt?: string; // 图生视频画面提示词，不包含字幕或大字
+  imagePrompt?: string; // 场景镜静帧绘图提示词，按该镜脚本写成
+  finalPrompt?: string;
+  selectionReason?: string;
+  promptStale?: boolean;
+  imageIndex?: number; // 采集图目录中的参考图编号
+  referenceFrameUrl?: string; // 重绘完成后、提交视频前保存的场景参考图
   motion?: VideoSalesMotion; // 仅 product_image 有效
   textOverlay?: VideoSalesTextOverlay;
   characterId?: string; // 关联出镜人物
   avatarVoiceId?: string;
   audioUrl?: string;
   assetUrl?: string; // 实际使用的图片或视频 URL
-  status?: 'pending' | 'generating' | 'done' | 'failed';
+  taskId?: string;
+  modelDuration?: number;
+  failReason?: string;
+  status?: 'pending' | 'redrawing' | 'generating' | 'done' | 'failed' | 'uncertain';
 }
 
 /** 针对短视频算法的 SEO 交付物料 */
@@ -78,14 +87,33 @@ export interface VideoSalesSeo {
   description: string; // 发布描述详情（50字以内）
 }
 
+import type { SalesCreativeAsset, SalesVideoSnapshot } from './workflowTypes';
+
 /** 单套生成脚本 */
 export interface VideoSalesScript {
   id: string;
   title: string;
-  styleType: VideoSalesStyleType;
   totalDuration: number; // 秒
   shots: VideoSalesShot[];
   seo: VideoSalesSeo;
+  beat?: VideoSalesFashionBeat;
+  deliveryMode?: 'single';
+  workflowVersion?: 3;
+  planRevision?: string;
+  planStale?: boolean;
+  assets?: SalesCreativeAsset[];
+  assetValidation?: 'pending' | 'passed' | 'conflict' | 'uncertain';
+  finalizedRevision?: string;
+  renderSnapshot?: SalesVideoSnapshot;
+  renderResultUrl?: string;
+  renderError?: string;
+  fullPrompt?: string;
+  personImagePrompt?: string;
+  sceneImagePrompt?: string;
+  personFrameUrl?: string;
+  sceneFrameUrl?: string;
+  renderTaskId?: string;
+  renderStatus?: 'pending' | 'generating' | 'done' | 'failed' | 'uncertain';
 }
 
 /** 商品视觉分析结果 */
@@ -108,6 +136,11 @@ export interface VideoSalesProductAnalysis {
     keyVisuals: string[];
     suggestedStyle: string;
   };
+  knownFacts?: string[];
+  creativeNotes?: string[];
+  coveredImageCount?: number;
+  imageCount?: number;
+  degraded?: boolean;
 }
 
 /** 视频合成配置 */

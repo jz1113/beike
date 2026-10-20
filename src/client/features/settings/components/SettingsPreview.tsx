@@ -52,16 +52,6 @@ const CANVAS_CONTROLS: Record<CanvasSettingsPage, { title: string; blurb?: strin
   },
 };
 
-const PET_SPEC: { title: string; blurb?: string; controls: PreviewControl[] } = {
-  title: '麻衣桌宠',
-  controls: [
-    { kind: 'toggle', id: 'show', label: '显示桌宠', desc: '在画布上显示麻衣桌宠。', defaultOn: true },
-    { kind: 'segment', id: 'preview', label: '快捷预览', desc: '预览待机、跑动或视线动作。', options: ['待机', '跑动', '视线'] },
-    { kind: 'segment', id: 'size', label: '显示大小', desc: '画布上桌宠的显示尺寸。', options: ['小', '中', '大'], defaultIndex: 1 },
-    { kind: 'segment', id: 'link', label: '画布联动', desc: '关闭后暂停画布与任务通知。', options: ['全开', '仅生成', '关闭'] },
-  ],
-};
-
 const MODALITY_MODELS: Record<'three_d' | 'music' | 'voice', { title: string; models: { name: string; id: string }[] }> = {
   three_d: { title: '3D', models: [{ name: 'Hunyuan 3D Pro', id: 'hunyuan-3d-pro' }, { name: 'Hunyuan 3D Rapid', id: 'hunyuan-3d-rapid' }] },
   music: { title: '音乐', models: [{ name: 'Suno V6', id: 'suno-v6' }, { name: 'Suno V6 Wild', id: 'suno-v6-wild' }] },
@@ -137,20 +127,6 @@ export function CanvasPreview({ page }: { page: CanvasSettingsPage }) {
         {spec.blurb && <p>{spec.blurb}</p>}
       </header>
       <PreviewRows key={page} controls={spec.controls} />
-    </section>
-  );
-}
-
-export function PetPreview() {
-  const spec = PET_SPEC;
-  return (
-    <section className="settings-preview">
-      <header>
-        <h2>{spec.title}</h2>
-        <SettingsPreviewNotice />
-        {spec.blurb && <p>{spec.blurb}</p>}
-      </header>
-      <PreviewRows key="pet" controls={spec.controls} />
     </section>
   );
 }

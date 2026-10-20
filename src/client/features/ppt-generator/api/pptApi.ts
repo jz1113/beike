@@ -27,6 +27,7 @@ export interface GenerateOutlineParams {
   language?: PptLanguage;
   currentOutline?: PptOutlinePage[];
   model?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
   customBaseUrl?: string;
   customApiKey?: string;
   allowFallback?: boolean;
@@ -37,6 +38,7 @@ export interface GenerateDetailParams {
   detailLevel?: PptDetailLevel;
   language?: PptLanguage;
   model?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
   customBaseUrl?: string;
   customApiKey?: string;
   renderMode?: 'layout' | 'visual';
@@ -66,6 +68,7 @@ export interface GenerateNarrationParams {
   speakerPersona?: string;
   tone?: string;
   model?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
   customBaseUrl?: string;
   customApiKey?: string;
 }
@@ -77,6 +80,7 @@ export async function fetchPptOutline(params: GenerateOutlineParams) {
     pages: PptOutlinePage[];
     fromFallback: boolean;
     model?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
     usage?: unknown;
   }>('/api/generate/ppt-outline', params, {
     ...(params.customBaseUrl ? { 'x-custom-base-url': params.customBaseUrl } : {}),
@@ -99,6 +103,7 @@ export async function fetchPptDetail(params: GenerateDetailParams) {
     }>;
     fromFallback: boolean;
     model?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
     usage?: unknown;
   }>('/api/generate/ppt-detail', params, {
     ...(params.customBaseUrl ? { 'x-custom-base-url': params.customBaseUrl } : {}),
@@ -127,6 +132,7 @@ export async function fetchPptNarration(params: GenerateNarrationParams) {
     narrations: Record<string, string>;
     fromFallback: boolean;
     model?: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
     usage?: unknown;
   }>('/api/generate/ppt-narration', params, {
     ...(params.customBaseUrl ? { 'x-custom-base-url': params.customBaseUrl } : {}),

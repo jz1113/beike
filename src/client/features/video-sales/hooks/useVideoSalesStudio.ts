@@ -1,322 +1,390 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
-import type {
-  VideoSalesCategory,
-  VideoSalesMode,
-  VideoSalesProductAnalysis,
-  VideoSalesScript,
-  VideoSalesShot,
-  VideoSalesStyleType,
-} from '@shared/domain/video-sales';
-import { VIDEO_SALES_PRESET_TEMPLATES } from '@shared/domain/video-sales';
 import {
-  analyzeProductMedia,
-  composeSalesVideo,
-  generateSalesScripts,
-  synthesizeSalesVoice,
-} from '../api/videoSalesApi';
+  appendSalesImages,
+  editSalesShot,
+  markSalesImageUnavailable,
+  eligibleSalesImages,
+  emptySalesColorSelection,
+  type FashionRefs,
+  type VideoSalesScript,
+  type VideoSalesShot,
+} from '@shared/domain/video-sales';
+import { uploadStudioFile } from '@client/shared/api/uploadStudioFile';
+import { confirmAction } from '@client/shared/utils/confirmAction';
+import { collectEcommerceProduct } from '../api/collectProduct';
+import { buildSalesPlan, type SalesPlanPhase } from '../model/buildSalesPlan';
+import { executeSalesRender } from '../model/executeSalesRender';
+import { parseProductLink } from '../model/productLink';
+import { productImageFiles } from '../model/productImageDrop';
+import type { SalesRenderPhase } from '../model/renderSalesVideo';
+import { clearSalesProduct, hasSalesProductContent, readSalesStudioDraft, SALES_STUDIO_STORAGE_KEY, type VideoSalesStudioState as SalesStudioDraft } from '../model/salesStudioDraft';
+import { salesJobAllowed, type SalesAspectRatio } from '../model/salesWorkspace';
+import { invalidateSalesState, salesPlanInputRevision } from '../model/salesStageRules';
+import { salesSingleVideoError } from '../model/salesSingleVideo';
+import { reuseSalesPlanAssets } from '../model/reuseSalesPlanAssets';
+import { useSalesCreativeStages } from './useSalesCreativeStages';
 
-export type VideoSalesStep = 'setup' | 'script' | 'assets' | 'compose' | 'export';
+export type VideoSalesStudioState = SalesStudioDraft;
+export type { SalesAspectRatio, SalesPlanPhase, SalesRenderPhase };
 
-const STORAGE_KEY = 'beike.video_sales.draft.v1';
+let salesResumeStarted = false;
 
-export interface VideoSalesStudioState {
-  currentStep: VideoSalesStep;
-  productName: string;
-  category: VideoSalesCategory;
-  sellingPoints: string;
-  priceRange: string;
-  targetAudience: string;
-  selectedPlatforms: string[];
-  videoMode: VideoSalesMode;
-  styleType: VideoSalesStyleType;
-  targetDuration: number;
-  productImages: string[];
-  selectedChatModel?: string;
-  selectedImageModel?: string;
-  selectedVideoModel?: string;
-  selectedVoiceModel?: string;
-  analysis: VideoSalesProductAnalysis | null;
-  scripts: VideoSalesScript[];
-  selectedScriptIndex: number;
-  selectedTemplateId: string | null;
-  composedResultUrl: string | null;
-  composedCommand: string | null;
+function chatRoute(modelId?: string) {
+  const route = resolveModalityModelRoute('chat', modelId);
+  return { model: route.modelId || undefined, textProtocol: route.textProtocol, customBaseUrl: route.baseUrl || undefined, customApiKey: route.apiKey || undefined };
 }
 
-const defaultState: VideoSalesStudioState = {
-  currentStep: 'setup',
-  productName: '德宝湿水不破纸巾',
-  category: 'home',
-  sellingPoints: '4层加厚韧性升级，湿水不破擦拭无碎屑，可作湿巾使用',
-  priceRange: '29.9元/12包',
-  targetAudience: '精致宝妈、上班族、对纸品品质有要求的白领',
-  selectedPlatforms: ['douyin', 'xiaohongshu'],
-  videoMode: 'product_closeup',
-  styleType: 'pain_point',
-  targetDuration: 25,
-  productImages: [
-    'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&auto=format&fit=crop&q=80',
-  ],
-  analysis: null,
-  scripts: [],
-  selectedScriptIndex: 0,
-  selectedTemplateId: null,
-  composedResultUrl: null,
-  composedCommand: null,
-};
-
 export function useVideoSalesStudio() {
-  const [state, setState] = useState<VideoSalesStudioState>(() => {
-    if (typeof window === 'undefined') return defaultState;
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...defaultState, ...parsed };
-      }
-    } catch {
-      // ignore
-    }
-    return defaultState;
-  });
-
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [isComposing, setIsComposing] = useState(false);
-  const [composeProgress, setComposeProgress] = useState(0);
+  const [state, setState] = useState<VideoSalesStudioState>(readSalesStudioDraft);
+  const [isCollecting, setIsCollecting] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [planPhase, setPlanPhase] = useState<SalesPlanPhase | null>(null);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderPhase, setRenderPhase] = useState<SalesRenderPhase | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const stateRef = useRef(state);
+  const collectAbortRef = useRef<AbortController | null>(null);
+  const renderAbortRef = useRef<AbortController | null>(null);
+  const planTokenRef = useRef(0);
+  const resetPendingRef = useRef(false);
+  const busyRef = useRef({ collecting: false, planning: false, rendering: false, uploading: false });
+  const commit = useCallback((recipe: (prev: VideoSalesStudioState) => VideoSalesStudioState) => {
+    const next = recipe(stateRef.current);
+    stateRef.current = next;
+    if (typeof window !== 'undefined') { try { window.localStorage.setItem(SALES_STUDIO_STORAGE_KEY, JSON.stringify(next)); } catch { /* keep in-memory state if storage is unavailable */ } }
+    setState(next);
+  }, []);
 
-  // 自动持久化草稿
+  const stages = useSalesCreativeStages({ stateRef, busyRef, commit, setError });
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // ignore
-    }
+    try { window.localStorage.setItem(SALES_STUDIO_STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore quota */ }
   }, [state]);
+  useEffect(() => () => { planTokenRef.current += 1; collectAbortRef.current?.abort(); renderAbortRef.current?.abort(); }, []);
 
   const updateState = useCallback((patch: Partial<VideoSalesStudioState>) => {
-    setState((prev) => ({ ...prev, ...patch }));
-  }, []);
+    commit((prev) => invalidateSalesState(prev, patch));
+  }, [commit]);
 
-  const goToStep = useCallback((step: VideoSalesStep) => {
-    setState((prev) => ({ ...prev, currentStep: step }));
-  }, []);
-
-  // 1. 商品智能视觉分析
-  const runProductAnalysis = useCallback(async () => {
-    if (state.productImages.length === 0) {
-      setError('请至少添加一张商品参考图');
-      return;
-    }
-    setIsAnalyzing(true);
+  const setFashionRef = useCallback(async (slot: keyof FashionRefs, file: File | null) => {
+    if (!salesJobAllowed(busyRef.current, 'collect')) return;
+    busyRef.current.uploading = true;
+    setIsUploading(true);
     setError(null);
     try {
-      const route = resolveModalityModelRoute('chat', state.selectedChatModel);
-      const res = await analyzeProductMedia({
-        imageUrls: state.productImages,
-        productName: state.productName,
-        category: state.category,
-        model: state.selectedChatModel ? route.modelId || undefined : undefined,
-        customBaseUrl: route.baseUrl || undefined,
-        customApiKey: route.apiKey || undefined,
-      });
-      updateState({
-        analysis: res,
-        sellingPoints: res.sellingPoints?.join('；') || state.sellingPoints,
-        targetAudience: res.targetAudience || state.targetAudience,
-      });
+      const url = file ? await uploadStudioFile(file, 'video-sales') : '';
+      commit((prev) => ({
+        ...prev,
+        fashionRefs: { ...prev.fashionRefs, [slot]: url },
+        composedResultUrl: null,
+        scripts: prev.scripts.map((script) => ({
+          ...script,
+          personFrameUrl: undefined,
+          sceneFrameUrl: undefined,
+          shots: script.shots.map((shot) => ({ ...shot, promptStale: true })),
+        })),
+      }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '商品分析失败');
+      setError(err instanceof Error ? err.message : '图片上传失败');
     } finally {
-      setIsAnalyzing(false);
+      busyRef.current.uploading = false;
+      setIsUploading(false);
     }
-  }, [state.productImages, state.productName, state.category, state.sellingPoints, state.targetAudience, state.selectedChatModel, updateState]);
+  }, [commit]);
 
-  // 2. 脚本生成
-  const runScriptGeneration = useCallback(async () => {
-    if (!state.productName.trim()) {
-      setError('请填写商品名称');
-      return;
-    }
-    setIsGeneratingScript(true);
-    setError(null);
-    try {
-      const route = resolveModalityModelRoute('chat', state.selectedChatModel);
-      const res = await generateSalesScripts({
-        productName: state.productName,
-        category: state.category,
-        productDescription: state.sellingPoints,
-        productImages: state.productImages,
-        productAnalysis: state.analysis ? JSON.stringify(state.analysis) : undefined,
-        videoMode: state.videoMode,
-        styleType: state.styleType,
-        targetDuration: state.targetDuration,
-        priceRange: state.priceRange,
-        targetAudience: state.targetAudience,
-        platforms: state.selectedPlatforms,
-        templateId: state.selectedTemplateId || undefined,
-        model: state.selectedChatModel ? route.modelId || undefined : undefined,
-        customBaseUrl: route.baseUrl || undefined,
-        customApiKey: route.apiKey || undefined,
-      });
+  const replaceScript = useCallback((script: VideoSalesScript, extra?: Partial<VideoSalesStudioState>) => {
+    commit((prev) => ({ ...prev, scripts: [script], selectedScriptIndex: 0, ...extra }));
+  }, [commit]);
 
-      if (res.length === 0) {
-        setError('没有生成可用脚本，请调整商品信息后重试，或使用示例脚本');
-        return;
-      }
-      updateState({
-        scripts: res,
-        selectedScriptIndex: 0,
-        currentStep: 'script',
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '生成脚本失败');
-    } finally {
-      setIsGeneratingScript(false);
-    }
-  }, [state, updateState]);
-
-  // 修改当前脚本的分镜
-  const updateCurrentScriptShots = useCallback((next: VideoSalesShot[] | ((shots: VideoSalesShot[]) => VideoSalesShot[])) => {
-    setState((prev) => {
+  const patchShot = useCallback((index: number, patch: Partial<VideoSalesShot>) => {
+    commit((prev) => {
       const scripts = [...prev.scripts];
-      const cur = scripts[prev.selectedScriptIndex];
-      if (!cur) return prev;
-      const newShots = typeof next === 'function' ? next(cur.shots) : next;
-      scripts[prev.selectedScriptIndex] = {
-        ...cur,
-        shots: newShots,
-        totalDuration: newShots.reduce((acc, s) => acc + (s.duration || 3), 0),
-      };
-      return { ...prev, scripts };
+      const current = scripts[prev.selectedScriptIndex];
+      if (!current) return prev;
+      const previous = current.shots[index];
+      if (!previous) return prev;
+      const shots = current.shots.map((shot, shotIndex) => (shotIndex === index ? { ...shot, ...patch } : shot));
+      scripts[prev.selectedScriptIndex] = { ...current, shots, totalDuration: shots.reduce((sum, shot) => sum + (shot.duration || 3), 0) };
+      const invalidate = patch.status === 'generating' || (patch.assetUrl !== undefined && patch.assetUrl !== previous.assetUrl);
+      return { ...prev, scripts, composedResultUrl: invalidate ? null : prev.composedResultUrl };
     });
-  }, []);
+  }, [commit]);
 
-  // 4. 执行 FFmpeg 视频合成
-  const useExampleScripts = useCallback(() => {
-    const presets = VIDEO_SALES_PRESET_TEMPLATES.filter((item) => item.category === state.category);
-    const scripts: VideoSalesScript[] = presets.map((item) => ({
-      id: item.id,
-      title: item.name,
-      styleType: item.styleType,
-      totalDuration: item.shots.reduce((acc, shot) => acc + shot.duration, 0),
-      shots: item.shots,
-      seo: item.seo,
-    }));
-    if (scripts.length === 0) {
-      setError('当前品类没有示例脚本');
-      return;
-    }
-    updateState({ scripts, selectedScriptIndex: 0, currentStep: 'script' });
-  }, [state.category, updateState]);
-
-  const runVideoComposition = useCallback(async (options?: { bgmPath?: string; bgmVolume?: number; aspectRatio?: string }) => {
-    const curScript = state.scripts[state.selectedScriptIndex];
-    if (!curScript || curScript.shots.length === 0) {
-      setError('没有可合成的分镜脚本');
-      return;
-    }
-    setIsComposing(true);
-    setComposeProgress(10);
+  const runProductCollect = useCallback(async (internal = false, forceRefresh = false) => {
+    if (busyRef.current.collecting) return false;
+    if (!internal && !salesJobAllowed(busyRef.current, 'collect')) return false;
+    const parsed = parseProductLink(stateRef.current.productUrl);
+    if (!parsed.ok) { setError(parsed.error); return false; }
+    if (forceRefresh && !window.confirm('重新采集会跳过缓存，可能产生接口计费；成功后替换商品资料和图片。已有方案、镜头素材与成片保留，但旧方案需要更新后才能使用新素材继续生成，是否继续？')) return false;
+    const previous = collectAbortRef.current;
+    const controller = new AbortController();
+    collectAbortRef.current = controller;
+    previous?.abort();
+    busyRef.current.collecting = true;
+    setIsCollecting(true);
     setError(null);
-
-    const timer = setInterval(() => {
-      setComposeProgress((p) => (p < 85 ? p + 15 : p));
-    }, 400);
-
     try {
-      const voiceRoute = resolveModalityModelRoute('voice', state.selectedVoiceModel);
-      const clips = [];
-      for (let idx = 0; idx < curScript.shots.length; idx += 1) {
-        const shot = curScript.shots[idx];
-        let audioUrl = shot.audioUrl;
-        if (shot.voiceover?.trim() && voiceRoute.modelId && voiceRoute.baseUrl && voiceRoute.apiKey) {
-          audioUrl = await synthesizeSalesVoice({
-            text: shot.voiceover,
-            model: voiceRoute.modelId,
-            customBaseUrl: voiceRoute.baseUrl,
-            customApiKey: voiceRoute.apiKey,
-          });
-        }
-        clips.push({
-          type: (shot.visualSource === 'product_image' ? 'image' : 'video') as 'image' | 'video',
-          filePath: shot.assetUrl || (state.productImages[idx % state.productImages.length] || ''),
-          duration: shot.duration,
-          transition: shot.transition,
-          motion: shot.motion || 'zoom_in_slow',
-          hasAudio: Boolean(audioUrl),
-          audioUrl,
-          voiceover: shot.voiceover,
-        });
+      const product = await collectEcommerceProduct(parsed.url, parsed.platform, controller.signal, forceRefresh);
+      if (collectAbortRef.current !== controller || controller.signal.aborted) return false;
+      commit((prev) => ({
+        ...prev, ...product, category: prev.category, productUrl: parsed.url, analysis: null,
+        colorSelection: (() => {
+          const variant = product.variantMetadata?.variants.find((item) => item.id === product.variantMetadata?.selectedVariantId);
+          return variant?.color ? { ...emptySalesColorSelection(), variantId: variant.id, colorLabel: variant.color } : emptySalesColorSelection();
+        })(),
+        scripts: prev.scripts.map((script, index) => ({
+          ...script, planStale: true, finalizedRevision: undefined, assetValidation: 'pending',
+          renderResultUrl: script.renderResultUrl || (index === prev.selectedScriptIndex ? prev.composedResultUrl || undefined : undefined),
+          personFrameUrl: undefined, sceneFrameUrl: undefined,
+          shots: script.shots.map((shot) => ({ ...shot, promptStale: true, referenceFrameUrl: undefined })),
+        })),
+      }));
+      return true;
+    } catch (err) {
+      if (collectAbortRef.current !== controller || controller.signal.aborted) return false;
+      setError(err instanceof Error ? err.message : '商品采集失败');
+      return false;
+    } finally {
+      if (collectAbortRef.current === controller) {
+        busyRef.current.collecting = false;
+        setIsCollecting(false);
       }
-      if (clips.some((clip) => !clip.filePath)) {
-        setError('有分镜还没有画面素材');
-        return;
-      }
+    }
+  }, [commit]);
 
-      let accumTime = 0;
-      const subtitles = curScript.shots.map((shot) => {
-        const start = accumTime;
-        const end = accumTime + shot.duration;
-        accumTime = end;
-        return {
-          text: shot.voiceover || shot.description,
-          startTime: start,
-          endTime: end,
-        };
-      });
-
-      const res = await composeSalesVideo({
-        projectId: `proj_${Date.now()}`,
-        clips,
-        output: {
-          resolution: '1080p',
-          aspectRatio: options?.aspectRatio || '9:16',
-          bgmVolume: options?.bgmVolume ?? 0.3,
-          bgmPath: options?.bgmPath,
-        },
-        subtitles,
-      });
-
-      setComposeProgress(100);
-      updateState({
-        composedResultUrl: res.resultUrl || clips[0].filePath,
-        composedCommand: res.command,
-        currentStep: 'export',
+  const addProductImages = useCallback(async (files: File[]) => {
+    if (!salesJobAllowed(busyRef.current, 'collect')) return;
+    const images = productImageFiles(files);
+    if (images.length === 0) { setError('没有可用的图片'); return; }
+    setError(null);
+    busyRef.current.uploading = true;
+    setIsUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of images) urls.push(await uploadStudioFile(file, 'video-sales'));
+      commit((prev) => {
+        const imageCatalog = appendSalesImages(prev.imageCatalog, urls, 'main');
+        return { ...prev, imageCatalog, productImages: imageCatalog.map((image) => image.url) };
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '视频合成失败');
+      setError(err instanceof Error ? err.message : '图片上传失败');
     } finally {
-      clearInterval(timer);
-      setIsComposing(false);
+      busyRef.current.uploading = false;
+      setIsUploading(false);
     }
-  }, [state.scripts, state.selectedScriptIndex, state.productImages, state.selectedVoiceModel, updateState]);
+  }, [commit]);
 
-  const resetProject = useCallback(() => {
-    setState(defaultState);
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(STORAGE_KEY);
+  const removeProductImage = useCallback((index: number) => {
+    commit((prev) => {
+      const image = prev.imageCatalog.find((item) => item.index === index);
+      if (!image) return prev;
+      return invalidateSalesState(prev, { colorSelection: { ...prev.colorSelection, excludedImageUrls: [...new Set([...prev.colorSelection.excludedImageUrls, image.url])] } });
+    });
+  }, [commit]);
+
+  const markImageUnavailable = useCallback((index: number) => {
+    commit((prev) => {
+      if (prev.imageCatalog.find((image) => image.index === index)?.unavailable) return prev;
+      return { ...prev, imageCatalog: markSalesImageUnavailable(prev.imageCatalog, index) };
+    });
+  }, [commit]);
+
+  const editShot = useCallback((index: number, patch: Partial<VideoSalesShot>) => {
+    commit((prev) => {
+      const scripts = [...prev.scripts];
+      const current = scripts[prev.selectedScriptIndex];
+      if (!current?.shots[index]) return prev;
+      const previous = current.shots[index];
+      const shots = current.shots.map((shot, shotIndex) => (shotIndex === index ? editSalesShot(shot, patch) : shot));
+      const clearFrames = Boolean(shots[index]?.promptStale && !previous.promptStale);
+      scripts[prev.selectedScriptIndex] = {
+        ...current, finalizedRevision: undefined, assetValidation: 'pending',
+        shots,
+        totalDuration: shots.reduce((sum, shot) => sum + (shot.duration || 3), 0),
+        ...(clearFrames ? { personFrameUrl: undefined, sceneFrameUrl: undefined } : {}),
+      };
+      return { ...prev, scripts, composedResultUrl: null };
+    });
+  }, [commit]);
+
+  const editStillPrompt = useCallback((field: 'personImagePrompt' | 'sceneImagePrompt', value: string) => {
+    commit((prev) => {
+      const scripts = [...prev.scripts];
+      const current = scripts[prev.selectedScriptIndex];
+      if (!current) return prev;
+      const frameKey = field === 'personImagePrompt' ? 'personFrameUrl' : 'sceneFrameUrl';
+      scripts[prev.selectedScriptIndex] = { ...current, [field]: value, [frameKey]: undefined };
+      return { ...prev, scripts, composedResultUrl: null };
+    });
+  }, [commit]);
+
+  const editFullPrompt = useCallback((fullPrompt: string) => {
+    commit((prev) => {
+      const scripts = [...prev.scripts];
+      const current = scripts[prev.selectedScriptIndex];
+      if (!current) return prev;
+      scripts[prev.selectedScriptIndex] = { ...current, fullPrompt };
+      return { ...prev, scripts, composedResultUrl: null };
+    });
+  }, [commit]);
+
+  const runPlan = useCallback(async () => {
+    if (!salesJobAllowed(busyRef.current, 'plan')) return;
+    const token = ++planTokenRef.current;
+    busyRef.current.planning = true;
+    setIsPlanning(true);
+    setError(null);
+    try {
+      if (!stateRef.current.productName.trim() && stateRef.current.productUrl.trim()) {
+        const collected = await runProductCollect(true);
+        if (!collected || planTokenRef.current !== token) return;
+      }
+      const current = stateRef.current;
+      if (planTokenRef.current !== token) return;
+      if (current.scripts.some((item) => ['generating', 'uncertain'].includes(item.renderStatus || '') || item.assets?.some((asset) => ['generating', 'uncertain'].includes(asset.status || '')))) { setError('已有提交结果待确认，请先查询原任务或核对生成记录，再更新方案'); return; }
+      if (!current.productName.trim()) { setError('请先采集或填写商品名称'); return; }
+      const images = eligibleSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata);
+      if (images.length === 0) { setError('请先选择本次颜色，并确认至少一张对应商品图'); return; }
+      const revision = salesPlanInputRevision(current);
+      const plan = await buildSalesPlan({
+        productName: current.productName,
+        brand: current.brand,
+        category: current.category,
+        sellingPoints: current.sellingPoints, productProps: current.props,
+        priceLabel: current.priceLabel,
+        imageCatalog: images,
+        selectedColor: current.colorSelection.colorLabel,
+        aspectRatio: current.aspectRatio,
+        fashionRefs: current.fashionRefs,
+        targetDuration: current.targetDuration,
+        videoMode: current.videoMode,
+        redrawScenes: current.redrawScenes,
+        route: chatRoute(current.selectedChatModel),
+        onPhase: (phase) => { if (planTokenRef.current === token) setPlanPhase(phase); },
+      });
+      if (planTokenRef.current !== token || salesPlanInputRevision(stateRef.current) !== revision) return;
+      const script = reuseSalesPlanAssets({ ...plan.script, id: crypto.randomUUID(), planRevision: revision }, current.scripts[current.selectedScriptIndex]);
+      commit((previous) => ({ ...previous, scripts: [script, ...previous.scripts.map((item) => ({ ...item, renderResultUrl: item.renderResultUrl || (item.id === current.scripts[current.selectedScriptIndex]?.id ? current.composedResultUrl || undefined : undefined) }))], selectedScriptIndex: 0, analysis: plan.analysis, composedResultUrl: null }));
+    } catch (err) {
+      if (planTokenRef.current !== token) return;
+      setError(err instanceof Error ? err.message : '生成方案失败');
+    } finally {
+      if (planTokenRef.current === token) {
+        busyRef.current.planning = false;
+        setIsPlanning(false);
+        setPlanPhase(null);
+      }
     }
-  }, []);
+  }, [commit, runProductCollect]);
+
+  const runRender = useCallback(async (options?: { resumeOnly?: boolean }) => {
+    if (busyRef.current.rendering) return;
+    if (!options?.resumeOnly && !salesJobAllowed(busyRef.current, 'render')) return;
+    const current = stateRef.current;
+    const script = current.scripts[current.selectedScriptIndex];
+    if (!script?.shots.length) { setError('请先生成创作方案'); return; }
+    const previous = renderAbortRef.current;
+    const controller = new AbortController();
+    renderAbortRef.current = controller;
+    previous?.abort();
+    busyRef.current.rendering = true;
+    setIsRendering(true);
+    setError(null);
+    try {
+      if (!options?.resumeOnly && script.renderStatus === 'done' && !await confirmAction({
+        title: '重新生成整段视频？', confirmText: '确认重新生成',
+        description: '已有完成的成片。重新生成会创建新的计费任务；原始成片仍保留在服务端生成记录中。',
+      })) return;
+      if (controller.signal.aborted) return;
+      await executeSalesRender({
+        resumeOnly: Boolean(options?.resumeOnly),
+        signal: controller.signal,
+        script,
+        current,
+        getState: () => stateRef.current,
+        replaceScript,
+        commitScript: (recipe, extra) => {
+          commit((prev) => {
+            const scripts = [...prev.scripts];
+            const scriptIndex = scripts.findIndex((item) => item.id === script.id);
+            const currentScript = scripts[scriptIndex];
+            if (!currentScript) return prev;
+            scripts[scriptIndex] = recipe(currentScript);
+            return { ...prev, scripts, ...(extra?.composedResultUrl !== undefined && prev.selectedScriptIndex === scriptIndex ? { composedResultUrl: extra.composedResultUrl } : {}) };
+          });
+        },
+        patchShot,
+        onPhase: setRenderPhase,
+        onPromptPhase: () => setPlanPhase('prompt'),
+        onResult: (url) => commit((previous) => previous.scripts[previous.selectedScriptIndex]?.id === script.id ? { ...previous, composedResultUrl: url } : previous),
+      });
+    } catch (err) {
+      if (renderAbortRef.current !== controller) return;
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+        setError('已停止继续提交。已经提交的镜头仍可能在生成，刷新后会继续查询。');
+      } else {
+        setError(err instanceof Error ? err.message : '视频生成失败');
+      }
+    } finally {
+      if (renderAbortRef.current === controller) {
+        busyRef.current.rendering = false;
+        setIsRendering(false);
+        setPlanPhase(null);
+        setRenderPhase(null);
+      }
+    }
+  }, [commit, patchShot, replaceScript]);
+
+  useEffect(() => {
+    if (salesResumeStarted) return;
+    const current = stateRef.current;
+    const script = current.scripts[current.selectedScriptIndex];
+    const shots = script?.shots || [];
+    const singleResume = Boolean(script?.renderTaskId) && (script?.renderStatus === 'generating' || script?.renderStatus === 'uncertain');
+    const shotResume = shots.some((shot) => shot.taskId && shot.status === 'generating' && !shot.assetUrl);
+    if (!singleResume && !shotResume) return;
+    salesResumeStarted = true;
+    void runRender({ resumeOnly: true });
+  }, [runRender]);
+
+  const retryShot = useCallback((index: number) => {
+    if (!salesJobAllowed(busyRef.current, 'render')) return;
+    patchShot(index, { status: 'pending', taskId: undefined, assetUrl: undefined, failReason: undefined, promptStale: false });
+    void runRender();
+  }, [patchShot, runRender]);
+
+  const stopRender = useCallback(() => { renderAbortRef.current?.abort(); }, []);
+
+  const resetProject = useCallback(async () => {
+    const allowed = () => salesJobAllowed(busyRef.current, 'collect') && hasSalesProductContent(stateRef.current);
+    if (resetPendingRef.current || !allowed()) return false;
+    resetPendingRef.current = true;
+    try {
+      const confirmed = await confirmAction({
+        title: '清空当前商品？', confirmText: '清空并更换商品',
+        description: '将清空商品资料、商品图片、人物／人脸／场景参考、关联方案和当前成片引用，且无法撤销。保留生成设置、采集缓存、原始文件及服务端生成记录；不会取消服务商已提交的任务。',
+      });
+      if (!confirmed || !allowed()) return false;
+      planTokenRef.current += 1;
+      commit(clearSalesProduct);
+      setPlanPhase(null);
+      setRenderPhase(null);
+      setError(null);
+      return true;
+    } finally {
+      resetPendingRef.current = false;
+    }
+  }, [commit]);
 
   return {
-    state,
-    updateState,
-    goToStep,
-    isAnalyzing,
-    isGeneratingScript,
-    isComposing,
-    composeProgress,
-    error,
-    setError,
-    runProductAnalysis,
-    runScriptGeneration,
-    updateCurrentScriptShots,
-    runVideoComposition,
-    useExampleScripts,
-    resetProject,
+    state, updateState, ...stages,
+    videoError: salesSingleVideoError(state, state.scripts[state.selectedScriptIndex]),
+    videoSubmitError: salesSingleVideoError(state, state.scripts[state.selectedScriptIndex], true),
+    isCollecting, isUploading, isPlanning, planPhase, isRendering, renderPhase, error,
+    runProductCollect, addProductImages, removeProductImage, markImageUnavailable, setFashionRef, editShot, editStillPrompt, editFullPrompt,
+    runPlan, runRender, retryShot, stopRender, resetProject,
   };
 }

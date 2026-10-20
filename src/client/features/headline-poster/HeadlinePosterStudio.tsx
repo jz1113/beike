@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { WandSparkles } from 'lucide-react';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { saveToDownloadDir } from '@client/shared/media/saveDownload';
@@ -8,7 +8,15 @@ import { PosterCoverGallery } from './components/PosterCoverGallery';
 import { PosterBatchHistoryDialog } from './components/PosterBatchHistoryDialog';
 import { PosterSettingsDialog } from './components/PosterSettingsDialog';
 import { CoverMemoryStudioDialog } from './components/CoverMemoryStudioDialog';
+import { CoverFeedDock } from './components/memory/CoverFeedDock';
+import { CoverFeedPanel } from './components/memory/CoverFeedPanel';
+import { useCoverSampleFeed } from './hooks/useCoverSampleFeed';
+import { useCoverPetLink } from './hooks/useCoverPetLink';
+import { useCoverVisionModels } from './hooks/useCoverVisionModels';
+import { CoverSkillSheet } from './components/CoverSkillSheet';
 import { PosterToolbar } from './components/PosterToolbar';
+import { deconstructCoverSample } from './api/coverMemoryApi';
+import { useCoverMemory } from './hooks/useCoverMemory';
 import { usePosterProduction } from './hooks/usePosterProduction';
 import { safeBaseName, type PosterItem } from './model/posterTypes';
 
@@ -23,13 +31,78 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
   const [isNewBatchConfirming, setIsNewBatchConfirming] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+  const [isFeedOpen, setIsFeedOpen] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [previewDownloadError, setPreviewDownloadError] = useState<string | null>(null);
+  const memory = useCoverMemory(true);
+  const vision = useCoverVisionModels();
+  const feed = useCoverSampleFeed(() => memory.reload());
+  const retryingSample = useRef(false);
+  const adoptedCount = memory.memory.entries.filter((entry) => entry.status === 'adopted').length;
+  const pendingMemoryCount = memory.memory.entries.filter((entry) => entry.status === 'pending').length;
   const isBusy = !studio.isReady || studio.isRunning || studio.isExporting || studio.isRestoring || studio.isImporting;
   const pendingCount = studio.items.filter((item) => item.status === 'idle' || item.status === 'interrupted').length;
   const startBatch = () => {
     setIsGalleryMode(true);
     void studio.runBatch();
   };
+  const acceptFeedFiles = async (files: File[]) => {
+    setIsFeedOpen(true);
+    await feed.addFiles(files);
+  };
+  const submitFeed = async () => {
+    const finished = await feed.start(vision.selectionId, vision.effort);
+    if (finished) {
+      setIsFeedOpen(false);
+      setIsMemoryOpen(true);
+    }
+  };
+  const retryFailedSample = async (urls: string[], _model: string, title: string) => {
+    if (retryingSample.current) return;
+    if (!vision.selectionId) {
+      setIsMemoryOpen(false);
+      setIsFeedOpen(true);
+      return;
+    }
+    retryingSample.current = true;
+    try {
+      for (const url of urls.filter(Boolean).slice(0, 10)) {
+        await deconstructCoverSample(url, vision.selectionId, title || '封面样张', vision.effort);
+      }
+      await memory.reload();
+    } finally {
+      retryingSample.current = false;
+    }
+  };
+  const coverModalOpen = isMemoryOpen || isHistoryOpen || isRulesOpen || studio.isSettingsOpen || Boolean(studio.previewState);
+  const feedPanel = (
+    <CoverFeedPanel
+      jobs={feed.jobs}
+      models={vision.models}
+      selectionId={vision.selectionId}
+      effort={vision.effort}
+      busy={feed.busy}
+      notice={feed.notice}
+      onSelectModel={vision.setSelectionId}
+      onEffortChange={vision.setEffort}
+      onClose={() => setIsFeedOpen(false)}
+      onFiles={(files) => { void feed.addFiles(files); }}
+      onRemove={feed.removeJob}
+      onStart={() => { void submitFeed(); }}
+      onRetry={() => { void feed.retryUncertain(); }}
+      onOpenSettings={onOpenSettings}
+    />
+  );
+  const petLink = useCoverPetLink({
+    coverModalOpen,
+    open: isFeedOpen,
+    setOpen: setIsFeedOpen,
+    phase: feed.phase,
+    modelLabel: vision.label,
+    onFiles: (files) => { void acceptFeedFiles(files); },
+    onDragging: feed.setDragging,
+    panel: feedPanel,
+  });
   const confirmNewBatch = async () => {
     if (isBusy) return;
     setPreviewDownloadError(null);
@@ -77,8 +150,13 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
           hasItems={studio.items.length > 0}
           historyCount={studio.historyBatches.length}
           isNewBatchConfirming={isNewBatchConfirming}
+          isFeeding={feed.busy}
+          adoptedCount={adoptedCount}
+          pendingMemoryCount={pendingMemoryCount}
           onOpenSettings={studio.openProductionSettings}
+          onOpenRules={() => setIsRulesOpen(true)}
           onOpenMemory={() => setIsMemoryOpen(true)}
+          onOpenFeed={() => setIsFeedOpen(true)}
           onOpenHistory={() => setIsHistoryOpen(true)}
           onRetryFailed={() => void studio.runBatch(true)}
           onExport={() => void studio.exportZip()}
@@ -90,6 +168,9 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
         />
 
         <main className={`mx-auto w-full ${isGalleryMode ? 'max-w-none' : 'max-w-[1120px]'} space-y-5 pb-10 pt-1 sm:pt-2`}>
+          {!isMemoryOpen && memory.error && (
+            <div role="alert" className="rounded-2xl border border-rose-100 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">{memory.error}</div>
+          )}
           {studio.notice && (
             <div role="status" className="flex items-start gap-2 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-4 py-3 text-xs leading-5 text-slate-700 dark:text-slate-200 [overflow-wrap:anywhere]"><WandSparkles className="mt-0.5 h-4 w-4 shrink-0" />{studio.notice}</div>
           )}
@@ -151,6 +232,10 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
               isRunning={isBusy}
               onClose={studio.closeProductionSettings}
               onChange={(next) => studio.setSettingsDraft(next)}
+              memorySamples={memory.memory.samples.flatMap((sample) => {
+                const adopted = memory.memory.entries.some((entry) => entry.sampleId === sample.id && entry.status === 'adopted' && entry.source === 'sample');
+                return adopted ? [{ id: sample.id, title: sample.title || '封面样张', grouped: sample.imageUrls.length > 1 }] : [];
+              })}
               onSave={studio.saveProductionSettings}
               onOpenSettings={onOpenSettings}
             />
@@ -158,10 +243,19 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
 
           {isMemoryOpen && (
             <CoverMemoryStudioDialog
-              titleModel={studio.titleModel}
+              memory={memory.memory}
+              error={memory.error}
+              busy={memory.busy}
+              feeding={feed.busy}
               onClose={() => setIsMemoryOpen(false)}
+              onSetStatus={(entry, status) => { void memory.setStatus(entry, status); }}
+              onAddCorrection={(rule) => { void memory.addCorrection(rule); }}
+              onClearTrash={() => { void memory.clearTrash(); }}
+              onRetry={(urls, model, title) => { void retryFailedSample(urls, model, title); }}
             />
           )}
+
+          {isRulesOpen && <CoverSkillSheet adoptedCount={adoptedCount} pendingCount={pendingMemoryCount} onClose={() => setIsRulesOpen(false)} />}
 
           {isHistoryOpen && (
             <PosterBatchHistoryDialog
@@ -189,6 +283,7 @@ export default function HeadlinePosterStudio({ onBack, onOpenSettings }: Props) 
           />
         </main>
       </div>
+      {petLink.fallback && <CoverFeedDock open={isFeedOpen}>{feedPanel}</CoverFeedDock>}
     </div>
   );
 }

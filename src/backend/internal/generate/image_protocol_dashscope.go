@@ -37,7 +37,7 @@ func (dashscopeImageProtocol) Submit(req imageRequest) (imageSubmitResult, error
 	async := dashscopeUsesAsync(req.Model, kind)
 	endpoint := system.DashScopeRoot(req.Base) + dashscopeImagePath(async)
 	headers := map[string]string{}
-	timeout := 180 * time.Second
+	timeout := 300 * time.Second
 	if async {
 		headers["X-DashScope-Async"] = "enable"
 		timeout = 45 * time.Second
@@ -113,12 +113,8 @@ func dashscopeImageKind(model string) (string, string) {
 	}
 }
 
-func dashscopeUsesAsync(model, kind string) bool {
-	if kind == "wan" {
-		return true
-	}
-	id := strings.ToLower(model)
-	return strings.Contains(id, "qwen-image-3") || strings.Contains(id, "qwen-image-2.1") || strings.Contains(id, "qwen-image-2-1")
+func dashscopeUsesAsync(_, kind string) bool {
+	return kind == "wan"
 }
 
 func dashscopeImagePath(async bool) string {

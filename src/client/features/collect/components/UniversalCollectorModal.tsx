@@ -126,7 +126,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
       setCurrentView('workshop');
     }
     onClose();
-    showToast('🚀 已成功将全套高清素材带入「商业视觉工坊」！');
+    showToast('已将采集返回的可用素材带入「商业视觉工坊」');
   };
 
   // 一键导入 AI 助手输入框

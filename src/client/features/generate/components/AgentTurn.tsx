@@ -1,28 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RotateCcw, Trash2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Alert02Icon,
-  CheckmarkCircle02Icon,
   Copy01Icon,
   FileAudioIcon,
   File01Icon,
   Film01Icon,
-  Loading03Icon,
   Presentation01Icon,
   StopIcon,
   Tick02Icon,
-  Wrench01Icon,
 } from '@hugeicons/core-free-icons';
-import type { GenerationTask } from '@client/store';
+import { useAppStore, type GenerationTask } from '@client/store';
+import GenerationBatchPanel from '@client/shared/agent/GenerationBatchPanel';
+import GenerationPromptCodeBlock from '@client/shared/agent/GenerationPromptCodeBlock';
+import { agentPromptSource } from '@client/shared/agent/generationBatchSources';
 import { apiFetch } from '@client/shared/api/apiClient';
 import ThoughtLine from '@client/shared/ui/ThoughtLine';
 import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
-import type { ApprovalRequestItem, AssistantItem, ToolCallItem, ToolResultItem } from '@shared/domain/assistant/types';
+import type { ApprovalRequestItem, AssistantItem } from '@shared/domain/assistant/types';
 import { stopAgentTask } from '../engine/submitAgentTask';
 import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '../model/agentArtifact';
+import { presentAgentTurn } from '../model/agentToolActivity';
+import AgentToolActivity from './AgentToolActivity';
+
+const EMPTY_ITEMS: AssistantItem[] = [];
+const EMPTY_TASKS: GenerationTask[] = [];
 
 interface Props {
   task: GenerationTask;
@@ -79,30 +83,6 @@ function AttachmentPill({ item }: { item: ParsedAttachment }) {
   );
 }
 
-function ToolRow({ call, result }: { call: ToolCallItem; result?: ToolResultItem }) {
-  const status = result?.status || call.status;
-  const icon = status === 'running' ? Loading03Icon : status === 'error' ? Alert02Icon : CheckmarkCircle02Icon;
-  const tone = status === 'running' ? 'text-blue-600 dark:text-blue-400' : status === 'error' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400';
-  const label = status === 'running' ? '运行中' : status === 'error' ? '失败' : '完成';
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="py-1 text-xs text-slate-500 dark:text-slate-400"
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        <HugeiconsIcon icon={Wrench01Icon} size={14} className="shrink-0 text-slate-400" />
-        <span className="min-w-0 truncate text-slate-700 dark:text-slate-200">{call.displayName || call.name || '工具'}</span>
-        <span className={`inline-flex shrink-0 items-center gap-1 ${tone}`}>
-          <HugeiconsIcon icon={icon} size={13} className={status === 'running' ? 'animate-spin' : ''} />
-          {label}
-        </span>
-      </div>
-      {result?.summary ? <p className="mt-1 line-clamp-2 pl-6 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{result.summary}</p> : null}
-    </motion.div>
-  );
-}
-
 export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -113,7 +93,7 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
   const prompt = visibleAgentPrompt(task.prompt || '');
   const attachments = parseAgentAttachments(task);
   const writing = task.status === 'IN_PROGRESS';
-  const items = task.agentTurn?.items || [];
+  const items = task.agentTurn?.items ?? EMPTY_ITEMS;
   const itemReply = items
     .filter((item): item is Extract<AssistantItem, { kind: 'agentMessage' }> => item.kind === 'agentMessage' && Boolean(item.content?.trim()))
     .map((item) => item.content.trim())
@@ -144,9 +124,10 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
     }).catch(() => undefined);
   };
 
-  const results = new Map(
-    items.filter((item): item is ToolResultItem => item.kind === 'toolResult').map((item) => [item.id, item]),
-  );
+  const blocks = useMemo(() => presentAgentTurn(items), [items]);
+  const sessionTasks = useAppStore(state => state.sessions.find(session => session.id === task.sessionId)?.tasks ?? EMPTY_TASKS);
+  const source = useMemo(() => agentPromptSource(sessionTasks, task), [sessionTasks, task]);
+  const renderCode = (code: string, lang: string, incomplete: boolean) => <GenerationPromptCodeBlock code={code} lang={lang} incomplete={incomplete} source={source} disabled={writing || task.status !== 'SUCCESS'} />;
 
   return (
     <div className="w-full max-w-3xl space-y-6 py-2 select-text">
@@ -171,8 +152,10 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
         )}
 
         <AnimatePresence initial={false}>
-          {items.map((item, index) => {
-            if (item.kind === 'toolResult' || item.kind === 'userMessage') return null;
+          {blocks.map((block) => {
+            if (block.kind === 'tools') return <AgentToolActivity key={block.group.id} group={block.group} />;
+            const item = block.item;
+            const index = items.findIndex((entry) => entry.id === item.id);
             if (item.kind === 'agentReasoning') {
               const stillThinking = writing && !items.slice(index + 1).some((later) => later.kind === 'agentMessage' && later.content);
               return (
@@ -191,10 +174,6 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
                 </ThoughtLine>
               );
             }
-            if (item.kind === 'toolCall') {
-              const call = item as ToolCallItem;
-              return <ToolRow key={item.id} call={call} result={results.get(`${call.id}__result`)} />;
-            }
             if (item.kind === 'approvalRequest') {
               const approval = item as ApprovalRequestItem;
               if (approval.status !== 'pending') return null;
@@ -210,14 +189,16 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
               const message = item as Extract<AssistantItem, { kind: 'agentMessage' }>;
               if (!message.content?.trim()) return null;
               const streaming = writing && index === items.findLastIndex((entry) => entry.kind === 'agentMessage');
-              return <MarkdownBody key={item.id} content={message.content} accentColor="slate" streaming={streaming} />;
+              return <MarkdownBody key={item.id} content={message.content} accentColor="slate" streaming={streaming} renderCode={renderCode} />;
             }
             return null;
           })}
         </AnimatePresence>
 
-        {!itemReply && reply ? <MarkdownBody content={reply} accentColor="slate" streaming={writing} /> : null}
+        {!itemReply && reply ? <MarkdownBody content={reply} accentColor="slate" streaming={writing} renderCode={renderCode} /> : null}
+        <GenerationBatchPanel key={source.sourceId} source={source} disabled={writing || task.status !== 'SUCCESS'} />
 
+        {task.agentTurn?.generationNotice && <p role="status" className="text-xs leading-6 text-slate-500">{task.agentTurn.generationNotice}</p>}
         {failure ? <p className="text-sm leading-6 text-rose-600 dark:text-rose-400">{failure}</p> : null}
 
         <div className="flex items-center gap-2.5 pt-0.5 text-xs text-slate-400 dark:text-slate-500">

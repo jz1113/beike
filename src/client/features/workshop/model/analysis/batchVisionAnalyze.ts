@@ -75,7 +75,7 @@ export async function analyzeBatchProduct(
 
     const effectivePersona = deps.personaMode || 'asset_driven';
 
-    const { customBaseUrl: localUrl, customApiKey: localApiKey, apiFormat, allowInsecureHttp } = getMultimodalClientOverrides(deps.selectedVisionModel);
+    const { customBaseUrl: localUrl, customApiKey: localApiKey, textProtocol, apiFormat, allowInsecureHttp } = getMultimodalClientOverrides(deps.selectedVisionModel);
     const targetShotCount = deps.selectedShotCount || 4;
 
     let data: any = null;
@@ -147,6 +147,7 @@ export async function analyzeBatchProduct(
           model: requestModelId(deps.selectedVisionModel),
           customBaseUrl: localUrl,
           customApiKey: localApiKey,
+          textProtocol,
           apiFormat,
           allowInsecureHttp,
           previousGroupSignatures: deps.batchGroupSignaturesRef?.current?.slice(-4) || [],

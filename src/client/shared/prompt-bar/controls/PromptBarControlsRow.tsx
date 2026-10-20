@@ -4,7 +4,7 @@ import PromptBarModeSelector from './PromptBarModeSelector';
 import PromptBarUploadMenu from './PromptBarUploadMenu';
 import { PromptBarAssetPickerModal } from './PromptBarAssetPickerModal';
 import { PromptBarAtMenu } from './PromptBarAtMenu';
-import { menuLabelForModel, PromptBarModelPickerModal } from './PromptBarModelPickerModal';
+import { agentTriggerModelName, menuLabelForModel, PromptBarModelPickerModal } from './PromptBarModelPickerModal';
 import { PromptBarReasoningPill } from './PromptBarReasoningPill';
 import { PromptBarParamsPill } from './PromptBarParamsPill';
 import PromptBarSkillsModal from './PromptBarSkillsModal';
@@ -13,7 +13,6 @@ import { PromptBarSendActions } from './PromptBarSendActions';
 import type { PromptBarControlsRowProps } from './PromptBarControlsRowTypes';
 import { useAppStore } from '@client/store';
 import { useI18n } from '@client/shared/i18n';
-import { parseModelDetails } from '@shared/domain/models/modelParsing';
 import { matchesStoredModel, usePreferenceModels } from '../hooks/usePromptBarWorkflowModels';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 
@@ -23,28 +22,6 @@ function flatTriggerClass(active: boolean) {
       ? 'bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-white'
       : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-white/10'
   }`;
-}
-
-function looksLikeRawId(value: string) {
-  const text = value.trim();
-  return Boolean(text) && !/\s/.test(text) && text === text.toLowerCase() && /[-_./]/.test(text);
-}
-
-function looksBrokenLabel(label: string) {
-  return /\d{6,}/.test(label) || /\d\s+0\s+\d/.test(label);
-}
-
-/** Agent 触发按钮显示家族和版本，例如 gpt-6-sol → GPT 6 Sol。 */
-function agentTriggerModelName(modelId: string, syncedName: string) {
-  const fallback = (syncedName.split(' · ')[0] || syncedName || modelId || '未配置模型').trim();
-  if (syncedName && syncedName !== modelId && !looksLikeRawId(syncedName)) return fallback;
-  const source = modelId || syncedName;
-  if (!source) return fallback;
-  const parsed = parseModelDetails(source);
-  const variant = parsed.variantKey !== 'default' && parsed.displayName !== '标准版' ? parsed.displayName : '';
-  const label = [parsed.generationLabel, variant].filter(Boolean).join(' ');
-  if (!label || looksBrokenLabel(label) || parsed.familyId === 'general') return fallback;
-  return label;
 }
 
 function modalityOf(mode: QuickGenMode): 'chat' | 'image' | 'video' | 'audio' {

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 func newRuntimeID(prefix string) string {
@@ -39,6 +41,7 @@ type agentLoop struct {
 	space          string
 	items          []map[string]any
 	toolNotes      []string
+	toolVisuals    []map[string]any
 	maxRounds      int
 	depth          int
 	mu             *sync.Mutex
@@ -53,6 +56,7 @@ func (loop *agentLoop) run() (string, string, bool, error) {
 			return loop.models[0], "", false, err
 		}
 		loop.noteMessage(round)
+		loop.pushAssistant(round)
 		return loop.currentModel(round), loop.plan.incomplete(), true, nil
 	}
 	actual := loop.models[0]
@@ -120,18 +124,16 @@ func (loop *agentLoop) spawnSubagent(skillID, prompt string) string {
 	child.plan = &taskPlan{}
 	child.send = func(map[string]any) {}
 	child.messages = []map[string]any{{"role": "user", "content": strings.TrimSpace(skillID + "\n" + prompt)}}
-	names := []string{}
-	tools := []map[string]any{}
-	for _, name := range loop.names {
-		if name == "spawn_subagent" {
-			continue
-		}
-		names = append(names, name)
+	names := filterChildTools(loop.names, loop.box.mcp)
+	allowedName := map[string]bool{}
+	for _, name := range names {
+		allowedName[name] = true
 	}
+	tools := []map[string]any{}
 	for _, tool := range loop.tools {
 		fn, _ := tool["function"].(map[string]any)
 		name, _ := fn["name"].(string)
-		if name != "spawn_subagent" {
+		if allowedName[name] {
 			tools = append(tools, tool)
 		}
 	}
@@ -140,13 +142,85 @@ func (loop *agentLoop) spawnSubagent(skillID, prompt string) string {
 	child.box = &toolBox{
 		ctx: child.ctx, db: loop.box.db, cfg: loop.box.cfg, workspace: loop.box.workspace,
 		documents: loop.box.documents, client: loop.box.client, plan: child.plan, results: loop.results,
-		budget: loop.budget, allowed: names, mcp: loop.box.mcp,
+		budget: loop.budget, allowed: names, mcp: loop.box.mcp, visual: loop.box.visual,
 	}
 	_, summary, _, err := child.run()
 	if err != nil {
 		return toolJSON(false, err.Error())
 	}
 	body, _ := json.Marshal(map[string]any{"success": true, "subTurnId": newRuntimeID("sub"), "skillId": skillID, "summary": summary, "output": summary})
+	return string(body)
+}
+
+func filterChildTools(names []string, mcp map[string]mcpBinding) []string {
+	out := []string{}
+	for _, name := range names {
+		if childToolAllowed(name, mcp) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func childToolAllowed(name string, mcp map[string]mcpBinding) bool {
+	switch name {
+	case "spawn_subagent", "read_skill", "read_skill_file", "load_mcp_tool", "search_mcp_tools":
+		return false
+	}
+	binding, known := mcp[name]
+	if !known {
+		return true
+	}
+	return binding.readOnly && !binding.destructive && !binding.openWorld
+}
+
+func (loop *agentLoop) applyAllowed(allowed []string) {
+	loop.names = append([]string{}, allowed...)
+	loop.box.allowed = append([]string{}, allowed...)
+	next := make([]map[string]any, 0, len(loop.tools))
+	for _, tool := range loop.tools {
+		fn, _ := tool["function"].(map[string]any)
+		name, _ := fn["name"].(string)
+		if containsTool(allowed, name) {
+			next = append(next, tool)
+		}
+	}
+	loop.tools = next
+}
+
+func (loop *agentLoop) activateMCPTool(name string) string {
+	binding, ok := loop.box.mcp[name]
+	if !ok {
+		return toolJSON(false, unknownMCP(name, loop.box))
+	}
+	if binding.exposed {
+		body, _ := json.Marshal(map[string]any{"success": true, "name": name, "server": binding.serverLabel(), "remote": binding.remote, "message": "工具已在本轮函数列表中，可直接调用 " + name})
+		return string(body)
+	}
+	schema := binding.schema
+	if schema == nil {
+		schema = map[string]any{"type": "object"}
+	}
+	loop.tools = append(loop.tools, mcpFunctionSpec(name, binding.description, schema))
+	if !containsTool(loop.names, name) {
+		loop.names = append(loop.names, name)
+	}
+	if !containsTool(loop.box.allowed, name) {
+		loop.box.allowed = append(loop.box.allowed, name)
+	}
+	if !containsTool(loop.box.exposedMCP, name) {
+		loop.box.exposedMCP = append(loop.box.exposedMCP, name)
+	}
+	binding.exposed = true
+	loop.box.mcp[name] = binding
+	if len(loop.box.skillTools) > 0 {
+		loop.box.noteSkillTools(nil)
+	}
+	message := "已加入后续轮次的函数列表。下一轮可以调用 " + name + "。"
+	if binding.schemaBytes > mcpSchemaLimit {
+		message = "schema 较大，已加入后续轮次的函数列表。下一轮可以调用 " + name + "。"
+	}
+	body, _ := json.Marshal(map[string]any{"success": true, "name": name, "server": binding.serverLabel(), "remote": binding.remote, "message": message})
 	return string(body)
 }
 
@@ -174,7 +248,14 @@ func (loop *agentLoop) complete(final, withTools bool) (modelRound, error) {
 	loop.reasonItemID = ""
 	loop.messageItemID = ""
 	var last error
-	for _, model := range loop.models {
+	models := loop.models
+	if len(models) > 0 && modelgw.ResolveTextProtocol(models[0], loop.creds.protocol) != "openai" {
+		models = models[:1]
+	}
+	for _, model := range models {
+		if modelgw.ResolveTextProtocol(model, loop.creds.protocol) != modelgw.ResolveTextProtocol(models[0], loop.creds.protocol) {
+			continue
+		}
 		tools := loop.tools
 		if !withTools {
 			tools = nil
@@ -201,34 +282,6 @@ func (loop *agentLoop) complete(final, withTools bool) (modelRound, error) {
 		last = errors.New("模型请求失败，未获得有效响应")
 	}
 	return modelRound{}, last
-}
-
-func (loop *agentLoop) pushAssistant(round modelRound) {
-	message := map[string]any{"role": "assistant", "content": round.content}
-	if preserveReasoning(loop.currentModel(round)) && round.reasoning != "" {
-		message["reasoning_content"] = round.reasoning
-	}
-	loop.messages = append(loop.messages, message)
-}
-
-func (loop *agentLoop) pushToolMessage(round modelRound) {
-	calls := []any{}
-	for _, call := range round.toolCalls {
-		item := map[string]any{"id": call.id, "type": "function", "function": map[string]any{"name": call.name, "arguments": call.arguments}}
-		if call.extra != nil {
-			item["extra_content"] = call.extra
-		}
-		calls = append(calls, item)
-	}
-	content := any(round.content)
-	if strings.TrimSpace(round.content) == "" {
-		content = nil
-	}
-	message := map[string]any{"role": "assistant", "content": content, "tool_calls": calls}
-	if preserveReasoning(loop.currentModel(round)) && round.reasoning != "" {
-		message["reasoning_content"] = round.reasoning
-	}
-	loop.messages = append(loop.messages, message)
 }
 
 func (loop *agentLoop) executeCall(call modelToolCall) string {
@@ -310,6 +363,9 @@ func (loop *agentLoop) finishCall(item map[string]any, result, status string) st
 	}
 	item["status"] = status
 	item["summary"] = summarizeToolResult(result)
+	if action := clientAction(result); action != nil {
+		item["action"] = action
+	}
 	loop.items = append(loop.items, item)
 	if loop.persist != nil {
 		loop.persist(item)
@@ -318,9 +374,8 @@ func (loop *agentLoop) finishCall(item map[string]any, result, status string) st
 		"type": "item/toolCall/completed", "turnId": loop.turnID, "itemId": item["id"],
 		"name": item["name"], "displayName": item["displayName"], "status": status, "summary": item["summary"],
 	}
-	if action := clientAction(result); action != nil {
+	if action, ok := item["action"].(map[string]any); ok {
 		completed["action"] = action
-		item["action"] = action
 	}
 	loop.send(completed)
 	loop.send(map[string]any{"type": "tool_result", "name": item["name"], "displayName": item["displayName"], "status": status, "detail": item["summary"], "action": completed["action"]})
@@ -339,5 +394,6 @@ func (loop *agentLoop) finalReply() (string, error) {
 		return "", err
 	}
 	loop.noteMessage(round)
+	loop.pushAssistant(round)
 	return loop.currentModel(round), nil
 }

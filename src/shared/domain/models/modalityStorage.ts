@@ -1,3 +1,4 @@
+import { configuredTextProtocol, parseTextProtocol, resolveTextProtocol, type TextProtocol } from './textProtocol';
 import { domainStorage } from '../core/runtime';
 import { isAvatarDriverModel } from './avatarDrivers';
 import { DEFAULT_MODALITY_MODELS, type ModalityStorageKind, type StoredModalityModelItem } from './modalityDefaults';
@@ -79,7 +80,8 @@ function removeStorageItem(key: string): void {
 function isStoredModalityModel(item: unknown): item is StoredModalityModelItem {
   if (!item || typeof item !== 'object') return false;
   const row = item as StoredModalityModelItem;
-  return Boolean(row.id && row.modelId && !isInvalidPlaceholderModalityItem(row));
+  return Boolean(row.id && row.modelId && !isInvalidPlaceholderModalityItem(row)
+    && (row.textProtocol === undefined || parseTextProtocol(row.textProtocol)));
 }
 
 export function readStoredModalityModels(kind: ModalityStorageKind): StoredModalityModelItem[] {
@@ -324,6 +326,7 @@ export function readStoredApiProviders(): StoredApiProviderCredentials[] {
 
 export interface ModalityModelRoute {
   modelId: string;
+  textProtocol?: TextProtocol;
   baseUrl: string;
   apiKey: string;
 }
@@ -359,6 +362,7 @@ export function resolveModalityModelRoute(kind: ModalityStorageKind, value?: str
   const channel = providerCredentials(matched?.channelId);
   return {
     modelId: matched?.modelId || trimmed,
+    ...(kind === 'chat' ? { textProtocol: resolveTextProtocol(matched?.modelId || trimmed, matched ? configuredTextProtocol(matched) : undefined) } : {}),
     baseUrl: matched?.baseUrl?.trim() || channel?.baseUrl || globalConfig.baseUrl,
     apiKey: matched?.apiKey?.trim() || channel?.apiKey || globalConfig.apiKey,
   };

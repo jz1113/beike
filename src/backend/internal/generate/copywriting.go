@@ -24,6 +24,11 @@ func Copywriting(cfg config.Config) http.Handler {
 			writeCopyFallback(w, map[string]any{})
 			return
 		}
+		var ok bool
+		r, ok = BindTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		if copyNeedsUpstream(cfg, r, payload) {
 			runCopywriting(cfg, w, r, payload)
 			return

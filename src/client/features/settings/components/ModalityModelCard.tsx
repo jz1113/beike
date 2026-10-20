@@ -1,3 +1,4 @@
+import { configuredTextProtocol, type TextProtocol } from '@shared/domain/models/textProtocol';
 import React, { useEffect, useState, useMemo } from 'react';
 import type {
   ModalityKind,
@@ -199,6 +200,19 @@ export function ModalityModelCard({
           </div>
         </div>
 
+        {kind === 'chat' && (
+          <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-slate-500">
+            <span className="text-right">文本协议</span>
+            <select aria-label="文本协议" value={configuredTextProtocol(model) || 'auto'}
+              onChange={event => onUpdate({ textProtocol: event.target.value as TextProtocol })}
+              className="h-8 rounded-lg border border-slate-200 bg-transparent px-2 dark:border-white/10">
+              <option value="auto">自动（按实际模型 ID）</option>
+              <option value="openai">OpenAI 兼容</option>
+              <option value="gemini">Gemini 原生</option>
+              <option value="anthropic">Anthropic 原生</option>
+            </select>
+          </label>
+        )}
         {/* 行 2: API KEY */}
         <div className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
           <label className="text-right text-[11px] font-medium leading-none text-slate-500 select-none dark:text-slate-400">

@@ -82,7 +82,15 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 		}
 		return http.StatusOK, body
 	}
-	list, gatewayStatus, gatewayError := readGatewayModels(ctx, client, target, key, openAI)
+	var list []any
+	var gatewayStatus int
+	var gatewayError string
+	nativeProtocol := catalogNativeProtocol(payload, rawURL)
+	if nativeProtocol != "" {
+		list, gatewayStatus, gatewayError = readNativeModels(ctx, client, rawURL, key, nativeProtocol)
+	} else {
+		list, gatewayStatus, gatewayError = readGatewayModels(ctx, client, target, key, openAI)
+	}
 	if len(list) > 0 {
 		var models any
 		count := 0
@@ -106,7 +114,7 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 	}
 	strict, _ := payload["strict"].(bool)
 	failed := gatewayStatus == 401 || gatewayStatus == 403 || gatewayStatus == 404 || gatewayStatus == 500 || gatewayStatus == 200
-	if strict || openAI || failed {
+	if strict || openAI || nativeProtocol != "" || failed {
 		if gatewayError == "" {
 			gatewayError = "未发现可用模型"
 		}

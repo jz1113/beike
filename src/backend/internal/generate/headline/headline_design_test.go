@@ -22,6 +22,47 @@ func TestCoverPromptsDescribeXiaohongshuDesign(t *testing.T) {
 			t.Fatalf("missing %s", phrase)
 		}
 	}
+	if strings.Contains(design, "米白纸纹") {
+		t.Fatalf("cold start leaked into remembered design %s", design)
+	}
+}
+
+func TestCoverPromptColdStartOnlyWithoutMemory(t *testing.T) {
+	empty := coverDirectorPrompt("原标题", "洗完衣服不发灰", "3:4", "洗衣机", "", nil)
+	if !strings.Contains(empty, "米白纸纹") || !strings.Contains(empty, "不要套用固定风格名") {
+		t.Fatal(empty)
+	}
+	remembered := coverDirectorPrompt("原标题", "洗完衣服不发灰", "3:4", "洗衣机", "", []string{"- [纠正] 不要挡住品牌"})
+	if strings.Contains(remembered, "米白纸纹") {
+		t.Fatal(remembered)
+	}
+}
+
+func TestCoverDeconstructPromptKeepsEachCover(t *testing.T) {
+	prompt := coverDeconstructPrompt()
+	for _, phrase := range []string{"这一张封面", "不要总结成多张封面的共性", "不要套用", "uncertainty", "不会变成记忆条目"} {
+		if !strings.Contains(prompt, phrase) {
+			t.Fatalf("missing %s", phrase)
+		}
+	}
+	if strings.Contains(prompt, "至少两张") || strings.Contains(prompt, "必须遵守") {
+		t.Fatal(prompt)
+	}
+}
+
+func TestDeconstructRejectsEmptyModelAndMultipleImages(t *testing.T) {
+	handler := HeadlineDeconstruct(config.Config{})
+	cases := []string{
+		`{"imageUrls":["data:image/jpeg;base64,YQ=="],"model":""}`,
+		`{"imageUrls":["data:image/jpeg;base64,YQ==","data:image/jpeg;base64,Yg=="],"model":"vision"}`,
+	}
+	for _, body := range cases {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(body)))
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("status %d body %s", response.Code, response.Body.String())
+		}
+	}
 }
 
 func TestHeadlineDesignSchemaOrder(t *testing.T) {
@@ -60,7 +101,7 @@ func TestHeadlineDesignRequiresKey(t *testing.T) {
 	}
 	blocked := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "production"})
 	gateway := httptest.NewRecorder()
-	blocked.ServeHTTP(gateway, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["https://img.alicdn.com/a.jpg"],"originalTitle":"台灯","coverTitle":"台灯","customBaseUrl":"http://127.0.0.1","customApiKey":"secret"}`)))
+	blocked.ServeHTTP(gateway, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["https://img.alicdn.com/a.jpg"],"originalTitle":"台灯","coverTitle":"台灯","customBaseUrl":"http://127.0.0.1","textProtocol":"openai","customApiKey":"secret"}`)))
 	if gateway.Code != http.StatusBadRequest || !strings.Contains(gateway.Body.String(), "当前接口地址与服务器允许的视觉网关不一致") {
 		t.Fatalf("gateway %d %s", gateway.Code, gateway.Body.String())
 	}
@@ -95,7 +136,7 @@ func TestHeadlineDesignReturnsPlan(t *testing.T) {
 	t.Cleanup(func() { generate.ModelHTTP = previous })
 	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "integrated-cover-v5") || !strings.Contains(response.Body.String(), "标题文字锁定") {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
 	}

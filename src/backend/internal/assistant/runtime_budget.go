@@ -16,7 +16,15 @@ const (
 	maxSubAgents         = 2
 	toolStoreThreshold   = 12_000
 	toolContextLimit     = 48_000
+	skillResultThreshold = 80_000
 )
+
+func toolResultThreshold(name string) int {
+	if name == "read_skill" || name == "read_skill_file" {
+		return skillResultThreshold
+	}
+	return toolStoreThreshold
+}
 
 type execBudget struct {
 	modelRequests int

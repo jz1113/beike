@@ -1,6 +1,7 @@
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readEffectiveFallbackOrder } from '@client/shared/api/generation/fallbackOrder';
+import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import type { DeconstructJobSnapshot } from '@shared/contracts/deconstructJobs';
@@ -59,7 +60,7 @@ export async function submitDeconstructJob(input: {
   // with this same persisted jobId, so one user action cannot bill twice.
   const body = await readResponse(await apiRequest('POST', endpoint, {
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...rest, reviewBeforeSave: Boolean(rest.reviewBeforeSave), model: requestModelId(selectedVisionModel), overrides,
+    body: JSON.stringify({ ...rest, reviewBeforeSave: Boolean(rest.reviewBeforeSave), model: isDeepSeekRoute(selectedVisionModel) ? selectedVisionModel : selectedTextModel(selectedVisionModel).modelId, overrides,
       fallbackOrder: isolatedRoute ? [] : (readEffectiveFallbackOrder() || modelIds).filter(id => !isOpenAIModelRouteId(id) && !isDeepSeekRoute(id)).map(requestModelId) }),
   }));
   return snapshot(body.job);

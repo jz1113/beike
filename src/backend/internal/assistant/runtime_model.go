@@ -26,8 +26,9 @@ var approvedAssistantModels = map[string]bool{
 }
 
 type gatewayCreds struct {
-	baseURL string
-	apiKey  string
+	baseURL  string
+	apiKey   string
+	protocol string
 }
 
 func resolveTurnCreds(r *http.Request, model, customBase, customKey string, production bool) (gatewayCreds, error) {
@@ -89,6 +90,7 @@ type modelRound struct {
 	prompt     int
 	completion int
 	usageOK    bool
+	native     any
 }
 
 type modelToolCall struct {

@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -10,6 +11,19 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
+
+func TestVideoPayloadRequestsNativeAudio(t *testing.T) {
+	withAudio := buildVideoPayload("doubao-seedance-2.5", "海边", map[string]json.RawMessage{
+		"audio": json.RawMessage(`true`),
+	})
+	if withAudio.payload["audio"] != true || withAudio.payload["generate_audio"] != true {
+		t.Fatalf("native audio flags: %#v", withAudio.payload)
+	}
+	silent := buildVideoPayload("doubao-seedance-2.5", "海边", map[string]json.RawMessage{})
+	if _, ok := silent.payload["generate_audio"]; ok {
+		t.Fatalf("audio should stay unset: %#v", silent.payload)
+	}
+}
 
 func TestVideoBodyMatchesContract(t *testing.T) {
 	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})

@@ -1,0 +1,68 @@
+package videosales
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"beike.local/cloud/src/backend/internal/generate"
+)
+
+// chatWait matches the model gateway default and covers observed completions of about four minutes.
+const chatWait = 5 * time.Minute
+
+const longOutputTokens = 8192
+
+var errTruncatedOutput = errors.New("模型输出被截断，没有完整结果")
+
+func roleLabel(role string) string {
+	switch role {
+	case "main":
+		return "主图"
+	case "sku":
+		return "规格图"
+	default:
+		return "详情图"
+	}
+}
+
+func visionParts(intro string, images []CatalogImage) []map[string]any {
+	parts := []map[string]any{{"type": "text", "text": intro}}
+	for _, image := range images {
+		parts = append(parts,
+			map[string]any{"type": "text", "text": fmt.Sprintf("图片编号 %d，%s", image.Index, roleLabel(image.Role))},
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": image.URL, "index": image.Index}},
+		)
+	}
+	return parts
+}
+
+func postChatJSON(ctx context.Context, base, key string, body map[string]any, timeout time.Duration) (string, map[string]any, int, error) {
+	text, raw, status, err := generate.ChatCompletionPayload(ctx, base, key, body, timeout)
+	if err != nil {
+		return "", raw, status, err
+	}
+	if chatFinishReason(raw) == "length" {
+		return "", raw, status, errTruncatedOutput
+	}
+	if text == "" {
+		return "", raw, status, fmt.Errorf("模型没有返回内容")
+	}
+	return cleanJSONFence(text), raw, status, nil
+}
+
+func chatFinishReason(raw map[string]any) string {
+	choices, _ := raw["choices"].([]any)
+	if len(choices) == 0 {
+		return ""
+	}
+	choice, _ := choices[0].(map[string]any)
+	reason, _ := choice["finish_reason"].(string)
+	return reason
+}
+
+func withLongOutput(body map[string]any) map[string]any {
+	body["max_tokens"] = longOutputTokens
+	return body
+}

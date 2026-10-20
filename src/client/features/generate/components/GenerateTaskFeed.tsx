@@ -25,6 +25,7 @@ export interface GenerateTaskFeedProps {
   visibleFlatBatches: FlatBatchItem[];
   hasMoreBatches: boolean;
   loadMoreSentinelRef: RefObject<HTMLDivElement | null>;
+  onPinToLatest: () => void;
   onShowToast: (msg: string) => void;
 }
 
@@ -35,6 +36,7 @@ export function GenerateTaskFeed({
   visibleFlatBatches,
   hasMoreBatches,
   loadMoreSentinelRef,
+  onPinToLatest,
   onShowToast,
 }: GenerateTaskFeedProps) {
   const {
@@ -56,16 +58,10 @@ export function GenerateTaskFeed({
       const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
       setShowScrollBottom(distanceToBottom > 220);
     };
+    handleScroll();
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
-  }, [scrollContainerRef]);
-
-  const scrollToBottom = () => {
-    scrollContainerRef.current?.scrollTo({
-      top: scrollContainerRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
-  };
+  }, [scrollContainerRef, visibleFlatBatches]);
 
   const premiumGeneratingTaskId = useMemo(() => {
     for (let i = visibleFlatBatches.length - 1; i >= 0; i--) {
@@ -89,7 +85,7 @@ export function GenerateTaskFeed({
       ref={scrollContainerRef}
       data-generate-scroll
       {...pageMediaDropProps}
-      className={`flex-1 overflow-y-auto px-4 sm:px-6 py-4 ${dockSafeArea} relative`}
+      className={`flex-1 min-h-0 overflow-y-auto [overflow-anchor:none] px-4 sm:px-6 py-4 ${dockSafeArea} relative`}
     >
       {taskBatches.length === 0 && (
         <div className="min-h-[45vh] flex flex-col items-center justify-center gap-2 text-center px-4" role="status" aria-live="polite">
@@ -110,7 +106,6 @@ export function GenerateTaskFeed({
               <div
                 key={`${batch.batchId || 'batch'}-${bIdx}`}
                 className={batch.tasks.length > 1 ? "col-span-full min-w-0" : "min-w-0"}
-                style={{ contentVisibility: 'auto' }}
               >
                 <div className="space-y-8">
                   {(() => {
@@ -286,7 +281,7 @@ export function GenerateTaskFeed({
       {showScrollBottom && (
         <button
           type="button"
-          onClick={scrollToBottom}
+          onClick={onPinToLatest}
           aria-label="滚动到最新消息"
           className="fixed bottom-[calc(var(--prompt-dock-h,10rem)+1rem)] left-1/2 -translate-x-1/2 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-600 shadow-md backdrop-blur-xs transition-all hover:bg-white hover:text-slate-900 hover:shadow-lg cursor-pointer animate-fade-in dark:hover:text-white dark:text-slate-300 dark:hover:bg-white/10 dark:border-white/10 dark:bg-[#18191c]/95"
         >

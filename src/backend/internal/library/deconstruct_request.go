@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/system"
 )
@@ -23,6 +24,11 @@ func deconstructRequestHandler(cfg config.Config) http.HandlerFunc {
 		var payload map[string]any
 		if json.Unmarshal(body, &payload) != nil {
 			writeDeconstructFailure(w, "请求数据格式异常")
+			return
+		}
+		var protocolOK bool
+		r, protocolOK = generate.BindTextProtocol(w, r, payload)
+		if !protocolOK {
 			return
 		}
 		majorID := ""

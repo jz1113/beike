@@ -13,6 +13,7 @@ import Skeleton from '@client/shared/ui/Skeleton';
 import CollectorMediaGallery from './CollectorMediaGallery';
 import CollectorAssistantPanel from './CollectorAssistantPanel';
 import ScraperEngineSelector from './ScraperEngineSelector';
+import { CollectionSourceStatus } from './CollectionSourceStatus';
 
 import type { CollectorSinglePanelProps } from './collectorSinglePanelTypes';
 export type { CollectorSinglePanelProps } from './collectorSinglePanelTypes';
@@ -119,7 +120,7 @@ export default function CollectorSinglePanel({
 
           <button
             type="button"
-            onClick={handleSingleCollect}
+            onClick={() => handleSingleCollect()}
             disabled={!canCollect}
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 transition-colors hover:bg-black dark:hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 dark:disabled:bg-white/10 disabled:text-slate-400 dark:disabled:text-slate-600"
             title="开始采集（⌘ / Ctrl + Enter）"
@@ -131,6 +132,10 @@ export default function CollectorSinglePanel({
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <span>默认优先使用缓存；重新采集可能产生接口计费。</span>
+        <button type="button" disabled={!canCollect} onClick={() => handleSingleCollect(true)} title="跳过缓存调用接口，可能产生计费" className={`${secondaryBtnClass} disabled:cursor-not-allowed disabled:opacity-50`}>重新采集（可能计费）</button>
+      </div>
       {/* 🌟 加载中的骨架占位（深浅模式毛玻璃自适应） */}
       {isCollectingSingle && !singleCollectedResult && (
         <div
@@ -211,7 +216,7 @@ export default function CollectorSinglePanel({
                       <span>作者: <strong className="text-slate-700 dark:text-slate-300">{singleCollectedResult.author}</strong></span>
                     )}
                     <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-medium">
-                      素材总数: <strong className="text-slate-900 dark:text-white font-mono">{mediaAssetCount(singleCollectedResult)}</strong>
+                      已返回素材: <strong className="text-slate-900 dark:text-white font-mono">{mediaAssetCount(singleCollectedResult)}</strong>
                       {collectedVideoList.length > 0 ? `（含 ${collectedVideoList.length} 条视频/动态）` : ' 张'}
                     </span>
                     {collectedVideoList.length > 0 && (
@@ -221,6 +226,7 @@ export default function CollectorSinglePanel({
                       </span>
                     )}
                   </div>
+                  <CollectionSourceStatus fromCache={singleCollectedResult.fromCache} apiUsed={singleCollectedResult.apiUsed} detailsMissing={singleCollectedResult.detailsMissing} />
                 </div>
               </div>
 

@@ -127,6 +127,8 @@ function snapshotItem(value: unknown, batchId: string): PosterBatchSnapshotItem 
     status: importError && !(status === 'complete' && (resultUrl || resultCacheKey)) ? 'failed' : status,
     importError, error: importError || stringValue(item.error),
     modelFallbackNote: stringValue(item.modelFallbackNote),
+    memorySampleId: stringValue(item.memorySampleId)?.trim(),
+    memoryEntryIds: Array.isArray(item.memoryEntryIds) ? item.memoryEntryIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0) : undefined,
   };
 }
 
@@ -156,6 +158,7 @@ function normalizeRecord(value: unknown): PosterBatchRecord | undefined {
       imageModel: settings.imageModel || 'gpt-image-2', titleModel: settings.titleModel || 'gemini-3.7-flash',
       titleHandling: settings.titleHandling || 'rewrite', imageQuality: settings.imageQuality || 'high',
       concurrency: settings.concurrency || 5,
+      memorySampleId: settings.memorySampleId || '',
     },
     items,
   };

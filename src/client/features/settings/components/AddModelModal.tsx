@@ -12,6 +12,7 @@ interface Props {
 }
 
 export const API_TEMPLATE_OPTIONS = [
+  { id: 'auto', label: '自动（按实际模型 ID）', desc: 'Gemini 和 Claude 默认使用各自原生文本/图片理解协议；其他模型使用 OpenAI 兼容协议。不改变地址和密钥。' },
   { id: 'chat_completions', label: 'Chat Completions 兼容接口', desc: '使用 Chat Completions (/v1/chat/completions) 请求格式。每个模型可单独配置地址和 Key，选择模型时自动使用对应协议。' },
   { id: 'responses', label: 'Responses 兼容接口', desc: '使用 OpenAI Responses 协议 (/v1/responses) 格式。' },
   { id: 'gemini', label: 'Gemini 原生接口', desc: '使用 Gemini generateContent 格式。' },
@@ -35,7 +36,7 @@ export default function AddModelModal({
 
   const [displayName, setDisplayName] = useState('');
   const [modelId, setModelId] = useState('');
-  const [apiTemplate, setApiTemplate] = useState('chat_completions');
+  const [apiTemplate, setApiTemplate] = useState('auto');
   const [capability, setCapability] = useState<'chat' | 'image' | 'video'>('chat');
   const [useProviderCreds, setUseProviderCreds] = useState(true);
   const [customBaseUrl, setCustomBaseUrl] = useState('');
@@ -64,6 +65,7 @@ export default function AddModelModal({
       customBaseUrl: !useProviderCreds && customBaseUrl.trim() ? customBaseUrl.trim() : (provider?.baseUrl || undefined),
       customApiKey: !useProviderCreds && customApiKey.trim() ? customApiKey.trim() : (provider?.apiKey || undefined),
       apiTemplate,
+      ...(isMultimodal ? { textProtocol: apiTemplate === 'chat_completions' || apiTemplate === 'responses' ? 'openai' as const : apiTemplate === 'gemini' ? 'gemini' as const : apiTemplate === 'anthropic' ? 'anthropic' as const : 'auto' as const } : {}),
       enabled: true,
       isCustom: true,
       isImage,

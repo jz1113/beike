@@ -18,7 +18,7 @@ export function CoverBranchDetailPopover({ branch, entries, samples, busy, onClo
   const visible = entries.filter((entry) => entry.status !== 'trashed');
   const pending = visible.filter((entry) => entry.status === 'pending');
   const adopted = visible.filter((entry) => entry.status === 'adopted');
-  const thumb = (entry: CoverMemoryEntry) => samples.find((sample) => sample.id === entry.sampleId)?.imageUrls[0];
+  const sampleOf = (entry: CoverMemoryEntry) => samples.find((sample) => sample.id === entry.sampleId);
 
   const submit = () => {
     const next = rule.trim();
@@ -40,9 +40,10 @@ export function CoverBranchDetailPopover({ branch, entries, samples, busy, onClo
             {group.list.length === 0 ? <p className="text-[11px] text-slate-500">没有条目</p> : group.list.map((entry) => (
               <article key={entry.id} className="mb-2 rounded-xl border border-white/10 bg-white/[0.03] p-2">
                 <div className="flex gap-2">
-                  {thumb(entry) && <img src={thumb(entry)} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />}
+                  {sampleOf(entry)?.imageUrls[0] && <img src={sampleOf(entry)?.imageUrls[0]} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />}
                   <p className="min-w-0 flex-1 leading-5">{entry.rule}</p>
                 </div>
+                {(sampleOf(entry)?.imageUrls.length || 0) > 1 && <p className="mt-1 text-[10px] text-slate-500">旧版分组反推，缩略图是这组的第一张</p>}
                 {entry.evidence && <p className="mt-1 text-[10px] text-slate-400">依据：{entry.evidence}</p>}
                 <div className="mt-2 flex gap-2">
                   {entry.status !== 'adopted' && <button type="button" disabled={busy} onClick={() => onSetStatus(entry, 'adopted')} className="rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-bold text-slate-950 disabled:opacity-40">采纳</button>}

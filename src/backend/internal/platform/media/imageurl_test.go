@@ -8,7 +8,7 @@ func TestNormalizeKeepsSignedQueryAndRewritesJd(t *testing.T) {
 		t.Fatalf("signed query changed: %s", got)
 	}
 	got := NormalizeImageURLToStandardJpg("https://img14.360buyimg.com/n0/s800x800_jfs/t1/a.webp")
-	if got != "https://img10.360buyimg.com/pcpubliccms/s1440x1440_jfs/t1/a.jpg" {
+	if got != "https://img10.360buyimg.com/pcpubliccms/s1440x1440_jfs/t1/a.webp" {
 		t.Fatalf("jd url %s", got)
 	}
 	if IsProductImageURL("https://example.com/video.mp4") {

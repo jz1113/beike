@@ -53,7 +53,7 @@ func TestCompressHistorySummarizesOverflow(t *testing.T) {
 	for i := 0; i < 41; i++ {
 		messages = append(messages, map[string]any{"role": "user", "content": "消息"})
 	}
-	out := compressHistory(context.Background(), messages, gatewayCreds{baseURL: server.URL, apiKey: "secret"}, "gemini-3.7-flash", true)
+	out := compressHistory(context.Background(), messages, gatewayCreds{baseURL: server.URL, apiKey: "secret", protocol: "openai"}, "gemini-3.7-flash", true)
 	if out[0]["role"] != "system" {
 		t.Fatal("system prompt dropped")
 	}

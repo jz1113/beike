@@ -1,5 +1,6 @@
+import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getEnabledMultimodalModelsFromSettings, isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
+import { getEnabledMultimodalModelsFromSettings, isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import type { BatchProductItem } from '../batchTypes';
 import { isDeliverableWorkshopResult } from '../generation/workshopReadiness';
@@ -52,11 +53,12 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
   try {
     const copyModel = isOpenAIModelRouteId(ctx.selectedVisionModel)
       ? getEnabledMultimodalModelsFromSettings().find(model => model.channel !== 'openai')?.id || 'gpt-5.4-mini'
-      : requestModelId(ctx.selectedVisionModel);
+      : ctx.selectedVisionModel;
     const res = await apiFetch('/api/generate/copywriting', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...getMultimodalClientOverrides(copyModel),
         model: copyModel || undefined,
         productTitle: item.title,
         productCategory: item.category,

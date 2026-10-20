@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -83,9 +84,14 @@ func TestEntriesFromDeconstruction(t *testing.T) {
 		"harmony":    map[string]any{"rule": "米白、近黑、暖铜三色", "evidence": "灯座"},
 		"variation":  map[string]any{"rule": "这一张取纸感", "evidence": "整张"},
 	}
+	parsed["subject"] = map[string]any{"observation": "右下角有一枚手绘星星", "method": "保留右下角手绘星星", "uncertainty": "看不清星星是否描边"}
 	entries := entriesFromDeconstruction("sample_1", parsed)
 	if len(entries) != 6 {
 		t.Fatalf("entries %d", len(entries))
+	}
+	subject := entries[4]
+	if subject.Branch != "subject" || subject.Rule != "保留右下角手绘星星" || !strings.Contains(subject.Evidence, "手绘星星") || !strings.Contains(subject.Evidence, "不确定：看不清星星是否描边") {
+		t.Fatalf("unique trait %#v", subject)
 	}
 	if entries[0].Branch != "layout" || entries[0].Evidence != "顶部两行" || entries[0].Status != "pending" {
 		t.Fatalf("layout %#v", entries[0])
@@ -140,7 +146,7 @@ func TestHeadlineDesignInjectsAdoptedMemory(t *testing.T) {
 	t.Cleanup(func() { generate.ModelHTTP = previous })
 
 	response := httptest.NewRecorder()
-	request := `{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","batchId":"batch_1","itemId":"item_1","itemTitle":"台灯很好用","previousDesign":"上一张是深底黄字","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
+	request := `{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","batchId":"batch_1","itemId":"item_1","itemTitle":"台灯很好用","previousDesign":"上一张是深底黄字","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
 	HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
@@ -202,7 +208,7 @@ func TestHeadlineDeconstructStoresPendingEntries(t *testing.T) {
 	t.Cleanup(func() { generate.ModelHTTP = previous })
 
 	response := httptest.NewRecorder()
-	request := `{"imageUrls":["data:image/jpeg;base64,YQ==","data:image/jpeg;base64,Yg=="],"title":"纸感样张","model":"gemini-3.7-flash","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
+	request := `{"imageUrls":["data:image/jpeg;base64,YQ=="],"title":"纸感样张","model":"gemini-3.7-flash","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
 	HeadlineDeconstruct(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(request)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "标题压住商品上沿") {
 		t.Fatalf("deconstruct %d %s", response.Code, response.Body.String())
@@ -218,6 +224,155 @@ func TestHeadlineDeconstructStoresPendingEntries(t *testing.T) {
 	}
 	if err := read.QueryRow(`SELECT "rule" FROM "CoverMemoryEntry" WHERE "status"='pending'`).Scan(&rule); err != nil || rule != "标题压住商品上沿" {
 		t.Fatalf("entry %s %v", rule, err)
+	}
+}
+
+func TestDesignUsesOnlyRequestedSample(t *testing.T) {
+	cfg := coverMemoryConfig(t)
+	db, err := database.OpenWrite(cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", "platform", "database", "migrate", "sources", "cover_memory.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	if err := insertCoverEntries(ctx, db, "local", []coverEntry{
+		{ID: "old_layout", Branch: "layout", Rule: "旧样张使用深色满版", SampleID: "sample_old", Status: "adopted", Source: "sample"},
+		{ID: "new_layout", Branch: "layout", Rule: "新样张把标题放在左下", SampleID: "sample_new", Status: "adopted", Source: "sample"},
+		{ID: "fix_only", Branch: "correction", Rule: "不要挡住镜头", Status: "adopted", Source: "correction"},
+		{ID: "pending_new", Branch: "background", Rule: "待确认的网格不要注入", SampleID: "sample_new", Status: "pending", Source: "sample"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE "CoverMemoryEntry" SET "createdAt"='2020-01-01T00:00:00Z' WHERE "id"='old_layout'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE "CoverMemoryEntry" SET "createdAt"='2024-01-01T00:00:00Z' WHERE "id"='new_layout'`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+
+	plan, _ := json.Marshal(map[string]any{
+		"title": "台灯", "titleLines": []string{"台灯"}, "productNameLine": "",
+		"composition": "居中", "material": "木桌", "palette": "暖白", "artDirectionId": "A",
+		"typographySystem": "A", "typography": "粗黑", "visualAnchor": "灯", "styleFamily": "桌面",
+		"layout": "左下标题", "typeface": "超粗黑体", "textColor": "白字",
+		"background": "浅灰", "subject": "台灯", "harmony": "灰白黑", "variation": "改了位置",
+		"imagePrompt": strings.Repeat("生成一张封面并保留商品真实颜色。", 20) + "「台灯」",
+	})
+	body, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(plan)}}}})
+	var seen string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		seen = string(raw)
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+	previous := generate.ModelHTTP
+	generate.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { generate.ModelHTTP = previous })
+	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: cfg.DatabaseURL})
+	request := `{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","memorySampleId":"sample_old","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"memorySampleId":"sample_old"`) {
+		t.Fatalf("design %d %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(seen, "旧样张使用深色满版") || strings.Contains(seen, "新样张把标题放在左下") || strings.Contains(seen, "待确认的网格不要注入") || !strings.Contains(seen, "不要挡住镜头") {
+		t.Fatal(seen)
+	}
+	read, err := database.OpenWrite(cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer read.Close()
+	var oldUses, newUses int
+	if err := read.QueryRow(`SELECT "useCount" FROM "CoverMemoryEntry" WHERE "id"='old_layout'`).Scan(&oldUses); err != nil || oldUses != 1 {
+		t.Fatalf("old uses %d %v", oldUses, err)
+	}
+	if err := read.QueryRow(`SELECT "useCount" FROM "CoverMemoryEntry" WHERE "id"='new_layout'`).Scan(&newUses); err != nil || newUses != 0 {
+		t.Fatalf("new uses %d %v", newUses, err)
+	}
+	missed := httptest.NewRecorder()
+	handler.ServeHTTP(missed, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","memorySampleId":"missing","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	if missed.Code != http.StatusBadRequest || !strings.Contains(missed.Body.String(), "所选样张没有已采纳的特点") {
+		t.Fatalf("missing %d %s", missed.Code, missed.Body.String())
+	}
+}
+
+func TestHeadlineDeconstructReasoningEffort(t *testing.T) {
+	cfg := coverMemoryConfig(t)
+	db, err := database.OpenWrite(cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", "platform", "database", "migrate", "sources", "cover_memory.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+
+	var calls atomic.Int32
+	var firstEffort atomic.Bool
+	var defaultEffort atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		body, _ := io.ReadAll(r.Body)
+		var sent map[string]any
+		if json.Unmarshal(body, &sent) != nil {
+			t.Errorf("upstream body %s", body)
+		}
+		if _, leaked := sent["reasoning_effort"]; leaked {
+			t.Errorf("raw effort leaked %s", body)
+		}
+		effort, _ := sent["output_config"].(map[string]any)
+		thinking, _ := sent["thinking"].(map[string]any)
+		if n == 1 {
+			firstEffort.Store(effort["effort"] == "high" && thinking["type"] == "adaptive")
+		}
+		if n == 2 && effort["effort"] != nil {
+			defaultEffort.Store(true)
+		}
+		reply := `{"layout":{"rule":"标题压住商品上沿","evidence":"顶部两行"}}`
+		_ = json.NewEncoder(w).Encode(map[string]any{"content": []any{map[string]any{"type": "text", "text": reply}}, "stop_reason": "end_turn", "usage": map[string]any{"input_tokens": 1, "output_tokens": 2}})
+	}))
+	defer server.Close()
+	previous := generate.ModelHTTP
+	generate.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { generate.ModelHTTP = previous })
+
+	handler := HeadlineDeconstruct(cfg)
+	post := func(effort string) *httptest.ResponseRecorder {
+		body := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"title":"纸感样张","model":"claude-haiku-5-5","textProtocol":"anthropic","customApiKey":"secret","customBaseUrl":"` + server.URL + `"`
+		if effort != "" {
+			body += `,"reasoningEffort":"` + effort + `"`
+		}
+		body += `}`
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(body)))
+		return rec
+	}
+	accepted := post("high")
+	if accepted.Code != http.StatusOK || !firstEffort.Load() || calls.Load() != 1 {
+		t.Fatalf("accepted %d calls %d effort %v body %s", accepted.Code, calls.Load(), firstEffort.Load(), accepted.Body.String())
+	}
+	omitted := post("")
+	if omitted.Code != http.StatusOK || calls.Load() != 2 || defaultEffort.Load() {
+		t.Fatalf("default %d calls %d leaked %v body %s", omitted.Code, calls.Load(), defaultEffort.Load(), omitted.Body.String())
+	}
+
+	rejected := httptest.NewRecorder()
+	handler.ServeHTTP(rejected, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"model":"claude-haiku-5-5","reasoningEffort":"max","textProtocol":"anthropic","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	if rejected.Code != http.StatusBadRequest || !strings.Contains(rejected.Body.String(), "不支持的思考强度") || calls.Load() != 2 {
+		t.Fatalf("rejected %d calls %d body %s", rejected.Code, calls.Load(), rejected.Body.String())
 	}
 }
 

@@ -15,12 +15,38 @@ import (
 func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
 	model := videoRequestedModel(payload)
 	base, apiKey := videoCredentials(cfg, r, payload)
-	if apiKey == "" {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "未配置视频生成接口密钥 (API Key)。请前往「⚙️ 设置 -> 服务接口配置」中填入凭证。", "missingConfig": "apiKey", "retryable": false})
-		return
-	}
 	prompt := strings.TrimSpace(rawString(payload, "prompt"))
 	adapted := buildVideoPayload(model, prompt, payload)
+	key, err := videoSubmissionKey(r, payload)
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "retryable": false, "error": err.Error()})
+		return
+	}
+	claim, err := claimVideoSubmission(cfg, r, payload, adapted, base, key)
+	if err != nil {
+		body := map[string]any{"success": false, "taskKey": key, "submissionUnknown": true, "submissionOutcome": "unknown", "retryable": false, "error": "原视频提交回执暂时无法核对，未重发上游请求"}
+		status := http.StatusServiceUnavailable
+		if err == errVideoSubmissionConflict {
+			status = http.StatusConflict
+			body["submissionUnknown"] = false
+			body["submissionOutcome"] = "rejected"
+			body["submissionRejected"] = true
+			body["idempotencyConflict"] = true
+			body["error"] = err.Error()
+		}
+		httpx.WriteJSON(w, status, body)
+		return
+	}
+	if !claim.claimed {
+		writeVideoSubmission(w, claim, true)
+		return
+	}
+	if apiKey == "" {
+		message := "未配置视频生成接口密钥 (API Key)。请前往「⚙️ 设置 -> 服务接口配置」中填入凭证。"
+		_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{Status: "FAILURE", FailReason: message})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "error": message, "missingConfig": "apiKey", "retryable": false})
+		return
+	}
 	encoded, _ := json.Marshal(adapted.payload)
 	started := time.Now()
 	result := modelgw.SubmitVideo(r.Context(), modelgw.SubmitCommand{
@@ -39,17 +65,23 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 			status = http.StatusServiceUnavailable
 			message = "视频提交结果不确定，请核对上游任务记录"
 		}
-		body := map[string]any{"success": false, "submissionOutcome": string(result.Outcome), "submissionUnknown": unknown, "retryable": false, "error": message}
+		state := "FAILURE"
+		if unknown {
+			state = "SUBMISSION_UNKNOWN"
+		}
+		_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{TaskID: result.TaskID, Status: state, FailReason: message})
+		body := map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": string(result.Outcome), "submissionUnknown": unknown, "submissionRejected": !unknown, "retryable": false, "error": message}
 		if unknown && result.TaskID != "" {
 			body["taskId"] = result.TaskID
 		}
 		httpx.WriteJSON(w, status, body)
 		return
 	}
-	recordID, err := persistVideoTask(cfg, r, payload, adapted, result.TaskID, prompt)
+	recordID := claim.recordID
+	err = persistVideoTask(cfg, r, adapted, recordID, result.TaskID, prompt)
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{
-			"success": false, "error": "任务已提交，但本地记录保存失败，请核对原任务", "taskId": result.TaskID,
+			"success": false, "taskKey": key, "recordId": recordID, "error": "任务已提交，但本地记录保存失败，请核对原任务", "taskId": result.TaskID,
 			"submissionOutcome": "accepted", "submissionUnknown": true, "retryable": false,
 		})
 		return
@@ -61,7 +93,7 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"success": true, "taskId": result.TaskID, "recordId": recordID, "model": adapted.modelID, "family": adapted.family,
+		"success": true, "taskKey": key, "submissionOutcome": "accepted", "retryable": false, "taskId": result.TaskID, "recordId": recordID, "model": adapted.modelID, "family": adapted.family,
 		"duration": adapted.duration, "aspect_ratio": adapted.ratio, "resolution": adapted.resolution, "size": adapted.size,
 		"status": "IN_PROGRESS", "prompt": prompt,
 		"timing": map[string]any{"parseMs": 0, "convertMs": 0, "gatewayMs": int(time.Since(started).Milliseconds()), "dbMs": 0, "totalMs": int(time.Since(started).Milliseconds()), "payloadKB": len(encoded) / 1024, "imageCount": len(adapted.images), "endpointAttempts": result.EndpointAttempts, "convertCacheHits": 0},
@@ -95,6 +127,10 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	body := map[string]any{
 		"model": model, "prompt": prompt, "duration": duration, "ratio": ratio, "aspect_ratio": ratio,
 		"resolution": resolution, "watermark": rawBool(payload, "watermark"), "size": videoPixelSize(ratio, resolution),
+	}
+	if rawBool(payload, "audio") {
+		body["audio"] = true
+		body["generate_audio"] = true
 	}
 	if len(images) > 0 {
 		body["images"] = images
@@ -204,14 +240,9 @@ func videoCredentials(cfg config.Config, r *http.Request, payload map[string]jso
 	return base, imageAPIKey(cfg, r, payload, clientBase)
 }
 
-func persistVideoTask(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, adapted videoAdapted, taskID, prompt string) (string, error) {
-	db, err := openTaskDB(cfg)
-	if err != nil {
-		return "", err
-	}
-	defer db.Close()
-	return insertImageTask(r.Context(), db, workspaceOf(r), imageTaskDraft{
-		ProductID: rawString(payload, "productId"), Prompt: prompt, TaskID: taskID, Model: adapted.modelID,
+func persistVideoTask(cfg config.Config, r *http.Request, adapted videoAdapted, recordID, taskID, prompt string) error {
+	return settleVideoSubmission(cfg, r, recordID, imageTaskDraft{
+		Prompt: prompt, TaskID: taskID, Model: adapted.modelID,
 		Size: adapted.ratio, Quality: adapted.resolution, Status: "IN_PROGRESS", MediaType: "video",
 	})
 }

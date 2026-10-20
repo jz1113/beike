@@ -62,6 +62,69 @@ func TestCollectStoresWanbangProduct(t *testing.T) {
 	}
 }
 
+func TestCollectAcceptsOfficialWanbangSuccessEnvelope(t *testing.T) {
+	db := openCollectDB(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "/jd/item_get_pro/") || r.URL.Query().Get("num_iid") != "10235916959245" {
+			t.Errorf("url %s", r.URL.String())
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"item": {
+				"num_iid": "10235916959245",
+				"title": "京东测试商品",
+				"price": "30.90",
+				"orginal_price": "49.00",
+				"nick": "京东自营",
+				"brand": "贝壳",
+				"rootCatId": "1315",
+				"pic_url": "//img13.360buyimg.com/n12/jfs/t1/125462/28/28387/257349/62e60e0bEddd31475/41ed23e1642bd846.jpg",
+				"desc": "",
+				"desc_img": "",
+				"item_imgs": {"item_img": [{"url": "//img10.360buyimg.com/n1/jfs/t1/233092/38/27075/59513/66decdddFe35f87b5/d7bb1d6573c8dd24.jpg"}]},
+				"props": []
+			},
+			"error": "",
+			"reason": "",
+			"error_code": "0000"
+		}`))
+	}))
+	defer server.Close()
+	original := buildWanbangURL
+	buildWanbangURL = func(input productInput, apiName, apiKey, apiSecret string) string {
+		return server.URL + original(input, apiName, apiKey, apiSecret)[len("https://api-gw.onebound.cn"):]
+	}
+	defer func() { buildWanbangURL = original }()
+	result := Product(context.Background(), db, "local", map[string]any{"platform": "jd", "url": "10235916959245"}, "key", "secret", server.Client())
+	body := mustJSON(t, result.Body)
+	if result.Status != http.StatusOK || strings.Contains(body, "未返回有效的商品图片") || !strings.Contains(body, `"title":"京东测试商品"`) {
+		t.Fatalf("status %d body %s", result.Status, body)
+	}
+	if !strings.Contains(body, "41ed23e1642bd846.jpg") || !strings.Contains(body, "d7bb1d6573c8dd24.jpg") {
+		t.Fatalf("images %s", body)
+	}
+}
+
+func TestWanbangFailureMapsUpstreamCodes(t *testing.T) {
+	cases := []struct {
+		code, text string
+	}{
+		{"4000", "万邦采集接口服务器异常，请稍后重试"},
+		{"4001", "万邦采集接口网络异常，请稍后重试"},
+		{"4002", "万邦采集接口访问目标站点失败，请稍后重试"},
+		{"5000", "万邦采集接口返回未知错误，请稍后重试"},
+	}
+	for _, item := range cases {
+		failure := wanbangFailure(map[string]any{"error_code": item.code, "error": "upstream"})
+		if failure.error != item.text || failure.status != http.StatusBadGateway || failure.stop {
+			t.Fatalf("%s %#v", item.code, failure)
+		}
+	}
+	if wanbangReportedError("") || wanbangReportedError(" ok ") || wanbangReportedError("SUCCESS") || !wanbangReportedError("item-not-found") {
+		t.Fatal("error text classification")
+	}
+}
+
 func openCollectDB(t *testing.T) *sql.DB {
 	t.Helper()
 	db, err := database.OpenWrite(filepath.Join(t.TempDir(), "collect.db"))

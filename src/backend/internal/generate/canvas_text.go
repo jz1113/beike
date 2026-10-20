@@ -24,6 +24,11 @@ func CanvasText(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "请选择模型并填写生成要求（最多 20000 字）"})
 			return
 		}
+		var ok bool
+		r, ok = BindTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		model, _ := payload["model"].(string)
 		prompt, _ := payload["prompt"].(string)
 		if strings.TrimSpace(model) == "" || utf8.RuneCountInString(strings.TrimSpace(model)) > 200 || strings.TrimSpace(prompt) == "" || utf8.RuneCountInString(strings.TrimSpace(prompt)) > 20000 {

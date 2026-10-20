@@ -31,6 +31,24 @@ export function menuLabelForModel(modelId: string, fallback = '') {
   return variant ? `${parsed.generationLabel} ${variant}` : parsed.generationLabel;
 }
 
+function looksLikeRawId(value: string) {
+  const text = value.trim();
+  return Boolean(text) && !/\s/.test(text) && text === text.toLowerCase() && /[-_./]/.test(text);
+}
+
+/** Agent 触发按钮显示家族和版本，例如 gpt-6-sol → GPT 6 Sol。 */
+export function agentTriggerModelName(modelId: string, syncedName: string) {
+  const fallback = (syncedName.split(' · ')[0] || syncedName || modelId || '未配置模型').trim();
+  if (syncedName && syncedName !== modelId && !looksLikeRawId(syncedName)) return fallback;
+  const source = modelId || syncedName;
+  if (!source) return fallback;
+  const parsed = parseModelDetails(source);
+  const variant = parsed.variantKey !== 'default' && parsed.displayName !== '标准版' ? parsed.displayName : '';
+  const label = [parsed.generationLabel, variant].filter(Boolean).join(' ');
+  if (!label || looksBroken(label) || parsed.familyId === 'general') return fallback;
+  return label;
+}
+
 function groupKey(model: PreferenceModelItem) {
   return model.upstreamId || model.id;
 }

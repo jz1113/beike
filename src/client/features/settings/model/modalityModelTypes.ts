@@ -6,6 +6,8 @@ export interface ModalityModelItem {
   modality: ModalityKind;
   vendor: string;
   modelId: string;
+  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
+  apiTemplate?: string;
   apiKey?: string;
   baseUrl?: string;
   isInfrequent?: boolean;

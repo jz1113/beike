@@ -1,4 +1,7 @@
 import { apiFetch } from '@client/shared/api/apiClient';
+import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
+import { coverDeconstructBody } from '../model/coverReasoning';
+import { resolveCoverVisionRoute } from '../model/coverVisionModels';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import {
   CoverMemoryResponseSchema,
@@ -38,11 +41,32 @@ export async function clearCoverTrash(): Promise<void> {
   await readJson(await apiFetch('/api/generate/headline-memory/trash', { method: 'DELETE' }));
 }
 
-export async function deconstructCoverSamples(imageUrls: string[], model: string, title: string): Promise<void> {
-  const data = await readJson(await apiFetch('/api/generate/headline-deconstruct', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageUrls, model, title }),
-  }));
-  recordChatTokens({ modelId: typeof data.model === 'string' ? data.model : model, type: 'vision', usage: data.usage });
+export class CoverDeconstructError extends Error {
+  constructor(message: string, readonly uncertain: boolean) {
+    super(message);
+  }
+}
+
+export async function deconstructCoverSample(imageUrl: string, selectionId: string, title: string, effort?: ReasoningEffort): Promise<{ sampleId: string; model: string }> {
+  const route = resolveCoverVisionRoute(selectionId);
+  let response: Response;
+  try {
+    response = await apiFetch('/api/generate/headline-deconstruct', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(coverDeconstructBody(route, imageUrl, title, effort)),
+    });
+  } catch (error) {
+    throw new CoverDeconstructError(error instanceof Error ? error.message : '反推请求没有完成', true);
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.success === false) {
+    const message = typeof data?.error === 'string' ? data.error : '封面反推失败';
+    throw new CoverDeconstructError(message, message.includes('请先刷新核对'));
+  }
+  const sampleId = typeof data.sampleId === 'string' ? data.sampleId : '';
+  if (!sampleId) throw new CoverDeconstructError('反推没有保存到封面记忆', true);
+  const model = typeof data.model === 'string' ? data.model : route.modelId;
+  recordChatTokens({ modelId: model, type: 'vision', usage: data.usage });
+  return { sampleId, model };
 }

@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
-	"beike.local/cloud/src/backend/internal/system"
+	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 const (
@@ -59,13 +59,14 @@ type OutputError struct {
 func (e *OutputError) Error() string { return e.Message }
 
 type Input struct {
-	BaseURL  string
-	APIKey   string
-	Model    string
-	Provider string
-	Mode     string
-	Rows     []Row
-	Rules    []RuleEntry
+	TextProtocol string
+	BaseURL      string
+	APIKey       string
+	Model        string
+	Provider     string
+	Mode         string
+	Rows         []Row
+	Rules        []RuleEntry
 }
 
 func Review(ctx context.Context, client *http.Client, input Input) (Result, error) {
@@ -88,29 +89,29 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if err != nil {
 		return Result{}, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, system.ChatCompletionsURL(input.BaseURL), bytes.NewReader(body))
-	if err != nil {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
 		return Result{}, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+input.APIKey)
-	response, err := client.Do(request)
-	if err != nil {
-		return Result{}, err
+	protocol := modelgw.TextProtocol(ctx, input.Model)
+	if input.TextProtocol != "" {
+		protocol = modelgw.ResolveTextProtocol(input.Model, input.TextProtocol)
 	}
-	defer response.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	status, data, callErr := modelgw.CompleteText(ctx, modelgw.TextRequest{
+		BaseURL: input.BaseURL, APIKey: input.APIKey, Protocol: protocol, Payload: payload,
+		Client: client, Timeout: 630 * time.Second,
+	})
 	provider := "DeepSeek"
 	if input.Provider == "gateway" {
 		provider = "模型网关"
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		parsed := map[string]any{}
-		_ = json.Unmarshal(raw, &parsed)
-		return Result{}, &UpstreamError{Status: response.StatusCode, Provider: provider, Body: parsed}
+	if status != 0 && (status < 200 || status >= 300) {
+		return Result{}, &UpstreamError{Status: status, Provider: provider, Body: data}
 	}
-	var data map[string]any
-	if json.Unmarshal(raw, &data) != nil {
+	if callErr != nil {
+		if status == 0 {
+			return Result{}, callErr
+		}
 		return Result{}, &UpstreamError{Status: 502, Provider: provider, Message: "模型服务响应传输异常，提交结果待核对"}
 	}
 	usage, _ := json.Marshal(data["usage"])

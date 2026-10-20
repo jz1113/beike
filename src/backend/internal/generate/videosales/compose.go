@@ -127,9 +127,9 @@ func BuildFFmpegCommand(p ComposePayload, outputPath string) (string, []string) 
 			if clip.Type == "image" {
 				args = append(args, "-loop", "1", "-t", fmt.Sprintf("%.2f", d), "-i", clip.FilePath)
 			} else {
-				args = append(args, "-i", clip.FilePath)
+				args = append(args, "-t", fmt.Sprintf("%.2f", d), "-i", clip.FilePath)
 			}
-			filterParts = append(filterParts, fmt.Sprintf("[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setpts=PTS-STARTPTS[v%d]", i, width, height, width, height, i))
+			filterParts = append(filterParts, fmt.Sprintf("[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=%d,setpts=PTS-STARTPTS[v%d]", i, width, height, width, height, fps, i))
 		}
 	}
 
@@ -173,9 +173,9 @@ func BuildFFmpegCommand(p ComposePayload, outputPath string) (string, []string) 
 				d = 3
 			}
 			if input, ok := voiceInput[i]; ok {
-				audioParts = append(audioParts, fmt.Sprintf("[%d:a]atrim=duration=%.2f,asetpts=PTS-STARTPTS[a%d]", input, d, i))
+				audioParts = append(audioParts, fmt.Sprintf("[%d:a]atrim=duration=%.2f,apad=whole_dur=%.2f,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a%d]", input, d, d, i))
 			} else if clip.HasAudio && clip.Type == "video" {
-				audioParts = append(audioParts, fmt.Sprintf("[%d:a]asetpts=PTS-STARTPTS[a%d]", i, i))
+				audioParts = append(audioParts, fmt.Sprintf("[%d:a]atrim=duration=%.2f,apad=whole_dur=%.2f,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a%d]", i, d, d, i))
 			} else {
 				audioParts = append(audioParts, fmt.Sprintf("anullsrc=r=44100:cl=stereo,atrim=duration=%.2f,asetpts=PTS-STARTPTS[a%d]", d, i))
 			}
@@ -185,12 +185,9 @@ func BuildFFmpegCommand(p ComposePayload, outputPath string) (string, []string) 
 	currentAudioStream := ""
 	if hasAnyAudio && len(audioParts) > 0 {
 		filterParts = append(filterParts, audioParts...)
-		var aInputs string
-		for i := range p.Clips {
-			aInputs += fmt.Sprintf("[a%d]", i)
-		}
-		filterParts = append(filterParts, fmt.Sprintf("%sconcat=n=%d:v=0:a=1[aconcat_out]", aInputs, len(p.Clips)))
-		currentAudioStream = "aconcat_out"
+		joined, joinFilters := audioJoinFilters(p.Clips)
+		filterParts = append(filterParts, joinFilters...)
+		currentAudioStream = joined
 	}
 
 	// 4. BGM mixing
@@ -266,6 +263,27 @@ func clipSeconds(clip ComposeClip) float64 {
 	return clip.Duration
 }
 
+func audioJoinFilters(clips []ComposeClip) (string, []string) {
+	if len(clips) == 0 {
+		return "", nil
+	}
+	if len(clips) == 1 {
+		return "a0", nil
+	}
+	filters := make([]string, 0, len(clips)-1)
+	current := "a0"
+	for i := 1; i < len(clips); i++ {
+		next := fmt.Sprintf("ajoin%d", i)
+		if clips[i].Transition == "ffmpeg_fade" {
+			filters = append(filters, fmt.Sprintf("[%s][a%d]acrossfade=d=0.50:c1=tri:c2=tri[%s]", current, i, next))
+		} else {
+			filters = append(filters, fmt.Sprintf("[%s][a%d]concat=n=2:v=0:a=1[%s]", current, i, next))
+		}
+		current = next
+	}
+	return current, filters
+}
+
 // Compose handles rendering timeline clips into final MP4 video via FFmpeg
 func Compose(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +307,7 @@ func Compose(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
 			return
 		}
-		if err := materializeComposeInputs(r.Context(), &payload, outDir); err != nil {
+		if err := materializeComposeInputs(r.Context(), cfg.Root, &payload, outDir); err != nil {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
 			return
 		}

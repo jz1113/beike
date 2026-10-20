@@ -1,15 +1,11 @@
 package assistant
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"time"
-
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 const (
@@ -88,38 +84,10 @@ func messageText(content any) string {
 }
 
 func plainCompletion(ctx context.Context, creds gatewayCreds, model, prompt string, maxTokens int, timeout time.Duration) (string, error) {
-	payload, _ := json.Marshal(map[string]any{
+	return nativeText(ctx, creds, map[string]any{
 		"model": model, "temperature": 0.3, "max_tokens": maxTokens,
 		"messages": []map[string]any{{"role": "user", "content": prompt}},
-	})
-	callCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	request, err := http.NewRequestWithContext(callCtx, http.MethodPost, system.ChatCompletionsURL(creds.baseURL), bytes.NewReader(payload))
-	if err != nil {
-		return "", err
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+creds.apiKey)
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", errStatus(response.StatusCode)
-	}
-	var parsed struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if json.Unmarshal(raw, &parsed) != nil || len(parsed.Choices) == 0 {
-		return "", errStatus(response.StatusCode)
-	}
-	return parsed.Choices[0].Message.Content, nil
+	}, timeout, assistantHTTP())
 }
 
 type statusError int

@@ -26,6 +26,8 @@ export interface CollectedSourceItem {
   sourceUrl: string;
   time: string;
   apiUsed?: string;
+  fromCache?: boolean;
+  detailsMissing?: boolean;
 }
 
 /** 显式指定的解析接口与链接类型不一致时，在发起付费请求前拦住。 */
@@ -136,6 +138,9 @@ export async function collectSourceMedia(
         props: product.props || data.images?.props || {},
         sourceUrl: url,
         time,
+        apiUsed: typeof data.apiUsed === 'string' ? data.apiUsed : undefined,
+        fromCache: typeof data.fromCache === 'boolean' ? data.fromCache : undefined,
+        detailsMissing: descImgs.length === 0,
       });
     }
     requestSignal.throwIfAborted();

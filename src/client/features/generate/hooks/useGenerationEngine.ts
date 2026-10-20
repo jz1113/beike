@@ -13,7 +13,8 @@ import {
   getUnsubmittedGenerationTasks,
 } from '../engine/generationTaskPolling';
 import { submitSingleGenerationTask } from '../engine/generationTaskSubmitter';
-import { GenerationSubmissionQueue } from '../engine/generationSubmissionQueue';
+import { getGenerationSubmissionLane } from '../engine/generationSubmissionQueue';
+import { generationSubmissionQueue } from '../engine/generationSubmissionConfig';
 import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@client/shared/api/generation/generationAbort';
 
 export {
@@ -27,8 +28,8 @@ export {
  * 全局生图/视频任务引擎：与视图解耦，挂在 page 级即可在切页后继续提交与轮询。
  * 工坊批量生图由 useBatchWorkshopRunner 自行轮询 per-item tasks，不在此处理。
  */
-// 跨批次与组件生命周期共享同一个提交 worker，新增任务只能排到当前请求之后。
-const generationSubmissionQueue = new GenerationSubmissionQueue();
+// 所有批次与组件挂载共享分通道队列；最后一个引擎卸载时才中止请求。
+let generationEngineUsers = 0;
 
 export function abortActiveGenerationEngine() {
   generationSubmissionQueue.cancel();
@@ -52,12 +53,17 @@ export function useGenerationEngine() {
   const recoveredOnceRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    generationEngineUsers += 1;
     // Store subscriptions run synchronously, including when a task is deleted during media preparation.
     const unsubscribe = useAppStore.subscribe((state, previous) => {
       if (state.generationTasks === previous.generationTasks) return;
       generationSubmissionQueue.retain(new Set(state.generationTasks.map(task => task.id)));
     });
-    return () => { unsubscribe(); abortActiveGenerationEngine(); };
+    return () => {
+      unsubscribe();
+      generationEngineUsers -= 1;
+      if (generationEngineUsers === 0) abortActiveGenerationEngine();
+    };
   }, []);
 
   // 后台标签页/非生成相关页面：拉长轮询间隔，减少无谓的网络与 CPU 消耗
@@ -163,8 +169,9 @@ export function useGenerationEngine() {
   // 每批只将任务 ID 加入全局队列，真正派发时重新检查当前任务，避免提交已删除的快照。
   useEffect(() => {
     if (!unsubmittedTasksKey) return;
-    generationSubmissionQueue.enqueue(getUnsubmittedGenerationTasks().map(({ id }) => ({
+    generationSubmissionQueue.enqueue(getUnsubmittedGenerationTasks().map(({ id, mediaType }) => ({
       id,
+      lane: getGenerationSubmissionLane(mediaType || (id.startsWith('agent-task-') ? 'agent' : undefined)),
       run: async (signal) => {
         if (!useAppStore.getState().generationHistoryReady) return;
         const task = getUnsubmittedGenerationTasks().find((t) => t.id === id);

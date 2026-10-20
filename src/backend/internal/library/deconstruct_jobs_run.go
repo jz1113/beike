@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
 
@@ -40,6 +41,11 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 		writeJobError(w, http.StatusBadRequest, "后台反推参数无效", "invalid_job_submission")
 		return
 	}
+	protocol, protocolErr := generate.RequestTextProtocol(r, payload)
+	if protocolErr != nil {
+		writeJobError(w, http.StatusBadRequest, protocolErr.Error(), "invalid_text_protocol")
+		return
+	}
 	baseURL, apiKey := deconstructCreds(cfg, r, payload)
 	items, err := normalizeJobItems(payload["items"])
 	if err != nil {
@@ -54,6 +60,9 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 	configBody := map[string]any{
 		"model": payload["model"], "userHint": payload["userHint"], "fallbackOrder": payload["fallbackOrder"],
 		"concurrency": concurrency, "reviewBeforeSave": reviewBefore,
+	}
+	if protocol != "" {
+		configBody["textProtocol"] = protocol
 	}
 	rawConfig, _ := json.Marshal(scrubJob(configBody, apiKey))
 	hash := dbworkshop.JobInputHash(items, configBody, baseURL)
@@ -180,7 +189,7 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 		request = request.WithContext(httpx.WithWorkspace(request.Context(), workspace))
 		payload := map[string]any{
 			"imageUrls": item["images"], "albumName": item["name"], "userHint": jobHint(configBody, stringValue(item["name"])),
-			"model": configBody["model"], "fallbackOrder": configBody["fallbackOrder"],
+			"model": configBody["model"], "textProtocol": stringValue(configBody["textProtocol"]), "fallbackOrder": configBody["fallbackOrder"],
 			"targetCategory": item["targetCategory"], "targetSubcategory": item["targetSubcategory"],
 			"customBaseUrl": baseURL, "customApiKey": apiKey, "reviewBeforeSave": configBody["reviewBeforeSave"],
 			"autoSave":     !boolValue(configBody["reviewBeforeSave"]),
@@ -262,6 +271,9 @@ func jobTaskID(jobID, itemID string) string {
 }
 
 func scrubJob(value any, apiKey string) any {
+	if apiKey == "" {
+		return value
+	}
 	raw, _ := json.Marshal(value)
 	text := strings.ReplaceAll(string(raw), apiKey, "[密钥已隐藏]")
 	var out any

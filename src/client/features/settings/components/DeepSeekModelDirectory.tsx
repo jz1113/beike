@@ -27,7 +27,7 @@ export function DeepSeekModelDirectory({ apiKey, configuredModels, onAdd }: {
     try {
       const response = await apiFetch('/api/system/models/fetch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'deepseek', apiKey: apiKey.trim(), strict: true }),
+        body: JSON.stringify({ provider: 'deepseek', providerType: 'openai', catalogProtocol: 'openai', apiKey: apiKey.trim(), strict: true }),
       });
       const data = await response.json();
       if (!response.ok || !data.success || data.provider !== 'deepseek' || !Array.isArray(data.models)) throw new Error(data.error || '模型目录无效');

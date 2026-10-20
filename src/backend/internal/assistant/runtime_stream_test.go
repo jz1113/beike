@@ -186,7 +186,7 @@ func TestStreamClampsNamedCompletionLimit(t *testing.T) {
 func testLoop(base string, send func(map[string]any)) *agentLoop {
 	return &agentLoop{
 		ctx:      context.Background(),
-		creds:    gatewayCreds{baseURL: base, apiKey: "secret"},
+		creds:    gatewayCreds{baseURL: base, apiKey: "secret", protocol: "openai"},
 		models:   []string{"gemini-3.7-flash"},
 		messages: []map[string]any{{"role": "user", "content": "你好"}},
 		budget:   newBudget(),

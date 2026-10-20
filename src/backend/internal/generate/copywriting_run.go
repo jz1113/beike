@@ -24,6 +24,10 @@ func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, p
 	text, data, status, err := ChatCompletionJSON(r.Context(), base, key, model, messages, 0.7, 18*time.Second)
 	parsed := DecodeObject(text)
 	if err != nil || status >= 300 || parsed == nil {
+		if !TextFallbackAllowed(r.Context(), model) {
+			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "文案模型调用失败，请检查模型配置后重试"})
+			return
+		}
 		if status == 404 {
 			writeCopyFallback(w, payload)
 			return
@@ -34,6 +38,10 @@ func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, p
 	title, _ := parsed["title"].(string)
 	content, _ := parsed["content"].(string)
 	if title == "" || content == "" {
+		if !TextFallbackAllowed(r.Context(), model) {
+			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "文案模型返回内容不完整"})
+			return
+		}
 		writeCopyFallback(w, payload)
 		return
 	}

@@ -55,6 +55,24 @@ func TestNativeSystemRouteRequiresToken(t *testing.T) {
 	}
 }
 
+func TestPetRoutesAreRegistered(t *testing.T) {
+	handler := New(config.Config{AccessToken: "secret", NodeEnv: "development"})
+	list := httptest.NewRequest(http.MethodGet, "/api/pets", nil)
+	list.Header.Set("x-app-token", "secret")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, list)
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "接口不存在") {
+		t.Fatalf("status %d body %s", response.Code, response.Body.String())
+	}
+	importRequest := httptest.NewRequest(http.MethodPost, "/api/pets/import", strings.NewReader(`{"commands":"not-a-command"}`))
+	importRequest.Header.Set("x-app-token", "secret")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, importRequest)
+	if response.Code == http.StatusNotFound || strings.Contains(response.Body.String(), "接口不存在") {
+		t.Fatalf("status %d body %s", response.Code, response.Body.String())
+	}
+}
+
 func TestUnknownAPIIsJSON(t *testing.T) {
 	handler := New(config.Config{Upstream: "http://127.0.0.1:1"})
 	response := httptest.NewRecorder()

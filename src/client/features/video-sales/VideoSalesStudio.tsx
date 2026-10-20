@@ -1,116 +1,103 @@
-import {
-  Clapperboard,
-  History,
-  Package,
-  Plus,
-  Settings2,
-  ShoppingBag,
-  Sparkles,
-  Film,
-} from 'lucide-react';
-import { StudioBrandChip, StudioDockBar, studioDockClass } from '@client/shared/ui/studio';
-import { useVideoSalesStudio } from './hooks/useVideoSalesStudio';
+import { useEffect, useRef, useState } from 'react';
+import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
+import { eligibleSalesImages, salesAssetsReady } from '@shared/domain/video-sales/workflow';
+import { FashionSkillSheet } from './components/FashionSkillSheet';
 import { ProductSetupPanel } from './components/ProductSetupPanel';
-import { ScriptStoryboardEditor } from './components/ScriptStoryboardEditor';
-import { AssetPipelineView } from './components/AssetPipelineView';
-import { TimelineComposerView } from './components/TimelineComposerView';
-import { PlatformExportPanel } from './components/PlatformExportPanel';
+import { SalesActionBar } from './components/SalesActionBar';
+import { SalesAssetsSection } from './components/SalesAssetsSection';
+import { SalesEmptyGuide } from './components/SalesEmptyGuide';
+import { SalesPlanSection } from './components/SalesPlanSection';
+import { SalesHistorySection } from './components/SalesHistorySection';
+import { SalesResultSection } from './components/SalesResultSection';
+import { SalesStudioHeader } from './components/SalesStudioHeader';
+import { SalesVideoSection } from './components/SalesVideoSection';
+import { salesPanelClass } from './components/salesSurface';
+import { useSalesPanelWidth } from './hooks/useSalesPanelWidth';
+import { useVideoSalesStudio } from './hooks/useVideoSalesStudio';
+import { assertSalesPlanCurrent, salesFinalInputRevision } from './model/salesStageRules';
+import { hasSalesProductContent } from './model/salesStudioDraft';
+import { initialSalesNavigation, navigateSalesWorkspace, SALES_WORKFLOW_STEPS, salesHasQueryableTask, salesHasRenderActivity, salesStageActions, type SalesActionIntent, type SalesWorkflowStep, type SalesWorkflowStepView } from './model/salesWorkspaceView';
 
-interface Props {
-  onBack: () => void;
-  onOpenSettings?: () => void;
-}
+interface Props { onBack: () => void }
 
-export default function VideoSalesStudio({ onBack, onOpenSettings }: Props) {
-  const {
-    state,
-    updateState,
-    goToStep,
-    isAnalyzing,
-    isGeneratingScript,
-    isComposing,
-    composeProgress,
-    error,
-    runProductAnalysis,
-    runScriptGeneration,
-    updateCurrentScriptShots,
-    runVideoComposition,
-    useExampleScripts,
-    resetProject,
-  } = useVideoSalesStudio();
+export default function VideoSalesStudio({ onBack }: Props) {
+  const studio = useVideoSalesStudio();
+  const { state } = studio;
+  const script = state.scripts[state.selectedScriptIndex];
+  const hasScript = Boolean(script?.shots.length);
+  let planCurrent = false;
+  try { if (script) { assertSalesPlanCurrent(state, script); planCurrent = true; } } catch { /* 过期方案仍可查看，但不可作为已完成阶段。 */ }
+  const assetsReady = planCurrent && salesAssetsReady(script);
+  const hasResult = salesHasRenderActivity(script, state.composedResultUrl, studio.isRendering);
+  const chatRoute = resolveModalityModelRoute('chat', state.selectedChatModel);
+  const videoRoute = resolveModalityModelRoute('video', state.selectedVideoModel);
+  const imageRoute = resolveModalityModelRoute('image', state.selectedImageModel);
+  const finalized = Boolean(script?.fullPrompt?.trim() && assetsReady && !studio.videoError && script.finalizedRevision === salesFinalInputRevision(state, script, videoRoute.modelId || ''));
+  const usable = eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata);
+  const isBusy = studio.isCollecting || studio.isUploading || studio.isPlanning || studio.isPreparingAssets || studio.isFinalizing || studio.isRendering;
+  const resetDisabled = isBusy || !hasSalesProductContent(state);
+  const resetTitle = isBusy ? '请等待当前任务完成；视频生成可先停止' : resetDisabled ? '暂无可清空的商品内容' : '清空当前商品，保留生成设置和原始文件';
+  const configScrollRef = useRef<HTMLDivElement>(null);
+  const workspaceScrollRef = useRef<HTMLDivElement>(null);
+  const { containerRef, wide, width, separatorProps } = useSalesPanelWidth();
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [navigation, setNavigation] = useState(() => initialSalesNavigation(hasScript, hasResult));
+  const { step, lastCreativeStep } = navigation;
+  const navigate = (next: SalesWorkflowStep) => setNavigation((previous) => navigateSalesWorkspace(previous, next));
+  const seen = useRef({ planning: studio.isPlanning, rendering: studio.isRendering, finalizing: studio.isFinalizing });
 
-  const currentScript = state.scripts[state.selectedScriptIndex] || state.scripts[0];
+  useEffect(() => {
+    const previous = seen.current;
+    if (previous.planning && !studio.isPlanning && hasScript) setNavigation((current) => navigateSalesWorkspace(current, 'plan'));
+    if (previous.finalizing && !studio.isFinalizing && script?.fullPrompt) setNavigation((current) => navigateSalesWorkspace(current, 'video'));
+    if (!previous.rendering && studio.isRendering) setNavigation((current) => navigateSalesWorkspace(current, 'result'));
+    seen.current = { planning: studio.isPlanning, rendering: studio.isRendering, finalizing: studio.isFinalizing };
+  }, [hasScript, script?.fullPrompt, studio.isPlanning, studio.isRendering, studio.isFinalizing]);
+  useEffect(() => { workspaceScrollRef.current?.scrollTo({ top: 0 }); }, [step]);
 
-  const dock = [
-    { id: 'new', icon: <Plus className="h-4 w-4" />, label: '新建', onClick: resetProject, className: studioDockClass(false) },
-    { id: 'setup', icon: <Package className="h-4 w-4" />, label: '商品', onClick: () => goToStep('setup'), active: state.currentStep === 'setup', className: studioDockClass(state.currentStep === 'setup') },
-    { id: 'script', icon: <Sparkles className="h-4 w-4" />, label: '分镜脚本', onClick: () => goToStep('script'), active: state.currentStep === 'script', className: studioDockClass(state.currentStep === 'script') },
-    { id: 'assets', icon: <Film className="h-4 w-4" />, label: '素材', onClick: () => goToStep('assets'), active: state.currentStep === 'assets', className: studioDockClass(state.currentStep === 'assets') },
-    { id: 'compose', icon: <Clapperboard className="h-4 w-4" />, label: '合成', onClick: () => goToStep('compose'), active: state.currentStep === 'compose', className: studioDockClass(state.currentStep === 'compose') },
-    { id: 'export', icon: <History className="h-4 w-4" />, label: '发布', onClick: () => goToStep('export'), active: state.currentStep === 'export', className: studioDockClass(state.currentStep === 'export') },
-    { id: 'settings', icon: <Settings2 className="h-4 w-4" />, label: '设置', onClick: () => onOpenSettings?.(), className: studioDockClass(false) },
-  ];
+  const resetCurrentProduct = async () => {
+    if (!await studio.resetProject()) return;
+    setNavigation(initialSalesNavigation(false, false));
+    requestAnimationFrame(() => configScrollRef.current?.scrollTo({ top: 0 }));
+  };
+  const planReason = !state.productName.trim() ? '请先采集或填写商品名称' : !usable.length ? '请选择本次颜色并明确确认至少一张可用商品图' : !Number.isInteger(state.targetDuration) || state.targetDuration < 10 || state.targetDuration > 120 ? '目标时长必须为 10–120 秒整数' : !chatRoute.modelId ? '请配置多模态模型' : null;
+  const complete = { product: !planReason, plan: planCurrent, assets: assetsReady, video: finalized, result: Boolean(state.composedResultUrl) };
+  const steps: SalesWorkflowStepView[] = SALES_WORKFLOW_STEPS.map(([id, label]) => ({ id, label, state: id === step ? 'current' : complete[id] ? 'done' : 'pending' }));
+  const progress = studio.isCollecting ? '正在采集商品资料' : studio.isUploading ? '正在上传商品图片' : studio.isPlanning ? ({ analyze: '正在分析商品图片', script: '正在编写口播脚本', select: '正在匹配商品参考图', prompt: '正在整理视频提示词' }[studio.planPhase || 'analyze']) : studio.isPreparingAssets ? '正在准备并校验素材图片' : studio.isFinalizing ? '正在依据实际图片定稿' : studio.isRendering ? '正在等待并查询视频结果' : null;
+  const actions = salesStageActions({ step, busy: isBusy, progress, hasScript, planCurrent, planReason, assetsReady, assetCount: script?.assets?.length || 0, imageReady: Boolean(imageRoute.modelId), finalized, videoError: studio.videoError, submitError: studio.videoSubmitError, rendering: studio.isRendering, canQuery: salesHasQueryableTask(script), hasResult: Boolean(state.composedResultUrl), submissionUncertain: script?.renderStatus === 'uncertain', renderFailed: script?.renderStatus === 'failed' });
+  const runAction = (intent: SalesActionIntent) => {
+    if (intent === 'write') void studio.runPlan();
+    else if (intent === 'prepare') void studio.runAssets();
+    else if (intent === 'finalize') void studio.runFinalize();
+    else if (intent === 'render') void studio.runRender();
+    else if (intent === 'query') void studio.runRender({ resumeOnly: true });
+    else if (intent === 'stop') studio.stopRender();
+    else if (intent === 'resume') navigate(lastCreativeStep);
+    else if (intent !== 'download') navigate(intent);
+  };
+  const actionProps = (action: typeof actions.primary) => ({ ...action, onClick: () => runAction(action.intent), ...(action.intent === 'download' && state.composedResultUrl ? { href: state.composedResultUrl, download: `${script?.title || '带货视频'}.mp4` } : {}) });
 
   return (
-    <div className="relative h-full w-full flex flex-col bg-transparent text-slate-900 dark:text-[#EDEDED] overflow-hidden select-none">
-      <StudioBrandChip title="视频带货" icon={<ShoppingBag className="h-4 w-4" />} onBack={onBack} />
-      <StudioDockBar items={dock} label="视频带货导航" />
-      <main className="flex-1 overflow-y-auto px-6 pt-20">
-        {state.currentStep === 'setup' && (
-          <ProductSetupPanel
-            state={state}
-            updateState={updateState}
-            isAnalyzing={isAnalyzing}
-            isGeneratingScript={isGeneratingScript}
-            error={error}
-            onAnalyze={runProductAnalysis}
-            onGenerate={runScriptGeneration}
-            onUseExample={useExampleScripts}
-          />
-        )}
-
-        {state.currentStep === 'script' && (
-          <ScriptStoryboardEditor
-            scripts={state.scripts}
-            selectedScriptIndex={state.selectedScriptIndex}
-            onSelectScript={(idx) => updateState({ selectedScriptIndex: idx })}
-            onUpdateShots={updateCurrentScriptShots}
-            onNext={() => goToStep('assets')}
-            onBack={() => goToStep('setup')}
-          />
-        )}
-
-        {state.currentStep === 'assets' && (
-          <AssetPipelineView
-            shots={currentScript?.shots || []}
-            productImages={state.productImages}
-            videoModel={state.selectedVideoModel}
-            imageModel={state.selectedImageModel}
-            voiceModel={state.selectedVoiceModel}
-            onUpdateShots={updateCurrentScriptShots}
-            onNext={() => goToStep('compose')}
-            onBack={() => goToStep('script')}
-          />
-        )}
-
-        {state.currentStep === 'compose' && (
-          <TimelineComposerView
-            shots={currentScript?.shots || []}
-            isComposing={isComposing}
-            composeProgress={composeProgress}
-            onCompose={runVideoComposition}
-            onBack={() => goToStep('assets')}
-          />
-        )}
-
-        {state.currentStep === 'export' && currentScript && (
-          <PlatformExportPanel
-            script={currentScript}
-            resultUrl={state.composedResultUrl || state.productImages[0]}
-            onRestart={() => goToStep('setup')}
-          />
-        )}
-      </main>
+    <div className="flex h-full w-full flex-col overflow-hidden text-slate-900 dark:text-slate-100">
+      <SalesStudioHeader onBack={onBack} onReset={() => { void resetCurrentProduct(); }} resetDisabled={resetDisabled} resetTitle={resetTitle} steps={steps} onStep={navigate} onOpenRules={() => setRulesOpen(true)} />
+      {studio.error && <p role="alert" className="mx-3 mb-3 shrink-0 rounded-xl border border-rose-500/15 bg-rose-500/[0.06] px-4 py-3 text-xs leading-5 text-rose-600 sm:mx-5 dark:text-rose-300">{studio.error}</p>}
+      <div ref={containerRef} className="flex min-h-0 flex-1 px-3 pb-3 sm:px-5 sm:pb-4">
+        <aside aria-label="商品确认与前置设置" style={{ width: wide ? width : '100%' }} className={`${wide || step === 'product' ? 'flex' : 'hidden'} min-h-0 shrink-0 flex-col overflow-hidden ${salesPanelClass}`}>
+          <div ref={configScrollRef} className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"><ProductSetupPanel state={state} updateState={studio.updateState} compact={step !== 'product'} isBusy={isBusy} isCollecting={studio.isCollecting} isUploading={studio.isUploading} onCollect={() => { void studio.runProductCollect(); }} onRefresh={() => { void studio.runProductCollect(false, true); }} onImageError={studio.markImageUnavailable} onUpload={studio.addProductImages} onOpenRules={() => setRulesOpen(true)} /></div>
+        </aside>
+        {wide && <div {...separatorProps} title="拖动调整宽度；方向键调整，Shift 加速，Home / End 到边界" className="group flex w-4 shrink-0 touch-none cursor-col-resize items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/70"><span className="h-12 w-0.5 rounded-full bg-black/10 group-hover:bg-black/30 dark:bg-white/10 dark:group-hover:bg-white/30" /></div>}
+        <section aria-label="创作与生成结果" className={`${wide || step !== 'product' ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${salesPanelClass}`}>
+          <div ref={workspaceScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            {step === 'result' && <SalesHistorySection scripts={state.scripts} selected={state.selectedScriptIndex} disabled={isBusy} onSelect={(selectedScriptIndex) => studio.updateState({ selectedScriptIndex, composedResultUrl: state.scripts[selectedScriptIndex]?.renderResultUrl || null })} />}
+            {(step === 'plan' || step === 'product') && (script ? <SalesPlanSection analysis={state.analysis} script={script} disabled={isBusy} onEditShot={studio.editShot} /> : <SalesEmptyGuide kind="plan" category={state.category} onOpenRules={() => setRulesOpen(true)} />)}
+            {step === 'assets' && (script ? <SalesAssetsSection script={script} imageModel={state.selectedImageModel || ''} disabled={isBusy} onModel={(selectedImageModel) => studio.updateState({ selectedImageModel })} onEditPrompt={studio.editAssetPrompt} onGenerate={(id, queryOnly) => { void studio.runAssets(id, queryOnly); }} /> : <SalesEmptyGuide kind="assets" />)}
+            {step === 'video' && (script ? <SalesVideoSection state={state} script={script} modelId={videoRoute.modelId || ''} disabled={isBusy} assetsReady={assetsReady} finalized={finalized} videoError={studio.videoError} submitError={studio.videoSubmitError} onChange={studio.updateState} onEditPrompt={studio.editFullPrompt} /> : <SalesEmptyGuide kind="video" />)}
+            {step === 'result' && (script && hasResult ? <SalesResultSection script={script} aspectRatio={state.aspectRatio} resultUrl={state.composedResultUrl} renderPhase={studio.renderPhase} isRendering={studio.isRendering} onRetryShot={studio.retryShot} onStop={studio.stopRender} onCompose={() => { void studio.runRender(script.deliveryMode === 'single' ? { resumeOnly: true } : undefined); }} singleDelivery={script.deliveryMode === 'single'} actionsInFooter globalError={studio.error} /> : <SalesEmptyGuide kind="result" />)}
+          </div>
+        </section>
+      </div>
+      <SalesActionBar primary={actionProps(actions.primary)} secondary={actions.secondary ? actionProps(actions.secondary) : undefined} busy={isBusy} reason={actions.reason} note={actions.note} progress={progress} />
+      {rulesOpen && <FashionSkillSheet active={state.category === 'fashion'} onClose={() => setRulesOpen(false)} />}
     </div>
   );
 }

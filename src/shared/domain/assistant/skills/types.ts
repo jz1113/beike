@@ -73,9 +73,26 @@ export interface ParsedSkillFile {
   format: 'markdown' | 'json';
 }
 
+/** 技能包里的附属文件或参考规范。只在模型调用 read_skill_file 时展开。 */
+export interface SkillResourceFile {
+  path: string;
+  content: string;
+}
+
 /** 客户端组装后传给 API 的技能运行时载荷 */
 export interface AssistantSkillRuntime {
   skillId: string;
   systemPrompt: string;
   allowedTools?: string[];
+  resources: SkillResourceFile[];
+}
+
+/** 本轮可发现的技能。正文和资料只在未超出载荷时携带，供 read_skill 按需读取。 */
+export interface SkillCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  prompt?: string;
+  tools?: string[];
+  resources?: SkillResourceFile[];
 }

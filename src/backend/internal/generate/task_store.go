@@ -38,6 +38,7 @@ func reuseImageTask(ctx context.Context, db *sql.DB, workspace, key string) (str
 	err := db.QueryRowContext(ctx, `
 		SELECT "id", COALESCE("taskId", ''), "resultUrl" FROM "ImageTask"
 		WHERE "workspaceId" = ? AND "idempotencyKey" = ? AND "status" = 'SUCCESS' AND COALESCE("resultUrl", '') != ''
+			AND COALESCE(NULLIF("mediaType", ''), 'image') = 'image'
 		ORDER BY "createdAt" DESC LIMIT 1`, workspace, key).Scan(&id, &taskID, &result)
 	if err != nil || result == "" {
 		return "", "", "", false

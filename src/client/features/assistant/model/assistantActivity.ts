@@ -11,7 +11,7 @@ export interface ActivityEntry {
 export function activityTarget(args?: string): string {
   try {
     const value = JSON.parse(args || '{}');
-    for (const key of ['query', 'keyword', 'document_name', 'filename', 'path', 'url', 'asset_id']) {
+    for (const key of ['query', 'keyword', 'document_name', 'filename', 'path', 'url', 'asset_id', 'skill_id', 'name']) {
       if (typeof value[key] === 'string') return value[key].replace(/\s+/g, ' ').slice(0, 160);
     }
   } catch { /* Arguments may still be streaming. */ }

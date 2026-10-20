@@ -64,7 +64,7 @@ export function CoverMemoryGraphCanvas({ entries, samples, selected, onSelect, o
           })}
         </svg>
         <div data-interactive="true" className="absolute flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-2xl border border-amber-400/70 bg-[#1c140c] text-amber-100 shadow-[0_0_32px_rgba(245,158,11,0.35)]" style={{ left: CENTER.x, top: CENTER.y }}>
-          <span className="text-[10px] font-bold tracking-wide text-amber-300">封面技能</span>
+          <span className="text-[10px] font-bold tracking-wide text-amber-300">封面生成</span>
           <span className="mt-1 text-lg font-black">{adopted}</span>
           <span className="text-[10px] text-amber-200/80">已采纳</span>
         </div>
@@ -106,7 +106,7 @@ export function CoverMemoryGraphCanvas({ entries, samples, selected, onSelect, o
         <button type="button" className="flex h-7 w-7 items-center justify-center rounded-xl hover:bg-white/10" onClick={() => setZoom((value) => Math.max(0.6, value - 0.1))} aria-label="缩小"><Minus className="h-3.5 w-3.5" /></button>
         <button type="button" className="flex h-7 w-7 items-center justify-center rounded-xl hover:bg-white/10" onClick={() => { setZoom(1); setPan({ x: 40, y: 20 }); }} aria-label="还原"><Maximize2 className="h-3.5 w-3.5" /></button>
       </div>
-      {empty && <p className="absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#1a1a1d]/90 px-4 py-2 text-xs text-slate-300">还没有封面记忆。投喂样张，或在「纠正」里写下不要再犯的错。</p>}
+      {empty && <p className="absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#1a1a1d]/90 px-4 py-2 text-xs text-slate-300">还没有封面记忆。回到封面生成页投喂样张，或在「纠正」里写下不要再犯的错。</p>}
     </div>
   );
 }

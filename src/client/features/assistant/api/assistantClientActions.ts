@@ -1,3 +1,4 @@
+import { executeGenerationBatchAction } from '@client/shared/agent/dispatchGenerationBatch';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { useAppStore } from '@client/store';
 import type { ApprovalDecision } from '../model/assistantTurnTypes';
@@ -23,6 +24,7 @@ export function executeClientToolAction(
   action: Record<string, unknown> | undefined,
   showToast: (msg: string) => void,
   originSessionId?: string,
+  originUserText = '',
 ): void {
   if (!action?.action) return;
 
@@ -33,6 +35,14 @@ export function executeClientToolAction(
   }
 
   switch (action.action) {
+    case 'generate_batch': {
+      if (!originSessionId) { showToast('缺少原会话标识，已阻止批量生成'); break; }
+      try {
+        const receipts = executeGenerationBatchAction(action, 'assistant', originSessionId, originUserText);
+        showToast(`已保留 ${receipts.reduce((sum, receipt) => sum + receipt.taskIds.length, 0)} 项提交记录，请在原回复清单查看进度`);
+      } catch (error) { showToast(error instanceof Error ? error.message : '批量生成未提交'); }
+      break;
+    }
     case 'navigate': {
       const target = action.target_view as string;
       if (target && isAppView(target)) {

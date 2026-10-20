@@ -1,62 +1,96 @@
+export type GenerationSubmissionLane = 'media' | 'agent' | 'serial';
+
 interface SubmissionJob {
   id: string;
+  lane: GenerationSubmissionLane;
   run: (signal: AbortSignal) => Promise<void>;
 }
 
-/** One submission worker shared by every batch and engine render. */
+interface ActiveSubmission {
+  lane: GenerationSubmissionLane;
+  controller: AbortController;
+}
+
+export function getGenerationSubmissionLane(mediaType?: string): GenerationSubmissionLane {
+  if (mediaType === 'agent') return 'agent';
+  // Older image tasks have no mediaType. Unknown/new task types stay conservative.
+  if (!mediaType || mediaType === 'image' || mediaType === 'video') return 'media';
+  return 'serial';
+}
+
+/** Shared by every batch and engine render; each lane has its own capacity. */
 export class GenerationSubmissionQueue {
   private pending = new Map<string, SubmissionJob>();
-  private active: { id: string; controller: AbortController } | undefined;
-  private running = false;
+  private active = new Map<string, ActiveSubmission>();
   private scheduled = false;
+  private mediaConcurrency = 3;
+
+  getMediaConcurrency(): number {
+    return this.mediaConcurrency;
+  }
+
+  /** Lowering capacity never interrupts requests already in flight. */
+  setMediaConcurrency(value: number): number {
+    this.mediaConcurrency = Number.isFinite(value) ? Math.min(6, Math.max(1, Math.trunc(value))) : 3;
+    this.schedule();
+    return this.mediaConcurrency;
+  }
 
   enqueue(jobs: SubmissionJob[]): void {
     for (const job of jobs) {
-      if (job.id !== this.active?.id) this.pending.set(job.id, job);
+      if (!this.active.has(job.id)) this.pending.set(job.id, job);
     }
-    if (this.running || this.scheduled || this.pending.size === 0) return;
-    // React's development mount/unmount check must finish before dispatching.
-    this.scheduled = true;
-    queueMicrotask(() => {
-      this.scheduled = false;
-      void this.drain();
-    });
+    this.schedule();
   }
 
   cancel(): void {
     this.pending.clear();
-    this.active?.controller.abort();
-    // Keep the worker occupied until the cancelled request actually settles.
-    // A remount or a new batch must not overlap a still-finishing submission.
+    for (const { controller } of this.active.values()) controller.abort();
+    // Aborting does not free a slot or an ID until the original run actually settles.
+    // Remounts/new batches must not overlap a still-finishing submission.
   }
 
   /** Removing a task must interrupt its preparation before a generation request is sent. */
   retain(taskIds: ReadonlySet<string>): void {
     for (const id of this.pending.keys()) if (!taskIds.has(id)) this.pending.delete(id);
-    if (this.active && !taskIds.has(this.active.id)) this.active.controller.abort();
+    for (const [id, { controller }] of this.active) {
+      if (!taskIds.has(id)) controller.abort();
+    }
   }
 
-  private async drain(): Promise<void> {
-    if (this.running) return;
-    this.running = true;
+  private schedule(): void {
+    if (this.scheduled || this.pending.size === 0) return;
+    // React's development mount/unmount check must finish before dispatching.
+    this.scheduled = true;
+    queueMicrotask(() => {
+      this.scheduled = false;
+      this.drain();
+    });
+  }
+
+  private drain(): void {
+    const counts: Record<GenerationSubmissionLane, number> = { media: 0, agent: 0, serial: 0 };
+    for (const { lane } of this.active.values()) counts[lane] += 1;
+    for (const [id, job] of this.pending) {
+      const capacity = job.lane === 'media' ? this.mediaConcurrency : 1;
+      if (counts[job.lane] >= capacity) continue;
+      this.pending.delete(id);
+      const controller = new AbortController();
+      this.active.set(id, { lane: job.lane, controller });
+      counts[job.lane] += 1;
+      void this.run(job, controller.signal);
+    }
+  }
+
+  private async run(job: SubmissionJob, signal: AbortSignal): Promise<void> {
     try {
-      while (this.pending.size > 0) {
-        const job = this.pending.values().next().value as SubmissionJob;
-        this.pending.delete(job.id);
-        const controller = new AbortController();
-        this.active = { id: job.id, controller };
-        try {
-          await job.run(controller.signal);
-        } catch (error) {
-          // Jobs normally report their own failures. An unexpected local error
-          // must still release the worker and allow the next task to proceed.
-          console.warn('[generationEngine] 提交队列异常:', error);
-        } finally {
-          this.active = undefined;
-        }
-      }
+      await job.run(signal);
+    } catch (error) {
+      // Jobs normally report their own failures; unexpected errors still release their slot.
+      console.warn('[generationEngine] 提交队列异常:', error);
     } finally {
-      this.running = false;
+      this.active.delete(job.id);
+      this.schedule();
     }
   }
 }

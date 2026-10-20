@@ -195,6 +195,7 @@ export function repairWorkflowModelsForSettings(value?: unknown) {
       id: m.id,
       routeId: m.routeId,
       channel: m.channel,
+      customBaseUrl: m.customBaseUrl, customApiKey: m.customApiKey, apiTemplate: m.apiTemplate, textProtocol: m.textProtocol,
       enabled: m.enabled,
       name: m.name || m.id,
       shortName: m.shortName || m.id.split(/[-_]/)[0] || m.id,

@@ -1,4 +1,6 @@
-import { isProductImageUrl, normalizeImageSource, normalizeImageUrlToStandardJpg, normalizeRemoteMediaUrl } from '@shared/domain/media/drawing';
+import { normalizeImageSource, normalizeRemoteMediaUrl } from '@shared/domain/media/drawing';
+import { normalizeCollectedProductImages } from '@shared/domain/collection/productImages';
+import { normalizeCollectedProductImage } from '@shared/domain/media/productImageUrls';
 
 /**
  * 修复小红书图片域名
@@ -20,7 +22,7 @@ export function keepCollectedUrl(u: string, isSocial: boolean): boolean {
   if (isSocial) {
     return Boolean(normalizeImageSource(u));
   }
-  return isProductImageUrl(normalizeImageUrlToStandardJpg(u) || u);
+  return Boolean(normalizeCollectedProductImage(u));
 }
 
 /**
@@ -41,16 +43,17 @@ export function sanitizeCollectedItem(it: any): any {
   const cleanUrl = (u: unknown) => typeof u === 'string'
     ? isSocial
       ? fixXhsUrl(normalizeImageSource(u))
-      : normalizeImageUrlToStandardJpg(u)
+      : normalizeCollectedProductImage(u)
     : '';
   const mapImgs = (arr: any) =>
     [...new Set<string>((Array.isArray(arr) ? arr : []).map(cleanUrl).filter(keepUrl))];
 
-  const cleanMain = mapImgs(it.mainImages?.length ? it.mainImages : it.images);
-  const cleanSkus = mapImgs(it.skuImages);
-  const cleanDesc = mapImgs(it.descImages?.length ? it.descImages : it.detailImages);
-  const all = [...new Set([...cleanMain, ...cleanSkus, ...cleanDesc, ...mapImgs(it.images)])];
-  const rawCover = cleanUrl(it.coverImage || it.picUrl) || cleanMain[0] || all[0] || '';
+  const productGroups = isSocial ? undefined : normalizeCollectedProductImages({ product: it });
+  const cleanMain = productGroups?.mainImgs ?? mapImgs(it.mainImages?.length ? it.mainImages : it.images);
+  const cleanSkus = productGroups?.skuImgs ?? mapImgs(it.skuImages);
+  const cleanDesc = productGroups?.descImgs ?? mapImgs(it.descImages?.length ? it.descImages : it.detailImages);
+  const all = productGroups?.allImgs ?? [...new Set([...cleanMain, ...cleanSkus, ...cleanDesc, ...mapImgs(it.images)])];
+  const rawCover = productGroups?.coverImg || cleanUrl(it.coverImage || it.picUrl) || cleanMain[0] || all[0] || '';
   const cover = keepUrl(rawCover) ? rawCover : all[0] || '';
   if (all.length === 0 && cover) all.push(cover);
   const videos = [...new Set([...(Array.isArray(it.videos) ? it.videos : []), it.video, it.videoUrl]
@@ -61,9 +64,10 @@ export function sanitizeCollectedItem(it: any): any {
     ...it,
     coverImage: cover,
     images: all,
-    mainImages: cleanMain.length > 0 ? cleanMain : all.length > 0 ? [all[0]] : [],
+    mainImages: isSocial && cleanMain.length === 0 && all.length > 0 ? [all[0]] : cleanMain,
     skuImages: cleanSkus,
     descImages: cleanDesc,
+    detailImages: cleanDesc,
     video,
     videoUrl: video,
     videos,

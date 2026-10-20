@@ -22,6 +22,11 @@ func Analyze(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "请求数据格式异常"})
 			return
 		}
+		var ok bool
+		r, ok = bindRawTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		if message := analyzeBodyError(payload); message != "" {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": message})
 			return

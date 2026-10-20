@@ -28,6 +28,11 @@ func PptOutline(cfg config.Config) http.Handler {
 			return
 		}
 
+		var ok bool
+		r, ok = generate.BindTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		ideaPrompt := strings.TrimSpace(generate.StringField(payload, "ideaPrompt"))
 		outlineText := strings.TrimSpace(generate.StringField(payload, "outlineText"))
 		userRequirement := strings.TrimSpace(generate.StringField(payload, "userRequirement"))
@@ -88,7 +93,7 @@ func PptOutline(cfg config.Config) http.Handler {
 			}
 		}
 
-		if !wantsFallback(payload) {
+		if !wantsFallback(payload) || !generate.TextFallbackAllowed(r.Context(), model) {
 			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "大纲模型调用失败，请检查模型与密钥后重试"})
 			return
 		}

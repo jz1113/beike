@@ -1,6 +1,7 @@
 import './settingsWorkspace.css';
 import { CANVAS_SETTINGS_PAGES, clearQueuedSettingsSection, peekQueuedSettingsSection, settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
 import { CanvasPreview } from './components/SettingsPreview';
+import { PetSettingsPanel } from './components/pet/PetSettingsPanel';
 import { LanguageSettingsPanel } from './components/LanguageSettingsPanel';
 import { AppearanceSettingsPanel } from './components/AppearanceSettingsPanel';
 import { useI18n } from '@client/shared/i18n';
@@ -258,6 +259,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
                 {navSection === 'canvas' && <CanvasPreview page={canvasPage} />}
+                {navSection === 'pet' && <PetSettingsPanel />}
                 {['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'].includes(navSection) && (
                   <ModalityHubView
                     kind={navSection as ModalityKind}

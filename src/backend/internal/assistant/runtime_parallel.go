@@ -2,24 +2,38 @@ package assistant
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
 )
 
 var sequentialTools = map[string]bool{
 	"update_plan": true, "execute_code": true, "workspace_navigate": true,
 	"workspace_load_workshop_product": true, "trigger_generate": true, "set_workshop_arch": true,
-	"spawn_subagent": true, "deconstruct_image": true, "inspect_video_media": true,
+	"trigger_generate_batch": true,
+	"spawn_subagent":         true, "deconstruct_image": true, "inspect_video_media": true,
+	"read_skill": true, "load_mcp_tool": true,
 	"extract_video_storyboard": true, "extract_video_detailed_frames": true,
 }
 
 func isParallelSafe(name string) bool {
-	if len(name) >= 4 && name[:4] == "mcp_" {
+	return parallelSafe(name, mcpBinding{}, false)
+}
+
+func parallelSafe(name string, binding mcpBinding, known bool) bool {
+	if known {
+		return binding.readOnly && !binding.destructive && !binding.openWorld
+	}
+	if strings.HasPrefix(name, "mcp_") {
 		return false
 	}
 	return !sequentialTools[name]
 }
 
 func toolGroups(names []string) [][]int {
+	return toolGroupsWith(names, isParallelSafe)
+}
+
+func toolGroupsWith(names []string, safe func(string) bool) [][]int {
 	groups := [][]int{}
 	var current []int
 	flush := func() {
@@ -30,7 +44,7 @@ func toolGroups(names []string) [][]int {
 		current = nil
 	}
 	for index, name := range names {
-		if isParallelSafe(name) {
+		if safe(name) {
 			current = append(current, index)
 			continue
 		}
@@ -47,8 +61,12 @@ func (loop *agentLoop) runToolCalls(calls []modelToolCall) {
 	for i, call := range calls {
 		names[i] = call.name
 	}
-	for _, group := range toolGroups(names) {
-		if len(group) == 1 && !isParallelSafe(calls[group[0]].name) {
+	safe := func(name string) bool {
+		binding, known := loop.box.mcp[name]
+		return parallelSafe(name, binding, known)
+	}
+	for _, group := range toolGroupsWith(names, safe) {
+		if len(group) == 1 && !safe(calls[group[0]].name) {
 			loop.recordTool(calls[group[0]], loop.executeCall(calls[group[0]]))
 			continue
 		}
@@ -73,15 +91,18 @@ func (loop *agentLoop) runToolCalls(calls []modelToolCall) {
 
 func (loop *agentLoop) recordTool(call modelToolCall, output string) {
 	if follow := visualFollowup(output); follow != nil {
-		loop.messages = append(loop.messages, map[string]any{"role": "user", "content": follow})
+		loop.toolVisuals = append(loop.toolVisuals, map[string]any{"role": "user", "content": follow})
 	}
-	loop.messages = append(loop.messages, map[string]any{"role": "tool", "tool_call_id": call.id, "content": loop.results.forModel(output, toolStoreThreshold)})
+	loop.messages = append(loop.messages, map[string]any{"role": "tool", "tool_call_id": call.id, "content": loop.results.forModel(output, toolResultThreshold(call.name))})
 	if note := unfinishedToolNote(call.name, output); note != "" {
 		loop.toolNotes = append(loop.toolNotes, note)
 	}
 }
 
 func (loop *agentLoop) flushToolNotes() {
+	// All tool results must immediately follow their assistant tool-use block.
+	loop.messages = append(loop.messages, loop.toolVisuals...)
+	loop.toolVisuals = nil
 	for _, note := range loop.toolNotes {
 		loop.messages = append(loop.messages, map[string]any{"role": "system", "content": note})
 	}

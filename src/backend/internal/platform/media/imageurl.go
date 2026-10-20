@@ -11,15 +11,10 @@ var (
 	otherMedia     = regexp.MustCompile(`(?i)\.(?:html?|mp4|mov|webm|m4v|avi|flv|m3u8|mpd|mp3|m4a|wav|ogg|pdf)(?:[!~]|$)`)
 	trackerPath    = regexp.MustCompile(`(?i)(?:i\.php|(?:space|spacer|1x1|blank)\.(?:gif|png)|taesite|tongji|picon/|imagetools/|service_ico|devfe/|s(?:48x48|54x54|30x30|20x20|60x60)_|error-new|jisushenhe|spiderfont)`)
 	imageHosts     = []string{"360buyimg.com", "alicdn.com", "taobaocdn.com", "tbcdn.cn", "pddpic.com", "yangkeduo.com", "xhscdn.com", "xiaohongshu.com", "douyinpic.com", "byteimg.com", "snssdk.com", "pstatp.com", "kwaicdn.com", "kwimgs.com", "yximgs.com", "sinaimg.cn", "hdslb.com", "r2.dev", "qiniucdn.com", "upaiyun.com"}
-	jdResize       = regexp.MustCompile(`(?i)^https?://[^/]+/(?:mobilecms/|popWaterMark/|popWareDetail/|n\d+/|sku/|shaidan/|babel/|imgzone/|pcpubliccms/)?(?:s\d+x\d+_)?jfs/`)
 	sizeBeforeJfs  = regexp.MustCompile(`(?i)/s\d+x\d+_`)
 	sizeSegment    = regexp.MustCompile(`(?i)/s\d+x\d+/`)
 	jdSuffix       = regexp.MustCompile(`(?i)![a-zA-Z0-9_.-]*$`)
-	jdDpg          = regexp.MustCompile(`(?i)\.dpg(?:\.webp)?$`)
 	jpgWebp        = regexp.MustCompile(`(?i)\.(jpe?g|png)\.webp$`)
-	webpSuffix     = regexp.MustCompile(`(?i)\.webp$`)
-	aliTail        = regexp.MustCompile(`(?i)_\.webp$|_(?:q\d+\.jpg|\d+x\d+|sum\.jpg|[bms]\.jpg).*$`)
-	aliSize        = regexp.MustCompile(`(?i)\.\d+x\d+\.jpg.*$|\.(?:search|summ)\.jpg.*$`)
 	cosHost        = regexp.MustCompile(`(?i)(?:^|\.)(?:cos\.|oss-)`)
 	imageProcess   = regexp.MustCompile(`(?i)(?:imageView2|imageMogr2|image_process|imageView|format/)`)
 )
@@ -37,7 +32,7 @@ func NormalizeImageURLToStandardJpg(value string) string {
 	if err != nil {
 		return source
 	}
-	if parsed.RawQuery != "" || parsed.Fragment != "" {
+	if strings.ContainsAny(source, "?#") {
 		return source
 	}
 	host := strings.ToLower(parsed.Hostname())
@@ -45,22 +40,21 @@ func NormalizeImageURLToStandardJpg(value string) string {
 		return regexp.MustCompile(`(?i)^https?://ci\.xiaohongshu\.com`).ReplaceAllString(source, "https://sns-img-hw.xhscdn.com")
 	}
 	if hostMatches(host, []string{"360buyimg.com"}) {
-		source = jdResize.ReplaceAllString(source, "https://img10.360buyimg.com/pcpubliccms/s1440x1440_jfs/")
+		if image, ok := ParseProductImage(source); ok && strings.HasPrefix(image.Key, "jd:") {
+			return image.URL
+		}
 		source = replaceSizeUnlessJfs(source)
 		source = sizeSegment.ReplaceAllString(source, "/")
 		source = jdSuffix.ReplaceAllString(source, "")
-		source = jdDpg.ReplaceAllString(source, "")
-		source = jpgWebp.ReplaceAllString(source, ".$1")
-		return webpSuffix.ReplaceAllString(source, ".jpg")
+		source = jdProductDpg.ReplaceAllString(source, "$1")
+		return jpgWebp.ReplaceAllString(source, ".$1")
 	}
 	if hostMatches(host, []string{"alicdn.com", "taobaocdn.com", "tbcdn.cn"}) {
-		source = aliTail.ReplaceAllString(source, "")
-		source = aliSize.ReplaceAllString(source, ".jpg")
-		source = jpgWebp.ReplaceAllString(source, ".$1")
-		return webpSuffix.ReplaceAllString(source, ".jpg")
+		return aliProductOriginal(source)
 	}
 	if hostMatches(host, []string{"pddpic.com", "yangkeduo.com"}) {
-		return webpSuffix.ReplaceAllString(source, ".jpeg")
+		// A standalone .webp is a native format, not evidence of a JPEG source.
+		return jpgWebp.ReplaceAllString(source, ".$1")
 	}
 	return source
 }

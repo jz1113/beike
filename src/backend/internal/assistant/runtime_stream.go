@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 const maxStreamRetries = 2
@@ -17,6 +19,12 @@ const maxStreamRetries = 2
 var errToolsUnsupported = errors.New("upstream tools unsupported")
 
 func (loop *agentLoop) streamModel(body []byte, withTools bool) (modelRound, error) {
+	var payload struct {
+		Model string `json:"model"`
+	}
+	if json.Unmarshal(body, &payload) == nil && modelgw.ResolveTextProtocol(payload.Model, loop.creds.protocol) != "openai" {
+		return loop.nativeStream(body)
+	}
 	var last error
 	retryAfter := ""
 	clamped := false

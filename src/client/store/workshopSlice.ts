@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import { ShotPrompt, buildActionDigestFromShots } from '@shared/domain/prompts/vision';
-import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
+import { normalizeCollectedProductImages } from '@shared/domain/collection/productImages';
 import type { ProductImage } from '@client/types';
 import {
   getStoredMultimodalModelId,
@@ -247,37 +247,15 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   setError: (error) => set({ error }),
 
   setProductData: (product, imagesInput, apiUsed) => {
-    const toArray = (val: unknown): string[] => {
-      if (!val) return [];
-      if (Array.isArray(val)) return val.map(String).filter(Boolean);
-      if (typeof val === 'string') {
-        try {
-          const parsed = JSON.parse(val);
-          if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-        } catch {}
-        return [val].filter(Boolean);
-      }
-      return [];
-    };
-
-    const rawMain = imagesInput?.main;
-    const rawDetails = imagesInput?.details;
-    const rawSkus = imagesInput?.skus;
-
-    const mainList = toArray(rawMain);
-    const skusList = toArray(rawSkus);
-    const detailsList = toArray(rawDetails);
-
+    const { mainImgs, skuImgs, descImgs, coverImg } = normalizeCollectedProductImages({
+      product: product ? { ...product } : {}, images: imagesInput,
+    });
     const formattedImages: ProductImage[] = [
-      ...mainList.map(url => ({ url: normalizeImageUrlToStandardJpg(url), type: 'main' as const, selected: false })),
-      ...skusList.map(url => ({ url: normalizeImageUrlToStandardJpg(url), type: 'sku' as const, selected: false })),
-      ...detailsList.map(url => ({ url: normalizeImageUrlToStandardJpg(url), type: 'detail' as const, selected: false }))
-    ].filter(img => Boolean(img.url));
-
-    const cleanProduct = product ? {
-      ...product,
-      picUrl: normalizeImageUrlToStandardJpg(product.picUrl)
-    } : null;
+      ...mainImgs.map(url => ({ url, type: 'main' as const, selected: false })),
+      ...skuImgs.map(url => ({ url, type: 'sku' as const, selected: false })),
+      ...descImgs.map(url => ({ url, type: 'detail' as const, selected: false })),
+    ];
+    const cleanProduct = product ? { ...product, picUrl: coverImg } : null;
 
     // 如果还没有设置参考图，默认设置商品首图
     const firstImg = formattedImages[0]?.url || null;

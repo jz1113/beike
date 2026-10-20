@@ -13,6 +13,7 @@ export function toolGetWorkshopState(ctx: ToolExecContext): string {
       workshopMode: c.workshopMode || null,
       assetLibraryTab: c.assetLibraryTab || null,
       assetLibraryKeyword: c.assetLibraryKeyword || null,
+      generationBatches: c.generationBatches || [],
     },
   });
 }
@@ -62,11 +63,12 @@ export function toolGetViewCapabilities(args: { view?: string }, ctx: ToolExecCo
     },
   };
   const cfg = capabilities[currentView] || { actions: [], tools: [] };
+  const hasBatches = Boolean(ctx.clientContext?.generationBatches?.length);
   return JSON.stringify({
     success: true,
     view: currentView,
-    actions: cfg.actions,
-    availableTools: cfg.tools,
-    note: '可用工具以本轮函数列表和权限为准；查询资料无需切换视图。生图工具仅载入首页输入草稿，用户确认生成后才产生图片；视频生成和模型设置当前由用户在界面操作。',
+    actions: hasBatches ? [...cfg.actions, 'request_generate_batch'] : cfg.actions,
+    availableTools: hasBatches ? [...cfg.tools, 'trigger_generate_batch'] : cfg.tools,
+    note: '可用工具以本轮函数列表和权限为准；查询资料无需切换视图。trigger_generate 仅载入首页草稿；trigger_generate_batch 仅在用户明确要求生成时请求提交本轮客户端清单，客户端校验后执行，不表示提交或生成成功。写提示词不构成生成授权；模型设置由用户在界面操作。',
   });
 }

@@ -4,7 +4,7 @@
 
 ## 调用约定
 
-- 聊天模型默认使用当前 OpenAI 兼容通道的 `/v1/chat/completions`。千问 / DashScope 域名会自动改走 `/compatible-mode/v1/chat/completions` 和 `/compatible-mode/v1/models`。
+- Gemini、Claude 的文本及图片理解默认使用各自原生协议，分别访问 `generateContent` / `streamGenerateContent` 与 `/v1/messages`；单模型 `textProtocol` 可显式切回 OpenAI 兼容。保留所选渠道地址和密钥，原生失败不静默回退。其他聊天模型继续使用当前 OpenAI 兼容通道的 `/v1/chat/completions`。千问 / DashScope 域名走 `/compatible-mode/v1/chat/completions` 和 `/compatible-mode/v1/models`。具体能力与验证边界见 [思考强度适配](reasoning.md)。
 - 在设置里添加服务商并填写 `https://maas.qianwenaiapi.com` 后，生图会走 DashScope 原生接口。`qwen-image` 同步返回图片，`wan2.6` / `wan2.7` 图像模型异步轮询。界面上的 4K 只会留给 `wan2.7-image-pro`，千问图像模型不发送 OpenAI 的 `quality`。
 - 聚合网关上的 `qwen-image-max` 仍使用通用 DALL·E Generations；旧别名 `qwen-image-3` 已从原清单修正。
 - Midjourney 网关模型 ID 为 `midjourney`，运行时提交为 `mj_fast_imagine`；网关 v7/v8 共用 Imagine / Action / Fetch 接口。其 Apifox 链接是网关资料，不是厂商官方 API。

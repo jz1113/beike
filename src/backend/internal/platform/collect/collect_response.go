@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/platform/database"
+	"beike.local/cloud/src/backend/internal/platform/database/catalog"
+	"beike.local/cloud/src/backend/internal/platform/media"
 )
 
 type missingCredential struct {
@@ -17,13 +19,14 @@ type missingCredential struct {
 }
 
 type imagePayload struct {
-	Main     []string          `json:"main"`
-	Details  []string          `json:"details"`
-	Skus     []string          `json:"skus"`
-	Props    map[string]string `json:"props"`
-	Price    float64           `json:"price"`
-	Brand    string            `json:"brand"`
-	Category string            `json:"category"`
+	Main            []string                        `json:"main"`
+	Details         []string                        `json:"details"`
+	Skus            []string                        `json:"skus"`
+	Props           map[string]string               `json:"props"`
+	Price           float64                         `json:"price"`
+	Brand           string                          `json:"brand"`
+	Category        string                          `json:"category"`
+	VariantMetadata *catalog.ProductVariantMetadata `json:"variantMetadata,omitempty"`
 }
 
 type failurePayload struct {
@@ -61,9 +64,35 @@ func cachedProduct(ctx context.Context, db *sql.DB, workspace string, input prod
 	if json.Unmarshal([]byte(detail), &stored) != nil {
 		return Result{}, false
 	}
-	main := cleanProductImages(append(jsonList(stored["main"]), picURL))
-	details := cleanProductImages(jsonList(stored["details"]))
-	skus := cleanProductImages(jsonList(stored["skus"]))
+	mainSource := extractURLs(stored["main"], true)
+	skuSource := extractURLs(stored["skus"], true)
+	detailSource := extractURLs(stored["details"], true)
+	// picUrl is a cover alias, not evidence that a sku/detail image is a main
+	// image. Keep an existing group's ownership, including old cache payloads.
+	if cover, ok := media.ParseProductImage(picURL); ok {
+		group := 0
+		found := false
+		for index, values := range [][]string{mainSource, skuSource, detailSource} {
+			for _, value := range values {
+				if image, valid := media.ParseProductImage(value); valid && image.Key == cover.Key {
+					group, found = index, true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		switch group {
+		case 1:
+			skuSource = append(skuSource, picURL)
+		case 2:
+			detailSource = append(detailSource, picURL)
+		default:
+			mainSource = append(mainSource, picURL)
+		}
+	}
+	main, skus, details := productImageGroups(mainSource, skuSource, detailSource)
 	combined := uniqueStrings(append(append(append([]string{}, main...), skus...), details...))
 	if len(combined) == 0 {
 		return Result{}, false
@@ -76,6 +105,8 @@ func cachedProduct(ctx context.Context, db *sql.DB, workspace string, input prod
 	brand := textOr(stored["brand"], "")
 	category := textOr(stored["category"], "全品类")
 	props := stringMap(stored["props"])
+	variants := catalog.AlignProductVariantImages(catalog.ReadProductVariantMetadata(stored["variantMetadata"]), combined)
+	variants = selectRequestedVariant(variants, input)
 	return Result{Status: http.StatusOK, Body: struct {
 		Success   bool   `json:"success"`
 		Product   any    `json:"product"`
@@ -84,35 +115,36 @@ func cachedProduct(ctx context.Context, db *sql.DB, workspace string, input prod
 		FromCache bool   `json:"fromCache"`
 	}{
 		true,
-		cachedItem{id, input.platform, input.itemID, input.itemID, input.itemID, title, price, brand, category, cover, cover, combined, main, details, details, skus, props, createdAt},
-		imagePayload{main, details, skus, props, price, brand, category},
+		cachedItem{id, input.platform, input.itemID, input.itemID, input.itemID, title, price, brand, category, cover, cover, combined, main, details, details, skus, props, createdAt, variants},
+		imagePayload{main, details, skus, props, price, brand, category, variants},
 		"💾 本地数据库已存 (0次扣费/瞬时加载)",
 		true,
 	}}, true
 }
 
 type cachedItem struct {
-	ID           string            `json:"id"`
-	Platform     string            `json:"platform"`
-	ItemID       string            `json:"itemId"`
-	NumIID       string            `json:"num_iid"`
-	SKUID        string            `json:"skuId"`
-	Title        string            `json:"title"`
-	Price        float64           `json:"price"`
-	Brand        string            `json:"brand"`
-	Category     string            `json:"category"`
-	PicURL       string            `json:"picUrl"`
-	CoverImage   string            `json:"coverImage"`
-	Images       []string          `json:"images"`
-	MainImages   []string          `json:"mainImages"`
-	DetailImages []string          `json:"detailImages"`
-	DescImages   []string          `json:"descImages"`
-	SKUImages    []string          `json:"skuImages"`
-	Props        map[string]string `json:"props"`
-	CreatedAt    string            `json:"createdAt"`
+	ID              string                          `json:"id"`
+	Platform        string                          `json:"platform"`
+	ItemID          string                          `json:"itemId"`
+	NumIID          string                          `json:"num_iid"`
+	SKUID           string                          `json:"skuId"`
+	Title           string                          `json:"title"`
+	Price           float64                         `json:"price"`
+	Brand           string                          `json:"brand"`
+	Category        string                          `json:"category"`
+	PicURL          string                          `json:"picUrl"`
+	CoverImage      string                          `json:"coverImage"`
+	Images          []string                        `json:"images"`
+	MainImages      []string                        `json:"mainImages"`
+	DetailImages    []string                        `json:"detailImages"`
+	DescImages      []string                        `json:"descImages"`
+	SKUImages       []string                        `json:"skuImages"`
+	Props           map[string]string               `json:"props"`
+	CreatedAt       string                          `json:"createdAt"`
+	VariantMetadata *catalog.ProductVariantMetadata `json:"variantMetadata,omitempty"`
 }
 
-func freshProduct(id string, input productInput, title string, price float64, category, brand, picURL string, combined, main, details, skus []string, props map[string]string, createdAt, apiUsed string) any {
+func freshProduct(id string, input productInput, title string, price float64, category, brand, picURL string, combined, main, details, skus []string, props map[string]string, createdAt, apiUsed string, variants *catalog.ProductVariantMetadata) any {
 	return struct {
 		Success bool   `json:"success"`
 		Product any    `json:"product"`
@@ -121,33 +153,29 @@ func freshProduct(id string, input productInput, title string, price float64, ca
 	}{
 		true,
 		struct {
-			ID           string            `json:"id"`
-			Platform     string            `json:"platform"`
-			ItemID       string            `json:"itemId"`
-			NumIID       string            `json:"num_iid"`
-			SKUID        string            `json:"skuId"`
-			Title        string            `json:"title"`
-			Price        float64           `json:"price"`
-			Category     string            `json:"category"`
-			Brand        string            `json:"brand"`
-			PicURL       string            `json:"picUrl"`
-			CoverImage   string            `json:"coverImage"`
-			Images       []string          `json:"images"`
-			MainImages   []string          `json:"mainImages"`
-			DetailImages []string          `json:"detailImages"`
-			DescImages   []string          `json:"descImages"`
-			SKUImages    []string          `json:"skuImages"`
-			Props        map[string]string `json:"props"`
-			CreatedAt    string            `json:"createdAt"`
-		}{id, input.platform, input.itemID, input.itemID, input.itemID, title, price, category, brand, picURL, picURL, combined, main, details, details, skus, props, createdAt},
-		imagePayload{main, details, skus, props, price, brand, category},
+			ID              string                          `json:"id"`
+			Platform        string                          `json:"platform"`
+			ItemID          string                          `json:"itemId"`
+			NumIID          string                          `json:"num_iid"`
+			SKUID           string                          `json:"skuId"`
+			Title           string                          `json:"title"`
+			Price           float64                         `json:"price"`
+			Category        string                          `json:"category"`
+			Brand           string                          `json:"brand"`
+			PicURL          string                          `json:"picUrl"`
+			CoverImage      string                          `json:"coverImage"`
+			Images          []string                        `json:"images"`
+			MainImages      []string                        `json:"mainImages"`
+			DetailImages    []string                        `json:"detailImages"`
+			DescImages      []string                        `json:"descImages"`
+			SKUImages       []string                        `json:"skuImages"`
+			Props           map[string]string               `json:"props"`
+			CreatedAt       string                          `json:"createdAt"`
+			VariantMetadata *catalog.ProductVariantMetadata `json:"variantMetadata,omitempty"`
+		}{id, input.platform, input.itemID, input.itemID, input.itemID, title, price, category, brand, picURL, picURL, combined, main, details, details, skus, props, createdAt, variants},
+		imagePayload{main, details, skus, props, price, brand, category, variants},
 		apiUsed,
 	}
-}
-
-func jsonList(value any) []any {
-	list, _ := value.([]any)
-	return list
 }
 
 func numberValue(value any) float64 {

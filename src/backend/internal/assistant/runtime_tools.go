@@ -11,18 +11,67 @@ import (
 )
 
 type toolBox struct {
-	ctx       context.Context
-	db        *sql.DB
-	cfg       config.Config
-	workspace string
-	documents []attachedDoc
-	client    map[string]any
-	plan      *taskPlan
-	results   *resultStore
-	budget    *execBudget
-	allowed   []string
-	mcp       map[string]mcpBinding
-	spawn     func(skillID, prompt string) string
+	ctx           context.Context
+	db            *sql.DB
+	cfg           config.Config
+	workspace     string
+	documents     []attachedDoc
+	client        map[string]any
+	plan          *taskPlan
+	results       *resultStore
+	budget        *execBudget
+	allowed       []string
+	ceiling       []string
+	pinnedCeiling bool
+	skillTools    []string
+	exposedMCP    []string
+	mcpEnabled    bool
+	mcp           map[string]mcpBinding
+	skills        []skillPackage
+	skillFiles    []skillResource
+	visual        *visualBudget
+	spawn         func(skillID, prompt string) string
+	applyTools    func(allowed []string)
+	activateMCP   func(name string) string
+}
+
+type skillResource struct {
+	Path    string
+	Content string
+}
+
+type skillPackage struct {
+	ID          string
+	Name        string
+	Description string
+	Prompt      string
+	Tools       []string
+	Resources   []skillResource
+}
+
+func skillResources(raw json.RawMessage) []skillResource {
+	if len(raw) == 0 {
+		return nil
+	}
+	var rows []struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	}
+	if json.Unmarshal(raw, &rows) != nil {
+		return nil
+	}
+	if len(rows) > 24 {
+		rows = rows[:24]
+	}
+	out := make([]skillResource, 0, len(rows))
+	for _, row := range rows {
+		path := strings.TrimSpace(row.Path)
+		if path == "" || len([]rune(path)) > 240 {
+			continue
+		}
+		out = append(out, skillResource{Path: path, Content: trimRunes(row.Content, 40_000)})
+	}
+	return out
 }
 
 type attachedDoc struct {
@@ -37,6 +86,14 @@ func (box *toolBox) run(name string, args map[string]any) string {
 	switch name {
 	case "update_plan":
 		return box.plan.update(args)
+	case "read_skill":
+		return box.readSkill(args)
+	case "read_skill_file":
+		return box.readSkillFile(args)
+	case "search_mcp_tools":
+		return box.searchMCP(args)
+	case "load_mcp_tool":
+		return box.loadMCP(args)
 	case "read_tool_result":
 		return box.results.read(textArg(args, "result_id"), intArg(args, "offset"), intArgDefault(args, "length", 4000))
 	case "execute_code":
@@ -59,6 +116,8 @@ func (box *toolBox) run(name string, args map[string]any) string {
 		return navigateTool(textArg(args, "target_view"), textArg(args, "reason"))
 	case "workspace_load_workshop_product":
 		return loadWorkshopProduct(box.ctx, box.db, box.workspace, textArg(args, "itemId"))
+	case "trigger_generate_batch":
+		return box.generateBatch(args)
 	case "trigger_generate":
 		body, _ := json.Marshal(map[string]any{"success": true, "action": "trigger_generate", "prompt": args["prompt"], "requiresUserGenerate": true, "message": "已请求将提示词和参考图载入首页生图输入，等待用户确认生成"})
 		return string(body)
@@ -172,6 +231,7 @@ func workshopState(client map[string]any) string {
 		"productTitle": client["productTitle"], "productItemId": client["productItemId"],
 		"selectedArchId": client["selectedArchId"], "workshopMode": client["workshopMode"],
 		"assetLibraryTab": client["assetLibraryTab"], "assetLibraryKeyword": client["assetLibraryKeyword"],
+		"generationBatches": client["generationBatches"],
 	}})
 	return string(body)
 }
@@ -192,9 +252,13 @@ func viewCapabilities(view string, client map[string]any) string {
 		"assets":   {"query_asset_library", "get_prompt_asset_detail", "deconstruct_image", "workspace_navigate"},
 		"collect":  {"parse_product_or_social_url"},
 	}
+	if batches, err := generationBatches(client); err == nil && len(batches) > 0 {
+		actions[view] = append(actions[view], "request_generate_batch")
+		tools[view] = append(tools[view], "trigger_generate_batch")
+	}
 	body, _ := json.Marshal(map[string]any{
 		"success": true, "view": view, "actions": actions[view], "availableTools": tools[view],
-		"note": "可用工具以本轮函数列表和权限为准；查询资料无需切换视图。生图工具仅载入首页输入草稿，用户确认生成后才产生图片；视频生成和模型设置当前由用户在界面操作。",
+		"note": "可用工具以本轮函数列表和权限为准；查询资料无需切换视图。trigger_generate 仅载入首页草稿；trigger_generate_batch 仅在用户明确要求生成时请求提交本轮客户端清单，客户端校验后执行，不表示提交或生成成功。写提示词不构成生成授权；模型设置由用户在界面操作。",
 	})
 	return string(body)
 }
@@ -206,6 +270,25 @@ func navigateTool(target, reason string) string {
 	}
 	body, _ := json.Marshal(map[string]any{"success": true, "action": "navigate", "target_view": target, "reason": reason, "message": "已请求将工作台切换至「" + label + "」"})
 	return string(body)
+}
+
+func (box *toolBox) readSkillFile(args map[string]any) string {
+	path := textArg(args, "path")
+	if path == "" {
+		return toolJSON(false, "缺少技能文件路径")
+	}
+	for _, file := range box.skillFiles {
+		if file.Path != path {
+			continue
+		}
+		body := file.Content
+		if len([]rune(body)) > 12000 {
+			body = string([]rune(body)[:12000]) + "\n\n…（文件剩余部分请缩小范围后再读）"
+		}
+		payload, _ := json.Marshal(map[string]any{"success": true, "path": file.Path, "content": body})
+		return string(payload)
+	}
+	return toolJSON(false, "当前技能资料里没有这个文件")
 }
 
 func toolJSON(success bool, message string) string {
@@ -259,6 +342,12 @@ func summarizeToolResult(raw string) string {
 	if json.Unmarshal([]byte(raw), &parsed) == nil {
 		if message, _ := parsed["message"].(string); message != "" {
 			return clipText(message, 240)
+		}
+		if text, _ := parsed["text"].(string); text != "" {
+			return clipText(text, 240)
+		}
+		if path, _ := parsed["path"].(string); path != "" {
+			return clipText("已读取 "+path, 240)
 		}
 		if errText, _ := parsed["error"].(string); errText != "" {
 			return clipText(errText, 240)

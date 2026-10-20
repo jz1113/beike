@@ -1,4 +1,10 @@
+import type { TextProtocol } from './textProtocol';
+
 export type WorkflowCapability = {
+  textProtocol?: TextProtocol;
+  apiTemplate?: string;
+  customBaseUrl?: string;
+  customApiKey?: string;
   id: string;
   /** Upstream model ID stays bare; routeId distinguishes equal IDs on separate gateways. */
   routeId?: string;

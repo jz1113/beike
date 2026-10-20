@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TextRequestRoutingFields } from './textRouting';
 
 const assistantIdSchema = z.string().trim().min(1).max(255);
 
@@ -41,7 +42,21 @@ export const workspaceSnapshotSchema = z.object({
   }).optional(),
 }).optional();
 
+export const generationBatchSchema = z.object({
+  sourceId: assistantIdSchema,
+  entries: z.array(z.object({
+    id: assistantIdSchema,
+    title: z.string().max(160),
+    mediaType: z.enum(['image', 'video']),
+  })).max(30).refine((entries) => new Set(entries.map((entry) => entry.id)).size === entries.length, '批量条目 ID 不能重复'),
+});
+
 export const clientContextSchema = z.object({
+  /** 本轮客户端可提交清单；正文中的提示词或编号不能代替此清单。 */
+  generationBatches: z.array(generationBatchSchema).max(8).refine(
+    (batches) => new Set(batches.map((batch) => batch.sourceId)).size === batches.length,
+    '批量来源 ID 不能重复',
+  ).optional(),
   currentView: z.string().optional(),
   workshopStep: z.number().optional(),
   productTitle: z.string().optional(),
@@ -58,10 +73,26 @@ export const mcpServerConfigSchema = z.object({
   name: z.string(),
   url: z.string().url(),
   enabled: z.boolean().optional(),
+  headers: z.record(z.string().max(200), z.string().max(4_000)).optional(),
+});
+
+const skillResourceSchema = z.object({
+  path: z.string().max(240),
+  content: z.string().max(40_000),
+});
+
+const skillCatalogEntrySchema = z.object({
+  id: z.string().max(128),
+  name: z.string().max(200),
+  description: z.string().max(400).optional().default(''),
+  prompt: z.string().max(12_000).optional(),
+  tools: z.array(z.string().max(128)).max(50).optional(),
+  resources: z.array(skillResourceSchema).max(24).optional(),
 });
 
 export const turnStartBodySchema = z
   .object({
+    ...TextRequestRoutingFields,
     threadId: assistantIdSchema.nullish(),
     turnId: assistantIdSchema.nullish(),
     messages: z.array(assistantMessageSchema).min(1).max(500).refine(
@@ -77,6 +108,8 @@ export const turnStartBodySchema = z
     customApiKey: z.string().max(4096).nullish(),
     systemPrompt: z.string().max(100_000).nullish(),
     skillId: z.string().max(128).nullish(),
+    skillResources: z.array(skillResourceSchema).max(24).nullish(),
+    skillCatalog: z.array(skillCatalogEntrySchema).max(16).nullish(),
     allowedTools: z.array(z.string().max(128)).max(50).nullish(),
     enableAgentTools: z.boolean().nullish(),
     fallbackOrder: z.array(z.string().max(200)).max(256).optional(),

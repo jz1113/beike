@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 type deconstructHooks struct {
@@ -25,6 +27,11 @@ type deconstructHooks struct {
 }
 
 func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]any, hooks deconstructHooks) (int, map[string]any) {
+	protocol, protocolErr := generate.RequestTextProtocol(r, payload)
+	if protocolErr != nil {
+		return http.StatusBadRequest, map[string]any{"success": false, "error": protocolErr.Error()}
+	}
+	r = r.WithContext(modelgw.WithTextProtocol(r.Context(), protocol))
 	images := stringList(payload["imageUrls"])
 	workspace := httpx.WorkspaceFrom(r)
 	taskID, _ := payload["clientTaskId"].(string)

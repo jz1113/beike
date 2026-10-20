@@ -113,6 +113,11 @@ export interface AssistantTurn {
 }
 
 export interface ClientContext {
+  /** 本轮客户端可提交的来源与条目清单，最多 8 组，每组最多 30 条。 */
+  generationBatches?: Array<{
+    sourceId: string;
+    entries: Array<{ id: string; title: string; mediaType: 'image' | 'video' }>;
+  }>;
   currentView?: string;
   workshopStep?: number;
   productTitle?: string;
@@ -138,6 +143,8 @@ export interface McpServerConfig {
   name: string;
   url: string;
   enabled?: boolean;
+  /** 只发给该 MCP 服务，不进入模型上下文。 */
+  headers?: Record<string, string>;
 }
 
 export interface TurnStartOptions {
@@ -157,6 +164,14 @@ export interface TurnStartOptions {
   historyLimit?: number;
   systemPrompt?: string;
   skillId?: string;
+  skillCatalog?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    prompt?: string;
+    tools?: string[];
+    resources?: Array<{ path: string; content: string }>;
+  }>;
   allowedTools?: string[];
   enableAgentTools?: boolean;
   fallbackModels?: string[];

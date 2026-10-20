@@ -34,7 +34,7 @@ export function PosterImportPanel({
   return (
     <section className="mx-auto w-full max-w-[980px] text-center">
       <h1 className="text-3xl font-black tracking-[-0.045em] text-slate-950 dark:text-white sm:text-[40px]">一键批量制作封面</h1>
-      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">可粘贴表格，或直接上传图片。图片文件名会作为原标题，默认文字竖。封面技能按每张的构图、字体、字色、背景和主体一次生成。</p>
+      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">可粘贴表格，或直接上传图片。图片文件名会作为原标题，默认文字竖。封面生成按每张的构图、字体、字色、背景和主体一次生成。</p>
 
       {/* 导入模式切换 */}
       <div className="mt-6 inline-flex max-w-full rounded-full bg-slate-100 dark:bg-white/10 p-1 shadow-inner">

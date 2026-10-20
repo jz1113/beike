@@ -16,7 +16,7 @@ const capsules = [
   { id: 'headline_poster', title: '封面生成', hint: '商品与标题，一次生成吸睛封面', icon: Brush },
   { id: 'workshop', title: '电商工坊', hint: '从灵感到批量成片的一站式创作', icon: ShoppingBag },
   { id: 'digital_human', title: '数字人', hint: '高颜值数字人克隆与口播视频生成', icon: ScanFace },
-  { id: 'video_sales', title: '视频带货', hint: '上传商品图，AI 自动生成短视频带货脚本与成片', icon: Captions },
+  { id: 'video_sales', title: '视频带货', hint: '贴商品链接，采集图文后生成无字幕带货视频', icon: Captions },
   { id: 'keyword_review', title: '词包审核', hint: '批量语义分类，审核内容是否值得制作', icon: FilePen },
   { id: 'ppt_generator', title: 'PPT生成', hint: '一句话/大纲，AI 视觉渲染高保真演示文稿', icon: FileType },
   { id: 'collector_hub', title: '内容采集', hint: '聚合商品与社媒内容，沉淀可用素材库', icon: Download },

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TextRequestRoutingFields } from './textRouting';
 
 export const ImageTaskStatusSchema = z.enum([
   'PENDING',
@@ -141,6 +142,7 @@ const HeadlineProductNameSchema = z.string().max(128).transform((name) => name.r
 // 25 MiB originals fit within this base64 limit; remote and local URLs are also accepted.
 const HeadlineImageSchema = z.string().trim().min(1).max(36 * 1024 * 1024, '商品图片数据过大');
 const HeadlineCredentials = {
+  ...TextRequestRoutingFields,
   customBaseUrl: z.string().trim().max(2048).optional(),
   customApiKey: z.string().trim().max(4096).optional(),
 };
@@ -180,6 +182,7 @@ export const KeywordReviewRowSchema = z.object({
 });
 
 export const KeywordReviewRequestSchema = z.object({
+  ...TextRequestRoutingFields,
   model: z.string().max(160).optional(),
   provider: z.enum(['deepseek', 'gateway']).optional(),
   reviewMode: z.enum(['image', 'video']).optional(),

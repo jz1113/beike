@@ -73,6 +73,18 @@ func turnHandler(cfg config.Config, mode string, limit int64, empty, tooLarge, b
 }
 
 func turnStartError(payload map[string]json.RawMessage) string {
+	if raw, exists := payload["textProtocol"]; exists {
+		protocol, ok := rawText(raw)
+		if !ok || !validTextProtocol(protocol) {
+			return "textProtocol: 不支持的文本协议"
+		}
+	}
+	if raw, exists := payload["reasoningEffort"]; exists {
+		effort, ok := rawText(raw)
+		if !ok || (effort != "auto" && effort != "low" && effort != "medium" && effort != "high" && effort != "xhigh") {
+			return "reasoningEffort: 不支持的思考强度"
+		}
+	}
 	raw, ok := payload["messages"]
 	if !ok {
 		return "messages: Required"

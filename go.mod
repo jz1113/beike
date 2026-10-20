@@ -36,7 +36,7 @@ require (
 	github.com/xuri/nfp v0.0.1 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/image v0.30.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/net v0.40.0
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	modernc.org/libc v1.77.1 // indirect

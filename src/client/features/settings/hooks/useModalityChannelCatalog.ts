@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { MODALITY_GLOBAL_CHANNEL_ID } from '@shared/domain/models/modalityStorage';
 import { loadStoredProviders, type ApiProvider } from '../model/apiProviderTypes';
+import { catalogRequestProtocol } from '../model/catalogRequestProtocol';
 import { parseRemoteModelFetch } from '../model/remoteModelFetch';
 import type { ModalityChannelOption, ModalityGlobalConfig } from '../model/modalityModelTypes';
 
@@ -70,7 +71,8 @@ export function useModalityChannelCatalog(
   }, [globalConfig.apiKey, globalConfig.baseUrl, providers]);
 
   const syncChannel = useCallback(async (channelId: string) => {
-    const channel = buildChannels(globalConfig, loadStoredProviders()).find((item) => item.id === channelId);
+    const savedProviders = loadStoredProviders();
+    const channel = buildChannels(globalConfig, savedProviders).find((item) => item.id === channelId);
     if (!channel?.baseUrl) {
       showToast(channelId ? `请先在服务商配置中填写「${channel?.name || '该渠道'}」的地址` : '请先配置全局地址');
       return;
@@ -81,6 +83,7 @@ export function useModalityChannelCatalog(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...catalogRequestProtocol(savedProviders.find((provider) => provider.id === channelId)?.providerType),
           baseUrl: channel.baseUrl,
           apiKey: channel.apiKey,
           strict: false,

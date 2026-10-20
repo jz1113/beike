@@ -16,6 +16,7 @@ type VideoProbe struct {
 	FPS      float64
 	Width    int
 	Height   int
+	HasAudio bool
 }
 
 func ProbeVideo(root, path string) (VideoProbe, error) {
@@ -51,21 +52,34 @@ func parseProbe(raw []byte) (VideoProbe, error) {
 	if json.Unmarshal(raw, &parsed) != nil {
 		return VideoProbe{}, errors.New("未在视频中找到视频流")
 	}
+	duration, _ := strconv.ParseFloat(strings.TrimSpace(parsed.Format.Duration), 64)
+	width, height := 0, 0
+	avgRate, frameRate := "", ""
+	foundVideo := false
+	hasAudio := false
 	for _, stream := range parsed.Streams {
-		if stream.CodecType != "video" {
+		if stream.CodecType == "audio" {
+			hasAudio = true
 			continue
 		}
-		duration, _ := strconv.ParseFloat(strings.TrimSpace(parsed.Format.Duration), 64)
-		fps := parseFrameRate(stream.AvgFrameRate)
-		if fps <= 0 {
-			fps = parseFrameRate(stream.RFrameRate)
+		if stream.CodecType != "video" || foundVideo {
+			continue
 		}
-		if fps <= 0 {
-			fps = 24
-		}
-		return VideoProbe{Duration: duration, FPS: fps, Width: stream.Width, Height: stream.Height}, nil
+		foundVideo = true
+		width, height = stream.Width, stream.Height
+		avgRate, frameRate = stream.AvgFrameRate, stream.RFrameRate
 	}
-	return VideoProbe{}, errors.New("未在视频中找到视频流")
+	if !foundVideo {
+		return VideoProbe{}, errors.New("未在视频中找到视频流")
+	}
+	fps := parseFrameRate(avgRate)
+	if fps <= 0 {
+		fps = parseFrameRate(frameRate)
+	}
+	if fps <= 0 {
+		fps = 24
+	}
+	return VideoProbe{Duration: duration, FPS: fps, Width: width, Height: height, HasAudio: hasAudio}, nil
 }
 
 func parseFrameRate(value string) float64 {

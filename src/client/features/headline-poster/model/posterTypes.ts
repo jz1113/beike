@@ -54,6 +54,9 @@ export interface PosterItem {
   error?: string;
   /** Records a successful automatic title/design model fallback for the current run. */
   modelFallbackNote?: string;
+  /** The adopted sample pinned for this cover. Retries keep the same reference. */
+  memorySampleId?: string;
+  memoryEntryIds?: string[];
 }
 
 export interface PosterProductionSettings {
@@ -62,6 +65,8 @@ export interface PosterProductionSettings {
   titleHandling: PosterTitleHandling;
   imageQuality: ImageQuality;
   concurrency: number;
+  /** Empty means the server picks one adopted sample when design starts. */
+  memorySampleId: string;
 }
 
 export interface HeadlineDesignResponse {

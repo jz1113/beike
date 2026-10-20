@@ -12,6 +12,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/system"
 )
@@ -113,24 +114,17 @@ func completeCanvasText(ctx context.Context, base, key, model string, deepseek b
 	if deepseek {
 		body["thinking"] = map[string]any{"type": "disabled"}
 	}
-	encoded, _ := json.Marshal(body)
-	requestCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, system.ChatCompletionsURL(base), bytes.NewReader(encoded))
+	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
+		BaseURL: base, APIKey: key, Protocol: modelgw.TextProtocol(ctx, model), Payload: body,
+		Client: canvasHTTP(), Timeout: 120 * time.Second,
+	})
+	if status != 0 && (status < 200 || status >= 300) {
+		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(status) + "），请检查模型配置后重试", nil
+	}
 	if err != nil {
 		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
 	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+key)
-	response, err := canvasHTTP().Do(request)
-	if err != nil {
-		return "", http.StatusBadGateway, "文本生成失败，请重试", nil
-	}
-	defer response.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", http.StatusBadGateway, "文本生成失败（HTTP " + Itoa(response.StatusCode) + "），请检查模型配置后重试", nil
-	}
+	raw, _ := json.Marshal(data)
 	text, usage, message := canvasTextFromChat(raw)
 	if message != "" {
 		return "", http.StatusBadGateway, message, nil

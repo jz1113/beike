@@ -1,5 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import { useAppStore, type AssistantMessage, type MediaAttachment } from '@client/store';
+import { AssistantImageBatch } from '../panels/AssistantBatchPanel';
 import AssistantTurnList from './AssistantTurnList';
 import { AssistantReplyFooter } from './AssistantReplyFooter';
 import { canRetryAssistantMessage, getAssistantMessageText } from './assistantMessagePresentation';
@@ -14,6 +15,7 @@ import type { PendingApproval, ApprovalDecision } from '../../model/assistantTur
  */
 export default function CodexAssistantBubble({
   onAnalyzeImages,
+  sessionId,
   msg,
   referenceMedia,
   isSendingCurrent,
@@ -32,6 +34,7 @@ export default function CodexAssistantBubble({
   showToast,
 }: {
   onAnalyzeImages?: () => void;
+  sessionId: string;
   msg: AssistantMessage;
   referenceMedia: MediaAttachment[];
   isSendingCurrent: boolean;
@@ -103,6 +106,7 @@ export default function CodexAssistantBubble({
           }
           onPreviewImage={(imgUrl) => setChatPreview({ url: imgUrl, type: 'image' })}
         />
+        <AssistantImageBatch sessionId={sessionId} replyId={msg.id} disabled={isSendingCurrent} />
         {/* 底部操作栏：模型标签 + 复制 + 重新执行 */}
         {!isSendingCurrent && (replyText || msg.error || canRetryAssistantMessage(msg)) && <AssistantReplyFooter
                       canCopy={Boolean(replyText.trim())}

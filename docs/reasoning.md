@@ -1,29 +1,40 @@
-# 助手思考强度适配
+# 助手思考强度与原生文本协议
 
-核对日期：2026-09-27。能力表位于 `src/shared/domain/assistant/reasoning.ts`，界面和服务端共同使用，未知模型不猜测参数。
+## 路由规则
 
-| 模型 | 手动档位 | Chat Completions 参数 |
-| --- | --- | --- |
-| 已适配 GPT、Grok 4.6 / 4.7 | 低、中、高、极高 | `reasoning_effort: low / medium / high / xhigh` |
-| Gemini 3.1 Pro Preview、3.7 / 3.8 Flash | 低、中、高 | `reasoning_effort: low / medium / high` |
-| Qwen 3.8 Max | 低、中、极高 | `reasoning_effort: low / medium / xhigh` |
-| Kimi K3 | 低、高、极高 | `reasoning_effort: low / high / max` |
-| DeepSeek V4 / V4.1 Flash、官方 Flash / V4 Pro | 低、高、极高 | `reasoning_effort: low / high / max`，开启 thinking |
-| Claude（当前 OpenAI 兼容通道） | 未适配 | 不发送强度参数；原生接口配置不能直接等同兼容接口 |
+Gemini、Claude 的文本及图片理解默认分别使用 Gemini Generate Content、Anthropic Messages 原生接口。设置中的单模型 `textProtocol` 可以显式选择 `auto`、`gemini`、`anthropic` 或 `openai`；显式配置优先于型号推断。OpenAI 类型的聚合渠道不会强制其中的 Gemini、Claude 使用兼容接口。
 
-界面只保留手动档位。旧“自动”强度偏好和未设置值迁移为固定默认：支持中的模型使用中，Kimi / DeepSeek 使用高。不会再根据提示词复杂度调整强度。接口仍接受旧 auto 值以兼容已打开的客户端，但会执行同样的固定映射。切换模型或故障回退时归一化：Gemini 的极高降为高；Qwen 的高映射极高；Kimi / DeepSeek 的中映射高。极高是产品名称，在 Kimi / DeepSeek 上明确映射为 max。
+路由只改变所选渠道的请求格式、认证头与端点，不替换已保存的地址、密钥或模型 ID。渠道不支持原生接口时明确返回错误，由用户选择兼容协议；系统不会静默切协议、换渠道或重复提交原生付费请求。图片生成和视频生成保持独立协议。
 
-所有助手流式请求、工具兼容请求、最终回复、记忆摘要与图片筛选共享适配。推理模型使用供应商默认采样参数；Qwen 不同时发送 thinking_budget。工具轮次回传 Kimi / Qwen / DeepSeek reasoning_content，流式工具调用保留通道返回的 extra_content（如 Gemini 签名）。Kimi 输出预算使用 max_completion_tokens。
+## 能力与参数
 
-## 官方依据
+原生型号能力以 `src/shared/domain/models/textModelCapabilities.json` 为真源，后端使用其嵌入副本，`pnpm check:shared-data` 校验一致性。型号识别使用实际上游 ID，不使用界面显示名称或渠道条目 ID。未知别名可使用原生接口，但不猜测该型号的思考参数。
 
-- [Grok reasoning](https://docs.x.ai/developers/model-capabilities/text/reasoning)：4.6 及以上提供四档，不能关闭推理。
-- [Gemini OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai) 与 [Thinking](https://ai.google.dev/gemini-api/docs/thinking)：兼容接口支持 reasoning_effort；上述三个模型支持 low / medium / high。
-- [Qwen OpenAI Chat](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions)：Qwen 3.8 原生三档为 low / medium / xhigh，high 是 xhigh 的兼容映射；与 thinking_budget 互斥。
-- [Kimi Chat Completions](https://platform.kimi.com/docs/api/chat)：K3 始终推理，三档 low / high / max；Preserved Thinking 要求保留返回的推理上下文。
-- [DeepSeek 思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/)：三档 low / high / max，官方兼容值 medium / xhigh 均映射 high。因此产品极高显式发送 max。
-- [Claude OpenAI compatibility](https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk)：reasoning_effort 被忽略；[原生 effort](https://platform.claude.com/docs/en/build-with-claude/effort) 使用 output_config.effort。尚无本项目 Comfly 通道的已核实映射，不增加无效滑杆。
+- Gemini 4 Argon 支持低、中、高，分别发送 `generationConfig.thinkingConfig.thinkingLevel: low / medium / high`。Gemini 3 的档位按具体型号区分；Gemini 2.5 使用 `thinkingBudget`，不与 level 同时发送。
+- Claude 的新型号使用自适应思考及适用的 `output_config.effort`；旧型号使用带 `budget_tokens` 的扩展思考。界面档位按已核实型号提供，输出上限需同时容纳思考与正文，不能直接套用 OpenAI 的 `reasoning_effort`。预算档位是本产品的取值策略，不是厂商允许的最大预算：Gemini 2.5 为 2048／8192／12288，旧 Claude 为 1024／2048／3072，以给默认输出上限保留正文空间。
+- 官方 Claude Haiku 5.5 ID 是 `claude-haiku-5-5`，原生支持低、中、高、极高；`claude-5.5-haiku` 等未核实的网关别名只按 Claude 前缀路由，不冒认同一能力。界面继续使用现有四档，不将 `max` 与 `xhigh` 混为一档。
+- 显式 OpenAI 兼容的 Claude 不宣称支持原生思考控制；其他兼容型号沿用既有档位规则。GPT、Grok 使用 `reasoning_effort`，Qwen、Kimi、DeepSeek 的特殊映射与原生 Gemini/Claude 配置相互独立。
+- 界面保存的档位在切换型号、渠道或协议后归一化。原生请求在发送前再次校验能力，不把无效档位直接透传给厂商。
+- 思考内容展示的是厂商允许返回的摘要；省略摘要不代表思考关闭，也不代表没有思考 token 费用。
+
+助手主链、最终回复、摘要和图片筛选使用同一原生适配层。辅助摘要与筛图使用其专用输出预算，不从网页展示历史中重建签名或工具调用。
+
+## 工具、多轮与流式
+
+Gemini 的 `thoughtSignature`、Claude 的 thinking/signature/redacted-thinking 块按原始内容块保留，回传时保持顺序。所有工具结果先完整成组返回，再补充工具产生的图片和执行提醒；工具参数不完整、断流、截断或安全拦截都不执行工具。
+
+签名是服务端内部上下文，不作为普通正文、思考摘要或客户端事件发送。一次执行中的工具轮次保留完整原生消息；跨用户回合仅从同工作区、同会话、同模型、同渠道凭证的已完成回合恢复匹配的最终原生消息。浏览器提交的展示历史不能覆盖签名，旧的工具调用不按展示文本重放。上下文压缩可以总结早期文本，但不伪造签名。
+
+SSE 流支持厂商原生内容块、工具参数增量、思考摘要、结束状态与错误。Gemini 的输出用量计入厂商报告的思考 token；缺少用量报告时不伪造零用量作为真实计费数据。
 
 ## 验证边界
 
-上述资料确认厂商契约。项目通过 Comfly 调用的模型已按兼容格式发送参数，但这不等同于已确认网关实际执行每个强度：本次使用 mock 请求断言验证服务端序列化、流式 / 非流式一致性、模型回退与工具上下文回传，没有消耗生产 API 额度。未找到可核实的 Comfly Claude 强度转换契约，保留明确的“未适配”状态，需网关原生适配或确认其参数映射后再开放。
+正式测试使用本地模拟上游覆盖端点、认证、流式/非流式、思考参数、工具往返、签名保真及错误路径。完整检查运行 `pnpm check`。这些结果验证项目序列化和解析行为，不代表已验证某个聚合网关对所有型号的原生支持；真实渠道付费验证需单独确认。
+
+## 官方依据
+
+- [Gemini thinking](https://ai.google.dev/gemini-api/docs/generate-content/thinking)
+- [Gemini thought signatures](https://ai.google.dev/gemini-api/docs/generate-content/thought-signatures)
+- [Anthropic thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)
+- [Anthropic effort](https://platform.claude.com/docs/en/build-with-claude/effort)
+- [DeepSeek 思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/)

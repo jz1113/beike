@@ -15,9 +15,14 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 func startAssistantTurn(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
+	if _, err := generationBatches(objectField(payload, "clientContext")); err != nil {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error(), "retryable": false})
+		return
+	}
 	turnID := optionalString(payload, "turnId")
 	if turnID == "" {
 		turnID = newTurnID()
@@ -37,6 +42,14 @@ func startAssistantTurn(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	creds, err := resolveTurnCreds(r, model, optionalString(payload, "customBaseUrl"), optionalString(payload, "customApiKey"), cfg.Production())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error(), "retryable": false})
+		return
+	}
+	creds.protocol = optionalString(payload, "textProtocol")
+	if creds.protocol == "" {
+		creds.protocol = strings.TrimSpace(r.Header.Get("x-text-protocol"))
+	}
+	if !validTextProtocol(creds.protocol) {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "textProtocol: 不支持的文本协议"})
 		return
 	}
 	workspace := httpx.WorkspaceFrom(r)
@@ -95,6 +108,7 @@ func replayTurn(cfg config.Config, w http.ResponseWriter, r *http.Request, works
 }
 
 func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage, creds gatewayCreds, workspace, turnID, threadID, model string) {
+	ctx = modelgw.WithTextProtocol(ctx, creds.protocol)
 	flusher, _ := w.(http.Flusher)
 	writeSSE(w, flusher, map[string]any{"type": "turn/started", "turnId": turnID, "threadId": threadID, "model": model})
 	send := func(event map[string]any) { writeSSE(w, flusher, event) }
@@ -127,6 +141,7 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 		noteTurnEvent(workspace, "turn/failed", turnID, threadID, model, "", "api-key", started)
 		return
 	}
+	restoreNativeContinuations(ctx, cfg, workspace, threadID, model, creds, messages)
 	messages = compressHistory(ctx, messages, creds, model, optionalBoolDefault(payload, "enableCompression", false))
 	if intent.analyze {
 		images := reusedImages(messages)
@@ -142,9 +157,16 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 		}
 	}
 	allowed := stringArray(payload, "allowedTools")
+	pinnedSkill := optionalString(payload, "skillId")
+	catalog := parseSkillCatalog(payload["skillCatalog"])
+	toolsEnabled := optionalBoolDefault(payload, "enableAgentTools", true)
+	if toolsEnabled {
+		messages = insertSkillCatalog(messages, skillCatalogNote(catalog, pinnedSkill))
+		messages = insertSkillCatalog(messages, generationBatchesNote(objectField(payload, "clientContext")))
+	}
 	tools := []map[string]any{}
 	names := []string{}
-	if optionalBoolDefault(payload, "enableAgentTools", true) {
+	if toolsEnabled {
 		tools = openAITools(allowed)
 		for _, tool := range tools {
 			fn, _ := tool["function"].(map[string]any)
@@ -165,17 +187,25 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 		ctx: ctx, creds: creds, models: []string{model}, effort: optionalString(payload, "reasoningEffort"),
 		generationMode: "auto",
 		messages:       messages, tools: tools, names: names, budget: budget, plan: plan, results: results,
-		box:  &toolBox{ctx: ctx, db: db, cfg: cfg, workspace: workspace, documents: documents, client: objectField(payload, "clientContext"), plan: plan, results: results, budget: budget, allowed: names},
+		box: &toolBox{
+			ctx: ctx, db: db, cfg: cfg, workspace: workspace, documents: documents, client: objectField(payload, "clientContext"),
+			plan: plan, results: results, budget: budget, allowed: append([]string{}, names...), skillFiles: skillResources(payload["skillResources"]),
+			skills: catalog, pinnedCeiling: pinnedSkill != "" && len(allowed) > 0, ceiling: append([]string{}, allowed...), visual: &visualBudget{},
+		},
 		send: send, persist: persist, granted: sessionTools(workspace, threadID), turnID: turnID, threadID: threadID, space: workspace,
 		mu: &sync.Mutex{},
 	}
 	loop.box.spawn = loop.spawnSubagent
+	loop.box.applyTools = loop.applyAllowed
+	loop.box.activateMCP = loop.activateMCPTool
 	if raw, ok := payload["mcpServers"]; ok {
 		var servers []any
 		_ = json.Unmarshal(raw, &servers)
 		extra, bindings := listMCPTools(servers)
 		loop.tools = append(loop.tools, extra...)
 		loop.box.mcp = bindings
+		loop.box.mcpEnabled = len(bindings) > 0
+		loop.box.exposedMCP = exposedMCPNames(bindings)
 		for _, tool := range extra {
 			fn, _ := tool["function"].(map[string]any)
 			name, _ := fn["name"].(string)
@@ -184,6 +214,16 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 				loop.box.allowed = append(loop.box.allowed, name)
 			}
 		}
+	}
+	if toolsEnabled && len(catalog) > 0 {
+		ensureTool(loop, "read_skill")
+		if catalogHasResources(catalog) || len(loop.box.skillFiles) > 0 {
+			ensureTool(loop, "read_skill_file")
+		}
+	}
+	if toolsEnabled && loop.box.mcpEnabled {
+		ensureTool(loop, "search_mcp_tools")
+		ensureTool(loop, "load_mcp_tool")
 	}
 	actual, stop, streamed, runErr := loop.run()
 	if runErr != nil {
@@ -214,6 +254,9 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 	noteTurnEvent(workspace, phase, turnID, threadID, actual, "", stop, time.Now())
 	snapshot := map[string]any{"id": turnID, "threadId": threadID, "status": status, "items": loop.items, "usage": map[string]any{"inputTokens": budget.inputTokens, "outputTokens": budget.outputTokens}, "modelUsed": actual}
 	_ = saveTurnState(ctx, cfg, workspace, turnID, status, actual, budget.inputTokens, budget.outputTokens, snapshot)
+	if status == "completed" {
+		saveNativeContinuation(ctx, cfg, workspace, turnID, loop)
+	}
 	send(map[string]any{"type": "meta", "modelUsed": actual, "requestedModel": model})
 	if budget.usageReports > 0 {
 		send(map[string]any{"type": "usage", "usage": map[string]any{"prompt_tokens": budget.inputTokens, "completion_tokens": budget.outputTokens}})

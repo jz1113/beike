@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 var ModelHTTP = func() *http.Client { return network.SafeClient() }
@@ -58,14 +58,19 @@ func PostModelHeaders(ctx context.Context, method, endpoint, apiKey string, payl
 }
 
 func ChatCompletion(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration) (string, map[string]any, int, error) {
-	return chatCompletion(ctx, base, apiKey, model, messages, temperature, timeout, false)
+	return chatCompletion(ctx, base, apiKey, model, messages, temperature, timeout, false, "")
 }
 
 func ChatCompletionJSON(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration) (string, map[string]any, int, error) {
-	return chatCompletion(ctx, base, apiKey, model, messages, temperature, timeout, true)
+	return chatCompletion(ctx, base, apiKey, model, messages, temperature, timeout, true, "")
 }
 
-func chatCompletion(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration, jsonObject bool) (string, map[string]any, int, error) {
+// ChatCompletionJSONWithEffort adds a verified reasoning level. Official DeepSeek routes stay on the existing disabled-thinking payload.
+func ChatCompletionJSONWithEffort(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration, effort string) (string, map[string]any, int, error) {
+	return chatCompletion(ctx, base, apiKey, model, messages, temperature, timeout, true, effort)
+}
+
+func chatCompletion(ctx context.Context, base, apiKey, model string, messages any, temperature float64, timeout time.Duration, jsonObject bool, effort string) (string, map[string]any, int, error) {
 	payload := map[string]any{
 		"model":       wireModel(model),
 		"messages":    messages,
@@ -76,16 +81,24 @@ func chatCompletion(ctx context.Context, base, apiKey, model string, messages an
 	}
 	if strings.HasPrefix(model, "deepseek-official:") {
 		payload["thinking"] = map[string]any{"type": "disabled"}
+	} else if effort != "" {
+		payload["reasoning_effort"] = effort
 	}
-	status, raw, err := PostModel(ctx, http.MethodPost, system.ChatCompletionsURL(base), apiKey, payload, timeout)
+	return ChatCompletionPayload(ctx, base, apiKey, payload, timeout)
+}
+
+// ChatCompletionPayload preserves caller-specific limits and injected HTTP clients
+// while routing OpenAI-compatible input through the selected native protocol.
+func ChatCompletionPayload(ctx context.Context, base, apiKey string, payload map[string]any, timeout time.Duration) (string, map[string]any, int, error) {
+	model, _ := payload["model"].(string)
+	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
+		BaseURL: base, APIKey: apiKey, Protocol: modelgw.TextProtocol(ctx, model),
+		Payload: payload, Client: ModelHTTP(), Timeout: timeout,
+	})
 	if err != nil {
-		return "", nil, status, err
+		return "", data, status, err
 	}
-	var data map[string]any
-	if json.Unmarshal(raw, &data) != nil {
-		data = map[string]any{}
-	}
-	if status < 200 || status >= 300 {
+	if status != 0 && (status < 200 || status >= 300) && data != nil {
 		return "", data, status, errors.New(imageUpstreamError(data, status))
 	}
 	return chatContent(data), data, status, nil

@@ -156,7 +156,7 @@ export function useBatchTaskQueue({ isOpen, showToast, saveToCollectorHistory }:
     }
   };
 
-  const executeTask = async (task: BatchTaskItem, runSignal?: AbortSignal): Promise<BatchTaskItem> => {
+  const executeTask = async (task: BatchTaskItem, runSignal?: AbortSignal, forceRefresh = false): Promise<BatchTaskItem> => {
     const controller = new AbortController();
     const abortBeforeDispatch = () => {
       if (!submittedTaskIdsRef.current.has(task.id)) controller.abort();
@@ -170,7 +170,7 @@ export function useBatchTaskQueue({ isOpen, showToast, saveToCollectorHistory }:
       && batchTasksRef.current.some((item) => item.id === task.id);
     let updated: BatchTaskItem = { ...task, status: 'pending', error: undefined };
     try {
-      const result = await collectSourceMedia(task.url, task.platform, false, socialRateLimiterRef.current, controller.signal, {
+      const result = await collectSourceMedia(task.url, task.platform, forceRefresh, socialRateLimiterRef.current, controller.signal, {
         shouldStop: () => Boolean(runSignal?.aborted) || !isOpenRef.current || !aliveRef.current,
         onSubmitted: () => submittedTaskIdsRef.current.add(task.id),
         preferredScraper: getPreferredScraperSync(),
@@ -178,12 +178,13 @@ export function useBatchTaskQueue({ isOpen, showToast, saveToCollectorHistory }:
       if (!isRetained()) return updated;
       updated = { ...task, status: 'success', error: undefined, title: result.title, coverImage: result.coverImage,
         images: result.images, video: result.video, videos: result.videos, livePhotos: result.livePhotos,
-        price: result.price, author: result.author, time: result.time };
+        price: result.price, author: result.author, time: result.time,
+        fromCache: result.fromCache, apiUsed: result.apiUsed, detailsMissing: result.detailsMissing };
       saveToCollectorHistory?.(result);
     } catch (error) {
       if (!isRetained()) return updated;
       if (submittedTaskIdsRef.current.has(task.id) || !controller.signal.aborted) {
-        updated = { ...task, status: 'failed', error: formatUserError(error, '采集失败，请检查结果后再手动重试') };
+        updated = { ...task, status: forceRefresh ? 'success' : 'failed', error: `${forceRefresh ? '刷新失败，保留原素材：' : ''}${formatUserError(error, '采集失败，请检查结果后再手动重试')}` };
       }
     } finally {
       runSignal?.removeEventListener('abort', abortBeforeDispatch);
@@ -197,7 +198,9 @@ export function useBatchTaskQueue({ isOpen, showToast, saveToCollectorHistory }:
   const executeSingleTask = async (task: BatchTaskItem): Promise<BatchTaskItem> => {
     const current = batchTasksRef.current.find((item) => item.id === task.id);
     if (!current || current.status === 'running' || activeRunRef.current || !isOpenRef.current) return current || task;
-    return executeTask(current);
+    const forceRefresh = current.status === 'success';
+    if (forceRefresh && !window.confirm('重新采集会跳过缓存并调用外部接口，可能产生计费。成功后替换该条目的采集素材，是否继续？')) return current;
+    return executeTask(current, undefined, forceRefresh);
   };
 
   const handleStartBatchTasks = async () => {

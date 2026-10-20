@@ -1,4 +1,3 @@
-import { AssistantImageBatch } from '../panels/AssistantBatchPanel';
 import AssistantCodeBlock from './AssistantCodeBlock';
 import type { MediaAttachment } from '@client/store/appStoreTypes';
 import MarkdownBody, { type MarkdownAccent } from '@client/shared/ui/markdown/MarkdownBody';
@@ -23,7 +22,6 @@ export default function FormattedMarkdown({
       content={content}
       className={className}
       accentColor={accentColor}
-      leading={<AssistantImageBatch content={content} referenceMedia={referenceMedia} />}
       renderCode={(code, lang, incomplete) => (
         <AssistantCodeBlock code={code} lang={lang} referenceMedia={referenceMedia} incomplete={incomplete} />
       )}

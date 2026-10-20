@@ -63,7 +63,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'avatar', label: '数字人', icon: UserRound, keywords: ['数字人', '对口型', '口型', '驱动'] },
   { id: 'voice', label: '语音', icon: AudioLines, keywords: ['语音', '配音'] },
   { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点'] },
-  { id: 'pet', label: '桌宠', icon: Bot, keywords: ['桌宠', '麻衣'] },
+  { id: 'pet', label: '桌宠', icon: Bot, keywords: ['桌宠', '宠物', 'codex'] },
   { id: 'language', label: '语言', icon: Languages, keywords: ['语言', '中文'] },
   { id: 'storage', label: '存储', icon: HardDrive, keywords: ['存储', 'oss', 'r2', 's3'] },
 ];

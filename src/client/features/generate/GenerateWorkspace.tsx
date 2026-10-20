@@ -108,7 +108,7 @@ export default function GenerateWorkspace({
     [dateGroupedBatches],
   );
 
-  const { visibleFlatBatches, hasMoreBatches, loadMoreSentinelRef } = useGenerateFeedHistory(
+  const { visibleFlatBatches, hasMoreBatches, loadMoreSentinelRef, pinToLatest } = useGenerateFeedHistory(
     flatBatches,
     currentSessionId,
     scrollContainerRef,
@@ -131,6 +131,7 @@ export default function GenerateWorkspace({
           visibleFlatBatches={visibleFlatBatches}
           hasMoreBatches={hasMoreBatches}
           loadMoreSentinelRef={loadMoreSentinelRef}
+          onPinToLatest={pinToLatest}
           onShowToast={showToast}
         />
 

@@ -29,6 +29,7 @@ func assistantTools() []assistantTool {
 	approval := map[string]string{
 		"deconstruct_image": "per_turn", "workspace_navigate": "per_turn",
 		"workspace_load_workshop_product": "per_turn", "trigger_generate": "per_turn", "set_workshop_arch": "per_turn",
+		"trigger_generate_batch": "per_turn",
 	}
 	tools := make([]assistantTool, 0, len(raw))
 	for _, item := range raw {
@@ -56,6 +57,14 @@ func toolDisplayName(name string) string {
 	switch name {
 	case "update_plan":
 		return "更新执行计划"
+	case "read_skill":
+		return "读取技能"
+	case "read_skill_file":
+		return "读取技能资料"
+	case "search_mcp_tools":
+		return "检索外部工具"
+	case "load_mcp_tool":
+		return "加载外部工具"
 	case "read_tool_result":
 		return "读取工具结果"
 	case "execute_code":
@@ -82,6 +91,8 @@ func toolDisplayName(name string) string {
 		return "载入种草工坊"
 	case "trigger_generate":
 		return "准备生图"
+	case "trigger_generate_batch":
+		return "请求批量生成"
 	case "set_workshop_arch":
 		return "切换拍摄架构"
 	case "inspect_video_media":
@@ -93,6 +104,9 @@ func toolDisplayName(name string) string {
 	case "spawn_subagent":
 		return "启动子任务"
 	default:
+		if label, ok := mcpDisplayLabel(name); ok {
+			return label
+		}
 		return name
 	}
 }
@@ -108,6 +122,23 @@ func openAITools(allowed []string) []map[string]any {
 		}})
 	}
 	return out
+}
+
+func ensureTool(loop *agentLoop, name string) {
+	if loop == nil || containsTool(loop.names, name) {
+		return
+	}
+	tool, ok := toolByName(name)
+	if !ok {
+		return
+	}
+	loop.tools = append(loop.tools, map[string]any{"type": "function", "function": map[string]any{
+		"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters,
+	}})
+	loop.names = append(loop.names, name)
+	if loop.box != nil {
+		loop.box.allowed = append(loop.box.allowed, name)
+	}
 }
 
 func containsTool(allowed []string, name string) bool {

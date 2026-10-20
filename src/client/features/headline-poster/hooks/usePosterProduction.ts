@@ -68,6 +68,7 @@ export function usePosterProduction() {
   const [titleHandling, setTitleHandling] = useState<PosterProductionSettings['titleHandling']>('rewrite');
   const [imageQuality, setImageQuality] = useState<ImageQuality>('high');
   const [concurrency, setConcurrency] = useState<number>(POSTER_CONCURRENCY_OPTIONS[0]);
+  const [memorySampleId, setMemorySampleId] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<PosterProductionSettings | null>(null);
   const [previewState, setPreviewState] = useState<{ itemId: string; index: number } | null>(null);
@@ -79,6 +80,7 @@ export function usePosterProduction() {
   const titleHandlingRef = useRef(titleHandling);
   const imageModelRef = useRef(imageModel);
   const imageQualityRef = useRef(imageQuality);
+  const memorySampleIdRef = useRef(memorySampleId);
   const activeBatchIdRef = useRef<string | null>(null);
   const activeBatchCreatedAtRef = useRef<number | null>(null);
   const activeBatchRevisionRef = useRef<string | null>(null);
@@ -96,6 +98,7 @@ export function usePosterProduction() {
   titleHandlingRef.current = titleHandling;
   imageModelRef.current = imageModel;
   imageQualityRef.current = imageQuality;
+  memorySampleIdRef.current = memorySampleId;
 
   useEffect(() => {
     const interruptActive = () => interruptActiveRef.current();
@@ -143,6 +146,7 @@ export function usePosterProduction() {
     titleHandling: titleHandlingRef.current,
     imageQuality: imageQualityRef.current,
     concurrency,
+    memorySampleId: memorySampleIdRef.current,
   });
 
   const workspaceChanged = () => workspaceSecretRef.current !== getWorkspaceSecret();
@@ -320,6 +324,7 @@ export function usePosterProduction() {
         setTitleHandling(saved.titleHandling || 'rewrite');
         setImageQuality(saved.imageQuality || 'high');
         setConcurrency(normalizeConcurrency(saved.concurrency));
+        setMemorySampleId(saved.memorySampleId || '');
         setIsReady(true);
       } catch (error) {
         if (!cancelled) setNoticeIfAlive(error instanceof Error ? error.message : '工作区初始化失败，请刷新页面重试。');
@@ -372,10 +377,10 @@ export function usePosterProduction() {
     return () => window.clearTimeout(timer);
     // The snapshot must be refreshed for every item and production-setting change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, imageModel, titleModel, titleHandling, imageQuality, concurrency]);
+  }, [items, imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId]);
 
   const openProductionSettings = () => {
-    setSettingsDraft({ imageModel, titleModel, titleHandling, imageQuality, concurrency });
+    setSettingsDraft({ imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId });
     setIsSettingsOpen(true);
   };
 
@@ -394,6 +399,7 @@ export function usePosterProduction() {
     setTitleHandling(next.titleHandling);
     setImageQuality(next.imageQuality);
     setConcurrency(next.concurrency);
+    setMemorySampleId(next.memorySampleId || '');
     const persisted = persistPosterProductionSettings(next);
     if (persisted) {
       setNoticeIfAlive(`生产设置已保存：${next.titleHandling === 'original' ? '保留原标题' : 'AI 优化标题'}，并行任务 ${next.concurrency} 条。`);
@@ -611,6 +617,7 @@ export function usePosterProduction() {
       setTitleHandling(settings.titleHandling);
       setImageQuality(settings.imageQuality);
       setConcurrency(normalizeConcurrency(settings.concurrency));
+      setMemorySampleId(settings.memorySampleId || '');
       setNoticeIfAlive(`已恢复历史批次及生产设置，共 ${restored.length} 条；中断生图会先核对原任务。`);
       return true;
     } finally {
@@ -779,14 +786,17 @@ export function usePosterProduction() {
           (modelId) => directCoverDesign(item, coverTitle, modelId, {
             batchId,
             previousDesign: previousDesignSummary(previous?.designPlan),
+            memorySampleId: item.memorySampleId || settings.memorySampleId || 'auto',
             signal,
           }),
         );
         if (itemAborted()) throw new Error('已取消大字报任务');
-        designPlan = buildDesignPlan(coverTitle, directorResult.value);
+        designPlan = buildDesignPlan(coverTitle, directorResult.value.design);
         prompt = designPlan.generationDirection;
         updateItem(item.id, {
           status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'integrated-cover-v5',
+          memorySampleId: directorResult.value.memorySampleId,
+          memoryEntryIds: directorResult.value.memoryEntryIds,
           modelFallbackNote: directorResult.fallbackNote || titleResult.fallbackNote,
         });
       }
@@ -986,7 +996,7 @@ export function usePosterProduction() {
     isDraggingFile, setIsDraggingFile,
     items, isReady, isRunning, isImporting, isRestoring, isExporting, notice,
     availableImageModels, availableTitleModels,
-    imageModel, titleModel, titleHandling, imageQuality, concurrency,
+    imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId,
     isSettingsOpen, settingsDraft, setSettingsDraft,
     previewState, setPreviewState, previewItem, previewImages,
     completedCount, failedCount, historyBatches, activeBatchId: activeBatchIdRef.current,

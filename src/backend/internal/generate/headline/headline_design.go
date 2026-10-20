@@ -28,6 +28,11 @@ func HeadlineDesign(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "请求数据格式异常"})
 			return
 		}
+		var ok bool
+		r, ok = generate.BindTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		images, _ := payload["imageUrls"].([]any)
 		product, _ := payload["productTitle"].(string)
 		original, _ := payload["originalTitle"].(string)

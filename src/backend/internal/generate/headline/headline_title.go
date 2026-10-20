@@ -32,6 +32,11 @@ func HeadlineTitle(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "请求数据格式异常"})
 			return
 		}
+		var ok bool
+		r, ok = generate.BindTextProtocol(w, r, payload)
+		if !ok {
+			return
+		}
 		if strings.TrimSpace(generate.StringField(payload, "originalTitle")) == "" {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "缺少原标题，无法改写封面标题。"})
 			return

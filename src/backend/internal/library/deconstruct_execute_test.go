@@ -74,7 +74,7 @@ func TestDeconstructJobSubmitDoesNotProxy(t *testing.T) {
 	}
 	_ = db.Close()
 	cfg := config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: "file:" + dbPath}
-	body := `{"jobId":"job-1","items":[{"id":"a","name":"套组","images":["https://127.0.0.1:1/a.jpg"]}]}`
+	body := `{"jobId":"job-1","overrides":{"textProtocol":"anthropic"},"items":[{"id":"a","name":"套组","images":["https://127.0.0.1:1/a.jpg"]}]}`
 	response := httptest.NewRecorder()
 	deconstructJobsPostHandler(cfg).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/assets/deconstruct/jobs", strings.NewReader(body)))
 	if response.Code != http.StatusAccepted || !strings.Contains(response.Body.String(), `"jobId":"job-1"`) {
@@ -86,8 +86,11 @@ func TestDeconstructJobSubmitDoesNotProxy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var status string
-		err = read.QueryRow(`SELECT "status" FROM "DeconstructJob" WHERE "jobId" = 'job-1'`).Scan(&status)
+		var status, storedConfig string
+		err = read.QueryRow(`SELECT "status", "configJson" FROM "DeconstructJob" WHERE "jobId" = 'job-1'`).Scan(&status, &storedConfig)
+		if err == nil && !strings.Contains(storedConfig, `"textProtocol":"anthropic"`) {
+			t.Fatalf("async protocol lost: %s", storedConfig)
+		}
 		_ = read.Close()
 		if err == nil && status == "failed" {
 			return

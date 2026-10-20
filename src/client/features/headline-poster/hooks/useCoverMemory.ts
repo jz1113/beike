@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   addCoverCorrection,
   clearCoverTrash,
-  deconstructCoverSamples,
   fetchCoverMemory,
   setCoverMemoryStatus,
 } from '../api/coverMemoryApi';
@@ -39,8 +38,10 @@ export function useCoverMemory(active: boolean) {
     try {
       await action();
       await reload();
+      return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '封面记忆操作失败');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -54,6 +55,5 @@ export function useCoverMemory(active: boolean) {
     setStatus: (entry: CoverMemoryEntry, status: CoverMemoryStatus) => run(() => setCoverMemoryStatus(entry.id, status)),
     addCorrection: (rule: string) => run(() => addCoverCorrection(rule)),
     clearTrash: () => run(() => clearCoverTrash()),
-    deconstruct: (imageUrls: string[], model: string, title: string) => run(() => deconstructCoverSamples(imageUrls, model, title)),
   };
 }

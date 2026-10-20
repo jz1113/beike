@@ -9,6 +9,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -115,6 +116,12 @@ func serveModelProbe(w http.ResponseWriter, r *http.Request, cfg config.Config, 
 	if text, ok := payload["model"].(string); ok && text != "" {
 		model = text
 	}
+	protocol, valid := requestTextProtocol(payload)
+	if !valid {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "textProtocol: 不支持的文本协议"})
+		return
+	}
+	r = r.WithContext(modelgw.WithTextProtocol(r.Context(), protocol))
 	var status int
 	var body map[string]any
 	if mediaModel(model) {

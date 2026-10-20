@@ -1,17 +1,15 @@
 package library
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/system"
+	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 type visionOutcome struct {
@@ -29,30 +27,25 @@ func callDeconstructVision(ctx context.Context, baseURL, apiKey, model string, i
 		"max_tokens":      8192,
 		"response_format": map[string]any{"type": "json_object"},
 	}
-	raw, _ := json.Marshal(body)
-	endpoint := system.ChatCompletionsURL(baseURL)
-	reqCtx, cancel := context.WithTimeout(ctx, 240*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(raw))
-	if err != nil {
-		return visionFailure("视觉网关地址无效", false, false)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+apiKey)
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
+	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
+		BaseURL: baseURL, APIKey: apiKey, Protocol: modelgw.TextProtocol(ctx, model), Payload: body,
+		Client: http.DefaultClient, Timeout: 240 * time.Second,
+	})
+	payload, _ := json.Marshal(data)
+	if err != nil && status == 0 {
 		return visionFailure(err.Error(), true, false)
 	}
-	defer response.Body.Close()
-	payload, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if response.StatusCode == http.StatusTooManyRequests {
+	if status == http.StatusTooManyRequests {
 		if strings.Contains(strings.ToLower(string(payload)), "quota") || strings.Contains(string(payload), "余额") {
 			return visionFailure("上游账户余额或配额不足，等待或切换模型都不能解决；请检查当前 API Key 对应账户。", false, true)
 		}
 		return visionFailure("上游分组当前繁忙，原任务没有自动重试。请等待当前调用完成后再手动重试，避免重复计费。", false, false)
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return visionFailure("HTTP "+strconv.Itoa(response.StatusCode)+": "+truncate(string(payload), 200), response.StatusCode >= 500, false)
+	if status < 200 || status >= 300 {
+		return visionFailure("HTTP "+strconv.Itoa(status)+": "+truncate(string(payload), 200), status >= 500, false)
+	}
+	if err != nil {
+		return visionFailure(err.Error(), false, false)
 	}
 	var parsed struct {
 		Choices []struct {

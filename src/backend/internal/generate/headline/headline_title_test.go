@@ -50,7 +50,7 @@ func TestHeadlineTitleRewrites(t *testing.T) {
 	t.Cleanup(func() { generate.ModelHTTP = previous })
 	handler := HeadlineTitle(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-title", strings.NewReader(`{"originalTitle":"台灯测评","imageUrls":["data:image/jpeg;base64,YQ=="],"customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-title", strings.NewReader(`{"originalTitle":"台灯测评","imageUrls":["data:image/jpeg;base64,YQ=="],"textProtocol":"openai","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "台灯到底值不值") {
 		t.Fatalf("title %d %s", response.Code, response.Body.String())
 	}

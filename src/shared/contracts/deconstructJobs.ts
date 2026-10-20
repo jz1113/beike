@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TextRequestRoutingFields } from './textRouting';
 
 const identifier = z.string().trim().min(1).max(160);
 const taxonomySchema = z.object({
@@ -22,6 +23,7 @@ export const deconstructJobSubmitSchema = z.object({
   concurrency: z.number().int().min(1).max(16).default(4),
   reviewBeforeSave: z.boolean().default(false),
   overrides: z.object({
+    ...TextRequestRoutingFields,
     customBaseUrl: z.string().max(2048).optional(), customApiKey: z.string().max(4096).optional(),
     apiFormat: z.string().max(100).optional(), allowInsecureHttp: z.boolean().optional(),
   }).optional(),
