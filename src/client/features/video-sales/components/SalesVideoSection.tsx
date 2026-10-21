@@ -26,7 +26,7 @@ export function SalesVideoSection({ state, script, modelId, disabled, assetsRead
     <div className="space-y-4 p-4 sm:p-5">
       <section className={`${salesCardClass} space-y-4 p-4 sm:p-5`}>
         <h2 className="text-base font-semibold">视频定稿</h2>
-        {!assetsReady ? <p role="status" className="rounded-xl bg-amber-500/[0.07] p-3 text-xs leading-6 text-amber-700 dark:text-amber-200">请先在“素材图片”完成生成与校验，定稿模型和视频参数届时开放。</p> : <div className="space-y-4">
+        {!assetsReady ? <p role="status" className="rounded-xl bg-amber-500/[0.07] p-3 text-xs leading-6 text-amber-700 dark:text-amber-200">请先在“素材图片”完成生成并确认图片，定稿模型和视频参数届时开放。</p> : <div className="space-y-4">
           <div className="space-y-1.5"><span className="text-xs text-slate-500">定稿提示词模型</span><SalesModelPicker modality="chat" value={state.selectedChatModel || ''} models={multimodalModels} ready={ready} disabled={disabled} onChange={(selectedChatModel) => onChange({ selectedChatModel })} /><p className="text-xs leading-6 text-slate-500 dark:text-slate-400">与口播脚本是同一只多模态模型，由它查看真实图片后编写提示词。旁边的视频模型只负责出片。</p></div>
           <div className="grid gap-4 xl:grid-cols-2">
             <div className="space-y-1.5"><span className="text-xs text-slate-500">视频模型</span><SalesModelPicker modality="video" value={state.selectedVideoModel || ''} models={videoModels} ready={ready} disabled={disabled} onChange={(selectedVideoModel) => onChange({ selectedVideoModel })} /></div>
@@ -36,8 +36,8 @@ export function SalesVideoSection({ state, script, modelId, disabled, assetsRead
         {assetsReady && videoError && <p role="status" className="rounded-xl bg-amber-500/[0.07] p-3 text-xs leading-6 text-amber-700 dark:text-amber-200">{videoError}</p>}
       </section>
       <section className={`${salesCardClass} space-y-3 p-4 sm:p-5`}>
-        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">最终完整视频提示词</h3><span className={`text-[11px] ${finalized ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}`}>{finalized ? '已定稿，可单独确认生成' : script.fullPrompt?.trim() ? '需要重新定稿' : '待定稿'}</span></div>
-        {script.fullPrompt?.trim() ? <SalesFinalPrompt prompt={script.fullPrompt} references={finalReferences(state, script)} disabled={disabled || !assetsReady} onChange={onEditPrompt} /> : <p className="py-6 text-sm leading-7 text-slate-500 dark:text-slate-400">脚本阶段无需完整视频提示词。完成素材后，点击“定稿视频提示词”生成。</p>}
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">最终完整视频提示词</h3><span className={`text-[11px] ${finalized ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}`}>{finalized ? '提示词已生成' : script.fullPrompt?.trim() ? '需要更新提示词' : '待生成'}</span></div>
+        {script.fullPrompt?.trim() ? <SalesFinalPrompt prompt={script.fullPrompt} references={finalReferences(state, script)} disabled={disabled || !assetsReady} onChange={onEditPrompt} /> : <p className="py-6 text-sm leading-7 text-slate-500 dark:text-slate-400">脚本阶段无需完整视频提示词。完成素材后，点击“生成视频提示词”。</p>}
         {assetsReady && submitError && submitError !== videoError && <p role="status" className="text-xs leading-6 text-amber-700 dark:text-amber-200">{submitError}</p>}
       </section>
     </div>
@@ -75,7 +75,7 @@ function SalesFinalPrompt({ prompt, references, disabled, onChange }: { prompt: 
       ) : (
         <MarkdownCodeBlock code={prompt} preamble={chips} action={<button type="button" disabled={disabled} onClick={() => setEditing(true)} className="mr-1 rounded-md border border-slate-300 px-2 py-1 text-[11px] disabled:opacity-40 dark:border-white/20">编辑</button>} />
       )}
-      <p className="mt-2 text-xs leading-6 text-slate-500 dark:text-slate-400">整条视频一次提交。更换定稿模型、视频模型、参数、商品或素材后，请重新定稿。</p>
+      <p className="mt-2 text-xs leading-6 text-slate-500 dark:text-slate-400">整条视频一次提交。切换模型、参考方式或清晰度会保留已有有效提示词，提交前检查新配置是否兼容。修改商品、脚本或素材后需更新提示词。</p>
     </div>
   );
 }

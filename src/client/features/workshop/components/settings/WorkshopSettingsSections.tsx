@@ -29,7 +29,7 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
     : '暂无可用四图母本，请到资产库导入并解构图组。';
   return <section className="space-y-3 py-5" aria-label="内容与素材">
     <h3 className="text-sm font-semibold">内容与素材</h3>
-    <label className={labelClass}>拍摄架构
+    <label className={labelClass}>类目技能
       <select aria-label="拍摄架构" value={selectedArchId} disabled={!hasRecipes} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
         {!selectedArchId && <option value="" disabled>{hasRecipes ? '请选择拍摄架构' : '暂无可用拍摄架构'}</option>}
         {hasRecipes && <option value="auto">自动按商品类目匹配</option>}
@@ -90,7 +90,7 @@ export function WorkshopOutputSettings(props: WorkshopSettingsModalProps) {
         {([['low', '1K'], ['medium', '2K'], ['high', '4K']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={props.selectedQuality === value} onClick={() => props.setSelectedQuality(value)} className={`flex-1 rounded-lg py-2 text-xs transition-colors ${props.selectedQuality === value ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10 dark:bg-white/5'}`}>{label}</button>)}
       </div></fieldset>
     </div>
-    <p className="mt-3 text-[11px] leading-5 text-slate-400">{isGrid ? '四宫格固定 4 镜，画质指拆分前的整图。' : props.selectedShotCount === 8 ? '前 4 镜沿用母组；后 4 镜由模型规划新的场景、动作与机位。生成并采用后，可重新反推为衍生母组。' : '每镜独立生成，画质应用于单张图片。'}</p>
+    <p className="mt-3 text-[11px] leading-5 text-slate-400">{isGrid ? '四宫格一次排成四格再裁切，每镜分到整图四分之一的像素；精细商品建议单张逐镜。' : props.selectedShotCount === 8 ? '前 4 镜沿用母组；后 4 镜由模型规划新的场景、动作与机位。生成并采用后，可重新反推为衍生母组。' : '推荐：每镜使用商品图与对应样本独立生成，画质应用于完整单张图片。'}</p>
     {isGrid && <WorkshopGridOutputSettings {...props} />}
   </section>;
 }

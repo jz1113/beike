@@ -40,7 +40,7 @@ func commitDeconstructReview(cfg config.Config, w http.ResponseWriter, r *http.R
 		return
 	}
 	if status == "approved" {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "fullPromptIds": stored["fullPromptIds"]})
 		return
 	}
 	if status != "pending" {
@@ -65,14 +65,21 @@ func commitDeconstructReview(cfg config.Config, w http.ResponseWriter, r *http.R
 			return
 		}
 	}
-	if err := dblibrary.UpdateDeconstructReviewStatus(r.Context(), db, httpx.WorkspaceFrom(r), id, "pending", "approved"); err != nil {
-		writeReviewFailure(w, "审核失败")
+	drafts, draftErr := deconstructGroupDrafts(stored)
+	if draftErr != nil {
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": draftErr.Error()})
 		return
 	}
+	ids, saveErr := dblibrary.CommitDeconstructGroups(r.Context(), db, httpx.WorkspaceFrom(r), id, drafts)
+	if saveErr != nil {
+		writeReviewFailure(w, "参考母本入库失败，候选仍保留："+saveErr.Error())
+		return
+	}
+
 	if source := stringValue(stored["sourceKey"]); source != "" {
 		_, _ = db.ExecContext(r.Context(), `UPDATE "PromptImportSource" SET "state" = 'approved', "updatedAt" = "updatedAt" WHERE "workspaceId" = ? AND "sourceKey" = ?`, httpx.WorkspaceFrom(r), source)
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "fullPromptIds": []any{}})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "fullPromptIds": ids})
 }
 
 func replaceMotherReview(w http.ResponseWriter, r *http.Request, db *sql.DB, reviewID, status string, stored map[string]any) {
@@ -130,7 +137,12 @@ func replaceMotherReview(w http.ResponseWriter, r *http.Request, db *sql.DB, rev
 		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "新图的人物／静物镜头顺序与母组不一致，请改为新增衍生母组", "code": "shot_structure_mismatch"})
 		return
 	}
-	rawShots, _ := json.Marshal(images)
+	drafts, draftErr := deconstructGroupDrafts(stored)
+	if draftErr != nil || len(drafts) != 1 {
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "新图未形成完整四镜反推词，原母本未修改"})
+		return
+	}
+	rawShots := []byte(stringValue(drafts[0]["shotPromptsJson"]))
 	summary := ""
 	if parsed != nil {
 		summary = stringValue(parsed["content_summary"])

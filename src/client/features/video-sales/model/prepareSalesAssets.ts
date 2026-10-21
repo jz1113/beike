@@ -47,6 +47,7 @@ export async function prepareSalesCreativeAssets(input: {
   route: SalesRouteHeaders;
   regenerateId?: string;
   validateOnly?: boolean;
+  autoValidate?: boolean;
   isAborted: () => boolean;
   updateAsset: (id: string, patch: Partial<SalesCreativeAsset>) => void;
   getScript: () => VideoSalesScript;
@@ -82,7 +83,7 @@ export async function prepareSalesCreativeAssets(input: {
     if (failure) throw failure;
     if (blocked) throw blocked;
   }
-  await validatePreparedSalesAssets(input, validate);
+  if (input.autoValidate !== false) await validatePreparedSalesAssets(input, validate);
 }
 
 /** Re-check existing pictures without invoking or resubmitting image generation. */
@@ -105,7 +106,7 @@ validate: SalesAssetValidator): Promise<void> {
     eligibleImageIndexes: input.images.map((image) => image.index), selectedColor: input.selectedColor, ...input.route,
   });
   for (const result of results) {
-    if (assets.some((asset) => asset.id === result.id)) input.updateAsset(result.id, { validation: result.status, validationReason: result.reason });
+    if (assets.some((asset) => asset.id === result.id)) input.updateAsset(result.id, { validation: result.status, validationReason: result.reason, validationSource: 'model' });
   }
   const failed = results.find((result) => result.status !== 'passed');
   input.setValidation(failed?.status || 'passed');
@@ -157,7 +158,7 @@ function inspectAsset(input: Parameters<typeof prepareSalesCreativeAssets>[0], i
 async function runAssetWave(input: Parameters<typeof prepareSalesCreativeAssets>[0], jobs: AssetJob[], client: SalesImageBatchClient): Promise<Error | undefined> {
   for (const job of jobs) {
     input.updateAsset(job.id, {
-      status: 'generating', validation: 'pending', validationReason: undefined, error: undefined, sourceRevision: job.sourceRevision,
+      status: 'generating', validation: 'pending', validationSource: undefined, validationReason: undefined, error: undefined, sourceRevision: job.sourceRevision,
       attempts: job.attempts, submissionKey: job.submissionKey, modelId: job.modelId, ...(job.resume ? {} : { taskId: undefined }),
     });
   }
@@ -171,7 +172,10 @@ async function runAssetWave(input: Parameters<typeof prepareSalesCreativeAssets>
         aspectRatio: input.aspectRatio, idempotencyKey: job.submissionKey,
       })), input.isAborted);
     } catch (error) {
-      if (input.isAborted() || (error instanceof DOMException && error.name === 'AbortError')) throw error;
+      if (input.isAborted() || (error instanceof DOMException && error.name === 'AbortError')) {
+        for (const job of fresh) input.updateAsset(job.id, { status: 'uncertain', error: '已停止等待，请按提交标识查询原任务，不要重新提交' });
+        throw error;
+      }
       const message = error instanceof Error ? error.message : '批量生图请求失败';
       receipts = await Promise.all(fresh.map(async (job) => {
         try {
@@ -218,7 +222,7 @@ async function runAssetWave(input: Parameters<typeof prepareSalesCreativeAssets>
       input.updateAsset(job.id, { url, status: 'done', validation: 'pending', error: undefined, sourceRevision: job.sourceRevision, taskId });
       return undefined;
     } catch (error) {
-      const businessFailure = error instanceof Error && ['ImageGenBusinessError', 'NonRetryableError'].includes(error.name);
+      const businessFailure = !input.isAborted() && error instanceof Error && ['ImageGenBusinessError', 'NonRetryableError'].includes(error.name);
       input.updateAsset(job.id, { status: businessFailure ? 'failed' : 'uncertain', taskId, error: error instanceof Error ? error.message : '图片结果未确认' });
       return error instanceof Error ? error : new Error('图片结果未确认');
     }

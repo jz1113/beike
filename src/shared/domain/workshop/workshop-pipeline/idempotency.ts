@@ -5,6 +5,7 @@ export interface ImageTaskKeyInput {
   shotNo: number;
   prompt: string;
   selectedImageUrls: string[];
+  compositionReferenceUrls?: string[];
   model: string;
   aspectRatio: string;
   quality: string;
@@ -36,6 +37,7 @@ export function buildImageTaskKey(input: ImageTaskKeyInput): string {
     String(input.shotNo),
     promptHash,
     selectedImageHash,
+    ...(input.compositionReferenceUrls?.length ? [`refs=${stableHash(JSON.stringify([input.selectedImageUrls, input.compositionReferenceUrls]))}`] : []),
     input.model,
     input.aspectRatio,
     input.quality,

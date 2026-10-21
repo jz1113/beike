@@ -24,7 +24,7 @@ func workflowPayload() map[string]any {
 }
 
 func validWorkflowScript() string {
-	return `{"scripts":[{"id":"script_1","title":"桌面展示","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"桌面纸巾","camera":"推近","voiceover":"看看纸巾","prompt":"展示商品","visualSource":"ai_generate"}],"assets":[{"id":"table","kind":"scene","label":"桌面","prompt":"实拍桌面纸巾，商品保持白色","required":true,"usesProduct":true}]}]}`
+	return `{"scripts":[{"id":"script_1","title":"桌面展示","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"桌面纸巾","camera":"推近","speechMode":"voiceover","voiceover":"看看纸巾","prompt":"展示商品","visualSource":"ai_generate"}],"assets":[{"id":"table","kind":"scene","label":"桌面","prompt":"实拍桌面纸巾，商品保持白色","required":true,"usesProduct":true}]}]}`
 }
 
 func attachGateway(payload map[string]any, url string) {
@@ -201,7 +201,7 @@ func TestWorkflowAnalysisAppliesFashionNarrative(t *testing.T) {
 	server := useChatServer(t, func(body map[string]any, _ int) string {
 		encoded, _ := json.Marshal(body)
 		text := string(encoded)
-		for _, expected := range []string{"开箱换装", "生活穿搭", "鞋包展示", "creativeNotes", "videoSuggestions", "productName", "sellingPoints", "穿着后果", "看点", "knownFacts"} {
+		for _, expected := range []string{"开箱换装", "生活穿搭", "鞋包展示", "creativeNotes", "videoSuggestions", "productName", "sellingPoints", "穿着场合", "knownFacts", "论证箭头"} {
 			if !strings.Contains(text, expected) {
 				t.Errorf("missing %s", expected)
 			}
@@ -220,20 +220,23 @@ func TestWorkflowAnalysisAppliesFashionNarrative(t *testing.T) {
 
 func TestFashionVoiceoverBudget(t *testing.T) {
 	low, high := fashionVoiceoverBudget(15)
-	if low != 70 || high != 100 {
+	if low != 48 || high != 69 {
 		t.Fatalf("15s got %d-%d", low, high)
 	}
 	low, high = fashionVoiceoverBudget(30)
-	if low != 140 || high != 200 {
+	if low != 96 || high != 138 {
 		t.Fatalf("30s got %d-%d", low, high)
 	}
 	low, high = fashionVoiceoverBudget(10)
-	if low != 47 || high != 67 {
+	if low != 32 || high != 46 {
 		t.Fatalf("10s got %d-%d", low, high)
 	}
 	low, high = fashionVoiceoverBudget(5)
-	if low != 23 || high != 33 {
+	if low != 16 || high != 23 {
 		t.Fatalf("5s got %d-%d", low, high)
+	}
+	if fashionShotVoiceoverCap(5) != 30 {
+		t.Fatalf("5s cap %d", fashionShotVoiceoverCap(5))
 	}
 }
 
@@ -246,8 +249,8 @@ func TestFashionVoiceoverRejectsThinCopyAndEmptyClose(t *testing.T) {
 	if err := validateFashionVoiceover(thin, 15); err == nil || !strings.Contains(err.Error(), "汉字") {
 		t.Fatalf("thin copy: %v", err)
 	}
-	spoken := "降温还在找一件不闷的圆领，这件黑色纯棉套上就能出门。领口贴着锁骨，近看是平纹，走远了颜色还是这一块黑。单穿就能出门，里面加件衬衫也压得住，上班和周末都不用再换一件外套。"
-	if voiceoverHanCount(spoken) < 70 || voiceoverHanCount(spoken) > 100 {
+	spoken := "家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"
+	if voiceoverHanCount(spoken) < 48 || voiceoverHanCount(spoken) > 69 {
 		t.Fatalf("sample length %d", voiceoverHanCount(spoken))
 	}
 	if err := validateFashionVoiceover([]ScriptShot{{ShotId: 1, Duration: 15, Voiceover: spoken}}, 15); err != nil {
@@ -257,12 +260,23 @@ func TestFashionVoiceoverRejectsThinCopyAndEmptyClose(t *testing.T) {
 		t.Fatalf("empty close: %v", err)
 	}
 	shots := []ScriptShot{
-		{ShotId: 1, Duration: 5, Voiceover: "降温还在找一件不闷的圆领，这件黑色纯棉套上就能出门。"},
-		{ShotId: 2, Duration: 5, Voiceover: "领口是罗纹，胸前那点绣花就在正中，近看清楚，走远了不抢衣服。"},
-		{ShotId: 3, Duration: 5, Voiceover: "单穿就够，里面加件衬衫也压得住，上班和周末不用再换一件。"},
+		{ShotId: 1, Duration: 5, Voiceover: "家人们，我今天出门就套这件黑色圆领。"},
+		{ShotId: 2, Duration: 5, Voiceover: "纯棉的，领口那圈罗纹贴着锁骨。"},
+		{ShotId: 3, Duration: 5, Voiceover: "单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"},
 	}
 	if err := validateFashionVoiceover(shots, 15); err != nil {
 		t.Fatal(err)
+	}
+	rushed := []ScriptShot{
+		{ShotId: 1, Duration: 5, Voiceover: "家人们我今天出门就套这件黑色圆领纯棉的领口那圈罗纹贴着锁骨啊吧还要再补几个字才算连珠炮"},
+		{ShotId: 2, Duration: 5, Voiceover: "纯棉的，领口那圈罗纹贴着锁骨。"},
+		{ShotId: 3, Duration: 5, Voiceover: "单穿就行。"},
+	}
+	if err := validateFashionVoiceover(rushed, 15); err == nil || !strings.Contains(err.Error(), "不要超过") {
+		t.Fatalf("rushed shot: %v", err)
+	}
+	if err := validateFashionVoiceover([]ScriptShot{{ShotId: 1, Duration: 15, Voiceover: "好看"}}, 15); err == nil || !strings.Contains(err.Error(), "一句") {
+		t.Fatalf("fragment: %v", err)
 	}
 }
 
@@ -270,12 +284,12 @@ func TestWorkflowFashionScriptRequestsNarrative(t *testing.T) {
 	server := useChatServer(t, func(body map[string]any, _ int) string {
 		encoded, _ := json.Marshal(body)
 		text := string(encoded)
-		for _, expected := range []string{"开箱换装", "生活穿搭", "鞋包展示", "beat", "deliveryMode", "usesProduct", "穿着后果", "看点", "卖点", "可以直接入手", "70 到 100", "不得少于 70", "23到33"} {
+		for _, expected := range []string{"开箱换装", "生活穿搭", "鞋包展示", "beat", "deliveryMode", "usesProduct", "对镜头", "卖点", "可以直接入手", "48 到 69", "不得少于 48", "每秒 6", "真实肤质", "中景"} {
 			if !strings.Contains(text, expected) {
 				t.Errorf("missing %s", expected)
 			}
 		}
-		return strings.Replace(validWorkflowScript(), `"voiceover":"看看纸巾"`, `"voiceover":"降温还在找一件不闷的圆领，这件黑色纯棉套上就能出门。领口贴着锁骨，近看是平纹，走远了颜色还是这一块黑。单穿就能出门，里面加件衬衫也压得住，上班和周末都不用再换一件外套。"`, 1)
+		return strings.Replace(validWorkflowScript(), `"voiceover":"看看纸巾"`, `"voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"`, 1)
 	})
 	payload := workflowPayload()
 	payload["category"] = "fashion"

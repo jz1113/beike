@@ -7,7 +7,7 @@ import { getEnabledMultimodalModelsFromSettings } from '@shared/domain/models/wo
 import { normalizeImageSource } from '@shared/domain/media/drawing';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
-import type { ExtractedRecipeData } from './types';
+import type { BaseStyleSkill, ExtractedRecipeData } from './types';
 import { useStyleExtractSession } from './useStyleExtractSession';
 import { extractStyleRecipe, parseStyleReferences } from './styleExtractRequests';
 
@@ -17,6 +17,7 @@ export interface UseStyleExtractWorkflowOptions {
   onRecipeCreated?: (recipe: any) => void;
   initialImages?: string[];
   initialTitle?: string;
+  baseSkill?: BaseStyleSkill;
 }
 
 export function useStyleExtractWorkflow({
@@ -25,10 +26,11 @@ export function useStyleExtractWorkflow({
   onRecipeCreated,
   initialImages,
   initialTitle,
+  baseSkill,
 }: UseStyleExtractWorkflowOptions) {
   const { setSafeTimeout, clearSafeTimeout } = useSafeTimeout();
   const initialImageKey = JSON.stringify(initialImages);
-  const sessionKey = JSON.stringify([isOpen, initialImageKey, initialTitle]);
+  const sessionKey = JSON.stringify([isOpen, initialImageKey, initialTitle, baseSkill?.id]);
   const { active, capture, begin, isCurrent, finish } = useStyleExtractSession(sessionKey, isOpen);
 
   // 图源选择 Tab
@@ -316,10 +318,10 @@ export function useStyleExtractWorkflow({
 
     try {
       if (!isCurrent(operation)) return;
-      const recipe = await extractStyleRecipe({ images: selectedImages, userHint, model: extractModel,
+      const recipe = await extractStyleRecipe({ images: selectedImages, userHint, baseSkill, model: extractModel,
         modelIds: multimodalModels.map((model) => model.id).filter(Boolean) }, operation.controller.signal, () => isCurrent(operation));
       if (!isCurrent(operation)) return;
-      setExtractedRecipe(recipe);
+      setExtractedRecipe(baseSkill ? { ...recipe, name: `${baseSkill.name} · 新版`, category: baseSkill.category } : recipe);
       showToast('🎉 AI 风格逆向解构完成！');
     } catch (e: unknown) {
       if (isCurrent(operation)) alert(formatUserError(e, 'AI 逆向提炼超时，请重试'));
@@ -339,6 +341,7 @@ export function useStyleExtractWorkflow({
     setSafeTimeout,
     showToast,
     userHint,
+    baseSkill,
   ]);
 
   // 保存至品类配方库
@@ -366,7 +369,7 @@ export function useStyleExtractWorkflow({
           promptSnippet: extractedRecipe.promptSnippet,
           coverUrl: selectedImages[0] || '',
           sampleImages: selectedImages.slice(0, 10),
-          sourceUrl: linkInput,
+          sourceUrl: baseSkill ? `skill:${baseSkill.id}` : linkInput,
         }),
       });
       const data = await res.json();
@@ -389,6 +392,7 @@ export function useStyleExtractWorkflow({
     }
   }, [
     extractedRecipe,
+    baseSkill,
     active,
     capture,
     linkInput,

@@ -68,6 +68,15 @@ describe('videoSales domain and templates', () => {
     expect(prompted[0].imagePrompt).toBeUndefined();
   });
 
+  it('invalidates audio and generated frames when the speech source changes', () => {
+    const shot: VideoSalesShot = { shotId: 1, type: 'demo', duration: 5, description: '讲解', camera: '中景', visualSource: 'ai_generate', transition: 'direct_concat', voiceover: '看看领口', speechMode: 'voiceover', promptStale: false, audioUrl: '/audio.mp3', referenceFrameUrl: '/frame.jpg', assetUrl: '/video.mp4' };
+    const edited = editSalesShot(shot, { speechMode: 'on_camera' });
+    expect(edited).toMatchObject({ speechMode: 'on_camera', promptStale: true, status: 'pending' });
+    expect(edited.audioUrl).toBeUndefined();
+    expect(edited.referenceFrameUrl).toBeUndefined();
+    expect(editSalesShot(shot, { speechMode: 'voiceover' }).assetUrl).toBe('/video.mp4');
+  });
+
   it('keeps a scene shot and requires its still prompt', () => {
     const catalog = buildSalesImageCatalog({ mainImages: ['https://example.com/main.jpg'] });
     const shots: VideoSalesShot[] = [

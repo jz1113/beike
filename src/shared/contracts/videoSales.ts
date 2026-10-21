@@ -73,7 +73,7 @@ export const videoSalesScriptGenerateBodySchema = z.object({
   ...modelFields, ...workflowFields, imageCatalog: catalogSchema.optional(),
   productName: z.string().min(1, '商品名称不能为空').max(100), brand: z.string().optional(),
   category: categorySchema.default('beauty'), productDescription: z.string().max(2000).optional(),
-  productImages: z.array(z.string()).max(10).optional(), productAnalysis: z.string().max(4000).optional(),
+  productImages: z.array(z.string()).max(40).optional(), productAnalysis: z.string().max(4000).optional(),
   videoMode: z.enum(['product_closeup', 'graphic_montage', 'scene_demo', 'live_presenter']).default('product_closeup'),
   targetDuration: z.number().int().min(10).max(120).optional(), aspectRatio: aspectRatioSchema.optional(),
   priceRange: z.string().max(100).optional(), targetAudience: z.string().max(200).optional(),
@@ -104,6 +104,7 @@ export type VideoSalesComposeBody = z.infer<typeof videoSalesComposeBodySchema>;
 const shotSchema = z.object({
   shotId: z.number().int().positive(), imageIndex: z.number().int().nonnegative(),
   duration: z.number().int().positive().optional(), description: z.string().optional(), camera: z.string().optional(),
+  speechMode: z.enum(['on_camera', 'voiceover']).optional(),
   voiceover: z.string().optional(), prompt: z.string().optional(), visualSource: z.string().optional(),
 });
 export const videoSalesSelectBodySchema = z.object({

@@ -10,7 +10,7 @@ const planApi = { analyzeProductMedia, generateSalesScripts, selectSalesImages }
 const input = {
   productName: '商品', brand: '', category: 'other' as VideoSalesCategory, sellingPoints: '棉',
   imageCatalog: [{ index: 9, url: '/black.jpg', role: 'main' as const }], selectedColor: '黑色', aspectRatio: '16:9',
-  targetDuration: 15, videoMode: 'product_closeup' as const, redrawScenes: true, route: { model: 'chosen-vision' }, onPhase: vi.fn(),
+  targetDuration: 15, videoMode: 'product_closeup' as const, route: { model: 'chosen-vision' }, onPhase: vi.fn(),
 };
 
 beforeEach(() => {
@@ -21,6 +21,29 @@ beforeEach(() => {
 });
 
 describe('all-category script and asset planning', () => {
+  it('assigns the sole selected image without another model request', async () => {
+    const result = await buildSalesPlan(input, planApi);
+    expect(result.script.shots[0].imageIndex).toBe(9);
+    expect(selectSalesImages).not.toHaveBeenCalled();
+  });
+  it('resumes image selection after failure without repeating successful analysis or writing', async () => {
+    let checkpoint = {};
+    const multiple = { ...input, imageCatalog: [...input.imageCatalog, { index: 10, role: 'main' as const, url: '/detail.jpg' }], onCheckpoint: (value: object) => { checkpoint = value; } };
+    vi.mocked(selectSalesImages).mockRejectedValueOnce(new Error('选图连接失败'));
+    await expect(buildSalesPlan(multiple, planApi)).rejects.toThrow('选图连接失败');
+    const result = await buildSalesPlan({ ...multiple, checkpoint }, planApi);
+    expect(result.script.shots[0].imageIndex).toBe(9);
+    expect(analyzeProductMedia).toHaveBeenCalledTimes(1);
+    expect(generateSalesScripts).toHaveBeenCalledTimes(1);
+    expect(selectSalesImages).toHaveBeenCalledTimes(2);
+  });
+  it('stops before writing when analysis finishes after cancellation', async () => {
+    const controller = new AbortController();
+    const analysis = await analyzeProductMedia({ imageCatalog: [] });
+    vi.mocked(analyzeProductMedia).mockClear().mockImplementation(async () => { controller.abort(); return analysis; });
+    await expect(buildSalesPlan({ ...input, route: { ...input.route, signal: controller.signal } }, planApi)).rejects.toThrow('已停止');
+    expect(generateSalesScripts).not.toHaveBeenCalled();
+  });
   it.each<VideoSalesCategory>(['beauty', 'food', 'home', 'fashion', 'tech', 'other'])('plans %s without uploaded people or video models and defers finalization', async (category) => {
     const result = await buildSalesPlan({ ...input, category }, planApi);
     expect(result.script.deliveryMode).toBe('single');
@@ -44,7 +67,7 @@ describe('all-category script and asset planning', () => {
   });
   it('rejects model picks from a different color', async () => {
     vi.mocked(selectSalesImages).mockResolvedValue([{ shotId: 1, imageIndex: 0, reason: '另一张图' }]);
-    await expect(buildSalesPlan(input, planApi)).rejects.toThrow('没有可用参考图');
+    await expect(buildSalesPlan({ ...input, imageCatalog: [...input.imageCatalog, { index: 10, role: 'main', url: '/detail.jpg' }] }, planApi)).rejects.toThrow('没有可用参考图');
   });
   it('preserves a pure fashion portrait without inventing product dependencies', async () => {
     vi.mocked(generateSalesScripts).mockResolvedValue([{ ...script, assets: [{ id: 'person', kind: 'person', label: '成年人物', prompt: '面部肖像', required: true, usesProduct: false, productImageIndexes: [] }] }]);

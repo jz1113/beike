@@ -27,12 +27,13 @@ type SubmitResult struct {
 }
 
 type SubmitCommand struct {
-	Endpoints   []string
-	APIKey      string
-	PayloadJSON string
-	Headers     map[string]string
-	ReadTaskID  func(map[string]any) string
-	Client      *http.Client
+	Endpoints           []string
+	APIKey              string
+	PayloadJSON         string
+	Headers             map[string]string
+	ReadTaskID          func(map[string]any) string
+	Client              *http.Client
+	RetryOnMissingInput bool
 }
 
 func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
@@ -67,13 +68,20 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 			result.Error = ""
 			return result
 		}
-		result.Error = upstreamMessage(data, status)
+		rawMessage := upstreamMessage(data, status)
+		if command.APIKey != "" {
+			rawMessage = strings.ReplaceAll(rawMessage, command.APIKey, "[已隐藏]")
+		}
+		if status >= 200 && status < 300 && taskID == "" {
+			rawMessage = "响应未返回任务 ID：" + rawMessage
+		}
+		result.Error = presentVideoError(rawMessage)
 		if status >= 200 && status < 300 || status >= 500 {
 			result.Outcome = Unknown
 			result.TaskID = taskID
 			return result
 		}
-		if !CanTryAnotherEndpoint(status) {
+		if !CanTryAnotherEndpoint(status) && !(command.RetryOnMissingInput && missingVideoInput(rawMessage)) {
 			result.Outcome = Rejected
 			return result
 		}
@@ -103,6 +111,65 @@ func postJSON(ctx context.Context, client *http.Client, endpoint string, command
 	data := map[string]any{}
 	_ = json.Unmarshal(raw, &data)
 	return response.StatusCode, data, nil
+}
+
+func missingVideoInput(message string) bool {
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "missing required parameter 'input'") || strings.Contains(lower, `missing required parameter "input"`)
+}
+
+func presentVideoError(message string) string {
+	detail := unwrapVideoError(strings.TrimSpace(message))
+	lower := strings.ToLower(detail)
+	switch {
+	case strings.Contains(lower, "missing required parameter 'input'") || strings.Contains(lower, `missing required parameter "input"`):
+		return "万相官方请求未被接受：" + clipVideoError(detail)
+	case strings.Contains(lower, "mode is not supported") || (strings.Contains(detail, "FieldInvalid") && strings.Contains(lower, "model")):
+		return "该渠道不接受当前型号或参考方式：" + clipVideoError(detail)
+	default:
+		return clipVideoError(detail)
+	}
+}
+
+func unwrapVideoError(message string) string {
+	text := strings.TrimSpace(message)
+	if start := strings.Index(text, "{"); start > 0 && strings.Contains(strings.ToLower(text[:start]), "failed") {
+		text = strings.TrimSpace(text[start:])
+	}
+	if parsed := nestedVideoError(text); parsed != "" {
+		return parsed
+	}
+	return text
+}
+
+func nestedVideoError(text string) string {
+	var data map[string]any
+	if json.Unmarshal([]byte(text), &data) != nil {
+		return ""
+	}
+	for _, key := range []string{"message", "error", "fail_reason"} {
+		value, ok := data[key].(string)
+		if !ok || value == "" {
+			continue
+		}
+		if inner := nestedVideoError(strings.TrimSpace(value)); inner != "" {
+			return inner
+		}
+		return value
+	}
+	if reason, ok := data["reason"].(string); ok && reason != "" {
+		return reason
+	}
+	return ""
+}
+
+func clipVideoError(text string) string {
+	text = strings.TrimSpace(text)
+	runes := []rune(text)
+	if len(runes) > 180 {
+		return string(runes[:180])
+	}
+	return text
 }
 
 func upstreamMessage(data map[string]any, status int) string {

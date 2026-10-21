@@ -12,6 +12,13 @@ const shots = [{ shotId: 1, imageIndex: 2, duration: 15, voiceover: '看看这�
 const actualReferences = [{ id: 'product', kind: 'product', label: '商品', url: catalog[0].url }];
 
 describe('video sales version 3 contracts', () => {
+  it('keeps supported speech modes and rejects unknown voice sources', () => {
+    const request = { ...workflow, shots: [{ ...shots[0], speechMode: 'on_camera' }], actualReferences, operation: 'validate-assets' };
+    expect(videoSalesFinalizeBodySchema.parse(request).shots[0].speechMode).toBe('on_camera');
+    expect(videoSalesSelectBodySchema.parse(request).shots[0].speechMode).toBe('on_camera');
+    expect(videoSalesFinalizeBodySchema.safeParse({ ...request, shots: [{ ...shots[0], speechMode: 'unknown' }] }).success).toBe(false);
+  });
+
   it('keeps legacy script defaults and legacy finalize requests', () => {
     const result = videoSalesScriptGenerateBodySchema.parse({ productName: '纸巾' });
     expect(result.targetDuration).toBe(15);

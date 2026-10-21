@@ -1,3 +1,10 @@
+export interface BaseStyleSkill {
+  id: string;
+  name: string;
+  category: string;
+  promptSnippet: string;
+}
+
 export interface ExtractedRecipeData {
   name: string;
   category: string;

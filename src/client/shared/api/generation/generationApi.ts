@@ -40,10 +40,15 @@ export async function fetchAssetTasks(page = 1, pageSize = 40, signal?: AbortSig
 export async function pollGenerationTask(
   taskId: string,
   mediaType: 'image' | 'video' = 'image',
+  modelId?: string,
 ) {
   const endpoint = mediaType === 'video' ? '/api/generate/video' : '/api/generate/image';
-  const res = await apiFetch(`${endpoint}?taskId=${encodeURIComponent(taskId)}`, {
-    headers: storageConfigHeaders(),
+  const model = mediaType === 'video' && modelId ? `&model=${encodeURIComponent(modelId)}` : '';
+  const res = await apiFetch(`${endpoint}?taskId=${encodeURIComponent(taskId)}${model}`, {
+    headers: {
+      ...storageConfigHeaders(),
+      ...(mediaType === 'video' && modelId ? getGatewayClientHeaders(modelId) : {}),
+    },
   });
   if (!res.ok) {
     throw new Error(`轮询失败 (${res.status})`);

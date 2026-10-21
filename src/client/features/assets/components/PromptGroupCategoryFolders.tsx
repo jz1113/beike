@@ -53,7 +53,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     setSelectedFolderIds(previous => previous.filter(id => folders.some(folder => folder.id === id)));
   }, [folders]);
 
-  const selectOrOpen = (event: MouseEvent, folder: PromptGroupFolder) => {
+  const selectOrOpen = (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>, folder: PromptGroupFolder) => {
     if (event.metaKey || event.ctrlKey) {
       setSelectedFolderIds(previous => previous.includes(folder.id)
         ? previous.filter(id => id !== folder.id) : [...previous, folder.id]);
@@ -265,13 +265,18 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
       </div>
     </div>
 
-    {folders.length ? <div className="flex flex-wrap gap-x-4 gap-y-5">
+    {folders.length ? <div className="grid grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-x-4 gap-y-5 max-w-6xl">
       {folders.map(folder => {
         const previews = folder.items.slice(0, 3).map(item => proxyMediaUrl(item.coverUrl, { thumb: true, width: 180 })).filter(Boolean);
         const isSelected = selectedFolderIds.includes(folder.id);
-        return <div key={folder.id} data-prompt-folder className="group relative w-[164px] rounded-2xl px-2 py-3 text-center"
+        return <div key={folder.id} data-prompt-folder className="group relative min-w-0 rounded-2xl px-2 py-3 text-center"
           onContextMenu={event => openMenu(event, folder)}
           onKeyDown={event => {
+            if ((event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('.folder-stage')) {
+              event.preventDefault();
+              selectOrOpen(event, folder);
+              return;
+            }
             if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
               event.preventDefault();
               const target = event.target as HTMLElement;
@@ -286,8 +291,9 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
               });
             }
           }}>
-          <div className="flex h-[118px] items-center justify-center">
-            <Folder color={folder.isVirtual ? '#64748B' : '#4F46E5'} size={1.16} items={previews}
+          <div className="flex h-[136px] items-center justify-center overflow-hidden">
+            <Folder color={folder.isVirtual ? '#64748B' : '#4F46E5'} size={0.52} items={previews.length ? previews : [{ title: folder.name }]}
+              open={false} peek={false} intro={false} tilt={0} bounce={0} draggable={false} zoomOnClick={false}
               count={folder.items.length} badgeSuffix="组" ariaLabel={`打开${folder.name}，${folder.items.length}组母本`}
               onClick={event => selectOrOpen(event, folder)} />
           </div>

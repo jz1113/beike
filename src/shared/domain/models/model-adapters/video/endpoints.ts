@@ -1,3 +1,4 @@
+import { isDashScopeBase } from '@shared/domain/media/imageCapabilities';
 import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayUrl';
 import type { GatewayEndpoints } from '../types';
 
@@ -54,17 +55,25 @@ export function seedanceOfficialEndpoints(baseUrl: string): GatewayEndpoints {
   };
 }
 
+function dashScopeVideoRoot(baseUrl: string): string {
+  let root = rootOf(baseUrl);
+  for (const suffix of ['/compatible-mode', '/api']) {
+    if (root.toLowerCase().endsWith(suffix)) root = root.slice(0, -suffix.length).replace(/\/+$/, '');
+  }
+  return root;
+}
+
 export function wanOfficialEndpoints(baseUrl: string): GatewayEndpoints {
+  const submitPath = '/api/v1/services/aigc/video-generation/video-synthesis';
+  const queryPath = '/api/v1/tasks/{taskId}';
+  if (isDashScopeBase(baseUrl)) {
+    const root = dashScopeVideoRoot(baseUrl);
+    return { submit: [`${root}${submitPath}`], query: [`${root}${queryPath}`] };
+  }
   const root = rootOf(baseUrl);
   return {
-    submit: [
-      `${root}/qwen/api/v1/services/aigc/video-generation/video-synthesis`,
-      `${root}/api/v1/services/aigc/video-generation/video-synthesis`,
-    ],
-    query: [
-      `${root}/qwen/api/v1/tasks/{taskId}`,
-      `${root}/api/v1/tasks/{taskId}`,
-    ],
+    submit: [`${root}/wan${submitPath}`, `${root}/qwen${submitPath}`, `${root}${submitPath}`],
+    query: [`${root}/wan${queryPath}`, `${root}/qwen${queryPath}`, `${root}${queryPath}`],
   };
 }
 

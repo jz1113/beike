@@ -1,3 +1,4 @@
+import { WorkshopReferenceStrip } from '../WorkshopReferenceStrip';
 import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
 import {
   Loader2,
@@ -202,6 +203,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
         <p className="text-xs text-slate-500 dark:text-slate-400">每款商品使用上方母组，场景按镜头绑定；展开分镜结构可核对实际场景与光线。</p>
       )}
 
+      {hasPrompts && <WorkshopReferenceStrip item={item} />}
       {/* 共用资产只在商品级展示，分镜保留差异信息。 */}
       {hasPrompts && isGridMode ? (
         <section className="rounded-xl border border-indigo-100 bg-slate-50/60 p-4 space-y-3 dark:bg-white/5">

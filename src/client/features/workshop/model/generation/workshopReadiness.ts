@@ -34,6 +34,7 @@ export function checkWorkshopReadiness(items: BatchProductItem[], config: { gene
     if (!item.analyzedSuccess || item.isAnalyzing || shots.length === 0) add('尚未完成分镜分析', 3);
     else if (shots.length !== config.selectedShotCount) add(`现有 ${shots.length} 镜，与设置的 ${config.selectedShotCount} 镜不一致，请重新分析`, 3);
     if (shots.some(shot => !Number.isInteger(shot.shot_no) || shot.shot_no < 1) || new Set(shots.map(shot => shot.shot_no)).size !== shots.length) add('分镜编号缺失或重复，请重新分析', 3);
+    if (shots.some(shot => shot.assembly_source === 'group_skeleton' && !shot.sourceReferenceImageUrl)) add('旧分析未绑定参考原图，请重新分析后生成', 3);
     if (config.generationStrategy === 'grid_first') {
       if (config.selectedShotCount !== 4) add('四宫格策略需要选择 4 镜', 2);
       if (!item.gridPrompt?.trim()) add('缺少四宫格整组提示词，请重新分析', 3);

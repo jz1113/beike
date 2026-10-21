@@ -5,6 +5,7 @@ import type { VideoSalesScript } from '@shared/domain/video-sales';
 import VideoSalesStudio from './VideoSalesStudio';
 import { useVideoSalesStudio } from './hooks/useVideoSalesStudio';
 import { defaultSalesStudioState } from './model/salesStudioDraft';
+import { salesFinalInputRevision, salesPlanInputRevision } from './model/salesStageRules';
 
 vi.mock('./hooks/useVideoSalesStudio', () => ({ useVideoSalesStudio: vi.fn() }));
 vi.mock('./hooks/useSalesPanelWidth', () => ({ useSalesPanelWidth: () => ({ containerRef: { current: null }, wide: false, width: 480, separatorProps: {} }) }));
@@ -18,7 +19,7 @@ const script: VideoSalesScript = {
 const base = {
   state: { ...defaultSalesStudioState, scripts: [script] },
   isCollecting: false, isUploading: false, isPlanning: false, isPreparingAssets: false, isFinalizing: false, isRendering: false,
-  planPhase: null, renderPhase: null, error: null as string | null, videoError: null, videoSubmitError: null,
+  planPhase: null, renderPhase: null, error: null as string | null, videoError: null as string | null, videoSubmitError: null as string | null,
   updateState: vi.fn(), resetProject: vi.fn(), runPlan: vi.fn(), runAssets: vi.fn(), runFinalize: vi.fn(), runRender: vi.fn(), stopRender: vi.fn(),
   runProductCollect: vi.fn(), markImageUnavailable: vi.fn(), addProductImages: vi.fn(), editShot: vi.fn(), editAssetPrompt: vi.fn(), editFullPrompt: vi.fn(), retryShot: vi.fn(),
 };
@@ -29,6 +30,23 @@ function render(patch: Partial<typeof base> = {}) {
 beforeEach(() => vi.clearAllMocks());
 
 describe('sales studio integration', () => {
+  it('keeps history available while reviewing scripts rather than only on results', () => {
+    const html = render({ state: { ...base.state, scripts: [script, { ...script, id: 'history', title: '历史脚本' }] } });
+    expect(html).toContain('口播与画面时间轴');
+    expect(html).toContain('选择历史方案');
+    expect(html).toContain('历史脚本');
+    expect(html.indexOf('历史方案与任务')).toBeLessThan(html.indexOf('商品确认与前置设置'));
+  });
+  it('shows the distinction between a speaking presenter and voiceover', () => {
+    const speaking = { ...script, shots: [{ ...script.shots[0], speechMode: 'on_camera' as const }, { ...script.shots[0], shotId: 2, speechMode: 'voiceover' as const }] };
+    const html = render({ state: { ...base.state, category: 'fashion', videoMode: 'live_presenter', scripts: [speaking] } });
+    expect(html).toContain('出镜说话 · 同步口型');
+    expect(html).toContain('画外音');
+    expect(html).toContain('段落 1 声音来源');
+    expect(html).toContain('出镜方式');
+    expect(html).toMatch(/value="live_presenter" selected=""/);
+    expect(html).toContain('完整嘴部清晰可见');
+  });
   it('renders one footer and starts pending scripts at the script stage', () => {
     const html = render();
     expect(html.match(/<footer\b/g)).toHaveLength(1);
@@ -40,6 +58,21 @@ describe('sales studio integration', () => {
     const html = render({ state: { ...base.state, scripts: [{ ...script, fullPrompt: '旧版完整提示词', finalizedRevision: 'old' }] } });
     expect(html).toContain('aria-label="4 视频定稿，待完成"');
     expect(html).not.toContain('aria-label="4 视频定稿，已完成"');
+  });
+  it('keeps the prompt step complete when the new video model has a separate compatibility error', () => {
+    const state = { ...structuredClone(defaultSalesStudioState), productName: '商品',
+      imageCatalog: [{ index: 0, role: 'main' as const, url: '/product.jpg' }],
+      colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] },
+    };
+    const approved = { ...script, fullPrompt: '已经确认的整段提示词', assets: [], assetValidation: 'passed' as const,
+      shots: [{ ...script.shots[0], imageIndex: 0 }], planRevision: salesPlanInputRevision(state),
+      finalizedRevision: '',
+    };
+    approved.finalizedRevision = salesFinalInputRevision(state, approved);
+    state.scripts = [approved];
+    const html = render({ state, videoError: '当前视频模型不支持所选参考模式' });
+    expect(html).toContain('aria-label="4 视频定稿，已完成"');
+    expect(base.runFinalize).not.toHaveBeenCalled();
   });
   it('shows the global error only once', () => {
     const html = render({ error: '本次采集失败' });

@@ -4,7 +4,7 @@ import { eligibleSalesImages, type SalesColorSelection, type SalesImageRef, type
 import type { VideoSalesStudioState } from '../hooks/useVideoSalesStudio';
 import { salesCreationRule } from '../model/fashionSalesSkill';
 import { PRODUCT_IMAGE_ACCEPT, imagesFromDataTransfer } from '../model/productImageDrop';
-import { SalesCreationRule, salesCardClass, salesDividerClass, salesFocusClass, salesGhostButtonClass, salesGroupClass, salesInputClass, salesLabelClass, salesSectionTitleClass } from './salesChrome';
+import { salesCardClass, salesDividerClass, salesFocusClass, salesGhostButtonClass, salesGroupClass, salesInputClass, salesLabelClass, salesSectionTitleClass } from './salesChrome';
 import { SalesColorGallery } from './SalesColorGallery';
 import { SalesPlanningSettings } from './salesPlanning';
 
@@ -70,11 +70,13 @@ export function SalesProductMedia({ productUrl, images, usableCount, metadata, s
           <button type="button" onClick={onCollect} disabled={isBusy || !productUrl.trim()} className={`h-10 shrink-0 px-3.5 disabled:opacity-40 ${salesGhostButtonClass}`}>{isCollecting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}采集</button>
         </div>
       </label>
-      <input ref={inputRef} type="file" aria-label="上传商品图片" accept={PRODUCT_IMAGE_ACCEPT} multiple className="sr-only" disabled={isBusy} onChange={(event) => { const files = [...(event.target.files || [])]; event.target.value = ''; if (files.length) void onUpload(files); }} />
+      <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">可采集链接，也可直接上传图片并填写商品名称。</p>
+      <input ref={inputRef} type="file" aria-label="上传商品图片" accept={PRODUCT_IMAGE_ACCEPT} multiple className="hidden" disabled={isBusy} onChange={(event) => { const files = [...(event.target.files || [])]; event.target.value = ''; if (files.length) void onUpload(files); }} />
       <div className={`space-y-3 rounded-2xl ${dragging ? 'ring-2 ring-slate-400' : ''}`} onDragEnter={(event) => { if (!hasFiles(event)) return; event.preventDefault(); if (!isBusy) { dragDepth.current += 1; setDragging(true); } }} onDragOver={(event) => { if (!hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = isBusy ? 'none' : 'copy'; }} onDragLeave={(event) => { if (!hasFiles(event)) return; event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }} onDrop={onDrop}>
-        <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium">商品参考图 · 已选 {usableCount}/{images.length}</span><button type="button" disabled={isBusy} onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-1 text-xs disabled:opacity-40">{isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}上传商品图</button></div>
+        <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium">商品参考图 · 已选 {usableCount}/{images.length}</span>{images.length > 0 && <button type="button" disabled={isBusy} onClick={() => inputRef.current?.click()} className={`inline-flex items-center gap-1 rounded text-xs disabled:opacity-40 ${salesFocusClass}`}>{isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}上传商品图</button>}</div>
         {images.length > 0 ? <SalesColorGallery images={images} metadata={metadata} selection={selection} disabled={isBusy} onChange={onSelection} onImageError={onImageError} /> : <button type="button" disabled={isBusy} onClick={() => inputRef.current?.click()} className="flex w-full flex-col items-center rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-xs text-slate-500 disabled:opacity-40 dark:border-white/20"><ImagePlus className="mb-2 h-5 w-5" />{isUploading ? '正在上传图片' : dragging ? '松开以添加图片' : '上传商品图片，或拖入图片 / 文件夹'}</button>}
         {dragging && <p role="status" className="text-center text-xs text-slate-500">松开以添加商品图片，原图会保留。</p>}
+        {images.length > 0 && <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">选择同一款式、颜色的图片作为本次参考；未选图片仍保留在图库中。</p>}
       </div>
     </section>
   );
@@ -83,19 +85,18 @@ export function SalesProductMedia({ productUrl, images, usableCount, metadata, s
 interface SalesEmptyGuideProps { kind: 'plan' | 'result' | 'assets' | 'video'; category?: VideoSalesCategory; onOpenRules?: () => void }
 const CONTENT = {
   plan: { title: '先确认商品，再编写口播', input: '商品资料和所选参考图', output: '口播时间轴与素材计划', icon: FileText, steps: ['选择本次使用的商品图', '设置目标时长、画幅和多模态模型', '编写脚本后，分步确认素材与视频'] },
-  assets: { title: '脚本确认后，准备素材图片', input: '有效脚本与素材计划', output: '实际图片与校验状态', icon: Images, steps: ['先完成商品确认与口播脚本', '仅生成脚本需要的人物、场景或关键帧', '素材通过校验后，再进入视频定稿'] },
-  video: { title: '素材完成后，定稿整段视频', input: '已校验素材与视频模型配置', output: '一条完整视频提示词', icon: Clapperboard, steps: ['先完成必要素材与校验', '按实际图片与模型能力定稿提示词', '定稿后单独确认付费生成，整段一次出片'] },
+  assets: { title: '脚本确认后，准备素材图片', input: '有效脚本与素材计划', output: '实际图片与确认状态', icon: Images, steps: ['先完成商品确认与口播脚本', '仅生成脚本需要的人物、场景或关键帧', '人工确认图片无误后，再生成视频提示词'] },
+  video: { title: '素材完成后，定稿整段视频', input: '已校验素材与视频模型配置', output: '一条完整视频提示词', icon: Clapperboard, steps: ['先完成必要素材并确认图片', '按实际图片与模型能力定稿提示词', '定稿后单独确认付费生成，整段一次出片'] },
   result: { title: '成片与任务状态会显示在这里', input: '已明确确认的视频生成任务', output: '可预览、下载的完整视频', icon: Video, steps: ['先完成素材与视频定稿', '单独确认生成一条整段视频', '已有回执优先查询，不重复提交'] },
 };
 
-export function SalesEmptyGuide({ kind, category, onOpenRules }: SalesEmptyGuideProps) {
+export function SalesEmptyGuide({ kind }: SalesEmptyGuideProps) {
   const content = CONTENT[kind];
   const Icon = content.icon;
-  return <div className="flex min-h-full items-center justify-center p-4 sm:p-6"><section aria-label="当前阶段说明" className="w-full max-w-lg py-8">
+  return <div className="flex items-center justify-center p-4 sm:p-6"><section aria-label="当前阶段说明" className="w-full max-w-lg py-8">
     <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-300/20"><Icon className="h-5 w-5" aria-hidden /></span>
     <h2 className="text-lg font-semibold leading-8">{content.title}</h2>
     <dl className={`mt-5 grid gap-4 p-4 sm:grid-cols-2 ${salesCardClass}`}>{[['输入', content.input], ['产出', content.output]].map(([label, value]) => <div key={label}><dt className="text-[11px] text-slate-500 dark:text-slate-400">{label}</dt><dd className="mt-1 text-[13px] leading-6">{value}</dd></div>)}</dl>
-    {kind === 'plan' && category && onOpenRules && <div className="mt-5"><SalesCreationRule category={category} onOpenRules={onOpenRules} /></div>}
     <ol className="mt-5 space-y-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{content.steps.map((step, index) => <li key={step} className="flex gap-2.5"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-black/5 text-[10px] dark:bg-white/5">{index + 1}</span><span>{step}</span></li>)}</ol>
   </section></div>;
 }

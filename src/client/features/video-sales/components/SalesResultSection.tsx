@@ -1,4 +1,4 @@
-import { Check, Copy, Download, RotateCcw } from 'lucide-react';
+import { Check, Copy, Download } from 'lucide-react';
 import { useState } from 'react';
 import type { VideoSalesScript, VideoSalesShot } from '@shared/domain/video-sales';
 import { salesPreviewClass, salesRedrawnCount, salesRenderStatus, salesShotStatusLabel, type SalesRenderPhase } from '../model/salesWorkspace';
@@ -11,21 +11,22 @@ interface Props {
   resultUrl: string | null;
   renderPhase: SalesRenderPhase | null;
   isRendering: boolean;
-  onRetryShot: (index: number) => void;
   onStop: () => void;
   onCompose: () => void;
   singleDelivery?: boolean;
   actionsInFooter?: boolean;
   globalError?: string | null;
+  onPrepareRetry?: () => void;
 }
 
-export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase, isRendering, onRetryShot, onStop, onCompose, singleDelivery = false, actionsInFooter = false, globalError }: Props) {
+export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase, isRendering, onStop, onCompose, singleDelivery = false, actionsInFooter = false, globalError, onPrepareRetry }: Props) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const copyText = async () => {
     try { await navigator.clipboard.writeText(seoText(script)); setCopyStatus('copied'); }
     catch { setCopyStatus('error'); }
   };
   const shots = script.shots;
+  const issue = globalError || script.renderError;
   const videoDone = shots.filter((shot) => shot.status === 'done' && shot.assetUrl).length;
   const done = renderPhase === 'redrawing' ? salesRedrawnCount(shots) : videoDone;
   const status = singleDelivery ? salesSingleResultStatus({ rendering: isRendering, hasResult: Boolean(resultUrl), status: script.renderStatus, hasReceipt: Boolean(script.renderTaskId) }) : salesRenderStatus({ renderPhase, done, total: shots.length, hasResult: Boolean(resultUrl) });
@@ -43,13 +44,21 @@ export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase
         </div>
       </div>
       {!actionsInFooter && singleDelivery && !isRendering && script.renderTaskId && ['generating', 'uncertain'].includes(script.renderStatus || '') && <button type="button" onClick={onCompose} className={`h-9 px-4 text-xs ${salesGhostButtonClass}`}>继续查询原任务（不重新提交）</button>}
-      {singleDelivery && script.renderStatus === 'uncertain' && <p role="alert" className="rounded-xl bg-amber-500/10 p-4 text-xs leading-6 text-amber-700 dark:text-amber-300">视频提交结果未确认。已有回执时仅查询原任务；没有回执时请核对服务端生成记录，当前项目不会自动重投，以免重复计费。</p>}
-      {singleDelivery && script.renderError && script.renderError !== globalError && <p role="alert" className="rounded-xl bg-rose-500/10 p-4 text-xs leading-6 text-rose-500">{script.renderError}</p>}
+      {singleDelivery && script.renderStatus === 'uncertain' && !issue && <p role="alert" className="rounded-xl bg-amber-500/10 p-4 text-xs leading-6 text-amber-700 dark:text-amber-300">{script.renderSubmissionKey ? '视频提交结果未确认。将按已保存的提交标识查询原任务，不会另外创建计费任务。' : '视频提交结果未确认。已有回执时仅查询原任务；没有回执时请核对服务端生成记录，当前项目不会自动重投，以免重复计费。'}</p>}
+      {singleDelivery && script.renderStatus === 'failed' && resultUrl && <p className="rounded-xl bg-black/[0.04] p-4 text-xs leading-6 text-slate-600 dark:bg-white/[0.04] dark:text-slate-300">本次生成失败，下面仍是之前保留的成片，没有被这次任务替换。</p>}
+      {singleDelivery && issue && <p role="alert" className="rounded-xl bg-rose-500/10 p-4 text-xs leading-6 text-rose-500">{issue}</p>}
+      {singleDelivery && (script.renderTaskId || script.renderSubmissionKey) && <dl aria-label="任务核对信息" className={`${salesCardClass} space-y-2 break-all p-4 text-xs text-slate-500`}>
+        <div><dt>提交标识</dt><dd className="mt-1 select-all">{script.renderSubmissionKey || '历史任务未记录'}</dd></div>
+        <div><dt>上游任务 ID</dt><dd className="mt-1 select-all">{script.renderTaskId || '尚未返回，请凭提交标识核对渠道记录'}</dd></div>
+        {script.renderSnapshot?.model && <div><dt>提交模型</dt><dd className="mt-1">{script.renderSnapshot.model}</dd></div>}
+      </dl>}
+      {singleDelivery && script.renderStatus === 'uncertain' && !script.renderTaskId && onPrepareRetry && <details className="text-xs text-slate-500"><summary className="cursor-pointer">已向渠道人工核对？</summary><p className="my-3 leading-6">仅在渠道明确确认没有创建任务后，才能另建草稿。原记录与提示词继续保留。</p><button type="button" disabled={isRendering} onClick={onPrepareRetry} className={`min-h-9 ${salesGhostButtonClass}`}>已核实未提交，准备新草稿</button></details>}
       {resultUrl && <div className="flex justify-center rounded-2xl bg-black/[0.035] p-3 dark:bg-black/20"><video src={resultUrl} controls playsInline className={`rounded-xl ring-1 ring-black/[0.06] dark:ring-white/[0.08] ${salesPreviewClass(aspectRatio, 'hero')}`} /></div>}
+      {resultUrl && shots.some((shot) => shot.speechMode === 'on_camera') && <p className="text-xs leading-6 text-slate-500">预览时请听看出镜段：人物是否亲口说话、每个字与嘴唇开合是否同步、停顿是否停嘴、转身前是否说完。生成成功表示已返回视频，口型仍需看成片确认。</p>}
       {!singleDelivery && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {shots.map((shot, index) => (
-            <ShotResult key={shot.shotId || index} shot={shot} index={index} title={script.title} aspectRatio={aspectRatio} disabled={isRendering} onRetry={() => onRetryShot(index)} />
+            <ShotResult key={shot.shotId || index} shot={shot} index={index} title={script.title} aspectRatio={aspectRatio} />
           ))}
         </div>
       )}
@@ -69,18 +78,15 @@ export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase
   );
 }
 
-function ShotResult({ shot, index, title, aspectRatio, disabled, onRetry }: { shot: VideoSalesShot; index: number; title: string; aspectRatio: string; disabled: boolean; onRetry: () => void }) {
+function ShotResult({ shot, index, title, aspectRatio }: { shot: VideoSalesShot; index: number; title: string; aspectRatio: string }) {
   const label = salesShotStatusLabel(shot.status, Boolean(shot.assetUrl));
   return (
     <article className={`${salesCardClass} p-3`}>
       <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-[#8E8E93]"><span>镜头 {index + 1}</span><span>{label}</span></div>
       {shot.assetUrl ? <video src={shot.assetUrl} muted playsInline controls className={`rounded-xl ${salesPreviewClass(aspectRatio, 'shot')}`} /> : shot.referenceFrameUrl ? <img src={shot.referenceFrameUrl} alt="场景参考图" className={`rounded-xl object-cover ${salesPreviewClass(aspectRatio, 'shot')}`} /> : <div className={`flex items-center justify-center rounded-xl bg-black/[0.04] text-[11px] text-slate-500 dark:bg-white/[0.06] dark:text-[#8E8E93] ${salesPreviewClass(aspectRatio, 'shot')}`}>{shot.status === 'redrawing' ? '正在重绘参考图' : '待生成'}</div>}
-      {shot.status === 'uncertain' && <p className="mt-2 text-[11px] leading-relaxed text-amber-600 dark:text-amber-300">提交结果未确认。重新提交可能重复计费，请先核对这个镜头是否已经生成。</p>}
+      {shot.status === 'uncertain' && <p className="mt-2 text-[11px] leading-relaxed text-amber-600 dark:text-amber-300">这个历史镜头的提交结果未确认。当前流程不再重新提交单镜，请核对生成记录。</p>}
       {shot.failReason && <p className="mt-2 text-[11px] text-rose-500">{shot.failReason}</p>}
-      <div className="mt-2 flex gap-3 text-[11px]">
-        {shot.status !== 'generating' && shot.status !== 'redrawing' && <button type="button" disabled={disabled} onClick={onRetry} className="inline-flex cursor-pointer items-center gap-1 font-medium text-slate-800 disabled:opacity-40 dark:text-[#EDEDED]"><RotateCcw className="h-3 w-3" />{shot.status === 'uncertain' ? '确认后重新提交' : '重试这个镜头'}</button>}
-        {shot.assetUrl && <a href={shot.assetUrl} download={`${title || '带货视频'}-镜头${index + 1}.mp4`} className="inline-flex items-center gap-1 font-semibold text-slate-500"><Download className="h-3 w-3" />下载</a>}
-      </div>
+      {shot.assetUrl && <a href={shot.assetUrl} download={`${title || '带货视频'}-镜头${index + 1}.mp4`} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500"><Download className="h-3 w-3" />下载</a>}
     </article>
   );
 }

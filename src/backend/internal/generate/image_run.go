@@ -204,6 +204,23 @@ func imageReferences(payload map[string]json.RawMessage) []string {
 		seen[value] = struct{}{}
 		out = append(out, value)
 	}
+	// Workshop reference numbers are explicit: preserve slots even when images repeat.
+	if _, exists := payload["compositionReferenceImages"]; exists {
+		ordered := []string{}
+		for _, key := range []string{"productReferenceImages", "compositionReferenceImages"} {
+			var items []string
+			_ = json.Unmarshal(payload[key], &items)
+			for _, item := range items {
+				if value := normalizeImageRef(item); value != "" {
+					ordered = append(ordered, value)
+				}
+			}
+		}
+		if face := normalizeImageRef(rawString(payload, "anchorFaceImageUrl")); face != "" {
+			ordered = append(ordered, face)
+		}
+		return ordered
+	}
 	for _, key := range []string{"productImageUrl", "referenceImageUrl", "anchorFaceImageUrl", "sceneAnchorImageUrl"} {
 		add(rawString(payload, key))
 	}

@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"net/url"
 	"strings"
 	"sync"
 
@@ -31,8 +32,16 @@ func videoEndpointSet(family, model, mode string, images []string) ([]string, []
 		submit = []string{root + "/seedance/v3/contents/generations/tasks", root + "/v2/videos/generations"}
 		query = []string{root + "/seedance/v3/contents/generations/tasks/{taskId}", root + "/v2/videos/generations/{taskId}"}
 	case "wan":
-		submit = []string{root + "/qwen/api/v1/services/aigc/video-generation/video-synthesis", root + "/api/v1/services/aigc/video-generation/video-synthesis"}
-		query = []string{root + "/qwen/api/v1/tasks/{taskId}", root + "/api/v1/tasks/{taskId}"}
+		submit = []string{
+			root + "/wan/api/v1/services/aigc/video-generation/video-synthesis",
+			root + "/qwen/api/v1/services/aigc/video-generation/video-synthesis",
+			root + "/api/v1/services/aigc/video-generation/video-synthesis",
+		}
+		query = []string{
+			root + "/wan/api/v1/tasks/{taskId}",
+			root + "/qwen/api/v1/tasks/{taskId}",
+			root + "/api/v1/tasks/{taskId}",
+		}
 		headers["X-DashScope-Async"] = "enable"
 	case "kling":
 		mode := "text2video"
@@ -93,6 +102,39 @@ func grokSubmitPath(mode string) string {
 	default:
 		return "generations"
 	}
+}
+
+func dashscopeVideoRoute(base, protocol string) bool {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "dashscope", "qwen", "qianwen":
+		return true
+	}
+	return system.IsDashScopeGateway(base)
+}
+
+// routeWanEndpoints picks one native DashScope URL for Qianwen hosts, and passthrough
+// URLs for other gateways. Wan never uses the flat /v1/videos adapter.
+func routeWanEndpoints(base, protocol string) (submit, query []string) {
+	const submitPath = "/api/v1/services/aigc/video-generation/video-synthesis"
+	const queryPath = "/api/v1/tasks/{taskId}"
+	if dashscopeVideoRoute(base, protocol) {
+		root := system.DashScopeRoot(base)
+		return []string{root + submitPath}, []string{root + queryPath}
+	}
+	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	parsed, _ := url.Parse(root)
+	if parsed != nil && (parsed.Hostname() == "ai.comfly.org" || parsed.Hostname() == "comfly.org") {
+		return []string{root + "/qwen" + submitPath}, []string{root + "/qwen" + queryPath}
+	}
+	return []string{
+			root + "/wan" + submitPath,
+			root + "/qwen" + submitPath,
+			root + submitPath,
+		}, []string{
+			root + "/wan" + queryPath,
+			root + "/qwen" + queryPath,
+			root + queryPath,
+		}
 }
 
 func expandVideoURLs(base string, templates []string, taskID string) []string {

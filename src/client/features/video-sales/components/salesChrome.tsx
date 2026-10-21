@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { BookOpen, Check, Loader2, Plus, ShoppingBag } from 'lucide-react';
 import { StudioBrandChip } from '@client/shared/ui/studio';
 import type { VideoSalesCategory, VideoSalesScript } from '@shared/domain/video-sales';
@@ -22,7 +22,7 @@ export function salesTabClass(active: boolean): string {
   return `rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${salesFocusClass} ${active ? 'bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}`;
 }
 
-export function SalesCreationRule({ category, onOpenRules }: { category: VideoSalesCategory; onOpenRules: () => void }) {
+export function SalesCreationRule({ category }: { category: VideoSalesCategory; onOpenRules?: () => void }) {
   const rule = salesCreationRule(category);
   return (
     <div className={`flex items-start justify-between gap-3 p-3 ${salesCardClass}`}>
@@ -31,7 +31,6 @@ export function SalesCreationRule({ category, onOpenRules }: { category: VideoSa
         <p className="mt-1 text-sm font-semibold">{rule.title}</p>
         <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{rule.detail}</p>
       </div>
-      <button type="button" onClick={onOpenRules} className={`h-8 shrink-0 ${salesGhostButtonClass}`}>带货规则</button>
     </div>
   );
 }
@@ -40,13 +39,13 @@ export function SalesHistorySection({ scripts, selected, disabled, onSelect }: {
   scripts: VideoSalesScript[]; selected: number; disabled: boolean; onSelect: (index: number) => void;
 }) {
   if (scripts.length < 2) return null;
-  return <section aria-label="历史方案与任务" className="border-b border-black/5 px-6 py-4 dark:border-white/10">
-    <label className="flex items-center gap-3 text-xs text-slate-500">查看方案与历史任务
+  return <section aria-label="历史方案与任务" className="mx-3 mb-3 shrink-0 rounded-xl border border-slate-200/80 bg-white px-3 py-2 sm:mx-5 dark:border-white/10 dark:bg-[#18191c]">
+    <label className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">方案与历史任务 · {scripts.length} 份
       <select aria-label="选择历史方案" disabled={disabled} value={selected} onChange={(event) => onSelect(Number(event.target.value))} className="min-w-0 flex-1 rounded-lg border border-black/10 bg-transparent p-2 dark:border-white/10">
         {scripts.map((script, index) => <option key={script.id} value={index}>{index === 0 ? '最新' : '历史'} · {script.title}{script.renderResultUrl ? ' · 已有成片' : script.renderTaskId ? ' · 已有任务回执' : ''}{script.planStale ? ' · 方案已过期' : ''}</option>)}
       </select>
     </label>
-    <p className="mt-2 text-[11px] text-slate-500">历史成片和任务回执继续保留；过期方案需要更新，已有任务只查询原任务。</p>
+    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">各阶段均可切换查看；历史成片和任务回执继续保留。</p>
   </section>;
 }
 
@@ -68,11 +67,19 @@ interface SalesActionBarProps {
 
 export function SalesActionBar({ primary, secondary, busy, reason, note, progress }: SalesActionBarProps) {
   const uid = useId();
-  const description = [progress, reason || note].filter((value, index, values) => value && values.indexOf(value) === index).join(' · ');
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    setElapsed(0);
+    if (!busy) return;
+    const start = Date.now();
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+  const description = reason || note;
   const primaryClass = `inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-[13px] font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white ${salesFocusClass}`;
   return <footer aria-label="当前步骤操作" className="shrink-0 border-t border-slate-200/80 bg-white px-3 py-3 sm:px-5 dark:border-white/10 dark:bg-[#18191c]">
     <div className="mx-auto flex max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p id={`${uid}-reason`} role="status" aria-live="polite" className="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400">{description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
+      <div className="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400"><p id={`${uid}-reason`} role="status" aria-live="polite">{busy ? progress || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>{busy && <p className="mt-1"><span className="tabular-nums">已等待 {elapsed} 秒</span>{note ? ` · ${note}` : ''}</p>}</div>
       <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
         {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 flex-1 px-4 disabled:opacity-40 sm:flex-none ${salesGhostButtonClass}`}>{secondary.label}</button>}
         {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} aria-describedby={`${uid}-reason`} className={`${primaryClass} flex-1 sm:flex-none`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} flex-1 sm:flex-none`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{primary.label}</button>}

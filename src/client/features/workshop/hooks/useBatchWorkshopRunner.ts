@@ -147,6 +147,15 @@ export function useBatchWorkshopRunner() {
     setSelectedArchId(id);
     invalidateWorkshopConfig('architecture');
   };
+  useEffect(() => {
+    const applied = () => {
+      analyzeConfigRevisionRef.current += 1;
+      setItems(previous => applyInvalidationToItems(previous, { type: 'architecture' }));
+      setStoryboardRevision(revision => revision + 1);
+    };
+    window.addEventListener('workshop-skill-applied', applied);
+    return () => window.removeEventListener('workshop-skill-applied', applied);
+  }, [setItems]);
   const changeSelectedShotCount = (count: number) => {
     if (count === selectedShotCount) return;
     setSelectedShotCount(count);

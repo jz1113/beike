@@ -46,7 +46,7 @@ describe('sales rule groups', () => {
   });
 
   it('documents ordered stages, final output and delivery checks', () => {
-    for (const section of ['适用范围', '输入与事实依据', '执行流程', '口播论证', '素材与参考规则', '输出与阶段区分', '费用与恢复', '交付自检']) {
+    for (const section of ['适用范围', '输入与事实依据', '执行流程', '口播', '素材与参考规则', '输出与阶段区分', '参考成片吸收', '费用与恢复', '交付自检']) {
       expect(SALES_SKILL_DOCUMENT.body).toContain(`## ${section}`);
     }
     expect(source.indexOf('**自动生图并校验**')).toBeLessThan(source.indexOf('**实际图片定稿**'));
@@ -75,11 +75,14 @@ describe('sales rule groups', () => {
     expect(source).toContain('画面无字幕、贴纸、大字标题或价格条');
     expect(source).toContain('口播不出现价格或金额');
     expect(source).toContain('没有依据的功效、评价、销量、实测、优惠、尺码或链接不编造');
-    expect(source).toContain('15秒全片写70–100个汉字');
-    expect(source).toContain('5秒写23–33个字');
-    expect(source).toContain('购买理由从一条事实推到穿着或使用后果');
-    expect(source).toContain('每一段同时有卖点和看点');
-    expect(source).toContain('可以直接入手、简单好搭、值得入、基础百搭不算收尾');
+    expect(source).toContain('15秒全片写48–69个汉字');
+    expect(source).toContain('约每秒 3.2–4.6 个字');
+    expect(source).toContain('单段不超过约每秒 6 个字');
+    expect(source).toContain('对镜头说的第一人称');
+    expect(source).toContain('可以直接入手、简单好搭、值得入、基础百搭、闭眼入不算收尾');
+    expect(source).toContain('语速略慢，一句说完停半拍，嘴型与原文对齐');
+    expect(source).toContain('参考成片吸收');
+    expect(source).toContain('不认第二套、第三套');
     expect(source).toContain('不写换装或面料飘动');
   });
 });

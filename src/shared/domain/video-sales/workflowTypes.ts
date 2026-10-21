@@ -18,6 +18,7 @@ export interface SalesCreativeAsset {
   url?: string;
   status?: 'pending' | 'generating' | 'done' | 'failed' | 'uncertain';
   validation?: 'pending' | 'passed' | 'conflict' | 'uncertain';
+  validationSource?: 'manual' | 'model';
   validationReason?: string;
   error?: string;
   sourceRevision?: string;
@@ -42,4 +43,5 @@ export interface SalesVideoSnapshot {
   aspectRatio: string;
   resolution: string;
   refMode: string;
+  submissionKey?: string;
 }

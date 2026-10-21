@@ -125,6 +125,15 @@ func TestWorkflowAllCategoriesFinalizeOneVideoWithoutStillPrompts(t *testing.T) 
 						t.Errorf("unexpected %s", forbidden)
 					}
 				}
+				if category == "fashion" {
+					for _, expected := range []string{"语速略慢", "生活 vlog", "嘴型与原文对齐"} {
+						if !strings.Contains(text, expected) {
+							t.Errorf("fashion finalize missing %s", expected)
+						}
+					}
+				} else if strings.Contains(text, "语速略慢") || strings.Contains(text, "生活 vlog") {
+					t.Errorf("non-fashion finalize included the fashion architecture")
+				}
 				return `{"fullPrompt":"实拍桌面，保持白色商品，整段口播","prompts":[{"shotId":1,"prompt":"推近白色商品"}]}`
 			})
 			payload := workflowPayload()

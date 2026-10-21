@@ -159,6 +159,7 @@ func runProductAnalysis(ctx context.Context, base, key, model string, facts anal
 	batches := chunkImages(images, visionBatchSize)
 	parts := make([]ProductAnalysisResult, 0, len(batches))
 	var raw map[string]any
+	usage := map[string]any{}
 	for index, batch := range batches {
 		content, nextRaw, status, err := postChatJSON(ctx, base, key, analyzeChatBody(model, facts, batch, index+1, len(batches)), productAnalysisTimeout)
 		if err != nil || status < 200 || status >= 300 {
@@ -170,9 +171,10 @@ func runProductAnalysis(ctx context.Context, base, key, model string, facts anal
 		}
 		parts = append(parts, parsed)
 		raw = nextRaw
+		addSalesUsage(usage, nextRaw)
 	}
 	if len(parts) == 1 {
-		return parts[0], raw, nil
+		return parts[0], salesUsageResult(raw, usage), nil
 	}
 	encoded, err := json.Marshal(parts)
 	if err != nil {
@@ -186,7 +188,8 @@ func runProductAnalysis(ctx context.Context, base, key, model string, facts anal
 	if decodeErr != nil {
 		return ProductAnalysisResult{}, nil, analysisCallError("summarize", 0, len(batches), 0, decodeErr)
 	}
-	return parsed, nextRaw, nil
+	addSalesUsage(usage, nextRaw)
+	return parsed, salesUsageResult(nextRaw, usage), nil
 }
 
 func decodeAnalysis(content string) (ProductAnalysisResult, error) {
@@ -226,7 +229,7 @@ func analysisSystemPrompt(category string) string {
 	if category != "fashion" {
 		return base
 	}
-	return base + " 当前商品属于服饰、鞋、包。knownFacts 只写颜色、版型、面料、结构等看得见或资料里有的事实。sellingPoints 至少写两条能分开念的卖点，每条写成「可见事实 → 看点位置 → 穿着后果」：看点是画面里指得着的一处，穿着后果是少做哪一步、适合什么场合、怎么和已有衣服搭配，并写明依据；推不出穿着后果就不要写成卖点。usageScenarios 与 painPoints 只从品名、季节和品类推出。creativeNotes 与 videoSuggestions 只在开箱换装、生活穿搭、鞋包展示中给出拍摄方向，keyVisuals 只列口播要对着讲的看点。不编造功效、评价、销量、实测、优惠、尺码或价格。"
+	return base + " 当前商品属于服饰、鞋、包。knownFacts 只写颜色、版型、面料、结构等看得见或资料里有的事实。sellingPoints 至少写两条能分开说的事实，每条写成嘴里能说出来的穿着场合或搭配，并写明依据；推不出场合或搭配就不要写成卖点。不要写成必须照念的论证箭头。usageScenarios 与 painPoints 只从品名、季节和品类推出。creativeNotes 与 videoSuggestions 只在开箱换装、生活穿搭、鞋包展示中给出生活实拍方向，keyVisuals 只列画面里真的会给观众看的一处。不编造功效、评价、销量、实测、优惠、尺码或价格。" + "\n" + fashionFramingRules()
 }
 
 func analysisSummaryPrompt(category string) string {
@@ -234,13 +237,13 @@ func analysisSummaryPrompt(category string) string {
 	if category != "fashion" {
 		return base
 	}
-	return base + " 合并时保持服饰约束：knownFacts 只保留颜色、版型、面料、结构等可见事实；sellingPoints 保留「可见事实 → 看点位置 → 穿着后果」并带依据，没有依据的穿着后果删掉，至少留下两条能分开念的卖点；usageScenarios 与 painPoints 只保留能从品名、季节或品类推出的场合。拍摄建议只保留开箱换装、生活穿搭或鞋包展示，keyVisuals 只保留口播要对着讲的看点，不新增功效、评价、销量、实测、优惠、尺码或价格。"
+	return base + " 合并时保持服饰约束：knownFacts 只保留颜色、版型、面料、结构等可见事实；sellingPoints 保留能说出口的穿着场合或搭配并带依据，推不出场合或搭配的删掉，至少留下两条能分开说的事实，不要保留论证箭头；usageScenarios 与 painPoints 只保留能从品名、季节或品类推出的场合。拍摄建议只保留开箱换装、生活穿搭或鞋包展示，keyVisuals 只保留画面里真的会给观众看的一处，不新增功效、评价、销量、实测、优惠、尺码或价格。" + "\n" + fashionFramingRules()
 }
 
 func analysisJSONShape(category string) string {
 	points := "卖点"
 	if category == "fashion" {
-		points = "可见事实，看点位置，穿着后果"
+		points = "能说出口的穿着场合或搭配"
 	}
 	return `输出格式：{"productName":"","category":"","brand":"","visualFeatures":{"mainColor":"","designStyle":"","productForm":"","texture":""},"sellingPoints":["` + points + `"],"targetAudience":"","usageScenarios":["场景"],"painPoints":["痛点"],"knownFacts":["资料或图片中可见的事实"],"creativeNotes":["拍摄建议，不是商品事实"],"videoSuggestions":{"recommendedAngles":["角度"],"keyVisuals":["焦点"],"suggestedStyle":""}}`
 }
@@ -249,7 +252,7 @@ func chatBody(model, system string, user any, temperature float64) map[string]an
 	return map[string]any{
 		"model": model,
 		"messages": []map[string]any{
-			{"role": "system", "content": system},
+			{"role": "system", "content": system + "\n" + compactJSONRules},
 			{"role": "user", "content": user},
 		},
 		"temperature":     temperature,

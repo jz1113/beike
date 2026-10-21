@@ -36,6 +36,22 @@ function doneReceipt(item: SalesImageBatchItem): SalesImageBatchReceipt {
 }
 
 describe('automatic creative images', () => {
+  it('keeps receipt keys uncertain after stopping a submission without permitting a new task', async () => {
+    const h = harness();
+    let aborted = false;
+    const submitBatch = vi.fn(async () => { aborted = true; throw new DOMException('已停止', 'AbortError'); });
+    await expect(prepareSalesCreativeAssets({ ...h.job(), autoValidate: false, isAborted: () => aborted }, client({ submitBatch }), h.validate)).rejects.toThrow('已停止');
+    expect(h.current().assets?.every((asset) => asset.status === 'uncertain' && asset.submissionKey)).toBe(true);
+    await expect(prepareSalesCreativeAssets({ ...h.job(), autoValidate: false }, client({ submitBatch }), h.validate)).rejects.toThrow('不能自动重投');
+    expect(submitBatch).toHaveBeenCalledTimes(1);
+  });
+  it('leaves a single creation ready for human confirmation without calling visual validation', async () => {
+    const h = harness();
+    await prepareSalesCreativeAssets({ ...h.job(), autoValidate: false }, client({ submitBatch: async (items) => items.map(doneReceipt) }), h.validate);
+    expect(h.current().assets?.every((asset) => asset.status === 'done')).toBe(true);
+    expect(h.validate).not.toHaveBeenCalled();
+    expect(h.current().assetValidation).not.toBe('passed');
+  });
   it('generates without human uploads, injects the selected product, and validates actual image URLs', async () => {
     const h = harness();
     const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map(doneReceipt));

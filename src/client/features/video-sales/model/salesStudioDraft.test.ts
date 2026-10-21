@@ -25,7 +25,7 @@ function populatedDraft(): VideoSalesStudioState {
     variantMetadata: { version: 1, variants: [{ id: 'black', label: '黑色', skuIds: ['sku-black'], imageUrls: ['/product.jpg'] }] },
     category: 'fashion', selectedChatModel: 'chat', selectedImageModel: 'image', selectedVideoModel: 'video',
     videoMode: 'product_closeup', targetDuration: 10, aspectRatio: '3:4',
-    videoResolution: '1080P', videoRefMode: 'first_frame', redrawScenes: false,
+    videoResolution: '1080P', videoRefMode: 'first_frame',
   };
 }
 
@@ -39,7 +39,7 @@ describe('clearing the current sales product', () => {
       ...defaultSalesStudioState,
       category: 'fashion', selectedChatModel: 'chat', selectedImageModel: 'image', selectedVideoModel: 'video',
       videoMode: original.videoMode, targetDuration: 10, aspectRatio: '3:4',
-      videoResolution: '1080P', videoRefMode: 'first_frame', redrawScenes: false,
+      videoResolution: '1080P', videoRefMode: 'first_frame',
     });
     expect(cleared.collectionSource).toBeUndefined();
     expect(cleared.fromCache).toBeUndefined();

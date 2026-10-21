@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoSalesScript } from '@shared/domain/video-sales';
-import { initialSalesNavigation, navigateSalesWorkspace, salesHasQueryableTask, salesHasRenderActivity, salesSingleResultStatus, salesStageActions, type SalesStageContext, type SalesWorkflowStep } from './salesWorkspaceView';
+import { initialSalesNavigation, restoreSalesNavigation, navigateSalesWorkspace, salesHasQueryableTask, salesHasRenderActivity, salesSingleResultStatus, salesStageActions, type SalesStageContext, type SalesWorkflowStep } from './salesWorkspaceView';
 
 const ready: SalesStageContext = {
   step: 'video', busy: false, hasScript: true, planCurrent: true, planReason: null, assetsReady: true,
@@ -9,6 +9,11 @@ const ready: SalesStageContext = {
 };
 
 describe('sales workspace navigation', () => {
+  it('restores the saved creative stage and ignores it after product reset', () => {
+    const saved = { step: 'video' as const, lastCreativeStep: 'video' as const };
+    expect(restoreSalesNavigation(saved, true, false)).toEqual(saved);
+    expect(restoreSalesNavigation(saved, false, false).step).toBe('product');
+  });
   it('starts at the available content without treating an empty draft as a result', () => {
     expect(initialSalesNavigation(false, false).step).toBe('product');
     expect(initialSalesNavigation(true, false).step).toBe('plan');
@@ -24,6 +29,29 @@ describe('sales workspace navigation', () => {
 });
 
 describe('sales stage primary actions', () => {
+  it.each<SalesWorkflowStep>(['product', 'plan', 'assets', 'video', 'result'])('keeps video stopping available from %s', (step) => {
+    const actions = salesStageActions({ ...ready, step, busy: true, rendering: true });
+    expect(actions.primary.disabled).toBe(true);
+    expect(actions.secondary).toMatchObject({ intent: 'stop', disabled: false });
+    expect(actions.reason).toBeUndefined();
+  });
+  it('prioritizes receipt queries even for stale plans and missing image models', () => {
+    const actions = salesStageActions({ ...ready, step: 'assets', planCurrent: false, imageReady: false, assetsQueryable: true });
+    expect(actions.primary).toMatchObject({ intent: 'queryAssets', disabled: false });
+    expect(actions.note).toContain('不重新生图');
+  });
+  it('blocks unknown picture submissions without offering paid retries', () => {
+    expect(salesStageActions({ ...ready, step: 'assets', assetsUnresolved: true }).primary.disabled).toBe(true);
+  });
+  it('offers human confirmation for completed pictures without requiring an image model', () => {
+    const actions = salesStageActions({ ...ready, step: 'assets', assetsReady: false, assetsGenerated: true, imageReady: false });
+    expect(actions.primary).toMatchObject({ intent: 'confirmAssets', disabled: false });
+  });
+  it('offers stopping during script and image generation instead of stale repair instructions', () => {
+    const actions = salesStageActions({ ...ready, step: 'video', busy: true, progress: '正在生成视频提示词', videoError: '旧原因' });
+    expect(actions.secondary).toMatchObject({ intent: 'stop', disabled: false });
+    expect(actions.reason).toBeUndefined();
+  });
   it('offers an enabled product entry from an empty creative stage', () => {
     const actions = salesStageActions({ ...ready, step: 'assets', hasScript: false });
     expect(actions.primary).toMatchObject({ intent: 'product', disabled: false });

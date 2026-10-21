@@ -46,7 +46,7 @@ function fashionState(): VideoSalesStudioState {
     ...product, draftVersion: 3, category: 'fashion', sellingPoints: '圆领', props: product.props,
     colorSelection: { variantId: 'black', colorLabel: '黑色', confirmedImageUrls: [], excludedImageUrls: [] },
     fashionRefs: { personUrl: '', faceUrl: '', sceneUrl: '' }, videoMode: 'product_closeup', targetDuration: 15,
-    aspectRatio: '9:16', videoResolution: '720P', videoRefMode: 'omni', redrawScenes: true,
+    aspectRatio: '9:16', videoResolution: '720P', videoRefMode: 'omni',
     selectedChatModel: 'vision-test', selectedImageModel: 'image-test', selectedVideoModel: 'kling-video-v3-omni',
     scripts: [], selectedScriptIndex: 0, analysis: null, composedResultUrl: null,
   };
@@ -59,7 +59,7 @@ async function readyFashion() {
   const plan = await buildSalesPlan({
     productName: state.productName, brand: state.brand, category: 'fashion', sellingPoints: state.sellingPoints,
     imageCatalog: images, selectedColor: '黑色', aspectRatio: state.aspectRatio,
-    targetDuration: 15, videoMode: state.videoMode, redrawScenes: true, route: { model: 'vision-test' }, onPhase: (phase) => phases.push(phase),
+    targetDuration: 15, videoMode: state.videoMode, route: { model: 'vision-test' }, onPhase: (phase) => phases.push(phase),
   }, planApi);
   let script: VideoSalesScript = { ...plan.script, id: 'plan', planRevision: salesPlanInputRevision(state) };
   const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const })));
@@ -75,7 +75,7 @@ async function readyFashion() {
     ...script, fullPrompt: finalized.fullPrompt, assetValidation: 'passed',
     shots: script.shots.map((item) => ({ ...item, finalPrompt: finalized.prompts.find((prompt) => prompt.shotId === item.shotId)?.prompt, promptStale: false })),
   };
-  script = { ...script, finalizedRevision: salesFinalInputRevision(state, script, 'kling-video-v3-omni') };
+  script = { ...script, finalizedRevision: salesFinalInputRevision(state, script) };
   state.analysis = plan.analysis;
   state.scripts = [script];
   return { state, get script() { return script; }, setScript: (next: VideoSalesScript) => { script = next; }, phases, images, references, submitBatch };
@@ -104,7 +104,7 @@ describe('offline video sales workflow', () => {
     expect(ready.images.map((image) => image.url)).toEqual(['https://example.com/black.jpg']);
     expect(analyzeProductMedia).toHaveBeenCalledWith(expect.objectContaining({ selectedColor: '黑色', eligibleImageIndexes: [7], imageCatalog: ready.images }));
     expect(generateSalesScripts).toHaveBeenCalledWith(expect.objectContaining({ category: 'fashion', selectedColor: '黑色' }));
-    expect(selectSalesImages).toHaveBeenCalledWith(expect.objectContaining({ imageCatalog: ready.images }));
+    expect(selectSalesImages).not.toHaveBeenCalled();
     expect(finalizeSalesPrompts).not.toHaveBeenCalledWith(expect.objectContaining({ imageCatalog: expect.arrayContaining([expect.objectContaining({ url: 'https://example.com/white.jpg' })]) }));
     expect(ready.references.map((ref) => ref.url)).toEqual(['https://example.com/black.jpg', '/person.jpg', '/face.jpg']);
     expect(ready.submitBatch.mock.calls.map((call) => call[0].map((item) => item.id))).toEqual([['person'], ['face']]);
@@ -131,7 +131,7 @@ describe('offline video sales workflow', () => {
     const plan = await buildSalesPlan({
       productName: '纸巾', brand: '', category: 'other', sellingPoints: '', selectedColor: '白色',
       imageCatalog: eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
-      targetDuration: 15, videoMode: 'product_closeup', redrawScenes: true, route: { model: 'vision-test' }, onPhase: vi.fn(),
+      targetDuration: 15, videoMode: 'product_closeup', route: { model: 'vision-test' }, onPhase: vi.fn(),
     }, planApi);
     expect(plan.script.assets?.map((asset) => asset.kind)).toEqual(['scene']);
     expect(plan.script.assets?.[0].usesProduct).toBeFalsy();
@@ -143,7 +143,7 @@ describe('offline video sales workflow', () => {
     const ready = await readyFashion();
     ready.setScript({ ...ready.script, assetValidation: 'conflict' });
     ready.state.scripts = [ready.script];
-    expect(salesSingleVideoError(ready.state, ready.script, true)).toContain('校验');
+    expect(salesSingleVideoError(ready.state, ready.script, true)).toContain('确认图片');
     const stale = invalidateSalesState(ready.state, { colorSelection: { variantId: 'white', colorLabel: '白色', confirmedImageUrls: [], excludedImageUrls: [] } });
     await expect(executeSalesRender({
       resumeOnly: false, signal: new AbortController().signal, script: ready.script, current: stale, getState: () => stale,
@@ -197,7 +197,13 @@ describe('offline video sales workflow', () => {
     }, renderApi)).rejects.toThrow('回执未确认');
     expect(script.renderStatus).toBe('uncertain');
     expect(script.renderTaskId).toBeUndefined();
-    expect(salesSingleVideoError(ready.state, script, true)).toContain('核对生成记录');
+    expect(script.renderSubmissionKey).toBeTruthy();
+    const lookup = vi.fn(async () => ({ outcome: 'pending' as const, error: '原视频提交结果待核实，请稍后查询；不会自动重新提交' }));
+    await expect(executeSalesRender({
+      resumeOnly: true, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
+      replaceScript: vi.fn(), commitScript: (recipe) => { script = recipe(script); }, patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+    }, { ...renderApi, lookupSubmission: lookup })).rejects.toThrow('待核实');
+    expect(lookup).toHaveBeenCalledWith(script.renderSubmissionKey, expect.any(String), expect.any(Function));
     expect(renderSalesVideo).toHaveBeenCalledTimes(1);
   });
 });

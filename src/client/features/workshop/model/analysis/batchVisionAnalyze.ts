@@ -10,6 +10,7 @@ import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@shared/domain
 import { recipeKind, resolveRecipeForProduct } from '@shared/domain/products/productRecipeSelection';
 import { isAutoPromptGroupSelection, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshop-pipeline';
 import { productPropsWithCategory, type BatchProductItem } from '../batchTypes';
+import { resolveAnalysisGroup, resolveAnalysisAppearance } from './resolveAnalysisGroup';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
 export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';
 
@@ -96,6 +97,10 @@ export async function analyzeBatchProduct(
       ? itemIndex
       : (deps.items ? deps.items.findIndex(p => p.id === item.id) : 0);
 
+    const resolvedGroup = resolveAnalysisGroup(deps, item, archObj, Math.max(0, computedProductIdx));
+    if (!resolvedGroup) throw new Error('没有适配当前商品的参考样本，请补充样本后重试');
+    const resolvedAppearance = resolveAnalysisAppearance(deps, resolvedGroup, Math.max(0, computedProductIdx));
+
     const isJewelryArch = recipeKind(archObj) === 'jewelry';
     const jewelryProduct = isJewelryProductTitle(item.title, item.props);
     const templateStyle = isJewelryArch && jewelryProduct
@@ -134,14 +139,16 @@ export async function analyzeBatchProduct(
           imageUrls: imagePayload,
           modelPersona: effectivePersona,
           templateStyle,
+          recipeId: archObj.id,
           useAssetLibrary: deps.useAssetLibrary !== false,
-          lockedAssets,
+          lockedAssets: { ...lockedAssets, ...resolvedAppearance, fullPromptId: resolvedGroup.id },
+          groupSelectionMode: fullPromptId ? 'manual' : 'auto',
           allocatedAssets: allocatedAsset ? {
             sceneId: allocatedAsset.scene?.id,
             outfitId: allocatedAsset.outfit?.id,
             personaId: allocatedAsset.persona?.id,
           } : undefined,
-          extraRequirements: `- 🚨【分镜数量严格保证】：必须输出完整的 ${targetShotCount} 个分镜，数组 prompts 长度必须严格等于 ${targetShotCount}！\n- 🚨【商品外观唯一锚定 @图片1】：美学置景与构图写入文字，生图只垫商品图。`,
+          extraRequirements: `- 🚨【分镜数量严格保证】：必须输出完整的 ${targetShotCount} 个分镜，数组 prompts 长度必须严格等于 ${targetShotCount}！\n- 🚨【商品外观唯一锚定 @图片1】：商品身份与参考图构图分开，保留逐镜完整反推描述，仅修改商品及其接触关系。`,
           shotCount: targetShotCount,
           model: requestModelId(deps.selectedVisionModel),
           customBaseUrl: localUrl,
@@ -283,6 +290,7 @@ export async function analyzeBatchProduct(
         appliedFullPromptAppearance: data?.assetTrace?.fullPromptAppearance,
         appliedFullPromptEligibleCount: data?.assetTrace?.fullPromptEligibleCount,
         appliedFullPromptInventoryCount: data?.assetTrace?.fullPromptInventoryCount,
+        appliedSkillSnapshot: data?.assetTrace?.skillSnapshot,
         productRole: formatted.productRole,
         productFingerprint: formatted.productFingerprint,
         lookParts: formatted.lookParts ?? lookPartsFromApi,

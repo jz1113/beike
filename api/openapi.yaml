@@ -1039,7 +1039,7 @@ components:
               maxLength: 4000
             productImages:
               type: array
-              maxItems: 10
+              maxItems: 40
               items:
                 type: string
             targetDuration:

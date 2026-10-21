@@ -108,7 +108,7 @@ func selectChatBody(model string, shots []ScriptShot, vision []CatalogImage) map
 	return map[string]any{
 		"model": model,
 		"messages": []map[string]any{
-			{"role": "system", "content": "你负责为带货分镜挑选商品参考图。不要发明目录里没有的图片编号。"},
+			{"role": "system", "content": "你负责为带货分镜挑选商品参考图。不要发明目录里没有的图片编号。" + compactJSONRules},
 			{"role": "user", "content": visionParts(intro, vision)},
 		},
 		"temperature":     0.2,

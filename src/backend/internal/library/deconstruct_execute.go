@@ -62,9 +62,8 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 	category := deconstructCategoryValue(payload)
 	parent := stringValue(payload["parentFullPromptId"])
 	sub := stringValue(payload["targetSubcategory"])
-	reviewID := ""
-	if reviewBefore {
-		reviewID = deconstructReviewID(workspace, images, fullPrompt, category, parent, sub)
+	reviewID := deconstructReviewID(workspace, images, fullPrompt, category, parent, sub)
+	if reviewBefore || len(images) >= 4 {
 		if existing, ok := existingReview(cfg, r, reviewID); ok {
 			return http.StatusOK, existing
 		}
@@ -106,15 +105,24 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 		"data": parsed, "savedRecords": map[string]any{"scenes": []any{}, "outfits": []any{}, "actions": []any{}, "fullPrompts": []any{}},
 		"stats": map[string]any{"imageCount": len(prepared), "perImageCount": len(perImage), "pass2Skipped": true, "pipelineMode": "single_vision_pass", "shardCount": 1, "visionCallCount": 1},
 	}
-	if reviewBefore {
+	if reviewBefore || len(prepared) >= 4 {
 		if fullPrompt && (len(prepared) != 4 || len(perImage) != 4) {
 			report("failed", "反推未完成，请查看任务错误信息")
 			return http.StatusUnprocessableEntity, map[string]any{"error": "四张成图未能提炼为完整母本，本次未入库，请检查后重试"}
+		}
+		resolvedCategory := category
+		if resolvedCategory == "" {
+			inferred := stringValue(parsed["product_major_category"])
+			if inferred == "jewelry" {
+				inferred = "jewelry_luxury"
+			}
+			resolvedCategory, _ = resolveMajorCategory(cfg, r, inferred)
 		}
 		stored := map[string]any{
 			"parsedResult": parsed, "perImageResults": perImage, "imageUrls": originals, "albumName": album,
 			"isSingleImage": len(prepared) == 1, "category": firstString(parsed["theme_category"], "general"),
 			"fullPromptOnly": fullPrompt, "provenance": "deconstructed", "parentFullPromptId": parent,
+			"targetProductCategory": resolvedCategory, "targetSubcategory": sub,
 		}
 		if fullPrompt {
 			stored["provenance"] = "workshop_generated"
@@ -122,17 +130,30 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 		raw, _ := json.Marshal(stored)
 		db, err := httpx.OpenDB(cfg)
 		if err != nil {
-			report("failed", "反推未完成，请查看任务错误信息")
-			return http.StatusInternalServerError, map[string]any{"success": false, "error": scrubText(err.Error(), apiKey), "code": "internal_error"}
+			return http.StatusInternalServerError, map[string]any{"success": false, "error": "参考样本保存失败，请核对审核队列"}
 		}
 		defer db.Close()
 		if err := dblibrary.InsertDeconstructReview(r.Context(), db, workspace, reviewID, album, string(raw)); err != nil {
-			report("failed", "反推未完成，请查看任务错误信息")
-			return http.StatusInternalServerError, map[string]any{"success": false, "error": scrubText(err.Error(), apiKey), "code": "internal_error"}
+			return http.StatusInternalServerError, map[string]any{"success": false, "error": "参考候选保存失败"}
 		}
-		body["previewShots"] = perImage
-		body["reviewId"] = reviewID
-		body["reviewStatus"] = "pending"
+		body["previewShots"], body["reviewId"], body["reviewStatus"] = perImage, reviewID, "pending"
+		if !reviewBefore {
+			drafts, draftErr := deconstructGroupDrafts(stored)
+			if draftErr != nil {
+				return http.StatusUnprocessableEntity, map[string]any{"error": draftErr.Error(), "reviewId": reviewID}
+			}
+			ids, saveErr := dblibrary.CommitDeconstructGroups(r.Context(), db, workspace, reviewID, drafts)
+			if saveErr != nil {
+				return http.StatusInternalServerError, map[string]any{"error": "反推已完成，样本入库失败，候选已保留：" + saveErr.Error(), "reviewId": reviewID}
+			}
+			body["fullPromptIds"], body["reviewStatus"] = ids, "approved"
+			records := []any{}
+			for _, id := range ids {
+				records = append(records, map[string]any{"id": id})
+			}
+			body["savedRecords"].(map[string]any)["fullPrompts"] = records
+			body["stats"].(map[string]any)["fullPromptsCount"] = len(ids)
+		}
 	}
 	report("completed", "反推完成")
 	return http.StatusOK, scrubSecrets(body, apiKey)
@@ -247,7 +268,7 @@ func existingReview(cfg config.Config, r *http.Request, id string) (map[string]a
 	if json.Unmarshal([]byte(payload), &stored) != nil {
 		return nil, false
 	}
-	return map[string]any{"success": true, "data": stored["parsedResult"], "previewShots": stored["perImageResults"], "reviewId": id, "reviewStatus": status, "reused": true}, true
+	return map[string]any{"success": true, "data": stored["parsedResult"], "previewShots": stored["perImageResults"], "reviewId": id, "reviewStatus": status, "fullPromptIds": stored["fullPromptIds"], "reused": true}, true
 }
 
 func deconstructReviewID(workspace string, images []string, full bool, category, parent, sub string) string {

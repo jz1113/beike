@@ -101,3 +101,14 @@ describe('image receipt recovery safety', () => {
     expect(assets[1]).toMatchObject({ status: 'failed', error: '明确失败' });
   });
 });
+
+it('recovers a stopped image submission by its key without creating another task', async () => {
+  const script: VideoSalesScript = { id: 'p', title: '', totalDuration: 15, shots: [], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' }, assets: [{ ...front, status: 'uncertain', submissionKey: 'saved-image-key' }] };
+  const updateAsset = vi.fn();
+  const generate = vi.fn(async () => '/recovered.jpg');
+  const lookup = vi.fn(async () => ({ id: 'front', taskId: 'original-image-task', outcome: 'poll' as const }));
+  await recoverSalesAssetReceipts({ script, isAborted: () => false, updateAsset }, generate, lookup);
+  expect(lookup).toHaveBeenCalledWith('saved-image-key', undefined, expect.any(Function));
+  expect(generate).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'original-image-task' }));
+  expect(updateAsset).toHaveBeenCalledWith('front', expect.objectContaining({ url: '/recovered.jpg', status: 'done' }));
+});

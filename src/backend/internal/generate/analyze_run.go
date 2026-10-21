@@ -21,8 +21,14 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		shotCount = 4
 	}
 	title := rawString(payload, "productTitle")
-	messages := []any{map[string]any{"role": "user", "content": analyzePrompt(title, rawString(payload, "productProps"), shotCount, rawString(payload, "extraRequirements"))}}
-	text, data, status, err := ChatCompletionJSON(r.Context(), base, apiKey, model, messages, 0.4, 90*time.Second)
+	binding, bindingErr := loadWorkshopBinding(cfg, r, payload)
+	if bindingErr != nil {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": bindingErr.Error()})
+		return
+	}
+	content := workshopAnalyzeContent(payload, binding, shotCount)
+	messages := []any{map[string]any{"role": "user", "content": content}}
+	text, data, status, err := ChatCompletionJSON(r.Context(), base, apiKey, model, messages, 0.4, 240*time.Second)
 	if err != nil || status >= 300 || text == "" {
 		message := "视觉分析失败"
 		if err != nil {
@@ -36,9 +42,10 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "视觉模型没有返回合法 JSON"})
 		return
 	}
-	prompts, _ := parsed["prompts"].([]any)
-	if prompts == nil {
-		prompts = []any{}
+	prompts, promptErr := finalizeWorkshopPrompts(parsed, binding, shotCount)
+	if promptErr != nil {
+		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"error": promptErr.Error()})
+		return
 	}
 	fingerprint := TextField(parsed, "productFingerprint", "product_fingerprint")
 	role := TextField(parsed, "productRole", "product_role")
@@ -64,17 +71,11 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		"actionDigest": action, "groupSignature": group,
 		"prompts": prompts, "modelUsed": model, "requestedModel": model,
 		"modelSwitched": false, "triedModels": []string{model}, "rawOutput": text,
-		"usedActionIds": []any{}, "assetTrace": nil,
-		"qualityChecks": []any{}, "usedAssetLibrary": false, "assemblySource": "model",
+		"usedActionIds": []any{}, "assetTrace": workshopTrace(binding),
+		"qualityChecks": []any{}, "usedAssetLibrary": binding != nil, "assemblySource": "reference_adaptation",
 	}
 	attachUsage(body, data)
 	httpx.WriteJSON(w, http.StatusOK, body)
-}
-
-func analyzePrompt(title, props string, shots int, extra string) string {
-	return "你是商品买家秀分镜策划。只返回 JSON，字段包括 productFingerprint、productRole、masterScene、lookBible、styleBible、identityBible、actionDigest、prompts。" +
-		"prompts 为长度 " + Itoa(shots) + " 的数组，每项含 shot、prompt、shotType。" +
-		"商品标题：" + title + "。商品属性：" + props + "。补充要求：" + extra + "。不要编造无法从标题确认的参数。"
 }
 
 func TextField(data map[string]any, keys ...string) string {
@@ -97,6 +98,6 @@ func saveAnalysis(cfg config.Config, r *http.Request, title, fingerprint, model 
 		title = "未命名商品"
 	}
 	_, _ = dbcatalog.CreatePromptRecord(r.Context(), db, workspaceOf(r), dbcatalog.PromptDraft{
-		ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "📱 真实手机买家秀", PromptsJSON: string(raw),
+		ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "参考样本换品", PromptsJSON: string(raw),
 	})
 }

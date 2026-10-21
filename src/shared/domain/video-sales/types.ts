@@ -49,6 +49,9 @@ export interface VideoSalesTextOverlay {
   style: 'title' | 'subtitle' | 'highlight' | 'price';
 }
 
+/** 声音来源：出镜人物现场说话，或明确的画外音。旧脚本可暂未标注。 */
+export type VideoSalesSpeechMode = 'on_camera' | 'voiceover';
+
 /** 单个分镜定义 */
 export interface VideoSalesShot {
   shotId: number;
@@ -58,7 +61,8 @@ export interface VideoSalesShot {
   camera: string; // 运镜描述（如：特写推近、俯拍全景）
   visualSource: VideoSalesVisualSource;
   transition: VideoSalesTransition;
-  voiceover: string; // 播报文案。服饰每段同时写卖点和看点，约每秒 4.7–6.7 字，15 秒为 70–100 字；其他品类约每秒 3–4 字
+  speechMode?: VideoSalesSpeechMode;
+  voiceover: string; // 台词原文，声音来源由 speechMode 指定。服饰是对镜头的口语，全片约每秒 3.2–4.6 字，15 秒为 48–69 字，单段不超过约每秒 6 字；其他品类约每秒 3–4 字
   prompt?: string; // 图生视频画面提示词，不包含字幕或大字
   imagePrompt?: string; // 场景镜静帧绘图提示词，按该镜脚本写成
   finalPrompt?: string;
@@ -104,6 +108,7 @@ export interface VideoSalesScript {
   assets?: SalesCreativeAsset[];
   assetValidation?: 'pending' | 'passed' | 'conflict' | 'uncertain';
   finalizedRevision?: string;
+  finalStaleReason?: string;
   renderSnapshot?: SalesVideoSnapshot;
   renderResultUrl?: string;
   renderError?: string;
@@ -113,6 +118,7 @@ export interface VideoSalesScript {
   personFrameUrl?: string;
   sceneFrameUrl?: string;
   renderTaskId?: string;
+  renderSubmissionKey?: string;
   renderStatus?: 'pending' | 'generating' | 'done' | 'failed' | 'uncertain';
 }
 

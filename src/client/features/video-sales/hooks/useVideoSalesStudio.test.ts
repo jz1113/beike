@@ -88,6 +88,25 @@ describe('video sales clear current product safety', () => {
       collectionSource: '缓存', fromCache: true, detailsMissing: true,
     });
   });
+  it('requires manual verification before making an unsubmitted retry draft and never generates automatically', async () => {
+    const project = existingProject();
+    const original = project.scripts[project.selectedScriptIndex];
+    original.renderStatus = 'uncertain';
+    original.renderTaskId = undefined;
+    original.renderSubmissionKey = 'original-submission';
+    original.fullPrompt = '已有完整提示词';
+    vi.mocked(readSalesStudioDraft).mockReturnValue(project);
+    const studio = StudioHarness();
+    vi.mocked(confirmAction).mockResolvedValueOnce(false);
+    expect(await studio.prepareVideoRetry()).toBe(false);
+    expect(commits.states).toHaveLength(0);
+    expect(await studio.prepareVideoRetry()).toBe(true);
+    const next = latestCommit();
+    expect(next.scripts[0]).toMatchObject({ renderStatus: 'pending', fullPrompt: '已有完整提示词' });
+    expect(next.scripts[0].renderSubmissionKey).toBeUndefined();
+    expect(next.scripts.find((item) => item.id === original.id)?.renderSubmissionKey).toBe('original-submission');
+    expect(executeSalesRender).not.toHaveBeenCalled();
+  });
 
   it('asks for confirmation and clears all product content but retains preferences', async () => {
     const studio = StudioHarness();

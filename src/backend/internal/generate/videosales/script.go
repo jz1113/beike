@@ -20,6 +20,7 @@ type ScriptShot struct {
 	VisualSource    string            `json:"visualSource"`
 	Transition      string            `json:"transition"`
 	Voiceover       string            `json:"voiceover"`
+	SpeechMode      string            `json:"speechMode,omitempty"`
 	Prompt          string            `json:"prompt,omitempty"`
 	ImageIndex      int               `json:"imageIndex"`
 	SelectionReason string            `json:"selectionReason,omitempty"`

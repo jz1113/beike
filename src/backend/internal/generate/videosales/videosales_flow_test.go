@@ -134,7 +134,7 @@ func TestFashionScriptPromptLocksReferences(t *testing.T) {
 	body := workflowScriptBody("gemini", map[string]any{"productName": "衬衫", "category": "fashion"}, nil, 15, "9:16")
 	encoded, _ := json.Marshal(body)
 	text := string(encoded)
-	for _, piece := range []string{"开箱换装", "生活穿搭", "鞋包展示", "usesProduct"} {
+	for _, piece := range []string{"开箱换装", "生活穿搭", "鞋包展示", "usesProduct", "中景", "不写秒数"} {
 		if !strings.Contains(text, piece) {
 			t.Fatalf("missing %s", piece)
 		}

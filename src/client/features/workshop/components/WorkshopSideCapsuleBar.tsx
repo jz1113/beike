@@ -12,7 +12,7 @@ export interface WorkshopSideCapsuleBarProps {
 const tabs = [
   { id: 'studio', label: '创作工作台', icon: Sparkles },
   { id: 'prompt_assets', label: '提示词资产库', icon: Type },
-  { id: 'recipes', label: '拍摄架构', icon: Camera },
+  { id: 'recipes', label: '类目技能', icon: Camera },
 ] as const;
 
 export function WorkshopSideCapsuleBar({ activeTab, onSelectTab, className = '' }: WorkshopSideCapsuleBarProps) {

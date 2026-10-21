@@ -48,7 +48,7 @@ export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, ta
     const nextResolution = salesResolveResolution(modelId, resolution);
     const patch: { videoRefMode?: SalesVideoRefMode; videoResolution?: string } = {};
     if (nextMode !== refMode) patch.videoRefMode = nextMode;
-    if (nextResolution !== resolution) patch.videoResolution = nextResolution;
+    if (nextResolution.toUpperCase() !== (resolution || '').toUpperCase()) patch.videoResolution = nextResolution;
     if (patch.videoRefMode || patch.videoResolution) onChange(patch);
   }, [modelId, refMode, resolution, onChange]);
 

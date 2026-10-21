@@ -48,6 +48,10 @@ export interface VisionAnalyzeParams {
 }
 
 export interface ShotPrompt {
+  sourceReferenceImageUrl?: string;
+  sourceShotNo?: number;
+  sourcePrompt?: string;
+  sourceGroupId?: string;
   assembly_source?: 'group_skeleton' | 'architecture' | 'fallback';
   shot_no: number;
   title?: string;

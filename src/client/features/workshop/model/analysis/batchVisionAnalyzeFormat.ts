@@ -51,6 +51,10 @@ export function formatAnalyzedStoryboard(opts: {
           title: p.title, has_human: isHumanShot, promptFallback: rawPrompt,
         }, { hasFace: false, skipRichPrompt: true });
     return {
+      sourceReferenceImageUrl: p.sourceReferenceImageUrl,
+      sourceShotNo: p.sourceShotNo,
+      sourcePrompt: p.sourcePrompt,
+      sourceGroupId: p.sourceGroupId,
       assembly_source: p.assembly_source,
       shot_no: p.shot_no || idx + 1,
       title: p.title || `分镜 ${idx + 1}`,

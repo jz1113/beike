@@ -1,7 +1,7 @@
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
 import { salesActualReferences, type VideoSalesScript, type VideoSalesShot } from '@shared/domain/video-sales';
 import { renderSalesVideo, type SalesRenderGenerators, type SalesRenderPhase } from './renderSalesVideo';
-import { SalesSubmitUncertainError } from './salesSubmitError';
+import { SalesSubmitUncertainError, type SalesVideoLookup } from './salesSubmitError';
 import { assertSalesPlanCurrent, salesSingleVideoError } from './salesStageRules';
 import type { VideoSalesStudioState } from './salesStudioDraft';
 
@@ -15,13 +15,15 @@ export async function executeSalesRender(input: {
   getState: () => SalesRenderSnapshot;
   replaceScript: (script: VideoSalesScript) => void;
   commitScript: (recipe: (script: VideoSalesScript) => VideoSalesScript, extra?: { composedResultUrl?: string | null }) => void;
+  persistScript?: (recipe: (script: VideoSalesScript) => VideoSalesScript, extra?: { composedResultUrl?: string | null }) => void;
   patchShot: (index: number, patch: Partial<VideoSalesShot>) => void;
   onPhase: (phase: SalesRenderPhase) => void;
   onPromptPhase: () => void;
   onResult: (url: string) => void;
 }, generators: SalesRenderGenerators): Promise<void> {
   const { script, current } = input;
-  const resumeTask = script.renderTaskId && (script.renderStatus === 'generating' || script.renderStatus === 'uncertain');
+  const open = script.renderStatus === 'generating' || script.renderStatus === 'uncertain';
+  const resumeTask = script.renderTaskId && open;
   if (resumeTask) {
     input.onPhase('generating');
     // Query a receipt before checking today's draft: already-submitted work keeps its original inputs.
@@ -42,29 +44,35 @@ export async function executeSalesRender(input: {
     }
     return;
   }
-  if (input.resumeOnly) {
-    if (script.shots.some((shot) => shot.taskId && shot.status === 'generating')) {
-      const url = await renderSalesVideo({
-        shots: script.shots, images: current.productImages, videoModel: current.selectedVideoModel,
-        aspectRatio: current.aspectRatio, resolution: current.videoResolution, refMode: current.videoRefMode,
-        redraw: false, resumeOnly: true, signal: input.signal,
-        getShots: () => input.getState().scripts[input.getState().selectedScriptIndex]?.shots || [],
-        patchShot: input.patchShot, onPhase: input.onPhase,
-      }, generators);
-      if (url && !input.signal.aborted) input.onResult(url);
-    }
+  if (script.renderSubmissionKey && open) {
+    const found = await recoverSalesSubmission(script, input, generators);
+    if (found !== 'missing') return;
+    if (input.resumeOnly) throw new Error('尚未找到原视频提交记录，请稍后查询；不会自动重新提交');
+  }
+  if (script.deliveryMode !== 'single') {
+    const url = await renderSalesVideo({
+      shots: script.shots, images: current.productImages, videoModel: current.selectedVideoModel,
+      aspectRatio: current.aspectRatio, resolution: current.videoResolution, refMode: current.videoRefMode,
+      redraw: false, resumeOnly: true, signal: input.signal,
+      getShots: () => input.getState().scripts[input.getState().selectedScriptIndex]?.shots || [],
+      patchShot: input.patchShot, onPhase: input.onPhase,
+    }, generators);
+    if (url && !input.signal.aborted) input.onResult(url);
     return;
   }
+  if (input.resumeOnly) return;
   const error = salesSingleVideoError(current, script, true);
   if (error) throw new Error(error);
   const images = assertSalesPlanCurrent(current, script);
   const references = salesActualReferences(script, images);
   const model = resolveModalityModelRoute('video', current.selectedVideoModel).modelId!;
+  const submissionKey = script.renderSubmissionKey && open ? script.renderSubmissionKey : crypto.randomUUID();
   const snapshot = {
     model, prompt: script.fullPrompt!, images: references.map((ref) => ref.url), duration: current.targetDuration,
-    aspectRatio: current.aspectRatio, resolution: current.videoResolution, refMode: current.videoRefMode,
+    aspectRatio: current.aspectRatio, resolution: current.videoResolution, refMode: current.videoRefMode, submissionKey,
   };
-  input.commitScript((previous) => ({ ...previous, renderStatus: 'generating', renderError: undefined, renderTaskId: undefined, renderSnapshot: snapshot }));
+  const store = input.persistScript || input.commitScript;
+  store((previous) => ({ ...previous, renderStatus: 'generating', renderError: undefined, renderTaskId: undefined, renderSubmissionKey: submissionKey, renderSnapshot: snapshot }));
   let receipt: string | undefined;
   try {
     const url = await renderSalesVideo({
@@ -74,7 +82,7 @@ export async function executeSalesRender(input: {
       getShots: () => input.getState().scripts[input.getState().selectedScriptIndex]?.shots || [],
       patchShot: input.patchShot, onPhase: input.onPhase,
       single: {
-        prompt: snapshot.prompt, images: snapshot.images, duration: snapshot.duration,
+        prompt: snapshot.prompt, images: snapshot.images, duration: snapshot.duration, submissionKey,
         onTaskId: (taskId) => { receipt = taskId; input.commitScript((previous) => ({ ...previous, renderTaskId: taskId, renderStatus: 'generating' })); },
       },
     }, generators);
@@ -89,4 +97,31 @@ export async function executeSalesRender(input: {
     }));
     throw err;
   }
+}
+
+async function recoverSalesSubmission(script: VideoSalesScript, input: Parameters<typeof executeSalesRender>[0], generators: SalesRenderGenerators): Promise<SalesVideoLookup['outcome']> {
+  if (!generators.lookupSubmission || !script.renderSubmissionKey) return 'missing';
+  const found = await generators.lookupSubmission(script.renderSubmissionKey, script.renderSnapshot?.model, () => input.signal.aborted);
+  if (found.outcome === 'done' && found.url) {
+    input.commitScript((previous) => ({ ...previous, renderTaskId: found.taskId || previous.renderTaskId, renderStatus: 'done', renderResultUrl: found.url, renderError: undefined }), { composedResultUrl: found.url });
+    if (!input.signal.aborted) input.onResult(found.url);
+    return found.outcome;
+  }
+  if (found.outcome === 'poll' && found.taskId) {
+    input.commitScript((previous) => ({ ...previous, renderTaskId: found.taskId, renderStatus: 'generating', renderError: undefined }));
+    const snapshot = script.renderSnapshot;
+    const url = await generators.generateVideo({
+      existingTaskId: found.taskId, prompt: snapshot?.prompt || '', duration: snapshot?.duration || script.totalDuration,
+      videoModel: snapshot?.model, isAborted: () => input.signal.aborted,
+    });
+    input.commitScript((previous) => ({ ...previous, renderStatus: 'done', renderResultUrl: url, renderError: undefined }), { composedResultUrl: url });
+    if (!input.signal.aborted) input.onResult(url);
+    return found.outcome;
+  }
+  if (found.outcome === 'failed') {
+    input.commitScript((previous) => ({ ...previous, renderTaskId: found.taskId, renderStatus: 'failed', renderError: found.error || '视频生成失败' }));
+    throw new Error(found.error || '视频生成失败');
+  }
+  if (found.outcome === 'pending') throw new Error(found.error || '原视频提交结果待核实，请稍后查询；不会自动重新提交');
+  return 'missing';
 }

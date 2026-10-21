@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SalesColorSelection, SalesCreativeAsset, SalesImageRef, VideoSalesScript } from '@shared/domain/video-sales';
 import { eligibleSalesImages } from '@shared/domain/video-sales/workflow';
 import { defaultSalesStudioState } from '../model/salesStudioDraft';
-import { SalesActionBar, SalesCreationRule, SalesStudioHeader } from './salesChrome';
+import { SalesActionBar, SalesStudioHeader } from './salesChrome';
 import { SalesPlanSection, SalesPlanningSettings, SalesPromptDetails } from './salesPlanning';
 import { SalesEmptyGuide, SalesProductFields } from './salesProductSetup';
 import { SalesAssetsSection } from './SalesAssetsSection';
@@ -17,6 +17,7 @@ const hooks = vi.hoisted(() => ({ index: 0, values: [] as unknown[] }));
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
   useId: () => 'sales-ui-test',
+  useEffect: () => {},
   useState: (initial: unknown) => {
     const index = hooks.index++;
     return [index in hooks.values ? hooks.values[index] : initial, vi.fn()];
@@ -176,8 +177,8 @@ describe('sales workflow stages', () => {
   it('keeps finalization and paid video submission as separate user actions', () => {
     const finalize = vi.fn();
     const render = vi.fn();
-    const action = SalesActionBar({ primary: { label: '定稿视频提示词', onClick: finalize }, secondary: { label: '确认生成整段视频', onClick: render } });
-    click(action, '定稿视频提示词');
+    const action = SalesActionBar({ primary: { label: '生成视频提示词', onClick: finalize }, secondary: { label: '确认生成整段视频', onClick: render } });
+    click(action, '生成视频提示词');
     expect(finalize).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
     click(action, '确认生成整段视频');
@@ -197,7 +198,7 @@ describe('sales workflow stages', () => {
     expect(fields).not.toContain('创作技能');
     expect(settings.indexOf('创作设置')).toBeLessThan(settings.indexOf('创作技能'));
     expect(settings.indexOf('创作技能')).toBeLessThan(settings.indexOf('多模态分析与口播模型'));
-    expect(settings).toContain('同一模型也负责素材校验和视频定稿');
+    expect(settings).toContain('同一模型也用于可选图片校验和视频提示词');
     expect(settings).toContain('通用制作流程');
     expect(settings).toContain('服饰专属规则');
     expect(settings).toContain('value="generic"');
@@ -208,17 +209,14 @@ describe('sales workflow stages', () => {
     expect(fields).not.toContain('价格');
     expect(fields).not.toContain('品牌未返回');
   });
-  it('locks the creation rule on the confirm guide and opens the existing rules', () => {
+  it('keeps the rule description in settings without duplicating rule buttons', () => {
     const onOpenRules = vi.fn();
-    const fashion = renderToStaticMarkup(createElement(SalesEmptyGuide, { kind: 'plan', category: 'fashion', onOpenRules }));
-    const generic = renderToStaticMarkup(createElement(SalesPlanningSettings, { state: { ...defaultSalesStudioState, category: 'home' }, disabled: false, onOpenRules, onChange: vi.fn() }));
-    expect(fashion).toContain('服饰专属规则');
-    expect(fashion).toContain('带货规则');
-    expect(generic).toContain('全品类通用流程');
-    expect(generic).not.toContain('开箱换装');
-    const rule = nodes(SalesEmptyGuide({ kind: 'plan', category: 'fashion', onOpenRules })).find((item) => item.type === SalesCreationRule);
-    click(SalesCreationRule(rule!.props as { category: 'fashion'; onOpenRules: () => void }), '带货规则');
-    expect(onOpenRules).toHaveBeenCalledTimes(1);
+    const guide = renderToStaticMarkup(createElement(SalesEmptyGuide, { kind: 'plan', category: 'fashion', onOpenRules }));
+    const settings = renderToStaticMarkup(createElement(SalesPlanningSettings, { state: { ...defaultSalesStudioState, category: 'fashion' }, disabled: false, onOpenRules, onChange: vi.fn() }));
+    expect(guide).not.toContain('本次创作规则');
+    expect(guide).not.toContain('带货规则');
+    expect(settings).toContain('服饰专属规则');
+    expect(settings).not.toContain('>带货规则</button>');
   });
   it('keeps long prompt editing collapsed without losing the complete value', () => {
     const html = renderToStaticMarkup(createElement(SalesPromptDetails, { title: '完整提示词', value: '真实图片与一条整段视频', disabled: false, onChange: vi.fn(), copyable: true }));
@@ -265,7 +263,7 @@ describe('sales workflow stages', () => {
     expect(html).toContain('src="/person.jpg"');
   });
   it('keeps stopped or uncertain task recovery separate from duplicate controls', () => {
-    const html = renderToStaticMarkup(createElement(SalesResultSection, { script: { ...script, renderTaskId: 'receipt', renderStatus: 'uncertain' }, aspectRatio: '9:16', resultUrl: null, renderPhase: null, isRendering: false, onRetryShot: vi.fn(), onStop: vi.fn(), onCompose: vi.fn(), singleDelivery: true, actionsInFooter: true }));
+    const html = renderToStaticMarkup(createElement(SalesResultSection, { script: { ...script, renderTaskId: 'receipt', renderStatus: 'uncertain' }, aspectRatio: '9:16', resultUrl: null, renderPhase: null, isRendering: false, onStop: vi.fn(), onCompose: vi.fn(), singleDelivery: true, actionsInFooter: true }));
     expect(html).toContain('提交结果待确认');
     expect(html).toContain('不会自动重投');
     expect(html).not.toContain('继续查询原任务（不重新提交）');

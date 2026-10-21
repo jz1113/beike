@@ -73,6 +73,10 @@ func claimVideoSubmission(cfg config.Config, r *http.Request, payload map[string
 	if err != nil {
 		return videoSubmission{}, err
 	}
+	prompt := strings.TrimSpace(rawString(payload, "prompt"))
+	if prompt == "" {
+		return videoSubmission{}, errors.New("视频提示词不能为空")
+	}
 	fingerprint := videoSubmissionFingerprint(base, payload, adapted)
 	// Keep the request fingerprint in the immutable record ID. Terminal polling
 	// can then update failReason/resultUrl without losing conflict detection.
@@ -92,7 +96,7 @@ func claimVideoSubmission(cfg config.Config, r *http.Request, payload map[string
 		) SELECT ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, 'video', ?, ?, ?, ?, ?
 		WHERE NOT EXISTS (SELECT 1 FROM "ImageTask"
 			WHERE "workspaceId" = ? AND "idempotencyKey" = ? AND "mediaType" = 'video')`,
-		id, workspaceOf(r), emptyNull(product), adapted.payload["prompt"], "pending_"+nonce, adapted.modelID,
+		id, workspaceOf(r), emptyNull(product), prompt, "pending_"+nonce, adapted.modelID,
 		adapted.ratio, adapted.resolution, key, now, now, workspaceOf(r), key)
 	if err != nil {
 		return videoSubmission{}, err

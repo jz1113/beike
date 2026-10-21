@@ -15,8 +15,10 @@ import '@shared/domain/media/drawing';
 import { apiFetch } from '@client/shared/api/apiClient';
 import type { CategoryItem } from '@shared/domain/prompts/vision';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
+import type { BaseStyleSkill } from '@client/shared/modals/style-extract/types';
 
 interface Props {
+  onFeedSkill?: (recipe: BaseStyleSkill) => void;
   recipes: any[];
   copiedId: string | null;
   setCopiedId: (id: string | null) => void;
@@ -43,6 +45,7 @@ interface Props {
 
 export default function AssetRecipeLibrary({
   recipes,
+  onFeedSkill,
   copiedId,
   setCopiedId,
   editingRecipe,
@@ -88,8 +91,8 @@ export default function AssetRecipeLibrary({
           <div className="space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2.5"><h2 className="text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-100">拍摄架构</h2><span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 dark:bg-[#18191c]/95">{recipes.length}</span></div>
-                  <p className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">收藏品类的光影与构图规则，为每次创作提供 8 段式分镜骨架。</p>
+                  <div className="flex items-center gap-2.5"><h2 className="text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-100">类目拍摄技能</h2><span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 dark:bg-[#18191c]/95">{recipes.length}</span></div>
+                  <p className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">类目技能约束商品保真与换品方法，参考样本决定每镜画面。继续投喂可审阅并另存新版。</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {hiddenOfficialRecipes.length > 0 && onRestoreOfficialRecipe && (
@@ -126,7 +129,7 @@ export default function AssetRecipeLibrary({
                     className="rounded-xl bg-indigo-600 px-3 py-2 text-xs text-white hover:bg-indigo-500 font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>新建架构推理</span>
+                    <span>从参考图新建技能</span>
                   </button>
                 </div>
               </div>
@@ -184,9 +187,10 @@ export default function AssetRecipeLibrary({
                       </p>
 
                       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/40 text-[10px] text-slate-400">
-                        <span>{new Date(recipe.createdAt).toLocaleDateString()}</span>
+                        <span>{Number.isNaN(new Date(recipe.updatedAt || recipe.createdAt).getTime()) ? '已有规则' : new Date(recipe.updatedAt || recipe.createdAt).toLocaleDateString('zh-CN')}</span>
 
                         <div className="flex items-center gap-1.5">
+                          {onFeedSkill && <button type="button" onClick={() => onFeedSkill(recipe)} className="rounded-lg px-2 py-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-white/10">继续投喂</button>}
                           {/* ✏️ 编辑与查看大架构 */}
                           <button
                             onClick={() => setEditingRecipe({ ...recipe })}

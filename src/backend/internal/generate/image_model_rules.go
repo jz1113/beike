@@ -49,6 +49,9 @@ func imageModelRuleError(payload map[string]json.RawMessage, model string) strin
 }
 
 func referenceCount(payload map[string]json.RawMessage) int {
+	if _, ok := payload["compositionReferenceImages"]; ok {
+		return len(imageReferences(payload))
+	}
 	seen := map[string]struct{}{}
 	add := func(value string) {
 		value = strings.TrimSpace(value)
@@ -59,7 +62,7 @@ func referenceCount(payload map[string]json.RawMessage) int {
 	for _, key := range []string{"productImageUrl", "referenceImageUrl", "anchorFaceImageUrl", "sceneAnchorImageUrl"} {
 		add(rawString(payload, key))
 	}
-	for _, key := range []string{"images", "referenceImages", "productReferenceImages"} {
+	for _, key := range []string{"images", "referenceImages", "productReferenceImages", "compositionReferenceImages"} {
 		var items []json.RawMessage
 		if json.Unmarshal(payload[key], &items) != nil {
 			continue

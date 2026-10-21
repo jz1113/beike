@@ -12,6 +12,7 @@ import CategoryManagerModal from './CategoryManagerModal';
 import { RecipeEditorPanel } from './style-extract/RecipeEditorPanel';
 import { StyleExtractSourcePanel } from './style-extract/StyleExtractSourcePanel';
 import { useStyleExtractWorkflow } from './style-extract/useStyleExtractWorkflow';
+import type { BaseStyleSkill } from './style-extract/types';
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface Props {
   onRecipeCreated?: (recipe: any) => void;
   initialImages?: string[];
   initialTitle?: string;
+  baseSkill?: BaseStyleSkill;
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * - 图源录入多渠道交互抽离为 StyleExtractSourcePanel
  * - 配方调优编辑器由 RecipeEditorPanel 承载
  */
-export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated, initialImages, initialTitle }: Props) {
+export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated, initialImages, initialTitle, baseSkill }: Props) {
   const {
     sourceType,
     setSourceType,
@@ -79,6 +81,7 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated, in
     onRecipeCreated,
     initialImages,
     initialTitle,
+    baseSkill,
   });
 
   if (!isOpen) return null;
@@ -97,13 +100,13 @@ export default function StyleExtractModal({ isOpen, onClose, onRecipeCreated, in
             </div>
             <div className="min-w-0">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
-                提示词架构推理实验室
+                {baseSkill ? `继续投喂 · ${baseSkill.name}` : '提炼类目拍摄技能'}
                 <span className="hidden sm:inline-flex text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60">
                   Prompt Architecture Inference
                 </span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                深度解构参考图集的置景光影与摄影机位，沉淀为该品类专属的通用提示词生成架构
+                {baseSkill ? '结合已有规则与新参考图提炼候选，审阅后另存新版，保留原技能供比较。' : '从参考图提炼商品保真、换品方法与画面描述规则；具体构图继续由参考样本决定。'}
               </p>
             </div>
           </div>

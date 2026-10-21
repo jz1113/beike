@@ -24,6 +24,11 @@ export function salesAssetsReady(script?: VideoSalesScript): boolean {
     && script.assetValidation === 'passed');
 }
 
+export function salesAssetsGenerated(script?: VideoSalesScript): boolean {
+  return Boolean(script?.deliveryMode === 'single' && !script.planStale && Array.isArray(script.assets)
+    && script.assets.every((asset) => (!asset.required && !asset.url) || (asset.status === 'done' && Boolean(asset.url))));
+}
+
 export function salesActualReferences(script: VideoSalesScript, images: SalesImageRef[]): SalesActualReference[] {
   const chosen = [...new Set(script.shots.map((shot) => shot.imageIndex))];
   const product = chosen.map((index) => images.find((image) => image.index === index));

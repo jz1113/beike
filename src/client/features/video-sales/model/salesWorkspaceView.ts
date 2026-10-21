@@ -1,7 +1,8 @@
 import type { VideoSalesScript } from '@shared/domain/video-sales';
 
 export function salesHasQueryableTask(script?: VideoSalesScript): boolean {
-  return Boolean(script?.renderTaskId && ['generating', 'uncertain'].includes(script.renderStatus || '')
+  const open = ['generating', 'uncertain'].includes(script?.renderStatus || '');
+  return Boolean(open && (script?.renderTaskId || script?.renderSubmissionKey)
     || script?.deliveryMode !== 'single' && script?.shots.some((shot) => shot.taskId && shot.status === 'generating'));
 }
 
@@ -23,11 +24,18 @@ export function initialSalesNavigation(hasScript: boolean, hasResult: boolean): 
   return { step, lastCreativeStep: step === 'product' ? 'plan' : step };
 }
 
+export function restoreSalesNavigation(saved: SalesNavigation | undefined, hasScript: boolean, hasResult: boolean): SalesNavigation {
+  const fallback = initialSalesNavigation(hasScript, hasResult);
+  const valid = (step: unknown) => SALES_WORKFLOW_STEPS.some(([id]) => id === step);
+  if (!saved || !valid(saved.step) || !valid(saved.lastCreativeStep) || saved.lastCreativeStep === ('product' as string) || !hasScript) return fallback;
+  return saved;
+}
+
 export function navigateSalesWorkspace(previous: SalesNavigation, step: SalesWorkflowStep): SalesNavigation {
   return { step, lastCreativeStep: step === 'product' ? previous.lastCreativeStep : step };
 }
 
-export type SalesActionIntent = SalesWorkflowStep | 'write' | 'prepare' | 'finalize' | 'render' | 'query' | 'stop' | 'download' | 'resume';
+export type SalesActionIntent = SalesWorkflowStep | 'write' | 'prepare' | 'queryAssets' | 'confirmAssets' | 'finalize' | 'render' | 'query' | 'stop' | 'download' | 'resume';
 interface ViewAction { label: string; intent: SalesActionIntent; disabled?: boolean }
 export interface SalesStageActions { primary: ViewAction; secondary?: ViewAction; reason?: string | null; note?: string }
 export interface SalesStageContext {
@@ -38,6 +46,10 @@ export interface SalesStageContext {
   planCurrent: boolean;
   planReason: string | null;
   assetsReady: boolean;
+  assetsGenerated?: boolean;
+  assetsQueryable?: boolean;
+  assetsUnresolved?: boolean;
+  preflightError?: string | null;
   assetCount: number;
   imageReady: boolean;
   finalized: boolean;
@@ -54,19 +66,23 @@ export interface SalesStageContext {
 export function salesStageActions(context: SalesStageContext): SalesStageActions {
   const c = context;
   const action = (label: string, intent: SalesActionIntent, disabled = c.busy): ViewAction => ({ label, intent, disabled });
+  if (c.rendering) return { primary: action('正在生成视频', 'result', true), secondary: action('停止继续提交', 'stop', false), note: '已提交的任务仍可能生成并计费，停止仅阻止后续提交或查询。' };
+  if (c.busy && !c.rendering) return { primary: action(c.progress || '正在处理', 'product', true), secondary: action('停止当前操作', 'stop', false), note: '停止后保留已完成结果；服务商已接受的任务仍可能生成并计费。' };
   if (c.step === 'product') return {
     primary: action(c.progress || (c.hasScript ? '更新商品分析与口播脚本' : '确认商品，编写口播脚本'), 'write', c.busy || Boolean(c.planReason)),
     reason: c.planReason,
     secondary: c.hasScript ? action('返回原创作阶段', 'resume') : undefined,
   };
   if (c.step === 'result') {
-    if (c.rendering) return { primary: action('正在生成视频', 'result', true), secondary: action('停止继续提交', 'stop', false), note: '已提交的任务仍可能生成并计费，停止仅阻止后续提交或查询。' };
-    if (c.hasResult) return { primary: action(c.canQuery || c.submissionUncertain || c.renderFailed ? '下载已有成片' : '下载完整视频', 'download'), secondary: c.canQuery ? action('继续查询原任务', 'query') : action('返回视频定稿', 'video'), reason: c.submissionUncertain && !c.canQuery ? '新提交结果未确认且没有回执，请核对服务端记录；已有成片仍可下载。' : null };
+    if (c.hasResult) return { primary: action(c.canQuery || c.submissionUncertain || c.renderFailed ? '下载已有成片' : '下载完整视频', 'download'), secondary: c.canQuery ? action('继续查询原任务', 'query') : action('返回视频定稿', 'video'), reason: c.renderFailed ? '本次生成失败，已有成片仍保留，没有被这次任务替换。' : c.submissionUncertain && !c.canQuery ? '新提交结果未确认且没有回执，请核对服务端记录；已有成片仍可下载。' : null };
     if (c.canQuery) return { primary: action('继续查询原任务', 'query'), secondary: action('返回视频定稿', 'video'), note: '仅查询已有回执，不重新提交或创建计费任务。' };
+    if (c.renderFailed) return { primary: action('返回视频定稿', 'video'), reason: '视频生成失败，请查看上方原因并调整后再生成。' };
     if (c.submissionUncertain) return { primary: action('返回视频定稿', 'video'), reason: '提交结果未确认且没有回执，请先核对服务端生成记录，避免重复计费。' };
     return { primary: action(c.hasScript ? '去视频定稿' : '去确认商品', c.hasScript ? 'video' : 'product') };
   }
   if (!c.hasScript) return { primary: action('去确认商品', 'product'), reason: '先确认商品与参考图，再编写口播脚本。' };
+  if (c.step === 'assets' && c.assetsQueryable) return { primary: action('继续查询原图片任务', 'queryAssets'), secondary: action('返回口播脚本', 'plan'), note: '仅查询已有图片任务，不重新生图；查询完成后再补齐或确认素材。' };
+  if (c.step === 'assets' && c.assetsUnresolved) return { primary: action('图片提交结果待核实', 'prepare', true), secondary: action('返回口播脚本', 'plan'), reason: '部分图片没有返回任务回执，请先核对服务商记录，避免重复计费。' };
   if (c.step === 'plan') return c.planCurrent ? {
     primary: action('确认脚本，准备素材图片', 'assets'),
     secondary: action('重新编写脚本', 'write', c.busy || Boolean(c.planReason)),
@@ -78,18 +94,18 @@ export function salesStageActions(context: SalesStageContext): SalesStageActions
   };
   if (!c.planCurrent) return { primary: action('去更新口播脚本', 'plan'), reason: '当前脚本已过期，请先更新脚本再继续。' };
   if (c.step === 'assets') return {
-    primary: c.assetsReady ? action('素材已确认，进入视频定稿', 'video') : action(c.progress || (c.assetCount ? '生成待完成素材（可能计费）' : '确认素材并校验'), 'prepare', c.busy || (c.assetCount > 0 && !c.imageReady)),
+    primary: c.assetsReady ? action('素材已确认，进入视频定稿', 'video') : c.assetsGenerated ? action('图片无误，确认并继续', 'confirmAssets') : action(c.progress || (c.assetCount ? '生成待完成素材（可能计费）' : '确认素材图片'), 'prepare', c.busy || (c.assetCount > 0 && !c.imageReady)),
     secondary: action('返回口播脚本', 'plan'),
-    reason: !c.assetsReady && c.assetCount > 0 && !c.imageReady ? '请先选择绘图模型。' : null,
+    reason: !c.assetsReady && !c.assetsGenerated && c.assetCount > 0 && !c.imageReady ? '请先选择绘图模型。' : c.preflightError,
   };
-  if (!c.assetsReady) return { primary: action('去完成素材与校验', 'assets'), reason: '请先完成必要素材及其校验，再定稿视频。' };
-  const finalize = action(c.progress || (c.finalized ? '重新定稿提示词' : '定稿视频提示词'), 'finalize', c.busy || Boolean(c.videoError));
+  if (!c.assetsReady) return { primary: action('去完成素材与确认', 'assets'), reason: '请先完成必要素材并确认图片，再生成视频提示词。' };
+  const finalize = action(c.progress || (c.finalized ? '重新生成视频提示词' : '生成视频提示词'), 'finalize', c.busy || Boolean(c.videoError));
   const render = action('确认生成整段视频（可能计费）', 'render', c.busy || Boolean(c.submitError) || !c.finalized);
   return {
     primary: c.finalized ? render : finalize,
     secondary: c.finalized ? finalize : undefined,
     reason: c.videoError || c.submitError,
-    note: '定稿与视频生成分别确认；定稿不会自动提交视频。',
+    note: '提示词生成与视频生成分别确认；生成提示词不会自动提交视频。',
   };
 }
 

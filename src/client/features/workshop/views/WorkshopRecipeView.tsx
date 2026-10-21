@@ -7,6 +7,7 @@ import { useAppStore } from '@client/store';
 import { DEFAULT_CATEGORIES, getMergedCategories, type CategoryItem } from '@shared/domain/prompts/vision';
 import AssetRecipeLibrary from '../components/AssetRecipeLibrary';
 import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
+import type { BaseStyleSkill } from '@client/shared/modals/style-extract/types';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 
 interface Props {
@@ -22,6 +23,7 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
   const [hiddenOfficialRecipes, setHiddenOfficialRecipes] = useState<Array<{ id: string; name: string }>>([]);
   const [isRestoringOfficial, setIsRestoringOfficial] = useState(false);
   const [, setIsLoading] = useState(() => !getCachedRecipes());
+  const [feedSkill, setFeedSkill] = useState<BaseStyleSkill | undefined>();
   const [isExtractModalOpen, setIsExtractModalOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
   const [isUpdatingRecipe, setIsUpdatingRecipe] = useState(false);
@@ -67,10 +69,11 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
     void fetchRecipes();
   }, [fetchRecipes]);
 
-  useEffect(() => { setCachedRecipes(recipes); }, [recipes]);
+  useEffect(() => { setCachedRecipes(recipes); window.dispatchEvent(new Event('workshop-recipes-changed')); }, [recipes]);
 
   const handleApplyRecipe = (recipe: any) => {
     setSelectedArchId(recipe.id);
+    window.dispatchEvent(new Event('workshop-skill-applied'));
     setPendingBatchStage(2);
     showToast(`✨ 已锁定【${recipe.name || '拍摄架构'}】并载入工作台！`);
     onEnterStudio();
@@ -211,7 +214,8 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
           setIsCreatingCategory={setIsCreatingCategory}
           newCategoryName={newCategoryName}
           setNewCategoryName={setNewCategoryName}
-          setIsExtractModalOpen={setIsExtractModalOpen}
+          setIsExtractModalOpen={open => { setFeedSkill(undefined); setIsExtractModalOpen(open); }}
+          onFeedSkill={recipe => { setFeedSkill(recipe); setIsExtractModalOpen(true); }}
           setIsCategoryManagerOpen={setIsCategoryManagerOpen}
           onDeleteRecipe={handleDeleteRecipe}
           onApplyRecipe={handleApplyRecipe}
@@ -237,7 +241,8 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
         setIsCreatingCategory={setIsCreatingCategory}
         newCategoryName={newCategoryName}
         setNewCategoryName={setNewCategoryName}
-        setIsExtractModalOpen={setIsExtractModalOpen}
+        setIsExtractModalOpen={open => { setFeedSkill(undefined); setIsExtractModalOpen(open); }}
+          onFeedSkill={recipe => { setFeedSkill(recipe); setIsExtractModalOpen(true); }}
         setIsCategoryManagerOpen={setIsCategoryManagerOpen}
         onDeleteRecipe={handleDeleteRecipe}
         onApplyRecipe={handleApplyRecipe}
@@ -247,6 +252,9 @@ export default function WorkshopRecipeView({ onEnterStudio }: Props) {
       />
 
       <StyleExtractModal
+        key={feedSkill?.id || 'new'}
+        baseSkill={feedSkill}
+        initialImages={[]}
         isOpen={isExtractModalOpen}
         onClose={() => setIsExtractModalOpen(false)}
         onRecipeCreated={(newRecipe) => {

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"beike.local/cloud/src/backend/internal/generate"
 )
 
 type assetValidation struct {
@@ -140,6 +142,11 @@ func parseValidations(content string, refs []actualReference) ([]assetValidation
 
 func validationBody(model string, payload map[string]any, shots []ScriptShot, refs []actualReference, catalog []CatalogImage) map[string]any {
 	facts, _ := json.Marshal(map[string]any{"shots": shots, "selectedColor": payload["selectedColor"], "productAnalysis": payload["productAnalysis"], "assets": payload["assets"]})
-	system := `你是实际图片视觉校验员，必须逐张查看实际参考图与商品事实对照原图，不能仅凭文字声称通过。验证实际图是否满足脚本、商品颜色和款式、相同人物身份、脸与人物一致、场景连续性；上身图和关键帧若含商品，外观必须与商品原图及 selectedColor 一致。纯人物图不要求出现商品。还必须独立核对每张素材的正面、背面、侧面或局部是否满足它自己的 label、prompt 及 productImageIndexes 指向的原图，而不是要求每张素材同时满足整段分镜。名称或提示词写正面但实际是背面时必须 conflict，正反面生成成同一张背面也不能通过；根据领口前后高低、门襟、口袋、接缝、胸前或背部标志位置提供可见证据，不得因为黑色和轮廓相似就 passed。标志缺失、移位、镜像或细节拼图代替单张静帧均属冲突；正反或标志太小看不清时 uncertain。商品原图优先于前置生成图，不允许用生成图互相证明商品事实。图片无法辨认、无法查看或证据不足时必须 uncertain，明显冲突时 conflict，仅图中确有依据时 passed。不得伪造通过。每个实际参考ID返回且只返回一条，禁止未知ID；只输出 JSON {"validations":[{"id":"实际ID","status":"passed|conflict|uncertain","reason":"具体可见依据或无法确认的原因"}]}。`
+	system := `你是实际图片视觉校验员，必须逐张查看实际参考图与商品事实对照原图，不能仅凭文字声称通过。验证实际图是否满足脚本、商品颜色和款式、相同人物身份、脸与人物一致、场景连续性；上身图和关键帧若含商品，外观必须与商品原图及 selectedColor 一致。纯人物图不要求出现商品。还必须独立核对每张素材的正面、背面、侧面或局部是否满足它自己的 label、prompt 及 productImageIndexes 指向的原图，而不是要求每张素材同时满足整段分镜。名称或提示词写正面但实际是背面时必须 conflict，正反面生成成同一张背面也不能通过；根据领口前后高低、门襟、口袋、接缝、胸前或背部标志位置提供可见证据，不得因为黑色和轮廓相似就 passed。标志缺失、移位、镜像或细节拼图代替单张静帧均属冲突；无法确认正反或必要外观一致性时 uncertain；标志在正常比例下较小不等于缺失或移位，不要求读取小字。商品原图优先于前置生成图，不允许用生成图互相证明商品事实。图片无法辨认、无法查看或证据不足时必须 uncertain，明显冲突时 conflict，仅图中确有依据时 passed。不得伪造通过。每个实际参考ID返回且只返回一条，禁止未知ID；只输出 JSON {"validations":[{"id":"实际ID","status":"passed|conflict|uncertain","reason":"具体可见依据或无法确认的原因"}]}。`
+	if generate.StringField(payload, "category") == "fashion" {
+		system += "\n" + fashionStillFramingRules()
+		system += "\n服饰生成角色须明确设定为东亚成年人并有具体选角年龄；仅对有人物的生成素材核对其label、prompt是否写全设定，遗漏时uncertain并要求补全。依据图片检查同一身份、成年外观及是否明显偏离选定年龄，明显换人或年龄漂移时conflict，遮挡或不能判断时uncertain。不凭人脸判定真实族裔或精确年龄，不把商品原图中模特的身份作为生成素材合规依据。手部特写不要求露脸，无人物静物不要求人物设定。"
+	}
+	system += "\n" + speechAssetValidationRules()
 	return chatBody(model, system, workflowVisionParts("脚本与商品事实："+string(facts), refs, catalog), 0.1)
 }

@@ -4,7 +4,7 @@ import { normalizeImageSource } from '@shared/domain/media/drawing';
 import { pickOrderedMultimodalFallbacks } from '@shared/domain/models/workflowModels';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
-import type { ExtractedRecipeData } from './types';
+import type { BaseStyleSkill, ExtractedRecipeData } from './types';
 
 function currentSessionGuard(signal: AbortSignal, isCurrent: () => boolean) {
   return () => {
@@ -61,13 +61,14 @@ export async function parseStyleReferences(lines: string[], signal: AbortSignal,
 
 export async function extractStyleRecipe(input: {
   images: string[]; userHint: string; model: string; modelIds: string[];
+  baseSkill?: BaseStyleSkill;
 }, signal: AbortSignal, isCurrent: () => boolean): Promise<ExtractedRecipeData> {
   const assertCurrent = currentSessionGuard(signal, isCurrent);
   assertCurrent();
   const { customBaseUrl } = getGatewayClientOverrides();
   const response = await apiFetch('/api/catalog/styles/extract', {
     method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageUrls: input.images, userHint: input.userHint.trim(), model: input.model,
+    body: JSON.stringify({ imageUrls: input.images, userHint: input.userHint.trim(), baseSkill: input.baseSkill, model: input.model,
       fallbackModels: pickOrderedMultimodalFallbacks(input.model, input.modelIds), customBaseUrl }),
   });
   const data = await response.json();

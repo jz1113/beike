@@ -37,13 +37,13 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }
 
 func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
-	const fashionScript = `{"scripts":[{"title":"开箱展示","beat":"unbox","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示黑色上衣","camera":"中景","voiceover":"降温还在找一件不闷的圆领，这件黑色纯棉套上就能出门。领口贴着锁骨，近看是平纹，走远了颜色还是这一块黑。单穿就能出门，里面加件衬衫也压得住，上班和周末都不用再换一件外套。","prompt":"展示商品","visualSource":"product_image"}],"assets":[{"id":"person","kind":"person","label":"出镜人物","prompt":"成年人物上身展示黑色上衣","required":true,"usesProduct":true},{"id":"face","kind":"face","label":"人物特写","prompt":"同一人物面部特写","required":true,"referenceAssetIds":["person"]}]}]}`
+	const fashionScript = `{"scripts":[{"title":"开箱展示","beat":"unbox","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示黑色上衣","camera":"中景","speechMode":"on_camera","voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompt":"展示商品","visualSource":"product_image"}],"assets":[{"id":"person","kind":"person","label":"出镜人物","prompt":"成年人物上身展示黑色上衣","required":true,"usesProduct":true},{"id":"face","kind":"face","label":"人物特写","prompt":"同一人物面部特写","required":true,"referenceAssetIds":["person"]}]}]}`
 	replies := []string{
 		`{"productName":"黑色圆领上衣","category":"fashion","sellingPoints":["圆领"],"knownFacts":["黑色"],"creativeNotes":["开箱换装"]}`,
 		fashionScript,
 		`{"assignments":[{"shotId":1,"imageIndex":7,"reason":"黑色主图"}]}`,
 		`{"validations":[{"id":"product-7","status":"passed","reason":"黑色与原图一致"},{"id":"person","status":"passed","reason":"人物已生成"},{"id":"face","status":"passed","reason":"与人物一致"}]}`,
-		`{"fullPrompt":"图片1黑色上衣，图片2人物，图片3特写","prompts":[{"shotId":1,"prompt":"0到15秒展示黑色上衣"}]}`,
+		`{"fullPrompt":"图片1黑色上衣，图片2人物，图片3特写，人物亲口说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompts":[{"shotId":1,"prompt":"0到15秒人物说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"}]}`,
 	}
 	var calls int
 	server := useChatServer(t, func(body map[string]any, call int) string {

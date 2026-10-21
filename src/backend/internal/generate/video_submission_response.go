@@ -31,7 +31,10 @@ func videoSubmissionBody(row videoSubmission) map[string]any {
 		body["submissionOutcome"] = "unknown"
 		body["submissionUnknown"] = true
 		body["submissionPending"] = row.status != "SUBMISSION_UNKNOWN"
-		body["error"] = "原视频提交结果待核实，请查询原任务；不会自动重新提交"
+		body["error"] = row.reason
+		if row.reason == "" {
+			body["error"] = "原视频提交结果待核实，请查询原任务；不会自动重新提交"
+		}
 	default:
 		body["submissionOutcome"] = "accepted"
 		body["resultUrl"] = row.result

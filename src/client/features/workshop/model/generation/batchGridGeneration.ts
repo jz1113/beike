@@ -9,6 +9,7 @@ import type { TaskExecutionConfig } from './batchTaskExecution';
 import { resolveGridRecoverySource } from './generationHelpers';
 import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { savedWorkshopOutputSize } from './generationHelpers';
+import { workshopReferenceInput } from './workshopReferenceInput';
 
 export async function runGridImageTask(
   item: BatchProductItem,
@@ -64,6 +65,8 @@ export async function runGridImageTask(
         productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
       );
       const productImageUrl = productReferenceImages[0];
+      const referenceInput = workshopReferenceInput(shots, productReferenceImages.length);
+      const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(compressProductImageIfNeeded));
       const safeAnchorFaceUrl = config.anchorFaceUrl
         ? await compressProductImageIfNeeded(config.anchorFaceUrl)
         : undefined;
@@ -71,10 +74,11 @@ export async function runGridImageTask(
       await config.beforeSubmit?.();
       verifySource = true;
       const generated = await submitImageGenTaskResult({
-      prompt: item.gridPrompt.trim(), model: config.selectedImageGenModel, size,
+      prompt: [item.gridPrompt.trim(), referenceInput.instruction].filter(Boolean).join('\n\n'), model: config.selectedImageGenModel, size,
       aspectRatio: config.selectedAspect, quality: config.selectedQuality,
       productImageUrl, referenceImageUrl: productImageUrl,
       referenceImages: productReferenceImages, productReferenceImages,
+      compositionReferenceImages,
       useReferenceImage: true,
       padSocialRef: false, isGrid2x2: true, workshopMode: 'storyboard_generate',
       productTitle: item.title, productFingerprint: item.productFingerprint || item.title,

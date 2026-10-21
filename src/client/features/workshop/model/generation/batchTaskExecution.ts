@@ -8,6 +8,7 @@ import { isActionAllowedForProduct } from '@shared/domain/products/phoneProductP
 import { submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
 import type { BatchProductItem } from '../batchTypes';
 import { compressProductImageIfNeeded } from './generationHelpers';
+import { workshopReferenceInput } from './workshopReferenceInput';
 
 export interface TaskExecutionConfig {
   selectedQuality: 'high' | 'medium' | 'low';
@@ -70,6 +71,9 @@ export async function executeSingleImageTask(
     productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
   );
   const safeProductImg = safeProductImages[0];
+  const referenceInput = workshopReferenceInput([shot], safeProductImages.length);
+  const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(compressProductImageIfNeeded));
+  promptText = [promptText, referenceInput.instruction].filter(Boolean).join('\n\n');
   const safeAnchorFaceUrl = !skipFace && anchorFaceUrl
     ? await compressProductImageIfNeeded(anchorFaceUrl)
     : undefined;
@@ -103,6 +107,7 @@ export async function executeSingleImageTask(
       referenceImageUrl: safeProductImg,
       referenceImages: safeProductImages,
       productReferenceImages: safeProductImages,
+      compositionReferenceImages,
       useReferenceImage: true,
       has_human: shot.has_human !== undefined ? shot.has_human : true,
       shot_type: shot.shot_type,

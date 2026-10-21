@@ -1,9 +1,12 @@
 package generate
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -63,16 +66,114 @@ func TestViduAndGrokPayloadsFollowOfficialAPIs(t *testing.T) {
 	}
 }
 
+func TestWanRouteUsesNativeDashScopePath(t *testing.T) {
+	submit, query := routeWanEndpoints("https://maas.qianwenaiapi.com/compatible-mode/v1", "")
+	if len(submit) != 1 || submit[0] != "https://maas.qianwenaiapi.com/api/v1/services/aigc/video-generation/video-synthesis" || strings.Contains(submit[0], "/qwen/") || strings.Contains(submit[0], "compatible-mode") {
+		t.Fatalf("qianwen submit %v", submit)
+	}
+	if len(query) != 1 || !strings.HasPrefix(query[0], "https://maas.qianwenaiapi.com/api/v1/tasks/") {
+		t.Fatalf("qianwen query %v", query)
+	}
+	protocolSubmit, _ := routeWanEndpoints("https://gateway.example", "dashscope")
+	if len(protocolSubmit) != 1 || strings.Contains(protocolSubmit[0], "/qwen/") || strings.Contains(protocolSubmit[0], "/wan/") {
+		t.Fatalf("protocol submit %v", protocolSubmit)
+	}
+	gateway, _ := routeWanEndpoints("https://gateway.example/v1", "")
+	joined := strings.Join(gateway, " ")
+	if len(gateway) != 3 || !strings.Contains(gateway[0], "/wan/api/v1/services/aigc/video-generation/video-synthesis") || !strings.Contains(gateway[1], "/qwen/api/v1/") || strings.Contains(joined, "/v1/videos") {
+		t.Fatalf("gateway %v", gateway)
+	}
+}
+
+func TestPrepareWanMediaConvertsStorageImages(t *testing.T) {
+	png, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel := filepath.Join("local", "wan-ref.png")
+	path := filepath.Join(".azhuo_storage", rel)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(".azhuo_storage") })
+	body := wanOfficialPayload("wan3.0-video", "展示卫衣", "omni", "9:16", "720P", 15, []string{"/storage/" + filepath.ToSlash(rel), "https://cdn.example/front.jpg"}, nil, true, true, false)
+	if err := prepareWanMedia(context.Background(), body, "local", false); err != nil {
+		t.Fatal(err)
+	}
+	input, _ := body["input"].(map[string]any)
+	media, _ := input["media"].([]map[string]string)
+	if input["prompt"] != "展示卫衣" || len(media) != 2 || !strings.HasPrefix(media[0]["url"], "data:image/png;base64,") || media[1]["url"] != "https://cdn.example/front.jpg" {
+		t.Fatalf("converted %#v", body)
+	}
+	rejected := wanOfficialPayload("wan3.0-video", "展示卫衣", "omni", "9:16", "720P", 15, []string{"/uploads/local.jpg"}, nil, true, true, false)
+	if err := prepareWanMedia(context.Background(), rejected, "local", false); err == nil {
+		t.Fatal("relative image was accepted")
+	}
+}
+
 func TestVideoPayloadRequestsNativeAudio(t *testing.T) {
 	withAudio := buildVideoPayload("doubao-seedance-2.5", "海边", map[string]json.RawMessage{
 		"audio": json.RawMessage(`true`),
 	})
-	if withAudio.payload["audio"] != true || withAudio.payload["generate_audio"] != true {
+	if _, ok := withAudio.payload["audio"]; ok || withAudio.payload["generate_audio"] != true {
 		t.Fatalf("native audio flags: %#v", withAudio.payload)
 	}
 	silent := buildVideoPayload("doubao-seedance-2.5", "海边", map[string]json.RawMessage{})
 	if _, ok := silent.payload["generate_audio"]; ok {
 		t.Fatalf("audio should stay unset: %#v", silent.payload)
+	}
+}
+
+func TestOfficialVideoFamiliesUseTheirRequestBodies(t *testing.T) {
+	first := "https://example.com/a.jpg"
+	last := "https://example.com/b.jpg"
+	wan := buildVideoPayload("wan3.0-video", "展示卫衣", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first, last}),
+		"aspect_ratio": rawJSON(t, "9:16"), "resolution": rawJSON(t, "480P"), "duration": rawJSON(t, 15),
+		"audio": json.RawMessage(`true`),
+	})
+	input, _ := wan.payload["input"].(map[string]any)
+	media, _ := input["media"].([]map[string]string)
+	parameters, _ := wan.payload["parameters"].(map[string]any)
+	if wan.payload["prompt"] != nil || input["prompt"] != "展示卫衣" || len(media) != 2 || media[0]["type"] != "reference_image" || media[0]["url"] != first {
+		t.Fatalf("wan input: %#v", wan.payload)
+	}
+	if parameters["resolution"] != "480P" || parameters["duration"] != 15 || parameters["audio"] != true || parameters["ratio"] != "9:16" {
+		t.Fatalf("wan parameters: %#v", parameters)
+	}
+	if !strings.Contains(wan.endpoints[0], "/video-generation/video-synthesis") {
+		t.Fatalf("wan endpoint: %v", wan.endpoints)
+	}
+	seedance := buildVideoPayload("doubao-seedance-2.5", "展示卫衣", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first}),
+		"aspect_ratio": rawJSON(t, "9:16"), "resolution": rawJSON(t, "480p"), "duration": rawJSON(t, 15),
+		"audio": json.RawMessage(`true`),
+	})
+	content, _ := seedance.payload["content"].([]map[string]any)
+	if seedance.payload["mode"] != nil || seedance.payload["images"] != nil || len(content) != 2 || content[1]["role"] != "reference_image" {
+		t.Fatalf("seedance content: %#v", seedance.payload)
+	}
+	kling := buildVideoPayload("kling-video-v3-omni", "展示卫衣", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first, last}),
+		"resolution": rawJSON(t, "1080P"), "duration": rawJSON(t, 5),
+	})
+	list, _ := kling.payload["image_list"].([]map[string]string)
+	if kling.payload["model_name"] != "kling-v3-omni" || kling.payload["mode"] != "pro" || len(list) != 2 || list[0]["image_url"] != first || kling.payload["image"] != nil {
+		t.Fatalf("kling omni: %#v", kling.payload)
+	}
+	if !strings.Contains(kling.endpoints[0], "/omni-video") {
+		t.Fatalf("kling endpoint: %v", kling.endpoints)
+	}
+	minimax := buildVideoPayload("MiniMax-H3", "展示卫衣", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first}),
+		"resolution": rawJSON(t, "720P"), "duration": rawJSON(t, 6),
+	})
+	urls, _ := minimax.payload["imageUrls"].([]string)
+	if minimax.payload["mode"] != "reference-to-video" || minimax.payload["resolution"] != "768P" || len(urls) != 1 || minimax.payload["seconds"] != 6 {
+		t.Fatalf("minimax: %#v", minimax.payload)
 	}
 }
 
@@ -188,5 +289,15 @@ func TestVideoSubmitAndPollUseGateway(t *testing.T) {
 	handler.ServeHTTP(polled, request)
 	if polled.Code != http.StatusOK || !strings.Contains(polled.Body.String(), "https://cdn.example.com/a.mp4") || !strings.Contains(polled.Body.String(), `"status":"SUCCESS"`) {
 		t.Fatalf("poll %d %s", polled.Code, polled.Body.String())
+	}
+}
+
+func TestComflyWanRouteUsesDocumentedQwenEndpoint(t *testing.T) {
+	submit, query := routeWanEndpoints("https://ai.comfly.org/v1", "")
+	if len(submit) != 1 || submit[0] != "https://ai.comfly.org/qwen/api/v1/services/aigc/video-generation/video-synthesis" {
+		t.Fatalf("undocumented submission route: %v", submit)
+	}
+	if len(query) != 1 || query[0] != "https://ai.comfly.org/qwen/api/v1/tasks/{taskId}" {
+		t.Fatalf("query: %v", query)
 	}
 }

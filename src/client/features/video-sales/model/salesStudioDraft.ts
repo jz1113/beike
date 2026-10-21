@@ -12,6 +12,8 @@ import {
 } from '@shared/domain/video-sales';
 import { readProductVariantMetadata, type ProductVariantMetadata } from '@shared/domain/collection/productVariants';
 import { salesOpeningProductUrl, type SalesAspectRatio, type SalesVideoRefMode } from './salesWorkspace';
+import type { SalesPlanCheckpoint } from './buildSalesPlan';
+import type { SalesNavigation } from './salesWorkspaceView';
 
 export const SALES_STUDIO_STORAGE_KEY = 'beike.video_sales.draft.v3';
 
@@ -44,7 +46,8 @@ export interface VideoSalesStudioState {
   selectedScriptIndex: number;
   analysis: VideoSalesProductAnalysis | null;
   composedResultUrl: string | null;
-  redrawScenes: boolean;
+  planCheckpoint?: SalesPlanCheckpoint & { revision: string };
+  workspaceNavigation?: SalesNavigation;
 }
 
 export const defaultSalesStudioState: VideoSalesStudioState = {
@@ -69,7 +72,6 @@ export const defaultSalesStudioState: VideoSalesStudioState = {
   selectedScriptIndex: 0,
   analysis: null,
   composedResultUrl: null,
-  redrawScenes: true,
 };
 
 export function hasSalesProductContent(state: VideoSalesStudioState): boolean {
@@ -95,7 +97,6 @@ export function clearSalesProduct(state: VideoSalesStudioState): VideoSalesStudi
     aspectRatio: state.aspectRatio,
     videoResolution: state.videoResolution,
     videoRefMode: state.videoRefMode,
-    redrawScenes: state.redrawScenes,
     props: {},
     colorSelection: emptySalesColorSelection(),
     imageCatalog: [],
@@ -116,6 +117,15 @@ function readVideoResolution(value: unknown): string {
 function readVideoRefMode(value: unknown): SalesVideoRefMode {
   if (value === 'first_frame' || value === 'first_last_frame' || value === 'text') return value;
   return 'omni';
+}
+
+export function writeSalesStudioDraft(state: VideoSalesStudioState): void {
+  if (typeof window === 'undefined') return;
+  const encoded = JSON.stringify(state);
+  window.localStorage.setItem(SALES_STUDIO_STORAGE_KEY, encoded);
+  if (window.localStorage.getItem(SALES_STUDIO_STORAGE_KEY) !== encoded) {
+    throw new Error('当前项目没有保存成功，已停止提交，避免刷新后重复计费');
+  }
 }
 
 export function readSalesStudioDraft(): VideoSalesStudioState {

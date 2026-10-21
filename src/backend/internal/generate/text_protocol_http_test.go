@@ -16,7 +16,7 @@ func TestBusinessHTTPBodyProtocolReachesNativeCall(t *testing.T) {
 		if r.URL.Path != "/v1/messages" || r.Header.Get("x-api-key") != "secret" {
 			t.Errorf("native business request %s", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"{\"productFingerprint\":\"台灯\",\"prompts\":[],\"title\":\"台灯实用体验分享\",\"content\":\"提供桌面局部照明。\"}"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`))
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"{\"productFingerprint\":\"台灯\",\"prompts\":[{\"shot_no\":1,\"prompt\":\"桌面近景\"}],\"title\":\"台灯实用体验分享\",\"content\":\"提供桌面局部照明。\"}"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`))
 	}))
 	defer server.Close()
 	priorModel, priorCanvas := ModelHTTP, canvasHTTP

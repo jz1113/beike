@@ -1,12 +1,13 @@
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from './apiClient';
 
-export async function uploadStudioFile(file: File, category: string): Promise<string> {
+export async function uploadStudioFile(file: File, category: string, signal?: AbortSignal): Promise<string> {
   const form = new FormData();
   form.append('file', file);
   form.append('category', category);
   form.append('customConfig', JSON.stringify(readClientStorageConfig()));
   const res = await apiFetch('/api/assets/storage/upload', {
     method: 'POST',
+    signal,
     headers: storageConfigHeaders(),
     body: form,
   });

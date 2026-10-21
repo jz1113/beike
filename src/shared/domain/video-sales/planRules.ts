@@ -1,6 +1,6 @@
 import type { VideoSalesShot } from './types';
 
-const CONTENT_KEYS = ['description', 'voiceover', 'duration', 'imageIndex', 'prompt', 'camera', 'finalPrompt'] as const;
+const CONTENT_KEYS = ['description', 'voiceover', 'speechMode', 'duration', 'imageIndex', 'prompt', 'camera', 'finalPrompt'] as const;
 
 export function editSalesShot(shot: VideoSalesShot, patch: Partial<VideoSalesShot>): VideoSalesShot {
   const changed = CONTENT_KEYS.some((key) => patch[key] !== undefined && patch[key] !== shot[key]);
@@ -32,7 +32,7 @@ export function applyFinalPrompts(shots: VideoSalesShot[], prompts: Array<{ shot
 }
 
 export function salesPlanRevision(shots: VideoSalesShot[]): string {
-  const text = shots.map((shot) => [shot.shotId, shot.imageIndex, shot.duration, shot.prompt, shot.description, shot.voiceover, shot.camera].join('|')).join('\n');
+  const text = shots.map((shot) => [shot.shotId, shot.imageIndex, shot.duration, shot.prompt, shot.description, shot.voiceover, shot.speechMode, shot.camera].join('|')).join('\n');
   let hash = 0;
   for (const char of text) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
   return hash.toString(16);

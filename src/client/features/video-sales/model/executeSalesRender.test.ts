@@ -41,6 +41,8 @@ describe('single sales video submission protection', () => {
     expect(renderSalesVideo).toHaveBeenCalledTimes(1);
     expect(renderSalesVideo).toHaveBeenCalledWith(expect.objectContaining({ single: expect.objectContaining({ images: ['/product.jpg', '/scene.jpg'], duration: 15 }), refMode: input.current.videoRefMode }), expect.anything());
     expect(getScript()).toMatchObject({ renderTaskId: 'paid-once', renderStatus: 'done', renderResultUrl: '/final.mp4', renderSnapshot: { model: 'chosen-video', images: ['/product.jpg', '/scene.jpg'] } });
+    expect(getScript().renderSubmissionKey).toBeTruthy();
+    expect(renderSalesVideo).toHaveBeenCalledWith(expect.objectContaining({ single: expect.objectContaining({ submissionKey: getScript().renderSubmissionKey }) }), expect.anything());
     expect(input.onPromptPhase).not.toHaveBeenCalled();
   });
 
@@ -72,6 +74,28 @@ describe('single sales video submission protection', () => {
     expect(generateSalesShotVideo).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'original-task', videoModel: 'original-model', duration: 30 }));
     expect(renderSalesVideo).not.toHaveBeenCalled();
     expect(getScript()).toMatchObject({ renderStatus: 'done', renderResultUrl: '/original.mp4' });
+  });
+
+  it('recovers a lost response from its saved submission key and does not create another task', async () => {
+    const { input, getScript } = fixture();
+    input.script.renderStatus = 'uncertain';
+    input.script.renderSubmissionKey = 'saved-key';
+    input.script.renderSnapshot = { model: 'original-model', prompt: '原文', images: ['/old.jpg'], duration: 15, aspectRatio: '9:16', resolution: '720P', refMode: 'omni', submissionKey: 'saved-key' };
+    const lookup = vi.fn(async () => ({ outcome: 'poll' as const, taskId: 'recovered-task' }));
+    vi.mocked(generateSalesShotVideo).mockResolvedValue('/recovered.mp4');
+    await executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, lookupSubmission: lookup, compose: async () => '' });
+    expect(lookup).toHaveBeenCalledWith('saved-key', 'original-model', expect.any(Function));
+    expect(generateSalesShotVideo).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'recovered-task', videoModel: 'original-model' }));
+    expect(renderSalesVideo).not.toHaveBeenCalled();
+    expect(getScript()).toMatchObject({ renderTaskId: 'recovered-task', renderStatus: 'done', renderResultUrl: '/recovered.mp4' });
+  });
+
+  it('stops before submission when the project cannot be saved', async () => {
+    const { input, getScript } = fixture();
+    input.persistScript = () => { throw new Error('当前项目没有保存成功，已停止提交，避免刷新后重复计费'); };
+    await expect(executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' })).rejects.toThrow('没有保存成功');
+    expect(renderSalesVideo).not.toHaveBeenCalled();
+    expect(getScript().renderStatus).toBeUndefined();
   });
 
   it('records terminal original-task failures without creating another paid task', async () => {

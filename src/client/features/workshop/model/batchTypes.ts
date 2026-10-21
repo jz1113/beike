@@ -110,6 +110,7 @@ export interface BatchProductItem {
   appliedFullPromptAppearance?: 'human' | 'product' | 'unknown';
   appliedFullPromptEligibleCount?: number;
   appliedFullPromptInventoryCount?: number;
+  appliedSkillSnapshot?: { id: string; name: string; promptSnippet: string; updatedAt?: string };
 
   // 生图任务队列专属
   tasks: BatchTaskItem[];

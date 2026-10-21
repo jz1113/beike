@@ -18,6 +18,11 @@ export function SalesColorGallery({ images, metadata, selection, disabled, onCha
   const [group, setGroup] = useState<'all' | 'selected' | 'unselected'>('all');
   const [preview, setPreview] = useState<SalesImageRef | null>(null);
   const [allImages, setAllImages] = useState(false);
+  const previewIndex = images.findIndex((image) => image.index === preview?.index);
+  const movePreview = (offset: number) => {
+    const next = images[previewIndex + offset];
+    if (next) setPreview(next);
+  };
   const selected = new Set(eligibleSalesImages(images, selection, metadata).map((image) => image.url));
   const grouped = {
     all: images,
@@ -55,6 +60,7 @@ export function SalesColorGallery({ images, metadata, selection, disabled, onCha
       {grouped[group].length === 0 && <p className="py-4 text-center text-xs text-slate-500">{group === 'selected' ? '尚未选择商品图，请在全部图片中直接选择。' : '此分组暂无图片。'}</p>}
       {preview && <div role="dialog" aria-modal="true" aria-label="商品图片大图" className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4" onKeyDown={(event) => {
         if (event.key === 'Escape') { event.stopPropagation(); setPreview(null); }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); movePreview(event.key === 'ArrowLeft' ? -1 : 1); }
         if (event.key !== 'Tab') return;
         const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
         const first = buttons[0];
@@ -64,7 +70,12 @@ export function SalesColorGallery({ images, metadata, selection, disabled, onCha
       }}>
         <button type="button" autoFocus onClick={() => setPreview(null)} className="ml-auto flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-sm text-white"><X className="h-4 w-4" />关闭大图</button>
         <img src={preview.url} alt={`完整商品图 ${preview.index + 1}`} className="min-h-0 w-full flex-1 object-contain p-4" />
-        <div className="flex justify-center"><button type="button" disabled={disabled || preview.unavailable} onClick={() => toggleImage(preview.url)} aria-pressed={selected.has(preview.url)} className="rounded-xl bg-white px-4 py-2 text-sm text-slate-900 disabled:opacity-40">{selected.has(preview.url) ? '取消选择此图' : '选择此图用于生成'}</button></div>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-white">
+          <button type="button" disabled={previewIndex <= 0} onClick={() => movePreview(-1)} className="rounded-xl px-4 py-2 text-sm disabled:opacity-40">上一张</button>
+          <span className="text-xs">{previewIndex + 1} / {images.length}</span>
+          <button type="button" disabled={disabled || preview.unavailable} onClick={() => toggleImage(preview.url)} aria-pressed={selected.has(preview.url)} className="rounded-xl bg-white px-4 py-2 text-sm text-slate-900 disabled:opacity-40">{selected.has(preview.url) ? '取消选择此图' : '选择此图用于生成'}</button>
+          <button type="button" disabled={previewIndex >= images.length - 1} onClick={() => movePreview(1)} className="rounded-xl px-4 py-2 text-sm disabled:opacity-40">下一张</button>
+        </div>
       </div>}
     </div>
   );

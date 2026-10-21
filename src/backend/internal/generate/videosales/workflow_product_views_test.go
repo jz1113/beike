@@ -56,7 +56,7 @@ func TestWorkflowValidationChecksAssetViewInsteadOfColorOnly(t *testing.T) {
 	refs := []actualReference{{ID: "front", Kind: "keyframe", Label: "卫衣正面", URL: "front.jpg"}}
 	body := validationBody("vision", map[string]any{"assets": []PlannedAsset{{ID: "front", ProductImageIndexes: []int{2}}}}, nil, refs, nil)
 	encoded, _ := json.Marshal(body)
-	for _, expected := range []string{"领口前后高低", "名称或提示词写正面但实际是背面时必须 conflict", "标志太小看不清时 uncertain", "不得因为黑色", "productImageIndexes"} {
+	for _, expected := range []string{"领口前后高低", "名称或提示词写正面但实际是背面时必须 conflict", "无法确认正反或必要外观一致性时 uncertain", "标志在正常比例下较小不等于缺失或移位", "不得因为黑色", "productImageIndexes"} {
 		if !strings.Contains(string(encoded), expected) {
 			t.Errorf("missing %s", expected)
 		}

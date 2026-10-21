@@ -17,6 +17,14 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	base, apiKey := videoCredentials(cfg, r, payload)
 	prompt := strings.TrimSpace(rawString(payload, "prompt"))
 	adapted := buildVideoPayload(model, prompt, payload)
+	protocol := r.Header.Get("x-custom-protocol")
+	if adapted.family == "wan" {
+		adapted.endpoints, adapted.queries = routeWanEndpoints(base, protocol)
+		if err := prepareWanMedia(r.Context(), adapted.payload, workspaceOf(r), cfg.Production()); err != nil {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "retryable": false, "error": err.Error()})
+			return
+		}
+	}
 	key, err := videoSubmissionKey(r, payload)
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "retryable": false, "error": err.Error()})
@@ -24,13 +32,17 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	}
 	claim, err := claimVideoSubmission(cfg, r, payload, adapted, base, key)
 	if err != nil {
-		body := map[string]any{"success": false, "taskKey": key, "submissionUnknown": true, "submissionOutcome": "unknown", "retryable": false, "error": "原视频提交回执暂时无法核对，未重发上游请求"}
-		status := http.StatusServiceUnavailable
+		// This happens before any upstream request. A database failure must stay
+		// retryable instead of looking like an unknown paid submission.
+		body := map[string]any{"success": false, "taskKey": key, "submitted": false, "submissionUnknown": false, "submissionOutcome": "rejected", "submissionRejected": true, "retryable": true, "error": "视频任务保存失败，尚未向上游提交，可以重试"}
+		status := http.StatusBadRequest
 		if err == errVideoSubmissionConflict {
 			status = http.StatusConflict
+			body["submitted"] = false
 			body["submissionUnknown"] = false
 			body["submissionOutcome"] = "rejected"
 			body["submissionRejected"] = true
+			body["retryable"] = false
 			body["idempotencyConflict"] = true
 			body["error"] = err.Error()
 		}
@@ -51,8 +63,9 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	started := time.Now()
 	result := modelgw.SubmitVideo(r.Context(), modelgw.SubmitCommand{
 		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), Headers: adapted.headers,
-		ReadTaskID: func(data map[string]any) string { return readVideoTaskID(data, adapted.family) },
-		Client:     ModelHTTP(),
+		ReadTaskID:          func(data map[string]any) string { return readVideoTaskID(data, adapted.family) },
+		Client:              ModelHTTP(),
+		RetryOnMissingInput: adapted.family == "wan",
 	})
 	if result.Outcome != modelgw.Accepted {
 		unknown := result.Outcome == modelgw.Unknown
@@ -63,8 +76,9 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		}
 		if unknown {
 			status = http.StatusServiceUnavailable
-			message = "视频提交结果不确定，请核对上游任务记录"
+			message = "视频提交结果不确定，请核对上游任务记录：" + message
 		}
+		message = safeVideoSubmitReason(message, apiKey, result.UpstreamStatus, result.EndpointAttempts)
 		state := "FAILURE"
 		if unknown {
 			state = "SUBMISSION_UNKNOWN"
@@ -86,8 +100,9 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		})
 		return
 	}
-	if len(adapted.queries) > 0 {
-		expanded := expandVideoURLs(base, adapted.queries[:1], "{taskId}")
+	queryIndex := result.EndpointAttempts - 1
+	if queryIndex >= 0 && queryIndex < len(adapted.queries) {
+		expanded := expandVideoURLs(base, adapted.queries[queryIndex:queryIndex+1], "{taskId}")
 		if len(expanded) > 0 {
 			rememberVideoQuery(base, result.TaskID, expanded[0])
 		}
@@ -130,6 +145,7 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 		duration = 6
 	}
 	audio, audioSet := rawBoolPresent(payload, "audio")
+	watermark := rawBool(payload, "watermark")
 	var body map[string]any
 	switch family {
 	case "vidu":
@@ -138,22 +154,17 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	case "grok-video":
 		body = grokOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos)
 		resolution = grokResolution(resolution)
+	case "wan":
+		body = wanOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
+		resolution = wanResolution(resolution)
+	case "seedance":
+		body = seedanceOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
+	case "kling":
+		body = klingOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
+	case "minimax":
+		body = minimaxOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
 	default:
-		body = map[string]any{
-			"model": model, "prompt": prompt, "duration": duration, "ratio": ratio, "aspect_ratio": ratio,
-			"resolution": resolution, "watermark": rawBool(payload, "watermark"), "size": videoPixelSize(ratio, resolution),
-		}
-		if audioSet && audio {
-			body["audio"] = true
-			body["generate_audio"] = true
-		}
-		if len(images) > 0 {
-			body["images"] = images
-			body["image"] = images[0]
-		}
-		if len(videos) > 0 {
-			body["videos"] = videos
-		}
+		body = flatVideoPayload(model, prompt, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	}
 	endpoints, queries, headers := videoEndpoints(family, model, mode, images)
 	return videoAdapted{family: family, modelID: model, ratio: ratio, resolution: resolution, size: videoPixelSize(ratio, resolution), duration: duration, images: images, payload: body, endpoints: endpoints, queries: queries, headers: headers}
@@ -169,103 +180,6 @@ func rawBoolPresent(payload map[string]json.RawMessage, key string) (bool, bool)
 		return false, false
 	}
 	return value, true
-}
-
-func viduResolution(resolution string) string {
-	upper := strings.ToUpper(strings.TrimSpace(resolution))
-	switch {
-	case strings.Contains(upper, "540"):
-		return "540p"
-	case strings.Contains(upper, "1080"):
-		return "1080p"
-	case strings.Contains(upper, "720"):
-		return "720p"
-	case strings.Contains(upper, "4K"):
-		return "4K"
-	case strings.Contains(upper, "2K"):
-		return "2K"
-	default:
-		return "720p"
-	}
-}
-
-func grokResolution(resolution string) string {
-	upper := strings.ToUpper(strings.TrimSpace(resolution))
-	switch {
-	case strings.Contains(upper, "1080"):
-		return "1080p"
-	case strings.Contains(upper, "720"):
-		return "720p"
-	default:
-		return "480p"
-	}
-}
-
-func viduOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images []string, audio, audioSet bool) map[string]any {
-	body := map[string]any{
-		"model": model, "prompt": prompt, "duration": duration, "resolution": viduResolution(resolution),
-	}
-	if audioSet {
-		body["audio"] = audio
-	}
-	switch mode {
-	case "first_frame":
-		if len(images) > 0 {
-			body["images"] = []string{images[0]}
-		}
-	case "first_last_frame":
-		if len(images) >= 2 {
-			body["images"] = []string{images[0], images[len(images)-1]}
-		}
-	case "text":
-		body["aspect_ratio"] = ratio
-	default:
-		body["images"] = images
-		body["aspect_ratio"] = ratio
-	}
-	return body
-}
-
-func grokOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images, videos []string) map[string]any {
-	if mode == "edit" || mode == "extend" {
-		body := map[string]any{"model": model, "prompt": prompt}
-		if len(videos) > 0 {
-			body["video"] = map[string]string{"url": videos[0]}
-		}
-		if mode == "extend" {
-			if duration == 0 {
-				duration = 6
-			}
-			body["duration"] = duration
-		}
-		return body
-	}
-	body := map[string]any{
-		"model": model, "prompt": prompt, "duration": duration,
-		"aspect_ratio": ratio, "resolution": grokResolution(resolution),
-	}
-	switch mode {
-	case "first_frame":
-		if len(images) > 0 {
-			body["image"] = map[string]string{"url": images[0]}
-		}
-	case "first_last_frame":
-		if len(images) > 0 {
-			body["image"] = map[string]string{"url": images[0]}
-		}
-		if len(images) > 1 {
-			body["last_frame"] = map[string]string{"url": images[len(images)-1]}
-		}
-	case "omni":
-		refs := make([]map[string]string, 0, len(images))
-		for _, item := range images {
-			refs = append(refs, map[string]string{"url": item})
-		}
-		if len(refs) > 0 {
-			body["reference_images"] = refs
-		}
-	}
-	return body
 }
 
 func videoFamily(model string) string {

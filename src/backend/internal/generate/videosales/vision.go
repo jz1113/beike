@@ -2,7 +2,6 @@ package videosales
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,9 +17,9 @@ import (
 // chatWait matches the model gateway default and covers observed completions of about four minutes.
 const chatWait = 5 * time.Minute
 
-const longOutputTokens = 8192
+const longOutputTokens = 16384
 
-var errTruncatedOutput = errors.New("模型输出被截断，没有完整结果")
+var errTruncatedOutput = errors.New("模型输出被截断，自动恢复后仍未获得完整结果；请缩短目标时长或切换支持更长输出的模型后重试")
 
 func roleLabel(role string) string {
 	switch role {
@@ -45,18 +44,7 @@ func visionParts(intro string, images []CatalogImage) []map[string]any {
 }
 
 func postChatJSON(ctx context.Context, base, key string, body map[string]any, timeout time.Duration) (string, map[string]any, int, error) {
-	text, raw, status, err := generate.ChatCompletionPayload(ctx, base, key, body, timeout)
-	if err != nil {
-		return "", raw, status, err
-	}
-	cleaned := cleanJSONFence(text)
-	if chatFinishReason(raw) == "length" && !json.Valid([]byte(cleaned)) {
-		return "", raw, status, errTruncatedOutput
-	}
-	if cleaned == "" {
-		return "", raw, status, fmt.Errorf("模型没有返回内容")
-	}
-	return cleaned, raw, status, nil
+	return completeSalesJSON(ctx, base, key, body, timeout)
 }
 
 func chatFinishReason(raw map[string]any) string {

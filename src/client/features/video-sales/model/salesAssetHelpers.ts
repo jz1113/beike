@@ -88,12 +88,22 @@ export async function recoverSalesAssetReceipts(input: {
   script: VideoSalesScript;
   isAborted: () => boolean;
   updateAsset: (id: string, patch: Partial<SalesCreativeAsset>) => void;
-}, generate: SalesFrameGenerator): Promise<void> {
-  const pending = (input.script.assets || []).filter((asset) => asset.taskId && ['generating', 'uncertain'].includes(asset.status || ''));
+}, generate: SalesFrameGenerator, lookup?: import('./salesImageTypes').SalesImageBatchClient['lookup']): Promise<void> {
+  const pending = (input.script.assets || []).filter((asset) => (asset.taskId || asset.submissionKey) && ['generating', 'uncertain'].includes(asset.status || ''));
   if (input.isAborted()) throw new DOMException('已停止查询', 'AbortError');
   const results = await mapWithLimit(pending, SALES_IMAGE_BATCH_LIMIT, async (asset) => {
     try {
-      const url = await generate({ existingTaskId: asset.taskId, imageModel: asset.modelId, prompt: '', isAborted: input.isAborted });
+      let taskId = asset.taskId;
+      if (!taskId && asset.submissionKey && lookup) {
+        const found = await lookup(asset.submissionKey, asset.modelId, input.isAborted);
+        if (found.outcome === 'done' && found.url) return { asset, url: found.url, error: undefined as unknown };
+        if (found.taskId) { taskId = found.taskId; input.updateAsset(asset.id, { taskId }); }
+        if (found.outcome === 'failed') {
+          const error = new Error(found.error || '原图片任务失败'); error.name = 'ImageGenBusinessError'; throw error;
+        }
+      }
+      if (!taskId) throw new Error('图片提交结果仍待核实，请继续查询原任务，不会重新提交');
+      const url = await generate({ existingTaskId: taskId, imageModel: asset.modelId, prompt: '', isAborted: input.isAborted });
       return { asset, url, error: undefined as unknown };
     } catch (error) {
       return { asset, url: undefined, error };
@@ -107,7 +117,7 @@ export async function recoverSalesAssetReceipts(input: {
     }
     const error = result.error;
     input.updateAsset(result.asset.id, {
-      status: error instanceof Error && error.name === 'ImageGenBusinessError' ? 'failed' : 'uncertain',
+      status: !input.isAborted() && error instanceof Error && error.name === 'ImageGenBusinessError' ? 'failed' : 'uncertain',
       error: error instanceof Error ? error.message : '原图片任务结果未确认',
     });
     if (failure === undefined) failure = error ?? new Error('原图片任务结果未确认');

@@ -11,6 +11,7 @@ export interface SalesPlanApi {
 }
 
 export type SalesPlanPhase = 'analyze' | 'script' | 'select' | 'prompt';
+export interface SalesPlanCheckpoint { analysis?: VideoSalesProductAnalysis; script?: VideoSalesScript }
 
 export async function buildSalesPlan(input: {
   productName: string;
@@ -24,9 +25,10 @@ export async function buildSalesPlan(input: {
   aspectRatio?: string;
   selectedColor?: string;
   videoMode: VideoSalesMode;
-  redrawScenes: boolean;
   route: SalesRouteHeaders;
   onPhase: (phase: SalesPlanPhase) => void;
+  checkpoint?: SalesPlanCheckpoint;
+  onCheckpoint?: (checkpoint: SalesPlanCheckpoint) => void;
 }, api: SalesPlanApi): Promise<{ analysis: VideoSalesProductAnalysis; script: VideoSalesScript }> {
   const images = input.imageCatalog.filter((image) => image.url.trim() && !image.unavailable);
   if (!images.length) throw new Error('请先选择至少一张用于生成的商品图');
@@ -34,14 +36,18 @@ export async function buildSalesPlan(input: {
   const productDescription = JSON.stringify({ suppliedSellingPoints: omitSalesPriceClauses(input.sellingPoints), originalProductProperties: omitSalesPriceProps(input.productProps || {}) });
   const context = { workflowVersion: 3 as const, eligibleImageIndexes: images.map((image) => image.index), selectedColor: input.selectedColor, aspectRatio: input.aspectRatio || '9:16' };
   input.onPhase('analyze');
-  const analysis = await api.analyzeProductMedia({
+  const checkAbort = () => { if (input.route.signal?.aborted) throw new DOMException('已停止脚本生成', 'AbortError'); };
+  checkAbort();
+  const analysis = input.checkpoint?.analysis || await api.analyzeProductMedia({
     imageCatalog: images, productName: input.productName, brand: input.brand,
     productDescription, category: input.category,
     ...context, ...input.route,
   });
   if (!analysis.sellingPoints?.some((point) => point.trim())) throw new Error('商品分析没有返回卖点');
+  checkAbort();
+  input.onCheckpoint?.({ analysis });
   input.onPhase('script');
-  const scripts = await api.generateSalesScripts({
+  const scripts = input.checkpoint?.script ? [input.checkpoint.script] : await api.generateSalesScripts({
     productName: input.productName, brand: input.brand, category: input.category,
     productDescription, productImages: images.map((image) => image.url), imageCatalog: images,
     productAnalysis: JSON.stringify(analysis), videoMode: input.videoMode, targetDuration: input.targetDuration,
@@ -55,8 +61,13 @@ export async function buildSalesPlan(input: {
   }
   if (!Array.isArray(selected.assets)) throw new Error('脚本没有返回自动素材计划，请重新生成');
   validateSalesAssetPlan(selected.assets, images);
+  checkAbort();
+  input.onCheckpoint?.({ analysis, script: selected });
   input.onPhase('select');
-  const assignments = await api.selectSalesImages({ shots: selected.shots, imageCatalog: images, ...context, ...input.route });
+  const assignments = images.length === 1
+    ? selected.shots.map((shot) => ({ shotId: shot.shotId, imageIndex: images[0].index, reason: '使用唯一已选商品图' }))
+    : await api.selectSalesImages({ shots: selected.shots, imageCatalog: images, ...context, ...input.route });
+  checkAbort();
   const shots = applyStrictImageAssignments(selected.shots, assignments, images);
   return {
     analysis,

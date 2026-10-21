@@ -19,7 +19,7 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 	}
 	base, apiKey := pollCredentials(cfg, r)
 	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
-	urls := videoPollURLs(root, taskID, r.URL.Query().Get("model"))
+	urls := videoPollURLs(root, taskID, r.URL.Query().Get("model"), r.Header.Get("x-custom-protocol"))
 	for _, endpoint := range urls {
 		status, raw, err := PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second)
 		if err != nil || status < 200 || status >= 300 {
@@ -40,14 +40,21 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 	writeProbeMiss(cfg, w, r, taskID, "视频任务失败", "暂时无法查询云端视频任务状态")
 }
 
-func videoPollURLs(base, taskID, model string) []string {
+func videoPollURLs(base, taskID, model, protocol string) []string {
 	var urls []string
 	if template := videoQueryTemplate(base, taskID); template != "" {
 		urls = append(urls, strings.ReplaceAll(template, "{taskId}", url.QueryEscape(taskID)))
 	}
-	_, queries, _ := videoEndpointSet(videoFamily(model), model, "", nil)
+	var queries []string
+	if videoFamily(model) == "wan" {
+		_, queries = routeWanEndpoints(base, protocol)
+	} else {
+		_, queries, _ = videoEndpointSet(videoFamily(model), model, "", nil)
+	}
 	urls = append(urls, expandVideoURLs(base, queries, url.QueryEscape(taskID))...)
-	urls = append(urls, base+"/v1/videos/"+taskID, base+"/v2/videos/generations/"+taskID, base+"/seedance/v3/contents/generations/tasks/"+taskID)
+	if videoFamily(model) != "wan" {
+		urls = append(urls, base+"/v1/videos/"+taskID, base+"/v2/videos/generations/"+taskID, base+"/seedance/v3/contents/generations/tasks/"+taskID)
+	}
 	return uniqueStrings(urls)
 }
 

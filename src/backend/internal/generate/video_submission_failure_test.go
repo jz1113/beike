@@ -93,7 +93,7 @@ func TestVideoSubmissionPersistenceFailurePreventsUpstream(t *testing.T) {
 		t.Fatal(err)
 	}
 	response := videoSubmissionTestPost(Video(cfg), server.URL, "no-receipt", "海边", "local")
-	if response.Code != http.StatusServiceUnavailable || calls.Load() != 0 {
+	if response.Code != http.StatusBadRequest || calls.Load() != 0 || !strings.Contains(response.Body.String(), `"submitted":false`) || !strings.Contains(response.Body.String(), `"retryable":true`) || strings.Contains(response.Body.String(), `"submissionUnknown":true`) {
 		t.Fatalf("submit without receipt: %d %s calls=%d", response.Code, response.Body.String(), calls.Load())
 	}
 }

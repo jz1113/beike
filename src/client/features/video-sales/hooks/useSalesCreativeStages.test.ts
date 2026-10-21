@@ -5,10 +5,12 @@ import { finalizeSalesPrompts } from '../api/videoSalesApi';
 import { prepareSalesCreativeAssets } from '../model/prepareSalesAssets';
 import { salesPlanInputRevision, salesSingleVideoError } from '../model/salesStageRules';
 import { defaultSalesStudioState, type VideoSalesStudioState } from '../model/salesStudioDraft';
+import { generateSalesReferenceFrame } from '../api/salesMediaApi';
 
 vi.mock('react', () => ({ useCallback: (callback: unknown) => callback, useEffect: () => {}, useRef: (current: unknown) => ({ current }), useState: (value: unknown) => [value, vi.fn()] }));
 vi.mock('../model/prepareSalesAssets', () => ({ prepareSalesCreativeAssets: vi.fn() }));
 vi.mock('../api/videoSalesApi', () => ({ finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn() }));
+vi.mock('../api/salesMediaApi', () => ({ generateSalesReferenceFrame: vi.fn() }));
 vi.mock('../model/salesStageRules', async (original) => ({ ...await original<typeof import('../model/salesStageRules')>(), salesSingleVideoError: vi.fn() }));
 vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute: (modality: string) => ({ modelId: `${modality}-chosen` }) }));
 
@@ -36,6 +38,30 @@ beforeEach(() => {
 });
 
 describe('sales creative stage ordering', () => {
+  it('queries only the requested image receipt even after the plan becomes stale', async () => {
+    const { stages, stateRef } = Harness();
+    const script = stateRef.current.scripts[0];
+    script.planStale = true;
+    script.assets = [
+      { ...script.assets![0], status: 'generating', taskId: 'scene-task' },
+      { ...script.assets![0], id: 'other', status: 'generating', taskId: 'other-task' },
+    ];
+    vi.mocked(generateSalesReferenceFrame).mockResolvedValue('/recovered-scene.jpg');
+    await stages.runAssets('scene', true);
+    expect(generateSalesReferenceFrame).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ existingTaskId: 'scene-task' }));
+    expect(stateRef.current.scripts[0].assets![0]).toMatchObject({ status: 'done', url: '/recovered-scene.jpg' });
+    expect(stateRef.current.scripts[0].assets![1].status).toBe('generating');
+    expect(prepareSalesCreativeAssets).not.toHaveBeenCalled();
+  });
+  it('confirms actual pictures manually without a model call and rejects incomplete pictures', () => {
+    const { stages, stateRef } = Harness();
+    expect(stages.confirmAssets()).toBe(false);
+    stateRef.current.scripts[0].assets![0] = { ...stateRef.current.scripts[0].assets![0], status: 'done', url: '/actual.jpg' };
+    expect(stages.confirmAssets()).toBe(true);
+    expect(stateRef.current.scripts[0]).toMatchObject({ assetValidation: 'passed', assets: [{ validation: 'passed', validationSource: 'manual' }] });
+    expect(finalizeSalesPrompts).not.toHaveBeenCalled();
+    expect(prepareSalesCreativeAssets).not.toHaveBeenCalled();
+  });
   it('blocks finalization until actual images pass and sends those exact images in submission order', async () => {
     const { stages, stateRef, setError } = Harness();
     await stages.runFinalize();

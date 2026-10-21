@@ -14,6 +14,8 @@ import { getShotAssetLabels } from '../../model/assetPresentation';
 
 export interface BatchStage3ShotCardProps {
   shot: {
+    sourcePrompt?: string;
+    sourceReferenceImageUrl?: string;
     assembly_source?: 'group_skeleton' | 'architecture' | 'fallback';
     scene?: string;
     shot_type?: 'model_shot' | 'hand_held_only' | 'pure_product';
@@ -67,6 +69,10 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
                  hover:border-indigo-200 transition-colors duration-200
                  overflow-hidden dark:bg-[#18191c] dark:border-white/10 dark:hover:border-indigo-400/40"
     >
+      {shot.sourcePrompt && <details className="border-b border-slate-100 px-4 py-2 text-[11px] text-slate-500 dark:border-white/10 dark:text-slate-400">
+        <summary className="cursor-pointer">核对样本原始反推词</summary>
+        <p className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap leading-6 select-text">{shot.sourcePrompt}</p>
+      </details>}
       {/* 标题区 */}
       <div className="p-4 space-y-3">
         {/* 分镜标题与元数据 */}

@@ -196,6 +196,9 @@ func strictShots(payload map[string]any, needImages bool, catalog []CatalogImage
 		}
 		seen[shot.ShotId] = true
 	}
+	if err := validateSpeechModes(shots, false); err != nil {
+		return nil, err
+	}
 	if needImages {
 		var raw []map[string]json.RawMessage
 		if err := decodeField(payload, "shots", &raw); err != nil {

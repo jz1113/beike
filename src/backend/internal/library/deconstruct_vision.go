@@ -91,6 +91,10 @@ func visionFailure(message string, unreachable, quota bool) visionOutcome {
 func deconstructPrompt(count int, hint, category string) string {
 	return "请一次完成这 " + strconv.Itoa(count) + " 张参考图的反推，只输出 JSON。" +
 		"必须包含 per_image（每张含 image_index、title、reverse_prompt_zh、has_human）、content_groups、scenes、outfits、actions、content_summary、theme_category、product_major_category。" +
+		"per_image 必须逐张对应原图，image_index 从1连续编号，不遗漏、不合并。reverse_prompt_zh 保留该图的完整画面描述，至少180字，按【主体】【发型与面部】【穿搭或物体细节】【动作或摆放】【场景结构】【光影】【构图镜头】【材质与真实感】【画质与限制】分段，未出镜的部分写不出镜，不补造。" +
+		"具体记录主体位置与占比、裁切、视角、支撑与握持接触、背景物件位置、光向与阴影、色调、景深、纹理与真实曝光；不添加样本没有的精修、电影光、极浅景深、磨皮或道具。不确定的摄影参数描述视觉效果，不猜测器材数值。" +
+		"每张另含 shot_type（model_shot/hand_held_only/pure_product）；只有人像镜头 has_human=true，仅手部时 has_human=false 且 shot_type=hand_held_only。scene 对象记录 title、description、lighting，action 对象记录 title、action、camera；人物面貌不可辨或只见衣袖时，不提取完整人物和穿搭资产。" +
+		"content_groups 每组恰好4张、顺序连续、不重复，字段 group_index、source_image_indices、title、scene_summary、architecture_summary、has_human；不足4张的余图不组成完整母本。组摘要不能替代逐镜完整描述，不将各图平均成统一场景与光线。" +
 		"\n用户提示：" + hint + "\n目标大类：" + category
 }
 

@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '@client/store';
 import { fetchRecipes, loadSystemConfiguredModels } from '../api/workshopResources';
 import { nextWorkshopRecipeSelection } from '../model/workshopResourceRules';
 
 export function useBatchWorkshopResources(setSelectedArchId: (id: string) => void) {
+  const recipeRequest = useRef(0);
   const [recipes, setRecipes] = useState<any[]>([]);
   // 模型配置
   const [availableVisionModels, setAvailableVisionModels] = useState<any[]>([]);
@@ -13,13 +14,15 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
 
   // 资源异步加载
   const fetchRecipesHandler = useCallback(async () => {
+    const request = ++recipeRequest.current;
     try {
       const visible = await fetchRecipes();
+      if (request !== recipeRequest.current) return;
       setRecipes(visible);
       const next = nextWorkshopRecipeSelection(visible, useAppStore.getState().selectedArchId);
       if (next !== null) setSelectedArchId(next);
     } catch {
-      setRecipes([]);
+      if (request === recipeRequest.current) setRecipes([]);
     }
   }, [setSelectedArchId]);
 
@@ -39,6 +42,9 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
   useEffect(() => {
     void fetchRecipesHandler();
     loadModelsHandler();
+    const refresh = () => { void fetchRecipesHandler(); };
+    window.addEventListener('workshop-recipes-changed', refresh);
+    return () => { ++recipeRequest.current; window.removeEventListener('workshop-recipes-changed', refresh); };
   }, [fetchRecipesHandler, loadModelsHandler]);
 
   return {

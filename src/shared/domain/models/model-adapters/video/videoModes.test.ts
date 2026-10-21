@@ -55,6 +55,18 @@ describe('video payloads keep frame roles exclusive', () => {
     expect(extended.payload.omni_reference_task_type).toBe('extend');
   });
 
+  it('uses the native Wan path on Qianwen and passthrough order on other gateways', () => {
+    const native = buildVideoRequest({ ...base, model: 'wan3.0-video', refMode: 'omni', images: [first] }).endpoints('https://maas.qianwenaiapi.com/compatible-mode/v1');
+    expect(native.submit).toEqual(['https://maas.qianwenaiapi.com/api/v1/services/aigc/video-generation/video-synthesis']);
+    expect(native.submit[0]).not.toContain('/qwen/');
+    expect(native.submit[0]).not.toContain('compatible-mode');
+    const gateway = buildVideoRequest({ ...base, model: 'wan3.0-video', refMode: 'omni', images: [first] }).endpoints('https://gateway.example/v1');
+    expect(gateway.submit[0]).toContain('/wan/api/v1/services/aigc/video-generation/video-synthesis');
+    expect(gateway.submit[1]).toContain('/qwen/api/v1/services/aigc/video-generation/video-synthesis');
+    expect(gateway.submit[2]).toBe('https://gateway.example/api/v1/services/aigc/video-generation/video-synthesis');
+    expect(gateway.submit.join(' ')).not.toContain('/v1/videos');
+  });
+
   it('sends Wan first and last frames without reference media', () => {
     const { payload } = buildVideoRequest({ ...base, model: 'wan3.0-video', refMode: 'first_last_frame', images: [first, last] });
     const media = (payload.input as { media: Array<{ type: string }> }).media;

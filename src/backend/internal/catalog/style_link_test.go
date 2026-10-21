@@ -64,7 +64,7 @@ func TestExtractStyleRequiresImageAndKey(t *testing.T) {
 
 func TestExtractStyleReturnsRecipe(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"name\":\"窗边桌搭\",\"category\":\"home_living\",\"tag\":\"暖光\",\"desc\":\"真实窗光\",\"promptSnippet\":\"你是一位种草级商业摄影大师，请按窗边暖光、木桌和浅景深来规划买家秀分镜，并保留商品真实外观。\"}"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"name\":\"窗边桌搭\",\"category\":\"home_living\",\"tag\":\"暖光\",\"desc\":\"真实窗光\",\"promptSnippet\":\"你是一位种草级商业摄影大师，请按窗边暖光、木桌和浅景深来规划买家秀分镜，并保留商品真实外观。参考图只提供画面结构，商品外观以新商品图片为准，皮肤和材质保留自然纹理。\"}"}}]}`))
 	}))
 	defer server.Close()
 	previous := styleHTTP

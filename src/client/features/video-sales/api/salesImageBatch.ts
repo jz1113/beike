@@ -1,3 +1,4 @@
+import { withSalesAbort } from './salesAbortSignal';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders, getGatewayClientOverrides, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { pollSingleTaskResult } from '@client/shared/api/generation/generationApi';
@@ -57,7 +58,8 @@ export async function submitSalesImageBatch(items: SalesImageBatchItem[], isAbor
   if (items.length > SALES_IMAGE_BATCH_LIMIT) throw new Error('一批最多提交 20 张图片');
   let response: Response;
   try {
-    response = await apiFetch('/api/generate/image-batch', {
+    response = await withSalesAbort(isAborted, (signal) => apiFetch('/api/generate/image-batch', {
+      signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +67,7 @@ export async function submitSalesImageBatch(items: SalesImageBatchItem[], isAbor
         ...storageConfigHeaders(),
       },
       body: JSON.stringify({ items: items.map(batchItemPayload) }),
-    });
+    }));
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : '批量生图请求失败');
   }

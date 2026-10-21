@@ -30,7 +30,7 @@ export default function WorkshopStudio({
 
   return (
     <WorkshopDockActionsProvider>
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-transparent relative select-none">
+      <div className={`flex-1 flex flex-col min-w-0 h-full overflow-hidden relative select-none ${activeWorkshopTab === 'studio' ? 'bg-transparent' : 'bg-slate-50/95 dark:bg-[#111214]/95'}`}>
         <WorkshopSideCapsuleBar activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />
         {activeWorkshopTab !== 'studio' && <WorkshopTopBar assetToolbarRef={setAssetToolbarTarget} activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />}
 
