@@ -2,7 +2,7 @@ import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { apiFetch, proxyMediaUrl, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { formatWorkshopCopywriting, type WorkshopExportRow } from '@shared/domain/workshop/workshopExport';
 import type { BatchProductItem } from '../batchTypes';
-import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExportFields';
+import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExport';
 
 export type MatrixExportRow = WorkshopExportRow;
 

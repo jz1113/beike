@@ -6,7 +6,7 @@ import {
   analyzePromotedGroup, approvePromotedGroup, loadMotherReplacement,
   replacePromotedGroup, type MotherReplacementState, type PromotedGroupCandidate,
 } from '../api/promoteGroup';
-import { reviewedFourShotGroup, reviewedGroupSignature } from '../model/generation/reviewedGroup';
+import { reviewedFourShotGroup, reviewedGroupSignature } from '../model/generation/generationHelpers';
 import { stableAssetCode } from '@shared/domain/assets/assetSampling';
 import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';
 import { getCachedAssetsSync, invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';

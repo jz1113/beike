@@ -21,7 +21,7 @@ import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
 import type { ApprovalRequestItem, AssistantItem } from '@shared/domain/assistant/types';
 import { stopAgentTask } from '../engine/submitAgentTask';
-import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '../model/agentArtifact';
+import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '@client/shared/media/agentArtifact';
 import { presentAgentTurn } from '../model/agentToolActivity';
 import AgentToolActivity from './AgentToolActivity';
 

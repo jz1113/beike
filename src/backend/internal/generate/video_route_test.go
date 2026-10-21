@@ -12,6 +12,57 @@ import (
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
+func TestViduAndGrokPayloadsFollowOfficialAPIs(t *testing.T) {
+	first := "https://example.com/a.jpg"
+	last := "https://example.com/b.jpg"
+	clip := "https://example.com/clip.mp4"
+	reference := buildVideoPayload("viduq3", "海边", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first, last}),
+		"aspect_ratio": rawJSON(t, "9:16"), "resolution": rawJSON(t, "1080P"), "duration": rawJSON(t, 5),
+		"audio": json.RawMessage(`false`),
+	})
+	if !strings.Contains(reference.endpoints[0], "/reference2video") || reference.payload["image"] != nil || reference.payload["aspect_ratio"] != "9:16" {
+		t.Fatalf("vidu reference: %#v %v", reference.payload, reference.endpoints)
+	}
+	if images, _ := reference.payload["images"].([]string); len(images) != 2 || images[0] != first || reference.payload["resolution"] != "1080p" || reference.payload["audio"] != false {
+		t.Fatalf("vidu reference body: %#v", reference.payload)
+	}
+	frame := buildVideoPayload("viduq3-pro", "海边", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "first_frame"), "images": rawJSON(t, []string{first}),
+		"aspect_ratio": rawJSON(t, "9:16"), "resolution": rawJSON(t, "720P"), "duration": rawJSON(t, 5),
+	})
+	if !strings.Contains(frame.endpoints[0], "/img2video") {
+		t.Fatalf("vidu frame endpoint: %v", frame.endpoints)
+	}
+	if _, ok := frame.payload["aspect_ratio"]; ok {
+		t.Fatalf("img2video includes aspect_ratio: %#v", frame.payload)
+	}
+	if images, _ := frame.payload["images"].([]string); len(images) != 1 || images[0] != first {
+		t.Fatalf("vidu frame images: %#v", frame.payload["images"])
+	}
+	grok := buildVideoPayload("grok-imagine-video-1.5", "海边", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first, last}),
+		"aspect_ratio": rawJSON(t, "9:16"), "resolution": rawJSON(t, "720P"), "duration": rawJSON(t, 5),
+	})
+	if !strings.Contains(grok.endpoints[0], "/xai/v1/videos/generations") || grok.payload["image"] != nil {
+		t.Fatalf("grok reference: %#v %v", grok.payload, grok.endpoints)
+	}
+	edited := buildVideoPayload("grok-imagine-video-1.5", "改项链", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "edit"), "videos": rawJSON(t, []string{clip}),
+		"duration": rawJSON(t, 5), "resolution": rawJSON(t, "720P"), "aspect_ratio": rawJSON(t, "16:9"),
+	})
+	if !strings.Contains(edited.endpoints[0], "/xai/v1/videos/edits") || edited.payload["duration"] != nil {
+		t.Fatalf("grok edit: %#v %v", edited.payload, edited.endpoints)
+	}
+	extended := buildVideoPayload("grok-imagine-video-1.5", "继续走", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "extend"), "videos": rawJSON(t, []string{clip}),
+		"resolution": rawJSON(t, "720P"), "aspect_ratio": rawJSON(t, "16:9"),
+	})
+	if !strings.Contains(extended.endpoints[0], "/xai/v1/videos/extensions") || extended.payload["duration"] != 6 {
+		t.Fatalf("grok extend: %#v %v", extended.payload, extended.endpoints)
+	}
+}
+
 func TestVideoPayloadRequestsNativeAudio(t *testing.T) {
 	withAudio := buildVideoPayload("doubao-seedance-2.5", "海边", map[string]json.RawMessage{
 		"audio": json.RawMessage(`true`),

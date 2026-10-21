@@ -303,7 +303,7 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
-                  <AppErrorBoundary title="带货剪手工作室异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                  <AppErrorBoundary title="视频带货异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <VideoSalesStudio onBack={() => setCurrentView('home')} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>

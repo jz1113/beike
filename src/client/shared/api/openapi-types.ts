@@ -1124,6 +1124,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/image-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_image_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/generate/keyword-review": {
         parameters: {
             query?: never;
@@ -1779,6 +1795,8 @@ export interface components {
             required: boolean;
             referenceAssetIds?: string[];
             usesProduct?: boolean;
+            /** @description 本张静帧按目标视角选择的商品目录原始编号，须属于模型看过的允许图片；未提供时兼容旧计划，生图使用全部已选商品图 */
+            productImageIndexes?: number[];
         };
         VideoSalesShot: {
             shotId: number;
@@ -3688,6 +3706,24 @@ export interface operations {
         };
     };
     post_api_generate_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_generate_image_batch: {
         parameters: {
             query?: never;
             header?: never;

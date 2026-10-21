@@ -21,6 +21,10 @@ export function boundaryViolations(from, to, specifier, allowed = new Set()) {
   if (inTree(from, 'src/client/shared') && inTree(to, 'src/client/features')) errors.push('shared-no-features');
   if (/^src\/client\/features\/workshop\/model\//.test(from)
     && (/^src\/client\/features\/workshop\/(hooks|components|views)\//.test(to))) errors.push('workshop-model-no-ui');
+  if (/^src\/client\/features\/video-sales\/model\//.test(from) && !/\.test\.tsx?$/.test(from)
+    && (/^src\/client\/features\/video-sales\/api\//.test(to) || /src\/client\/shared\/api\/apiClient/.test(to))) {
+    errors.push('video-sales-model-no-api');
+  }
   const sourceFeature = featureOf(from), targetFeature = featureOf(to);
   if (sourceFeature && targetFeature && sourceFeature !== targetFeature && !allowed.has(`${sourceFeature}->${targetFeature}`)) {
     errors.push(`cross-feature:${sourceFeature}->${targetFeature}`);

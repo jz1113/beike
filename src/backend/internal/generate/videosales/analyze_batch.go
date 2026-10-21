@@ -109,8 +109,8 @@ func imageFailureReason(err *modelgw.TextImageError) string {
 type analysisFacts struct {
 	Name        string
 	Brand       string
-	Price       string
 	Category    string
+	Color       string
 	Description string
 }
 
@@ -122,8 +122,8 @@ func analysisFactsFrom(payload map[string]any) analysisFacts {
 	return analysisFacts{
 		Name:        strings.TrimSpace(generate.StringField(payload, "productName")),
 		Brand:       strings.TrimSpace(generate.StringField(payload, "brand")),
-		Price:       strings.TrimSpace(generate.StringField(payload, "priceRange")),
 		Category:    category,
+		Color:       strings.TrimSpace(generate.StringField(payload, "selectedColor")),
 		Description: strings.TrimSpace(generate.StringField(payload, "productDescription")),
 	}
 }
@@ -200,36 +200,49 @@ func decodeAnalysis(content string) (ProductAnalysisResult, error) {
 	return parsed, nil
 }
 
+func analysisFactText(facts analysisFacts) string {
+	color := "未确认"
+	if facts.Color != "" {
+		color = facts.Color
+	}
+	return fmt.Sprintf("商品名称：%s\n品牌：%s\n品类：%s\n本次确认颜色：%s\n已有资料：%s",
+		facts.Name, facts.Brand, facts.Category, color, facts.Description)
+}
+
 func analyzeChatBody(model string, facts analysisFacts, images []CatalogImage, batch, total int) map[string]any {
-	text := fmt.Sprintf("商品名称：%s\n品牌：%s\n价格：%s\n品类：%s\n已有资料：%s\n这是第 %d 批图片，共 %d 批。只根据这些图片和已有资料总结。已知事实写入 knownFacts，拍摄建议写入 creativeNotes。不要编造功效、评价、销量、实测结果或促销。%s",
-		facts.Name, facts.Brand, facts.Price, facts.Category, facts.Description, batch, total, analysisJSONShape())
-	return chatBody(model, analysisSystemPrompt(facts.Category), visionParts(text, images), 0.2)
+	text := fmt.Sprintf("%s\n这是第 %d 批图片，共 %d 批。只根据这些图片、本次确认颜色和已有资料总结。已知事实写入 knownFacts，拍摄建议写入 creativeNotes。不要把其他颜色写成当前商品外观，不要提取或写入价格、金额或优惠，不要编造功效、评价、销量、实测结果或促销。%s",
+		analysisFactText(facts), batch, total, analysisJSONShape(facts.Category))
+	return withLongOutput(chatBody(model, analysisSystemPrompt(facts.Category), visionParts(text, images), 0.2))
 }
 
 func summarizeAnalysisBody(model string, facts analysisFacts, partials string) map[string]any {
-	text := fmt.Sprintf("商品名称：%s\n品牌：%s\n价格：%s\n品类：%s\n已有资料：%s\n下面是分批图片分析，请合并成一份。重复卖点只留一次，互相矛盾时保留更具体、能对应图片的说法。不要新增任何一批里都没有的功效、评价或优惠。%s\n分批结果：%s",
-		facts.Name, facts.Brand, facts.Price, facts.Category, facts.Description, analysisJSONShape(), partials)
-	return chatBody(model, analysisSummaryPrompt(facts.Category), text, 0.2)
+	text := fmt.Sprintf("%s\n下面是分批图片分析，请合并成一份。重复卖点只留一次，互相矛盾时保留更具体、能对应图片和本次确认颜色的说法。不要新增任何一批里都没有的功效、评价或优惠。%s\n分批结果：%s",
+		analysisFactText(facts), analysisJSONShape(facts.Category), partials)
+	return withLongOutput(chatBody(model, analysisSummaryPrompt(facts.Category), text, 0.2))
 }
 
 func analysisSystemPrompt(category string) string {
-	base := "你是电商选品编辑。只输出 JSON 对象，不输出解释。"
+	base := "你是电商选品编辑。只输出 JSON 对象，不输出解释。不要把价格、金额或优惠写进卖点、已知事实或拍摄建议。"
 	if category != "fashion" {
 		return base
 	}
-	return base + " 当前商品属于服饰、鞋、包。卖点和已知事实只写颜色、版型、面料、结构等可见依据。creativeNotes 与 videoSuggestions 只在开箱换装、生活穿搭、鞋包展示中给出拍摄方向，不编造功效、评价、销量或优惠。"
+	return base + " 当前商品属于服饰、鞋、包。knownFacts 只写颜色、版型、面料、结构等看得见或资料里有的事实。sellingPoints 至少写两条能分开念的卖点，每条写成「可见事实 → 看点位置 → 穿着后果」：看点是画面里指得着的一处，穿着后果是少做哪一步、适合什么场合、怎么和已有衣服搭配，并写明依据；推不出穿着后果就不要写成卖点。usageScenarios 与 painPoints 只从品名、季节和品类推出。creativeNotes 与 videoSuggestions 只在开箱换装、生活穿搭、鞋包展示中给出拍摄方向，keyVisuals 只列口播要对着讲的看点。不编造功效、评价、销量、实测、优惠、尺码或价格。"
 }
 
 func analysisSummaryPrompt(category string) string {
-	base := "你负责合并商品分析结果。只输出 JSON 对象。"
+	base := "你负责合并商品分析结果。只输出 JSON 对象。不要把价格、金额或优惠写进卖点、已知事实或拍摄建议。"
 	if category != "fashion" {
 		return base
 	}
-	return base + " 合并时保持服饰约束：事实只保留颜色、版型、面料、结构等可见依据；拍摄建议只保留开箱换装、生活穿搭或鞋包展示，不新增功效、评价、销量或优惠。"
+	return base + " 合并时保持服饰约束：knownFacts 只保留颜色、版型、面料、结构等可见事实；sellingPoints 保留「可见事实 → 看点位置 → 穿着后果」并带依据，没有依据的穿着后果删掉，至少留下两条能分开念的卖点；usageScenarios 与 painPoints 只保留能从品名、季节或品类推出的场合。拍摄建议只保留开箱换装、生活穿搭或鞋包展示，keyVisuals 只保留口播要对着讲的看点，不新增功效、评价、销量、实测、优惠、尺码或价格。"
 }
 
-func analysisJSONShape() string {
-	return `输出格式：{"productName":"","category":"","brand":"","visualFeatures":{"mainColor":"","designStyle":"","productForm":"","texture":""},"sellingPoints":["卖点"],"targetAudience":"","usageScenarios":["场景"],"painPoints":["痛点"],"knownFacts":["资料或图片中可见的事实"],"creativeNotes":["拍摄建议，不是商品事实"],"videoSuggestions":{"recommendedAngles":["角度"],"keyVisuals":["焦点"],"suggestedStyle":""}}`
+func analysisJSONShape(category string) string {
+	points := "卖点"
+	if category == "fashion" {
+		points = "可见事实，看点位置，穿着后果"
+	}
+	return `输出格式：{"productName":"","category":"","brand":"","visualFeatures":{"mainColor":"","designStyle":"","productForm":"","texture":""},"sellingPoints":["` + points + `"],"targetAudience":"","usageScenarios":["场景"],"painPoints":["痛点"],"knownFacts":["资料或图片中可见的事实"],"creativeNotes":["拍摄建议，不是商品事实"],"videoSuggestions":{"recommendedAngles":["角度"],"keyVisuals":["焦点"],"suggestedStyle":""}}`
 }
 
 func chatBody(model, system string, user any, temperature float64) map[string]any {

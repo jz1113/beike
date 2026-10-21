@@ -7,8 +7,8 @@ import type { BatchProductItem } from '../batchTypes';
 import { isDeliverableWorkshopResult } from '../generation/workshopReadiness';
 import { blobExtFromMime } from '../collection/batchRunnerIo';
 import { buildMatrixExportRows } from './batchMatrixExport';
-import { canNativeOfflineExport, tryNativeOfflineZip } from './batchZipNative';
-import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExportFields';
+import { canNativeOfflineExport, tryNativeOfflineZip } from './batchExport';
+import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExport';
 
 export type { MatrixExportRow } from './batchMatrixExport';
 export { buildMatrixExportRows, ensurePermanentImageUrl } from './batchMatrixExport';
@@ -53,7 +53,7 @@ async function writeZipExcel(
     allowUpload: false,
   });
   if (excelRows.length === 0) return;
-  const XLSX = await import('./batchExportSpreadsheet');
+  const XLSX = await import('./batchExport');
   const worksheet = XLSX.utils.json_to_sheet(excelRows);
   worksheet['!cols'] = [
     { wch: 35 }, { wch: 22 }, { wch: 24 },
@@ -164,7 +164,7 @@ export async function exportBatchExcel(items: BatchProductItem[], deps: BatchExp
       deps.showToast('未找到可导出的生产记录');
       return;
     }
-    const XLSX = await import('./batchExportSpreadsheet');
+    const XLSX = await import('./batchExport');
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
     worksheet['!cols'] = [
       { wch: 35 }, { wch: 22 }, { wch: 24 },

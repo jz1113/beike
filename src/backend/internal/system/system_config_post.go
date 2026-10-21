@@ -159,7 +159,7 @@ func mediaModel(id string) bool {
 		"grok-4.1-image", "grok-4.2-image", "grok-imagine-image-quality",
 		"veo3.1", "veo3.1-fast", "omni_flash-10s", "kling-video-v3", "kling-video-v3-omni", "kling-video-v2-5-turbo", "kling-video-v2-6",
 		"doubao-seedance-2-0-260128", "doubao-seedance-2-0-fast-260128", "doubao-seedance-2.0-mini", "doubao-seedance-2.5",
-		"sora-2", "sora-2-pro", "MiniMax-H3", "wan3.0-video", "grok-imagine-video-1.5", "viduq3", "viduq3-mix", "viduq3-turbo", "viduq3-pro", "gpt-6-astra":
+		"sora-2", "sora-2-pro", "MiniMax-H3", "wan3.0-video", "grok-imagine-video-1.5", "viduq3", "viduq3-mix", "viduq3-turbo", "viduq3-pro", "viduq4-preview", "gpt-6-astra":
 		return true
 	default:
 		return false

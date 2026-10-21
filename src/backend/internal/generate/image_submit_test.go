@@ -348,6 +348,27 @@ func TestLianchiEditUsesImageArrayField(t *testing.T) {
 	if len(form.File["image[]"]) != 1 || form.File["image[]"][0].Header.Get("Content-Type") != "image/png" {
 		t.Fatalf("files %#v", form.File)
 	}
+	multiple, contentType, err := buildImageEditBody(t.Context(), map[string]any{
+		"model": "gpt-image-2", "prompt": "细节", "size": "1024x1024", "quality": "high",
+		"image": []string{"data:image/png;base64," + tinyPNG, "data:image/png;base64," + tinyPNG},
+	}, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err = io.ReadAll(multiple)
+	if err != nil {
+		t.Fatal(err)
+	}
+	multiForm, err := multipart.NewReader(bytes.NewReader(raw), boundaryOf(contentType)).ReadForm(8 << 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := multiForm.File["image"]; ok || len(multiForm.File["image[]"]) != 2 {
+		t.Fatalf("gpt-image multiple files %#v", multiForm.File)
+	}
+	if normalizeImageRef("//cdn.example.com/hoodie.jpg") != "https://cdn.example.com/hoodie.jpg" {
+		t.Fatal("protocol-relative reference was not normalized")
+	}
 	urls := imageSubmitURLs("https://api.gapnet.ai/endpoint", true, "openai-dalle", "openai/gpt-image-2")
 	if len(urls) != 1 || urls[0] != "https://api.gapnet.ai/endpoint/v1/images/edits" {
 		t.Fatalf("urls %v", urls)

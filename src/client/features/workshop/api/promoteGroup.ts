@@ -2,7 +2,7 @@ import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { requestModelId } from '@shared/domain/models/workflowModels';
 import type { BatchProductItem, BatchTaskItem } from '../model/batchTypes';
-import type { MotherReplacementState, PromotedGroupCandidate } from '../model/generation/promoteGroup';
+import { PROMOTED_GROUP_HINT, type MotherReplacementState, type PromotedGroupCandidate } from '../model/generation/promoteGroup';
 
 export type { MotherReplacementState, PromotedGroupCandidate } from '../model/generation/promoteGroup';
 
@@ -31,7 +31,7 @@ export async function analyzePromotedGroup(input: {
       albumName: `优选衍生图组 · ${item.title.slice(0, 40)} · ${groupIndex + 1}`,
       productTitle: item.title,
       targetCategory: item.category || undefined,
-      userHint: '这四张是同一款商品的满意成图。逐图忠实分析实际画面；在图组架构总结中提炼可复用的机位、动作、空间和光影关系。商品品牌、型号、颜色、文字与外观属于本次商品，复用时必须以新商品参考图替换。',
+      userHint: PROMOTED_GROUP_HINT,
       clientTaskId: `promote_${item.id.slice(0, 32)}_${groupIndex}_${tasks.map((task) => task.id.slice(-16)).join('_')}`.slice(0, 160),
       model: requestModelId(visionModel),
       ...getMultimodalClientOverrides(visionModel),

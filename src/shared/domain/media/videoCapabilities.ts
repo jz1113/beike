@@ -1,3 +1,4 @@
+import { canonicalModelId } from '@shared/domain/models/modelCatalog';
 import { getVideoModelById } from './video';
 
 export const VIDEO_GENERATION_MODES = [
@@ -18,14 +19,14 @@ const SEEDANCE_MODES = ['omni', 'first_frame', 'first_last_frame', 'text', 'edit
 
 /** Expose modes with an implemented payload path, not every vendor marketing feature. */
 export function videoModeIds(model: string) {
-  const id = model.toLowerCase();
+  const id = canonicalModelId(model).toLowerCase();
   if (/seedance/.test(id)) return SEEDANCE_MODES;
   if (id === 'viduq3' || id === 'viduq3-mix') return ['omni'];
-  if (id === 'viduq3-turbo' || id === 'viduq3-pro') return FULL_MODES;
+  if (id === 'viduq3-turbo' || id === 'viduq3-pro' || id === 'viduq4-preview') return FULL_MODES;
   if (/omni[_-]flash/.test(id)) return ['first_frame', 'text'];
   if (/^veo3\.1/.test(id)) return FULL_MODES;
   if (/sora/.test(id)) return ['first_frame', 'text'];
-  if (/grok/.test(id)) return FULL_MODES;
+  if (/grok/.test(id)) return [...FULL_MODES, 'edit', 'extend'];
   if (/kling/.test(id)) return id.includes('omni') ? FULL_MODES : FRAME_MODES;
   if (/wan/.test(id)) return FULL_MODES;
   if (/minimax|hailuo/.test(id) || id === 'h3') return FULL_MODES;
@@ -70,6 +71,7 @@ export function videoRatioLocked(model: string, mode: string) {
 export function videoDurationOptions(model: string, resolution: string, mode = 'text') {
   if (/^veo3\.1/.test(model) && (resolution !== '720P' || mode === 'omni' || mode === 'first_last_frame')) return [8];
   const durations = getVideoModelById(model)?.supportedDurations || [5];
+  if (/grok/i.test(model) && mode === 'extend') return durations.filter(value => value >= 2 && value <= 10);
   return /^vidu/.test(model) && mode === 'omni' ? durations.filter(value => value >= 3) : durations;
 }
 
@@ -85,13 +87,15 @@ export function videoInputError(input: {
   if (mode === 'first_frame' && (images.length !== 1 || videos.length)) return '首帧模式需要一张图片';
   if (mode === 'first_last_frame' && (images.length !== 2 || videos.length)) return '首尾帧模式需要两张图片，分别作为首帧和尾帧';
   if ((mode === 'edit' || mode === 'extend') && !videos.length) return '请添加需要编辑或延长的参考视频';
-  if (videos.length && !referenceVideoAllowed(model)) return '当前模型的参考视频尚未接入，请使用图片或文字';
+  const grokClip = /grok/i.test(model) && (mode === 'edit' || mode === 'extend');
+  if (videos.length && !referenceVideoAllowed(model) && !grokClip) return '当前模型的参考视频尚未接入，请使用图片或文字';
   if (/^viduq3(?:-mix)?$/.test(model) && !images.length) return '该模型需要参考图片，请添加素材';
-  if (/^vidu/.test(model) && images.length > 7) return 'Vidu 最多支持 7 张参考图片';
+  if (/^vidu/.test(model) && images.length > 15) return 'Vidu 最多支持 15 张参考图片';
   if (/^veo3\.1/.test(model) && mode === 'omni' && images.length > 3) return 'Veo 最多支持 3 张参考图片';
   if (/^wan3/.test(model) && (images.length > 10 || videos.length > 5)) return '万相最多支持 10 张参考图、5 个参考视频';
   if (/minimax-h3/i.test(model) && (images.length > 9 || videos.length > 3 || images.length + videos.length > 12)) return 'H3 最多支持 9 张参考图、3 个参考视频，合计不超过 12 个素材';
   if (/grok-imagine-video/i.test(model) && mode === 'omni' && images.length > 14) return 'Grok 最多支持 14 张参考图片';
+  if (grokClip && (videos.length !== 1 || images.length)) return '请添加一段需要编辑或延长的视频';
   if (/kling.*omni/.test(model) && images.length > 7) return '可灵 Omni 最多支持 7 张参考图片';
   if (isSeedance(model)) {
     const maxImages = isSeedance25(model) ? 30 : 9;

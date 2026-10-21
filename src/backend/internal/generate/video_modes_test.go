@@ -34,10 +34,13 @@ func TestVideoModeTableMatchesOfficialCapabilities(t *testing.T) {
 		{"viduq3-mix", []string{"omni"}},
 		{"viduq3-pro", full},
 		{"viduq3-turbo", full},
+		{"viduq4-preview", full},
+		{"vidu-q4-preview", full},
+		{"viduq4", full},
 		{"veo3.1", full},
 		{"veo3.1-fast", full},
 		{"omni_flash-10s", []string{"first_frame", "text"}},
-		{"grok-imagine-video-1.5", full},
+		{"grok-imagine-video-1.5", []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}},
 		{"sora-2", []string{"first_frame", "text"}},
 	}
 	for _, item := range cases {

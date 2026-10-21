@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { FolderInput, FolderOpen, FolderPlus, Pencil, Settings2, Trash2 } from 'lucide-react';
-import type { PromptGroupFolder } from '../model/promptGroupFolder';
+import type { PromptGroupFolder } from '../model/promptGroupFolders';
 
 interface Props {
   menu: { x: number; y: number; folder?: PromptGroupFolder; ids: string[] };

@@ -1,4 +1,4 @@
-import type { PromptGroupFolder } from '../model/promptGroupFolder';
+import type { PromptGroupFolder } from '../model/promptGroupFolders';
 
 export function PromptFolderDeleteDialog({ folders, saving, error, onCancel, onDelete }: {
   folders: PromptGroupFolder[];

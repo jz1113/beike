@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { AssistantSession, MediaAttachment } from '@client/store/appStoreTypes';
-import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@client/features/assistant/api/sessions';
+import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@client/shared/api/assistantSessions';
 import {
   assistantDeletedIds,
   clearAssistantPersistTimer,

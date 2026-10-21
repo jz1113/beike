@@ -194,3 +194,8 @@ func generateFallbackOutline(idea, outline, vibe string) (string, []map[string]a
 	pages := parseMarkdownOutline(md)
 	return md, pages
 }
+
+func wantsFallback(payload map[string]any) bool {
+	allowed, _ := payload["allowFallback"].(bool)
+	return allowed
+}

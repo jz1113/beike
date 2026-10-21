@@ -3,8 +3,7 @@ package videosales
 import (
 	"fmt"
 	"strings"
-
-	"beike.local/cloud/src/backend/internal/generate"
+	"unicode"
 )
 
 func fashionNarrativeRules() string {
@@ -14,135 +13,69 @@ func fashionNarrativeRules() string {
 - accessory 鞋包展示：鞋或包。拿出、上手或上脚、多角度展示。不要写换装，也不要写面料飘动。`
 }
 
-func fashionScriptPrompt() string {
-	return `你是服饰带货编导。只写 1 套脚本，品类是服饰鞋包。
-成片会按参考图一次生成整段视频。分镜用来安排时间轴，不要写成互不相干的多条视频。
-` + fashionNarrativeRules() + `
-每段写景别、视角、动作、口播和转场。口播大约每秒 3 到 4 个字，只使用商品资料里的事实。没有尺码、链接、置顶、功效、评价、销量或优惠，就不要说。
-画面不要字幕、贴纸、大字或价格条。示例角度和示例台词只说明要写具体，不能原样输出。分镜时长加总等于目标时长。这一步不要写死图片编号。
-必须严格输出纯 JSON 对象：
-{
-  "scripts": [
-    {
-      "id": "script_1",
-      "title": "脚本标题",
-      "beat": "unbox",
-      "totalDuration": 15,
-      "shots": [
-        {
-          "shotId": 1,
-          "type": "hook",
-          "duration": 4,
-          "description": "这一段画面里发生什么",
-          "camera": "景别和视角",
-          "visualSource": "product_image",
-          "transition": "direct_concat",
-          "voiceover": "口播台词",
-          "prompt": "这一段的画面、动作、台词和转场"
-        }
-      ],
-      "seo": {
-        "title": "发布标题",
-        "hashtags": ["#标签"],
-        "coverText": "封面文案",
-        "interactionGuide": "评论引导",
-        "description": "发布描述"
-      }
-    }
-  ]
-}`
+func fashionVoiceoverBudget(seconds int) (int, int) {
+	if seconds < 1 {
+		seconds = 1
+	}
+	// 15秒对应70到100个字，其他时长按同样比例四舍五入。
+	return (seconds*14 + 1) / 3, (seconds*20 + 1) / 3
 }
 
-func fashionFinalizePrompt() string {
-	return `你负责把服饰带货分镜定稿成一条可直接提交的中文视频提示词，并给每个分段一段对应提示词。
-成片是一条提示词，一次生成整段。按这个顺序写：场景、参考图用途、按秒分段的景别视角动作台词转场、灯光、色彩、竖屏输出、锁定。
-锁定：人物外貌全程一致；衣服颜色、版型、图案与服饰单品参考一致；光线方向全程不变；匹配剪辑时身体位置相同；嘴型与台词对应。
-` + realisticLook() + `
-图片编号只能使用给出的参考顺序。参考顺序里已经有场景时，场景必须使用那个编号，即使这一步没有场景原图。鞋或包不要写换装和面料飘动。
-另外写两张静帧绘图提示词，不写口播、运镜时间轴、字幕或价格。personImagePrompt 按整段叙事里的出镜状态画一个人，外貌锁给出的人物和人脸。sceneImagePrompt 按脚本里的那一个空间画场景；没有场景原图时只靠文字。衣服不在这两张静帧里改款。两张静帧同样使用上面的实拍风格。
-不要字幕、贴纸、大字或价格条。不要编造资料里没有的尺码、链接、置顶、功效、评价、销量或优惠。
-只输出 JSON：{"fullPrompt":"整段提示词","personImagePrompt":"人物静帧","sceneImagePrompt":"场景静帧","prompts":[{"shotId":1,"prompt":"这一段提示词"}]}`
+func fashionVoiceoverRules() string {
+	return `口播是导购，不是画面说明。观众要听懂为什么买，并知道这一秒眼睛该看哪里。
+汉字数按目标时长计算，标点、数字和字母不计：15秒全片写70到100个字，其他时长按每秒约4.7到6.7个字折算。每一段再按本段秒数写满同一密度，5秒写23到33个汉字。低于下限会空，高于上限会压过动作和嘴型。一段至少两句，句间留短停顿，不能用一个短问句占满一整段。写完自数汉字，少了就补穿着后果，多了就删重复，不要用语气词凑字。
+每段同时完成两件事。卖点：从商品分析的 sellingPoints 或看得见的资料里取一条，说成购买理由，也就是少做哪一步、适合什么场合、怎么和已有衣服搭配。只报领型、罗纹、绣花名称不算卖点。看点：点名这一段画面正在给观众看的那一处，说出它在身上的位置，以及近看和走远之后分别怎样。口播和画面必须是同一处。
+整段按时间顺序写三步，每步都写满本段字数：开场用场合或缺口开口，同一段用第一条卖点回答，不能停在问号上；中段只锁定一个最强看点，把对应卖点说完；收尾用另一条事实说清怎么穿、什么时候穿、单穿还是叠搭。就看这一件、可以直接入手、简单好搭、值得入、基础百搭不算收尾。
+全片至少说出两条不同的卖点。同一事实不在两段里重复。品名和基础款最多出现一次，并且带上使用场合。精致、好看、高级、百搭不能单独充当卖点。
+事实只写看得见或资料里有的颜色、面料、领型、门襟、罗纹、绣花或图案位置、套头、鞋包结构、季节和品类。购买理由必须从一条事实推到穿着或使用后果，推不出来就不要说。口播不要出现价格、金额或优惠。没有尺码、链接、置顶、功效、评价、销量或优惠，就不要说。
+禁止写成这样：开场只问「秋天想要一件基础款长袖？」；中段只说「圆领罗纹收边，胸前小图案很精致。」；收尾只说「秋季日常穿，基础百搭，可以收着。」这三句合计约四十个字，开场停在问号，中段用精致代替购买理由，收尾是空号召，也没有看点位置。
+只学句长和论证，禁止原样输出下面的商品事实：开场「降温还在找一件不闷的圆领，这件黑色纯棉套上就能出门。」中段「领口是罗纹，胸前那点绣花就在正中，近看清楚，走远了不抢衣服。」收尾「单穿就够，里面加件衬衫也压得住，上班和周末不用再换一件。」`
 }
 
-func fashionReferenceNote(payload map[string]any) string {
-	raw, _ := payload["fashionReferences"].(map[string]any)
-	person, face, scene := false, false, false
-	if raw != nil {
-		person, _ = raw["person"].(bool)
-		face, _ = raw["face"].(bool)
-		scene, _ = raw["scene"].(bool)
-	}
-	lines := []string{"服饰参考："}
-	if person {
-		lines = append(lines, "有出镜人物。")
-	} else {
-		lines = append(lines, "还没有出镜人物。")
-	}
-	if face {
-		lines = append(lines, "有单独人脸特写。")
-	} else {
-		lines = append(lines, "没有单独人脸，人物图同时锁定脸。")
-	}
-	if scene {
-		lines = append(lines, "有场景参考。")
-	} else {
-		lines = append(lines, "没有场景图，场景只写文字，不要编造场景图片编号。")
-	}
-	lines = append(lines, "衣服从商品图里选定，这一步不要写死图片编号。")
-	return strings.Join(lines, "")
-}
-
-type fashionRef struct {
-	Slot       string
-	Label      string
-	URL        string
-	ImageIndex int
-}
-
-func parseFashionOrder(payload map[string]any) ([]fashionRef, error) {
-	raw, ok := payload["referenceOrder"].([]any)
-	if !ok || len(raw) == 0 {
-		return nil, fmt.Errorf("请上传出镜人物并保留一件商品图")
-	}
-	refs := make([]fashionRef, 0, len(raw))
-	for _, item := range raw {
-		obj, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		slot := strings.TrimSpace(generate.StringField(obj, "slot"))
-		label := strings.TrimSpace(generate.StringField(obj, "label"))
-		url := strings.TrimSpace(generate.StringField(obj, "url"))
-		if slot == "" || label == "" || (url == "" && slot != "scene") {
-			continue
-		}
-		refs = append(refs, fashionRef{Slot: slot, Label: label, URL: url, ImageIndex: generate.IntField(obj, "imageIndex")})
-	}
-	if !fashionHasSlot(refs, "person") || !fashionHasSlot(refs, "garment") {
-		return nil, fmt.Errorf("请上传出镜人物并保留一件商品图")
-	}
-	return refs, nil
-}
-
-func fashionHasSlot(refs []fashionRef, slot string) bool {
-	for _, ref := range refs {
-		if ref.Slot == slot {
-			return true
+func voiceoverHanCount(text string) int {
+	count := 0
+	for _, r := range text {
+		if unicode.Is(unicode.Han, r) {
+			count++
 		}
 	}
-	return false
+	return count
 }
 
-func fashionOrderText(refs []fashionRef) string {
-	lines := make([]string, 0, len(refs))
-	for i, ref := range refs {
-		if ref.Slot == "scene" && ref.URL == "" {
-			lines = append(lines, fmt.Sprintf("图片%d：%s（没有原图，按脚本生成）", i+1, ref.Label))
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("图片%d：%s", i+1, ref.Label))
+func validateFashionVoiceover(shots []ScriptShot, target int) error {
+	if len(shots) == 0 {
+		return fmt.Errorf("口播缺少分段")
 	}
-	return strings.Join(lines, "\n")
+	overallLow, overallHigh := fashionVoiceoverBudget(target)
+	total, sumLow, sumHigh := 0, 0, 0
+	var joined strings.Builder
+	for _, shot := range shots {
+		count := voiceoverHanCount(shot.Voiceover)
+		total += count
+		shotLow, shotHigh := fashionVoiceoverBudget(shot.Duration)
+		sumLow += shotLow
+		sumHigh += shotHigh
+		if count < shotLow || count > shotHigh {
+			return fmt.Errorf("第 %d 段口播有 %d 个汉字，%d 秒应写 %d 到 %d 个，并写出卖点和看点", shot.ShotId, count, shot.Duration, shotLow, shotHigh)
+		}
+		joined.WriteString(shot.Voiceover)
+	}
+	low, high := overallLow, overallHigh
+	if sumLow < low {
+		low = sumLow
+	}
+	if sumHigh > high {
+		high = sumHigh
+	}
+	if total < low || total > high {
+		return fmt.Errorf("口播合计 %d 个汉字，%d 秒应写 %d 到 %d 个", total, target, low, high)
+	}
+	for _, phrase := range []string{"就看这一件", "可以直接入手", "简单好搭", "值得入", "基础百搭", "闭眼入"} {
+		if strings.Contains(joined.String(), phrase) {
+			return fmt.Errorf("口播包含空号召「%s」，请改成具体穿法", phrase)
+		}
+	}
+	return nil
 }
 
 func normalizeFashionBeat(beat, productName string) string {

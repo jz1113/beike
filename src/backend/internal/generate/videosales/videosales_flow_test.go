@@ -54,7 +54,8 @@ func postSales(t *testing.T, handler http.Handler, path string, payload map[stri
 func TestAnalyzeRejectsEmptyObject(t *testing.T) {
 	server := useChatServer(t, func(map[string]any, int) string { return "{}" })
 	rec := postSales(t, Analyze(config.Config{}), "/api/generate/video-sales/analyze", map[string]any{
-		"productName": "纸巾", "imageUrls": []string{"https://example.com/a.jpg"}, "customBaseUrl": server.URL, "customApiKey": "test",
+		"workflowVersion": 3, "productName": "纸巾", "customBaseUrl": server.URL, "customApiKey": "test",
+		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}}, "eligibleImageIndexes": []int{0},
 	})
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("expected 502, got %d %s", rec.Code, rec.Body.String())
@@ -72,9 +73,15 @@ func TestAnalyzeCoversEveryImageBatch(t *testing.T) {
 		}
 		return `{"productName":"纸巾","category":"home","sellingPoints":["湿水不易破"],"targetAudience":"家庭","knownFacts":["白色包装"],"creativeNotes":["先拍正面"]}`
 	})
-	images := []string{"https://example.com/1.jpg", "https://example.com/2.jpg", "https://example.com/3.jpg", "https://example.com/4.jpg", "https://example.com/5.jpg"}
+	images := make([]map[string]any, 5)
+	indexes := make([]int, 5)
+	for i := range images {
+		indexes[i] = i
+		images[i] = map[string]any{"index": i, "url": "https://example.com/" + string(rune('1'+i)) + ".jpg", "role": "main"}
+	}
 	rec := postSales(t, Analyze(config.Config{}), "/api/generate/video-sales/analyze", map[string]any{
-		"productName": "纸巾", "imageUrls": images, "customBaseUrl": server.URL, "customApiKey": "test",
+		"workflowVersion": 3, "productName": "纸巾", "imageCatalog": images, "eligibleImageIndexes": indexes,
+		"customBaseUrl": server.URL, "customApiKey": "test",
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d %s", rec.Code, rec.Body.String())
@@ -99,7 +106,9 @@ func TestAnalyzeCoversEveryImageBatch(t *testing.T) {
 func TestScriptRejectsEmptyStoryboard(t *testing.T) {
 	server := useChatServer(t, func(map[string]any, int) string { return `{"scripts":[{}]}` })
 	rec := postSales(t, Script(config.Config{}), "/api/generate/video-sales/script", map[string]any{
-		"productName": "纸巾", "customBaseUrl": server.URL, "customApiKey": "test",
+		"workflowVersion": 3, "productName": "纸巾", "targetDuration": 15, "aspectRatio": "9:16",
+		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}}, "eligibleImageIndexes": []int{0},
+		"customBaseUrl": server.URL, "customApiKey": "test",
 	})
 	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "分镜") {
 		t.Fatalf("expected script rejection, got %d %s", rec.Code, rec.Body.String())
@@ -111,45 +120,44 @@ func TestSelectRejectsUnknownImage(t *testing.T) {
 		return `{"assignments":[{"shotId":1,"imageIndex":9,"reason":"不存在"}]}`
 	})
 	rec := postSales(t, Select(config.Config{}), "/api/generate/video-sales/select-images", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test",
-		"shots":        []map[string]any{{"shotId": 1, "description": "正面", "voiceover": "看这里"}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}},
+		"workflowVersion": 3, "customBaseUrl": server.URL, "customApiKey": "test",
+		"shots":                []map[string]any{{"shotId": 1, "description": "正面", "voiceover": "看这里"}},
+		"imageCatalog":         []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}},
+		"eligibleImageIndexes": []int{0},
 	})
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("expected 502, got %d %s", rec.Code, rec.Body.String())
 	}
 }
 
-func TestFinalizeRequiresPromptForEveryShot(t *testing.T) {
-	server := useChatServer(t, func(map[string]any, int) string {
-		return `{"prompts":[{"shotId":1,"prompt":""}]}`
-	})
-	rec := postSales(t, Finalize(config.Config{}), "/api/generate/video-sales/finalize-prompts", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test",
-		"shots":        []map[string]any{{"shotId": 1, "imageIndex": 0, "description": "正面", "voiceover": "看这里", "duration": 4}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}},
-	})
-	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "最终提示词") {
-		t.Fatalf("expected prompt rejection, got %d %s", rec.Code, rec.Body.String())
-	}
-}
-
 func TestFashionScriptPromptLocksReferences(t *testing.T) {
-	body := scriptChatBody("gemini", map[string]any{
-		"targetDuration":    15,
-		"fashionReferences": map[string]any{"person": true, "face": false, "scene": true},
-	}, "衬衫", "fashion", "product_closeup", "垂坠", "")
+	body := workflowScriptBody("gemini", map[string]any{"productName": "衬衫", "category": "fashion"}, nil, 15, "9:16")
 	encoded, _ := json.Marshal(body)
 	text := string(encoded)
-	for _, piece := range []string{"开箱换装", "生活穿搭", "没有单独人脸", "有场景参考", "不要写死图片编号"} {
+	for _, piece := range []string{"开箱换装", "生活穿搭", "鞋包展示", "usesProduct"} {
 		if !strings.Contains(text, piece) {
-			t.Fatalf("missing %s in %s", piece, text)
+			t.Fatalf("missing %s", piece)
 		}
 	}
 }
 
+func TestScriptPromptOmitsPrice(t *testing.T) {
+	facts := analysisFactText(analysisFactsFrom(map[string]any{"productName": "卫衣", "priceRange": "168元", "brand": "海澜之家"}))
+	if strings.Contains(facts, "168") || strings.Contains(facts, "价格") {
+		t.Fatal(facts)
+	}
+	workflow := workflowScriptBody("gemini", map[string]any{"priceRange": "168元", "productName": "卫衣", "category": "fashion"}, nil, 15, "9:16")
+	encoded, _ := json.Marshal(workflow)
+	if strings.Contains(string(encoded), "168元") || strings.Contains(string(encoded), "priceRange") {
+		t.Fatal("workflow script included a price")
+	}
+	if !strings.Contains(string(encoded), "口播不要出现价格") {
+		t.Fatal("script prompt should forbid price in voiceover")
+	}
+}
+
 func TestGenericScriptStaysForOtherCategories(t *testing.T) {
-	body := scriptChatBody("gemini", map[string]any{"targetDuration": 15}, "纸巾", "home", "product_closeup", "湿水", "")
+	body := workflowScriptBody("gemini", map[string]any{"productName": "纸巾", "category": "home"}, nil, 15, "9:16")
 	encoded, _ := json.Marshal(body)
 	if strings.Contains(string(encoded), "开箱换装") {
 		t.Fatal("home category used the fashion skill")
@@ -168,88 +176,6 @@ func TestNormalizeFashionBeat(t *testing.T) {
 	}
 }
 
-func TestFashionFinalizeUsesReferenceOrder(t *testing.T) {
-	var sawOrder, sawStills bool
-	server := useChatServer(t, func(body map[string]any, _ int) string {
-		encoded, _ := json.Marshal(body)
-		text := string(encoded)
-		if strings.Contains(text, "图片1：出镜人物") && strings.Contains(text, "图片2：服饰单品") {
-			sawOrder = true
-		}
-		sawStills = strings.Contains(text, "实拍照片") && strings.Contains(text, "personImagePrompt")
-		return `{"fullPrompt":"整段提示词锁定人物和衣服","personImagePrompt":"实拍出镜人物","sceneImagePrompt":"实拍客厅","prompts":[{"shotId":1,"prompt":"前段展示衣服"}]}`
-	})
-	rec := postSales(t, Finalize(config.Config{}), "/api/generate/video-sales/finalize-prompts", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test", "category": "fashion",
-		"shots":        []map[string]any{{"shotId": 1, "imageIndex": 0, "description": "展示", "voiceover": "看这件", "camera": "中景", "duration": 4}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/coat.jpg", "role": "main"}},
-		"referenceOrder": []map[string]any{
-			{"slot": "person", "label": "出镜人物", "url": "https://example.com/person.jpg"},
-			{"slot": "garment", "label": "服饰单品", "url": "https://example.com/coat.jpg", "imageIndex": 0},
-		},
-	})
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "整段提示词锁定人物和衣服") {
-		t.Fatalf("expected full prompt, got %d %s", rec.Code, rec.Body.String())
-	}
-	if !sawOrder || !sawStills {
-		t.Fatal("finalize should repeat the reference order and ask for realistic stills")
-	}
-	if !strings.Contains(rec.Body.String(), "实拍出镜人物") || !strings.Contains(rec.Body.String(), "实拍客厅") {
-		t.Fatalf("expected still prompts, got %s", rec.Body.String())
-	}
-}
-
-func TestFashionFinalizeRequiresFullPrompt(t *testing.T) {
-	server := useChatServer(t, func(map[string]any, int) string {
-		return `{"prompts":[{"shotId":1,"prompt":"只有分段"}]}`
-	})
-	rec := postSales(t, Finalize(config.Config{}), "/api/generate/video-sales/finalize-prompts", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test", "category": "fashion",
-		"shots":        []map[string]any{{"shotId": 1, "imageIndex": 0, "description": "展示", "voiceover": "看这件", "duration": 4}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/coat.jpg", "role": "main"}},
-		"referenceOrder": []map[string]any{
-			{"slot": "person", "label": "出镜人物", "url": "https://example.com/person.jpg"},
-			{"slot": "garment", "label": "服饰单品", "url": "https://example.com/coat.jpg"},
-		},
-	})
-	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "完整视频提示词") {
-		t.Fatalf("expected full prompt rejection, got %d %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestFashionFinalizeRequiresStillPrompts(t *testing.T) {
-	server := useChatServer(t, func(map[string]any, int) string {
-		return `{"fullPrompt":"整段提示词","prompts":[{"shotId":1,"prompt":"前段展示衣服"}]}`
-	})
-	rec := postSales(t, Finalize(config.Config{}), "/api/generate/video-sales/finalize-prompts", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test", "category": "fashion",
-		"shots":        []map[string]any{{"shotId": 1, "imageIndex": 0, "description": "展示", "voiceover": "看这件", "duration": 4}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/coat.jpg", "role": "main"}},
-		"referenceOrder": []map[string]any{
-			{"slot": "person", "label": "出镜人物", "url": "https://example.com/person.jpg"},
-			{"slot": "garment", "label": "服饰单品", "url": "https://example.com/coat.jpg"},
-			{"slot": "scene", "label": "场景", "url": ""},
-		},
-	})
-	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "绘图提示词") {
-		t.Fatalf("expected still prompt rejection, got %d %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestFinalizeRequiresSceneImagePrompt(t *testing.T) {
-	server := useChatServer(t, func(map[string]any, int) string {
-		return `{"prompts":[{"shotId":1,"prompt":"保持白色包装"}]}`
-	})
-	rec := postSales(t, Finalize(config.Config{}), "/api/generate/video-sales/finalize-prompts", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test",
-		"shots":        []map[string]any{{"shotId": 1, "imageIndex": 0, "description": "人在客厅", "voiceover": "看这里", "duration": 4, "visualSource": "ai_generate"}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}},
-	})
-	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "绘图提示词") {
-		t.Fatalf("expected image prompt rejection, got %d %s", rec.Code, rec.Body.String())
-	}
-}
-
 func TestNormalizeKeepsSceneVisualSource(t *testing.T) {
 	script := normalizeScript(SalesScript{Title: "方案", Shots: []ScriptShot{
 		{ShotId: 1, Description: "人在客厅", Voiceover: "看这里", Prompt: "草稿", VisualSource: "ai_generate"},
@@ -257,28 +183,6 @@ func TestNormalizeKeepsSceneVisualSource(t *testing.T) {
 	}})
 	if script.Shots[0].VisualSource != "ai_generate" || script.Shots[1].VisualSource != "product_image" {
 		t.Fatalf("visual source was not kept: %+v", script.Shots)
-	}
-}
-
-func TestFinalizeRewritesPromptFromSelectedImage(t *testing.T) {
-	var missedImage bool
-	server := useChatServer(t, func(body map[string]any, _ int) string {
-		encoded, _ := json.Marshal(body)
-		if !strings.Contains(string(encoded), "https://example.com/a.jpg") || !strings.Contains(string(encoded), "实拍照片") {
-			missedImage = true
-		}
-		return `{"prompts":[{"shotId":1,"prompt":"保持白色包装，镜头缓慢推近，不要字幕"}]}`
-	})
-	rec := postSales(t, Finalize(config.Config{}), "/api/generate/video-sales/finalize-prompts", map[string]any{
-		"customBaseUrl": server.URL, "customApiKey": "test",
-		"shots":        []map[string]any{{"shotId": 1, "imageIndex": 0, "description": "正面", "voiceover": "看这里", "camera": "推近", "duration": 4}},
-		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}},
-	})
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "保持白色包装") {
-		t.Fatalf("expected final prompt, got %d %s", rec.Code, rec.Body.String())
-	}
-	if missedImage {
-		t.Fatal("finalize should see the selected image")
 	}
 }
 

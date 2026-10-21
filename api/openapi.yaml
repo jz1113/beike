@@ -598,6 +598,12 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/generate/image-batch:
+    post:
+      operationId: post_api_generate_image_batch
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/keyword-review:
     post:
       operationId: post_api_generate_keyword_review
@@ -1099,6 +1105,13 @@ components:
             type: string
         usesProduct:
           type: boolean
+        productImageIndexes:
+          type: array
+          description: 本张静帧按目标视角选择的商品目录原始编号，须属于模型看过的允许图片；未提供时兼容旧计划，生图使用全部已选商品图
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 0
     VideoSalesShot:
       type: object
       required: [shotId]

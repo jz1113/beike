@@ -1,4 +1,4 @@
-import { useAssistantDialog } from './useAssistantDialog';
+import { useAssistantDialog } from '../hooks/useAssistantDialog';
 import AssistantRuntimeInfo from './panels/AssistantRuntimeInfo';
 import AssistantSessionMenu from './panels/AssistantSessionMenu';
 import { useEffect, useId, useRef, useState } from 'react';

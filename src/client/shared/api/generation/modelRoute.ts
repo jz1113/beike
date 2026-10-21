@@ -7,7 +7,7 @@ const endpoints = new Set(['/api/system/config', '/api/assistant/turn/start', '/
   '/api/generate/headline-design', '/api/generate/headline-title', '/api/generate/headline-deconstruct',
   '/api/generate/canvas-text', '/api/generate/keyword-review', '/api/generate/ppt-outline',
   '/api/generate/ppt-detail', '/api/generate/ppt-narration', '/api/generate/video-sales/analyze',
-  '/api/generate/video-sales/script', '/api/generate/video-sales/select-images', '/api/generate/video-sales/finalize-prompts', '/api/generate/video-sales/validate-assets']);
+  '/api/generate/video-sales/script', '/api/generate/video-sales/select-images', '/api/generate/video-sales/finalize-prompts']);
 export function withModelRoute(input: RequestInfo | URL, init?: RequestInit): RequestInit | undefined {
   if (typeof input !== 'string' || !endpoints.has(input.split('?')[0]) || init?.method?.toUpperCase() !== 'POST' || typeof init.body !== 'string') return init;
   let body;

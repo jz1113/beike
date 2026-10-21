@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
 import { salesActualReferences, type VideoSalesScript } from '@shared/domain/video-sales';
 import { confirmAction } from '@client/shared/utils/confirmAction';
-import { finalizeSalesPrompts } from '../api/videoSalesApi';
+import { defaultSalesImageBatchClient } from '../api/salesImageBatch';
+import { generateSalesReferenceFrame } from '../api/salesMediaApi';
+import { finalizeSalesPrompts, validateSalesAssets } from '../api/videoSalesApi';
 import { prepareSalesCreativeAssets } from '../model/prepareSalesAssets';
-import { recoverSalesAssetReceipts } from '../model/recoverSalesAssetReceipts';
-import { assertSalesPlanCurrent, salesFinalInputRevision } from '../model/salesStageRules';
-import { salesSingleVideoError } from '../model/salesSingleVideo';
+import { canResubmitRejectedAsset, recoverSalesAssetReceipts } from '../model/salesAssetHelpers';
+import { assertSalesPlanCurrent, salesFinalInputRevision, salesSingleVideoError } from '../model/salesStageRules';
 import { salesJobAllowed } from '../model/salesWorkspace';
 import type { VideoSalesStudioState } from '../model/salesStudioDraft';
 
@@ -33,13 +34,13 @@ export function useSalesCreativeStages(input: {
     }) }));
   }, [busyRef, commit]);
 
-  const runAssets = useCallback(async (regenerateId?: string, queryOnly = false) => {
+  const runAssets = useCallback(async (regenerateId?: string, queryOnly = false, validateOnly = false) => {
     if (!salesJobAllowed(busyRef.current, 'plan')) return;
     const current = stateRef.current;
     const script = current.scripts[current.selectedScriptIndex];
     if (!script) { setError('请先生成创作方案'); return; }
     const asset = script.assets?.find((item) => item.id === regenerateId);
-    if (asset?.status === 'uncertain' && !asset.taskId) { setError('该图片提交结果未确认，请先核对生成记录，不能自动重投'); return; }
+    if (asset?.status === 'uncertain' && !asset.taskId && !canResubmitRejectedAsset(asset)) { setError('该图片提交结果未确认，请先核对生成记录，不能自动重投'); return; }
     busyRef.current.planning = true;
     setIsPreparingAssets(true);
     setError(null);
@@ -51,7 +52,7 @@ export function useSalesCreativeStages(input: {
     try {
       await recoverSalesAssetReceipts({ script, isAborted: () => controller.signal.aborted,
         updateAsset: (id, patch) => commitScript((previous) => ({ ...previous, assetValidation: 'pending', finalizedRevision: undefined, assets: previous.assets?.map((item) => item.id === id ? { ...item, ...patch } : item) })),
-      });
+      }, generateSalesReferenceFrame);
       if (queryOnly) return;
       const images = assertSalesPlanCurrent(current, script);
       if (asset?.url && !['generating', 'uncertain'].includes(asset.status || '') && !(await confirmAction({ title: '重新生成素材？', description: '本次将调用绘图模型，可能计费；依赖这张图片的素材也可能需要更新。', confirmText: '重新生成' }))) return;
@@ -63,12 +64,12 @@ export function useSalesCreativeStages(input: {
       await prepareSalesCreativeAssets({
         script, images, imageModel: image.modelId || '', aspectRatio: current.aspectRatio,
         selectedColor: current.colorSelection.colorLabel, productAnalysis: JSON.stringify(current.analysis || {}),
-        regenerateId: force, isAborted: () => controller.signal.aborted,
+        regenerateId: force, validateOnly, isAborted: () => controller.signal.aborted,
         route: { model: route.modelId, textProtocol: route.textProtocol, customBaseUrl: route.baseUrl, customApiKey: route.apiKey, signal: controller.signal },
         getScript: () => stateRef.current.scripts.find((item) => item.id === script.id) || script,
         updateAsset: (id, patch) => commitScript((previous) => ({ ...previous, assets: previous.assets?.map((item) => item.id === id ? { ...item, ...patch } : item) })),
         setValidation: (status) => commitScript((previous) => ({ ...previous, assetValidation: status })),
-      });
+      }, defaultSalesImageBatchClient, validateSalesAssets);
     } catch (err) {
       setError(err instanceof Error ? err.message : '素材准备失败');
     } finally {

@@ -26,10 +26,10 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 			continue
 		}
 		var data map[string]any
-		if json.Unmarshal(raw, &data) != nil || data["error"] != nil {
+		if json.Unmarshal(raw, &data) != nil || videoPollSkipped(data) {
 			continue
 		}
-		if !videoPollReady(data) {
+		if !videoPollReady(data) && videoErrorMessage(data) == "" {
 			continue
 		}
 		parsed := readVideoPoll(data)
@@ -45,10 +45,26 @@ func videoPollURLs(base, taskID, model string) []string {
 	if template := videoQueryTemplate(base, taskID); template != "" {
 		urls = append(urls, strings.ReplaceAll(template, "{taskId}", url.QueryEscape(taskID)))
 	}
-	_, queries, _ := videoEndpointSet(videoFamily(model), model, nil)
+	_, queries, _ := videoEndpointSet(videoFamily(model), model, "", nil)
 	urls = append(urls, expandVideoURLs(base, queries, url.QueryEscape(taskID))...)
 	urls = append(urls, base+"/v1/videos/"+taskID, base+"/v2/videos/generations/"+taskID, base+"/seedance/v3/contents/generations/tasks/"+taskID)
 	return uniqueStrings(urls)
+}
+
+func videoPollSkipped(data map[string]any) bool {
+	_, object := data["error"].(map[string]any)
+	return data["error"] != nil && !object
+}
+
+func videoErrorMessage(data map[string]any) string {
+	switch err := data["error"].(type) {
+	case string:
+		return strings.TrimSpace(err)
+	case map[string]any:
+		return firstString(err, "message")
+	default:
+		return ""
+	}
 }
 
 func videoPollReady(data map[string]any) bool {
@@ -62,6 +78,12 @@ func videoPollReady(data map[string]any) bool {
 }
 
 func readVideoPoll(data map[string]any) pollParsed {
+	if message := videoErrorMessage(data); message != "" {
+		raw := strings.ToUpper(firstString(data, "task_status", "status", "state"))
+		if raw == "" || isFailure(raw) {
+			return pollParsed{status: "FAILURE", reason: message, progress: "0%"}
+		}
+	}
 	task := data
 	if nested, ok := data["task"].(map[string]any); ok {
 		task = nested
@@ -93,6 +115,12 @@ func readVideoPoll(data map[string]any) pollParsed {
 			reason = firstString(data, "fail_reason", "message")
 		}
 		if reason == "" {
+			reason = firstString(task, "err_code")
+		}
+		if reason == "" {
+			reason = videoErrorMessage(data)
+		}
+		if reason == "" {
 			reason = "视频生成失败"
 		}
 		result = ""
@@ -113,6 +141,11 @@ func extractVideoResult(roots ...map[string]any) string {
 		}
 		if url := firstString(root, "video_url", "url"); url != "" {
 			return url
+		}
+		if video, ok := root["video"].(map[string]any); ok {
+			if url := firstString(video, "url", "video_url"); url != "" {
+				return url
+			}
 		}
 		if content, ok := root["content"].(map[string]any); ok {
 			if url := firstString(content, "video_url", "url"); url != "" {

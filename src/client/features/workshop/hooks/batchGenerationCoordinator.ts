@@ -1,13 +1,13 @@
-import { savedWorkshopOutputSize } from '../model/generation/workshopOutputSize';
-import { prepareTaskRetry } from '../model/generation/taskRetry';
+import { savedWorkshopOutputSize } from '../model/generation/generationHelpers';
+import { prepareTaskRetry } from '../model/generation/generationHelpers';
 import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import { checkWorkshopReadiness } from '../model/generation/workshopReadiness';
 import { runGridImageTask } from '../model/generation/batchGridGeneration';
 import { runSelectedShots } from '../model/generation/batchSingleGeneration';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import type { BatchProductItem, BatchTaskItem, GenerationStrategy } from '../model/batchTypes';
-import { runGenerationJobs } from '../model/generation/batchImageGeneration';
-import { buildBatchGenerationJobs } from '../model/generation/batchGenerationJobs';
+import { runGenerationJobs } from '../model/generation/generationHelpers';
+import { buildBatchGenerationJobs } from '../model/generation/generationHelpers';
 import {
   executeSingleImageTask,
   type TaskExecutionConfig,

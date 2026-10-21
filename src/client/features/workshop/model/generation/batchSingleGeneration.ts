@@ -1,4 +1,4 @@
-import { savedWorkshopOutputSize } from './workshopOutputSize';
+import { savedWorkshopOutputSize } from './generationHelpers';
 import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import { waitWhilePaused } from '@client/shared/api/generation/generationAbort';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';

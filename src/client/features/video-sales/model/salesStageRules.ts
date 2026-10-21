@@ -1,5 +1,16 @@
-import { eligibleSalesImages, salesContentRevision, type SalesImageRef, type VideoSalesScript } from '@shared/domain/video-sales';
+import { clampVideoDuration, getVideoModelById } from '@shared/domain/media/video';
+import { videoInputError, videoModes } from '@shared/domain/media/videoCapabilities';
+import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
+import { eligibleSalesImages, salesActualReferences, salesAssetsReady, salesContentRevision, type SalesImageRef, type VideoSalesScript } from '@shared/domain/video-sales';
 import type { VideoSalesStudioState } from './salesStudioDraft';
+
+export function salesPlanReason(state: VideoSalesStudioState, chatModelId?: string): string | null {
+  if (!state.productName.trim()) return '请先采集或填写商品名称';
+  if (!eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata).length) return '请先选择至少一张用于生成的商品图';
+  if (!Number.isInteger(state.targetDuration) || state.targetDuration < 10 || state.targetDuration > 120) return '目标时长必须为 10–120 秒整数';
+  if (!chatModelId) return '请配置多模态模型';
+  return null;
+}
 
 export function salesPlanInputRevision(state: VideoSalesStudioState): string {
   return salesContentRevision({
@@ -13,8 +24,8 @@ export function salesPlanInputRevision(state: VideoSalesStudioState): string {
 export function salesFinalInputRevision(state: VideoSalesStudioState, script: VideoSalesScript, model: string): string {
   return salesContentRevision({
     plan: salesPlanInputRevision(state), shots: script.shots.map(({ shotId, duration, description, camera, voiceover, imageIndex }) => ({ shotId, duration, description, camera, voiceover, imageIndex })),
-    assets: script.assets?.map(({ id, url, prompt, validation }) => ({ id, url, prompt, validation })),
-    model, resolution: state.videoResolution, refMode: state.videoRefMode,
+    assets: script.assets?.map(({ id, url, prompt, validation, productImageIndexes }) => ({ id, url, prompt, validation, productImageIndexes })),
+    model, chatModel: state.selectedChatModel || '', resolution: state.videoResolution, refMode: state.videoRefMode,
   });
 }
 
@@ -22,7 +33,8 @@ export function invalidateSalesState(previous: VideoSalesStudioState, patch: Par
   const next = { ...previous, ...patch };
   const planChanged = salesPlanInputRevision(next) !== salesPlanInputRevision(previous);
   const videoChanged = next.selectedVideoModel !== previous.selectedVideoModel || next.videoRefMode !== previous.videoRefMode || next.videoResolution !== previous.videoResolution;
-  if (!planChanged && !videoChanged) return next;
+  const promptModelChanged = (next.selectedChatModel || '') !== (previous.selectedChatModel || '');
+  if (!planChanged && !videoChanged && !promptModelChanged) return next;
   return {
     ...next,
     scripts: next.scripts.map((script) => ({
@@ -40,6 +52,36 @@ export function assertSalesPlanCurrent(state: VideoSalesStudioState, script: Vid
   if (script.deliveryMode !== 'single' || script.planStale || script.planRevision !== salesPlanInputRevision(state)) throw new Error('商品、颜色或创作参数已变化，请先更新创作方案');
   if (script.totalDuration !== state.targetDuration || script.shots.reduce((sum, shot) => sum + shot.duration, 0) !== state.targetDuration) throw new Error('分镜时长与目标不一致，请更新脚本');
   const images = eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata);
-  if (!images.length || script.shots.some((shot) => !images.some((image) => image.index === shot.imageIndex))) throw new Error('方案包含不属于当前颜色的商品参考图');
+  if (!images.length || script.shots.some((shot) => !images.some((image) => image.index === shot.imageIndex))) throw new Error('方案包含未选中或已不可用的商品参考图');
   return images;
+}
+
+export function salesShotTiming(modelId: string | undefined, duration: number): { keepDuration: number; modelDuration: number; adjusted: boolean } {
+  const requested = Math.max(1, Math.round(duration || 3));
+  const modelDuration = clampVideoDuration(modelId, requested);
+  const keepDuration = Math.min(requested, modelDuration);
+  return { keepDuration, modelDuration, adjusted: keepDuration !== requested || modelDuration !== requested };
+}
+
+export function salesSingleVideoError(state: VideoSalesStudioState, script: VideoSalesScript | undefined, requirePrompt = false): string | null {
+  if (!script) return '请先生成口播与视频脚本';
+  try {
+    const images = assertSalesPlanCurrent(state, script);
+    if (!salesAssetsReady(script)) return '请先生成并校验所需素材图片';
+    if (!state.selectedChatModel?.trim()) return '请选择定稿提示词使用的多模态模型';
+    if (!state.selectedVideoModel?.trim()) return '请在视频制作阶段选择视频模型';
+    const model = resolveModalityModelRoute('video', state.selectedVideoModel).modelId || '';
+    const config = getVideoModelById(model);
+    if (!config) return '当前视频模型的能力尚未登记，请选择已登记的模型';
+    if (script.shots.some((shot) => shot.voiceover.trim()) && !config.audioSupport) return '当前模型尚未确认支持原生口播，请选择支持声音的视频模型';
+    if (!videoModes(model).some((mode) => mode.id === state.videoRefMode)) return '当前视频模型不支持所选参考模式，请明确选择其他模式';
+    const references = salesActualReferences(script, images);
+    const capabilityError = videoInputError({ model, images: references.map((ref) => ref.url), refMode: state.videoRefMode, duration: state.targetDuration, aspectRatio: state.aspectRatio, resolution: state.videoResolution });
+    if (capabilityError) return capabilityError;
+    if (requirePrompt && (!script.fullPrompt?.trim() || script.finalizedRevision !== salesFinalInputRevision(state, script, model))) return '图片、视频参数或定稿模型已变化，请先定稿视频提示词';
+    if (requirePrompt && script.renderStatus === 'uncertain' && !script.renderTaskId) return '上次视频提交结果未确认，请先核对生成记录，不要重复提交';
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : '当前方案不可用于视频制作';
+  }
 }

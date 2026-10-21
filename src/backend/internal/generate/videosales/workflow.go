@@ -8,13 +8,14 @@ import (
 
 // PlannedAsset is a still required by the script, ordered before its dependants.
 type PlannedAsset struct {
-	ID                string   `json:"id"`
-	Kind              string   `json:"kind"`
-	Label             string   `json:"label"`
-	Prompt            string   `json:"prompt"`
-	Required          bool     `json:"required"`
-	ReferenceAssetIDs []string `json:"referenceAssetIds,omitempty"`
-	UsesProduct       bool     `json:"usesProduct,omitempty"`
+	ID                  string   `json:"id"`
+	Kind                string   `json:"kind"`
+	Label               string   `json:"label"`
+	Prompt              string   `json:"prompt"`
+	Required            bool     `json:"required"`
+	ReferenceAssetIDs   []string `json:"referenceAssetIds,omitempty"`
+	UsesProduct         bool     `json:"usesProduct"`
+	ProductImageIndexes []int    `json:"productImageIndexes,omitempty"`
 }
 
 type actualReference struct {
@@ -27,8 +28,8 @@ type actualReference struct {
 func workflowV3(payload map[string]any) bool { return payload["workflowVersion"] == float64(3) }
 
 func checkWorkflowVersion(payload map[string]any) error {
-	if version, ok := payload["workflowVersion"]; ok && version != float64(3) {
-		return fmt.Errorf("不支持的 workflowVersion")
+	if payload["workflowVersion"] != float64(3) {
+		return fmt.Errorf("请使用当前工作室流程")
 	}
 	return nil
 }
@@ -57,6 +58,17 @@ func validateScriptReferences(content string, catalog []CatalogImage) error {
 			}
 		}
 		for _, asset := range script.Assets {
+			if raw, ok := asset["productImageIndexes"]; ok {
+				var indexes []int
+				if string(raw) == "null" || json.Unmarshal(raw, &indexes) != nil {
+					return fmt.Errorf("素材商品参考编号格式错误")
+				}
+				for _, index := range indexes {
+					if !valid[index] {
+						return fmt.Errorf("素材引用了模型未查看或不允许的商品图")
+					}
+				}
+			}
 			for _, key := range []string{"id", "kind", "label", "prompt", "required"} {
 				if raw, ok := asset[key]; !ok || string(raw) == "null" {
 					return fmt.Errorf("素材计划缺少 %s", key)
@@ -229,6 +241,16 @@ func validateAssetPlan(assets []PlannedAsset) error {
 		case "person", "face", "scene", "keyframe":
 		default:
 			return fmt.Errorf("未知素材类型 %s", asset.Kind)
+		}
+		productIndexes := map[int]bool{}
+		if asset.ProductImageIndexes != nil && asset.UsesProduct && len(asset.ProductImageIndexes) == 0 {
+			return fmt.Errorf("素材 %s 缺少商品参考编号", asset.ID)
+		}
+		for _, index := range asset.ProductImageIndexes {
+			if index < 0 || productIndexes[index] || !asset.UsesProduct {
+				return fmt.Errorf("素材 %s 商品参考编号无效或重复", asset.ID)
+			}
+			productIndexes[index] = true
 		}
 		deps := map[string]bool{}
 		for _, id := range asset.ReferenceAssetIDs {

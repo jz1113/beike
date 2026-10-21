@@ -17,7 +17,7 @@ const MODE_LABELS: Record<string, string> = {
   extend: '视频延长',
 };
 
-export type VideoResolutionValue = '480P' | '720P' | '1080P' | '4K';
+export type VideoResolutionValue = '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
 
 interface Props {
   modelId: string;

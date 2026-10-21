@@ -1,7 +1,7 @@
 import { buildAssistantWorkspaceSnapshot } from '../model/assistantWorkspaceContext';
-import { useAssistantDialog } from './useAssistantDialog';
-import { useAssistantNarrowViewport } from './useAssistantViewport';
-import { useAssistantOutputLanguage } from './useAssistantOutputLanguage';
+import { useAssistantDialog } from '../hooks/useAssistantDialog';
+import { useAssistantNarrowViewport } from '../hooks/useAssistantViewport';
+import { useAssistantOutputLanguage } from '../hooks/useAssistantOutputLanguage';
 import { getAssistantSuggestions } from '../model/assistantSuggestions';
 import { useAssistantReasoning } from '../hooks/useAssistantReasoning';
 import '../assistantWorkspace.css';

@@ -5,7 +5,7 @@ import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readSseEvents } from '@client/shared/api/sseStream';
 import { applyItemEvent, deriveTurnView } from '@client/shared/agent/turnItems';
 import type { AssistantItem } from '@shared/domain/assistant/types';
-import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '../model/agentArtifact';
+import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '@client/shared/media/agentArtifact';
 import type { TaskUpdater } from './generationTaskTypes';
 import type { AgentTurnTaskData } from '@client/store/appStoreTypes';
 import { resolveAgentSystemPrompt } from '@client/shared/prompt-bar/agentDefinitions';

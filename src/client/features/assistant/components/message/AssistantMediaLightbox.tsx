@@ -1,5 +1,5 @@
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
-import { useAssistantDialog } from '../useAssistantDialog';
+import { useAssistantDialog } from '../../hooks/useAssistantDialog';
 
 export interface ChatPreviewState {
   url: string;

@@ -11,7 +11,6 @@ import {
   emptySalesColorSelection,
 } from '@shared/domain/video-sales';
 import { readProductVariantMetadata, type ProductVariantMetadata } from '@shared/domain/collection/productVariants';
-import { normalizeSalesScripts, readSalesColorSelection } from './salesDraftMigration';
 import { salesOpeningProductUrl, type SalesAspectRatio, type SalesVideoRefMode } from './salesWorkspace';
 
 export const SALES_STUDIO_STORAGE_KEY = 'beike.video_sales.draft.v3';
@@ -111,7 +110,12 @@ function isSalesAspect(value: unknown): value is SalesAspectRatio {
 }
 
 function readVideoResolution(value: unknown): string {
-  return value === '480P' || value === '720P' || value === '1080P' || value === '4K' ? value : '480P';
+  return value === '480P' || value === '540P' || value === '720P' || value === '1080P' || value === '2K' || value === '4K' ? value : '480P';
+}
+
+function readVideoRefMode(value: unknown): SalesVideoRefMode {
+  if (value === 'first_frame' || value === 'first_last_frame' || value === 'text') return value;
+  return 'omni';
 }
 
 export function readSalesStudioDraft(): VideoSalesStudioState {
@@ -131,7 +135,7 @@ export function readSalesStudioDraft(): VideoSalesStudioState {
       selectedScriptIndex: Number.isInteger(parsed.selectedScriptIndex) && parsed.selectedScriptIndex! >= 0 && parsed.selectedScriptIndex! < scripts.length ? parsed.selectedScriptIndex! : 0,
       aspectRatio: isSalesAspect(parsed.aspectRatio) ? parsed.aspectRatio : '9:16',
       videoResolution: readVideoResolution(parsed.videoResolution),
-      videoRefMode: parsed.videoRefMode === 'first_frame' ? 'first_frame' : 'omni',
+      videoRefMode: readVideoRefMode(parsed.videoRefMode),
       analysis: parsed.analysis || null,
       composedResultUrl: typeof parsed.composedResultUrl === 'string' ? parsed.composedResultUrl : null,
       scripts,
@@ -142,4 +146,30 @@ export function readSalesStudioDraft(): VideoSalesStudioState {
   } catch {
     return defaultSalesStudioState;
   }
+}
+
+export function readSalesColorSelection(value: unknown): SalesColorSelection {
+  if (!value || typeof value !== 'object') return emptySalesColorSelection();
+  const raw = value as Partial<SalesColorSelection>;
+  const urls = (items: unknown) => Array.isArray(items) ? [...new Set(items.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())))] : [];
+  return {
+    variantId: typeof raw.variantId === 'string' ? raw.variantId : undefined,
+    colorLabel: typeof raw.colorLabel === 'string' ? raw.colorLabel : '',
+    confirmedImageUrls: urls(raw.confirmedImageUrls), excludedImageUrls: urls(raw.excludedImageUrls),
+  };
+}
+
+export function normalizeSalesScripts(value: unknown, current: boolean): VideoSalesScript[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is VideoSalesScript => Boolean(item && typeof item === 'object' && typeof item.id === 'string'
+    && typeof item.title === 'string' && Array.isArray(item.shots) && item.shots.every((shot: unknown) => shot && typeof shot === 'object'
+      && 'shotId' in shot && typeof shot.shotId === 'number' && 'duration' in shot && typeof shot.duration === 'number')))
+    .map((script) => ({
+      ...script,
+      assets: Array.isArray(script.assets) ? script.assets.filter((asset) => asset && typeof asset.id === 'string' && typeof asset.prompt === 'string')
+        .map((asset) => ({ ...asset, status: asset.status === 'generating' ? 'uncertain' : asset.status })) : undefined,
+      ...(current && script.workflowVersion === 3 ? {} : { planStale: true, finalizedRevision: undefined, assetValidation: 'pending' as const }),
+      // A browser may close after the request reached the provider but before a receipt arrived.
+      ...(script.renderStatus === 'generating' && !script.renderTaskId ? { renderStatus: 'uncertain' as const, renderError: '上次提交结果未确认，请核对服务端生成记录' } : {}),
+    }));
 }

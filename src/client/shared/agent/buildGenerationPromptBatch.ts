@@ -10,7 +10,7 @@ import { prepareAssistantImagePrompt, prepareBatchVideoPrompt } from './batchRef
 export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[] }
 export interface BatchGenerationSettings {
   imageModel: string; imageAspect: string; imageQuality: 'high' | 'medium' | 'low';
-  videoModel: string; videoAspect: string; videoResolution: '480P' | '720P' | '1080P' | '4K'; videoDuration: number; videoRefMode: string; videoGenerateAudio?: boolean;
+  videoModel: string; videoAspect: string; videoResolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K'; videoDuration: number; videoRefMode: string; videoGenerateAudio?: boolean;
 }
 
 export function availableBatchModels(kind: 'image' | 'video') {

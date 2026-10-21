@@ -1,9 +1,8 @@
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
 import { salesActualReferences, type VideoSalesScript, type VideoSalesShot } from '@shared/domain/video-sales';
-import { generateSalesShotVideo, SalesSubmitUncertainError } from './generateShotAsset';
-import { renderSalesVideo, type SalesRenderPhase } from './renderSalesVideo';
-import { assertSalesPlanCurrent } from './salesStageRules';
-import { salesSingleVideoError } from './salesSingleVideo';
+import { renderSalesVideo, type SalesRenderGenerators, type SalesRenderPhase } from './renderSalesVideo';
+import { SalesSubmitUncertainError } from './salesSubmitError';
+import { assertSalesPlanCurrent, salesSingleVideoError } from './salesStageRules';
 import type { VideoSalesStudioState } from './salesStudioDraft';
 
 export type SalesRenderSnapshot = VideoSalesStudioState;
@@ -20,7 +19,7 @@ export async function executeSalesRender(input: {
   onPhase: (phase: SalesRenderPhase) => void;
   onPromptPhase: () => void;
   onResult: (url: string) => void;
-}): Promise<void> {
+}, generators: SalesRenderGenerators): Promise<void> {
   const { script, current } = input;
   const resumeTask = script.renderTaskId && (script.renderStatus === 'generating' || script.renderStatus === 'uncertain');
   if (resumeTask) {
@@ -28,7 +27,7 @@ export async function executeSalesRender(input: {
     // Query a receipt before checking today's draft: already-submitted work keeps its original inputs.
     const snapshot = script.renderSnapshot;
     try {
-      const url = await generateSalesShotVideo({
+      const url = await generators.generateVideo({
         existingTaskId: script.renderTaskId, prompt: snapshot?.prompt || '', duration: snapshot?.duration || script.totalDuration,
         videoModel: snapshot?.model, isAborted: () => input.signal.aborted,
       });
@@ -51,7 +50,7 @@ export async function executeSalesRender(input: {
         redraw: false, resumeOnly: true, signal: input.signal,
         getShots: () => input.getState().scripts[input.getState().selectedScriptIndex]?.shots || [],
         patchShot: input.patchShot, onPhase: input.onPhase,
-      });
+      }, generators);
       if (url && !input.signal.aborted) input.onResult(url);
     }
     return;
@@ -78,7 +77,7 @@ export async function executeSalesRender(input: {
         prompt: snapshot.prompt, images: snapshot.images, duration: snapshot.duration,
         onTaskId: (taskId) => { receipt = taskId; input.commitScript((previous) => ({ ...previous, renderTaskId: taskId, renderStatus: 'generating' })); },
       },
-    });
+    }, generators);
     input.commitScript((previous) => ({ ...previous, renderStatus: 'done', renderResultUrl: url, renderError: undefined }), { composedResultUrl: url });
     if (!input.signal.aborted) input.onResult(url);
   } catch (err) {

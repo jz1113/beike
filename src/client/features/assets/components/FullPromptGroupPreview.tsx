@@ -4,8 +4,8 @@ import { parseGroupShotSkeleton } from '@shared/domain/workshop/workshop-pipelin
 import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshop-pipeline';
 import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';
 import { parseAssetDimensions } from '../model/assetPromptConstants';
-import { recognizedPromptGroupSubcategory, promptGroupSubcategoryLabel } from '../model/promptGroupSubcategory';
-import { promptGroupCategoryKey, promptGroupCategoryLabel } from '../model/promptGroupCategory';
+import { recognizedPromptGroupSubcategory, promptGroupSubcategoryLabel } from '../model/promptGroupFolders';
+import { promptGroupCategoryKey, promptGroupCategoryLabel } from '../model/promptGroupFolders';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, ImageOff, Tags, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';

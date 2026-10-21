@@ -1,6 +1,6 @@
 import { useAppStore } from '@client/store';
 import { useDeconstructJobObserver } from '@client/features/assets/hooks/useDeconstructJobs';
-import { requestDeconstructJobView } from '@client/features/assets/model/deconstructJobsState';
+import { requestDeconstructJobView } from '@client/features/assets/model/deconstructJobs';
 import { DeconstructJobNotifications } from '@client/features/assets/components/DeconstructJobNotifications';
 
 export function DeconstructJobsHost() {

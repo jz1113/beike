@@ -19,7 +19,7 @@ func TestSalesSelectionAndFinalizeNativeProtocols(t *testing.T) {
 		handler                          http.Handler
 	}{
 		{"selection", "gemini", "select-key", "/v1beta/models/shared-vision:generateContent", `{"assignments":[{"shotId":1,"imageIndex":2,"reason":"正面主图"}]}`, Select(cfg)},
-		{"finalize", "anthropic", "final-key", "/v1/messages", `{"prompts":[{"shotId":1,"prompt":"展示台灯"}]}`, Finalize(cfg)},
+		{"finalize", "anthropic", "final-key", "/v1/messages", `{"fullPrompt":"整段展示台灯","prompts":[{"shotId":1,"prompt":"展示台灯"}]}`, Finalize(cfg)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls atomic.Int32
@@ -42,7 +42,7 @@ func TestSalesSelectionAndFinalizeNativeProtocols(t *testing.T) {
 			previous := generate.ModelHTTP
 			generate.ModelHTTP = func() *http.Client { return server.Client() }
 			defer func() { generate.ModelHTTP = previous }()
-			body := `{"model":"shared-vision","textProtocol":"` + tc.protocol + `","customBaseUrl":"` + server.URL + `","customApiKey":"` + tc.key + `","shots":[{"shotId":1,"imageIndex":2,"description":"展示台灯"}],"imageCatalog":[{"index":2,"role":"main","url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}]}`
+			body := `{"workflowVersion":3,"operation":"finalize","targetDuration":15,"aspectRatio":"9:16","model":"shared-vision","textProtocol":"` + tc.protocol + `","customBaseUrl":"` + server.URL + `","customApiKey":"` + tc.key + `","shots":[{"shotId":1,"imageIndex":2,"duration":15,"description":"展示台灯"}],"imageCatalog":[{"index":2,"role":"main","url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}],"eligibleImageIndexes":[2],"actualReferences":[{"id":"lamp","kind":"product","label":"台灯","url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}]}`
 			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
 			r.Header.Set("x-text-protocol", "openai")
 			rec := httptest.NewRecorder()

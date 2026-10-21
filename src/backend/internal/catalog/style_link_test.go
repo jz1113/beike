@@ -72,7 +72,7 @@ func TestExtractStyleReturnsRecipe(t *testing.T) {
 	t.Cleanup(func() { styleHTTP = previous })
 	handler := extractStyleHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/extract", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/extract", strings.NewReader(`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "窗边桌搭") || !strings.Contains(response.Body.String(), `"success":true`) {
 		t.Fatalf("extract %d %s", response.Code, response.Body.String())
 	}

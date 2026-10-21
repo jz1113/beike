@@ -107,6 +107,25 @@ describe('video sales clear current product safety', () => {
     expect(confirmAction).toHaveBeenCalledTimes(1);
   });
 
+  it('plans from directly selected images without a typed color and omits unselected images', async () => {
+    const draft = vi.mocked(readSalesStudioDraft)();
+    draft.colorSelection = { colorLabel: '', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] };
+    draft.imageCatalog = [...draft.imageCatalog, { index: 8, role: 'sku', url: '/not-selected.jpg' }];
+    vi.mocked(readSalesStudioDraft).mockReturnValue(draft);
+    vi.mocked(buildSalesPlan).mockResolvedValue({ analysis: draft.analysis!, script: { ...draft.scripts[0], deliveryMode: 'single', assets: [] } });
+    const studio = StudioHarness();
+    await studio.runPlan();
+    expect(buildSalesPlan).toHaveBeenCalledWith(expect.objectContaining({ selectedColor: '', imageCatalog: [{ index: 0, role: 'main', url: '/product.jpg' }] }), expect.anything());
+    expect(latestCommit().scripts[0].planRevision).toBeTruthy();
+  });
+
+  it('blocks planning when no image is selected', async () => {
+    const draft = vi.mocked(readSalesStudioDraft)();
+    vi.mocked(readSalesStudioDraft).mockReturnValue({ ...draft, colorSelection: { colorLabel: '', confirmedImageUrls: [], excludedImageUrls: [] } });
+    await StudioHarness().runPlan();
+    expect(buildSalesPlan).not.toHaveBeenCalled();
+  });
+
   it('keeps the draft untouched when cancelled', async () => {
     vi.mocked(confirmAction).mockResolvedValue(false);
     expect(await StudioHarness().resetProject()).toBe(false);
@@ -131,7 +150,7 @@ describe('video sales clear current product safety', () => {
     expect(commits.states).toHaveLength(1);
   });
 
-  it.each(['collect', 'upload', 'reference', 'plan', 'render'] as const)('blocks clearing while %s is running', async (job) => {
+  it.each(['collect', 'upload', 'plan', 'render'] as const)('blocks clearing while %s is running', async (job) => {
     const pending = deferred<never>();
     vi.mocked(collectEcommerceProduct).mockReturnValue(pending.promise);
     vi.mocked(uploadStudioFile).mockReturnValue(pending.promise);
@@ -146,8 +165,7 @@ describe('video sales clear current product safety', () => {
     const file = new File(['image'], 'product.png', { type: 'image/png' });
     const task = job === 'collect' ? studio.runProductCollect()
       : job === 'upload' ? studio.addProductImages([file])
-        : job === 'reference' ? studio.setFashionRef('personUrl', file)
-          : job === 'plan' ? studio.runPlan() : studio.runRender();
+        : job === 'plan' ? studio.runPlan() : studio.runRender();
     expect(await studio.resetProject()).toBe(false);
     expect(confirmAction).not.toHaveBeenCalled();
     expect(commits.states).toHaveLength(0);
@@ -156,36 +174,25 @@ describe('video sales clear current product safety', () => {
     expect(await studio.resetProject()).toBe(true);
   });
 
-  it('rechecks busy state after confirmation and avoids stale reference uploads', async () => {
+  it('rechecks busy state after confirmation and avoids a stale product upload', async () => {
     const confirmation = deferred<boolean>();
     const upload = deferred<string>();
     vi.mocked(confirmAction).mockReturnValue(confirmation.promise);
     vi.mocked(uploadStudioFile).mockReturnValue(upload.promise);
     const studio = StudioHarness();
     const reset = studio.resetProject();
-    const file = new File(['image'], 'person.png', { type: 'image/png' });
-    const task = studio.setFashionRef('personUrl', file);
+    const file = new File(['image'], 'product.png', { type: 'image/png' });
+    const task = studio.addProductImages([file]);
     confirmation.resolve(true);
     expect(await reset).toBe(false);
     expect(commits.states).toHaveLength(0);
     await studio.runProductCollect();
-    await studio.addProductImages([file]);
-    await studio.setFashionRef('faceUrl', file);
     expect(collectEcommerceProduct).not.toHaveBeenCalled();
     expect(uploadStudioFile).toHaveBeenCalledTimes(1);
-    upload.resolve('/new-person.jpg');
+    upload.resolve('/new-product.jpg');
     await task;
-    expect(latestCommit().fashionRefs.personUrl).toBe('/new-person.jpg');
+    expect(latestCommit().imageCatalog.some((image) => image.url === '/new-product.jpg')).toBe(true);
     vi.mocked(confirmAction).mockResolvedValue(true);
-    expect(await studio.resetProject()).toBe(true);
-    expect(latestCommit().fashionRefs.personUrl).toBe('');
-  });
-
-  it('clears an individual reference without uploading and allows a subsequent reset', async () => {
-    const studio = StudioHarness();
-    await studio.setFashionRef('faceUrl', null);
-    expect(latestCommit().fashionRefs.faceUrl).toBe('');
-    expect(uploadStudioFile).not.toHaveBeenCalled();
     expect(await studio.resetProject()).toBe(true);
   });
 });
@@ -241,6 +248,32 @@ describe('video sales collection refresh safety', () => {
     expect(await studio.runProductCollect(false, true)).toBe(false);
     expect(collectEcommerceProduct).not.toHaveBeenCalled();
     expect(commits.states).toHaveLength(0);
+  });
+
+  it('clears previous variant metadata when the new product has no specifications', async () => {
+    vi.mocked(readSalesStudioDraft).mockReturnValue({
+      ...existingProject(),
+      variantMetadata: { version: 1, variants: [{ id: 'color:black', label: '黑色', color: '黑色', skuIds: ['1'], imageUrls: ['/old.jpg'] }] },
+      colorSelection: { variantId: 'color:black', colorLabel: '黑色', confirmedImageUrls: [], excludedImageUrls: [] },
+    });
+    vi.mocked(collectEcommerceProduct).mockResolvedValue(mapCollectedSalesProduct({
+      product: { title: '无规格商品', mainImages: ['https://example.com/plain.jpg'] },
+    }, 'https://item.jd.com/1234567.html'));
+    const studio = StudioHarness();
+    expect(await studio.runProductCollect()).toBe(true);
+    expect(latestCommit().variantMetadata).toBeUndefined();
+    expect(latestCommit().colorSelection.colorLabel).toBe('');
+    expect(latestCommit().productName).toBe('无规格商品');
+    expect(latestCommit().scripts).toHaveLength(2);
+    expect(latestCommit().scripts[1].renderResultUrl).toBe('https://example.com/final.mp4');
+  });
+
+  it('waits for direct image selection even when collection has a selected variant', async () => {
+    const product = mapCollectedSalesProduct({ product: { title: '黑色上衣', mainImages: ['https://example.com/black.jpg'] } }, 'https://item.jd.com/1234567.html');
+    vi.mocked(collectEcommerceProduct).mockResolvedValue({ ...product, variantMetadata: { version: 1, selectedVariantId: 'black', variants: [{ id: 'black', label: '黑色', color: '黑色', skuIds: ['b'], imageUrls: ['https://example.com/black.jpg'] }] } });
+    expect(await StudioHarness().runProductCollect()).toBe(true);
+    expect(latestCommit().colorSelection).toEqual({ colorLabel: '', confirmedImageUrls: [], excludedImageUrls: [] });
+    expect(latestCommit().variantMetadata?.selectedVariantId).toBe('black');
   });
 
   it('keeps the selected skill when collection infers another category', async () => {

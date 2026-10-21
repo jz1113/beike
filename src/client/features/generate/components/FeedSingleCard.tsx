@@ -4,7 +4,7 @@ import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import LazyVideoCover from '@client/shared/media/widgets/LazyVideoCover';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
 import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
-import { isDepthImageTask, isDepthVideoTask } from '../model/generationTaskMedia';
+import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationTaskMedia';
 import {
   AlertCircle,
   Upload,

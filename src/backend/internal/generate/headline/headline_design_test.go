@@ -53,8 +53,8 @@ func TestCoverDeconstructPromptKeepsEachCover(t *testing.T) {
 func TestDeconstructRejectsEmptyModelAndMultipleImages(t *testing.T) {
 	handler := HeadlineDeconstruct(config.Config{})
 	cases := []string{
-		`{"imageUrls":["data:image/jpeg;base64,YQ=="],"model":""}`,
-		`{"imageUrls":["data:image/jpeg;base64,YQ==","data:image/jpeg;base64,Yg=="],"model":"vision"}`,
+		`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"model":""}`,
+		`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","data:image/jpeg;base64,Yg=="],"model":"vision"}`,
 	}
 	for _, body := range cases {
 		response := httptest.NewRecorder()
@@ -136,7 +136,7 @@ func TestHeadlineDesignReturnsPlan(t *testing.T) {
 	t.Cleanup(func() { generate.ModelHTTP = previous })
 	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/jpeg;base64,YQ=="],"originalTitle":"台灯","coverTitle":"台灯","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"originalTitle":"台灯","coverTitle":"台灯","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "integrated-cover-v5") || !strings.Contains(response.Body.String(), "标题文字锁定") {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
 	}

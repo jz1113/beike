@@ -6,30 +6,9 @@ import { ModelIcon } from '@client/shared/ui/ModelIcons';
 import { APPROVED_MODELS } from '@shared/domain/models/modelCatalog';
 import { sortMultimodalModelsByPrice } from '../model/multimodalPriceSort';
 
-export interface WorkflowModel {
-  id: string;
-  routeId?: string;
-  /** Whether this route is offered in business model selectors; capabilities remain unchanged. */
-  enabled?: boolean;
-  channel?: 'comfly' | 'openai' | 'deepseek' | 'lianchi' | (string & {});
-  providerId?: string;
-  customBaseUrl?: string;
-  customApiKey?: string;
-  apiTemplate?: string;
-  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
-  name: string;
-  shortName: string;
-  badge?: string;
-  desc?: string;
-  isMultimodal?: boolean;
-  isImage: boolean;
-  isVideo: boolean;
-  isVision?: boolean;
-  isAssistant?: boolean;
-  isDistill?: boolean;
-  isThinking?: boolean;
-  isCustom?: boolean;
-}
+import type { WorkflowModel } from '../model/workflowModel';
+
+export type { WorkflowModel };
 
 export const DEFAULT_PRESET_MODELS: WorkflowModel[] = sortMultimodalModelsByPrice(APPROVED_MODELS.map((m) => ({
   id: m.id,

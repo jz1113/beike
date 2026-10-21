@@ -1,7 +1,38 @@
-import { resolveServiceStatus } from './connectionStatus';
-import type { useSettingsConfig } from '../hooks/useSettingsConfig';
+import { resolveServiceStatus, type ConnectionTestRecord } from './connectionStatus';
 
-export function serviceStatuses(config: ReturnType<typeof useSettingsConfig>) {
+interface ServiceStatusConfig {
+  apiKey: string;
+  baseUrl: string;
+  isTesting: boolean;
+  openAIApiKey: string;
+  openAIBaseUrl: string;
+  openAIEnabled: boolean;
+  isTestingOpenAI: boolean;
+  deepSeekApiKey: string;
+  isTestingDeepSeek: boolean;
+  lianchiApiKey: string;
+  isTestingLianchi: boolean;
+  wanbangKey: string;
+  wanbangSecret: string;
+  isTestingWanbang: boolean;
+  scraperId: string;
+  scraperSecret: string;
+  isTestingScraper: boolean;
+  qiyunAppId: string;
+  qiyunAppKey: string;
+  isTestingQiyun: boolean;
+  storageEndpoint: string;
+  storageProvider: string;
+  storageAccountId: string;
+  storageAccessKeyId: string;
+  storageSecretAccessKey: string;
+  storageBucketName: string;
+  storageEnabled: boolean;
+  isTestingStorage: boolean;
+  connectionResults: Record<string, ConnectionTestRecord | undefined>;
+}
+
+export function serviceStatuses(config: ServiceStatusConfig) {
   const c = config;
   return Object.fromEntries([
     ['comfly_gateway', Boolean(c.apiKey.trim() && c.baseUrl.trim()), true, c.isTesting],

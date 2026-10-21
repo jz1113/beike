@@ -218,3 +218,72 @@ describe('skill guide interactions', () => {
     expect(writeText).toHaveBeenCalledOnce();
   });
 });
+
+describe('in-place skill detail page', () => {
+  const page = { ...base, layout: 'compact' as const, detailMode: 'page' as const, items: [{ ...item, document }] };
+
+  it('replaces the compact overview instead of appending details below', () => {
+    const closed = renderToStaticMarkup(createElement(SkillGuideDialog, page));
+    expect(closed).toContain('示例规则');
+    expect(closed).toContain('查看详情');
+    expect(closed).toContain('max-w-[560px]');
+    expect(closed).toContain('h-9 w-9');
+    expect(closed).not.toContain('完整文档正文');
+    expect(closed).not.toContain('max-w-[840px]');
+    expect(closed.match(/overflow-y-auto/g)).toHaveLength(1);
+    state.openId = item.id;
+    const open = renderToStaticMarkup(createElement(SkillGuideDialog, page));
+    expect(open).toContain('返回');
+    expect(open).toContain('完整文档正文');
+    expect(open).toContain('example-skill');
+    expect(open).toContain('保持商品一致');
+    expect(open).toContain('max-w-[720px]');
+    expect(open).toContain('h-[min(720px,calc(100dvh-2rem))]');
+    expect(open).not.toContain('查看详情');
+    expect(open).not.toContain('max-w-[560px]');
+    expect(open).not.toContain('name: example-skill');
+    expect(open.match(/overflow-y-auto/g)).toHaveLength(1);
+  });
+
+  it('moves focus into the detail page and restores the overview button', async () => {
+    const focus = vi.fn();
+    const getElementById = vi.fn(() => ({ focus }));
+    vi.stubGlobal('document', { getElementById });
+    const { tree } = capture(() => SkillGuideDialog(page));
+    const card = findNode(tree, (node) => typeof node.props.onToggle === 'function');
+    (card.props.onToggle as () => void)();
+    await Promise.resolve();
+    expect(state.setOpenId).toHaveBeenCalledWith(item.id);
+    expect(getElementById).toHaveBeenCalledWith(expect.stringMatching(/-detail-example$/));
+    expect(focus).toHaveBeenCalledOnce();
+
+    state.openId = item.id;
+    focus.mockClear();
+    getElementById.mockClear();
+    const open = capture(() => SkillGuideDialog(page));
+    const back = findNode(open.tree, (node) => node.type === 'button' && renderToStaticMarkup(node).includes('返回'));
+    (back.props.onClick as () => void)();
+    await Promise.resolve();
+    expect(state.setOpenId).toHaveBeenCalledWith(null);
+    expect(getElementById).toHaveBeenCalledWith(expect.stringMatching(/-toggle-example$/));
+    expect(focus).toHaveBeenCalledOnce();
+  });
+
+  it('copies the original skill file from the detail page', async () => {
+    state.openId = item.id;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    const { tree } = capture(() => {
+      const dialog = SkillGuideDialog(page);
+      const detail = findNode(dialog, (node) => typeof node.props.detailId === 'string');
+      const detailTree = (detail.type as (props: object) => ReactNode)(detail.props);
+      const documentView = findNode(detailTree, (node) => node.props.mode === 'inline');
+      return (documentView.type as (props: object) => ReactNode)(documentView.props);
+    });
+    const button = findNode(tree, (node) => node.props['aria-label'] === '复制完整 SKILL.md 文件');
+    (button.props.onClick as () => void)();
+    await Promise.resolve();
+    expect(writeText).toHaveBeenCalledWith(document.source);
+    expect(state.setCopyState).toHaveBeenLastCalledWith('copied');
+  });
+});

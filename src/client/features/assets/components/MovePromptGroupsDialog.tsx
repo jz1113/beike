@@ -4,8 +4,8 @@ import { FolderInput, X } from 'lucide-react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
-import { promptGroupCategoryKey, topLevelCategories } from '../model/promptGroupCategory';
-import { promptGroupSubcategoryOptions, recognizedPromptGroupSubcategory } from '../model/promptGroupSubcategory';
+import { promptGroupCategoryKey, topLevelCategories } from '../model/promptGroupFolders';
+import { promptGroupSubcategoryOptions, recognizedPromptGroupSubcategory } from '../model/promptGroupFolders';
 
 interface Props {
   items: AssetLibrarySlim[];

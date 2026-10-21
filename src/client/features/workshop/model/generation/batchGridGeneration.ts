@@ -6,9 +6,9 @@ import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client
 import { sliceGridImage2x2Blobs } from '@client/shared/media/imageGridSlicer';
 import type { BatchProductItem } from '../batchTypes';
 import type { TaskExecutionConfig } from './batchTaskExecution';
-import { resolveGridRecoverySource } from './gridRecoverySource';
+import { resolveGridRecoverySource } from './generationHelpers';
 import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
-import { savedWorkshopOutputSize } from './workshopOutputSize';
+import { savedWorkshopOutputSize } from './generationHelpers';
 
 export async function runGridImageTask(
   item: BatchProductItem,

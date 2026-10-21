@@ -9,121 +9,9 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/system"
 )
-
-func submitImage(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
-	model := "gpt-image-2"
-	if raw, exists := payload["model"]; exists {
-		model = jsString(raw)
-	}
-	base, apiKey := imageSubmitCredentials(cfg, r, payload, model)
-	prompt := strings.TrimSpace(rawString(payload, "prompt"))
-	refs := imageReferences(payload)
-	size := rawString(payload, "size")
-	if size == "" {
-		size = rawString(payload, "aspectRatio")
-	}
-	if size == "" {
-		size = "2448x3264"
-	}
-	quality := rawString(payload, "quality")
-	if quality == "" {
-		if rawString(payload, "source") == "hub" {
-			quality = "medium"
-		} else {
-			quality = "high"
-		}
-	}
-	imageQuality := normalizeImageQuality(rawString(payload, "imageQuality"))
-	protocol := resolveImageProtocol(base, imageProtocolName(payload, r.Header.Get("x-custom-protocol")))
-	if protocol.ID() == "openai" && nativeDashscopeImageModel(model) {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{
-			"success": false, "submissionRejected": true,
-			"error": "该模型需要使用千问原生生图接口。请在设置中把模型绑定到千问服务商，或将接口地址改为千问 / DashScope。",
-		})
-		return
-	}
-	claim, statusCode, message := claimImageSubmission(cfg, r, payload, model, prompt, quality, size)
-	if statusCode != 0 {
-		httpx.WriteJSON(w, statusCode, map[string]any{"success": false, "error": message})
-		return
-	}
-	if claim.reusedURL != "" {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "taskId": claim.reusedTaskID, "status": "SUCCESS", "resultUrl": claim.reusedURL, "reused": true})
-		return
-	}
-	result, err := protocol.Submit(imageRequest{
-		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality, ImageQuality: imageQuality,
-		Strength: rawString(payload, "inferenceStrength"), Negative: rawString(payload, "negativePrompt"),
-		Refs: refs, Workspace: workspaceOf(r), Production: cfg.Production(), Template: imageRequestTemplate(payload),
-	})
-	adapted := result.Adapted
-	status, data := result.Status, result.Data
-	if err != nil {
-		var prepare imageEditPrepareError
-		if errors.As(err, &prepare) {
-			failImageSubmission(cfg, r, claim.recordID, prepare.Error())
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": prepare.Error()})
-			return
-		}
-		transportErr := imageSubmitTransportError(err)
-		failImageSubmission(cfg, r, claim.recordID, transportErr)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": transportErr})
-		return
-	}
-	taskID, direct := result.TaskID, result.Direct
-	if taskID != "" {
-		rememberImageTemplate(base, taskID, imageRequestTemplate(payload))
-	}
-	if status < 200 || status >= 300 || (taskID == "" && direct == "") {
-		upstreamErr := imageUpstreamError(data, status)
-		failImageSubmission(cfg, r, claim.recordID, upstreamErr)
-		rejected := status >= 400 && status < 500
-		outStatus := http.StatusBadGateway
-		outcome := "unknown"
-		if rejected {
-			outStatus = http.StatusBadRequest
-			outcome = "rejected"
-		}
-		body := map[string]any{
-			"success":           false,
-			"submissionOutcome": outcome,
-			"error":             upstreamErr,
-		}
-		if rejected {
-			body["submissionRejected"] = true
-		}
-		httpx.WriteJSON(w, outStatus, body)
-		return
-	}
-	if taskID == "" {
-		taskID = "direct_" + Itoa(int(time.Now().UnixMilli()))
-	}
-	if err := finishImageSubmission(cfg, r, claim.recordID, adapted, taskID, direct, size); err != nil {
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "任务持久化失败: " + err.Error(), "taskId": taskID})
-		return
-	}
-	recordID := claim.recordID
-	body := map[string]any{
-		"success": true, "taskId": taskID, "recordId": recordID, "model": adapted.modelID,
-		"requestedModel": model, "size": adapted.size, "family": adapted.family,
-		"usedEndpoint": adapted.endpoint, "status": "IN_PROGRESS", "prompt": adapted.prompt,
-		"timing": map[string]any{"parseMs": 0, "convertMs": 0, "gatewayMs": 0, "dbMs": 0, "totalMs": 0, "payloadKB": 0, "imageCount": len(refs), "convertCacheHits": 0},
-	}
-	if direct != "" {
-		body["status"] = "SUCCESS"
-		body["resultUrl"] = direct
-		body["temporaryUrl"] = strings.HasPrefix(direct, "http://") || strings.HasPrefix(direct, "https://")
-	}
-	if usage := NormalizeUsage(data); usage != nil {
-		body["usage"] = usage
-		rememberTaskUsage(r.Context(), cfg, taskID, usage)
-	}
-	httpx.WriteJSON(w, http.StatusOK, body)
-}
 
 type imageAdapted struct {
 	family, modelID, prompt, size, endpoint string
@@ -261,7 +149,7 @@ func imageDirect(data map[string]any) string {
 				return url
 			}
 			if b64, ok := item["b64_json"].(string); ok && b64 != "" {
-				return "data:image/png;base64," + b64
+				return modelgw.DataImageURL(b64)
 			}
 		}
 	}
@@ -306,7 +194,7 @@ func imageReferences(payload map[string]json.RawMessage) []string {
 	seen := map[string]struct{}{}
 	var out []string
 	add := func(value string) {
-		value = strings.TrimSpace(value)
+		value = normalizeImageRef(value)
 		if value == "" {
 			return
 		}
@@ -361,13 +249,13 @@ type imageClaim struct {
 	recordID, reusedTaskID, reusedURL string
 }
 
-func claimImageSubmission(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model, prompt, quality, size string) (imageClaim, int, string) {
+func claimImageSubmission(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model, prompt, quality, size, idempotencyKey string) (imageClaim, int, string) {
 	db, err := openTaskDB(cfg)
 	if err != nil {
 		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
 	}
 	defer db.Close()
-	key := strings.TrimSpace(r.Header.Get("x-idempotency-key"))
+	key := strings.TrimSpace(idempotencyKey)
 	if id, taskID, result, ok := reuseImageTask(r.Context(), db, workspaceOf(r), key); ok {
 		return imageClaim{recordID: id, reusedTaskID: taskID, reusedURL: result}, 0, ""
 	}

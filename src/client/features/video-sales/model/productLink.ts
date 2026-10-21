@@ -3,6 +3,7 @@ import { normalizeCollectedProductImages } from '@shared/domain/collection/produ
 import {
   buildSalesImageCatalog,
   inferSalesCategory,
+  omitSalesPriceProps,
   sellingPointsFromProps,
   type SalesImageRef,
 } from '@shared/domain/video-sales';
@@ -65,11 +66,10 @@ export function mapCollectedSalesProduct(data: {
   const images = data.images || {};
   const { mainImgs, skuImgs, descImgs } = normalizeCollectedProductImages(data);
   const catalog = buildSalesImageCatalog({ mainImages: mainImgs, skuImages: skuImgs, descImages: descImgs });
-  const props = stringRecord(product.props);
+  const props = omitSalesPriceProps(stringRecord(product.props));
   const brand = text(product.brand) || text(images.brand);
   const title = text(product.title) || '未命名商品';
   const categoryText = `${text(product.category) || text(images.category)} ${title}`;
-  const price = numberValue(product.price) || numberValue(images.price);
   let detail: Record<string, unknown> = {};
   if (typeof product.detailUrls === 'string') {
     try { detail = JSON.parse(product.detailUrls) as Record<string, unknown>; } catch { /* Old invalid caches have no variant evidence. */ }
@@ -81,13 +81,13 @@ export function mapCollectedSalesProduct(data: {
     productUrl: sourceUrl,
     productName: title,
     brand,
-    priceLabel: price > 0 ? `${price}元` : '',
+    priceLabel: '',
     category: inferSalesCategory(categoryText),
     sellingPoints: sellingPointsFromProps(props),
     props,
     imageCatalog: catalog,
     productImages: catalog.map((image) => image.url),
-    ...(variants ? { variantMetadata: alignProductVariantImages(variants, catalog.map(image => image.url)) } : {}),
+    variantMetadata: variants ? alignProductVariantImages(variants, catalog.map((image) => image.url)) : undefined,
   };
 }
 
@@ -102,8 +102,4 @@ function stringRecord(value: unknown): Record<string, string> {
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function numberValue(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }

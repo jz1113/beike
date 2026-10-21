@@ -1,19 +1,8 @@
 package modelgw
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"mime"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
-
-	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
 func textMap(v any) map[string]any { m, _ := v.(map[string]any); return m }
@@ -139,122 +128,6 @@ func validateOpenAIText(data map[string]any) error {
 		return errors.New("text upstream returned unfinished tool calls")
 	}
 	return nil
-}
-
-const textImageLimit = 10 << 20
-
-// textImageClient stays on the public-network client. Tests may replace it
-// with a local transport; production calls do not inherit model credentials.
-var textImageClient = func() *http.Client { return network.SafeClient() }
-
-// TextImageError classifies image preparation without exposing the source URL.
-type TextImageError struct {
-	Kind   string
-	Status int
-	err    error
-}
-
-func (e *TextImageError) Error() string {
-	switch e.Kind {
-	case "download":
-		return "safe remote image download failed"
-	case "status":
-		return fmt.Sprintf("remote image HTTP %d", e.Status)
-	case "mime":
-		return "unsupported text image MIME"
-	case "mismatch":
-		return "text image MIME does not match content"
-	case "size":
-		return "invalid text image size"
-	case "data":
-		return "image data URL must use base64"
-	default:
-		return "invalid text image"
-	}
-}
-
-func (e *TextImageError) Unwrap() error { return e.err }
-
-// IndexedImageError identifies the catalog picture that failed preparation.
-type IndexedImageError struct {
-	Index int
-	Err   error
-}
-
-func (e *IndexedImageError) Error() string {
-	return fmt.Sprintf("图片编号 %d：%s", e.Index, e.Err.Error())
-}
-
-func (e *IndexedImageError) Unwrap() error { return e.Err }
-
-func failTextImage(part map[string]any, err error) error {
-	if err == nil {
-		return nil
-	}
-	image := textMap(part["image_url"])
-	if _, ok := image["index"]; !ok {
-		return err
-	}
-	return &IndexedImageError{Index: int(textNumber(image["index"])), Err: err}
-}
-
-func textImage(ctx context.Context, raw string) (string, string, error) {
-	var data []byte
-	var mediaType string
-	if strings.HasPrefix(raw, "data:") {
-		head, body, ok := strings.Cut(strings.TrimPrefix(raw, "data:"), ",")
-		if !ok || !strings.HasSuffix(head, ";base64") {
-			return "", "", &TextImageError{Kind: "data"}
-		}
-		mediaType = strings.TrimSuffix(head, ";base64")
-		if len(body) > base64.StdEncoding.EncodedLen(textImageLimit) {
-			return "", "", &TextImageError{Kind: "size"}
-		}
-		var err error
-		data, err = base64.StdEncoding.DecodeString(body)
-		if err != nil {
-			return "", "", &TextImageError{Kind: "invalid", err: err}
-		}
-	} else {
-		u, err := url.Parse(raw)
-		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
-			return "", "", &TextImageError{Kind: "invalid", err: err}
-		}
-		downloadCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, u.String(), nil)
-		if err != nil {
-			return "", "", errors.New("invalid remote image request")
-		}
-		// A separate public-network client deliberately receives no model headers,
-		// custom transport, cookies, or authentication from TextRequest.Client.
-		response, err := textImageClient().Do(req)
-		if err != nil {
-			return "", "", &TextImageError{Kind: "download", err: err}
-		}
-		defer response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			return "", "", &TextImageError{Kind: "status", Status: response.StatusCode}
-		}
-		mediaType, _, _ = mime.ParseMediaType(response.Header.Get("Content-Type"))
-		data, err = io.ReadAll(io.LimitReader(response.Body, textImageLimit+1))
-		if err != nil {
-			return "", "", &TextImageError{Kind: "download", err: err}
-		}
-	}
-	if len(data) == 0 || len(data) > textImageLimit {
-		return "", "", &TextImageError{Kind: "size"}
-	}
-	detected := http.DetectContentType(data)
-	switch mediaType {
-	case "image/jpeg", "image/png", "image/gif", "image/webp":
-	default:
-		return "", "", &TextImageError{Kind: "mime"}
-	}
-	if detected != mediaType {
-		return "", "", &TextImageError{Kind: "mismatch"}
-	}
-	return mediaType, base64.StdEncoding.EncodeToString(data), nil
 }
 
 func textToolDefinitions(p map[string]any) ([]any, error) {

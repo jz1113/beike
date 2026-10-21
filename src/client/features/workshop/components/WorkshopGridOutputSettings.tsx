@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { OUTPUT_MAX_EDGE, outputAspectLabel, parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { resolveWorkshopImageSize } from '../model/generation/workshopImageSize';
-import { savedWorkshopOutputSize } from '../model/generation/workshopOutputSize';
+import { savedWorkshopOutputSize } from '../model/generation/generationHelpers';
 import type { WorkshopSettingsModalProps } from './settings/workshopSettingsTypes';
 
 const ratios = ['3:4', '1:1', '9:16', '16:9', '4:3', '4:5', '2:3'];

@@ -32,14 +32,21 @@ describe('sales product color eligibility', () => {
   it('accepts an explicit manual confirmation and preserves exclusions', () => {
     expect(eligibleSalesImages(images, { ...selection, confirmedImageUrls: ['/unknown.jpg'], excludedImageUrls: ['/black.jpg'] }, variants)).toEqual([images[2]]);
   });
-  it('does not silently replace a shot reference with another color', () => {
-    expect(() => salesActualReferences({ ...script, shots: [{ ...script.shots[0], imageIndex: 4 }] }, [images[0]])).toThrow('当前颜色');
+  it('accepts directly selected images without a color and still rejects unavailable or excluded images', () => {
+    const direct = { colorLabel: '', confirmedImageUrls: ['/black.jpg', '/unknown.jpg', '/missing.jpg'], excludedImageUrls: ['/black.jpg'] };
+    expect(eligibleSalesImages(images, direct, variants)).toEqual([images[2]]);
+    expect(eligibleSalesImages(images.map((image) => ({ ...image, unavailable: true })), direct, variants)).toEqual([]);
+    expect(eligibleSalesImages(images, { ...direct, confirmedImageUrls: [] }, variants)).toEqual([]);
+  });
+  it('does not silently replace a shot reference with another selected image', () => {
+    expect(() => salesActualReferences({ ...script, shots: [{ ...script.shots[0], imageIndex: 4 }] }, [images[0]])).toThrow('未被选中');
     expect(salesActualReferences(script, [images[0]])).toEqual([{ id: 'product-0', kind: 'product', label: '商品参考 1', url: '/black.jpg' }]);
   });
 });
 
 describe('creative image plan safety', () => {
   it('requires face close-ups to inherit the same previously planned person', () => {
+    expect(() => validateSalesAssetPlan([])).toThrow('1 至 4');
     expect(() => validateSalesAssetPlan([{ id: 'face', kind: 'face', label: '人脸', prompt: '特写', required: true }])).toThrow('同一');
     expect(() => validateSalesAssetPlan([
       { id: 'person', kind: 'person', label: '人物', prompt: '成年人物', required: true },

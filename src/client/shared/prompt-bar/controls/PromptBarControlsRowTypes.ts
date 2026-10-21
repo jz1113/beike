@@ -56,7 +56,7 @@ export interface PromptBarControlsRowProps {
   quickCount: number;
   quickVideoAspectId: string;
   setQuickVideoAspectId: (id: string) => void;
-  setQuickVideoResolution: (res: '480P' | '720P' | '1080P' | '4K') => void;
+  setQuickVideoResolution: (res: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K') => void;
   setQuickVideoCount: (c: number) => void;
   quickAspectId: string;
   setQuickAspectId: (id: string) => void;

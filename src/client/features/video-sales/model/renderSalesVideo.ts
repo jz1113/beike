@@ -1,24 +1,36 @@
 import { shotReferenceImage, type VideoSalesShot } from '@shared/domain/video-sales';
-import { composeSalesVideo } from '../api/videoSalesApi';
-import { SalesSubmitUncertainError, generateSalesReferenceFrame, generateSalesShotVideo } from './generateShotAsset';
+import type { SalesFrameGenerator } from './salesAssetHelpers';
+import { SalesSubmitUncertainError } from './salesSubmitError';
 import { salesComposeAspect, salesComposeResolution, salesResolveRefMode, salesResolveResolution, type SalesRenderPhase } from './salesWorkspace';
-import { salesAspectError, salesShotTiming } from './salesTiming';
+import { salesShotTiming } from './salesStageRules';
+import { salesAspectConflict } from './salesWorkspace';
 
 const CONCURRENCY = 2;
 
 export type { SalesRenderPhase };
 
 export interface SalesRenderGenerators {
-  generateFrame: typeof generateSalesReferenceFrame;
-  generateVideo: typeof generateSalesShotVideo;
-  compose: typeof composeSalesVideo;
+  generateFrame: SalesFrameGenerator;
+  generateVideo(input: {
+    prompt: string;
+    videoModel?: string;
+    referenceImage?: string;
+    referenceImages?: string[];
+    keepAllImages?: boolean;
+    duration?: number;
+    aspectRatio?: string;
+    resolution?: string;
+    refMode?: string;
+    existingTaskId?: string;
+    onTaskId?: (taskId: string) => void;
+    isAborted: () => boolean;
+  }): Promise<string>;
+  compose(body: {
+    projectId: string;
+    clips: Array<{ type: 'video' | 'image'; filePath: string; duration: number; transition?: string; hasAudio?: boolean }>;
+    output: { resolution: '720p' | '1080p'; aspectRatio: '9:16' | '16:9' | '3:4' | '1:1'; bgmVolume?: number };
+  }): Promise<string>;
 }
-
-const defaultGenerators: SalesRenderGenerators = {
-  generateFrame: generateSalesReferenceFrame,
-  generateVideo: generateSalesShotVideo,
-  compose: composeSalesVideo,
-};
 
 export async function renderSalesVideo(input: {
   shots: VideoSalesShot[];
@@ -48,7 +60,7 @@ export async function renderSalesVideo(input: {
     existingTaskId?: string;
     onTaskId?: (taskId: string) => void;
   };
-}, generators: SalesRenderGenerators = defaultGenerators): Promise<string> {
+}, generators: SalesRenderGenerators): Promise<string> {
   const single = input.single || input.fashion;
   if (single) {
     input.onPhase('generating');
@@ -69,7 +81,7 @@ export async function renderSalesVideo(input: {
   const videoModel = input.videoModel || 'doubao-seedance-2.5';
   const resolution = salesResolveResolution(videoModel, input.resolution);
   const refMode = salesResolveRefMode(videoModel, input.refMode);
-  const aspectError = salesAspectError(videoModel, input.aspectRatio);
+  const aspectError = salesAspectConflict(videoModel, input.aspectRatio);
   if (aspectError) throw new Error(aspectError);
   const job = { ...input, resolution, refMode };
   if (input.redraw && !input.resumeOnly && input.shots.some(shotNeedsNewFrame)) {

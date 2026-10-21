@@ -123,24 +123,149 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	if duration == 0 {
 		duration = 5
 	}
-	images := rawStringList(payload["images"])
-	body := map[string]any{
-		"model": model, "prompt": prompt, "duration": duration, "ratio": ratio, "aspect_ratio": ratio,
-		"resolution": resolution, "watermark": rawBool(payload, "watermark"), "size": videoPixelSize(ratio, resolution),
+	images := videoFrameList(payload)
+	videos := rawStringList(payload["videos"])
+	mode := resolveVideoMode(model, videoRefMode(payload), len(images), len(videos))
+	if family == "grok-video" && mode == "extend" && payload["duration"] == nil {
+		duration = 6
 	}
-	if rawBool(payload, "audio") {
-		body["audio"] = true
-		body["generate_audio"] = true
+	audio, audioSet := rawBoolPresent(payload, "audio")
+	var body map[string]any
+	switch family {
+	case "vidu":
+		body = viduOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet)
+		resolution = viduResolution(resolution)
+	case "grok-video":
+		body = grokOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos)
+		resolution = grokResolution(resolution)
+	default:
+		body = map[string]any{
+			"model": model, "prompt": prompt, "duration": duration, "ratio": ratio, "aspect_ratio": ratio,
+			"resolution": resolution, "watermark": rawBool(payload, "watermark"), "size": videoPixelSize(ratio, resolution),
+		}
+		if audioSet && audio {
+			body["audio"] = true
+			body["generate_audio"] = true
+		}
+		if len(images) > 0 {
+			body["images"] = images
+			body["image"] = images[0]
+		}
+		if len(videos) > 0 {
+			body["videos"] = videos
+		}
 	}
-	if len(images) > 0 {
-		body["images"] = images
-		body["image"] = images[0]
-	}
-	if videos := rawStringList(payload["videos"]); len(videos) > 0 {
-		body["videos"] = videos
-	}
-	endpoints, queries, headers := videoEndpoints(family, model, images)
+	endpoints, queries, headers := videoEndpoints(family, model, mode, images)
 	return videoAdapted{family: family, modelID: model, ratio: ratio, resolution: resolution, size: videoPixelSize(ratio, resolution), duration: duration, images: images, payload: body, endpoints: endpoints, queries: queries, headers: headers}
+}
+
+func rawBoolPresent(payload map[string]json.RawMessage, key string) (bool, bool) {
+	raw, ok := payload[key]
+	if !ok {
+		return false, false
+	}
+	var value bool
+	if json.Unmarshal(raw, &value) != nil {
+		return false, false
+	}
+	return value, true
+}
+
+func viduResolution(resolution string) string {
+	upper := strings.ToUpper(strings.TrimSpace(resolution))
+	switch {
+	case strings.Contains(upper, "540"):
+		return "540p"
+	case strings.Contains(upper, "1080"):
+		return "1080p"
+	case strings.Contains(upper, "720"):
+		return "720p"
+	case strings.Contains(upper, "4K"):
+		return "4K"
+	case strings.Contains(upper, "2K"):
+		return "2K"
+	default:
+		return "720p"
+	}
+}
+
+func grokResolution(resolution string) string {
+	upper := strings.ToUpper(strings.TrimSpace(resolution))
+	switch {
+	case strings.Contains(upper, "1080"):
+		return "1080p"
+	case strings.Contains(upper, "720"):
+		return "720p"
+	default:
+		return "480p"
+	}
+}
+
+func viduOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images []string, audio, audioSet bool) map[string]any {
+	body := map[string]any{
+		"model": model, "prompt": prompt, "duration": duration, "resolution": viduResolution(resolution),
+	}
+	if audioSet {
+		body["audio"] = audio
+	}
+	switch mode {
+	case "first_frame":
+		if len(images) > 0 {
+			body["images"] = []string{images[0]}
+		}
+	case "first_last_frame":
+		if len(images) >= 2 {
+			body["images"] = []string{images[0], images[len(images)-1]}
+		}
+	case "text":
+		body["aspect_ratio"] = ratio
+	default:
+		body["images"] = images
+		body["aspect_ratio"] = ratio
+	}
+	return body
+}
+
+func grokOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images, videos []string) map[string]any {
+	if mode == "edit" || mode == "extend" {
+		body := map[string]any{"model": model, "prompt": prompt}
+		if len(videos) > 0 {
+			body["video"] = map[string]string{"url": videos[0]}
+		}
+		if mode == "extend" {
+			if duration == 0 {
+				duration = 6
+			}
+			body["duration"] = duration
+		}
+		return body
+	}
+	body := map[string]any{
+		"model": model, "prompt": prompt, "duration": duration,
+		"aspect_ratio": ratio, "resolution": grokResolution(resolution),
+	}
+	switch mode {
+	case "first_frame":
+		if len(images) > 0 {
+			body["image"] = map[string]string{"url": images[0]}
+		}
+	case "first_last_frame":
+		if len(images) > 0 {
+			body["image"] = map[string]string{"url": images[0]}
+		}
+		if len(images) > 1 {
+			body["last_frame"] = map[string]string{"url": images[len(images)-1]}
+		}
+	case "omni":
+		refs := make([]map[string]string, 0, len(images))
+		for _, item := range images {
+			refs = append(refs, map[string]string{"url": item})
+		}
+		if len(refs) > 0 {
+			body["reference_images"] = refs
+		}
+	}
+	return body
 }
 
 func videoFamily(model string) string {
@@ -167,8 +292,8 @@ func videoFamily(model string) string {
 	}
 }
 
-func videoEndpoints(family, model string, images []string) ([]string, []string, map[string]string) {
-	return videoEndpointSet(family, model, images)
+func videoEndpoints(family, model, mode string, images []string) ([]string, []string, map[string]string) {
+	return videoEndpointSet(family, model, mode, images)
 }
 
 func videoPixelSize(ratio, resolution string) string {

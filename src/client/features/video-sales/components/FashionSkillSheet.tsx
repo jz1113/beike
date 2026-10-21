@@ -1,4 +1,4 @@
-import { Clapperboard, Shirt } from 'lucide-react';
+import { Shirt } from 'lucide-react';
 import { SkillGuideDialog, type SkillGuideItem } from '@client/shared/ui/SkillGuideDialog';
 import { SALES_RULE_GROUPS, SALES_SKILL_DOCUMENT, salesSkillBadge } from '../model/fashionSalesSkill';
 
@@ -10,19 +10,18 @@ interface Props {
 export function FashionSkillSheet({ active, onClose }: Props) {
   const items: SkillGuideItem[] = SALES_RULE_GROUPS.map((group) => ({
     ...group,
-    mark: group.id === 'workflow' ? <Clapperboard className="h-5 w-5" aria-hidden /> : <Shirt className="h-5 w-5" aria-hidden />,
-    badge: group.id === 'workflow'
-      ? { label: '全品类', tone: 'muted' }
-      : { label: salesSkillBadge(active), tone: active ? 'ready' : 'muted' },
-    document: group.id === 'fashion' ? SALES_SKILL_DOCUMENT : undefined,
+    mark: <Shirt className="h-4 w-4" aria-hidden />,
+    badge: { label: salesSkillBadge(active), tone: active ? 'ready' : 'muted' },
+    document: SALES_SKILL_DOCUMENT,
   }));
 
   return (
     <SkillGuideDialog
       title="带货规则"
-      status="全品类共用制作流程，服饰鞋包补充专属叙事与一致性规则。"
+      status="服饰、鞋、包使用实拍叙事，保持同一人物与单品。"
       items={items}
-      layout="grid"
+      layout="compact"
+      detailMode="page"
       onClose={onClose}
     />
   );

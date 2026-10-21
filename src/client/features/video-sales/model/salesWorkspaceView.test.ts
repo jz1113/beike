@@ -36,7 +36,7 @@ describe('sales stage primary actions', () => {
     expect(actions.secondary?.intent).toBe('resume');
   });
   it('promotes paid generation only after a valid finalization', () => {
-    const before = salesStageActions({ ...ready, finalized: false, submitError: '图片或参数已变化，请先定稿视频提示词' });
+    const before = salesStageActions({ ...ready, finalized: false, submitError: '图片、视频参数或定稿模型已变化，请先定稿视频提示词' });
     expect(before.primary.intent).toBe('finalize');
     expect(before.secondary).toBeUndefined();
     const after = salesStageActions(ready);

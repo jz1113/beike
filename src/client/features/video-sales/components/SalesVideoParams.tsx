@@ -3,10 +3,10 @@ import { ChevronDown } from 'lucide-react';
 import { AspectRatioCardGroup } from '@client/shared/prompt-bar/controls/preferences/AspectRatioCardGroup';
 import { usePromptBarPopoverLayout } from '@client/shared/prompt-bar/hooks/usePromptBarPopoverLayout';
 import { videoResolutionLabel } from '@shared/domain/media/videoCapabilities';
-import { DURATION_OPTIONS } from './ProductSetupPanelData';
-import { salesNoteClass } from './salesSurface';
+import { DURATION_OPTIONS } from './salesPlanning';
 import {
   salesAspectOptions,
+  salesDurationEnabled,
   salesParamSummary,
   salesRefModeChoices,
   salesResolutionChoices,
@@ -37,7 +37,7 @@ function choiceClass(selected: boolean) {
 export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, targetDuration, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(open, true, buttonRef, 300, 520);
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(open, true, buttonRef, 400, 520);
   const modes = salesRefModeChoices(modelId);
   const aspects = salesAspectOptions(modelId);
   const resolutions = salesResolutionChoices(modelId);
@@ -95,9 +95,9 @@ export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, ta
           <div className="space-y-4">
             <div className="space-y-1.5">
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">模式选择</div>
-              <div className="grid w-full gap-1 rounded-2xl bg-slate-100/80 p-1 dark:bg-white/5" style={{ gridTemplateColumns: `repeat(${Math.max(modes.length, 1)}, minmax(0, 1fr))` }}>
+              <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100/80 p-1 dark:bg-white/5">
                 {modes.map((item) => (
-                  <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ videoRefMode: item.id })} className={choiceClass(refMode === item.id)}>
+                  <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ videoRefMode: item.id })} className={`min-w-fit flex-1 text-center ${choiceClass(refMode === item.id)}`}>
                     {item.label}
                   </button>
                 ))}
@@ -127,12 +127,11 @@ export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, ta
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">成片时长</div>
               <div className="flex gap-1 rounded-2xl bg-slate-100/80 p-1 dark:bg-white/5" role="radiogroup" aria-label="成片时长">
                 {DURATION_OPTIONS.map((item) => (
-                  <button key={item.value} type="button" role="radio" aria-checked={targetDuration === item.value} disabled={disabled} onClick={() => onChange({ targetDuration: item.value })} className={`flex-1 ${choiceClass(targetDuration === item.value)}`}>
+                  <button key={item.value} type="button" role="radio" aria-checked={targetDuration === item.value} disabled={disabled || !salesDurationEnabled(modelId, item.value)} onClick={() => onChange({ targetDuration: item.value })} className={`flex-1 ${choiceClass(targetDuration === item.value)}`}>
                     {item.label}
                   </button>
                 ))}
               </div>
-              <p className={salesNoteClass}>这是整条视频的目标时长，整段一次生成。请确认当前模型支持该时长；不支持的配置会在定稿前提示。</p>
             </div>
           </div>
         </div>

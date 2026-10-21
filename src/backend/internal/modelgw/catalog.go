@@ -31,6 +31,8 @@ var modelAliases = map[string]string{
 	"mjv7":                 "midjourney",
 	"mjv8.1":               "midjourney",
 	"mjv8.2":               "midjourney",
+	"vidu-q4-preview":      "viduq4-preview",
+	"viduq4":               "viduq4-preview",
 }
 
 var videoModelIDs = []string{
@@ -54,6 +56,7 @@ var videoModelIDs = []string{
 	"viduq3-mix",
 	"viduq3-turbo",
 	"viduq3-pro",
+	"viduq4-preview",
 	"gpt-6-astra",
 }
 

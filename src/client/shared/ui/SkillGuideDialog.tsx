@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 import { SkillGuideDocumentView, type SkillGuideDocument } from './SkillGuideDocumentView';
 
@@ -28,13 +28,14 @@ interface Props {
   note?: string;
   items: readonly SkillGuideItem[];
   layout: 'compact' | 'grid';
+  detailMode?: 'inline' | 'page';
   document?: SkillGuideDocument;
   onClose: () => void;
 }
 
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/80';
 
-export function SkillGuideDialog({ title, status, note, items, layout, document: skillDocument, onClose }: Props) {
+export function SkillGuideDialog({ title, status, note, items, layout, detailMode = 'inline', document: skillDocument, onClose }: Props) {
   const uid = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -43,7 +44,16 @@ export function SkillGuideDialog({ title, status, note, items, layout, document:
   const [openId, setOpenId] = useState<string | null>(null);
   const visible = useViewVisibility();
   const openItem = items.find((item) => item.id === openId) ?? null;
-  const widthClass = skillDocument ? 'h-[min(740px,calc(100dvh-2rem))] max-w-[800px]' : layout === 'grid' ? 'max-w-[840px]' : 'max-w-[680px]';
+  const openPage = detailMode === 'page' ? openItem : null;
+  const widthClass = skillDocument
+    ? 'h-[min(740px,calc(100dvh-2rem))] max-w-[800px]'
+    : openPage
+      ? 'h-[min(720px,calc(100dvh-2rem))] max-w-[720px]'
+      : detailMode === 'page'
+        ? 'max-w-[560px]'
+        : layout === 'grid'
+          ? 'max-w-[840px]'
+          : 'max-w-[680px]';
 
   useLayoutEffect(() => {
     if (!visible) return;
@@ -60,21 +70,30 @@ export function SkillGuideDialog({ title, status, note, items, layout, document:
   }, [visible]);
 
   useLayoutEffect(() => {
-    if (!visible || !openId) return;
+    if (!visible || !openId || detailMode === 'page') return;
     const scroller = scrollerRef.current;
     const detail = detailRef.current;
     if (!scroller || !detail) return;
     const top = detail.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 12;
     scroller.scrollTo({ top: Math.max(0, top) });
     detail.focus({ preventScroll: true });
-  }, [openId, visible]);
+  }, [detailMode, openId, visible]);
 
   if (!visible) return null;
 
-  const toggle = (id: string) => setOpenId((current) => (current === id ? null : id));
+  const toggle = (id: string) => {
+    const opening = openId !== id;
+    setOpenId(opening ? id : null);
+    if (detailMode === 'page' && opening) focusAfterPaint(detailDomId(uid, id));
+  };
   const collapse = (id: string) => {
     setOpenId(null);
-    document.getElementById(toggleDomId(uid, id))?.focus();
+    const toggleId = toggleDomId(uid, id);
+    if (detailMode === 'page') {
+      focusAfterPaint(toggleId);
+      return;
+    }
+    document.getElementById(toggleId)?.focus();
   };
 
   return (
@@ -84,32 +103,46 @@ export function SkillGuideDialog({ title, status, note, items, layout, document:
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        aria-describedby={note ? `${uid}-status ${uid}-note` : `${uid}-status`}
+        aria-describedby={openPage ? `${uid}-page-summary` : note ? `${uid}-status ${uid}-note` : `${uid}-status`}
         tabIndex={-1}
         className={`grid max-h-[calc(100dvh-2rem)] w-full ${widthClass} grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.3)] outline-none dark:border-white/10 dark:bg-[#18191c] dark:text-slate-100`}
         onKeyDown={(event) => handleDialogKey(event, onClose)}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5 dark:border-white/10">
-          <div className="flex min-w-0 items-start gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:ring-amber-300/30">
-              <BookOpen className="h-4 w-4 text-amber-700 dark:text-amber-200" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-black tracking-tight">{title}</h2>
-              <p id={`${uid}-status`} className="mt-0.5 text-xs leading-5 text-slate-600 dark:text-slate-300">{status}</p>
-              {note ? <p id={`${uid}-note`} className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{note}</p> : null}
+        {openPage ? (
+          <header className="flex items-center gap-2 border-b border-slate-100 px-3 py-3 sm:px-4 dark:border-white/10">
+            <button type="button" onClick={() => collapse(openPage.id)} className={`inline-flex h-8 shrink-0 items-center gap-0.5 rounded-xl px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100 ${focusRing}`}>
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+              返回
+            </button>
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-sm font-black tracking-tight">{openPage.title}</h2>
+              <p id={`${uid}-page-summary`} className="truncate text-xs leading-5 text-slate-500 dark:text-slate-400">{openPage.summary}</p>
             </div>
-          </div>
-          <button type="button" onClick={onClose} aria-label={`关闭${title}`} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-100 ${focusRing}`}>
-            <X className="h-5 w-5" aria-hidden />
-          </button>
-        </header>
-        {skillDocument ? <SkillGuideDocumentView document={skillDocument} uid={uid} /> : (
-          <div ref={scrollerRef} tabIndex={0} role="region" aria-label={`${title}正文`} className={`min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 outline-none sm:px-5 ${focusRing}`}>
-            <ul className={layout === 'grid' ? 'grid items-stretch gap-3 sm:grid-cols-2' : 'grid gap-3'}>
+            <CloseButton title={title} onClose={onClose} />
+          </header>
+        ) : (
+          <header className={`flex items-start justify-between gap-3 border-b border-slate-100 dark:border-white/10 ${detailMode === 'page' ? 'px-4 py-3 sm:px-4' : 'px-4 py-4 sm:px-5'}`}>
+            <div className="flex min-w-0 items-start gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:ring-amber-300/30">
+                <BookOpen className="h-4 w-4 text-amber-700 dark:text-amber-200" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-black tracking-tight">{title}</h2>
+                <p id={`${uid}-status`} className="mt-0.5 text-xs leading-5 text-slate-600 dark:text-slate-300">{status}</p>
+                {note ? <p id={`${uid}-note`} className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{note}</p> : null}
+              </div>
+            </div>
+            <CloseButton title={title} onClose={onClose} />
+          </header>
+        )}
+        {skillDocument ? <SkillGuideDocumentView document={skillDocument} uid={uid} /> : openPage ? (
+          <SkillGuidePage item={openPage} detailRef={detailRef} detailId={detailDomId(uid, openPage.id)} />
+        ) : (
+          <div ref={scrollerRef} tabIndex={0} role="region" aria-label={`${title}正文`} className={`min-h-0 overflow-y-auto overscroll-contain outline-none ${detailMode === 'page' ? 'space-y-2 px-3 py-3' : 'space-y-3 px-4 py-4 sm:px-5'} ${focusRing}`}>
+            <ul className={layout === 'grid' ? 'grid items-stretch gap-3 sm:grid-cols-2' : 'grid gap-2'}>
               {items.map((item) => (
                 <li key={item.id} className="h-full min-w-0">
-                  <SkillGuideCard item={item} layout={layout} open={openId === item.id} detailId={detailDomId(uid, item.id)} toggleId={toggleDomId(uid, item.id)} onToggle={() => toggle(item.id)} />
+                  <SkillGuideCard item={item} layout={layout} dense={detailMode === 'page'} open={openId === item.id} detailId={detailDomId(uid, item.id)} toggleId={toggleDomId(uid, item.id)} onToggle={() => toggle(item.id)} />
                 </li>
               ))}
             </ul>
@@ -121,16 +154,17 @@ export function SkillGuideDialog({ title, status, note, items, layout, document:
   );
 }
 
-function SkillGuideCard({ item, layout, open, detailId, toggleId, onToggle }: { item: SkillGuideItem; layout: 'compact' | 'grid'; open: boolean; detailId: string; toggleId: string; onToggle: () => void }) {
+function SkillGuideCard({ item, layout, dense, open, detailId, toggleId, onToggle }: { item: SkillGuideItem; layout: 'compact' | 'grid'; dense: boolean; open: boolean; detailId: string; toggleId: string; onToggle: () => void }) {
   const facts = [
     ['适用', item.appliesWhen],
     ['输入', item.input],
     ['产出', item.output],
   ] as const;
+  const stacked = layout === 'grid' || dense;
   return (
-    <article className={`flex h-full flex-col rounded-[18px] border p-4 ${open ? 'border-amber-300 bg-amber-50/40 ring-2 ring-amber-100 dark:border-amber-300/40 dark:bg-amber-400/5 dark:ring-amber-400/15' : 'border-slate-200/80 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]'}`}>
+    <article className={`flex h-full flex-col rounded-[18px] border ${dense ? 'p-3' : 'p-4'} ${open ? 'border-amber-300 bg-amber-50/40 ring-2 ring-amber-100 dark:border-amber-300/40 dark:bg-amber-400/5 dark:ring-amber-400/15' : 'border-slate-200/80 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]'}`}>
       <div className="flex items-start gap-3">
-        <SkillMark compact={layout === 'grid'}>{item.mark}</SkillMark>
+        <SkillMark size={dense ? 'dense' : layout === 'grid' ? 'compact' : 'regular'}>{item.mark}</SkillMark>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[15px] font-black tracking-tight">{item.title}</h3>
@@ -139,7 +173,7 @@ function SkillGuideCard({ item, layout, open, detailId, toggleId, onToggle }: { 
           <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.summary}</p>
         </div>
       </div>
-      <dl className={layout === 'grid' ? 'mt-3 space-y-2' : 'mt-3 grid gap-3 sm:grid-cols-3'}>
+      <dl className={stacked ? (dense ? 'mt-2.5 space-y-1.5' : 'mt-3 space-y-2') : 'mt-3 grid gap-3 sm:grid-cols-3'}>
         {facts.map(([label, value]) => (
           <div key={label} className="min-w-0">
             <dt className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{label}</dt>
@@ -147,11 +181,11 @@ function SkillGuideCard({ item, layout, open, detailId, toggleId, onToggle }: { 
           </div>
         ))}
       </dl>
-      <div className={layout === 'compact' ? 'mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between' : 'mt-auto flex flex-col gap-3 pt-4'}>
+      <div className={stacked ? `mt-auto flex flex-col ${dense ? 'gap-2 pt-3' : 'gap-3 pt-4'}` : 'mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'}>
         <SkillFlow steps={item.flow} />
-        <button id={toggleId} type="button" aria-expanded={open} aria-controls={detailId} onClick={onToggle} className={`inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-amber-300 hover:text-slate-950 dark:border-white/10 dark:bg-[#1B1B1E] dark:text-slate-100 dark:hover:border-amber-300/50 ${layout === 'grid' ? 'w-full' : 'w-full sm:w-auto'} ${focusRing}`}>
+        <button id={toggleId} type="button" aria-expanded={open} aria-controls={detailId} onClick={onToggle} className={`inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-amber-300 hover:text-slate-950 dark:border-white/10 dark:bg-[#1B1B1E] dark:text-slate-100 dark:hover:border-amber-300/50 ${dense || layout === 'grid' ? 'w-full' : 'w-full sm:w-auto'} ${focusRing}`}>
           {open ? '收起详情' : '查看详情'}
-          <ChevronDown className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} aria-hidden />
+          {dense ? <ChevronRight className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} aria-hidden />}
         </button>
       </div>
     </article>
@@ -188,9 +222,41 @@ function SkillGuideDetail({ item, detailRef, detailId, onCollapse }: { item: Ski
   );
 }
 
-function SkillMark({ compact, children }: { compact: boolean; children: ReactNode }) {
+function SkillGuidePage({ item, detailRef, detailId }: { item: SkillGuideItem; detailRef: Ref<HTMLElement>; detailId: string }) {
   return (
-    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-amber-50 text-amber-800 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-300/25 ${compact ? 'h-11 w-11' : 'h-14 w-14'}`}>
+    <section ref={detailRef} id={detailId} aria-label={`${item.title}详情`} tabIndex={-1} className={`min-h-0 overflow-y-auto overscroll-contain px-4 py-4 outline-none sm:px-5 ${focusRing}`}>
+      <div className="space-y-5">
+        {item.sections.map((section) => (
+          <div key={section.heading} className="border-l-2 border-amber-200 pl-3 dark:border-amber-400/35">
+            <h3 className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{section.heading}</h3>
+            <ul className="mt-2 space-y-2">
+              {section.body.map((line, index) => (
+                <li key={`${section.heading}-${index}`} className="flex gap-2 text-[13px] leading-6 text-slate-700 dark:text-slate-200">
+                  <span aria-hidden className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-amber-500/80" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {item.document ? <SkillGuideDocumentView document={item.document} uid={detailId} mode="inline" /> : null}
+      </div>
+    </section>
+  );
+}
+
+function CloseButton({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <button type="button" onClick={onClose} aria-label={`关闭${title}`} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-100 ${focusRing}`}>
+      <X className="h-5 w-5" aria-hidden />
+    </button>
+  );
+}
+
+function SkillMark({ size, children }: { size: 'dense' | 'compact' | 'regular'; children: ReactNode }) {
+  const box = size === 'dense' ? 'h-9 w-9 rounded-xl' : size === 'compact' ? 'h-11 w-11 rounded-2xl' : 'h-14 w-14 rounded-2xl';
+  return (
+    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-amber-50 text-amber-800 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-300/25 ${box}`}>
       <span aria-hidden className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-[#df6a48]/20" />
       <span aria-hidden className="absolute -bottom-4 -left-3 h-7 w-7 rounded-md bg-amber-200/80 dark:bg-amber-200/15" />
       <span className="relative">{children}</span>
@@ -210,6 +276,10 @@ function SkillFlow({ steps }: { steps: readonly string[] }) {
       ))}
     </ol>
   );
+}
+
+function focusAfterPaint(id: string) {
+  queueMicrotask(() => document.getElementById(id)?.focus());
 }
 
 function toggleDomId(uid: string, id: string) {

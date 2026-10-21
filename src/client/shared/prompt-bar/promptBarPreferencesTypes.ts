@@ -3,7 +3,7 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 export type PromptPreferencesTab = 'video' | 'image' | 'reasoning';
 
 export type VideoAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
-export type VideoResolutionOption = '480P' | '720P' | '1080P' | '4K';
+export type VideoResolutionOption = '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
 export type VideoDurationMode = 'smart' | 'custom';
 export type PreferenceGenerationMode = 'normal' | 'auto';
 

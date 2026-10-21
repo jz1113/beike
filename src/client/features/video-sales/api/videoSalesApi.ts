@@ -1,23 +1,27 @@
+import { z } from 'zod';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
+import {
+  videoSalesAnalyzeBodySchema,
+  videoSalesComposeBodySchema,
+  videoSalesFinalizeBodySchema,
+  videoSalesFinalizeResponseSchema,
+  videoSalesScriptGenerateBodySchema,
+  videoSalesSelectBodySchema,
+  videoSalesValidateAssetsResponseSchema,
+  type VideoSalesComposeBody,
+} from '@shared/contracts/videoSales';
 import type {
-  VideoSalesAnalyzeBody,
   VideoSalesCategory,
-  VideoSalesComposeBody,
   VideoSalesMode,
   VideoSalesProductAnalysis,
   VideoSalesScript,
   SalesActualReference,
+  SalesImageRef,
 } from '@shared/domain/video-sales';
-import type { SalesImageRef } from '@shared/domain/video-sales';
+import type { SalesRouteHeaders } from '../model/salesRoute';
 
-export interface SalesRouteHeaders {
-  model?: string;
-  textProtocol?: import('@shared/domain/models/textProtocol').TextProtocol;
-  customBaseUrl?: string;
-  customApiKey?: string;
-  signal?: AbortSignal;
-}
+export type { SalesRouteHeaders };
 
 export interface SalesWorkflowContext {
   workflowVersion?: 3;
@@ -26,7 +30,13 @@ export interface SalesWorkflowContext {
   aspectRatio?: string;
 }
 
-async function postSales<T>(path: string, body: unknown, extraHeaders?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+function parseSales<T>(schema: z.ZodType<T>, value: unknown, fallback: string): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || fallback);
+  return parsed.data;
+}
+
+async function postSales<T>(path: string, body: unknown, response: z.ZodType<T>, extraHeaders?: Record<string, string>, signal?: AbortSignal): Promise<T> {
   const res = await apiFetch(path, {
     method: 'POST',
     signal,
@@ -37,7 +47,7 @@ async function postSales<T>(path: string, body: unknown, extraHeaders?: Record<s
   if (!res.ok || data?.success === false) {
     throw new Error(typeof data?.error === 'string' ? data.error : '请求失败');
   }
-  return data as T;
+  return parseSales(response, data, '返回格式不正确');
 }
 
 function routeHeaders(input: SalesRouteHeaders): Record<string, string> {
@@ -55,7 +65,7 @@ export async function analyzeProductMedia(input: {
   productDescription?: string;
   category?: VideoSalesCategory;
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<VideoSalesProductAnalysis> {
-  const data = await postSales<{ analysis: VideoSalesProductAnalysis; model?: string; usage?: unknown; degraded?: boolean }>('/api/generate/video-sales/analyze', {
+  const data = await postSales('/api/generate/video-sales/analyze', parseSales(videoSalesAnalyzeBodySchema, {
     imageCatalog: input.imageCatalog.map((image) => ({ index: image.index, url: image.url, role: image.role })),
     imageUrls: input.imageCatalog.map((image) => image.url),
     productName: input.productName,
@@ -70,7 +80,10 @@ export async function analyzeProductMedia(input: {
     textProtocol: input.textProtocol,
     customBaseUrl: input.customBaseUrl,
     customApiKey: input.customApiKey,
-  } as VideoSalesAnalyzeBody, routeHeaders(input), input.signal);
+  }, '商品分析请求不正确'), z.object({
+    analysis: z.custom<VideoSalesProductAnalysis>((value) => Boolean(value) && typeof value === 'object'),
+    model: z.string().optional(), usage: z.unknown().optional(), degraded: z.boolean().optional(),
+  }), routeHeaders(input), input.signal);
   if (data.degraded || data.analysis?.degraded) throw new Error('商品分析没有返回真实结果');
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-analyze', type: 'vision', usage: data.usage });
   return data.analysis;
@@ -92,7 +105,11 @@ export async function generateSalesScripts(input: {
   templateId?: string;
   fashionReferences?: { person: boolean; face: boolean; scene: boolean };
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<VideoSalesScript[]> {
-  const data = await postSales<{ scripts?: VideoSalesScript[]; model?: string; usage?: unknown }>('/api/generate/video-sales/script', input, routeHeaders(input), input.signal);
+  const request = { ...input };
+  delete request.signal;
+  const data = await postSales('/api/generate/video-sales/script', parseSales(videoSalesScriptGenerateBodySchema, request, '脚本请求不正确'), z.object({
+    scripts: z.array(z.custom<VideoSalesScript>()).optional(), model: z.string().optional(), usage: z.unknown().optional(),
+  }), routeHeaders(input), input.signal);
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-script', type: 'chat', usage: data.usage });
   return data.scripts || [];
 }
@@ -101,7 +118,7 @@ export async function selectSalesImages(input: {
   shots: VideoSalesScript['shots'];
   imageCatalog: SalesImageRef[];
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<Array<{ shotId: number; imageIndex: number; reason?: string }>> {
-  const data = await postSales<{ assignments?: Array<{ shotId: number; imageIndex: number; reason?: string }>; degraded?: boolean; model?: string; usage?: unknown }>('/api/generate/video-sales/select-images', {
+  const data = await postSales('/api/generate/video-sales/select-images', parseSales(videoSalesSelectBodySchema, {
     shots: input.shots.map((shot) => ({
       shotId: shot.shotId,
       type: shot.type,
@@ -116,7 +133,10 @@ export async function selectSalesImages(input: {
     textProtocol: input.textProtocol,
     customBaseUrl: input.customBaseUrl,
     customApiKey: input.customApiKey,
-  }, routeHeaders(input), input.signal);
+  }, '选图请求不正确'), z.object({
+    assignments: z.array(z.object({ shotId: z.number(), imageIndex: z.number(), reason: z.string().optional() })).optional(),
+    degraded: z.boolean().optional(), model: z.string().optional(), usage: z.unknown().optional(),
+  }), routeHeaders(input), input.signal);
   if (data.degraded) throw new Error('选图结果不可用');
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-select', type: 'vision', usage: data.usage });
   return data.assignments || [];
@@ -136,7 +156,7 @@ export async function finalizeSalesPrompts(input: {
   videoResolution?: string;
   referenceOrder?: Array<{ slot: string; label: string; url: string; imageIndex?: number }>;
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<{ prompts: Array<{ shotId: number; prompt: string; imagePrompt?: string }>; fullPrompt?: string; personImagePrompt?: string; sceneImagePrompt?: string }> {
-  const data = await postSales<{ prompts?: Array<{ shotId: number; prompt: string; imagePrompt?: string }>; fullPrompt?: string; personImagePrompt?: string; sceneImagePrompt?: string; model?: string; usage?: unknown }>('/api/generate/video-sales/finalize-prompts', {
+  const data = await postSales('/api/generate/video-sales/finalize-prompts', parseSales(videoSalesFinalizeBodySchema, {
     shots: input.shots.map((shot) => ({
       shotId: shot.shotId,
       imageIndex: shot.imageIndex,
@@ -166,9 +186,9 @@ export async function finalizeSalesPrompts(input: {
     textProtocol: input.textProtocol,
     customBaseUrl: input.customBaseUrl,
     customApiKey: input.customApiKey,
-  }, routeHeaders(input), input.signal);
+  }, '定稿请求不正确'), videoSalesFinalizeResponseSchema, routeHeaders(input), input.signal);
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-finalize', type: 'vision', usage: data.usage });
-  return { prompts: data.prompts || [], fullPrompt: data.fullPrompt, personImagePrompt: data.personImagePrompt, sceneImagePrompt: data.sceneImagePrompt };
+  return { prompts: data.prompts, fullPrompt: data.fullPrompt };
 }
 
 export async function validateSalesAssets(input: {
@@ -178,8 +198,12 @@ export async function validateSalesAssets(input: {
   assets?: VideoSalesScript['assets'];
   productAnalysis?: string;
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<Array<{ id: string; status: 'passed' | 'conflict' | 'uncertain'; reason: string }>> {
-  const data = await postSales<{ validations?: Array<{ id: string; status: 'passed' | 'conflict' | 'uncertain'; reason: string }>; model?: string; usage?: unknown }>(
-    '/api/generate/video-sales/finalize-prompts', { ...input, signal: undefined, operation: 'validate-assets' }, routeHeaders(input), input.signal,
+  const request = { ...input };
+  delete request.signal;
+  const data = await postSales(
+    '/api/generate/video-sales/finalize-prompts',
+    parseSales(videoSalesFinalizeBodySchema, { ...request, operation: 'validate-assets' }, '素材校验请求不正确'),
+    videoSalesValidateAssetsResponseSchema, routeHeaders(input), input.signal,
   );
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-validate', type: 'vision', usage: data.usage });
   const found = data.validations || [];
@@ -192,7 +216,9 @@ export async function validateSalesAssets(input: {
 }
 
 export async function composeSalesVideo(body: VideoSalesComposeBody): Promise<string> {
-  const data = await postSales<{ resultUrl?: string; executed?: boolean }>('/api/generate/video-sales/compose', body);
+  const data = await postSales('/api/generate/video-sales/compose', parseSales(videoSalesComposeBodySchema, body, '合成请求不正确'), z.object({
+    resultUrl: z.string().optional(), executed: z.boolean().optional(),
+  }));
   if (!data.executed || !data.resultUrl) throw new Error('合成没有返回成片地址');
   return data.resultUrl;
 }

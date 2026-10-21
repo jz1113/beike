@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VideoSalesScript } from '@shared/domain/video-sales';
 import { executeSalesRender } from './executeSalesRender';
-import { generateSalesShotVideo, SalesSubmitUncertainError } from './generateShotAsset';
+import { generateSalesShotVideo, SalesSubmitUncertainError } from '../api/salesMediaApi';
 import { renderSalesVideo } from './renderSalesVideo';
-import { salesSingleVideoError } from './salesSingleVideo';
 import { defaultSalesStudioState } from './salesStudioDraft';
-import { salesPlanInputRevision } from './salesStageRules';
+import { salesPlanInputRevision, salesSingleVideoError } from './salesStageRules';
 
-vi.mock('./generateShotAsset', async (original) => ({ ...await original<typeof import('./generateShotAsset')>(), generateSalesShotVideo: vi.fn() }));
+vi.mock('../api/salesMediaApi', async (original) => ({ ...await original<typeof import('../api/salesMediaApi')>(), generateSalesShotVideo: vi.fn() }));
 vi.mock('./renderSalesVideo', () => ({ renderSalesVideo: vi.fn() }));
-vi.mock('./salesSingleVideo', () => ({ salesSingleVideoError: vi.fn(() => null) }));
+vi.mock('./salesStageRules', async (original) => ({ ...await original<typeof import('./salesStageRules')>(), salesSingleVideoError: vi.fn(() => null) }));
 vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute: (_: string, modelId: string) => ({ modelId }) }));
 
 function fixture() {
@@ -38,9 +37,9 @@ describe('single sales video submission protection', () => {
   it('submits exactly once with the actual ordered images and stores the receipt and snapshot', async () => {
     const { input, getScript } = fixture();
     vi.mocked(renderSalesVideo).mockImplementation(async (request) => { request.single!.onTaskId!('paid-once'); return '/final.mp4'; });
-    await executeSalesRender(input);
+    await executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' });
     expect(renderSalesVideo).toHaveBeenCalledTimes(1);
-    expect(renderSalesVideo).toHaveBeenCalledWith(expect.objectContaining({ single: expect.objectContaining({ images: ['/product.jpg', '/scene.jpg'], duration: 15 }), refMode: input.current.videoRefMode }));
+    expect(renderSalesVideo).toHaveBeenCalledWith(expect.objectContaining({ single: expect.objectContaining({ images: ['/product.jpg', '/scene.jpg'], duration: 15 }), refMode: input.current.videoRefMode }), expect.anything());
     expect(getScript()).toMatchObject({ renderTaskId: 'paid-once', renderStatus: 'done', renderResultUrl: '/final.mp4', renderSnapshot: { model: 'chosen-video', images: ['/product.jpg', '/scene.jpg'] } });
     expect(input.onPromptPhase).not.toHaveBeenCalled();
   });
@@ -48,7 +47,7 @@ describe('single sales video submission protection', () => {
   it('blocks an incompatible or stale configuration before any submission', async () => {
     const { input } = fixture();
     vi.mocked(salesSingleVideoError).mockReturnValue('模型不支持所需参考图');
-    await expect(executeSalesRender(input)).rejects.toThrow('参考图');
+    await expect(executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' })).rejects.toThrow('参考图');
     expect(renderSalesVideo).not.toHaveBeenCalled();
     expect(generateSalesShotVideo).not.toHaveBeenCalled();
   });
@@ -56,7 +55,7 @@ describe('single sales video submission protection', () => {
   it('keeps an unknown no-receipt submission blocked rather than retrying', async () => {
     const { input, getScript } = fixture();
     vi.mocked(renderSalesVideo).mockRejectedValue(new SalesSubmitUncertainError('回执未确认'));
-    await expect(executeSalesRender(input)).rejects.toThrow('回执未确认');
+    await expect(executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' })).rejects.toThrow('回执未确认');
     expect(getScript().renderStatus).toBe('uncertain');
     expect(getScript().renderSnapshot?.model).toBe('chosen-video');
     expect(renderSalesVideo).toHaveBeenCalledTimes(1);
@@ -69,7 +68,7 @@ describe('single sales video submission protection', () => {
     input.current.selectedVideoModel = 'changed-model'; input.current.colorSelection.colorLabel = '白色';
     vi.mocked(salesSingleVideoError).mockReturnValue('当前方案已过期');
     vi.mocked(generateSalesShotVideo).mockResolvedValue('/original.mp4');
-    await executeSalesRender(input);
+    await executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' });
     expect(generateSalesShotVideo).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'original-task', videoModel: 'original-model', duration: 30 }));
     expect(renderSalesVideo).not.toHaveBeenCalled();
     expect(getScript()).toMatchObject({ renderStatus: 'done', renderResultUrl: '/original.mp4' });
@@ -79,7 +78,7 @@ describe('single sales video submission protection', () => {
     const { input, getScript } = fixture();
     input.script.renderTaskId = 'failed-task'; input.script.renderStatus = 'generating';
     vi.mocked(generateSalesShotVideo).mockRejectedValue(Object.assign(new Error('服务商拒绝'), { name: 'ImageGenBusinessError' }));
-    await expect(executeSalesRender(input)).rejects.toThrow('服务商拒绝');
+    await expect(executeSalesRender(input, { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' })).rejects.toThrow('服务商拒绝');
     expect(getScript()).toMatchObject({ renderTaskId: 'failed-task', renderStatus: 'failed' });
     expect(renderSalesVideo).not.toHaveBeenCalled();
   });

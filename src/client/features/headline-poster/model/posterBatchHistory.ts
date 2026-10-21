@@ -1,5 +1,5 @@
 import { COVER_FORMATS, parseCoverFormat } from './coverFormat';
-import { normalizePosterProductionSettings } from './posterSettings';
+import { normalizePosterProductionSettings } from './posterDraft';
 import {
   isPosterImageUrl,
   normalizeProductName,

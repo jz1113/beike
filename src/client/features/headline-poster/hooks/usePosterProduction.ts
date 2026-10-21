@@ -12,11 +12,11 @@ import { loadSystemConfiguredModels } from '@client/shared/models/configuredMode
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 import { directCoverDesign, generateFinalCover, rewriteCoverTitle } from '../api/posterApi';
 import { parseTable } from '../model/parsePosterTable';
-import { isPosterImageFile, isPosterTableFile, posterItemFromUploadedImage } from '../model/posterImageTitle';
-import { assertPosterImportRowCount, assertPosterPasteSize, assertPosterSheetImportRange } from '../model/posterImportLimits';
-import { mergePosterItems } from '../model/mergePosterItems';
+import { isPosterImageFile, isPosterTableFile, posterItemFromUploadedImage } from '../model/posterDraft';
+import { assertPosterImportRowCount, assertPosterPasteSize, assertPosterSheetImportRange } from '../model/posterDraft';
+import { mergePosterItems } from '../model/posterDraft';
 import { usePosterInputDraft } from './usePosterInputDraft';
-import { loadPosterProductionSettings, persistPosterProductionSettings } from '../model/posterSettings';
+import { loadPosterProductionSettings, persistPosterProductionSettings } from '../model/posterDraft';
 import {
   loadPosterBatchHistory,
   persistPosterBatchRecord,

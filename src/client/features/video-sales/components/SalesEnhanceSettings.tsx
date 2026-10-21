@@ -1,7 +1,7 @@
 import { usePreferenceModels } from '@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels';
 import { SalesModelPicker } from './SalesModelPicker';
 import { SalesVideoParams } from './SalesVideoParams';
-import { salesDividerClass, salesGroupClass, salesLabelClass, salesSectionTitleClass } from './salesSurface';
+import { salesDividerClass, salesGroupClass, salesLabelClass, salesSectionTitleClass } from './salesChrome';
 import type { SalesAspectRatio, SalesVideoRefMode } from '../model/salesWorkspace';
 
 interface Props {

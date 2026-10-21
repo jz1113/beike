@@ -1,4 +1,4 @@
-import type { WorkflowModel } from '../components/settingsShared';
+import type { WorkflowModel } from './workflowModel';
 import { repairWorkflowModelsForSettings } from '@shared/domain/models/workflowModels';
 import { isValidWorkflowModelList } from '@shared/domain/models/workflowModelStorage';
 import { reconcileStoredWorkflowDefaults } from '@shared/domain/models/workflowModelDefaults';

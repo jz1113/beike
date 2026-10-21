@@ -60,7 +60,7 @@ export interface HomeSlice {
   quickAudioModel: string;
   quickVideoModel: string;
   quickVideoDuration: number;
-  quickVideoResolution: '480P' | '720P' | '1080P' | '4K';
+  quickVideoResolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
   quickVideoAspectId: string;
   quickVideoRefMode: string;
   quickVideoFirstFrame: string | null;
@@ -82,7 +82,7 @@ export interface HomeSlice {
   setQuickAudioModel: (model: string) => void;
   setQuickVideoModel: (model: string) => void;
   setQuickVideoDuration: (duration: number) => void;
-  setQuickVideoResolution: (resolution: '480P' | '720P' | '1080P' | '4K') => void;
+  setQuickVideoResolution: (resolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K') => void;
   setQuickVideoAspectId: (aspectId: string) => void;
   setQuickVideoRefMode: (mode: string) => void;
   setQuickVideoFirstFrame: (frame: string | null) => void;

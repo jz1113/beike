@@ -17,7 +17,9 @@ export function imageGenBusinessError(message: string): Error {
 }
 
 export function nonRetryableError(message: string): Error {
-  return Object.assign(new Error(message), { retryable: false });
+  const err = new Error(message);
+  err.name = 'NonRetryableError';
+  return Object.assign(err, { retryable: false });
 }
 
 export type GenerationPollOutcome = 'success' | 'failure' | 'pending';

@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  initialSalesPane,
   salesOpeningProductUrl,
-  salesActions,
   salesAspectChoices,
   salesAspectConflict,
-  salesFlowSteps,
-  salesHasRenderActivity,
   salesJobAllowed,
   salesAspectOptions,
   salesComposeResolution,
@@ -14,27 +10,13 @@ import {
   salesPreviewClass,
   salesRedrawnCount,
   salesRenderStatus,
+  salesDurationEnabled,
+  salesRefModeChoices,
   salesResolveRefMode,
   salesResolveResolution,
   salesShotStatusLabel,
   salesVideoCapability,
-  type SalesActionInput,
 } from './salesWorkspace';
-
-const ready: SalesActionInput = {
-  hasName: true,
-  hasUrl: false,
-  usableImages: 2,
-  hasScript: false,
-  isCollecting: false,
-  isPlanning: false,
-  isRendering: false,
-  planPhase: null,
-  renderPhase: null,
-  chatReady: true,
-  videoReady: true,
-  aspectConflict: null,
-};
 
 describe('sales opening product link', () => {
   it('drops a leftover product id when the draft has no product', () => {
@@ -46,61 +28,6 @@ describe('sales opening product link', () => {
     expect(salesOpeningProductUrl({ productUrl: '10235916959245', productName: '连衣裙' })).toBe('10235916959245');
     expect(salesOpeningProductUrl({ productUrl: 'https://item.jd.com/1.html', imageCatalog: [{ url: 'https://img' }] })).toBe('https://item.jd.com/1.html');
     expect(salesOpeningProductUrl({ productUrl: 'https://item.jd.com/1.html', scripts: [{}] })).toBe('https://item.jd.com/1.html');
-  });
-});
-
-describe('sales workspace actions', () => {
-  it('asks for a presenter before planning apparel', () => {
-    const action = salesActions({ ...ready, needsFashionPerson: true });
-    expect(action.plan.reason).toBe('请上传出镜人物');
-    expect(action.plan.disabled).toBe(true);
-  });
-
-  it('asks for a product before planning', () => {
-    const action = salesActions({ ...ready, hasName: false, usableImages: 0 });
-    expect(action.primary).toBe('plan');
-    expect(action.plan.disabled).toBe(true);
-    expect(action.plan.reason).toMatch(/商品链接/);
-  });
-
-  it('blocks planning when the named product has no usable image', () => {
-    expect(salesActions({ ...ready, usableImages: 0 }).plan.reason).toMatch(/可用商品图/);
-  });
-
-  it('blocks planning until an analysis model is configured', () => {
-    expect(salesActions({ ...ready, chatReady: false }).plan.reason).toMatch(/多模态模型/);
-  });
-
-  it('keeps planning locked while product images are uploading', () => {
-    const action = salesActions({ ...ready, hasScript: true, isUploading: true });
-    expect(action.primary).toBe('plan');
-    expect(action.plan.label).toBe('正在上传图片…');
-    expect(action.plan.disabled).toBe(true);
-    expect(salesJobAllowed({ collecting: false, planning: false, rendering: false, uploading: true }, 'plan')).toBe(false);
-  });
-
-  it('switches the primary action to render after a script exists', () => {
-    const action = salesActions({ ...ready, hasScript: true });
-    expect(action.primary).toBe('render');
-    expect(action.render.label).toBe('确认方案，生成视频');
-    expect(action.plan.label).toBe('重新生成方案');
-  });
-
-  it('explains video and aspect blockers without changing the aspect', () => {
-    expect(salesActions({ ...ready, hasScript: true, videoReady: false }).render.reason).toMatch(/视频模型/);
-    expect(salesActions({ ...ready, hasScript: true, needsSceneFrames: true, imageReady: false }).render.reason).toMatch(/绘图模型/);
-    expect(salesActions({ ...ready, hasScript: true, needsSceneFrames: true, imageReady: false }).render.disabled).toBe(true);
-    expect(salesActions({ ...ready, hasScript: true, redrawScenes: true, imageReady: false }).render.reason).toBeNull();
-    expect(salesActions({ ...ready, hasScript: true, aspectConflict: '当前视频模型不支持 3:4' }).render.reason).toMatch(/3:4/);
-    expect(salesActions({ ...ready, hasScript: true, fashionPromptMissing: true }).render.reason).toBe('请按服饰带货重新生成方案');
-  });
-
-  it('hides validation reasons while a job is running and keeps the plan action primary', () => {
-    const action = salesActions({ ...ready, hasScript: true, isPlanning: true, planPhase: 'script', hasName: false });
-    expect(action.primary).toBe('plan');
-    expect(action.plan.label).toMatch(/分镜/);
-    expect(action.plan.reason).toBeNull();
-    expect(action.plan.disabled).toBe(true);
   });
 });
 
@@ -123,7 +50,6 @@ describe('sales model capability', () => {
     expect(salesVideoCapability('doubao-seedance-2.5').note).toMatch(/单镜头/);
     expect(salesRenderStatus({ renderPhase: 'redrawing', done: 1, total: 4, hasResult: false })).toBe('正在重绘参考图 1/4');
     expect(salesRenderStatus({ renderPhase: 'generating', done: 1, total: 4, hasResult: false })).toBe('正在生成镜头 1/4');
-    expect(salesActions({ ...ready, hasScript: true, isRendering: true, renderPhase: 'redrawing' }).render.label).toBe('正在重绘参考图…');
     expect(salesRedrawnCount([{ referenceFrameUrl: 'https://frame' }, { status: 'redrawing' }])).toBe(1);
   });
 
@@ -145,6 +71,16 @@ describe('sales model capability', () => {
     expect(salesResolveRefMode(undefined, 'first_frame')).toBe('first_frame');
   });
 
+  it('lists Vidu Q4 preview modes and keeps a supported choice', () => {
+    expect(salesRefModeChoices('vidu-q4-preview').map((item) => item.id)).toEqual(['omni', 'first_frame', 'first_last_frame', 'text']);
+    expect(salesResolveRefMode('viduq4', 'first_frame')).toBe('first_frame');
+    expect(salesResolveRefMode('viduq4-preview', 'edit')).toBe('omni');
+    expect(salesDurationEnabled('viduq4-preview', 15)).toBe(true);
+    expect(salesDurationEnabled('viduq4-preview', 30)).toBe(false);
+    expect(salesDurationEnabled('viduq4-preview', 60)).toBe(false);
+    expect(salesVideoCapability('vidu-q4-preview').known).toBe(true);
+  });
+
   it('maps generation resolution onto the two compose sizes', () => {
     expect(salesComposeResolution('480P')).toBe('720p');
     expect(salesComposeResolution('720P')).toBe('720p');
@@ -164,22 +100,6 @@ describe('sales model capability', () => {
 });
 
 describe('sales workspace flow', () => {
-  it('moves from preparation to confirmation and then rendering', () => {
-    expect(salesFlowSteps({ hasScript: false, isCollecting: true, isPlanning: false, isRendering: false, hasRenderActivity: false })[0].state).toBe('current');
-    const confirm = salesFlowSteps({ hasScript: true, isCollecting: false, isPlanning: false, isRendering: false, hasRenderActivity: false });
-    expect(confirm.find((step) => step.id === 'confirm')?.state).toBe('current');
-    expect(confirm.find((step) => step.id === 'prepare')?.state).toBe('done');
-    const render = salesFlowSteps({ hasScript: true, isCollecting: false, isPlanning: false, isRendering: true, hasRenderActivity: true });
-    expect(render.find((step) => step.id === 'render')?.label).toBe('正在生成视频');
-  });
-
-  it('opens the result pane only when render activity already exists', () => {
-    expect(initialSalesPane(false)).toBe('plan');
-    expect(initialSalesPane(true)).toBe('result');
-    expect(salesHasRenderActivity([{ status: 'failed' }], null)).toBe(true);
-    expect(salesHasRenderActivity([{ status: 'pending' }], null)).toBe(false);
-  });
-
   it('keeps preview frames on the selected aspect', () => {
     expect(salesPreviewClass('16:9', 'hero')).toContain('aspect-video');
     expect(salesPreviewClass('9:16', 'shot')).toContain('aspect-[9/16]');

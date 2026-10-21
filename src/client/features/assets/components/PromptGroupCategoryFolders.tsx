@@ -5,12 +5,12 @@ import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache
 import Folder from '@client/shared/media/widgets/Folder';
 import { PromptFolderDeleteDialog } from './PromptFolderDeleteDialog';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
-import type { PromptGroupFolder } from '../model/promptGroupFolder';
+import type { PromptGroupFolder } from '../model/promptGroupFolders';
 import { PromptFolderContextMenu } from './PromptFolderContextMenu';
 import { PromptFolderRulesDialog } from './PromptFolderRulesDialog';
 import { promptFolderRuleCategories, promptFolderRuleCategory } from '../model/promptFolderRuleCategories';
 
-export { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders } from '../model/promptGroupFolderLists';
+export { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders } from '../model/promptGroupFolders';
 
 interface Props {
   categories: AssetProductCategory[];

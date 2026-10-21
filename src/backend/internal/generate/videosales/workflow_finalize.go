@@ -69,7 +69,11 @@ func handleWorkflowFinalize(w http.ResponseWriter, r *http.Request, cfg config.C
 		return
 	}
 	if err != nil || status < 200 || status >= 300 {
-		workflowError(w, 502, fmt.Errorf("实际图片视觉模型调用失败"))
+		label := "素材校验失败"
+		if operation == "finalize" {
+			label = "视频定稿失败"
+		}
+		workflowError(w, 502, fmt.Errorf("%s：%s", label, analysisFailureReason(status, err)))
 		return
 	}
 	response := map[string]any{"success": true, "model": model}
@@ -147,7 +151,7 @@ func parseWorkflowPrompts(content string, shots []ScriptShot) ([]finalPrompt, st
 }
 
 func workflowFinalConstraints(payload map[string]any, shots []ScriptShot, refs []actualReference, target int, ratio string) string {
-	lines := []string{fmt.Sprintf("一次生成一条完整视频，总时长精确 %d 秒，画幅 %s。分镜仅为同一视频时间轴，禁止增删时长。全程无字幕、无贴纸、无价格条，口播由视频模型生成。", target, ratio)}
+	lines := []string{fmt.Sprintf("一次生成一条完整视频，总时长精确 %d 秒，画幅 %s。分镜仅为同一视频时间轴，禁止增删时长。全程无字幕、无贴纸、无价格条，口播由视频模型生成，不要出现价格、金额或优惠。", target, ratio)}
 	for i, ref := range refs {
 		lines = append(lines, fmt.Sprintf("图片%d：%s（ID=%s，类型=%s）；按实际图片锁定外观与连续性。", i+1, ref.Label, ref.ID, ref.Kind))
 	}
@@ -164,6 +168,6 @@ func workflowFinalConstraints(payload map[string]any, shots []ScriptShot, refs [
 
 func workflowFinalizeBody(model string, payload map[string]any, shots []ScriptShot, refs []actualReference, catalog []CatalogImage, target int, ratio string) map[string]any {
 	facts, _ := json.Marshal(map[string]any{"shots": shots, "productAnalysis": payload["productAnalysis"], "category": payload["category"], "selectedColor": payload["selectedColor"], "videoModel": payload["videoModel"], "videoRefMode": payload["videoRefMode"], "videoResolution": payload["videoResolution"]})
-	system := `你负责所有商品品类的实际图片定稿。逐张观察实际参考图与商品原图，以真实图的外观而非计划中的想象写一条完整视频提示词。图片编号只能引用给出的实际图片连续编号，不得把商品对照图的目录编号当成图片编号，不得虚构缺失人物、人脸或场景。参考图是外观约束，不强迫图间幻灯片切换。保持人物身份、商品颜色款式、空间与动作连续；只对服饰采用真实穿搭或鞋包展示规则，其余品类按自己的脚本。禁止编造事实。逐段包含准确起止秒数、原文口播、运镜、动作和衔接；全程无字幕。一次生成整段视频，不拆任务。不要求人物或场景绘图提示词，不生成 imagePrompt。没有提供的视频模型、分辨率、参考模式均不得自行默认或猜测；音频能力已经由调用方检查。严格按输入画幅、目标时长，不输出固定竖屏。只输出 JSON {"fullPrompt":"一条整段视频提示词","prompts":[{"shotId":1,"prompt":"本段定稿"}]}。`
+	system := `你负责所有商品品类的实际图片定稿。逐张观察实际参考图与商品原图，以真实图的外观而非计划中的想象写一条完整视频提示词。图片编号只能引用给出的实际图片连续编号，不得把商品对照图的目录编号当成图片编号，不得虚构缺失人物、人脸或场景。参考图是外观约束，不强迫图间幻灯片切换。逐张辨认商品正面、背面和局部，锁定领口、门襟、口袋、接缝、图案和标志所在部位；不能把背面写成正面、把镜像写成转身或把胸前标志移到背部。保持人物身份、商品颜色款式、空间与动作连续；只对服饰采用真实穿搭或鞋包展示规则，其余品类按自己的脚本。禁止编造事实。逐段包含准确起止秒数、原文口播、运镜、动作和衔接；全程无字幕。一次生成整段视频，不拆任务。不要求人物或场景绘图提示词，不生成 imagePrompt。没有提供的视频模型、分辨率、参考模式均不得自行默认或猜测；音频能力已经由调用方检查。严格按输入画幅、目标时长，不输出固定竖屏。只输出 JSON {"fullPrompt":"一条整段视频提示词","prompts":[{"shotId":1,"prompt":"本段定稿"}]}。`
 	return withLongOutput(chatBody(model, system, workflowVisionParts(workflowFinalConstraints(payload, shots, refs, target, ratio)+"\n请求事实："+string(facts), refs, catalog), 0.3))
 }

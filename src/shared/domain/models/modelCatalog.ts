@@ -29,6 +29,8 @@ const MODEL_ALIASES: Record<string, string> = {
   mjv7: 'midjourney',
   'mjv8.1': 'midjourney',
   'mjv8.2': 'midjourney',
+  'vidu-q4-preview': 'viduq4-preview',
+  viduq4: 'viduq4-preview',
 };
 
 export function canonicalModelId(id: string): string {

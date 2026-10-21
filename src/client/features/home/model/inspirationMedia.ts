@@ -1,4 +1,4 @@
-import type { InspirationItem } from '../components/inspiration/InspirationModal';
+import type { InspirationItem } from './inspirationItem';
 
 /** 首屏优先加载的灵感条目数量 */
 // Keep the first viewport warm without decoding a dozen large assets at once.

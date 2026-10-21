@@ -1,7 +1,7 @@
 import { comflyTokenPrice } from './comflyReferencePrice';
 import { isMultimodalWorkflowModel, workflowModelRouteId } from '@shared/domain/models/workflowModels';
 import { channelDisplayName } from '@shared/domain/models/modelChannels';
-import type { WorkflowModel } from '../components/settingsShared';
+import type { WorkflowModel } from './workflowModel';
 import { type ComflyPriceMap } from './multimodalPriceSort';
 
 export type ModelChannel = NonNullable<WorkflowModel['channel']>;

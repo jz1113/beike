@@ -143,6 +143,7 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/copywriting", true, generate.Copywriting(cfg)},
 		{"POST /api/generate/image", true, generate.Image(cfg)},
 		{"GET /api/generate/image", true, generate.Image(cfg)},
+		{"POST /api/generate/image-batch", true, generate.ImageBatch(cfg)},
 		{"POST /api/generate/video", true, generate.Video(cfg)},
 		{"GET /api/generate/video", true, generate.Video(cfg)},
 		{"POST /api/generate/audio", true, generate.Audio(cfg)},

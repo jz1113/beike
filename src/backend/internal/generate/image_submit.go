@@ -31,29 +31,8 @@ func Image(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "请求数据格式异常或体积过大 ()"})
 			return
 		}
-		prompt, ok := jsonString(payload["prompt"])
-		if !ok || strings.TrimSpace(prompt) == "" {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "提示词不能为空"})
-			return
-		}
-		model := "gpt-image-2"
-		if raw, exists := payload["model"]; exists {
-			model = jsString(raw)
-		}
-		if strings.TrimSpace(model) == "" {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "模型名称不能为空"})
-			return
-		}
-		if status, fields := imageGatewayError(cfg, r, payload, model); status != 0 {
+		if status, fields := imagePayloadError(cfg, r, payload); status != 0 {
 			httpx.WriteJSON(w, status, fields)
-			return
-		}
-		if message := workshopProductImageError(payload); message != "" {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
-			return
-		}
-		if message := imageModelRuleError(payload, model); message != "" {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
 			return
 		}
 		submitImage(cfg, w, r, payload)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadPosterInputDraft, persistPosterInputDraft, type PosterInputDraft } from '../model/posterInputDraft';
+import { loadPosterInputDraft, persistPosterInputDraft, type PosterInputDraft } from '../model/posterDraft';
 
 export function usePosterInputDraft(notify: (message: string) => void) {
   const [draft, setDraft] = useState<PosterInputDraft>({ pasteText: '', importMode: 'paste' });

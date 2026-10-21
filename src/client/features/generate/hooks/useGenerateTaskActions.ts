@@ -3,8 +3,8 @@ import { useAppStore, type GenerationTask } from '@client/store';
 import { cleanPromptText, getAspectRatioFromSize, stripWorkshopPromptGuards } from '@shared/domain/media/drawing';
 import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { registerRefMedia } from '@client/shared/media/refMediaRegistry';
-import { createGenerationAttemptId, prepareGenerationAttempt } from '../model/generationAttempt';
-import { isDepthImageTask, isDepthVideoTask } from '../model/generationTaskMedia';
+import { createGenerationAttemptId, prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
+import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationTaskMedia';
 import { isGenerateVideoTask } from '../model/generateWorkspaceLayout';
 
 function getLiveTask(task: GenerationTask): GenerationTask {
@@ -53,7 +53,7 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
       store.setQuickVideoDuration(task.videoDuration || 5);
       const resolution = task.videoResolution || task.quality;
       store.setQuickVideoResolution(['480P', '720P', '1080P', '4K'].includes(resolution)
-        ? resolution as '480P' | '720P' | '1080P' | '4K' : '720P');
+        ? resolution as '480P' | '540P' | '720P' | '1080P' | '2K' | '4K' : '720P');
       const refMode = task.videoRefMode || 'omni';
       store.setQuickVideoRefMode(refMode);
       if (refMode === 'first_last_frame') {

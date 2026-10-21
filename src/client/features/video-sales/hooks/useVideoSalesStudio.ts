@@ -6,13 +6,14 @@ import {
   markSalesImageUnavailable,
   eligibleSalesImages,
   emptySalesColorSelection,
-  type FashionRefs,
   type VideoSalesScript,
   type VideoSalesShot,
 } from '@shared/domain/video-sales';
 import { uploadStudioFile } from '@client/shared/api/uploadStudioFile';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { collectEcommerceProduct } from '../api/collectProduct';
+import { composeSalesVideo, analyzeProductMedia, generateSalesScripts, selectSalesImages } from '../api/videoSalesApi';
+import { generateSalesReferenceFrame, generateSalesShotVideo } from '../api/salesMediaApi';
 import { buildSalesPlan, type SalesPlanPhase } from '../model/buildSalesPlan';
 import { executeSalesRender } from '../model/executeSalesRender';
 import { parseProductLink } from '../model/productLink';
@@ -20,15 +21,12 @@ import { productImageFiles } from '../model/productImageDrop';
 import type { SalesRenderPhase } from '../model/renderSalesVideo';
 import { clearSalesProduct, hasSalesProductContent, readSalesStudioDraft, SALES_STUDIO_STORAGE_KEY, type VideoSalesStudioState as SalesStudioDraft } from '../model/salesStudioDraft';
 import { salesJobAllowed, type SalesAspectRatio } from '../model/salesWorkspace';
-import { invalidateSalesState, salesPlanInputRevision } from '../model/salesStageRules';
-import { salesSingleVideoError } from '../model/salesSingleVideo';
-import { reuseSalesPlanAssets } from '../model/reuseSalesPlanAssets';
+import { reuseSalesPlanAssets } from '../model/salesAssetHelpers';
+import { invalidateSalesState, salesPlanInputRevision, salesPlanReason, salesSingleVideoError } from '../model/salesStageRules';
 import { useSalesCreativeStages } from './useSalesCreativeStages';
 
 export type VideoSalesStudioState = SalesStudioDraft;
 export type { SalesAspectRatio, SalesPlanPhase, SalesRenderPhase };
-
-let salesResumeStarted = false;
 
 function chatRoute(modelId?: string) {
   const route = resolveModalityModelRoute('chat', modelId);
@@ -49,6 +47,7 @@ export function useVideoSalesStudio() {
   const renderAbortRef = useRef<AbortController | null>(null);
   const planTokenRef = useRef(0);
   const resetPendingRef = useRef(false);
+  const resumeStartedRef = useRef(false);
   const busyRef = useRef({ collecting: false, planning: false, rendering: false, uploading: false });
   const commit = useCallback((recipe: (prev: VideoSalesStudioState) => VideoSalesStudioState) => {
     const next = recipe(stateRef.current);
@@ -67,32 +66,6 @@ export function useVideoSalesStudio() {
 
   const updateState = useCallback((patch: Partial<VideoSalesStudioState>) => {
     commit((prev) => invalidateSalesState(prev, patch));
-  }, [commit]);
-
-  const setFashionRef = useCallback(async (slot: keyof FashionRefs, file: File | null) => {
-    if (!salesJobAllowed(busyRef.current, 'collect')) return;
-    busyRef.current.uploading = true;
-    setIsUploading(true);
-    setError(null);
-    try {
-      const url = file ? await uploadStudioFile(file, 'video-sales') : '';
-      commit((prev) => ({
-        ...prev,
-        fashionRefs: { ...prev.fashionRefs, [slot]: url },
-        composedResultUrl: null,
-        scripts: prev.scripts.map((script) => ({
-          ...script,
-          personFrameUrl: undefined,
-          sceneFrameUrl: undefined,
-          shots: script.shots.map((shot) => ({ ...shot, promptStale: true })),
-        })),
-      }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '图片上传失败');
-    } finally {
-      busyRef.current.uploading = false;
-      setIsUploading(false);
-    }
   }, [commit]);
 
   const replaceScript = useCallback((script: VideoSalesScript, extra?: Partial<VideoSalesStudioState>) => {
@@ -130,11 +103,8 @@ export function useVideoSalesStudio() {
       const product = await collectEcommerceProduct(parsed.url, parsed.platform, controller.signal, forceRefresh);
       if (collectAbortRef.current !== controller || controller.signal.aborted) return false;
       commit((prev) => ({
-        ...prev, ...product, category: prev.category, productUrl: parsed.url, analysis: null,
-        colorSelection: (() => {
-          const variant = product.variantMetadata?.variants.find((item) => item.id === product.variantMetadata?.selectedVariantId);
-          return variant?.color ? { ...emptySalesColorSelection(), variantId: variant.id, colorLabel: variant.color } : emptySalesColorSelection();
-        })(),
+        ...prev, ...product, variantMetadata: product.variantMetadata, category: prev.category, productUrl: parsed.url, analysis: null,
+        colorSelection: emptySalesColorSelection(),
         scripts: prev.scripts.map((script, index) => ({
           ...script, planStale: true, finalizedRevision: undefined, assetValidation: 'pending',
           renderResultUrl: script.renderResultUrl || (index === prev.selectedScriptIndex ? prev.composedResultUrl || undefined : undefined),
@@ -177,14 +147,6 @@ export function useVideoSalesStudio() {
     }
   }, [commit]);
 
-  const removeProductImage = useCallback((index: number) => {
-    commit((prev) => {
-      const image = prev.imageCatalog.find((item) => item.index === index);
-      if (!image) return prev;
-      return invalidateSalesState(prev, { colorSelection: { ...prev.colorSelection, excludedImageUrls: [...new Set([...prev.colorSelection.excludedImageUrls, image.url])] } });
-    });
-  }, [commit]);
-
   const markImageUnavailable = useCallback((index: number) => {
     commit((prev) => {
       if (prev.imageCatalog.find((image) => image.index === index)?.unavailable) return prev;
@@ -206,17 +168,6 @@ export function useVideoSalesStudio() {
         totalDuration: shots.reduce((sum, shot) => sum + (shot.duration || 3), 0),
         ...(clearFrames ? { personFrameUrl: undefined, sceneFrameUrl: undefined } : {}),
       };
-      return { ...prev, scripts, composedResultUrl: null };
-    });
-  }, [commit]);
-
-  const editStillPrompt = useCallback((field: 'personImagePrompt' | 'sceneImagePrompt', value: string) => {
-    commit((prev) => {
-      const scripts = [...prev.scripts];
-      const current = scripts[prev.selectedScriptIndex];
-      if (!current) return prev;
-      const frameKey = field === 'personImagePrompt' ? 'personFrameUrl' : 'sceneFrameUrl';
-      scripts[prev.selectedScriptIndex] = { ...current, [field]: value, [frameKey]: undefined };
       return { ...prev, scripts, composedResultUrl: null };
     });
   }, [commit]);
@@ -245,16 +196,15 @@ export function useVideoSalesStudio() {
       const current = stateRef.current;
       if (planTokenRef.current !== token) return;
       if (current.scripts.some((item) => ['generating', 'uncertain'].includes(item.renderStatus || '') || item.assets?.some((asset) => ['generating', 'uncertain'].includes(asset.status || '')))) { setError('已有提交结果待确认，请先查询原任务或核对生成记录，再更新方案'); return; }
-      if (!current.productName.trim()) { setError('请先采集或填写商品名称'); return; }
+      const blocked = salesPlanReason(current, chatRoute(current.selectedChatModel).model);
+      if (blocked) { setError(blocked); return; }
       const images = eligibleSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata);
-      if (images.length === 0) { setError('请先选择本次颜色，并确认至少一张对应商品图'); return; }
       const revision = salesPlanInputRevision(current);
       const plan = await buildSalesPlan({
         productName: current.productName,
         brand: current.brand,
         category: current.category,
         sellingPoints: current.sellingPoints, productProps: current.props,
-        priceLabel: current.priceLabel,
         imageCatalog: images,
         selectedColor: current.colorSelection.colorLabel,
         aspectRatio: current.aspectRatio,
@@ -264,7 +214,7 @@ export function useVideoSalesStudio() {
         redrawScenes: current.redrawScenes,
         route: chatRoute(current.selectedChatModel),
         onPhase: (phase) => { if (planTokenRef.current === token) setPlanPhase(phase); },
-      });
+      }, { analyzeProductMedia, generateSalesScripts, selectSalesImages });
       if (planTokenRef.current !== token || salesPlanInputRevision(stateRef.current) !== revision) return;
       const script = reuseSalesPlanAssets({ ...plan.script, id: crypto.randomUUID(), planRevision: revision }, current.scripts[current.selectedScriptIndex]);
       commit((previous) => ({ ...previous, scripts: [script, ...previous.scripts.map((item) => ({ ...item, renderResultUrl: item.renderResultUrl || (item.id === current.scripts[current.selectedScriptIndex]?.id ? current.composedResultUrl || undefined : undefined) }))], selectedScriptIndex: 0, analysis: plan.analysis, composedResultUrl: null }));
@@ -320,7 +270,7 @@ export function useVideoSalesStudio() {
         onPhase: setRenderPhase,
         onPromptPhase: () => setPlanPhase('prompt'),
         onResult: (url) => commit((previous) => previous.scripts[previous.selectedScriptIndex]?.id === script.id ? { ...previous, composedResultUrl: url } : previous),
-      });
+      }, { generateFrame: generateSalesReferenceFrame, generateVideo: generateSalesShotVideo, compose: composeSalesVideo });
     } catch (err) {
       if (renderAbortRef.current !== controller) return;
       if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
@@ -339,14 +289,14 @@ export function useVideoSalesStudio() {
   }, [commit, patchShot, replaceScript]);
 
   useEffect(() => {
-    if (salesResumeStarted) return;
+    if (resumeStartedRef.current) return;
     const current = stateRef.current;
     const script = current.scripts[current.selectedScriptIndex];
     const shots = script?.shots || [];
     const singleResume = Boolean(script?.renderTaskId) && (script?.renderStatus === 'generating' || script?.renderStatus === 'uncertain');
     const shotResume = shots.some((shot) => shot.taskId && shot.status === 'generating' && !shot.assetUrl);
     if (!singleResume && !shotResume) return;
-    salesResumeStarted = true;
+    resumeStartedRef.current = true;
     void runRender({ resumeOnly: true });
   }, [runRender]);
 
@@ -384,7 +334,7 @@ export function useVideoSalesStudio() {
     videoError: salesSingleVideoError(state, state.scripts[state.selectedScriptIndex]),
     videoSubmitError: salesSingleVideoError(state, state.scripts[state.selectedScriptIndex], true),
     isCollecting, isUploading, isPlanning, planPhase, isRendering, renderPhase, error,
-    runProductCollect, addProductImages, removeProductImage, markImageUnavailable, setFashionRef, editShot, editStillPrompt, editFullPrompt,
+    runProductCollect, addProductImages, markImageUnavailable, editShot, editFullPrompt,
     runPlan, runRender, retryShot, stopRender, resetProject,
   };
 }

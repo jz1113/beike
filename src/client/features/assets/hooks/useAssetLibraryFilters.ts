@@ -18,8 +18,8 @@ import {
 } from '../model/assetPromptConstants';
 import { compareAssetGalleryOrder } from '../model/assetGalleryLabels';
 import { compareFullPromptGroupOrder } from '@shared/domain/assets/fullPromptGroupLabel';
-import { recognizedPromptGroupSubcategory, type PromptGroupSubcategoryFilter } from '../model/promptGroupSubcategory';
-import { promptGroupCategoryIds, promptGroupCategoryKey } from '../model/promptGroupCategory';
+import { recognizedPromptGroupSubcategory, type PromptGroupSubcategoryFilter } from '../model/promptGroupFolders';
+import { promptGroupCategoryIds, promptGroupCategoryKey } from '../model/promptGroupFolders';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 
 function readCategoryLists() {

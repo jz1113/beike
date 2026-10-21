@@ -3,7 +3,7 @@ import type {
   AssistantSession,
   MediaAttachment,
 } from '@client/store/appStoreTypes';
-import { putAssistantSessionsRemote } from '@client/features/assistant/api/sessions';
+import { putAssistantSessionsRemote } from '@client/shared/api/assistantSessions';
 import { isProjectAutosaveEnabled } from '@client/shared/utils/localStoragePrefs';
 import { normalizeAssistantSessions } from './assistantValidation';
 

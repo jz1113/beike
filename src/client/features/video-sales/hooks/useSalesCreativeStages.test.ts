@@ -3,14 +3,13 @@ import type { VideoSalesScript } from '@shared/domain/video-sales';
 import { useSalesCreativeStages } from './useSalesCreativeStages';
 import { finalizeSalesPrompts } from '../api/videoSalesApi';
 import { prepareSalesCreativeAssets } from '../model/prepareSalesAssets';
-import { salesSingleVideoError } from '../model/salesSingleVideo';
-import { salesPlanInputRevision } from '../model/salesStageRules';
+import { salesPlanInputRevision, salesSingleVideoError } from '../model/salesStageRules';
 import { defaultSalesStudioState, type VideoSalesStudioState } from '../model/salesStudioDraft';
 
 vi.mock('react', () => ({ useCallback: (callback: unknown) => callback, useEffect: () => {}, useRef: (current: unknown) => ({ current }), useState: (value: unknown) => [value, vi.fn()] }));
 vi.mock('../model/prepareSalesAssets', () => ({ prepareSalesCreativeAssets: vi.fn() }));
-vi.mock('../api/videoSalesApi', () => ({ finalizeSalesPrompts: vi.fn() }));
-vi.mock('../model/salesSingleVideo', () => ({ salesSingleVideoError: vi.fn() }));
+vi.mock('../api/videoSalesApi', () => ({ finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn() }));
+vi.mock('../model/salesStageRules', async (original) => ({ ...await original<typeof import('../model/salesStageRules')>(), salesSingleVideoError: vi.fn() }));
 vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute: (modality: string) => ({ modelId: `${modality}-chosen` }) }));
 
 function Harness() {
@@ -53,6 +52,19 @@ describe('sales creative stage ordering', () => {
       actualReferences: [{ id: 'product-8', kind: 'product', label: '商品参考 9', url: '/black.jpg' }, { id: 'scene', kind: 'scene', label: '桌面', url: '/actual-scene.jpg' }],
     }));
     expect(stateRef.current.scripts[0].finalizedRevision).toBeTruthy();
+  });
+
+  it('retries a rejected reference and still blocks an unknown submission', async () => {
+    const { stages, stateRef, setError } = Harness();
+    stateRef.current.scripts[0].assets![0] = { ...stateRef.current.scripts[0].assets![0], status: 'uncertain', error: '图 2 缺失参考图无法读取；参考图预设 SM19' };
+    await stages.runAssets('scene');
+    expect(prepareSalesCreativeAssets).toHaveBeenCalledWith(expect.objectContaining({ regenerateId: 'scene' }), expect.anything(), expect.anything());
+    expect(setError).not.toHaveBeenCalledWith(expect.stringContaining('未确认'));
+    vi.mocked(prepareSalesCreativeAssets).mockClear();
+    stateRef.current.scripts[0].assets![0] = { ...stateRef.current.scripts[0].assets![0], status: 'uncertain', taskId: undefined, error: '连接中断' };
+    await stages.runAssets('scene');
+    expect(prepareSalesCreativeAssets).not.toHaveBeenCalled();
+    expect(setError).toHaveBeenCalledWith(expect.stringContaining('未确认'));
   });
 
   it('rejects a stale finalization response after inputs change', async () => {

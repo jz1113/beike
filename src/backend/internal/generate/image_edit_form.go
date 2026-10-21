@@ -15,10 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
-const editImageMaxBytes = 8 << 20
+const (
+	editImageMaxBytes    = 8 << 20
+	editImageSourceLimit = 25 << 20 // Same ceiling as the vision input copy.
+)
 
 type imageEditPrepareError struct{ message string }
 
@@ -83,7 +87,7 @@ func buildImageEditBody(ctx context.Context, payload map[string]any, workspace s
 			return nil, "", imageEditPrepareError{fmt.Sprintf("第 %d 张参考图无法读取：%s", index+1, err.Error())}
 		}
 		header := make(textproto.MIMEHeader)
-		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, editImageField(payload), file.filename))
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, editImageField(payload, len(refs)), file.filename))
 		header.Set("Content-Type", file.mime)
 		part, err := writer.CreatePart(header)
 		if err != nil {
@@ -99,17 +103,25 @@ func buildImageEditBody(ctx context.Context, payload map[string]any, workspace s
 	return bytes.NewReader(body.Bytes()), writer.FormDataContentType(), nil
 }
 
-func loadEditImage(ctx context.Context, ref string, index int, workspace string, production bool) (editImageFile, error) {
+func normalizeImageRef(ref string) string {
 	ref = strings.TrimSpace(ref)
+	if strings.HasPrefix(ref, "//") {
+		return "https:" + ref
+	}
+	return ref
+}
+
+func loadEditImage(ctx context.Context, ref string, index int, workspace string, production bool) (editImageFile, error) {
+	ref = normalizeImageRef(ref)
 	var file editImageFile
 	var err error
 	switch {
 	case strings.HasPrefix(strings.ToLower(ref), "data:image/"):
-		file, err = decodeDataImage(ref)
+		file, err = decodeDataImage(ctx, ref)
 	case strings.HasPrefix(ref, "https://") || strings.HasPrefix(ref, "http://"):
 		file, err = downloadEditImage(ctx, ref)
 	case strings.HasPrefix(ref, "/storage/"):
-		file, err = readStorageImage(ref, workspace, production)
+		file, err = readStorageImage(ctx, ref, workspace, production)
 	default:
 		err = errors.New("不支持的参考图地址")
 	}
@@ -122,7 +134,7 @@ func loadEditImage(ctx context.Context, ref string, index int, workspace string,
 	return file, nil
 }
 
-func decodeDataImage(ref string) (editImageFile, error) {
+func decodeDataImage(ctx context.Context, ref string) (editImageFile, error) {
 	comma := strings.Index(ref, ",")
 	if comma < 0 || !strings.Contains(strings.ToLower(ref[:comma]), ";base64") {
 		return editImageFile{}, errors.New("不是有效的图片数据")
@@ -134,18 +146,11 @@ func decodeDataImage(ref string) (editImageFile, error) {
 	if err != nil || len(raw) == 0 {
 		return editImageFile{}, errors.New("不是有效的图片数据")
 	}
-	if len(raw) > editImageMaxBytes {
-		return editImageFile{}, errors.New("参考图超过 8MB")
-	}
 	meta := ref[len("data:"):comma]
 	if semi := strings.Index(meta, ";"); semi >= 0 {
 		meta = meta[:semi]
 	}
-	mimeType, ext, ok := imageMIME(meta, raw)
-	if !ok {
-		return editImageFile{}, errors.New("请使用 PNG、JPEG 或 WebP")
-	}
-	return editImageFile{filename: "image" + ext, mime: mimeType, data: raw}, nil
+	return bytesToEditImage(ctx, meta, raw)
 }
 
 func downloadEditImage(ctx context.Context, ref string) (editImageFile, error) {
@@ -161,14 +166,14 @@ func downloadEditImage(ctx context.Context, ref string) (editImageFile, error) {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return editImageFile{}, errors.New("参考图下载失败")
 	}
-	raw, err := io.ReadAll(io.LimitReader(response.Body, editImageMaxBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(response.Body, editImageSourceLimit+1))
 	if err != nil {
 		return editImageFile{}, errors.New("参考图下载失败")
 	}
-	return bytesToEditImage(response.Header.Get("Content-Type"), raw)
+	return bytesToEditImage(ctx, response.Header.Get("Content-Type"), raw)
 }
 
-func readStorageImage(ref, workspace string, production bool) (editImageFile, error) {
+func readStorageImage(ctx context.Context, ref, workspace string, production bool) (editImageFile, error) {
 	rel := strings.TrimPrefix(ref, "/storage/")
 	rel = strings.SplitN(rel, "?", 2)[0]
 	rel = strings.SplitN(rel, "#", 2)[0]
@@ -192,25 +197,37 @@ func readStorageImage(ref, workspace string, production bool) (editImageFile, er
 		return editImageFile{}, errors.New("本地参考图不存在")
 	}
 	defer file.Close()
-	raw, err := io.ReadAll(io.LimitReader(file, editImageMaxBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(file, editImageSourceLimit+1))
 	if err != nil {
 		return editImageFile{}, errors.New("本地参考图不存在")
 	}
-	return bytesToEditImage(storageMIME(path), raw)
+	return bytesToEditImage(ctx, storageMIME(path), raw)
 }
 
-func bytesToEditImage(header string, raw []byte) (editImageFile, error) {
+func bytesToEditImage(ctx context.Context, header string, raw []byte) (editImageFile, error) {
 	if len(raw) == 0 {
 		return editImageFile{}, errors.New("不是有效的图片数据")
 	}
-	if len(raw) > editImageMaxBytes {
-		return editImageFile{}, errors.New("参考图超过 8MB")
+	if len(raw) > editImageSourceLimit {
+		return editImageFile{}, errors.New("参考图超过 25MB")
 	}
 	mimeType, ext, ok := imageMIME(header, raw)
 	if !ok {
 		return editImageFile{}, errors.New("请使用 PNG、JPEG 或 WebP")
 	}
-	return editImageFile{filename: "image" + ext, mime: mimeType, data: raw}, nil
+	if len(raw) <= editImageMaxBytes {
+		return editImageFile{filename: "image" + ext, mime: mimeType, data: raw}, nil
+	}
+	// The edit payload stays within 8MB. This copy is not written back over the saved image.
+	fitted, fittedType, err := modelgw.CompressUploadImage(ctx, raw, mimeType, editImageMaxBytes)
+	if err != nil {
+		var imageErr *modelgw.TextImageError
+		if errors.As(err, &imageErr) && imageErr.Kind == "size" {
+			return editImageFile{}, errors.New("参考图超过 8MB")
+		}
+		return editImageFile{}, errors.New("不是有效的图片数据")
+	}
+	return editImageFile{filename: "image.jpg", mime: fittedType, data: fitted}, nil
 }
 
 func imageMIME(header string, data []byte) (string, string, bool) {
@@ -249,8 +266,10 @@ func storageMIME(path string) string {
 	}
 }
 
-func editImageField(payload map[string]any) string {
-	if payloadText(payload["model"]) == "openai/gpt-image-2" {
+// OpenAI documents multiple edit inputs as image[]. Repeating a single image field drops every file after the first.
+func editImageField(payload map[string]any, count int) string {
+	model := payloadText(payload["model"])
+	if model == "openai/gpt-image-2" || (count > 1 && isGptImageModel(model)) {
 		return "image[]"
 	}
 	return "image"

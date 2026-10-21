@@ -9,8 +9,8 @@ import {
 import type { ActionCategoryId, SubCategoryDef } from '@shared/domain/products/productCategory';
 import type { ActionShotScale } from '../hooks/useAssetLibraryFilters';
 import type { AssetSubTab } from '../model/assetPromptConstants';
-import { AssetLibrarySortControls } from './AssetLibrarySortControls';
-import { AssetTagFilter } from './AssetTagFilter';
+import { AssetLibrarySortControls } from './assetLibraryFilters';
+import { AssetTagFilter } from './assetLibraryFilters';
 
 export interface AssetLibraryFilterBarProps {
   /** 与筛选维度同级的资产类型导航，由父级提供以保持筛选栏的单行布局。 */

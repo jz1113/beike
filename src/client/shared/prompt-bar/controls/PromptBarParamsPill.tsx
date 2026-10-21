@@ -31,7 +31,7 @@ interface PromptBarParamsPillProps {
   quickVideoDuration: number;
   setQuickVideoRefMode: (mode: string) => void;
   setQuickVideoAspectId: (aspect: string) => void;
-  setQuickVideoResolution: (resolution: '480P' | '720P' | '1080P' | '4K') => void;
+  setQuickVideoResolution: (resolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K') => void;
   setQuickVideoDuration: (seconds: number) => void;
   quickAspectId: string;
   quickQuality: string;

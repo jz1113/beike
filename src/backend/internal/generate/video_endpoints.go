@@ -22,7 +22,7 @@ func videoQueryTemplate(base, taskID string) string {
 	return text
 }
 
-func videoEndpointSet(family, model string, images []string) ([]string, []string, map[string]string) {
+func videoEndpointSet(family, model, mode string, images []string) ([]string, []string, map[string]string) {
 	root := "{base}"
 	var submit, query []string
 	headers := map[string]string{}
@@ -44,14 +44,11 @@ func videoEndpointSet(family, model string, images []string) ([]string, []string
 		submit = []string{root + "/kling/v1/videos/" + mode}
 		query = []string{root + "/kling/v1/videos/" + mode + "/{taskId}"}
 	case "vidu":
-		path := "text2video"
-		if len(images) > 0 {
-			path = "img2video"
-		}
+		path := viduSubmitPath(mode)
 		submit = []string{root + "/vidu/v2/" + path, root + "/vidu/ent/v2/" + path}
 		query = []string{root + "/vidu/v2/tasks/{taskId}/creations", root + "/vidu/ent/v2/tasks/{taskId}/creations"}
 	case "grok-video":
-		submit = []string{root + "/xai/v1/videos/generations"}
+		submit = []string{root + "/xai/v1/videos/" + grokSubmitPath(mode)}
 		query = []string{root + "/xai/v1/videos/{taskId}"}
 	case "minimax":
 		if strings.Contains(strings.ToLower(model), "t2v-01") {
@@ -72,6 +69,30 @@ func videoEndpointSet(family, model string, images []string) ([]string, []string
 		query = []string{root + "/v2/videos/generations/{taskId}", root + "/v1/videos/{taskId}", root + "/v1/video/generations/{taskId}"}
 	}
 	return submit, query, headers
+}
+
+func viduSubmitPath(mode string) string {
+	switch mode {
+	case "first_frame":
+		return "img2video"
+	case "first_last_frame":
+		return "start-end2video"
+	case "text":
+		return "text2video"
+	default:
+		return "reference2video"
+	}
+}
+
+func grokSubmitPath(mode string) string {
+	switch mode {
+	case "edit":
+		return "edits"
+	case "extend":
+		return "extensions"
+	default:
+		return "generations"
+	}
 }
 
 func expandVideoURLs(base string, templates []string, taskID string) []string {

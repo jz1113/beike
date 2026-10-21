@@ -15,6 +15,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/media"
 	"beike.local/cloud/src/backend/internal/platform/mediasign"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
@@ -246,45 +247,13 @@ func httpUpgradeHost(raw string) bool {
 }
 
 func upstreamHeaders(rawURL string, video bool, rangeHeader string) map[string]string {
-	headers := map[string]string{
-		"User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-		"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-	}
+	accept := "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
 	if video {
-		headers["Accept"] = "*/*"
-	} else {
-		headers["Accept"] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+		accept = "*/*"
 	}
+	headers := media.RemoteMediaHeaders(rawURL, accept)
 	if rangeHeader != "" {
 		headers["Range"] = rangeHeader
-	}
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return headers
-	}
-	host := strings.ToLower(parsed.Hostname())
-	rules := []struct{ suffix, referer string }{
-		{"xhscdn.com", "https://www.xiaohongshu.com/"},
-		{"xiaohongshu.com", "https://www.xiaohongshu.com/"},
-		{"douyinpic.com", "https://www.douyin.com/"},
-		{"snssdk.com", "https://www.douyin.com/"},
-		{"bytecdn.cn", "https://www.douyin.com/"},
-		{"360buyimg.com", "https://www.jd.com/"},
-		{"jd.com", "https://www.jd.com/"},
-		{"alicdn.com", "https://www.taobao.com/"},
-		{"taobao.com", "https://www.taobao.com/"},
-		{"tmall.com", "https://www.taobao.com/"},
-		{"pddpic.com", "https://mobile.yangkeduo.com/"},
-		{"yangkeduo.com", "https://mobile.yangkeduo.com/"},
-		{"kuaishou.com", "https://www.kuaishou.com/"},
-		{"yximgs.com", "https://www.kuaishou.com/"},
-		{"kwimgs.com", "https://www.kuaishou.com/"},
-	}
-	for _, rule := range rules {
-		if host == rule.suffix || strings.HasSuffix(host, "."+rule.suffix) {
-			headers["Referer"] = rule.referer
-			break
-		}
 	}
 	return headers
 }

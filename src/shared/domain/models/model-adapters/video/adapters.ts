@@ -218,17 +218,40 @@ export const lumaVideoAdapter: VideoModelAdapter = {
   },
 };
 
+function viduResolution(resolution?: string) {
+  const upper = (resolution || '720P').toUpperCase();
+  if (upper.includes('540')) return '540p';
+  if (upper.includes('1080')) return '1080p';
+  if (upper.includes('720')) return '720p';
+  if (upper.includes('4K')) return '4K';
+  if (upper.includes('2K')) return '2K';
+  return '720p';
+}
+
 export const viduVideoAdapter: VideoModelAdapter = {
   id: 'vidu',
   match: (modelId) => modelId.toLowerCase().includes('vidu'),
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
-    const mode = input.refMode || (collectVideoImages(input).length ? 'omni' : 'text');
+    const images = collectVideoImages(input);
+    const mode = input.refMode || (images.length ? 'omni' : 'text');
     assertVideoInput(input, modelId, mode);
-    const payload = baseVideoPayload(input, modelId);
-    applyExclusiveFrameFields(payload, input, mode);
-    payload.mode = mode === 'first_last_frame' ? 'start-end' : mode === 'first_frame' ? 'img2video' : mode === 'text' ? 'text2video' : 'reference';
-    return { family: 'vidu', modelId, payload, endpoints: (baseUrl) => viduVideoEndpoints(baseUrl, String(payload.mode || 'text2video')) };
+    const endpointMode = mode === 'first_last_frame' ? 'start-end' : mode === 'first_frame' ? 'img2video' : mode === 'text' ? 'text2video' : 'reference';
+    const payload: Record<string, unknown> = {
+      model: modelId,
+      prompt: input.prompt,
+      duration: Number(input.duration) || 5,
+      resolution: viduResolution(input.resolution),
+    };
+    if (input.audio !== undefined) payload.audio = Boolean(input.audio);
+    if (mode === 'first_frame') payload.images = images.slice(0, 1);
+    else if (mode === 'first_last_frame') payload.images = [images[0], images[images.length - 1]];
+    else if (mode === 'text') payload.aspect_ratio = input.aspectRatio || '16:9';
+    else {
+      payload.images = images;
+      payload.aspect_ratio = input.aspectRatio || '16:9';
+    }
+    return { family: 'vidu', modelId, payload, endpoints: (baseUrl) => viduVideoEndpoints(baseUrl, endpointMode) };
   },
 };
 
@@ -245,22 +268,31 @@ export const grokVideoAdapter: VideoModelAdapter = {
     const payload = baseVideoPayload(input, modelId);
     const imagine = modelId.toLowerCase().includes('grok-imagine');
     if (imagine) {
-      const images = applyExclusiveFrameFields(payload, input, mode);
+      const images = collectVideoImages(input);
+      const resolution = String(payload.resolution || '480p');
+      if (mode === 'edit' || mode === 'extend') {
+        const official: Record<string, unknown> = {
+          model: payload.model,
+          prompt: payload.prompt,
+          video: { url: input.videos?.[0] },
+        };
+        if (mode === 'extend') official.duration = Number(payload.duration) || 6;
+        return { family: 'grok-video', modelId, payload: official, endpoints: (baseUrl) => grokImagineVideoEndpoints(baseUrl, mode) };
+      }
       const official: Record<string, unknown> = {
         model: payload.model,
         prompt: payload.prompt,
         duration: payload.duration,
         aspect_ratio: payload.aspect_ratio,
-        resolution: payload.resolution,
+        resolution,
       };
-      if (payload.generate_audio !== undefined) official.generate_audio = payload.generate_audio;
       if (mode === 'first_frame' || mode === 'first_last_frame') {
-        const first = typeof payload.image === 'string' ? payload.image : images[0];
+        const first = images[0];
         if (first) official.image = { url: first };
       }
-      if (mode === 'first_last_frame' && typeof payload.last_frame_image === 'string') official.last_frame = { url: payload.last_frame_image };
+      if (mode === 'first_last_frame' && images.length > 1) official.last_frame = { url: images[images.length - 1] };
       if (mode === 'omni' && images.length) official.reference_images = images.map((url) => ({ url }));
-      return { family: 'grok-video', modelId, payload: official, endpoints: grokImagineVideoEndpoints };
+      return { family: 'grok-video', modelId, payload: official, endpoints: (baseUrl) => grokImagineVideoEndpoints(baseUrl, mode) };
     }
     return {
       family: 'grok-video',

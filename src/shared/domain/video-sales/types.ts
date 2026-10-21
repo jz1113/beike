@@ -1,5 +1,5 @@
 /**
- * 电商带货视频（带货剪手）共享领域类型定义
+ * 视频带货共享领域类型定义
  */
 
 /** 视频模式：决定画面生成策略与视觉管线 */
@@ -58,7 +58,7 @@ export interface VideoSalesShot {
   camera: string; // 运镜描述（如：特写推近、俯拍全景）
   visualSource: VideoSalesVisualSource;
   transition: VideoSalesTransition;
-  voiceover: string; // 播报文案（约每秒 3-4 字）
+  voiceover: string; // 播报文案。服饰每段同时写卖点和看点，约每秒 4.7–6.7 字，15 秒为 70–100 字；其他品类约每秒 3–4 字
   prompt?: string; // 图生视频画面提示词，不包含字幕或大字
   imagePrompt?: string; // 场景镜静帧绘图提示词，按该镜脚本写成
   finalPrompt?: string;
@@ -141,59 +141,5 @@ export interface VideoSalesProductAnalysis {
   coveredImageCount?: number;
   imageCount?: number;
   degraded?: boolean;
-}
-
-/** 视频合成配置 */
-export interface VideoSalesComposeConfig {
-  resolution: '720p' | '1080p';
-  aspectRatio: '9:16' | '16:9' | '3:4' | '1:1';
-  bgmPath?: string;
-  bgmVolume?: number; // 0-1 (默认 0.3)
-  ttsEnabled?: boolean;
-  ttsVoice?: string;
-  subtitleEnabled?: boolean;
-  subtitleStyle?: {
-    fontSize?: number;
-    color?: string;
-    strokeColor?: string;
-    strokeWidth?: number;
-    position?: 'bottom' | 'center' | 'top';
-  };
-}
-
-export interface VideoSalesAnalyzeBody {
-  imageUrls: string[];
-  productName?: string;
-  category?: VideoSalesCategory;
-  model?: string;
-}
-
-export interface VideoSalesComposeBody {
-  projectId?: string;
-  shots?: VideoSalesShot[];
-  config?: VideoSalesComposeConfig;
-  output?: {
-    resolution?: string;
-    aspectRatio?: string;
-    bgmVolume?: number;
-    bgmPath?: string;
-  };
-  clips?: Array<{
-    filePath: string;
-    duration: number;
-    visualSource?: string;
-    speed?: number;
-    transition?: string;
-    type?: 'image' | 'video';
-    hasAudio?: boolean;
-    audioUrl?: string;
-    voiceover?: string;
-    motion?: string;
-  }>;
-  subtitles?: Array<{
-    text: string;
-    startTime: number;
-    endTime: number;
-  }>;
 }
 

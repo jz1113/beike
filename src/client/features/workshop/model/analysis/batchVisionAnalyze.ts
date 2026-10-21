@@ -1,5 +1,4 @@
 import { workshopAnalysisBlockReason, type AnalysisPreflightConfig } from './workshopAnalysisPreflight';
-import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { PreviousGroupSignature } from '@shared/domain/prompts/vision';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
@@ -28,12 +27,12 @@ export type VisionAnalyzeDeps = Omit<AnalysisPreflightConfig, 'recipes'> & {
   availableVisionModels?: Array<{ id: string }>;
   useAssetLibrary?: boolean;
   personaMode?: 'asset_driven' | 'none';
-  setItems?: Dispatch<SetStateAction<BatchProductItem[]>>;
+  setItems?: (update: BatchProductItem[] | ((prev: BatchProductItem[]) => BatchProductItem[])) => void;
   getItems?: () => BatchProductItem[];
   getConfigRevision?: () => number;
-  batchGroupSignaturesRef?: MutableRefObject<PreviousGroupSignature[]>;
-  batchActionIdsRef?: MutableRefObject<string[]>;
-  batchSceneIdsRef?: MutableRefObject<string[]>;
+  batchGroupSignaturesRef?: { current: PreviousGroupSignature[] };
+  batchActionIdsRef?: { current: string[] };
+  batchSceneIdsRef?: { current: string[] };
   batchId?: string;
 };
 

@@ -1,6 +1,6 @@
 import { videoInputError } from '@shared/domain/media/videoCapabilities';
 import { fashionReferenceError, type FashionReference } from '@shared/domain/video-sales';
-import { generateSalesReferenceFrame } from './generateShotAsset';
+import type { SalesFrameGenerator } from './salesAssetHelpers';
 
 export function fashionSubmitError(input: {
   modelId?: string;
@@ -36,14 +36,14 @@ export async function prepareFashionStills(input: {
   imageModel?: string;
   aspectRatio: string;
   isAborted: () => boolean;
-  generateFrame?: typeof generateSalesReferenceFrame;
+  generateFrame: SalesFrameGenerator;
 }): Promise<{ personFrameUrl: string; sceneFrameUrl: string }> {
   if (!input.imageModel?.trim()) throw new Error('请先配置绘图模型');
   const personPrompt = input.personPrompt?.trim() || '';
   const scenePrompt = input.scenePrompt?.trim() || '';
   if (!personPrompt || !scenePrompt) throw new Error('请按服饰带货重新生成方案');
   if (!input.personRefs.some((url) => url.trim())) throw new Error('请上传出镜人物');
-  const generate = input.generateFrame || generateSalesReferenceFrame;
+  const generate = input.generateFrame;
   const personFrameUrl = input.personFrameUrl?.trim() || await generate({
     prompt: personPrompt,
     imageModel: input.imageModel,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { useAssistantDialog } from '../useAssistantDialog';
+import { useAssistantDialog } from '../../hooks/useAssistantDialog';
 
 interface MemoryView { enabled: boolean; summary: string; updatedAt: number; coveredCount: number; pendingCount: number }
 export default function AssistantMemoryPanel({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {

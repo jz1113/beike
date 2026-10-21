@@ -5,7 +5,7 @@ import {
 } from '@shared/domain/products/productCategory';
 import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 import type { ImageSetQueueItem } from '../model/assetPromptConstants';
-import { topLevelCategories } from '../model/promptGroupCategory';
+import { topLevelCategories } from '../model/promptGroupFolders';
 
 export type ProductCategoryOption = AssetProductCategory;
 

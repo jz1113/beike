@@ -1,13 +1,13 @@
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import { enforceLookConsistency, isGenericLook } from '@shared/domain/media/drawing';
-import { closestWorkshopOutputAspect } from './workshopOutputSize';
+import { closestWorkshopOutputAspect } from './generationHelpers';
 import { resolveWorkshopImageSize } from './workshopImageSize';
 import { assertOutputDimensions, parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { isActionAllowedForProduct } from '@shared/domain/products/phoneProductPolicy';
 import { submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
 import type { BatchProductItem } from '../batchTypes';
-import { compressProductImageIfNeeded } from './batchImageTasks';
+import { compressProductImageIfNeeded } from './generationHelpers';
 
 export interface TaskExecutionConfig {
   selectedQuality: 'high' | 'medium' | 'low';

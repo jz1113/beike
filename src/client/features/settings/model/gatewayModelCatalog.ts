@@ -1,6 +1,6 @@
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
 import { inferWorkflowCapabilitiesFromId, openAIModelRouteId, gatewayModelToWorkflowModel, repairWorkflowModelsForSettings, repairWorkflowModelId, workflowModelRouteId } from '@shared/domain/models/workflowModels';
-import type { WorkflowModel } from '../components/settingsShared';
+import type { WorkflowModel } from './workflowModel';
 
 export interface GatewayModelItem {
   id: string; name: string; shortName: string;

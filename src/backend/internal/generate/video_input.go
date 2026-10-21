@@ -25,14 +25,15 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	if (mode == "edit" || mode == "extend") && len(videos) == 0 {
 		return "请添加需要编辑或延长的参考视频"
 	}
-	if len(videos) > 0 && !referenceVideoAllowed(model) {
+	grokClip := regexp.MustCompile(`(?i)grok`).MatchString(model) && (mode == "edit" || mode == "extend")
+	if len(videos) > 0 && !referenceVideoAllowed(model) && !grokClip {
 		return "当前模型的参考视频尚未接入，请使用图片或文字"
 	}
 	if regexp.MustCompile(`^viduq3(?:-mix)?$`).MatchString(model) && len(images) == 0 {
 		return "该模型需要参考图片，请添加素材"
 	}
-	if regexp.MustCompile(`^vidu`).MatchString(model) && len(images) > 7 {
-		return "Vidu 最多支持 7 张参考图片"
+	if regexp.MustCompile(`^vidu`).MatchString(model) && len(images) > 15 {
+		return "Vidu 最多支持 15 张参考图片"
 	}
 	if regexp.MustCompile(`^veo3\.1`).MatchString(model) && mode == "omni" && len(images) > 3 {
 		return "Veo 最多支持 3 张参考图片"
@@ -45,6 +46,9 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	}
 	if regexp.MustCompile(`(?i)grok-imagine-video`).MatchString(model) && mode == "omni" && len(images) > 14 {
 		return "Grok 最多支持 14 张参考图片"
+	}
+	if regexp.MustCompile(`(?i)grok`).MatchString(model) && (mode == "edit" || mode == "extend") && (len(videos) != 1 || len(images) > 0) {
+		return "请添加一段需要编辑或延长的视频"
 	}
 	if regexp.MustCompile(`kling.*omni`).MatchString(model) && len(images) > 7 {
 		return "可灵 Omni 最多支持 7 张参考图片"
@@ -71,6 +75,8 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 		if json.Unmarshal(raw, &duration) != nil {
 			return ""
 		}
+	} else if regexp.MustCompile(`(?i)grok`).MatchString(model) && mode == "extend" {
+		duration = 6
 	}
 	return videoSpecError(model, mode, resolution, aspect, duration)
 }
@@ -146,6 +152,15 @@ func referenceVideoAllowed(model string) bool {
 	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || regexp.MustCompile(`(?i)minimax-h3`).MatchString(model)
 }
 
+func viduQ4Preview(id string) bool {
+	switch strings.ToLower(strings.TrimSpace(id)) {
+	case "viduq4-preview", "vidu-q4-preview", "viduq4":
+		return true
+	default:
+		return false
+	}
+}
+
 func videoModes(model string) []string {
 	id := strings.ToLower(model)
 	full := []string{"omni", "first_frame", "first_last_frame", "text"}
@@ -155,7 +170,7 @@ func videoModes(model string) []string {
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case id == "viduq3" || id == "viduq3-mix":
 		return []string{"omni"}
-	case id == "viduq3-turbo" || id == "viduq3-pro":
+	case id == "viduq3-turbo" || id == "viduq3-pro" || viduQ4Preview(id):
 		return full
 	case regexp.MustCompile(`omni[_-]flash`).MatchString(id):
 		return []string{"first_frame", "text"}
@@ -164,7 +179,7 @@ func videoModes(model string) []string {
 	case regexp.MustCompile(`sora`).MatchString(id):
 		return []string{"first_frame", "text"}
 	case regexp.MustCompile(`grok`).MatchString(id):
-		return full
+		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case regexp.MustCompile(`kling`).MatchString(id) && strings.Contains(id, "omni"):
 		return full
 	case regexp.MustCompile(`kling`).MatchString(id):

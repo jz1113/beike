@@ -88,6 +88,7 @@ func requestText(ctx context.Context, req TextRequest, stream bool, onDelta func
 	case "anthropic":
 		payload, err = anthropicRequest(ctx, payload, model, stream)
 	default:
+		err = prepareOpenAITextImages(ctx, payload)
 		payload = openAITextPayload(payload)
 		payload["stream"] = stream
 		if stream {

@@ -3,16 +3,16 @@ import { ChevronRight, Layers } from 'lucide-react';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
-import type { PromptGroupFolder } from '../model/promptGroupFolder';
+import type { PromptGroupFolder } from '../model/promptGroupFolders';
 import type { GalleryAtomType } from '../model/assetGalleryLabels';
-import { promptGroupCategoryLabel } from '../model/promptGroupCategory';
+import { promptGroupCategoryLabel } from '../model/promptGroupFolders';
 import { promptLibraryEmptyCopy } from '../model/promptLibraryEmptyCopy';
 import { PromptGroupCategoryFolders } from './PromptGroupCategoryFolders';
 import { VirtualAssetGrid } from './VirtualAssetGrid';
 import PromptAssetCard from './PromptAssetCard';
-import { AssetLifecycleFilter } from './AssetLifecycleFilter';
-import { AssetLibrarySortControls } from './AssetLibrarySortControls';
-import { AssetTagFilter } from './AssetTagFilter';
+import { AssetLifecycleFilter } from './assetLibraryFilters';
+import { AssetLibrarySortControls } from './assetLibraryFilters';
+import { AssetTagFilter } from './assetLibraryFilters';
 
 export function isGalleryAtomType(type: PromptAssetType): type is GalleryAtomType {
   return type === 'persona' || type === 'outfit' || type === 'scene';

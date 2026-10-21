@@ -1,7 +1,7 @@
 import { ArrowUpRight, FileSpreadsheet, LoaderCircle, Square } from 'lucide-react';
 import type { DeconstructQueueApi } from '../hooks/useDeconstructQueue';
 import type { useXhsBatchImport } from '../hooks/useXhsBatchImport';
-import { deconstructImportTargetHint } from '../model/deconstructImportTarget';
+import { deconstructImportTargetHint } from '../model/deconstructJobs';
 import { DeconstructCategoryPicker } from './DeconstructCategoryPicker';
 
 export function DeconstructImportFooter({ queueApi, xhsImport }: {

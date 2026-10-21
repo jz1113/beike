@@ -1,5 +1,5 @@
 import { COVER_FORMATS, parseCoverFormat } from './coverFormat';
-import { assertPosterImportRowCount } from './posterImportLimits';
+import { assertPosterImportRowCount } from './posterDraft';
 import {
   cleanCell,
   isPosterImageUrl,

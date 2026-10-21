@@ -1,6 +1,6 @@
 import { createAssistantBrandKit } from '../../model/assistantBrandKitDefaults';
 import BrandKitEditor from './BrandKitEditor';
-import { useAssistantDialog } from '../useAssistantDialog';
+import { useAssistantDialog } from '../../hooks/useAssistantDialog';
 import React, { useState } from 'react';
 import {
   X,

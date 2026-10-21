@@ -1,6 +1,6 @@
 # 视频模型接入与提示词约定
 
-核对日期：2026-09-27。覆盖当前目录的 20 个视频型号、8 个厂商系列。Seedance 依据本次提供的五份官方 API / Prompt 教程；其他系列依据下列官方网页。UI 仅暴露已接入的工作流，不把第三方产品的“样片”“5 分钟”等入口直接当成模型能力。
+核对日期：2026-09-27。覆盖当前目录的 21 个视频型号、8 个厂商系列。Seedance 依据本次提供的五份官方 API / Prompt 教程；其他系列依据下列官方网页。UI 仅暴露已接入的工作流，不把第三方产品的“样片”“5 分钟”等入口直接当成模型能力。
 
 ## 已接入参数
 
@@ -19,11 +19,12 @@
 | kling-video-v2-5-turbo | 5 / 10 秒 | 720P / 1080P | 文生、首帧、首尾帧；不提供参考视频入口 |
 | MiniMax-H3 | 4–15 秒 | 768P / 2K | 文生、首帧、首尾帧、全能参考分开；全能参考可混合图片和视频。2K 是分辨率，不是再生成接口 |
 | wan3.0-video | 2–30 秒 | 480P / 720P / 1080P | 首尾帧与参考图、参考视频互斥；支持自动比例和 21:9 |
-| grok-imagine-video-1.5 | 1–15 秒 | 480P / 720P / 1080P | 官方透传保留 image、last_frame 与最多 14 张 reference_images |
-| viduq3 | 3–16 秒 | 720P / 1080P | 渠道型号仍只接全能参考 |
-| viduq3-mix | 3–16 秒 | 720P / 1080P | 渠道型号仍只接全能参考 |
-| viduq3-turbo | 1–16 秒；参考模式 ≥3 秒 | 720P / 1080P | 文生、首帧、首尾帧、全能参考分别走 text2video、img2video、start-end2video、reference2video |
-| viduq3-pro | 1–16 秒；参考模式 ≥3 秒 | 720P / 1080P | 同上 |
+| grok-imagine-video-1.5 | 1–15 秒；延长 2–10 秒 | 480P / 720P / 1080P | 文生、首帧、首尾帧、参考图走 `/xai/v1/videos/generations`；编辑走 `/videos/edits`，延长走 `/videos/extensions`。参考图最多 14 张，只写 `reference_images` |
+| viduq3 | 3–16 秒 | 540P / 720P / 1080P / 2K / 4K | 只接全能参考，提交 `reference2video`，最多 15 张参考图 |
+| viduq3-mix | 3–16 秒 | 540P / 720P / 1080P / 2K / 4K | 同上 |
+| viduq3-turbo | 3–16 秒 | 540P / 720P / 1080P / 2K / 4K | 文生、首帧、首尾帧、全能参考分别走 text2video、img2video、start-end2video、reference2video |
+| viduq3-pro | 3–16 秒 | 540P / 720P / 1080P / 2K / 4K | 同上 |
+| viduq4-preview | 3–16 秒 | 540P / 720P / 1080P / 2K / 4K | 文生、首帧、首尾帧、全能参考。`vidu-q4-preview` 与 `viduq4` 查同一份能力，提交仍用所选原始型号 |
 | sora-2 | 保留渠道 10 / 15 秒 | 保留渠道档位 | 官方 Videos API 已于 2026-09-24 关闭；渠道别名是否继续可用须渠道确认 |
 | sora-2-pro | 保留渠道 10 / 15 / 25 秒 | 保留渠道档位 | 同上；不得把渠道时长当成官方 API 规格 |
 
@@ -47,8 +48,8 @@
 - [可灵能力表](https://kling.ai/document-api/guides/capability-map/video)、[文生视频字段](https://kling.ai/document-api/api/video/2-6/text-to-video/legacy)、[Omni 素材结构](https://kling.ai/document-api/api/video/o1/video-omni/legacy)、[3.0 创作指南](https://kling.ai/quickstart/klingai-video-3-model-user-guide)：质量 mode 与生成端点互不混用；对话注明说话主体，镜头叙事明确先后关系。部分页面仅搜索索引能读取，未据此开放所有高级功能。
 - [MiniMax H3 创建接口](https://platform.minimax.io/docs/api-reference/video-generation-v2-create)、[H3 创作示例](https://platform.minimax.io/docs/guides/video-prompt)：官方 V2 使用带 role 的 content 数组。现有渠道仍提交 `imageUrls` 与 `768P` / `2k`，并用 `mode` 区分文生、首帧、首尾帧和全能参考。2K再生成是另一条付费接口，未接入。提示词分别交代人物、环境、产品和风格素材的用途。
 - [万相 3.0 API](https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference)、[使用指南](https://help.aliyun.com/zh/model-studio/wan3-video-generation-guide)：保持 input.media 的角色和各类型编号一致；现有适配保留 prompt_extend 智能改写。
-- [Grok 视频生成](https://docs.x.ai/developers/model-capabilities/video/generation)：创建任务的 request_id 是此系列的任务编号；不能把其他厂商用于排查的 request_id 当任务编号。
-- [Vidu 文字生成](https://platform.vidu.com/docs/text-to-video)、[参考生成](https://platform.vidu.com/docs/reference-to-video)、[模型表](https://platform.vidu.com/docs/model-map)：区分参考生成与首尾帧端点。部分页面参数说明存在版本差异，渠道仍需真实素材验证。
+- [Grok 视频生成](https://docs.x.ai/developers/rest-api-reference/inference/videos)、[编辑](https://docs.x.ai/developers/rest-api-reference/inference/videos#video-edit)、[延长](https://docs.x.ai/developers/rest-api-reference/inference/videos#video-extension)：创建任务的 request_id 是此系列的任务编号。成片地址在 `video.url`。
+- [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video)、[参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md)：参考图走 `reference2video`，首帧才走 `img2video`。渠道型号仍用现有别名，不替换成 `viduq4-preview`。
 - [OpenAI API 下线公告](https://developers.openai.com/api/docs/deprecations)：Sora 官方服务状态独立于渠道别名，保留配置便于使用者核对渠道，不作可用性承诺。
 
 ## 接入边界与验证

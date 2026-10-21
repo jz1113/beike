@@ -1,7 +1,9 @@
 package network
 
 import (
+	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,5 +31,20 @@ func TestSafeClientRejectsPrivateHost(t *testing.T) {
 	client.Timeout = 2 * time.Second
 	if _, err := client.Get("http://127.0.0.1:1/"); err == nil {
 		t.Fatal("private address must be refused before dial")
+	}
+}
+
+func TestDialableIPsPreferIPv4AndRejectPrivate(t *testing.T) {
+	v6 := net.ParseIP("240e:946:3000:8008::73")
+	v4 := net.ParseIP("150.138.229.197")
+	got, err := dialableIPs([]net.IPAddr{{IP: v6}, {IP: v4}})
+	if err != nil || len(got) != 2 || !got[0].Equal(v4) || !got[1].Equal(v6) {
+		t.Fatalf("order %#v err %v", got, err)
+	}
+	if _, err := dialableIPs([]net.IPAddr{{IP: v4}, {IP: net.ParseIP("10.1.2.3")}}); err == nil || !strings.Contains(err.Error(), "private") {
+		t.Fatal(err)
+	}
+	if _, err := dialableIPs(nil); err == nil {
+		t.Fatal("empty lookup must fail")
 	}
 }

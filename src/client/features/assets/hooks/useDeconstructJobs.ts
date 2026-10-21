@@ -6,7 +6,7 @@ import { readDeconstructJobReceiptState } from '../model/deconstructQueueStorage
 import {
   getDeconstructJobsState, subscribeDeconstructJobs, updateDeconstructJobsState,
   upsertDeconstructJob, isDeconstructJobActive, mergeDeconstructJobSnapshot,
-} from '../model/deconstructJobsState';
+} from '../model/deconstructJobs';
 
 export function useDeconstructJobsState() {
   return useSyncExternalStore(subscribeDeconstructJobs, getDeconstructJobsState, getDeconstructJobsState);

@@ -91,6 +91,9 @@ func videoDurations(model, resolution, mode string) []int {
 		return []int{8}
 	}
 	if spec, ok := videoSpecFor(model); ok {
+		if strings.Contains(id, "grok") && mode == "extend" {
+			return ints(2, 10)
+		}
 		if strings.Contains(id, "vidu") && mode == "omni" {
 			return filterMin(spec.durations, 3)
 		}
@@ -146,9 +149,10 @@ var videoSpecs = map[string]videoSpec{
 	"sora-2-pro":                      {[]int{10, 15, 25}, []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
 	"MiniMax-H3":                      {ints(4, 15), []string{"720P", "1080P"}, videoRatios},
 	"wan3.0-video":                    {ints(2, 30), []string{"480P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"}},
-	"grok-imagine-video-1.5":          {ints(1, 15), []string{"480P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"}},
-	"viduq3":                          {ints(3, 16), []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
-	"viduq3-mix":                      {ints(3, 16), []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
-	"viduq3-turbo":                    {ints(1, 16), []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
-	"viduq3-pro":                      {ints(1, 16), []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
+	"grok-imagine-video-1.5":          {ints(1, 15), []string{"480P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9", "5:2"}},
+	"viduq3":                          {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3-mix":                      {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3-turbo":                    {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3-pro":                      {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq4-preview":                  {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
 }

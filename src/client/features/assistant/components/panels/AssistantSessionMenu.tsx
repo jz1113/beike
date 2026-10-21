@@ -1,5 +1,5 @@
 import { getAssistantMessageText } from '../message/assistantMessagePresentation';
-import { useAssistantDialog } from '../useAssistantDialog';
+import { useAssistantDialog } from '../../hooks/useAssistantDialog';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Pencil, Search, Trash2, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';

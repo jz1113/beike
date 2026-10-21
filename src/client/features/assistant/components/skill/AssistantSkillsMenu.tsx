@@ -1,4 +1,4 @@
-import { useAssistantDialog } from '../useAssistantDialog';
+import { useAssistantDialog } from '../../hooks/useAssistantDialog';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Upload, Plus, Search, Settings } from 'lucide-react';
 import { AssistantSkillIcon } from './AssistantSkillIcon';

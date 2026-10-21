@@ -3,38 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { SALES_RULE_GROUPS, SALES_SKILL_DOCUMENT, SALES_SKILL_OPTIONS, salesCategoryForSkill, salesCreationRule, salesSkillBadge, salesSkillId } from './fashionSalesSkill';
 
 describe('sales rule groups', () => {
-  it('groups shared workflow and fashion guidance into two concise cards', () => {
+  it('shows one self-contained fashion card in the rules dialog', () => {
     expect(SALES_RULE_GROUPS.map((group) => [group.id, group.title])).toEqual([
-      ['workflow', '通用制作流程'], ['fashion', '服饰专属规则'],
+      ['fashion', '服饰专属规则'],
     ]);
-    for (const group of SALES_RULE_GROUPS) {
-      expect(group.summary.length).toBeLessThanOrEqual(40);
-      expect(group.appliesWhen).toBeTruthy();
-      expect(group.input).toBeTruthy();
-      expect(group.output).toContain('一条完整视频');
-      expect(group.flow).toHaveLength(4);
-    }
-  });
-
-  it('keeps the all-category workflow explicit and requires real images before finalization', () => {
-    const workflow = SALES_RULE_GROUPS[0];
-    expect(workflow.appliesWhen).toBe('全部商品品类');
-    expect(workflow.input).toMatch(/商品资料.*SKU 颜色.*商品图.*时长.*画幅/);
-    expect(workflow.flow).toEqual(['确认商品', '编排脚本', '生成素材', '定稿出片']);
-    const details = workflow.sections.flatMap((section) => section.body).join('\n');
-    expect(details).toContain('人物与场景按脚本需要自动规划');
-    expect(details).toContain('根据实际图片定稿完整提示词');
-    expect(details).toContain('不静默丢图、改秒数或拆段拼接');
-    expect(details).toContain('仅请求分析或提示词时，不擅自调用付费');
-    expect(details).toContain('提交结果未确认时不自动重复提交');
-  });
-
-  it('presents fashion as additional guidance with lightweight applicability labels', () => {
-    const fashion = SALES_RULE_GROUPS[1];
-    expect(fashion.summary).toContain('在通用流程上');
+    const fashion = SALES_RULE_GROUPS[0];
+    expect(fashion.summary.length).toBeLessThanOrEqual(40);
+    expect(fashion.summary).toBe('为服饰、鞋、包选择实拍叙事，保持同一人物与单品。');
+    expect(fashion.summary).not.toContain('通用');
     expect(fashion.appliesWhen).toBe('服饰、鞋、包');
-    expect(fashion.input).toContain('同一颜色的单品图');
-    expect(fashion.input).toContain('人物与场景按需生成');
+    expect(fashion.input).toBe('商品资料、同一颜色的单品图、时长和画幅；人物与场景按需生成');
+    expect(fashion.output).toContain('一条完整视频');
+    expect(fashion.flow).toEqual(['选择叙事', '保持一致', '实图定稿', '整段出片']);
+  });
+
+  it('keeps generic creation selectable outside the rules dialog', () => {
     expect(salesCreationRule('fashion').title).toBe('服饰专属规则');
     expect(salesCreationRule('home').title).toBe('通用制作流程');
     expect(salesCreationRule('beauty').detail).toContain('通用流程');
@@ -63,7 +46,7 @@ describe('sales rule groups', () => {
   });
 
   it('documents ordered stages, final output and delivery checks', () => {
-    for (const section of ['适用范围', '输入与事实依据', '执行流程', '素材与参考规则', '输出与阶段区分', '费用与恢复', '交付自检']) {
+    for (const section of ['适用范围', '输入与事实依据', '执行流程', '口播论证', '素材与参考规则', '输出与阶段区分', '费用与恢复', '交付自检']) {
       expect(SALES_SKILL_DOCUMENT.body).toContain(`## ${section}`);
     }
     expect(source.indexOf('**自动生图并校验**')).toBeLessThan(source.indexOf('**实际图片定稿**'));
@@ -90,7 +73,13 @@ describe('sales rule groups', () => {
     expect(source).toContain('不静默改秒数、丢图或拆段拼接');
     expect(source).toContain('真实皮肤、空间、自然光和比例');
     expect(source).toContain('画面无字幕、贴纸、大字标题或价格条');
+    expect(source).toContain('口播不出现价格或金额');
     expect(source).toContain('没有依据的功效、评价、销量、实测、优惠、尺码或链接不编造');
+    expect(source).toContain('15秒全片写70–100个汉字');
+    expect(source).toContain('5秒写23–33个字');
+    expect(source).toContain('购买理由从一条事实推到穿着或使用后果');
+    expect(source).toContain('每一段同时有卖点和看点');
+    expect(source).toContain('可以直接入手、简单好搭、值得入、基础百搭不算收尾');
     expect(source).toContain('不写换装或面料飘动');
   });
 });

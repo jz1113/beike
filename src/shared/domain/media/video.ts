@@ -3,7 +3,7 @@
  * 对齐 /v2/videos/generations 规范接口与各大旗舰视频大模型
  */
 
-import { listApprovedModels, vendorLabel, type VideoAudioSupportType } from '@shared/domain/models/modelCatalog';
+import { canonicalModelId, listApprovedModels, vendorLabel, type VideoAudioSupportType } from '@shared/domain/models/modelCatalog';
 
 export type { VideoAudioSupportType };
 
@@ -18,7 +18,7 @@ export interface VideoGenModel {
   badge?: string;
   description: string;
   supportedDurations: number[]; // e.g. [4, 5, 8, 10]
-  supportedResolutions: ('480P' | '720P' | '1080P' | '4K')[];
+  supportedResolutions: ('480P' | '540P' | '720P' | '1080P' | '2K' | '4K')[];
   supportedAspectRatios: string[];
   audioSupport?: VideoAudioSupportType;
 }
@@ -49,6 +49,7 @@ export const VIDEO_ASPECT_RATIOS: VideoAspectRatioItem[] = [
   { id: '3:2', label: '3:2', ratio: '3:2', iconType: 'wide43' },
   { id: '2:3', label: '2:3', ratio: '2:3', iconType: 'tall34' },
   { id: '21:9', label: '21:9', ratio: '21:9', iconType: 'ultrawide' },
+  { id: '5:2', label: '5:2', ratio: '5:2', iconType: 'ultrawide' },
   { id: '16:9', label: '16:9', ratio: '16:9', iconType: 'wide169' },
   { id: '4:3', label: '4:3', ratio: '4:3', iconType: 'wide43' },
   { id: '1:1', label: '1:1', ratio: '1:1', iconType: 'square' },
@@ -73,7 +74,7 @@ export const VIDEO_REF_MODES: VideoRefModeItem[] = [
   { id: 'extend', name: '视频延长', desc: '描述原视频之后发生的内容' },
 ];
 
-export const VIDEO_RESOLUTIONS: ('480P' | '720P' | '1080P' | '4K')[] = ['480P', '720P', '1080P', '4K'];
+export const VIDEO_RESOLUTIONS: ('480P' | '540P' | '720P' | '1080P' | '2K' | '4K')[] = ['480P', '540P', '720P', '1080P', '2K', '4K'];
 export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
 export const VIDEO_DURATIONS: number[] = [4, 5, 8, 10, 15, 30];
 
@@ -98,6 +99,9 @@ export function resolveVideoResolution(current: string | null | undefined, suppo
 /** 按模型 id 查找视频模型配置 */
 export function getVideoModelById(modelId?: string | null): VideoGenModel | undefined {
   if (!modelId) return undefined;
+  const canonical = canonicalModelId(modelId).toLowerCase().trim();
+  const exact = VIDEO_GEN_MODELS.find((x) => x.id.toLowerCase() === canonical);
+  if (exact) return exact;
   const m = modelId.toLowerCase().trim();
   return (
     VIDEO_GEN_MODELS.find((x) => x.id.toLowerCase() === m) ||

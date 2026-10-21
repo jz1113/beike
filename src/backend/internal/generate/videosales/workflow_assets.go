@@ -62,6 +62,15 @@ func workflowReferences(payload map[string]any, catalog []CatalogImage) ([]actua
 			return nil, err
 		}
 		for _, asset := range assets {
+			for _, index := range asset.ProductImageIndexes {
+				found := false
+				for _, image := range catalog {
+					found = found || image.Index == index
+				}
+				if !found {
+					return nil, fmt.Errorf("素材 %s 商品参考编号 %d 不在允许图片中", asset.ID, index)
+				}
+			}
 			ref, exists := seen[asset.ID]
 			if asset.Required && !exists {
 				return nil, fmt.Errorf("缺少必要素材 %s", asset.ID)
@@ -84,10 +93,10 @@ func workflowReferences(payload map[string]any, catalog []CatalogImage) ([]actua
 func workflowVisionParts(text string, refs []actualReference, catalog []CatalogImage) []map[string]any {
 	parts := []map[string]any{{"type": "text", "text": text}}
 	for i, ref := range refs {
-		parts = append(parts, map[string]any{"type": "text", "text": fmt.Sprintf("图片%d：ID=%s；类型=%s；名称=%s。以下为实际参考图。", i+1, ref.ID, ref.Kind, ref.Label)}, map[string]any{"type": "image_url", "image_url": map[string]string{"url": ref.URL}})
+		parts = append(parts, map[string]any{"type": "text", "text": fmt.Sprintf("图片%d：ID=%s；类型=%s；名称=%s。以下为实际参考图。", i+1, ref.ID, ref.Kind, ref.Label)}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": ref.URL, "index": i + 1}})
 	}
 	for _, image := range catalog {
-		parts = append(parts, map[string]any{"type": "text", "text": fmt.Sprintf("商品事实对照原图（目录编号 %d，不是成片参考编号）", image.Index)}, map[string]any{"type": "image_url", "image_url": map[string]string{"url": image.URL}})
+		parts = append(parts, map[string]any{"type": "text", "text": fmt.Sprintf("商品事实对照原图（目录编号 %d，不是成片参考编号）", image.Index)}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image.URL, "index": image.Index}})
 	}
 	return parts
 }
@@ -131,6 +140,6 @@ func parseValidations(content string, refs []actualReference) ([]assetValidation
 
 func validationBody(model string, payload map[string]any, shots []ScriptShot, refs []actualReference, catalog []CatalogImage) map[string]any {
 	facts, _ := json.Marshal(map[string]any{"shots": shots, "selectedColor": payload["selectedColor"], "productAnalysis": payload["productAnalysis"], "assets": payload["assets"]})
-	system := `你是实际图片视觉校验员，必须逐张查看实际参考图与商品事实对照原图，不能仅凭文字声称通过。验证实际图是否满足脚本、商品颜色和款式、相同人物身份、脸与人物一致、场景连续性；上身图和关键帧若含商品，外观必须与商品原图及 selectedColor 一致。纯人物图不要求出现商品。图片无法辨认、无法查看或证据不足时必须 uncertain，明显冲突时 conflict，仅图中确有依据时 passed。不得伪造通过。每个实际参考ID返回且只返回一条，禁止未知ID；只输出 JSON {"validations":[{"id":"实际ID","status":"passed|conflict|uncertain","reason":"具体可见依据或无法确认的原因"}]}。`
+	system := `你是实际图片视觉校验员，必须逐张查看实际参考图与商品事实对照原图，不能仅凭文字声称通过。验证实际图是否满足脚本、商品颜色和款式、相同人物身份、脸与人物一致、场景连续性；上身图和关键帧若含商品，外观必须与商品原图及 selectedColor 一致。纯人物图不要求出现商品。还必须独立核对每张素材的正面、背面、侧面或局部是否满足它自己的 label、prompt 及 productImageIndexes 指向的原图，而不是要求每张素材同时满足整段分镜。名称或提示词写正面但实际是背面时必须 conflict，正反面生成成同一张背面也不能通过；根据领口前后高低、门襟、口袋、接缝、胸前或背部标志位置提供可见证据，不得因为黑色和轮廓相似就 passed。标志缺失、移位、镜像或细节拼图代替单张静帧均属冲突；正反或标志太小看不清时 uncertain。商品原图优先于前置生成图，不允许用生成图互相证明商品事实。图片无法辨认、无法查看或证据不足时必须 uncertain，明显冲突时 conflict，仅图中确有依据时 passed。不得伪造通过。每个实际参考ID返回且只返回一条，禁止未知ID；只输出 JSON {"validations":[{"id":"实际ID","status":"passed|conflict|uncertain","reason":"具体可见依据或无法确认的原因"}]}。`
 	return chatBody(model, system, workflowVisionParts("脚本与商品事实："+string(facts), refs, catalog), 0.1)
 }

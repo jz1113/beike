@@ -62,12 +62,43 @@ func dialPublic(ctx context.Context, dialer *net.Dialer, networkName, address st
 	if err != nil || len(records) == 0 {
 		return nil, errors.New("DNS lookup failed for host")
 	}
+	targets, err := dialableIPs(records)
+	if err != nil {
+		return nil, err
+	}
+	var last error
+	for _, ip := range targets {
+		conn, err := dialer.DialContext(ctx, networkName, net.JoinHostPort(ip.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		last = err
+	}
+	if last == nil {
+		last = errors.New("DNS lookup failed for host")
+	}
+	return nil, last
+}
+
+// Public addresses are dialed IPv4 first. One unreachable record must not hide
+// another that works, and any private address still rejects the whole name.
+func dialableIPs(records []net.IPAddr) ([]net.IP, error) {
+	if len(records) == 0 {
+		return nil, errors.New("DNS lookup failed for host")
+	}
+	v4 := make([]net.IP, 0, len(records))
+	v6 := make([]net.IP, 0)
 	for _, record := range records {
 		if PrivateIP(record.IP.String()) {
 			return nil, errors.New("Resolved to private IP")
 		}
+		if record.IP.To4() != nil {
+			v4 = append(v4, record.IP)
+			continue
+		}
+		v6 = append(v6, record.IP)
 	}
-	return dialer.DialContext(ctx, networkName, net.JoinHostPort(records[0].IP.String(), port))
+	return append(v4, v6...), nil
 }
 
 func blockedHost(host string) bool {

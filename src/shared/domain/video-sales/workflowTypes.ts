@@ -13,6 +13,8 @@ export interface SalesCreativeAsset {
   required: boolean;
   referenceAssetIds?: string[];
   usesProduct?: boolean;
+  /** 商品目录原始编号，按本张静帧的目标视角选择；不等同于分镜选图。 */
+  productImageIndexes?: number[];
   url?: string;
   status?: 'pending' | 'generating' | 'done' | 'failed' | 'uncertain';
   validation?: 'pending' | 'passed' | 'conflict' | 'uncertain';

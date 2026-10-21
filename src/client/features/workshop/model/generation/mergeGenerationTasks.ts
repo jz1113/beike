@@ -1,6 +1,8 @@
-import { savedWorkshopOutputSize } from './workshopOutputSize';
 import { buildImageTaskKey, resolveTaskMergeAction } from '@shared/domain/workshop/workshop-pipeline';
 import type { BatchProductItem, BatchTaskItem } from '../batchTypes';
+import { needsGenerationSubmit, savedWorkshopOutputSize } from './generationHelpers';
+
+export { needsGenerationSubmit };
 
 export interface MergeTaskContext {
   batchId: string;
@@ -76,9 +78,3 @@ export function mergeGenerationTasks(
   });
 }
 
-export function needsGenerationSubmit(task: BatchTaskItem): boolean {
-  if (task.recoveryRequired || task.resultStatus === 'superseded') return false;
-  if (task.status === 'SUCCESS' && task.resultUrl) return false;
-  if (task.status === 'IN_PROGRESS' && !task.recoveryRequired) return false;
-  return true;
-}

@@ -75,7 +75,12 @@ func TestSalesNativeErrorsDoNotFallbackOrReplay(t *testing.T) {
 	previous := generate.ModelHTTP
 	generate.ModelHTTP = func() *http.Client { return server.Client() }
 	defer func() { generate.ModelHTTP = previous }()
-	payload := map[string]any{"model": "gemini-2.5-flash", "textProtocol": "gemini", "customBaseUrl": server.URL, "customApiKey": "secret", "productName": "纸巾", "allowFallback": true}
+	payload := map[string]any{
+		"workflowVersion": 3, "model": "gemini-2.5-flash", "textProtocol": "gemini", "customBaseUrl": server.URL, "customApiKey": "secret", "productName": "纸巾",
+		"targetDuration": 15, "aspectRatio": "9:16",
+		"imageCatalog":         []map[string]any{{"index": 1, "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "role": "main"}},
+		"eligibleImageIndexes": []int{1},
+	}
 	for _, handler := range []http.Handler{Script(config.Config{}), Analyze(config.Config{})} {
 		payload["imageUrls"] = []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}
 		body, _ := json.Marshal(payload)
@@ -108,9 +113,14 @@ func postAnthropicAnalysis(t *testing.T, server *httptest.Server, images []map[s
 	previous := generate.ModelHTTP
 	generate.ModelHTTP = func() *http.Client { return server.Client() }
 	t.Cleanup(func() { generate.ModelHTTP = previous })
+	indexes := make([]int, len(images))
+	for i, image := range images {
+		indexes[i], _ = image["index"].(int)
+	}
 	payload := map[string]any{
-		"model": "claude-5.5-haiku", "textProtocol": "anthropic", "allowFallback": true, "productName": "卫衣",
-		"customBaseUrl": server.URL + "/v1/chat/completions", "customApiKey": "analysis-secret", "imageCatalog": images,
+		"workflowVersion": 3, "model": "claude-5.5-haiku", "textProtocol": "anthropic", "productName": "卫衣",
+		"customBaseUrl": server.URL + "/v1/chat/completions", "customApiKey": "analysis-secret",
+		"imageCatalog": images, "eligibleImageIndexes": indexes,
 	}
 	body, _ := json.Marshal(payload)
 	rec := httptest.NewRecorder()
@@ -130,7 +140,7 @@ func TestAnalyzeAnthropicOfficialMessages(t *testing.T) {
 			t.Errorf("request did not use Anthropic image blocks: %s", r.URL.Path)
 			return
 		}
-		if body["max_tokens"] != float64(4096) || body["system"] == nil {
+		if body["max_tokens"] != float64(longOutputTokens) || body["system"] == nil {
 			t.Errorf("missing official fields: %#v", body)
 			return
 		}
@@ -231,20 +241,47 @@ func TestAnalyzeAnthropicTimeoutAndMissingInput(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 	imageRec := httptest.NewRecorder()
-	imageBody := `{"model":"claude-5.5-haiku","textProtocol":"anthropic","customBaseUrl":"https://example.test","customApiKey":"analysis-secret","imageCatalog":[{"index":6,"url":"data:text/html;base64,SGk=","role":"main"}]}`
+	imageBody := `{"workflowVersion":3,"model":"claude-5.5-haiku","textProtocol":"anthropic","customBaseUrl":"https://example.test","customApiKey":"analysis-secret","imageCatalog":[{"index":6,"url":"data:text/html;base64,SGk=","role":"main"}],"eligibleImageIndexes":[6]}`
 	Analyze(config.Config{}).ServeHTTP(imageRec, httptest.NewRequest(http.MethodPost, "/analyze", strings.NewReader(imageBody)))
 	if imageRec.Code != 502 || !strings.Contains(imageRec.Body.String(), "图片编号 6") || !strings.Contains(imageRec.Body.String(), "格式不受支持") || strings.Contains(imageRec.Body.String(), "SGk=") {
 		t.Fatalf("%d %s", imageRec.Code, imageRec.Body.String())
 	}
 	for _, tc := range []struct{ body, want string }{
-		{`{"model":"claude-5.5-haiku","textProtocol":"anthropic","customApiKey":"analysis-secret","allowFallback":true}`, "请先确认至少一张商品图片"},
-		{`{"model":"claude-5.5-haiku","textProtocol":"anthropic","allowFallback":true,"imageUrls":["` + salesPNG + `"]}`, "请配置多模态模型地址和密钥"},
+		{`{"workflowVersion":3,"model":"claude-5.5-haiku","textProtocol":"anthropic","customApiKey":"analysis-secret"}`, "缺少 imageCatalog"},
+		{`{"workflowVersion":3,"model":"claude-5.5-haiku","textProtocol":"anthropic","imageCatalog":[{"index":1,"url":"` + salesPNG + `","role":"main"}],"eligibleImageIndexes":[1]}`, "请配置多模态模型地址和密钥"},
 	} {
 		response := httptest.NewRecorder()
 		Analyze(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/analyze", strings.NewReader(tc.body)))
 		if response.Code != 400 || !strings.Contains(response.Body.String(), tc.want) || strings.Contains(response.Body.String(), `"success":true`) {
 			t.Fatalf("%d %s", response.Code, response.Body.String())
 		}
+	}
+}
+
+func TestAnalyzeKeepsClosedJSONWhenOutputHitsLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		raw, _ := io.ReadAll(r.Body)
+		if json.Unmarshal(raw, &body) != nil || body["max_tokens"] != float64(longOutputTokens) {
+			t.Errorf("analysis output budget %#v", body["max_tokens"])
+		}
+		encoded, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{
+			"finish_reason": "length",
+			"message":       map[string]string{"content": salesAnalysisJSON},
+		}}})
+		_, _ = w.Write(encoded)
+	}))
+	defer server.Close()
+	previous := generate.ModelHTTP
+	generate.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { generate.ModelHTTP = previous })
+	payload := map[string]any{
+		"workflowVersion": 3, "model": "vision-test", "textProtocol": "openai", "productName": "卫衣", "category": "fashion",
+		"customBaseUrl": server.URL, "customApiKey": "analysis-secret", "imageCatalog": salesImages(1), "eligibleImageIndexes": []int{1},
+	}
+	rec := postSales(t, Analyze(config.Config{}), "/analyze", payload)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"sellingPoints"`) || strings.Contains(rec.Body.String(), errTruncatedOutput.Error()) {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 }
 

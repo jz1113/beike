@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { posterItemFromUploadedImage, titleFromImageFileName } from './posterImageTitle';
+import { posterItemFromUploadedImage, titleFromImageFileName } from './posterDraft';
 
 describe('titleFromImageFileName', () => {
   it('uses the file name without its extension or copy suffix', () => {

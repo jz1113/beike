@@ -38,6 +38,7 @@ export const videoSalesPlannedAssetSchema = z.object({
   id: z.string().trim().min(1), kind: z.enum(['person', 'face', 'scene', 'keyframe']),
   label: z.string().trim().min(1), prompt: z.string().trim().min(1), required: z.boolean(),
   referenceAssetIds: z.array(z.string().min(1)).optional(), usesProduct: z.boolean().optional(),
+  productImageIndexes: z.array(z.number().int().nonnegative()).optional(),
 });
 export const videoSalesActualReferenceSchema = z.object({
   id: z.string().trim().min(1), kind: z.enum(['product', 'person', 'face', 'scene', 'keyframe']),
@@ -139,10 +140,10 @@ export const videoSalesFinalizeBodySchema = z.object({
 export type VideoSalesFinalizeBody = z.infer<typeof videoSalesFinalizeBodySchema>;
 
 export const videoSalesValidateAssetsResponseSchema = z.object({
-  success: z.literal(true), validations: z.array(videoSalesAssetValidationSchema).min(1), model: z.string().optional(),
+  success: z.literal(true), validations: z.array(videoSalesAssetValidationSchema).min(1), model: z.string().optional(), usage: z.unknown().optional(),
 });
 export const videoSalesFinalizeResponseSchema = z.object({
   success: z.literal(true), fullPrompt: z.string().min(1),
   prompts: z.array(z.object({ shotId: z.number().int().positive(), prompt: z.string().min(1) })).min(1),
-  model: z.string().optional(),
+  model: z.string().optional(), usage: z.unknown().optional(),
 });

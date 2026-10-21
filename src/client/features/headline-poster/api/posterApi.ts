@@ -5,7 +5,7 @@ import { retryWhenLocalApiUnavailable } from '@client/shared/api/localApiRetry';
 import { pollSingleTask, submitImageGenTask } from '@client/shared/api/generation/generationApi';
 import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import { classifyGenerationPollResult, imageGenBusinessError } from '@client/shared/api/generation/generationErrors';
-import { exportCoverJpeg, loadImageForCanvas } from '../model/coverExport';
+import { loadImageForCanvas, rasterizeCoverImage } from '../model/coverExport';
 import {
   normalizeCoverTitle,
   type CoverDesignPlan,
@@ -168,26 +168,12 @@ export async function generateFinalCover(
     return result;
   });
   const { image, revoke } = await waitForPosterOperation(loading, recovery.signal);
-  const canvas = document.createElement('canvas');
   try {
     if (isAborted()) throw new Error('已取消大字报任务');
-    const expectedRatio = format.width / format.height;
-    if (!image.naturalWidth || !image.naturalHeight || Math.abs(image.naturalWidth / image.naturalHeight - expectedRatio) > 0.02) {
-      throw new Error('生图结果不是 ' + format.aspectRatio + '，已停止导出以避免拉伸或裁掉标题');
-    }
-    canvas.width = format.width;
-    canvas.height = format.height;
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('浏览器无法导出封面');
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await waitForPosterOperation(exportCoverJpeg(canvas, format), recovery.signal);
+    const blob = await waitForPosterOperation(rasterizeCoverImage(image, format), recovery.signal);
     if (isAborted()) throw new Error('已取消大字报任务');
     return URL.createObjectURL(blob);
   } finally {
-    canvas.width = 0;
-    canvas.height = 0;
     revoke();
   }
 }

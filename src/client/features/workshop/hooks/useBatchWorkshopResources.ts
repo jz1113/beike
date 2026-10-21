@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useAppStore } from '@client/store';
 import { fetchRecipes, loadSystemConfiguredModels } from '../api/workshopResources';
+import { nextWorkshopRecipeSelection } from '../model/workshopResourceRules';
 
 export function useBatchWorkshopResources(setSelectedArchId: (id: string) => void) {
   const [recipes, setRecipes] = useState<any[]>([]);
@@ -11,7 +13,14 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
 
   // 资源异步加载
   const fetchRecipesHandler = useCallback(async () => {
-    await fetchRecipes(setRecipes, setSelectedArchId);
+    try {
+      const visible = await fetchRecipes();
+      setRecipes(visible);
+      const next = nextWorkshopRecipeSelection(visible, useAppStore.getState().selectedArchId);
+      if (next !== null) setSelectedArchId(next);
+    } catch {
+      setRecipes([]);
+    }
   }, [setSelectedArchId]);
 
   const loadModelsHandler = useCallback(() => {

@@ -1,6 +1,6 @@
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
 import { inferWorkflowCapabilitiesFromId } from '@shared/domain/models/workflowModels';
-import type { GatewayModelItem } from '../components/GatewayModelModal';
+import type { GatewayModelItem } from './gatewayModelCatalog';
 
 /** CC Switch/Codex catalog is a local model list, not an authentication file. */
 export function parseCodexCatalog(raw: unknown): GatewayModelItem[] {

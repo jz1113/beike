@@ -68,10 +68,11 @@ export function wanOfficialEndpoints(baseUrl: string): GatewayEndpoints {
   };
 }
 
-export function grokImagineVideoEndpoints(baseUrl: string): GatewayEndpoints {
+export function grokImagineVideoEndpoints(baseUrl: string, mode = 'text'): GatewayEndpoints {
   const root = rootOf(baseUrl);
+  const path = mode === 'edit' ? 'edits' : mode === 'extend' ? 'extensions' : 'generations';
   return {
-    submit: [`${root}/xai/v1/videos/generations`],
+    submit: [`${root}/xai/v1/videos/${path}`],
     query: [`${root}/xai/v1/videos/{taskId}`],
   };
 }

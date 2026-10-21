@@ -1,13 +1,8 @@
 import { getVideoDurationBounds, getVideoModelById, resolveVideoResolution, VIDEO_ASPECT_RATIOS, VIDEO_RESOLUTIONS, type VideoResolution } from '@shared/domain/media/video';
 import { videoModeLabel, videoModes } from '@shared/domain/media/videoCapabilities';
-import { salesAspectError } from './salesTiming';
 
 export type SalesAspectRatio = '9:16' | '3:4' | '16:9' | '1:1';
-export type SalesVideoRefMode = 'omni' | 'first_frame';
-export type SalesWorkPane = 'plan' | 'result';
-export type SalesMobilePane = 'config' | 'workspace';
-export type SalesFlowStep = 'prepare' | 'confirm' | 'render';
-export type SalesPlanPhase = 'analyze' | 'script' | 'select' | 'prompt';
+export type SalesVideoRefMode = 'omni' | 'first_frame' | 'first_last_frame' | 'text';
 export type SalesRenderPhase = 'redrawing' | 'generating' | 'composing';
 
 export const SALES_ASPECTS: { value: SalesAspectRatio; label: string }[] = [
@@ -17,20 +12,7 @@ export const SALES_ASPECTS: { value: SalesAspectRatio; label: string }[] = [
   { value: '1:1', label: '1:1' },
 ];
 
-const SALES_REF_MODES: SalesVideoRefMode[] = ['omni', 'first_frame'];
-
-const PLAN_PHASE_LABEL: Record<SalesPlanPhase, string> = {
-  analyze: '正在分析商品图片…',
-  script: '正在整理分镜和口播…',
-  select: '正在挑选参考图…',
-  prompt: '正在更新视频提示词…',
-};
-
-const RENDER_PHASE_LABEL: Record<SalesRenderPhase, string> = {
-  redrawing: '正在重绘参考图…',
-  generating: '正在生成镜头…',
-  composing: '正在合成成片…',
-};
+const SALES_REF_MODES: SalesVideoRefMode[] = ['omni', 'first_frame', 'first_last_frame', 'text'];
 
 export interface SalesAspectChoice {
   value: SalesAspectRatio;
@@ -41,46 +23,6 @@ export interface SalesAspectChoice {
 export interface SalesVideoCapability {
   known: boolean;
   note: string;
-}
-
-export interface SalesFlowStepView {
-  id: SalesFlowStep;
-  label: string;
-  state: 'done' | 'current' | 'upcoming';
-}
-
-export interface SalesActionButton {
-  label: string;
-  disabled: boolean;
-  reason: string | null;
-}
-
-export interface SalesActionState {
-  primary: 'plan' | 'render';
-  plan: SalesActionButton;
-  render: SalesActionButton;
-}
-
-export interface SalesActionInput {
-  hasName: boolean;
-  hasUrl: boolean;
-  usableImages: number;
-  hasScript: boolean;
-  isCollecting: boolean;
-  isUploading?: boolean;
-  isPlanning: boolean;
-  isRendering: boolean;
-  planPhase: SalesPlanPhase | null;
-  renderPhase: SalesRenderPhase | null;
-  chatReady: boolean;
-  videoReady: boolean;
-  aspectConflict: string | null;
-  redrawScenes?: boolean;
-  needsSceneFrames?: boolean;
-  imageReady?: boolean;
-  needsFashionPerson?: boolean;
-  fashionPromptMissing?: boolean;
-  singleDelivery?: boolean;
 }
 
 export function salesAspectChoices(modelId?: string): SalesAspectChoice[] {
@@ -94,7 +36,9 @@ export function salesAspectChoices(modelId?: string): SalesAspectChoice[] {
 
 export function salesAspectConflict(modelId: string | undefined, aspect: string): string | null {
   if (!modelId?.trim() || !getVideoModelById(modelId)) return null;
-  return salesAspectError(modelId, aspect);
+  const ratios = getVideoModelById(modelId)?.supportedAspectRatios;
+  if (!ratios?.length || ratios.includes(aspect)) return null;
+  return `当前视频模型不支持 ${aspect}，请更换画幅或模型`;
 }
 
 export function salesVideoCapability(modelId?: string): SalesVideoCapability {
@@ -136,6 +80,12 @@ export function salesResolveResolution(modelId: string | undefined, current: str
   return resolveVideoResolution(current, supported);
 }
 
+export function salesDurationEnabled(modelId: string | undefined, duration: number): boolean {
+  const allowed = modelId?.trim() ? getVideoModelById(modelId)?.supportedDurations : undefined;
+  if (!allowed?.length) return true;
+  return allowed.includes(duration);
+}
+
 export function salesParamSummary(input: { refMode: string; aspect: string; resolution: string; duration: number }): string {
   return `${videoModeLabel(input.refMode)} · ${input.aspect} · ${input.resolution} · ${input.duration}秒`;
 }
@@ -158,34 +108,6 @@ export function salesResolutionChoices(modelId?: string): VideoResolution[] {
   return VIDEO_RESOLUTIONS.filter((value) => allowed.has(value));
 }
 
-export function salesFlowSteps(input: {
-  hasScript: boolean;
-  isCollecting: boolean;
-  isPlanning: boolean;
-  isRendering: boolean;
-  hasRenderActivity: boolean;
-}): SalesFlowStepView[] {
-  let current: SalesFlowStep = 'prepare';
-  if (!input.isCollecting && !input.isPlanning && (input.isRendering || input.hasRenderActivity)) current = 'render';
-  else if (!input.isCollecting && (input.hasScript || input.isPlanning)) current = 'confirm';
-  const labels: Record<SalesFlowStep, string> = {
-    prepare: '资料准备',
-    confirm: input.isPlanning && !input.hasScript ? '正在整理方案' : '方案确认',
-    render: input.isRendering ? '正在生成视频' : '视频生成',
-  };
-  const order: SalesFlowStep[] = ['prepare', 'confirm', 'render'];
-  const index = order.indexOf(current);
-  return order.map((id, stepIndex) => ({
-    id,
-    label: labels[id],
-    state: stepIndex < index ? 'done' : stepIndex === index ? 'current' : 'upcoming',
-  }));
-}
-
-export function initialSalesPane(hasRenderActivity: boolean): SalesWorkPane {
-  return hasRenderActivity ? 'result' : 'plan';
-}
-
 export function salesOpeningProductUrl(draft: {
   productUrl?: unknown;
   productName?: unknown;
@@ -202,11 +124,6 @@ export function salesOpeningProductUrl(draft: {
   return named || catalog || images || scripted ? url : '';
 }
 
-export function salesHasRenderActivity(shots: { status?: string; assetUrl?: string }[] | undefined, resultUrl: string | null): boolean {
-  if (resultUrl) return true;
-  return Boolean(shots?.some((shot) => (shot.status && shot.status !== 'pending') || shot.assetUrl));
-}
-
 export function salesPreviewClass(aspect: string, kind: 'hero' | 'shot'): string {
   if (kind === 'shot') {
     if (aspect === '16:9') return 'aspect-video w-full bg-black object-contain';
@@ -218,47 +135,6 @@ export function salesPreviewClass(aspect: string, kind: 'hero' | 'shot'): string
   if (aspect === '3:4') return 'mx-auto aspect-[3/4] w-full max-w-sm bg-black object-contain';
   if (aspect === '1:1') return 'mx-auto aspect-square w-full max-w-sm bg-black object-contain';
   return 'mx-auto aspect-[9/16] w-full max-w-sm bg-black object-contain';
-}
-
-export function salesActions(input: SalesActionInput): SalesActionState {
-  const busy = input.isCollecting || input.isUploading || input.isPlanning || input.isRendering;
-  let planReason: string | null = null;
-  if (!input.hasName && !input.hasUrl) planReason = '请先粘贴商品链接，或填写商品名称';
-  else if (input.hasName && input.usableImages === 0) planReason = '请至少保留一张可用商品图';
-  else if (input.needsFashionPerson) planReason = '请上传出镜人物';
-  else if (!input.chatReady) planReason = '请先配置多模态模型';
-
-  let renderReason: string | null = null;
-  if (!input.hasScript) renderReason = '请先生成创作方案';
-  else if (input.usableImages === 0) renderReason = '请至少保留一张可用商品图';
-  else if (input.needsFashionPerson) renderReason = '请上传出镜人物';
-  else if (input.fashionPromptMissing) renderReason = '请按服饰带货重新生成方案';
-  else if (!input.videoReady) renderReason = '请先配置视频模型';
-  else if (input.needsSceneFrames && !input.imageReady) renderReason = '请先配置绘图模型';
-  else if (input.aspectConflict) renderReason = input.aspectConflict;
-
-  const planLabel = input.isUploading
-    ? '正在上传图片…'
-    : input.isCollecting
-      ? '正在采集商品…'
-      : input.planPhase
-        ? PLAN_PHASE_LABEL[input.planPhase]
-        : input.hasScript
-          ? '重新生成方案'
-          : '生成创作方案';
-  const renderLabel = input.renderPhase === 'generating' && input.singleDelivery
-    ? '正在生成成片…'
-    : input.renderPhase
-      ? RENDER_PHASE_LABEL[input.renderPhase]
-      : input.planPhase === 'prompt'
-        ? PLAN_PHASE_LABEL.prompt
-        : '确认方案，生成视频';
-
-  return {
-    primary: input.hasScript && !input.isPlanning && !input.isCollecting && !input.isUploading ? 'render' : 'plan',
-    plan: { label: planLabel, disabled: busy || Boolean(planReason), reason: busy ? null : planReason },
-    render: { label: renderLabel, disabled: busy || Boolean(renderReason), reason: busy ? null : renderReason },
-  };
 }
 
 export function salesRenderStatus(input: {

@@ -67,7 +67,7 @@ describe('mapCollectedSalesProduct', () => {
         price: 89,
         brand: '示例',
         category: '美妆护肤',
-        props: { 规格: '50ml' },
+        props: { 规格: '50ml', 价格: '89元' },
         mainImages: ['https://example.com/main.jpg'],
         skuImages: ['https://example.com/sku.jpg'],
         descImages: ['https://example.com/detail.jpg'],
@@ -79,7 +79,9 @@ describe('mapCollectedSalesProduct', () => {
       'https://example.com/detail.jpg',
     ]);
     expect(product.category).toBe('beauty');
-    expect(product.priceLabel).toBe('89元');
+    expect(product.priceLabel).toBe('');
+    expect(product.props.价格).toBeUndefined();
     expect(product.sellingPoints).toContain('规格');
+    expect(product.sellingPoints).not.toContain('价格');
   });
 });

@@ -1,6 +1,6 @@
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import type { CoverFormat } from './coverFormat';
-import { enforceCoverJpegFileSize, MAX_COVER_FILE_BYTES } from './jpegFileSize';
+import { enforceCoverJpegFileSize, MAX_COVER_FILE_BYTES } from './posterDraft';
 
 export async function loadImageForCanvas(url: string): Promise<{ image: HTMLImageElement; revoke: () => void }> {
   const blob = await fetchMediaBlob(url);
@@ -27,6 +27,27 @@ async function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number): Pro
       else reject(new Error('封面 JPG 编码失败'));
     }, 'image/jpeg', quality);
   });
+}
+
+export async function rasterizeCoverImage(image: HTMLImageElement, format: CoverFormat): Promise<Blob> {
+  const expectedRatio = format.width / format.height;
+  if (!image.naturalWidth || !image.naturalHeight || Math.abs(image.naturalWidth / image.naturalHeight - expectedRatio) > 0.02) {
+    throw new Error('生图结果不是 ' + format.aspectRatio + '，已停止导出以避免拉伸或裁掉标题');
+  }
+  const canvas = document.createElement('canvas');
+  try {
+    canvas.width = format.width;
+    canvas.height = format.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('浏览器无法导出封面');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await exportCoverJpeg(canvas, format);
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 export async function exportCoverJpeg(workingCanvas: HTMLCanvasElement, format: CoverFormat): Promise<Blob> {

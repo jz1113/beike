@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { readDeconstructJob, submitDeconstructJob, stopDeconstructJob, DeconstructJobRequestError } from '../api/deconstructJobsClient';
 import { useDeconstructJobsState } from './useDeconstructJobs';
-import { applyDeconstructJobToQueue } from '../model/deconstructJobQueue';
-import { getDeconstructJobsState, isDeconstructJobActive, upsertDeconstructJob, updateDeconstructJobsState } from '../model/deconstructJobsState';
+import { applyDeconstructJobToQueue } from '../model/deconstructJobs';
+import { getDeconstructJobsState, isDeconstructJobActive, upsertDeconstructJob, updateDeconstructJobsState } from '../model/deconstructJobs';
 import {
   getEnabledMultimodalModelsFromSettings,
   resolveStoredMultimodalModelId,
@@ -16,7 +16,7 @@ import {
 } from '../model/assetDeconstructCsvExport';
 import { buildQueueItemsFromFiles } from '../model/assetFolderImport';
 import type { ImageSetQueueItem } from '../model/assetPromptConstants';
-import { selectableDeconstructSubcategory } from '../model/deconstructImportTarget';
+import { selectableDeconstructSubcategory } from '../model/deconstructJobs';
 import {
   clearDeconstructQueueDraft,
   persistDeconstructQueue,

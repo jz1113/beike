@@ -1,6 +1,6 @@
 import { useState, useReducer, useRef } from 'react';
 import { createRunControl, type RunControl } from '../model/workspace/runControl';
-import { acknowledgeUncertainTasks } from '../model/generation/taskRetry';
+import { acknowledgeUncertainTasks } from '../model/generation/generationHelpers';
 import { startAutoPilotPipeline as runAutoPilotPipeline } from '../model/analysis/batchAutoPilot';
 
 type BatchRunControlOptions = Pick<Parameters<typeof runAutoPilotPipeline>[0],

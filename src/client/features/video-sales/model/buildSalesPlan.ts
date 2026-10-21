@@ -1,8 +1,14 @@
 import {
-  applyStrictImageAssignments, validateSalesAssetPlan, type FashionRefs, type SalesImageRef,
+  applyStrictImageAssignments, omitSalesPriceClauses, omitSalesPriceProps, validateSalesAssetPlan, type FashionRefs, type SalesImageRef,
   type VideoSalesCategory, type VideoSalesMode, type VideoSalesProductAnalysis, type VideoSalesScript,
 } from '@shared/domain/video-sales';
-import { analyzeProductMedia, generateSalesScripts, selectSalesImages, type SalesRouteHeaders } from '../api/videoSalesApi';
+import type { SalesRouteHeaders } from './salesRoute';
+
+export interface SalesPlanApi {
+  analyzeProductMedia(input: object): Promise<VideoSalesProductAnalysis>;
+  generateSalesScripts(input: object): Promise<VideoSalesScript[]>;
+  selectSalesImages(input: object): Promise<Array<{ shotId: number; imageIndex: number; reason?: string }>>;
+}
 
 export type SalesPlanPhase = 'analyze' | 'script' | 'select' | 'prompt';
 
@@ -12,7 +18,6 @@ export async function buildSalesPlan(input: {
   category: VideoSalesCategory;
   sellingPoints: string;
   productProps?: Record<string, string>;
-  priceLabel: string;
   imageCatalog: SalesImageRef[];
   fashionRefs?: FashionRefs;
   targetDuration: number;
@@ -22,25 +27,25 @@ export async function buildSalesPlan(input: {
   redrawScenes: boolean;
   route: SalesRouteHeaders;
   onPhase: (phase: SalesPlanPhase) => void;
-}): Promise<{ analysis: VideoSalesProductAnalysis; script: VideoSalesScript }> {
+}, api: SalesPlanApi): Promise<{ analysis: VideoSalesProductAnalysis; script: VideoSalesScript }> {
   const images = input.imageCatalog.filter((image) => image.url.trim() && !image.unavailable);
-  if (!images.length) throw new Error('请先确认当前颜色的商品图片');
+  if (!images.length) throw new Error('请先选择至少一张用于生成的商品图');
   if (!Number.isInteger(input.targetDuration) || input.targetDuration < 10 || input.targetDuration > 120) throw new Error('目标时长需为 10–120 秒的整数');
-  const productDescription = JSON.stringify({ suppliedSellingPoints: input.sellingPoints, originalProductProperties: input.productProps || {} });
+  const productDescription = JSON.stringify({ suppliedSellingPoints: omitSalesPriceClauses(input.sellingPoints), originalProductProperties: omitSalesPriceProps(input.productProps || {}) });
   const context = { workflowVersion: 3 as const, eligibleImageIndexes: images.map((image) => image.index), selectedColor: input.selectedColor, aspectRatio: input.aspectRatio || '9:16' };
   input.onPhase('analyze');
-  const analysis = await analyzeProductMedia({
+  const analysis = await api.analyzeProductMedia({
     imageCatalog: images, productName: input.productName, brand: input.brand,
-    priceRange: input.priceLabel, productDescription, category: input.category,
+    productDescription, category: input.category,
     ...context, ...input.route,
   });
   if (!analysis.sellingPoints?.some((point) => point.trim())) throw new Error('商品分析没有返回卖点');
   input.onPhase('script');
-  const scripts = await generateSalesScripts({
+  const scripts = await api.generateSalesScripts({
     productName: input.productName, brand: input.brand, category: input.category,
     productDescription, productImages: images.map((image) => image.url), imageCatalog: images,
     productAnalysis: JSON.stringify(analysis), videoMode: input.videoMode, targetDuration: input.targetDuration,
-    priceRange: input.priceLabel, targetAudience: analysis.targetAudience, ...context, ...input.route,
+    targetAudience: analysis.targetAudience, ...context, ...input.route,
   });
   const selected = scripts[0];
   if (!selected?.shots?.length) throw new Error('没有生成可用脚本，请调整商品信息后重试');
@@ -49,16 +54,16 @@ export async function buildSalesPlan(input: {
     throw new Error(`分镜合计 ${total} 秒，与目标 ${input.targetDuration} 秒不一致，请重新生成方案`);
   }
   if (!Array.isArray(selected.assets)) throw new Error('脚本没有返回自动素材计划，请重新生成');
-  validateSalesAssetPlan(selected.assets);
+  validateSalesAssetPlan(selected.assets, images);
   input.onPhase('select');
-  const assignments = await selectSalesImages({ shots: selected.shots, imageCatalog: images, ...context, ...input.route });
+  const assignments = await api.selectSalesImages({ shots: selected.shots, imageCatalog: images, ...context, ...input.route });
   const shots = applyStrictImageAssignments(selected.shots, assignments, images);
   return {
     analysis,
     script: {
       ...selected, shots, totalDuration: total, deliveryMode: 'single', workflowVersion: 3, planStale: false,
       assets: selected.assets.map((asset) => ({
-        ...asset, usesProduct: asset.usesProduct || (input.category === 'fashion' && asset.kind === 'person'),
+        ...asset, usesProduct: asset.usesProduct ?? (input.category === 'fashion' && asset.kind === 'person'),
         url: undefined, status: 'pending', validation: 'pending',
       })),
       fullPrompt: undefined, finalizedRevision: undefined, assetValidation: 'pending',

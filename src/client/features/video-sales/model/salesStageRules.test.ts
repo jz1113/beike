@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSalesStudioState, type VideoSalesStudioState } from './salesStudioDraft';
+import { defaultSalesStudioState, normalizeSalesScripts, readSalesColorSelection, type VideoSalesStudioState } from './salesStudioDraft';
 import { assertSalesPlanCurrent, invalidateSalesState, salesPlanInputRevision } from './salesStageRules';
-import { normalizeSalesScripts, readSalesColorSelection } from './salesDraftMigration';
-import { reuseSalesPlanAssets } from './reuseSalesPlanAssets';
+import { reuseSalesPlanAssets } from './salesAssetHelpers';
 import type { VideoSalesScript } from '@shared/domain/video-sales';
 
 function fixture(): { state: VideoSalesStudioState; script: VideoSalesScript } {
@@ -42,6 +41,16 @@ describe('sales stage invalidation and migration', () => {
     expect(next.scripts[0].planStale).toBeUndefined();
     expect(next.scripts[0].finalizedRevision).toBeUndefined();
     expect(assertSalesPlanCurrent(next, next.scripts[0]).map((image) => image.index)).toEqual([4]);
+  });
+
+  it('changes the prompt model without staling the plan or deleting images', () => {
+    const { state } = fixture();
+    const next = invalidateSalesState(state, { selectedChatModel: 'another-chat' });
+    expect(next.selectedChatModel).toBe('another-chat');
+    expect(next.scripts[0].assets).toEqual(state.scripts[0].assets);
+    expect(next.scripts[0].planStale).toBeUndefined();
+    expect(next.scripts[0].finalizedRevision).toBeUndefined();
+    expect(next.scripts[0].renderTaskId).toBe('paid-task');
   });
 
   it('keeps legacy video results and receipts while requiring new color evidence and finalization', () => {

@@ -25,10 +25,13 @@ describe('video generation modes follow official capabilities', () => {
     ['viduq3-mix', ['omni']],
     ['viduq3-turbo', full],
     ['viduq3-pro', full],
+    ['viduq4-preview', full],
+    ['vidu-q4-preview', full],
+    ['viduq4', full],
     ['veo3.1', full],
     ['veo3.1-fast', full],
     ['omni_flash-10s', ['first_frame', 'text']],
-    ['grok-imagine-video-1.5', full],
+    ['grok-imagine-video-1.5', [...full, 'edit', 'extend']],
     ['sora-2', ['first_frame', 'text']],
     ['sora-2-pro', ['first_frame', 'text']],
   ])('%s exposes %j', (model, modes) => {
@@ -83,8 +86,18 @@ describe('video payloads keep frame roles exclusive', () => {
     } as const;
     for (const [refMode, path] of Object.entries(paths)) {
       const images = refMode === 'text' ? [] : refMode === 'first_frame' ? [first] : [first, last];
-      const request = buildVideoRequest({ ...base, model: 'viduq3-pro', refMode, images, duration: refMode === 'omni' ? 5 : 1 });
+      const request = buildVideoRequest({ ...base, model: 'viduq3-pro', refMode, images, duration: 5 });
       expect(request.endpoints('https://gateway.example').submit[0]).toContain(`/${path}`);
+      expect(request.payload.image).toBeUndefined();
+      expect(request.payload.resolution).toBe('720p');
+      if (refMode === 'first_frame') {
+        expect(request.payload.images).toEqual([first]);
+        expect(request.payload.aspect_ratio).toBeUndefined();
+      }
+      if (refMode === 'omni') {
+        expect(request.payload.images).toEqual([first, last]);
+        expect(request.payload.aspect_ratio).toBe('16:9');
+      }
     }
   });
 
@@ -122,6 +135,13 @@ describe('video payloads keep frame roles exclusive', () => {
     expect(frames.payload.image).toEqual({ url: first });
     expect(frames.payload.last_frame).toEqual({ url: last });
     expect(frames.payload.reference_images).toBeUndefined();
+    const edited = buildVideoRequest({ ...base, model: 'grok-imagine-video-1.5', refMode: 'edit', videos: [clip], duration: 5 });
+    expect(edited.payload).toEqual({ model: 'grok-imagine-video-1.5', prompt: '海边行走', video: { url: clip } });
+    expect(edited.endpoints('https://gateway.example').submit[0]).toContain('/xai/v1/videos/edits');
+    const extended = buildVideoRequest({ ...base, model: 'grok-imagine-video-1.5', refMode: 'extend', videos: [clip], duration: 6 });
+    expect(extended.payload.video).toEqual({ url: clip });
+    expect(extended.payload.duration).toBe(6);
+    expect(extended.endpoints('https://gateway.example').submit[0]).toContain('/xai/v1/videos/extensions');
   });
 
   it('rejects combinations the selected model does not implement', () => {

@@ -1,6 +1,6 @@
 import type { ProductCategoryOption } from '../hooks/deconstructQueueOps';
-import { topLevelCategories } from '../model/promptGroupCategory';
-import { deconstructSubcategoryOptions } from '../model/deconstructImportTarget';
+import { topLevelCategories } from '../model/promptGroupFolders';
+import { deconstructSubcategoryOptions } from '../model/deconstructJobs';
 
 export function DeconstructCategoryPicker({
   value,

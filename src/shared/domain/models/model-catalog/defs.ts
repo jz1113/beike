@@ -33,7 +33,7 @@ export interface ApprovedModel {
   defaultSize?: string;
   supportEdits?: boolean;
   supportedDurations?: number[];
-  supportedResolutions?: Array<'480P' | '720P' | '1080P' | '4K'>;
+  supportedResolutions?: Array<'480P' | '540P' | '720P' | '1080P' | '2K' | '4K'>;
   supportedAspectRatios?: string[];
   audioSupport?: VideoAudioSupportType;
 }

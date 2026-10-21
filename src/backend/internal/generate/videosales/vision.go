@@ -2,11 +2,17 @@ package videosales
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/system"
 )
 
 // chatWait matches the model gateway default and covers observed completions of about four minutes.
@@ -43,13 +49,14 @@ func postChatJSON(ctx context.Context, base, key string, body map[string]any, ti
 	if err != nil {
 		return "", raw, status, err
 	}
-	if chatFinishReason(raw) == "length" {
+	cleaned := cleanJSONFence(text)
+	if chatFinishReason(raw) == "length" && !json.Valid([]byte(cleaned)) {
 		return "", raw, status, errTruncatedOutput
 	}
-	if text == "" {
+	if cleaned == "" {
 		return "", raw, status, fmt.Errorf("模型没有返回内容")
 	}
-	return cleanJSONFence(text), raw, status, nil
+	return cleaned, raw, status, nil
 }
 
 func chatFinishReason(raw map[string]any) string {
@@ -65,4 +72,40 @@ func chatFinishReason(raw map[string]any) string {
 func withLongOutput(body map[string]any) map[string]any {
 	body["max_tokens"] = longOutputTokens
 	return body
+}
+
+func resolveCredentials(cfg config.Config, r *http.Request, payload map[string]any) (string, string) {
+	clientBase := strings.TrimSpace(generate.StringField(payload, "customBaseUrl"))
+	if clientBase == "" {
+		clientBase = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
+	}
+	clientKey := strings.TrimSpace(generate.StringField(payload, "customApiKey"))
+	if clientKey == "" {
+		clientKey = strings.TrimSpace(r.Header.Get("x-custom-api-key"))
+	}
+
+	base := system.NormalizeGatewayBaseURL(clientBase)
+	key := clientKey
+
+	if key == "" && !cfg.Production() {
+		key = strings.TrimSpace(os.Getenv("AI_API_KEY"))
+		if key == "" {
+			key = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+		}
+		if key == "" {
+			key = strings.TrimSpace(os.Getenv("GOOGLE_API_KEY"))
+		}
+	}
+
+	if base == "" {
+		base = strings.TrimSpace(os.Getenv("AI_API_BASE"))
+		if base == "" {
+			base = strings.TrimSpace(os.Getenv("OPENAI_API_BASE"))
+		}
+		if base == "" {
+			base = "https://api.openai.com"
+		}
+	}
+
+	return system.NormalizeGatewayBaseURL(base), key
 }

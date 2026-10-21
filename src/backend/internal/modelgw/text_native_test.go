@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,7 @@ import (
 	"testing"
 )
 
-const textTestPNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF1sAAAAASUVORK5CYII="
+var textTestPNG = textImageDataURL("image/png", textPNGFixture(1, 1, png.DefaultCompression))
 
 func textTestClone(t *testing.T, p map[string]any) map[string]any {
 	t.Helper()
@@ -112,7 +113,7 @@ func TestAnthropicJSONObjectKeepsOfficialMessagesShape(t *testing.T) {
 }
 
 func TestTextImageRemoteFailuresStaySafe(t *testing.T) {
-	png, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+	png, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(textTestPNG, "data:image/png;base64,"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -81,8 +81,26 @@ export function inferSalesCategory(text: string): VideoSalesCategory {
   return 'other';
 }
 
+const salesPricePropertyKey = /^(价格|售价|单价|促销价|券后价|到手价|活动价|price)$/i;
+
+export function omitSalesPriceProps(props: Record<string, string>): Record<string, string> {
+  const next: Record<string, string> = {};
+  for (const [key, value] of Object.entries(props)) {
+    if (!salesPricePropertyKey.test(key.trim())) next[key] = value;
+  }
+  return next;
+}
+
+export function omitSalesPriceClauses(text: string): string {
+  return text
+    .split(/[；;\n]/)
+    .map((part) => part.trim())
+    .filter((part) => part && !salesPricePropertyKey.test(part.split(/[:：]/, 1)[0]?.trim() || ''))
+    .join('；');
+}
+
 export function sellingPointsFromProps(props: Record<string, string>): string {
-  return Object.entries(props)
+  return Object.entries(omitSalesPriceProps(props))
     .filter(([key, value]) => key.trim() && value.trim())
     .slice(0, 8)
     .map(([key, value]) => `${key}：${value}`)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@client/store';
 import { subscribeAssetInvalidation } from '@client/shared/api/assetLibraryCache';
 import { fetchAssetLibraryOptions } from '../api/workshopResources';
+import { filterWorkshopLibrary } from '../model/workshopResourceRules';
 import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 
 export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?: () => void) {
@@ -27,7 +28,7 @@ export function useWorkshopAssetLocks(workspaceReady: boolean, onBindingApplied?
     setAssetLoadState('loading');
     setAssetLoadError('');
     try {
-      const { personas, scenes, outfits, actions, fullPrompts, productCategories } = await fetchAssetLibraryOptions(force);
+      const { personas, scenes, outfits, actions, fullPrompts, productCategories } = filterWorkshopLibrary(await fetchAssetLibraryOptions(force));
       if (id !== requestId.current) return;
       setAvailablePersonas(personas); setAvailableScenes(scenes); setAvailableOutfits(outfits);
       setAvailableActions(actions); setAvailableFullPrompts(fullPrompts);

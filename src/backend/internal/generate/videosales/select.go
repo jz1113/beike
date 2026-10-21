@@ -34,17 +34,14 @@ func Select(cfg config.Config) http.Handler {
 			workflowError(w, 400, err)
 			return
 		}
-		shots := parseSelectShots(payload)
-		catalog := parseCatalog(payload)
-		if workflowV3(payload) {
-			catalog, err = workflowCatalog(payload)
-			if err == nil {
-				shots, err = strictShots(payload, false, nil)
-			}
-			if err != nil {
-				httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
-				return
-			}
+		catalog, err := workflowCatalog(payload)
+		var shots []ScriptShot
+		if err == nil {
+			shots, err = strictShots(payload, false, nil)
+		}
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
+			return
 		}
 		if len(shots) == 0 {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "没有可配图的分镜"})
@@ -82,15 +79,7 @@ func Select(cfg config.Config) http.Handler {
 				}
 			}
 		}
-		if allowed, _ := payload["allowFallback"].(bool); !allowed || workflowV3(payload) || !generate.TextFallbackAllowed(r.Context(), model) {
-			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": failure})
-			return
-		}
-		assigned := AssignImageIndexes(shots, nil, len(catalog))
-		for i := range assigned {
-			assigned[i].SelectionReason = "模型不可用，按镜头顺序使用商品图"
-		}
-		writeAssignments(w, model, assigned, nil, true)
+		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": failure})
 	})
 }
 

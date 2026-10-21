@@ -62,11 +62,12 @@
 | `sora-2-pro` | video | openai | [OpenAI Videos API](https://platform.openai.com/docs/api-reference/videos) |
 | `MiniMax-H3` | video | minimax | [MiniMax 视频生成](https://platform.minimaxi.com/document/video_api_intro) |
 | `wan3.0-video` | video | alibaba | [通义万相视频生成](https://help.aliyun.com/zh/model-studio/wan-video) |
-| `grok-imagine-video-1.5` | video | xai | [xAI video generation](https://docs.x.ai/developers/model-capabilities/video/generation) |
-| `viduq3` | video | vidu | [Vidu API](https://platform.vidu.com/docs/api) |
-| `viduq3-mix` | video | vidu | [Vidu API](https://platform.vidu.com/docs/api) |
-| `viduq3-turbo` | video | vidu | [Vidu API](https://platform.vidu.com/docs/api) |
-| `viduq3-pro` | video | vidu | [Vidu API](https://platform.vidu.com/docs/api) |
+| `grok-imagine-video-1.5` | video | xai | [xAI Videos](https://docs.x.ai/developers/rest-api-reference/inference/videos) |
+| `viduq3` | video | vidu | [Vidu Q4 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md) |
+| `viduq3-mix` | video | vidu | [Vidu Q4 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md) |
+| `viduq3-turbo` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) |
+| `viduq3-pro` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) |
+| `viduq4-preview` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video)、[参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md) |
 | `multimodal-chat` | multimodal | chat | [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat) · [Anthropic Messages](https://docs.anthropic.com/en/api/messages) · [Gemini generateContent](https://ai.google.dev/api/generate-content) · [DeepSeek API](https://api-docs.deepseek.com/) · [Moonshot Kimi](https://platform.moonshot.cn/docs/api/chat) |
 
 ## 网关文档标识
@@ -114,6 +115,7 @@
 | `viduq3-mix` | `374481802` → `vidu-text2video`<br>`374481817` → `vidu-query` |
 | `viduq3-turbo` | `374481802` → `vidu-text2video`<br>`374481817` → `vidu-query` |
 | `viduq3-pro` | `374481802` → `vidu-text2video`<br>`374481817` → `vidu-query` |
+| `viduq4-preview` | `374481802` → `vidu-text2video`<br>`374481658` → `vidu-image2video`<br>`374481783` → `vidu-reference`<br>`374481785` → `vidu-start-end`<br>`374481817` → `vidu-query` |
 | `multimodal-chat` | `139393491` → `chat-completions`<br>`287782723` → `chat-stream`<br>`139453850` → `chat-vision`<br>`321040299` → `chat-video`<br>`287782788` → `chat-structured`<br>`223322111` → `chat-tools`<br>`228980408` → `claude-messages`<br>`350079690` → `gemini-official`<br>`321434971` → `responses-create` |
 
 ## 渠道显示

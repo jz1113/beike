@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { VideoSalesScript, VideoSalesShot } from '@shared/domain/video-sales';
 import { salesPreviewClass, salesRedrawnCount, salesRenderStatus, salesShotStatusLabel, type SalesRenderPhase } from '../model/salesWorkspace';
 import { salesSingleResultStatus } from '../model/salesWorkspaceView';
-import { salesCardClass, salesGhostButtonClass } from './salesSurface';
+import { salesCardClass, salesGhostButtonClass } from './salesChrome';
 
 interface Props {
   script: VideoSalesScript;
