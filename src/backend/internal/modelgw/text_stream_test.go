@@ -108,6 +108,37 @@ func TestTextOpenAIStreamToolsExtraContent(t *testing.T) {
 	}
 }
 
+func TestTextStreamAcceptsBufferedJSONCompletion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body["stream"] != true {
+			t.Errorf("stream %#v", body["stream"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}]}`)
+	}))
+	defer server.Close()
+	status, result, err := StreamText(context.Background(), TextRequest{BaseURL: server.URL, Payload: textTestPayload("gpt-test")}, nil)
+	if err != nil || status != 200 || textTestMessage(result)["content"] != "hello" {
+		t.Fatalf("status=%d result=%v err=%v", status, result, err)
+	}
+}
+
+func TestTextStreamRejectsNonJSONWhenSSEIsMissing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, "<html>timeout</html>")
+	}))
+	defer server.Close()
+	_, _, err := StreamText(context.Background(), TextRequest{BaseURL: server.URL, Payload: textTestPayload("gpt-test")}, nil)
+	if err == nil || !strings.Contains(err.Error(), "did not return SSE") {
+		t.Fatal(err)
+	}
+}
+
 func TestTextStreamHTTPProtocolAndPath(t *testing.T) {
 	for _, protocol := range []string{"gemini", "anthropic", "openai"} {
 		t.Run(protocol, func(t *testing.T) {

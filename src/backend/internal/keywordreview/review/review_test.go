@@ -108,6 +108,34 @@ func TestReviewSalvagesTruncatedRows(t *testing.T) {
 	}
 }
 
+func TestReviewReadsOpenAIEventStream(t *testing.T) {
+	content := `{"results":[["1","动物","制作","猫砂属于宠物用品",""]]}`
+	body := map[string]any{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		if json.Unmarshal(raw, &body) != nil {
+			t.Fatalf("body %s", raw)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		delta, _ := json.Marshal(map[string]any{
+			"choices": []any{map[string]any{"index": 0, "delta": map[string]any{"content": content}, "finish_reason": "stop"}},
+			"usage":   map[string]any{"total_tokens": 4},
+		})
+		_, _ = io.WriteString(w, "data: "+string(delta)+"\n\ndata: [DONE]\n\n")
+	}))
+	defer server.Close()
+	result, err := Review(context.Background(), server.Client(), Input{
+		BaseURL: server.URL, APIKey: "secret", Model: "deepseek-v4.1-flash", Provider: "gateway",
+		Rows: []Row{{ID: "row-1", Query: "猫砂"}},
+	})
+	if err != nil || len(result.Results) != 1 || result.Results[0]["id"] != "row-1" || result.Results[0]["category"] != "动物" {
+		t.Fatalf("result %#v err %v", result, err)
+	}
+	if body["stream"] != true {
+		t.Fatalf("stream %#v", body["stream"])
+	}
+}
+
 func TestReviewRejectsTruncationWithoutACompleteRow(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		encoded, _ := json.Marshal(map[string]any{

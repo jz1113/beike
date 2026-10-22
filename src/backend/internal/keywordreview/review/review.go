@@ -99,10 +99,10 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if input.TextProtocol != "" {
 		protocol = modelgw.ResolveTextProtocol(input.Model, input.TextProtocol)
 	}
-	status, data, callErr := modelgw.CompleteText(ctx, modelgw.TextRequest{
+	status, data, callErr := modelgw.StreamText(ctx, modelgw.TextRequest{
 		BaseURL: input.BaseURL, APIKey: input.APIKey, Protocol: protocol, Payload: payload,
 		Client: client, Timeout: 630 * time.Second,
-	})
+	}, nil)
 	provider := "DeepSeek"
 	if input.Provider == "gateway" {
 		provider = "模型网关"

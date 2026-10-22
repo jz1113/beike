@@ -14,8 +14,8 @@ func TestKeywordHTTPBodyProtocolReachesNativeReview(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		if r.URL.Path != "/v1beta/models/custom-vision:generateContent" || r.Header.Get("x-goog-api-key") != "secret" {
-			t.Errorf("request %s", r.URL.Path)
+		if r.URL.Path != "/v1beta/models/custom-vision:streamGenerateContent" || r.URL.RawQuery != "alt=sse" || r.Header.Get("x-goog-api-key") != "secret" {
+			t.Errorf("request %s?%s", r.URL.Path, r.URL.RawQuery)
 		}
 		_, _ = w.Write([]byte(`{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"{\"results\":[[\"1\",\"动物\",\"制作\",\"猫砂属于宠物用品\",\"\"]]}"}]}}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":2,"totalTokenCount":3}}`))
 	}))

@@ -13,8 +13,8 @@ func TestReviewGeminiNativePreservesTruncatedRows(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		if r.URL.Path != "/v1beta/models/gemini-2.5-flash:generateContent" || r.Header.Get("x-goog-api-key") != "secret" {
-			t.Errorf("native request %s", r.URL.Path)
+		if r.URL.Path != "/v1beta/models/gemini-2.5-flash:streamGenerateContent" || r.URL.RawQuery != "alt=sse" || r.Header.Get("x-goog-api-key") != "secret" {
+			t.Errorf("native request %s?%s", r.URL.Path, r.URL.RawQuery)
 		}
 		var request map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&request)

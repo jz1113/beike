@@ -141,10 +141,7 @@ func requestText(ctx context.Context, req TextRequest, stream bool, onDelta func
 		}
 		return status, data, fmt.Errorf("text upstream HTTP %d: %s", status, textSafeError(errors.New(upstreamMessage(data, status)), req.APIKey))
 	}
-	if stream {
-		if !strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
-			return status, nil, errors.New("text upstream did not return SSE")
-		}
+	if stream && strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
 		data, err := readTextStream(response.Body, protocol, model, onDelta)
 		if err == nil {
 			err = validateNativeTextJSON(protocol, req.Payload, data)
@@ -154,8 +151,12 @@ func requestText(ctx context.Context, req TextRequest, stream bool, onDelta func
 		}
 		return status, data, nil
 	}
+	// A finished JSON completion is accepted when a stream request is not served as SSE.
 	data, err := readTextJSON(response.Body)
 	if err != nil {
+		if stream {
+			return status, nil, errors.New("text upstream did not return SSE")
+		}
 		return status, nil, err
 	}
 	if data["error"] != nil {
