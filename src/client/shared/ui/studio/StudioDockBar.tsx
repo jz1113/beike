@@ -5,11 +5,12 @@ interface Props {
   label: string;
 }
 
-const neutral = '!border-slate-200 !bg-white !text-slate-950 shadow-sm hover:!border-slate-300 hover:!bg-slate-50';
+const neutral =
+  '!border-slate-200/80 !bg-white/90 !text-slate-900 shadow-sm backdrop-blur hover:!border-slate-300 hover:!bg-white dark:!border-white/10 dark:!bg-[#1B1B1E]/90 dark:!text-slate-200 dark:hover:!border-white/20 dark:hover:!bg-[#26262B] dark:hover:!text-white';
 
 export function studioDockClass(active: boolean) {
   return active
-    ? '!border-indigo-600 !bg-indigo-600 !text-white shadow-sm shadow-indigo-500/25 hover:!border-indigo-600 hover:!bg-indigo-600 hover:!text-white'
+    ? '!border-indigo-600 !bg-indigo-600 !text-white shadow-sm shadow-indigo-500/30 hover:!border-indigo-500 hover:!bg-indigo-500 hover:!text-white dark:!border-indigo-500 dark:!bg-indigo-600 dark:shadow-indigo-500/40'
     : neutral;
 }
 

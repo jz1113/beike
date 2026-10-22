@@ -149,9 +149,7 @@ function DockLabel({
           animate={{ opacity: 1, y: isBottom ? 2 : -10 }}
           exit={{ opacity: 0, y: isBottom ? -4 : 0 }}
           transition={{ duration: reducedMotion ? 0 : 0.2 }}
-          className={`${className} absolute ${isBottom
-            ? 'top-[calc(100%+8px)] text-[11px] font-medium leading-none text-slate-500 dark:text-slate-400'
-            : '-top-6 rounded-md border border-[#3a3540] bg-[#201d25] px-2 py-0.5 text-xs text-white shadow-lg'} left-1/2 w-fit whitespace-pre`}
+          className={`${className} pointer-events-none absolute z-50 rounded-lg border border-slate-200/90 bg-white/95 px-2 py-1 text-[11px] font-medium text-slate-800 shadow-md backdrop-blur dark:border-white/10 dark:bg-[#1B1B1E]/95 dark:text-slate-100 ${isBottom ? 'top-[calc(100%+8px)]' : '-top-8'} left-1/2 w-fit whitespace-pre`}
           role="tooltip"
           style={{ x: '-50%' }}
         >
