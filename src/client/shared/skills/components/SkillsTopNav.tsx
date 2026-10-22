@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, X, Plus, ChevronDown } from 'lucide-react';
-import { type SkillMainTab, CreateSkillDropdown } from '@client/shared/skills';
+import type { SkillMainTab } from '../model/skillTypes';
+import { CreateSkillDropdown } from './CreateSkillDropdown';
 
 interface SkillsTopNavProps {
   activeTab: SkillMainTab;

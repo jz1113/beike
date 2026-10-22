@@ -191,18 +191,21 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
       const promptTokens = item.promptTokens || 0;
       const completionTokens = item.completionTokens || 0;
       const totalTokens = item.totalTokens || (promptTokens + completionTokens) || 0;
-      const taskId = item.taskId?.trim();
-      if (taskId) {
-        const existing = logs.find(log => log.taskId === taskId);
-        if (existing) {
-          if (totalTokens > 0 && !(existing.totalTokens || 0)) {
-            existing.promptTokens = promptTokens;
-            existing.completionTokens = completionTokens;
-            existing.totalTokens = totalTokens;
-            safeSaveUsageLogs(logs);
-          }
-          return;
+      const taskId = item.taskId?.trim() || undefined;
+      const localTaskId = item.localTaskId?.trim() || undefined;
+      const existing = logs.find((log) => (localTaskId && log.localTaskId === localTaskId) || (taskId && log.taskId === taskId));
+      if (existing) {
+        let changed = false;
+        if (taskId && !existing.taskId) { existing.taskId = taskId; changed = true; }
+        if (localTaskId && !existing.localTaskId) { existing.localTaskId = localTaskId; changed = true; }
+        if (totalTokens > 0 && !(existing.totalTokens || 0)) {
+          existing.promptTokens = promptTokens;
+          existing.completionTokens = completionTokens;
+          existing.totalTokens = totalTokens;
+          changed = true;
         }
+        if (changed) safeSaveUsageLogs(logs);
+        return;
       }
       const calculatedCostUsd = item.costUsd !== undefined
         ? item.costUsd
@@ -225,6 +228,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
         id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         timestamp: item.timestamp ?? Date.now(),
         ...(taskId ? { taskId } : {}),
+        ...(localTaskId ? { localTaskId } : {}),
         modelId: item.modelId,
         modelName: item.modelName || item.modelId,
         provider: vendor,

@@ -14,6 +14,9 @@ export type SkillCategory = typeof SKILL_CATEGORIES[number];
 
 export interface SkillItem {
   id: string;
+  runtime?: 'assistant' | 'workshop';
+  libraryVersion?: string;
+  isOfficial?: boolean;
   title: string;
   description: string;
   models: string;

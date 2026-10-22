@@ -64,6 +64,11 @@ function dateKeyOf(timestamp: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+export function usageLogsInRange(logs: UsageLogItem[], range: UsageRange, now = Date.now()) {
+  const cutoff = rangeCutoff(range, now);
+  return logs.filter((log) => Number.isFinite(log.timestamp) && log.timestamp >= cutoff && log.timestamp <= now);
+}
+
 function rangeCutoff(range: UsageRange, now: number) {
   if (range === 'all') return Number.NEGATIVE_INFINITY;
   if (range === 'today') {

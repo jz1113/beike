@@ -26,6 +26,9 @@ function normalizeUsedSkill(value: unknown): AssistantMessage['usedSkill'] {
   if (!isRecord(value) || typeof value.name !== 'string' || typeof value.skillId !== 'string' || typeof value.systemPrompt !== 'string') return undefined;
   return {
     name: value.name, skillId: value.skillId, systemPrompt: value.systemPrompt,
+    libraryVersion: optionalText(value.libraryVersion),
+    resources: Array.isArray(value.resources) ? value.resources.flatMap(file =>
+      isRecord(file) && typeof file.path === 'string' && typeof file.content === 'string' ? [{ path: file.path, content: file.content }] : []) : undefined,
     allowedTools: Array.isArray(value.allowedTools) ? value.allowedTools.filter((tool): tool is string => typeof tool === 'string') : undefined,
   };
 }

@@ -1,3 +1,4 @@
+import type { OutputRating } from '@shared/contracts/categorySkills';
 import { BatchDeliveryStatus } from '../BatchDeliveryStatus';
 import { isDeliverableWorkshopResult, isUsableWorkshopResult, summarizeWorkshopResults } from '../../model/generation/workshopReadiness';
 import { useState } from 'react';
@@ -61,7 +62,7 @@ interface Props {
   onBackToPrompts?: () => void;
   onContinueGeneration?: () => Promise<void>;
   pipelineStatus?: string;
-  onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => void;
+  onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected', rating?: OutputRating) => void;
   onAcknowledgeRecovery?: () => void;
 }
 

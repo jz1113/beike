@@ -1,5 +1,6 @@
 import type { BrandKitProfile } from '@shared/domain/products/brandKitModels';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
+import type { SkillLibrary } from '@shared/domain/skills/library';
 import type { ShotPrompt, PreviousGroupSignature } from '@shared/domain/prompts/vision';
 import type { OriginalLookParts, OriginalProductRole } from '@shared/domain/media/drawing';
 import type { ProductImage, ProductData } from '@client/types/product';
@@ -329,11 +330,14 @@ export interface BrandKitSlice {
 
 export interface AssistantSkillSlice {
   assistantCustomSkills: AssistantSkill[];
+  assistantSkillsError: string | null;
+  refreshAssistantSkills: () => Promise<SkillLibrary>;
   activeAssistantSkillId: string | null;
+  activeAssistantSkillSnapshot: AssistantSkill | null;
   setActiveAssistantSkillId: (id: string | null) => void;
-  addAssistantSkill: (skill: AssistantSkill) => void;
-  updateAssistantSkill: (id: string, updates: Partial<AssistantSkill>) => void;
-  deleteAssistantSkill: (id: string) => void;
+  addAssistantSkill: (skill: AssistantSkill) => Promise<void>;
+  updateAssistantSkill: (id: string, updates: Partial<AssistantSkill>) => Promise<void>;
+  deleteAssistantSkill: (id: string) => Promise<void>;
   getAllAssistantSkills: () => AssistantSkill[];
   getActiveAssistantSkill: () => AssistantSkill | null;
   importAssistantSkillFromFile: (file: File) => Promise<AssistantSkill>;

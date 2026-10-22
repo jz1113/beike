@@ -8,6 +8,7 @@ import (
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
 	want := map[string]string{
+		"20261022_02_category_skill_learning":                  "b20605ae7eb2e506603ecfce03658b2d6515868bdbcc9b0a6ee009f5df8b75eb",
 		"20260913_01_desktop_baseline":                         "c108512db8bd1bd145787d220ac013bb1d7533c6170ff3b130df9d8faf7a7962",
 		"20260913_02_library_order_indexes":                    "5be8c7031bb2191647e9a6747a82bb16dc83f05718c943140406eb57d040c446",
 		"20260915_01_asset_organization":                       "fb09704a01fc01da213b2989d98e6604c588fb9935bb09a0f4680a46f3897cc2",
@@ -33,6 +34,7 @@ func TestChecksumsMatchNodeLedger(t *testing.T) {
 		"20261018_01_avatar_studio":                            "67904d61ea56444e812df3abb9eff00867ce1e27f458a729db6b5490db9e941b",
 		"20261018_02_task_usage":                               "7a252a01e2e6f478d9dbd817b30ad4829d74f626c3f94100f08d4398fadf90d2",
 		"20261019_01_cover_memory":                             "9759d310bb51c550b68479b04ca4770984a2ba7a4c0a3fcdfc3c48cd8fffa85a",
+		"20261022_01_skill_library":                            "96b1132fa80e6b6a132545e7963703aae8606d6ac3ce8fd7dbb9df8bb0130042",
 	}
 	items := mustMigrations()
 	if len(items) != len(want) {

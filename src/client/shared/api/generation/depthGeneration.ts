@@ -273,6 +273,8 @@ export async function submitDepthVideo(
   const data = await postDepthFile('/api/generate/depth-video', form, signal, operationId);
   if (!data.taskId) throw generationRecoveryError(SUBMISSION_RECOVERY_HINT);
   recordModelUsage({
+    localTaskId: operationId,
+    taskId: data.taskId,
     modelId: 'depth-video',
     modelName: `深度动作捕捉 (${style})`,
     provider: '本地算力 / 视频生成',

@@ -55,12 +55,14 @@ describe('cover feed model picker', () => {
     expect(html).not.toContain('暂无已启用的模型');
   });
 
-  it('renders both channel choices in the real shared menu', async () => {
+  it('groups the selected channel and offers a switch instead of raw ids', async () => {
     const actual = await vi.importActual<typeof import('@client/shared/prompt-bar/controls/PromptBarModelPickerModal')>('@client/shared/prompt-bar/controls/PromptBarModelPickerModal');
     const { picker } = render();
     const html = renderToStaticMarkup(createElement(actual.PromptBarModelPickerModal, { ...picker, isOpen: true }));
-    expect(html).toContain('gpt-4o-mini · 渠道甲');
-    expect(html).toContain('gpt-4o-mini · 渠道乙');
+    expect(html).toContain('切换渠道');
+    expect(html).toContain('渠道乙');
+    expect(html).toContain('GPT 4o');
+    expect(html).not.toContain('gpt-4o-mini · 渠道甲');
     expect(html).not.toContain('渠道已移除');
   });
 

@@ -89,7 +89,7 @@ export function buildSkillFromStudio(payload: SkillStudioPayload, options: Build
   const files = flattenFiles(payload.files).filter((file) => file.content.trim());
   return {
     ...parsed,
-    id: options.id || `custom_skill_${now}`,
+    id: options.id || `custom_skill_${crypto.randomUUID()}`,
     name: slug,
     displayName: title,
     description,

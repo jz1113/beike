@@ -30,8 +30,8 @@ describe('cover vision models', () => {
       { ...base, selectionId: 'vision-b', channel: '渠道乙' },
       { ...base, selectionId: 'missing-channel', channel: '渠道已移除', unavailable: true },
     ])).toEqual([
-      { id: 'vision-a', upstreamId: 'gpt-4o-mini', name: 'GPT 4o Mini · 渠道甲', desc: '封面视觉反推' },
-      { id: 'vision-b', upstreamId: 'gpt-4o-mini', name: 'GPT 4o Mini · 渠道乙', desc: '封面视觉反推' },
+      { id: 'vision-a', upstreamId: 'gpt-4o-mini', name: 'GPT 4o Mini · 渠道甲', desc: '封面视觉反推', provider: '渠道甲' },
+      { id: 'vision-b', upstreamId: 'gpt-4o-mini', name: 'GPT 4o Mini · 渠道乙', desc: '封面视觉反推', provider: '渠道乙' },
     ]);
     expect(coverVisionPickerModels([])).toEqual([]);
     expect(coverVisionPickerModels([{ ...base, channel: '' }])[0].name).toBe('GPT 4o Mini');

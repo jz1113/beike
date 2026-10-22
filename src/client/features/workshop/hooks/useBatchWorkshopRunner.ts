@@ -43,7 +43,7 @@ export function useBatchWorkshopRunner() {
   const [batchInputText, setBatchInputText] = useState('');
   const { items, itemsRef, setItems } = useLiveItems();
 
-  // 配方库（拍摄架构与全局 store 同步，支持资产中心「载入配方」）
+  // 配方库（工坊技能与全局 store 同步，支持资产中心「载入配方」）
   const selectedArchId = useAppStore((s) => s.selectedArchId);
   const setSelectedArchId = useAppStore((s) => s.setSelectedArchId);
   const originalAnchorFaceImageUrl = useAppStore((s) => (
@@ -132,7 +132,7 @@ export function useBatchWorkshopRunner() {
   const successfulItems = items.filter((i) => i.status === 'success' && i.selected);
 
   const { isCollecting, collectProgress, collectInFlight, handleRemoveItem, handleParseInput, startBatchCollect } = useBatchCollection({
-    items, itemsRef, setItems, batchInputText, setBatchInputText, showToast,
+    items, itemsRef, setItems, batchInputText, setBatchInputText, showToast, onCollected: () => setCurrentStage(stage => stage === 1 ? 2 : stage),
   });
 
   const { toggleProductImageSelection, batchSetProductImages } = useBatchImageSelection(setItems);

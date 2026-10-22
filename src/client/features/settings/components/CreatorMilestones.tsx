@@ -11,7 +11,7 @@ const RANGES: { id: UsageRange; label: string }[] = [
 ];
 
 function formatTokens(value: number) {
-  return value > 0 ? value.toLocaleString() : '—';
+  return value.toLocaleString();
 }
 
 export function CreatorMilestones({

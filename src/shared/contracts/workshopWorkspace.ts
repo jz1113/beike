@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { learningContextSchema, outputReviewScoresSchema } from './categorySkills';
 import { workshopPipelineStateSchema } from './workshopPipeline';
 
 export const workspaceIdSchema = z.literal('original');
@@ -30,6 +31,8 @@ const task = z.object({
   outputSize: outputSize.optional(),
   generationSize: z.string().optional(),
   attempt: z.number().int().min(0).optional(),
+  learningContext: learningContextSchema.optional(),
+  outputRating: z.object({ scores: outputReviewScoresSchema, note: z.string().max(2000).optional() }).optional(),
   outputReview: z.enum(['unreviewed', 'accepted', 'retry_requested', 'rejected']).default('unreviewed'),
 });
 

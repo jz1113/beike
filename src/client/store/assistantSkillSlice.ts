@@ -1,5 +1,7 @@
 import { migrateTravelCopySkill } from './migrateTravelCopySkill';
 import { StateCreator } from 'zustand';
+import { announceSkillLibraryChange, loadSkillLibrary, saveSkillDocument, deleteSkillDocument } from '@client/shared/api/skillLibrary';
+import { loadSkillFavorites } from '@client/shared/skills/model/skillTypes';
 import type { AppState, AssistantSkillSlice } from '@client/store/types';
 import type { AssistantSkill, AssistantSkillFile, AssistantSkillMeta } from '@shared/domain/assistant/skills/types';
 import {
@@ -9,7 +11,6 @@ import {
 } from '@shared/domain/assistant/skills';
 
 const SKILLS_STORAGE_KEY = 'azhuo_assistant_skills_vault';
-const ACTIVE_SKILL_STORAGE_KEY = 'azhuo_active_assistant_skill_id';
 const builtinIds = new Set(BUILTIN_ASSISTANT_SKILLS.map((skill) => skill.id));
 const SKILL_GENRES = new Set(['视频', '图片', '音频', '文本']);
 const MAX_SKILL_FILE_CHARS = 256 * 1024;
@@ -97,11 +98,13 @@ function loadStoredSkills(): AssistantSkill[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const valid: AssistantSkill[] = [];
+    const favorites = loadSkillFavorites();
     for (const skill of parsed) {
       if (!skill || typeof skill.id !== 'string' || skill.isBuiltin
         || typeof skill.name !== 'string' || typeof skill.prompt !== 'string') continue;
       try {
-        valid.push(migrateTravelCopySkill(normalizeCustomSkill(skill)));
+        const migrated = migrateTravelCopySkill(normalizeCustomSkill({ ...skill, isFavorite: skill.isFavorite || favorites.has(skill.id) }));
+        valid.push({ ...migrated, createdAt: skill.createdAt || 1, updatedAt: skill.updatedAt || skill.createdAt || 1 });
       } catch {}
     }
     return valid;
@@ -110,33 +113,42 @@ function loadStoredSkills(): AssistantSkill[] {
   }
 }
 
-function persistSkills(customSkills: AssistantSkill[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(SKILLS_STORAGE_KEY, JSON.stringify(customSkills));
-    // 技能库持久保存；待发送消息的选择不跨应用启动恢复。
-    localStorage.removeItem(ACTIVE_SKILL_STORAGE_KEY);
-  } catch {}
-}
-
 export type { AssistantSkillSlice } from '@client/store/types';
 
 export const createAssistantSkillSlice: StateCreator<AppState, [], [], AssistantSkillSlice> = (set, get) => {
-  const initialCustom = loadStoredSkills();
-  persistSkills(initialCustom);
+  let refreshEpoch = 0;
 
   return {
-    assistantCustomSkills: initialCustom,
+    assistantCustomSkills: [],
+    assistantSkillsError: null,
     activeAssistantSkillId: null,
+    activeAssistantSkillSnapshot: null,
+
+    refreshAssistantSkills: async () => {
+      const epoch = ++refreshEpoch;
+      try {
+        const library = await loadSkillLibrary(loadStoredSkills());
+        if (epoch === refreshEpoch) {
+          const skills = library.skills.flatMap(entry => entry.kind === 'assistant' ? [entry.content] : []);
+          const activeId = get().activeAssistantSkillId;
+          set({ assistantCustomSkills: skills, assistantSkillsError: null,
+            activeAssistantSkillId: activeId && !skills.some(skill => skill.id === activeId) && !builtinIds.has(activeId) ? null : activeId });
+        }
+        return library;
+      } catch (error) {
+        if (epoch === refreshEpoch) set({ assistantSkillsError: error instanceof Error ? error.message : '技能库加载失败' });
+        throw error;
+      }
+    },
 
     setActiveAssistantSkillId: (id) => {
       const all = mergeAssistantSkills(get().assistantCustomSkills, BUILTIN_ASSISTANT_SKILLS);
       const nextId = id && all.some((s) => s.id === id) ? id : null;
-      set({ activeAssistantSkillId: nextId });
-      persistSkills(get().assistantCustomSkills);
+      set({ activeAssistantSkillId: nextId, activeAssistantSkillSnapshot: all.find(skill => skill.id === nextId) || null });
     },
 
-    addAssistantSkill: (skill) => {
+    addAssistantSkill: async (skill) => {
+      await loadSkillLibrary(loadStoredSkills());
       const now = Date.now();
       const normalized: AssistantSkill = {
         ...normalizeCustomSkill(skill),
@@ -144,31 +156,31 @@ export const createAssistantSkillSlice: StateCreator<AppState, [], [], Assistant
         createdAt: skill.createdAt || now,
         updatedAt: now,
       };
-      const updated = [
-        normalized,
-        ...get().assistantCustomSkills.filter((s) => s.id !== normalized.id),
-      ];
-      set({ assistantCustomSkills: updated, activeAssistantSkillId: normalized.id });
-      persistSkills(updated);
+      const saved = await saveSkillDocument(normalized, true);
+      ++refreshEpoch;
+      set({ assistantCustomSkills: [saved, ...get().assistantCustomSkills.filter(s => s.id !== saved.id)] });
+      announceSkillLibraryChange();
     },
 
-    updateAssistantSkill: (id, updates) => {
+    updateAssistantSkill: async (id, updates) => {
       const target = get().assistantCustomSkills.find((s) => s.id === id);
       if (!target || target.isBuiltin) return;
-      const updated = get().assistantCustomSkills.map((s) =>
-        s.id === id ? normalizeCustomSkill({ ...s, ...updates, id: s.id, isBuiltin: false, updatedAt: Date.now() }) : s,
-      );
-      set({ assistantCustomSkills: updated });
-      persistSkills(updated);
+      const saved = await saveSkillDocument(normalizeCustomSkill({ ...target, ...updates, id, isBuiltin: false, updatedAt: Date.now() }), false);
+      ++refreshEpoch;
+      set({ assistantCustomSkills: get().assistantCustomSkills.map(s => s.id === id ? saved : s) });
+      announceSkillLibraryChange();
     },
 
-    deleteAssistantSkill: (id) => {
+    deleteAssistantSkill: async (id) => {
       const target = [...get().assistantCustomSkills, ...BUILTIN_ASSISTANT_SKILLS].find((s) => s.id === id);
       if (!target || target.isBuiltin) return;
+      await deleteSkillDocument(target);
+      ++refreshEpoch;
       const updated = get().assistantCustomSkills.filter((s) => s.id !== id);
       const nextActive = get().activeAssistantSkillId === id ? null : get().activeAssistantSkillId;
-      set({ assistantCustomSkills: updated, activeAssistantSkillId: nextActive });
-      persistSkills(updated);
+      set({ assistantCustomSkills: updated, activeAssistantSkillId: nextActive,
+        activeAssistantSkillSnapshot: nextActive ? get().activeAssistantSkillSnapshot : null });
+      announceSkillLibraryChange();
     },
 
     getAllAssistantSkills: () =>
@@ -177,6 +189,7 @@ export const createAssistantSkillSlice: StateCreator<AppState, [], [], Assistant
     getActiveAssistantSkill: () => {
       const activeId = get().activeAssistantSkillId;
       if (!activeId) return null;
+      if (get().activeAssistantSkillSnapshot?.id === activeId) return get().activeAssistantSkillSnapshot;
       return get().getAllAssistantSkills().find((s) => s.id === activeId) || null;
     },
 
@@ -185,7 +198,7 @@ export const createAssistantSkillSlice: StateCreator<AppState, [], [], Assistant
       const content = await file.text();
       const { skill } = parseSkillFileContent(content, file.name);
       const normalized = normalizeCustomSkill(skill);
-      get().addAssistantSkill(normalized);
+      await get().addAssistantSkill(normalized);
       return normalized;
     },
   };

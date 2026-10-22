@@ -1,3 +1,4 @@
+import type { OutputRating } from '@shared/contracts/categorySkills';
 import type { WorkshopBatchEvent } from '@shared/contracts/workshopPipeline';
 import { apiRequest } from '@client/shared/api/apiRequest';
 
@@ -16,7 +17,7 @@ export async function dispatchBatchEvent(batchId: string, revision: number, even
 
 export async function reviewWorkshopTask(
   taskId: string,
-  body: { decision: 'accepted' | 'retry_requested' | 'rejected'; note?: string },
+  body: { decision: 'accepted' | 'retry_requested' | 'rejected'; scores?: OutputRating['scores']; note?: string },
 ) {
   const response = await apiRequest('POST', '/api/workshop/tasks/{taskId}/review', {
     pathParams: { taskId },

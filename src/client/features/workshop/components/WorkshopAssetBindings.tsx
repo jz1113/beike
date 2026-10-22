@@ -112,7 +112,7 @@ function WorkshopGroupPicker({ value, onChange, groups, products, noPeople, scop
       coverUrl: selectedOutsideScope.coverUrl || null,
       displayNumber: selectedOutsideScope.displayNumber || null,
       disabled: true,
-      reason: '请重新选择当前文件夹与拍摄架构内的母本',
+      reason: '请重新选择当前文件夹与工坊技能内的母本',
     }] : []),
     ...fixedOptions,
   ];
@@ -260,13 +260,13 @@ export function WorkshopAssetBindings(props: {
       <WorkshopGroupPicker value={props.groupId} onChange={props.onGroupChange} groups={scopedGroups} products={props.products || []} noPeople={noPeople} scopeKnown={scopeKnown} selectedOutsideScope={groupOutsideScope ? group : undefined} onOpenLibrary={() => props.onOpenAssets?.('full_prompt')} />
       <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">复用母本的四镜顺序、构图与描述；生成图片以本批次商品图为商品身份参考，母本原图不直接提交生图。</p>
       {groupsNeedingReview.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700">{groupsNeedingReview.slice(0, 4).map(item => fullPromptGroupLabel(item.displayNumber)).join('、')}{groupsNeedingReview.length > 4 ? `等 ${groupsNeedingReview.length} 组` : ''}的文件夹归属与内容不一致，已暂停轮换；请到资产库核对细分文件夹。</p>}
-      {scopeKnown && scopedGroups.length === 0 && !invalidFolder && <p className="mt-2 text-xs leading-5 text-amber-700">当前文件夹与拍摄架构下暂无已发布完整四图母本，请调整文件夹或在资产库补充母本。</p>}
+      {scopeKnown && scopedGroups.length === 0 && !invalidFolder && <p className="mt-2 text-xs leading-5 text-amber-700">当前文件夹与工坊技能下暂无已发布完整四图母本，请调整文件夹或在资产库补充母本。</p>}
       {invalidFolder
-        ? <p className="mt-2 text-xs leading-5 text-amber-700">原母本文件夹已删除或与当前拍摄架构不符，请重新选择。</p>
+        ? <p className="mt-2 text-xs leading-5 text-amber-700">原母本文件夹已删除或与当前工坊技能不符，请重新选择。</p>
         : incompatibleGroupSelection
         ? <p className="mt-2 text-xs leading-5 text-amber-700">当前设置为无人像出镜，已锁定的图组含人物镜头或出镜类型待判定，无法用于本批次。请重新选择全组无人物母本或无人物自动轮换。</p>
         : groupOutsideScope
-        ? <p className="mt-2 text-xs leading-5 text-amber-700">已选母本不属于当前文件夹或拍摄架构，请更换图组或调整母本文件夹。</p>
+        ? <p className="mt-2 text-xs leading-5 text-amber-700">已选母本不属于当前文件夹或工坊技能，请更换图组或调整母本文件夹。</p>
         : fixedGroupConflict
         ? <p className="mt-2 text-xs leading-5 text-amber-700">当前固定图组不适配本批次：{fixedGroupConflict}。请更换图组或在资产库核对分类。</p>
         : !automatic && !group

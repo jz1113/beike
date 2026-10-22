@@ -1,4 +1,4 @@
-import type { SkillItem } from '@client/shared/skills';
+import type { SkillItem } from '../model/skillTypes';
 import { SkillCard } from './SkillCard';
 import { SkillsEmptyState } from './SkillsEmptyState';
 
@@ -8,6 +8,10 @@ interface SkillsCardGridProps {
   onToggleFavorite: (id: string) => void;
   onUseSkill: (skill: SkillItem) => void;
   emptyMessage?: string;
+  onDetail: (skill: SkillItem) => void;
+  onEdit: (skill: SkillItem) => void;
+  onDelete: (skill: SkillItem) => void;
+  onFeed: (skill: SkillItem) => void;
 }
 
 export function SkillsCardGrid({
@@ -16,6 +20,7 @@ export function SkillsCardGrid({
   onToggleFavorite,
   onUseSkill,
   emptyMessage,
+  onDetail, onEdit, onDelete, onFeed,
 }: SkillsCardGridProps) {
   if (skills.length === 0) {
     return <SkillsEmptyState message={emptyMessage} />;
@@ -30,6 +35,7 @@ export function SkillsCardGrid({
           isFavorite={favorites.has(skill.id)}
           onToggleFavorite={onToggleFavorite}
           onUseSkill={onUseSkill}
+          onDetail={onDetail} onEdit={onEdit} onDelete={onDelete} onFeed={onFeed}
         />
       ))}
     </div>

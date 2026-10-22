@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeywordReviewMode } from '@shared/contracts/generate';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
+import { resolveKeywordReviewRoute, resolveStoredKeywordReviewModel } from '@client/shared/models/keywordReviewModels';
+import { keywordReviewReasoning } from '../model/keywordReviewReasoning';
 import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 import { exportReviewedWorkbook, parseKeywordWorkbook, parseKeywordWorkbookData } from '../model/keywordReviewWorkbook';
-import { advanceKnownFailureVersions, applyBatchResults, isKnownModelOutputFailure, updateReviewRecords } from '../model/reviewProgress';
+import { advanceAutomaticRetryVersions, applyBatchResults, isAutomaticRetryRecord, updateReviewRecords } from '../model/reviewProgress';
 import { DEEPSEEK_BASE_URL } from '../model/reviewRequest';
 import { runKeywordReviewBatches } from '../model/reviewRun';
 import { prepareReviewRun } from '../model/reviewRunPreparation';
@@ -109,19 +111,41 @@ export function useKeywordReview() {
 
   const runReview = async (mode: 'trial' | 'all' = 'trial') => {
     if (busy() || !session.canStart() || records.length === 0) return;
-    const candidates = records.filter((record) => record.status === 'idle' || (mode === 'all' && isKnownModelOutputFailure(record)));
-    if (!candidates.length) { setNotice(counts.failed ? '没有待审核记录；已确认失败的记录可单独选择重审' : '所有记录都已完成审核'); return; }
+    const candidates = records.filter((record) => record.status === 'idle' || (mode === 'all' && isAutomaticRetryRecord(record)));
+    if (!candidates.length) {
+      setNotice(counts.uncertain
+        ? '没有可继续的记录；提交结果无法确认的待核对记录仍保持隔离'
+        : counts.failed
+          ? '没有待审核记录；已确认失败的记录可单独选择重审'
+          : '所有记录都已完成审核');
+      return;
+    }
     runStartingRef.current = true; setIsPreparing(true);
     const version = inputVersionRef.current;
     const runModel = selectedModel;
-    const baseUrl = runModel.provider === 'deepseek' ? DEEPSEEK_BASE_URL : getGatewayClientOverrides().customBaseUrl || 'https://ai.comfly.org';
+    let route: ReturnType<typeof resolveKeywordReviewRoute>;
+    try { route = resolveKeywordReviewRoute(runModel); }
+    catch (error) {
+      finishPreparing(); setNotice(error instanceof Error ? error.message : '审核准备失败，未发起审核请求'); return;
+    }
+    const baseUrl = route.provider === 'deepseek'
+      ? DEEPSEEK_BASE_URL
+      : route.baseUrl || getGatewayClientOverrides().customBaseUrl || 'https://ai.comfly.org';
+    const reasoningEffort = keywordReviewReasoning(route.model, route.textProtocol);
+    const requestModel = { ...runModel, model: route.model, provider: route.provider, textProtocol: route.textProtocol, reasoningEffort };
     let apiKey: string;
     let rulesVersion: number;
     try {
-      ({ apiKey, rulesVersion } = await prepareReviewRun(runModel.provider, session.taskRef.current.context.rulesVersion));
+      ({ apiKey, rulesVersion } = await prepareReviewRun(route, session.taskRef.current.context.rulesVersion));
       if (!mountedRef.current || version !== inputVersionRef.current) { finishPreparing(); return; }
-      advanceKnownFailureVersions(candidates, recordIndicesRef.current, batchRetryVersionsRef.current);
-      setContext({ rulesVersion, usageProvider: runModel.provider, modelValue: runModel.value, settings,
+      advanceAutomaticRetryVersions(candidates, recordIndicesRef.current, batchRetryVersionsRef.current);
+      const releasing = candidates.filter((record) => record.status === 'error').map((record) => record.id);
+      if (releasing.length) {
+        setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, releasing, (record) => ({
+          ...record, status: 'idle', error: undefined, submissionUncertain: false,
+        })));
+      }
+      setContext({ rulesVersion, usageProvider: route.provider, modelValue: runModel.value, settings,
         tokenUsage: { cacheHit: 0, cacheMiss: 0, completion: 0 }, estimatedYuan: 0 });
       await commit();
     } catch (error) {
@@ -136,17 +160,17 @@ export function useKeywordReview() {
       setRecords((current) => updateReviewRecords(current, recordIndicesRef.current, ids, change));
     try {
       setNotice(await runKeywordReviewBatches({
-        queue, candidates: candidates.length, mode, settings, model: runModel, baseUrl, apiKey, rulesVersion, reviewMode,
+        queue, candidates: candidates.length, mode, settings, model: requestModel, baseUrl, apiKey, rulesVersion, reviewMode,
         signal: controller.signal, shouldStop, requestStop: () => { stopRequestedRef.current = true; },
         indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, notice: setNotice,
-        refreshBalance: (force) => { if (runModel.provider === 'deepseek') refreshBalance(force); },
+        refreshBalance: (force) => { if (route.provider === 'deepseek') refreshBalance(force); },
         onWaiting: () => {},
         onDispatch: async (submission) => {
           if (session.errorRef.current) throw new Error(session.errorRef.current);
           setContext((current) => ({ ...current, reviewAttempted: true, submissions: [...current.submissions, submission] }));
           update(submission.rows.map((row) => row.id), (record) => ({ ...record, status: 'running', error: undefined, submissionUncertain: false }));
           await commit(submission.rows.map((row) => row.id));
-          if (runModel.provider === 'deepseek') markDispatch();
+          if (route.provider === 'deepseek') markDispatch();
         },
         onCancelled: async (submission) => {
           removeSubmission(submission);
@@ -156,7 +180,7 @@ export function useKeywordReview() {
         },
         onUsage: (usage, date) => {
           const used = readTokenUsage(usage);
-          recordChatTokens({ modelId: runModel.model, modelName: runModel.label, type: 'chat', usage });
+          recordChatTokens({ modelId: route.model, modelName: runModel.label, type: 'chat', usage });
           setContext((current) => ({ ...current, tokenUsage: addTokenUsage(current.tokenUsage, used),
             estimatedYuan: current.estimatedYuan + estimateReviewYuan(used, date).yuan }));
         },
@@ -189,7 +213,7 @@ export function useKeywordReview() {
         : { ...record, status: 'idle' });
       if (!session.errorRef.current) try { await commit(ids); } catch { /* Keep all available results for export. */ }
       abortRef.current = null; finishPreparing(); setIsRunning(false); setIsStopping(false); setRunMode('idle');
-      if (runModel.provider === 'deepseek') refreshBalance(true);
+      if (route.provider === 'deepseek') refreshBalance(true);
     }
   };
 
@@ -200,13 +224,13 @@ export function useKeywordReview() {
   };
   const retryFailed = async () => {
     if (busy() || !session.canStart()) return;
-    const failed = records.filter((record) => record.status === 'error' && !record.submissionUncertain);
-    if (!failed.length) { setNotice('待核对记录已隔离，请先导出进度并核对模型用量'); return; }
+    const failed = records.filter((record) => isAutomaticRetryRecord(record));
+    if (!failed.length) { setNotice(counts.uncertain ? '待核对记录已隔离，请先导出进度并核对模型用量' : '没有可重审的失败记录'); return; }
     for (const record of failed) {
       const index = recordIndicesRef.current.get(record.id);
       if (index !== undefined) batchRetryVersionsRef.current.set(index, (batchRetryVersionsRef.current.get(index) ?? 0) + 1);
     }
-    setRecords((current) => current.map((record) => record.status === 'error' && !record.submissionUncertain ? { ...record, status: 'idle', error: undefined } : record));
+    setRecords((current) => current.map((record) => isAutomaticRetryRecord(record) ? { ...record, status: 'idle', error: undefined, submissionUncertain: false } : record));
     try { await commit(failed.map((record) => record.id)); setNotice(`已将 ${failed.length} 条已确认失败记录放回待审；重新审核可能产生新费用。`); }
     catch (error) { setNotice(error instanceof Error ? error.message : '本机保存失败，未发起审核'); }
   };
@@ -245,7 +269,8 @@ export function useKeywordReview() {
     const saved = await session.restore();
     if (!saved) return;
     refreshIndices(); inputVersionRef.current += 1; setReviewMode(saved.parsed.mode); setFilter('all');
-    if (modelOptions.some((item) => item.value === saved.context.modelValue)) selectConfiguredModel(saved.context.modelValue);
+    const restoredModel = resolveStoredKeywordReviewModel(saved.context.modelValue, modelOptions);
+    if (modelOptions.some((item) => item.value === restoredModel)) selectConfiguredModel(restoredModel);
     saveConfiguredSettings(saved.context.settings);
     setNotice('已恢复上次表格和审核进度；审核不会自动开始，待核对记录继续隔离。');
   };

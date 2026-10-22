@@ -41,7 +41,7 @@ func ListStyleRecipes(ctx context.Context, db *sql.DB, workspace, category strin
 	}
 	listArgs := append(append([]any{}, args...), pageSize, (page-1)*pageSize)
 	rows, err := db.QueryContext(ctx, `
-		SELECT "id", "workspaceId", "name", "category", "tag", "desc", "coverUrl", "sampleImages", "isFavorite", "createdAt", "updatedAt", "promptSnippet"
+		SELECT "id", "workspaceId", "name", "category", "tag", "desc", "coverUrl", "sampleImages", "isFavorite", "createdAt", "updatedAt", "promptSnippet", "sourceUrl"
 		FROM "StyleRecipe" WHERE `+filter+`
 		ORDER BY "isFavorite" DESC, "createdAt" DESC
 		LIMIT ? OFFSET ?`, listArgs...)
@@ -115,23 +115,29 @@ func listHiddenOfficial(ctx context.Context, db *sql.DB, ids []string) ([]map[st
 
 func scanStyleRecipe(row database.Scanner) (map[string]any, error) {
 	var id, workspaceID, name, category, promptSnippet, createdAt, updatedAt string
-	var tag, desc, coverURL, sampleImages sql.NullString
+	var tag, desc, coverURL, sampleImages, sourceURL sql.NullString
 	var favorite int
-	if err := row.Scan(&id, &workspaceID, &name, &category, &tag, &desc, &coverURL, &sampleImages, &favorite, &createdAt, &updatedAt, &promptSnippet); err != nil {
+	if err := row.Scan(&id, &workspaceID, &name, &category, &tag, &desc, &coverURL, &sampleImages, &favorite, &createdAt, &updatedAt, &promptSnippet, &sourceURL); err != nil {
 		return nil, err
 	}
 	return map[string]any{
 		"id": id, "name": name, "category": category,
 		"tag": database.NullText(tag), "desc": database.NullText(desc), "coverUrl": database.NullText(coverURL),
 		"sampleImages": database.NullText(sampleImages), "isFavorite": favorite != 0,
+		"sourceUrl": database.NullText(sourceURL),
 		"createdAt": database.FormatSQLiteTime(createdAt), "updatedAt": database.FormatSQLiteTime(updatedAt),
 		"promptSnippet": promptSnippet, "isOfficial": workspaceID == database.OfficialWorkspace,
 	}, nil
 }
 
-func DeleteStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string) error {
+func DeleteStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string, expected ...string) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	var owner string
-	err := db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT "workspaceId" FROM "StyleRecipe" WHERE "id" = ? AND "workspaceId" IN (?, ?)`,
 		id, workspace, database.OfficialWorkspace).Scan(&owner)
 	if err == sql.ErrNoRows {
@@ -140,11 +146,25 @@ func DeleteStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string) er
 	if err != nil {
 		return err
 	}
-	if owner == database.OfficialWorkspace {
-		return hideOfficialRecipe(ctx, db, workspace, id)
+	if len(expected) > 0 && expected[0] != "" {
+		current, err := loadStyleRecipe(ctx, tx, workspace, id)
+		if err != nil {
+			return err
+		}
+		if SkillVersion(styleSnapshotContent(id, current)) != expected[0] {
+			return ErrSkillConflict
+		}
 	}
-	_, err = db.ExecContext(ctx, `DELETE FROM "StyleRecipe" WHERE "id" = ? AND "workspaceId" = ?`, id, workspace)
-	return err
+	if owner == database.OfficialWorkspace {
+		if err := hideOfficialRecipe(ctx, tx, workspace, id); err != nil {
+			return err
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM "StyleRecipe" WHERE "id" = ? AND "workspaceId" = ?`, id, workspace); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func RestoreOfficialStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string) (string, error) {
@@ -208,7 +228,7 @@ func hiddenRecipeEventID(workspace, id string) string {
 	return "recipe_hidden_" + hex.EncodeToString(sum[:])
 }
 
-func hideOfficialRecipe(ctx context.Context, db *sql.DB, workspace, id string) error {
+func hideOfficialRecipe(ctx context.Context, db styleExec, workspace, id string) error {
 	_, err := db.ExecContext(ctx, `
 		INSERT OR IGNORE INTO "PromptAssetUsageEvent"
 		("id", "workspaceId", "assetId", "batchId", "eventType", "createdAt", "metadata")

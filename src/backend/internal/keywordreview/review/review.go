@@ -59,14 +59,15 @@ type OutputError struct {
 func (e *OutputError) Error() string { return e.Message }
 
 type Input struct {
-	TextProtocol string
-	BaseURL      string
-	APIKey       string
-	Model        string
-	Provider     string
-	Mode         string
-	Rows         []Row
-	Rules        []RuleEntry
+	TextProtocol    string
+	BaseURL         string
+	APIKey          string
+	Model           string
+	Provider        string
+	Mode            string
+	ReasoningEffort string
+	Rows            []Row
+	Rules           []RuleEntry
 }
 
 func Review(ctx context.Context, client *http.Client, input Input) (Result, error) {
@@ -74,15 +75,16 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if mode == "" {
 		mode = "image"
 	}
+	effort := concreteReasoningEffort(input.ReasoningEffort)
 	requestBody := chatRequest{
-		Model: input.Model, Temperature: 0.1, MaxTokens: maxTokens,
+		Model: input.Model, Temperature: 0.1, MaxTokens: maxTokens, ReasoningEffort: effort,
 		ResponseFormat: map[string]string{"type": "json_object"},
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt(mode, true, input.Rules)},
 			{Role: "user", Content: "请审核以下行：\n" + marshalText(modelRows(input.Rows))},
 		},
 	}
-	if disableThinking(input) {
+	if effort == "" && disableThinking(input) {
 		requestBody.Thinking = &chatThinking{Type: "disabled"}
 	}
 	body, err := marshalTextBytes(requestBody)
@@ -132,17 +134,27 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	return Result{Results: stripLookup(checked.results), Failed: checked.failed, Usage: usage, Model: input.Model}, nil
 }
 
+func concreteReasoningEffort(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "low", "medium", "high", "xhigh":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
+}
+
 func disableThinking(input Input) bool {
 	return input.Provider != "gateway" || strings.HasPrefix(input.Model, "deepseek-")
 }
 
 type chatRequest struct {
-	Model          string            `json:"model"`
-	Temperature    float64           `json:"temperature"`
-	MaxTokens      int               `json:"max_tokens"`
-	Thinking       *chatThinking     `json:"thinking,omitempty"`
-	ResponseFormat map[string]string `json:"response_format"`
-	Messages       []chatMessage     `json:"messages"`
+	Model           string            `json:"model"`
+	Temperature     float64           `json:"temperature"`
+	MaxTokens       int               `json:"max_tokens"`
+	Thinking        *chatThinking     `json:"thinking,omitempty"`
+	ReasoningEffort string            `json:"reasoning_effort,omitempty"`
+	ResponseFormat  map[string]string `json:"response_format"`
+	Messages        []chatMessage     `json:"messages"`
 }
 
 type chatThinking struct {

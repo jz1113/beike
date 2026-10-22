@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, type RefObject } from 'react';
+import React, { useEffect, useRef, useState, useMemo, type RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { type PreferenceModelItem } from '../hooks/usePromptBarWorkflowModels';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
@@ -12,6 +12,7 @@ import {
   type GenerationRowItem,
 } from '@shared/domain/models/modelGrouping';
 import { looksBroken, PromptBarModelVariantStrip } from './PromptBarModelVariantStrip';
+import { DEFAULT_MODEL_CHANNEL, listModelChannels, modelChannel, modelsInChannel } from './modelPickerChannels';
 
 interface PromptBarModelPickerModalProps {
   isOpen: boolean;
@@ -71,30 +72,28 @@ export function PromptBarModelPickerModal({
   modalityKind = 'chat',
   onSelectModel,
 }: PromptBarModelPickerModalProps) {
-  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, triggerRef, 260, 420, true);
-  const duplicateUpstreamIds = new Set<string>();
-  const seenUpstreamIds = new Set<string>();
-  for (const model of models) {
-    const key = model.upstreamId || model.id;
-    if (seenUpstreamIds.has(key)) duplicateUpstreamIds.add(key);
-    seenUpstreamIds.add(key);
-  }
-  const listChannelsSeparately = duplicateUpstreamIds.size > 0;
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, triggerRef, 280, 460, true);
+  const channels = useMemo(() => listModelChannels(models), [models]);
+  const selectedChannel = modelChannel(models.find((model) => model.id === selectedModelId) || {});
+  const [channel, setChannel] = useState(selectedChannel);
+  const [channelOpen, setChannelOpen] = useState(false);
+  const activeChannel = channels.includes(channel) ? channel : channels[0] || DEFAULT_MODEL_CHANNEL;
+  const channelModels = useMemo(() => modelsInChannel(models, activeChannel), [models, activeChannel]);
   const names = useMemo(() => {
     const map = new Map<string, string>();
-    for (const model of models) {
+    for (const model of channelModels) {
       if (model.name && (model.upstreamId || model.name !== model.id)) {
         map.set(model.id, model.name);
         if (model.upstreamId) map.set(model.upstreamId, model.name);
       }
     }
     return map;
-  }, [models]);
+  }, [channelModels]);
 
   const uniqueModelIds = useMemo(() => {
     const seen = new Set<string>();
     const list: string[] = [];
-    for (const model of models) {
+    for (const model of channelModels) {
       const key = groupKey(model);
       if (key && !seen.has(key)) {
         seen.add(key);
@@ -102,7 +101,7 @@ export function PromptBarModelPickerModal({
       }
     }
     return list;
-  }, [models]);
+  }, [channelModels]);
 
   const generationSections = useMemo(
     () => groupModelsByGeneration(uniqueModelIds, modalityKind),
@@ -119,12 +118,13 @@ export function PromptBarModelPickerModal({
     return list;
   }, [generationSections]);
 
-  const chosenUpstream = models.find((model) => model.id === selectedModelId)?.upstreamId;
-  const matchesSelection = (candidate: string) => (
+  const selectedHere = channelModels.some((model) => model.id === selectedModelId);
+  const chosenUpstream = selectedHere ? models.find((model) => model.id === selectedModelId)?.upstreamId : undefined;
+  const matchesSelection = (candidate: string) => selectedHere && (
     sameModel(candidate, selectedModelId) || Boolean(chosenUpstream && sameModel(candidate, chosenUpstream))
   );
   const selectionIdFor = (groupedModelId: string) => {
-    const matches = models.filter((model) => sameModel(groupKey(model), groupedModelId));
+    const matches = channelModels.filter((model) => sameModel(groupKey(model), groupedModelId));
     const current = matches.find((model) => model.id === selectedModelId || (model.upstreamId && sameModel(model.upstreamId, selectedModelId)));
     return current?.id || matches[0]?.id || groupedModelId;
   };
@@ -136,6 +136,23 @@ export function PromptBarModelPickerModal({
   }, [allRows, chosenUpstream, selectedModelId]);
 
   const [expandedRowId, setExpandedRowId] = useState<string | null>(activeRowId);
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      wasOpen.current = false;
+      setChannelOpen(false);
+      return;
+    }
+    const next = listModelChannels(models);
+    const preferred = modelChannel(models.find((model) => model.id === selectedModelId) || {});
+    const opening = !wasOpen.current;
+    wasOpen.current = true;
+    setChannel((current) => {
+      if (!opening && next.includes(current)) return current;
+      return next.includes(preferred) ? preferred : next[0] || DEFAULT_MODEL_CHANNEL;
+    });
+  }, [isOpen, selectedModelId, models]);
 
   useEffect(() => {
     if (isOpen) setExpandedRowId(activeRowId);
@@ -180,6 +197,15 @@ export function PromptBarModelPickerModal({
         opensUp ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'
       } overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/95 text-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.12)] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-[#18191c]/95 dark:text-slate-100 dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] z-50 animate-fade-in p-1.5 text-left select-none`}
     >
+      {channels.length > 1 && <div className="mb-1 border-b border-slate-100 px-1.5 pb-1.5 dark:border-white/10">
+        <button type="button" aria-expanded={channelOpen} aria-haspopup="listbox" aria-label={`切换渠道：${activeChannel}`} onClick={() => setChannelOpen((current) => !current)} className="flex h-9 w-full items-center justify-between gap-2 rounded-xl px-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5">
+          <span className="text-xs text-slate-500 dark:text-slate-400">切换渠道</span>
+          <span className="flex min-w-0 items-center gap-1 font-medium"><span className="truncate">{activeChannel}</span><ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${channelOpen ? 'rotate-180' : ''}`} /></span>
+        </button>
+        {channelOpen && <div role="listbox" aria-label="渠道" className="mt-0.5">
+          {channels.map((name) => <button key={name} type="button" role="option" aria-selected={name === activeChannel} onClick={() => { setChannel(name); setChannelOpen(false); }} className={`flex w-full items-center rounded-xl px-2.5 py-1.5 text-left text-sm ${name === activeChannel ? 'bg-slate-100 font-semibold dark:bg-white/10' : 'hover:bg-slate-50 dark:hover:bg-white/5'}`}>{name}</button>)}
+        </div>}
+      </div>}
       <div className="space-y-1 py-0.5">
         {generationSections.length === 0 ? (
           <div className="px-3 py-6 text-center">
@@ -192,22 +218,6 @@ export function PromptBarModelPickerModal({
               去设置同步模型
             </button>
           </div>
-        ) : listChannelsSeparately ? (
-          models.map((model) => (
-            <button
-              key={model.id}
-              type="button"
-              onClick={() => {
-                onSelectModel(model.id);
-                onClose();
-              }}
-              className={`flex w-full items-center rounded-xl px-2.5 py-2 text-left text-sm ${
-                model.id === selectedModelId ? 'bg-slate-100 font-semibold dark:bg-white/10' : 'hover:bg-slate-50 dark:hover:bg-white/5'
-              }`}
-            >
-              <span className="truncate">{model.name}</span>
-            </button>
-          ))
         ) : (
           generationSections.map((section, sectionIndex) => {
             const visibleRows = section.rows.filter((row) => !row.isArchived);

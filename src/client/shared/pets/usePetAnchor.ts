@@ -140,6 +140,7 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void) {
   };
   return {
     rootRef, anchorRef, panelRef, moving, pointerProps,
+    frame: layout ? { point: layout.point, size: layout.size, bounds: layout.bounds } : null,
     anchorStyle: layout ? { left: layout.point.x, top: layout.point.y } : { right: 16, bottom: 16 },
     panelStyle: layout ? petPanelLayout(layout.point, layout.size, layout.bounds, layout.panelHeight) : undefined,
   };

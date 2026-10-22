@@ -27,6 +27,7 @@ const pollingTaskIds = new Set<string>();
 function recordFinishedTaskUsage(task: GenerationTask, data: { taskId?: unknown; usage?: unknown } | null) {
   const reportedId = typeof data?.taskId === 'string' ? data.taskId : '';
   recordMediaTaskUsage({
+    localTaskId: task.id,
     taskId: reportedId || task.taskId,
     modelId: task.model || 'unknown',
     type: task.mediaType === 'audio' ? 'audio' : isVideoTask(task) ? 'video' : 'image',

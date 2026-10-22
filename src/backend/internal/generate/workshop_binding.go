@@ -11,6 +11,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
@@ -85,18 +86,38 @@ func loadWorkshopBinding(cfg config.Config, r *http.Request, payload map[string]
 	}
 	binding := &workshopBinding{Group: group, Shots: shots, References: refs, Replacements: map[string]map[string]any{}, Selection: rawString(payload, "groupSelectionMode")}
 	if id := rawString(payload, "recipeId"); id != "" {
-		page, err := dbcatalog.ListStyleRecipes(r.Context(), db, workspaceOf(r), "", 1, 10000)
-		if err != nil {
-			return nil, err
-		}
-		for _, recipe := range page.Recipes {
-			if recipe["id"] == id {
-				binding.Skill = recipe
-				break
+		if id == learning.BaseRecipeID {
+			binding.Skill = learning.BaseRecipe()
+		} else {
+			page, err := dbcatalog.ListStyleRecipes(r.Context(), db, workspaceOf(r), "", 1, 10000)
+			if err != nil {
+				return nil, err
+			}
+			for _, recipe := range page.Recipes {
+				if recipe["id"] == id {
+					binding.Skill = recipe
+					break
+				}
+			}
+			if binding.Skill == nil {
+				return nil, errors.New("类目技能已删除或不可访问，请重新选择")
+			}
+			if version := rawString(payload, "recipeVersion"); version != "" {
+				binding.Skill, err = dbcatalog.ReadSkillRevision(r.Context(), db, workspaceOf(r), "workshop", id, version)
+				if err != nil {
+					return nil, errors.New("本次技能版本不可访问，请刷新技能后重新分析")
+				}
+			} else {
+				version, err := dbcatalog.RememberSkillRevision(r.Context(), db, workspaceOf(r), "workshop", id, binding.Skill)
+				if err != nil {
+					return nil, err
+				}
+				binding.Skill["libraryVersion"] = version
 			}
 		}
-		if binding.Skill == nil {
-			return nil, errors.New("类目技能已删除或不可访问，请重新选择")
+		binding.Skill, err = learning.Apply(r.Context(), db, workspaceOf(r), group, refs, shots, binding.Skill)
+		if err != nil {
+			return nil, err
 		}
 		payload["templateStyle"], _ = json.Marshal(TextField(binding.Skill, "name") + "\n" + TextField(binding.Skill, "promptSnippet"))
 	}

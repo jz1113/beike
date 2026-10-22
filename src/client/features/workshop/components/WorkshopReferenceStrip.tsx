@@ -20,7 +20,7 @@ export function WorkshopReferenceStrip({ item }: { item: BatchProductItem }) {
       </figure>)}
     </div>
     {item.appliedSkillSnapshot && <details className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
-      <summary className="cursor-pointer">本次使用技能：{item.appliedSkillSnapshot.name}</summary>
+      <summary className="cursor-pointer">本次使用技能：{item.appliedSkillSnapshot.name}{item.appliedSkillSnapshot.libraryVersion ? ` · 版本 ${item.appliedSkillSnapshot.libraryVersion.slice(0, 8)}` : ''}</summary>
       <p className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap leading-6 select-text">{item.appliedSkillSnapshot.promptSnippet}</p>
     </details>}
     <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">构图、光线、动作与生活质感来自对应样本；人物、穿搭、场景仅在明确选择替换时改变。相似度仍需用实际成图核对。</p>

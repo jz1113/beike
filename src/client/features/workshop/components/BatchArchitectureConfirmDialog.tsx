@@ -50,8 +50,8 @@ export function BatchArchitectureConfirmDialog({
               <Settings2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h2 id="batch-architecture-confirm-title" className="text-sm font-black tracking-tight text-slate-900 dark:text-white">确认本批次类目拍摄架构</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">拍摄架构约束商品展示与提示词规则；四图母本仍按商品匹配或在生产设置中指定。</p>
+              <h2 id="batch-architecture-confirm-title" className="text-sm font-black tracking-tight text-slate-900 dark:text-white">确认本批次工坊技能</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">工坊技能约束商品展示与提示词规则；四图母本仍按商品匹配或在生产设置中指定。</p>
             </div>
           </div>
           <button type="button" onClick={onCancel} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-white" title="返回选图">
@@ -68,7 +68,7 @@ export function BatchArchitectureConfirmDialog({
 
           <div className="space-y-1.5">
             <label htmlFor="batch-architecture-select" className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200">
-              <span>类目拍摄架构</span>
+              <span>工坊技能</span>
               <span className="font-normal text-slate-400 dark:text-slate-500">约束商品展示与提示词规则</span>
             </label>
             <select
@@ -77,7 +77,7 @@ export function BatchArchitectureConfirmDialog({
               onChange={(event) => setBatchArchId(event.target.value)}
               className="w-full cursor-pointer rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#151518] px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-white outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/40"
             >
-              <option value="" disabled>请选择类目拍摄架构</option>
+              <option value="" disabled>请选择工坊技能</option>
               {recipes.length > 0 && <option value="auto">自动按商品类目匹配（逐款）</option>}
               {recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}
             </select>
@@ -101,7 +101,7 @@ export function BatchArchitectureConfirmDialog({
               {selectedRecipe.promptSnippet ? <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{selectedRecipe.promptSnippet}</p> : null}
             </div>
           ) : (
-            <p role="alert" className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3.5 py-3 text-xs font-medium leading-5 text-amber-800 dark:text-amber-200">请选择一个有效的类目拍摄架构，才能开始提示词分析。</p>
+            <p role="alert" className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3.5 py-3 text-xs font-medium leading-5 text-amber-800 dark:text-amber-200">请选择一个有效的工坊技能，才能开始提示词分析。</p>
           )}
         </div>
 

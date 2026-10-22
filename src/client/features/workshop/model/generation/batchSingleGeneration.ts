@@ -37,6 +37,7 @@ export async function runSelectedShots(
         ...config,
         outputSize: savedWorkshopOutputSize(liveTask),
         idempotencyKey: liveTask?.idempotencyKey || config.idempotencyKey,
+        onLearningContextResolved: (learningContext) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, learningContext } : task)),
         onOutputSizeResolved: (outputSize) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, outputSize } : task)),
         onGenerationSizeResolved: (generationSize) => patchItemTasks(setItems, item.id, (tasks) => tasks.map((task) => task.shot_no === shot.shot_no && task.idempotencyKey === liveTask?.idempotencyKey ? { ...task, generationSize } : task)),
         onTaskSubmitted: async (upstreamTaskId) => {

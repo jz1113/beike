@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useKeywordReviewDialog } from '../hooks/useKeywordReviewDialog';
 import { splitRejectReason, type KeywordReviewRecord, type OutputColumn } from '../model/keywordReviewWorkbook';
+import { isIsolatedSubmission } from '../model/reviewProgress';
 
 function sourceValue(record: KeywordReviewRecord, column: OutputColumn): string {
   if (column.key === 'query') return record.query;
@@ -14,7 +15,8 @@ export function KeywordReviewRecordDetails({ record, columns, onClose }: { recor
   const sourceColumns = columns.filter((column) => column.kind === 'source' && (column.sourceKind !== 'query' || column.key !== 'query'));
   const hasResult = record.status === 'done';
   const reject = hasResult && record.producible === '不制作' ? splitRejectReason(record.rejectReason) : null;
-  const statusLabel = record.status === 'done' ? '已完成' : record.status === 'running' ? '审核中' : record.status === 'error' ? record.submissionUncertain ? '待核对' : '失败' : '待审核';
+  const isolated = isIsolatedSubmission(record);
+  const statusLabel = record.status === 'done' ? '已完成' : record.status === 'running' ? '审核中' : record.status === 'error' ? isolated ? '待核对' : '失败' : '待审核';
   const dialogRef = useKeywordReviewDialog(true, onClose);
 
   return (
@@ -34,7 +36,7 @@ export function KeywordReviewRecordDetails({ record, columns, onClose }: { recor
             <div><p className="text-xs font-bold text-slate-500 dark:text-slate-400">是否可制作</p><p className="mt-1 font-bold text-slate-800 dark:text-slate-100">{hasResult ? record.producible || '—' : '—'}</p></div>
             <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-500 dark:text-slate-400">垂类依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700 dark:text-slate-200">{hasResult ? record.categoryReason || '—' : record.status === 'running' ? '审核进行中，完成后显示依据' : '尚未获得有效审核结果'}</p></div>
             {hasResult && record.producible === '不制作' && <div className="sm:col-span-2"><p className="text-xs font-bold text-slate-500 dark:text-slate-400">不制作依据</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700 dark:text-slate-200">{reject ? `${reject.kind ? `${reject.kind}：` : ''}${reject.detail}` : record.rejectReason || '—'}</p></div>}
-            {record.status === 'error' && <div className="sm:col-span-2"><p className="text-xs font-bold text-rose-500">{record.submissionUncertain ? '待核对原因' : '审核错误'}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-rose-700">{record.error || (record.submissionUncertain ? '提交结果尚未确认，请先核对' : '审核失败，请重试')}</p></div>}
+            {record.status === 'error' && <div className="sm:col-span-2"><p className="text-xs font-bold text-rose-500">{isolated ? '待核对原因' : '审核错误'}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-rose-700">{record.error || (isolated ? '提交结果尚未确认，请先核对' : '审核失败，请重试')}</p></div>}
             {hasResult && record.lowValue && <div><p className="text-xs font-bold text-slate-500 dark:text-slate-400">低价值关键词</p><p className="mt-1 font-bold text-slate-800 dark:text-slate-100">{record.lowValue}</p></div>}
           </div>
           {sourceColumns.length > 0 && <div>

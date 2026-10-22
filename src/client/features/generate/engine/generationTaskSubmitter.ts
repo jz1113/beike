@@ -376,6 +376,7 @@ export async function submitSingleGenerationTask(
   const resolvedModelId = data.model || t.model || (video ? 'doubao-seedance-2.5' : isAudio ? 'speech-2.8-hd' : 'gpt-image-2');
 
   recordMediaTaskUsage({
+    localTaskId: t.id,
     taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
     modelId: resolvedModelId,
     modelName: formatDisplayModel(resolvedModelId, video),

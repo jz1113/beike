@@ -53,7 +53,7 @@ func Review(cfg config.Config) http.Handler {
 		review.ProductID = productID
 		review.TaskID = taskID
 		review.AssetIDs = assetIDs
-		if err := dbworkshop.InsertOutputReview(r.Context(), db, httpx.WorkspaceFrom(r), review); err != nil {
+		if err := saveReviewedOutput(r.Context(), db, httpx.WorkspaceFrom(r), snapshot, review); err != nil {
 			writeFail(w, http.StatusBadRequest, "审核提交失败", "bad_request")
 			return
 		}
@@ -135,7 +135,7 @@ func findReviewTarget(snapshot map[string]any, taskID string) (string, []string,
 					assets = append(assets, value)
 				}
 			}
-			for _, key := range []string{"selectedSceneAssetId", "selectedOutfitAssetId", "selectedPersonaAssetId"} {
+			for _, key := range []string{"selectedSceneAssetId", "selectedOutfitAssetId", "selectedPersonaAssetId", "appliedFullPromptId"} {
 				if value, ok := product[key].(string); ok && value != "" {
 					assets = append(assets, value)
 				}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import type { PetPose } from '@shared/domain/pets/atlas';
 import type { PetSummary } from '@shared/contracts/pets';
@@ -41,7 +41,7 @@ export function PetSettingsPanel() {
   const [preview, setPreview] = useState<PetPose>('idle');
   const [look, setLook] = useState(4);
   const [sheet, setSheet] = useState('');
-  const [customOpen, setCustomOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const selected = pets.find((pet) => pet.id === preferences.petId);
@@ -89,7 +89,6 @@ export function PetSettingsPanel() {
   const previewSize = PET_SIZES[preferences.size];
   return (
     <div className="space-y-8">
-      <PetImportForm onImported={() => void reload()} />
       {loadError && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">{loadError}<button type="button" className="ml-3 underline" onClick={() => void reload()}>重试</button></p>}
       <section className="rounded-3xl border border-slate-200 bg-white px-4 py-6 dark:border-white/10 dark:bg-white/[0.03] sm:px-6">
         <div className="flex h-48 items-center justify-center">
@@ -101,8 +100,7 @@ export function PetSettingsPanel() {
             </div>
           ) : <p className="text-sm text-slate-500">{loadError || '正在准备预览'}</p>}
         </div>
-        <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <span />
+        <div className="mt-2 flex justify-center">
           <div ref={menuRef} className="relative">
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-[#1c1c1f]">
               <button type="button" aria-pressed={shown} aria-label="显示桌宠" onClick={toggleVisible} className="grid h-8 w-8 place-items-center rounded-full text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
@@ -123,17 +121,7 @@ export function PetSettingsPanel() {
               </div>
             )}
           </div>
-          <div className="justify-self-end">
-            <button type="button" aria-expanded={customOpen} onClick={() => setCustomOpen((open) => !open)} className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm text-slate-700 dark:border-white/15 dark:bg-transparent dark:text-slate-200">自定义</button>
-          </div>
         </div>
-        {customOpen && (
-          <div className="mx-auto mt-5 max-w-md space-y-3">
-            <Control label="显示桌宠"><button type="button" role="switch" aria-checked={shown} aria-label="显示桌宠" className={`settings-switch ${shown ? 'is-on' : ''}`} onClick={toggleVisible}><span /></button></Control>
-            <Control label="显示大小"><Segment options={SIZE_OPTIONS} value={preferences.size} onChange={(size) => updatePetPreferences({ size: size as PetSizeName })} /></Control>
-            <Control label="动作预览"><Segment options={POSE_OPTIONS} value={poseValue} onChange={(pose) => setPreview(pose as PetPose)} /></Control>
-          </div>
-        )}
       </section>
       <section>
         <div className="flex items-center justify-between">
@@ -145,6 +133,10 @@ export function PetSettingsPanel() {
             <PetChoiceCard key={pet.id} pet={pet} pressed={preferences.petId === pet.id} onSelect={() => updatePetPreferences({ petId: pet.id, visible: pet.id !== 'none' })} />
           ))}
         </div>
+      </section>
+      <section>
+        <button type="button" aria-expanded={importOpen} onClick={() => setImportOpen((open) => !open)} className="text-sm font-semibold text-slate-900 dark:text-white">用命令导入</button>
+        {importOpen && <div className="mt-3"><PetImportForm onImported={() => void reload()} /></div>}
       </section>
     </div>
   );
@@ -184,18 +176,6 @@ function PetChoiceCard({ pet, pressed, onSelect }: { pet: PetChoice; pressed: bo
       <span className="mt-2 block text-sm font-semibold text-slate-900 dark:text-white">{pet.displayName}</span>
       <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">{pet.description}</span>
       {pet.author && <span className="mt-2 block text-[11px] text-slate-400">{pet.author}</span>}
-    </div>
-  );
-}
-
-function Control({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="flex items-center justify-between gap-4"><span className="text-sm text-slate-700 dark:text-slate-200">{label}</span>{children}</div>;
-}
-
-function Segment({ options, value, onChange }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="settings-segment" role="group" aria-label={options.map((item) => item[1]).join(' ')}>
-      {options.map(([id, label]) => <button key={id} type="button" aria-pressed={value === id} onClick={() => onChange(id)}>{label}</button>)}
     </div>
   );
 }

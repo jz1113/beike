@@ -2,6 +2,7 @@ package keywordreview
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -44,6 +45,26 @@ func TestKeywordBalanceReadsOfficialAccount(t *testing.T) {
 	})
 	if status != http.StatusOK || body["currency"] != "CNY" || body["total"] != "12.5" || body["available"] != true {
 		t.Fatalf("status %d body %#v", status, body)
+	}
+}
+
+func TestDeepSeekFailureReportsGatewayCutoff(t *testing.T) {
+	for _, status := range []int{http.StatusGatewayTimeout, 524} {
+		message := deepSeekFailure(status, nil, "模型网关")
+		if strings.Contains(message, "请求失败") || !strings.Contains(message, "模型网关在约 120 秒切断了响应") || !strings.Contains(message, fmt.Sprintf("HTTP %d", status)) {
+			t.Fatalf("status %d message %q", status, message)
+		}
+	}
+	official := deepSeekFailure(http.StatusGatewayTimeout, nil, "DeepSeek")
+	if !strings.Contains(official, "DeepSeek 在约 120 秒切断了响应") || !strings.Contains(official, "HTTP 504") {
+		t.Fatalf("official message %q", official)
+	}
+	detailed := deepSeekFailure(524, map[string]any{"error": "origin timeout"}, "模型网关")
+	if !strings.Contains(detailed, "约 120 秒") || !strings.Contains(detailed, "接口原因：origin timeout") || strings.Contains(detailed, "HTTP 524") {
+		t.Fatalf("detailed message %q", detailed)
+	}
+	if got := deepSeekFailure(http.StatusBadGateway, nil, "模型网关"); got != "模型网关请求失败，请稍后重试" {
+		t.Fatalf("generic message %q", got)
 	}
 }
 

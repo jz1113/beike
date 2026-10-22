@@ -41,6 +41,31 @@ func TestReviewDisablesThinkingForGatewayDeepSeek(t *testing.T) {
 	}
 }
 
+func TestReviewSendsChosenReasoningEffort(t *testing.T) {
+	body := map[string]any{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		if json.Unmarshal(raw, &body) != nil {
+			t.Fatalf("body %s", raw)
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"{\"results\":[[\"1\",\"动物\",\"制作\",\"猫砂属于宠物用品\",\"\"]]}"}}]}`))
+	}))
+	defer server.Close()
+	_, err := Review(context.Background(), server.Client(), Input{
+		BaseURL: server.URL, APIKey: "secret", Model: "deepseek-v4.1-flash", Provider: "gateway",
+		ReasoningEffort: "high", Rows: []Row{{ID: "row-1", Query: "猫砂"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body["reasoning_effort"] != "high" {
+		t.Fatalf("reasoning %#v", body["reasoning_effort"])
+	}
+	if _, ok := body["thinking"]; ok {
+		t.Fatalf("thinking %#v", body["thinking"])
+	}
+}
+
 func TestReviewLeavesThinkingEnabledForOtherGatewayModels(t *testing.T) {
 	body := map[string]any{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Eye, Loader2, Search, XCircle 
 import type { useKeywordReview } from '../hooks/useKeywordReview';
 import type { KeywordReviewRecord } from '../model/keywordReviewWorkbook';
 import { REVIEW_FILTER_LABELS, type KeywordReviewFilter } from '../model/reviewPreview';
+import { isIsolatedSubmission } from '../model/reviewProgress';
 
 const selectClass = 'h-10 min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:text-slate-200 dark:border-white/10 dark:bg-[#18191c]';
 const pageButtonClass = 'flex h-8 items-center justify-center rounded-lg border border-slate-200 px-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-white/5 dark:border-white/10';
@@ -10,7 +11,7 @@ const pageButtonClass = 'flex h-8 items-center justify-center rounded-lg border 
 function ReviewStatus({ record }: { record: KeywordReviewRecord }) {
   if (record.status === 'done') return <span className="inline-flex items-center gap-1.5 text-emerald-700"><CheckCircle2 className="h-4 w-4" />已完成</span>;
   if (record.status === 'running') return <span className="inline-flex items-center gap-1.5 text-blue-600"><Loader2 className="h-4 w-4 animate-spin" />审核中</span>;
-  if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-600" title={record.error}><XCircle className="h-4 w-4" />{record.submissionUncertain ? '待核对' : '失败'}</span>;
+  if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-600" title={record.error}><XCircle className="h-4 w-4" />{isIsolatedSubmission(record) ? '待核对' : '失败'}</span>;
   return <span className="text-slate-500 dark:text-slate-400">待审核</span>;
 }
 
@@ -18,7 +19,7 @@ function reviewReason(record: KeywordReviewRecord) {
   if (record.status === 'done') {
     return record.producible === '不制作' ? record.rejectReason || record.categoryReason || '—' : record.categoryReason || '—';
   }
-  if (record.status === 'error') return record.error || (record.submissionUncertain ? '提交结果尚未确认，请先核对' : '审核失败，请重试');
+  if (record.status === 'error') return record.error || (isIsolatedSubmission(record) ? '提交结果尚未确认，请先核对' : '审核失败，请重试');
   return record.status === 'running' ? '审核进行中，完成后显示依据' : '尚未完成审核';
 }
 

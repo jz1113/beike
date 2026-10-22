@@ -5,7 +5,6 @@ import BatchWorkshopView from './components/BatchWorkshopView';
 import { WorkshopTopBar } from './components/WorkshopTopBar';
 import { WorkshopSideCapsuleBar } from './components/WorkshopSideCapsuleBar';
 import { WorkshopDockActionsProvider } from './components/WorkshopDockActionsContext';
-import WorkshopRecipeView from './views/WorkshopRecipeView';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 
 interface Props {
@@ -35,7 +34,7 @@ export default function WorkshopStudio({
         {activeWorkshopTab !== 'studio' && <WorkshopTopBar assetToolbarRef={setAssetToolbarTarget} activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />}
 
         {/* 核心工作区内容渲染 */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
+        <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative z-10 ${activeWorkshopTab !== 'studio' ? 'pt-16 lg:pt-0' : ''}`}>
           <div className={activeWorkshopTab === 'studio' ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>
             <BatchWorkshopView onOpenAssetTab={(type) => {
               setAssetInitialSubTab(type);
@@ -47,9 +46,7 @@ export default function WorkshopStudio({
             <AssetPromptLibraryComponent toolbarTarget={assetToolbarTarget} initialSubTab={assetInitialSubTab} onEnterWorkshop={() => setActiveWorkshopTab('studio')} />
           )}
 
-          {activeWorkshopTab === 'recipes' && (
-            <WorkshopRecipeView onEnterStudio={() => setActiveWorkshopTab('studio')} />
-          )}
+
 
         </div>
       </div>

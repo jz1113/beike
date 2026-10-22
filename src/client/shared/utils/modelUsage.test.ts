@@ -44,4 +44,22 @@ describe('reported model usage', () => {
     expect(getUsageSummary('today').totalTokens).toBe(33);
     expect(getUsageSummary('today').imageCount).toBe(1);
   });
+
+  it('keeps one row when the upstream id arrives after the local task id', () => {
+    installStorage();
+    recordMediaTaskUsage({ localTaskId: 'local-1', modelId: 'gpt-image-2', type: 'image', mediaCount: 1 });
+    recordMediaTaskUsage({
+      localTaskId: 'local-1', taskId: 'upstream-1', modelId: 'gpt-image-2', type: 'image', mediaCount: 1,
+      usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
+    });
+    const logs = getUsageLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.taskId).toBe('upstream-1');
+    expect(logs[0]?.localTaskId).toBe('local-1');
+    expect(logs[0]?.totalTokens).toBe(33);
+    expect(logs[0]?.mediaCount).toBe(1);
+    recordMediaTaskUsage({ localTaskId: 'local-1', taskId: 'upstream-1', modelId: 'gpt-image-2', type: 'image', mediaCount: 1 });
+    expect(getUsageLogs()).toHaveLength(1);
+    expect(getUsageSummary('today').imageCount).toBe(1);
+  });
 });

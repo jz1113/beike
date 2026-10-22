@@ -34,11 +34,12 @@ function getStoredHistoryLimit(): number {
 
 export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice> = (set, get) => {
   const initial = getStoredAssistantState();
-  const drafts = new Map<string, { input: string; attachments: MediaAttachment[]; skillId: string | null }>();
+  const drafts = new Map<string, { input: string; attachments: MediaAttachment[]; skillId: string | null; skillSnapshot: AppState['activeAssistantSkillSnapshot'] }>();
   const rememberDraft = (state: AppState) => drafts.set(state.currentAssistantSessionId, {
     input: state.assistantInputDraft,
     attachments: state.assistantAttachments,
     skillId: state.activeAssistantSkillId,
+    skillSnapshot: state.activeAssistantSkillSnapshot,
   });
   const restoreDraft = (id: string) => {
     const draft = drafts.get(id);
@@ -47,6 +48,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
       assistantInputDraft: draft?.input || get().assistantSessionDrafts[id] || '',
       assistantAttachments: draft?.attachments || [],
       activeAssistantSkillId: skillId && get().getAllAssistantSkills().some((skill) => skill.id === skillId) ? skillId : null,
+      activeAssistantSkillSnapshot: draft?.skillSnapshot || null,
     };
   };
   let lastStreamPersistAt = 0;

@@ -1,3 +1,4 @@
+import type { OutputRating } from '@shared/contracts/categorySkills';
 import { OFFICIAL_MASTER_RECIPES } from '@shared/domain/prompts/masterRecipes';
 import { ShotPrompt } from '@shared/domain/prompts/vision';
 
@@ -45,6 +46,8 @@ export interface BatchTaskItem {
   /** Upstream canvas size, which can differ from the final cropped delivery size. */
   generationSize?: string;
   attempt?: number;
+  learningContext?: { scopeId: string; versionId: string; referenceFingerprint: string; baseRecipeVersion: string; groupId: string; productImages: string[]; referenceImage: string; model: string; aspectRatio: string; quality: string; strategy: string; anchorFaceUrl: string; replacements: string[] };
+  outputRating?: OutputRating;
   outputReview?: 'unreviewed' | 'accepted' | 'retry_requested' | 'rejected';
 }
 
@@ -110,7 +113,7 @@ export interface BatchProductItem {
   appliedFullPromptAppearance?: 'human' | 'product' | 'unknown';
   appliedFullPromptEligibleCount?: number;
   appliedFullPromptInventoryCount?: number;
-  appliedSkillSnapshot?: { id: string; name: string; promptSnippet: string; updatedAt?: string };
+  appliedSkillSnapshot?: { id: string; name: string; promptSnippet: string; updatedAt?: string; libraryVersion?: string; learningScopeId?: string; learningVersionId?: string; learningReferenceFingerprint?: string; baseRecipeVersion?: string };
 
   // 生图任务队列专属
   tasks: BatchTaskItem[];

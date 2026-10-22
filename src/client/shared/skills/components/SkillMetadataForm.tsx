@@ -15,6 +15,8 @@ export interface SkillMetadataFormProps {
   onChange: (updated: SkillDraftData) => void;
   onSaveAndUse: () => void;
   showToast: (msg: string) => void;
+  saving?: boolean;
+  saveLabel?: string;
 }
 
 export function SkillMetadataForm({
@@ -22,6 +24,8 @@ export function SkillMetadataForm({
   onChange,
   onSaveAndUse,
   showToast,
+  saving = false,
+  saveLabel = '保存技能',
 }: SkillMetadataFormProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const showcaseInputRef = useRef<HTMLInputElement>(null);
@@ -199,10 +203,10 @@ export function SkillMetadataForm({
           onChange={(defaultImageModel) => onChange({ ...draft, defaultImageModel })}
         />
 
-        {/* 技能封面 (建议比例16:9) * */}
+        {/* 技能封面为可选展示资料 */}
         <div>
           <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
-            技能封面（建议比例16:9） <span className="text-red-500">*</span>
+            技能封面（可选，建议比例16:9）
           </label>
           <input
             ref={coverInputRef}
@@ -323,9 +327,10 @@ export function SkillMetadataForm({
         <button
           type="button"
           onClick={onSaveAndUse}
+          disabled={saving}
           className="flex h-9 items-center rounded-full bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 px-6 text-xs font-semibold text-white dark:text-slate-900 shadow-md active:scale-95 transition-all cursor-pointer"
         >
-          保存并使用
+          {saving ? '保存中…' : saveLabel}
         </button>
       </footer>
     </section>

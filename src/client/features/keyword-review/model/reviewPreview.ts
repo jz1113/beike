@@ -1,4 +1,5 @@
 import type { KeywordReviewRecord } from './keywordReviewWorkbook';
+import { isIsolatedSubmission } from './reviewProgress';
 
 export type KeywordReviewFilter = 'all' | 'pending' | 'running' | 'done' | 'producible' | 'rejected' | 'failed' | 'uncertain' | 'low_value';
 export const REVIEW_FILTER_LABELS: Record<KeywordReviewFilter, string> = {
@@ -43,8 +44,8 @@ export function filterReviewRecords(records: KeywordReviewRecord[], filter: Keyw
     if (filter === 'pending' && record.status !== 'idle') return false;
     if (filter === 'running' && record.status !== 'running') return false;
     if (filter === 'done' && record.status !== 'done') return false;
-    if (filter === 'failed' && (record.status !== 'error' || record.submissionUncertain)) return false;
-    if (filter === 'uncertain' && (record.status !== 'error' || !record.submissionUncertain)) return false;
+    if (filter === 'failed' && (record.status !== 'error' || isIsolatedSubmission(record))) return false;
+    if (filter === 'uncertain' && !isIsolatedSubmission(record)) return false;
     if (filter === 'producible' && (record.status !== 'done' || record.producible !== '制作')) return false;
     if (filter === 'rejected' && (record.status !== 'done' || record.producible !== '不制作')) return false;
     if (filter === 'low_value' && (record.status !== 'done' || record.lowValue !== '是')) return false;

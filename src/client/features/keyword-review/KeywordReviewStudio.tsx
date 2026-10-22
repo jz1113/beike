@@ -7,12 +7,14 @@ import { ToolSuiteMark } from '@client/shared/icons';
 import { KeywordReviewRulesDialog } from './components/KeywordReviewRulesDialog';
 import { KeywordReviewSettingsDialog } from './components/KeywordReviewSettingsDialog';
 import { useKeywordReview } from './hooks/useKeywordReview';
-import { countReviewRecords, isKnownModelOutputFailure } from './model/reviewProgress';
+import { countReviewRecords, isAutomaticRetryRecord } from './model/reviewProgress';
 import { KeywordReviewPreviewTable } from './components/KeywordReviewPreviewTable';
 import { KeywordReviewReplaceDialog } from './components/KeywordReviewReplaceDialog';
 import { KeywordReviewRecordDetails } from './components/KeywordReviewRecordDetails';
 import { KeywordReviewRecoveryDialog } from './components/KeywordReviewRecoveryDialog';
 import { KeywordReviewRecoveryStatus } from './components/KeywordReviewRecoveryStatus';
+import { KeywordReviewModelPicker } from './components/KeywordReviewModelPicker';
+import { KeywordReviewEffortButton } from './components/KeywordReviewEffortButton';
 
 interface Props {
   onBack: () => void;
@@ -43,7 +45,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
   const trialLabel = `${review.counts.done > 0 || review.counts.failed > 0 ? '再试跑' : '试跑'} ${trialCount || review.trialSize} 条`;
   const batchLabel = review.counts.done > 0 || review.counts.failed > 0 ? '继续批量' : '批量审核';
   const canTrial = review.counts.pending > 0 && !busy && review.sessionReady;
-  const canRun = !busy && review.sessionReady && (canTrial || review.records.some(isKnownModelOutputFailure));
+  const canRun = !busy && review.sessionReady && (canTrial || review.records.some(isAutomaticRetryRecord));
   const displayColumns = review.parsed?.displayColumns ?? [];
   const selectedRecord = review.records.find((record) => record.id === selectedRecordId);
   const selectedColumns = review.parsed?.sheets.find((sheet) => sheet.name === selectedRecord?.sheetName)?.outputColumns ?? displayColumns;
@@ -63,7 +65,7 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-slate-900 dark:text-slate-100">
-      <header className="flex min-h-[72px] shrink-0 flex-wrap items-center justify-between py-3 gap-3 px-4 sm:px-6 lg:px-8">
+      <header className="relative z-20 flex min-h-[72px] shrink-0 flex-wrap items-center justify-between py-3 gap-3 px-4 sm:px-6 lg:px-8">
         <button type="button" onClick={onBack} aria-label="词包审核，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#26262B] text-slate-900 dark:text-white">
           <ToolSuiteMark>
             <FilePen className="h-4 w-4 stroke-[2]" />
@@ -75,12 +77,8 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
             <BookOpen className="h-4 w-4" />
             审核规则
           </button>
-          <label className="relative flex h-10 max-w-[240px] items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-2 shadow-sm hover:border-amber-300 dark:hover:border-amber-400/50">
-            <span className="sr-only">审核模型</span>
-            <select aria-label="审核模型" value={review.modelValue} onChange={(event) => review.selectModel(event.target.value)} disabled={busy} className="min-w-0 w-full cursor-pointer bg-transparent px-1 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none disabled:cursor-not-allowed disabled:opacity-60">
-              {review.modelOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
+          <KeywordReviewModelPicker options={review.modelOptions} value={review.modelValue} disabled={busy} onChange={review.selectModel} />
+          <KeywordReviewEffortButton model={review.modelOptions.find((option) => option.value === review.modelValue)?.model || review.modelOptions[0]?.model || ''} disabled={busy} />
           {review.modelProvider === 'deepseek' && <button
             type="button"
             onClick={() => review.refreshBalance(true)}
@@ -178,8 +176,8 @@ export default function KeywordReviewStudio({ onBack, onOpenSettings }: Props) {
                 <details className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
                   <summary className="w-fit cursor-pointer font-semibold hover:text-slate-800 dark:hover:text-slate-100">审核与费用说明</summary>
                   <div className="mt-2 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-                    <p>工作表：{review.sheetSummary}。试跑 {review.trialSize} 条，每次请求 {review.batchSize} 条，最多 {review.concurrency} 路并发；遇限流会自动降速。</p>
-                    <p>停止后会等待已提交请求返回并保留结果。提交结果不确定的记录会单独隔离，避免自动重复提交；费用估算只计入已收到的用量，待核对请求可能尚未计入。</p>
+                    <p>工作表：{review.sheetSummary}。试跑 {review.trialSize} 条，每次请求 {review.batchSize} 条，最多 {review.concurrency} 路并发；遇限流会自动降速并重试。网关切断单次响应时，会把该批拆开再提交。</p>
+                    <p>停止后会等待已提交请求返回并保留结果。网关已明确返回且没有用量的失败会自动换新任务重试。只有提交结果无法确认的记录会单独隔离，避免重复扣费；费用估算只计入已收到的用量。</p>
                     <p>联网补查暂不可用，当前审核不发起额外补查请求。</p>
                     <p>模型费用以实际账单为准。<a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing/" target="_blank" rel="noreferrer" className="ml-1 font-semibold text-blue-700 underline underline-offset-2">查看 DeepSeek 官方价格</a></p>
                     <p>{review.parsed.preserveSourceLayout ? '含公式、内部引用或辅助工作表的工作簿保留原工作表与列顺序。' : review.reviewMode === 'video' ? '原表列全部保留，追加最终垂类、制作判断与低价值标记。' : '原表列保留；整列为空的实体拓展q和分类不进入结果表，审核列接在下发时间后。'}</p>

@@ -43,7 +43,11 @@ type OutputReview struct {
 	AssetIDs    []string
 }
 
-func InsertOutputReview(ctx context.Context, db *sql.DB, workspace string, review OutputReview) error {
+type reviewExec interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func InsertOutputReview(ctx context.Context, db reviewExec, workspace string, review OutputReview) error {
 	reasons, err := json.Marshal(review.ReasonCodes)
 	if err != nil {
 		return err

@@ -320,6 +320,17 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/catalog/category-skills:
+    get:
+      operationId: get_api_catalog_category_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_category_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/catalog/collect:
     post:
       operationId: post_api_catalog_collect
@@ -379,6 +390,27 @@ paths:
           description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/skills:
+    delete:
+      operationId: delete_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_skills
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应

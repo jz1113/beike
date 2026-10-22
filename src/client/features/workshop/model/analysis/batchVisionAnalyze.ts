@@ -15,7 +15,7 @@ import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
 export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';
 
 export type VisionAnalyzeDeps = Omit<AnalysisPreflightConfig, 'recipes'> & {
-  recipes: Array<{ id: string; name: string; category?: string; promptSnippet?: string }>;
+  recipes: Array<{ id: string; name: string; category?: string; promptSnippet?: string; libraryVersion?: string }>;
   selectedArchId: string;
   items?: BatchProductItem[];
   lockedPersonaId: string;
@@ -140,6 +140,7 @@ export async function analyzeBatchProduct(
           modelPersona: effectivePersona,
           templateStyle,
           recipeId: archObj.id,
+          recipeVersion: archObj.libraryVersion,
           useAssetLibrary: deps.useAssetLibrary !== false,
           lockedAssets: { ...lockedAssets, ...resolvedAppearance, fullPromptId: resolvedGroup.id },
           groupSelectionMode: fullPromptId ? 'manual' : 'auto',

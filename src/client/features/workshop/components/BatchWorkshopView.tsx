@@ -1,5 +1,4 @@
 import { WorkshopTopBar } from './WorkshopTopBar';
-import { WorkshopProductionOverview } from './WorkshopProductionOverview';
 import { WorkspaceSaveNotice } from './WorkspaceSaveNotice';
 import { useEffect, useMemo, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
@@ -136,6 +135,11 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     readBatch,
   } = runner;
   useEffect(() => {
+    if (!workspaceReady || isCollecting || historyGenerationBatch) return;
+    if (currentStage === 1 && successfulItems.length > 0 && !items.some(item => item.status === 'pending' || item.status === 'collecting')) setCurrentStage(2);
+    if (currentStage === 2 && successfulItems.length === 0) setCurrentStage(1);
+  }, [workspaceReady, isCollecting, historyGenerationBatch, currentStage, items, successfulItems.length, setCurrentStage]);
+  useEffect(() => {
     // A cached history preview must not hide the newly selected active batch.
     setHistoryGenerationBatch(null);
     setIsArchitectureConfirmOpen(false);
@@ -199,11 +203,11 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
 
   const confirmArchitectureAndAnalyze = (architectureId: string) => {
     if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
-      showToast('请先选择有效的类目拍摄架构，再开始提示词分析');
+      showToast('请先选择有效的工坊技能，再开始提示词分析');
       return;
     }
     if (recipes.length === 0) {
-      showToast('暂无可用拍摄架构，请先到拍摄架构页同步或新建');
+      showToast('暂无可用工坊技能，请先到工坊技能页同步或新建');
       return;
     }
 
@@ -247,17 +251,14 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         showToast={showToast}
       />
       {/* 主体工作区 Content Area（Stage 1 采编采用黄金阅读宽度；Stage 2+ 选图及后续生产流水线自适应全屏大画幅充盈放大） */}
-      <div className="flex-1 overflow-y-auto px-3 pt-11 pb-3 sm:px-5 sm:pt-11 sm:pb-4 xl:px-7 flex flex-col">
+      <div className="flex-1 overflow-y-auto px-5 pt-20 pb-6 sm:px-8 sm:pb-8 lg:pt-6 xl:px-10 flex flex-col">
         <div className={
-          !historyGenerationBatch && currentStage === 1 && items.length === 0
-            ? "max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto w-full flex-1 flex flex-col justify-between"
+          !historyGenerationBatch && currentStage === 1
+            ? "max-w-[960px] mx-auto w-full flex-1 flex flex-col"
             : historyGenerationBatch || currentStage === 4
               ? "mx-auto w-full max-w-[1840px] space-y-4"
               : "w-full space-y-4"
         }>
-          {!historyGenerationBatch && items.length > 0 && <WorkshopProductionOverview items={items} currentStage={currentStage} onStageChange={setCurrentStage}
-            busy={isCollecting || isAnalyzingAll || isGeneratingBatch || isAutoPilotRunning || items.some((item) => item.isAnalyzing)}
-            analysisIssue={runner.analysisIssue} strategy={generationStrategy} shotCount={selectedShotCount} aspect={selectedAspect} gridOutputSize={runner.gridOutputSize} concurrency={imageGenConcurrency} onSettings={() => setIsWorkshopConfigOpen(true)} />}
           {historyGenerationBatch ? (
             <BatchWorkshopHistoryPreview
               batch={historyGenerationBatch}
@@ -273,28 +274,19 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
               batchInputText={batchInputText}
               setBatchInputText={setBatchInputText}
               items={items}
-              setItems={setItems}
               isCollecting={isCollecting}
               collectProgress={collectProgress}
-              successfulItems={successfulItems}
               handleParseInput={handleParseInput}
               startBatchCollect={startBatchCollect}
-              handleRemoveItem={handleRemoveItem}
-              onPreviewImage={(url) => openGalleryPreview([url], 0, '商品封面')}
-              onNextStage={() => setCurrentStage(2)}
-              recipes={recipes}
-              selectedArchId={selectedArchId}
-              selectedShotCount={selectedShotCount}
-              selectedAspect={selectedAspect}
-              selectedQuality={selectedQuality}
-              selectedImageGenModel={selectedImageGenModel}
-              selectedVisionModel={selectedVisionModel}
-              onOpenSettings={() => setIsWorkshopConfigOpen(true)}
             />
           )}
 
           {!historyGenerationBatch && currentStage === 2 && (
             <BatchConfigProvider value={stage2ConfigValue}>
+              {items.some(item => item.status === 'failed' || item.status === 'pending') && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-300">
+                <span>{items.filter(item => item.status === 'failed' || item.status === 'pending').length} 款商品未采集成功</span>
+                <button type="button" onClick={() => { setCurrentStage(1); void startBatchCollect(); }} className="rounded-lg px-3 py-1.5 hover:bg-amber-500/10">重试采集</button>
+              </div>}
               <BatchStage2Config />
             </BatchConfigProvider>
           )}

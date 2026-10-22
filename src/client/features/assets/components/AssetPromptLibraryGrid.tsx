@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { CategorySkillPanel, type CategorySkillTab } from './CategorySkillPanel';
+import { promptGroupSubcategoryOptions } from '../model/promptGroupFolders';
 import type { ComponentProps, Dispatch, MouseEvent, RefObject, SetStateAction } from 'react';
 import { ChevronRight, Layers } from 'lucide-react';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
@@ -75,6 +78,7 @@ interface Props {
   getAssetPreviewText: (item: Record<string, unknown>) => string;
   setEditingItem: (item: Record<string, unknown>) => void;
   setTagEditItem: (item: Record<string, unknown>) => void;
+  onUseLearningReference: (id: string) => void;
   deleteAsset: (id: string, event: MouseEvent) => void | Promise<void>;
 }
 
@@ -92,8 +96,11 @@ export function AssetPromptLibraryGrid({
   setAtomicPreview, setMoveItems, setOpenCardMenuId, setSelectedIds, setIsBatchMode,
   selectionAnchorRef, setAssetContextMenu, toggleSelectItem, toggleFavorite,
   setZoomImageUrl, withAssetDetail, handleCopyPrompt, getAssetPreviewText,
-  setEditingItem, setTagEditItem, deleteAsset,
+  setEditingItem, setTagEditItem, deleteAsset, onUseLearningReference,
 }: Props) {
+  const [learningTab, setLearningTab] = useState<CategorySkillTab>('references');
+  const learningFolder = activeSubTab === 'full_prompt' && !folderRootVisible && !subcategoryFoldersVisible && !isBatchMode
+    ? promptGroupSubcategoryOptions(promptGroupCategories, promptGroupCategoryFilter).find(option => option.id === promptGroupSubcategoryFilter)?.folderId : undefined;
   return (
       <div ref={assetScrollRef} data-asset-scroll className={`flex-1 min-h-0 bg-transparent overflow-y-auto px-5 sm:px-7 xl:px-8 pb-6 ${activeSubTab === 'full_prompt' ? 'pt-2' : activeSubTab === 'persona' || activeSubTab === 'outfit' ? 'pt-3' : 'pt-6'}`}>
         {loadError && <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
@@ -120,6 +127,7 @@ export function AssetPromptLibraryGrid({
             </div>}
           </div>
         )}
+        {learningFolder && <CategorySkillPanel key={learningFolder} folderId={learningFolder} tab={learningTab} onTab={setLearningTab} onPreview={id => { const item = items.find(item => item.id === id); if (item) openGroupPreview(item); else showToast('来源图组已移除，请重新提炼技能'); }} onUseReference={onUseLearningReference} />}
         {folderRootVisible && isLoading && !items.length && !promptGroupCategories.length ? (
           <div className="flex flex-wrap gap-5 animate-pulse" aria-label="正在加载商品大类">
             {[1, 2, 3].map(n => <div key={n} className="h-40 w-[164px] rounded-2xl bg-slate-100/70 dark:bg-white/10" />)}
@@ -148,7 +156,7 @@ export function AssetPromptLibraryGrid({
             onMoveGroups={ids => setMoveItems(items.filter(item => ids.includes(item.id)))}
             onArchived={refreshAssets}
           />
-        ) : displayedItems.length > 0 ? (
+        ) : learningFolder && learningTab !== 'references' ? null : displayedItems.length > 0 ? (
           <VirtualAssetGrid
             items={displayedItems}
             scrollRef={assetScrollRef}

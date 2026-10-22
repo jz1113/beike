@@ -194,6 +194,8 @@ var deepSeekHints = map[int]string{
 	429: "DeepSeek 请求过于频繁，请稍后重试",
 	500: "DeepSeek 服务暂时故障，请稍后重试",
 	503: "DeepSeek 服务繁忙，请稍后重试",
+	504: "DeepSeek 在约 120 秒切断了响应，请减少每批词数后重试",
+	524: "DeepSeek 在约 120 秒切断了响应，请减少每批词数后重试",
 }
 
 func deepSeekFailure(status int, data map[string]any, provider string) string {
@@ -206,6 +208,9 @@ func deepSeekFailure(status int, data map[string]any, provider string) string {
 	}
 	detail := upstreamDetail(data)
 	if detail == "" {
+		if status == http.StatusGatewayTimeout || status == 524 {
+			return fmt.Sprintf("%s（HTTP %d）", hint, status)
+		}
 		return hint
 	}
 	return hint + "。接口原因：" + detail

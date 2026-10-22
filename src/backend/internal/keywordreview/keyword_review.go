@@ -73,6 +73,7 @@ func executeKeywordReview(cfg config.Config, r *http.Request, client *http.Clien
 		}
 		reviewed, err := reviewsvc.Review(context.WithoutCancel(r.Context()), client, reviewsvc.Input{
 			TextProtocol: protocol, BaseURL: baseURL, APIKey: apiKey, Model: model, Provider: provider, Mode: mode, Rows: rows, Rules: rules,
+			ReasoningEffort: keywordText(parsed["reasoningEffort"], ""),
 		})
 		return keywordReviewResult(provider, reviewed, err)
 	})

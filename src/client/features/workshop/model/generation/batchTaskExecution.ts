@@ -6,6 +6,8 @@ import { assertOutputDimensions, parseOutputDimensions } from '@shared/domain/me
 import { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { isActionAllowedForProduct } from '@shared/domain/products/phoneProductPolicy';
 import { submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
+import { captureLearningContext } from './learningContext';
+import type { BatchTaskItem } from '../batchTypes';
 import type { BatchProductItem } from '../batchTypes';
 import { compressProductImageIfNeeded } from './generationHelpers';
 import { workshopReferenceInput } from './workshopReferenceInput';
@@ -22,6 +24,7 @@ export interface TaskExecutionConfig {
   idempotencyKey?: string;
   outputSize?: string;
   gridOutputSize?: string;
+  onLearningContextResolved?: (context: BatchTaskItem['learningContext']) => void;
   onOutputSizeResolved?: (size: string) => void;
   onGenerationSizeResolved?: (size: string) => void;
   onTaskSubmitted?: (taskId: string) => void | Promise<void>;
@@ -93,6 +96,7 @@ export async function executeSingleImageTask(
   const outputSize = config.outputSize || pixelSize;
   config.onOutputSizeResolved?.(outputSize);
   config.onGenerationSizeResolved?.(pixelSize);
+  config.onLearningContextResolved?.(captureLearningContext(item, shot, { ...config, selectedAspect: aspect }, 'single_shot'));
   await config.beforeSubmit?.();
   const generated = await submitImageGenTaskResult(
     {

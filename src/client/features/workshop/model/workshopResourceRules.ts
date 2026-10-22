@@ -9,6 +9,7 @@ export interface WorkshopRecipeSummary {
   category: string;
   tag: string;
   promptSnippet: string;
+  libraryVersion?: string;
 }
 
 export function nextWorkshopRecipeSelection(recipes: WorkshopRecipeSummary[], selectedId: string): string | null {

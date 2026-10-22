@@ -33,7 +33,7 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
 
   const startBatchVisionAnalyze = async (architectureId = selectedArchId): Promise<number> => {
     if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
-      showToast('请先确认类目拍摄架构，再开始提示词分析');
+      showToast('请先确认工坊技能，再开始提示词分析');
       return 0;
     }
 

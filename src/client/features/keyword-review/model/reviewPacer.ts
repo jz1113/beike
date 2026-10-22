@@ -1,12 +1,15 @@
 export const MAX_REVIEW_CONCURRENCY = 12;
 
+/** A finished batch this slow is near the client timeout, so concurrency stops climbing. */
+export const SLOW_GATEWAY_BATCH_MS = 8 * 60_000;
+
 /** Limits parallel requests and backs off when the selected provider rate limits a request. */
 export class ReviewPacer {
   private active = 0;
   private limit: number;
   private successes = 0;
   private cooldownUntil = 0;
-  private readonly maxLimit: number;
+  private maxLimit: number;
 
   constructor(maxConcurrency = MAX_REVIEW_CONCURRENCY) {
     this.maxLimit = Math.min(MAX_REVIEW_CONCURRENCY, Math.max(1, Math.floor(maxConcurrency) || 1));
@@ -39,11 +42,29 @@ export class ReviewPacer {
 
   failed(): void { this.active -= 1; }
 
+  /** A 504/524 cuts the in-flight ceiling in half for the rest of this run. */
+  timedOut(): void {
+    this.active -= 1;
+    this.lockCeiling(Math.floor(this.limit / 2));
+  }
+
+  /** A slow success must not climb back toward the original ceiling. Above two in flight, halve it. */
+  succeededSlow(): void {
+    this.active -= 1;
+    this.lockCeiling(this.limit > 2 ? Math.floor(this.limit / 2) : this.limit);
+  }
+
   rateLimited(retryNumber: number): void {
     this.active -= 1;
     this.limit = Math.max(1, Math.floor(this.limit / 2));
     this.successes = 0;
     const backoffMs = Math.min(15_000, 1_000 * 2 ** retryNumber);
     this.cooldownUntil = Math.max(this.cooldownUntil, Date.now() + backoffMs);
+  }
+
+  private lockCeiling(next: number): void {
+    this.maxLimit = Math.max(1, Math.min(this.maxLimit, next));
+    this.limit = Math.min(this.limit, this.maxLimit);
+    this.successes = 0;
   }
 }

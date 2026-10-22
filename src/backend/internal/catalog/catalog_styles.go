@@ -2,6 +2,7 @@ package catalog
 
 import (
 	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -32,9 +33,18 @@ func styleRecipesHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
 		}
+		for _, recipe := range pageResult.Recipes {
+			id, _ := recipe["id"].(string)
+			version, err := dbcatalog.RememberSkillRevision(r.Context(), db, httpx.WorkspaceFrom(r), "workshop", id, recipe)
+			if err != nil {
+				writeSkillError(w, http.StatusInternalServerError, "技能版本保存失败")
+				return
+			}
+			recipe["libraryVersion"] = version
+		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{
 			"success": true, "page": page, "pageSize": pageSize, "total": pageResult.Total,
-			"recipes": pageResult.Recipes, "hiddenOfficialRecipes": pageResult.HiddenOfficialRecipes,
+			"categorySkillBase": learning.BaseRecipe(), "recipes": pageResult.Recipes, "hiddenOfficialRecipes": pageResult.HiddenOfficialRecipes,
 		})
 	}
 }
@@ -52,7 +62,11 @@ func styleRecipesDeleteHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		if err := dbcatalog.DeleteStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id); err != nil {
+		if err := dbcatalog.DeleteStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id, r.URL.Query().Get("version")); err != nil {
+			if err == dbcatalog.ErrSkillConflict {
+				writeSkillError(w, http.StatusConflict, "技能已更新，请刷新后重试")
+				return
+			}
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
 		}

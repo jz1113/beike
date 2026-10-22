@@ -134,5 +134,5 @@ func workshopSkillSnapshot(skill map[string]any) any {
 	if skill == nil {
 		return nil
 	}
-	return map[string]any{"id": skill["id"], "name": skill["name"], "promptSnippet": skill["promptSnippet"], "updatedAt": skill["updatedAt"]}
+	return map[string]any{"id": skill["id"], "name": skill["name"], "promptSnippet": skill["promptSnippet"], "updatedAt": skill["updatedAt"], "libraryVersion": skill["libraryVersion"], "learningScopeId": skill["learningScopeId"], "learningVersionId": skill["learningVersionId"], "learningReferenceFingerprint": skill["learningReferenceFingerprint"], "baseRecipeVersion": skill["baseRecipeVersion"]}
 }

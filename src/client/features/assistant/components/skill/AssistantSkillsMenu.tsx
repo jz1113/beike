@@ -22,6 +22,7 @@ export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props)
   const store = useAppStore(useShallow(s => ({
     activeId: s.activeAssistantSkillId, setActive: s.setActiveAssistantSkillId,
     getSkills: s.getAllAssistantSkills,
+    customSkills: s.assistantCustomSkills, error: s.assistantSkillsError,
     add: s.addAssistantSkill, update: s.updateAssistantSkill, remove: s.deleteAssistantSkill,
   })));
   const [open, setOpen] = useState(false);
@@ -50,14 +51,16 @@ export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props)
     const state = studioStateFromSkill(skill);
     openStudio(state.files, state.draft, skill);
   };
-  const saveStudio = (payload: SkillStudioPayload) => {
+  const saveStudio = async (payload: SkillStudioPayload) => {
     const skill = buildSkillFromStudio(payload, editingSkill ? { id: editingSkill.id, createdAt: editingSkill.createdAt } : undefined);
-    if (editingSkill && !editingSkill.isBuiltin) store.update(skill.id, skill);
-    else store.add(skill);
+    if (editingSkill && !editingSkill.isBuiltin) await store.update(skill.id, { ...skill, libraryVersion: editingSkill.libraryVersion });
+    else await store.add(skill);
+    store.setActive(skill.id);
     showToast(editingSkill ? '技能已更新' : '技能已创建');
   };
   useEffect(() => {
     if (!open) return;
+    void useAppStore.getState().refreshAssistantSkills().catch(() => {});
     searchRef.current?.focus();
     const outside = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', outside);
@@ -70,6 +73,7 @@ export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props)
       {open && <section ref={popoverRef} role="dialog" aria-modal="false" tabIndex={-1} className="agent-popover agent-skills-panel" aria-label="技能库">
         <label className="agent-search"><Search size={14} aria-hidden="true" /><input ref={searchRef} aria-label="搜索技能" placeholder="搜索技能" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <div className="agent-skills-list">
+          {store.error && <p role="alert" className="agent-empty-result">{store.error}，重新打开技能菜单可重试</p>}
           {filtered.map(skill => <button type="button" key={skill.id} className="agent-skill-option" title={`${skill.displayName || skill.name}\n${skill.description}`} aria-pressed={store.activeId === skill.id} onClick={() => { store.setActive(store.activeId === skill.id ? null : skill.id); close(); triggerRef.current?.focus(); }}>
             <AssistantSkillIcon className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1"><strong>{skill.displayName || skill.name}</strong></span>{store.activeId === skill.id && <Check size={14} className="shrink-0" aria-hidden="true" />}
           </button>)}
@@ -101,6 +105,7 @@ export default function AssistantSkillsMenu({ showToast, onUploadFiles }: Props)
       heading={editingSkill ? '编辑技能' : '创建技能'}
       mode={editingSkill ? 'edit' : 'create'}
       onSave={saveStudio}
+      saveLabel="保存并使用"
     />
     <AssistantSkillManageModal isOpen={manage} onClose={() => setManage(false)} skills={skills} activeSkillId={store.activeId} onActivate={store.setActive}
       onEdit={skill => { setManage(false); openEdit(skill); }} onDelete={store.remove} showToast={showToast} />

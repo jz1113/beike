@@ -383,6 +383,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
         withAssetDetail={withAssetDetail} handleCopyPrompt={handleCopyPrompt} getAssetPreviewText={getAssetPreviewText}
         setEditingItem={(item) => { const next = libraryItem(item); if (next) setEditingItem(next); }}
         setTagEditItem={(item) => { const next = libraryItem(item); if (next) setTagEditItem(next); }}
+        onUseLearningReference={id => { void withAssetDetail({ id }, detail => { const item = libraryItem(detail); if (item) handleApplyToWorkshop(item); }); }}
         deleteAsset={deleteAsset}
       />
 

@@ -31,6 +31,27 @@ export function writePetPosition(storage: Pick<Storage, 'setItem'>, point: PetPo
   try { storage.setItem(PET_POSITION_KEY, JSON.stringify(point)); } catch { /* Private browsing may block storage. */ }
 }
 
+export interface PetFloatBox { width: number; height: number }
+export interface PetFloatPlacement { left: number; top: number; width: number; side: 'above' | 'below' }
+
+/** Place floating chrome beside the pet. The pet point is not part of the result. */
+export function petStackLayout(point: PetPoint, size: PetSize, bounds: PetBounds, boxes: readonly PetFloatBox[], gap = 8): PetFloatPlacement[] {
+  if (boxes.length === 0) return [];
+  const stackHeight = boxes.reduce((sum, box) => sum + box.height, 0) + gap * (boxes.length - 1);
+  const above = Math.max(0, point.y - bounds.top - gap);
+  const below = Math.max(0, bounds.height - bounds.bottom - point.y - size.height - gap);
+  const up = above >= stackHeight || above >= below;
+  const room = Math.max(0, bounds.width - bounds.left - bounds.right);
+  let cursor = up ? point.y - gap : point.y + size.height + gap;
+  return boxes.map((box) => {
+    const width = Math.min(Math.max(0, box.width), room);
+    const left = Math.max(bounds.left, Math.min(point.x + size.width - width, bounds.width - bounds.right - width));
+    const top = up ? cursor - box.height : cursor;
+    cursor = up ? top - gap : top + box.height + gap;
+    return { left, top, width, side: up ? 'above' as const : 'below' as const };
+  });
+}
+
 export function petPanelLayout(point: PetPoint, size: PetSize, bounds: PetBounds, contentHeight: number) {
   const gap = 12;
   const width = Math.max(0, Math.min(380, bounds.width - bounds.left - bounds.right));

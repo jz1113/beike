@@ -1,22 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import BatchImageSelectionPanel from '../BatchImageSelectionPanel';
 import { useBatchConfig } from '../BatchConfigContext';
-import { BatchStage2PresetBar } from './BatchStage2PresetBar';
-import { useAppStore } from '@client/store';
-import type { AppState } from '@client/store/types';
 
 export default function BatchStage2Config() {
   const {
     successfulItems,
     setItems,
-    recipes,
-    selectedArchId,
-    availableVisionModels,
-    selectedVisionModel,
-    availableImageModels,
-    selectedImageGenModel,
-    selectedAspect,
-    selectedShotCount,
     activeImgFilter,
     setActiveImgFilter,
     toggleProductImageSelection,
@@ -25,10 +14,7 @@ export default function BatchStage2Config() {
     onPreviewGallery,
     onPreviewImage,
     onNextStage,
-    openWorkshopConfig,
   } = useBatchConfig();
-  const setIsWorkshopConfigOpen = useAppStore((s: AppState) => s.setIsWorkshopConfigOpen);
-  const handleOpenSettings = openWorkshopConfig || (() => setIsWorkshopConfigOpen(true));
 
   // 商品筛选状态（全部 / 待选图 / 已就绪）
   const [productFilter, setProductFilter] = useState<'pending' | 'completed' | 'all'>('all');
@@ -70,25 +56,8 @@ export default function BatchStage2Config() {
     }
   }, [displayedItems.length, focusedIndex]);
 
-  const readyCount = completedItems.length;
-
   return (
     <div className="space-y-4">
-      {/* 🌟 极简紧凑全局生产预设微指示条（仅 36px 高度，点击可打开独立设置面板） */}
-      <BatchStage2PresetBar
-        recipes={recipes}
-        selectedArchId={selectedArchId}
-        selectedShotCount={selectedShotCount}
-        selectedAspect={selectedAspect}
-        selectedVisionModel={selectedVisionModel}
-        availableVisionModels={availableVisionModels}
-        selectedImageGenModel={selectedImageGenModel}
-        availableImageModels={availableImageModels}
-        onOpenSettings={handleOpenSettings}
-        readyCount={readyCount}
-        totalCount={successfulItems.length}
-      />
-
       {/* 🌟 选图工作台：统一单面板 */}
       <div className="space-y-3.5">
 

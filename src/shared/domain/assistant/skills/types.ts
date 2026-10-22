@@ -35,6 +35,9 @@ export interface AssistantSkillMeta {
 
 export interface AssistantSkill {
   id: string;
+  /** Server content version, separate from the author's version label. */
+  libraryVersion?: string;
+  isFavorite?: boolean;
   name: string;
   description: string;
   /** 注入 systemPrompt 的主指令（精简） */

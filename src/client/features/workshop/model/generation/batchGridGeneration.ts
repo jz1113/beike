@@ -9,6 +9,7 @@ import type { TaskExecutionConfig } from './batchTaskExecution';
 import { resolveGridRecoverySource } from './generationHelpers';
 import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { savedWorkshopOutputSize } from './generationHelpers';
+import { captureLearningContext } from './learningContext';
 import { workshopReferenceInput } from './workshopReferenceInput';
 
 export async function runGridImageTask(
@@ -71,6 +72,10 @@ export async function runGridImageTask(
         ? await compressProductImageIfNeeded(config.anchorFaceUrl)
         : undefined;
       patch({ gridTaskKey: taskKey, gridSize: size, outputSize, upstreamTaskId: undefined });
+      setItems(items => items.map(entry => entry.id === item.id ? { ...entry, tasks: entry.tasks.map(task => {
+        const shot = shots.find(shot => shot.shot_no === task.shot_no);
+        return matchesAttempt(task) && shot ? { ...task, learningContext: captureLearningContext(item, shot, config, 'grid_first') } : task;
+      }) } : entry));
       await config.beforeSubmit?.();
       verifySource = true;
       const generated = await submitImageGenTaskResult({

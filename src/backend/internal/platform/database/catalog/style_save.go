@@ -14,37 +14,39 @@ import (
 var ErrStyleMissing = errors.New("style missing")
 
 type StyleChanges struct {
-	Name          *string
-	Category      *string
-	Tag           *string
-	Desc          *string
-	PromptSnippet *string
-	CoverURL      *string
-	Favorite      *bool
+	Name            *string
+	Category        *string
+	Tag             *string
+	Desc            *string
+	PromptSnippet   *string
+	CoverURL        *string
+	Favorite        *bool
+	ExpectedVersion string
 }
 
 func SaveStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string, changes StyleChanges) (map[string]any, bool, error) {
-	current, err := loadStyleRecipe(ctx, db, workspace, id)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback()
+	current, err := loadStyleRecipe(ctx, tx, workspace, id)
 	if err == sql.ErrNoRows {
 		return nil, false, ErrStyleMissing
 	}
 	if err != nil {
 		return nil, false, err
 	}
+	if changes.ExpectedVersion != "" && SkillVersion(styleSnapshotContent(id, current)) != changes.ExpectedVersion {
+		return nil, false, ErrSkillConflict
+	}
 	if current.workspace != database.OfficialWorkspace {
-		recipe, err := updateStyleRecipe(ctx, db, workspace, id, current, changes)
-		return recipe, false, err
-	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, false, err
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
+		recipe, err := updateStyleRecipeTx(ctx, tx, workspace, id, current, changes, time.Now().UTC().Format("2006-01-02T15:04:05.000Z"))
+		if err != nil {
+			return nil, false, err
 		}
-	}()
+		return recipe, false, tx.Commit()
+	}
 	var hidden int
 	err = tx.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM "PromptAssetUsageEvent" WHERE "id" = ? AND "workspaceId" = ?`,
@@ -83,30 +85,36 @@ func SaveStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string, chan
 	if err := tx.Commit(); err != nil {
 		return nil, false, err
 	}
-	committed = true
 	return recipe, true, nil
 }
 
 type storedStyle struct {
-	name, category, prompt, created              string
+	name, category, prompt, created, updated     string
 	tag, desc, coverURL, sampleImages, sourceURL sql.NullString
 	favorite                                     bool
 	workspace                                    string
 }
 
-func loadStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string) (storedStyle, error) {
+type styleReader interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func loadStyleRecipe(ctx context.Context, db styleReader, workspace, id string) (storedStyle, error) {
 	var style storedStyle
 	var favorite int
 	err := db.QueryRowContext(ctx, `
-		SELECT "workspaceId", "name", "category", "tag", "desc", "promptSnippet", "coverUrl", "sampleImages", "sourceUrl", "isFavorite", "createdAt"
+		SELECT "workspaceId", "name", "category", "tag", "desc", "promptSnippet", "coverUrl", "sampleImages", "sourceUrl", "isFavorite", "createdAt", "updatedAt"
 		FROM "StyleRecipe" WHERE "id" = ? AND "workspaceId" IN (?, ?)`,
-		id, workspace, database.OfficialWorkspace).Scan(&style.workspace, &style.name, &style.category, &style.tag, &style.desc, &style.prompt, &style.coverURL, &style.sampleImages, &style.sourceURL, &favorite, &style.created)
+		id, workspace, database.OfficialWorkspace).Scan(&style.workspace, &style.name, &style.category, &style.tag, &style.desc, &style.prompt, &style.coverURL, &style.sampleImages, &style.sourceURL, &favorite, &style.created, &style.updated)
 	style.favorite = favorite != 0
 	return style, err
 }
 
-func updateStyleRecipe(ctx context.Context, db *sql.DB, workspace, id string, current storedStyle, changes StyleChanges) (map[string]any, error) {
-	return updateStyleRecipeDB(ctx, db, workspace, id, current, changes, time.Now().UTC().Format("2006-01-02T15:04:05.000Z"))
+func styleSnapshotContent(id string, style storedStyle) map[string]any {
+	content := styleRecipeMap(id, style.workspace, style, database.FormatSQLiteTime(style.created), database.FormatSQLiteTime(style.updated))
+	delete(content, "workspaceId")
+	content["isOfficial"] = style.workspace == database.OfficialWorkspace
+	return content
 }
 
 func updateStyleRecipeTx(ctx context.Context, tx *sql.Tx, workspace, id string, current storedStyle, changes StyleChanges, now string) (map[string]any, error) {

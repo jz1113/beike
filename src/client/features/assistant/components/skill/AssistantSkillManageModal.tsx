@@ -13,7 +13,7 @@ interface Props {
   activeSkillId: string | null;
   onActivate: (id: string | null) => void;
   onEdit: (skill: AssistantSkill) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
   showToast: (msg: string) => void;
 }
 
@@ -250,10 +250,12 @@ export default function AssistantSkillManageModal({
                 {!selectedSkill.isBuiltin ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      onDelete(selectedSkill.id);
-                      showToast('技能已删除');
-                      closeDetail();
+                    onClick={async () => {
+                      try {
+                        await onDelete(selectedSkill.id);
+                        showToast('技能已删除');
+                        closeDetail();
+                      } catch (error) { showToast(error instanceof Error ? error.message : '删除失败'); }
                     }}
                     className="text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:text-rose-400 dark:hover:text-rose-300"
                   >

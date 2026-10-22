@@ -1,8 +1,17 @@
 import { KEYWORD_REVIEW_CATEGORIES, KEYWORD_VIDEO_CATEGORIES, KeywordReviewResultSchema, type KeywordReviewMode, type KeywordReviewResult } from '@shared/contracts/generate';
+import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
+import type { ResolvedTextProtocol } from '@shared/domain/models/textProtocol';
 import type { KeywordReviewRecord } from './keywordReviewWorkbook';
-import { ReviewPacer } from './reviewPacer';
+import { ReviewPacer, SLOW_GATEWAY_BATCH_MS } from './reviewPacer';
 import { DEEPSEEK_BASE_URL, requestReviewBatch, type ReviewRequestError } from './reviewRequest';
 import type { ReviewSubmission } from './reviewSubmission';
+
+/** Attempts for one chunk after an unbilled gateway or rate-limit response, including the first try. */
+const GATEWAY_RETRY_ATTEMPTS = 8;
+
+export type ReviewRetryReason = 'rate' | 'gateway';
+
+type ReviewPacerControl = Pick<ReviewPacer, 'concurrency' | 'acquire' | 'succeeded' | 'succeededSlow' | 'failed' | 'timedOut' | 'rateLimited'>;
 
 function localProgressFailure(error: unknown, dispatched: boolean): ReviewRequestError {
   const detail = error instanceof Error ? error.message : '无法保存本机进度';
@@ -51,6 +60,8 @@ export function createReviewBatchSubmit(options: {
   model: string;
   provider?: 'deepseek' | 'gateway';
   baseUrl?: string;
+  textProtocol?: ResolvedTextProtocol;
+  reasoningEffort?: ReasoningEffort;
   reviewMode?: KeywordReviewMode;
   apiKey: string;
   lookup: boolean;
@@ -60,13 +71,13 @@ export function createReviewBatchSubmit(options: {
   shouldStop: () => boolean;
   indices: Map<string, number>;
   versions: Map<number, number>;
-  pacer: ReviewPacer;
+  pacer: ReviewPacerControl;
   onDispatch: (submission: ReviewSubmission) => void | Promise<void>;
   onCancelled?: (submission: ReviewSubmission) => void | Promise<void>;
   onRequestFailure?: (error: ReviewRequestError, submission: ReviewSubmission) => void | Promise<void>;
   onUsage?: (usage: unknown, dispatchedAt: Date) => void;
   onSuccess: (rows: KeywordReviewRecord[], results: KeywordReviewResult[], lookedUp: number, usage: unknown, lookupUsage: unknown, submission: ReviewSubmission) => void | Promise<void>;
-  onRateLimit: (concurrency: number) => void;
+  onRateLimit: (concurrency: number, reason: ReviewRetryReason) => void;
   onFailure: () => void;
   request?: typeof requestReviewBatch;
 }): (chunk: KeywordReviewRecord[]) => Promise<string[]> {
@@ -76,25 +87,30 @@ export function createReviewBatchSubmit(options: {
     const modeField = options.reviewMode === 'video' ? { reviewMode: 'video' as const } : {};
     const providerField = options.provider === 'gateway' ? { provider: 'gateway' as const } : {};
     const budgetField = options.lookupBudget === undefined ? {} : { lookupBudget: options.lookupBudget };
-    const payload = JSON.stringify({ model: options.model, lookup: options.lookup, rulesVersion: options.rulesVersion, rows, ...providerField, ...modeField, ...budgetField });
+    const protocolField = options.textProtocol ? { textProtocol: options.textProtocol } : {};
+    const effortField = options.reasoningEffort && options.reasoningEffort !== 'auto' ? { reasoningEffort: options.reasoningEffort } : {};
+    const baseUrl = options.baseUrl || DEEPSEEK_BASE_URL;
+    const payload = JSON.stringify({ model: options.model, lookup: options.lookup, rulesVersion: options.rulesVersion, rows, baseUrl, ...providerField, ...modeField, ...budgetField, ...protocolField, ...effortField });
     const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
     const fingerprint = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    for (let retry = 0; retry < 5; retry += 1) {
+    for (let retry = 0; retry < GATEWAY_RETRY_ATTEMPTS; retry += 1) {
       if (!await options.pacer.acquire(options.shouldStop)) return [];
       // The view can unmount between acquiring a slot and resuming this await.
       if (options.shouldStop()) { options.pacer.failed(); return []; }
       const retryVersion = options.versions.get(sourceIndex) ?? 0;
       let outcome: 'succeeded' | 'failed' | 'limited' = 'failed';
       let retryPending = false;
+      let retryReason: ReviewRetryReason = 'rate';
       let responseReceived = false;
       let dispatched = false;
       let usageAccounted = false;
+      let gatewayTimedOut = false;
       const dispatchedAt = new Date();
       const submission: ReviewSubmission = {
         idempotencyKey: `keyword:${fingerprint}:${retryVersion}`,
         attemptId: crypto.randomUUID(), dispatchedAt: dispatchedAt.getTime(), rows,
         model: options.model, provider: options.provider || 'deepseek',
-        baseUrl: options.baseUrl || DEEPSEEK_BASE_URL,
+        baseUrl,
         reviewMode: options.reviewMode || 'image', rulesVersion: options.rulesVersion,
         lookup: options.lookup, ...budgetField,
       };
@@ -108,8 +124,8 @@ export function createReviewBatchSubmit(options: {
         }
         dispatched = true;
         const data = await (options.request || requestReviewBatch)(JSON.stringify({
-          model: options.model, ...providerField,
-          customBaseUrl: options.baseUrl || DEEPSEEK_BASE_URL, customApiKey: options.apiKey,
+          model: options.model, ...providerField, ...protocolField, ...effortField,
+          customBaseUrl: baseUrl, customApiKey: options.apiKey,
           lookup: options.lookup, rulesVersion: options.rulesVersion, rows, ...modeField, ...budgetField,
         }), options.signal, submission.idempotencyKey, { attemptId: submission.attemptId });
         responseReceived = true;
@@ -136,9 +152,16 @@ export function createReviewBatchSubmit(options: {
           failure.outcomeUncertain = true;
           failure.infrastructureFailure = true;
         }
-        const limited = failure.rateLimited === true;
-        if (limited) outcome = 'limited';
-        if (limited || failure.modelOutputInvalid) {
+        const retryable = failure.rateLimited === true || failure.gatewayRetryable === true;
+        // A 504/524 already used the gateway's time budget. Repeating the same rows times out again.
+        const sameBatchRetry = retryable && failure.gatewayTimeout !== true;
+        if (failure.gatewayTimeout === true) gatewayTimedOut = true;
+        if (sameBatchRetry) {
+          outcome = 'limited';
+          retryReason = failure.gatewayRetryable && !failure.rateLimited ? 'gateway' : 'rate';
+        }
+        // The failed attempt's receipt is already stored. The next try must use a new key.
+        if (retryable || failure.modelOutputInvalid) {
           options.versions.set(sourceIndex, retryVersion + 1);
         }
         if (!usageAccounted && failure.usage !== undefined && !(failure.usageReplayed ?? failure.replayed)) {
@@ -148,7 +171,7 @@ export function createReviewBatchSubmit(options: {
         }
         try { await options.onRequestFailure?.(failure, submission); }
         catch (progressError) { failure = localProgressFailure(progressError, dispatched); }
-        if (limited && !failure.fatalLocal && retry < 4 && !options.shouldStop()) {
+        if (sameBatchRetry && !failure.fatalLocal && retry < GATEWAY_RETRY_ATTEMPTS - 1 && !options.shouldStop()) {
           retryPending = true;
         } else {
           try { options.onFailure(); }
@@ -156,11 +179,14 @@ export function createReviewBatchSubmit(options: {
           throw failure;
         }
       } finally {
+        const slowSuccess = outcome === 'succeeded' && Date.now() - dispatchedAt.getTime() >= SLOW_GATEWAY_BATCH_MS;
         if (outcome === 'limited') options.pacer.rateLimited(retry);
+        else if (slowSuccess) options.pacer.succeededSlow();
         else if (outcome === 'succeeded') options.pacer.succeeded();
+        else if (gatewayTimedOut) options.pacer.timedOut();
         else options.pacer.failed();
       }
-      if (retryPending) options.onRateLimit(options.pacer.concurrency);
+      if (retryPending) options.onRateLimit(options.pacer.concurrency, retryReason);
     }
     return [];
   };

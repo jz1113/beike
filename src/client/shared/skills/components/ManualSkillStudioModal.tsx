@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useModalDialog } from '@client/shared/hooks/useModalDialog';
 import { SKILL_TAG_OPTIONS, type SkillDraftData } from '../model/skillTypes';
 import type { SkillStudioPayload } from '../model/buildSkillFromStudio';
 import { extractYamlFrontmatter } from '../model/skillPackageParser';
@@ -30,7 +31,8 @@ export interface ManualSkillStudioModalProps {
   heading?: string;
   /** create：相对空白模板判断未保存；edit：相对打开时的内容判断未保存 */
   mode?: 'create' | 'edit';
-  onSave: (skill: SkillStudioPayload) => void;
+  onSave: (skill: SkillStudioPayload) => void | Promise<void>;
+  saveLabel?: string;
 }
 
 const DEFAULT_DRAFT: SkillDraftData = {
@@ -67,8 +69,9 @@ export function ManualSkillStudioModal({
   heading = '创建技能',
   mode = 'create',
   onSave,
+  saveLabel = '保存技能',
 }: ManualSkillStudioModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useModalDialog(isOpen, () => requestClose());
   const baselineRef = useRef('');
 
   const [fileNodes, setFileNodes] = useState<SkillFileNode[]>(() =>
@@ -79,6 +82,8 @@ export function ManualSkillStudioModal({
   const [baselineNodes, setBaselineNodes] = useState<SkillFileNode[]>([]);
   const [session, setSession] = useState(0);
   const sessionRef = useRef(0);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -159,7 +164,8 @@ export function ManualSkillStudioModal({
     setFileNodes((prev) => toggleFolderOpenInTree(prev, id));
   };
 
-  const handleSaveAndUse = () => {
+  const handleSaveAndUse = async () => {
+    if (savingRef.current) return;
     const trimmedTitle = draft.title.trim();
     if (!trimmedTitle) {
       showToast('请输入技能名称');
@@ -178,10 +184,6 @@ export function ManualSkillStudioModal({
       showToast('需要选择 1 个类型标签');
       return;
     }
-    if (!draft.coverUrl) {
-      showToast('请上传技能封面');
-      return;
-    }
 
     const mainPrompt = getMainSkillContent(fileNodes);
     if (!extractYamlFrontmatter(mainPrompt).body.trim()) {
@@ -189,21 +191,30 @@ export function ManualSkillStudioModal({
       return;
     }
 
-    onSave({
-      title: trimmedTitle,
-      description: trimmedDesc,
-      genres: draft.genres,
-      tags: draft.tags,
-      defaultVideoModel: draft.defaultVideoModel,
-      defaultImageModel: draft.defaultImageModel,
-      coverUrl: draft.coverUrl,
-      showcaseUrls: draft.showcaseUrls,
-      promptGuide: draft.promptGuide.trim(),
-      assetGuide: draft.assetGuide.trim(),
-      isPublic: draft.isPublic,
-      files: fileNodes,
-    });
-    onClose();
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await onSave({
+        title: trimmedTitle,
+        description: trimmedDesc,
+        genres: draft.genres,
+        tags: draft.tags,
+        defaultVideoModel: draft.defaultVideoModel,
+        defaultImageModel: draft.defaultImageModel,
+        coverUrl: draft.coverUrl,
+        showcaseUrls: draft.showcaseUrls,
+        promptGuide: draft.promptGuide.trim(),
+        assetGuide: draft.assetGuide.trim(),
+        isPublic: draft.isPublic,
+        files: fileNodes,
+      });
+      onClose();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '保存失败，编辑内容已保留');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const ready = session > 0 && session === sessionRef.current;
@@ -211,6 +222,7 @@ export function ManualSkillStudioModal({
   const dirtyIds = ready ? collectDirtyNodeIds(fileNodes, baselineNodes) : new Set<string>();
 
   const requestClose = () => {
+    if (savingRef.current) return;
     if (dirty && !window.confirm('当前技能还有未保存的修改，确定关闭吗？')) return;
     onClose();
   };
@@ -239,7 +251,7 @@ export function ManualSkillStudioModal({
           </button>
         </header>
 
-        <div className="flex flex-1 overflow-hidden">
+        <fieldset disabled={saving} className="flex min-h-0 flex-1 overflow-hidden">
           <section className="flex flex-1 flex-col border-r border-black/[0.06] dark:border-white/[0.08] p-5">
             <div className="mb-2 flex items-center gap-1">
               <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">技能内容</span>
@@ -279,8 +291,10 @@ export function ManualSkillStudioModal({
             onChange={setDraft}
             onSaveAndUse={handleSaveAndUse}
             showToast={showToast}
+            saving={saving}
+            saveLabel={saveLabel}
           />
-        </div>
+        </fieldset>
       </div>
     </div>,
     document.body

@@ -68,6 +68,8 @@ export function resolveRecipeForProduct<T extends RecipeForProduct>(
     return { recipe: chosen, error: null };
   }
 
+  const automatic = recipes.find(recipe => recipe.id === '__category_skill__');
+  if (automatic) return { recipe: automatic, error: null };
   const matching = recipes.filter(recipe => recipeKind(recipe) === productKind);
   const preferredId = productKind === 'phone' ? 'recipe_phone_comms_master'
     : productKind === 'jewelry' ? 'recipe_jewelry_master' : '';

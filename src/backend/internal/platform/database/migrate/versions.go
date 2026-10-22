@@ -59,6 +59,8 @@ func mustMigrations() []migration {
 		{version: "20261018_01_avatar_studio", checksum: file("avatar_studio.sql"), apply: script("avatar_studio.sql", false)},
 		{version: "20261018_02_task_usage", checksum: file("task_usage.sql"), apply: script("task_usage.sql", true)},
 		{version: "20261019_01_cover_memory", checksum: file("cover_memory.sql"), apply: script("cover_memory.sql", false)},
+		{version: "20261022_01_skill_library", checksum: file("skill_library.sql"), apply: script("skill_library.sql", false)},
+		{version: "20261022_02_category_skill_learning", checksum: file("category_skill_learning.sql"), apply: script("category_skill_learning.sql", false)},
 	}
 }
 

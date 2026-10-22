@@ -2,6 +2,7 @@ export interface UsageLogItem {
   id: string;
   timestamp: number; // Date.now()
   taskId?: string;
+  localTaskId?: string;
   modelId: string;
   modelName: string;
   provider: string;

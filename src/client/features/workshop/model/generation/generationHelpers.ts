@@ -121,7 +121,7 @@ export function prepareTaskRetry(task: BatchTaskItem): BatchTaskItem {
     attempt, idempotencyKey: `${base}:a${attempt}`, upstreamTaskId: undefined,
     generationSize: undefined,
     gridTaskKey: undefined, gridSourceUrl: undefined, gridSize: undefined, outputSize: savedWorkshopOutputSize(task),
-    resultUrl: undefined, temporaryUrl: false, outputReview: 'unreviewed',
+    resultUrl: undefined, temporaryUrl: false, outputReview: 'unreviewed', outputRating: undefined, learningContext: undefined,
     resultStatus: 'current',
   };
 }

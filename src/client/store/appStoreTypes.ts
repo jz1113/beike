@@ -112,7 +112,7 @@ export interface AssistantMessage {
   runMode?: AssistantRunMode;
   referenceScope?: ReferenceScope;
   /** 本条消息发送时的技能快照，重试复用原始指令。 */
-  usedSkill?: { name: string; skillId: string; systemPrompt: string; allowedTools?: string[] };
+  usedSkill?: { name: string; skillId: string; systemPrompt: string; allowedTools?: string[]; libraryVersion?: string; resources?: Array<{ path: string; content: string }> };
   imageBatchSessionId?: string;
   id: string;
   role: 'user' | 'assistant';

@@ -335,6 +335,7 @@ export async function retrySingleShotTaskCoordinator(
     await beforeSubmit();
     const generated = await executeSingleImageTask(targetItem, shot, config.anchorFaceUrl, { ...config, idempotencyKey, outputSize: savedWorkshopOutputSize(task),
       beforeSubmit,
+      onLearningContextResolved: (learningContext) => patchItemTasks(setItems, itemId, tasks => tasks.map(entry => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, learningContext } : entry)),
       onOutputSizeResolved: (outputSize) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, outputSize } : entry)),
       onGenerationSizeResolved: (generationSize) => patchItemTasks(setItems, itemId, (tasks) => tasks.map((entry) => entry.id === task.id && entry.idempotencyKey === idempotencyKey ? { ...entry, generationSize } : entry)),
       onTaskSubmitted: async (upstreamTaskId) => {

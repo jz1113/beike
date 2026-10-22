@@ -39,6 +39,10 @@ func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
 		}
 		defer db.Close()
 		recipe, copied, err := dbcatalog.SaveStyleRecipe(r.Context(), db, httpx.WorkspaceFrom(r), id, changes)
+		if err == dbcatalog.ErrSkillConflict {
+			writeSkillError(w, http.StatusConflict, "技能已更新，请刷新后重试；编辑内容已保留")
+			return
+		}
 		if err == dbcatalog.ErrStyleMissing {
 			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{
 				"success": false, "code": "recipe_not_found",
@@ -56,6 +60,13 @@ func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
 
 func styleChanges(object map[string]any) (dbcatalog.StyleChanges, bool) {
 	var changes dbcatalog.StyleChanges
+	if value, exists := object["expectedVersion"]; exists {
+		version, ok := value.(string)
+		if !ok {
+			return changes, false
+		}
+		changes.ExpectedVersion = version
+	}
 	var ok bool
 	if changes.Name, ok = optionalChangeString(object, "name"); !ok {
 		return changes, false

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { clampPetPosition, LEGACY_PET_POSITION_KEY, PET_POSITION_KEY, petPanelLayout, readPetPosition, writePetPosition } from './petGeometry';
+import { clampPetPosition, LEGACY_PET_POSITION_KEY, PET_POSITION_KEY, petPanelLayout, petStackLayout, readPetPosition, writePetPosition } from './petGeometry';
 
 const bounds = { width: 1000, height: 740, left: 16, right: 16, top: 16, bottom: 16 };
 const size = { width: 160, height: 140 };
@@ -33,6 +33,20 @@ describe('pet position rules', () => {
   it('opens above a lower pet and below an upper pet without crossing either horizontal edge', () => {
     expect(petPanelLayout({ x: 824, y: 584 }, size, bounds, 300)).toEqual({ left: 604, top: 272, width: 380, maxHeight: 556, side: 'above' });
     expect(petPanelLayout({ x: 16, y: 16 }, size, bounds, 300)).toEqual({ left: 16, top: 168, width: 380, maxHeight: 556, side: 'below' });
+  });
+  it('places the menu beside the pet and leaves the saved point unchanged', () => {
+    const point = { x: 824, y: 584 };
+    const placed = petStackLayout(point, size, bounds, [{ width: 144, height: 28 }, { width: 176, height: 168 }]);
+    expect(point).toEqual({ x: 824, y: 584 });
+    expect(placed.map((item) => item.side)).toEqual(['above', 'above']);
+    expect(placed[0].top + 28).toBeLessThanOrEqual(point.y);
+    expect(placed[1].top).toBeLessThan(placed[0].top);
+    expect(placed[1].left + placed[1].width).toBeLessThanOrEqual(bounds.width - bounds.right);
+  });
+  it('drops stacked chrome below a pet that sits against the top edge', () => {
+    const placed = petStackLayout({ x: 16, y: 16 }, size, bounds, [{ width: 176, height: 180 }]);
+    expect(placed[0]).toMatchObject({ left: 16, side: 'below' });
+    expect(placed[0].top).toBeGreaterThanOrEqual(16 + size.height);
   });
   it('limits long panels to the larger side and narrows panels on mobile', () => {
     const panel = petPanelLayout({ x: 180, y: 250 }, size, { ...bounds, width: 360, height: 600 }, 1000);

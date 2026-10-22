@@ -47,6 +47,7 @@ export function coverVisionPickerModels(models: CoverVisionModel[]) {
     upstreamId: model.modelId,
     name: coverVisionModelLabel(model),
     desc: '封面视觉反推',
+    ...(model.channel ? { provider: model.channel } : {}),
   }));
 }
 

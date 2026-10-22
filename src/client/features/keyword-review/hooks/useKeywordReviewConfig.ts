@@ -1,19 +1,36 @@
 import { useEffect, useState } from 'react';
-import { DEFAULT_KEYWORD_REVIEW_MODEL, KEYWORD_REVIEW_MODEL_STORAGE_KEY, loadKeywordReviewModels } from '@client/shared/models/keywordReviewModels';
+import { KEYWORD_REVIEW_MODEL_STORAGE_KEY, loadKeywordReviewModels, resolveStoredKeywordReviewModel } from '@client/shared/models/keywordReviewModels';
 import { loadKeywordReviewSettings, normalizeKeywordReviewSettings, persistKeywordReviewSettings, type KeywordReviewSettings } from '../model/keywordReviewSettings';
+
+function readStoredModel(): string {
+  try { return localStorage.getItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY) || ''; }
+  catch { return ''; }
+}
 
 export function useKeywordReviewConfig(busy: () => boolean, onNotice: (message: string) => void) {
   const [settings, setSettings] = useState<KeywordReviewSettings>(loadKeywordReviewSettings);
   const [modelOptions, setModelOptions] = useState(loadKeywordReviewModels);
-  const [modelValue, setModelValue] = useState(() => {
-    try { return localStorage.getItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY) || DEFAULT_KEYWORD_REVIEW_MODEL; }
-    catch { return DEFAULT_KEYWORD_REVIEW_MODEL; }
-  });
+  const [modelValue, setModelValue] = useState(() => resolveStoredKeywordReviewModel(readStoredModel(), loadKeywordReviewModels()));
   const selectedModel = modelOptions.find((option) => option.value === modelValue) || modelOptions[0];
   useEffect(() => {
-    const reload = () => setModelOptions(loadKeywordReviewModels());
+    const reload = () => {
+      const next = loadKeywordReviewModels();
+      setModelOptions(next);
+      setModelValue((current) => {
+        const resolved = resolveStoredKeywordReviewModel(current || readStoredModel(), next);
+        if (resolved !== current) {
+          try { localStorage.setItem(KEYWORD_REVIEW_MODEL_STORAGE_KEY, resolved); } catch { /* storage unavailable */ }
+        }
+        return resolved;
+      });
+    };
+    reload();
     window.addEventListener('models_updated', reload);
-    return () => window.removeEventListener('models_updated', reload);
+    window.addEventListener('modality_models_updated', reload);
+    return () => {
+      window.removeEventListener('models_updated', reload);
+      window.removeEventListener('modality_models_updated', reload);
+    };
   }, []);
 
   const selectModel = (value: string) => {

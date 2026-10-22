@@ -1,7 +1,7 @@
 import type { UsageSummary } from '@client/shared/utils/usageTracker';
 
 function tokenText(value: number) {
-  return value > 0 ? value.toLocaleString() : '—';
+  return value.toLocaleString();
 }
 
 export function CreatorMixCards({ usageSummary }: { usageSummary: UsageSummary }) {

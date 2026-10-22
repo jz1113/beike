@@ -9,9 +9,10 @@ interface BatchCollectionOptions {
   batchInputText: string;
   setBatchInputText: Dispatch<SetStateAction<string>>;
   showToast: (message: string) => void;
+  onCollected: () => void;
 }
 
-export function useBatchCollection({ items, itemsRef, setItems, batchInputText, setBatchInputText, showToast }: BatchCollectionOptions) {
+export function useBatchCollection({ items, itemsRef, setItems, batchInputText, setBatchInputText, showToast, onCollected }: BatchCollectionOptions) {
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectProgress, setCollectProgress] = useState({ total: 0, current: 0, success: 0, failed: 0 });
   const collectInFlight = useRef(false);
@@ -68,6 +69,7 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
         concurrency: 3,
       });
       showToast(`${forceRefresh ? '重新采集完成' : '批量采编完成'}：已就绪 ${result.success} 款${result.failed ? `，失败 ${result.failed} 款${forceRefresh ? '（保留原素材）' : ''}` : ''}`);
+      if (!forceRefresh && itemsRef.current.some(item => item.status === 'success' && item.selected)) onCollected();
     } finally {
       collectInFlight.current = false;
       setIsCollecting(false);

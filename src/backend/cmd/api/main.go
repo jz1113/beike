@@ -15,9 +15,11 @@ import (
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate/depth"
+	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/keywordreview"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/platform/database"
+	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 	"beike.local/cloud/src/backend/internal/platform/database/migrate"
 	"beike.local/cloud/src/backend/internal/system"
 )
@@ -46,6 +48,12 @@ func main() {
 			log.Printf("[API] 任务自愈未完成: %v", err)
 		} else if count > 0 {
 			log.Printf("→ [任务自愈] 已自动终止 %d 个未提交的生成任务", count)
+		}
+		if db, err := httpx.OpenDB(cfg); err == nil {
+			if err := learning.RecoverRuns(context.Background(), db); err != nil {
+				log.Printf("[API] 细分技能分析恢复未完成: %v", err)
+			}
+			db.Close()
 		}
 		go maintain(cfg)
 		sweep(cfg)

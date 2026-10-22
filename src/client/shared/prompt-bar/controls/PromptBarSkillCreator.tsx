@@ -55,9 +55,10 @@ export function usePromptBarSkillCreator(richInputRef: RefObject<RichPromptInput
     studioFiles,
     studioDraft,
     show,
-    saveSkill: (payload: SkillStudioPayload) => {
+    saveSkill: async (payload: SkillStudioPayload) => {
       const skill = buildSkillFromStudio(payload);
-      addAssistantSkill(skill);
+      await addAssistantSkill(skill);
+      setActiveAssistantSkillId(skill.id);
       richInputRef.current?.insertSkill(skill.displayName || skill.name);
       show(`技能「${payload.title}」已保存并激活`);
     },
@@ -94,6 +95,7 @@ export function PromptBarSkillCreatorHost({
         initialFiles={creator.studioFiles}
         initialDraft={creator.studioDraft}
         onSave={creator.saveSkill}
+        saveLabel="保存并使用"
       />
       {creator.toastMessage && createPortal(
         <div className="pointer-events-none fixed bottom-6 left-1/2 z-[140] -translate-x-1/2 rounded-2xl bg-slate-900 px-4 py-2.5 text-xs font-medium text-white shadow-xl dark:bg-white dark:text-slate-950">

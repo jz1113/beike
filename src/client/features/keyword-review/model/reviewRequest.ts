@@ -22,6 +22,10 @@ type ReviewResponse = {
 
 export type ReviewRequestError = Error & {
   rateLimited?: boolean;
+  /** Gateway returned a completed HTTP error and did not report usage. Safe to submit again with a new idempotency key. */
+  gatewayRetryable?: boolean;
+  /** 504/524: the gateway cut this response off. Retry a smaller batch instead of the same one. */
+  gatewayTimeout?: boolean;
   modelOutputInvalid?: boolean;
   outcomeUncertain?: boolean;
   infrastructureFailure?: boolean;
@@ -115,11 +119,21 @@ export async function requestReviewBatch(
     if (response.status === 409 && data.submissionUnknown) {
       throw Object.assign(error, { outcomeUncertain: true, infrastructureFailure: true });
     }
-    if ((response.status === 429 || response.status === 503) && data.usage === undefined && (data.code === 'deepseek_api_error' || data.code === 'upstream_api_error')) {
-      throw Object.assign(error, { rateLimited: true, infrastructureFailure: true });
-    }
     if (isRecoverableModelOutputError(response.status, data.code)) {
       throw Object.assign(error, { modelOutputInvalid: true });
+    }
+    // A finished HTTP error with no usage did not report a charge. Retry it with a new key.
+    // Timeouts, dropped connections, 409 receipts and responses that include usage stay quarantined.
+    const unbilledGateway = data.usage === undefined && !data.submissionUnknown
+      && (response.status === 429 || response.status >= 500);
+    if (unbilledGateway) {
+      const rateLimited = response.status === 429 || response.status === 503;
+      const gatewayTimeout = response.status === 504 || response.status === 524;
+      throw Object.assign(error, {
+        infrastructureFailure: true,
+        ...(rateLimited ? { rateLimited: true } : { gatewayRetryable: true }),
+        ...(gatewayTimeout ? { gatewayTimeout: true } : {}),
+      });
     }
     const rejected = [400, 401, 402, 403, 404, 405, 409, 413, 415, 422].includes(response.status);
     if (response.status >= 500 || response.status === 429 || (response.status >= 400 && response.status < 500 && !rejected)) {

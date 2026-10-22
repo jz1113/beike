@@ -5,6 +5,7 @@ import { persistAssistantImages } from '../api/persistAssistantImages';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { recordAssistantChatUsage } from '../model/assistantUsage';
+import { snapshotAssistantSkill } from '../model/assistantSkillSnapshot';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { buildBrandKitSystemPrompt } from '@shared/domain/products/brandKitModels';
 import { composeSkillCatalog, composeSkillRuntime, withSkillFileTool } from '@shared/domain/assistant/skills';
@@ -161,18 +162,12 @@ export function useAssistantChatStream({
     }
 
     const selectedSkill = getActiveAssistantSkill();
-    const selectedRuntime = composeSkillRuntime(selectedSkill);
     const usedSkill = retryUserMsg
       ? retryUserMsg.usedSkill
-      : selectedSkill && selectedRuntime ? {
-          name: selectedSkill.displayName || selectedSkill.name,
-          skillId: selectedRuntime.skillId,
-          systemPrompt: selectedRuntime.systemPrompt,
-          allowedTools: selectedRuntime.allowedTools,
-        } : undefined;
+      : snapshotAssistantSkill(selectedSkill);
     const skillRuntime = usedSkill;
     const allSkills = useAppStore.getState().getAllAssistantSkills();
-    const skillResources = composeSkillRuntime(
+    const skillResources = usedSkill?.resources ?? composeSkillRuntime(
       allSkills.find((item) => item.id === skillRuntime?.skillId),
     )?.resources;
     const skillCatalog = composeSkillCatalog(allSkills);

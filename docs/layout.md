@@ -74,7 +74,7 @@ backend/
   internal/keywordreview/    关键词审核与提交保护；review 子包做提示词、结果校验与补救
   internal/modelgw/          上游模型提交
   internal/platform/collect  采集上游请求与响应
-  internal/platform/database 连接与共用工具；library / catalog / workshop 子包按领域访问数据；migrate 做版本化迁移、checksum、备份与官方种子
+  internal/platform/database 连接与共用工具；library / catalog / workshop / learning 子包按领域访问数据；migrate 做版本化迁移、checksum、备份与官方种子
   internal/platform/media    图片地址规范化
   internal/platform/mediasign 媒体读取签名
   internal/platform/network  出站拨号与私网拦截
@@ -102,8 +102,13 @@ shared/
     models/                  模型目录、厂商、网关与调用适配器
     products/                商品品类、属性、品牌和保真规则
     prompts/                 提示词引擎、资产评分、视觉规则与业务技能
+    skills/                  统一技能目录、场景兼容性与工坊技能类型
     workshop/                工坊状态机、事件、门禁与镜头规则
 ```
+
+技能列表、详情、创建与编辑共用 `src/client/shared/skills`，全局技能页提供助手技能和可手动维护的工坊技能。`src/shared/contracts/skills.ts` 校验目录响应；Go 的 `/api/catalog/skills` 提供统一目录、助手技能读写、幂等旧缓存导入和工作区收藏。工坊记录继续沿用 `StyleRecipe` 与原 ID，助手技能存入 `SkillDocument`；不可变内容版本存入 `SkillRevision`，导入来源存入 `SkillImport`。
+
+商品细分的持续优化不另开页面。工坊导航的“素材与技能”进入细分文件夹后，由 `assets` 的参考图组、当前技能和优化记录共用同一面板。`src/shared/contracts/categorySkills.ts` 校验细分状态、版本和成图评分。Go 的 `/api/catalog/category-skills` 读取样本、发起提炼并切换试用、正式版或回滚；样本、观察、版本和反馈存在 `platform/database/learning`。分析时按参考图组所属细分注入当时版本，生图任务冻结该版本与生成设置，评分写回同一版本。细则见 [workshop-reference-generation.md](workshop-reference-generation.md)。
 
 `client/shared` 只在浏览器使用；`src/shared` 同时服务前后端。共享业务规则不能依赖 Node、React 或某个前端功能。跨层使用 `@client/* / @server/* / @shared/*` 别名。
 
@@ -130,7 +135,7 @@ shared/
 | 小工具 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
 | --- | --- | --- | --- |
 | 封面大字报 | `headline-poster` | `generate/headline` | 一次出图的中文封面。投喂样张接到全局桌宠；隐藏桌宠后仍可从工具栏打开喂图面板 |
-| 电商工坊 | `workshop` | `workshop` | 多商品、多模特、多场景批量生图与矩阵化交付 |
+| 电商工坊 | `workshop`、`assets` | `workshop`、`catalog`、`platform/database/learning` | 批量生图与交付。素材与技能按商品细分积累参考图组、提炼规则，并用成图评分决定是否升级 |
 | 词包审核 | `keyword-review` | `keywordreview` | 关键词表批量导入、垂类判定、生产方向建议与合规导出 |
 | 内容采集 | `collect` | `platform/collect` | 跨平台图文视频采编、元数据抽取与无水印解析 |
 | PPT生成工坊 | `ppt-generator` | `generate/ppt` | 论断大纲、可编辑排版或整页视觉渲染、按图像家族路由配图并导出 PPTX |

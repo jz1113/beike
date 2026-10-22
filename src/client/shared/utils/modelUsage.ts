@@ -45,6 +45,7 @@ export function recordChatTokens(input: {
 
 export function recordMediaTaskUsage(input: {
   taskId?: string;
+  localTaskId?: string;
   modelId: string;
   modelName?: string;
   type: UsageLogItem['type'];
@@ -55,6 +56,7 @@ export function recordMediaTaskUsage(input: {
   const tokens = readReportedUsage(input.usage);
   recordModelUsage({
     taskId: input.taskId,
+    localTaskId: input.localTaskId,
     modelId: input.modelId,
     modelName: input.modelName || input.modelId,
     provider: resolveModelVendor(input.modelId),

@@ -24,7 +24,6 @@ export function PetImportForm({ onImported }: { onImported: () => void }) {
   };
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">用命令导入</h3>
       <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">每行一条 `npx codex-pets add 宠物标识`。命令只用来识别宠物，不会在本机执行。</p>
       <textarea value={commands} onChange={(event) => setCommands(event.target.value)} rows={4} aria-label="桌宠导入命令" spellCheck={false} className="w-full rounded-2xl border border-slate-200 bg-white p-3 font-mono text-xs text-slate-800 outline-none focus:border-blue-400 dark:border-white/10 dark:bg-[#151518] dark:text-slate-100" />
       <div className="flex items-center gap-3">

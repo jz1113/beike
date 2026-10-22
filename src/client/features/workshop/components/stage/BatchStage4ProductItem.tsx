@@ -1,3 +1,4 @@
+import type { OutputRating } from '@shared/contracts/categorySkills';
 import { useState } from 'react';
 import '../workshopDelivery.css';
 import LazyProxyImage from '@client/shared/ui/LazyProxyImage';
@@ -30,7 +31,7 @@ export interface BatchStage4ProductItemProps {
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
   onRecheckTask?: (itemId: string, taskId: string) => Promise<void>;
   readOnly?: boolean;
-  onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected') => void;
+  onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected', rating?: OutputRating) => void;
 }
 
 export function BatchStage4ProductItem({
@@ -283,7 +284,8 @@ export function BatchStage4ProductItem({
                     {!readOnly && hasImage && onReviewTask ? (
                       <OutputReviewButtons
                         decision={task.outputReview}
-                        onDecide={(decision) => onReviewTask(item.id, task.id, decision)}
+                        rating={task.outputRating}
+                        onDecide={(decision, rating) => onReviewTask(item.id, task.id, decision, rating)}
                       />
                     ) : null}
                   </div>

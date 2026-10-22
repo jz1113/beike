@@ -29,15 +29,15 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
     : '暂无可用四图母本，请到资产库导入并解构图组。';
   return <section className="space-y-3 py-5" aria-label="内容与素材">
     <h3 className="text-sm font-semibold">内容与素材</h3>
-    <label className={labelClass}>类目技能
-      <select aria-label="拍摄架构" value={selectedArchId} disabled={!hasRecipes} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
-        {!selectedArchId && <option value="" disabled>{hasRecipes ? '请选择拍摄架构' : '暂无可用拍摄架构'}</option>}
+    <label className={labelClass}>工坊技能
+      <select aria-label="工坊技能" value={selectedArchId} disabled={!hasRecipes} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
+        {!selectedArchId && <option value="" disabled>{hasRecipes ? '请选择工坊技能' : '暂无可用工坊技能'}</option>}
         {hasRecipes && <option value="auto">自动按商品类目匹配</option>}
         {props.recipes.map(recipe => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}
       </select>
     </label>
-    {hasRecipes && selectedArchId === 'auto' && <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">混合批次会逐款匹配拍摄架构；无法匹配的商品会阻止分析。</p>}
-    {!hasRecipes && <p role="status" className="text-xs leading-5 text-amber-700">暂未加载到可用拍摄架构。请到“拍摄架构”页检查、同步或新建后重试。</p>}
+    {hasRecipes && selectedArchId === 'auto' && <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">混合批次会逐款匹配工坊技能；无法匹配的商品会阻止分析。</p>}
+    {!hasRecipes && <p role="status" className="text-xs leading-5 text-amber-700">暂未加载到可用工坊技能。请到“工坊技能”页检查、同步或新建后重试。</p>}
     <section className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 dark:bg-white/5 dark:border-white/10" aria-label="生产资源状态">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p role={assetLoadState === 'error' ? 'alert' : 'status'} className={`text-xs ${assetLoadState === 'error' ? 'text-red-600' : 'text-slate-500 dark:text-slate-400'}`}>

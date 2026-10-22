@@ -110,6 +110,7 @@ export default function App() {
       useAppStore.getState().setSelectedVisionModel(selectedModel);
     }
     void migrateLegacyCredentialsOnce();
+    void useAppStore.getState().refreshAssistantSkills().catch(() => {});
   }, []);
 
   // URL 同步 currentView / currentStep

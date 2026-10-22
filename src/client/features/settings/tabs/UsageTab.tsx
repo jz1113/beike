@@ -6,6 +6,7 @@ import { CreatorMilestones } from '../components/CreatorMilestones';
 import { CreatorMixCards } from '../components/CreatorMixCards';
 import { CreatorProfileHeader } from '../components/CreatorProfileHeader';
 import { UsageHeatmapPanel } from './UsageHeatmapPanel';
+import { UsageRecentList } from './UsageRecentList';
 import { type GatewayUserInfo } from '../hooks/useGatewayUser';
 import { buildUsageCsv, formatUsageCost, localDateKey } from '../model/usageFormatting';
 
@@ -123,6 +124,7 @@ export default function UsageTab({
       <CreatorMilestones usageRange={usageRange} setUsageRange={setUsageRange} usageSummary={usageSummary} />
       <UsageHeatmapPanel usageSummary={heatmapSummary} />
       <CreatorMixCards usageSummary={usageSummary} />
+      <UsageRecentList logs={allLogs} range={usageRange} />
     </div>
   );
 }
