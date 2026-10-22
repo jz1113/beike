@@ -7,12 +7,24 @@ export interface ExtractedSkuInfo {
 
 const COMMON_COLOR_REGEX = /(银白灰|深空灰|钛空灰|暗夜黑|曜石黑|幻夜黑|亮黑|磨砂黑|星空黑|羽砂黑|雪域白|凝光白|珍珠白|象牙白|钛金|流光金|香槟金|玫瑰金|土豪金|远峰蓝|海蓝|天蓝|冰蓝|藏青|深蓝|暗夜绿|苍岭绿|墨绿|橄榄绿|薄荷绿|浅绿|暗夜紫|丁香紫|薰衣草紫|樱花粉|活力橙|日落橙|中国红|酒红|银色|灰色|黑色|白色|金色|蓝色|绿色|黄色|橙色|棕色|米色|驼色|咖色|原色钛金属|黑色钛金属|白色钛金属|蓝色钛金属|灰色|白色|黑色|金色|银色|粉色|紫色|蓝色|绿色|黄色|橙色)/;
 
-const COMMON_SPEC_REGEX = /(官方标配|标配|高配|顶配|尊享版|标准版|套装[1-9一二三四]?|\d+[\+\*xX]\d+[Gg]?[Bb]?|\d+[Gg][Bb]|\d+[Tt][Bb])/;
+const COMMON_SPEC_REGEX = /(官方标配|标配|高配|顶配|尊享版|标准版|套装[1-9一二三四]?|\d+[+*xX]\d+[Gg]?[Bb]?|\d+[Gg][Bb]|\d+[Tt][Bb])/;
+
+export interface SkuVariantItem {
+  id?: string;
+  label?: string;
+  color?: string;
+  skuIds?: string[];
+}
+
+export interface SkuVariantMetadata {
+  requestedSkuId?: string;
+  variants?: SkuVariantItem[];
+}
 
 /**
  * 从商品的 props、variantMetadata 或标题中智能解析出当前 SKU 的颜色与规格
  */
-export function extractProductSkuInfo(item: Pick<BatchProductItem, 'props' | 'title' | 'itemId'> & { variantMetadata?: any }): ExtractedSkuInfo {
+export function extractProductSkuInfo(item: Pick<BatchProductItem, 'props' | 'title' | 'itemId'> & { variantMetadata?: SkuVariantMetadata | null }): ExtractedSkuInfo {
   const props = item.props || {};
 
   // 1. 优先从 props 中的颜色字段读取
@@ -61,12 +73,15 @@ export function extractProductSkuInfo(item: Pick<BatchProductItem, 'props' | 'ti
 
   // 3. 从 variantMetadata 中查找与当前 itemId 匹配的变体
   if (item.variantMetadata && Array.isArray(item.variantMetadata.variants)) {
-    const matched = item.variantMetadata.variants.find((v: any) =>
-      v.skuIds?.includes(item.itemId) || v.id === item.itemId || v.id === item.variantMetadata?.requestedSkuId
+    const requestedSku = item.variantMetadata.requestedSkuId;
+    const currentItemId = item.itemId;
+    const matched = item.variantMetadata.variants.find((v) =>
+      (currentItemId && v.skuIds?.includes(currentItemId)) || (currentItemId && v.id === currentItemId) || (requestedSku && v.id === requestedSku)
     );
     if (matched) {
-      if (!color && (matched.color || matched.label)) {
-        const clean = (matched.color || matched.label).replace(/^颜色[:：]\s*/, '').trim();
+      const colorCandidate = matched.color || matched.label;
+      if (!color && colorCandidate) {
+        const clean = colorCandidate.replace(/^颜色[:：]\s*/, '').trim();
         if (clean && clean !== '未知') {
           color = clean;
         }

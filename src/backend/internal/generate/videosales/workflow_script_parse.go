@@ -34,11 +34,22 @@ func oneSalesScript(content string) (SalesScript, string, error) {
 	}
 	if err := json.Unmarshal(normalized, &parsed); err != nil {
 		if mismatch, ok := err.(*json.UnmarshalTypeError); ok {
-			return SalesScript{}, "", fmt.Errorf("脚本模型已返回 JSON，但 %s 字段类型不符，预期 %s；请重新生成脚本", mismatch.Field, scriptFieldType(mismatch.Type.Kind()))
+			return SalesScript{}, "", fmt.Errorf("脚本模型已返回 JSON，但 %s 字段类型不符，预期 %s；请重新生成脚本", cleanScriptField(mismatch.Field), scriptFieldType(mismatch.Type.Kind()))
 		}
 		return SalesScript{}, "", fmt.Errorf("脚本模型已返回 JSON，但脚本字段无法解析；请重新生成脚本")
 	}
 	return parsed.Scripts[0], string(normalized), nil
+}
+
+func cleanScriptField(field string) string {
+	parts := strings.Split(field, ".")
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if _, err := strconv.Atoi(part); err != nil {
+			filtered = append(filtered, part)
+		}
+	}
+	return strings.Join(filtered, ".")
 }
 
 func scriptFieldType(kind reflect.Kind) string {
