@@ -57,30 +57,25 @@ export default function BatchStage2Config() {
   }, [displayedItems.length, focusedIndex]);
 
   return (
-    <div className="space-y-4">
-      {/* 🌟 选图工作台：统一单面板 */}
-      <div className="space-y-3.5">
-
-        {/* 统一选图面板（左侧商品轨 + 右侧选图区 + 底部确认流转条） */}
-        <BatchImageSelectionPanel
-          onConfirmAndNext={onNextStage}
-          displayedItems={displayedItems}
-          focusedIndex={focusedIndex}
-          activeImgFilter={activeImgFilter}
-          productFilter={productFilter}
-          onFilterChange={setActiveImgFilter}
-          onProductFilterChange={setProductFilter}
-          setFocusedIndex={setFocusedIndex}
-          setItems={setItems}
-          onToggleImage={toggleProductImageSelection}
-          batchSetProductImages={batchSetProductImages}
-          handleRemoveItem={handleRemoveItem}
-          onPreviewGallery={onPreviewGallery}
-          onPreviewImage={onPreviewImage}
-          pendingItems={pendingItems}
-          completedItems={completedItems}
-        />
-      </div>
+    <div className="flex-1 flex flex-col min-h-0 w-full">
+      <BatchImageSelectionPanel
+        onConfirmAndNext={onNextStage}
+        displayedItems={displayedItems}
+        focusedIndex={focusedIndex}
+        activeImgFilter={activeImgFilter}
+        productFilter={productFilter}
+        onFilterChange={setActiveImgFilter}
+        onProductFilterChange={setProductFilter}
+        setFocusedIndex={setFocusedIndex}
+        setItems={setItems}
+        onToggleImage={toggleProductImageSelection}
+        batchSetProductImages={batchSetProductImages}
+        handleRemoveItem={handleRemoveItem}
+        onPreviewGallery={onPreviewGallery}
+        onPreviewImage={onPreviewImage}
+        pendingItems={pendingItems}
+        completedItems={completedItems}
+      />
     </div>
   );
 }

@@ -38,3 +38,20 @@ export function batchSetProductImages(
     return { ...p, selectedProductImages: next, coverImage: next[0] || collectedCover };
   });
 }
+
+/**
+ * 将指定图片设为第一主基准（若未在已选中则先选中，且置于首位），同时联动 coverImage
+ */
+export function setPrimaryProductImage(
+  items: BatchProductItem[],
+  itemId: string,
+  imgUrl: string
+): BatchProductItem[] {
+  return items.map(p => {
+    if (p.id !== itemId) return p;
+    const current = p.selectedProductImages || [];
+    const withoutTarget = current.filter(u => u !== imgUrl);
+    const next = [imgUrl, ...withoutTarget];
+    return { ...p, selectedProductImages: next, coverImage: imgUrl };
+  });
+}

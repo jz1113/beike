@@ -5,17 +5,24 @@ interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   src?: string | null;
   thumb?: boolean;
   width?: number;
+  wrapperClassName?: string;
 }
 
 /** 使用浏览器原生懒加载，源地址变化时独立重建加载状态。 */
 export default function LazyProxyImage(props: Props) {
-  return <ImageContent key={`${props.src || ''}|${props.thumb ?? true}|${props.width || ''}`} {...props} />;
+  return (
+    <ImageContent
+      key={`${props.src || ''}|${props.thumb ?? true}|${props.width || ''}|${props.wrapperClassName || ''}`}
+      {...props}
+    />
+  );
 }
 
 function ImageContent({
   src,
   thumb = true,
   width,
+  wrapperClassName,
   className = '',
   onLoad,
   onError,
@@ -36,8 +43,12 @@ function ImageContent({
     ? originalUrl
     : proxyMediaUrl(originalUrl, { thumb, width });
 
+  const hasHeight = /\bh-/.test(className);
+  const hasFit = /\bobject-/.test(className);
+  const defaultWrapper = 'w-full h-full relative bg-slate-100/70 overflow-hidden select-none dark:bg-white/10';
+
   return (
-    <div className="w-full h-full relative bg-slate-100/70 overflow-hidden select-none dark:bg-white/10">
+    <div className={wrapperClassName ?? defaultWrapper}>
       {/* 优雅低对比度骨架加载动画 */}
       {!loaded && !loadError && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200/50 animate-pulse" />
@@ -64,7 +75,7 @@ function ImageContent({
           }}
           decoding="async"
           referrerPolicy="no-referrer"
-          className={`w-full h-full object-cover transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'} ${className}`}
+          className={`w-full ${hasHeight ? '' : 'h-full'} ${hasFit ? '' : 'object-cover'} transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'} ${className}`}
           onLoad={(e) => {
             setLoaded(true);
             onLoad?.(e);

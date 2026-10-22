@@ -257,7 +257,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
             ? "max-w-[960px] mx-auto w-full flex-1 flex flex-col"
             : historyGenerationBatch || currentStage === 4
               ? "mx-auto w-full max-w-[1840px] space-y-4"
-              : "w-full space-y-4"
+              : !historyGenerationBatch && currentStage === 2 ? "w-full flex-1 flex flex-col min-h-0" : "w-full space-y-4"
         }>
           {historyGenerationBatch ? (
             <BatchWorkshopHistoryPreview
