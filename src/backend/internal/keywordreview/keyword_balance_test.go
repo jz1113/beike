@@ -68,6 +68,18 @@ func TestDeepSeekFailureReportsGatewayCutoff(t *testing.T) {
 	}
 }
 
+func TestKeywordTransportErrorNamesConnectionDrops(t *testing.T) {
+	if got := keywordTransportError(fmt.Errorf("text upstream request failed: Post [url]: EOF")); got != "模型网关连接被中断，请稍后重试" {
+		t.Fatal(got)
+	}
+	if got := keywordTransportError(fmt.Errorf("DNS lookup failed for host")); got != "无法解析模型网关地址" {
+		t.Fatal(got)
+	}
+	if got := keywordTransportError(fmt.Errorf("Resolved to private IP")); got != "模型网关地址不可用" {
+		t.Fatal(got)
+	}
+}
+
 func TestKeywordBalanceReportsUpstreamFailure(t *testing.T) {
 	request := func() *http.Request {
 		return httptest.NewRequest(http.MethodPost, "/api/generate/keyword-review/balance", strings.NewReader(`{"customBaseUrl":"https://api.deepseek.com","customApiKey":"secret"}`))

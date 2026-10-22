@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"regexp"
@@ -99,10 +101,20 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if input.TextProtocol != "" {
 		protocol = modelgw.ResolveTextProtocol(input.Model, input.TextProtocol)
 	}
-	status, data, callErr := modelgw.StreamText(ctx, modelgw.TextRequest{
+	request := modelgw.TextRequest{
 		BaseURL: input.BaseURL, APIKey: input.APIKey, Protocol: protocol, Payload: payload,
 		Client: client, Timeout: 630 * time.Second,
-	}, nil)
+	}
+	status, data, callErr := modelgw.StreamText(ctx, request, nil)
+	// Some gateways accept generateContent but reject or drop
+	// streamGenerateContent immediately. Retry once without streaming.
+	if streamEndpointRejected(status, data) || streamTransportFallback(status, callErr) {
+		log.Printf("[API] keyword-review stream unavailable status=%d detail=%s", status, redactReviewError(callErr))
+		status, data, callErr = modelgw.CompleteText(ctx, request)
+	}
+	if callErr != nil && status == 0 {
+		log.Printf("[API] keyword-review transport detail=%s", redactReviewError(callErr))
+	}
 	provider := "DeepSeek"
 	if input.Provider == "gateway" {
 		provider = "模型网关"
@@ -132,6 +144,36 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 		return Result{}, &OutputError{Message: fmt.Sprintf("关键词审核模型 %s 输出被截断，本批结果未写入", input.Model), Usage: usage}
 	}
 	return Result{Results: stripLookup(checked.results), Failed: checked.failed, Usage: usage, Model: input.Model}, nil
+}
+
+func streamEndpointRejected(status int, data map[string]any) bool {
+	switch status {
+	case http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusNotImplemented, 530:
+	default:
+		return false
+	}
+	return data == nil || data["usage"] == nil
+}
+
+func streamTransportFallback(status int, err error) bool {
+	if status != 0 || err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return !strings.Contains(message, "timeout") && !strings.Contains(message, "deadline")
+}
+
+var reviewURLPattern = regexp.MustCompile(`https?://[^\s"']+`)
+
+func redactReviewError(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := reviewURLPattern.ReplaceAllString(err.Error(), "[url]")
+	if len(message) > 240 {
+		message = message[:240]
+	}
+	return message
 }
 
 func concreteReasoningEffort(value string) string {

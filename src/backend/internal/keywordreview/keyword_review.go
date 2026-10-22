@@ -118,6 +118,18 @@ func keywordTransportError(err error) string {
 	if strings.Contains(message, "refused") || strings.Contains(message, "no such host") || strings.Contains(message, "network") {
 		return "网络连接失败，请检查网络或 API 地址"
 	}
+	if strings.Contains(message, "eof") || strings.Contains(message, "reset") || strings.Contains(message, "broken pipe") || strings.Contains(message, "goaway") {
+		return "模型网关连接被中断，请稍后重试"
+	}
+	if strings.Contains(message, "dns") {
+		return "无法解析模型网关地址"
+	}
+	if strings.Contains(message, "certificate") || strings.Contains(message, "x509") || strings.Contains(message, "tls") {
+		return "模型网关证书校验失败"
+	}
+	if strings.Contains(message, "private ip") || strings.Contains(message, "host not allowed") {
+		return "模型网关地址不可用"
+	}
 	return "关键词审核失败"
 }
 
