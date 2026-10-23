@@ -12,7 +12,7 @@ function browserOrigin(): string {
   return 'http://127.0.0.1';
 }
 
-/** 由 api/openapi.yaml 生成的客户端。自定义 fetch 继续走现有鉴权头。 */
+/** 由 src/shared/contracts/openapi.yaml 生成的客户端。自定义 fetch 继续走现有鉴权头。 */
 export const openApi = createClient<paths>({
   baseUrl: browserOrigin(),
   fetch: (input) => apiFetch(input),

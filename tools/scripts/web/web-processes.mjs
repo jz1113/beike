@@ -71,14 +71,17 @@ function matches(root, kind, record, options) {
   if (!info || info.started !== record.started || (info.cwd !== null && !samePath(info.cwd, record.root))) return false;
   if (kind !== 'gateway' && kind !== 'vite') return false;
   const canonical = canonicalRoot(root);
-  const marker = kind === 'gateway'
-    ? resolve(canonical, 'tools/build/beike-api')
-    : resolve(canonical, 'vite.config.ts');
+  const markers = kind === 'gateway'
+    ? [resolve(canonical, 'tools/build/beike-api')]
+    : [
+      resolve(canonical, 'tools/configs/vite.config.ts'),
+      resolve(canonical, 'vite.config.ts'), // 允许核对整理前已记录的开发进程。
+    ];
   if (process.platform === 'win32') {
     const normalize = (s) => s.toLowerCase().replaceAll('/', '\\');
-    return normalize(info.command).includes(normalize(marker));
+    return markers.some(marker => normalize(info.command).includes(normalize(marker)));
   }
-  return info.command.includes(marker);
+  return markers.some(marker => info.command.includes(marker));
 }
 
 export function ownsWebProcess(root, kind, options = {}, isolated = false) {

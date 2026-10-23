@@ -29,7 +29,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
   totalCount,
 }) => {
   const currentArchName = selectedArchId === 'auto'
-    ? '自动按商品类目匹配'
+    ? '自动使用二级类目技能'
     : recipes.find(r => r.id === selectedArchId)?.name || '未确认工坊技能';
   const currentVisionName = availableVisionModels.find(m => m.id === selectedVisionModel)?.shortName ||
     availableVisionModels.find(m => m.id === selectedVisionModel)?.name ||
@@ -44,7 +44,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
         <span className="flex items-center gap-1.5 font-bold text-slate-800 shrink-0 dark:text-slate-100">
           <Camera className="w-3.5 h-3.5 text-indigo-600" />
-          <span>当前生产预设:</span>
+          <span>本次创作:</span>
         </span>
 
         <span 
@@ -61,7 +61,7 @@ export const BatchStage2PresetBar: React.FC<BatchStage2PresetBarProps> = ({
         <span className="font-semibold text-slate-700 whitespace-nowrap dark:text-slate-200">{selectedAspect}</span>
 
         <span className="text-slate-300">·</span>
-        <span className="font-semibold text-slate-700 whitespace-nowrap dark:text-slate-200">出镜按图组母本</span>
+        <span className="font-semibold text-slate-700 whitespace-nowrap dark:text-slate-200">画面沿用参考图</span>
 
         <span className="text-slate-300 hidden md:inline">·</span>
         <span className="text-slate-400 font-medium hidden md:inline truncate max-w-[140px]" title={`视觉模型: ${currentVisionName}`}>

@@ -1,8 +1,8 @@
 import { useCanvasHydrated } from './hooks/useCanvasHydrated';
 import React from 'react';
 import { useCanvasStore } from './store/useCanvasStore';
-import { CanvasHomeFeed } from './components/CanvasHomeFeed';
-import { InfiniteCanvasEditor } from './components/InfiniteCanvasEditor';
+import { CanvasHomeFeed } from './components/projects/CanvasHomeFeed';
+import { InfiniteCanvasEditor } from './components/editor/InfiniteCanvasEditor';
 import { submitCanvasPrompt } from './hooks/useCanvasPromptSubmit';
 
 export const CanvasWorkspaceView: React.FC = () => {

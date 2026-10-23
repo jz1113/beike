@@ -104,13 +104,15 @@ func LoadDataset(ctx context.Context, db *sql.DB, workspace, folderID string) (D
 		}
 	}
 	// Establish at least three held-out groups before the first consolidation.
-	if len(roles) == 0 && len(dataset.Samples) >= 20 {
+	if len(dataset.Samples) >= 20 {
 		for i := range dataset.Samples {
 			if holdouts >= 3 {
 				break
 			}
-			if dataset.Samples[i].Role != "holdout" {
-				dataset.Samples[i].Role = "holdout"
+			sample := &dataset.Samples[i]
+			// Already observed training images must never become validation evidence.
+			if sample.Role != "holdout" && roles[sample.ID] == "" && roles[sampleSourceRole(*sample)] == "" {
+				sample.Role = "holdout"
 				holdouts++
 			}
 		}

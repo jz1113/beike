@@ -34,7 +34,7 @@ func Load() Config {
 		access = "azhuo-local-dev"
 	}
 	root, _ := os.Getwd()
-	return Config{
+	cfg := Config{
 		Hostname:     env("HOSTNAME", "127.0.0.1"),
 		Port:         port,
 		NodeEnv:      nodeEnv,
@@ -42,11 +42,13 @@ func Load() Config {
 		AdminToken:   strings.TrimSpace(os.Getenv("ADMIN_ACCESS_TOKEN")),
 		Upstream:     env("BEIKE_NODE_UPSTREAM", "http://127.0.0.1:3100"),
 		WebDistDir:   strings.TrimSpace(os.Getenv("WEB_DIST_DIR")),
-		DatabasePath: databasePath(os.Getenv("DATABASE_URL")),
 		DatabaseURL:  strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		Root:         root,
 		ExtraOrigins: splitOrigins(env("PUBLIC_WEB_ORIGIN", os.Getenv("PUBLIC_WEB_ORIGINS"))),
 	}
+	// Startup migrations and request handlers must always open the same file.
+	cfg.DatabasePath = cfg.SQLiteFile()
+	return cfg
 }
 
 func (c Config) Production() bool { return c.NodeEnv == "production" }
@@ -76,16 +78,26 @@ func (c Config) SQLiteFile() string {
 	if raw == "" {
 		return ""
 	}
-	filePath := raw
-	if strings.HasPrefix(filePath, "file:") {
-		filePath = strings.TrimPrefix(filePath, "file:")
+	filePath := strings.TrimPrefix(raw, "file:")
+	if strings.HasPrefix(raw, "file://") {
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			return ""
+		}
+		filePath = parsed.Path
+		if parsed.Host != "" && parsed.Host != "localhost" {
+			filePath = "//" + parsed.Host + filePath
+		}
+		// A Windows file URI uses /C:/, while native paths use C:/.
+		if len(filePath) >= 4 && filePath[0] == '/' && filePath[2] == ':' {
+			filePath = filePath[1:]
+		}
 	}
-	switch {
-	case strings.HasPrefix(filePath, "//"):
-		filePath = filePath[2:]
-	case strings.HasPrefix(filePath, "/"):
-	case len(filePath) >= 3 && filePath[1] == ':' && (filePath[2] == '/' || filePath[2] == '\\'):
-	default:
+	if filePath == "" {
+		return ""
+	}
+	windowsDrive := len(filePath) >= 3 && filePath[1] == ':' && (filePath[2] == '/' || filePath[2] == '\\')
+	if !filepath.IsAbs(filePath) && !windowsDrive && !strings.HasPrefix(filePath, "/") {
 		filePath = filepath.Join(c.Root, filePath)
 	}
 	return filepath.Clean(filePath)
@@ -106,16 +118,4 @@ func (c Config) MediaReviewRoot() string {
 		return filepath.Join(dir, "media-review")
 	}
 	return filepath.Join(c.Root, ".local", "media-review")
-}
-
-func databasePath(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if !strings.HasPrefix(raw, "file:") {
-		return ""
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return ""
-	}
-	return parsed.Path
 }

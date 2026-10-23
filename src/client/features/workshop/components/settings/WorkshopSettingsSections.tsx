@@ -1,6 +1,6 @@
 import type { WorkshopSettingsModalProps } from './workshopSettingsTypes';
-import { WorkshopGridOutputSettings } from '../WorkshopGridOutputSettings';
-import { WorkshopAssetBindings } from '../WorkshopAssetBindings';
+import { WorkshopGridOutputSettings } from './WorkshopGridOutputSettings';
+import { WorkshopAssetBindings } from './WorkshopAssetBindings';
 import { recipeKind } from '@shared/domain/products/productRecipeSelection';
 import { promptGroupMatchesMajorCategory } from '@shared/domain/workshop/workshop-pipeline';
 

@@ -36,7 +36,12 @@ func Apply(ctx context.Context, db *sql.DB, workspace string, group map[string]a
 	}
 	result["learningScopeId"], result["learningVersionId"] = folder, versionID
 	result["learningReferenceFingerprint"] = Hash(map[string]any{"images": refs, "shots": shots})
-	result["baseRecipeVersion"] = Hash(base)
+	notes, err := Notes(ctx, db, workspace, folder)
+	if err != nil {
+		return nil, err
+	}
+	result["baseRecipeVersion"] = Hash(map[string]any{"base": base, "notes": notes})
+	result["promptSnippet"] = text(base, "promptSnippet") + NotePrompt(notes)
 	if versionID == "" {
 		return result, nil
 	}
@@ -52,7 +57,7 @@ func Apply(ctx context.Context, db *sql.DB, workspace string, group map[string]a
 	if !ManifestCurrent(version, dataset) {
 		return nil, errors.New("细分技能的学习样本已变化，请回到素材与技能重新提炼或回滚")
 	}
-	result["name"], result["promptSnippet"], result["libraryVersion"] = dataset.Folder.Name+" · 细分技能", strings.TrimSpace(version.PromptSnippet), versionID
+	result["name"], result["promptSnippet"], result["libraryVersion"] = dataset.Folder.Name+" · 类目技能", text(base, "promptSnippet")+"\n【类目技能】\n"+strings.TrimSpace(version.PromptSnippet)+NotePrompt(notes), versionID
 	result["updatedAt"] = version.CreatedAt
 	return result, nil
 }

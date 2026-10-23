@@ -37,13 +37,13 @@ const CanvasWorkspaceView = lazyWithRetry(() => import('@client/features/canvas/
 // 首页只下载创作入口。完整工作区及其 xlsx、jszip、动画等依赖，在实际进入时再下载。
 const GenerateWorkspace = lazyWithRetry(() => import('@client/features/generate/GenerateWorkspace'));
 const WorkshopStudio = lazyWithRetry(() => import('@client/features/workshop/WorkshopStudio'));
-const HeadlinePosterStudio = lazyWithRetry(() => import('@client/features/headline-poster/HeadlinePosterStudio'));
-const KeywordReviewStudio = lazyWithRetry(() => import('@client/features/keyword-review/KeywordReviewStudio'));
-const PptStudioView = lazyWithRetry(() => import('@client/features/ppt-generator/PptStudioView'));
-const VideoSalesStudio = lazyWithRetry(() => import('@client/features/video-sales/VideoSalesStudio'));
+const PosterStudio = lazyWithRetry(() => import('@client/features/poster/PosterStudio'));
+const KeywordsStudio = lazyWithRetry(() => import('@client/features/keywords/KeywordsStudio'));
+const PptStudio = lazyWithRetry(() => import('@client/features/ppt/PptStudio'));
+const SalesStudio = lazyWithRetry(() => import('@client/features/sales/SalesStudio'));
 const AvatarStudioView = lazyWithRetry(() => import('@client/features/avatar/AvatarStudioView'));
 const AssetCenter = lazyWithRetry(() => import('@client/features/assets/components/AssetCenter'));
-const AssetPromptLibrary = lazyWithRetry(() => import('@client/features/assets/components/AssetPromptLibrary'));
+const AssetPromptLibrary = lazyWithRetry(() => import('@client/features/assets/components/library/AssetPromptLibrary'));
 const SkillsWorkspaceView = lazyWithRetry(() => import('@client/features/skills/SkillsWorkspaceView'));
 
 function AssetCenterWithCanvas() {
@@ -55,7 +55,7 @@ function AssetCenterWithCanvas() {
     onSelectCanvasProject={(projectId: string) => useCanvasStore.getState().selectProject(projectId)}
   />;
 }
-const CanvasRecentProjects = lazyWithRetry(() => import('@client/features/canvas/components/CanvasRecentProjects'));
+const CanvasRecentProjects = lazyWithRetry(() => import('@client/features/canvas/components/projects/CanvasRecentProjects'));
 // 点阵背景为纯装饰，延后下载，使首页核心控件和灵感流优先可用。
 const GlobalDynamicBackground = lazyWithRetry(() => import('@client/shared/media/widgets/GlobalDynamicBackground'));
 
@@ -274,8 +274,8 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="keyword_review" currentView={pageView}>
-                  <AppErrorBoundary title="词包审核异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <KeywordReviewStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                  <AppErrorBoundary title="关键词审核异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <KeywordsStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -287,7 +287,7 @@ export default function App() {
 
                 <ViewKeepAlivePanel view="headline_poster" currentView={pageView}>
                   <AppErrorBoundary title="封面生成异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <HeadlinePosterStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                    <PosterStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -299,13 +299,13 @@ export default function App() {
 
                 <ViewKeepAlivePanel view="ppt_generator" currentView={pageView}>
                   <AppErrorBoundary title="PPT生成工坊异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <PptStudioView onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                    <PptStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
-                  <AppErrorBoundary title="视频带货异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <VideoSalesStudio onBack={() => setCurrentView('home')} />
+                  <AppErrorBoundary title="带货视频异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <SalesStudio onBack={() => setCurrentView('home')} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 

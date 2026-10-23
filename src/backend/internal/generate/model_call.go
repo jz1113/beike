@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -91,8 +91,8 @@ func chatCompletion(ctx context.Context, base, apiKey, model string, messages an
 // while routing OpenAI-compatible input through the selected native protocol.
 func ChatCompletionPayload(ctx context.Context, base, apiKey string, payload map[string]any, timeout time.Duration) (string, map[string]any, int, error) {
 	model, _ := payload["model"].(string)
-	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
-		BaseURL: base, APIKey: apiKey, Protocol: modelgw.TextProtocol(ctx, model),
+	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
+		BaseURL: base, APIKey: apiKey, Protocol: gateway.TextProtocol(ctx, model),
 		Payload: payload, Client: ModelHTTP(), Timeout: timeout,
 	})
 	if err != nil {

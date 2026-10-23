@@ -13,16 +13,16 @@ func TestNativeRoutesAreInOpenAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	for {
-		if _, statErr := os.Stat(filepath.Join(dir, "api/openapi.yaml")); statErr == nil {
+		if _, statErr := os.Stat(filepath.Join(dir, "src/shared/contracts/openapi.yaml")); statErr == nil {
 			break
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Fatal("找不到 api/openapi.yaml")
+			t.Fatal("找不到 src/shared/contracts/openapi.yaml")
 		}
 		dir = parent
 	}
-	raw, err := os.ReadFile(filepath.Join(dir, "api/openapi.yaml"))
+	raw, err := os.ReadFile(filepath.Join(dir, "src/shared/contracts/openapi.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

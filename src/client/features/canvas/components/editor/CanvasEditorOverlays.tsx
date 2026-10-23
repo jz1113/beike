@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
-import CanvasAssetImportModal from '../CanvasAssetImportModal';
-import CanvasLightingModal, { type LightingParams } from '../CanvasLightingModal';
+import CanvasAssetImportModal from '../tools/CanvasAssetImportModal';
+import CanvasLightingModal, { type LightingParams } from '../tools/CanvasLightingModal';
 import { CanvasMultiAngleModal, type MultiAngleParams } from '@client/shared/modals/multi-angle';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { CanvasNode } from '../../model/types';

@@ -102,12 +102,12 @@ if ! command -v go >/dev/null 2>&1; then
   fi
 fi
 
-command -v go >/dev/null 2>&1 || fail "未检测到 Go 环境。项目 API 服务需要 Go 1.23+（推荐 Go 1.26），请先安装 Go（https://golang.google.cn/dl/ 或 https://go.dev/dl/）。"
+command -v go >/dev/null 2>&1 || fail "未检测到 Go 环境。项目 API 服务需要 Go 1.26 或更高版本，请先安装 Go（https://golang.google.cn/dl/ 或 https://go.dev/dl/）。"
 
 # 首次启动配置文件初始化
-if [[ ! -f ".env" && -f ".env.example" ]]; then
-  echo "→ 首次运行，正在根据 .env.example 初始化本地 .env…"
-  cp ".env.example" ".env"
+if [[ ! -f ".env" && -f "tools/configs/env.example" ]]; then
+  echo "→ 首次运行，正在根据 tools/configs/env.example 初始化本地 .env…"
+  cp "tools/configs/env.example" ".env"
 fi
 
 # 首次启动依赖检查与自动安装

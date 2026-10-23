@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -114,7 +114,7 @@ func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[st
 		if status >= 200 && status < 300 && (taskID != "" || direct != "") {
 			return status, data, nil
 		}
-		if !modelgw.CanTryAnotherEndpoint(status) {
+		if !gateway.CanTryAnotherEndpoint(status) {
 			return status, data, nil
 		}
 	}
@@ -149,7 +149,7 @@ func imageDirect(data map[string]any) string {
 				return url
 			}
 			if b64, ok := item["b64_json"].(string); ok && b64 != "" {
-				return modelgw.DataImageURL(b64)
+				return gateway.DataImageURL(b64)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -16,9 +17,11 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/platform/media"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 type deconstructHooks struct {
@@ -31,7 +34,7 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 	if protocolErr != nil {
 		return http.StatusBadRequest, map[string]any{"success": false, "error": protocolErr.Error()}
 	}
-	r = r.WithContext(modelgw.WithTextProtocol(r.Context(), protocol))
+	r = r.WithContext(gateway.WithTextProtocol(r.Context(), protocol))
 	images := stringList(payload["imageUrls"])
 	workspace := httpx.WorkspaceFrom(r)
 	taskID, _ := payload["clientTaskId"].(string)
@@ -88,6 +91,9 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 	}
 	report("analyzing", "正在等待 "+model+" 分析图片")
 	hint := stringValue(payload["userHint"])
+	if sub != "" {
+		hint += "\n本次归档的商品二级类目：" + sub + "。仅描述实际可见商品，不为迎合归档而改写图片事实。"
+	}
 	outcome := callDeconstructVision(r.Context(), baseURL, apiKey, model, prepared, deconstructPrompt(len(prepared), hint, category))
 	if outcome.Fail != nil {
 		report("failed", "反推未完成，请查看任务错误信息")
@@ -97,6 +103,10 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 	if err != nil {
 		report("failed", "反推未完成，请查看任务错误信息")
 		return http.StatusBadGateway, map[string]any{"error": "视觉模型解构失败，请检查模型配置或稍后重试", "detail": map[string]any{"pipelineStage": "unified_failed", "modelsTried": []string{model}}}
+	}
+	if err := validateVisionImages(perImage, len(prepared)); err != nil {
+		report("failed", "逐图结果不完整，本次未入库")
+		return http.StatusBadGateway, map[string]any{"error": err.Error(), "code": "INCOMPLETE_VISION_RESULT"}
 	}
 	report("reconciling", "正在整理反推结果")
 	album := firstString(payload["albumName"], payload["productTitle"], trimHint(hint), "导入图集")
@@ -189,33 +199,21 @@ func prepareDeconstructImages(cfg config.Config, images []string) ([]string, []s
 			if len(selected) == 1 {
 				return nil, nil, err
 			}
-			continue
+			return nil, nil, errors.New("图组中有原图无法读取，未改变镜头顺序")
 		}
 		prepared = append(prepared, data)
 		originals = append(originals, image)
 	}
-	if len(selected) > 1 {
-		prepared, originals = completeGroups(prepared, originals)
-	}
 	return prepared, originals, nil
 }
 
-func completeGroups(prepared, originals []string) ([]string, []string) {
-	keep := len(prepared) / 4 * 4
-	return prepared[:keep], originals[:keep]
-}
-
 func loadDeconstructImage(cfg config.Config, image string) (string, error) {
-	if strings.HasPrefix(image, "data:image/") {
-		return image, nil
-	}
-	if strings.HasPrefix(image, "/storage/") {
-		relative := strings.TrimPrefix(image, "/storage/")
-		body, err := os.ReadFile(filepath.Join(depthStorageFrom(cfg), filepath.FromSlash(relative)))
-		if err != nil {
-			return "", err
+	if strings.HasPrefix(image, "data:image/") || strings.HasPrefix(image, "/storage/") {
+		root := storage.ResolveRoot()
+		if os.Getenv("AZHUO_CACHE_DIR") == "" && cfg.DataDir() != "" {
+			root = filepath.Join(cfg.DataDir(), "storage")
 		}
-		return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(body), nil
+		return media.VisionImageURL(root, image)
 	}
 	if !strings.HasPrefix(image, "https://") && !strings.HasPrefix(image, "http://") {
 		return "", nil
@@ -226,6 +224,9 @@ func loadDeconstructImage(cfg config.Config, image string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	for key, value := range media.RemoteImageHeaders(image) {
+		request.Header.Set(key, value)
+	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return "", err
@@ -234,24 +235,15 @@ func loadDeconstructImage(cfg config.Config, image string) (string, error) {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return "", nil
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
-	if err != nil || len(body) == 0 {
-		return "", err
+	body, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
+	if err != nil || len(body) == 0 || len(body) > 8<<20 {
+		return "", errors.New("原图下载失败或超过 8 MB")
 	}
-	return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(body), nil
-}
-
-func depthStorageFrom(cfg config.Config) string {
-	if cache := os.Getenv("AZHUO_CACHE_DIR"); cache != "" {
-		return cache
+	mime := http.DetectContentType(body)
+	if !strings.HasPrefix(mime, "image/") {
+		return "", errors.New("下载内容不是图片")
 	}
-	if data := cfg.DataDir(); data != "" {
-		return filepath.Join(data, "storage")
-	}
-	if file := cfg.SQLiteFile(); file != "" {
-		return filepath.Join(filepath.Dir(file), "storage")
-	}
-	return ""
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(body), nil
 }
 
 func existingReview(cfg config.Config, r *http.Request, id string) (map[string]any, bool) {

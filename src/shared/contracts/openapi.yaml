@@ -1,0 +1,1514 @@
+openapi: 3.0.3
+info:
+  title: 贝壳云图 API
+  version: 0.0.2
+paths:
+  /api/assets/storage/migrate:
+    post:
+      operationId: post_api_assets_storage_migrate
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assets/storage/test:
+    post:
+      operationId: post_api_assets_storage_test
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assets/storage/upload:
+    post:
+      operationId: post_api_assets_storage_upload
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assets/tasks:
+    delete:
+      operationId: delete_api_assets_tasks
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_assets_tasks
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/chat:
+    post:
+      operationId: post_api_assistant_chat
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/extract-document:
+    post:
+      operationId: post_api_assistant_extract_document
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/media:
+    post:
+      operationId: post_api_assistant_media
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/runs:
+    get:
+      operationId: get_api_assistant_runs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/sessions:
+    delete:
+      operationId: delete_api_assistant_sessions
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_assistant_sessions
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_assistant_sessions
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/threads/{threadId}/memory':
+    get:
+      operationId: get_api_assistant_threads_threadId_memory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_assistant_threads_threadId_memory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/threads/{threadId}/runs':
+    get:
+      operationId: get_api_assistant_threads_threadId_runs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/threads/{threadId}/turns':
+    get:
+      operationId: get_api_assistant_threads_threadId_turns
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/turn/approve:
+    post:
+      operationId: post_api_assistant_turn_approve
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/turn/interrupt:
+    post:
+      operationId: post_api_assistant_turn_interrupt
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/assistant/turn/start:
+    post:
+      operationId: post_api_assistant_turn_start
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantTurnStartRequest'
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/turns/{turnId}/recover':
+    post:
+      operationId: post_api_assistant_turns_turnId_recover
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/assistant/turns/{turnId}/snapshot':
+    get:
+      operationId: get_api_assistant_turns_turnId_snapshot
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/characters:
+    get:
+      operationId: get_api_avatar_characters
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_avatar_characters
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/avatar/characters/{id}':
+    delete:
+      operationId: delete_api_avatar_characters_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/fonts:
+    get:
+      operationId: get_api_avatar_fonts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/render:
+    post:
+      operationId: post_api_avatar_render
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/tasks:
+    get:
+      operationId: get_api_avatar_tasks
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/avatar/tasks/{id}':
+    delete:
+      operationId: delete_api_avatar_tasks_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_avatar_tasks_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/avatar/voices:
+    get:
+      operationId: get_api_avatar_voices
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_avatar_voices
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/avatar/voices/{id}':
+    delete:
+      operationId: delete_api_avatar_voices_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/create-version':
+    post:
+      operationId: post_api_catalog_assets_type_id_create_version
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/disable':
+    post:
+      operationId: post_api_catalog_assets_type_id_disable
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/performance':
+    get:
+      operationId: get_api_catalog_assets_type_id_performance
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/publish':
+    post:
+      operationId: post_api_catalog_assets_type_id_publish
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/assets/{type}/{id}/submit-review':
+    post:
+      operationId: post_api_catalog_assets_type_id_submit_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/deconstruct:
+    post:
+      operationId: post_api_catalog_assets_deconstruct
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/deconstruct/jobs:
+    get:
+      operationId: get_api_catalog_assets_deconstruct_jobs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_deconstruct_jobs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/deconstruct/progress:
+    get:
+      operationId: get_api_catalog_assets_deconstruct_progress
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/library:
+    delete:
+      operationId: delete_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_assets_library
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/mother-replacement:
+    get:
+      operationId: get_api_catalog_assets_mother_replacement
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/reviews:
+    get:
+      operationId: get_api_catalog_assets_reviews
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_reviews
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/seed:
+    post:
+      operationId: post_api_catalog_assets_seed
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/assets/source-check:
+    get:
+      operationId: get_api_catalog_assets_source_check
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_assets_source_check
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/categories:
+    get:
+      operationId: get_api_catalog_categories
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/categories/migration-apply:
+    post:
+      operationId: post_api_catalog_categories_migration_apply
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/categories/migration-preview:
+    post:
+      operationId: post_api_catalog_categories_migration_preview
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/category-skills:
+    get:
+      operationId: get_api_catalog_category_skills
+      description: 读取当前工作区二级类目的样本、观察记忆、经验、技能版本及验证进度。
+      parameters:
+        - in: query
+          name: folderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 类目智能体状态；原图与逐镜长文本不在状态轮询中返回。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, memory, pendingSamples, needsConsolidation, attemptFingerprint]
+                additionalProperties: true
+                properties:
+                  success:
+                    type: boolean
+                  memory:
+                    $ref: '#/components/schemas/CategoryLearningMemory'
+                  pendingSamples:
+                    type: integer
+                  needsConsolidation:
+                    type: boolean
+                  attemptFingerprint:
+                    type: string
+    post:
+      operationId: post_api_catalog_category_skills
+      description: 逐组观察、整理候选、维护经验及切换版本；学习请求不自动重放失败调用。
+      parameters:
+        - in: query
+          name: action
+          required: true
+          schema:
+            type: string
+            enum: [learn, observe, remember, forget, retry-sample, configure, trial, baseline, publish, rollback]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [folderId]
+              additionalProperties: true
+              properties:
+                folderId:
+                  type: string
+                revision:
+                  type: integer
+                  description: 非学习操作必须提交当前状态版本，防止覆盖并发修改。
+                maxNewSamples:
+                  type: integer
+                  minimum: 1
+                  maximum: 30
+                  default: 5
+                force:
+                  type: boolean
+                kind:
+                  type: string
+                  enum: [prefer, avoid]
+                content:
+                  type: string
+                  maxLength: 500
+                id:
+                  type: string
+                versionId:
+                  type: string
+      responses:
+        '200':
+          description: 操作成功；学习操作包含 observed 或 candidate 阶段、已读组数和剩余组数。
+        '409':
+          description: 状态冲突、相同资料已尝试或候选尚未通过实际成图对照。
+  /api/catalog/collect:
+    post:
+      operationId: post_api_catalog_collect
+      responses:
+        '200':
+          description: 采集结果保留商品规格与颜色元数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  product:
+                    type: object
+                    additionalProperties: true
+                    properties:
+                      variantMetadata:
+                        $ref: '#/components/schemas/CollectVariantMetadata'
+                  images:
+                    type: object
+                    additionalProperties: true
+                    properties:
+                      variantMetadata:
+                        $ref: '#/components/schemas/CollectVariantMetadata'
+  /api/catalog/products:
+    delete:
+      operationId: delete_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/prompts:
+    delete:
+      operationId: delete_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_prompts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/skills:
+    delete:
+      operationId: delete_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_skills
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/styles:
+    delete:
+      operationId: delete_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_styles
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/styles/extract:
+    post:
+      operationId: post_api_catalog_styles_extract
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/styles/parse-link:
+    post:
+      operationId: post_api_catalog_styles_parse_link
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches:
+    get:
+      operationId: get_api_catalog_workshop_batches
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_catalog_workshop_batches
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/workshop-batches/{id}':
+    delete:
+      operationId: delete_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_workshop_batches_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/workshop-batches/{id}/duplicate':
+    post:
+      operationId: post_api_catalog_workshop_batches_id_duplicate
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/catalog/workshop-batches/{id}/events':
+    post:
+      operationId: post_api_catalog_workshop_batches_id_events
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches/active:
+    get:
+      operationId: get_api_catalog_workshop_batches_active
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches/active/archive:
+    post:
+      operationId: post_api_catalog_workshop_batches_active_archive
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-batches/history:
+    delete:
+      operationId: delete_api_catalog_workshop_batches_history
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/catalog/workshop-workspace:
+    get:
+      operationId: get_api_catalog_workshop_workspace
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_catalog_workshop_workspace
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/analyze:
+    post:
+      operationId: post_api_generate_analyze
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/audio:
+    get:
+      operationId: get_api_generate_audio
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_audio
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/canvas-text:
+    post:
+      operationId: post_api_generate_canvas_text
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/copywriting:
+    post:
+      operationId: post_api_generate_copywriting
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/depth-image:
+    get:
+      operationId: get_api_generate_depth_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_depth_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/depth-video:
+    get:
+      operationId: get_api_generate_depth_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_depth_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/export-zip:
+    post:
+      operationId: post_api_generate_export_zip
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-deconstruct:
+    post:
+      operationId: post_api_generate_headline_deconstruct
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-design:
+    post:
+      operationId: post_api_generate_headline_design
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-memory:
+    get:
+      operationId: get_api_generate_headline_memory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-memory/corrections:
+    post:
+      operationId: post_api_generate_headline_memory_corrections
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/generate/headline-memory/entries/{id}':
+    patch:
+      operationId: patch_api_generate_headline_memory_entries_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-memory/trash:
+    delete:
+      operationId: delete_api_generate_headline_memory_trash
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-title:
+    post:
+      operationId: post_api_generate_headline_title
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/image:
+    get:
+      operationId: get_api_generate_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/image-batch:
+    post:
+      operationId: post_api_generate_image_batch
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/keyword-review:
+    post:
+      operationId: post_api_generate_keyword_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/keyword-review/balance:
+    post:
+      operationId: post_api_generate_keyword_review_balance
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/keyword-review/rules:
+    get:
+      operationId: get_api_generate_keyword_review_rules
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    put:
+      operationId: put_api_generate_keyword_review_rules
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/layer-decomposition:
+    post:
+      operationId: post_api_generate_layer_decomposition
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-detail:
+    post:
+      operationId: post_api_generate_ppt_detail
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-narration:
+    post:
+      operationId: post_api_generate_ppt_narration
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-outline:
+    post:
+      operationId: post_api_generate_ppt_outline
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/ppt-slide:
+    post:
+      operationId: post_api_generate_ppt_slide
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/upload-ref:
+    post:
+      operationId: post_api_generate_upload_ref
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video:
+    get:
+      operationId: get_api_generate_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video-sales/analyze:
+    post:
+      operationId: post_api_generate_video_sales_analyze
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoSalesAnalyzeRequest'
+      responses:
+        '200':
+          description: 仅分析允许的商品图
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  analysis:
+                    type: object
+                    additionalProperties: true
+  /api/generate/video-sales/compose:
+    post:
+      operationId: post_api_generate_video_sales_compose
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/video-sales/finalize-prompts:
+    post:
+      operationId: post_api_generate_video_sales_finalize_prompts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoSalesFinalizeRequest'
+      responses:
+        '200':
+          description: validate-assets 返回逐ID视觉校验，finalize 返回一条整段提示词，无operation仍走旧接口
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoSalesFinalizeResponse'
+  /api/generate/video-sales/script:
+    post:
+      operationId: post_api_generate_video_sales_script
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoSalesScriptRequest'
+      responses:
+        '200':
+          description: 新版每套脚本包含单条视频交付模式及自动素材计划，旧请求兼容
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, scripts]
+                properties:
+                  success:
+                    type: boolean
+                  scripts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VideoSalesScript'
+  /api/generate/video-sales/select-images:
+    post:
+      operationId: post_api_generate_video_sales_select_images
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoSalesSelectRequest'
+      responses:
+        '200':
+          description: 只能选取模型实际查看过且在允许集合内的商品图片
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  assignments:
+                    type: array
+                    items:
+                      type: object
+                      required: [shotId, imageIndex, reason]
+                      properties:
+                        shotId:
+                          type: integer
+                        imageIndex:
+                          type: integer
+                        reason:
+                          type: string
+  /api/health:
+    get:
+      operationId: get_api_health
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/pets:
+    get:
+      operationId: get_api_pets
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/pets/{id}/spritesheet':
+    get:
+      operationId: get_api_pets_id_spritesheet
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/pets/import:
+    post:
+      operationId: post_api_pets_import
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/config:
+    get:
+      operationId: get_api_system_config
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_system_config
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/depth-env:
+    get:
+      operationId: get_api_system_depth_env
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/gateway-user:
+    post:
+      operationId: post_api_system_gateway_user
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/local-storage/clear-derived:
+    post:
+      operationId: post_api_system_local_storage_clear_derived
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/local-storage/stats:
+    get:
+      operationId: get_api_system_local_storage_stats
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/media-review:
+    get:
+      operationId: get_api_system_media_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/memory-cleanup:
+    post:
+      operationId: post_api_system_memory_cleanup
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/models/fetch:
+    post:
+      operationId: post_api_system_models_fetch
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/models/pricing:
+    get:
+      operationId: get_api_system_models_pricing
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/proxy-image:
+    get:
+      operationId: get_api_system_proxy_image
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/proxy-video:
+    get:
+      operationId: get_api_system_proxy_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/video-downloads:
+    post:
+      operationId: post_api_system_video_downloads
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/system/video-downloads/{jobId}':
+    get:
+      operationId: get_api_system_video_downloads_jobId
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/system/video-downloads/{jobId}/cancel':
+    post:
+      operationId: post_api_system_video_downloads_jobId_cancel
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/system/video-downloads/pick-directory:
+    post:
+      operationId: post_api_system_video_downloads_pick_directory
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/workshop/tasks/{taskId}/review':
+    post:
+      operationId: post_api_workshop_tasks_taskId_review
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+components:
+  schemas:
+    CategoryLearningNote:
+      type: object
+      required: [id, kind, content, createdAt]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [prefer, avoid]
+        content:
+          type: string
+        createdAt:
+          type: string
+    CategoryLearningEntry:
+      type: object
+      required: [groupId, title, state, reason, rules, conditions, avoid, model, createdAt]
+      properties:
+        groupId:
+          type: string
+        title:
+          type: string
+        state:
+          type: string
+          enum: [pending, learned, rejected, holdout]
+        reason:
+          type: string
+        rules:
+          type: array
+          items:
+            type: string
+        conditions:
+          type: array
+          items:
+            type: string
+        avoid:
+          type: array
+          items:
+            type: string
+        model:
+          type: string
+        createdAt:
+          type: string
+    CategoryLearningMemory:
+      type: object
+      required: [entries, notes, learned, pending, rejected, holdout, fingerprint]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryLearningEntry'
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryLearningNote'
+        learned:
+          type: integer
+        pending:
+          type: integer
+        rejected:
+          type: integer
+        holdout:
+          type: integer
+        fingerprint:
+          type: string
+    TextModelRoute:
+      type: object
+      description: 文本及图片理解模型路由；模型级显式协议优先，auto按真实上游模型识别Gemini或Anthropic原生协议，不改变渠道地址与密钥，也不自动回退协议。
+      properties:
+        model:
+          type: string
+          maxLength: 200
+        textProtocol:
+          type: string
+          enum: [auto, openai, gemini, anthropic]
+          default: auto
+        customBaseUrl:
+          type: string
+          maxLength: 2048
+        customApiKey:
+          type: string
+          maxLength: 4096
+    AssistantTurnStartRequest:
+      allOf:
+        - $ref: '#/components/schemas/TextModelRoute'
+        - type: object
+          required: [messages]
+          properties:
+            messages:
+              type: array
+              minItems: 1
+              maxItems: 500
+              items:
+                type: object
+                required: [role, content]
+                properties:
+                  role:
+                    type: string
+                    enum: [user, assistant, system]
+                  content:
+                    type: string
+                    maxLength: 100000
+                additionalProperties: true
+            reasoningEffort:
+              type: string
+              enum: [auto, low, medium, high, xhigh]
+              default: medium
+          additionalProperties: true
+    VideoSalesCatalogImage:
+      type: object
+      required: [index, url, role]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        url:
+          type: string
+          minLength: 1
+        role:
+          type: string
+          minLength: 1
+    VideoSalesWorkflowRequest:
+      type: object
+      description: workflowVersion为3时imageCatalog与eligibleImageIndexes必填，保留原始编号，仅处理允许集合
+      properties:
+        workflowVersion:
+          type: integer
+          enum: [3]
+        imageCatalog:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items:
+            $ref: '#/components/schemas/VideoSalesCatalogImage'
+        eligibleImageIndexes:
+          type: array
+          minItems: 1
+          maxItems: 40
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 0
+        selectedColor:
+          type: string
+          maxLength: 200
+        model:
+          type: string
+        customBaseUrl:
+          type: string
+        customApiKey:
+          type: string
+        textProtocol:
+          type: string
+          enum: [auto, openai, gemini, anthropic]
+          default: auto
+      oneOf:
+        - not:
+            required: [workflowVersion]
+        - required: [workflowVersion, imageCatalog, eligibleImageIndexes]
+    VideoSalesAnalyzeRequest:
+      allOf:
+        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
+        - type: object
+          properties:
+            imageUrls:
+              type: array
+              maxItems: 40
+              items:
+                type: string
+            productName:
+              type: string
+            brand:
+              type: string
+            priceRange:
+              type: string
+            productDescription:
+              type: string
+              maxLength: 4000
+            category:
+              type: string
+    VideoSalesAspectRatio:
+      type: string
+      enum: ['9:16', '16:9', '3:4', '4:3', '1:1', '21:9']
+    VideoSalesScriptRequest:
+      allOf:
+        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
+        - type: object
+          required: [productName]
+          properties:
+            productName:
+              type: string
+              minLength: 1
+              maxLength: 100
+            category:
+              type: string
+              enum: [beauty, food, home, fashion, tech, other]
+            productDescription:
+              type: string
+              maxLength: 2000
+            productAnalysis:
+              type: string
+              maxLength: 4000
+            productImages:
+              type: array
+              maxItems: 40
+              items:
+                type: string
+            targetDuration:
+              type: integer
+              minimum: 10
+              maximum: 120
+            aspectRatio:
+              $ref: '#/components/schemas/VideoSalesAspectRatio'
+            priceRange:
+              type: string
+            brand:
+              type: string
+            targetAudience:
+              type: string
+            videoMode:
+              type: string
+              enum: [product_closeup, graphic_montage, scene_demo, live_presenter]
+            platforms:
+              type: array
+              items:
+                type: string
+            templateId:
+              type: string
+            characterId:
+              type: string
+            fashionReferences:
+              type: object
+              required: [person, face, scene]
+              properties:
+                person:
+                  type: boolean
+                face:
+                  type: boolean
+                scene:
+                  type: boolean
+          oneOf:
+            - not:
+                required: [workflowVersion]
+            - required: [workflowVersion, targetDuration, aspectRatio]
+    VideoSalesPlannedAsset:
+      type: object
+      description: 按需1至4张，依赖只能指向前序素材；衣服上身图usesProduct必须为true
+      required: [id, kind, label, prompt, required]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        kind:
+          type: string
+          enum: [person, face, scene, keyframe]
+        label:
+          type: string
+          minLength: 1
+        prompt:
+          type: string
+          minLength: 1
+        required:
+          type: boolean
+        referenceAssetIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        usesProduct:
+          type: boolean
+        productImageIndexes:
+          type: array
+          description: 本张静帧按目标视角选择的商品目录原始编号，须属于模型看过的允许图片；未提供时兼容旧计划，生图使用全部已选商品图
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 0
+    VideoSalesShot:
+      type: object
+      required: [shotId]
+      properties:
+        shotId:
+          type: integer
+          minimum: 1
+        type:
+          type: string
+        duration:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        camera:
+          type: string
+        voiceover:
+          type: string
+        prompt:
+          type: string
+        imageIndex:
+          type: integer
+          minimum: 0
+        visualSource:
+          type: string
+        transition:
+          type: string
+        selectionReason:
+          type: string
+    VideoSalesScript:
+      type: object
+      description: 新版deliveryMode和assets必有，时长必须精确匹配请求，旧版返回结构保留
+      required: [id, title, totalDuration, shots]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        beat:
+          type: string
+        deliveryMode:
+          type: string
+          enum: [single]
+        assets:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/VideoSalesPlannedAsset'
+        totalDuration:
+          type: integer
+        shots:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoSalesShot'
+        seo:
+          type: object
+          additionalProperties: true
+        fullPrompt:
+          type: string
+    VideoSalesSelectRequest:
+      allOf:
+        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
+        - type: object
+          required: [shots, imageCatalog]
+          properties:
+            shots:
+              type: array
+              minItems: 1
+              maxItems: 40
+              items:
+                $ref: '#/components/schemas/VideoSalesShot'
+    VideoSalesActualReference:
+      type: object
+      required: [id, kind, label, url]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        kind:
+          type: string
+          enum: [product, person, face, scene, keyframe]
+        label:
+          type: string
+          minLength: 1
+        url:
+          type: string
+          minLength: 1
+    VideoSalesFinalizeRequest:
+      allOf:
+        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
+        - type: object
+          required: [shots, imageCatalog]
+          properties:
+            operation:
+              type: string
+              enum: [validate-assets, finalize]
+            shots:
+              type: array
+              minItems: 1
+              maxItems: 40
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/VideoSalesShot'
+                  - type: object
+                    required: [imageIndex]
+            actualReferences:
+              type: array
+              minItems: 1
+              maxItems: 44
+              items:
+                $ref: '#/components/schemas/VideoSalesActualReference'
+            assets:
+              type: array
+              minItems: 1
+              maxItems: 4
+              items:
+                $ref: '#/components/schemas/VideoSalesPlannedAsset'
+            targetDuration:
+              type: integer
+              minimum: 10
+              maximum: 120
+            aspectRatio:
+              $ref: '#/components/schemas/VideoSalesAspectRatio'
+            videoModel:
+              type: string
+            videoRefMode:
+              type: string
+            videoResolution:
+              type: string
+            productAnalysis:
+              type: string
+              maxLength: 8000
+            category:
+              type: string
+              enum: [beauty, food, home, fashion, tech, other]
+            referenceOrder:
+              type: array
+              maxItems: 4
+              items:
+                type: object
+                required: [slot, label, url]
+                properties:
+                  slot:
+                    type: string
+                    enum: [person, face, garment, scene]
+                  label:
+                    type: string
+                  url:
+                    type: string
+                  imageIndex:
+                    type: integer
+                    minimum: 0
+          oneOf:
+            - not:
+                anyOf:
+                  - required: [workflowVersion]
+                  - required: [operation]
+            - required: [workflowVersion, operation, actualReferences]
+              properties:
+                operation:
+                  enum: [validate-assets]
+            - required: [workflowVersion, operation, actualReferences, targetDuration, aspectRatio]
+              properties:
+                operation:
+                  enum: [finalize]
+    VideoSalesAssetValidation:
+      type: object
+      required: [id, status, reason]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [passed, conflict, uncertain]
+        reason:
+          type: string
+          minLength: 1
+    VideoSalesFinalizeResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        model:
+          type: string
+        validations:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoSalesAssetValidation'
+        fullPrompt:
+          type: string
+        prompts:
+          type: array
+          items:
+            type: object
+            required: [shotId, prompt]
+            properties:
+              shotId:
+                type: integer
+              prompt:
+                type: string
+              imagePrompt:
+                type: string
+        personImagePrompt:
+          type: string
+        sceneImagePrompt:
+          type: string
+    CollectVariantMetadata:
+      type: object
+      required: [version, variants]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        variants:
+          type: array
+          items:
+            type: object
+            required: [id, label, skuIds, imageUrls]
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              color:
+                type: string
+              skuIds:
+                type: array
+                items:
+                  type: string
+              imageUrls:
+                type: array
+                items:
+                  type: string
+        requestedSkuId:
+          type: string
+        selectedVariantId:
+          type: string

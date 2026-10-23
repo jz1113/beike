@@ -42,7 +42,8 @@ func TestCategoryLearningReadsOriginalsCachesPartialWorkAndNeverTrainsOnHoldouts
 		t.Fatal(err)
 	}
 	folder := "prompt_subcategory:digital_3c:phone"
-	for i := 0; i < 20; i++ {
+	// Keep at least sixteen training groups after the deterministic holdout split.
+	for i := 0; i < 25; i++ {
 		images := []string{}
 		shots := []map[string]any{}
 		for n := 1; n <= 4; n++ {
@@ -140,7 +141,7 @@ func TestCategoryLearningReadsOriginalsCachesPartialWorkAndNeverTrainsOnHoldouts
 	handler := CategorySkills(config.Config{Root: root, DatabaseURL: "file:" + path})
 	call := func(force bool, status int) {
 		t.Helper()
-		body, _ := json.Marshal(map[string]any{"folderId": folder, "model": "mock-vision", "customBaseUrl": "https://example.com", "customApiKey": "test-key", "textProtocol": "openai", "force": force})
+		body, _ := json.Marshal(map[string]any{"folderId": folder, "model": "mock-vision", "customBaseUrl": "https://example.com", "customApiKey": "test-key", "textProtocol": "openai", "force": force, "maxNewSamples": 30})
 		r := httptest.NewRequest(http.MethodPost, "/api/catalog/category-skills?action=learn", bytes.NewReader(body))
 		r = r.WithContext(httpx.WithWorkspace(r.Context(), "a"))
 		w := httptest.NewRecorder()

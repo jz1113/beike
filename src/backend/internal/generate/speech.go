@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
@@ -60,7 +60,7 @@ func SynthesizeSpeech(ctx context.Context, req SpeechRequest) (SpeechResult, err
 			return SpeechResult{Bytes: raw, ContentType: contentType}, nil
 		}
 		last = errors.New(speechError(raw, status))
-		retryable := modelgw.CanTryAnotherEndpoint(status) || status >= 500
+		retryable := gateway.CanTryAnotherEndpoint(status) || status >= 500
 		if !retryable || index == len(attempts)-1 {
 			return SpeechResult{}, last
 		}

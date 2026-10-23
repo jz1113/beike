@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
@@ -219,9 +219,9 @@ func bytesToEditImage(ctx context.Context, header string, raw []byte) (editImage
 		return editImageFile{filename: "image" + ext, mime: mimeType, data: raw}, nil
 	}
 	// The edit payload stays within 8MB. This copy is not written back over the saved image.
-	fitted, fittedType, err := modelgw.CompressUploadImage(ctx, raw, mimeType, editImageMaxBytes)
+	fitted, fittedType, err := gateway.CompressUploadImage(ctx, raw, mimeType, editImageMaxBytes)
 	if err != nil {
-		var imageErr *modelgw.TextImageError
+		var imageErr *gateway.TextImageError
 		if errors.As(err, &imageErr) && imageErr.Kind == "size" {
 			return editImageFile{}, errors.New("参考图超过 8MB")
 		}

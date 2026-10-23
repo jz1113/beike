@@ -1,4 +1,4 @@
-import { CanvasRichTextEditor } from '../CanvasRichTextEditor';
+import { CanvasRichTextEditor } from '../editor/CanvasRichTextEditor';
 import { useEffect, useRef, useState } from 'react';
 import { AlignLeft, ArrowUp } from 'lucide-react';
 import { apiFetch } from '@client/shared/api/apiClient';
@@ -6,8 +6,8 @@ import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { getEnabledMultimodalModelsFromSettings, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
 import type { CanvasNode } from '../../model/types';
-import { CanvasDrawingEditor } from '../CanvasDrawingEditor';
-import { CanvasModelPicker } from '../CanvasModelPicker';
+import { CanvasDrawingEditor } from '../editor/CanvasDrawingEditor';
+import { CanvasModelPicker } from '../tools/CanvasModelPicker';
 
 const loadModels = () => getEnabledMultimodalModelsFromSettings(readWorkflowModelsFromStorage(), 'assistant').map(model => ({ id: model.id, name: model.name || model.id }));
 export function CanvasPromptNode({ node, selected, onChange }: { node: CanvasNode; selected: boolean; onChange: (patch: Partial<CanvasNode>) => void }) {

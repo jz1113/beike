@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 func startAssistantTurn(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
@@ -108,7 +108,7 @@ func replayTurn(cfg config.Config, w http.ResponseWriter, r *http.Request, works
 }
 
 func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage, creds gatewayCreds, workspace, turnID, threadID, model string) {
-	ctx = modelgw.WithTextProtocol(ctx, creds.protocol)
+	ctx = gateway.WithTextProtocol(ctx, creds.protocol)
 	flusher, _ := w.(http.Flusher)
 	writeSSE(w, flusher, map[string]any{"type": "turn/started", "turnId": turnID, "threadId": threadID, "model": model})
 	send := func(event map[string]any) { writeSSE(w, flusher, event) }

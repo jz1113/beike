@@ -2,10 +2,8 @@ import { deepSeekRouteId } from '@shared/domain/models/deepseek';
 import { useState, useEffect, useRef, useCallback, type SetStateAction } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { confirmAction } from '@client/shared/utils/confirmAction';
-import {
-  DEFAULT_PRESET_MODELS,
-  type WorkflowModel,
-} from '../components/settingsShared';
+import { DEFAULT_PRESET_MODELS } from '../model/presetModels';
+import type { WorkflowModel } from '../model/workflowModel';
 import { mergeGatewayModels, type GatewayModelItem } from '../model/gatewayModelCatalog';
 import {
   gatewayModelToWorkflowModel,

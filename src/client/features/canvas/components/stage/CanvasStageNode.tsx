@@ -1,4 +1,4 @@
-import { CanvasResizeHandle } from '../CanvasResizeHandle';
+import { CanvasResizeHandle } from '../editor/CanvasResizeHandle';
 import { CanvasStageNodeMedia } from './CanvasStageNodeMedia';
 import { CanvasStageNodeToolbar } from './CanvasStageNodeToolbar';
 import type { CanvasStageNodeProps } from './canvasStageNodeTypes';

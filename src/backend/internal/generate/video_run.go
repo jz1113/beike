@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -61,14 +61,14 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	}
 	encoded, _ := json.Marshal(adapted.payload)
 	started := time.Now()
-	result := modelgw.SubmitVideo(r.Context(), modelgw.SubmitCommand{
+	result := gateway.SubmitVideo(r.Context(), gateway.SubmitCommand{
 		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), Headers: adapted.headers,
 		ReadTaskID:          func(data map[string]any) string { return readVideoTaskID(data, adapted.family) },
 		Client:              ModelHTTP(),
 		RetryOnMissingInput: adapted.family == "wan",
 	})
-	if result.Outcome != modelgw.Accepted {
-		unknown := result.Outcome == modelgw.Unknown
+	if result.Outcome != gateway.Accepted {
+		unknown := result.Outcome == gateway.Unknown
 		status := http.StatusBadRequest
 		message := result.Error
 		if message == "" {

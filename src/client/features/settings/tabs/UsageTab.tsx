@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { getUsageLogs, getUsageSummary, clearUsageLogs, type UsageRange, type UsageSummary } from '@client/shared/utils/usageTracker';
-import GatewayBalanceCard from '../components/GatewayBalanceCard';
-import { CreatorMilestones } from '../components/CreatorMilestones';
-import { CreatorMixCards } from '../components/CreatorMixCards';
-import { CreatorProfileHeader } from '../components/CreatorProfileHeader';
+import GatewayBalanceCard from '../components/models/GatewayBalanceCard';
+import { CreatorMilestones } from '../components/creator/CreatorMilestones';
+import { CreatorMixCards } from '../components/creator/CreatorMixCards';
+import { CreatorProfileHeader } from '../components/creator/CreatorProfileHeader';
 import { UsageHeatmapPanel } from './UsageHeatmapPanel';
 import { UsageRecentList } from './UsageRecentList';
 import { type GatewayUserInfo } from '../hooks/useGatewayUser';

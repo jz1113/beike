@@ -157,7 +157,7 @@ func TestCandidateRequiresActualPairedHoldoutResultsAndCanRollback(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bound["learningVersionId"] != id || bound["promptSnippet"] != version.PromptSnippet {
+	if bound["learningVersionId"] != id || !strings.Contains(bound["promptSnippet"].(string), version.PromptSnippet) || !strings.Contains(bound["promptSnippet"].(string), BaseRecipe()["promptSnippet"].(string)) {
 		t.Fatal("candidate not used for new analysis")
 	}
 	if err := Switch(ctx, db, "a", testFolder, "publish", id, 1); err == nil {

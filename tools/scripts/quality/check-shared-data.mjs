@@ -12,7 +12,7 @@ import { OPENAI_TOOLS } from '../../../src/shared/domain/assistant/tools/defs.ts
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const textCapabilities = JSON.parse(fs.readFileSync(path.join(root, 'src/shared/domain/models/textModelCapabilities.json'), 'utf8'));
 const files = {
-  'src/backend/internal/modelgw/textModelCapabilities.json': textCapabilities,
+  'src/backend/internal/gateway/textModelCapabilities.json': textCapabilities,
   'src/shared/data/systemConfigModels.json': { visionModels: VISION_MODELS, imageModels: IMAGE_GEN_MODELS },
   'src/shared/data/defaultSubCategories.json': DEFAULT_SUBCATEGORIES_MAP,
   'src/shared/data/officialMasterRecipes.json': OFFICIAL_MASTER_RECIPES,

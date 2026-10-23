@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowUpRight, Archive, Clock3, MoreHorizontal, Pencil, Search, Trash2, X } from 'lucide-react';
-import { WorkshopActionMenu, workshopMenuItemClass } from '../WorkshopActionMenu';
+import { WorkshopActionMenu, workshopMenuItemClass } from '../layout/WorkshopActionMenu';
 import { BatchHistoryProduct, BatchHistoryRecord, BatchHistoryStats, batchHistoryStatus, formatBatchHistoryDate } from './BatchHistoryContent';
 import type { WorkshopBatchSummary } from '@shared/contracts/workshopBatches';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';

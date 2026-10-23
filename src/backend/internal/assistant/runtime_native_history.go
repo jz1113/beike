@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 // Only a completed, tool-free final native message is eligible for restoration.
@@ -39,7 +39,7 @@ func saveNativeContinuation(ctx context.Context, cfg config.Config, workspace, t
 		return
 	}
 	model := loop.models[0]
-	continuation := nativeContinuation{Model: model, BaseURL: normalizeBase(loop.creds.baseURL), Protocol: modelgw.ResolveTextProtocol(model, loop.creds.protocol), RouteHash: nativeRouteHash(loop.creds), Text: text, Content: message["native_content"]}
+	continuation := nativeContinuation{Model: model, BaseURL: normalizeBase(loop.creds.baseURL), Protocol: gateway.ResolveTextProtocol(model, loop.creds.protocol), RouteHash: nativeRouteHash(loop.creds), Text: text, Content: message["native_content"]}
 	raw, err := json.Marshal(continuation)
 	if err != nil || len(raw) > 2<<20 {
 		return
@@ -54,7 +54,7 @@ func saveNativeContinuation(ctx context.Context, cfg config.Config, workspace, t
 }
 
 func restoreNativeContinuations(ctx context.Context, cfg config.Config, workspace, threadID, model string, creds gatewayCreds, messages []map[string]any) {
-	protocol := modelgw.ResolveTextProtocol(model, creds.protocol)
+	protocol := gateway.ResolveTextProtocol(model, creds.protocol)
 	if protocol == "openai" {
 		return
 	}

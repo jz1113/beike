@@ -1,115 +1,101 @@
 # 贝壳云图
 
-面向电商视觉创作的全栈工作台，包含商品采集、视觉反推、分镜生成、大字报封面、关键词审核、无限画布编辑和 AI 伴随助手。
+面向电商视觉创作的全栈工作台，包含商品采集、图像与视频生成、视觉反推、封面制作、关键词审核、无限画布和 AI 助手。
 
-采用单项目全栈结构：统一依赖清单、统一锁文件、一套安装和构建命令。前后端通过目录与依赖检查隔离，不使用 monorepo 或多包 workspace。
-
----
-
-## 项目整体六大架构速查地图
-
-为了让所有开发者与交接人员能够直观、清晰地定位项目各层，项目核心物理结构与职能严格划分为以下六大体系：
-
-| 架构分层 | 物理对应目录 / 文件 | 包含职责与定位 |
-| --- | --- | --- |
-| **1. 前端 (Client)** | `src/client/` | 浏览器界面、无限画布、全局状态、组件库以及各独立小工具前端视窗 |
-| **2. 后端 (Backend)** | `src/backend/` | Go 语言高性能服务入口 (`cmd/api`)、业务领域调度逻辑与数据库版本化迁移 |
-| **3. API 调用层 (网关)** | `src/backend/internal/modelgw/`<br>`docs/` | 生图、视频、语音合成、数字人、3D 资产、多模态反推的统一网关，调用样例写在对应参考文档末尾 |
-| **4. 文件资料层** | `database/`<br>`docs/` | 本地 SQLite 开发库文件组、全量业务契约、模型调用文档与技术排布指南 |
-| **5. 相关依赖** | `node_modules/`<br>`package.json`<br>`go.mod` | 前端第三方 npm 依赖包清单与 Go 后端第三方 SDK 依赖声明 |
-| **6. 工程工具** | `tools/` | 启动脚本、生产打包产物、质量自动化门禁 (`tools/scripts`) 与部署模版 (`tools/deploy`) |
-
-> **根目录散落文件说明**：
-> - `启动贝壳云图.command`：**macOS 用户专用**，双击自动安装环境并拉起全栈服务；
-> - `启动贝壳云图.bat` / `.ps1`：**Windows 用户专用**双击启动入口；
-> - `index.html` / `vite.config.ts`：前端 Vite 打包工具的硬性行业根入口，禁止移动；
-> - `package.json` / `go.mod`：Node 与 Go 工具链的模块根文件，禁止移动；
-> - `tsconfig.json`：TypeScript 编辑器语法支持与源码别名映射根配置。
-
----
+项目使用一个根 package.json、一份 pnpm-lock.yaml 和一个 Go module。所有安装、启动、检查与构建命令都在仓库根目录执行。
 
 ## 目录导航
 
 ```text
-贝壳/
-├── 源码核心层 (业务代码)
-│   ├── src/client/            -> 【前端】：页面、交互、画布、独立小工具
-│   │   └── public/            -> 公开静态素材 (URL 直接访问)
-│   ├── src/backend/           -> 【后端】：Go 接口入口、业务领域服务、数据库迁移
-│   └── src/shared/            -> 【前后端共享】：Zod 接口契约、纯业务模型规则
-│
-├── 资料与依赖层
-│   ├── database/              -> 【文件资料】：SQLite 本地开发库与结构档案
-│   ├── docs/                  -> 【文档】：架构、部署和各模态调用参考（样例附在文末）
-│   └── node_modules/          -> 【前端依赖】：pnpm 下载的底层包
-│
-├── 工程工具层
-│   ├── tools/                 -> 【工程工具】：质量门禁、启动器、部署模板
-│   │   ├── configs/           -> ESLint、TypeScript、依赖边界规则
-│   │   ├── scripts/           -> quality 质检、web 启动调度、db 数据维护
-│   │   └── build/ui/          -> 自动生成的前端构建产物 (不提交)
-│   └── api/                   -> 【接口文档】：OpenAPI 规范
-│
-└── 根目录标准入口 (行业规范固定位置)
-    ├── 启动贝壳云图.command    -> macOS 双击启动入口
-    ├── 启动贝壳云图.bat        -> Windows 双击启动入口
-    ├── 启动贝壳云图.ps1        -> Windows PowerShell 启动入口
-    ├── index.html             -> 浏览器主 HTML
-    ├── vite.config.ts         -> 前端打包与代理配置
-    ├── tsconfig.json          -> TS 别名与类型配置
-    ├── package.json           -> 依赖与执行命令
-    └── pnpm-lock.yaml         -> 依赖版本锁定
+云图/
+├── src/                         产品源码
+│   ├── client/                  React 浏览器端
+│   │   ├── index.html           浏览器 HTML 入口
+│   │   ├── app/                 应用组装、导航、全局弹窗
+│   │   ├── features/            按功能组织的页面与流程
+│   │   ├── shared/              跨功能 UI、请求与媒体能力
+│   │   ├── store/               全局状态与持久化
+│   │   └── public/              按原 URL 提供的公开资源
+│   ├── backend/                 Go API、存储、运行时迁移与官方种子
+│   └── shared/                  接口契约、纯业务规则与共用 JSON
+│       └── contracts/openapi.yaml  HTTP 契约
+├── tools/                       工程工具
+│   ├── configs/                 环境模板、Vite、TypeScript、ESLint 与质量规则
+│   ├── scripts/                 启动、构建配套、检查和数据维护
+│   ├── launchers/               Windows / macOS 启动器实现
+│   ├── deploy/                  服务与反向代理模板
+│   └── build/                   自动生成的 API 可执行文件与 ui/ 产物
+├── database/                    历史 SQL；本地数据库与备份不提交
+├── docs/                        当前架构、使用、模型接入与运维文档
+├── node_modules/                自动安装的 Node 依赖
+├── .local/                      本机运行记录、工具状态与备份
+├── package.json / pnpm-lock.yaml  Node 依赖与统一命令
+├── go.mod / go.sum              Go 模块与依赖版本
+├── tsconfig.json                编辑器与类型检查入口
+└── 启动贝壳云图.bat             Windows 双击启动入口
 ```
 
-日常修改界面看 `src/client`，修改接口、数据库迁移和官方种子看 `src/backend`，历史 SQL 看 `database/migrations`，使用方法看 `docs`。`pnpm dev` 与 `pnpm start` 编译并启动 Go API。依赖由 `pnpm install` 管理；工程工具独立收纳，避免混入产品源码。根目录几个配置文件是工具入口，不必为了减少文件数再包一层。
+| 要修改什么 | 从哪里开始 |
+| --- | --- |
+| 页面、交互与业务流程 | `src/client/features/<功能>` |
+| 导航、页面挂载、全局灯箱和右键菜单 | `src/client/app` |
+| 多个功能共用的浏览器能力 | `src/client/shared` |
+| HTTP 接口、数据库读写与运行时迁移 | `src/backend/internal` |
+| 请求响应契约与 OpenAPI | `src/shared/contracts` |
+| 业务规则、模型适配与类型 | `src/shared/domain` |
+| 构建、检查、启动和部署 | `tools` |
 
-详细归属和功能导航见 [目录与分层](docs/layout.md)，依赖限制见同页的模块职责与依赖边界。
+详细目录归属、功能导航与依赖方向见 [目录与分层](docs/layout.md)。组件分类目录直接存放实现文件；功能内部按 `components / hooks / api / model` 的实际需要组织。
 
-`node_modules/` 是安装依赖，`tools/build/ui/` 是构建产物；二者会在安装或构建时生成，不是额外子项目。`.local/` 只保存本机工具、运行记录、凭证与备份，不放产品源码。`.agents/skills/` 是可复用技能，`AGENTS.md` 与 `.cursor/rules/` 是工程规则，均不是临时计划文件。
+常用功能目录：`poster` 封面、`keywords` 关键词审核、`ppt` 演示文稿、`sales` 带货视频。前后端沿用同一组名称，模型协议适配统一放在后端 `gateway`。
+
+根目录保留工具链需要发现的依赖清单、锁文件、TypeScript 入口和 `jsrepo.config.mts`，以及说明、工程约定和 Windows 双击入口。环境模板、Vite 配置位于 `tools/configs`，HTML 位于 `src/client/index.html`；统一命令会显式选择配置。`.agents`、`.cursor`、`.github` 与 `.vscode` 分别保存技能、规则、CI 和编辑器配置。
 
 ## 安装与启动
 
-环境：Node.js 22、pnpm 10.13.1、Go 1.26。技术栈：React 19、Vite、Tailwind CSS、Go、SQLite。
+环境：Node.js 22、pnpm 10.13.1、Go 1.26 或更高版本。技术栈：React 19、Vite、Tailwind CSS、Go、SQLite。
 
 ```bash
 nvm use
 corepack enable
-cp .env.example .env          # 仅首次创建；已有配置不要覆盖
+cp tools/configs/env.example .env  # 仅首次创建；已有配置不要覆盖
 pnpm install --frozen-lockfile
-pnpm dev                     # 同时启动前端和 API
+pnpm dev                     # 同时启动前端和 Go API
 ```
 
-浏览器打开 http://127.0.0.1:5173。`pnpm dev` 同时启动 Vite 与 Go API。单独启动前端用 `pnpm dev:ui`；`dev:web` / `start:web` 与 `dev` / `start` 相同。
+浏览器打开 `http://127.0.0.1:5173`。单独启动前端使用 `pnpm dev:ui`；`dev:web` / `start:web` 分别是 `dev` / `start` 的别名。
 
-Windows 可在资源管理器中双击根目录的 [启动贝壳云图.bat](启动贝壳云图.bat) 或右键运行 [启动贝壳云图.ps1](启动贝壳云图.ps1)，macOS 也可在 Finder 中双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)：它们选用 Node.js 22，首次缺依赖时按锁文件安装，然后启动 API 与前端并打开浏览器。重复双击会打开已运行的页面；在启动器的终端窗口按 Ctrl+C 停止服务。现有 `.env` 和本机数据不会被启动器覆盖。
+Windows 双击根目录的 [启动贝壳云图.bat](启动贝壳云图.bat)，它调用 `tools/launchers` 中唯一的 Windows 实现；也可右键运行 [PowerShell 启动器](tools/launchers/启动贝壳云图.ps1)。macOS 双击 [macOS 启动器](tools/launchers/启动贝壳云图.command)。首次缺依赖时按锁文件安装，然后启动服务并打开浏览器。按启动终端中的 Ctrl+C 停止本次服务。
 
-在 `.env` 填写模型网关和采集配置；不要提交密钥。前端通过开发代理访问 API。生产由 Go 进程托管页面与 API：`pnpm start` 先编译 `src/backend/cmd/api`，启动时再用现有 Node 脚本执行数据库迁移和官方种子。
+模型网关和采集配置填写在根目录 `.env`；首次启动从 `tools/configs/env.example` 创建，已有配置会保留。浏览器专属凭证通过设置页保存。开发端口和进程记录统一写入 `.local`。启动器继续兼容旧根目录端口缓存，并按 PID、启动时间、项目目录和配置识别自己记录的开发服务。
 
 ## 构建与检查
 
 ```bash
 pnpm build                   # 类型检查并构建前端
-pnpm start                   # 启动生产服务，读取 tools/build/ui/
-pnpm check                   # 静态质量检查与生产构建，与 CI 一致
-pnpm run check:structure     # 单项目结构与依赖声明
-pnpm run lint:boundaries     # 浏览器/服务端、公共/功能模块边界
+pnpm start                   # Go 托管 tools/build/ui、API 和存储读取
+pnpm check                   # 全部静态检查、Go 检查、单元测试与生产构建
+pnpm run check:root-layout    # 目录、入口归属、文档位置和实际组件分类
+pnpm run lint:boundaries      # 浏览器安全、共享层和功能间依赖方向
 ```
 
-`pnpm check` 检查目录、依赖声明、模型文档、TypeScript、ESLint、未使用绑定、文件长度、依赖边界、密钥和 Go，运行单元测试，并构建前端。正式测试留在仓库内。QA fixture、截图、报告和 Agent 计划应放在项目外的临时目录，验证后清理。
+`pnpm check` 还校验模型目录、共享数据和 OpenAPI，并检查 TypeScript、ESLint、未使用绑定、显式 any、文件长度、依赖循环与密钥。质量基线只允许收紧。正式测试与源码同目录；截图、QA fixture、一次性报告和临时计划放项目外。
+
+接口调整后运行 `pnpm openapi:write`，同步 `src/shared/contracts/openapi.yaml` 和生成的浏览器类型。生产构建输出到 `tools/build/ui`，公开资源 URL 保持稳定。
 
 ## 数据与部署
 
-- `pnpm db:migrate` / `pnpm db:deploy` 都运行 Go 版版本化 SQLite 迁移和官方种子。`database/migrations/` 里的历史 SQL 不参与新库初始化。
-- `pnpm db:backup` 对实际运行库做一致性快照；`pnpm db:restore:verify <文件>` 检查快照完整性及外键。
-- 本地启动器继续使用系统原有应用数据目录；`database/dev.db` 仅作为开发/首次启动后备数据。
-- [部署说明](docs/deployment.md)与 Nginx 模板使用 `tools/build/ui/`。
-
-`.env*`、本机凭证、数据库及 WAL/SHM、备份、上传素材不能作为源码垃圾清理。`pnpm clean` 只清除可重建的 `tools/build/ui`；`clean:all` 另清除可重装依赖。
+- `pnpm db:migrate` / `pnpm db:deploy` 运行 Go 版版本化迁移和官方种子；`database/migrations` 保存历史 SQL。
+- `pnpm db:backup` 对实际运行库生成一致性快照；`pnpm db:restore:verify <文件>` 校验快照。
+- 本地启动器沿用系统应用数据目录。数据库及 WAL/SHM、备份、上传素材、`.env*` 与 `.local` 按运行数据保护。
+- `pnpm clean` 只清除可重建的 `tools/build/ui`；`pnpm clean:all` 还清除可重装的 `node_modules`，支持 Windows、macOS 和 Linux。
+- 生产部署及 `WEB_DIST_DIR`、Nginx 路径配置见 [部署说明](docs/deployment.md)。
 
 ## 文档
 
 - [工程约定](AGENTS.md)
 - [目录与分层](docs/layout.md)
 - [工坊资产绑定](docs/workshop-asset-binding.md)
+- [工坊参考生图与类目技能](docs/workshop-reference-generation.md)
 - [助手执行机制](docs/assistant-runtime.md)
 - [厂商接口与模型索引](docs/models.md)

@@ -1,6 +1,6 @@
 import type { OutputRating } from '@shared/contracts/categorySkills';
 import { useState } from 'react';
-import '../workshopDelivery.css';
+import '../delivery/workshopDelivery.css';
 import LazyProxyImage from '@client/shared/ui/LazyProxyImage';
 import {
   Clock3,
@@ -14,8 +14,8 @@ import { BatchProductItem } from '../../model/batchTypes';
 import { isDeliverableWorkshopResult, isUsableWorkshopResult } from '../../model/generation/workshopReadiness';
 import { BatchStage4ProductInfo } from './BatchStage4ProductInfo';
 import { BatchStage4CopyPanel } from './BatchStage4CopyPanel';
-import { OutputReviewButtons } from '../OutputReviewButtons';
-import { WorkshopPromoteGroup } from '../WorkshopPromoteGroup';
+import { OutputReviewButtons } from '../delivery/OutputReviewButtons';
+import { WorkshopPromoteGroup } from '../delivery/WorkshopPromoteGroup';
 
 export interface BatchStage4ProductItemProps {
   productNavigation?: React.ReactNode;

@@ -1,4 +1,4 @@
 @echo off
 chcp 65001 >nul
-call "%~dp0tools\launchers\启动贝壳云图.bat" %*
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\launchers\启动贝壳云图.ps1" %*
 exit /b %errorlevel%

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sparkles, Cpu } from 'lucide-react';
-import BatchProgressBar from '../BatchProgressBar';
+import BatchProgressBar from '../delivery/BatchProgressBar';
 
 export interface BatchStage3HeaderProps {
   readyCount: number;

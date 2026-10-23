@@ -2,9 +2,9 @@ import { useEffect, useState, type ComponentType } from 'react';
 import { useAppStore } from '@client/store';
 import { normalizeWorkshopTab } from '@client/store/workshopTab';
 import BatchWorkshopView from './components/BatchWorkshopView';
-import { WorkshopTopBar } from './components/WorkshopTopBar';
-import { WorkshopSideCapsuleBar } from './components/WorkshopSideCapsuleBar';
-import { WorkshopDockActionsProvider } from './components/WorkshopDockActionsContext';
+import { WorkshopTopBar } from './components/layout/WorkshopTopBar';
+import { WorkshopSideCapsuleBar } from './components/layout/WorkshopSideCapsuleBar';
+import { WorkshopDockActionsProvider } from './components/layout/WorkshopDockActionsContext';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 
 interface Props {

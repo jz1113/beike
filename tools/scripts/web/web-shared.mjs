@@ -94,11 +94,23 @@ export function getLogPaths(appDataDir) {
   };
 }
 
-const PORT_FILE = '.local-api-port';
+const PORT_FILE = '.local/api-port';
+const LEGACY_PORT_FILE = '.local-api-port';
 
 export function readApiPort(root, { isolated = false } = {}) {
   try {
-    const file = isolated ? join(root, '.local', 'isolated-api-port') : join(root, PORT_FILE);
+    let file;
+    if (isolated) {
+      file = join(root, '.local', 'isolated-api-port');
+    } else {
+      // Try new path first, then legacy path for backwards compatibility
+      const newPath = join(root, PORT_FILE);
+      if (existsSync(newPath)) {
+        file = newPath;
+      } else {
+        file = join(root, LEGACY_PORT_FILE);
+      }
+    }
     const n = Number.parseInt(readFileSync(file, 'utf8').trim(), 10);
     if (Number.isInteger(n) && n >= PORT_MIN && n <= PORT_MAX) return n;
   } catch {
@@ -108,8 +120,13 @@ export function readApiPort(root, { isolated = false } = {}) {
 }
 
 export function writeApiPort(root, port, { isolated = false } = {}) {
-  if (isolated) mkdirSync(join(root, '.local'), { recursive: true });
-  writeFileSync(isolated ? join(root, '.local', 'isolated-api-port') : join(root, PORT_FILE), String(port), 'utf8');
+  if (isolated) {
+    mkdirSync(join(root, '.local'), { recursive: true });
+    writeFileSync(join(root, '.local', 'isolated-api-port'), String(port), 'utf8');
+  } else {
+    mkdirSync(join(root, '.local'), { recursive: true });
+    writeFileSync(join(root, PORT_FILE), String(port), 'utf8');
+  }
 }
 
 export function healthOk(port) {
@@ -197,8 +214,8 @@ export function resolveGo() {
     if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;
   }
   const hint = process.platform === 'win32'
-    ? '未找到 Go 1.23 或更高版本。请安装 Go（https://golang.google.cn/dl/）或设置 GO_BIN 环境变量'
-    : '未找到 Go 1.23 或更高版本。可安装到 ~/.local/go，或设置 GO_BIN';
+    ? '未找到 Go 1.26 或更高版本。请安装 Go（https://golang.google.cn/dl/）或设置 GO_BIN 环境变量'
+    : '未找到 Go 1.26 或更高版本。可安装到 ~/.local/go，或设置 GO_BIN';
   throw new Error(hint);
 }
 
@@ -231,7 +248,7 @@ export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, 
 
 export function startViteServer({ workspaceRoot, accessToken, apiPort, appDataDir, vitePort = VITE_PORT, isolated = false }) {
   const viteCli = resolveCli(workspaceRoot, 'vite', 'vite');
-  const child = spawn(process.execPath, [viteCli, '--config', join(workspaceRoot, 'vite.config.ts'), '--strictPort', '--host', '127.0.0.1', '--port', String(vitePort)], {
+  const child = spawn(process.execPath, [viteCli, '--config', join(workspaceRoot, 'tools/configs/vite.config.ts'), '--strictPort', '--host', '127.0.0.1', '--port', String(vitePort)], {
     cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: {
@@ -240,7 +257,11 @@ export function startViteServer({ workspaceRoot, accessToken, apiPort, appDataDi
       BEIKE_DEV_API_PORT: String(apiPort),
     },
   });
-  recordWebProcess(workspaceRoot, 'vite', child, { ...webProcessOptions({ apiPort, appDataDir, accessToken }), vitePort }, isolated);
+  recordWebProcess(workspaceRoot, 'vite', child, {
+    ...webProcessOptions({ apiPort, appDataDir, accessToken }),
+    vitePort,
+    viteConfig: 'tools/configs/vite.config.ts',
+  }, isolated);
   return child;
 }
 

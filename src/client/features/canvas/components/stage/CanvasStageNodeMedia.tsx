@@ -1,8 +1,8 @@
 import { CanvasPromptNode } from '../prompt/CanvasPromptNode';
-import { CanvasTextNode } from '../CanvasTextNode';
+import { CanvasTextNode } from '../nodes/CanvasTextNode';
 import { useState } from 'react';
-import { CanvasDrawingNode } from '../CanvasDrawingNode';
-import { CanvasFileNode } from '../CanvasFileNode';
+import { CanvasDrawingNode } from '../nodes/CanvasDrawingNode';
+import { CanvasFileNode } from '../nodes/CanvasFileNode';
 import { CanvasVideoPlayer } from '../video/CanvasVideoPlayer';
 import { CanvasCompareNode } from '../nodes/CanvasCompareNode';
 import { CanvasSaveNode } from '../nodes/CanvasSaveNode';

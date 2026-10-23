@@ -1,5 +1,5 @@
 import type { OutputRating } from '@shared/contracts/categorySkills';
-import { BatchDeliveryStatus } from '../BatchDeliveryStatus';
+import { BatchDeliveryStatus } from '../delivery/BatchDeliveryStatus';
 import { isDeliverableWorkshopResult, isUsableWorkshopResult, summarizeWorkshopResults } from '../../model/generation/workshopReadiness';
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

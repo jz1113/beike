@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestChatCompletionNativeProtocols(t *testing.T) {
@@ -55,7 +55,7 @@ func TestChatCompletionNativeProtocols(t *testing.T) {
 			previous := ModelHTTP
 			ModelHTTP = func() *http.Client { return server.Client() }
 			defer func() { ModelHTTP = previous }()
-			ctx := modelgw.WithTextProtocol(context.Background(), tc.protocol)
+			ctx := gateway.WithTextProtocol(context.Background(), tc.protocol)
 			text, raw, status, err := ChatCompletionJSON(ctx, server.URL, "secret", tc.model, []any{map[string]any{"role": "user", "content": "test"}}, .2, time.Second)
 			if err != nil || status != 200 || text != `{"ok":true}` || calls != 1 {
 				t.Fatalf("status %d text %s calls %d err %v", status, text, calls, err)
@@ -116,10 +116,10 @@ func TestTextProtocolBodyOverridesHeaderAndValidates(t *testing.T) {
 			}
 			continue
 		}
-		if !ok || modelgw.TextProtocol(bound.Context(), "gemini-2.5-flash") != tc.want {
+		if !ok || gateway.TextProtocol(bound.Context(), "gemini-2.5-flash") != tc.want {
 			t.Fatalf("protocol %#v", tc)
 		}
-		if modelgw.TextProtocol(r.Context(), "gemini-2.5-flash") != "gemini" {
+		if gateway.TextProtocol(r.Context(), "gemini-2.5-flash") != "gemini" {
 			t.Fatal("request context mutated")
 		}
 	}

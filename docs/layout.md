@@ -1,239 +1,198 @@
 # 目录与分层
 
-项目只使用根依赖清单；以下目录均为源码分层，不是独立包。
+本页描述当前实际目录与依赖方向。项目使用一个根 Node package 和一个根 Go module，源码分层不具有独立安装、版本或发布流程。
 
-## 一级职责
+## 一级归属
 
-| 目录 | 内容 |
+| 位置 | 职责 |
 | --- | --- |
-| `src/client` | 浏览器端 React UI、业务交互与状态 |
-| `src/backend` | Go 入口。对外 API、静态页、存储读取、数据库迁移和官方种子 |
-| `src/shared` | 前后端共享的契约、纯规则与 JSON 数据 |
-| `database` | 历史 SQL 档案；本地数据库与备份不提交 |
-| `src/client/public` | 按原路径提供的公开图片、品牌与灵感资源 |
-| `tools/configs` | TypeScript、ESLint、依赖边界和质量基线 |
-| `tools/scripts` | `web` 启动、`quality` 检查、`depth` 环境、`db-maintenance` 数据维护和种子导出 |
+| `src/client` | React 浏览器界面、交互、状态和公开资源 |
+| `src/backend` | Go API、业务编排、数据库访问、运行时迁移与官方种子 |
+| `src/shared/contracts` | Zod DTO、请求响应校验与 `openapi.yaml` |
+| `src/shared/domain` | 浏览器安全的纯规则、模型适配、提示词与业务类型 |
+| `src/shared/data` | 前后端共用的 JSON 数据与官方种子 |
+| `database` | 历史 SQL 档案；本地数据库和备份不提交 |
+| `tools/configs` | 本地环境模板、Vite、TypeScript、Vitest、ESLint、依赖边界与质量基线 |
+| `tools/scripts` | `web` 启动与产物清理、`quality` 检查、`depth` 环境、`db-maintenance` 数据维护 |
+| `tools/launchers` | Windows / macOS 启动器实现 |
 | `tools/deploy` | 服务与反向代理模板、服务器安装入口 |
-| `tools/build/ui` | 自动生成的前端产物，不提交 |
-| `api` | OpenAPI 契约，前后端接口的唯一来源 |
-| `docs/deployment.md` | 部署与运维说明 |
-| `docs` | 当前架构、产品操作和厂商接口 |
+| `tools/build` | 自动生成的 API 可执行文件和 `ui` 前端产物 |
+| `docs` | 当前架构、产品规则、模型接入与运维文档，文件直接放在本目录 |
 
-根目录仅保留入口和项目配置。依赖 `node_modules`、构建结果 `tools/build/ui` 由工具生成。
+根目录保留 `package.json`、`pnpm-lock.yaml`、`go.mod`、`go.sum`、`tsconfig.json`、`jsrepo.config.mts`、README、AGENTS 和 Windows 双击入口 `启动贝壳云图.bat`。Node 依赖只声明在根 package.json；jsrepo 配置保留其默认发现位置。`node_modules` 由安装生成。PowerShell 与 macOS 启动器直接位于 `tools/launchers`；Windows 批处理入口转交 PowerShell，不再维护重复的 Windows 实现。
 
-根目录入口 `启动贝壳云图.bat` / `启动贝壳云图.ps1`（Windows）与 `启动贝壳云图.command`（macOS）调用 `tools/scripts/web/dev-web.mjs`，由同一流程启动本地 API 与 Vite；只复用启动器记录且 PID、启动时间、工作目录和配置匹配的本项目开发服务。未记录的端口占用需先关闭对应启动终端，启动器不会按端口或模糊进程名停止服务。它是浏览器版的入口，不依赖已停用的桌面端。
+前端 HTML 位于 `src/client/index.html`，Vite 配置位于 `tools/configs/vite.config.ts`，OpenAPI 位于 `src/shared/contracts/openapi.yaml`。环境模板统一放在 `tools/configs/env.example`，首次启动复制到根目录 `.env`；已有 `.env` 保持原位。启动和构建命令显式选择 Vite 配置，根目录不保留第二份入口或接口目录。
 
-日常入口保留历史用户数据目录与访问令牌，不迁移或复制已有库。代码验证可运行 `BEIKE_ISOLATED_DEV=1 pnpm dev:web`：默认使用用户数据目录下的 `development/`、独立令牌、API 空闲端口和 UI `5174`；不读取根 `.env`、旧根令牌或日常 API 端口缓存。可显式指定 `AZHUO_DATA_DIR`，应选择独立目录。隔离与日常模式的 PID 记录分别保存在本项目 `.local/`；新库仅由同一版本化运行时迁移链初始化，不复制 `database/dev.db`。
-
-`database/migrations/` 留存历史 SQL，不参与新库初始化。当前运行的版本化迁移在 `src/backend/internal/platform/database/migrate`，由 `beike-api migrate` 执行。`dev.db` 与同名的 `-wal`、`-shm` 是同一开发数据库的文件组，不能拆开整理。备份写在数据库文件旁边的 `database-backups/`；本地开发库对应 `database/database-backups/`，旧的 `backups/` 已完整归档到其中的 `legacy-20260920/`，备份文件没有删除。生产数据库及其备份位于配置的数据目录，不要求搬入仓库。
+`.agents/skills`、`.cursor/rules`、`.github/workflows` 与 `.vscode` 保存技能、工程规则、CI 和编辑器配置。`.local` 保存本机工具状态、进程记录、端口缓存、凭证与备份，不存放产品源码。
 
 ## 浏览器端
 
 ```text
-client/
-  app/                       应用组装与 Provider
+src/client/
+  index.html                 HTML 入口
+  main.tsx                   React 启动入口
+  app/                       应用组装、Provider、导航与全局交互
+    lightbox/                全局灯箱及编辑动作
+    context-menu/            全局右键菜单
   features/<功能>/
-    components/              业务组件与弹窗
+    components/              业务组件，组件多时再按用途归组
     hooks/                   React 状态、订阅与流程组合
     api/                     当前功能专属请求
-    model/                   纯规则、转换、校验与类型
-    store/                   画布局部状态
-    views/                   工坊视图
-    engine/                  生成引擎的阶段实现
-  shared/                    跨功能 UI、图标、请求、媒体、工具、提示词输入与弹窗
-  store/                     全局 Zustand 切片和持久化
+    model/                   规则、转换、校验与业务类型
+  shared/                    跨功能的浏览器能力
+  store/                     全局 Zustand 切片与持久化
   assets/                    随构建打包的资源
-  public/                    原 URL 提供的公开素材，不改变访问链接
+  public/                    按原 URL 提供的图片、品牌和灵感素材
   styles/                    全局样式
-  types/                     跨功能类型
+  types/                     浏览器公共类型
 ```
 
-功能根目录保留页面入口与功能样式；其余按实际职责分类，不为空职责建立目录。组件很多时按前缀再分子目录，例如资产组件按 `cards / dialogs / filters / deconstruct` 归类并设 `index.ts` 统一导出；设置组件按 `providers / models / vendors / creator / storage / modality` 归类导出；工坊按 `stage / history / settings / product`，画布按 `editor / prompt / stage / video`。助手组件按 `message / panels / brand-kit` 分组，抽屉和按钮留在 `components`。首页 `data/` 是首页展示数据，设置 `tabs/` 是设置页签。灯箱在 `app/lightbox`，全局右键菜单在 `app/context-menu`。跨平台启动器在 `tools/launchers` 归档。
+功能根目录放页面入口、对外导出与功能样式。按实际需要建立职责目录：画布另有 `store`，生成引擎另有 `engine`，工坊另有 `views`，首页另有 `data`，设置另有 `tabs`。不为没有实现的职责创建空目录。
 
-`shared/media/widgets` 放轮播、点阵、文件夹和封面组件；下载、缓存、裁切和缩放留在 `media`。商品采集的图片字段合并与分类去重放在 `src/shared/domain/collection`，由采集页、工坊和视频带货共用；图片质量、缓存和重新采集规则见 [product-collection.md](product-collection.md)。`shared/api/generation` 放生图提交、中止、错误、恢复、深度任务和回退顺序。`shared/agent` 归并助手回合的 item 事件，以及图片／视频提示词清单、来源与素材映射、编辑草稿、提交回执和并发偏好，生成页和助手抽屉共用；纯提示词识别与生成授权判断放在 `src/shared/domain/assistant`。`shared/ui/markdown` 渲染模型 Markdown，两种对话在整轮回复外接统一批量面板。`shared/ui/studio` 放数字人、PPT 和视频带货共用的全屏工作台外壳。
+### 组件归组
 
-工坊 `model/` 再按 `collection / analysis / generation / delivery / workspace` 分组；React hook 不进入 model。采编、视觉分析和生图状态由 `workshop/hooks` 的独立 hook 协调。画布的导入、几何、图层和任务规则在 `canvas/model`；设置的模型目录、报价、存储和连接状态规则在 `settings/model`。
+以下路径相对于 `src/client/features/<功能>/components`。分类目录直接存放实现文件，已有 index.ts 只作为导出入口，不能用向上转发代替实际归类；功能内部优先直接导入所需文件。
 
-## 对外 API
-
-`pnpm dev`、`pnpm start`、`启动贝壳云图.bat` 与 `启动贝壳云图.command` 编译 `src/backend/cmd/api`，由 Go 监听 API、静态页和存储读取。启动时在进程内执行 `internal/platform/database/migrate`：校验 `_BeikeMigration` 的版本和 checksum，有待执行版本时先备份再写入，然后同步官方种子。
-
-```text
-backend/
-  cmd/api/                   进程入口
-  internal/app/              路由装配、鉴权中间件、静态页
-  internal/httpx/            JSON、工作区、数据库连接、反向代理
-  internal/config/           进程配置
-  internal/system/           系统配置、网关、模型目录、报价、深度环境、媒体待核
-  internal/catalog/          类目、商品、提示词、风格、采集
-  internal/library/          素材库、审核、查重、母组、反推任务
-  internal/assets/           存储、生图任务、素材生命周期与表现
-  internal/generate/         图片、视频、分析、文案与画布文字；depth、headline、export 是子包
-  internal/workshop/         工坊批次与输出审核
-  internal/assistant/        回合、记忆、沙箱与运行时；extract 做文档抽取，sessions 做会话读写。runtime 留在本包：循环、工具和状态共用未导出类型
-  internal/keywordreview/    关键词审核与提交保护；review 子包做提示词、结果校验与补救
-  internal/modelgw/          上游模型提交
-  internal/platform/collect  采集上游请求与响应
-  internal/platform/database 连接与共用工具；library / catalog / workshop / learning 子包按领域访问数据；migrate 做版本化迁移、checksum、备份与官方种子
-  internal/platform/media    图片地址规范化
-  internal/platform/mediasign 媒体读取签名
-  internal/platform/network  出站拨号与私网拦截
-  internal/platform/storage  本地与对象存储路径
-```
-
-`GET /api/health`、模型报价、深度环境、本地存储统计和派生缓存清理、本地媒体读取、未开启云存储时的媒体上传、存储配置不完整时的连通性检查和迁移拦截、内存与 WAL 清理、媒体待核列表、系统配置读取和连通性测试、桌宠列表、命令导入和精灵图、网关账户额度、模型目录拉取、关键词审核规则、提示词记录、类目列表和类目迁移预览、类目迁移写入、风格配方的列表、新建、修改、恢复、删除和官方预置导入，商品的读取、保存、修改和删除、商品采集、生图任务列表和删除、素材来源查重结果和链接查重、反推审核的列表、驳回和恢复、素材库组织视图、穿搭动作人物场景和完整提示词详情、一次返回全部类型的素材列表和全量导出、按编号删除、素材修改、素材新建（场景、穿搭、动作、人物、完整提示词）、批量导入素材、审核记录、换图记录、商品品类和图集、种子清理、按类型清空、去重提纯和清空当前工作区、品类排序、品类保存、图集归类、素材归类、母组移动和文件夹归档、文件夹规则保存、规则导入和细分文件夹保存、母组换图状态、后台反推任务查询、素材表现，由 Go 直接处理。未登记的 `/api` 返回不存在。系统配置里的模型清单和类目默认值来自 `src/shared/data`。类目读取包含当前工作区与官方类目。
-
-工坊工作区、参考文件上传和生图任务列表由 Go 直接处理。深度图片、深度视频、反推请求、后台反推的提交与停止、反推进度，以及审核通过和换图，由 Go 直接处理。深度图和深度视频调用本机 Python 与 ffmpeg。后台反推在进程内派发；服务重启后未完成任务只标记中断，不自动重放付费请求。
-
-助手回合、会话、文档抽取、图像反推、视频规格检查和抽帧已在 Go 中处理。抽帧使用 ffmpeg，并把画面作为下一轮视觉上下文，单轮最多 20 张、合计 5MB。请求体里的 `mcpServers` 通过 HTTP JSON-RPC 接入，先握手再列出工具，名称带 `mcp_` 前缀，调用直接执行。`spawn_subagent` 在当前回合内最多再跑 2 轮，不能再拆子任务，也不能读取技能。`POST /api/catalog/assets/seed` 返回「官方预置资产已禁用」；风格官方预置走 `POST /api/catalog/styles?action=seed`。官方资产种子在启动迁移后按缺失项补齐。
-
-## 共享代码
-
-```text
-shared/
-  contracts/                 Zod DTO、请求响应校验
-  data/                      前后端共用的 JSON：主机后缀、官方种子
-  domain/
-    assistant/               助手类型、技能、强度与执行规则
-    assets/                  资产分类、编辑、采样、解构与场景组合
-    collection/              采集来源规则
-    core/                    运行环境注入、并发池、任务状态与耗时
-    media/                   绘图、视频与深度类型
-    models/                  模型目录、厂商、网关与调用适配器
-    products/                商品品类、属性、品牌和保真规则
-    prompts/                 提示词引擎、资产评分、视觉规则与业务技能
-    skills/                  统一技能目录、场景兼容性与工坊技能类型
-    workshop/                工坊状态机、事件、门禁与镜头规则
-```
-
-技能列表、详情、创建与编辑共用 `src/client/shared/skills`，全局技能页提供助手技能和可手动维护的工坊技能。`src/shared/contracts/skills.ts` 校验目录响应；Go 的 `/api/catalog/skills` 提供统一目录、助手技能读写、幂等旧缓存导入和工作区收藏。工坊记录继续沿用 `StyleRecipe` 与原 ID，助手技能存入 `SkillDocument`；不可变内容版本存入 `SkillRevision`，导入来源存入 `SkillImport`。
-
-商品细分的持续优化不另开页面。工坊导航的“素材与技能”进入细分文件夹后，由 `assets` 的参考图组、当前技能和优化记录共用同一面板。`src/shared/contracts/categorySkills.ts` 校验细分状态、版本和成图评分。Go 的 `/api/catalog/category-skills` 读取样本、发起提炼并切换试用、正式版或回滚；样本、观察、版本和反馈存在 `platform/database/learning`。分析时按参考图组所属细分注入当时版本，生图任务冻结该版本与生成设置，评分写回同一版本。细则见 [workshop-reference-generation.md](workshop-reference-generation.md)。
-
-`client/shared` 只在浏览器使用；`src/shared` 同时服务前后端。共享业务规则不能依赖 Node、React 或某个前端功能。跨层使用 `@client/* / @server/* / @shared/*` 别名。
-
-文本协议与型号思考能力位于 `src/shared/domain/models`；`textModelCapabilities.json` 是浏览器安全的能力真源，由 `check-shared-data.mjs` 生成 Go `internal/modelgw` 的嵌入副本并校验一致性。Go `modelgw` 负责 Gemini、Anthropic 与 OpenAI 兼容文本请求转换，业务包只消费统一响应，图片与视频生成仍走独立适配器。
-
-## 功能导航与架构分类
-
-项目分为「全局核心视窗」与「垂直独立小工具」，前后端保持高度对称：
-
-### 1. 全局核心视窗 (Core Views)
-
-| 核心功能 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
-| --- | --- | --- | --- |
-| 首页与灵感 | `home` | `catalog` | 瀑布流、灵感案例、预置模版、推荐展示 |
-| 无限画布 | `canvas` | `generate` (节点执行)、`catalog` | 节点式自由编排、局部编辑与图层解构 |
-| 资产与历史中心 | `assets` | `assets`、`library` | 历史生成任务、原子资产（人物/场景/穿搭/动作/提示词）、查重、反推库 |
-| 系统设置与厂商 | `settings` | `system` | 模型目录、网关配置、密钥认证、配额、存储设置与桌宠 |
-| AI 伴随助手 | `assistant` | `assistant` | 多轮对话、Agent 循环、文档与素材抽取、沙箱执行 |
-
-### 2. 垂直独立小工具 (Specialized Studios & Tools)
-
-每个工具独立文件夹，互不产生交叉依赖，按需挂载到工作区：
-
-| 小工具 | 前端路径 (`src/client/features`) | 后端领域包 (`src/backend/internal`) | 职责描述 |
-| --- | --- | --- | --- |
-| 封面大字报 | `headline-poster` | `generate/headline` | 一次出图的中文封面。投喂样张接到全局桌宠；隐藏桌宠后仍可从工具栏打开喂图面板 |
-| 电商工坊 | `workshop`、`assets` | `workshop`、`catalog`、`platform/database/learning` | 批量生图与交付。素材与技能按商品细分积累参考图组、提炼规则，并用成图评分决定是否升级 |
-| 词包审核 | `keyword-review` | `keywordreview` | 关键词表批量导入、垂类判定、生产方向建议与合规导出 |
-| 内容采集 | `collect` | `platform/collect` | 跨平台图文视频采编、元数据抽取与无水印解析 |
-| PPT生成工坊 | `ppt-generator` | `generate/ppt` | 论断大纲、可编辑排版或整页视觉渲染、按图像家族路由配图并导出 PPTX |
-| 数字人工作室 | `avatar` | `avatar` | 照片数字人与视频对口型。驱动模型在设置「数字人」线路拉取，配音沿用「语音」线路 |
-| 视频带货 | `video-sales` | `generate/videosales` | 全品类确认商品与参考图、前置时长/画幅后，经多模态创作口播分镜、按需自动生图并校验；图片完成后选择视频模型，依据实际参考图定稿整段提示词并一次出片。服饰鞋包使用专属叙事；历史逐镜任务保留查询与结果查看，操作与恢复规则见 [video-sales.md](video-sales.md) |
-
-### 3. Feature 内部标准四元结构规范
-
-每个功能目录内严格遵循四元划分，避免代码平铺与职责混乱：
-- `components/`：专属业务组件、对话框、卡片及子拆分目录。
-- `hooks/`：React 状态机、交互流程驱动与事件监听组合。
-- `api/`：当前功能专属的后端 API 调用封装（只依赖 `@client/shared/api` 统一客户端）。
-- `model/`：纯业务规则、类型定义、校验计算与数据适配转换（严禁引用 UI 组件或 React hooks）。
-
-### 4. 统一多模态网关架构 (`src/backend/internal/modelgw`)
-
-所有外部 AI 上游调用（包括联池、Comfly、千问、SiliconFlow、OpenAI 等）均收敛至网关层，业务领域层严禁直接发起非标准外部 HTTP 请求：
-- `image/`：文生图、图生图、局部重绘、扩图与图层分离。
-- `video/`：文生视频、图生视频、首尾帧过渡、运镜控制。
-- `audio/`：TTS 文本朗读、声音克隆、配乐与音效生成。
-- `avatar/`：数字人姿态与唇形对齐（Lip-sync）驱动。
-- `threed/`：文本/图像转 3D 网格模型。
-- `multimodal/`：视觉大模型理解、OCR 识别、提示词反推与结构化解析。
-- `adapter.go`：统一的上游厂商适配器接口（超时、重试、错误映射、用量回传）。
-- `dispatcher.go`：渠道路由、健康探测与多服务商自动 Fallback 容灾。
-
-## 文件生命周期
-
-- 长期源码、资源、接口文档和部署工具放入对应目录。
-- 正式测试保留在源码旁边：`*.test.ts` 与 Go 的 `*_test.go`。不保留 QA fixture、截图、一次性核查结果和 Agent 计划；临时验证放项目外。
-- `.agents/skills`、`.cursor/rules`、`AGENTS.md` 是长期技能和工程规则，保留。
-- 数据库、迁移、种子、密钥、备份和用户素材具有运行或恢复用途，不能按“没有 import”删除。
-- 未引用源码先核查入口、动态加载和样式关联；只对确认不使用的模块做清理。
-- `pnpm check` 执行静态检查、单元测试和构建。既有质量基线只允许收紧。
-
-## 整理后的运行路径
-
-- 所有命令仍在根目录执行；不创建子 package，也不移动 node_modules。
-- Vite 从 `src/client/public` 读取公开素材，浏览器中的 `/app_logo.png`、`/inspirations/...` 等 URL 不变。
-- 构建输出到 `tools/build/ui`；生产启动器默认读取同一目录。`pnpm clean` 只清除该构建目录。
-- 已部署环境如显式配置 `WEB_DIST_DIR`，更新为部署根目录下的 `tools/build/ui`，并同步 Nginx 静态路径；重新构建后再重启服务。
-- 根目录不再放 `public`、`deploy`、`dist`，目录检查会阻止这些旧目录重新出现。
-- 数据库、备份、`.env*` 和 `.local` 保持原位；目录整理不执行数据迁移。
-
-## 模块职责与依赖边界
-
-贝壳云图使用一个根依赖清单与锁文件。以下都是源码目录，不是独立 npm 包，不拥有版本、安装或构建流程。
-
-| 模块 | 职责 | 可依赖的内部模块 |
+| 功能 | 子目录 | 内容 |
 | --- | --- | --- |
-| client | React 界面、浏览器交互与状态 | shared/contracts、shared/domain |
-| backend | 对外 HTTP、迁移、官方种子、SQLite 访问与上游调用 | shared 的 JSON 数据；不引用 client |
-| shared/contracts | 请求/响应契约、Zod 校验 | 无业务实现 |
-| shared/domain | 纯规则、模型适配、提示词、类型与种子 | 不依赖 UI、Node 或其他运行层 |
-| database | 历史 SQL 档案 | 运行时迁移由 `src/backend/internal/platform/database/migrate` 执行 |
+| `assets` | `cards` | 任务、提示词、原子资产卡片与图组预览 |
+| `assets` | `dialogs` | 详情、编辑、新建、标签与提示词弹窗 |
+| `assets` | `filters` | 列表筛选、工具栏与标签选择 |
+| `assets` | `deconstruct` | 图集导入、反推弹窗和后台任务通知 |
+| `assets` | `folders` | 文件夹规则、分类、移动、菜单与细分技能面板 |
+| `assets` | `library` / `material` | 提示词资产库 / 素材项目与素材库视图 |
+| `settings` | `providers` / `vendors` | 自定义服务商 / 具体厂商接入面板与展示数据 |
+| `settings` | `models` / `modality` | 模型目录、报价、回退顺序 / 模态家族与同步 |
+| `settings` | `storage` / `creator` / `appearance` | 存储配置 / 创作档案 / 主题、背景和语言 |
+| `canvas` | `editor` / `nodes` | 编辑器、连线、图层、富文本 / 各类画布节点 |
+| `canvas` | `tools` / `projects` | 打光、拆图、导入和模型选择 / 项目与首页列表 |
+| `canvas` | `prompt` / `stage` / `video` / `storyboard` | 提示词输入 / 舞台 / 视频 / 分镜 |
+| `workshop` | `layout` | 顶栏、侧栏、批次控制、保存通知与共享操作上下文 |
+| `workshop` | `stage` / `product` | 各流程阶段 / 商品选择与参考图展示 |
+| `workshop` | `settings` / `delivery` / `history` | 生成配置 / 成图、进度、审核与交付 / 历史批次 |
+| `assistant` | `message` / `panels` / `brand-kit` / `document` / `skill` | 对话消息 / 功能面板 / 品牌 / 文档 / 技能 |
 
-根 tsconfig 和 Vite 映射 `@client/*`、`@server/*`、`@shared/*`。Node 由 tsx 加载同一套别名；Vite 只配置前端允许使用的别名。
+资产中心 `AssetCenter`、工坊组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
 
-`pnpm run check:structure` 禁止嵌套 manifest、workspace 依赖和遗漏外部依赖声明。`pnpm run lint:boundaries` 检查静态 import、re-export、类型 import、字面量动态 import 和 require；`pnpm run lint:deps` 将依赖循环作为错误；ESLint 同时限制浏览器导入服务端依赖。`pnpm run typecheck:client` 不载入 Node 全局类型。Go 检查由 `pnpm run check:go` 执行。非字面量动态路径仍需人工复核。
+工坊 model 按 `collection / analysis / generation / delivery / workspace` 分组。画布的几何、导入、图层、图关系和任务规则放在 model；节点类型和打光参数由 model 导出，hook 直接引用。设置默认模型在 `settings/model/presetModels.ts`；服务商图标与展示数据属于 components。
 
-前端公共代码不反向导入 features；功能之间不直接相互导入；跨功能组合由 app 负责。数据库迁移在 `src/backend/internal/platform/database/migrate`。工坊契约只解析快照格式；`src/shared/workshopSnapshot.ts` 组合契约与纯业务状态规则，升级旧快照。`pnpm db:migrate` 与 `pnpm db:deploy` 共用运行时的 `_BeikeMigration` 迁移链，历史 Prisma SQL 不参与新库初始化。
+### 浏览器共享能力
 
-源码文件按职责拆分，单文件上限为 400 行有效代码（不计空行与注释）。文件长度基线已清空，不再保留超长文件豁免；未使用绑定和依赖边界基线只能收紧。
+- `shared/api` 提供统一鉴权请求和缓存；`shared/api/generation` 放提交、中止、恢复、深度任务与回退顺序。
+- `shared/ui`、`shared/icons`、`shared/hooks` 放跨功能组件、图标和 hook；`shared/ui/markdown` 放 Markdown 渲染，`shared/ui/studio` 放全屏工作台外壳。
+- `shared/media` 放下载、缓存、裁切、缩放与媒体处理；`shared/media/widgets` 放封面、文件夹、点阵和背景组件。
+- `shared/agent` 放助手回合事件、素材映射、编辑草稿、提交回执与并发偏好，供助手和生成页共用。
+- `shared/skills` 统一技能列表、详情与编辑；`shared/prompt-bar` 放跨功能的提示词输入。
+- 商品采集的图片合并、来源识别与分类去重放在 `src/shared/domain/collection`，规则见 [product-collection.md](product-collection.md)。
 
-## 任务提交与恢复
+### 功能导航
 
-工坊以已确认保存的批次快照作为提交依据：生成计划、每次提交的标识和参数先保存；收到上游任务 ID 后再次保存，才进入轮询。保存期间输入、配置或批次变化会阻止新提交，保存失败保留现有恢复标识。资产列表由同一 React Query 缓存承载。
+前端功能路径相对于 `src/client/features`，后端路径相对于 `src/backend/internal`。功能目录优先使用一个常用英文词；封面、关键词、PPT、带货分别记作 `poster / keywords / ppt / sales`。相同业务沿用相同名称，共用后端能力按实际归属列出。
 
-助手先在当前工作区原子领取 turnId，再执行模型和工具。重复请求只查询或回放原任务；同一标识对应不同输入或凭据返回冲突。请求指纹只存摘要，私有领取信息不进入公共快照；结果条目保存后才写终态。浏览器在发送前保留最小恢复回执，断线或中断后继续核对同一任务。
+| 功能 | 前端 | 后端 |
+| --- | --- | --- |
+| 首页 | `home` | `catalog` |
+| AI 生成 | `generate` | `generate` |
+| 画布 | `canvas` | `generate`、`catalog` |
+| 资产库 | `assets` | `assets`、`library`、`catalog` |
+| 设置 | `settings` | `system` |
+| AI 助手 | `assistant` | `assistant` |
+| 电商工坊 | `workshop` | `workshop`、`catalog`、`platform/database/learning` |
+| 封面生成 | `poster` | `generate/poster` |
+| 关键词审核 | `keywords` | `keywords` |
+| 内容采集 | `collect` | `catalog`、`platform/collect` |
+| PPT 生成 | `ppt` | `generate/ppt`、`generate/export` |
+| 数字人 | `avatar` | `avatar` |
+| 带货视频 | `sales` | `generate/sales` |
+| 技能 | `skills` | `catalog`、`platform/database` |
 
-视频由请求契约校验参数，`src/backend/internal/generate` 编排模型规则和记录并写入数据。上游结果分为已接收、明确拒绝与待核实；仅 404、405、415 允许尝试另一提交端点，超时、5xx 和缺少任务 ID 的响应不会自动再次提交。
+页面入口统一为 `PosterStudio / KeywordsStudio / PptStudio / SalesStudio`。带货的共享业务规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
 
-## 后端领域包
+目录名用于源码定位。浏览器视图参数、HTTP 接口地址、草稿存储键与数据库标识保持原有兼容形式，已有链接和工作记录继续可用。
 
-对外接口从 `src/backend/cmd/api` 启动，按领域放在 `src/backend/internal`。`app` 负责路由装配，`system` 负责厂商与密钥，`catalog` 负责预置内容，`assets` 与 `library` 负责素材和历史，`generate` 负责图像、视频、语音和封面，`workshop` 负责批量出图，`keywordreview` 负责词包审核，`assistant` 负责助手回合，`avatar` 负责数字人，`modelgw` 是内部统一模型网关，`platform` 负责数据库、存储和网络。
+产品操作与恢复规则分别见 [assistant-runtime.md](assistant-runtime.md)、[video-sales.md](video-sales.md)、[workshop-asset-binding.md](workshop-asset-binding.md) 与 [workshop-reference-generation.md](workshop-reference-generation.md)。
 
-`modelgw` 按模态拆成 `video_submit.go`、`audio_submit.go`、`avatar_submit.go`、`threed_submit.go`、`multimodal_submit.go`，公共调度在 `submit.go` 与 `adapter.go`。
+## Go 后端
 
-前端功能按 `components / hooks / api / model` 放置，功能根目录保留 `index.ts` 作为视窗导出入口。当前独立视窗包括首页、画布、素材、设置、助手、工坊、大字报、词包审核、采集、生成、数字人、视频带货、PPT 和技能。
+`src/backend/cmd/api` 是进程入口。`pnpm dev`、`pnpm start`、双击启动器和数据库维护命令均使用同一套 Go API 与运行时迁移。
 
-## 新功能与小工具接入指南 (5 步标准化开发)
+| 领域包 | 职责 |
+| --- | --- |
+| `internal/app` | 路由装配、鉴权中间件与静态页面 |
+| `internal/config` / `internal/httpx` | 进程配置 / HTTP、工作区与公共请求工具 |
+| `internal/system` | 系统设置、网关与模型目录、报价、深度环境、存储管理和桌宠 |
+| `internal/catalog` | 类目、商品、风格、技能与采集入口 |
+| `internal/library` / `internal/assets` | 素材库、图组、查重与反推 / 存储、生图任务与素材生命周期 |
+| `internal/generate` | 图像、视频、分析、文案、语音与画布任务编排 |
+| `internal/generate/{depth,poster,ppt,export,sales}` | 深度推理、封面设计、PPT、文件导出、带货视频子包 |
+| `internal/workshop` / `internal/keywords` | 工坊批次与输出审核 / 关键词审核与提交保护 |
+| `internal/assistant` | 回合、记忆、沙箱、工具与运行时；`extract` 抽取文档，`sessions` 读写会话 |
+| `internal/avatar` | 数字人驱动与配音流程 |
+| `internal/gateway` | 模型协议、提交适配与文本流式处理 |
+| `internal/platform/collect` | 采集上游请求与响应 |
+| `internal/platform/database` | 数据库连接、工具与按领域拆分的数据访问；`migrate` 负责版本化迁移与官方种子 |
+| `internal/platform/{media,mediasign,network,storage}` | 媒体地址、读取签名、出站网络、本地与对象存储 |
 
-当为系统增加新的独立小工具（如数字人、视频带货、PPT 生成等）时，请严格按以下 5 步接入，确保团队任何程序员接手均能快速定位与审查：
+Go 的同目录文件共同组成一个包，共享未导出类型。领域包内按文件前缀定位职责，例如 `generate/image_*.go`、`generate/video_*.go` 与 `gateway/text_*.go`；拆子包须先具备独立职责和稳定依赖，避免仅为减少文件数扩大导出接口。
 
-1. **第 1 步：契约定义与数据模型 (`src/shared/contracts`)**
-   - 新建该功能对应的数据 DTO，使用 Zod 声明强类型的请求体与响应格式；
-   - 在 `src/shared/domain` 中定义与界面无关的纯业务模型、枚举与默认参数。
-2. **第 2 步：后端领域服务实现 (`src/backend/internal/<studio>`)**
-   - 在 `internal` 下创建与功能名称对应的业务包（例如 `digitalhuman` 或 `videocommerce`）；
-   - 实现业务状态存取、本地队列管理；外部模型调用一律经由 `internal/modelgw` 的统一适配接口。
-3. **第 3 步：对外路由装配 (`src/backend/internal/app/routes.go`)**
-   - 登记对应的 `/api/<feature>` 路径并绑定中间件（鉴权、工作区隔离、超时保护）；
-   - 在 `api/openapi.yaml` 保持契约同步。各模态的请求样例写在 `docs` 根目录对应的调用参考文档末尾。
-4. **第 4 步：前端 Feature 模块构建 (`src/client/features/<feature>`)**
-   - 创建标准四元目录：`components/`（页面与组件）、`hooks/`（状态组合）、`api/`（接口请求）、`model/`（纯转换与表单状态）；
-   - 在功能根目录设立 `index.ts` 统一导出主视窗组件。
-5. **第 5 步：视窗注册与侧边栏挂载 (`src/client/app`)**
-   - 在 `src/client/store/appStoreTypes.ts` 中扩充视窗枚举 `CurrentView`；
-   - 在 `src/client/app/AppSidebar.tsx` 配置导航按钮与图标；
-   - 在 `src/client/app/App.tsx` 使用 `lazyWithRetry` 动态引入该视窗并完成条件渲染；
-   - 运行 `pnpm check` 确保所有架构门禁、依赖边界与单元测试全绿。
+当前 gateway 的模态入口是 `video_submit.go`、`audio_submit.go`、`avatar_submit.go`、`threed_submit.go` 与 `multimodal_submit.go`，公共提交在 `submit.go / adapter.go`，文本协议在 `text_*.go`。图像和视频部分上游协议仍与 generate 任务编排相邻；不存在独立的 `gateway/image` 等目录，也没有单独的 dispatcher.go。接入新模型先复用现有适配入口，厂商文档见 [models.md](models.md)。
+
+路由修改后执行 `pnpm openapi:write`，更新共享 OpenAPI 和 `src/client/shared/api/openapi-types.ts`。Go 契约测试及 `pnpm check:openapi` 校验路由覆盖和生成类型。未登记的 `/api` 请求返回不存在。
+
+## 共享层与依赖方向
+
+| 模块 | 可以依赖的内部能力 |
+| --- | --- |
+| `client/app` | 功能模块、浏览器 shared、全局 store 与共享业务层 |
+| `client/features/<功能>` | 本功能、浏览器 shared、store、shared/contracts 和 shared/domain |
+| `client/shared` | 浏览器共用能力与 shared；不能反向引用 features |
+| `client/features/*/model` | 规则与类型；不能引用功能 components、hooks 或 views |
+| `shared/contracts` | 契约校验；不承载业务编排、不依赖 domain |
+| `shared/domain` | 纯规则、模型适配与运行环境注入；不依赖 contracts、React、Node 或 client/backend |
+| `backend` | Go 内部领域与基础能力，以及共享 JSON 的嵌入副本；不引用 client |
+
+浏览器使用 `@client/*` 与 `@shared/*` 别名；Go 使用根 go.mod 的模块路径。client/shared 禁止引入 backend、Node 原生模块、Prisma、sharp 和 AWS SDK。不同 feature 之间不直接导入，由 app 组装；跨功能复用下沉最小公共能力，依赖豁免不能扩充。
+
+`src/shared/workshopSnapshot.ts` 组合契约与业务规则，承担旧快照适配，避免让 contracts 与 domain 相互引用。`src/shared/data` 保存官方种子与主机规则；`textModelCapabilities.json` 位于 domain/models，由共享数据检查生成并校验 Go gateway 的嵌入副本。
+
+domain 的子目录包括 `assistant / assets / collection / core / media / models / pets / products / prompts / sales / settings / skills / workshop`。其中 core 放环境注入、并发池和任务状态；models 放模型目录与调用适配；业务提示词、技能和工坊规则分别放入 prompts、skills 和 workshop。
+
+## 运行、构建与数据
+
+- `pnpm dev` 启动 Go API 与 Vite，`pnpm dev:ui` 仅启动 Vite。HTML 根是 `src/client`，环境配置目录是仓库根，公开资源来自 `src/client/public`。
+- 所有入口共用 `tools/configs/vite.config.ts`；`pnpm build:ui` 输出到 `tools/build/ui`，`pnpm start` 由 Go 托管同一产物。部署模板和 `WEB_DIST_DIR` 指向该目录。
+- `/app_logo.png`、`/inspirations/...` 等公开 URL 保持稳定。组件迁移同步更新静态导入、动态加载、样式路径与质量基线中的文件路径。
+- Windows 根目录 `.bat` 只调用 `tools/launchers/启动贝壳云图.ps1`；macOS 使用 `tools/launchers/启动贝壳云图.command`，两个实现都定位到仓库根目录运行。开发端口写入 `.local/api-port`，兼容读取旧 `.local-api-port`；隔离端口写入 `.local/isolated-api-port`。
+- 日常与隔离模式的进程记录分别放在 `.local/web-processes.json` 和 `.local/isolated-web-processes.json`。只操作 PID、启动时间、工作目录和配置匹配的已记录进程，不按端口或模糊名称停止服务。迁移前的 Vite 记录会在下次启动时核对并替换为新配置。
+- PowerShell 验证隔离数据模式：设置 `$env:BEIKE_ISOLATED_DEV="1"` 后运行 `pnpm dev:web`；可再设置独立的 `AZHUO_DATA_DIR`。隔离模式使用独立令牌、API 空闲端口和 UI 5174，不能指向日常用户数据目录。
+- `pnpm clean` 仅清除 `tools/build/ui`；`pnpm clean:all` 还清除 node_modules。跨平台清理脚本固定目标并检查实际路径位于仓库内。
+
+日常启动沿用系统原有应用数据目录与访问令牌。新库由 `src/backend/internal/platform/database/migrate` 初始化；启动时校验 `_BeikeMigration` 版本与 checksum，待迁移时先备份，再执行迁移并同步官方种子。`beike-api migrate`、`pnpm db:migrate` 和 `pnpm db:deploy` 使用同一迁移链。
+
+启动迁移和 HTTP 请求使用相同的数据库路径解析，兼容 Windows 原生 `file:C:\...`、相对路径和文件 URI。迁移失败时 API 停止启动，不向页面暴露底层 SQL 错误。新增迁移追加版本，不能改写已发布 SQL 的 checksum。
+
+二级类目智能体的数据读取、记忆、经验与版本切换集中在 `src/backend/internal/platform/database/learning`；`catalog/category_skill_*` 负责模型观察、候选整理和接口。浏览器的 `assets/model/categoryAgent.ts` 只做流程判断，组件分别呈现类目总览、学习记忆与技能版本。生成侧继续冻结实际使用的规则和对照输入，评分由 `workshop` 写回同一学习域。本地原图进入模型的转换能力放在 `platform/media`，反推和类目观察共用，不重复实现文件读取。
+
+`database/migrations` 保存历史 SQL，不参与新库初始化。数据库主文件和同名 WAL/SHM 是一组运行文件。快照放在数据库旁的 `database-backups`，本地开发库对应 `database/database-backups`；已有归档、备份和用户素材保持原位。生产数据位于配置的数据目录，无需搬入仓库。备份与恢复见 [deployment.md](deployment.md)。
+
+工坊生成计划、提交标识与上游回执须先保存再轮询，保存失败时保留恢复信息；助手按当前工作区原子领取 turnId，重复请求核对原任务。服务重启后未确认的付费生成或后台反推任务不自动重放，用户重新进入后核对原结果。具体恢复规则以各产品文档为准。
+
+## 验证与文件生命周期
+
+`pnpm check` 串行执行目录与单项目结构检查、模型目录、工坊契约、共享数据、OpenAPI、类型检查、ESLint、质量基线、依赖边界、循环与密钥检查、Go 格式/vet/测试、前端单元测试与生产构建。CI 使用同一命令。
+
+- `check:root-layout` 限定根目录归属，检查 HTML/Vite/OpenAPI 的唯一位置、docs 平铺和组件实际分类。
+- `check:structure` 禁止嵌套 package.json、workspace 依赖和未声明的外部依赖。
+- `lint:boundaries` 校验静态导入、re-export、类型导入、字面量动态 import 和 require，并阻止 feature model 反向依赖功能界面。
+- `lint:deps` 检查孤立模块与依赖循环；`typecheck:client` 不加载 Node 全局类型。
+- 文件有效代码预算为 400 行。第三方背景组件仍有已审查的长度基线；未使用、显式 any、文件长度和依赖边界基线只允许收紧，目录迁移只更新对应路径。
+- 正式测试留在源码旁，使用 `*.test.ts` 和 Go `*_test.go`。QA fixture、截图、一次性报告和 Agent 计划放项目外。
+- `.env*`、`.local`、数据库及 WAL/SHM、备份、上传素材、迁移与种子具有运行和恢复用途；不能按忽略状态或 import 数量删除。
+
+## 新功能接入
+
+1. 在 `src/shared/contracts` 定义请求响应，在 domain 中定义需要复用的纯规则；两者保持独立。
+2. 在现有 Go 领域包实现接口、数据访问和必要迁移；仅在职责独立时增加领域包。
+3. 在 `src/backend/internal/app/routes.go` 装配路由与中间件，执行 `pnpm openapi:write` 同步契约。
+4. 在 `src/client/features/<功能>` 建立页面和实际需要的 components、hooks、api、model；组件分类直接存放实现。
+5. 在 `src/client/store/appView.ts`、`src/client/app/routes.ts`、`AppSidebar.tsx` 与 `App.tsx` 登记视图和按需加载；更新相关产品文档后运行 `pnpm check`。

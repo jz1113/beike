@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -23,7 +24,7 @@ func CategorySkills(cfg config.Config) http.Handler {
 			folder := r.URL.Query().Get("folderId")
 			dataset, err := learning.LoadDataset(r.Context(), db, workspace, folder)
 			if err != nil {
-				writeSkillError(w, 400, err.Error())
+				categoryReadError(w, err)
 				return
 			}
 			scope, err := learning.ReadScope(r.Context(), db, workspace, folder)
@@ -62,19 +63,10 @@ func CategorySkills(cfg config.Config) http.Handler {
 				writeSkillError(w, 500, "优化记录读取失败")
 				return
 			}
-			pending := 0
-			for _, sample := range dataset.Samples {
-				if sample.Role != "training" {
-					continue
-				}
-				raw, err := learning.Observation(r.Context(), db, workspace, folder, sample)
-				if err != nil {
-					writeSkillError(w, 500, "样本分析进度读取失败")
-					return
-				}
-				if raw == nil {
-					pending++
-				}
+			memory, err := learning.ReadMemory(r.Context(), db, workspace, folder, dataset)
+			if err != nil {
+				writeSkillError(w, 500, "类目记忆暂时无法读取，请检查服务是否已完成数据库升级")
+				return
 			}
 			validations := map[string]learning.Validation{}
 			for i := range versions {
@@ -88,13 +80,17 @@ func CategorySkills(cfg config.Config) http.Handler {
 				dataset.Samples[i].Images = nil
 				dataset.Samples[i].Shots = nil
 			}
-			latest := ""
+			feedbackHash := learning.FeedbackFingerprint(learning.TrainingFeedback(dataset, feedback))
+			fingerprint := categoryAttempt(dataset, memory, feedbackHash)
+			feedbackChanged, memoryChanged := len(feedback) > 0, len(memory.Notes) > 0
+			needsConsolidation := memory.Learned > 0
 			if len(versions) > 0 {
-				latest = versions[0].Manifest.FeedbackFingerprint
+				latest := versions[0]
+				feedbackChanged = latest.Manifest.FeedbackFingerprint != feedbackHash
+				memoryChanged = latest.Manifest.MemoryFingerprint != memory.Fingerprint
+				needsConsolidation = latest.SourceFingerprint != dataset.Fingerprint || feedbackChanged || memoryChanged || !learning.MemoryCovered(memory, latest) || latest.Manifest.EngineVersion != learning.EngineVersion
 			}
-			fingerprint := learning.Hash([]string{dataset.Fingerprint, learning.FeedbackFingerprint(learning.TrainingFeedback(dataset, feedback))})
-			feedbackChanged := latest != learning.FeedbackFingerprint(learning.TrainingFeedback(dataset, feedback))
-			httpx.WriteJSON(w, 200, map[string]any{"success": true, "scope": scope, "dataset": dataset, "versions": versions, "events": events, "validations": validations, "pendingSamples": pending, "feedbackCount": len(feedback), "feedbackChanged": feedbackChanged, "attemptFingerprint": fingerprint})
+			httpx.WriteJSON(w, 200, map[string]any{"success": true, "scope": scope, "dataset": dataset, "versions": versions, "events": events, "validations": validations, "memory": memory, "pendingSamples": memory.Pending, "feedbackCount": len(feedback), "feedbackChanged": feedbackChanged, "memoryChanged": memoryChanged, "needsConsolidation": needsConsolidation, "attemptFingerprint": fingerprint, "engineVersion": learning.EngineVersion})
 			return
 		}
 		body, err := io.ReadAll(io.LimitReader(r.Body, (256<<10)+1))
@@ -113,7 +109,7 @@ func CategorySkills(cfg config.Config) http.Handler {
 			return
 		}
 		action := r.URL.Query().Get("action")
-		if action == "learn" {
+		if action == "learn" || action == "observe" {
 			learnCategorySkill(cfg, w, r, db, payload)
 			return
 		}
@@ -122,7 +118,26 @@ func CategorySkills(cfg config.Config) http.Handler {
 			writeSkillError(w, 400, "请刷新后再修改技能状态")
 			return
 		}
-		if action == "configure" {
+		if action == "remember" || action == "forget" || action == "retry-sample" {
+			if action == "retry-sample" {
+				dataset, loadErr := learning.LoadDataset(r.Context(), db, workspace, folder)
+				if loadErr != nil {
+					categoryReadError(w, loadErr)
+					return
+				}
+				found := false
+				for _, sample := range dataset.Samples {
+					if sample.ID == styleString(payload, "id") && sample.Role == "training" {
+						found = true
+					}
+				}
+				if !found {
+					writeSkillError(w, 400, "只能重新观察当前细分的学习样本")
+					return
+				}
+			}
+			err = learning.ChangeMemory(r.Context(), db, workspace, folder, action, styleString(payload, "id"), styleString(payload, "kind"), styleString(payload, "content"), int(revision))
+		} else if action == "configure" {
 			min, minOK := payload["minSamples"].(float64)
 			analyze, analyzeOK := payload["autoAnalyze"].(bool)
 			publish, publishOK := payload["autoPublish"].(bool)
@@ -140,4 +155,16 @@ func CategorySkills(cfg config.Config) http.Handler {
 		}
 		httpx.WriteJSON(w, 200, map[string]any{"success": true})
 	})
+}
+
+func categoryReadError(w http.ResponseWriter, err error) {
+	if errors.Is(err, learning.ErrScope) {
+		writeSkillError(w, 400, err.Error())
+	} else {
+		writeSkillError(w, 500, "类目资料暂时无法读取，请检查服务是否已完成数据库升级后重试")
+	}
+}
+
+func categoryAttempt(dataset learning.Dataset, memory learning.Memory, feedbackHash string) string {
+	return learning.Hash([]string{dataset.Fingerprint, feedbackHash, memory.Fingerprint, learning.EngineVersion})
 }

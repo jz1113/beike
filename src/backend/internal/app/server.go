@@ -17,11 +17,11 @@ import (
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/generate/export"
-	"beike.local/cloud/src/backend/internal/generate/headline"
+	"beike.local/cloud/src/backend/internal/generate/poster"
 	"beike.local/cloud/src/backend/internal/generate/ppt"
-	"beike.local/cloud/src/backend/internal/generate/videosales"
+	"beike.local/cloud/src/backend/internal/generate/sales"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/keywordreview"
+	"beike.local/cloud/src/backend/internal/keywords"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/system"
 	"beike.local/cloud/src/backend/internal/workshop"
@@ -71,10 +71,10 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/system/video-downloads", false, system.StartVideoDownload(cfg)},
 		{"GET /api/system/video-downloads/{jobId}", false, system.VideoDownloadStatus(cfg)},
 		{"POST /api/system/video-downloads/{jobId}/cancel", false, system.CancelVideoDownload(cfg)},
-		{"POST /api/generate/keyword-review/balance", true, keywordreview.Balance()},
-		{"POST /api/generate/keyword-review", true, keywordreview.Review(cfg)},
-		{"GET /api/generate/keyword-review/rules", true, keywordreview.RulesGet(cfg)},
-		{"PUT /api/generate/keyword-review/rules", true, keywordreview.RulesPut(cfg)},
+		{"POST /api/generate/keyword-review/balance", true, keywords.Balance()},
+		{"POST /api/generate/keyword-review", true, keywords.Review(cfg)},
+		{"GET /api/generate/keyword-review/rules", true, keywords.RulesGet(cfg)},
+		{"PUT /api/generate/keyword-review/rules", true, keywords.RulesPut(cfg)},
 		{"GET /api/catalog/categories", true, catalog.Categories(cfg)},
 		{"POST /api/catalog/categories/migration-preview", true, catalog.CategoryPreview(cfg)},
 		{"POST /api/catalog/categories/migration-apply", true, catalog.CategoryApply(cfg)},
@@ -138,13 +138,13 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/upload-ref", true, generate.UploadRef()},
 		{"POST /api/generate/canvas-text", true, generate.CanvasText(cfg)},
 		{"POST /api/generate/layer-decomposition", true, generate.LayerDecomposition(cfg)},
-		{"POST /api/generate/headline-title", true, headline.HeadlineTitle(cfg)},
-		{"POST /api/generate/headline-design", true, headline.HeadlineDesign(cfg)},
-		{"POST /api/generate/headline-deconstruct", true, headline.HeadlineDeconstruct(cfg)},
-		{"GET /api/generate/headline-memory", true, headline.HeadlineMemory(cfg)},
-		{"PATCH /api/generate/headline-memory/entries/{id}", true, headline.HeadlineMemoryEntry(cfg)},
-		{"POST /api/generate/headline-memory/corrections", true, headline.HeadlineMemoryCorrection(cfg)},
-		{"DELETE /api/generate/headline-memory/trash", true, headline.HeadlineMemoryTrash(cfg)},
+		{"POST /api/generate/headline-title", true, poster.HeadlineTitle(cfg)},
+		{"POST /api/generate/headline-design", true, poster.HeadlineDesign(cfg)},
+		{"POST /api/generate/headline-deconstruct", true, poster.HeadlineDeconstruct(cfg)},
+		{"GET /api/generate/headline-memory", true, poster.HeadlineMemory(cfg)},
+		{"PATCH /api/generate/headline-memory/entries/{id}", true, poster.HeadlineMemoryEntry(cfg)},
+		{"POST /api/generate/headline-memory/corrections", true, poster.HeadlineMemoryCorrection(cfg)},
+		{"DELETE /api/generate/headline-memory/trash", true, poster.HeadlineMemoryTrash(cfg)},
 		{"POST /api/generate/analyze", true, generate.Analyze(cfg)},
 		{"POST /api/generate/copywriting", true, generate.Copywriting(cfg)},
 		{"POST /api/generate/image", true, generate.Image(cfg)},
@@ -163,11 +163,11 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/ppt-detail", true, ppt.PptDetail(cfg)},
 		{"POST /api/generate/ppt-slide", true, ppt.PptSlide(cfg)},
 		{"POST /api/generate/ppt-narration", true, ppt.PptNarration(cfg)},
-		{"POST /api/generate/video-sales/analyze", true, videosales.Analyze(cfg)},
-		{"POST /api/generate/video-sales/script", true, videosales.Script(cfg)},
-		{"POST /api/generate/video-sales/select-images", true, videosales.Select(cfg)},
-		{"POST /api/generate/video-sales/finalize-prompts", true, videosales.Finalize(cfg)},
-		{"POST /api/generate/video-sales/compose", true, videosales.Compose(cfg)},
+		{"POST /api/generate/video-sales/analyze", true, sales.Analyze(cfg)},
+		{"POST /api/generate/video-sales/script", true, sales.Script(cfg)},
+		{"POST /api/generate/video-sales/select-images", true, sales.Select(cfg)},
+		{"POST /api/generate/video-sales/finalize-prompts", true, sales.Finalize(cfg)},
+		{"POST /api/generate/video-sales/compose", true, sales.Compose(cfg)},
 		{"POST /api/workshop/tasks/{taskId}/review", true, workshop.Review(cfg)},
 		{"GET /api/avatar/characters", true, avatar.Characters(cfg)},
 		{"POST /api/avatar/characters", true, avatar.CreateCharacter(cfg)},

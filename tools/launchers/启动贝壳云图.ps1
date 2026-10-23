@@ -63,7 +63,7 @@ Write-Ok "Node.js 环境检测通过: $nodeVersion"
 # 3. 检查 Go 环境（Go API 服务必需）
 $goCmd = Get-Command go -ErrorAction SilentlyContinue
 if (-not $goCmd) {
-    Write-Err "未检测到 Go 编译器。项目 API 服务需要 Go 1.23+（推荐 Go 1.26+）。"
+    Write-Err "未检测到 Go 编译器。项目 API 服务需要 Go 1.26 或更高版本。"
     Write-Host "  下载地址：https://golang.google.cn/dl/ 或 https://go.dev/dl/" -ForegroundColor Yellow
     Pause-OnError
     exit 1
@@ -73,9 +73,9 @@ Write-Ok "Go 编译环境检测通过: $goVersion"
 
 # 4. 配置文件初始化
 if (-not (Test-Path ".env")) {
-    if (Test-Path ".env.example") {
-        Write-Info "正在根据 .env.example 初始化本地 .env…"
-        Copy-Item ".env.example" ".env"
+    if (Test-Path "tools/configs/env.example") {
+        Write-Info "正在根据 tools/configs/env.example 初始化本地 .env…"
+        Copy-Item -LiteralPath "tools/configs/env.example" -Destination ".env"
         Write-Ok "已生成默认 .env 配置文件"
     }
 }

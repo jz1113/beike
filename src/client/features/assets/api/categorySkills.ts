@@ -2,7 +2,7 @@ import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
-import { categorySkillStateSchema } from '@shared/contracts/categorySkills';
+import { categorySkillRunSchema, categorySkillStateSchema } from '@shared/contracts/categorySkills';
 
 const endpoint = '/api/catalog/category-skills' as const;
 async function read(response: Response) {
@@ -16,6 +16,6 @@ export async function readCategorySkill(folderId: string, signal?: AbortSignal) 
 export async function changeCategorySkill(folderId: string, action: string, payload: Record<string, unknown>, signal?: AbortSignal) {
   return read(await apiRequest('POST', endpoint, { search: `action=${encodeURIComponent(action)}`, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, folderId }), signal }));
 }
-export function learnCategorySkill(folderId: string, modelId: string, force: boolean, signal?: AbortSignal) {
-  return changeCategorySkill(folderId, 'learn', { force, model: isDeepSeekRoute(modelId) ? modelId : selectedTextModel(modelId).modelId, ...getMultimodalClientOverrides(modelId) }, signal);
+export async function learnCategorySkill(folderId: string, modelId: string, force: boolean, maxNewSamples: number, action: 'learn' | 'observe', signal?: AbortSignal) {
+  return categorySkillRunSchema.parse(await changeCategorySkill(folderId, action, { force, maxNewSamples, model: isDeepSeekRoute(modelId) ? modelId : selectedTextModel(modelId).modelId, ...getMultimodalClientOverrides(modelId) }, signal));
 }

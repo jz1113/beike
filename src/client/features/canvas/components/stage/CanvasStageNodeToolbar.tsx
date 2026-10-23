@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { CanvasGridSplit } from '../CanvasGridSplit';
+import { CanvasGridSplit } from '../tools/CanvasGridSplit';
 import { drawingGeometry } from '../../model/drawingGeometry';
 import '../../canvasMediaToolbar.css';
-import { CanvasLayerDecomposition } from '../CanvasLayerDecomposition';
+import { CanvasLayerDecomposition } from '../tools/CanvasLayerDecomposition';
 import { LightingIcon, MultiAngleIcon } from '@client/shared/icons';
 import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
 import { Check, Download, Edit2, Image as ImageIcon, Maximize2, MessageSquare, Video as VideoIcon, Camera, Sparkles, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';

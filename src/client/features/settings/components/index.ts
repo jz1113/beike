@@ -5,3 +5,6 @@ export * from './vendors';
 export * from './creator';
 export * from './storage';
 export * from './modality';
+export * from './SettingsControls';
+export * from './SettingsPreview';
+export * from './SettingsSidebar';

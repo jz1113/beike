@@ -14,9 +14,9 @@ import { useAssetActions } from '../hooks/useAssetActions';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { permanentDeleteGeneration } from '@client/shared/api/permanentDeleteGeneration';
 import { useI18n } from '@client/shared/i18n';
-import type { ProjectFolderItem } from './MaterialProjectView';
-import MaterialLibraryView from './MaterialLibraryView';
-import AssetLibraryView from './AssetLibraryView';
+import type { ProjectFolderItem } from './material/MaterialProjectView';
+import MaterialLibraryView from './material/MaterialLibraryView';
+import AssetLibraryView from './library/AssetLibraryView';
 
 export type { AssetTaskBatch } from '../model/assetBatch';
 

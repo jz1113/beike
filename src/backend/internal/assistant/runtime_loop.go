@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func newRuntimeID(prefix string) string {
@@ -249,11 +249,11 @@ func (loop *agentLoop) complete(final, withTools bool) (modelRound, error) {
 	loop.messageItemID = ""
 	var last error
 	models := loop.models
-	if len(models) > 0 && modelgw.ResolveTextProtocol(models[0], loop.creds.protocol) != "openai" {
+	if len(models) > 0 && gateway.ResolveTextProtocol(models[0], loop.creds.protocol) != "openai" {
 		models = models[:1]
 	}
 	for _, model := range models {
-		if modelgw.ResolveTextProtocol(model, loop.creds.protocol) != modelgw.ResolveTextProtocol(models[0], loop.creds.protocol) {
+		if gateway.ResolveTextProtocol(model, loop.creds.protocol) != gateway.ResolveTextProtocol(models[0], loop.creds.protocol) {
 			continue
 		}
 		tools := loop.tools

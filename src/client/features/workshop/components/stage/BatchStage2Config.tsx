@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import BatchImageSelectionPanel from '../BatchImageSelectionPanel';
-import { useBatchConfig } from '../BatchConfigContext';
+import BatchImageSelectionPanel from '../product/BatchImageSelectionPanel';
+import { useBatchConfig } from '../settings/BatchConfigContext';
 
 export default function BatchStage2Config() {
   const {

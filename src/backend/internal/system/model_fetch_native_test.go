@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestCatalogProtocolExplicitOverridePrecedesHost(t *testing.T) {
@@ -81,7 +81,7 @@ func TestNativeConnectionProbeUsesSelectedProtocol(t *testing.T) {
 	if status != 200 || body["success"] != true || body["textProtocol"] != "gemini" {
 		t.Fatalf("%d %v", status, body)
 	}
-	if modelgw.TextProtocol(modelgw.WithTextProtocol(context.Background(), "openai"), "gemini-4-argon") != "openai" {
+	if gateway.TextProtocol(gateway.WithTextProtocol(context.Background(), "openai"), "gemini-4-argon") != "openai" {
 		t.Fatal("explicit compatible protocol ignored")
 	}
 }

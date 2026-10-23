@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -146,7 +146,7 @@ func firstImageURL(value any) string {
 			}
 		}
 		if b64, ok := typed["b64_json"].(string); ok && b64 != "" {
-			return modelgw.DataImageURL(b64)
+			return gateway.DataImageURL(b64)
 		}
 		for _, key := range []string{"data", "result", "output", "outputs", "images"} {
 			if found := firstImageURL(typed[key]); found != "" {

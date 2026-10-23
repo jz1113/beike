@@ -9,7 +9,7 @@ import {
   Hand,
   User,
 } from 'lucide-react';
-import { formatAssetBadgeText } from '../BatchAssetTag';
+import { formatAssetBadgeText } from '../delivery/BatchAssetTag';
 import { getShotAssetLabels } from '../../model/assetPresentation';
 
 export interface BatchStage3ShotCardProps {

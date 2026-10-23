@@ -1,7 +1,7 @@
 import { Loader2, FileSpreadsheet, Download, Sparkles, Columns3, Image as ImageIcon, Pause, Play, Square, CheckCircle2, ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { BatchProductItem } from '../../model/batchTypes';
 import { isDeliverableWorkshopResult } from '../../model/generation/workshopReadiness';
-import { WorkshopActionMenu, workshopMenuItemClass } from '../WorkshopActionMenu';
+import { WorkshopActionMenu, workshopMenuItemClass } from '../layout/WorkshopActionMenu';
 
 export interface BatchStage4HeaderProps {
   isGeneratingBatch: boolean;

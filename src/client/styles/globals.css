@@ -2,7 +2,7 @@
 
 /*
  * 封面主标题使用系统里已有的中文粗体，不从外站加载字体。
- * 无法匹配时，画布会在 HeadlinePosterStudio 中显式退回系统中文粗体。
+ * 无法匹配时，画布会在 PosterStudio 中显式退回系统中文粗体。
  */
 
 @custom-variant compact (&:is(:where(html[data-layout="compact"]) *));

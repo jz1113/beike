@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 // RequestTextProtocol validates the request override. An explicitly supplied body
@@ -45,13 +45,13 @@ func BindTextProtocol(w http.ResponseWriter, r *http.Request, payload map[string
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
 		return r, false
 	}
-	return r.WithContext(modelgw.WithTextProtocol(r.Context(), protocol)), true
+	return r.WithContext(gateway.WithTextProtocol(r.Context(), protocol)), true
 }
 
 // TextFallbackAllowed prevents a native provider failure from being disguised as
 // a successful local placeholder. Existing compatible-provider fallback policy remains.
 func TextFallbackAllowed(ctx context.Context, model string) bool {
-	return modelgw.TextProtocol(ctx, model) == "openai"
+	return gateway.TextProtocol(ctx, model) == "openai"
 }
 
 func bindRawTextProtocol(w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) (*http.Request, bool) {

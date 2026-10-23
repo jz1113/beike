@@ -1,4 +1,4 @@
-import { WorkshopReferenceStrip } from '../WorkshopReferenceStrip';
+import { WorkshopReferenceStrip } from '../product/WorkshopReferenceStrip';
 import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
 import {
   Loader2,
@@ -8,8 +8,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { BatchProductItem } from '../../model/batchTypes';
-import BatchShotGrid from '../BatchShotGrid';
-import BatchStatusBadge from '../BatchStatusBadge';
+import BatchShotGrid from '../delivery/BatchShotGrid';
+import BatchStatusBadge from '../delivery/BatchStatusBadge';
 import { BatchStage3ShotCard } from './BatchStage3ShotCard';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { getSharedAssetLabels, getShotAssetLabels } from '../../model/assetPresentation';

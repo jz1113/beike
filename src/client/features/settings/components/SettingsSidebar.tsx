@@ -1,5 +1,26 @@
 import { SETTINGS_NAV_ITEMS, type SettingsNavSection } from '../model/settingsNavigation';
 import { useI18n } from '@client/shared/i18n';
+import {
+  Activity, AudioLines, Bot, Box, HardDrive, Languages, LayoutGrid, MessageSquare,
+  Music, Palette, Plug, SunMedium, UserRound, Video,
+} from 'lucide-react';
+
+const SECTION_ICONS = {
+  profile: Activity,
+  appearance: SunMedium,
+  api: Plug,
+  chat: MessageSquare,
+  image: Palette,
+  video: Video,
+  three_d: Box,
+  music: Music,
+  avatar: UserRound,
+  voice: AudioLines,
+  canvas: LayoutGrid,
+  pet: Bot,
+  language: Languages,
+  storage: HardDrive,
+} satisfies Record<SettingsNavSection, typeof LayoutGrid>;
 
 export function SettingsSidebar({
   navSection,
@@ -21,7 +42,7 @@ export function SettingsSidebar({
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {SETTINGS_NAV_ITEMS.map(item => {
-          const Icon = item.icon;
+          const Icon = SECTION_ICONS[item.id];
           const active = navSection === item.id;
           const profileBadge = item.id === 'profile' && gatewayBalanceFormatted !== undefined;
           const countBadge = modalityCounts?.[item.id];

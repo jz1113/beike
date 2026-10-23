@@ -57,7 +57,7 @@ try {
     for (apiPort = 3001; apiPort <= 3099 && !(await portFree(apiPort)); apiPort += 1) { /* find isolated port */ }
     if (apiPort > 3099) throw new Error('找不到隔离开发 API 的空闲端口');
   }
-  const viteOptions = { ...processOptions(), vitePort };
+  const viteOptions = { ...processOptions(), vitePort, viteConfig: 'tools/configs/vite.config.ts' };
   if (ownsWebProcess(workspaceRoot, 'vite', {}, isolated)
       && !ownsWebProcess(workspaceRoot, 'vite', viteOptions, isolated)) {
     await stopWebProcess(workspaceRoot, 'vite', isolated);

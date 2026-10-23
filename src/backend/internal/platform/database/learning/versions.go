@@ -118,6 +118,13 @@ func Switch(ctx context.Context, db *sql.DB, workspace, folder, action, versionI
 		if !ManifestCurrent(version, dataset) {
 			return errors.New("候选版本的参考样本已修改或移除，请重新提炼")
 		}
+		notes, err := Notes(ctx, db, workspace, folder)
+		if err != nil {
+			return err
+		}
+		if version.Manifest.MemoryFingerprint != "" && version.Manifest.MemoryFingerprint != Hash(notes) {
+			return errors.New("类目经验已更新，请先整理新技能再试用或发布")
+		}
 		if action == "trial" {
 			trial = versionID
 			comparison = versionID

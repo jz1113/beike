@@ -39,6 +39,8 @@ sudo bash /opt/beike/tools/deploy/bootstrap-ubuntu.sh
 sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install --frozen-lockfile && pnpm run build:ui'
 ```
 
+`build:ui` 在根目录执行，显式读取 `tools/configs/vite.config.ts` 和 `src/client/index.html`，产物仍在 `tools/build/ui`。服务和 Nginx 模板使用同一产物路径；接口契约源文件在 `src/shared/contracts/openapi.yaml`。
+
 首次安装只启用 HTTP，不要求预先存在证书。域名解析到服务器后，再运行 `sudo bash /opt/beike/tools/deploy/enable-https.sh 你的域名 你的邮箱` 获取证书并启用 HTTPS；随后把 `PUBLIC_WEB_ORIGIN` 改为 `https://你的域名` 并重启服务。网页访问凭据保存在服务器的 `/etc/nginx/.htpasswd`。
 
 编辑 `/var/lib/beike/.env`：填入 `LOCAL_ACCESS_TOKEN`，并把 `PUBLIC_WEB_ORIGIN` 改成 `http://你的公网IP`。
@@ -64,6 +66,8 @@ sudo systemctl status beike --no-pager
 运行中的数据库需要备份时，以 `beike` 用户在仓库根目录执行 `pnpm db:backup`，脚本会读取生产环境的 `DATABASE_URL` 并生成一致性快照到数据库旁的 `database-backups/`。恢复前先用 `pnpm db:restore:verify <快照路径>` 校验完整性和外键；替换运行库前须停服务并保留原文件及 WAL/SHM。
 
 图集后台反推由运行中的 API 进程执行，任务状态持久化到数据库；关闭或刷新浏览器不影响执行。升级服务时先停止新派发并等待已提交请求收尾，重启后未确认任务只标记中断，不自动重放付费请求。用户重新进入页面即可查询状态和核对结果。工作区存储中的 `deconstruct-inputs` 与 `deconstruct-results` 分别保存本地图集和大体积解析结果，须与数据库一起备份；模型密钥只保留在执行中的内存，任务恢复不会保存或重用该密钥。
+
+二级类目的观察、经验、技能版本和评分也保存在运行库中，随数据库备份。类目学习当前在页面打开时执行，关闭页面会中断当前轮，已完成观察保留。升级后启动会自动补齐类目学习和记忆表；迁移失败时服务停止启动，先检查日志与迁移前备份，不能删除用户库来绕过问题。Windows 启动器生成的 `file:C:\...` 数据库地址与接口使用同一解析结果。
 
 ## 3. 本机仓库里已经准备好的文件
 

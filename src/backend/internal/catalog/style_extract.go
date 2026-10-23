@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/system"
 )
@@ -102,8 +102,8 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	if strings.HasPrefix(model, "deepseek-") {
 		body["thinking"] = map[string]any{"type": "disabled"}
 	}
-	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
-		BaseURL: base, APIKey: key, Protocol: modelgw.TextProtocol(ctx, model), Payload: body,
+	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
+		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocol(ctx, model), Payload: body,
 		Client: styleHTTP(), Timeout: 90 * time.Second,
 	})
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 const maxStreamRetries = 2
@@ -22,7 +22,7 @@ func (loop *agentLoop) streamModel(body []byte, withTools bool) (modelRound, err
 	var payload struct {
 		Model string `json:"model"`
 	}
-	if json.Unmarshal(body, &payload) == nil && modelgw.ResolveTextProtocol(payload.Model, loop.creds.protocol) != "openai" {
+	if json.Unmarshal(body, &payload) == nil && gateway.ResolveTextProtocol(payload.Model, loop.creds.protocol) != "openai" {
 		return loop.nativeStream(body)
 	}
 	var last error

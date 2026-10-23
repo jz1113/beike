@@ -12,6 +12,8 @@ export interface NodeRunHistory {
 
 export type CanvasPortType = 'image' | 'video' | 'audio' | 'prompt' | 'any';
 
+export type CanvasQuickNodeType = 'prompt' | 'file' | 'image-generation' | 'video-generation' | 'compare' | 'save' | 'preview' | 'audio';
+
 export interface CanvasEdge {
   id: string;
   sourceNodeId: string;

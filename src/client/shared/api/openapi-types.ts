@@ -667,8 +667,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description 读取当前工作区二级类目的样本、观察记忆、经验、技能版本及验证进度。 */
         get: operations["get_api_catalog_category_skills"];
         put?: never;
+        /** @description 逐组观察、整理候选、维护经验及切换版本；学习请求不自动重放失败调用。 */
         post: operations["post_api_catalog_category_skills"];
         delete?: never;
         options?: never;
@@ -1736,6 +1738,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CategoryLearningNote: {
+            id: string;
+            /** @enum {string} */
+            kind: "prefer" | "avoid";
+            content: string;
+            createdAt: string;
+        };
+        CategoryLearningEntry: {
+            groupId: string;
+            title: string;
+            /** @enum {string} */
+            state: "pending" | "learned" | "rejected" | "holdout";
+            reason: string;
+            rules: string[];
+            conditions: string[];
+            avoid: string[];
+            model: string;
+            createdAt: string;
+        };
+        CategoryLearningMemory: {
+            entries: components["schemas"]["CategoryLearningEntry"][];
+            notes: components["schemas"]["CategoryLearningNote"][];
+            learned: number;
+            pending: number;
+            rejected: number;
+            holdout: number;
+            fingerprint: string;
+        };
         /** @description 文本及图片理解模型路由；模型级显式协议优先，auto按真实上游模型识别Gemini或Anthropic原生协议，不改变渠道地址与密钥，也不自动回退协议。 */
         TextModelRoute: {
             model?: string;
@@ -2915,33 +2945,72 @@ export interface operations {
     };
     get_api_catalog_category_skills: {
         parameters: {
-            query?: never;
+            query: {
+                folderId: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 类目智能体状态；原图与逐镜长文本不在状态轮询中返回。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                        memory: components["schemas"]["CategoryLearningMemory"];
+                        pendingSamples: number;
+                        needsConsolidation: boolean;
+                        attemptFingerprint: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    post_api_catalog_category_skills: {
+        parameters: {
+            query: {
+                action: "learn" | "observe" | "remember" | "forget" | "retry-sample" | "configure" | "trial" | "baseline" | "publish" | "rollback";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    folderId: string;
+                    /** @description 非学习操作必须提交当前状态版本，防止覆盖并发修改。 */
+                    revision?: number;
+                    /** @default 5 */
+                    maxNewSamples?: number;
+                    force?: boolean;
+                    /** @enum {string} */
+                    kind?: "prefer" | "avoid";
+                    content?: string;
+                    id?: string;
+                    versionId?: string;
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description 操作成功；学习操作包含 observed 或 candidate 阶段、已读组数和剩余组数。 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-        };
-    };
-    post_api_catalog_category_skills: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
+            /** @description 状态冲突、相同资料已尝试或候选尚未通过实际成图对照。 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

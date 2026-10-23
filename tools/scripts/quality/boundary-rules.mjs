@@ -19,11 +19,13 @@ export function boundaryViolations(from, to, specifier, allowed = new Set()) {
   if (domain && inTree(to, 'src/shared') && !inTree(to, 'src/shared/domain')) errors.push('domain-is-independent');
   if (contracts && inTree(to, 'src/shared') && !inTree(to, 'src/shared/contracts')) errors.push('contracts-stay-thin');
   if (inTree(from, 'src/client/shared') && inTree(to, 'src/client/features')) errors.push('shared-no-features');
-  if (/^src\/client\/features\/workshop\/model\//.test(from)
-    && (/^src\/client\/features\/workshop\/(hooks|components|views)\//.test(to))) errors.push('workshop-model-no-ui');
-  if (/^src\/client\/features\/video-sales\/model\//.test(from) && !/\.test\.tsx?$/.test(from)
-    && (/^src\/client\/features\/video-sales\/api\//.test(to) || /src\/client\/shared\/api\/apiClient/.test(to))) {
-    errors.push('video-sales-model-no-api');
+  const modelFeature = /^src\/client\/features\/([^/]+)\/model\//.exec(from)?.[1];
+  if (modelFeature && /^src\/client\/features\/[^/]+\/(hooks|components|views)\//.test(to)) {
+    errors.push('feature-model-no-ui');
+  }
+  if (/^src\/client\/features\/sales\/model\//.test(from) && !/\.test\.tsx?$/.test(from)
+    && (/^src\/client\/features\/sales\/api\//.test(to) || /src\/client\/shared\/api\/apiClient/.test(to))) {
+    errors.push('sales-model-no-api');
   }
   const sourceFeature = featureOf(from), targetFeature = featureOf(to);
   if (sourceFeature && targetFeature && sourceFeature !== targetFeature && !allowed.has(`${sourceFeature}->${targetFeature}`)) {

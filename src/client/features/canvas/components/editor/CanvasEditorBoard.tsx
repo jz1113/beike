@@ -1,11 +1,11 @@
-import { CanvasMinimap } from '../CanvasMinimap';
-import { CanvasSelectionToolbar } from '../CanvasSelectionToolbar';
+import { CanvasMinimap } from './CanvasMinimap';
+import { CanvasSelectionToolbar } from './CanvasSelectionToolbar';
 import { Image as ImageIcon, MousePointer2, Type, Upload, Video as VideoIcon } from 'lucide-react';
-import { CanvasNodeMenu, type CanvasQuickNodeType } from '../CanvasNodeMenu';
+import { CanvasNodeMenu, type CanvasQuickNodeType } from './CanvasNodeMenu';
 import { DotGrid } from '@client/shared/media/widgets/DotGrid';
-import { CanvasConnections } from '../CanvasConnections';
+import { CanvasConnections } from './CanvasConnections';
 import { CanvasStageNode } from '../stage/CanvasStageNode';
-import { CanvasLayersPanel } from '../CanvasLayersPanel';
+import { CanvasLayersPanel } from './CanvasLayersPanel';
 import CanvasPromptDock from '../prompt/CanvasPromptDock';
 import { useCanvasFileDrop } from '../../hooks/useCanvasFileDrop';
 import { useI18n } from '@client/shared/i18n';

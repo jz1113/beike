@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestDeconstructVisionUsesNativeProtocolOverride(t *testing.T) {
@@ -21,7 +21,7 @@ func TestDeconstructVisionUsesNativeProtocolOverride(t *testing.T) {
 		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"{\"per_image\":[{}]}"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`))
 	}))
 	defer server.Close()
-	outcome := callDeconstructVision(modelgw.WithTextProtocol(context.Background(), "anthropic"), server.URL, "secret", "custom-vision", []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}, "分析图片")
+	outcome := callDeconstructVision(gateway.WithTextProtocol(context.Background(), "anthropic"), server.URL, "secret", "custom-vision", []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}, "分析图片")
 	if outcome.Fail != nil || outcome.Text != `{"per_image":[{}]}` || calls != 1 {
 		t.Fatalf("outcome %#v calls %d", outcome, calls)
 	}

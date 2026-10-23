@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -121,7 +121,7 @@ func serveModelProbe(w http.ResponseWriter, r *http.Request, cfg config.Config, 
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "textProtocol: 不支持的文本协议"})
 		return
 	}
-	r = r.WithContext(modelgw.WithTextProtocol(r.Context(), protocol))
+	r = r.WithContext(gateway.WithTextProtocol(r.Context(), protocol))
 	var status int
 	var body map[string]any
 	if mediaModel(model) {

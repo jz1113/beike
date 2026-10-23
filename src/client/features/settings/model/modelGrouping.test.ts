@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseModelDetails, groupModelsByGeneration } from './modelGrouping';
+import { parseModelDetails, groupModelsByGeneration } from '@shared/domain/models/modelGrouping';
 
 describe('modelGrouping (generation row structure)', () => {
   it('parses models with accurate generation label and variants', () => {

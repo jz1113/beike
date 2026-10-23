@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
-	"beike.local/cloud/src/backend/internal/modelgw"
 )
 
 func ProcessVoiceClone(cfg config.Config, voice Voice, req CreateVoiceRequest) {
@@ -70,7 +70,7 @@ func cloneMiniMax(ctx context.Context, base, key, model string, voice Voice) (st
 			return voice.VoiceID, nil
 		}
 		last = errors.New(cloneError(raw, status))
-		retryable := modelgw.CanTryAnotherEndpoint(status) || status >= 500
+		retryable := gateway.CanTryAnotherEndpoint(status) || status >= 500
 		if !retryable || index == len(endpoints)-1 {
 			return "", last
 		}

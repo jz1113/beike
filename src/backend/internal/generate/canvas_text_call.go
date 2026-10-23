@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/system"
 )
@@ -114,8 +114,8 @@ func completeCanvasText(ctx context.Context, base, key, model string, deepseek b
 	if deepseek {
 		body["thinking"] = map[string]any{"type": "disabled"}
 	}
-	status, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
-		BaseURL: base, APIKey: key, Protocol: modelgw.TextProtocol(ctx, model), Payload: body,
+	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
+		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocol(ctx, model), Payload: body,
 		Client: canvasHTTP(), Timeout: 120 * time.Second,
 	})
 	if status != 0 && (status < 200 || status >= 300) {

@@ -49,7 +49,14 @@ type Manifest struct {
 	Samples             []Sample         `json:"samples"`
 	FeedbackFingerprint string           `json:"feedbackFingerprint"`
 	RuleEvidence        []map[string]any `json:"ruleEvidence"`
+	MemoryFingerprint   string           `json:"memoryFingerprint"`
+	Notes               []Note           `json:"notes"`
+	EngineVersion       string           `json:"engineVersion"`
 }
+
+// Bump when observation or consolidation semantics change.
+const EngineVersion = "category-agent-v2"
+
 type Version struct {
 	ID                string   `json:"id"`
 	FolderID          string   `json:"folderId"`

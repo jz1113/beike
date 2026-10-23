@@ -1,6 +1,8 @@
 package migrate
 
 import (
+	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +10,7 @@ import (
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
 	want := map[string]string{
+		"20261023_01_category_skill_memory":                    "0c80824b6c90b1470efda4c793964a8794f62b0ad1fb99c6188865ab2065e12b",
 		"20261022_02_category_skill_learning":                  "b20605ae7eb2e506603ecfce03658b2d6515868bdbcc9b0a6ee009f5df8b75eb",
 		"20260913_01_desktop_baseline":                         "c108512db8bd1bd145787d220ac013bb1d7533c6170ff3b130df9d8faf7a7962",
 		"20260913_02_library_order_indexes":                    "5be8c7031bb2191647e9a6747a82bb16dc83f05718c943140406eb57d040c446",
@@ -62,5 +65,52 @@ func TestEmptyDatabaseMigrates(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLegacyDatabaseGetsLearningTablesWithBackupAndRetainsUserRows(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", ".."))
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := mustMigrations()
+	firstNew := 0
+	for i, item := range items {
+		if item.version == "20261018_01_avatar_studio" {
+			firstNew = i
+			break
+		}
+	}
+	if firstNew == 0 {
+		t.Fatal("legacy boundary missing")
+	}
+	if err := applyPending(context.Background(), db, items[:firstNew]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE "UserSentinel" ("value" TEXT); INSERT INTO "UserSentinel" VALUES ('keep user data')`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if err := Run(path, root, false); err != nil {
+		t.Fatal(err)
+	}
+	db, err = sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'CategorySkill%'`).Scan(&count); err != nil || count != 7 {
+		t.Fatalf("learning schema not migrated: %d %v", count, err)
+	}
+	var value string
+	if err := db.QueryRow(`SELECT "value" FROM "UserSentinel"`).Scan(&value); err != nil || value != "keep user data" {
+		t.Fatal("user data changed during upgrade")
+	}
+	backups, _ := filepath.Glob(filepath.Join(filepath.Dir(path), "database-backups", "before-20261018_01_avatar_studio-*.db"))
+	if len(backups) != 1 {
+		t.Fatal("pre-upgrade backup missing")
 	}
 }

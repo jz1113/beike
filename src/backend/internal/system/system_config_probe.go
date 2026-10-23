@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -99,8 +99,8 @@ func probeMediaCatalog(ctx context.Context, client *http.Client, baseURL, apiKey
 }
 
 func probeChat(ctx context.Context, client *http.Client, baseURL, apiKey, model string) (int, map[string]any) {
-	if protocol := modelgw.TextProtocol(ctx, model); protocol != "openai" {
-		status, _, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
+	if protocol := gateway.TextProtocol(ctx, model); protocol != "openai" {
+		status, _, err := gateway.CompleteText(ctx, gateway.TextRequest{
 			BaseURL: baseURL, APIKey: apiKey, Protocol: protocol, Client: client, Timeout: 40 * time.Second,
 			Payload: map[string]any{"model": model, "max_tokens": 4096, "reasoning_effort": "low", "messages": []map[string]string{{"role": "user", "content": "Ping. Reply PONG only."}}},
 		})

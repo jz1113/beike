@@ -16,7 +16,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/keywordreview"
+	"beike.local/cloud/src/backend/internal/keywords"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
@@ -40,7 +40,9 @@ func main() {
 		return
 	}
 	if cfg.DatabasePath != "" {
-		runSchema(cfg.Root, cfg.DatabasePath, !cfg.Production())
+		if err := migrate.Run(cfg.DatabasePath, cfg.Root, !cfg.Production()); err != nil {
+			log.Fatalf("[API] 数据库升级未完成，已停止启动以保护现有数据: %v", err)
+		}
 		if err := database.Check(cfg.DatabasePath); err != nil {
 			log.Printf("[API] 数据库检查未完成: %v", err)
 		}
@@ -87,12 +89,6 @@ func main() {
 	}
 }
 
-func runSchema(root, dbPath string, adoptLocal bool) {
-	if err := migrate.Run(dbPath, root, adoptLocal); err != nil {
-		log.Printf("[API] 数据库迁移未完成: %v", err)
-	}
-}
-
 func maintain(cfg config.Config) {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
@@ -106,7 +102,7 @@ func maintain(cfg config.Config) {
 }
 
 func sweep(cfg config.Config) {
-	if count := keywordreview.PurgeExpiredReceipts(time.Now()); count > 0 {
+	if count := keywords.PurgeExpiredReceipts(time.Now()); count > 0 {
 		log.Printf("→ [提交收据] 已清理 %d 个过期收据", count)
 	}
 	if count := system.PurgeExpiredMediaReviews(cfg.MediaReviewRoot(), time.Now()); count > 0 {

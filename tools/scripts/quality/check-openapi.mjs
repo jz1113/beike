@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Keep api/openapi.yaml and the generated client types aligned with the Go routes. */
+/** Keep the shared OpenAPI contract and generated client types aligned with the Go routes. */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,7 +9,7 @@ import { collectRoutes, renderOpenApi } from './openapi-routes.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const normalizeLf = (text) => text.replace(/\r\n/g, '\n');
-const target = path.join(root, 'api/openapi.yaml');
+const target = path.join(root, 'src/shared/contracts/openapi.yaml');
 const rendered = renderOpenApi(collectRoutes(root), fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '');
 
 if (process.argv.includes('--write')) {
@@ -17,7 +17,7 @@ if (process.argv.includes('--write')) {
   fs.writeFileSync(target, rendered);
   console.log(`[openapi] wrote ${collectRoutes(root).length} routes`);
 } else if (!fs.existsSync(target) || normalizeLf(fs.readFileSync(target, 'utf8')) !== normalizeLf(rendered)) {
-  console.error('[openapi] api/openapi.yaml 与当前路由不一致。运行 node tools/scripts/quality/check-openapi.mjs --write');
+  console.error('[openapi] src/shared/contracts/openapi.yaml 与当前路由不一致。运行 node tools/scripts/quality/check-openapi.mjs --write');
   process.exit(1);
 } else {
   console.log(`[openapi] OK ${collectRoutes(root).length} routes`);
@@ -25,7 +25,7 @@ if (process.argv.includes('--write')) {
 
 const typesPath = path.join(root, 'src/client/shared/api/openapi-types.ts');
 const generatedTypes = path.join(os.tmpdir(), 'beike-openapi-types.ts');
-const generated = spawnSync('pnpm', ['exec', 'openapi-typescript', 'api/openapi.yaml', '-o', generatedTypes], {
+const generated = spawnSync('pnpm', ['exec', 'openapi-typescript', 'src/shared/contracts/openapi.yaml', '-o', generatedTypes], {
   cwd: root,
   encoding: 'utf8',
   shell: true,

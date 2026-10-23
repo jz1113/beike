@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/modelgw"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 type assistantRoundTripper func(*http.Request) (*http.Response, error)
@@ -38,9 +38,9 @@ func (loop *agentLoop) nativeStream(body []byte) (modelRound, error) {
 		payload["reasoning_effort"] = loop.effort
 	}
 	emitted := false
-	_, data, err := modelgw.StreamText(loop.ctx, modelgw.TextRequest{
+	_, data, err := gateway.StreamText(loop.ctx, gateway.TextRequest{
 		BaseURL: loop.creds.baseURL, APIKey: loop.creds.apiKey,
-		Protocol: modelgw.ResolveTextProtocol(model, loop.creds.protocol),
+		Protocol: gateway.ResolveTextProtocol(model, loop.creds.protocol),
 		Payload:  payload, Client: assistantHTTP(), Timeout: 10 * time.Minute,
 	}, func(kind, text string) {
 		if !emitted && loop.send != nil {
@@ -115,8 +115,8 @@ func nativeCount(value any) (int, bool) {
 
 func nativeText(ctx context.Context, creds gatewayCreds, payload map[string]any, timeout time.Duration, client *http.Client) (string, error) {
 	model, _ := payload["model"].(string)
-	_, data, err := modelgw.CompleteText(ctx, modelgw.TextRequest{
-		BaseURL: creds.baseURL, APIKey: creds.apiKey, Protocol: modelgw.ResolveTextProtocol(model, creds.protocol),
+	_, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
+		BaseURL: creds.baseURL, APIKey: creds.apiKey, Protocol: gateway.ResolveTextProtocol(model, creds.protocol),
 		Payload: payload, Client: client, Timeout: timeout,
 	})
 	if err != nil {

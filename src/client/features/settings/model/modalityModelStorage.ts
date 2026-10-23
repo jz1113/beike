@@ -1,5 +1,5 @@
 import type { ModalityGlobalConfig, ModalityKind, ModalityModelItem } from './modalityModelTypes';
-import { DEFAULT_MODALITY_MODELS } from './modalityModelDefaults';
+import { DEFAULT_MODALITY_MODELS } from '@shared/domain/models/modalityDefaults';
 import { inferVendorFromModelId, normalizeModelVendor } from './modalityMeta';
 import {
   MODALITY_STORAGE_KEY_PREFIX,

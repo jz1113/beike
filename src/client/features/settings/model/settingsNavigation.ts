@@ -1,20 +1,3 @@
-import {
-  Activity,
-  AudioLines,
-  Bot,
-  Box,
-  HardDrive,
-  Languages,
-  LayoutGrid,
-  MessageSquare,
-  Music,
-  Palette,
-  Plug,
-  SunMedium,
-  UserRound,
-  Video,
-} from 'lucide-react';
-
 export type SettingsNavSection =
   | 'appearance'
   | 'profile'
@@ -40,7 +23,6 @@ export type CanvasSettingsPage =
 interface NavItem {
   id: SettingsNavSection;
   label: string;
-  icon: typeof LayoutGrid;
   keywords: string[];
 }
 
@@ -52,20 +34,20 @@ export const CANVAS_SETTINGS_PAGES: { id: CanvasSettingsPage; label: string; cou
 ];
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { id: 'profile', label: '创作档案', icon: Activity, keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
-  { id: 'appearance', label: '外观与主题', icon: SunMedium, keywords: ['外观', '深色', '浅色', '主题', '暗黑', '模式', '背景', '夜间', '白天'] },
-  { id: 'api', label: 'API 接入', icon: Plug, keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦', '奇云'] },
-  { id: 'chat', label: '多模态', icon: MessageSquare, keywords: ['多模态', '对话', '视觉', '默认', '助手'] },
-  { id: 'image', label: '绘画', icon: Palette, keywords: ['绘画', '生图', '默认'] },
-  { id: 'video', label: '视频', icon: Video, keywords: ['视频', '默认'] },
-  { id: 'three_d', label: '3D', icon: Box, keywords: ['3d', '混元'] },
-  { id: 'music', label: '音乐', icon: Music, keywords: ['音乐', 'suno'] },
-  { id: 'avatar', label: '数字人', icon: UserRound, keywords: ['数字人', '对口型', '口型', '驱动'] },
-  { id: 'voice', label: '语音', icon: AudioLines, keywords: ['语音', '配音'] },
-  { id: 'canvas', label: '画布功能', icon: LayoutGrid, keywords: ['画布', '连线', '节点'] },
-  { id: 'pet', label: '桌宠', icon: Bot, keywords: ['桌宠', '宠物', 'codex'] },
-  { id: 'language', label: '语言', icon: Languages, keywords: ['语言', '中文'] },
-  { id: 'storage', label: '存储', icon: HardDrive, keywords: ['存储', 'oss', 'r2', 's3'] },
+  { id: 'profile', label: '创作档案', keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
+  { id: 'appearance', label: '外观与主题', keywords: ['外观', '深色', '浅色', '主题', '暗黑', '模式', '背景', '夜间', '白天'] },
+  { id: 'api', label: 'API 接入', keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦', '奇云'] },
+  { id: 'chat', label: '多模态', keywords: ['多模态', '对话', '视觉', '默认', '助手'] },
+  { id: 'image', label: '绘画', keywords: ['绘画', '生图', '默认'] },
+  { id: 'video', label: '视频', keywords: ['视频', '默认'] },
+  { id: 'three_d', label: '3D', keywords: ['3d', '混元'] },
+  { id: 'music', label: '音乐', keywords: ['音乐', 'suno'] },
+  { id: 'avatar', label: '数字人', keywords: ['数字人', '对口型', '口型', '驱动'] },
+  { id: 'voice', label: '语音', keywords: ['语音', '配音'] },
+  { id: 'canvas', label: '画布功能', keywords: ['画布', '连线', '节点'] },
+  { id: 'pet', label: '桌宠', keywords: ['桌宠', '宠物', 'codex'] },
+  { id: 'language', label: '语言', keywords: ['语言', '中文'] },
+  { id: 'storage', label: '存储', keywords: ['存储', 'oss', 'r2', 's3'] },
 ];
 
 export function settingsSectionLabel(section: SettingsNavSection, canvasPage: CanvasSettingsPage) {

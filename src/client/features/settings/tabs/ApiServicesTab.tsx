@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsConnectionContext } from '../components/SettingsControls';
-import { ApiServicesWanbangPanel } from '../components/ApiServicesWanbangPanel';
-import { ApiServicesApiaPanel } from '../components/ApiServicesApiaPanel';
-import { ApiServicesQiyunPanel } from '../components/ApiServicesQiyunPanel';
-import { ApiServicesStoragePanel } from '../components/ApiServicesStoragePanel';
-import { ApiProvidersNavList } from '../components/ApiProvidersNavList';
-import { ApiProviderDetailPanel } from '../components/ApiProviderDetailPanel';
-import { AddProviderModal } from '../components/AddProviderModal';
+import { ApiServicesWanbangPanel } from '../components/vendors/ApiServicesWanbangPanel';
+import { ApiServicesApiaPanel } from '../components/vendors/ApiServicesApiaPanel';
+import { ApiServicesQiyunPanel } from '../components/vendors/ApiServicesQiyunPanel';
+import { ApiServicesStoragePanel } from '../components/storage/ApiServicesStoragePanel';
+import { ApiProvidersNavList } from '../components/providers/ApiProvidersNavList';
+import { ApiProviderDetailPanel } from '../components/providers/ApiProviderDetailPanel';
+import { AddProviderModal } from '../components/providers/AddProviderModal';
 import { serviceStatuses } from '../model/serviceStatuses';
-import { SERVICE_STATUS_COLORS } from '../components/ApiServicesNavList';
+import { SERVICE_STATUS_COLORS } from '../components/vendors/ApiServicesNavList';
 import { useApiProviders } from '../hooks/useApiProviders';
 import type { ApiServicesTabProps } from './apiServicesTabTypes';
 

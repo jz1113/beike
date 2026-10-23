@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
-	"beike.local/cloud/src/backend/internal/modelgw"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
@@ -153,7 +153,7 @@ func submitLipsyncTask(ctx context.Context, creds PipelineCreds, avatarURL, audi
 	if spec.Family == FamilyWanx {
 		headers["X-DashScope-Async"] = "enable"
 	}
-	result := modelgw.SubmitAvatar(ctx, modelgw.SubmitCommand{
+	result := gateway.SubmitAvatar(ctx, gateway.SubmitCommand{
 		Endpoints:   lipsyncSubmitEndpoints(creds),
 		APIKey:      driverKey,
 		PayloadJSON: string(payload),
@@ -161,7 +161,7 @@ func submitLipsyncTask(ctx context.Context, creds PipelineCreds, avatarURL, audi
 		Client:      generate.ModelHTTP(),
 		ReadTaskID:  readTaskID,
 	})
-	if result.Outcome == modelgw.Accepted && result.TaskID != "" {
+	if result.Outcome == gateway.Accepted && result.TaskID != "" {
 		return result.TaskID, nil
 	}
 	if strings.TrimSpace(result.Error) == "" {
