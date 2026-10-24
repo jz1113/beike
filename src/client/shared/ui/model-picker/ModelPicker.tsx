@@ -8,7 +8,7 @@ import { normalizeReasoningEffort, REASONING_EFFORT_LABELS, reasoningCapability,
 import './modelPicker.css';
 
 export interface AssistantModelOption { id: string; modelId?: string; name?: string; shortName?: string; provider?: string; badge?: string }
-const descriptions = { auto: '使用模型默认设置。', low: '更快回应，适合提取、改写与简单问答。', medium: '兼顾响应速度与分析深度。', high: '适合复杂规划、比较和多步分析。', xhigh: '投入更多推理时间，可能增加等待与消耗。' };
+const descriptions = { auto: '使用模型默认设置。', low: '更快回应，适合提取、改写与简单问答。', medium: '兼顾响应速度与分析深度。', high: '适合复杂规划、比较和多步分析。', xhigh: '投入更多推理时间，可能增加等待与消耗。', max: '使用模型的最高推理强度，适合极复杂任务。' };
 
 function displayLabel(model: { id: string; name?: string; shortName?: string }) {
   return (model.shortName || model.name || model.id).split(' · ')[0];

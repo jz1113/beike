@@ -30,7 +30,7 @@ func normalizeGptImageRequest(model, size, quality string) (string, string, stri
 	if omitGptImageQuality(model) {
 		return model, finalSize, ""
 	}
-	return model, finalSize, tier
+	return model, finalSize, gptImageWireQuality(model, quality, tier)
 }
 
 func isGptImageModel(model string) bool {
@@ -97,20 +97,35 @@ func legacyGptImageSuffix(lower string) string {
 	return "gpt-image-2-" + tier
 }
 
+func isGptImage25Model(model string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(model)), "gpt-image-2.5")
+}
+
 func normalizeImageQuality(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "low", "medium", "high":
+	case "low", "medium", "high", "xhigh", "max":
 		return strings.ToLower(strings.TrimSpace(value))
 	default:
 		return ""
 	}
 }
 
+func gptImageWireQuality(model, raw, tier string) string {
+	q := strings.ToLower(strings.TrimSpace(raw))
+	if q == "xhigh" || q == "max" {
+		if isGptImage25Model(model) {
+			return q
+		}
+		return "high"
+	}
+	return tier
+}
+
 func gptImageQualityTier(quality string) string {
 	switch strings.ToLower(strings.TrimSpace(quality)) {
 	case "low", "1k":
 		return "low"
-	case "high", "4k":
+	case "high", "xhigh", "max", "4k":
 		return "high"
 	default:
 		return "medium"
@@ -223,8 +238,15 @@ func clampGptImageOfficialPixelSize(pixelSize string) string {
 	if !ok {
 		return pixelSize
 	}
-	width = snap16(math.Min(3840, float64(width)))
-	height = snap16(math.Min(3840, float64(height)))
+	edge := max(width, height)
+	if edge > 3840 && edge > 0 {
+		scale := 3840.0 / float64(edge)
+		width = snap16(float64(width) * scale)
+		height = snap16(float64(height) * scale)
+	} else {
+		width = snap16(math.Min(3840, float64(width)))
+		height = snap16(math.Min(3840, float64(height)))
+	}
 	longEdge := max(width, height)
 	shortEdge := min(width, height)
 	if shortEdge > 0 && float64(longEdge)/float64(shortEdge) > 3 {
@@ -238,14 +260,14 @@ func clampGptImageOfficialPixelSize(pixelSize string) string {
 	pixels := width * height
 	if pixels < gptImageMinPixels {
 		scale := math.Sqrt(float64(gptImageMinPixels) / float64(pixels))
-		width = snap16(float64(width) * scale)
-		height = snap16(float64(height) * scale)
+		width = max(16, int(math.Ceil(float64(width)*scale/16))*16)
+		height = max(16, int(math.Ceil(float64(height)*scale/16))*16)
 		pixels = width * height
 	}
 	if pixels > gptImageMaxPixels {
 		scale := math.Sqrt(float64(gptImageMaxPixels) / float64(pixels))
-		width = snap16(float64(width) * scale)
-		height = snap16(float64(height) * scale)
+		width = max(16, int(math.Floor(float64(width)*scale/16))*16)
+		height = max(16, int(math.Floor(float64(height)*scale/16))*16)
 	}
 	width = min(3840, width)
 	height = min(3840, height)
@@ -300,6 +322,8 @@ var gptImageSafeSizes = map[string][3]string{
 	"3:4":   {"960x1280", "1536x2048", "3072x4096"},
 	"2:3":   {"1024x1536", "1360x2048", "2160x3240"},
 	"9:16":  {"864x1536", "1152x2048", "2160x3840"},
+	"4:5":   {"1024x1280", "1632x2048", "2560x3200"},
+	"5:4":   {"1280x1024", "2048x1632", "3200x2560"},
 }
 
 var gptImageSuffix2K = map[string]string{
@@ -312,4 +336,6 @@ var gptImageSuffix2K = map[string]string{
 	"3:4":   "1536x2048",
 	"2:3":   "1024x1536",
 	"9:16":  "1152x2048",
+	"4:5":   "1280x1600",
+	"5:4":   "1600x1280",
 }

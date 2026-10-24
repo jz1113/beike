@@ -38,6 +38,7 @@ export interface BatchStage3ShotCardProps {
   copyShotPrompt: (prompt: string, key: string) => void;
   onUpdatePrompt: (newVal: string) => void;
   productPersona?: string;
+  readOnly?: boolean;
   sharedAssets?: { scene?: string; outfit?: string; persona?: string };
 }
 
@@ -51,6 +52,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
   copyShotPrompt,
   onUpdatePrompt,
   productPersona,
+  readOnly = false,
   sharedAssets,
 }) => {
   const labels = getShotAssetLabels(shot, productPersona);
@@ -211,6 +213,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
             <textarea
               aria-label={`镜头 ${shot.shot_no ?? shotIdx + 1} 提示词`}
               rows={6}
+              disabled={readOnly}
               value={shot.prompt}
               placeholder="正在装配提示词..."
               onChange={(e) => onUpdatePrompt(e.target.value)}
@@ -256,7 +259,7 @@ export const BatchStage3ShotCard: React.FC<BatchStage3ShotCardProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleShotExpand(shotKey)}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold
+                  className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25 text-xs font-semibold
                            flex items-center gap-1.5 transition-colors"
                   title="展开编辑"
                 >

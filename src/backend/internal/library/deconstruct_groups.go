@@ -1,6 +1,7 @@
 package library
 
 import (
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -77,6 +78,7 @@ func deconstructGroupDrafts(stored map[string]any) ([]map[string]any, error) {
 					kind = "pure_product"
 				}
 			}
+			kind = dblibrary.RefineShotType(kind, prompt)
 			human = kind == "model_shot"
 			hasHuman = hasHuman || human
 			shots = append(shots, map[string]any{"shot_no": i + 1, "prompt": prompt, "title": source["title"], "has_human": human, "shot_type": kind,
@@ -98,6 +100,10 @@ func deconstructGroupDrafts(stored map[string]any) ([]map[string]any, error) {
 		}
 		if sub := stringValue(stored["targetSubcategory"]); sub != "" {
 			draft["productSubcategory"] = sub
+		} else if category := stringValue(stored["targetProductCategory"]); category == "digital_3c" {
+			if sub := dblibrary.ReferenceSubjectSubcategory(draft["shotPromptsJson"]); sub != "" {
+				draft["productSubcategory"] = sub
+			}
 		}
 		drafts = append(drafts, draft)
 	}

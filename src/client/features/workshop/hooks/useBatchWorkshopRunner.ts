@@ -3,6 +3,7 @@ import { useWorkshopAnalysis } from './useWorkshopAnalysis';
 import { useFreshWorkshopEntry } from './useFreshWorkshopEntry';
 import { deriveWorkshopPipelineStatus } from '../model/workspace/workshopPipelineStatus';
 import { useLiveItems } from './useLiveItems';
+import { useWorkshopTaskRecovery } from './useWorkshopTaskRecovery';
 import { recheckWorkshopTask } from '../model/generation/recheckWorkshopTask';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { PreviousGroupSignature } from '@shared/domain/prompts/vision';
@@ -253,7 +254,7 @@ export function useBatchWorkshopRunner() {
 
   const delivery = useBatchExport(itemsRef, showToast, setIsExportingZip, setExportingSingleItemId);
 
-  const { reviewTask } = useBatchReview(itemsRef, setItems, retrySingleShotTask, showToast, () => workspace.flush());
+  const { reviewTask, reviewBatch, isReviewingOutputs } = useBatchReview(itemsRef, setItems, retrySingleShotTask, showToast, () => workspace.flush());
 
   const applyWorkspaceSnapshot = useCallback((value: WorkshopSnapshot) => {
     setCurrentStage(value.currentStage);
@@ -306,6 +307,10 @@ export function useBatchWorkshopRunner() {
   }, applyWorkspaceSnapshot, () => itemsRef.current);
   activeBatchIdRef.current = workspace.activeBatch?.id || 'draft';
 
+  useWorkshopTaskRecovery(workspace.ready, activeBatchIdRef.current, itemsRef, setItems, {
+    selectedAspect, selectedQuality, selectedImageGenModel, gridOutputSize,
+  });
+
   useEffect(() => {
     setWorkspaceReady(workspace.ready);
   }, [workspace.ready]);
@@ -313,7 +318,7 @@ export function useBatchWorkshopRunner() {
   useWorkspaceSnapshotSync(workspace.ready, currentStage, setCurrentStage, itemsRef);
 
   const whenIdle = async (action: () => Promise<void>) => {
-    if (collectInFlight.current || analysisInFlight.current || isGeneratingBatch || isAutoPilotRunning || itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+    if (collectInFlight.current || analysisInFlight.current || isGeneratingBatch || isAutoPilotRunning || isReviewingOutputs || itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
       throw new Error('仍有任务执行中，请等待结束后再切换批次');
     }
     await action();
@@ -423,6 +428,8 @@ export function useBatchWorkshopRunner() {
     acknowledgeRecovery,
     completeCurrentBatch,
     reviewTask,
+    reviewBatch,
+    isReviewingOutputs,
     toastMsg,
     showToast,
     workspaceError: workspace.error,

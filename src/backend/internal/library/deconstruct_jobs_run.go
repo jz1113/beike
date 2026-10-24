@@ -59,7 +59,7 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 	reviewBefore, _ := payload["reviewBeforeSave"].(bool)
 	configBody := map[string]any{
 		"model": payload["model"], "userHint": payload["userHint"], "fallbackOrder": payload["fallbackOrder"],
-		"concurrency": concurrency, "reviewBeforeSave": reviewBefore,
+		"concurrency": concurrency, "reviewBeforeSave": reviewBefore, "apiFormat": modelOption(payload, "apiFormat"), "fullPromptOnly": payload["fullPromptOnly"],
 	}
 	if protocol != "" {
 		configBody["textProtocol"] = protocol
@@ -189,7 +189,7 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 		request = request.WithContext(httpx.WithWorkspace(request.Context(), workspace))
 		payload := map[string]any{
 			"imageUrls": item["images"], "albumName": item["name"], "userHint": jobHint(configBody, stringValue(item["name"])),
-			"model": configBody["model"], "textProtocol": stringValue(configBody["textProtocol"]), "fallbackOrder": configBody["fallbackOrder"],
+			"apiFormat": configBody["apiFormat"], "model": configBody["model"], "textProtocol": stringValue(configBody["textProtocol"]), "fallbackOrder": configBody["fallbackOrder"],
 			"targetCategory": item["targetCategory"], "targetSubcategory": item["targetSubcategory"],
 			"customBaseUrl": baseURL, "customApiKey": apiKey, "reviewBeforeSave": configBody["reviewBeforeSave"],
 			"autoSave":     !boolValue(configBody["reviewBeforeSave"]),

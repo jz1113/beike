@@ -86,7 +86,12 @@ export interface BuildTypedListResult {
  * 将接口返回的商品图片列表整合为带类型的图片分类池（纯函数）
  */
 export function buildTypedList(prod: Record<string, unknown>, images?: unknown): BuildTypedListResult {
-  const { mainImgs, skuImgs, descImgs, coverImg } = normalizeCollectedProductImages({ product: prod, images });
+  const normalized = normalizeCollectedProductImages({ product: prod, images });
+  const usable = (url: string) => !/\.gif(?:$|[?#])/i.test(url);
+  const mainImgs = normalized.mainImgs.filter(usable);
+  const skuImgs = normalized.skuImgs.filter(usable);
+  const descImgs = normalized.descImgs.filter(usable);
+  const coverImg = usable(normalized.coverImg) ? normalized.coverImg : mainImgs[0] || '';
   const typedList: TypedProductImage[] = [
     ...mainImgs.map(url => ({ url, type: 'main' as const })),
     ...skuImgs.map(url => ({ url, type: 'sku' as const })),
@@ -149,6 +154,8 @@ export async function runBatchCollect(
             continue;
           }
 
+          const defaultMain = mainImgs.filter(u => !/\.gif(?:$|[?#])/i.test(u)).slice(0, 1);
+          const initialSelected = defaultMain.length > 0 ? defaultMain : (cleanCover && !/\.gif(?:$|[?#])/i.test(cleanCover) ? [cleanCover] : []);
           deps.onItemUpdate(item.id, {
             title: prod.title || item.title,
             price: prod.price || 0,
@@ -164,7 +171,7 @@ export async function runBatchCollect(
             status: 'success',
             selected: true,
             allTypedImages: typedList,
-            selectedProductImages: [],
+            selectedProductImages: initialSelected,
             errorMsg: undefined,
           });
           successCount++;

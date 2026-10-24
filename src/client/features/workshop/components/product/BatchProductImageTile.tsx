@@ -3,19 +3,15 @@ import { Check, Plus, Star, ZoomIn } from 'lucide-react';
 import LazyProxyImage from '@client/shared/ui/LazyProxyImage';
 import type { TypedProductImage } from '../../model/batchTypes';
 
-export type ImageTileLayout = 'masonry' | 'grid';
-
 interface Props {
   itemId: string;
   imgObj: TypedProductImage;
   imgIdx: number;
   isChecked: boolean;
   selectedOrder?: number;
-  layout?: ImageTileLayout;
   onToggle: () => void;
   onPreview: () => void;
   onSetPrimary?: () => void;
-  onFocusStage?: () => void;
 }
 
 function BatchProductImageTile({
@@ -23,27 +19,17 @@ function BatchProductImageTile({
   imgIdx,
   isChecked,
   selectedOrder = -1,
-  layout = 'masonry',
   onToggle,
   onPreview,
   onSetPrimary,
-  onFocusStage,
 }: Props) {
   const isPrimary = isChecked && selectedOrder === 0;
-  const isMasonry = layout === 'masonry';
 
   const typeLabel = imgObj.type === 'main'
     ? `主图 ${imgIdx + 1}`
     : imgObj.type === 'sku'
       ? 'SKU'
       : '详情';
-
-  const handleClick = () => {
-    if (onFocusStage) {
-      onFocusStage();
-    }
-    onToggle();
-  };
 
   const cardBorderAndShadow = isChecked
     ? isPrimary
@@ -53,9 +39,7 @@ function BatchProductImageTile({
 
   return (
     <div
-      className={`group relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 select-none border ${cardBorderAndShadow} bg-white dark:bg-[#18191d] ${
-        isMasonry ? 'w-full' : 'aspect-square'
-      }`}
+      className={`group relative aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 select-none border ${cardBorderAndShadow} bg-slate-50/70 dark:bg-[#131417]`}
       title={
         isChecked
           ? isPrimary
@@ -64,37 +48,23 @@ function BatchProductImageTile({
           : '点击选为参考素材'
       }
     >
-      {/* 图像容器：瀑布流模式自适应自然长宽比；统一网格模式平铺居中 */}
-      {isMasonry ? (
-        <div className="w-full relative overflow-hidden bg-slate-100/40 dark:bg-white/[0.02]">
-          <LazyProxyImage
-            src={imgObj.url}
-            thumb={true}
-            width={520}
-            wrapperClassName="relative overflow-hidden w-full bg-slate-100/30 dark:bg-white/[0.02]"
-            className="w-full h-auto block object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
-            alt={`${typeLabel}，素材 ${imgIdx + 1}`}
-          />
-        </div>
-      ) : (
-        <div className="w-full h-full p-2 flex items-center justify-center relative overflow-hidden bg-slate-50/70 dark:bg-[#131417]">
-          <LazyProxyImage
-            src={imgObj.url}
-            thumb={true}
-            width={380}
-            wrapperClassName="w-full h-full relative flex items-center justify-center bg-transparent"
-            className="max-w-full max-h-full object-contain transition-transform duration-300 ease-out group-hover:scale-105"
-            alt={`${typeLabel}，素材 ${imgIdx + 1}`}
-          />
-        </div>
-      )}
+      <div className="w-full h-full flex items-center justify-center relative overflow-hidden">
+        <LazyProxyImage
+          src={imgObj.url}
+          thumb={true}
+          width={380}
+          wrapperClassName="w-full h-full relative flex items-center justify-center bg-transparent"
+          className="max-w-full max-h-full object-contain transition-transform duration-300 ease-out group-hover:scale-105"
+          alt={`${typeLabel}，素材 ${imgIdx + 1}`}
+        />
+      </div>
 
       {/* 点击卡片主交互层 */}
       <button
         type="button"
         aria-label={`${isChecked ? '取消选择' : '选择'}素材 ${imgIdx + 1}`}
         aria-pressed={isChecked}
-        onClick={handleClick}
+        onClick={onToggle}
         className="absolute inset-0 z-10 rounded-[inherit] cursor-pointer focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-[-2px]"
       />
 
@@ -143,7 +113,7 @@ function BatchProductImageTile({
         )}
       </div>
 
-      {/* 底部悬浮快捷工具条：鼠标移入时优雅浮现，平时完全不挡图 */}
+      {/* 底部悬浮快捷工具条 */}
       <div className="absolute bottom-2 inset-x-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 pointer-events-auto">
         <button
           type="button"

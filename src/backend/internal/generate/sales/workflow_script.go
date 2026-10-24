@@ -76,6 +76,9 @@ func handleWorkflowScript(w http.ResponseWriter, r *http.Request, cfg config.Con
 		workflowError(w, 502, err)
 		return
 	}
+	if generate.StringField(payload, "category") == "fashion" {
+		script.Shots = normalizeFashionSpeechModes(script.Shots, generate.StringField(payload, "videoMode"))
+	}
 	if err := validateSpeechModes(script.Shots, generate.StringField(payload, "category") == "fashion"); err != nil {
 		workflowError(w, 502, err)
 		return
@@ -136,6 +139,9 @@ referenceAssetIds 只能依赖数组里已出现的素材ID，不能自引用、
 		system += "\n仅服饰品类遵循以下叙事，并在脚本 JSON 中输出 beat，取值为 unbox、lifestyle 或 accessory。\n" + fashionNarrativeRules() + "\n" + fashionStillRules() + "\n" + fashionCameraRules() + "\n" + fashionVoiceoverRules() + fmt.Sprintf("\n本次目标 %d 秒，口播汉字合计写 %d 到 %d 个，标点、数字、字母和省略号不计，不得少于 %d 个，也不得超过 %d 个。每一段至少一句能说完的话，不必写满同一密度，单段不超过约每秒 6 个字。卖点用口语说出来，不念论证箭头；口播和同一段画面是同一处。只锁定当前这一件。\n", target, low, high, low, high) + "服饰 videoMode 为 live_presenter 时让同一人物对镜头现场讲解，必须包含 on_camera 分镜，开场和收尾优先露脸说完整短句；product_closeup 是兼容保留的商品展示方式，不代表必须近景；它与 graphic_montage 都为商品展示，scene_demo 为手部或背影展示，这些无露脸模式全部使用 voiceover，不强加人脸。未指定 videoMode 时默认优先出镜人物讲解。根据具体脚本决定是否需要人物或人脸。锁定同一人物及当前这一件单品，衣服上身素材必须 usesProduct:true。"
 	}
 	system += "\nvoiceover 字段只存台词原文，不代表旁白；每段必须输出 speechMode，取值 on_camera（出镜人物说话）或 voiceover（画外音）。description 和 prompt 写清声音来源与可执行动作。\n" + salesSpeechRules()
+	if category == "fashion" {
+		system += fashionPresentationRule(generate.StringField(payload, "videoMode"))
+	}
 	system += workflowScriptOutputExample(target, category, LimitVisionImages(catalog, 8), generate.StringField(payload, "videoMode"))
 	facts := map[string]any{"productName": payload["productName"], "category": category, "productDescription": payload["productDescription"], "productAnalysis": payload["productAnalysis"], "brand": payload["brand"], "selectedColor": payload["selectedColor"], "targetAudience": payload["targetAudience"], "videoMode": payload["videoMode"], "targetDuration": target, "aspectRatio": ratio}
 	encoded, _ := json.Marshal(facts)
@@ -160,9 +166,15 @@ func workflowScriptOutputExample(target int, category string, catalog []CatalogI
 	}
 	if category == "fashion" {
 		low, high := fashionVoiceoverBudget(target)
-		span := fmt.Sprintf("全片汉字合计 %d 到 %d 个。本段至少一句口语，不必写满；单段不超过约每秒 6 个字。把事实说成对镜头的话，不要写近看怎样、走远怎样", low, high)
+		lead := "用一个场合或一件具体的事对镜头开口，把第一条事实嵌进去。"
+		tail := "把事实说成对镜头的话，不要写近看怎样、走远怎样"
+		if !presenter {
+			lead = "用一个场合或一件具体的事用画外音自然开口，把第一条事实嵌进去。"
+			tail = "全程使用画外音配合商品或无露脸展示，不要写近看怎样、走远怎样"
+		}
+		span := fmt.Sprintf("全片汉字合计 %d 到 %d 个。本段至少一句口语，不必写满；单段不超过约每秒 6 个字。%s", low, high, tail)
 		voiceovers = []string{
-			"开场须直接可念：用一个场合或一件具体的事对镜头开口，把第一条事实嵌进去。" + span,
+			"开场须直接可念：" + lead + span,
 			"中段须直接可念：换装或转身可以少说，只讲这一镜正在看的那一处，禁止只用精致、好看、高级或百搭。" + span,
 			"收尾须直接可念：用另一条事实说清怎么穿、什么时候穿，可以征求意见。禁止就看这一件、可以直接入手、简单好搭、值得入、基础百搭、闭眼入。" + span,
 		}

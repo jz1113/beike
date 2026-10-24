@@ -27,6 +27,7 @@ func RemoteMediaHeaders(rawURL, accept string) map[string]string {
 		{"360buyimg.com", "https://www.jd.com/"},
 		{"jd.com", "https://www.jd.com/"},
 		{"alicdn.com", "https://www.taobao.com/"},
+		{"tbcdn.cn", "https://www.taobao.com/"},
 		{"taobao.com", "https://www.taobao.com/"},
 		{"tmall.com", "https://www.taobao.com/"},
 		{"pddpic.com", "https://mobile.yangkeduo.com/"},
@@ -46,4 +47,16 @@ func RemoteMediaHeaders(rawURL, accept string) map[string]string {
 // RemoteImageHeaders asks only for formats the vision pipeline can decode.
 func RemoteImageHeaders(rawURL string) map[string]string {
 	return RemoteMediaHeaders(rawURL, "image/jpeg,image/png,image/webp,image/gif,image/*;q=0.8,*/*;q=0.5")
+}
+
+// Inline protected retail/social images; public signed URLs retain their bytes.
+func RemoteImageNeedsInline(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	if strings.HasSuffix(strings.ToLower(u.Path), ".octet-stream") {
+		return true
+	}
+	return RemoteImageHeaders(raw)["Referer"] != ""
 }

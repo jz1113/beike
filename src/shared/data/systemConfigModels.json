@@ -186,12 +186,14 @@
       "supportedQualities": [
         "high",
         "medium",
-        "low"
+        "low",
+        "xhigh",
+        "max"
       ],
       "defaultSize": "1024x1024",
       "supportEdits": true,
       "badge": "2.5 旗舰",
-      "description": "OpenAI 新一代生图，支持 low/medium/high 与参考图编辑"
+      "description": "OpenAI 新一代生图，支持 low/medium/high/xhigh/max 与最多 16 张参考图编辑"
     },
     {
       "id": "openai/gpt-image-2",
@@ -215,12 +217,14 @@
       "supportedQualities": [
         "high",
         "medium",
-        "low"
+        "low",
+        "xhigh",
+        "max"
       ],
       "defaultSize": "1024x1024",
       "supportEdits": true,
       "badge": "2.5",
-      "description": "OpenAI 2.5 生图通道，尺寸约束与 Flare 相同"
+      "description": "OpenAI 2.5 高精度生图与编辑通道，支持 low/medium/high/xhigh/max 与最多 16 张参考图"
     },
     {
       "id": "gpt-image-2",
@@ -239,13 +243,86 @@
       "description": "OpenAI 官方文档标准通道，支持 low/medium/high 画质与参考图编辑"
     },
     {
+      "id": "gemini-nano-banana-2.1",
+      "name": "Nano Banana 2.1",
+      "shortName": "Nano Banana 2.1",
+      "provider": "Google",
+      "isPrimary": true,
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "2.1 主力",
+      "description": "Google Gemini Nano Banana 2.1 高效主力生图与智能修图，支持 1K/2K/4K 与 14 种比例"
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "name": "Nano Banana 2 (3.1 Flash)",
+      "shortName": "Nano Banana 2",
+      "provider": "Google",
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "2.0",
+      "description": "Google Gemini 3.1 Flash Image，支持 512px～4K 与 14 种比例"
+    },
+    {
+      "id": "gemini-3.1-flash-lite-image",
+      "name": "Nano Banana 2 Lite",
+      "shortName": "Nano Banana 2 Lite",
+      "provider": "Google",
+      "supportedQualities": [
+        "low"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "Lite",
+      "description": "Google Gemini 3.1 Flash Lite Image，极速低成本 1K 生图"
+    },
+    {
+      "id": "gemini-3-pro-image",
+      "name": "Gemini 3 Pro Image",
+      "shortName": "Gemini 3 Pro Image",
+      "provider": "Google",
+      "supportedQualities": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "defaultSize": "2048x2048",
+      "supportEdits": true,
+      "badge": "3 Pro",
+      "description": "Google Gemini 3 Pro Image，复杂视觉与高精度文字渲染"
+    },
+    {
+      "id": "gemini-2.5-flash-image",
+      "name": "Gemini 2.5 Flash Image",
+      "shortName": "Gemini 2.5 Flash Image",
+      "provider": "Google",
+      "supportedQualities": [
+        "low"
+      ],
+      "defaultSize": "1024x1024",
+      "supportEdits": true,
+      "badge": "2.5",
+      "description": "Google Gemini 2.5 Flash Image 标准 1K 生图"
+    },
+    {
       "id": "nano-banana-pro",
       "name": "Nano Banana Pro",
       "shortName": "Nano Banana Pro",
       "provider": "Google",
       "supportedQualities": [
         "high",
-        "medium"
+        "medium",
+        "low"
       ],
       "defaultSize": "2048x2048",
       "supportEdits": true,
@@ -259,7 +336,8 @@
       "provider": "Google",
       "supportedQualities": [
         "high",
-        "medium"
+        "medium",
+        "low"
       ],
       "defaultSize": "1024x1024",
       "supportEdits": true,

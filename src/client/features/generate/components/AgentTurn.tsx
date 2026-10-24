@@ -157,7 +157,7 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
             const item = block.item;
             const index = items.findIndex((entry) => entry.id === item.id);
             if (item.kind === 'agentReasoning') {
-              const stillThinking = writing && !items.slice(index + 1).some((later) => later.kind === 'agentMessage' && later.content);
+              const stillThinking = writing && index === items.length - 1;
               return (
                 <ThoughtLine
                   key={item.id}
@@ -166,10 +166,10 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
                   working={stillThinking}
                   collapseOnSettle
                   fontSize={13.5}
-                  className="text-slate-700 dark:text-slate-200"
+                  className="w-full text-slate-700 dark:text-slate-200"
                 >
                   {item.content ? (
-                    <p className="mt-2 max-h-60 overflow-y-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-slate-600 select-text dark:text-slate-300">{item.content}</p>
+                    <p className="mt-2 max-h-60 w-full overflow-y-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-words text-slate-600 select-text dark:text-slate-300">{item.content}</p>
                   ) : null}
                 </ThoughtLine>
               );
@@ -188,7 +188,7 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
             if (item.kind === 'agentMessage') {
               const message = item as Extract<AssistantItem, { kind: 'agentMessage' }>;
               if (!message.content?.trim()) return null;
-              const streaming = writing && index === items.findLastIndex((entry) => entry.kind === 'agentMessage');
+              const streaming = writing && index === items.length - 1;
               return <MarkdownBody key={item.id} content={message.content} accentColor="slate" streaming={streaming} renderCode={renderCode} />;
             }
             return null;

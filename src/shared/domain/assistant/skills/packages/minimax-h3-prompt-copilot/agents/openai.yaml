@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniMax H3 提示副驾驶"
+  short_description: "为 MiniMax / 海螺视频组织主体引用、镜头节奏、保留项和声音设计，交付可读的六段式制作提示词。"
+  default_prompt: "使用 $minimax-h3-prompt-copilot 完成当前任务。"

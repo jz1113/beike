@@ -127,14 +127,14 @@ func routeWanEndpoints(base, protocol string) (submit, query []string) {
 		return []string{root + "/qwen" + submitPath}, []string{root + "/qwen" + queryPath}
 	}
 	return []string{
-		root + "/wan" + submitPath,
-		root + "/qwen" + submitPath,
-		root + submitPath,
-	}, []string{
-		root + "/wan" + queryPath,
-		root + "/qwen" + queryPath,
-		root + queryPath,
-	}
+			root + "/wan" + submitPath,
+			root + "/qwen" + submitPath,
+			root + submitPath,
+		}, []string{
+			root + "/wan" + queryPath,
+			root + "/qwen" + queryPath,
+			root + queryPath,
+		}
 }
 
 func expandVideoURLs(base string, templates []string, taskID string) []string {

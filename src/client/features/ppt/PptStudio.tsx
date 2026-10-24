@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { FileType, History, LayoutTemplate, Plus, Presentation, Settings2, Sparkles, ListTree } from 'lucide-react';
-import { StudioBrandChip, StudioDockBar, StudioHistoryDrawer, studioDockClass } from '@client/shared/ui/studio';
+import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
+import { StudioDockBar, studioDockClass } from '@client/shared/ui/studio/StudioDockBar';
+import { StudioHistoryDrawer } from '@client/shared/ui/studio/StudioHistoryDrawer';
 import { usePptStore } from './store/usePptStore';
 import { PptInputStage } from './components/PptInputStage';
 import { PptOutlineStage } from './components/PptOutlineStage';

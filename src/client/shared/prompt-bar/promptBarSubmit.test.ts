@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildPromptBarGenerationTasks, canSubmitPromptBar, type PromptBarSubmitInput } from './promptBarSubmit';
+import { resolvePromptPlaceholder } from './promptBarDisplay';
+import { buildPromptBarGenerationTasks, buildPromptBarSubjects, canSubmitPromptBar, type PromptBarSubmitInput } from './promptBarSubmit';
 
 function input(currentView: string): PromptBarSubmitInput {
   return {
@@ -82,5 +83,31 @@ describe('buildPromptBarGenerationTasks session', () => {
       hasAudioModels: true,
     });
     expect(emptyText).toBe(false);
+  });
+});
+
+describe('resolvePromptPlaceholder', () => {
+  it('returns empty placeholder in agent mode', () => {
+    expect(
+      resolvePromptPlaceholder({
+        isDepthMode: false,
+        quickGenMode: 'agent',
+        quickVideoRefMode: 'omni',
+        isGenerateDock: false,
+      }),
+    ).toBe('');
+  });
+});
+
+describe('buildPromptBarSubjects', () => {
+  it('excludes agent-file attachments from @ mention subjects', () => {
+    const subjects = buildPromptBarSubjects({
+      customSubjects: [],
+      quickRefImages: ['agent-file:doc-1', 'data:image/png;base64,AAA'],
+      refImageNames: {},
+    });
+    expect(subjects).toEqual([
+      { id: 'ref-1', url: 'data:image/png;base64,AAA', name: '1' },
+    ]);
   });
 });

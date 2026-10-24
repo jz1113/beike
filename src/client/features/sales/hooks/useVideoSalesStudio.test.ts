@@ -295,6 +295,17 @@ describe('video sales collection refresh safety', () => {
     expect(latestCommit().variantMetadata?.selectedVariantId).toBe('black');
   });
 
+  it('auto-enables fashion presenter mode when collecting a fashion item on an empty project', async () => {
+    vi.mocked(readSalesStudioDraft).mockReturnValue({ ...defaultSalesStudioState, productUrl: '100265837786' });
+    vi.mocked(collectEcommerceProduct).mockResolvedValue(mapCollectedSalesProduct({
+      product: { title: '啄木鸟男士黑色圆领卫衣', category: '男装', mainImages: ['https://example.com/sweater.jpg'] },
+    }, '100265837786'));
+    const studio = StudioHarness();
+    expect(await studio.runProductCollect()).toBe(true);
+    expect(latestCommit().category).toBe('fashion');
+    expect(latestCommit().videoMode).toBe('live_presenter');
+  });
+
   it('keeps the selected skill when collection infers another category', async () => {
     vi.mocked(readSalesStudioDraft).mockReturnValue({ ...existingProject(), category: 'fashion' });
     vi.mocked(collectEcommerceProduct).mockResolvedValue(mapCollectedSalesProduct({

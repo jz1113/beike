@@ -12,7 +12,7 @@ Gemini、Claude 的文本及图片理解默认分别使用 Gemini Generate Conte
 
 - Gemini 4 Argon 支持低、中、高，分别发送 `generationConfig.thinkingConfig.thinkingLevel: low / medium / high`。Gemini 3 的档位按具体型号区分；Gemini 2.5 使用 `thinkingBudget`，不与 level 同时发送。
 - Claude 的新型号使用自适应思考及适用的 `output_config.effort`；旧型号使用带 `budget_tokens` 的扩展思考。界面档位按已核实型号提供，输出上限需同时容纳思考与正文，不能直接套用 OpenAI 的 `reasoning_effort`。预算档位是本产品的取值策略，不是厂商允许的最大预算：Gemini 2.5 为 2048／8192／12288，旧 Claude 为 1024／2048／3072，以给默认输出上限保留正文空间。
-- 官方 Claude Haiku 5.5 ID 是 `claude-haiku-5-5`，原生支持低、中、高、极高；`claude-5.5-haiku` 等未核实的网关别名只按 Claude 前缀路由，不冒认同一能力。界面继续使用现有四档，不将 `max` 与 `xhigh` 混为一档。
+- 官方 Claude Haiku 5.5 ID 是 `claude-haiku-5-5`，与 Claude 4.7/4.8/5/5.5 及 OpenAI GPT-5.6/GPT-6 系列一起支持最高 `max`（最高）思考强度；Claude 4.6 支持 `low / medium / high / max`。`claude-5.5-haiku` 等未核实的网关别名只按 Claude 前缀路由，不冒认同一能力。
 - 显式 OpenAI 兼容的 Claude 不宣称支持原生思考控制；其他兼容型号沿用既有档位规则。GPT、Grok 使用 `reasoning_effort`，Qwen、Kimi、DeepSeek 的特殊映射与原生 Gemini/Claude 配置相互独立。
 - 界面保存的档位在切换型号、渠道或协议后归一化。原生请求在发送前再次校验能力，不把无效档位直接透传给厂商。
 - 思考内容展示的是厂商允许返回的摘要；省略摘要不代表思考关闭，也不代表没有思考 token 费用。

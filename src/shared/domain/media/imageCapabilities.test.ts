@@ -38,9 +38,20 @@ describe('imageCapabilities', () => {
     expect(isNativeDashscopeImageModel('gpt-image-2')).toBe(false);
   });
 
-  it('gives a quality tier only to gpt-image and locks suffix models', () => {
+  it('gives a quality tier only to gpt-image, exposes xhigh/max on 2.5, and locks suffix models', () => {
     expect(imageCapabilities('gpt-image-2', 'openai')).toMatchObject({
       resolutions: ['1K', '2K', '4K'], strength: 'quality', sendsQuality: true,
+      qualities: ['low', 'medium', 'high'], maxReferenceImages: 16,
+    });
+    expect(imageCapabilities('gpt-image-2.5-flare', 'openai')).toMatchObject({
+      resolutions: ['1K', '2K', '4K'], strength: 'quality', sendsQuality: true,
+      qualities: ['low', 'medium', 'high', 'xhigh', 'max'], maxReferenceImages: 16,
+    });
+    expect(imageCapabilities('gemini-3.1-flash-lite-image', 'openai')).toMatchObject({
+      resolutions: ['1K'], strength: 'none', sendsQuality: false, maxReferenceImages: 14,
+    });
+    expect(imageCapabilities('gemini-2.5-flash-image', 'openai')).toMatchObject({
+      resolutions: ['1K'], strength: 'none', sendsQuality: false, maxReferenceImages: 3,
     });
     expect(imageCapabilities('openai/gpt-image-2', 'openai').strength).toBe('quality');
     expect(imageCapabilities('gpt-image-2-2k', 'openai')).toMatchObject({ resolutions: ['2K'], strength: 'none', sendsQuality: false });
@@ -55,5 +66,22 @@ describe('imageCapabilities', () => {
     expect(imageCapabilities('wan2.7-image-pro', 'dashscope').resolutions).toEqual(['1K', '2K', '4K']);
     expect(imageCapabilities('wan2.7-image', 'dashscope').resolutions).toEqual(['1K', '2K']);
     expect(imageCapabilities('wan2.6-t2i', 'dashscope').resolutions).toEqual(['1K']);
+  });
+
+  it('configures Gemini Nano Banana resolutions, aspect ratios, and 14-image reference limit', () => {
+    const nb21 = imageCapabilities('gemini-nano-banana-2.1', 'openai');
+    expect(nb21.resolutions).toEqual(['1K', '2K', '4K']);
+    expect(nb21.aspectRatios).toContain('1:4');
+    expect(nb21.aspectRatios).toContain('8:1');
+    expect(nb21.maxReferenceImages).toBe(14);
+
+    const pro = imageCapabilities('nano-banana-pro', 'openai');
+    expect(pro.resolutions).toEqual(['1K', '2K', '4K']);
+    expect(pro.aspectRatios).not.toContain('1:4');
+    expect(pro.maxReferenceImages).toBe(14);
+
+    expect(imageCapabilities('gemini-3.1-flash-lite-image', 'openai').resolutions).toEqual(['1K']);
+    expect(imageCapabilities('gemini-2.5-flash-image', 'openai').resolutions).toEqual(['1K']);
+    expect(imageCapabilities('nano-banana', 'openai').resolutions).toEqual(['1K']);
   });
 });

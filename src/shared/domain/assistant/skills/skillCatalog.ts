@@ -1,4 +1,5 @@
-import { collectSkillResources } from './composeSkillRuntime';
+import { resolveSkillKind } from './skillPurpose';
+import { collectSkillResources, skillRuntimeInstructions } from './composeSkillRuntime';
 import type { AssistantSkill, SkillCatalogEntry, SkillResourceFile } from './types';
 
 /** 目录最多列出的技能数。超出的技能本轮不可发现。 */
@@ -19,12 +20,13 @@ function payloadCost(prompt: string, resources: SkillResourceFile[]): number {
   return prompt.length + resources.reduce((total, resource) => total + resource.content.length, 0);
 }
 
-/** 组装本轮技能目录。系统提示只使用名称和用途，正文留给 read_skill。 */
+/** 仅组装 Agent 运行技能目录，创作模板只在用户选用后单独注入。系统提示只使用名称和用途，正文留给 read_skill。 */
 export function composeSkillCatalog(skills: AssistantSkill[]): SkillCatalogEntry[] {
   const entries: SkillCatalogEntry[] = [];
   const seen = new Set<string>();
   let used = 0;
   for (const skill of skills) {
+    if (resolveSkillKind(skill) !== 'agent') continue;
     if (entries.length >= SKILL_CATALOG_ENTRY_LIMIT) break;
     const id = skill?.id?.trim() || '';
     const name = (skill?.displayName || skill?.name || '').trim();
@@ -35,7 +37,7 @@ export function composeSkillCatalog(skills: AssistantSkill[]): SkillCatalogEntry
       name: clip(name, 200),
       description: clip(skill.description || '', MAX_DESCRIPTION_CHARS),
     };
-    const prompt = clip(skill.prompt || '', MAX_PROMPT_CHARS);
+    const prompt = clip(skillRuntimeInstructions(skill), MAX_PROMPT_CHARS);
     const resources = prompt ? collectSkillResources(skill) : [];
     const tools = skill.tools?.map((tool) => tool.trim()).filter(Boolean).slice(0, 50);
     const cost = payloadCost(prompt, resources);

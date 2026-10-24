@@ -127,6 +127,18 @@ func (box *toolBox) readSkill(args map[string]any) string {
 	if id == "" {
 		id = textArg(args, "id")
 	}
+	if id != "" && id == box.pinnedSkillID {
+		paths := make([]string, 0, len(box.skillFiles))
+		for _, file := range box.skillFiles {
+			paths = append(paths, file.Path)
+		}
+		body, _ := json.Marshal(map[string]any{
+			"success": true, "skillId": id, "resources": paths,
+			"instructions": "本次技能主指令已在系统提示中展开，请遵循本次消息的正文与资料快照，不使用当前目录的新版本替换。主指令若指向 SKILL.md，仍须读取该文件。",
+			"note":         "用 read_skill_file 和本技能 skill_id 读取快照资料；长文件按 nextOffset 续读。",
+		})
+		return string(body)
+	}
 	var found *skillPackage
 	for i := range box.skills {
 		if box.skills[i].ID == id {
@@ -151,7 +163,7 @@ func (box *toolBox) readSkill(args map[string]any) string {
 	if found.Prompt == "" {
 		return toolJSON(false, "「"+found.Name+"」本轮只携带了名称和用途，正文未随目录发送。请直接说明并改用最接近的做法。")
 	}
-	box.mergeSkillFiles(found.Resources)
+	box.mergeSkillFiles(found.ID, found.Resources)
 	if !box.pinnedCeiling && len(found.Tools) > 0 {
 		box.noteSkillTools(found.Tools)
 	}
@@ -163,26 +175,9 @@ func (box *toolBox) readSkill(args map[string]any) string {
 		"success": true, "skillId": found.ID, "name": found.Name,
 		"message":      "已读取技能 " + found.Name,
 		"instructions": found.Prompt, "resources": paths,
-		"note": "附属文件未展开。需要细则时调用 read_skill_file，path 必须与 resources 一致。",
+		"note": "附属文件未展开。需要细则时调用 read_skill_file，skill_id 使用本技能 id，path 使用 resources 中的路径。长文件按 nextOffset 继续读取。",
 	})
 	return string(body)
-}
-
-func (box *toolBox) mergeSkillFiles(files []skillResource) {
-	for _, file := range files {
-		replaced := false
-		for i := range box.skillFiles {
-			if box.skillFiles[i].Path != file.Path {
-				continue
-			}
-			box.skillFiles[i] = file
-			replaced = true
-			break
-		}
-		if !replaced {
-			box.skillFiles = append(box.skillFiles, file)
-		}
-	}
 }
 
 func (box *toolBox) noteSkillTools(extra []string) {

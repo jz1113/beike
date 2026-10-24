@@ -1,32 +1,22 @@
 #!/usr/bin/env node
 /**
- * 从本机桌面数据库导出类目拍摄架构与提示词资产，写入仓库官方种子。
- * 默认读取 macOS：~/Library/Application Support/com.azhuo.workbench/azhuo.db
+ * 从运行库的一致性快照导出当前前后端共用的官方架构与提示词资产。
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveSqliteFile } from './sqlite-path.mjs';
+import { createSqliteSnapshot } from './sqlite-snapshot.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const defaultDb = join(homedir(), 'Library/Application Support/com.azhuo.workbench/azhuo.db');
-const dbPath = process.env.AZHUO_DB_PATH || defaultDb;
-const seedDir = join(root, 'src/shared/data');
-const backupDir = join(root, '.local/deploy-backup');
-
-if (!existsSync(dbPath)) {
-  console.error(`找不到数据库：${dbPath}`);
-  process.exit(1);
-}
-
-mkdirSync(seedDir, { recursive: true });
-mkdirSync(backupDir, { recursive: true });
 
 const py = `
 import json, sqlite3, sys
 db, recipes_path, assets_path = sys.argv[1], sys.argv[2], sys.argv[3]
-con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+import pathlib
+con = sqlite3.connect(pathlib.Path(db).as_uri() + '?immutable=1', uri=True)
 con.row_factory = sqlite3.Row
 
 def dump(table):
@@ -49,16 +39,41 @@ assets = {
     },
 }
 assets["counts"] = {k: len(v) for k, v in assets["data"].items()}
-open(recipes_path, "w", encoding="utf-8").write(json.dumps(recipes, ensure_ascii=False, indent=2))
+official_recipes = [{
+    "id": row["id"], "name": row["name"], "category": row.get("category") or "",
+    "tag": row.get("tag") or "", "desc": row.get("desc") or "",
+    "promptSnippet": row.get("promptSnippet") or "",
+    "coverUrl": row.get("coverUrl"), "sampleImages": row.get("sampleImages"),
+    "isFavorite": bool(row.get("isFavorite", True)),
+} for row in recipes]
+if any(not row["id"] or not row["name"] or not row["promptSnippet"] for row in official_recipes):
+    raise ValueError("官方架构种子须有 id、名称和提示词正文")
+if len({row["id"] for row in official_recipes}) != len(official_recipes):
+    raise ValueError("官方架构种子 id 重复")
+open(recipes_path, "w", encoding="utf-8").write(json.dumps(official_recipes, ensure_ascii=False, indent=2) + "\\n")
 open(assets_path, "w", encoding="utf-8").write(json.dumps(assets, ensure_ascii=False))
 print(json.dumps(assets["counts"], ensure_ascii=False))
 `;
 
-const recipesPath = join(seedDir, 'styleRecipes.json');
-const assetsPath = join(seedDir, 'promptAssets.json');
-const counts = execFileSync('python3', ['-c', py, dbPath, recipesPath, assetsPath], { encoding: 'utf8' }).trim();
-cpSync(dbPath, join(backupDir, 'azhuo.db'));
-console.log(`已导出官方种子：${counts}`);
-console.log(`架构：${recipesPath}`);
-console.log(`资产：${assetsPath}`);
-console.log(`数据库备份：${join(backupDir, 'azhuo.db')}（不进 Git）`);
+export function exportOfficialSeeds(dbPath, outputRoot = root) {
+  if (!existsSync(dbPath)) throw new Error(`找不到数据库：${dbPath}`);
+  const seedDir = join(outputRoot, 'src/shared/data');
+  const backupDir = join(outputRoot, '.local/deploy-backup');
+  mkdirSync(seedDir, { recursive: true });
+  mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const snapshotPath = join(backupDir, `azhuo-${stamp}-${randomUUID()}.db`);
+  createSqliteSnapshot(dbPath, snapshotPath);
+  const recipesPath = join(seedDir, 'officialMasterRecipes.json');
+  const assetsPath = join(seedDir, 'promptAssets.json');
+  const counts = execFileSync(process.env.SQLITE_BACKUP_PYTHON || 'python3', ['-c', py, snapshotPath, recipesPath, assetsPath], { encoding: 'utf8' }).trim();
+  return { counts, recipesPath, assetsPath, snapshotPath };
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const result = exportOfficialSeeds(resolveSqliteFile(process.argv[2] || process.env.AZHUO_DB_PATH));
+  console.log(`已导出官方种子：${result.counts}`);
+  console.log(`架构：${result.recipesPath}`);
+  console.log(`资产：${result.assetsPath}`);
+  console.log(`数据库备份：${result.snapshotPath}（不进 Git）`);
+}

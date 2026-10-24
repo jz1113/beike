@@ -4,7 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/platform/media"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 const workshopDirection = `你负责将参考样本换成当前商品，输出可直接生图的小红书生活摄影提示词。
@@ -16,23 +22,45 @@ const workshopDirection = `你负责将参考样本换成当前商品，输出�
 手机机身以商品图片为准；手机正面屏显可沿用样本主题重新设计无字壁纸，不复制旧型号、旧 UI、乱码与通知。
 返回严格 JSON：productFingerprint、productRole、prompts。prompts 每项包含 shot_no、title、prompt、scene、action、angle、lighting_type、has_human、shot_type。prompt 必须完整、独立可执行，使用 @图片1 指代新商品。`
 
-func workshopAnalyzeContent(payload map[string]json.RawMessage, binding *workshopBinding, shots int) []any {
+func resolveWorkshopVisionURL(cfg config.Config, source string) string {
+	if strings.HasPrefix(source, "/storage/") {
+		root := storage.ResolveRoot()
+		if os.Getenv("AZHUO_CACHE_DIR") == "" && cfg.DataDir() != "" {
+			root = filepath.Join(cfg.DataDir(), "storage")
+		}
+		if resolved, err := media.VisionImageURL(root, source); err == nil && resolved != "" {
+			return resolved
+		}
+	}
+	return source
+}
+
+func workshopAnalyzeContent(cfg config.Config, payload map[string]json.RawMessage, binding *workshopBinding, shots int) []any {
 	props := strings.TrimSpace(string(payload["productProps"]))
 	intro := workshopDirection + "\n商品标题：" + rawString(payload, "productTitle") + "\n商品属性：" + props +
 		"\n类目技能（仅商品约束）：" + rawString(payload, "templateStyle") +
 		"\n补充要求：" + rawString(payload, "extraRequirements") + fmt.Sprintf("\n严格输出 %d 镜。", shots)
 	if binding != nil {
-		source, _ := json.Marshal(binding.Shots)
-		replacements, _ := json.Marshal(binding.Replacements)
-		intro += "\n逐镜完整反推词（前四镜依次一一对应，不混合为平均风格）：" + string(source) +
-			"\n用户明确替换资产：" + string(replacements)
+		// Separate authority and visual evidence so a learned preference cannot
+		// silently replace product identity or an explicit user selection.
+		layers := []map[string]any{
+			{"layer": "L1 商品身份与品类铁律", "title": rawString(payload, "productTitle"), "properties": json.RawMessage(payload["productProps"]), "rule": "当前商品图决定身份、结构、颜色和比例；不可见事实不补造"},
+			{"layer": "L2 逐镜完整反推词与原图骨架", "shots": binding.Shots, "references": binding.References},
+			{"layer": "L3 用户明确替换资产", "replacements": binding.Replacements, "rule": "仅覆盖相应槽位，保持静物、手部、人像出镜范围"},
+			{"layer": "L4 类目经验与避坑", "skill": binding.Skill, "rule": "只提供有条件的方法，不覆盖前述商品事实、显式替换和样本画面"},
+		}
+		if len(payload["productProps"]) == 0 {
+			layers[0]["properties"] = nil
+		}
+		raw, _ := json.Marshal(layers)
+		intro += "\n分层上下文（约束优先级：L1 → L3 → L2 → L4）：" + string(raw)
 		if shots > 4 {
 			intro += "\n第5至8镜依次延续第1至4镜的主体、场景与出镜范围，只做轻微景别变化。"
 		}
 	}
 	parts := []any{map[string]any{"type": "text", "text": intro}}
 	add := func(label, url string) {
-		parts = append(parts, map[string]any{"type": "text", "text": label}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": url}})
+		parts = append(parts, map[string]any{"type": "text", "text": label}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": resolveWorkshopVisionURL(cfg, url)}})
 	}
 	var images []string
 	_ = json.Unmarshal(payload["imageUrls"], &images)

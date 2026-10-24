@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ShoppingBag } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
-import { StudioBrandChip } from '@client/shared/ui/studio';
+import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
 import { SalesStudioHeader } from './salesChrome';
 
 const icon = createElement(ShoppingBag, { className: 'h-4 w-4' });

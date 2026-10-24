@@ -93,7 +93,10 @@ func ReadMemory(ctx context.Context, db *sql.DB, workspace, folder string, datas
 				return m, errors.New("观察记忆损坏，请重新读图")
 			}
 			entry.Model, entry.CreatedAt = rec.model, rec.createdAt
-			if observation["compatible"] == false {
+			if message := text(observation, "error"); message != "" {
+				entry.Reason = message
+				m.Pending++
+			} else if observation["compatible"] == false {
 				entry.State, entry.Reason = "rejected", text(observation, "reason")
 				m.Rejected++
 			} else {
@@ -202,14 +205,6 @@ func MemoryCovered(memory Memory, version Version) bool {
 	return true
 }
 
-func ReadyToConsolidate(memory Memory, minSamples int) bool {
-	// A large validation pool cannot substitute for actually observed training images.
-	reserved := minSamples / 5
-	if reserved < 3 {
-		reserved = 3
-	}
-	if memory.Holdout < reserved {
-		reserved = memory.Holdout
-	}
-	return memory.Holdout >= 3 && memory.Learned+reserved >= minSamples
+func ReadyToConsolidate(memory Memory, _ int) bool {
+	return memory.Learned > 0 || len(memory.Notes) > 0
 }

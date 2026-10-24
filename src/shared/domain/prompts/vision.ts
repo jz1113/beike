@@ -127,7 +127,7 @@ export function isVisionCapableModel(modelId?: string): boolean {
     lower.includes('claude') ||
     lower.includes('grok') ||
     lower.includes('4o') ||
-    /gpt-[45]/.test(lower) ||
+    /gpt-[456]/.test(lower) ||
     lower.includes('qwen-vl') ||
     lower.includes('luna')
   ) {

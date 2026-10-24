@@ -3,6 +3,7 @@ package assets
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
@@ -79,3 +81,38 @@ func (failObjectStore) Put(context.Context, storage.ObjectConfig, string, string
 }
 
 func (failObjectStore) Delete(context.Context, storage.ObjectConfig, string) error { return nil }
+
+func TestProductionUploadRemainsReadableOnlyInItsWorkspace(t *testing.T) {
+	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
+	cfg := config.Config{NodeEnv: "production", AccessToken: "access"}
+	request := httptest.NewRequest(http.MethodPost, "/api/assets/storage/upload", strings.NewReader(`{"dataUrl":"data:image/png;base64,aGVsbG8="}`))
+	request.Header.Set("x-app-token", "access")
+	request.Header.Set("x-workspace-token", strings.Repeat("a", 64))
+	workspace, ok := httpx.ResolveWorkspace(request, cfg)
+	if !ok {
+		t.Fatal("test workspace rejected")
+	}
+	request = request.WithContext(httpx.WithWorkspace(request.Context(), workspace))
+	response := httptest.NewRecorder()
+	storageUploadHandler(cfg).ServeHTTP(response, request)
+	var data struct {
+		URL string `json:"url"`
+	}
+	if json.Unmarshal(response.Body.Bytes(), &data) != nil || data.URL == "" {
+		t.Fatal(response.Body.String())
+	}
+	for _, secret := range []string{strings.Repeat("a", 64), strings.Repeat("b", 64)} {
+		read := httptest.NewRequest(http.MethodGet, data.URL, nil)
+		read.Header.Set("x-app-token", "access")
+		read.Header.Set("x-workspace-token", secret)
+		result := httptest.NewRecorder()
+		storageHandler(cfg).ServeHTTP(result, read)
+		expected := http.StatusForbidden
+		if secret == strings.Repeat("a", 64) {
+			expected = http.StatusOK
+		}
+		if result.Code != expected {
+			t.Fatalf("scoped read status=%d expected=%d: %s", result.Code, expected, result.Body.String())
+		}
+	}
+}

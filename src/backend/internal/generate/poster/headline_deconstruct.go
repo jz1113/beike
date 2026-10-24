@@ -145,7 +145,7 @@ func coverReasoningEffort(payload map[string]any) (string, bool) {
 		return "", true
 	}
 	switch effort {
-	case "low", "medium", "high", "xhigh":
+	case "low", "medium", "high", "xhigh", "max":
 		return effort, true
 	default:
 		return "", false

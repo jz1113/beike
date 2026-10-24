@@ -69,6 +69,31 @@ func needsSpeakingAsset(shots []ScriptShot) bool {
 	return false
 }
 
+func isFashionVoiceoverMode(mode string) bool {
+	return mode == "product_closeup" || mode == "graphic_montage" || mode == "scene_demo"
+}
+
+func normalizeFashionSpeechModes(shots []ScriptShot, mode string) []ScriptShot {
+	if !isFashionVoiceoverMode(mode) {
+		return shots
+	}
+	out := make([]ScriptShot, len(shots))
+	copy(out, shots)
+	for i := range out {
+		if out[i].SpeechMode == "on_camera" || (out[i].SpeechMode == "" && strings.TrimSpace(out[i].Voiceover) != "") {
+			out[i].SpeechMode = "voiceover"
+		}
+	}
+	return out
+}
+
+func fashionPresentationRule(mode string) string {
+	if isFashionVoiceoverMode(mode) {
+		return "\n本次出镜方式为 " + mode + "（无露脸展示，全程画外音）：所有分镜的 speechMode 必须全部填写 \"voiceover\"，严禁任何一段填写 \"on_camera\"；画内人物不开口对镜头说话，不规划露脸说话人物，全程使用画外音配合商品、手部或背影展示。"
+	}
+	return "\n本次出镜方式为 live_presenter（人物出镜讲解）：脚本必须包含至少一段 speechMode:\"on_camera\" 的出镜人物说话分镜（不能全片 voiceover），且 assets 数组必须包含至少一项 required:true、kind:\"person\"、usesProduct:true 的出镜人物素材。"
+}
+
 func validateFashionPresentation(shots []ScriptShot, mode string) error {
 	if mode == "live_presenter" && !needsSpeakingAsset(shots) {
 		return fmt.Errorf("已选择人物出镜讲解，脚本必须包含 on_camera 出镜说话分镜，不能全片画外音")

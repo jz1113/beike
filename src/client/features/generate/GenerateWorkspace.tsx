@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, GenerationTask } from '@client/store';
 import { useQuickRefMediaDrop } from '@client/shared/hooks/useQuickRefMediaDrop';
-import PromptActionBar from '@client/shared/prompt-bar';
+import PromptActionBar from '@client/shared/prompt-bar/PromptActionBar';
 import { GenerateTaskFeed } from './components/GenerateTaskFeed';
 import {
   groupTasksIntoBatches,

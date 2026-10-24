@@ -1,0 +1,30 @@
+{
+  "id": "headline-poster-generator",
+  "name": "headline-poster-generator",
+  "displayName": "大字报商品封面生成",
+  "category": "内容生产流程",
+  "author": "贝壳",
+  "colorTheme": "orange",
+  "icon": "poster",
+  "tools": [
+    "read_attached_document",
+    "parse_product_or_social_url",
+    "trigger_generate_batch",
+    "trigger_generate",
+    "get_view_capabilities"
+  ],
+  "requires": [
+    "image"
+  ],
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "从商品图与原标题制作中文大字报封面方案：提炼 7–12 字标题、七栏设计单与可直接生图的 3:4 提示词。"
+}

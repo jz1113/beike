@@ -11,6 +11,7 @@ interface Props {
   batchInputText: string;
   currentStage: number;
   ready: boolean;
+  busy: boolean;
   createNewBatch: () => Promise<void>;
   refreshHistory: () => Promise<WorkshopBatchSummary[]>;
   duplicateBatch: (id: string) => Promise<void>;
@@ -23,7 +24,7 @@ interface Props {
 }
 
 export function BatchWorkspaceBatchControls({
-  activeBatch, historyBatches, itemsCount, batchInputText, currentStage, ready,
+  activeBatch, historyBatches, itemsCount, batchInputText, currentStage, ready, busy,
   createNewBatch, refreshHistory, duplicateBatch, clearHistory, deleteHistoryBatch, renameBatch, readBatch, onOpenGenerationView, showToast,
 }: Props) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -47,6 +48,7 @@ export function BatchWorkspaceBatchControls({
   };
 
   const requestNew = () => {
+    if (busy) { showToast('任务执行中，请等待结束后再新建批次'); return; }
     if (itemsCount === 0 && currentStage === 1 && !batchInputText.trim()) {
       showToast('当前已经是空白新批次，可以直接输入 SKU');
       return;
@@ -54,21 +56,21 @@ export function BatchWorkspaceBatchControls({
     if (!window.confirm('新建批次会保留当前内容到历史，并切换到空白批次。确定继续吗？')) return;
     void run(createNewBatch);
   };
-  // The dock lives above this view; stable callbacks read the current batch state.
+  // The toolbar lives above this view; stable callbacks read the current batch state.
   const handlersRef = useRef({ requestNew, openHistory });
   handlersRef.current = { requestNew, openHistory };
   useEffect(() => {
     setActions({
       onCreate: () => handlersRef.current.requestNew(),
       onHistory: () => handlersRef.current.openHistory(),
-      disabled: true,
+      disabled: true, createDisabled: true,
     });
     return () => setActions(null);
   }, [setActions]);
   useEffect(() => {
-    setActions(current => current && current.disabled !== (!ready || isRunning)
-      ? { ...current, disabled: !ready || isRunning } : current);
-  }, [ready, isRunning, setActions]);
+    setActions(current => current && (current.disabled !== (!ready || isRunning) || current.createDisabled !== (!ready || isRunning || busy))
+      ? { ...current, disabled: !ready || isRunning, createDisabled: !ready || isRunning || busy } : current);
+  }, [ready, isRunning, busy, setActions]);
 
   return (
     <>

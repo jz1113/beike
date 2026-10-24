@@ -22,47 +22,46 @@ export const QueueImageTile = memo(function QueueImageTile({
   const failed = attempt === 2;
 
   return (
-    <div className={`group relative w-[124px] shrink-0 aspect-[3/4] overflow-hidden rounded-2xl bg-slate-100 sm:w-[132px] xl:w-[140px] dark:bg-white/10 ${
-      selected ? 'ring-2 ring-indigo-500 ring-offset-2 shadow-md shadow-indigo-100/70' : 'opacity-40 grayscale hover:opacity-70'
+    <div className={`group relative min-w-0 aspect-[3/4] overflow-hidden rounded-xl bg-slate-100 transition-all dark:bg-white/10 ${
+      selected ? 'ring-1 ring-indigo-500/80 shadow-2xs' : 'opacity-40 grayscale hover:opacity-70'
     }`}>
       <button
         type="button"
         onClick={() => onToggle(itemId, imageIndex)}
         disabled={disabled}
         aria-pressed={selected}
-        aria-label={`图 ${imageIndex + 1}${selected ? '，已选' : '，未选'}`}
-        title={selected ? '已选择，点击取消' : '未选择，点击加入'}
-        className="h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+        title={selected ? `第 ${imageIndex + 1} 镜（点击排除）` : `第 ${imageIndex + 1} 镜（已排除，点击恢复）`}
+        className="h-full w-full cursor-pointer disabled:cursor-default"
       >
-        {failed ? (
-          <span className="block px-3 text-xs text-slate-500 dark:text-slate-400">图片暂时无法加载</span>
-        ) : (
+        {!failed && (
           <img
-            key={retry}
-            src={attempt === 0 ? proxy : original}
-            alt={`图 ${imageIndex + 1}`}
+            src={`${attempt === 0 ? proxy : original}${retry ? `${(attempt === 0 ? proxy : original).includes('?') ? '&' : '?'}retry=${retry}` : ''}`}
+            alt=""
             loading="lazy"
             decoding="async"
-            referrerPolicy="no-referrer"
-            onError={() => setAttempt(attempt === 0 && proxy !== original ? 1 : 2)}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+            onError={() => setAttempt(current => current === 0 && proxy !== original ? 1 : 2)}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         )}
-        <span className="absolute bottom-2 left-2 rounded-lg bg-slate-950/65 px-2 py-1 text-[11px] font-semibold text-white">
-          图 {imageIndex + 1}
+        <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-slate-950/65 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur-xs">
+          #{imageIndex + 1}
         </span>
-        {selected && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md">
-          <Check className="h-4 w-4" strokeWidth={3} />
-        </span>}
+        <span className={`pointer-events-none absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shadow-xs ${
+          selected ? 'bg-indigo-600 text-white' : 'bg-slate-900/70 text-white'
+        }`}>
+          {selected ? <Check className="h-3 w-3" /> : '—'}
+        </span>
       </button>
-      {failed && <button
-        type="button"
-        onClick={() => { setAttempt(0); setRetry((value) => value + 1); }}
-        className="absolute inset-x-2 top-[60%] flex items-center justify-center gap-1 rounded-lg bg-white px-2 py-2 text-xs font-semibold text-indigo-600 shadow-sm dark:bg-[#18191c]"
-        aria-label={`重新加载图 ${imageIndex + 1}`}
-      >
-        <RefreshCw className="h-3 w-3" />重新加载
-      </button>}
+      {failed && (
+        <button
+          type="button"
+          onClick={() => { setAttempt(0); setRetry(current => current + 1); }}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-100/95 p-2 text-[11px] font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:bg-[#18191c]/95"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span>重试加载</span>
+        </button>
+      )}
     </div>
   );
 });

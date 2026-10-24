@@ -3,16 +3,13 @@ import { createPortal } from 'react-dom';
 import { useAppStore } from '@client/store';
 import { useToast } from '@client/shared/hooks/useToast';
 import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
-import {
-  AgentCreateSkillBar,
-  ManualSkillStudioModal,
-  buildSkillFromStudio,
-  parseLocalSkillFiles,
-  type GeneratedSkillResult,
-  type SkillDraftData,
-  type SkillFileNode,
-  type SkillStudioPayload,
-} from '@client/shared/skills';
+import { AgentCreateSkillBar } from '@client/shared/skills/components/AgentCreateSkillBar';
+import { ManualSkillStudioModal } from '@client/shared/skills/components/ManualSkillStudioModal';
+import { buildSkillFromStudio, type SkillStudioPayload } from '@client/shared/skills/model/buildSkillFromStudio';
+import type { SkillFileNode } from '@client/shared/skills/model/skillFileTree';
+import { parseLocalSkillFiles } from '@client/shared/skills/model/skillPackageParser';
+import type { GeneratedSkillResult } from '@client/shared/skills/model/agentSkillGenerator';
+import type { SkillDraftData } from '@client/shared/skills/model/skillTypes';
 
 export function usePromptBarSkillCreator(richInputRef: RefObject<RichPromptInputRef | null>) {
   const { message, show } = useToast();
@@ -34,9 +31,24 @@ export function usePromptBarSkillCreator(richInputRef: RefObject<RichPromptInput
     overlayOpen: agentOpen || studioOpen,
     openAgentCreate: () => setAgentOpen(true),
     openManualCreate: () => openStudio(null, null),
-    useSkill: (skill: { id: string; title: string }) => {
+    useSkill: (skill: { id: string; title: string }, initialPromptOverride?: string) => {
+      const store = useAppStore.getState();
+      store.setQuickGenMode('agent');
       setActiveAssistantSkillId(skill.id);
-      richInputRef.current?.insertSkill(skill.title);
+      if (initialPromptOverride !== undefined) {
+        store.setQuickPrompt(initialPromptOverride);
+      } else if (richInputRef.current) {
+        const prev = store.quickPrompt || '';
+        if (/【强指令·[^】]+】/.test(prev)) store.setQuickPrompt(prev.replace(/【强指令·[^】]+】[^【\n]*?[！。；]\s*/g, '').trim());
+        richInputRef.current.insertSkill(skill.title);
+      } else {
+        const current = store.quickPrompt || '';
+        const token = `#[skill:${skill.title}]`;
+        if (!current.includes(token)) {
+          const stripped = current.replace(/#\[skill:[^\]]+\]\s*/gi, '').trim();
+          store.setQuickPrompt(stripped ? `${token} ${stripped}` : `${token} `);
+        }
+      }
     },
     uploadFiles: async (files: File[]) => {
       try {
@@ -58,6 +70,7 @@ export function usePromptBarSkillCreator(richInputRef: RefObject<RichPromptInput
     saveSkill: async (payload: SkillStudioPayload) => {
       const skill = buildSkillFromStudio(payload);
       await addAssistantSkill(skill);
+      useAppStore.getState().setQuickGenMode('agent');
       setActiveAssistantSkillId(skill.id);
       richInputRef.current?.insertSkill(skill.displayName || skill.name);
       show(`技能「${payload.title}」已保存并激活`);

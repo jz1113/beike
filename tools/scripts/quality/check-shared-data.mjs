@@ -20,6 +20,11 @@ const files = {
   'src/backend/internal/assistant/assistantTools.json': OPENAI_TOOLS,
 };
 const write = process.argv.includes('--write');
+const recipes = JSON.parse(fs.readFileSync(path.join(root, 'src/shared/data/officialMasterRecipes.json'), 'utf8'));
+if (!Array.isArray(recipes) || recipes.some(recipe => !recipe.id || !recipe.name || !recipe.promptSnippet)
+  || new Set(recipes.map(recipe => recipe.id)).size !== recipes.length) {
+  throw new Error('[shared-data] 官方架构种子须有唯一 id、名称和提示词正文');
+}
 const normalizeLf = (s) => s.replace(/\r\n/g, '\n');
 for (const [relative, value] of Object.entries(files)) {
   const target = path.join(root, relative);

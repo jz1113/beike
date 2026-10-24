@@ -5,10 +5,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
-import ffprobeStatic from 'ffprobe-static';
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 
 const execFileAsync = promisify(execFile);
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -17,13 +17,13 @@ const python = process.env.DEPTH_VIDEO_PYTHON?.trim() || 'python3';
 
 async function main() {
   const ffmpeg = ffmpegPath;
-  const ffprobe = ffprobeStatic.path;
+  const ffprobe = ffprobePath;
   console.log('[ffmpeg]', ffmpeg, fs.existsSync(ffmpeg || '') ? 'OK' : 'MISSING');
   console.log('[ffprobe]', ffprobe, fs.existsSync(ffprobe) ? 'OK' : 'MISSING');
 
-  if (ffmpeg) {
-    const { stdout } = await execFileAsync(ffmpeg, ['-version']);
-    console.log('[ffmpeg version]', stdout.split('\n')[0]);
+  for (const [name, binary] of [['ffmpeg', ffmpeg], ['ffprobe', ffprobe]]) {
+    const { stdout } = await execFileAsync(binary, ['-version'], { timeout: 5000 });
+    console.log(`[${name} version]`, stdout.split('\n')[0]);
   }
 
   let pyEnv = '';
@@ -58,6 +58,12 @@ async function main() {
   const outMp4 = path.join(dir, 'out.mp4');
   await execFileAsync(ffmpeg, ['-y', '-framerate', '25', '-i', path.join(framesOut, '%06d.png'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', outMp4]);
   console.log('[pipeline]', 'OK', 'output bytes =', fs.statSync(outMp4).size);
+  const { stdout } = await execFileAsync(ffprobe, ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', outMp4], { timeout: 10000 });
+  const probe = JSON.parse(stdout);
+  if (!probe.streams?.some(stream => stream.codec_type === 'video') || !(Number(probe.format?.duration) > 0)) {
+    throw new Error('ffprobe 未读取到有效视频');
+  }
+  console.log('[probe]', 'OK', 'duration =', probe.format.duration);
   fs.rmSync(dir, { recursive: true, force: true });
 }
 

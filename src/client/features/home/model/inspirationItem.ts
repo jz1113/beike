@@ -8,6 +8,7 @@ export interface InspirationItem {
   /** Prompt with reference slots mapped to the attached image order. */
   referencePrompt?: string;
   image: string;
+  thumbnail?: string;
   video?: string;
   poster?: string;
   mediaType?: 'image' | 'video';

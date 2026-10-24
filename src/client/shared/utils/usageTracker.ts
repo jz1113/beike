@@ -152,7 +152,8 @@ function safeSaveUsageLogs(logs: UsageLogItem[]): void {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(targetList));
       notifyUsageLogs();
       return;
-    } catch (e: any) {
+    } catch (error: unknown) {
+      const e = error as { name?: string; code?: number; number?: number; message?: string } | null;
       const isQuota =
         e?.name === 'QuotaExceededError' ||
         e?.code === 22 ||

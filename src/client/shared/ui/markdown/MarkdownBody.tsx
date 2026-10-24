@@ -24,12 +24,13 @@ export default function MarkdownBody({
   if (!content && !leading && !streaming) return null;
 
   const cleanContent = normalizeMarkdownSource(content || '');
+  const rendered = renderLines(cleanContent.split('\n'), accentColor, renderCode, streaming);
 
   return (
     <div className={`agent-markdown space-y-2 text-sm leading-7 select-text text-slate-700 min-w-0 [overflow-wrap:anywhere] dark:text-slate-200 ${className}`}>
       {leading}
-      {renderLines(cleanContent.split('\n'), accentColor, renderCode)}
-      {streaming ? <span className="inline-block h-4 w-1.5 translate-y-0.5 animate-pulse rounded-full bg-slate-400 align-middle dark:bg-slate-300" aria-hidden="true" /> : null}
+      {rendered}
+      {streaming && rendered.length === 0 ? <StreamingCursor /> : null}
     </div>
   );
 }
@@ -50,11 +51,17 @@ function parseTableRow(str: string): string[] {
   return withoutEnds.split('|').map((c) => c.trim());
 }
 
+function StreamingCursor() {
+  return <span className="ml-1 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse rounded-full bg-slate-400 align-middle dark:bg-slate-300" aria-hidden="true" />;
+}
+
 function renderLines(
   lines: string[],
   accentColor: MarkdownAccent,
   renderCode?: (code: string, lang: string, incomplete: boolean) => ReactNode,
+  streaming = false,
 ) {
+  const lastLineIndex = streaming ? lines.findLastIndex((entry) => Boolean(entry.trim())) : -1;
   const elements: React.ReactNode[] = [];
   let inCodeBlock = false;
   let codeBlockLang = '';
@@ -159,11 +166,13 @@ function renderLines(
 
     if (!line.trim()) continue;
 
+    const tailCursor = i === lastLineIndex ? <StreamingCursor /> : null;
+
     if (line.startsWith('#### ')) {
       elements.push(
         <h6 key={`h4-${i}`} className="mt-2.5 mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-900 sm:text-[13px] dark:text-slate-100">
           {accentColor !== 'slate' && <span className={`h-1.5 w-1.5 rounded-full ${dotClasses}`} />}
-          <span>{renderInline(line.slice(5))}</span>
+          <span>{renderInline(line.slice(5))}{tailCursor}</span>
         </h6>,
       );
       continue;
@@ -172,7 +181,7 @@ function renderLines(
       elements.push(
         <h5 key={`h3-${i}`} className="mt-2.5 mb-1 flex items-center gap-1.5 pb-1 text-xs font-bold text-slate-900 sm:text-[13px] dark:text-slate-100">
           {accentColor !== 'slate' && <span className={`h-3 w-1.5 rounded-full ${dotClasses}`} />}
-          <span>{renderInline(line.slice(4))}</span>
+          <span>{renderInline(line.slice(4))}{tailCursor}</span>
         </h5>,
       );
       continue;
@@ -181,7 +190,7 @@ function renderLines(
       elements.push(
         <h4 key={`h2-${i}`} className="mt-3 mb-1 flex items-center gap-2 pb-0.5 text-sm font-bold text-slate-900 sm:text-base dark:text-slate-100">
           {accentColor !== 'slate' && <span className={`h-4 w-1.5 rounded-full ${accentPillClasses}`} />}
-          <span>{renderInline(line.slice(3))}</span>
+          <span>{renderInline(line.slice(3))}{tailCursor}</span>
         </h4>,
       );
       continue;
@@ -190,7 +199,7 @@ function renderLines(
       elements.push(
         <h3 key={`h1-${i}`} className="mt-3.5 mb-1.5 flex items-center gap-2 pb-0.5 text-base font-extrabold text-slate-900 sm:text-lg dark:text-slate-100">
           {accentColor !== 'slate' && <span className={`h-4.5 w-2 rounded-full ${accentPillClasses}`} />}
-          <span>{renderInline(line.slice(2))}</span>
+          <span>{renderInline(line.slice(2))}{tailCursor}</span>
         </h3>,
       );
       continue;
@@ -199,7 +208,7 @@ function renderLines(
     if (line.startsWith('> ')) {
       elements.push(
         <blockquote key={`quote-${i}`} className={`${quoteClasses} my-2 rounded-r-xl py-1.5 pl-3 text-xs italic sm:text-[13px]`}>
-          {renderInline(line.slice(2).trim())}
+          {renderInline(line.slice(2).trim())}{tailCursor}
         </blockquote>,
       );
       continue;
@@ -211,7 +220,7 @@ function renderLines(
       elements.push(
         <div key={`bullet-${i}`} className={`my-1 flex items-start gap-2 ${indent > 0 ? 'ml-4' : 'ml-0.5'}`}>
           <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${dotClasses}`} />
-          <div className="flex-1 leading-relaxed text-slate-700 dark:text-slate-200">{renderInline(bulletMatch[2])}</div>
+          <div className="flex-1 leading-relaxed text-slate-700 dark:text-slate-200">{renderInline(bulletMatch[2])}{tailCursor}</div>
         </div>,
       );
       continue;
@@ -225,7 +234,7 @@ function renderLines(
           <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border font-mono text-[11px] font-bold shadow-2xs ${numBadgeClasses}`}>
             {numMatch[2]}
           </span>
-          <div className="flex-1 pt-0.5 leading-relaxed text-slate-700 dark:text-slate-200">{renderInline(numMatch[3])}</div>
+          <div className="flex-1 pt-0.5 leading-relaxed text-slate-700 dark:text-slate-200">{renderInline(numMatch[3])}{tailCursor}</div>
         </div>,
       );
       continue;
@@ -234,6 +243,7 @@ function renderLines(
     elements.push(
       <p key={`p-${i}`} className="my-2 break-words leading-7 text-slate-700 dark:text-slate-200">
         {renderInline(line)}
+        {tailCursor}
       </p>,
     );
   }

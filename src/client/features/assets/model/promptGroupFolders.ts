@@ -64,7 +64,9 @@ export function promptGroupCategoryLabel(
   const key = promptGroupCategoryKey(item, categories, albums);
   if (key === 'universal') return '通用商品';
   if (key === 'unclassified') return '待分类';
-  return categories.find((category) => category.id === key)?.name || '待分类';
+  const majorName = categories.find((category) => category.id === key)?.name || '待分类';
+  const subLabel = item.productSubcategory ? promptGroupSubcategoryLabel(item.productSubcategory, categories, key) : '';
+  return subLabel && subLabel !== '待分类' ? `${majorName} · ${subLabel}` : majorName;
 }
 
 export const PROMPT_GROUP_SUBCATEGORY_OPTIONS = PROMPT_GROUP_SUBCATEGORIES.map((id) => ({

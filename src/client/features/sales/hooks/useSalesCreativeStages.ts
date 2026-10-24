@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
-import { salesActualReferences, type VideoSalesScript } from '@shared/domain/sales';
+import { eligibleSalesImages, omitSalesPriceClauses, omitSalesPriceProps, salesActualReferences, type VideoSalesScript } from '@shared/domain/sales';
 import { salesAssetsGenerated } from '@shared/domain/sales/workflow';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { defaultSalesImageBatchClient } from '../api/salesImageBatch';
 import { generateSalesReferenceFrame } from '../api/salesMediaApi';
-import { finalizeSalesPrompts, validateSalesAssets } from '../api/videoSalesApi';
+import { analyzeProductMedia, finalizeSalesPrompts, validateSalesAssets } from '../api/videoSalesApi';
+import { invalidateSalesState } from '../model/salesStageRules';
 import { prepareSalesCreativeAssets } from '../model/prepareSalesAssets';
 import { canResubmitRejectedAsset, recoverSalesAssetReceipts } from '../model/salesAssetHelpers';
 import { assertSalesPlanCurrent, salesFinalInputRevision, salesSingleVideoError } from '../model/salesStageRules';
@@ -26,6 +27,7 @@ export function useSalesCreativeStages(input: {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isValidatingAssets, setIsValidatingAssets] = useState(false);
   const [isQueryingAssets, setIsQueryingAssets] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -144,5 +146,60 @@ export function useSalesCreativeStages(input: {
     }
   }, [busyRef, commit, setError, stateRef]);
 
-  return { isPreparingAssets, isValidatingAssets, isQueryingAssets, isFinalizing, runAssets, runFinalize, confirmAssets, editAssetPrompt, stopAssets: () => abortRef.current?.abort() };
+  const runProductAnalyze = useCallback(async () => {
+    if (!salesJobAllowed(busyRef.current, 'plan')) return false;
+    const current = stateRef.current;
+    if (!current.productName.trim()) { setError('请先采集或填写商品名称'); return false; }
+    const selectedImages = eligibleSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata);
+    const fallbackImages = current.imageCatalog.filter((img) => img.url.trim() && !img.unavailable).slice(0, 4);
+    const images = selectedImages.length > 0 ? selectedImages : fallbackImages;
+    if (!images.length) { setError('请先采集或上传至少一张商品图'); return false; }
+    const chat = resolveModalityModelRoute('chat', current.selectedChatModel);
+    if (!chat.modelId) { setError('请先在下方创作设置中选择多模态分析与口播模型'); return false; }
+    busyRef.current.planning = true;
+    setIsAnalyzing(true);
+    setError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const activeVariant = current.variantMetadata?.variants.find((v) => v.id === (current.colorSelection.variantId || current.variantMetadata?.selectedVariantId));
+      const selectedColor = current.colorSelection.colorLabel || activeVariant?.color || activeVariant?.label || '';
+      const productDescription = JSON.stringify({
+        suppliedSellingPoints: omitSalesPriceClauses(current.sellingPoints),
+        originalProductProperties: omitSalesPriceProps(current.props || {}),
+      });
+      const analysis = await analyzeProductMedia({
+        workflowVersion: 3,
+        eligibleImageIndexes: images.map((img) => img.index),
+        imageCatalog: images,
+        productName: current.productName,
+        brand: current.brand,
+        productDescription,
+        category: current.category,
+        selectedColor,
+        aspectRatio: current.aspectRatio || '9:16',
+        model: chat.modelId,
+        textProtocol: chat.textProtocol,
+        customBaseUrl: chat.baseUrl,
+        customApiKey: chat.apiKey,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return false;
+      const refinedPoints = (analysis.sellingPoints || []).map((item) => item.trim()).filter(Boolean).join('；');
+      commit((prev) => ({
+        ...invalidateSalesState(prev, refinedPoints ? { sellingPoints: refinedPoints } : {}),
+        analysis,
+      }));
+      return true;
+    } catch (err) {
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'AI 提炼商品卖点失败');
+      return false;
+    } finally {
+      busyRef.current.planning = false;
+      setIsAnalyzing(false);
+      if (abortRef.current === controller) abortRef.current = null;
+    }
+  }, [busyRef, commit, setError, stateRef]);
+
+  return { isPreparingAssets, isValidatingAssets, isQueryingAssets, isFinalizing, isAnalyzing, runAssets, runFinalize, runProductAnalyze, confirmAssets, editAssetPrompt, stopAssets: () => abortRef.current?.abort() };
 }

@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { Sparkles, Upload, PenTool } from 'lucide-react';
 
 export interface CreateSkillDropdownProps {
+  purpose?: 'agent' | 'creation';
   isOpen: boolean;
   onClose: () => void;
   onSelectAgentCreate: () => void;
   onSelectLocalUpload: () => void;
   onSelectManualCreate: () => void;
+  onSelectReference?: () => void;
+  onSelectWorkshop?: () => void;
 }
 
 export function CreateSkillDropdown({
@@ -17,77 +19,58 @@ export function CreateSkillDropdown({
   onSelectManualCreate,
 }: CreateSkillDropdownProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
+    const outside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!menuRef.current?.contains(target) && !target.closest('[data-skill-create-trigger]')) {
+        closeRef.current();
       }
     };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        closeRef.current();
+      }
     };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', outside);
+    window.addEventListener('keydown', keyboard);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', outside);
+      window.removeEventListener('keydown', keyboard);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const actions = [
+    { label: '通过Agent创建', action: onSelectAgentCreate },
+    { label: '上传本地Skill', action: onSelectLocalUpload },
+    { label: '手动创建Skill', action: onSelectManualCreate },
+  ];
 
   return (
     <div
       ref={menuRef}
-      role="menu"
       aria-label="创建技能方式"
-      className="absolute right-0 top-full mt-2 z-50 w-44 overflow-hidden rounded-2xl border border-black/[0.08] dark:border-white/10 bg-white/95 dark:bg-[#1E1E22]/95 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.14)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none"
+      className="absolute right-0 top-full z-50 mt-2.5 w-44 rounded-[22px] border border-slate-200/80 bg-white/95 p-2 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-[#22242A]/95 dark:shadow-[0_18px_44px_rgba(0,0,0,0.55)]"
     >
-      <div className="flex flex-col gap-0.5">
+      {actions.map(({ label, action }) => (
         <button
           type="button"
-          role="menuitem"
+          key={label}
           onClick={() => {
             onClose();
-            onSelectAgentCreate();
+            action();
           }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-slate-100/90 dark:hover:bg-white/[0.08] active:scale-[0.98] cursor-pointer"
+          className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 focus:outline-none focus-visible:bg-slate-100/90 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white dark:focus-visible:bg-white/[0.08]"
         >
-          <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
-          <span>通过Agent创建</span>
+          <span>{label}</span>
         </button>
-
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose();
-            onSelectLocalUpload();
-          }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-slate-100/90 dark:hover:bg-white/[0.08] active:scale-[0.98] cursor-pointer"
-        >
-          <Upload className="h-4 w-4 shrink-0 text-blue-500" />
-          <span>上传本地Skill</span>
-        </button>
-
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose();
-            onSelectManualCreate();
-          }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-slate-100/90 dark:hover:bg-white/[0.08] active:scale-[0.98] cursor-pointer"
-        >
-          <PenTool className="h-4 w-4 shrink-0 text-emerald-500" />
-          <span>手动创建Skill</span>
-        </button>
-      </div>
+      ))}
     </div>
   );
 }

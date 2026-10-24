@@ -104,7 +104,7 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	}
 	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
 		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocol(ctx, model), Payload: body,
-		Client: styleHTTP(), Timeout: 90 * time.Second,
+		Client: styleHTTP(), Timeout: 180 * time.Second,
 	})
 	if err != nil {
 		return "", status, nil, err

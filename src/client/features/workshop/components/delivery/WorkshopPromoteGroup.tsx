@@ -101,10 +101,10 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
     : `母本 ${sourceGroupNumber ? fullPromptGroupLabel(sourceGroupNumber) : `#${stableAssetCode('R', item.appliedFullPromptId)}`}`;
 
   return <>
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200/65 bg-indigo-50/30 px-3 py-2.5 text-xs">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200/65 bg-indigo-50/30 px-3.5 py-2.5 text-xs dark:border-indigo-500/20 dark:bg-indigo-500/[0.06]">
       <span className="font-semibold text-slate-800 dark:text-slate-100">满意图组沉淀</span>
       <span className="text-slate-500 dark:text-slate-400">四镜全部点“采用”后，可重析入库；首组还可用于原母本的一次性换图。</span>
-      {replacement?.replaced && <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">来源母组已换图</span>}
+      {replacement?.replaced && <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">来源母组已换图</span>}
       <div className="ml-auto flex flex-wrap gap-2">
         {groupIndices.map((groupIndex) => {
           const tasks = reviewedFourShotGroup(item, groupIndex);
@@ -112,7 +112,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
           return <button key={groupIndex} type="button" disabled={!tasks || busyGroup !== null || saved}
             onClick={() => void analyze(groupIndex)}
             title={!tasks ? '请先将本组四张有效成图全部标记为采用' : undefined}
-            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white/70 px-2.5 py-1.5 font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-[#18191c]/95">
+            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white/80 px-2.5 py-1.5 font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-indigo-400/25 dark:bg-white/5 dark:text-indigo-300 dark:hover:bg-indigo-500/15">
             {busyGroup === groupIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
             {saved ? '已处理' : groupIndex === 0 ? '提炼原四镜' : `提炼衍生四镜 ${groupIndex}`}
           </button>;

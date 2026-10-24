@@ -51,6 +51,8 @@ describe('confirmed thinking capabilities', () => {
     expect(reasoningRequestOptions('gemini-4-argon', 'high')).toEqual({ thinkingConfig: { thinkingLevel: 'high' } });
     expect(reasoningRequestOptions('claude-haiku-5-5', 'medium')).toEqual({ thinking: { type: 'adaptive' }, output_config: { effort: 'medium' } });
     expect(normalizeReasoningEffort('claude-haiku-5-5', 'xhigh')).toBe('xhigh');
+    expect(normalizeReasoningEffort('claude-haiku-5-5', 'max')).toBe('max');
+    expect(normalizeReasoningEffort('claude-sonnet-4-6', 'max')).toBe('max');
     expect(normalizeReasoningEffort('claude-sonnet-4-6', 'xhigh')).toBe('high');
     expect(normalizeReasoningEffort('gemini-3-pro-preview', 'medium')).toBe('high');
     expect(normalizeReasoningEffort('gemini-4-argon', 'xhigh')).toBe('high');
@@ -58,7 +60,8 @@ describe('confirmed thinking capabilities', () => {
     expect(reasoningCapability('claude-5.5-haiku').levels).toEqual([]);
     expect(reasoningCapability('openai-responses:gemini-4-argon').levels).toEqual([]);
     expect(reasoningCapability('claude-haiku-5-5', 'openai').levels).toEqual([]);
-    expect(reasoningCapability('deepseek-official:deepseek-flash').levels).toEqual(['low', 'high', 'xhigh']);
+    expect(reasoningCapability('deepseek-official:deepseek-flash').levels).toEqual(['low', 'high', 'xhigh', 'max']);
+    expect(reasoningCapability('gpt-6-astra').levels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
     expect(reasoningCapability('claude-unknown').levels).toEqual([]);
     expect(reasoningRequestOptions('claude-unknown', 'high')).toEqual({});
   });

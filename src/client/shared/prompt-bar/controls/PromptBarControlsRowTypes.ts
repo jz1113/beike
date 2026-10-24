@@ -67,10 +67,10 @@ export interface PromptBarControlsRowProps {
   durationMenu: DropdownMenuState;
   videoDurationBounds: { min: number; max: number };
   quickPrompt: string;
-  setQuickPrompt: (p: string) => void;
   media: ReturnType<typeof usePromptBarMedia>;
   richInputRef: RefObject<RichPromptInputRef | null>;
   handleSendPrompt: () => void;
   canSend: boolean;
   isSubmitting: boolean;
+  onDropdownOpenChange?: (open: boolean) => void;
 }

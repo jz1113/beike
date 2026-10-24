@@ -1,15 +1,22 @@
 import { isVideoFile, type RefMediaKind } from '../api/mediaUpload';
 
-const g = (typeof window !== 'undefined' ? window : globalThis) as any;
+interface RefMediaGlobal {
+  __beike_ref_files__?: Map<string, File>;
+  __beike_ref_kinds__?: Map<string, RefMediaKind>;
+  __beike_ref_names__?: Map<string, string>;
+  __beike_ref_identities__?: Map<string, string>;
+}
+
+const g = (typeof window !== 'undefined' ? window : globalThis) as unknown as RefMediaGlobal;
 if (!g.__beike_ref_files__) {
   g.__beike_ref_files__ = new Map<string, File>();
   g.__beike_ref_kinds__ = new Map<string, RefMediaKind>();
   g.__beike_ref_names__ = new Map<string, string>();
 }
 
-const files: Map<string, File> = g.__beike_ref_files__;
-const kinds: Map<string, RefMediaKind> = g.__beike_ref_kinds__;
-const names: Map<string, string> = g.__beike_ref_names__;
+const files: Map<string, File> = g.__beike_ref_files__!;
+const kinds: Map<string, RefMediaKind> = g.__beike_ref_kinds__!;
+const names: Map<string, string> = g.__beike_ref_names__!;
 const identities: Map<string, string> = g.__beike_ref_identities__ ||= new Map<string, string>();
 
 /** Identity follows the URL through reordering and duplicate filenames. */

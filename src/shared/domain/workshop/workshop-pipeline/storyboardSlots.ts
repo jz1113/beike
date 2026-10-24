@@ -130,6 +130,7 @@ export function parseGroupShotSkeleton(json: unknown): GroupShotSkeleton[] {
       has_human: typeof shot.has_human === 'boolean' ? shot.has_human : undefined,
       title: text(shot.title),
       action: text(shot.action) || sourcePromptSection(text(shot.prompt), '动作或摆放'),
+      prompt: text(shot.prompt),
     });
     shots.push({
       shot_no: Number(shot.shot_no) || index + 1,

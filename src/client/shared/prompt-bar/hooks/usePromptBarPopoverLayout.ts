@@ -10,6 +10,8 @@ interface PopoverLayout {
   left: number;
   width: number;
   maxHeight: number;
+  top?: number;
+  bottom?: number;
 }
 
 /** Keep parameter menus inside the visible workspace, with scrolling when neither side fits. */
@@ -20,6 +22,7 @@ export function usePromptBarPopoverLayout(
   panelWidth = PANEL_WIDTH,
   panelMaxHeight = PANEL_MAX_HEIGHT,
   shrinkToContent = false,
+  portal = false,
 ) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<PopoverLayout | null>(null);
@@ -42,7 +45,7 @@ export function usePromptBarPopoverLayout(
         bottom: (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight),
       };
       // Workspace containers also clip menus, especially beside the sidebar on narrow screens.
-      for (let parent = anchor.parentElement; parent; parent = parent.parentElement) {
+      for (let parent = portal ? null : anchor.parentElement; parent; parent = parent.parentElement) {
         const style = getComputedStyle(parent);
         const rect = parent.getBoundingClientRect();
         if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) {
@@ -74,7 +77,9 @@ export function usePromptBarPopoverLayout(
       const next = {
         isUp,
         width,
-        left: Math.max(bounds.left + EDGE_PADDING, Math.min(rect.left, bounds.right - EDGE_PADDING - width)) - rect.left,
+        left: Math.max(bounds.left + EDGE_PADDING, Math.min(rect.left, bounds.right - EDGE_PADDING - width)) - (portal ? 0 : rect.left),
+        top: portal && !isUp ? rect.bottom + PANEL_GAP : undefined,
+        bottom: portal && isUp ? window.innerHeight - rect.top + PANEL_GAP : undefined,
         maxHeight: Math.min(panelMaxHeight, isUp ? above : below),
       };
       setLayout(previous => previous && Object.keys(next).every(key => previous[key as keyof PopoverLayout] === next[key as keyof PopoverLayout]) ? previous : next);
@@ -95,11 +100,11 @@ export function usePromptBarPopoverLayout(
       viewport?.removeEventListener('resize', update);
       viewport?.removeEventListener('scroll', update);
     };
-  }, [isOpen, preferUp, anchorRef, panelWidth, panelMaxHeight, shrinkToContent]);
+  }, [isOpen, preferUp, anchorRef, panelWidth, panelMaxHeight, shrinkToContent, portal]);
 
   return {
     panelRef,
     opensUp: layout?.isUp ?? preferUp,
-    panelStyle: layout ? { left: layout.left, width: layout.width, maxHeight: layout.maxHeight } : undefined,
+    panelStyle: layout ? { left: layout.left, width: layout.width, maxHeight: layout.maxHeight, ...(portal ? { top: layout.top, bottom: layout.bottom } : {}) } : undefined,
   };
 }

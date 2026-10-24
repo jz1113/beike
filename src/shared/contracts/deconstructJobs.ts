@@ -11,7 +11,7 @@ const taxonomySchema = z.object({
 });
 export const deconstructJobItemInputSchema = z.object({
   id: identifier, name: z.string().trim().min(1).max(500),
-  images: z.array(z.string().min(1).max(28_000_000)).min(1).max(10),
+  images: z.array(z.string().min(1).max(28_000_000)).min(1).max(8).refine(images => images.length === 1 || images.length % 4 === 0, "完整母本需 4 张或 8 张图片；单图可独立反推"),
   targetCategory: z.string().max(200).optional(),
   targetSubcategory: z.string().max(300).optional(),
   customSubCategories: z.array(taxonomySchema).max(100).optional(),

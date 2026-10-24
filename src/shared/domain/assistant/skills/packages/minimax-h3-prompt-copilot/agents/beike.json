@@ -1,0 +1,27 @@
+{
+  "id": "minimax-h3-prompt-copilot",
+  "name": "minimax-h3-prompt-copilot",
+  "displayName": "MiniMax H3 提示副驾驶",
+  "category": "模型提示词规范",
+  "author": "系统",
+  "colorTheme": "rose",
+  "icon": "waveform",
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "为 MiniMax / 海螺视频组织主体引用、镜头节奏、保留项和声音设计，交付可读的六段式制作提示词。",
+  "tools": [
+    "get_view_capabilities",
+    "trigger_generate_batch",
+    "inspect_video_media",
+    "extract_video_storyboard",
+    "extract_video_detailed_frames"
+  ]
+}

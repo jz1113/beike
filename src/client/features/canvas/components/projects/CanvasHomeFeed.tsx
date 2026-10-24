@@ -1,5 +1,5 @@
 import React from 'react';
-import PromptActionBar from '@client/shared/prompt-bar';
+import PromptActionBar from '@client/shared/prompt-bar/PromptActionBar';
 import { CanvasRecentProjects } from './CanvasRecentProjects';
 
 interface CanvasHomeFeedProps {

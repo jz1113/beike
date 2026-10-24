@@ -1,3 +1,5 @@
+import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
+
 export type GenerationSubmissionLane = 'media' | 'agent' | 'serial';
 
 interface SubmissionJob {
@@ -23,7 +25,7 @@ export class GenerationSubmissionQueue {
   private pending = new Map<string, SubmissionJob>();
   private active = new Map<string, ActiveSubmission>();
   private scheduled = false;
-  private mediaConcurrency = 3;
+  private mediaConcurrency = GENERATION_BATCH_LIMIT;
 
   getMediaConcurrency(): number {
     return this.mediaConcurrency;
@@ -31,7 +33,9 @@ export class GenerationSubmissionQueue {
 
   /** Lowering capacity never interrupts requests already in flight. */
   setMediaConcurrency(value: number): number {
-    this.mediaConcurrency = Number.isFinite(value) ? Math.min(6, Math.max(1, Math.trunc(value))) : 3;
+    this.mediaConcurrency = Number.isFinite(value)
+      ? Math.min(GENERATION_BATCH_LIMIT, Math.max(1, Math.trunc(value)))
+      : GENERATION_BATCH_LIMIT;
     this.schedule();
     return this.mediaConcurrency;
   }

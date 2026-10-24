@@ -2,26 +2,11 @@
 /** Go format, vet, line budget, and race tests. */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveGo, resolveGofmt } from '../common/go-toolchain.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-
-function resolveGo() {
-  const candidates = [
-    process.env.GO_BIN,
-    'go',
-    path.join(os.homedir(), '.local/go/bin/go'),
-    ...(process.platform === 'win32'
-      ? ['C:\\Program Files\\Go\\bin\\go.exe', 'C:\\Go\\bin\\go.exe', path.join(os.homedir(), 'go/bin/go.exe')]
-      : []),
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;
-  }
-  throw new Error('未找到 Go。可安装到 ~/.local/go，或设置 GO_BIN');
-}
 
 function run(go, args) {
   const result = spawnSync(go, args, { cwd: root, encoding: 'utf8', env: { ...process.env, GOTOOLCHAIN: 'local' } });
@@ -72,7 +57,7 @@ if (violations.length) {
 }
 
 const go = resolveGo();
-const gofmt = path.join(path.dirname(go), 'gofmt');
+const gofmt = resolveGofmt(go);
 const dirty = run(gofmt, ['-l', 'src/backend']).trim();
 if (dirty) {
   console.error('Go 文件未格式化:\n' + dirty);

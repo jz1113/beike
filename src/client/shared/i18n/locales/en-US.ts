@@ -61,18 +61,6 @@ export const enUS: TranslationSchema = {
     },
   },
   promptBar: {
-    agent: 'Discuss requirements with the assistant before creating for better results.',
-    agentTips: [
-      'Want to review previous works? Find them in the sidebar or ask the assistant directly',
-      'Want to fix video start/end frames? Send images to the assistant with instructions.',
-      'Want to continue from the current video? Send it to the assistant and ask to extend',
-      'Try switching reasoning models to explore different language styles',
-      'Want to confirm every credit deduction? Enable confirmation in settings',
-      'Want to replicate an art style? Upload a reference image for the assistant to adapt',
-      'Maintain character consistency? Use @ to mention assets and specify interactions',
-      'Need cinematic shot ideas? Share your vision and let the assistant craft prompts',
-    ],
-    manualBadge: 'Documentation',
     refMedia: 'Combine references, enter text, or use @ reference to describe how you want to adjust the image.',
     refMediaVideo: 'Use @ to mention references, e.g., @image1 mimic actions of @video1, follow camera rhythm of @video1',
     depthImage: 'Upload an image to extract spatial depth map',

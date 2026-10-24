@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CategorySkillPanel, type CategorySkillTab } from '../folders/CategorySkillPanel';
 import { promptGroupSubcategoryOptions } from '../../model/promptGroupFolders';
 import type { ComponentProps, Dispatch, MouseEvent, RefObject, SetStateAction } from 'react';
@@ -100,6 +100,12 @@ export function AssetPromptLibraryGrid({
   setEditingItem, setTagEditItem, deleteAsset, onUseLearningReference, onFeedReference,
 }: Props) {
   const [learningTab, setLearningTab] = useState<CategorySkillTab>('references');
+  const groupNumbers = useMemo(() => {
+    const map = new Map<string, number>();
+    if (activeSubTab !== 'full_prompt') return map;
+    displayedItems.forEach((item, index) => map.set(item.id, index + 1));
+    return map;
+  }, [activeSubTab, displayedItems]);
   const learningFolder = activeSubTab === 'full_prompt' && !folderRootVisible && !subcategoryFoldersVisible && !isBatchMode
     ? promptGroupSubcategoryOptions(promptGroupCategories, promptGroupCategoryFilter).find(option => option.id === promptGroupSubcategoryFilter)?.folderId : undefined;
   return (
@@ -111,24 +117,24 @@ export function AssetPromptLibraryGrid({
         {activeSubTab === 'full_prompt' && !folderRootVisible && !isBatchMode && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <nav aria-label="商品文件夹路径" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <button type="button" onClick={returnToCategoryFolders} className="font-medium text-indigo-600 hover:text-indigo-800">商品大类</button>
-              <ChevronRight className="h-3.5 w-3.5" />
+              <button type="button" onClick={returnToCategoryFolders} className="rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 font-semibold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-indigo-400/40 dark:hover:text-indigo-300 cursor-pointer">商品大类</button>
+              <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
               {promptGroupSubcategoryFilter !== 'all' && promptGroupCategoryFilter !== 'all' ? <>
-                <button type="button" onClick={returnToSubcategoryFolders} className="font-medium text-indigo-600 hover:text-indigo-800">{currentFolderName}</button>
-                <ChevronRight className="h-3.5 w-3.5" />
-                <span className="font-semibold text-slate-800 dark:text-slate-100">
+                <button type="button" onClick={returnToSubcategoryFolders} className="rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 font-semibold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-indigo-400/40 dark:hover:text-indigo-300 cursor-pointer">{currentFolderName}</button>
+                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
                   {subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.name || '待分类'}
                 </span>
-              </> : <span className="font-semibold text-slate-800 dark:text-slate-100">{currentFolderName}</span>}
+              </> : <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{currentFolderName}</span>}
             </nav>
-            {!subcategoryFoldersVisible && <div className="flex flex-wrap items-center gap-2">
+            {!subcategoryFoldersVisible && (!learningFolder || learningTab === 'references') && <div className="flex flex-wrap items-center gap-2">
               {showLifecycleFilters && <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} items={items} />}
               <AssetTagFilter activeSubTab={activeSubTab} dynamicTagList={dynamicTagList} selectedTag={selectedTag} setSelectedTag={setSelectedTag} />
               <AssetLibrarySortControls showCount={false} isAnyFilterActive={false} displayedItemsCount={displayedItems.length} sortBy={sortBy} setSortBy={setSortBy} defaultSortTitle="按组号从小到大" />
             </div>}
           </div>
         )}
-        {learningFolder && <CategorySkillPanel key={learningFolder} folderId={learningFolder} tab={learningTab} onTab={setLearningTab} onFeed={onFeedReference} onPreview={id => { const item = items.find(item => item.id === id); if (item) openGroupPreview(item); else showToast('来源图组已移除，请重新提炼技能'); }} onUseReference={onUseLearningReference} />}
+        {learningFolder && <CategorySkillPanel key={learningFolder} folderId={learningFolder} tab={learningTab} onTab={setLearningTab} groupNumbers={groupNumbers} onPreview={id => { const item = items.find(item => item.id === id); if (item) openGroupPreview(item, groupNumbers.get(id)); else showToast('来源图组已移除，请重新提炼技能'); }} onUseReference={onUseLearningReference} />}
         {folderRootVisible && isLoading && !items.length && !promptGroupCategories.length ? (
           <div className="flex flex-wrap gap-5 animate-pulse" aria-label="正在加载商品大类">
             {[1, 2, 3].map(n => <div key={n} className="h-40 w-[164px] rounded-2xl bg-slate-100/70 dark:bg-white/10" />)}
@@ -163,11 +169,9 @@ export function AssetPromptLibraryGrid({
             scrollRef={assetScrollRef}
             openItemId={openCardMenuId}
             resetKey={resetKey}
-            renderItem={(item) => {
+            renderItem={(item, index) => {
               const isSelected = selectedIds.includes(item.id);
-              const listPosition = activeSubTab === 'full_prompt' && Number.isInteger(item.displayNumber) && Number(item.displayNumber) > 0
-                ? Number(item.displayNumber)
-                : undefined;
+              const listPosition = activeSubTab === 'full_prompt' ? index + 1 : undefined;
               const displayLabel = galleryLabels.get(item.id);
               return (
                 <PromptAssetCard

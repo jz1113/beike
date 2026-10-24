@@ -45,7 +45,7 @@ const prompt = z.object({
 }).passthrough();
 
 const product = z.object({
-  id: z.string(), itemId: z.string(), platform: z.enum(['jd', 'taobao', 'tmall', '1688']),
+  id: z.string(), itemId: z.string(), platform: z.enum(['jd', 'taobao', 'tmall', '1688', 'local']),
   title: z.string(), price: z.number(), category: z.string(), brand: z.string(), coverImage: z.string(),
   mainImages: strings, skuImages: strings, detailImages: strings, props: z.record(z.string()),
   status: z.enum(['pending', 'collecting', 'success', 'failed']), selected: z.boolean(),

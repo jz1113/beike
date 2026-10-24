@@ -1,0 +1,51 @@
+{
+  "id": "prompt-reverse-engineer",
+  "name": "提示词反推专家",
+  "displayName": "提示词反推专家",
+  "category": "视觉理解与素材分析",
+  "author": "贝壳",
+  "colorTheme": "cyan",
+  "icon": "sparkles",
+  "tools": [
+    "deconstruct_image",
+    "query_asset_library",
+    "get_prompt_asset_detail"
+  ],
+  "steps": [
+    {
+      "id": "input",
+      "label": "提供参考图或资产",
+      "hint": "上传参考图，或说明要查看的资产库条目"
+    },
+    {
+      "id": "deconstruct",
+      "label": "反推九段式提示词",
+      "hint": "调用工具完成反推或拉取资产详情"
+    },
+    {
+      "id": "present",
+      "label": "代码块展示 + 解读",
+      "hint": "完整提示词放代码块，分析用 Markdown"
+    }
+  ],
+  "references": [
+    {
+      "path": "assetDeconstruct/REVERSE_ENGINE_CORE_SPEC",
+      "label": "反推规范"
+    }
+  ],
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "从参考图提取可复用的主体、构图、光影和材质，按九维结构交付复刻提示词。适用于图片反推、定向换元与资产检索。",
+  "requires": [
+    "image"
+  ]
+}

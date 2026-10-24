@@ -451,10 +451,10 @@ ${buildMachineJsonLayer({ imageCount: 1, imageIndex, userHint, targetCategory, c
 }
 
 /** 批量导入时，每套图集最少图片数 */
-export const MIN_IMAGES_PER_SET = 3;
+export const MIN_IMAGES_PER_SET = 4;
 
 /** 批量导入时，每套图集最多反推图片数（超出截断） */
-export const MAX_IMAGES_PER_SET = 10;
+export const MAX_IMAGES_PER_SET = 8;
 
 /** 每个视觉请求最多处理一个完整的四图内容组，避免长 JSON 超时或截断。 */
 export const DEFAULT_UNIFIED_SHARD_SIZE = 4;

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
 import {
   generationSubmissionQueue,
   getGenerationMediaConcurrency,
@@ -14,7 +15,7 @@ afterEach(() => {
 
 describe('generation submission configuration', () => {
   it('configures the same shared queue used by the generation engine', () => {
-    expect(getGenerationMediaConcurrency()).toBe(3);
+    expect(getGenerationMediaConcurrency()).toBe(GENERATION_BATCH_LIMIT);
     expect(setGenerationMediaConcurrency(6)).toBe(6);
     expect(generationSubmissionQueue.getMediaConcurrency()).toBe(6);
     expect(setGenerationMediaConcurrency(1)).toBe(1);
@@ -31,6 +32,7 @@ describe('generation submission configuration', () => {
       expect(listener).toHaveBeenCalledOnce();
       setGenerationMediaConcurrency(99);
       expect(listener).toHaveBeenCalledTimes(2);
+      expect(getGenerationMediaConcurrency()).toBe(GENERATION_BATCH_LIMIT);
       unsubscribe();
       setGenerationMediaConcurrency(2);
       expect(listener).toHaveBeenCalledTimes(2);

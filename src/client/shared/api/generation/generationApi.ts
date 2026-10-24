@@ -43,11 +43,11 @@ export async function pollGenerationTask(
   modelId?: string,
 ) {
   const endpoint = mediaType === 'video' ? '/api/generate/video' : '/api/generate/image';
-  const model = mediaType === 'video' && modelId ? `&model=${encodeURIComponent(modelId)}` : '';
+  const model = modelId ? `&model=${encodeURIComponent(modelId)}` : '';
   const res = await apiFetch(`${endpoint}?taskId=${encodeURIComponent(taskId)}${model}`, {
     headers: {
       ...storageConfigHeaders(),
-      ...(mediaType === 'video' && modelId ? getGatewayClientHeaders(modelId) : {}),
+      ...getGatewayClientHeaders(modelId),
     },
   });
   if (!res.ok) {
@@ -91,7 +91,8 @@ export async function pollSingleTaskResult(
     throwIfGenerationAborted(isAborted);
     await sleepWhilePolling(2000, isAborted, isPaused);
     try {
-      const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}`, {
+      const model = modelId ? `&model=${encodeURIComponent(modelId)}` : '';
+      const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}${model}`, {
         headers: {
           ...gatewayHeaders,
           ...storageConfigHeaders(),

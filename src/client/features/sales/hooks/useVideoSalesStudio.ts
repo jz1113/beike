@@ -115,8 +115,12 @@ export function useVideoSalesStudio() {
     try {
       const product = await collectEcommerceProduct(parsed.url, parsed.platform, controller.signal, forceRefresh);
       if (collectAbortRef.current !== controller || controller.signal.aborted) return false;
-      commit((prev) => ({
-        ...prev, ...product, variantMetadata: product.variantMetadata, category: prev.category, productUrl: parsed.url, analysis: null,
+      commit((prev) => {
+        const autoFashion = !prev.scripts.length && prev.category === 'other' && product.category === 'fashion';
+        const category = autoFashion ? 'fashion' : prev.category;
+        const videoMode = autoFashion && prev.videoMode === 'product_closeup' ? 'live_presenter' : prev.videoMode;
+        return {
+        ...prev, ...product, variantMetadata: product.variantMetadata, category, videoMode, productUrl: parsed.url, analysis: null,
         colorSelection: emptySalesColorSelection(),
         scripts: prev.scripts.map((script, index) => ({
           ...script, planStale: true, finalizedRevision: undefined, assetValidation: 'pending',
@@ -124,7 +128,8 @@ export function useVideoSalesStudio() {
           personFrameUrl: undefined, sceneFrameUrl: undefined,
           shots: script.shots.map((shot) => ({ ...shot, promptStale: true, referenceFrameUrl: undefined })),
         })),
-      }));
+      };
+      });
       return true;
     } catch (err) {
       if (collectAbortRef.current !== controller || controller.signal.aborted) return false;
@@ -219,8 +224,11 @@ export function useVideoSalesStudio() {
       const revision = salesPlanInputRevision(current);
       const route = { ...chatRoute(current.selectedChatModel), signal: controller.signal };
       const checkpointRevision = salesContentRevision({ revision, model: route.model, protocol: route.textProtocol });
+      const existingCheckpoint = current.planCheckpoint?.revision === checkpointRevision
+        ? current.planCheckpoint
+        : current.analysis ? { analysis: current.analysis } : undefined;
       const plan = await buildSalesPlan({
-        checkpoint: current.planCheckpoint?.revision === checkpointRevision ? current.planCheckpoint : undefined,
+        checkpoint: existingCheckpoint,
         onCheckpoint: (checkpoint) => { if (!controller.signal.aborted) commit((previous) => ({ ...previous, planCheckpoint: { ...checkpoint, revision: checkpointRevision } })); },
         productName: current.productName,
         brand: current.brand,
@@ -237,7 +245,12 @@ export function useVideoSalesStudio() {
       }, { analyzeProductMedia, generateSalesScripts, selectSalesImages });
       if (controller.signal.aborted || planTokenRef.current !== token || salesPlanInputRevision(stateRef.current) !== revision) return;
       const script = reuseSalesPlanAssets({ ...plan.script, id: crypto.randomUUID(), planRevision: revision }, current.scripts[current.selectedScriptIndex]);
-      commit((previous) => ({ ...previous, scripts: [script, ...previous.scripts.map((item) => ({ ...item, renderResultUrl: item.renderResultUrl || (item.id === current.scripts[current.selectedScriptIndex]?.id ? current.composedResultUrl || undefined : undefined) }))], selectedScriptIndex: 0, analysis: plan.analysis, planCheckpoint: undefined, composedResultUrl: null }));
+      const syncedPoints = !current.analysis && plan.analysis?.sellingPoints?.length
+        ? plan.analysis.sellingPoints.map((item) => item.trim()).filter(Boolean).join('；')
+        : current.sellingPoints;
+      const finalRevision = salesPlanInputRevision({ ...current, sellingPoints: syncedPoints });
+      const finalScript = { ...script, planRevision: finalRevision };
+      commit((previous) => ({ ...previous, sellingPoints: syncedPoints, scripts: [finalScript, ...previous.scripts.map((item) => ({ ...item, renderResultUrl: item.renderResultUrl || (item.id === current.scripts[current.selectedScriptIndex]?.id ? current.composedResultUrl || undefined : undefined) }))], selectedScriptIndex: 0, analysis: plan.analysis, planCheckpoint: undefined, composedResultUrl: null }));
     } catch (err) {
       if (planTokenRef.current !== token || controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : '生成方案失败');

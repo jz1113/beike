@@ -37,7 +37,7 @@ export function SalesAssetsSection({ script, productImages, imageModel, disabled
         {assets.length === 0 && <p className="text-sm">此方案无需额外绘图，确认素材后即可进入视频定稿。</p>}
       </section>
       <div className="grid gap-4 2xl:grid-cols-2">
-        {assets.map((asset) => <SalesAssetCard key={asset.id} asset={asset} assets={assets} legacyProductIndexes={legacyProductIndexes} disabled={disabled || Boolean(script.planStale && salesAssetRecovery(asset) !== 'query')} modelReady={Boolean(imageModel)} onEdit={(prompt) => onEditPrompt(asset.id, prompt)} onGenerate={(queryOnly) => onGenerate(asset.id, queryOnly)} />)}
+        {assets.map((asset) => <SalesAssetCard key={asset.id} asset={asset} assets={assets} productImages={productImages} legacyProductIndexes={legacyProductIndexes} disabled={disabled || Boolean(script.planStale && salesAssetRecovery(asset) !== 'query')} modelReady={Boolean(imageModel)} onEdit={(prompt) => onEditPrompt(asset.id, prompt)} onGenerate={(queryOnly) => onGenerate(asset.id, queryOnly)} />)}
       </div>
       <p className="text-xs leading-6 text-slate-500">生成素材与视频定稿是独立操作。单项重新生成也可能计费；生成完成后不会自动提交视频。</p>
     </div>

@@ -2,7 +2,7 @@ import { selectedTextModel, selectedTextProtocol } from '../models/textModelRout
 import { textModelCapability, type TextProtocol } from '../models/textProtocol';
 import { deepSeekModel, isDeepSeekRoute } from '../models/deepseek';
 /** UI levels follow the verified model and selected protocol. See docs/reasoning.md. */
-export const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const;
+export const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 /** auto is accepted only for legacy preferences and unsupported-model defaults. */
 export type ReasoningEffort = typeof REASONING_EFFORTS[number] | 'auto';
 export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
@@ -11,6 +11,7 @@ export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
   medium: '中',
   high: '高',
   xhigh: '极高',
+  max: '最高',
 };
 interface ReasoningCapability {
   levels: readonly ReasoningEffort[];
@@ -19,13 +20,15 @@ interface ReasoningCapability {
   maxEffort?: boolean;
   preserveReasoning?: boolean;
 }
-const gptModels = new Set([
-  'gpt-6-luna', 'gpt-6-sol', 'gpt-6-astra', 'gpt-5.6', 'gpt-5.6-luna',
-  'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.4-mini',
+const gptMaxModels = new Set([
+  'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-5.6',
+  'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra',
 ]);
+const fourTierModels = new Set(['gpt-5.4-mini', 'grok-4.6', 'grok-4.7']);
 const deepseekModels = new Set(['deepseek-v4-flash', 'deepseek-v4.1-flash']);
-const full: ReasoningCapability = { levels: REASONING_EFFORTS, description: '支持低、中、高、极高四档思考强度。' };
-const max: ReasoningCapability = { levels: ['low', 'high', 'xhigh'], description: '支持低、高、极高三档；极高使用模型的最大推理强度。', maxEffort: true, preserveReasoning: true };
+const fullMax: ReasoningCapability = { levels: REASONING_EFFORTS, description: '支持低、中、高、极高、最高五档思考强度。' };
+const fullFour: ReasoningCapability = { levels: ['low', 'medium', 'high', 'xhigh'], description: '支持低、中、高、极高四档思考强度。' };
+const max: ReasoningCapability = { levels: ['low', 'high', 'xhigh', 'max'], description: '支持低、高、极高、最高；极高与最高使用模型的最大推理强度。', maxEffort: true, preserveReasoning: true };
 export function reasoningCapability(model: string, protocol?: TextProtocol): ReasoningCapability {
   const id = selectedTextModel(model).modelId.toLowerCase();
   const effectiveProtocol = selectedTextProtocol(model, protocol);
@@ -38,7 +41,8 @@ export function reasoningCapability(model: string, protocol?: TextProtocol): Rea
   if (id === 'smart-reasoning' || id === 'smart') {
     return { levels: ['low', 'medium', 'high'], description: '支持低、中、高三档；智能匹配将自动选配合适的推理预算。' };
   }
-  if (gptModels.has(id) || ['grok-4.6', 'grok-4.7'].includes(id)) return full;
+  if (gptMaxModels.has(id)) return fullMax;
+  if (fourTierModels.has(id)) return fullFour;
   if (id === 'qwen3.8-max') return { levels: ['low', 'medium', 'xhigh'], description: '支持低、中、极高三档；官方将高映射为极高。', preserveReasoning: true };
   if (id === 'kimi-k3' || deepseekModels.has(id) || (isDeepSeekRoute(model) && deepSeekModel(model))) return max;
   if (id.startsWith('claude-')) return { levels: [], unavailableLabel: '待确认', description: '此模型在当前协议下尚未确认支持强度调节，使用模型默认设置。' };
@@ -52,8 +56,10 @@ export function normalizeReasoningEffort(model: string, value: unknown, protocol
   if (!levels.length) return 'auto';
   if (!(REASONING_EFFORTS as readonly unknown[]).includes(value)) value = 'medium';
   if (levels.includes(value as ReasoningEffort)) return value as ReasoningEffort;
-  // Switching models retains the closest supported strength, with the displayed value matching the wire.
-  return levels.find(level => (REASONING_EFFORTS as readonly ReasoningEffort[]).indexOf(level) >= (REASONING_EFFORTS as readonly ReasoningEffort[]).indexOf(value as ReasoningEffort)) || levels[levels.length - 1];
+  const nonMax = levels.filter((level): level is ReasoningEffort => level !== 'max');
+  const pool = nonMax.length ? nonMax : levels;
+  // Switching models retains the closest supported strength without silently escalating xhigh into max.
+  return pool.find(level => (REASONING_EFFORTS as readonly ReasoningEffort[]).indexOf(level) >= (REASONING_EFFORTS as readonly ReasoningEffort[]).indexOf(value as ReasoningEffort)) || pool[pool.length - 1];
 }
 export function reasoningRequestOptions(model: string, effort?: ReasoningEffort, protocol?: TextProtocol) {
   const value = normalizeReasoningEffort(model, effort, protocol);
@@ -68,7 +74,7 @@ export function reasoningRequestOptions(model: string, effort?: ReasoningEffort,
     if (native.thinking === 'enabled') return { thinking: { type: 'enabled' as const } };
     return {};
   }
-  return { reasoning_effort: value === 'xhigh' && reasoningCapability(model, protocol).maxEffort ? 'max' : value,
+  return { reasoning_effort: (value === 'xhigh' || value === 'max') && reasoningCapability(model, protocol).maxEffort ? 'max' : value,
     ...(deepseekModels.has(selectedTextModel(model).modelId.toLowerCase()) ? { thinking: { type: 'enabled' as const } } : {}),
   };
 }

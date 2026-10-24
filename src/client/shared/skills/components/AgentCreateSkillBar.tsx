@@ -6,6 +6,7 @@ export interface AgentCreateSkillBarProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerated: (result: GeneratedSkillResult) => void;
+  onAskAgent?: (idea: string) => void;
   showToast: (msg: string) => void;
 }
 
@@ -13,6 +14,7 @@ export function AgentCreateSkillBar({
   isOpen,
   onClose,
   onGenerated,
+  onAskAgent,
   showToast,
 }: AgentCreateSkillBarProps) {
   const [idea, setIdea] = useState('');
@@ -32,15 +34,20 @@ export function AgentCreateSkillBar({
     if (e) e.preventDefault();
     const trimmed = idea.trim();
     if (!trimmed) {
-      showToast('请输入需要沉淀的Skill想法');
+      showToast('请描述技能的用途与需要完成的任务');
+      return;
+    }
+
+    if (onAskAgent) {
+      onAskAgent(trimmed);
+      onClose();
       return;
     }
 
     setIsGenerating(true);
     try {
-      await new Promise((r) => setTimeout(r, 650));
       const result = generateSkillFromIdea(trimmed);
-      showToast('Agent 已为您规划并生成技能规范');
+      showToast('技能模板已起草，请检查并完善正文');
       onGenerated(result);
       onClose();
     } catch (err: unknown) {
@@ -59,7 +66,7 @@ export function AgentCreateSkillBar({
       >
         <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-200/90 dark:bg-white/15 px-3 py-1 text-xs font-semibold text-slate-800 dark:text-slate-100 select-none">
           <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
-          <span>创建技能</span>
+          <span>{onAskAgent ? 'Agent 创建' : '模板起草'}</span>
         </div>
 
         <input
@@ -68,7 +75,7 @@ export function AgentCreateSkillBar({
           value={idea}
           disabled={isGenerating}
           onChange={(e) => setIdea(e.target.value)}
-          placeholder="请输入需要沉淀的Skill想法："
+          placeholder="请描述技能的用途与需要完成的任务："
           className="w-full bg-transparent text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none disabled:opacity-50"
         />
 
@@ -85,7 +92,7 @@ export function AgentCreateSkillBar({
               </>
             ) : (
               <>
-                <span>AI 生成</span>
+                <span>{onAskAgent ? '交给 Agent' : '起草模板'}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </>
             )}

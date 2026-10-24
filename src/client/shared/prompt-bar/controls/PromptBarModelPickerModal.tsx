@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { type PreferenceModelItem } from '../hooks/usePromptBarWorkflowModels';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
@@ -40,7 +41,8 @@ function looksLikeRawId(value: string) {
 /** Agent 触发按钮显示家族和版本，例如 gpt-6-sol → GPT 6 Sol。 */
 export function agentTriggerModelName(modelId: string, syncedName: string) {
   const fallback = (syncedName.split(' · ')[0] || syncedName || modelId || '未配置模型').trim();
-  if (syncedName && syncedName !== modelId && !looksLikeRawId(syncedName)) return fallback;
+  const genericVendor = /^(?:gpt|gemini|claude|grok|deepseek|moonshot|minimax|glm|qwen|gpt image|nano banana|midjourney|grok image|kolors|qwen image)$/i.test(fallback);
+  if (syncedName && syncedName !== modelId && !looksLikeRawId(syncedName) && !genericVendor) return fallback;
   const source = modelId || syncedName;
   if (!source) return fallback;
   const parsed = parseModelDetails(source);
@@ -72,7 +74,7 @@ export function PromptBarModelPickerModal({
   modalityKind = 'chat',
   onSelectModel,
 }: PromptBarModelPickerModalProps) {
-  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, triggerRef, 280, 460, true);
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, triggerRef, 300, 460, false, true);
   const channels = useMemo(() => listModelChannels(models), [models]);
   const selectedChannel = modelChannel(models.find((model) => model.id === selectedModelId) || {});
   const [channel, setChannel] = useState(selectedChannel);
@@ -189,13 +191,13 @@ export function PromptBarModelPickerModal({
     useAppStore.getState().setCurrentView('settings');
   };
 
-  return (
+  const panel = (
     <div
       ref={panelRef}
       style={panelStyle}
-      className={`absolute ${
-        opensUp ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'
-      } overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/95 text-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.12)] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-[#18191c]/95 dark:text-slate-100 dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] z-50 animate-fade-in p-1.5 text-left select-none`}
+      className={`fixed ${
+        opensUp ? 'origin-bottom' : 'origin-top'
+      } overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/95 text-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.12)] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-[#18191c]/95 dark:text-slate-100 dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] z-[10010] animate-fade-in p-1.5 text-left select-none`}
     >
       {channels.length > 1 && <div className="mb-1 border-b border-slate-100 px-1.5 pb-1.5 dark:border-white/10">
         <button type="button" aria-expanded={channelOpen} aria-haspopup="listbox" aria-label={`切换渠道：${activeChannel}`} onClick={() => setChannelOpen((current) => !current)} className="flex h-9 w-full items-center justify-between gap-2 rounded-xl px-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5">
@@ -245,6 +247,7 @@ export function PromptBarModelPickerModal({
       </div>
     </div>
   );
+  return typeof document === 'undefined' ? panel : createPortal(panel, document.body);
 }
 
 function ModelRow({

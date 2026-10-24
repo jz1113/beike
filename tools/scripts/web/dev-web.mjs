@@ -44,7 +44,6 @@ try {
   if (isolated && appDataDir === resolve(resolveAppDataDir())) {
     throw new Error('隔离开发模式不能使用日常用户数据目录，请指定独立的 AZHUO_DATA_DIR');
   }
-  resolveCli(workspaceRoot, 'tsx', 'tsx');
   resolveCli(workspaceRoot, 'vite', 'vite');
   ensureAppDatabase(workspaceRoot, appDataDir);
   const accessToken = resolveAccessToken(workspaceRoot, appDataDir, { isolated });

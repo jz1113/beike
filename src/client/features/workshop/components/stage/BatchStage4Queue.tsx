@@ -2,9 +2,10 @@ import type { OutputRating } from '@shared/contracts/categorySkills';
 import { BatchDeliveryStatus } from '../delivery/BatchDeliveryStatus';
 import { isDeliverableWorkshopResult, isUsableWorkshopResult, summarizeWorkshopResults } from '../../model/generation/workshopReadiness';
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import LazyProxyImage from '@client/shared/ui/LazyProxyImage';
 import { BatchProductItem } from '../../model/batchTypes';
+import BatchStageFooter from './BatchStageFooter';
 import { BatchStage4Header } from './BatchStage4Header';
 import { BatchStage4ProductItem } from './BatchStage4ProductItem';
 import { BatchStage4GalleryView } from './BatchStage4GalleryView';
@@ -27,18 +28,11 @@ function describeImageStatus(product: BatchProductItem): { label: string; failed
 interface Props {
   successfulItems: BatchProductItem[];
   selectedVisionModel: string;
-  availableImageModels: any[];
+  availableImageModels: Array<{ id: string; name: string; shortName?: string }>;
   selectedImageGenModel: string;
-  setSelectedImageGenModel: (m: string) => void;
   selectedQuality: 'high' | 'medium' | 'low';
-  setSelectedQuality: (q: 'high' | 'medium' | 'low') => void;
   selectedAspect: '3:4' | '1:1' | '9:16' | '16:9';
-  setSelectedAspect: (a: '3:4' | '1:1' | '9:16' | '16:9') => void;
   isGeneratingBatch: boolean;
-  totalTaskCount: number;
-  completedTaskCount: number;
-  successTaskCount: number;
-  failTaskCount: number;
   generateCopywritingForProduct: (item: BatchProductItem) => Promise<void>;
   updateItemCopywriting?: (itemId: string, copywriting: { title: string; content: string; tags?: string[] }) => void;
   generateAllCopywriting?: (options?: { force?: boolean }) => Promise<void>;
@@ -58,10 +52,9 @@ interface Props {
   onPauseRun?: () => void;
   onResumeRun?: () => void;
   onCancelRun?: () => void;
-  onCompleteBatch?: () => void;
-  onBackToPrompts?: () => void;
+  onReviewBatch?: (decision: 'accepted' | 'rejected') => Promise<boolean>;
+  isReviewingOutputs?: boolean;
   onContinueGeneration?: () => Promise<void>;
-  pipelineStatus?: string;
   onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected', rating?: OutputRating) => void;
   onAcknowledgeRecovery?: () => void;
 }
@@ -71,14 +64,9 @@ export default function BatchStage4Queue({
   selectedVisionModel,
   availableImageModels,
   selectedImageGenModel,
-  setSelectedImageGenModel,
   selectedQuality,
-  setSelectedQuality,
   selectedAspect,
-  setSelectedAspect,
   isGeneratingBatch,
-  totalTaskCount,
-  completedTaskCount,
   generateCopywritingForProduct,
   updateItemCopywriting,
   generateAllCopywriting,
@@ -97,14 +85,12 @@ export default function BatchStage4Queue({
   onPauseRun,
   onResumeRun,
   onCancelRun,
-  onCompleteBatch,
-  onBackToPrompts,
+  onReviewBatch,
+  isReviewingOutputs = false,
   onContinueGeneration,
-  pipelineStatus,
   onReviewTask,
   onAcknowledgeRecovery,
 }: Props) {
-  const [showEngineSettings, setShowEngineSettings] = useState(false);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'single' | 'gallery'>('single');
 
@@ -117,6 +103,7 @@ export default function BatchStage4Queue({
   const displayFailCount = successfulItems.flatMap(item => item.tasks || []).filter(task => task.resultStatus !== 'superseded' && task.status === 'FAILURE' && !task.recoveryRequired).length;
   const displaySuccessCount = summary.success;
   const busy = isGeneratingBatch || summary.running > 0;
+  const copyBusy = successfulItems.some(item => item.isCopywritingGenerating);
 
   const currentModelName =
     availableImageModels.find(m => m.id === selectedImageGenModel)?.shortName
@@ -127,24 +114,15 @@ export default function BatchStage4Queue({
     <div className="mx-auto w-full max-w-[1840px] space-y-5 bg-transparent">
       {/* 🌟 顶层全景大盘 Header：整合生产大盘总览、商品切换条与交付导出动作 */}
       <BatchStage4Header
-        isGeneratingBatch={isGeneratingBatch}
-        totalTaskCount={totalTaskCount}
-        completedTaskCount={completedTaskCount}
+        busy={busy}
+        totalTaskCount={summary.total}
+        completedTaskCount={summary.success + summary.failed}
         displaySuccessCount={displaySuccessCount}
         displayFailCount={displayFailCount}
         recoveryTaskCount={summary.recovery}
         pendingTaskCount={summary.pending}
         hasExportableSuccess={hasExportableSuccess}
-        currentModelName={currentModelName}
-        showEngineSettings={showEngineSettings}
-        setShowEngineSettings={setShowEngineSettings}
-        availableImageModels={availableImageModels}
-        selectedImageGenModel={selectedImageGenModel}
-        setSelectedImageGenModel={setSelectedImageGenModel}
-        selectedQuality={selectedQuality}
-        setSelectedQuality={setSelectedQuality}
-        selectedAspect={selectedAspect}
-        setSelectedAspect={setSelectedAspect}
+        outputLabel={`${currentModelName} · ${selectedAspect} · ${selectedQuality === 'high' ? '高质量' : selectedQuality === 'medium' ? '标准质量' : '快速生成'}`}
         viewMode={viewMode}
         setViewMode={setViewMode}
         generateAllCopywriting={generateAllCopywriting}
@@ -152,16 +130,11 @@ export default function BatchStage4Queue({
         handleExportExcel={handleExportExcel}
         isExportingZip={isExportingZip}
         successfulItems={successfulItems}
-        safeIndex={safeIndex}
-        setActiveItemIndex={setActiveItemIndex}
         readOnly={readOnly}
         runControlStatus={runControlStatus}
         onPauseRun={onPauseRun}
         onResumeRun={onResumeRun}
         onCancelRun={onCancelRun}
-        onCompleteBatch={onCompleteBatch}
-        onBackToPrompts={onBackToPrompts}
-        pipelineStatus={pipelineStatus}
       />
       <BatchDeliveryStatus items={successfulItems} busy={busy} readOnly={readOnly} onRetryFailed={retryFailedImageTasks} onContinue={onContinueGeneration}
         onLocateFailure={() => {
@@ -170,7 +143,7 @@ export default function BatchStage4Queue({
           if (next !== undefined) { setActiveItemIndex(next); setViewMode('single'); }
         }} />
       {!readOnly && onAcknowledgeRecovery && successfulItems.some((item) => (item.tasks || []).some((task) => task.recoveryRequired)) && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
           <span>部分任务的提交或生成结果尚未确认。请先核对原任务；放弃恢复后重做可能重复计费，不会自动重提。</span>
           <button type="button" onClick={onAcknowledgeRecovery} disabled={busy} className="shrink-0 rounded-xl bg-amber-900 px-3 py-1.5 font-bold text-white">放弃恢复，允许重做</button>
         </div>
@@ -184,8 +157,9 @@ export default function BatchStage4Queue({
             item={currentItem}
             selectedVisionModel={selectedVisionModel}
             onReviewTask={onReviewTask}
+            isReviewingOutputs={isReviewingOutputs}
             productNavigation={successfulItems.length > 1 ? (
-              <nav aria-label="切换交付商品" className="min-w-0 rounded-xl border border-slate-200/60 bg-transparent p-3 dark:border-white/10">
+              <nav aria-label="切换交付商品" className="min-w-0 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-[#18191c]/95">
                 <div className="mb-2 flex items-center justify-between gap-2 px-1">
                   <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">商品列表 <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{successfulItems.length} 款</span></h3>
                   <div className="flex items-center gap-1">
@@ -204,20 +178,20 @@ export default function BatchStage4Queue({
                 </div>
                 <div className="max-h-80 overflow-y-auto space-y-1 [scrollbar-gutter:stable]">
                   {successfulItems.map((product, index) => {
-                    const cover = product.selectedProductImages?.find(Boolean);
+                    const cover = product.prompts?.find(shot => shot.selected !== false && shot.sourceReferenceImageUrl)?.sourceReferenceImageUrl;
                     const copyFailed = Boolean(product.copywritingError);
                     const copyReady = Boolean(product.copywriting?.title && product.copywriting?.content);
                     const imageStatus = describeImageStatus(product);
                     return <button key={product.id} type="button" aria-current={index === safeIndex ? 'true' : undefined}
                       onClick={() => setActiveItemIndex(index)} title={product.title}
-                      className={`w-full min-w-0 flex items-center gap-2.5 rounded-lg p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'}`}>
-                      <span className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50 dark:bg-white/5">
-                        {cover && <LazyProxyImage src={cover} alt="" thumb width={80} className="!object-contain" />}
+                      className={`w-full min-w-0 flex items-center gap-2.5 rounded-xl p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-400/30' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'}`}>
+                      <span className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50 dark:bg-[#131417]">
+                        {cover && <LazyProxyImage src={cover} alt={`${product.title}的参考图`} thumb width={80} className="!object-contain" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-medium">{index + 1}. {product.title}</span>
-                        <span className={`block mt-1 text-[11px] ${imageStatus.failed ? 'text-rose-600' : 'text-slate-500 dark:text-slate-400'}`}>{imageStatus.label}</span>
-                        <span className={`block text-[11px] ${copyFailed ? 'text-rose-600' : 'text-slate-400'}`}>
+                        <span className={`block mt-1 text-[11px] ${imageStatus.failed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>{imageStatus.label}</span>
+                        <span className={`block text-[11px] ${copyFailed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
                           {copyFailed ? '文案失败，待重试' : copyReady ? '文案已就绪' : '文案待生成'}
                         </span>
                       </span>
@@ -247,8 +221,16 @@ export default function BatchStage4Queue({
           setActiveItemIndex={(index) => { setActiveItemIndex(index); setViewMode('single'); }}
           onPreviewGallery={onPreviewGallery}
           setPreviewImageUrl={setPreviewImageUrl}
+          onReviewTask={onReviewTask}
+          isReviewingOutputs={isReviewingOutputs}
+          readOnly={readOnly}
         />
       ) : null}
+      {!readOnly && onReviewBatch && <BatchStageFooter
+        secondaryActions={<button type="button" onClick={() => void onReviewBatch('rejected')}
+          disabled={busy || copyBusy || isReviewingOutputs || displaySuccessCount === 0}
+          className="rounded-2xl border border-rose-200 px-5 py-3 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-950/30">审核驳回</button>}
+        primaryAction={{ label: '审核通过', icon: <Check className="h-4 w-4" />, onClick: () => void onReviewBatch('accepted'), disabled: busy || copyBusy || isReviewingOutputs || summary.recovery > 0 || !hasExportableSuccess }} />}
     </div>
   );
 }

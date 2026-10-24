@@ -107,14 +107,14 @@ export default function DynamicTagDropdown({
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left ${
                       active
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
+                        ? 'bg-indigo-50 text-indigo-700 font-bold dark:bg-indigo-500/15 dark:text-indigo-300'
                         : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5'
                     }`}
                   >
                     <span className="truncate">{tag}</span>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded-full ml-2 shrink-0 ${
-                        active ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-400 font-normal dark:bg-white/10'
+                        active ? 'bg-indigo-100 text-indigo-700 font-bold dark:bg-indigo-500/20 dark:text-indigo-300' : 'bg-slate-100 text-slate-400 font-normal dark:bg-white/10'
                       }`}
                     >
                       {count}

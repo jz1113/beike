@@ -1,0 +1,4 @@
+interface:
+  display_name: "关键词垂类与可制作性审核"
+  short_description: "逐行审核关键词的内容垂类与制作可行性，保留原始数据与行序，按批准规则处理泛实体、低价值及边界查询。"
+  default_prompt: "使用 $keyword-review-workflow 完成当前任务。"

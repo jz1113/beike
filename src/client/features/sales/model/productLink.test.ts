@@ -84,4 +84,30 @@ describe('mapCollectedSalesProduct', () => {
     expect(product.sellingPoints).toContain('规格');
     expect(product.sellingPoints).not.toContain('价格');
   });
+
+  it('filters noisy catalog codes and prioritizes real product specs in sellingPoints', () => {
+    const product = mapCollectedSalesProduct({
+      product: {
+        title: '啄木鸟卫衣男',
+        brand: '啄木鸟（TUCANO）',
+        props: {
+          上市时间: '2026年春季',
+          厚度: '常规',
+          品牌: '啄木鸟（TUCANO）',
+          商品分类: '1315',
+          商品毛重: '0.660',
+          是否可定制: '不可定制',
+          材质: '涤纶97%,氨纶3%',
+          版型: '标准型',
+          穿着方式: '套头',
+        },
+        mainImages: ['https://example.com/main.jpg'],
+      },
+    }, '100265837786');
+    expect(product.sellingPoints).toContain('材质：涤纶97%,氨纶3%');
+    expect(product.sellingPoints).toContain('版型：标准型');
+    expect(product.sellingPoints).not.toContain('1315');
+    expect(product.sellingPoints).not.toContain('0.660');
+    expect(product.sellingPoints).not.toContain('不可定制');
+  });
 });

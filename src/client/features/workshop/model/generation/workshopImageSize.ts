@@ -12,19 +12,13 @@ export function resolveWorkshopImageSize(aspect: string, model: string, quality:
   return size;
 }
 
-export function assertWorkshopImageSize(width: number, height: number, expected: string): void {
-  const actual = `${width}x${height}`;
-  if (actual !== expected) {
-    throw generationRecoveryError(`成图尺寸不一致：要求 ${expected}，实际 ${actual}。已拦截交付，不会拉伸商品或自动重新计费；请核对原任务。`);
-  }
-}
-
-/** Check original bytes, never a thumbnail; failure retains the billable task for recovery. */
-export async function verifyWorkshopImageSize(url: string, expected: string): Promise<void> {
+/** Read original bytes; an upstream size adjustment does not invalidate a generated image. */
+export async function readWorkshopImageSize(url: string): Promise<{ width: number; height: number }> {
   let bitmap: ImageBitmap | undefined;
   try {
     bitmap = await createImageBitmap(await fetchMediaBlob(url));
-    assertWorkshopImageSize(bitmap.width, bitmap.height, expected);
+    if (!bitmap.width || !bitmap.height) throw new Error('原图尺寸无效');
+    return { width: bitmap.width, height: bitmap.height };
   } catch (error) {
     throw generationRecoveryError(error instanceof Error && 'recoveryRequired' in error
       ? error.message : '原图已生成，但无法读取原图尺寸；请核对原任务，不要重复生成。');

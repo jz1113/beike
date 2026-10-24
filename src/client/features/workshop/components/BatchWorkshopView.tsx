@@ -1,6 +1,5 @@
-import { WorkshopTopBar } from './layout/WorkshopTopBar';
 import { WorkspaceSaveNotice } from './layout/WorkspaceSaveNotice';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
 import BatchStage1Collect from './stage/BatchStage1Collect';
 import BatchStage2Config from './stage/BatchStage2Config';
@@ -10,26 +9,25 @@ import BatchStage4Queue from './stage/BatchStage4Queue';
 import { BatchPreviewLightbox } from '@client/shared/modals/lightbox/BatchPreviewLightbox';
 import { BatchWorkshopSettings } from './settings/BatchWorkshopSettings';
 import { BatchWorkspaceBatchControls } from './layout/BatchWorkspaceBatchControls';
-import { BatchArchitectureConfirmDialog } from './settings/BatchArchitectureConfirmDialog';
 import { useAppStore } from '@client/store';
-import { BatchProductItem, TypedProductImage, SYSTEM_MASTER_RECIPES } from '../model/batchTypes';
+import { BatchProductItem, TypedProductImage } from '../model/batchTypes';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
 import { isAutoPromptGroupSelection } from '@shared/domain/workshop/workshop-pipeline';
+import { getWorkshopFlow, type WorkshopStage } from '../model/workspace/workshopFlow';
+import { WorkshopFlowNavigation } from './layout/WorkshopFlowNavigation';
+import { WorkshopProductionSummary } from './settings/WorkshopProductionSummary';
 import { BatchWorkshopHistoryPreview } from './history/BatchWorkshopHistoryPreview';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
-export { SYSTEM_MASTER_RECIPES };
 export type { TypedProductImage, BatchProductItem };
 export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?: (type: PromptAssetType) => void }) {
   const runner = useBatchWorkshopRunner();
   const freshEntry = useAppStore(s => s.pendingFreshWorkshopEntry);
   const isWorkshopConfigOpen = useAppStore(s => s.isWorkshopConfigOpen);
   const setIsWorkshopConfigOpen = useAppStore(s => s.setIsWorkshopConfigOpen);
-  const activeWorkshopTab = useAppStore(s => s.activeWorkshopTab);
   const setActiveWorkshopTab = useAppStore(s => s.setActiveWorkshopTab);
   const [historyGenerationBatch, setHistoryGenerationBatch] = useState<WorkshopBatch | null>(null);
   const [isHistoryExporting, setIsHistoryExporting] = useState(false);
   const [historyExportItemId, setHistoryExportItemId] = useState<string | null>(null);
-  const [isArchitectureConfirmOpen, setIsArchitectureConfirmOpen] = useState(false);
   const {
     currentStage,
     setCurrentStage,
@@ -43,40 +41,14 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     handleRemoveItem,
     handleParseInput,
     startBatchCollect,
-    recipes,
     selectedArchId,
-    setSelectedArchId,
-    availableVisionModels,
-    selectedVisionModel,
-    setSelectedVisionModel,
     availableImageModels,
     selectedImageGenModel,
-    setSelectedImageGenModel,
     pipelineStatus,
-    useAssetLibrary,
-    setUseAssetLibrary,
-    lockedPersonaId,
-    setLockedPersonaId,
-    lockedSceneId,
-    setLockedSceneId,
-    lockedOutfitId,
-    setLockedOutfitId,
-    lockedActionId,
-    setLockedActionId,
-    availablePersonas,
-    availableScenes,
-    availableOutfits,
-    availableActions,
     generationStrategy,
-    setGenerationStrategy,
-    imageGenConcurrency,
-    setImageGenConcurrency,
     selectedQuality,
-    setSelectedQuality,
     selectedAspect,
-    setSelectedAspect,
     selectedShotCount,
-    setSelectedShotCount,
     isAnalyzingAll,
     analyzeProgress,
     activeImgFilter,
@@ -85,13 +57,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     batchSetProductImages,
     analyzeSingleProduct,
     startBatchVisionAnalyze,
-    analyzeConcurrency,
-    setAnalyzeConcurrency,
     isGeneratingBatch,
-    totalTaskCount,
-    completedTaskCount,
-    successTaskCount,
-    failTaskCount,
     startBatchGeneration,
     retryFailedImageTasks,
     retrySingleShotTask,
@@ -110,13 +76,12 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     openGalleryPreview,
     closeGalleryPreview,
     setGalleryIndex,
-    isAutoPilotRunning,
-    startAutoPilotPipeline,
     pauseRun,
     resumeRun,
     cancelRun,
     acknowledgeRecovery,
-    completeCurrentBatch,
+    reviewBatch,
+    isReviewingOutputs,
     reviewTask,
     toastMsg,
     showToast,
@@ -134,87 +99,39 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     renameBatch,
     readBatch,
   } = runner;
+  const flow = getWorkshopFlow(items, { generationStrategy, selectedShotCount, collecting: isCollecting, analyzing: isAnalyzingAll, generating: isGeneratingBatch });
   useEffect(() => {
-    if (!workspaceReady || isCollecting || historyGenerationBatch) return;
-    if (currentStage === 1 && successfulItems.length > 0 && !items.some(item => item.status === 'pending' || item.status === 'collecting')) setCurrentStage(2);
-    if (currentStage === 2 && successfulItems.length === 0) setCurrentStage(1);
-  }, [workspaceReady, isCollecting, historyGenerationBatch, currentStage, items, successfulItems.length, setCurrentStage]);
+    if (workspaceReady && !flow.busy && !historyGenerationBatch && currentStage > 1 && successfulItems.length === 0) setCurrentStage(1);
+  }, [workspaceReady, flow.busy, historyGenerationBatch, currentStage, successfulItems.length, setCurrentStage]);
   useEffect(() => {
     // A cached history preview must not hide the newly selected active batch.
     setHistoryGenerationBatch(null);
-    setIsArchitectureConfirmOpen(false);
   }, [runner.activeBatch?.id, freshEntry]);
 
-  const stage2ConfigValue = useMemo((): BatchConfigContextValue => ({
-    currentStage,
-    successfulItems,
-    setItems,
-    recipes,
-    selectedArchId,
-    setSelectedArchId,
-    availableVisionModels,
-    selectedVisionModel,
-    setSelectedVisionModel,
-    availableImageModels,
-    selectedImageGenModel,
-    setSelectedImageGenModel,
-    useAssetLibrary,
-    setUseAssetLibrary,
-    lockedPersonaId,
-    setLockedPersonaId,
-    lockedSceneId,
-    setLockedSceneId,
-    lockedOutfitId,
-    setLockedOutfitId,
-    lockedActionId,
-    setLockedActionId,
-    availablePersonas,
-    availableScenes,
-    availableOutfits,
-    availableActions,
-    generationStrategy,
-    setGenerationStrategy,
-    imageGenConcurrency,
-    setImageGenConcurrency,
-    selectedQuality,
-    setSelectedQuality,
-    selectedAspect,
-    setSelectedAspect,
-    selectedShotCount,
-    setSelectedShotCount,
-    analyzeConcurrency,
-    setAnalyzeConcurrency,
-    isAnalyzingAll,
-    analyzeProgress,
-    startBatchAnalyze: startBatchVisionAnalyze,
-    activeImgFilter,
-    setActiveImgFilter,
-    toggleProductImageSelection,
-    batchSetProductImages,
-    handleRemoveItem,
-    onPreviewGallery: openGalleryPreview,
-    onPreviewImage: (url) => openGalleryPreview([url], 0),
-    onStartAutoPilot: startAutoPilotPipeline,
-    isAutoPilotRunning,
-    onPrevStage: () => setCurrentStage(1),
-    openWorkshopConfig: () => setIsWorkshopConfigOpen(true),
-    onNextStage: () => setIsArchitectureConfirmOpen(true),
-  }), [setIsWorkshopConfigOpen, setIsArchitectureConfirmOpen, currentStage, successfulItems, setItems, recipes, selectedArchId, setSelectedArchId, availableVisionModels, selectedVisionModel, setSelectedVisionModel, availableImageModels, selectedImageGenModel, setSelectedImageGenModel, useAssetLibrary, setUseAssetLibrary, lockedPersonaId, setLockedPersonaId, lockedSceneId, setLockedSceneId, lockedOutfitId, setLockedOutfitId, lockedActionId, setLockedActionId, availablePersonas, availableScenes, availableOutfits, availableActions, generationStrategy, setGenerationStrategy, imageGenConcurrency, setImageGenConcurrency, selectedQuality, setSelectedQuality, selectedAspect, setSelectedAspect, selectedShotCount, setSelectedShotCount, analyzeConcurrency, setAnalyzeConcurrency, isAnalyzingAll, analyzeProgress, startBatchVisionAnalyze, activeImgFilter, setActiveImgFilter, toggleProductImageSelection, batchSetProductImages, handleRemoveItem, openGalleryPreview, startAutoPilotPipeline, isAutoPilotRunning, setCurrentStage]);
-
-  const confirmArchitectureAndAnalyze = (architectureId: string) => {
-    if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
-      showToast('请先选择有效的工坊技能，再开始提示词分析');
+  const selectStage = (stage: WorkshopStage) => {
+    const reason = flow.reasonForStage(stage);
+    if (reason) { showToast(reason); return; }
+    setCurrentStage(stage);
+  };
+  const confirmImagesAndAnalyze = () => {
+    if (flow.busy) return;
+    if (!flow.imagesReady || runner.analysisIssue) {
+      showToast(runner.analysisIssue || '请为每款商品至少选择一张商品图');
       return;
     }
-    if (recipes.length === 0) {
-      showToast('暂无可用工坊技能，请先到工坊技能页同步或新建');
-      return;
-    }
-
-    setSelectedArchId(architectureId);
-    setIsArchitectureConfirmOpen(false);
     setCurrentStage(3);
-    void startBatchVisionAnalyze(architectureId);
+    // Returning from image selection must preserve already reviewed prompts.
+    if (flow.pendingAnalysisIds.length > 0) void startBatchVisionAnalyze(selectedArchId, { productIds: flow.pendingAnalysisIds });
+  };
+  const stage2ConfigValue: BatchConfigContextValue = {
+    successfulItems, setItems, activeImgFilter, setActiveImgFilter,
+    toggleProductImageSelection, batchSetProductImages, handleRemoveItem,
+    onPreviewGallery: openGalleryPreview,
+    onPreviewImage: url => openGalleryPreview([url], 0),
+    onNextStage: confirmImagesAndAnalyze,
+    onPrevStage: () => selectStage(1),
+    analysisIssue: runner.analysisIssue,
+    busy: flow.busy,
   };
 
   if (!workspaceReady) {
@@ -228,10 +145,6 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
 
   return (
     <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-transparent relative">
-      <WorkshopTopBar activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />
-      {workspaceStatus && workspaceStatus !== '当前批次已就绪' && workspaceStatus !== '当前批次已保存' && !workspaceError ? (
-        <p className="px-4 sm:px-6 text-xs text-slate-500 dark:text-slate-400">{workspaceStatus}</p>
-      ) : null}
       <WorkspaceSaveNotice error={workspaceError} status={workspaceStatus} onRetry={runner.workspaceSaveActions.retry} onDownload={runner.workspaceSaveActions.download} onReload={reloadWorkspace} />
       <BatchWorkspaceBatchControls
         activeBatch={activeBatch}
@@ -240,6 +153,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         batchInputText={batchInputText}
         currentStage={currentStage}
         ready={workspaceReady}
+        busy={flow.busy}
         createNewBatch={createNewBatch}
         refreshHistory={refreshBatchHistory}
         duplicateBatch={duplicateBatch}
@@ -250,15 +164,19 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         onOpenGenerationView={setHistoryGenerationBatch}
         showToast={showToast}
       />
+      {!historyGenerationBatch && <WorkshopFlowNavigation currentStage={currentStage} busy={flow.busy}
+        productCount={successfulItems.length} readyCount={flow.readiness.readyCount} resultCount={flow.results.success}
+        reasonForStage={flow.reasonForStage} onSelectStage={selectStage} />}
       {/* 主体工作区 Content Area（Stage 1 采编采用黄金阅读宽度；Stage 2+ 选图及后续生产流水线自适应全屏大画幅充盈放大） */}
-      <div className="flex-1 overflow-y-auto px-5 pt-20 pb-6 sm:px-8 sm:pb-8 lg:pt-6 xl:px-10 flex flex-col">
+      <div key={historyGenerationBatch?.id || currentStage} className="flex-1 min-h-0 overflow-y-auto px-5 pt-4 pb-6 sm:px-8 sm:pt-6 sm:pb-8 xl:px-10 flex flex-col">
         <div className={
           !historyGenerationBatch && currentStage === 1
-            ? "max-w-[960px] mx-auto w-full flex-1 flex flex-col"
+            ? "max-w-[980px] mx-auto w-full flex-1 flex flex-col"
             : historyGenerationBatch || currentStage === 4
               ? "mx-auto w-full max-w-[1840px] space-y-4"
               : !historyGenerationBatch && currentStage === 2 ? "w-full flex-1 flex flex-col min-h-0" : "w-full space-y-4"
         }>
+          {!historyGenerationBatch && (currentStage === 2 || currentStage === 3) && <WorkshopProductionSummary runner={runner} onOpenSettings={() => setIsWorkshopConfigOpen(true)} />}
           {historyGenerationBatch ? (
             <BatchWorkshopHistoryPreview
               batch={historyGenerationBatch}
@@ -271,23 +189,29 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
             />
           ) : currentStage === 1 && (
             <BatchStage1Collect
+              key={runner.activeBatch?.id || 'draft'}
               batchInputText={batchInputText}
               setBatchInputText={setBatchInputText}
               items={items}
+              setItems={setItems}
               isCollecting={isCollecting}
               collectProgress={collectProgress}
               handleParseInput={handleParseInput}
               startBatchCollect={startBatchCollect}
+              onContinue={() => selectStage(2)}
             />
           )}
 
           {!historyGenerationBatch && currentStage === 2 && (
             <BatchConfigProvider value={stage2ConfigValue}>
-              {items.some(item => item.status === 'failed' || item.status === 'pending') && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-300">
+              {items.some(item => item.status === 'failed' || item.status === 'pending') && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300/50 bg-amber-50/85 px-3.5 py-2 text-xs text-amber-800 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-950/50 dark:text-amber-200">
                 <span>{items.filter(item => item.status === 'failed' || item.status === 'pending').length} 款商品未采集成功</span>
-                <button type="button" onClick={() => { setCurrentStage(1); void startBatchCollect(); }} className="rounded-lg px-3 py-1.5 hover:bg-amber-500/10">重试采集</button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setItems(prev => prev.filter(item => item.status !== 'failed' && item.status !== 'pending'))} className="rounded-lg px-2.5 py-1 hover:bg-amber-500/15">忽略</button>
+                  <button type="button" onClick={() => { setCurrentStage(1); void startBatchCollect(); }} className="rounded-lg bg-amber-500/15 px-3 py-1 font-medium hover:bg-amber-500/25">重试采集</button>
+                </div>
               </div>}
-              <BatchStage2Config />
+              <BatchStage2Config key={runner.activeBatch?.id || 'draft'} />
             </BatchConfigProvider>
           )}
 
@@ -300,33 +224,26 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
               setItems={setItems}
               isAnalyzingAll={isAnalyzingAll}
               analyzeProgress={analyzeProgress}
-              startBatchVisionAnalyze={startBatchVisionAnalyze}
+              startBatchVisionAnalyze={(productIds) => startBatchVisionAnalyze(selectedArchId, productIds ? { productIds } : undefined)}
               analyzeSingleProduct={analyzeSingleProduct}
-              analyzeConcurrency={analyzeConcurrency}
-              setAnalyzeConcurrency={setAnalyzeConcurrency}
               handleRemoveItem={handleRemoveItem}
               startBatchGeneration={startBatchGeneration}
               onPreviewImage={(url) => openGalleryPreview([url], 0)}
-              onPrevStage={() => setCurrentStage(2)}
+              onPrevStage={() => selectStage(2)}
+              onGoToStage={selectStage}
+              analysisIssue={runner.analysisIssue}
             />
           )}
 
           {!historyGenerationBatch && currentStage === 4 && (
             <BatchStage4Queue
               successfulItems={successfulItems}
-              selectedVisionModel={selectedVisionModel}
+              selectedVisionModel={runner.selectedVisionModel}
               availableImageModels={availableImageModels}
               selectedImageGenModel={selectedImageGenModel}
-              setSelectedImageGenModel={setSelectedImageGenModel}
               selectedQuality={selectedQuality}
-              setSelectedQuality={setSelectedQuality}
               selectedAspect={selectedAspect}
-              setSelectedAspect={setSelectedAspect}
               isGeneratingBatch={isGeneratingBatch}
-              totalTaskCount={totalTaskCount}
-              completedTaskCount={completedTaskCount}
-              successTaskCount={successTaskCount}
-              failTaskCount={failTaskCount}
               generateCopywritingForProduct={generateCopywritingForProduct}
               updateItemCopywriting={updateItemCopywriting}
               generateAllCopywriting={generateAllCopywriting}
@@ -344,11 +261,10 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
               onPauseRun={pauseRun}
               onResumeRun={resumeRun}
               onCancelRun={cancelRun}
-              onCompleteBatch={completeCurrentBatch}
-              onBackToPrompts={() => setCurrentStage(3)}
+              onReviewBatch={reviewBatch}
+              isReviewingOutputs={isReviewingOutputs}
               onContinueGeneration={startBatchGeneration}
               onRecheckTask={runner.recheckTask}
-              pipelineStatus={pipelineStatus}
               onReviewTask={reviewTask}
               onAcknowledgeRecovery={acknowledgeRecovery}
             />
@@ -371,15 +287,6 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         onClose={() => setIsWorkshopConfigOpen(false)}
         onOpenAssetTab={onOpenAssetTab}
         onFallbackAssets={() => setActiveWorkshopTab('prompt_assets')}
-      />
-      <BatchArchitectureConfirmDialog
-        key={isArchitectureConfirmOpen ? 'architecture-confirm-open' : 'architecture-confirm-closed'}
-        isOpen={isArchitectureConfirmOpen}
-        recipes={recipes}
-        selectedArchId={selectedArchId}
-        onCancel={() => setIsArchitectureConfirmOpen(false)}
-        onConfirm={confirmArchitectureAndAnalyze}
-        products={successfulItems}
       />
       {/* 底部 Toast */}
       {toastMsg && (

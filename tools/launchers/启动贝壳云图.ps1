@@ -61,15 +61,13 @@ if ($nodeMajor -ne "22") {
 Write-Ok "Node.js 环境检测通过: $nodeVersion"
 
 # 3. 检查 Go 环境（Go API 服务必需）
-$goCmd = Get-Command go -ErrorAction SilentlyContinue
-if (-not $goCmd) {
-    Write-Err "未检测到 Go 编译器。项目 API 服务需要 Go 1.26 或更高版本。"
-    Write-Host "  下载地址：https://golang.google.cn/dl/ 或 https://go.dev/dl/" -ForegroundColor Yellow
+'import { resolveGo } from "./tools/scripts/common/go-toolchain.mjs"; console.log(resolveGo());' | & node --input-type=module
+if ($LASTEXITCODE -ne 0) {
+    Write-Err "Go 环境检查失败，请按上方提示安装兼容版本或设置 GO_BIN。"
     Pause-OnError
     exit 1
 }
-$goVersion = (& go version 2>$null)
-Write-Ok "Go 编译环境检测通过: $goVersion"
+Write-Ok "Go 编译环境检测通过"
 
 # 4. 配置文件初始化
 if (-not (Test-Path ".env")) {
@@ -81,7 +79,7 @@ if (-not (Test-Path ".env")) {
 }
 
 # 5. 依赖检查与安装
-$needInstall = (-not (Test-Path "node_modules\tsx\package.json")) -or (-not (Test-Path "node_modules\vite\package.json"))
+$needInstall = -not (Test-Path "node_modules\vite\package.json")
 if ($needInstall) {
     Write-Info "首次运行，正在根据 pnpm-lock.yaml 安装项目依赖…"
     $pnpmCmd = Get-Command pnpm -ErrorAction SilentlyContinue

@@ -18,6 +18,7 @@ export const QueueImageSet = memo(function QueueImageSet({
   item, index, isDeconstructing, progressMessage, categories = [], onToggleImage, onRemove,
 }: Props) {
   const excluded = new Set(item.excludedImageIndices || []);
+  const selectedCount = item.images.length - excluded.size;
   const categoryId = typeof item.result?.product_major_category === 'string'
     ? item.result.product_major_category : '';
   const categoryName = categories.find(category => category.id === categoryId)?.name
@@ -27,47 +28,39 @@ export const QueueImageSet = memo(function QueueImageSet({
     : categorySource === 'vision' ? '视觉识别'
       : categorySource === 'title' ? '标题推断' : '需确认';
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">
-            {index + 1}
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5 dark:text-slate-100">
-              <span>{item.name}</span>
-              {item.sourceUrl && <span className="shrink-0 text-rose-500 text-[10px] font-semibold">小红书图集</span>}
-              {item.status === 'done' && categoryName && (
-                <span className="shrink-0 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
-                  {categoryName} · {sourceLabel}
-                </span>
-              )}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
-              共 {item.images.length} 张图片
-              {item.status === 'processing' && ` · ${progressMessage || '请求已提交，等待服务端处理'}`}
-              {item.status === 'pending' && isDeconstructing && ' · 等待开始'}
-              {item.status === 'done' && formatDeconstructSummary(item)}
-              {item.status === 'error' && ` · 失败: ${item.error}`}
-            </div>
-          </div>
+    <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-slate-50/55 p-3 transition-colors hover:border-indigo-300/60 dark:border-white/[0.08] dark:bg-white/[0.03]">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-xs font-bold tabular-nums text-slate-800 dark:text-slate-100">
+            组 {index + 1}
+          </span>
+          {item.status === 'done' && categoryName && (
+            <span className="shrink-0 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              {categoryName} · {sourceLabel}
+            </span>
+          )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="text-xs font-semibold text-indigo-600">
-            已选 {item.images.length - excluded.size} / {item.images.length}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+            selectedCount === 4
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+              : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+          }`}>
+            {selectedCount === 4 && item.images.length === 4 ? '4 张成组' : `已选 ${selectedCount}/${item.images.length}`}
           </span>
           <button
             type="button"
             onClick={() => onRemove(item.id)}
             disabled={isDeconstructing}
-            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer rounded-lg"
-            title="移除此图集"
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 cursor-pointer dark:hover:bg-red-500/10"
+            title="移除此图组"
           >
-            <X className="w-4 h-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
-      <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2 pr-1">
+
+      <div className="grid grid-cols-4 gap-2">
         {item.images.map((img, imageIndex) => (
           <QueueImageTile
             key={imageIndex}
@@ -80,6 +73,15 @@ export const QueueImageSet = memo(function QueueImageSet({
           />
         ))}
       </div>
+
+      {(item.status !== 'pending' || isDeconstructing) && (
+        <div className="mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">
+          {item.status === 'processing' && (progressMessage || '请求已提交，等待服务端处理')}
+          {item.status === 'pending' && isDeconstructing && '等待开始'}
+          {item.status === 'done' && formatDeconstructSummary(item).replace(/^\s*·\s*/, '')}
+          {item.status === 'error' && <span className="text-rose-500">失败: {item.error}</span>}
+        </div>
+      )}
     </div>
   );
 });

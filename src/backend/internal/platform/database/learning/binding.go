@@ -11,7 +11,7 @@ const BaseRecipeID = "__category_skill__"
 
 // The base supplies product constraints while each original group supplies its own visual style.
 func BaseRecipe() map[string]any {
-	return map[string]any{"id": BaseRecipeID, "name": "按参考图组应用细分技能", "category": "general", "tag": "自动细分", "libraryVersion": "category-base-v1", "promptSnippet": "商品身份、外形、颜色、结构、标识、比例与材质以当前商品图片为准，不复制参考图中的旧商品，不臆造不可见细节。逐镜沿用原始参考的构图、机位、主体占比、裁切、动作、空间、自然光色与可见纹理；只修改换品必需的握持、佩戴、支撑、接触、遮挡与受光关系。明确替换项按用户选择执行，其他内容沿用原图；静物、手部、人像的出镜范围保持一致。细分规则须按适用条件调用，不将各组不同风格平均为模板。文案只写已知事实，不捏造体验、参数或效果。"}
+	return map[string]any{"id": BaseRecipeID, "name": "按参考图组应用细分技能", "category": "general", "tag": "自动细分", "libraryVersion": "category-base-v1", "promptSnippet": "商品身份、外形、颜色、结构、标识、比例与材质以当前商品图片（@图片1）为准，不复制参考图中的旧商品，不臆造不可见细节。单镜绘图提示词按【@图片1主体结构锚定 → 构图机位与主体占比 → 动作握持/佩戴/摆放接触 → 生活场景与前景背景层次 → 自然光色与接触阴影 → 材质微距纹理与实拍景深 → 负向约束】架构组织；四镜保持参考图组的分镜递进与叙事节奏。只修改换品必需的握持、佩戴、支撑、接触、遮挡与受光关系；明确替换项按用户选择执行，静物、手部、人像的出镜范围严格一致。细分规则按适用条件调用，不将不同风格平均为单一模板。"}
 }
 
 func Apply(ctx context.Context, db *sql.DB, workspace string, group map[string]any, refs []string, shots []map[string]any, base map[string]any) (map[string]any, error) {

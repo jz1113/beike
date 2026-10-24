@@ -27,7 +27,7 @@ function PreviewTile({ url, index }: { url: string; index: number }) {
     <img
       src={useDirectUrl ? directUrl : proxyUrl}
       alt={`图组第 ${index + 1} 镜`}
-      className="h-full w-full min-h-0 min-w-0 object-cover"
+      className="h-full w-full min-h-0 min-w-0 object-cover transition-transform duration-300 group-hover/thumb:scale-[1.02]"
       loading="lazy"
       decoding="async"
       onError={() => {
@@ -65,7 +65,7 @@ export function FullPromptCardMosaic({
   }
 
   return (
-    <div className="grid h-full w-full grid-cols-2 grid-rows-2 overflow-hidden">
+    <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden bg-slate-200/80 dark:bg-black/60">
       {images.map((url, index) => <PreviewTile key={`${index}:${url}`} url={url} index={index} />)}
     </div>
   );

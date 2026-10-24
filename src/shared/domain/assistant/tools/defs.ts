@@ -36,11 +36,14 @@ export const OPENAI_TOOLS: ToolDefinition['openaiTool'][] = [
     type: 'function',
     function: {
       name: 'read_skill_file',
-      description: '读取当前已激活技能资料目录中的一个文件。path 必须与系统提示或 read_skill 返回的路径一致。只在需要样例、规范或细则时调用，不要一次读完全部文件。',
+      description: '读取已指定或经 read_skill 读取的技能文件。path 必须与资料目录一致；skill_id 区分不同技能的同名文件。长文件按返回的 nextOffset 继续读取，只读取任务需要的资料。',
       parameters: {
         type: 'object',
         properties: {
           path: { type: 'string', description: '资料目录中的路径，例如 examples.md' },
+          skill_id: { type: 'string', description: 'read_skill 返回的技能 id；多个技能有同名文件时必填' },
+          offset: { type: 'integer', minimum: 0, description: '字符起始偏移，默认 0；使用 nextOffset 继续读取' },
+          length: { type: 'integer', minimum: 1, maximum: 12000, description: '本次字符数，默认 8000' },
         },
         required: ['path'],
         additionalProperties: false,

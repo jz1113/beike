@@ -9,6 +9,7 @@ const descriptions: Record<ReasoningEffort, string> = {
   medium: '兼顾响应速度与分析深度。',
   high: '适合复杂规划、比较和多步分析。',
   xhigh: '投入更多推理时间，可能增加等待与消耗。',
+  max: '使用模型最高推理深度，适合复杂难题。',
 };
 
 interface Props {

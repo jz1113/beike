@@ -21,7 +21,7 @@ export function AppearanceAudienceFilter({ type, value, onChange, items }: {
   ];
   return <div aria-label="人群二级分类" className="mt-3 flex flex-wrap items-center gap-1.5">
     {options.map(option => <button key={option.id} type="button" aria-pressed={value === option.id}
-      onClick={() => onChange(option.id)} className={`rounded-lg px-2.5 py-1.5 text-xs transition-colors ${value === option.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-500 hover:bg-slate-100/70 dark:text-slate-400'}`}>
+      onClick={() => onChange(option.id)} className={`rounded-lg px-2.5 py-1.5 text-xs transition-colors ${value === option.id ? 'bg-indigo-50 text-indigo-700 font-semibold dark:bg-indigo-500/15 dark:text-indigo-300' : 'text-slate-500 hover:bg-slate-100/70 dark:text-slate-400 dark:hover:bg-white/[0.06]'}`}>
       {option.label}<span className="ml-1.5 opacity-60">{option.count}</span>
     </button>)}
   </div>;

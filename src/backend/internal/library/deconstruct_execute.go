@@ -30,6 +30,11 @@ type deconstructHooks struct {
 }
 
 func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]any, hooks deconstructHooks) (int, map[string]any) {
+	for _, name := range []string{"apiFormat", "textProtocol", "allowInsecureHttp"} {
+		if value := modelOption(payload, name); value != nil {
+			payload[name] = value
+		}
+	}
 	protocol, protocolErr := generate.RequestTextProtocol(r, payload)
 	if protocolErr != nil {
 		return http.StatusBadRequest, map[string]any{"success": false, "error": protocolErr.Error()}
@@ -72,10 +77,17 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 		}
 	}
 	report("preparing", "正在准备 "+strconv.Itoa(len(images))+" 张图片")
+	if len(images) == 0 || len(images) > 8 || (len(images) != 1 && len(images)%4 != 0) {
+		return http.StatusBadRequest, map[string]any{"error": "完整母本需 4 张或 8 张图片；单图可独立反推", "code": "INCOMPLETE_CONTENT_GROUP"}
+	}
 	prepared, originals, err := prepareDeconstructImages(cfg, images)
 	if err != nil || len(prepared) == 0 {
 		report("failed", "反推未完成，请查看任务错误信息")
 		return http.StatusBadRequest, map[string]any{"error": "原贴图片下载受限或已失效，请检查原贴链接或重试", "code": "IMAGE_DOWNLOAD_FAILED"}
+	}
+	originals, err = archiveDeconstructOriginals(cfg, workspace, prepared)
+	if err != nil {
+		return http.StatusInternalServerError, map[string]any{"error": "参考原图归档失败，未调用视觉模型", "code": "IMAGE_ARCHIVE_FAILED"}
 	}
 	report("queued", "图片准备完成，等待视觉模型")
 	if hooks.beforeDispatch != nil {
@@ -94,7 +106,22 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 	if sub != "" {
 		hint += "\n本次归档的商品二级类目：" + sub + "。仅描述实际可见商品，不为迎合归档而改写图片事实。"
 	}
-	outcome := callDeconstructVision(r.Context(), baseURL, apiKey, model, prepared, deconstructPrompt(len(prepared), hint, category))
+	extractAtomic, _ := payload["extractAtomicAssets"].(bool)
+	prompt := deconstructPrompt(len(prepared), hint, category, len(prepared) >= 4 && !extractAtomic)
+	outcome := callDeconstructVision(r.Context(), baseURL, apiKey, model, prepared, prompt, stringValue(payload["apiFormat"]))
+	// Only a definitive model rejection can move to the next configured alias.
+	// Timeouts, connection failures and accepted requests are never replayed.
+	if gateway.TextProtocol(r.Context(), model) == "openai" && stringValue(payload["apiFormat"]) != "openai-responses" {
+		for _, fallback := range stringList(payload["fallbackOrder"]) {
+			if !outcome.RetryModel {
+				break
+			}
+			if fallback == model || strings.HasPrefix(fallback, "deepseek-official:") {
+				continue
+			}
+			outcome = callDeconstructVision(r.Context(), baseURL, apiKey, fallback, prepared, prompt)
+		}
+	}
 	if outcome.Fail != nil {
 		report("failed", "反推未完成，请查看任务错误信息")
 		return outcome.Code, scrubSecrets(outcome.Fail, apiKey)
@@ -170,12 +197,13 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 }
 
 func deconstructCreds(cfg config.Config, r *http.Request, payload map[string]any) (string, string) {
+	overrides, _ := payload["overrides"].(map[string]any)
 	model := stringValue(payload["model"])
 	if strings.HasPrefix(model, "deepseek-official:") {
-		return "https://api.deepseek.com", firstString(payload["customApiKey"], r.Header.Get("x-custom-api-key"))
+		return "https://api.deepseek.com", firstString(payload["customApiKey"], overrides["customApiKey"], r.Header.Get("x-custom-api-key"))
 	}
-	base := firstString(payload["customBaseUrl"], r.Header.Get("x-custom-base-url"), os.Getenv("AI_DRAWING_BASE_URL"), "https://ai.comfly.org")
-	key := firstString(payload["customApiKey"], r.Header.Get("x-custom-api-key"))
+	base := firstString(payload["customBaseUrl"], overrides["customBaseUrl"], r.Header.Get("x-custom-base-url"), os.Getenv("AI_DRAWING_BASE_URL"), "https://ai.comfly.org")
+	key := firstString(payload["customApiKey"], overrides["customApiKey"], r.Header.Get("x-custom-api-key"))
 	if key == "" && !cfg.Production() {
 		key = firstString(os.Getenv("AI_DRAWING_API_KEY"), os.Getenv("AI_API_KEY"))
 	}
@@ -183,15 +211,10 @@ func deconstructCreds(cfg config.Config, r *http.Request, payload map[string]any
 }
 
 func prepareDeconstructImages(cfg config.Config, images []string) ([]string, []string, error) {
-	selected := images
-	if len(images) != 1 {
-		keep := len(images)
-		if keep > 10 {
-			keep = 10
-		}
-		keep = keep / 4 * 4
-		selected = images[:keep]
+	if len(images) == 0 || len(images) > 8 || (len(images) != 1 && len(images)%4 != 0) {
+		return nil, nil, errors.New("完整母本需 4 张或 8 张图片；单图可独立反推")
 	}
+	selected := images
 	var prepared, originals []string
 	for _, image := range selected {
 		data, err := loadDeconstructImage(cfg, image)
@@ -278,6 +301,11 @@ func deconstructReviewID(workspace string, images []string, full bool, category,
 
 func stringList(value any) []string {
 	items, _ := value.([]any)
+	if typed, ok := value.([]string); ok {
+		for _, item := range typed {
+			items = append(items, item)
+		}
+	}
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		text, ok := item.(string)

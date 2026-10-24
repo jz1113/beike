@@ -177,11 +177,11 @@ func childToolAllowed(name string, mcp map[string]mcpBinding) bool {
 func (loop *agentLoop) applyAllowed(allowed []string) {
 	loop.names = append([]string{}, allowed...)
 	loop.box.allowed = append([]string{}, allowed...)
-	next := make([]map[string]any, 0, len(loop.tools))
+	next := openAITools(allowed)
 	for _, tool := range loop.tools {
 		fn, _ := tool["function"].(map[string]any)
 		name, _ := fn["name"].(string)
-		if containsTool(allowed, name) {
+		if strings.HasPrefix(name, "mcp_") && containsTool(allowed, name) {
 			next = append(next, tool)
 		}
 	}

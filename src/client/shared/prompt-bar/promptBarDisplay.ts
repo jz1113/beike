@@ -1,5 +1,6 @@
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
+import { isGeminiImageModel, resolveGeminiPixelSize } from '@shared/domain/models/model-adapters/image/geminiImageSizes';
 import { t } from '@client/shared/i18n';
 
 /**
@@ -15,7 +16,7 @@ export function resolvePromptPlaceholder(params: {
   const { isDepthMode, quickGenMode, quickVideoRefMode, isGenerateDock, hasRefMedia } = params;
 
   if (quickGenMode === 'agent') {
-    return t('promptBar.agent');
+    return '';
   }
 
   // 🌟 当已有参考素材时，精准还原即梦图2原版操作指引文案
@@ -129,6 +130,15 @@ export function calculateImageDimensions(params: {
       quickModel,
       (quickQuality || 'high') as 'high' | 'medium' | 'low'
     );
+    const [w, h] = sizeStr.split('x').map(Number);
+    return { w, h, sizeStr };
+  }
+  if (isGeminiImageModel(quickModel)) {
+    if (quickAspectId === 'smart' || quickAspectId === 'auto') {
+      const [w, h] = resolveGeminiPixelSize('1:1', quickModel, quickQuality).split('x').map(Number);
+      return { w, h, sizeStr: 'auto' };
+    }
+    const sizeStr = resolveGeminiPixelSize(quickAspectId, quickModel, quickQuality);
     const [w, h] = sizeStr.split('x').map(Number);
     return { w, h, sizeStr };
   }

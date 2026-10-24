@@ -514,3 +514,29 @@ func TestImageTaskKeyReturnsUpstreamFailure(t *testing.T) {
 		t.Fatalf("key %d %s", found.Code, body)
 	}
 }
+
+func TestGptImage25QualitiesAndGeminiSpecs(t *testing.T) {
+	flare := buildImagePayload("gpt-image-2.5-flare", "一只猫", "4:5", "max", "max", nil)
+	if flare.payload["quality"] != "max" || flare.payload["size"] != "2560x3200" {
+		t.Fatalf("flare max: %#v", flare.payload)
+	}
+	sunburst := buildImagePayload("gpt-image-2.5-sunburst", "一只猫", "4096x3072", "xhigh", "xhigh", nil)
+	if sunburst.payload["quality"] != "xhigh" || sunburst.payload["size"] != "3312x2480" {
+		t.Fatalf("sunburst xhigh: %#v", sunburst.payload)
+	}
+	gpt2 := buildImagePayload("gpt-image-2", "一只猫", "5:4", "high", "max", nil)
+	if gpt2.payload["quality"] != "high" || gpt2.payload["size"] != "3200x2560" {
+		t.Fatalf("gpt2 clamp max->high: %#v", gpt2.payload)
+	}
+	banana := buildImagePayloadWithAspect("gemini-nano-banana-2.1", "一只猫", "4K", "1:4", "high", "high", nil)
+	if banana.payload["aspect_ratio"] != "1:4" || banana.payload["image_size"] != "4K" || banana.size != "2048x8192" {
+		t.Fatalf("banana 2.1: %#v size=%s", banana.payload, banana.size)
+	}
+	lite := buildImagePayloadWithAspect("gemini-3.1-flash-lite-image", "一只猫", "4K", "3:4", "high", "high", nil)
+	if lite.payload["image_size"] != "1K" || lite.size != "896x1200" {
+		t.Fatalf("lite 1K lock: %#v size=%s", lite.payload, lite.size)
+	}
+	if resolveGeminiImageThinkingLevel("gemini-nano-banana-2.1", "max") != "high" || resolveGeminiImageThinkingLevel("gemini-3.1-flash-image", "low") != "minimal" {
+		t.Fatal("gemini image thinking level mismatch")
+	}
+}

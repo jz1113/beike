@@ -1,6 +1,5 @@
 import { compressImageToDataUrl } from '@client/shared/media/image-utils';
 import {
-  MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
 } from '@shared/domain/assets/asset-deconstruct/prompts';
 import type { ImageSetQueueItem } from './assetPromptConstants';
@@ -117,23 +116,28 @@ export async function buildQueueItemsFromFiles(fileList: FileList | File[]): Pro
       continue;
     }
 
-    const targetFiles = sortedFiles.slice(0, MAX_IMAGES_PER_SET);
-    if (sortedFiles.length > MAX_IMAGES_PER_SET) {
+    const usableCount = Math.floor(sortedFiles.length / MIN_IMAGES_PER_SET) * MIN_IMAGES_PER_SET;
+    if (sortedFiles.length > usableCount) {
       truncatedCount++;
     }
+    const targetFiles = sortedFiles.slice(0, usableCount);
 
     const base64List = await Promise.all(
-      targetFiles.map((f) => compressImageToDataUrl(f, 1024, 0.82))
+      targetFiles.map((f) => compressImageToDataUrl(f, 2048, 0.9))
     );
     const validImgs = base64List.filter(Boolean);
-    if (validImgs.length > 0) {
+    const groups: string[][] = [];
+    for (let i = 0; i + MIN_IMAGES_PER_SET <= validImgs.length; i += MIN_IMAGES_PER_SET) {
+      groups.push(validImgs.slice(i, i + MIN_IMAGES_PER_SET));
+    }
+    groups.forEach((images, groupIndex) => {
       queueItems.push({
-        id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: folderName,
-        images: validImgs,
+        id: `queue_${Date.now()}_${groupIndex}_${Math.random().toString(36).slice(2, 7)}`,
+        name: groups.length > 1 ? `${folderName} · 组 ${groupIndex + 1}` : folderName,
+        images,
         status: 'pending',
       });
-    }
+    });
   }
 
   return { queueItems, imageCount: imageFiles.length, skipped, truncatedCount };

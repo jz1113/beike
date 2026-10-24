@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { BookOpen, Check, Loader2, Plus, ShoppingBag } from 'lucide-react';
-import { StudioBrandChip } from '@client/shared/ui/studio';
+import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
 import type { VideoSalesCategory, VideoSalesScript } from '@shared/domain/sales';
 import { salesCreationRule } from '../model/fashionSalesSkill';
 import type { SalesWorkflowStep, SalesWorkflowStepView } from '../model/salesWorkspaceView';
@@ -63,9 +63,10 @@ interface SalesActionBarProps {
   reason?: string | null;
   note?: string;
   progress?: string | null;
+  controls?: ReactNode;
 }
 
-export function SalesActionBar({ primary, secondary, busy, reason, note, progress }: SalesActionBarProps) {
+export function SalesActionBar({ primary, secondary, busy, reason, note, progress, controls }: SalesActionBarProps) {
   const uid = useId();
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -77,9 +78,15 @@ export function SalesActionBar({ primary, secondary, busy, reason, note, progres
   }, [busy]);
   const description = reason || note;
   const primaryClass = `inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-[13px] font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white ${salesFocusClass}`;
-  return <footer aria-label="当前步骤操作" className="shrink-0 border-t border-slate-200/80 bg-white px-3 py-3 sm:px-5 dark:border-white/10 dark:bg-[#18191c]">
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400"><p id={`${uid}-reason`} role="status" aria-live="polite">{busy ? progress || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>{busy && <p className="mt-1"><span className="tabular-nums">已等待 {elapsed} 秒</span>{note ? ` · ${note}` : ''}</p>}</div>
+  return <footer aria-label="当前步骤操作" className="shrink-0 border-t border-slate-200/80 bg-white px-3 py-2.5 sm:px-5 dark:border-white/10 dark:bg-[#18191c]">
+    <div className="mx-auto flex max-w-[1600px] flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+        {controls}
+        <div className={controls && !busy && !description ? 'sr-only' : 'min-w-0'}>
+          <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy ? 'text-amber-700 dark:text-amber-300' : ''}>{busy ? progress || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
+          {busy && <p className="mt-0.5"><span className="tabular-nums">已等待 {elapsed} 秒</span>{note ? ` · ${note}` : ''}</p>}
+        </div>
+      </div>
       <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
         {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 flex-1 px-4 disabled:opacity-40 sm:flex-none ${salesGhostButtonClass}`}>{secondary.label}</button>}
         {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} aria-describedby={`${uid}-reason`} className={`${primaryClass} flex-1 sm:flex-none`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} flex-1 sm:flex-none`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{primary.label}</button>}

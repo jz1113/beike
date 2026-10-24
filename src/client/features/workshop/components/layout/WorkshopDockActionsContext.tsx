@@ -4,6 +4,7 @@ export interface WorkshopBatchDockActions {
   onCreate: () => void;
   onHistory: () => void;
   disabled: boolean;
+  createDisabled: boolean;
 }
 
 interface WorkshopDockActionsContextValue {

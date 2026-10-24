@@ -1,0 +1,25 @@
+{
+  "id": "video-teardown",
+  "name": "video-teardown",
+  "displayName": "短视频拆解与生成提示词",
+  "category": "视觉理解与素材分析",
+  "author": "贝壳",
+  "colorTheme": "indigo",
+  "icon": "scissors",
+  "tools": [
+    "inspect_video_media",
+    "extract_video_storyboard",
+    "extract_video_detailed_frames"
+  ],
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "读取真实视频规格与关键帧，拆解镜头、光线和节奏，交付有证据的复刻方案与图像/视频提示词。"
+}

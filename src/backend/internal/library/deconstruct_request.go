@@ -70,8 +70,8 @@ func deconstructRequestHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "衍生母本须由完整四图组先提炼候选，再确认入库"})
 			return
 		}
-		if len(images) > 1 && len(images) < 4 {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "图组母本必须恰好 4 张；当前不足 4 张，不会反推或入库", "code": "INCOMPLETE_CONTENT_GROUP"})
+		if len(images) != 1 && (len(images) == 0 || len(images) > 8 || len(images)%4 != 0) {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "完整母本需 4 张或 8 张图片；不足或多余图片请另行处理", "code": "INCOMPLETE_CONTENT_GROUP"})
 			return
 		}
 		if !deconstructHasKey(cfg, r, payload) {
@@ -219,7 +219,7 @@ func aliasMatches(raw, category string) bool {
 }
 
 func deconstructUnsafeBase(cfg config.Config, r *http.Request, payload map[string]any) bool {
-	base, _ := payload["customBaseUrl"].(string)
+	base, _ := modelOption(payload, "customBaseUrl").(string)
 	base = strings.TrimSpace(base)
 	if base == "" {
 		base = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
@@ -227,15 +227,15 @@ func deconstructUnsafeBase(cfg config.Config, r *http.Request, payload map[strin
 	if base == "" {
 		return false
 	}
-	format, _ := payload["apiFormat"].(string)
-	allowHTTP, _ := payload["allowInsecureHttp"].(bool)
+	format, _ := modelOption(payload, "apiFormat").(string)
+	allowHTTP, _ := modelOption(payload, "allowInsecureHttp").(bool)
 	return !system.AllowCustomBase(cfg) && !system.SafeHTTPSGateway(base) && !(format == "openai-responses" && allowHTTP && system.PublicHTTPGateway(base))
 }
 
 func deconstructVisionReady(payload map[string]any) bool {
 	model, _ := payload["model"].(string)
 	model = strings.TrimSpace(model)
-	format, _ := payload["apiFormat"].(string)
+	format, _ := modelOption(payload, "apiFormat").(string)
 	if model == "" {
 		return true
 	}
@@ -260,7 +260,7 @@ func visionCapable(model string) bool {
 }
 
 func deconstructHasKey(cfg config.Config, r *http.Request, payload map[string]any) bool {
-	key, _ := payload["customApiKey"].(string)
+	key, _ := modelOption(payload, "customApiKey").(string)
 	if strings.TrimSpace(key) != "" || strings.TrimSpace(r.Header.Get("x-custom-api-key")) != "" {
 		return true
 	}

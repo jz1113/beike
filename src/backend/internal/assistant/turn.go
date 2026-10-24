@@ -81,7 +81,7 @@ func turnStartError(payload map[string]json.RawMessage) string {
 	}
 	if raw, exists := payload["reasoningEffort"]; exists {
 		effort, ok := rawText(raw)
-		if !ok || (effort != "auto" && effort != "low" && effort != "medium" && effort != "high" && effort != "xhigh") {
+		if !ok || (effort != "auto" && effort != "low" && effort != "medium" && effort != "high" && effort != "xhigh" && effort != "max") {
 			return "reasoningEffort: 不支持的思考强度"
 		}
 	}

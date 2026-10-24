@@ -23,7 +23,7 @@ export function videoModeIds(model: string) {
   if (/seedance/.test(id)) return SEEDANCE_MODES;
   if (id === 'viduq3' || id === 'viduq3-mix') return ['omni'];
   if (id === 'viduq3-turbo' || id === 'viduq3-pro' || id === 'viduq4-preview') return FULL_MODES;
-  if (/omni[_-]flash/.test(id)) return ['first_frame', 'text'];
+  if (/omni[_-]flash|gemini-omni/.test(id)) return SEEDANCE_MODES;
   if (/^veo3\.1/.test(id)) return FULL_MODES;
   if (/sora/.test(id)) return ['first_frame', 'text'];
   if (/grok/.test(id)) return [...FULL_MODES, 'edit', 'extend'];
@@ -39,6 +39,7 @@ export function videoModes(model: string) {
     if (mode.id !== 'omni') return mode;
     if (/minimax|hailuo/.test(id) || id === 'h3') return { ...mode, desc: '可混合参考图片与视频，一张参考图也不会被当成首帧' };
     if (isSeedance(id)) return { ...mode, desc: '全模态参考图片或视频；一张参考图也不会被当成首帧' };
+    if (/omni[_-]flash|gemini-omni/.test(id)) return { ...mode, desc: '最多 7 张参考图、3 个参考视频，支持多模态参考' };
     if (/^veo3\.1/.test(id)) return { ...mode, desc: '最多 3 张参考图，不能与首尾帧同时使用' };
     if (/grok/.test(id)) return { ...mode, desc: '最多 14 张参考图，不锁定为首帧' };
     return mode;
@@ -69,7 +70,8 @@ export function videoRatioLocked(model: string, mode: string) {
 }
 
 export function videoDurationOptions(model: string, resolution: string, mode = 'text') {
-  if (/^veo3\.1/.test(model) && (resolution !== '720P' || mode === 'omni' || mode === 'first_last_frame')) return [8];
+  const canonical = canonicalModelId(model).toLowerCase();
+  if (/^veo-?3\.1/.test(canonical) && (resolution !== '720P' || mode === 'omni' || mode === 'first_last_frame')) return [8];
   const durations = getVideoModelById(model)?.supportedDurations || [5];
   if (/grok/i.test(model) && mode === 'extend') return durations.filter(value => value >= 2 && value <= 10);
   return /^vidu/.test(model) && mode === 'omni' ? durations.filter(value => value >= 3) : durations;
@@ -91,7 +93,9 @@ export function videoInputError(input: {
   if (videos.length && !referenceVideoAllowed(model) && !grokClip) return '当前模型的参考视频尚未接入，请使用图片或文字';
   if (/^viduq3(?:-mix)?$/.test(model) && !images.length) return '该模型需要参考图片，请添加素材';
   if (/^vidu/.test(model) && images.length > 15) return 'Vidu 最多支持 15 张参考图片';
-  if (/^veo3\.1/.test(model) && mode === 'omni' && images.length > 3) return 'Veo 最多支持 3 张参考图片';
+  const canonical = canonicalModelId(model).toLowerCase();
+  if (/omni[_-]flash|gemini-omni/.test(canonical) && (images.length > 7 || videos.length > 3)) return 'Omni Flash 最多支持 7 张参考图片、3 个参考视频';
+  if (/^veo-?3\.1/.test(canonical) && mode === 'omni' && images.length > 3) return 'Veo 最多支持 3 张参考图片';
   if (/^wan3/.test(model) && (images.length > 10 || videos.length > 5)) return '万相最多支持 10 张参考图、5 个参考视频';
   if (/minimax-h3/i.test(model) && (images.length > 9 || videos.length > 3 || images.length + videos.length > 12)) return 'H3 最多支持 9 张参考图、3 个参考视频，合计不超过 12 个素材';
   if (/grok-imagine-video/i.test(model) && mode === 'omni' && images.length > 14) return 'Grok 最多支持 14 张参考图片';
@@ -110,5 +114,5 @@ export function videoInputError(input: {
 }
 
 function referenceVideoAllowed(model: string) {
-  return isSeedance(model) || /^wan3/.test(model) || /minimax-h3/i.test(model);
+  return isSeedance(model) || /^wan3/.test(model) || /minimax-h3/i.test(model) || /omni[_-]flash|gemini-omni/i.test(model);
 }

@@ -3,7 +3,7 @@ import { useAppStore } from '@client/store';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { useQuickRefMediaDrop } from '@client/shared/hooks/useQuickRefMediaDrop';
 import { useToast } from '@client/shared/hooks/useToast';
-import PromptActionBar from '@client/shared/prompt-bar';
+import PromptActionBar from '@client/shared/prompt-bar/PromptActionBar';
 import FeatureCapsules from './components/FeatureCapsules';
 import InspirationFeed from './components/inspiration/InspirationFeed';
 import { type InspirationUseOptions } from './components/inspiration/InspirationModal';

@@ -17,7 +17,7 @@ export interface ProductCategoryInfo {
  */
 export function inferProductCategoryAndAnatomy(
   title?: string | null,
-  props?: Record<string, any> | null
+  props?: Record<string, unknown> | null
 ): ProductCategoryInfo {
   const text = `${title || ''} ${JSON.stringify(props || {})}`.toLowerCase();
 

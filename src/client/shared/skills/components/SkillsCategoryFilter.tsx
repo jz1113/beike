@@ -1,32 +1,34 @@
-interface SkillsCategoryFilterProps {
+interface Props {
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
   categories: string[];
 }
 
-export function SkillsCategoryFilter({
-  selectedCategory,
-  onSelectCategory,
-  categories,
-}: SkillsCategoryFilterProps) {
-  if (categories.length <= 1) return null;
-
+/** 仅在存在多个实际有效分类时渲染次级筛选，避免展示无内容的空分类胶囊。 */
+export function SkillsCategoryFilter({ selectedCategory, onSelectCategory, categories }: Props) {
+  if (categories.length <= 2) return null;
   return (
-    <div className="flex w-full items-center gap-2 overflow-x-auto px-6 py-3.5 md:px-8 no-scrollbar">
-      {categories.map((cat) => {
-        const isSelected = selectedCategory === cat;
+    <div
+      role="tablist"
+      aria-label="筛选技能分类"
+      className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar"
+    >
+      {categories.map((category) => {
+        const active = selectedCategory === category;
         return (
           <button
-            key={cat}
+            key={category}
             type="button"
-            onClick={() => onSelectCategory(cat)}
-            className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs transition-colors cursor-pointer select-none ${
-              isSelected
-                ? 'bg-slate-200/80 dark:bg-white/15 text-slate-900 dark:text-white font-medium shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/5'
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelectCategory(category)}
+            className={`shrink-0 cursor-pointer rounded-full px-3.5 py-1.5 text-xs transition-all ${
+              active
+                ? 'bg-slate-200/90 font-semibold text-slate-900 shadow-2xs dark:bg-white/15 dark:text-white'
+                : 'border border-slate-200/80 bg-white/70 font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-100/80 hover:text-slate-900 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white'
             }`}
           >
-            {cat}
+            {category}
           </button>
         );
       })}

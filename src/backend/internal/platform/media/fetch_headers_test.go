@@ -23,3 +23,18 @@ func TestRemoteImageHeadersUseRetailRefererWithoutAvif(t *testing.T) {
 		t.Fatalf("video headers %#v", video)
 	}
 }
+
+func TestProtectedImageInlinePolicyMatchesRetailHeaders(t *testing.T) {
+	for _, host := range []string{"sns-img-hw.xhscdn.com", "img10.360buyimg.com", "img.alicdn.com", "img.tbcdn.cn", "img.pddpic.com", "img.douyinpic.com"} {
+		source := "https://" + host + "/original.jpg?signature=kept"
+		if !RemoteImageNeedsInline(source) || RemoteImageHeaders(source)["Referer"] == "" {
+			t.Fatalf("protected CDN not prepared: %s", host)
+		}
+	}
+	if RemoteImageNeedsInline("https://xhscdn.com.evil.example/image.jpg") {
+		t.Fatal("suffix spoof accepted")
+	}
+	if RemoteImageNeedsInline("https://public.example/image.jpg?signature=kept") {
+		t.Fatal("public signed image unnecessarily rewritten")
+	}
+}

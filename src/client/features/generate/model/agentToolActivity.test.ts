@@ -54,7 +54,7 @@ describe('presentAgentTurn', () => {
     expect(blocks.map((block) => block.kind)).toEqual(['tools', 'item', 'tools']);
     const [first, , third] = blocks;
     if (first?.kind !== 'tools' || third?.kind !== 'tools') throw new Error('expected tool groups');
-    expect(first.group.summary).toBe('更新了执行计划读取了文件');
+    expect(first.group.summary).toBe('更新了执行计划、读取了文件');
     expect(first.group.expandable).toBe(true);
     expect(first.group.lines.map((line) => line.text)).toEqual(['已更新执行计划', '已读取 template_following.md']);
     expect(third.group.summary).toBe('运行了代码');
@@ -101,5 +101,21 @@ describe('presentAgentTurn', () => {
     expect(block.group.summary).toBe('已查看 2 张图像');
     expect(block.group.expandable).toBe(false);
     expect(JSON.stringify(block.group)).not.toContain('https://example.com');
+  });
+
+  it('formats skill and skill resource reads cleanly with a separator', () => {
+    const [block] = presentAgentTurn([
+      call('skill', 'read_skill', '{"skill_id":"prompt-reverse-engineer"}'),
+      result('skill', 'read_skill', '已读取技能 提示词反推专家'),
+      call('file', 'read_skill_file', '{"path":"assetDeconstruct/REVERSE_ENGINE_CORE_SPEC"}'),
+      result('file', 'read_skill_file', '已读取 assetDeconstruct/REVERSE_ENGINE_CORE_SPEC'),
+    ]);
+    if (block?.kind !== 'tools') throw new Error('expected a tool group');
+    expect(block.group.summary).toBe('读取了技能、读取了技能资料');
+    expect(block.group.lines.map((line) => line.text)).toEqual([
+      '已读取技能 提示词反推专家',
+      '已读取 assetDeconstruct/REVERSE_ENGINE_CORE_SPEC',
+    ]);
+    expect(block.group.lines.map((line) => line.details)).toEqual([[], []]);
   });
 });

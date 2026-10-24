@@ -3,7 +3,7 @@ import type { TextProtocol } from '@shared/domain/models/textProtocol';
 
 export const KEYWORD_REVIEW_REASONING_STORAGE_KEY = 'keyword_review_reasoning_effort';
 
-const LEVELS = new Set<ReasoningEffort>(['auto', 'low', 'medium', 'high', 'xhigh']);
+const LEVELS = new Set<ReasoningEffort>(['auto', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 export function readStoredKeywordReviewReasoning(): ReasoningEffort {
   try {

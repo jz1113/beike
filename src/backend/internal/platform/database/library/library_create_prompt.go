@@ -235,11 +235,19 @@ func ensureVisiblePromptNumbers(ctx context.Context, tx *sql.Tx, workspace strin
 		INSERT OR IGNORE INTO "FullPromptDisplaySequence" ("id", "lastNumber") VALUES (?, 0)`, sequenceID); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM "FullPromptLibraryNumber"
+		WHERE "workspaceId" = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM "FullPromptAsset"
+			WHERE "FullPromptAsset"."id" = "FullPromptLibraryNumber"."assetId"
+			  AND "FullPromptAsset"."workspaceId" IN (?, ?)
+			  AND `+visiblePromptSQL+`
+		  )`, workspace, workspace, database.OfficialWorkspace); err != nil {
+		return err
+	}
 	var start int64
-	if err := tx.QueryRowContext(ctx, `SELECT MAX(
-		(SELECT "lastNumber" FROM "FullPromptDisplaySequence" WHERE "id" = ?),
-		COALESCE((SELECT MAX("displayNumber") FROM "FullPromptLibraryNumber" WHERE "workspaceId" = ?), 0)
-	)`, sequenceID, workspace).Scan(&start); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT MAX("displayNumber") FROM "FullPromptLibraryNumber" WHERE "workspaceId" = ?), 0)`, workspace).Scan(&start); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -252,9 +260,28 @@ func ensureVisiblePromptNumbers(ctx context.Context, tx *sql.Tx, workspace strin
 		workspace, start, workspace, database.OfficialWorkspace, workspace); err != nil {
 		return err
 	}
+	var count, maxNum int64
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(MAX("displayNumber"), 0) FROM "FullPromptLibraryNumber" WHERE "workspaceId" = ?`, workspace).Scan(&count, &maxNum); err != nil {
+		return err
+	}
+	if count != maxNum {
+		if _, err := tx.ExecContext(ctx, `UPDATE "FullPromptLibraryNumber" SET "displayNumber" = -"displayNumber" WHERE "workspaceId" = ?`, workspace); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			WITH ordered AS (
+				SELECT "assetId", ROW_NUMBER() OVER (ORDER BY -"displayNumber" ASC, "assetId" ASC) AS "seq"
+				FROM "FullPromptLibraryNumber" WHERE "workspaceId" = ?
+			)
+			UPDATE "FullPromptLibraryNumber"
+			SET "displayNumber" = (SELECT "seq" FROM ordered WHERE ordered."assetId" = "FullPromptLibraryNumber"."assetId")
+			WHERE "workspaceId" = ?`, workspace, workspace); err != nil {
+			return err
+		}
+	}
 	_, err := tx.ExecContext(ctx, `
-		UPDATE "FullPromptDisplaySequence" SET "lastNumber" = MAX(
-			"lastNumber", COALESCE((SELECT MAX("displayNumber") FROM "FullPromptLibraryNumber" WHERE "workspaceId" = ?), 0)
+		UPDATE "FullPromptDisplaySequence" SET "lastNumber" = COALESCE(
+			(SELECT MAX("displayNumber") FROM "FullPromptLibraryNumber" WHERE "workspaceId" = ?), 0
 		) WHERE "id" = ?`, workspace, sequenceID)
 	return err
 }

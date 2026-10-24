@@ -34,9 +34,9 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
       selectedImageGenModel: sImage,
     } = loadSystemConfiguredModels();
     setAvailableVisionModels(vModels);
-    setSelectedVisionModel(sVision);
+    setSelectedVisionModel((prev) => (vModels.some((m) => m.id === prev) ? prev : sVision));
     setAvailableImageModels(iModels);
-    setSelectedImageGenModel(sImage);
+    setSelectedImageGenModel((prev) => (iModels.some((m) => m.id === prev) ? prev : sImage));
   }, []);
 
   useEffect(() => {
@@ -44,7 +44,14 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
     loadModelsHandler();
     const refresh = () => { void fetchRecipesHandler(); };
     window.addEventListener('workshop-recipes-changed', refresh);
-    return () => { ++recipeRequest.current; window.removeEventListener('workshop-recipes-changed', refresh); };
+    window.addEventListener('models_updated', loadModelsHandler);
+    window.addEventListener('modality_models_updated', loadModelsHandler);
+    return () => {
+      recipeRequest.current += 1;
+      window.removeEventListener('workshop-recipes-changed', refresh);
+      window.removeEventListener('models_updated', loadModelsHandler);
+      window.removeEventListener('modality_models_updated', loadModelsHandler);
+    };
   }, [fetchRecipesHandler, loadModelsHandler]);
 
   return {

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"sort"
-	"strconv"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/platform/database"
@@ -67,55 +66,10 @@ func LoadDataset(ctx context.Context, db *sql.DB, workspace, folderID string) (D
 		dataset.Samples = append(dataset.Samples, sample)
 	}
 	sort.Slice(dataset.Samples, func(i, j int) bool { return dataset.Samples[i].ID < dataset.Samples[j].ID })
-	roleRows, err := db.QueryContext(ctx, `SELECT "groupId","role" FROM "CategorySkillSampleRole" WHERE "workspaceId"=? AND "folderId"=?`, workspace, folderID)
-	if err != nil {
-		return Dataset{}, err
-	}
-	roles := map[string]string{}
-	for roleRows.Next() {
-		var id, role string
-		if err := roleRows.Scan(&id, &role); err != nil {
-			roleRows.Close()
-			return Dataset{}, err
-		}
-		roles[id] = role
-	}
-	err = roleRows.Err()
-	roleRows.Close()
-	if err != nil {
-		return Dataset{}, err
-	}
-	holdouts := 0
+	// Every effective original may contribute observations. Historical manifests
+	// retain their old validation roles for provenance and optional comparisons.
 	for i := range dataset.Samples {
-		sample := &dataset.Samples[i]
-		sample.Role = roles[sample.ID]
-		if role := roles[sampleSourceRole(*sample)]; role != "" {
-			sample.Role = role
-		}
-		if sample.Role == "" {
-			number, _ := strconv.ParseUint(Hash(sample.ID)[:2], 16, 8)
-			sample.Role = "training"
-			if number%5 == 0 {
-				sample.Role = "holdout"
-			}
-		}
-		if sample.Role == "holdout" {
-			holdouts++
-		}
-	}
-	// Establish at least three held-out groups before the first consolidation.
-	if len(dataset.Samples) >= 20 {
-		for i := range dataset.Samples {
-			if holdouts >= 3 {
-				break
-			}
-			sample := &dataset.Samples[i]
-			// Already observed training images must never become validation evidence.
-			if sample.Role != "holdout" && roles[sample.ID] == "" && roles[sampleSourceRole(*sample)] == "" {
-				sample.Role = "holdout"
-				holdouts++
-			}
-		}
+		dataset.Samples[i].Role = "training"
 	}
 	manifest := []string{}
 	for _, sample := range dataset.Samples {

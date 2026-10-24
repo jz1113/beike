@@ -63,7 +63,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const sourceIdx = typeof detailItem.sourceImageIndex === 'number' ? detailItem.sourceImageIndex : null;
   const assetCode = detailItem.code || (detailItem.id ? stableAssetCode('R', String(detailItem.id)) : 'R-01');
   const displayTitle = activeSubTab === 'full_prompt'
-    ? fullPromptGroupLabel(detailItem.displayNumber ?? detailItem.listPosition)
+    ? fullPromptGroupLabel(detailItem.listPosition ?? detailItem.displayNumber)
     : detailItem.title || detailItem.name || '未命名资产';
   const isDerivedGroup = activeSubTab === 'full_prompt' && (
     detailItem.registry?.provenance === 'workshop_generated' ||

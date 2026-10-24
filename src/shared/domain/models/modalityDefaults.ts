@@ -48,7 +48,7 @@ export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalit
   ],
   image: [
     seed('img_openai', 'GPT Image', 'image', 'openai', 'gpt-image-2', { isDefault: true }),
-    seed('img_google', 'Imagen', 'image', 'google', 'imagen-3.0-generate'),
+    seed('img_google', 'Nano Banana', 'image', 'google', 'gemini-nano-banana-2.1'),
     seed('img_mj', 'Midjourney', 'image', 'midjourney', 'midjourney'),
     seed('img_xai', 'Grok Image', 'image', 'xai', 'grok-image'),
     seed('img_kling', 'Kolors', 'image', 'kling', 'kling-image'),

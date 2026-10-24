@@ -1,6 +1,7 @@
 import type { AssistantSkill, AssistantSkillFile } from '@shared/domain/assistant/skills/types';
 import { parseSkillFileContent } from '@shared/domain/assistant/skills';
-import type { SkillDraftData, SkillOutputGenre } from './skillTypes';
+import { skillPresentation } from './libraryView';
+import type { SkillDraftData, SkillOutputGenre, SkillPresentation } from './skillTypes';
 import { SKILL_GENRES } from './skillTypes';
 import {
   buildTreeFromPaths,
@@ -10,6 +11,7 @@ import {
 import { extractYamlFrontmatter } from './skillPackageParser';
 
 export interface SkillStudioPayload {
+  kind?: SkillPresentation;
   title: string;
   description: string;
   genres: SkillOutputGenre[];
@@ -48,6 +50,7 @@ export function applySkillFrontmatter(
   content: string,
   name: string,
   description: string,
+  kind?: SkillPresentation,
 ): { markdownDoc: string; body: string } {
   const { frontmatter, body } = extractYamlFrontmatter(content);
   const keys = Object.keys(frontmatter);
@@ -55,6 +58,7 @@ export function applySkillFrontmatter(
   if (!keys.includes('description')) keys.splice(keys.indexOf('name') + 1, 0, 'description');
   frontmatter.name = name;
   frontmatter.description = description;
+  if (kind) { frontmatter.kind = kind; if (!keys.includes('kind')) keys.push('kind'); }
   const yaml = keys
     .filter((key) => frontmatter[key]?.trim())
     .map((key) => `${key}: ${formatYamlScalar(frontmatter[key])}`)
@@ -82,7 +86,7 @@ export function buildSkillFromStudio(payload: SkillStudioPayload, options: Build
   const title = payload.title.trim();
   const description = payload.description.trim();
   const slug = slugifySkillName(title);
-  const { markdownDoc, body } = applySkillFrontmatter(getMainSkillContent(payload.files), slug, description);
+  const { markdownDoc, body } = applySkillFrontmatter(getMainSkillContent(payload.files), slug, description, payload.kind || 'creation');
   if (!body) throw new Error('请在 SKILL.md 中写下技能指令');
   const parsed = parseSkillFileContent(markdownDoc, 'SKILL.md').skill;
   const now = Date.now();
@@ -101,6 +105,7 @@ export function buildSkillFromStudio(payload: SkillStudioPayload, options: Build
     updatedAt: now,
     files: files.length > 0 ? files : undefined,
     meta: {
+      kind: payload.kind || 'creation',
       genres: payload.genres,
       tags: payload.tags,
       defaultVideoModel: payload.defaultVideoModel,
@@ -130,6 +135,7 @@ export function studioStateFromSkill(skill: AssistantSkill): { files: SkillFileN
   return {
     files: buildTreeFromPaths(entries),
     draft: {
+      kind: skillPresentation(skill),
       title: (skill.displayName || skill.name || '').slice(0, 20),
       description: (skill.description || '').slice(0, 50),
       genres: genres.length > 0 ? genres : ['图片'],

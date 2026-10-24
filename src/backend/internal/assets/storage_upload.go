@@ -37,7 +37,7 @@ func storageUploadHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "url": first, "urls": urls, "count": len(urls)})
 			return
 		}
-		urls, status, message := saveLocalUpload(r.Header.Get("Content-Type"), raw)
+		urls, status, message := saveLocalUpload(httpx.WorkspaceFrom(r), r.Header.Get("Content-Type"), raw)
 		if status != 0 {
 			httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message})
 			return
@@ -75,9 +75,9 @@ func storageTestHandler(cfg config.Config) http.HandlerFunc {
 	}
 }
 
-func saveLocalUpload(contentType string, raw []byte) ([]string, int, string) {
+func saveLocalUpload(workspace, contentType string, raw []byte) ([]string, int, string) {
 	if strings.Contains(contentType, "multipart/form-data") {
-		return saveMultipart(contentType, raw)
+		return saveMultipart(workspace, contentType, raw)
 	}
 	var payload map[string]any
 	if len(bytes.TrimSpace(raw)) > 0 && json.Unmarshal(raw, &payload) != nil {
@@ -100,7 +100,7 @@ func saveLocalUpload(contentType string, raw []byte) ([]string, int, string) {
 	}
 	saved := []string{}
 	for _, item := range urls {
-		path, err := writeDataURL(item, category)
+		path, err := writeDataURL(workspace, item, category)
 		if err != nil {
 			return nil, http.StatusInternalServerError, "无效的 data URL"
 		}
@@ -109,7 +109,7 @@ func saveLocalUpload(contentType string, raw []byte) ([]string, int, string) {
 	return saved, 0, ""
 }
 
-func saveMultipart(contentType string, raw []byte) ([]string, int, string) {
+func saveMultipart(workspace, contentType string, raw []byte) ([]string, int, string) {
 	_, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
 		return nil, http.StatusBadRequest, "未接收到待上传的文件"
@@ -140,7 +140,7 @@ func saveMultipart(contentType string, raw []byte) ([]string, int, string) {
 				return nil, http.StatusInternalServerError, "媒体上传至存储失败"
 			}
 			mimeType := file.Header.Get("Content-Type")
-			path, err := writeLocalBytes(body, mimeType, category, storedFilename(mimeType, file.Filename))
+			path, err := writeLocalBytes(workspace, body, mimeType, category, storedFilename(mimeType, file.Filename))
 			if err != nil {
 				return nil, http.StatusInternalServerError, "媒体上传至存储失败"
 			}
@@ -153,7 +153,7 @@ func saveMultipart(contentType string, raw []byte) ([]string, int, string) {
 	return saved, 0, ""
 }
 
-func writeDataURL(value, category string) (string, error) {
+func writeDataURL(workspace, value, category string) (string, error) {
 	match := dataURLPattern.FindStringSubmatch(value)
 	if match == nil {
 		return "", os.ErrInvalid
@@ -162,14 +162,14 @@ func writeDataURL(value, category string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return writeLocalBytes(body, match[1], category, "")
+	return writeLocalBytes(workspace, body, match[1], category, "")
 }
 
 func storedFilename(contentType, originalName string) string {
 	return httpx.RequestID() + "." + localExtension(contentType, originalName)
 }
 
-func writeLocalBytes(body []byte, contentType, category, filename string) (string, error) {
+func writeLocalBytes(workspace string, body []byte, contentType, category, filename string) (string, error) {
 	extension := localExtension(contentType, filename)
 	if category == "" {
 		category = "generated/images"
@@ -180,7 +180,7 @@ func writeLocalBytes(body []byte, contentType, category, filename string) (strin
 	if filename == "" {
 		filename = "azhuo_" + filePrefix(category) + "_" + time.Now().Format("20060102150405") + "_" + randomSuffix() + "." + extension
 	}
-	relative := workspaceStorageKey("local", storageKey(category, filename))
+	relative := workspaceStorageKey(workspace, storageKey(category, filename))
 	absolute := filepath.Join(storage.ResolveRoot(), relative)
 	if err := os.MkdirAll(filepath.Dir(absolute), 0o755); err != nil {
 		return "", err

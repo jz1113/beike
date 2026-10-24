@@ -1,11 +1,24 @@
+export type SkillPresentation = 'agent' | 'creation';
+
 export type SkillMainTab = 'all' | 'my' | 'favorite';
 
 export const SKILL_GENRES = ['视频', '图片', '音频', '文本'] as const;
 export type SkillOutputGenre = typeof SKILL_GENRES[number];
 
-/** 内容分类留空。「全部」是筛选入口；在此补充名称后，会同时出现在筛选条和创建时的类型标签。 */
 export const SKILL_CATEGORIES = [
   '全部',
+  '专业影视',
+  '营销广告',
+  '短剧漫剧',
+  '独家画风',
+  '独家超创',
+  'Skill大赛',
+  '创意发散',
+  '特效玩法',
+  '社媒热点',
+  '音乐MV',
+  '一镜到底',
+  '爆款复刻',
 ] as const;
 
 export const SKILL_TAG_OPTIONS: readonly string[] = SKILL_CATEGORIES.filter((category) => category !== '全部');
@@ -15,6 +28,7 @@ export type SkillCategory = typeof SKILL_CATEGORIES[number];
 export interface SkillItem {
   id: string;
   runtime?: 'assistant' | 'workshop';
+  presentation?: SkillPresentation;
   libraryVersion?: string;
   isOfficial?: boolean;
   title: string;
@@ -28,6 +42,9 @@ export interface SkillItem {
   genres?: SkillOutputGenre[];
   prompt?: string;
   author?: string;
+  usageCount?: number;
+  favoriteCount?: number;
+  files?: Array<{ path: string; content: string }>;
   isFavorite?: boolean;
   defaultVideoModel?: string;
   defaultImageModel?: string;
@@ -38,6 +55,7 @@ export interface SkillItem {
 }
 
 export interface SkillDraftData {
+  kind?: SkillPresentation;
   title: string;
   description: string;
   genres: SkillOutputGenre[];

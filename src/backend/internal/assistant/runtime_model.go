@@ -17,7 +17,7 @@ import (
 )
 
 var approvedAssistantModels = map[string]bool{
-	"gpt-6-luna": true, "grok-4.7": true, "gpt-6-sol": true, "gpt-5.6-luna": true, "gpt-5.6-sol": true,
+	"gpt-6-astra": true, "gpt-6.1-sol": true, "gpt-6-luna": true, "grok-4.7": true, "gpt-6-sol": true, "gemini-4-argon": true, "gpt-5.6-luna": true, "gpt-5.6-sol": true,
 	"gpt-5.6": true, "gpt-5.6-terra": true, "gpt-5.4-mini": true, "claude-opus-5": true, "claude-fable-5": true,
 	"claude-opus-4-7": true, "claude-haiku-4-5-20251001-thinking": true, "claude-sonnet-5": true,
 	"gemini-3.8-flash": true, "gemini-3.7-flash": true, "gemini-3.1-pro-preview": true,
@@ -114,7 +114,10 @@ func completionBody(model string, messages []map[string]any, tools []map[string]
 		payload["max_tokens"] = tokens
 	}
 	if effort != "" && effort != "auto" && effort != "none" && modelSupportsReasoning(model) {
-		payload["reasoning_effort"] = effort
+		payload["reasoning_effort"] = wireReasoningEffort(model, effort)
+		if model == "deepseek-v4-flash" || model == "deepseek-v4.1-flash" {
+			payload["thinking"] = map[string]any{"type": "enabled"}
+		}
 	}
 	if !strings.HasPrefix(model, "deepseek-official:") {
 		return json.Marshal(payload)
@@ -143,6 +146,34 @@ func completionBody(model string, messages []map[string]any, tools []map[string]
 	return json.Marshal(payload)
 }
 
+func wireReasoningEffort(model, effort string) string {
+	id := strings.ToLower(strings.TrimSpace(model))
+	switch {
+	case id == "kimi-k3" || id == "deepseek-v4-flash" || id == "deepseek-v4.1-flash":
+		if effort == "low" {
+			return "low"
+		}
+		if effort == "xhigh" || effort == "max" {
+			return "max"
+		}
+		return "high"
+	case id == "qwen3.8-max":
+		if effort == "low" || effort == "medium" {
+			return effort
+		}
+		return "xhigh"
+	case strings.HasPrefix(id, "gemini-"):
+		if effort == "low" || effort == "medium" {
+			return effort
+		}
+		return "high"
+	case (id == "gpt-5.4-mini" || strings.HasPrefix(id, "grok-4")) && effort == "max":
+		return "xhigh"
+	default:
+		return effort
+	}
+}
+
 func modelSupportsReasoning(model string) bool {
 	id := strings.ToLower(strings.TrimSpace(model))
 	if strings.Contains(id, "4o") || strings.Contains(id, "gpt-4") || strings.Contains(id, "gpt-3") {
@@ -154,7 +185,7 @@ func modelSupportsReasoning(model string) bool {
 	if strings.Contains(id, "reason") || strings.Contains(id, "thinking") {
 		return true
 	}
-	if strings.HasPrefix(id, "gpt-5") || strings.HasPrefix(id, "gpt-6") || strings.Contains(id, "grok-4") || strings.Contains(id, "gemini-3") || strings.Contains(id, "qwen3.8") || strings.Contains(id, "kimi-k3") || strings.Contains(id, "deepseek") {
+	if strings.HasPrefix(id, "gpt-5") || strings.HasPrefix(id, "gpt-6") || strings.Contains(id, "grok-4") || strings.Contains(id, "gemini-4") || strings.Contains(id, "gemini-3") || strings.Contains(id, "gemini-2.5") || strings.Contains(id, "qwen3.8") || strings.Contains(id, "kimi-k3") || strings.Contains(id, "deepseek") {
 		return true
 	}
 	return false

@@ -23,6 +23,10 @@ jobs:
         with:
           node-version: '22'
           cache: pnpm
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Full quality gate (same as local)

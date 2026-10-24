@@ -19,15 +19,35 @@ export function promptFingerprint(text: string): string {
   return (hash >>> 0).toString(36);
 }
 
+const KNOWN_PROMPT_ASPECTS = new Set([
+  '1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1', '4:3', '4:5', '5:4', '8:1', '9:16', '16:9', '21:9',
+]);
+
 function aspectFrom(text: string): string | undefined {
-  const ratio = text.match(/(?:--ar\s+|比例\s*[：:]?\s*|画幅\s*[：:]?\s*|^|[\s，,。；;])(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/m);
-  if (ratio && Number(ratio[1]) > 0 && Number(ratio[2]) > 0) return `${Number(ratio[1])}:${Number(ratio[2])}`;
+  const explicit = text.match(/(?:--ar\s+|比例\s*[：:]?\s*|画幅\s*[：:]?\s*)(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/im);
+  if (explicit && Number(explicit[1]) > 0 && Number(explicit[2]) > 0) {
+    const candidate = `${Number(explicit[1])}:${Number(explicit[2])}`;
+    if (KNOWN_PROMPT_ASPECTS.has(candidate)) return candidate;
+  }
+  for (const match of text.matchAll(/(?:^|[\s，,。；;（(])(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/gm)) {
+    const candidate = `${Number(match[1])}:${Number(match[2])}`;
+    if (KNOWN_PROMPT_ASPECTS.has(candidate)) return candidate;
+  }
   const pixels = text.match(/\b(\d{3,5})\s*[x×＊*]\s*(\d{3,5})\b/i);
   if (!pixels) return undefined;
   const a = Number(pixels[1]); const b = Number(pixels[2]);
+  if (!a || !b) return undefined;
   const gcd = (x: number, y: number): number => y ? gcd(y, x % y) : x;
   const divisor = gcd(a, b);
-  return a && b ? `${a / divisor}:${b / divisor}` : undefined;
+  const exact = `${a / divisor}:${b / divisor}`;
+  if (KNOWN_PROMPT_ASPECTS.has(exact)) return exact;
+  let best = '3:4'; let bestGap = Number.POSITIVE_INFINITY;
+  for (const ratio of KNOWN_PROMPT_ASPECTS) {
+    const [rw, rh] = ratio.split(':').map(Number);
+    const gap = Math.abs(Math.log((a / b) / (rw / rh)));
+    if (gap < bestGap) { bestGap = gap; best = ratio; }
+  }
+  return best;
 }
 
 export function isGenerationPrompt(code: string, lang = '', heading = ''): GenerationPromptMedia | undefined {

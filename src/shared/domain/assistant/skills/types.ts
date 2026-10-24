@@ -14,7 +14,7 @@ export interface AssistantSkillReference {
   label?: string;
 }
 
-/** SKILL.md 以外的附属文件，运行时跟在主指令后面注入 */
+/** SKILL.md 以外的附属文件，由 read_skill_file 按需读取。脚本不自动执行。 */
 export interface AssistantSkillFile {
   path: string;
   content: string;
@@ -22,6 +22,8 @@ export interface AssistantSkillFile {
 
 /** 技能工作室里填写的展示信息与默认模型 */
 export interface AssistantSkillMeta {
+  /** 用途：agent 参与按需发现；creation 由用户选用。不改变持久化标识。 */
+  kind?: 'agent' | 'creation';
   genres: string[];
   tags: string[];
   defaultVideoModel?: string;
@@ -40,7 +42,7 @@ export interface AssistantSkill {
   isFavorite?: boolean;
   name: string;
   description: string;
-  /** 注入 systemPrompt 的主指令（精简） */
+  /** 与 SKILL.md 正文一致的执行指令，点选注入或经 read_skill 读取。 */
   prompt: string;
   icon?: string;
   /** 允许使用的工具名；未声明则使用全量工具 */
@@ -59,8 +61,12 @@ export interface AssistantSkill {
   updatedAt?: number;
   /** 中文展示名称（如：Seedance 2.5 提示副驾驶） */
   displayName?: string;
+  /** 技能陈列分组名称（如：视觉反推与图像生成） */
+  category?: string;
   /** 技能提供方/作者，如 TapNow、官方、自定义 */
   author?: string;
+  usageCount?: number;
+  favoriteCount?: number;
   /** 图标渐变色主题 key */
   colorTheme?: string;
   /** 完整的 Markdown 文档，用于详情页展示 */

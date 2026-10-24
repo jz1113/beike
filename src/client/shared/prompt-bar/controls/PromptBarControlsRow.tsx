@@ -48,7 +48,6 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
     setQuickVideoResolution,
     setQuickAspectId,
     setQuickQuality,
-    setQuickPrompt,
     media,
     richInputRef,
     handleSendPrompt,
@@ -65,6 +64,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
     quickVideoDuration,
     quickAspectId,
     quickQuality,
+    onDropdownOpenChange,
   } = props;
 
   const [showUploadMenu, setShowUploadMenu] = useState(false);
@@ -73,9 +73,11 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
   const [showAssetPickerModal, setShowAssetPickerModal] = useState(false);
   const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [pillMenuOpen, setPillMenuOpen] = useState(false);
   const skillCreator = usePromptBarSkillCreator(richInputRef);
 
   const assistantModel = useAppStore((state) => state.assistantModel);
+  const activeAssistantSkillId = useAppStore((state) => state.activeAssistantSkillId);
   const setAssistantModel = useAppStore((state) => state.setAssistantModel);
   const { ready, videoModels, imageModels, audioModels, multimodalModels } = usePreferenceModels();
 
@@ -116,7 +118,9 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
   const modelDisplayName = modelSourceId ? menuLabelForModel(modelSourceId, selected?.name || modelSourceId) : '未配置模型';
   const agentModelName = agentTriggerModelName(modelSourceId, selected?.name || modelDisplayName);
 
-  const menuOpen = anyDropdownOpen || showUploadMenu || showSkillsModal || skillCreator.overlayOpen || showModelPicker || media.showAtMenu;
+  const localMenuOpen = showUploadMenu || showSkillsModal || skillCreator.overlayOpen || showModelPicker || showAssetPickerModal || pillMenuOpen;
+  useEffect(() => { onDropdownOpenChange?.(localMenuOpen); return () => onDropdownOpenChange?.(false); }, [localMenuOpen, onDropdownOpenChange]);
+  const menuOpen = anyDropdownOpen || localMenuOpen || media.showAtMenu;
 
   return (
     <div className={`relative mt-auto flex select-none flex-wrap items-center gap-1.5 pt-1 sm:gap-2 sm:pt-1.5 ${menuOpen ? 'z-40' : 'z-10'}`}>
@@ -153,10 +157,6 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
             onTriggerLocalUpload={() => media.fileInputRef.current?.click()}
             onOpenAssetLibrary={() => setShowAssetPickerModal(true)}
             onSubmitVideoUrl={(url) => useAppStore.getState().addQuickRefImage(url)}
-            onSelectPresetPrompt={(preset) => {
-              setQuickPrompt(preset);
-              richInputRef.current?.focus();
-            }}
           />
         </div>
 
@@ -171,7 +171,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
                 media.setAtMenuTrigger?.(null);
               } else {
                 richInputRef.current?.insertAtSymbol();
-                media.setAtMenuTrigger?.('input');
+                media.setAtMenuTrigger?.('button');
                 media.setShowAtMenu(true);
               }
               richInputRef.current?.focus();
@@ -233,6 +233,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
           >
             <Wrench className="h-3.5 w-3.5 shrink-0 stroke-[2] text-current" />
             <span>{t('sidebar.skills')}</span>
+            {activeAssistantSkillId && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />}
             <ChevronDown className="h-3 w-3 shrink-0" />
           </button>
           <PromptBarSkillsModal
@@ -276,7 +277,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
         </div>
 
         {isAgent ? (
-          <PromptBarReasoningPill assistantModel={selectedModelId} isUp={isUp} />
+          <PromptBarReasoningPill assistantModel={selectedModelId || modelSourceId} isUp={isUp} onOpenChange={setPillMenuOpen} />
         ) : (
           <PromptBarParamsPill
             isUp={isUp}
@@ -296,6 +297,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
             quickQuality={quickQuality}
             setQuickAspectId={setQuickAspectId}
             setQuickQuality={setQuickQuality}
+            onOpenChange={setPillMenuOpen}
           />
         )}
       </div>

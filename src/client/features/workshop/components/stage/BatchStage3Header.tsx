@@ -1,89 +1,25 @@
-import React from 'react';
-import { Sparkles, Cpu } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import BatchProgressBar from '../delivery/BatchProgressBar';
 
 export interface BatchStage3HeaderProps {
   readyCount: number;
   totalCount: number;
-  analyzeConcurrency?: number;
-  setAnalyzeConcurrency?: (n: number) => void;
+  failedCount: number;
   isAnalyzingAll: boolean;
-  showAnalyzeButton: boolean;
-  hasUnanalyzed: boolean;
-  startBatchVisionAnalyze: () => Promise<number | void>;
   analyzeProgress: { current: number; total: number };
-  onOpenSettings?: () => void;
 }
 
-export const BatchStage3Header: React.FC<BatchStage3HeaderProps> = ({
-  readyCount,
-  totalCount,
-  analyzeConcurrency = 2,
-  isAnalyzingAll,
-  showAnalyzeButton,
-  hasUnanalyzed,
-  startBatchVisionAnalyze,
-  analyzeProgress,
-  onOpenSettings,
-}) => {
-  return (
-    <div className="p-4 sm:p-5 rounded-xl bg-transparent border border-slate-200/60 space-y-3 transition-all dark:border-white/10">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight dark:text-slate-100">
-              提示词工作台
-            </h2>
-            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[11px] font-bold text-slate-600 border border-slate-200/60 shadow-2xs dark:text-slate-300 dark:bg-white/10 dark:border-white/10">
-              {readyCount}/{totalCount} 款已就绪
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 font-normal">
-            分析商品图片，生成分镜提示词；确认或微调后，即可批量生图。
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* 全局预设指示标签：轻量只读，点击可直达工坊全局预设中心修改 */}
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            title="点击打开工坊全局生产预设中心，调整模型与并发性能"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200/70 transition-all cursor-pointer group hover:border-indigo-200 dark:text-slate-300 dark:hover:bg-white/10 dark:bg-white/5 dark:border-white/10"
-          >
-            <Cpu className="w-3.5 h-3.5 text-indigo-500 group-hover:rotate-45 transition-transform" />
-            <span>{analyzeConcurrency} 线程并发</span>
-            <span className="text-[10px] text-slate-400 group-hover:text-indigo-600 underline underline-offset-2">预设配置</span>
-          </button>
-
-          {showAnalyzeButton && (
-            <button
-              type="button"
-              onClick={startBatchVisionAnalyze}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>
-                {hasUnanalyzed
-                  ? `批量分析商品`
-                  : '重新全量分析'}
-              </span>
-            </button>
-          )}
-        </div>
+export function BatchStage3Header({ readyCount, totalCount, failedCount, isAnalyzingAll, analyzeProgress }: BatchStage3HeaderProps) {
+  return <header aria-live="polite" className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 dark:border-white/10 dark:bg-[#18191c]/95">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">分析并确认分镜</h1>
+        <p className="mt-1 text-xs leading-6 text-slate-500 dark:text-slate-400">先核对商品身份与逐镜参考，再微调提示词。分析结束后，由你确认开始生图。</p></div>
+      <div className="flex items-center gap-3 text-xs">
+        {isAnalyzingAll ? <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-300"><Loader2 className="h-3.5 w-3.5 animate-spin" />分析进行中</span>
+          : failedCount > 0 ? <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300"><AlertCircle className="h-3.5 w-3.5" />{failedCount} 款分析失败</span> : null}
+        <span className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />{readyCount}/{totalCount} 款就绪</span>
       </div>
-
-      {/* 实时分析进度条 */}
-      {isAnalyzingAll && (
-        <div className="pt-2">
-          <BatchProgressBar
-            current={analyzeProgress.current}
-            total={analyzeProgress.total}
-            label="多模态 AI 视觉模型正在结合商品实物图深度优化分镜提示词..."
-            showSpinner
-          />
-        </div>
-      )}
     </div>
-  );
-};
+    {isAnalyzingAll && <div className="mt-4"><BatchProgressBar current={analyzeProgress.current} total={analyzeProgress.total} label="正在生成分镜提示词，完成后可审核" showSpinner /></div>}
+  </header>;
+}

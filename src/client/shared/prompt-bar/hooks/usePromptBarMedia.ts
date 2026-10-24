@@ -177,7 +177,7 @@ export function usePromptBarMedia({
       const newNamesMap: Record<string, string> = {};
       const newMentionNames: string[] = [];
 
-      let currentTotal = quickRefImages.length;
+      let currentTotal = quickRefImages.filter((url) => !url.startsWith('agent-file:')).length;
       items.forEach((item) => {
         registerRefMedia(item.previewUrl, item.file, item.origName);
         newNamesMap[item.previewUrl] = item.origName;
@@ -210,7 +210,7 @@ export function usePromptBarMedia({
         }
       }
     },
-    [isDepthMode, quickGenMode, quickPrompt, quickRefImages.length, bumpRefMediaVersion, setQuickRefImages, addQuickRefImage, setQuickPrompt],
+    [isDepthMode, quickGenMode, quickPrompt, quickRefImages, bumpRefMediaVersion, setQuickRefImages, addQuickRefImage, setQuickPrompt],
   );
 
   const resolveMediaFile = useCallback(
@@ -248,11 +248,8 @@ export function usePromptBarMedia({
     reader.onload = (event) => {
       if (typeof event.target?.result === 'string') {
         const url = event.target.result;
-        const newSub: SubjectItem = {
-          id: `custom-${Date.now()}`,
-          name: origName,
-          url,
-        };
+        registerRefMedia(url, file, origName); bumpRefMediaVersion();
+        const newSub: SubjectItem = { id: `custom-${Date.now()}`, name: origName, url };
         setRefImageNames((prev) => ({ ...prev, [url]: origName }));
         setCustomSubjects((prev) => [newSub, ...prev]);
         handleSelectSubject(newSub);

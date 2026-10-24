@@ -29,6 +29,8 @@ func videoSpecFor(model string) (videoSpec, bool) {
 		return videoSpecs["sora-2-pro"], true
 	case strings.Contains(id, "sora"):
 		return videoSpecs["sora-2"], true
+	case strings.Contains(id, "omni_flash") || strings.Contains(id, "omni-flash") || strings.Contains(id, "gemini-omni"):
+		return videoSpecs["omni_flash-10s"], true
 	case strings.Contains(id, "veo"):
 		return videoSpecs["veo3.1"], true
 	case strings.Contains(id, "kling"):
@@ -87,7 +89,7 @@ func videoSpecError(model, mode, resolution, aspect string, duration float64) st
 
 func videoDurations(model, resolution, mode string) []int {
 	id := strings.ToLower(model)
-	if strings.Contains(id, "veo") && !strings.Contains(id, "omni_flash") && !strings.Contains(id, "omni-flash") && (resolution != "720P" || mode == "omni" || mode == "first_last_frame") {
+	if strings.Contains(id, "veo") && !strings.Contains(id, "omni_flash") && !strings.Contains(id, "omni-flash") && !strings.Contains(id, "gemini-omni") && (resolution != "720P" || mode == "omni" || mode == "first_last_frame") {
 		return []int{8}
 	}
 	if spec, ok := videoSpecFor(model); ok {
@@ -135,8 +137,8 @@ func withAdaptive(values []string) []string {
 
 var videoSpecs = map[string]videoSpec{
 	"veo3.1":                          {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
-	"veo3.1-fast":                     {[]int{4, 6, 8}, []string{"720P", "1080P"}, []string{"16:9", "9:16"}},
-	"omni_flash-10s":                  {[]int{10}, []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
+	"veo3.1-fast":                     {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
+	"omni_flash-10s":                  {[]int{10}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
 	"kling-video-v3":                  {ints(3, 15), []string{"720P", "1080P"}, videoRatios},
 	"kling-video-v3-omni":             {ints(3, 15), []string{"720P", "1080P"}, videoRatios},
 	"kling-video-v2-5-turbo":          {[]int{5, 10}, []string{"720P", "1080P"}, videoRatios},

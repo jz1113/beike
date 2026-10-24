@@ -41,6 +41,38 @@ const CATALOG: Record<string, ToolCopy> = {
     skipped: '已跳过执行计划',
     line: () => '已更新执行计划',
   },
+  read_skill: {
+    icon: 'file',
+    done: '读取了技能',
+    running: '正在读取技能',
+    failed: '未能读取技能',
+    skipped: '已跳过读取技能',
+    line: (target) => (target ? `已读取技能 ${target}` : '已读取技能'),
+  },
+  read_skill_file: {
+    icon: 'file',
+    done: '读取了技能资料',
+    running: '正在读取技能资料',
+    failed: '未能读取技能资料',
+    skipped: '已跳过读取技能资料',
+    line: (target) => (target ? `已读取 ${target}` : '已读取技能资料'),
+  },
+  search_mcp_tools: {
+    icon: 'search',
+    done: '检索了外部工具',
+    running: '正在检索外部工具',
+    failed: '未能检索外部工具',
+    skipped: '已跳过检索外部工具',
+    line: (target) => (target ? `已检索 ${target}` : '已检索外部工具'),
+  },
+  load_mcp_tool: {
+    icon: 'tool',
+    done: '加载了外部工具',
+    running: '正在加载外部工具',
+    failed: '未能加载外部工具',
+    skipped: '已跳过加载外部工具',
+    line: (target) => (target ? `已加载 ${target}` : '已加载外部工具'),
+  },
   read_attached_document: {
     icon: 'file',
     done: '读取了文件',
@@ -161,6 +193,30 @@ const CATALOG: Record<string, ToolCopy> = {
     skipped: '已跳过准备生图',
     line: () => '已准备生图',
   },
+  get_view_capabilities: {
+    icon: 'tool',
+    done: '读取了视图能力',
+    running: '正在读取视图能力',
+    failed: '未能读取视图能力',
+    skipped: '已跳过读取视图能力',
+    line: () => '已读取视图能力',
+  },
+  trigger_generate_batch: {
+    icon: 'image',
+    done: '请求了批量生成',
+    running: '正在请求批量生成',
+    failed: '未能请求批量生成',
+    skipped: '已跳过请求批量生成',
+    line: () => '已请求批量生成',
+  },
+  spawn_subagent: {
+    icon: 'tool',
+    done: '启动了子任务',
+    running: '正在启动子任务',
+    failed: '未能启动子任务',
+    skipped: '已跳过启动子任务',
+    line: (target) => (target ? `已启动子任务 ${target}` : '已启动子任务'),
+  },
   set_workshop_arch: {
     icon: 'tool',
     done: '切换了拍摄架构',
@@ -272,15 +328,17 @@ function activityLine(call: ToolCallItem, result?: ToolResultItem): ToolActivity
   const images = imageCount(result);
   const seenImages = images > 0 && call.name !== 'update_plan';
   const icon = seenImages ? 'image' : copy.icon;
-  const phrase = seenImages && status === 'done' ? '查看了图像' : phraseFor(copy, status);
-  const text = status === 'done' && seenImages
-    ? `已查看 ${images} 张图像`
-    : status === 'done'
-      ? copy.line(targetFrom(call.args), images)
-      : phrase;
   const fromResult = planLines(result?.summary);
   const steps = fromResult.length ? fromResult : planLines(call.args);
   const note = plainText(result?.summary);
+  const phrase = seenImages && status === 'done' ? '查看了图像' : phraseFor(copy, status);
+  const text = status === 'done' && seenImages
+    ? `已查看 ${images} 张图像`
+    : status === 'done' && call.name === 'read_skill' && note.startsWith('已读取技能')
+      ? note
+      : status === 'done'
+        ? copy.line(targetFrom(call.args), images)
+        : phrase;
   const details = steps.length ? steps : note && note !== text ? [note] : [];
   return { id: call.id, icon, phrase, text, tone: toneFor(status), details };
 }
@@ -294,7 +352,7 @@ function groupSummary(lines: ToolActivityLine[]): string {
     seen.add(line.phrase);
     parts.push(line.phrase);
   }
-  return parts.join('');
+  return parts.join('、');
 }
 
 function buildGroup(calls: ToolCallItem[], results: Map<string, ToolResultItem>): ToolActivityGroup {

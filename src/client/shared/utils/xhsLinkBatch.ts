@@ -1,7 +1,6 @@
 import { apiFetch } from '@client/shared/api/apiClient';
 import { mapWithConcurrency } from '@shared/domain/core/asyncPool';
 import {
-  MAX_IMAGES_PER_SET,
   MIN_IMAGES_PER_SET,
 } from '@shared/domain/assets/asset-deconstruct/prompts';
 import { RateLimiter } from '@client/shared/utils/rateLimiter';
@@ -44,7 +43,7 @@ export interface XhsParseResult {
   skipped: XhsParseSkipRecord[];
 }
 
-/** 解析 parse-link 返回的媒体对象，过滤视频与不足 3 张图的笔记 */
+/** 解析 parse-link 返回的媒体对象，过滤视频与不足 4 张图的笔记 */
 export function filterParseLinkImages(
   media: ParseLinkMedia
 ): { ok: true; images: string[]; title: string; author: string } | { ok: false; reason: string } {
@@ -64,29 +63,35 @@ export function filterParseLinkImages(
     return { ok: false, reason: `图片数不足 ${MIN_IMAGES_PER_SET} 张（当前 ${rawImages.length} 张，已跳过）` };
   }
 
+  const completeCount = Math.floor(rawImages.length / MIN_IMAGES_PER_SET) * MIN_IMAGES_PER_SET;
   return {
     ok: true,
-    images: rawImages.slice(0, MAX_IMAGES_PER_SET),
+    images: rawImages.slice(0, completeCount),
     title: media.title ? media.title.slice(0, 40) : '',
     author: media.author || '',
   };
 }
 
-export function toXhsQueueItem(
+export function toXhsQueueItems(
   filtered: { images: string[]; title: string; author: string },
   sourceUrl: string,
   index: number,
   apiUsed?: string,
-): ImageSetQueueItem {
-  return {
-    id: `xhs_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    name: filtered.title || `小红书图集_${index + 1}`,
-    images: filtered.images,
+): ImageSetQueueItem[] {
+  const groups: string[][] = [];
+  for (let i = 0; i + MIN_IMAGES_PER_SET <= filtered.images.length; i += MIN_IMAGES_PER_SET) {
+    groups.push(filtered.images.slice(i, i + MIN_IMAGES_PER_SET));
+  }
+  const baseTitle = filtered.title || `小红书图集_${index + 1}`;
+  return groups.map((images, groupIndex) => ({
+    id: `xhs_${Date.now()}_${groupIndex}_${Math.random().toString(36).slice(2, 7)}`,
+    name: groups.length > 1 ? `${baseTitle} · 组 ${groupIndex + 1}` : baseTitle,
+    images,
     sourceUrl,
     author: filtered.author,
     status: 'pending',
     apiUsed,
-  };
+  }));
 }
 
 export interface ParseLinkRequestOptions {
@@ -175,7 +180,7 @@ export async function batchParseXhsLinks(
     if (parsed.success) {
       const filtered = filterParseLinkImages(parsed.media);
       if (filtered.ok) {
-        queueItems.push(toXhsQueueItem(filtered, url, queueItems.length, parsed.apiUsed));
+        queueItems.push(...toXhsQueueItems(filtered, url, queueItems.length, parsed.apiUsed));
       } else {
         skipped.push({ url, reason: filtered.reason, kind: 'filtered' });
       }

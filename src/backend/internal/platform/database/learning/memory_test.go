@@ -73,7 +73,7 @@ func TestMemorySeparatesRejectedHeldOutAndChangedSources(t *testing.T) {
 	_ = SaveObservation(ctx, db, "a", testFolder, "vision", training[0], json.RawMessage(`{"compatible":false,"reason":"图片主体是手机壳，不是手机本体"}`))
 	_ = SaveObservation(ctx, db, "a", testFolder, "vision", training[1], json.RawMessage(`{"compatible":true,"reusableRules":["保持主体占比"],"conditions":["手持时"],"failuresToAvoid":["不改结构"]}`))
 	memory, err := ReadMemory(ctx, db, "a", testFolder, dataset)
-	if err != nil || memory.Learned != 1 || memory.Rejected != 1 || len(memory.Sources) != 1 || memory.Holdout < 3 {
+	if err != nil || memory.Learned != 1 || memory.Rejected != 1 || len(memory.Sources) != 1 || memory.Holdout != 0 {
 		t.Fatalf("memory counts %#v error=%v", memory, err)
 	}
 	if MemoryCovered(memory, Version{}) {
@@ -90,42 +90,29 @@ func TestMemorySeparatesRejectedHeldOutAndChangedSources(t *testing.T) {
 	}
 }
 
-func TestConsolidationNeedsActualTrainingAndIndependentValidation(t *testing.T) {
-	if ReadyToConsolidate(Memory{Learned: 5, Holdout: 100}, 20) {
-		t.Fatal("validation images substituted for training observations")
+func TestConsolidationAcceptsOneObservationOrManualNotes(t *testing.T) {
+	if ReadyToConsolidate(Memory{Holdout: 100, Rejected: 20}, 20) {
+		t.Fatal("unobserved or rejected samples accepted")
 	}
-	if !ReadyToConsolidate(Memory{Learned: 16, Holdout: 4}, 20) {
-		t.Fatal("ready evidence not accepted")
+	if !ReadyToConsolidate(Memory{Learned: 1}, 30) {
+		t.Fatal("single observation blocked")
 	}
-	if ReadyToConsolidate(Memory{Learned: 30, Holdout: 2}, 20) {
-		t.Fatal("insufficient independent validation")
+	if !ReadyToConsolidate(Memory{Notes: []Note{{Content: "真实商品优先"}}}, 20) {
+		t.Fatal("manual notes blocked")
 	}
 }
 
-func TestNewGroupsFillValidationWithoutReassigningLearnedTraining(t *testing.T) {
+func TestHistoricalHoldoutsBecomeAvailableWithoutLosingObservations(t *testing.T) {
 	db := learningDB(t)
 	ctx := context.Background()
 	insertGroup(t, db, "first", "first", "a", "phone", "deconstructed")
-	first, _ := LoadDataset(ctx, db, "a", testFolder)
-	first.Samples[0].Role = "training"
-	if err := SaveRoles(ctx, db, "a", testFolder, first.Samples); err != nil {
+	dataset, _ := LoadDataset(ctx, db, "a", testFolder)
+	dataset.Samples[0].Role = "holdout"
+	if err := SaveRoles(ctx, db, "a", testFolder, dataset.Samples); err != nil {
 		t.Fatal(err)
 	}
-	twentyGroups(t, db)
 	all, err := LoadDataset(ctx, db, "a", testFolder)
-	if err != nil {
-		t.Fatal(err)
-	}
-	holdout := 0
-	for _, sample := range all.Samples {
-		if sample.ID == "first" && sample.Role != "training" {
-			t.Fatal("old training leaked into validation")
-		}
-		if sample.Role == "holdout" {
-			holdout++
-		}
-	}
-	if holdout < 3 {
-		t.Fatal("new groups did not establish validation set")
+	if err != nil || all.Samples[0].Role != "training" {
+		t.Fatal("historical role blocked learning", err)
 	}
 }

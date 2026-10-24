@@ -76,7 +76,7 @@ func ManifestCurrent(version Version, dataset Dataset) bool {
 			return false
 		}
 	}
-	return len(version.Manifest.Samples) > 0
+	return len(version.Manifest.Samples) > 0 || len(version.Manifest.Notes) > 0
 }
 
 func Switch(ctx context.Context, db *sql.DB, workspace, folder, action, versionID string, revision int) error {
@@ -103,7 +103,7 @@ func Switch(ctx context.Context, db *sql.DB, workspace, folder, action, versionI
 		trial = ""
 		comparison = ""
 		versionID = active
-	case "trial", "publish":
+	case "trial", "publish", "activate":
 		version, err := ReadVersion(ctx, db, workspace, folder, versionID)
 		if err != nil {
 			return err
@@ -128,6 +128,10 @@ func Switch(ctx context.Context, db *sql.DB, workspace, folder, action, versionI
 		if action == "trial" {
 			trial = versionID
 			comparison = versionID
+		} else if action == "activate" {
+			active = versionID
+			trial = ""
+			comparison = ""
 		} else {
 			feedback, err := Feedbacks(ctx, db, workspace, folder)
 			if err != nil {
@@ -156,7 +160,7 @@ func Switch(ctx context.Context, db *sql.DB, workspace, folder, action, versionI
 	if n, _ := result.RowsAffected(); n != 1 {
 		return ErrConflict
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO "CategorySkillEvent" ("id","workspaceId","folderId","versionId","eventType","detail","createdAt") VALUES (?,?,?,?,?,?,?)`, ID(), workspace, folder, versionID, action, map[string]string{"trial": "后续分析试用候选版本；已分析批次不变", "baseline": "后续分析恢复生产版，用于同商品同母本对照", "publish": "候选通过留出图组的实际成图对照，升级为生产版", "rollback": "恢复上一生产版本，保留历史记录"}[action], now())
+	_, err = tx.ExecContext(ctx, `INSERT INTO "CategorySkillEvent" ("id","workspaceId","folderId","versionId","eventType","detail","createdAt") VALUES (?,?,?,?,?,?,?)`, ID(), workspace, folder, versionID, action, map[string]string{"trial": "后续分析试用候选版本；已分析批次不变", "baseline": "后续分析恢复生产版，用于同商品同母本对照", "publish": "候选通过留出图组的实际成图对照，升级为生产版", "activate": "直接设为当前细分的正式技能", "rollback": "恢复上一生产版本，保留历史记录"}[action], now())
 	if err != nil {
 		return err
 	}

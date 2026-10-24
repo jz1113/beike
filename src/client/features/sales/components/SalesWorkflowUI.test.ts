@@ -268,6 +268,89 @@ describe('sales workflow stages', () => {
     expect(html).toContain('不会自动重投');
     expect(html).not.toContain('继续查询原任务（不重新提交）');
   });
+  it('supports quick variant selection and clearing selected images', () => {
+    const onChange = vi.fn();
+    const view = gallery({ onChange });
+    click(view, '红色 / M (1)');
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ variantId: 'red', colorLabel: '红色', confirmedImageUrls: ['/red.png'] }));
+    onChange.mockClear();
+    hooks.index = 0;
+    click(gallery({ onChange }), '清空重选');
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ variantId: undefined, colorLabel: '', confirmedImageUrls: [] }));
+  });
+  it('renders collected product attributes, script guardrails, asset thumbnails and pre-finalization reference chips', () => {
+    const fields = renderToStaticMarkup(createElement(SalesProductFields, {
+      productName: '卫衣',
+      brand: '品牌',
+      sellingPoints: '纯棉',
+      props: { 材质: '100%棉', 领型: '圆领', 商品分类: '1315', 商品毛重: '0.660' },
+      productUrl: '100265837786',
+      images: images.slice(0, 1),
+      colorSelection: { colorLabel: '黑色加绒', confirmedImageUrls: ['/black.png'], excludedImageUrls: [] },
+      variantMetadata: { version: 1, requestedSkuId: '100265837786', selectedVariantId: 'black-fleece', variants: [{ id: 'black-fleece', label: '黑色加绒', color: '黑色加绒', skuIds: ['100265837786'], imageUrls: ['/black.png'] }] },
+      analysis: { productName: '卫衣', category: 'fashion', visualFeatures: { mainColor: '黑色', designStyle: '简约', productForm: '圆领套头', texture: '华夫格' }, sellingPoints: ['秋冬季单穿内搭都合适'], targetAudience: '青年男士', usageScenarios: ['日常通勤'], painPoints: [], knownFacts: ['圆领罗纹收口'], videoSuggestions: { recommendedAngles: [], keyVisuals: [], suggestedStyle: '' } },
+      onAnalyze: vi.fn(),
+      disabled: false,
+      onChange: vi.fn(),
+    }));
+    expect(fields).toContain('已采集客观属性');
+    expect(fields).toContain('100%棉');
+    expect(fields).toContain('SKU：100265837786');
+    expect(fields).toContain('当前规格：黑色加绒');
+    expect(fields).toContain('AI 提炼卖点与信息');
+    expect(fields).toContain('AI 提炼卖点与商品信息点');
+    expect(fields).toContain('aria-expanded="false"');
+    expect(fields).not.toContain('秋冬季单穿内搭都合适');
+    expect(fields).not.toContain('1315');
+    expect(fields).not.toContain('0.660');
+    expect(fields).not.toContain('<details');
+
+    const planHtml = renderToStaticMarkup(createElement(SalesPlanSection, {
+      analysis: null,
+      script: {
+        ...script,
+        beat: 'unbox',
+        assets: [{ id: 'person', kind: 'person', label: '出镜人物', prompt: '人物', required: true }],
+        shots: [{ ...script.shots[0], duration: 10, imageIndex: 0, speechMode: 'on_camera' }],
+      },
+      disabled: false,
+      onEditShot: vi.fn(),
+      targetDuration: 15,
+      category: 'fashion',
+      videoMode: 'product_closeup',
+      productImages: images.slice(0, 1),
+    }));
+    expect(planHtml).toContain('当前分镜合计 10 秒，与目标时长 15 秒相差 -5 秒');
+    expect(planHtml).toContain('当前出镜方式为画外音展示，但分镜包含「出镜人物说话」');
+    expect(planHtml).toContain('下一步待准备素材（1 张）');
+    expect(planHtml).toContain('商品参考 #1');
+
+    const assetHtml = renderToStaticMarkup(createElement(SalesAssetsSection, {
+      script: { ...script, assets: [{ id: 'front', kind: 'keyframe', label: '正面', prompt: '正面', required: true, usesProduct: true, productImageIndexes: [0], status: 'done', url: '/front.jpg' }] },
+      productImages: images.slice(0, 1),
+      imageModel: 'image',
+      disabled: false,
+      onModel: vi.fn(),
+      onEditPrompt: vi.fn(),
+      onGenerate: vi.fn(),
+    }));
+    expect(assetHtml).toContain('本素材商品对照原图');
+    expect(assetHtml).toContain('商品参考 #1');
+
+    const preFinalHtml = renderToStaticMarkup(createElement(SalesVideoSection, {
+      state: { ...defaultSalesStudioState, imageCatalog: images.slice(0, 1), colorSelection: { colorLabel: '', confirmedImageUrls: ['/black.png'], excludedImageUrls: [] } },
+      script: { ...script, fullPrompt: undefined, shots: script.shots.map((shot) => ({ ...shot, imageIndex: 0 })), assets: [{ id: 'person', kind: 'person', label: '出镜人物', prompt: '人物', required: true, url: '/person.jpg', status: 'done' }] },
+      modelId: '',
+      disabled: false,
+      assetsReady: true,
+      finalized: false,
+      videoError: null,
+      onChange: vi.fn(),
+      onEditPrompt: vi.fn(),
+    }));
+    expect(preFinalHtml).toContain('图片1 · 商品参考 1');
+    expect(preFinalHtml).toContain('图片2 · 出镜人物');
+  });
   it('keeps paid-task warnings visible alongside progress in the single footer', () => {
     const html = renderToStaticMarkup(createElement(SalesActionBar, { primary: { label: '正在生成视频', disabled: true }, secondary: { label: '停止继续提交', onClick: vi.fn() }, busy: true, progress: '正在查询任务', note: '已提交任务仍可能计费' }));
     expect(html).toContain('正在查询任务');

@@ -29,7 +29,7 @@ export interface ApprovedModel {
   description?: string;
   isPrimary?: boolean;
   isThinking?: boolean;
-  supportedQualities?: Array<'high' | 'medium' | 'low'>;
+  supportedQualities?: Array<'max' | 'xhigh' | 'high' | 'medium' | 'low'>;
   defaultSize?: string;
   supportEdits?: boolean;
   supportedDurations?: number[];
@@ -45,4 +45,5 @@ export function rangeDurations(min: number, max: number): number[] {
 }
 
 export const IMAGE_QUALITIES = ['high', 'medium', 'low'] as const;
+export const GPT_IMAGE_25_QUALITIES = ['high', 'medium', 'low', 'xhigh', 'max'] as const;
 export const VIDEO_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];

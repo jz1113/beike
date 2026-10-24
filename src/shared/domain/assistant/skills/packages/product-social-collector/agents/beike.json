@@ -1,0 +1,30 @@
+{
+  "id": "product-social-collector",
+  "name": "product-social-collector",
+  "displayName": "电商与社媒链接采集",
+  "category": "内容采集与资料读取",
+  "author": "贝壳",
+  "colorTheme": "emerald",
+  "icon": "compass",
+  "tools": [
+    "parse_product_or_social_url",
+    "list_user_products",
+    "read_attached_document",
+    "workspace_load_workshop_product",
+    "get_view_capabilities"
+  ],
+  "requires": [
+    "url"
+  ],
+  "outputFormat": "markdown",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "解析商品或社媒链接，核实标题、图片和视频来源，整理可复用创作简报，并按用户要求载入已保存商品。"
+}

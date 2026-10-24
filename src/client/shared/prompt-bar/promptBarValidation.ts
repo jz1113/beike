@@ -1,3 +1,4 @@
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import {
   isDepthGenMode,
   DEPTH_IMAGE_LIMITS,
@@ -42,6 +43,7 @@ export function buildPromptBarSubjects(opts: {
   };
 
   opts.quickRefImages.forEach((url, idx) => {
+    if (url.startsWith('agent-file:')) return;
     pushUnique(`ref-${idx}`, url, opts.refImageNames[url]);
   });
 
@@ -85,8 +87,9 @@ export function collectEffectiveImages(input: PromptBarSubmitInput): string[] {
     quickVideoMultiFrames,
   } = input;
 
+  const visualQuickRefs = quickGenMode === 'agent' ? quickRefImages : quickRefImages.filter((url) => !url.startsWith('agent-file:'));
   if (isDepthGenMode(quickGenMode)) {
-    return quickRefImages.length > 0 ? [quickRefImages[0]] : [];
+    return visualQuickRefs.length > 0 ? [visualQuickRefs[0]] : [];
   }
 
   const referencedImages: string[] = [];
@@ -111,10 +114,10 @@ export function collectEffectiveImages(input: PromptBarSubmitInput): string[] {
     if (quickVideoRefMode === 'multi_frame') {
       return [...quickVideoMultiFrames];
     }
-    return Array.from(new Set([...quickRefImages, ...referencedImages]));
+    return Array.from(new Set([...visualQuickRefs, ...referencedImages]));
   }
 
-  return Array.from(new Set([...quickRefImages, ...referencedImages]));
+  return Array.from(new Set([...visualQuickRefs, ...referencedImages]));
 }
 
 export function buildOrderedMentionNames(
@@ -237,7 +240,7 @@ export function validateSubmitInput(
   if (quickGenMode === 'video') {
     if (!quickPrompt.trim()) return '请补充视频的动作、镜头或编辑要求';
     const mediaError = videoInputError({
-      model: input.quickVideoModel,
+      model: upstreamModalityModelId('video', input.quickVideoModel),
       refMode: quickVideoRefMode,
       images: effectiveImages.filter((url) => !isVideoMediaUrl(url)),
       videos: effectiveImages.filter(isVideoMediaUrl),

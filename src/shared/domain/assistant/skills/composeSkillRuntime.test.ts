@@ -14,6 +14,18 @@ function skill(partial: Partial<AssistantSkill> = {}): AssistantSkill {
 }
 
 describe('composeSkillRuntime', () => {
+  it('keeps long main instructions readable instead of clipping the final rule', () => {
+    const prompt = '正文'.repeat(6000) + '\n最后必须检查交付';
+    const input = skill({ prompt, tools: ['query_asset_library'] });
+    const runtime = composeSkillRuntime(input)!;
+    expect(runtime.systemPrompt.length).toBeLessThanOrEqual(12_000);
+    expect(runtime.resources.find(file => file.path === 'SKILL.md')?.content).toBe(prompt);
+    expect(runtime.allowedTools).toContain('read_skill_file');
+    const entry = composeSkillCatalog([input])[0];
+    expect(entry.resources?.find(file => file.path === 'SKILL.md')?.content).toBe(prompt);
+    expect(entry.prompt).toContain('nextOffset');
+  });
+
   it('lists supporting files and keeps their bodies out of the prompt', () => {
     const runtime = composeSkillRuntime(skill({
       files: [

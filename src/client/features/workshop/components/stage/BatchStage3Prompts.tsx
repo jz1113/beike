@@ -1,12 +1,11 @@
-import { checkWorkshopReadiness } from '../../model/generation/workshopReadiness';
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { BatchProductItem } from '../../model/batchTypes';
 import BatchStageFooter from './BatchStageFooter';
 import { BatchStage3Header } from './BatchStage3Header';
 import { BatchStage3ProductItem } from './BatchStage3ProductItem';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 import { useAppStore } from '@client/store';
-import type { AppState } from '@client/store/types';
+import { getWorkshopFlow, type WorkshopStage } from '../../model/workspace/workshopFlow';
 
 interface Props {
   selectedShotCount?: number;
@@ -16,14 +15,14 @@ interface Props {
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
   isAnalyzingAll: boolean;
   analyzeProgress: { current: number; total: number };
-  startBatchVisionAnalyze: () => Promise<number | void>;
+  startBatchVisionAnalyze: (productIds?: string[]) => Promise<number | void>;
   analyzeSingleProduct: (item: BatchProductItem, itemIndex?: number) => Promise<boolean>;
-  analyzeConcurrency?: number;
-  setAnalyzeConcurrency?: (n: number) => void;
   handleRemoveItem: (id: string) => void;
   startBatchGeneration: () => Promise<void>;
   onPreviewImage?: (url: string) => void;
   onPrevStage: () => void;
+  onGoToStage: (stage: WorkshopStage) => void;
+  analysisIssue: string | null;
 }
 
 // Bound mounted prompt editors even after a large batch has finished.
@@ -39,32 +38,45 @@ export default function BatchStage3Prompts({
   analyzeProgress,
   startBatchVisionAnalyze,
   analyzeSingleProduct,
-  analyzeConcurrency = 4,
-  setAnalyzeConcurrency,
   handleRemoveItem,
   startBatchGeneration,
   onPreviewImage,
   onPrevStage,
+  onGoToStage,
+  analysisIssue,
 }: Props) {
   const { setSafeTimeout } = useSafeTimeout();
   const resolveItemIndex = (item: BatchProductItem) =>
     successfulItems.findIndex((p) => p.id === item.id);
   const [page, setPage] = useState(0);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'ready' | 'failed'>('all');
   const [expandedShots, setExpandedShots] = useState<Record<string, boolean>>({});
   const [copiedShotKey, setCopiedShotKey] = useState<string | null>(null);
 
-  const pageCount = Math.max(1, Math.ceil(successfulItems.length / PRODUCTS_PER_PAGE));
+  const flow = getWorkshopFlow(successfulItems, { generationStrategy, selectedShotCount, analyzing: isAnalyzingAll });
+  const { readiness, pendingAnalysisIds } = flow;
+  const analysisBusy = isAnalyzingAll || successfulItems.some(item => item.isAnalyzing);
+  const readyCount = readiness.readyCount;
+  const blockedIds = new Set(readiness.issues.map(issue => issue.productId));
+  const failedCount = successfulItems.filter(item => item.analysisError && !item.isAnalyzing).length;
+  const filteredItems = successfulItems.filter(item => filter === 'all'
+    || (filter === 'ready' && !blockedIds.has(item.id))
+    || (filter === 'failed' && item.analysisError && !item.isAnalyzing)
+    || (filter === 'pending' && blockedIds.has(item.id)));
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PRODUCTS_PER_PAGE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageStart = currentPage * PRODUCTS_PER_PAGE;
-  const visibleItems = useMemo(
-    () => successfulItems.slice(pageStart, pageStart + PRODUCTS_PER_PAGE),
-    [successfulItems, pageStart],
-  );
-
-  const readiness = checkWorkshopReadiness(successfulItems, { generationStrategy, selectedShotCount });
-  const readyCount = readiness.readyCount;
-  const hasUnanalyzed = !readiness.canGenerate;
-  const showAnalyzeButton = !isAnalyzingAll && successfulItems.length > 0;
+  const visibleItems = filteredItems.slice(pageStart, pageStart + PRODUCTS_PER_PAGE);
+  const locateProduct = (id: string) => {
+    setFilter('all');
+    setPage(Math.floor(successfulItems.findIndex(item => item.id === id) / PRODUCTS_PER_PAGE));
+    setSafeTimeout(() => document.getElementById(`workshop-prompt-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+  };
+  const analyzePending = () => { void startBatchVisionAnalyze(pendingAnalysisIds); };
+  const reanalyzeAll = () => {
+    if (!window.confirm('重新分析会覆盖本批次已有的提示词与手动修改，已有成图将标记为旧版本。确定重新分析全部商品？')) return;
+    void startBatchVisionAnalyze();
+  };
 
   const toggleShotExpand = (key: string) => {
     setExpandedShots((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -92,6 +104,7 @@ export default function BatchStage3Prompts({
     setItems((prev) =>
       prev.map((p) => {
         if (p.id !== itemId) return p;
+        if (p.prompts[shotIdx]?.prompt === val) return p;
         const updated = [...p.prompts];
         updated[shotIdx] = {
           ...updated[shotIdx],
@@ -103,52 +116,44 @@ export default function BatchStage3Prompts({
         const tasks = (p.tasks || []).map((task) =>
           task.shot_no === shotNo ? { ...task, resultStatus: 'superseded' as const } : task
         );
-        return { ...p, prompts: updated, tasks };
+        return { ...p, prompts: updated, tasks, copywriting: undefined };
       }),
     );
   };
 
   const handleAnalyzeSingleItem = (item: BatchProductItem) => {
+    if (analysisBusy || flow.busy) return;
+    if (item.prompts.length > 0 && !window.confirm(`重新分析「${item.title}」会覆盖已有提示词与手动修改，已有成图将标记为旧版本。确定继续？`)) return;
     void analyzeSingleProduct(item, resolveItemIndex(item)).catch(() => {
       // 分析执行层已将具体错误写入商品状态。
     });
   };
 
-  const setIsWorkshopConfigOpen = useAppStore((s: AppState) => s.setIsWorkshopConfigOpen);
+  const setIsWorkshopConfigOpen = useAppStore(s => s.setIsWorkshopConfigOpen);
 
   return (
     <div className="w-full space-y-5 pb-8 bg-transparent">
-      {/* 极简扁平顶部栏 */}
-      <BatchStage3Header
-        readyCount={readyCount}
-        totalCount={successfulItems.length}
-        analyzeConcurrency={analyzeConcurrency}
-        setAnalyzeConcurrency={setAnalyzeConcurrency}
-        isAnalyzingAll={isAnalyzingAll}
-        showAnalyzeButton={showAnalyzeButton}
-        hasUnanalyzed={hasUnanalyzed}
-        startBatchVisionAnalyze={startBatchVisionAnalyze}
-        analyzeProgress={analyzeProgress}
-        onOpenSettings={() => setIsWorkshopConfigOpen(true)}
-      />
-
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 p-3 text-xs text-indigo-800">
-          <div className="space-y-1">
-            <p className="font-semibold">{generationStrategy === 'grid_first' ? '四宫格生成 4 镜 · 整组提示词生成，再拆分为 4 张' : '单张逐镜生成 · 每镜使用独立提示词生成完整图片'}</p>
-            {autoMatchMotherTemplate && <p>同类完整四图母本按生产设置的出镜范围依次轮换，用完一轮后再重复；每款实际使用的母本类型见下方商品行。</p>}
-          </div>
-          <button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 rounded-lg bg-white px-3 py-2 font-bold dark:bg-[#18191c]">生产设置</button>
-        </div>
+      <BatchStage3Header readyCount={readyCount} totalCount={successfulItems.length} failedCount={failedCount}
+        isAnalyzingAll={analysisBusy} analyzeProgress={isAnalyzingAll ? analyzeProgress : { current: 0, total: successfulItems.filter(item => item.isAnalyzing).length }} />
+      {autoMatchMotherTemplate && <p className="px-1 text-xs leading-6 text-slate-500 dark:text-slate-400">每款商品从适配的完整参考母本中轮换；实际图组、原图与逐镜反推词见商品卡片。</p>}
+      {!analysisBusy && analysisIssue && pendingAnalysisIds.length > 0 && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+        <span>{analysisIssue}</span><button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 font-semibold underline underline-offset-4">检查生产设置</button>
+      </div>}
+      <div role="group" aria-label="分镜分析状态筛选" className="flex flex-wrap gap-2">
+        {([['all', '全部', successfulItems.length], ['pending', analysisBusy ? '待完成' : '待处理', successfulItems.length - readyCount], ['ready', '已就绪', readyCount], ['failed', '分析失败', failedCount]] as const).map(([value, label, count]) => <button key={value} type="button" aria-pressed={filter === value}
+          onClick={() => { setFilter(value); setPage(0); }} className={`rounded-lg border px-3 py-2 text-xs font-medium ${filter === value ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-300' : 'border-slate-200 bg-white/90 text-slate-500 dark:border-white/10 dark:bg-[#18191c]/95 dark:text-slate-400'}`}>{label} {count}</button>)}
+      </div>
       {/* 极简高密度商品分镜列表 */}
       <div className="space-y-3">
-        {visibleItems.map((item, itemIdx) => (
+        {visibleItems.length === 0 && <p className="rounded-xl bg-white/95 p-10 text-center text-xs text-slate-500 dark:bg-[#18191c]/95 dark:text-slate-400">此状态下暂无商品</p>}
+        {visibleItems.map((item) => (
           <BatchStage3ProductItem
             key={item.id}
             item={item}
             isGridMode={generationStrategy === 'grid_first'}
-            onUpdateGridPrompt={(value) => setItems(prev => prev.map(p => p.id === item.id ? { ...p, gridPrompt: value } : p))}
-            itemIdx={pageStart + itemIdx}
-            isAnalyzingAll={isAnalyzingAll}
+            onUpdateGridPrompt={(value) => setItems(prev => prev.map(p => p.id === item.id && p.gridPrompt !== value ? { ...p, gridPrompt: value, copywriting: undefined, tasks: p.tasks.map(task => ({ ...task, resultStatus: 'superseded' as const })) } : p))}
+            itemIdx={resolveItemIndex(item)}
+            isAnalyzingAll={flow.busy}
             expandedShots={expandedShots}
             copiedShotKey={copiedShotKey}
             toggleShotExpand={toggleShotExpand}
@@ -174,30 +179,26 @@ export default function BatchStage3Prompts({
         </nav>
       )}
 
-      {readiness.issues.length > 0 && <details className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-        <summary className="cursor-pointer font-semibold">生图前检查：{successfulItems.length - readyCount} 款待完善，点击查看原因</summary>
-        <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto select-text">{readiness.issues.map((issue, index) => <li key={`${issue.productId}-${index}`}><span className="font-semibold">{issue.title}</span> · {issue.reason}</li>)}</ul>
+      {!analysisBusy && readiness.issues.length > 0 && <details open className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+        <summary className="cursor-pointer font-semibold">有 {successfulItems.length - readyCount} 款需要处理，请按原因修正后继续</summary>
+        <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto select-text">{readiness.issues.map((issue, index) => <li key={`${issue.productId}-${index}`} className="flex flex-wrap items-center justify-between gap-2">
+          <span className="min-w-0 flex-1"><span className="font-semibold">{issue.title}</span> · {issue.reason}</span>
+          <button type="button" onClick={() => issue.stage === 3 ? locateProduct(issue.productId) : onGoToStage(issue.stage)} className="shrink-0 rounded-md px-2 py-1 font-semibold underline underline-offset-4">{issue.stage === 2 ? '返回选图与配置' : issue.stage === 4 ? '核对生成任务' : '定位商品'}</button>
+        </li>)}</ul>
       </details>}
       {/* 底部操作门禁栏 */}
       <BatchStageFooter
         onPrev={onPrevStage}
-        prevLabel="返回配置与选图"
-        hint={
-          hasUnanalyzed ? (
-            <span className="text-xs text-amber-600 font-medium">
-              还有 {successfulItems.length - readyCount} 款待完善
-            </span>
-          ) : undefined
-        }
+        prevLabel="返回选图与配置"
+        prevDisabled={flow.busy}
+        hint={<span className={`text-xs ${analysisBusy ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400'}`}>
+          {analysisBusy ? '正在处理，请等待分析完成' : readiness.canGenerate ? '核对完成后，将按当前配置生成图片' : '已就绪商品会保留，只处理未完成项'}
+        </span>}
+        secondaryActions={!flow.busy && successfulItems.some(item => item.prompts.length > 0) && !successfulItems.some(item => item.tasks.some(task => task.recoveryRequired)) ? <button type="button" onClick={reanalyzeAll} className="rounded-lg px-3 py-2 text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5">重新分析全部</button> : undefined}
         primaryAction={{
-          label: hasUnanalyzed
-            ? `完成检查后可生图 (${readyCount}/${successfulItems.length})`
-            : `确认提示词，启动批量生图 (${readyCount} 款)`,
-          onClick: startBatchGeneration,
-          disabled:
-            isAnalyzingAll ||
-            successfulItems.length === 0 ||
-            hasUnanalyzed,
+          label: analysisBusy ? '正在分析分镜…' : readiness.canGenerate ? `确认分镜，开始生图（${readyCount * selectedShotCount} 张）` : pendingAnalysisIds.length > 0 ? `${readyCount > 0 ? '仅分析未就绪' : '开始分析分镜'}（${pendingAnalysisIds.length} 款）` : '请先处理待核对任务',
+          onClick: readiness.canGenerate ? startBatchGeneration : analyzePending,
+          disabled: flow.busy || (!readiness.canGenerate && (pendingAnalysisIds.length === 0 || Boolean(analysisIssue))),
         }}
       />
     </div>

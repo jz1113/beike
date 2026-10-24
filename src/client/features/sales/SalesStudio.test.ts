@@ -8,7 +8,8 @@ import { defaultSalesStudioState } from './model/salesStudioDraft';
 import { salesFinalInputRevision, salesPlanInputRevision } from './model/salesStageRules';
 
 vi.mock('./hooks/useVideoSalesStudio', () => ({ useVideoSalesStudio: vi.fn() }));
-vi.mock('./hooks/useSalesPanelWidth', () => ({ useSalesPanelWidth: () => ({ containerRef: { current: null }, wide: false, width: 480, separatorProps: {} }) }));
+const panelWidth = vi.hoisted(() => ({ wide: false }));
+vi.mock('./hooks/useSalesPanelWidth', () => ({ useSalesPanelWidth: () => ({ containerRef: { current: null }, wide: panelWidth.wide, width: 480, separatorProps: {} }) }));
 vi.mock('@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels', () => ({ usePreferenceModels: () => ({ ready: false, imageModels: [], videoModels: [], multimodalModels: [] }), matchesStoredModel: () => false }));
 
 const script: VideoSalesScript = {
@@ -27,7 +28,7 @@ function render(patch: Partial<typeof base> = {}) {
   vi.mocked(useVideoSalesStudio).mockReturnValue({ ...base, ...patch } as unknown as ReturnType<typeof useVideoSalesStudio>);
   return renderToStaticMarkup(createElement(SalesStudio, { onBack: vi.fn() }));
 }
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { panelWidth.wide = false; vi.clearAllMocks(); });
 
 describe('sales studio integration', () => {
   it('keeps history available while reviewing scripts rather than only on results', () => {
@@ -46,6 +47,8 @@ describe('sales studio integration', () => {
     expect(html).toContain('出镜方式');
     expect(html).toMatch(/value="live_presenter" selected=""/);
     expect(html).toContain('完整嘴部清晰可见');
+    expect(html).toContain('返回修改商品与设置');
+    expect(html).toContain('人物出镜讲解');
   });
   it('renders one footer and starts pending scripts at the script stage', () => {
     const html = render();
@@ -88,6 +91,22 @@ describe('sales studio integration', () => {
     expect(html).toContain('继续查询原任务');
     expect(html.split('继续查询原任务')).toHaveLength(2);
     expect(html).not.toContain('确认生成整段视频（可能计费）');
+  });
+  it('places product fields in the main workspace and creative controls in the bottom bar on wide product step', () => {
+    panelWidth.wide = true;
+    const html = render({ state: { ...defaultSalesStudioState, category: 'fashion', videoMode: 'live_presenter' } });
+    const splitAt = html.indexOf('创作与生成结果');
+    const footerAt = html.indexOf('<footer');
+    const aside = html.slice(0, splitAt);
+    const workspace = html.slice(splitAt, footerAt);
+    const footer = html.slice(footerAt);
+    expect(aside).toContain('商品链接');
+    expect(aside).not.toContain('商品资料');
+    expect(workspace).toContain('商品资料');
+    expect(workspace).not.toContain('出镜方式');
+    expect(footer).toContain('创作技能');
+    expect(footer).toContain('出镜方式');
+    expect(footer).toContain('口播模型');
   });
   it('preserves query-only recovery for historical shot receipts', () => {
     const historical = { ...script, deliveryMode: undefined, shots: [{ ...script.shots[0], taskId: 'old-receipt', status: 'generating' as const }] };

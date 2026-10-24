@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ensureAppDatabase,
+  gatewayBinary,
   healthOk,
   killChild,
   resolveAccessToken,
@@ -23,7 +24,13 @@ const apiPort = Number.parseInt(process.env.PORT || '3000', 10);
 
 if (!existsSync(join(webDistDir, 'index.html'))) {
   console.error(`找不到前端构建产物：${webDistDir}/index.html`);
-  console.error('请先在仓库根目录执行：pnpm run build:ui');
+  console.error('请先在仓库根目录执行：pnpm build');
+  process.exit(1);
+}
+
+if (!existsSync(gatewayBinary(workspaceRoot))) {
+  console.error(`找不到 API 构建产物：${gatewayBinary(workspaceRoot)}`);
+  console.error('请先在仓库根目录执行：pnpm build:api');
   process.exit(1);
 }
 
@@ -41,6 +48,7 @@ const gateway = startGateway({
   accessToken,
   extraEnv: { ...sharedEnv, WEB_DIST_DIR: webDistDir, HOSTNAME: process.env.HOSTNAME || '127.0.0.1' },
   record: false,
+  build: false,
 });
 
 const stop = (signal) => {
@@ -52,5 +60,8 @@ process.on('SIGINT', () => stop('SIGINT'));
 gateway.on('exit', (code, signal) => {
   process.exit(code ?? (signal ? 1 : 0));
 });
-if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gateway))) process.exit(1);
+if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gateway))) {
+  killChild(gateway);
+  process.exit(1);
+}
 console.log(`→ 生产 Web 已由 Go 接管：127.0.0.1:${apiPort}  dist=${webDistDir}  data=${appDataDir}`);

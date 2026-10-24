@@ -10,11 +10,11 @@ export function createSkillNode(skillName: string): HTMLElement {
   pill.contentEditable = 'false';
   pill.setAttribute('data-skill-name', skillName);
   pill.className =
-    'inline-skill-pill inline-flex items-center gap-1 mr-1.5 px-2.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold border border-slate-200 shadow-2xs select-none align-middle relative -top-[1px] cursor-default transition-colors';
+    'inline-skill-pill inline-flex items-center gap-1 mr-1.5 px-2.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 text-slate-800 dark:bg-white/10 dark:hover:bg-white/15 dark:text-slate-100 dark:border-white/15 text-xs font-semibold border border-slate-200 shadow-2xs select-none align-middle relative -top-[1px] cursor-default transition-colors';
 
   const label = document.createElement('span');
   label.textContent = skillName;
-  label.className = 'font-medium text-slate-900 text-xs leading-none';
+  label.className = 'font-medium text-slate-900 dark:text-slate-100 text-xs leading-none';
   pill.appendChild(label);
   return pill;
 }
@@ -102,6 +102,28 @@ export function renderTextToDOM(
   if (lastIndex < str.length) {
     container.appendChild(document.createTextNode(str.slice(lastIndex)));
   }
+}
+
+export function resolveEditorInsertionRange(editor: HTMLElement): { range: Range; sel: Selection | null } {
+  editor.focus();
+  const sel = window.getSelection();
+  let range: Range;
+  if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+    range = sel.getRangeAt(0);
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+  }
+  if (range.collapsed && range.startContainer.nodeType !== Node.TEXT_NODE && range.startOffset > 0) {
+    const prevChild = range.startContainer.childNodes[range.startOffset - 1];
+    if (prevChild && prevChild.nodeType === Node.TEXT_NODE) {
+      const len = prevChild.textContent?.length || 0;
+      range.setStart(prevChild, len);
+      range.setEnd(prevChild, len);
+    }
+  }
+  return { range, sel };
 }
 
 export function deleteAdjacentMention(editor: HTMLElement, backward: boolean): boolean {

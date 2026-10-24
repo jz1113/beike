@@ -9,11 +9,13 @@ import './promptBarEffort.css';
 interface PromptBarReasoningPillProps {
   assistantModel: string;
   isUp?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const PromptBarReasoningPill = function PromptBarReasoningPill({
   assistantModel,
   isUp = true,
+  onOpenChange,
 }: PromptBarReasoningPillProps) {
   const [open, setOpen] = useState(false);
   const [effort, setEffort] = useAssistantReasoning(assistantModel);
@@ -49,6 +51,8 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
       },
     });
   }, [assistantModel, effort]);
+
+  useEffect(() => { onOpenChange?.(open); return () => onOpenChange?.(false); }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;

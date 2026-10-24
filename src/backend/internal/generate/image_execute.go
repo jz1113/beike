@@ -24,9 +24,16 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 	base, apiKey := imageSubmitCredentials(cfg, r, payload, model)
 	prompt := strings.TrimSpace(rawString(payload, "prompt"))
 	refs := imageReferences(payload)
+	aspectRatio := rawString(payload, "aspectRatio")
+	if aspectRatio == "" {
+		aspectRatio = rawString(payload, "aspect_ratio")
+	}
+	if aspectRatio == "" {
+		aspectRatio = rawString(payload, "ar")
+	}
 	size := rawString(payload, "size")
 	if size == "" {
-		size = rawString(payload, "aspectRatio")
+		size = aspectRatio
 	}
 	if size == "" {
 		size = "2448x3264"
@@ -55,7 +62,7 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 		return http.StatusOK, map[string]any{"success": true, "taskId": claim.reusedTaskID, "status": "SUCCESS", "resultUrl": claim.reusedURL, "reused": true}
 	}
 	result, err := protocol.Submit(imageRequest{
-		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, Quality: quality, ImageQuality: imageQuality,
+		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, AspectRatio: aspectRatio, Quality: quality, ImageQuality: imageQuality,
 		Strength: rawString(payload, "inferenceStrength"), Negative: rawString(payload, "negativePrompt"),
 		Refs: refs, Workspace: workspaceOf(r), Production: cfg.Production(), Template: imageRequestTemplate(payload),
 	})

@@ -94,7 +94,7 @@ func TestObserveHonorsBudgetBelowThresholdAndRemembersRejections(t *testing.T) {
 	if calls != 1 {
 		t.Fatal("unchanged input automatically replayed")
 	}
-	body := call("learn", true, 200)
+	body := call("observe", true, 200)
 	if calls != 2 || !strings.Contains(body, `"stage":"observed"`) {
 		t.Fatal("call budget exceeded or premature candidate")
 	}
@@ -107,14 +107,14 @@ func TestObserveHonorsBudgetBelowThresholdAndRemembersRejections(t *testing.T) {
 	if len(versions) != 0 {
 		t.Fatal("candidate created without enough observed evidence")
 	}
-	if _, err := db.Exec(`DROP TABLE "CategorySkillSampleRole"`); err != nil {
+	if _, err := db.Exec(`DROP TABLE "CategorySkillObservation"`); err != nil {
 		t.Fatal(err)
 	}
 	r := httptest.NewRequest(http.MethodGet, "/api/catalog/category-skills?folderId="+folder, nil)
 	r = r.WithContext(httpx.WithWorkspace(r.Context(), "a"))
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
-	if w.Code != 500 || strings.Contains(w.Body.String(), "SQL") || strings.Contains(w.Body.String(), "CategorySkillSampleRole") {
+	if w.Code != 500 || strings.Contains(w.Body.String(), "SQL") || strings.Contains(w.Body.String(), "CategorySkillObservation") {
 		t.Fatal("internal SQL error exposed or misreported as user input error")
 	}
 }

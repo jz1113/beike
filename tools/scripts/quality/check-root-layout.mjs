@@ -12,7 +12,7 @@ const workspaceRoot = path.resolve(scriptDir, '../../..');
 
 const REQUIRED_DIRS = [
   'src/client', 'src/backend', 'src/shared/contracts', 'src/shared/domain', 'src/shared/data',
-  'database', 'src/client/public', 'tools/configs', 'tools/scripts', 'tools/launchers', 'docs', 'tools/deploy',
+  'src/client/public', 'tools/configs', 'tools/scripts', 'tools/launchers', 'docs', 'tools/deploy',
   'src/client/features/poster', 'src/client/features/keywords', 'src/client/features/ppt', 'src/client/features/sales',
   'src/shared/domain/sales', 'src/backend/internal/keywords', 'src/backend/internal/gateway',
   'src/backend/internal/generate/poster', 'src/backend/internal/generate/sales',
@@ -20,20 +20,21 @@ const REQUIRED_DIRS = [
 const REQUIRED_FILES = [
   'package.json', 'pnpm-lock.yaml', 'go.mod', 'go.sum', 'tsconfig.json',
   'src/client/index.html', 'tools/configs/vite.config.ts', 'src/shared/contracts/openapi.yaml',
-  'tools/configs/env.example', '启动贝壳云图.bat',
-  'tools/launchers/启动贝壳云图.ps1', 'tools/launchers/启动贝壳云图.command',
+  'tools/configs/env.example', '启动贝壳云图.bat', '启动贝壳云图.command',
+  'tools/launchers/启动贝壳云图.ps1', 'docs/database.md',
 ];
 const FORBIDDEN_PATHS = [
   'public', 'deploy', 'dist', '工程', '依赖', 'docs/API文档', 'docs/打包', 'app', 'db',
-  'desktop', 'works', 'apps', 'packages', 'pnpm-workspace.yaml', 'database/backups', 'api', 'tests',
+  'desktop', 'works', 'apps', 'packages', 'pnpm-workspace.yaml', 'database/backups', 'database/migrations', 'database/archive', 'api', 'tests',
   'index.html', 'vite.config.ts',
-  '.env.example', '启动贝壳云图.ps1', '启动贝壳云图.command', 'tools/launchers/启动贝壳云图.bat',
+  '.env.example', '启动贝壳云图.ps1',
+  'tools/launchers/启动贝壳云图.bat', 'tools/launchers/启动贝壳云图.command',
   'src/client/features/headline-poster', 'src/client/features/keyword-review',
   'src/client/features/ppt-generator', 'src/client/features/video-sales', 'src/shared/domain/video-sales',
   'src/backend/internal/keywordreview', 'src/backend/internal/modelgw',
   'src/backend/internal/generate/headline', 'src/backend/internal/generate/videosales',
 ];
-const ROOT_CHINESE_ALLOWLIST = new Set(['启动贝壳云图.bat']);
+const ROOT_CHINESE_ALLOWLIST = new Set(['启动贝壳云图.bat', '启动贝壳云图.command']);
 const ROOT_DIRECTORIES = new Set(['src', 'database', 'node_modules', 'docs', 'tools']);
 const ROOT_FILES = new Set([
   'AGENTS.md', 'README.md', 'package.json', 'pnpm-lock.yaml', 'go.mod', 'go.sum',

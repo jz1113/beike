@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useMemo } from 'react';
 import {
   Search,
@@ -107,12 +108,13 @@ export const PromptBarAssetPickerModal: React.FC<PromptBarAssetPickerModalProps>
         useAppStore.getState().addQuickRefImage(url);
       });
     }
+    setSelectedIds(new Set());
     onClose();
   };
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in select-none"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in select-none"
       onClick={onClose}
     >
       <div
@@ -383,4 +385,5 @@ export const PromptBarAssetPickerModal: React.FC<PromptBarAssetPickerModalProps>
       </div>
     </div>
   );
+  return typeof document === 'undefined' ? modal : createPortal(modal, document.body);
 };

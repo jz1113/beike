@@ -1,0 +1,4 @@
+interface:
+  display_name: "提示词反推专家"
+  short_description: "从参考图提取可复用的主体、构图、光影和材质，按九维结构交付复刻提示词。适用于图片反推、定向换元与资产检索。"
+  default_prompt: "使用 $prompt-reverse-engineer 完成当前任务。"

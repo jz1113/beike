@@ -1,8 +1,9 @@
 import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
-import { resolveWorkshopImageSize, verifyWorkshopImageSize } from './workshopImageSize';
+import { resolveWorkshopImageSize, readWorkshopImageSize } from './workshopImageSize';
 import { submitImageGenTaskResult, compressProductImageIfNeeded } from '@client/shared/api/generation/generationApi';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
+import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
 import { sliceGridImage2x2Blobs } from '@client/shared/media/imageGridSlicer';
 import type { BatchProductItem } from '../batchTypes';
 import type { TaskExecutionConfig } from './batchTaskExecution';
@@ -10,7 +11,7 @@ import { resolveGridRecoverySource } from './generationHelpers';
 import { parseOutputDimensions } from '@shared/domain/media/outputDimensions';
 import { savedWorkshopOutputSize } from './generationHelpers';
 import { captureLearningContext } from './learningContext';
-import { workshopReferenceInput } from './workshopReferenceInput';
+import { workshopReferenceInput, workshopReferenceBudget } from './workshopReferenceInput';
 
 export async function runGridImageTask(
   item: BatchProductItem,
@@ -46,7 +47,10 @@ export async function runGridImageTask(
     if (!sourceUrl && (previous?.gridTaskKey || recoveryOnly)) {
       const upstream = previous?.upstreamTaskId;
       const query = upstream ? `taskId=${encodeURIComponent(upstream)}` : `taskKey=${encodeURIComponent(taskKey || '')}`;
-      const response = await apiFetch(`/api/generate/image?${query}&recheck_failed=1`, { headers: storageConfigHeaders() });
+      const modelId = previous?.learningContext?.model || config.selectedImageGenModel;
+      const response = await apiFetch(`/api/generate/image?${query}&model=${encodeURIComponent(modelId)}&recheck_failed=1`, {
+        headers: { ...getGatewayClientHeaders(modelId), ...storageConfigHeaders() },
+      });
       const data = await response.json();
       if (data.taskId) patch({ upstreamTaskId: data.taskId });
       if (!response.ok || data.status !== 'SUCCESS' || !data.resultUrl) {
@@ -58,23 +62,25 @@ export async function runGridImageTask(
     if (!sourceUrl) {
       const reference = item.selectedProductImages[0] || item.coverImage;
       if (!reference) throw new Error('缺少商品垫图，请先勾选商品图');
+      const hasHuman = shots.some(shot => shot.shot_type === 'model_shot' || (!shot.shot_type && shot.has_human === true));
+      const maxProductRefs = workshopReferenceBudget(config.selectedImageGenModel, shots, hasHuman && Boolean(config.anchorFaceUrl));
       const productReferenceCandidates = Array.from(new Set([
         reference,
         ...item.selectedProductImages,
-      ].filter((img): img is string => Boolean(img)))).slice(0, 4);
+      ].filter((img): img is string => Boolean(img)))).slice(0, maxProductRefs);
       const productReferenceImages = await Promise.all(
         productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
       );
       const productImageUrl = productReferenceImages[0];
       const referenceInput = workshopReferenceInput(shots, productReferenceImages.length);
       const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(compressProductImageIfNeeded));
-      const safeAnchorFaceUrl = config.anchorFaceUrl
+      const safeAnchorFaceUrl = hasHuman && config.anchorFaceUrl
         ? await compressProductImageIfNeeded(config.anchorFaceUrl)
         : undefined;
       patch({ gridTaskKey: taskKey, gridSize: size, outputSize, upstreamTaskId: undefined });
       setItems(items => items.map(entry => entry.id === item.id ? { ...entry, tasks: entry.tasks.map(task => {
         const shot = shots.find(shot => shot.shot_no === task.shot_no);
-        return matchesAttempt(task) && shot ? { ...task, learningContext: captureLearningContext(item, shot, config, 'grid_first') } : task;
+        return matchesAttempt(task) && shot ? { ...task, learningContext: captureLearningContext(item, shot, { ...config, productReferenceImages: productReferenceCandidates, anchorFaceUrl: hasHuman ? config.anchorFaceUrl : undefined }, 'grid_first') } : task;
       }) } : entry));
       await config.beforeSubmit?.();
       verifySource = true;
@@ -89,7 +95,7 @@ export async function runGridImageTask(
       productTitle: item.title, productFingerprint: item.productFingerprint || item.title,
       productRole: item.productRole,
       anchorFaceImageUrl: safeAnchorFaceUrl,
-      has_human: shots.some((shot) => shot.has_human !== false),
+      has_human: hasHuman,
     }, { isAborted: config.isAborted, isPaused: config.isPaused, idempotencyKey: taskKey, onTaskSubmitted: async upstreamTaskId => {
       patch({ upstreamTaskId });
       await config.beforeSubmit?.();
@@ -101,7 +107,7 @@ export async function runGridImageTask(
       && entry.tasks.some(task => matchesAttempt(task) && task.resultStatus !== 'superseded')
       ? { ...entry, masterGridUrl: sourceUrl } : entry));
     stage = '下载或拆分';
-    if (verifySource) await verifyWorkshopImageSize(sourceUrl!, size);
+    if (verifySource) await readWorkshopImageSize(sourceUrl!);
     slices = await sliceGridImage2x2Blobs(sourceUrl!, {
       targetWidth: output.width, targetHeight: output.height,
     });

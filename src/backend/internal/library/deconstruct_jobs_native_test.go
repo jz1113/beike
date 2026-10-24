@@ -56,7 +56,7 @@ func TestBackgroundDeconstructPreservesNativeProtocol(t *testing.T) {
 				}
 			}
 			handler := deconstructJobsPostHandler(config.Config{DatabaseURL: "file:" + dbPath, NodeEnv: "development"})
-			body := `{"jobId":"` + job.id + `","model":"custom-vision","overrides":{"textProtocol":"` + job.protocol + `"},"customBaseUrl":"` + server.URL + `","customApiKey":"` + job.apiKey + `","items":[{"id":"a","name":"图","images":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="]}]}`
+			body := `{"jobId":"` + job.id + `","model":"custom-vision","overrides":{"textProtocol":"` + job.protocol + `","customBaseUrl":"` + server.URL + `","customApiKey":"` + job.apiKey + `"},"items":[{"id":"a","name":"图","images":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="]}]}`
 			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
 			r.Header.Set("x-text-protocol", "openai")
 			rec := httptest.NewRecorder()

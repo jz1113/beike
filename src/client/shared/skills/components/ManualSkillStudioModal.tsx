@@ -29,13 +29,14 @@ export interface ManualSkillStudioModalProps {
   initialFiles?: SkillFileNode[] | null;
   initialDraft?: Partial<SkillDraftData> | null;
   heading?: string;
-  /** create：相对空白模板判断未保存；edit：相对打开时的内容判断未保存 */
+  /** 标识创建或编辑会话；未保存判断以打开时的内容为准。 */
   mode?: 'create' | 'edit';
   onSave: (skill: SkillStudioPayload) => void | Promise<void>;
   saveLabel?: string;
 }
 
 const DEFAULT_DRAFT: SkillDraftData = {
+  kind: 'creation',
   title: '',
   description: '',
   genres: ['图片'],
@@ -95,6 +96,7 @@ export function ManualSkillStudioModal({
 
     const nextDraft: SkillDraftData = initialDraft
       ? {
+          kind: initialDraft.kind || 'creation',
           title: initialDraft.title || '',
           description: initialDraft.description || '',
           genres: initialDraft.genres?.length ? initialDraft.genres : ['图片'],
@@ -109,11 +111,9 @@ export function ManualSkillStudioModal({
         }
       : DEFAULT_DRAFT;
     setDraft(nextDraft);
-    const baseline = mode === 'edit'
-      ? studioSnapshot(openedNodes, nextDraft)
-      : studioSnapshot(createInitialSkillTree(), DEFAULT_DRAFT);
+    const baseline = studioSnapshot(openedNodes, nextDraft);
     baselineRef.current = baseline;
-    setBaselineNodes(mode === 'edit' ? openedNodes : createInitialSkillTree());
+    setBaselineNodes(openedNodes);
     sessionRef.current += 1;
     setSession(sessionRef.current);
   }, [isOpen, initialFiles, initialDraft, mode]);
@@ -176,11 +176,11 @@ export function ManualSkillStudioModal({
       showToast('请输入一句话介绍');
       return;
     }
-    if (draft.genres.length === 0) {
+    if (draft.kind !== 'agent' && draft.genres.length === 0) {
       showToast('请至少选择一个输出体裁');
       return;
     }
-    if (SKILL_TAG_OPTIONS.length > 0 && draft.tags.length === 0) {
+    if (draft.kind !== 'agent' && SKILL_TAG_OPTIONS.length > 0 && draft.tags.length === 0) {
       showToast('需要选择 1 个类型标签');
       return;
     }
@@ -195,6 +195,7 @@ export function ManualSkillStudioModal({
     setSaving(true);
     try {
       await onSave({
+        kind: draft.kind,
         title: trimmedTitle,
         description: trimmedDesc,
         genres: draft.genres,
@@ -251,8 +252,8 @@ export function ManualSkillStudioModal({
           </button>
         </header>
 
-        <fieldset disabled={saving} className="flex min-h-0 flex-1 overflow-hidden">
-          <section className="flex flex-1 flex-col border-r border-black/[0.06] dark:border-white/[0.08] p-5">
+        <fieldset disabled={saving} className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+          <section className="flex min-h-80 shrink-0 flex-col md:min-h-0 md:min-w-0 md:flex-1 border-r border-black/[0.06] dark:border-white/[0.08] p-5">
             <div className="mb-2 flex items-center gap-1">
               <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">技能内容</span>
               <span className="text-red-500">*</span>

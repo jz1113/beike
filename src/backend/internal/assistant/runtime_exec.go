@@ -190,7 +190,8 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 		box: &toolBox{
 			ctx: ctx, db: db, cfg: cfg, workspace: workspace, documents: documents, client: objectField(payload, "clientContext"),
 			plan: plan, results: results, budget: budget, allowed: append([]string{}, names...), skillFiles: skillResources(payload["skillResources"]),
-			skills: catalog, pinnedCeiling: pinnedSkill != "" && len(allowed) > 0, ceiling: append([]string{}, allowed...), visual: &visualBudget{},
+			pinnedSkillID: pinnedSkill,
+			skills:        catalog, pinnedCeiling: pinnedSkill != "" && len(allowed) > 0, ceiling: append([]string{}, allowed...), visual: &visualBudget{},
 		},
 		send: send, persist: persist, granted: sessionTools(workspace, threadID), turnID: turnID, threadID: threadID, space: workspace,
 		mu: &sync.Mutex{},

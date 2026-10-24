@@ -1,5 +1,4 @@
 import type { OutputRating } from '@shared/contracts/categorySkills';
-import { OFFICIAL_MASTER_RECIPES } from '@shared/domain/prompts/masterRecipes';
 import { ShotPrompt } from '@shared/domain/prompts/vision';
 
 export interface MasterRecipe {
@@ -9,15 +8,6 @@ export interface MasterRecipe {
   tag?: string;
   promptSnippet?: string;
 }
-
-// 官方 8 段式高保真拍摄大架构（与配方库 / masterRecipes 保持一致，禁止删除）
-export const SYSTEM_MASTER_RECIPES: MasterRecipe[] = OFFICIAL_MASTER_RECIPES.map((recipe) => ({
-  id: recipe.id,
-  name: recipe.name,
-  category: recipe.category,
-  tag: recipe.tag,
-  promptSnippet: recipe.promptSnippet,
-}));
 
 export interface TypedProductImage {
   url: string;
@@ -62,7 +52,7 @@ export interface BatchCopywriting {
 export interface BatchProductItem {
   id: string;
   itemId: string;
-  platform: 'jd' | 'taobao' | 'tmall' | '1688';
+  platform: 'jd' | 'taobao' | 'tmall' | '1688' | 'local';
   url?: string;
   title: string;
   price: number;

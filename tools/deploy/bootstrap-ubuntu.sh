@@ -26,17 +26,20 @@ if ! command -v pnpm >/dev/null 2>&1 || [[ "$(pnpm --version)" != 10.13.1 ]]; th
   npm install -g pnpm@10.13.1
 fi
 
-if [[ ! -x /usr/local/go/bin/go ]]; then
+if ! (cd "$REPO_DIR" && GO_BIN=/usr/local/go/bin/go node --input-type=module -e \
+  'import { resolveGo } from "./tools/scripts/common/go-toolchain.mjs"; resolveGo();') >/dev/null 2>&1; then
   case "$(dpkg --print-architecture)" in
     amd64) GO_ARCH=amd64 ;;
     arm64) GO_ARCH=arm64 ;;
     *) echo "不支持的架构：$(dpkg --print-architecture)"; exit 1 ;;
   esac
-  curl -fsSL -o /tmp/go.tgz "https://go.dev/dl/go1.26.9.linux-${GO_ARCH}.tar.gz"
+  GO_DOWNLOAD_DIR="$(mktemp -d /tmp/beike-go.XXXXXX)"
+  trap 'rm -rf "$GO_DOWNLOAD_DIR"' EXIT
+  curl -fsSL -o "$GO_DOWNLOAD_DIR/go.tgz" "https://go.dev/dl/go1.26.9.linux-${GO_ARCH}.tar.gz"
   rm -rf /usr/local/go
-  tar -C /usr/local -xzf /tmp/go.tgz
-  ln -sfn /usr/local/go/bin/go /usr/local/bin/go
+  tar -C /usr/local -xzf "$GO_DOWNLOAD_DIR/go.tgz"
 fi
+ln -sfn /usr/local/go/bin/go /usr/local/bin/go
 
 id -u "$SITE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SITE_USER"
 
@@ -78,7 +81,7 @@ systemctl reload nginx
 
 echo
 echo "目录已就绪。接下来在 $REPO_DIR 执行："
-echo "  sudo -u $SITE_USER -H bash -lc 'cd $REPO_DIR && pnpm install --frozen-lockfile && pnpm run build:ui'"
-echo "然后把本机 .local/deploy-backup/azhuo.db 拷到 $DATA_DIR/azhuo.db"
+echo "  sudo -u $SITE_USER -H bash -lc 'cd $REPO_DIR && pnpm install --frozen-lockfile && pnpm build'"
+echo "然后把本机 pnpm db:backup 输出的一致性快照拷到 $DATA_DIR/azhuo.db"
 echo "  sudo systemctl start beike"
 echo "域名解析完成后，运行 tools/deploy/enable-https.sh <域名> <证书通知邮箱> 启用 HTTPS。"

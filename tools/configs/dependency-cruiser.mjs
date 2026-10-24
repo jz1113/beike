@@ -3,7 +3,7 @@ export default {
   forbidden: [
     {
       name: 'no-orphans',
-      comment: 'every source file must be imported, except entrypoints, tests and feature barrels',
+      comment: 'every source file must be imported, except entrypoints and tests',
       severity: 'error',
       from: {
         orphan: true,
@@ -12,8 +12,6 @@ export default {
           '(^|/)main\\.tsx$',
           '(^|/)vite-env\\.d\\.ts$',
           '^src/client/public/',
-          '^src/client/features/[^/]+/index\\.ts$',
-          '^src/client/features/(assets|settings)/components/index\\.ts$',
         ],
       },
       to: {},

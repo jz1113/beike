@@ -15,9 +15,11 @@
   --tl-done: 0.75;
   --tl-timer: 0.55;
 
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
   color: var(--tl-color);
   font-family: inherit;
   font-size: var(--tl-font);
@@ -109,15 +111,18 @@
 
 .thought-line[data-working] .thought-line__breath[data-shimmer] {
   color: var(--tl-color);
+  -webkit-text-fill-color: transparent;
   background-image: linear-gradient(
     100deg,
-    transparent 30%,
-    color-mix(in srgb, var(--tl-color) 28%, white) 50%,
-    transparent 70%
+    color-mix(in srgb, var(--tl-color) 55%, transparent) 30%,
+    var(--tl-color) 50%,
+    color-mix(in srgb, var(--tl-color) 55%, transparent) 70%
   );
   background-size: 220% 100%;
   background-repeat: no-repeat;
   background-position: 125% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
   animation: thought-line-shimmer var(--tl-shimmer) linear infinite;
 }
 
@@ -169,8 +174,8 @@
 .thought-line__trace {
   display: grid;
   grid-template-rows: 0fr;
-  width: 0;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   transition: grid-template-rows var(--tl-settle) var(--tl-ease-out);
 }
 
@@ -179,6 +184,7 @@
 }
 
 .thought-line__fold {
+  min-width: 0;
   min-height: 0;
   overflow-x: visible;
   overflow-y: clip;

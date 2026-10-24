@@ -29,13 +29,17 @@ import type { AppState, WorkshopSlice } from '@client/store/types';
 import { createWorkshopGenerationActions } from './workshopGenerationActions';
 
 const WORKSHOP_SELECTED_ARCH_KEY = 'workshop_selected_arch_id';
-const LEGACY_STYLE_IDS = new Set(['computer_office_monitor', 'arch_atomic_asset_hub', 'arch_jewelry_master']);
-const ARCH_ID_ALIASES: Record<string, string> = {
-  cmu25767x000011tybm2u7c3t: 'recipe_phone_comms_master',
-};
+const LEGACY_STYLE_IDS = new Set([
+  'computer_office_monitor',
+  'arch_atomic_asset_hub',
+  'arch_jewelry_master',
+  'cmu25767x000011tybm2u7c3t',
+  'recipe_phone_comms_master',
+  'recipe_jewelry_master',
+]);
 
 function canonicalizeArchId(id: string): string {
-  return ARCH_ID_ALIASES[id] || id;
+  return id;
 }
 
 function readInitialSelectedArchId(): string {

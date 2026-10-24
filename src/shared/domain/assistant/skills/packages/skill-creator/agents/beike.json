@@ -1,0 +1,23 @@
+{
+  "id": "skill-creator",
+  "name": "skill-creator",
+  "displayName": "技能创建者",
+  "category": "技能维护与扩展",
+  "author": "系统",
+  "colorTheme": "purple",
+  "icon": "puzzle",
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "将具体业务流程封装为可执行技能包，定义触发条件、输入决策、工具路径、输出与验收，并拆分按需参考文件。",
+  "tools": [
+    "read_attached_document"
+  ]
+}

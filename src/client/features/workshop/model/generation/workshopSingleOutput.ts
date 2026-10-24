@@ -3,7 +3,7 @@ import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client
 import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { resizeImageBlob } from '@client/shared/media/imageResize';
-import { verifyWorkshopImageSize } from './workshopImageSize';
+import { readWorkshopImageSize } from './workshopImageSize';
 
 /** The upstream canvas and delivered shot are separate contracts, frozen before submission. */
 export async function finishWorkshopSingleOutput(
@@ -13,11 +13,14 @@ export async function finishWorkshopSingleOutput(
   filename = 'workshop-shot.jpg',
 ): Promise<{ url: string; temporary: boolean }> {
   try {
-    // Old single-shot attempts did not store a separate upstream canvas size.
-    if (generationSize || outputSize) await verifyWorkshopImageSize(generated.url, generationSize || outputSize!);
-    if (!outputSize || !generationSize || outputSize === generationSize) return generated;
-    const dimensions = parseOutputDimensions(outputSize);
+    const targetSize = outputSize || generationSize;
+    if (!targetSize) return generated;
+    const dimensions = parseOutputDimensions(targetSize);
     if (!dimensions) throw new Error('分镜交付尺寸无效');
+    const actual = await readWorkshopImageSize(generated.url);
+    if (actual.width === dimensions.width && actual.height === dimensions.height) return generated;
+    // Gateways may return a supported canvas instead of the requested pixels.
+    // Use the existing proportional crop/resize path to honor the delivery size.
     const blob = await resizeImageBlob(await fetchMediaBlob(generated.url), dimensions.width, dimensions.height);
     const form = new FormData();
     form.append('category', 'generated/images');

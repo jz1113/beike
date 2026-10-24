@@ -14,7 +14,7 @@ import {
 } from '../engine/generationTaskPolling';
 import { submitSingleGenerationTask } from '../engine/generationTaskSubmitter';
 import { getGenerationSubmissionLane } from '../engine/generationSubmissionQueue';
-import { generationSubmissionQueue } from '../engine/generationSubmissionConfig';
+import { generationSubmissionQueue, setGenerationMediaConcurrency } from '../engine/generationSubmissionConfig';
 import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled } from '@client/shared/api/generation/generationAbort';
 
 export {
@@ -169,10 +169,10 @@ export function useGenerationEngine() {
   // 每批只将任务 ID 加入全局队列，真正派发时重新检查当前任务，避免提交已删除的快照。
   useEffect(() => {
     if (!unsubmittedTasksKey) return;
-    generationSubmissionQueue.enqueue(getUnsubmittedGenerationTasks().map(({ id, mediaType }) => ({
+    const jobs = getUnsubmittedGenerationTasks().map(({ id, mediaType }) => ({
       id,
       lane: getGenerationSubmissionLane(mediaType || (id.startsWith('agent-task-') ? 'agent' : undefined)),
-      run: async (signal) => {
+      run: async (signal: AbortSignal) => {
         if (!useAppStore.getState().generationHistoryReady) return;
         const task = getUnsubmittedGenerationTasks().find((t) => t.id === id);
         if (!task || signal.aborted) return;
@@ -200,7 +200,10 @@ export function useGenerationEngine() {
           }
         }
       },
-    })));
+    }));
+    const mediaCount = jobs.filter((job) => job.lane === 'media').length;
+    if (mediaCount > 0) setGenerationMediaConcurrency(mediaCount);
+    generationSubmissionQueue.enqueue(jobs);
   }, [unsubmittedTasksKey, updateGenerationTask]);
 
   // 轮询进行中 Hub 任务

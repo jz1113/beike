@@ -62,7 +62,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
     : item.appliedFullPromptId ? `#${stableAssetCode('R', item.appliedFullPromptId)}` : '未编号图组';
 
   return (
-    <div style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }} className="p-4 sm:p-5 space-y-4 bg-transparent border border-slate-200/60 rounded-2xl dark:border-white/10">
+    <div id={`workshop-prompt-${item.id}`} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }} className="p-4 sm:p-5 space-y-4 bg-white/95 dark:bg-[#18191c]/95 border border-slate-200/60 rounded-2xl dark:border-white/10">
       {/* 商品行头部信息 */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -95,9 +95,9 @@ const MemoizedProductItem = React.memo(function ProductItem({
                   AI 分析优化中
                 </BatchStatusBadge>
               ) : item.analysisError ? (
-                <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">分析失败</span>
+                <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full dark:bg-amber-500/15 dark:text-amber-300">分析失败</span>
               ) : hasPrompts && item.analyzedSuccess ? (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded dark:bg-emerald-500/15 dark:text-emerald-300">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                   提示词已就绪
                 </span>
@@ -164,8 +164,9 @@ const MemoizedProductItem = React.memo(function ProductItem({
           <button
             type="button"
             onClick={() => handleRemoveItem(item.id)}
-            className="p-1 rounded text-slate-400 hover:text-rose-600 cursor-pointer"
-            title="移除此商品"
+            disabled={item.isAnalyzing || isAnalyzingAll}
+            className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-rose-500/10"
+            title="移除此商品" aria-label={`移除商品 ${item.title}`}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -174,7 +175,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
 
       {/* 异常警示 */}
       {item.analysisError && (
-        <div className="p-2.5 rounded-lg bg-amber-50 text-amber-800 text-xs flex items-center justify-between gap-3 border-l-2 border-amber-500">
+        <div className="p-2.5 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 text-xs flex items-center justify-between gap-3 border-l-2 border-amber-500">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>{item.analysisError}</span>
@@ -183,7 +184,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
             type="button"
             disabled={item.isAnalyzing || isAnalyzingAll}
             onClick={onAnalyzeSingle}
-            className="px-2.5 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold cursor-pointer shrink-0"
+            className="px-2.5 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 dark:text-amber-200 text-xs font-bold cursor-pointer shrink-0"
           >
             重试分析
           </button>
@@ -269,12 +270,13 @@ const MemoizedProductItem = React.memo(function ProductItem({
                 onUpdatePrompt={(val) => onUpdatePrompt(shotIdx, val)}
                 productPersona={item.applied_persona}
                 sharedAssets={sharedAssets}
+                readOnly={item.isAnalyzing || isAnalyzingAll}
               />
             );
           })}
         </BatchShotGrid>
       ) : item.isAnalyzing ? (
-        <div role="status" className="p-3 flex items-center gap-3 bg-indigo-50/50 rounded-xl">
+        <div role="status" className="p-3 flex items-center gap-3 bg-indigo-50/50 rounded-xl dark:bg-indigo-500/10">
           <Loader2 className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
           <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
             正在分析材质与构图，生成分镜提示词…
@@ -283,7 +285,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
       ) : !item.analysisError ? (
         <div className="px-3 py-2.5 bg-slate-50 rounded-xl dark:bg-white/5">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {isAnalyzingAll ? '已加入分析队列，等待处理…' : '图片已准备好。点击上方「批量分析商品」，或单独分析此商品。'}
+            {isAnalyzingAll ? '已加入分析队列，等待处理…' : '图片已准备好。点击底部「开始分析分镜」，或单独分析此商品。'}
           </p>
         </div>
       ) : null}

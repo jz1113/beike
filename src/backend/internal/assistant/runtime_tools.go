@@ -11,28 +11,30 @@ import (
 )
 
 type toolBox struct {
-	ctx           context.Context
-	db            *sql.DB
-	cfg           config.Config
-	workspace     string
-	documents     []attachedDoc
-	client        map[string]any
-	plan          *taskPlan
-	results       *resultStore
-	budget        *execBudget
-	allowed       []string
-	ceiling       []string
-	pinnedCeiling bool
-	skillTools    []string
-	exposedMCP    []string
-	mcpEnabled    bool
-	mcp           map[string]mcpBinding
-	skills        []skillPackage
-	skillFiles    []skillResource
-	visual        *visualBudget
-	spawn         func(skillID, prompt string) string
-	applyTools    func(allowed []string)
-	activateMCP   func(name string) string
+	ctx               context.Context
+	db                *sql.DB
+	cfg               config.Config
+	workspace         string
+	documents         []attachedDoc
+	client            map[string]any
+	plan              *taskPlan
+	results           *resultStore
+	budget            *execBudget
+	allowed           []string
+	ceiling           []string
+	pinnedCeiling     bool
+	skillTools        []string
+	exposedMCP        []string
+	mcpEnabled        bool
+	mcp               map[string]mcpBinding
+	skills            []skillPackage
+	skillFiles        []skillResource
+	pinnedSkillID     string
+	skillFilePackages map[string][]skillResource
+	visual            *visualBudget
+	spawn             func(skillID, prompt string) string
+	applyTools        func(allowed []string)
+	activateMCP       func(name string) string
 }
 
 type skillResource struct {
@@ -270,25 +272,6 @@ func navigateTool(target, reason string) string {
 	}
 	body, _ := json.Marshal(map[string]any{"success": true, "action": "navigate", "target_view": target, "reason": reason, "message": "已请求将工作台切换至「" + label + "」"})
 	return string(body)
-}
-
-func (box *toolBox) readSkillFile(args map[string]any) string {
-	path := textArg(args, "path")
-	if path == "" {
-		return toolJSON(false, "缺少技能文件路径")
-	}
-	for _, file := range box.skillFiles {
-		if file.Path != path {
-			continue
-		}
-		body := file.Content
-		if len([]rune(body)) > 12000 {
-			body = string([]rune(body)[:12000]) + "\n\n…（文件剩余部分请缩小范围后再读）"
-		}
-		payload, _ := json.Marshal(map[string]any{"success": true, "path": file.Path, "content": body})
-		return string(payload)
-	}
-	return toolJSON(false, "当前技能资料里没有这个文件")
 }
 
 func toolJSON(success bool, message string) string {

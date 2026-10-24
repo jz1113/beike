@@ -9,7 +9,7 @@ import { generateSalesReferenceFrame } from '../api/salesMediaApi';
 
 vi.mock('react', () => ({ useCallback: (callback: unknown) => callback, useEffect: () => {}, useRef: (current: unknown) => ({ current }), useState: (value: unknown) => [value, vi.fn()] }));
 vi.mock('../model/prepareSalesAssets', () => ({ prepareSalesCreativeAssets: vi.fn() }));
-vi.mock('../api/videoSalesApi', () => ({ finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn() }));
+vi.mock('../api/videoSalesApi', () => ({ analyzeProductMedia: vi.fn(), finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn() }));
 vi.mock('../api/salesMediaApi', () => ({ generateSalesReferenceFrame: vi.fn() }));
 vi.mock('../model/salesStageRules', async (original) => ({ ...await original<typeof import('../model/salesStageRules')>(), salesSingleVideoError: vi.fn() }));
 vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute: (modality: string) => ({ modelId: `${modality}-chosen` }) }));

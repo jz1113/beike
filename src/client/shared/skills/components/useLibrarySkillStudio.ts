@@ -5,7 +5,7 @@ import { buildSkillFromStudio, studioStateFromSkill, type SkillStudioPayload } f
 import { parseLocalSkillFiles } from '../model/skillPackageParser';
 import type { GeneratedSkillResult } from '../model/agentSkillGenerator';
 import type { SkillFileNode } from '../model/skillFileTree';
-import type { SkillDraftData } from '../model/skillTypes';
+import type { SkillDraftData, SkillPresentation } from '../model/skillTypes';
 
 export function useLibrarySkillStudio(showToast: (message: string) => void) {
   const [open, setOpen] = useState(false);
@@ -18,13 +18,14 @@ export function useLibrarySkillStudio(showToast: (message: string) => void) {
   return {
     open, files, draft, editing,
     close: () => setOpen(false),
-    create: () => start(null, null),
+    create: (kind: SkillPresentation = 'creation') => start(null, { kind }),
     edit: (skill: AssistantSkill) => { const state = studioStateFromSkill(skill); start(state.files, state.draft, skill); },
+    duplicate: (skill: AssistantSkill) => { const state = studioStateFromSkill(skill); start(state.files, { ...state.draft, title: `${state.draft.title.slice(0, 16)} 副本` }); },
     generated: (result: GeneratedSkillResult) => start(result.files, result.draft),
-    upload: async (selected: FileList) => {
+    upload: async (selected: FileList, kind: SkillPresentation) => {
       try {
         const result = await parseLocalSkillFiles(selected);
-        start(result.files, result.draft);
+        start(result.files, { ...result.draft, kind: result.draft.kind || kind });
         if (result.warnings[0]) showToast(result.warnings[0]);
       } catch (error) { showToast(error instanceof Error ? error.message : '技能文件解析失败'); }
     },

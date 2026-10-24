@@ -54,6 +54,7 @@ function sanitizeSkillMeta(raw: unknown): AssistantSkillMeta | undefined {
     ? record.showcaseUrls.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4)
     : [];
   const meta: AssistantSkillMeta = {
+    kind: record.kind === 'agent' || record.kind === 'creation' ? record.kind : undefined,
     genres,
     tags,
     defaultVideoModel: typeof record.defaultVideoModel === 'string' ? record.defaultVideoModel : '',
@@ -64,7 +65,7 @@ function sanitizeSkillMeta(raw: unknown): AssistantSkillMeta | undefined {
     assetGuide: typeof record.assetGuide === 'string' ? record.assetGuide.slice(0, 12) : '',
     isPublic: record.isPublic === true,
   };
-  const filled = meta.genres.length > 0 || meta.tags.length > 0 || (meta.showcaseUrls?.length ?? 0) > 0
+  const filled = meta.kind || meta.genres.length > 0 || meta.tags.length > 0 || (meta.showcaseUrls?.length ?? 0) > 0
     || meta.coverUrl || meta.promptGuide || meta.assetGuide || meta.isPublic
     || meta.defaultVideoModel || meta.defaultImageModel;
   return filled ? meta : undefined;

@@ -1,0 +1,4 @@
+interface:
+  display_name: "服饰带货视频脚本与生成"
+  short_description: "从服饰、鞋、包的当前 SKU 图出发，规划口播、人物场景素材，再依据实际图片定稿整条带货视频提示词。"
+  default_prompt: "使用 $fashion-video-sales 完成当前任务。"

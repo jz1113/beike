@@ -46,7 +46,7 @@ export const veoVideoAdapter: VideoModelAdapter = {
   id: 'veo',
   match: (modelId) => {
     const m = modelId.toLowerCase();
-    return m.includes('veo') || m.includes('omni_flash') || m.includes('omni-flash');
+    return m.includes('veo') || m.includes('omni_flash') || m.includes('omni-flash') || m.includes('gemini-omni');
   },
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
@@ -54,7 +54,7 @@ export const veoVideoAdapter: VideoModelAdapter = {
     assertVideoInput(input, modelId, mode);
     const payload = baseVideoPayload(input, modelId);
     applyExclusiveFrameFields(payload, input, mode);
-    if (mode === 'omni') {
+    if (mode === 'omni' && !/omni[_-]flash|gemini-omni/i.test(modelId)) {
       delete payload.images;
       delete payload.image_urls;
     }

@@ -8,9 +8,9 @@
 - `src/backend`：对外 API、数据库迁移和官方种子。入口在 `cmd/api`，接口按领域放在 `internal`，迁移在 `internal/platform/database/migrate`。`pnpm dev`、`pnpm start` 与 `pnpm db:migrate` 都走这里。需要 Go 1.26。
 - `src/shared/contracts`：前后端接口、OpenAPI 与 Zod 契约，不承载业务编排。
 - `src/shared/domain`：浏览器安全的业务规则、模型适配、类型与种子。
-- `database`：schema、迁移和本地开发库；数据库和备份不提交。
-- `src/client/public`：无需编译的前端公开资源；`tools/configs`：环境模板和 Vite 等工程配置；`tools/scripts`：工程脚本；`tools/launchers`：Windows PowerShell / macOS 启动器实现；`tools/deploy`：部署模板；`tools/build/ui`：自动生成的前端产物。
-- 根目录只保留 `启动贝壳云图.bat` 作为 Windows 双击入口，调用 `tools/launchers` 下的 PowerShell 实现。环境模板位于 `tools/configs/env.example`，本机 `.env` 保留在根目录。
+- 当前 schema 与迁移统一在 Go 后端，不保留第二套历史 SQL。根 `database` 仅兼容已有本地库和 `database-backups`，可不存在；数据保持原位，整目录不提交、不按垃圾文件清理。维护规则见 `docs/database.md`。
+- `src/client/public`：无需编译的前端公开资源；`tools/configs`：环境模板和 Vite 等工程配置；`tools/scripts`：工程脚本；`tools/launchers`：Windows PowerShell 启动器实现；`tools/deploy`：部署模板；`tools/build/ui`：自动生成的前端产物。
+- 根目录保留 `启动贝壳云图.bat` 和 `启动贝壳云图.command`，分别作为 Windows 与 macOS 双击入口。Windows 入口调用 `tools/launchers` 下的 PowerShell 实现；macOS 实现直接放在根目录，保留可执行权限，不在其他目录保留副本。环境模板位于 `tools/configs/env.example`，本机 `.env` 保留在根目录。
 
 ## 依赖与分类
 

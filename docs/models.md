@@ -1,6 +1,6 @@
 # 模型接入索引
 
-模型目录统一引用本页。模型 ID、适配器和能力以 `src/shared/domain/models/model-catalog/` 与 `model-adapters/` 为准；官网链接与网关文档标识集中保存在 本页的模型与来源、网关文档标识两节。
+模型目录统一引用本页。模型 ID、适配器和能力以 `src/shared/domain/models/model-catalog/` 与同级 `model-adapters/` 为准；官网链接与网关文档标识集中保存在本页。设置页的模态种子来自 `src/shared/domain/models/modalityDefaults.ts`，不能把设置条目等同于完整产品能力。
 
 ## 调用约定
 
@@ -12,15 +12,29 @@
 
 ## 接入细节
 
-- [3D 模型调用参考指南](3D模型调用参考.md)
 - [多模态与对话模型调用参考指南](多模态与对话模型调用参考.md)
 - [生图与图像编辑模型调用参考指南](生图与图像编辑模型调用参考.md)
 - [视频生成模型调用参考指南](视频生成模型调用参考.md)
-- [音乐生成模型调用参考指南](音乐生成模型调用参考.md)
 - [语音合成与音频处理调用参考指南](语音合成与音频处理调用参考.md)
-- [视频能力与请求映射](video-capabilities.md)
 - [思考强度适配](reasoning.md)
 - [DeepSeek 接入约定](#deepseek-接入约定)
+
+## 配置存在但尚未形成完整产品链路
+
+- **3D**：设置默认模型为 `fal-ai/hunyuan-3d/v3.1/pro`（Hunyuan 3D）。`src/backend/internal/gateway/threed_submit.go` 有通用提交封装，但当前 Go 路由与 OpenAPI 未暴露 `/api/generate/threed`，也没有完整产品调用链；不保留虚构的本地接口样例。
+- **音乐**：设置种子为 `suno`、`elevenlabs-music`、`minimax-music`。当前未形成歌曲提交、轮询和产物保存链路；`/api/generate/audio` 实际执行语音合成，不能用于证明 Suno 已接入。
+
+这些条目保留配置用途。启用生产功能前需补齐契约、路由、提交防重、状态恢复、产物保存和真实调用验证，不能只增加模型名或下载域名就宣布完成。
+
+扩展参考：[Tripo 开发文档](https://platform.tripo3d.ai/docs)、[Fal 模型平台](https://fal.ai/)、[MiniMax 音乐资料](https://platform.minimaxi.com/document/music_generation)、[ElevenLabs API](https://elevenlabs.io/docs/api-reference)、[Suno 产品入口](https://suno.com/)。这些链接作为上游资料保留，不代表项目采用了相同接口、认证或任务结构。
+
+## 接入维护流程
+
+1. 分清设置种子、批准目录、模型能力与渠道路由，保留用户所选渠道别名，不擅自替换为官方型号。
+2. 在现有共享能力与 Go 适配器中补齐参数、提交和查询；新增对外接口时同步 `src/shared/contracts/openapi.yaml`，不另建 Node API。
+3. 同步尺寸、时长、分辨率、输入数量、参考角色及错误处理，分别核对前端选项、契约与后端校验。
+4. 为必要适配行为增加源码旁回归测试，执行 `pnpm check:model-catalog`、`pnpm check:openapi` 及相关测试。付费在线验证单独记录渠道与实际组合，不以列表发现成功替代。
+5. 更新本页来源和对应模态说明，产品流程通过链接引用，不在多页重复维护能力表。
 
 ## 模型与来源
 
@@ -28,11 +42,16 @@
 
 | 模型 / 协议 | 类型 | 厂商 / 协议组 | 参考资料 |
 | --- | --- | --- | --- |
-| `gpt-image-2.5-flare` | image | openai | [OpenAI Images API](https://platform.openai.com/docs/api-reference/images) · [OpenAI Image generation guide](https://platform.openai.com/docs/guides/image-generation) |
-| `gpt-image-2.5-sunburst` | image | openai | [OpenAI Images API](https://platform.openai.com/docs/api-reference/images) |
-| `gpt-image-2` | image | openai | [OpenAI Images API](https://platform.openai.com/docs/api-reference/images) |
-| `nano-banana-pro` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation) |
-| `nano-banana` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation) |
+| `gpt-image-2.5-flare` | image | openai | [OpenAI Images Generate](https://developers.openai.com/api/reference/resources/images/methods/generate?site_locale=en) · [OpenAI Images Edit](https://developers.openai.com/api/reference/resources/images/methods/edit) · [OpenAI Image generation guide](https://platform.openai.com/docs/guides/image-generation) |
+| `gpt-image-2.5-sunburst` | image | openai | [OpenAI Images Generate](https://developers.openai.com/api/reference/resources/images/methods/generate?site_locale=en) · [OpenAI Images Edit](https://developers.openai.com/api/reference/resources/images/methods/edit) |
+| `gpt-image-2` | image | openai | [OpenAI Images Generate](https://developers.openai.com/api/reference/resources/images/methods/generate?site_locale=en) · [OpenAI Images Edit](https://developers.openai.com/api/reference/resources/images/methods/edit) |
+| `gemini-nano-banana-2.1` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
+| `gemini-3.1-flash-image` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
+| `gemini-3.1-flash-lite-image` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
+| `gemini-3-pro-image` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
+| `gemini-2.5-flash-image` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
+| `nano-banana-pro` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
+| `nano-banana` | image | google | [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#aspect_ratios) |
 | `doubao-seedream-4-0-250828` | image | volcengine | [火山方舟图像生成](https://www.volcengine.com/docs/82379) |
 | `doubao-seedream-4-5-251128` | image | volcengine | [火山方舟图像生成](https://www.volcengine.com/docs/82379) |
 | `doubao-seedream-5-0-260128` | image | volcengine | [火山方舟图像生成](https://www.volcengine.com/docs/82379) |
@@ -47,9 +66,9 @@
 | `grok-4.1-image` | image | xai | [xAI image generation](https://docs.x.ai/docs/guides/image-generation) |
 | `grok-4.2-image` | image | xai | [xAI image generation](https://docs.x.ai/docs/guides/image-generation) |
 | `grok-imagine-image-quality` | image | xai | [xAI image generation](https://docs.x.ai/docs/guides/image-generation) |
-| `veo3.1` | video | google | [Gemini Veo](https://ai.google.dev/gemini-api/docs/video) |
-| `veo3.1-fast` | video | google | [Gemini Veo](https://ai.google.dev/gemini-api/docs/video) |
-| `omni_flash-10s` | video | google | [Gemini Veo](https://ai.google.dev/gemini-api/docs/video) |
+| `veo3.1` | video | google | [Gemini Veo](https://ai.google.dev/gemini-api/docs/veo?hl=zh-cn) |
+| `veo3.1-fast` | video | google | [Gemini Veo](https://ai.google.dev/gemini-api/docs/veo?hl=zh-cn) |
+| `omni_flash-10s` | video | google | [Gemini Omni Flash](https://ai.google.dev/gemini-api/docs/omni?hl=zh-cn) |
 | `kling-video-v3` | video | kling | [可灵开放平台](https://app.klingai.com/cn/dev/document-api/apiReference/model/textToVideo) |
 | `kling-video-v3-omni` | video | kling | [可灵 Omni-Video](https://app.klingai.com/cn/dev/document-api/apiReference/model/omniVideo) |
 | `kling-video-v2-5-turbo` | video | kling | [可灵开放平台](https://app.klingai.com/cn/dev/document-api/apiReference/model/textToVideo) |
@@ -141,14 +160,10 @@
 
 ## 数字人驱动与语音合成
 
-数字人口播把配音和驱动拆成两套凭证。配音模型在设置「语音」线路拉取，对口型驱动模型在设置「数字人」线路拉取。模型 ID 决定协议，404/405 才尝试下一条网关路径。环境变量 `AVATAR_LIPSYNC_SUBMIT_URLS` 与 `AVATAR_LIPSYNC_POLL_URLS` 仍可覆盖驱动地址。
+数字人口播把配音和驱动拆成两套凭证。配音模型在设置「语音」线路拉取，对口型驱动模型在设置「数字人」线路拉取。配音默认值、家族路径、请求与恢复边界见[语音合成接入](语音合成与音频处理调用参考.md)，以下只维护驱动矩阵。驱动路径的兼容尝试按实现的错误条件执行；环境变量 `AVATAR_LIPSYNC_SUBMIT_URLS` 与 `AVATAR_LIPSYNC_POLL_URLS` 可覆盖驱动地址。
 
 | 家族 | 识别 | 输入 | 提交路径 | 轮询路径 |
 | --- | --- | --- | --- | --- |
-| MiniMax 语音 | `speech-*`、`minimax`、`t2a` | 文本 + voice id | `/v1/t2a_v2`，失败再走 `/v1/audio/speech` | 同步返回音频 |
-| ElevenLabs | `eleven*` | 文本 + voice id | `/v1/text-to-speech/{voice_id}` | 同步返回音频 |
-| CosyVoice | `cosyvoice` | 文本 + voice | `/api/v1/services/aigc/text2audio/generation` | 同步返回音频 |
-| 豆包语音 | `doubao` 且含 `tts` | 文本 + voice_type | `/api/v1/tts` | 同步返回音频 |
 | 可灵对口型 | `kling` 且含 lip/avatar/ident | 照片或视频 + 音频 | `/kling/v1/videos/lip-sync` | `/kling/v1/videos/lip-sync/{id}` |
 | OmniHuman | `omnihuman` | 照片 + 音频 | `/v1/videos/omnihuman` | `/v1/videos/omnihuman/{id}` |
 | 万相对口型 | `wanx-avatar`、`videoretalk`、`emo-v` | 照片或视频 + 音频 | DashScope `image2video/video-synthesis` | `/api/v1/tasks/{id}` |
@@ -156,3 +171,7 @@
 | LatentSync | `latentsync`、`musetalk` | 视频 + 音频 | `/fal/latentsync` | `/fal/latentsync/{id}` |
 
 Seedance 等普通视频模型不能当作数字人驱动。声音克隆走 MiniMax `/v1/voice_clone` 或 ElevenLabs `/v1/voices/add`，状态分为处理中、就绪和失败。
+
+产品提交为 `POST /api/avatar/render`，状态查询为 `GET /api/avatar/tasks/{id}`。请求分别提供 `voiceModel` / `voiceBaseUrl` / `voiceApiKey` 与 `videoModel` / `driverBaseUrl` / `driverApiKey`，其余人物、布局和字幕字段按 `src/backend/internal/avatar/` 的请求实现填写；任务完成仍需预览口型与音画同步。
+
+语音参考：[OpenAI Audio](https://platform.openai.com/docs/api-reference/audio)、[MiniMax Speech](https://platform.minimaxi.com/document/t2a_v2)、[CosyVoice](https://help.aliyun.com/zh/model-studio/cosyvoice)、[ElevenLabs](https://elevenlabs.io/docs/api-reference)。

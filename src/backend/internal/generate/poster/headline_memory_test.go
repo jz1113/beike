@@ -370,7 +370,7 @@ func TestHeadlineDeconstructReasoningEffort(t *testing.T) {
 	}
 
 	rejected := httptest.NewRecorder()
-	handler.ServeHTTP(rejected, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"model":"claude-haiku-5-5","reasoningEffort":"max","textProtocol":"anthropic","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
+	handler.ServeHTTP(rejected, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"model":"claude-haiku-5-5","reasoningEffort":"extreme","textProtocol":"anthropic","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if rejected.Code != http.StatusBadRequest || !strings.Contains(rejected.Body.String(), "不支持的思考强度") || calls.Load() != 2 {
 		t.Fatalf("rejected %d calls %d body %s", rejected.Code, calls.Load(), rejected.Body.String())
 	}

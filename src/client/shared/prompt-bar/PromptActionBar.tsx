@@ -1,4 +1,7 @@
 import { Plus, ArrowUp } from 'lucide-react';
+import { useAppStore } from '@client/store';
+import { resolveSkillKind } from '@shared/domain/assistant/skills/skillPurpose';
+import { resolveCreationSkillModifiableSummary } from '@client/shared/skills/model/creationSkillModifiers';
 import { densityComposerPad, composerContainer, densityComposerRadius } from '@client/shared/ui/layoutClasses';
 import { RichPromptInput } from './RichPromptInput';
 import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
@@ -6,13 +9,17 @@ import PromptBarBrandHero from './PromptBarBrandHero';
 import PromptBarRefMediaPanel from './media/PromptBarRefMediaPanel';
 import { PromptBarControlsRow } from './controls/PromptBarControlsRow';
 import { PromptBarAgentFileChips } from './controls/PromptBarAgentFileChips';
+import {
+  PromptBarSkillAssetSlot,
+  PromptBarSkillCustomizeBar,
+} from './controls/PromptBarSkillCustomizeBar';
 import { usePromptActionBar, type PromptActionBarOptions } from './hooks/usePromptActionBar';
 
 export type { SubjectItem } from './promptBarConstants';
 
 export default function PromptActionBar(props: PromptActionBarOptions) {
   const {
-    store, containerRef, handleComposerFocus, handleContainerBlur, anyDropdownOpen,
+    store, containerRef, handleComposerFocus, handleContainerBlur, anyDropdownOpen, setControlsDropdownOpen,
     isFloatingDock, shouldShowBrandHero, isExpanded, useTopStrip, media, videoFrames,
     showInlinePolaroid, isGenerateDock, isComposerExpanded, richInputRef, handleComposerKeyDown,
     placeholder, isUp, isDepthMode, modeMenu, modeButtonClass, handleModeSwitch, modelMenu,
@@ -61,7 +68,34 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
     setQuickVideoCount,
   } = store;
 
-  const hasVisualRefImages = quickRefImages.some((url) => !url.startsWith('agent-file:'));
+  const activeSkill = useAppStore((s) =>
+    s.activeAssistantSkillId ? s.getActiveAssistantSkill() : null,
+  );
+  const isActiveCreationSkill = Boolean(quickGenMode === 'agent' && activeSkill && resolveSkillKind(activeSkill) === 'creation');
+  const visualRefImages = quickRefImages.filter((url) => !url.startsWith('agent-file:'));
+  const hasVisualRefImages = visualRefImages.length > 0;
+  const effectivePlaceholder =
+    isActiveCreationSkill && activeSkill
+      ? resolveCreationSkillModifiableSummary(activeSkill).composerPlaceholder
+      : placeholder;
+
+  const handleClearActiveSkill = () => {
+    useAppStore.getState().setActiveAssistantSkillId(null);
+    const cleaned = quickPrompt
+      .replace(/#\[skill:[^\]]+\]\s*/gi, '')
+      .replace(/【强指令·[^】]+】[^【\n]*?[！。；]\s*/g, '')
+      .trim();
+    setQuickPrompt(cleaned);
+    showToast('已取消当前创作技能');
+  };
+  const handlePromptChange = (next: string) => {
+    if (isActiveCreationSkill && /#\[skill:[^\]]+\]/i.test(quickPrompt) && !/#\[skill:[^\]]+\]/i.test(next)) {
+      useAppStore.getState().setActiveAssistantSkillId(null);
+      setQuickPrompt(next.replace(/【强指令·[^】]+】[^【\n]*?[！。；]\s*/g, '').trim());
+      return;
+    }
+    setQuickPrompt(next);
+  };
 
   return (
     <div
@@ -90,8 +124,19 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
             {quickGenMode === 'agent' && (
               <PromptBarAgentFileChips urls={quickRefImages} onRemove={media.handleRemoveRefImage} />
             )}
-            {/* 🌟 展开面板（参考图3）：点击全部展开后在顶部展示全功能面板 */}
-            {(useTopStrip || (media.isExpandedRefImages && quickRefImages.length > 0)) && (
+            {isActiveCreationSkill && (
+              <PromptBarSkillCustomizeBar
+                key={activeSkill?.id}
+                skill={activeSkill}
+                quickPrompt={quickPrompt}
+                setQuickPrompt={setQuickPrompt}
+                refImagesCount={visualRefImages.length}
+                onUploadClick={() => media.fileInputRef.current?.click()}
+                onClearSkill={handleClearActiveSkill}
+                showToast={showToast}
+              />
+            )}
+            {(useTopStrip || (media.isExpandedRefImages && hasVisualRefImages)) && (
               <div className="pb-2">
                 <PromptBarRefMediaPanel
                   layout="strip"
@@ -159,36 +204,39 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                 </div>
               )}
 
+              {showInlinePolaroid && !hasVisualRefImages && isActiveCreationSkill && activeSkill && (
+                <PromptBarSkillAssetSlot
+                  skill={activeSkill}
+                  onUploadClick={() => media.fileInputRef.current?.click()}
+                />
+              )}
+
               <div className="flex-1 min-w-0 relative z-10 overflow-x-hidden scrollbar-none no-scrollbar">
                 <RichPromptInput
                   ref={richInputRef}
                   variant={isGenerateDock ? 'default' : 'composer'}
                   expanded={!isGenerateDock && isComposerExpanded}
                   value={quickPrompt}
-                  onChange={setQuickPrompt}
+                  onChange={handlePromptChange}
                   onKeyDown={handleComposerKeyDown}
                   onPasteFiles={media.handlePasteFiles}
-                  placeholder={placeholder}
-                  onOpenManual={() => showToast('贝壳 Agent 模式：与 AI 深度对话推敲分镜与构思，支持多模态参考与模型自适应调度。')}
+                  placeholder={effectivePlaceholder}
                   allSubjects={media.allSubjects}
                   quickRefImages={quickRefImages}
                   onTriggerAtMenu={(pos, query) => {
                     media.setCursorPosition(pos);
                     media.setAtMenuQuery(query || '');
-                    media.setAtMenuTrigger('input');
+                    media.setAtMenuTrigger(media.showAtMenu && media.atMenuTrigger === 'button' ? 'button' : 'input');
                     media.setShowAtMenu(true);
                   }}
                   onCloseAtMenu={() => {
-                    if (media.atMenuTrigger === 'input') {
-                      media.setShowAtMenu(false);
-                      media.setAtMenuTrigger(null);
-                    }
+                    media.setShowAtMenu(false);
+                    media.setAtMenuTrigger(null);
                   }}
                 />
               </div>
             </div>
 
-            {/* 🌟 键盘输入 @ 触发时：紧贴输入框下方展现（图 1 同款高级空态/列表） */}
             {media.showAtMenu && media.atMenuTrigger === 'input' && (
               <PromptBarAtMenu
                 atMenuRef={media.atMenuRef}
@@ -257,18 +305,16 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
               durationMenu={durationMenu}
               videoDurationBounds={videoDurationBounds}
               quickPrompt={quickPrompt}
-              setQuickPrompt={setQuickPrompt}
               media={media}
-              richInputRef={richInputRef}
-              handleSendPrompt={handleSendPrompt}
               canSend={canSend}
               isSubmitting={isSubmitting}
+              handleSendPrompt={handleSendPrompt}
+              richInputRef={richInputRef}
+              onDropdownOpenChange={setControlsDropdownOpen}
             />
           </div>
         ) : (
-          /* 🌟 当处于常态折叠状态时 (!isExpanded，严格参考画布常态设计) */
           <div className="flex items-center gap-2.5 sm:gap-3 w-full">
-            {/* 左侧微倾斜参考素材插槽 (对齐截图2红框) */}
             <div className="shrink-0 flex items-center justify-center">
               <button
                 type="button"
@@ -280,7 +326,6 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
               </button>
             </div>
 
-            {/* 中间单行输入区 (极简占位提示) */}
             <div className="flex-1 min-w-0 relative z-10 overflow-x-hidden scrollbar-none no-scrollbar flex items-center">
               <RichPromptInput
                 ref={richInputRef}
@@ -288,33 +333,29 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                 expanded={false}
                 singleLine={true}
                 value={quickPrompt}
-                onChange={setQuickPrompt}
+                onChange={handlePromptChange}
                 onKeyDown={handleComposerKeyDown}
                 onPasteFiles={media.handlePasteFiles}
                 placeholder={
                   quickGenMode === 'video'
                     ? 'Seedance 2.0全能参考，上传参考、输入文字或 @ 主体'
-                    : placeholder
+                    : effectivePlaceholder
                 }
-                onOpenManual={() => showToast('贝壳 Agent 模式：与 AI 深度对话推敲分镜与构思，支持多模态参考与模型自适应调度。')}
                 allSubjects={media.allSubjects}
                 quickRefImages={quickRefImages}
                 onTriggerAtMenu={(pos, query) => {
-                  media.setCursorPosition(pos);
-                  media.setAtMenuQuery(query || '');
-                  media.setAtMenuTrigger('input');
-                  media.setShowAtMenu(true);
-                }}
-                onCloseAtMenu={() => {
-                  if (media.atMenuTrigger === 'input') {
+                    media.setCursorPosition(pos);
+                    media.setAtMenuQuery(query || '');
+                    media.setAtMenuTrigger(media.showAtMenu && media.atMenuTrigger === 'button' ? 'button' : 'input');
+                    media.setShowAtMenu(true);
+                  }}
+                  onCloseAtMenu={() => {
                     media.setShowAtMenu(false);
                     media.setAtMenuTrigger(null);
-                  }
-                }}
+                  }}
               />
             </div>
 
-            {/* 右侧圆形发送按钮 (对齐截图2红框) */}
             <div className="shrink-0 flex items-center gap-2">
               <button
                 type="button"
@@ -325,17 +366,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
                     ? 'bg-slate-900 hover:bg-black text-white shadow-2xs cursor-pointer dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200'
                     : 'bg-[#E3E5EB] text-slate-400 cursor-not-allowed'
                 }`}
-                title={
-                  quickGenMode === 'depth-image'
-                    ? '生成深度图片'
-                    : quickGenMode === 'depth-video'
-                      ? '生成深度动作捕捉'
-                      : quickGenMode === 'video'
-                        ? '开始生成视频'
-                        : quickGenMode === 'audio'
-                          ? '开始生成音频'
-                          : '立即生成图片'
-                }
+                title="立即发送"
               >
                 <ArrowUp className="w-4 h-4 stroke-[2.2]" />
               </button>
@@ -344,7 +375,6 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
         )}
       </div>
 
-      {/* 隐藏的系统文件选择器与拖拽入口 */}
       <input ref={media.fileInputRef} type="file" accept={fileAccept} multiple={!isDepthMode} className="hidden" onChange={media.handleFileUpload} />
       <input ref={media.createSubjectInputRef} type="file" accept="image/*" className="hidden" onChange={media.handleCreateSubject} />
       <input ref={videoFrames.firstFrameInputRef} type="file" accept="image/*" className="hidden" onChange={videoFrames.handleUploadFirstFrame} />

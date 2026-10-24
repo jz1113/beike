@@ -1,3 +1,30 @@
+export interface BatchTaskFields {
+  id?: string;
+  taskId?: string;
+  sessionId?: string;
+  sessionTitle?: string;
+  batchId?: string;
+  batchTitle?: string;
+  productId?: string;
+  title?: string;
+  prompt?: string;
+  model?: string;
+  size?: string;
+  quality?: string;
+  mediaType?: string;
+  resultUrl?: string;
+  shotNo?: number;
+  createdAt?: string | number;
+  rawTask?: {
+    sessionId?: string;
+    sessionTitle?: string;
+  } | object;
+}
+
+const asTaskFields = (value: unknown): BatchTaskFields => (value ?? {}) as BatchTaskFields;
+const rawTaskMeta = (task: BatchTaskFields): { sessionId?: string; sessionTitle?: string } | undefined =>
+  task.rawTask as { sessionId?: string; sessionTitle?: string } | undefined;
+
 export interface TaskBatch<T = any> {
   batchId: string;
   title?: string;
@@ -25,9 +52,11 @@ export function extractBaseTheme(prompt?: string, title?: string): string {
     .slice(0, 32);
 }
 
-export function areTasksInSameBatch(taskA: any, timeA: number, taskB: any, timeB: number): boolean {
-  const sessionA = taskA.sessionId || taskA.rawTask?.sessionId;
-  const sessionB = taskB.sessionId || taskB.rawTask?.sessionId;
+export function areTasksInSameBatch(taskAInput: unknown, timeA: number, taskBInput: unknown, timeB: number): boolean {
+  const taskA = asTaskFields(taskAInput);
+  const taskB = asTaskFields(taskBInput);
+  const sessionA = taskA.sessionId || rawTaskMeta(taskA)?.sessionId;
+  const sessionB = taskB.sessionId || rawTaskMeta(taskB)?.sessionId;
   if (sessionA && sessionB && sessionA !== sessionB) return false;
   if (taskA.batchId && taskB.batchId && taskA.batchId === taskB.batchId) {
     return true;
@@ -73,13 +102,15 @@ export function areTasksInSameBatch(taskA: any, timeA: number, taskB: any, timeB
   return false;
 }
 
-function getTaskTime(task: any): number {
+function getTaskTime(taskInput: unknown): number {
+  const task = asTaskFields(taskInput);
   return typeof task.createdAt === 'number'
     ? task.createdAt
     : new Date(task.createdAt || 0).getTime();
 }
 
-function isVideoTask(task: any): boolean {
+function isVideoTask(taskInput: unknown): boolean {
+  const task = asTaskFields(taskInput);
   return (
     task.mediaType === 'video' ||
     task.mediaType === 'depth-video' ||
@@ -91,7 +122,9 @@ function isVideoTask(task: any): boolean {
 
 function sortBatchTasks<T>(tasks: T[]): void {
   if (tasks.length <= 1) return;
-  tasks.sort((a: any, b: any) => {
+  tasks.sort((left, right) => {
+    const a = asTaskFields(left);
+    const b = asTaskFields(right);
     if (typeof a.shotNo === 'number' && typeof b.shotNo === 'number') {
       return a.shotNo - b.shotNo;
     }
@@ -106,7 +139,7 @@ function sortBatchTasks<T>(tasks: T[]): void {
   });
 }
 
-export function groupTasksIntoBatches<T = any>(
+export function groupTasksIntoBatches<T = BatchTaskFields>(
   tasks: T[],
   options?: {
     /** Conversation feed: group only results from one explicit submission. */
@@ -121,7 +154,7 @@ export function groupTasksIntoBatches<T = any>(
 ): TaskBatch<T>[] {
   if (!tasks || tasks.length === 0) return [];
 
-  const detectVideo = options?.isVideoTask ?? ((task: any) => isVideoTask(task));
+  const detectVideo = options?.isVideoTask ?? ((task: T) => isVideoTask(task));
   const defaultVideoModel = options?.defaultVideoModel ?? 'doubao-seedance-2.5';
   const defaultImageModel = options?.defaultImageModel ?? 'gpt-image-2';
   const defaultVideoSize = options?.defaultVideoSize ?? '16:9';
@@ -140,12 +173,12 @@ export function groupTasksIntoBatches<T = any>(
   const sessionIdMap = new Map<string, TaskBatch<T>>();
 
   items.forEach(({ task, time, idx }) => {
-    const row = task as any;
+    const row = asTaskFields(task);
     let targetBatch: TaskBatch<T> | undefined;
 
     // 🌟 1. 最高优先级：如果任务归属于某个生图会话 (sessionId)，则无论时间相隔多久、多轮生成，均归入同一个文件夹批次！
-    const rawSessionId = options?.bySubmissionOnly ? undefined : row.sessionId || row.rawTask?.sessionId;
-    const rawSessionTitle = options?.bySubmissionOnly ? undefined : row.sessionTitle || row.rawTask?.sessionTitle;
+    const rawSessionId = options?.bySubmissionOnly ? undefined : row.sessionId || rawTaskMeta(row)?.sessionId;
+    const rawSessionTitle = options?.bySubmissionOnly ? undefined : row.sessionTitle || rawTaskMeta(row)?.sessionTitle;
 
     if (rawSessionId) {
       targetBatch = sessionIdMap.get(String(rawSessionId));
@@ -154,7 +187,8 @@ export function groupTasksIntoBatches<T = any>(
     // 🌟 2. 次优先级：按明确的 batchId 归并
     if (!targetBatch && row.batchId) {
       targetBatch = batchIdMap.get(String(row.batchId));
-      const targetSessionId = (targetBatch?.tasks[0] as any)?.sessionId || (targetBatch?.tasks[0] as any)?.rawTask?.sessionId;
+      const firstTarget = asTaskFields(targetBatch?.tasks[0]);
+      const targetSessionId = firstTarget.sessionId || rawTaskMeta(firstTarget)?.sessionId;
       if (rawSessionId && targetSessionId && rawSessionId !== targetSessionId) targetBatch = undefined;
     }
 
@@ -220,7 +254,7 @@ export function groupTasksIntoBatches<T = any>(
 
   groups.forEach((group) => {
     sortBatchTasks(group.tasks);
-    const first = group.tasks[0] as any;
+    const first = asTaskFields(group.tasks[0]);
     if (first?.prompt && !group.prompt) {
       group.prompt = first.prompt;
     }

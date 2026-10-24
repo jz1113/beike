@@ -53,7 +53,7 @@ async function writeZipExcel(
     allowUpload: false,
   });
   if (excelRows.length === 0) return;
-  const XLSX = await import('./batchExport');
+  const XLSX = await import('xlsx');
   const worksheet = XLSX.utils.json_to_sheet(excelRows);
   worksheet['!cols'] = [
     { wch: 35 }, { wch: 22 }, { wch: 24 },
@@ -164,7 +164,7 @@ export async function exportBatchExcel(items: BatchProductItem[], deps: BatchExp
       deps.showToast('未找到可导出的生产记录');
       return;
     }
-    const XLSX = await import('./batchExport');
+    const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
     worksheet['!cols'] = [
       { wch: 35 }, { wch: 22 }, { wch: 24 },

@@ -26,7 +26,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": bindingErr.Error()})
 		return
 	}
-	content := workshopAnalyzeContent(payload, binding, shotCount)
+	content := workshopAnalyzeContent(cfg, payload, binding, shotCount)
 	messages := []any{map[string]any{"role": "user", "content": content}}
 	text, data, status, err := ChatCompletionJSON(r.Context(), base, apiKey, model, messages, 0.4, 240*time.Second)
 	if err != nil || status >= 300 || text == "" {

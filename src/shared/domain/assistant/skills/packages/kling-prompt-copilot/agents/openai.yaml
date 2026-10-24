@@ -1,0 +1,4 @@
+interface:
+  display_name: "克林提示副驾驶"
+  short_description: "为可灵视频设计有目的的运镜、从首帧出发的动作因果链与静动区域，处理图生视频和连续性修复。"
+  default_prompt: "使用 $kling-prompt-copilot 完成当前任务。"

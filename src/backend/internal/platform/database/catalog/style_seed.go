@@ -33,6 +33,10 @@ func LoadOfficialMasterRecipes(path string) ([]officialMasterRecipe, error) {
 }
 
 func UpsertOfficialMasterRecipes(ctx context.Context, db *sql.DB, recipes []officialMasterRecipe) error {
+	if len(recipes) == 0 {
+		_, err := db.ExecContext(ctx, `DELETE FROM "StyleRecipe" WHERE "workspaceId" = ?`, database.OfficialWorkspace)
+		return err
+	}
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	for _, recipe := range recipes {
 		var existing string

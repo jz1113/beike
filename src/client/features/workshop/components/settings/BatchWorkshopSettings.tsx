@@ -15,7 +15,6 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
   const {
     analyzeConcurrency,
     autoGenerateCopywriting,
-    availableActions,
     availableImageModels,
     availableOutfits,
     availablePersonas,
@@ -27,7 +26,6 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
     isCollecting,
     isGeneratingBatch,
     items,
-    lockedActionId,
     lockedOutfitId,
     lockedPersonaId,
     lockedSceneId,
@@ -43,20 +41,16 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
     setAutoGenerateCopywriting,
     setGenerationStrategy,
     setImageGenConcurrency,
-    setLockedActionId,
     setLockedOutfitId,
     setLockedPersonaId,
     setLockedSceneId,
-    setPersonaMode,
     setSelectedArchId,
     setSelectedAspect,
     setSelectedImageGenModel,
     setSelectedQuality,
     setSelectedShotCount,
     setSelectedVisionModel,
-    setUseAssetLibrary,
     successfulItems,
-    useAssetLibrary,
   } = runner;
   return (
       <WorkshopSettingsModal
@@ -95,8 +89,6 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
         setImageGenConcurrency={setImageGenConcurrency}
         analyzeConcurrency={analyzeConcurrency}
         setAnalyzeConcurrency={setAnalyzeConcurrency}
-        useAssetLibrary={useAssetLibrary}
-        setUseAssetLibrary={setUseAssetLibrary}
         lockedPersonaId={lockedPersonaId}
         setLockedPersonaId={setLockedPersonaId}
         availablePersonas={availablePersonas}
@@ -106,9 +98,6 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
         lockedOutfitId={lockedOutfitId}
         setLockedOutfitId={setLockedOutfitId}
         availableOutfits={availableOutfits}
-        lockedActionId={lockedActionId}
-        setLockedActionId={setLockedActionId}
-        availableActions={availableActions}
         lockedFullPromptId={runner.lockedFullPromptId}
         setLockedFullPromptId={runner.setLockedFullPromptId}
         availableFullPrompts={runner.availableFullPrompts}
@@ -117,7 +106,7 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
         setPromptGroupFolderId={runner.setPromptGroupFolderId}
         products={successfulItems.map(item => ({ title: item.title, props: productPropsWithCategory(item) }))}
         personaMode={personaMode}
-        setPersonaMode={setPersonaMode}
+        setPersonaMode={runner.setPersonaMode}
       />
   );
 }

@@ -1,3 +1,5 @@
+import { useAppStore } from '@client/store';
+import { resolveSkillKind } from '@shared/domain/assistant/skills/skillPurpose';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useScrollLock } from '@client/shared/hooks/useScrollLock';
 import { useDropdownMenu } from '@client/shared/hooks/useDropdownMenu';
@@ -12,7 +14,7 @@ import { usePromptBarStoreState } from './usePromptBarStoreState';
 import { useAppLayoutMode } from '@client/shared/hooks/useCompactLayout';
 
 import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
-import { IMAGE_RATIO_ITEMS, type SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
+import { ALL_IMAGE_RATIO_ITEMS, IMAGE_RATIO_ITEMS, type SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
 import { useDepthEnvCheck } from '@client/shared/api/generation/depthGeneration';
 import { isDepthGenMode, type QuickGenMode } from '@shared/domain/media/depthVideo';
 import {
@@ -89,6 +91,7 @@ export function usePromptActionBar({
   const isUp = dropdownPlacement === 'up' || (dropdownPlacement === 'auto' && currentView === 'generate');
 
   const [isComposerFocused, setIsComposerFocused] = useState(false);
+  const [controlsDropdownOpen, setControlsDropdownOpen] = useState(false);
   const richInputRef = useRef<RichPromptInputRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -112,7 +115,7 @@ export function usePromptActionBar({
   );
 
   const activeImageModelObj = availableImageModels.find(m => matchesStoredModel(m, quickModel)) || availableImageModels[0] || { id: '', name: '请从网关拉取生图模型', provider: 'Gateway' };
-  const activeImageRatioObj = IMAGE_RATIO_ITEMS.find(r => r.id === quickAspectId) || IMAGE_RATIO_ITEMS[0];
+  const activeImageRatioObj = ALL_IMAGE_RATIO_ITEMS.find(r => r.id === quickAspectId) || IMAGE_RATIO_ITEMS[0];
   const activeVideoModelObj = availableVideoModels.find(m => matchesStoredModel(m, quickVideoModel)) || availableVideoModels[0] || { id: '', name: '请从网关拉取视频模型', provider: 'Gateway' };
   const activeVideoRefModeObj = VIDEO_REF_MODES.find(m => m.id === quickVideoRefMode) || VIDEO_REF_MODES[0];
   const activeVideoRatioObj = VIDEO_ASPECT_RATIOS.find(r => r.id === quickVideoAspectId) || VIDEO_ASPECT_RATIOS.find(item => item.id === '16:9')!;
@@ -121,8 +124,9 @@ export function usePromptActionBar({
 
   useVideoParameterConstraints();
 
+  const imageModelId = ('upstreamId' in activeImageModelObj ? activeImageModelObj.upstreamId : undefined) || activeImageModelObj.id || quickModel;
   const { w: currentW, h: currentH, sizeStr } = calculateImageDimensions({
-    quickModel,
+    quickModel: imageModelId,
     quickAspectId,
     quickQuality,
     baseRatio: activeImageRatioObj,
@@ -210,6 +214,7 @@ export function usePromptActionBar({
     aspectMenu.isOpen ||
     videoRefModeMenu.isOpen ||
     durationMenu.isOpen ||
+    controlsDropdownOpen ||
     media.showAtMenu;
 
   useScrollLock(
@@ -220,6 +225,10 @@ export function usePromptActionBar({
   const handleModeSwitch = useCallback((next: QuickGenMode) => {
     if (next !== quickGenMode) {
       media.clearComposerMedia();
+      if (next !== 'agent') {
+        const activeSkill = useAppStore.getState().getActiveAssistantSkill();
+        if (activeSkill && resolveSkillKind(activeSkill) === 'creation') useAppStore.getState().setActiveAssistantSkillId(null);
+      }
     }
     setQuickGenMode(next);
     modeMenu.close();
@@ -259,11 +268,12 @@ export function usePromptActionBar({
   const layoutMode = useAppLayoutMode();
   const isCompactLayout = layoutMode === 'compact';
 
+  const visualRefCount = quickRefImages.filter((url) => !url.startsWith('agent-file:')).length;
   const hasSidebar = hasSidebarRefMedia({
     isDepthMode,
     quickGenMode,
     quickVideoRefMode,
-    hasRefImages: quickRefImages.length > 0,
+    hasRefImages: visualRefCount > 0,
   });
 
   const useTopStrip = resolveUseTopStrip({
@@ -277,7 +287,7 @@ export function usePromptActionBar({
   const showInlinePolaroid = !useTopStrip;
 
   const hasRefMedia =
-    quickRefImages.length > 0 ||
+    visualRefCount > 0 ||
     Boolean(quickVideoFirstFrame) ||
     Boolean(quickVideoLastFrame) ||
     quickVideoMultiFrames.length > 0;
@@ -309,6 +319,7 @@ export function usePromptActionBar({
     handleComposerFocus,
     handleContainerBlur,
     anyDropdownOpen,
+    setControlsDropdownOpen,
     isFloatingDock,
     shouldShowBrandHero,
     isExpanded,

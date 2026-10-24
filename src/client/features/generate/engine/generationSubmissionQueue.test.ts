@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
 import { GenerationSubmissionQueue, getGenerationSubmissionLane, type GenerationSubmissionLane } from './generationSubmissionQueue';
 
 function controlledJob(id: string, lane: GenerationSubmissionLane = 'media') {
@@ -15,28 +16,23 @@ async function flushQueue() {
 }
 
 describe('GenerationSubmissionQueue', () => {
-  it('defaults to three shared media slots across batches and deduplicates pending/active IDs', async () => {
+  it('dispatches all media tasks in a batch concurrently by default and deduplicates pending/active IDs', async () => {
     const queue = new GenerationSubmissionQueue();
     const jobs = Array.from({ length: 5 }, (_, i) => controlledJob(`media-${i}`));
     queue.enqueue(jobs.slice(0, 4));
     queue.enqueue(jobs);
     await flushQueue();
-    expect(jobs.map(job => job.run.mock.calls.length)).toEqual([1, 1, 1, 0, 0]);
+    expect(jobs.map(job => job.run.mock.calls.length)).toEqual([1, 1, 1, 1, 1]);
     queue.enqueue(jobs);
     await flushQueue();
-    expect(jobs.map(job => job.run.mock.calls.length)).toEqual([1, 1, 1, 0, 0]);
-    jobs[1].resolve();
-    await flushQueue();
-    expect(jobs.map(job => job.run.mock.calls.length)).toEqual([1, 1, 1, 1, 0]);
-    jobs[0].resolve();
-    await flushQueue();
-    expect(jobs[4].run).toHaveBeenCalledOnce();
+    expect(jobs.map(job => job.run.mock.calls.length)).toEqual([1, 1, 1, 1, 1]);
     jobs.forEach(job => job.resolve());
     await flushQueue();
   });
 
   it('dispatches independent Agent and conservative serial lanes without head-of-line blocking', async () => {
     const queue = new GenerationSubmissionQueue();
+    queue.setMediaConcurrency(3);
     const media = Array.from({ length: 4 }, (_, i) => controlledJob(`media-${i}`));
     const agents = [controlledJob('agent-1', 'agent'), controlledJob('agent-2', 'agent')];
     const other = [controlledJob('depth', 'serial'), controlledJob('audio', 'serial')];
@@ -81,7 +77,13 @@ describe('GenerationSubmissionQueue', () => {
     await flushQueue();
   });
 
-  it.each([[0, 1], [99, 6], [2.9, 2], [Number.NaN, 3], [Infinity, 3]])(
+  it.each([
+    [0, 1],
+    [99, GENERATION_BATCH_LIMIT],
+    [2.9, 2],
+    [Number.NaN, GENERATION_BATCH_LIMIT],
+    [Infinity, GENERATION_BATCH_LIMIT],
+  ])(
     'normalizes media capacity %s to %s', (input, expected) => {
       const queue = new GenerationSubmissionQueue();
       expect(queue.setMediaConcurrency(input)).toBe(expected);

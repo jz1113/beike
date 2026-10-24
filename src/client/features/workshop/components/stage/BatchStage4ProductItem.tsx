@@ -14,7 +14,6 @@ import { BatchProductItem } from '../../model/batchTypes';
 import { isDeliverableWorkshopResult, isUsableWorkshopResult } from '../../model/generation/workshopReadiness';
 import { BatchStage4ProductInfo } from './BatchStage4ProductInfo';
 import { BatchStage4CopyPanel } from './BatchStage4CopyPanel';
-import { OutputReviewButtons } from '../delivery/OutputReviewButtons';
 import { WorkshopPromoteGroup } from '../delivery/WorkshopPromoteGroup';
 
 export interface BatchStage4ProductItemProps {
@@ -31,6 +30,7 @@ export interface BatchStage4ProductItemProps {
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
   onRecheckTask?: (itemId: string, taskId: string) => Promise<void>;
   readOnly?: boolean;
+  isReviewingOutputs?: boolean;
   onReviewTask?: (itemId: string, taskId: string, decision: 'accepted' | 'retry_requested' | 'rejected', rating?: OutputRating) => void;
 }
 
@@ -41,13 +41,12 @@ export function BatchStage4ProductItem({
   generateCopywritingForProduct,
   updateItemCopywriting,
   retrySingleShotTask,
-  isExportingZip,
-  handleExportSingleProductZip,
   handleDownloadSingleTaskImage,
   setPreviewImageUrl,
   onPreviewGallery,
   onRecheckTask,
   readOnly = false,
+  isReviewingOutputs = false,
   onReviewTask,
 }: BatchStage4ProductItemProps) {
   const [recheckingId, setRecheckingId] = useState<string | null>(null);
@@ -113,7 +112,7 @@ export function BatchStage4ProductItem({
       {/* ===================== 中间栏 (5/12 宽度)：成图展台 ===================== */}
       {productNavigation}
       </div>
-      <div className="workshop-image-gallery lg:col-start-2 min-w-0 bg-transparent rounded-xl border border-slate-200/60 p-4 sm:p-5 space-y-4 dark:border-white/10">
+      <div className="workshop-image-gallery lg:col-start-2 min-w-0 rounded-2xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 space-y-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-[#18191c]/95">
         <WorkshopPromoteGroup item={item} visionModel={selectedVisionModel} />
         {/* 切片成图展台 (4 张大图) */}
         <div className="space-y-4">
@@ -122,6 +121,7 @@ export function BatchStage4ProductItem({
               <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 生成图片 <span className="ml-2 text-xs font-normal tabular-nums text-slate-500 dark:text-slate-400">{successTasks.length}/{tasks.length} 已完成</span>
               </h3>
+              {!readOnly && onReviewTask && <span className="text-[11px] text-slate-400 dark:text-slate-500">点击图片切换采用状态，灰色为不采用</span>}
             </div>
 
             {/* 预览全部按钮 */}
@@ -144,7 +144,7 @@ export function BatchStage4ProductItem({
 
           {/* 4 栏等高大图网格 */}
           {tasks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center dark:bg-white/5 dark:border-white/10">
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center dark:bg-[#131417] dark:border-white/10">
               <LayoutGrid className="w-6 h-6 text-slate-400 mx-auto mb-3" />
               <p className="text-sm font-medium text-slate-600 dark:text-slate-300">暂无生成图片</p>
               <p className="text-xs text-slate-400 mt-1">生成任务创建后，将在这里展示进度与成图。</p>
@@ -153,6 +153,7 @@ export function BatchStage4ProductItem({
           <div className="workshop-image-grid" data-count={tasks.length}>
             {tasks.map((task, shotIdx) => {
               const hasImage = isUsableWorkshopResult(task);
+              const excluded = hasImage && !isDeliverableWorkshopResult(task);
               const isGenFailure = task.status === 'FAILURE' || (task.status === 'SUCCESS' && !hasImage);
               const canRecover = Boolean(task.upstreamTaskId || task.idempotencyKey || task.gridTaskKey || task.gridSourceUrl || item.masterGridUrl);
               const currentPreviewIdx = hasImage && task.resultUrl ? previewUrls.indexOf(task.resultUrl) : 0;
@@ -161,28 +162,23 @@ export function BatchStage4ProductItem({
                 <div key={task.id || shotIdx} className="min-w-0 space-y-2 flex flex-col">
                   <div
                     onClick={() => {
-                      if (hasImage && task.resultUrl) {
-                        if (onPreviewGallery && previewUrls.length > 0) {
-                          onPreviewGallery(previewUrls, Math.max(0, currentPreviewIdx), `${item.title} - 分镜 ${task.shot_no}`);
-                        } else {
-                          setPreviewImageUrl(task.resultUrl);
-                        }
-                      } else if (!readOnly && isGenFailure && retrySingleShotTask && !recheckingId && !canRecover) {
+                      if (!hasImage && !readOnly && isGenFailure && retrySingleShotTask && !recheckingId && !canRecover) {
                         retrySingleShotTask(item.id, shotIdx);
                       }
                     }}
                     className={`aspect-[3/4] rounded-xl border overflow-hidden relative flex items-center justify-center transition-colors group ${hasImage || (!readOnly && isGenFailure) ? 'cursor-pointer' : 'cursor-default'} ${
                       hasImage
-                        ? 'border-slate-200 hover:border-indigo-400 bg-slate-50 dark:bg-white/5 dark:border-white/10'
+                        ? 'border-slate-200 hover:border-indigo-400 bg-slate-50 dark:bg-[#131417] dark:border-white/10 dark:hover:border-indigo-400/60'
                         : task.recoveryRequired
-                        ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-100/50'
+                        ? 'border-amber-300 bg-amber-50/70 hover:bg-amber-100/60 dark:border-amber-500/30 dark:bg-amber-950/30 dark:hover:bg-amber-950/45'
                         : isGenFailure
-                        ? 'border-rose-300 bg-rose-50/50 hover:bg-rose-100/50'
-                        : 'border-slate-200 bg-slate-50/90 dark:border-white/10'
+                        ? 'border-rose-300 bg-rose-50/70 hover:bg-rose-100/60 dark:border-rose-500/30 dark:bg-rose-950/30 dark:hover:bg-rose-950/45'
+                        : 'border-slate-200/80 bg-slate-50/90 dark:border-white/10 dark:bg-[#131417]'
                     }`}
                   >
                     {hasImage && task.resultUrl ? (
                       <>
+                        <div className={`h-full w-full transition-[filter,opacity] ${excluded ? 'grayscale opacity-35' : ''}`}>
                         <LazyProxyImage
                           src={task.resultUrl}
                           alt={task.title}
@@ -190,8 +186,22 @@ export function BatchStage4ProductItem({
                           thumb={true}
                           width={800}
                         />
-                        {/* 悬浮工具层 */}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`分镜 ${task.shot_no}：${!readOnly && onReviewTask ? excluded ? '点击恢复采用' : '点击不采用' : '放大预览'}`}
+                          aria-pressed={!readOnly && onReviewTask ? excluded : undefined}
+                          disabled={!readOnly && !!onReviewTask && isReviewingOutputs}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (!readOnly && onReviewTask) onReviewTask(item.id, task.id, excluded ? 'accepted' : 'rejected');
+                            else if (onPreviewGallery) onPreviewGallery(previewUrls, Math.max(0, currentPreviewIdx), `${item.title} - 分镜 ${task.shot_no}`);
+                            else setPreviewImageUrl(task.resultUrl!);
+                          }}
+                          className="absolute inset-0 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-indigo-500 disabled:cursor-wait"
+                        />
+                        {/* Preview remains separate from the image review toggle. */}
+                        <div className="absolute right-2 top-2 z-10 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -233,17 +243,17 @@ export function BatchStage4ProductItem({
                       </>
                     ) : isGenFailure ? (
                       <div className="p-4 text-center space-y-2">
-                        <span className="flex justify-center">{task.recoveryRequired ? <Clock3 className="w-8 h-8 text-amber-600" /> : <XCircle className="w-8 h-8 text-rose-500" />}</span>
-                        <div className={`text-xs font-bold ${task.recoveryRequired ? 'text-amber-800' : 'text-rose-700'}`}>{task.status === 'SUCCESS' ? '图片需重新生成' : task.recoveryRequired ? '结果待核对' : '生成失败'}</div>
-                        {task.error && <details className="text-left text-[11px] leading-5 text-rose-600 select-text">
+                        <span className="flex justify-center">{task.recoveryRequired ? <Clock3 className="w-8 h-8 text-amber-600 dark:text-amber-400" /> : <XCircle className="w-8 h-8 text-rose-500 dark:text-rose-400" />}</span>
+                        <div className={`text-xs font-bold ${task.recoveryRequired ? 'text-amber-800 dark:text-amber-200' : 'text-rose-700 dark:text-rose-300'}`}>{task.status === 'SUCCESS' ? '图片需重新生成' : task.recoveryRequired ? '结果待核对' : '生成失败'}</div>
+                        {task.error && <details className="text-left text-[11px] leading-5 text-rose-600 dark:text-rose-300 select-text">
                           <summary className="cursor-pointer text-center">查看详细原因</summary>
                           <p className="mt-1 max-h-32 overflow-y-auto break-words">{task.error}</p>
                         </details>}
-                        {task.recoveryRequired && <p className="text-[11px] leading-5 text-amber-800">请先核对原任务。重新生成可能重复计费。</p>}
+                        {task.recoveryRequired && <p className="text-[11px] leading-5 text-amber-800 dark:text-amber-200">请先核对原任务。重新生成可能重复计费。</p>}
                         {task.upstreamTaskId && <p className="break-all text-[10px] text-slate-400 select-text">任务 ID：{task.upstreamTaskId}</p>}
                         {!readOnly && canRecover && onRecheckTask && <button type="button" disabled={recheckingId !== null}
                           onClick={async (event) => { event.stopPropagation(); setRecheckingId(task.id); try { await onRecheckTask(item.id, task.id); } finally { setRecheckingId(null); } }}
-                          className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-600 disabled:opacity-40 dark:bg-[#18191c]">{recheckingId === task.id ? '核对中…' : '核对原任务'}</button>}
+                          className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-600 disabled:opacity-40 dark:border-indigo-500/30 dark:bg-[#18191c] dark:text-indigo-300">{recheckingId === task.id ? '核对中…' : '核对原任务'}</button>}
                         {!readOnly && retrySingleShotTask && <button
                           type="button"
                           disabled={recheckingId !== null}
@@ -251,22 +261,22 @@ export function BatchStage4ProductItem({
                             e.stopPropagation();
                             retrySingleShotTask?.(item.id, shotIdx);
                           }}
-                          className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm dark:bg-[#18191c]"
+                          className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm dark:bg-[#18191c] dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-950/40"
                         >
                           {task.recoveryRequired ? '放弃恢复并重做' : '重新生成'}
                         </button>}
                       </div>
                     ) : task.status === 'PENDING' ? (
                       <div role="status" className="p-4 text-center space-y-2">
-                        <Clock3 className="w-6 h-6 mx-auto text-slate-300" />
+                        <Clock3 className="w-6 h-6 mx-auto text-slate-400 dark:text-slate-500" />
                         <div className="text-xs font-medium text-slate-500 dark:text-slate-400">排队中</div>
                       </div>
                     ) : (
                       <div role="status" aria-label={`分镜 ${task.shot_no} 生成中`} className="flex flex-col items-center gap-3 p-4 text-center">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                           <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" />
                         </span>
-                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">正在生成</span>
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200">正在生成</span>
                         <span className="text-[11px] text-slate-500 dark:text-slate-400">完成后自动显示</span>
                       </div>
                     )}
@@ -277,18 +287,6 @@ export function BatchStage4ProductItem({
                     </div>
                   </div>
 
-                  <div className="text-center space-y-1">
-                    <span className="text-xs font-medium text-slate-600 truncate block dark:text-slate-300">
-                      {task.title || `分镜 ${task.shot_no}`}
-                    </span>
-                    {!readOnly && hasImage && onReviewTask ? (
-                      <OutputReviewButtons
-                        decision={task.outputReview}
-                        rating={task.outputRating}
-                        onDecide={(decision, rating) => onReviewTask(item.id, task.id, decision, rating)}
-                      />
-                    ) : null}
-                  </div>
                 </div>
               );
             })}
@@ -305,10 +303,8 @@ export function BatchStage4ProductItem({
         contentLength={contentLength}
         tags={cw.tags || []}
         successCount={tasks.filter(isDeliverableWorkshopResult).length}
-        isExportingZip={isExportingZip}
         generateCopywritingForProduct={generateCopywritingForProduct}
         updateItemCopywriting={updateItemCopywriting}
-        handleExportSingleProductZip={handleExportSingleProductZip}
         onCopyAll={handleCopyAllCopywriting}
         readOnly={readOnly}
       />

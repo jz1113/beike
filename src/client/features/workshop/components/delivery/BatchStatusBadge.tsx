@@ -4,11 +4,11 @@ import { Loader2 } from 'lucide-react';
 export type BatchStatusVariant = 'ready' | 'pending' | 'analyzing' | 'success' | 'failure';
 
 const STYLES: Record<BatchStatusVariant, string> = {
-  ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  analyzing: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  failure: 'bg-rose-50 text-rose-700 border-rose-200',
+  ready: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-400/20',
+  pending: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-400/20',
+  analyzing: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-400/20',
+  success: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-400/20',
+  failure: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-400/20',
 };
 
 interface Props {

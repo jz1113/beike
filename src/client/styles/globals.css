@@ -342,14 +342,6 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: transparent !important;
 }
 
-/* 当富文本输入框非空或处于正在输入状态时，隐藏紧随其后的占位浮层，防止输入法合成期出现重叠文字 */
-.rich-mention-contenteditable:not(:empty) ~ .prompt-placeholder-carousel,
-.rich-mention-contenteditable[data-has-content="true"] ~ .prompt-placeholder-carousel {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
 
 /* Tabular numbers for clean, non-jittering timers and counters */
 .font-mono-nums {

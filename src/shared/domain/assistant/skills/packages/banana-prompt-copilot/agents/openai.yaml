@@ -1,0 +1,4 @@
+interface:
+  display_name: "香蕉提示副驾驶"
+  short_description: "为 Banana / Gemini 图像任务编写自然语言提示词，处理多图角色分工、精准文字、局部编辑及保真修复。"
+  default_prompt: "使用 $banana-prompt-copilot 完成当前任务。"

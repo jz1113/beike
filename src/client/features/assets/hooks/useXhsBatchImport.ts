@@ -96,7 +96,7 @@ export function useXhsBatchImport({ queueApi, showToast }: UseXhsBatchImportOpti
         setXhsLinksInput('');
         setShowXhsLinkInput(false);
         showToast(
-          `已提取 ${queueItems.length} 套图集，请在下方选择图片后再开始智能解构${skipped.length ? `；跳过 ${skipped.length} 套` : ''}`
+          `已自动按每 4 张一组整理 ${queueItems.length} 组图片，可直接启动后台反推${skipped.length ? `；跳过 ${skipped.length} 条` : ''}`
         );
       } else {
         showToast(`未提取到可选图片：${skipped[0]?.reason || '请检查链接或稍后重试'}`);

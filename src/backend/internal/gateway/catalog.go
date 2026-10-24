@@ -7,6 +7,11 @@ var imageModelIDs = []string{
 	"openai/gpt-image-2",
 	"gpt-image-2.5-sunburst",
 	"gpt-image-2",
+	"gemini-nano-banana-2.1",
+	"gemini-3.1-flash-image",
+	"gemini-3.1-flash-lite-image",
+	"gemini-3-pro-image",
+	"gemini-2.5-flash-image",
 	"nano-banana-pro",
 	"nano-banana",
 	"doubao-seedream-4-0-250828",
@@ -26,13 +31,20 @@ var imageModelIDs = []string{
 }
 
 var modelAliases = map[string]string{
-	"qwen-image-3":         "qwen-image-max",
-	"qwen-image-edit-2509": "qwen-image-edit",
-	"mjv7":                 "midjourney",
-	"mjv8.1":               "midjourney",
-	"mjv8.2":               "midjourney",
-	"vidu-q4-preview":      "viduq4-preview",
-	"viduq4":               "viduq4-preview",
+	"nano-banana-2.1":                     "gemini-nano-banana-2.1",
+	"nano-banana-2":                       "gemini-3.1-flash-image",
+	"nano-banana-2-lite":                  "gemini-3.1-flash-lite-image",
+	"gemini-3.1-flash-image-preview":      "gemini-3.1-flash-image",
+	"gemini-3.1-flash-lite-image-preview": "gemini-3.1-flash-lite-image",
+	"gemini-3-pro-image-preview":          "gemini-3-pro-image",
+	"gemini-2.5-flash-image-preview":      "gemini-2.5-flash-image",
+	"qwen-image-3":                        "qwen-image-max",
+	"qwen-image-edit-2509":                "qwen-image-edit",
+	"mjv7":                                "midjourney",
+	"mjv8.1":                              "midjourney",
+	"mjv8.2":                              "midjourney",
+	"vidu-q4-preview":                     "viduq4-preview",
+	"viduq4":                              "viduq4-preview",
 }
 
 var videoModelIDs = []string{
@@ -57,7 +69,6 @@ var videoModelIDs = []string{
 	"viduq3-turbo",
 	"viduq3-pro",
 	"viduq4-preview",
-	"gpt-6-astra",
 }
 
 func IsApprovedImage(id string) bool { return approvedModel(id, imageModelIDs) }

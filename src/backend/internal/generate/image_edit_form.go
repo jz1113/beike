@@ -59,7 +59,7 @@ func postImageEdit(ctx context.Context, endpoint, apiKey string, payload map[str
 		return 0, nil, err
 	}
 	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
 	return response.StatusCode, raw, err
 }
 

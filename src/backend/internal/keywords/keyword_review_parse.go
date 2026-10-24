@@ -38,7 +38,7 @@ func parseKeywordReview(raw []byte) (map[string]any, []reviewsvc.Row, string) {
 	if message := copyOptionalString(object, parsed, "textProtocol", 32); message != "" {
 		return nil, nil, message
 	}
-	if message := copyEnum(object, parsed, "reasoningEffort", []string{"auto", "low", "medium", "high", "xhigh"}); message != "" {
+	if message := copyEnum(object, parsed, "reasoningEffort", []string{"auto", "low", "medium", "high", "xhigh", "max"}); message != "" {
 		return nil, nil, message
 	}
 	if message := copyOptionalBool(object, parsed, "lookup"); message != "" {

@@ -1,6 +1,12 @@
 import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayUrl';
 import { cleanPromptText, formatModelPayload, getAspectRatioFromSize } from '@shared/domain/media/drawing';
 import { normalizeOpenAiImageRequest } from '@shared/domain/models/model-adapters/image/normalizeOpenAiImageModel';
+import {
+  GEMINI_MAX_REFERENCE_IMAGES,
+  isGeminiImageModel,
+  resolveGeminiAspectRatio,
+  resolveGeminiImageSizeTier,
+} from '@shared/domain/models/model-adapters/image/geminiImageSizes';
 import type { GatewayEndpoints, ImageAdapterInput, ImageModelAdapter } from '../types';
 
 /** Grok Image API 仅支持 aspect_ratio，不支持 size / quality / negative_prompt */
@@ -197,6 +203,9 @@ export const openaiImageAdapter: ImageModelAdapter = {
     const hasRefs = Boolean(input.primaryImage || (input.images && input.images.length > 0));
     const useEdits = Boolean((input.preferEdits || hasRefs) && hasRefs);
     const refs = collectRefImages(input);
+    if (useEdits && refs.length > 16) {
+      throw new Error('GPT Image 图像编辑最多支持 16 张参考图。');
+    }
     const payload: Record<string, unknown> = {
       model: base.model,
       prompt: base.prompt,
@@ -247,25 +256,26 @@ export const grokImageAdapter: ImageModelAdapter = {
   },
 };
 
-/** Gemini / Nano-Banana：走 generations，参考图挂 image 字段 */
+/** Gemini / Nano-Banana：走 generations，省略 size/n/quality，发送 aspect_ratio 与大写 image_size */
 export const geminiImageAdapter: ImageModelAdapter = {
   id: 'gemini-nano',
-  match: (modelId) => {
-    const m = modelId.toLowerCase();
-    return (
-      m.includes('nano-banana') ||
-      (m.includes('gemini') && m.includes('image'))
-    );
-  },
+  match: (modelId) => isGeminiImageModel(modelId),
   build: (input) => {
     const base = formatModelPayload(input.model, buildFormatPayloadInput(input));
     const refs = collectRefImages(input).map(url => ensureSafePublicMediaUrl(url) || url);
-    const payload: Record<string, unknown> = { model: base.model, prompt: base.prompt, aspect_ratio: base.aspect_ratio, response_format: 'url' };
-    if (refs.length) payload.image = refs;
-    if (/nano-banana-(?:2|3\.1)|gemini-3/i.test(input.model)) {
-      const suffix = /-(1k|2k|4k)$/i.exec(input.model)?.[1]?.toUpperCase();
-      payload.image_size = suffix || ({ low: '1K', medium: '2K', high: '4K', '1K': '1K', '2K': '2K', '4K': '4K' }[input.quality || 'medium'] || '2K');
+    if (refs.length > GEMINI_MAX_REFERENCE_IMAGES) {
+      throw new Error(`Gemini / Nano Banana 模型最多支持 ${GEMINI_MAX_REFERENCE_IMAGES} 张参考图。`);
     }
+    const ratio = resolveGeminiAspectRatio(input.model, input.size);
+    const imageSize = resolveGeminiImageSizeTier(input.model, input.quality, input.size);
+    const payload: Record<string, unknown> = {
+      model: base.model,
+      prompt: base.prompt,
+      response_format: 'url',
+      ...(ratio ? { aspect_ratio: ratio, aspectRatio: ratio } : {}),
+      ...(imageSize ? { image_size: imageSize, imageSize } : {}),
+      ...(refs.length ? { image: refs } : {}),
+    };
     return {
       family: 'gemini-nano', modelId: String(base.model), useEdits: false, payload,
       endpoints: (baseUrl) => dalleEndpoints(baseUrl, false),

@@ -4,11 +4,7 @@ import { readDeconstructJob, submitDeconstructJob, stopDeconstructJob, Deconstru
 import { useDeconstructJobsState } from './useDeconstructJobs';
 import { applyDeconstructJobToQueue } from '../model/deconstructJobs';
 import { getDeconstructJobsState, isDeconstructJobActive, upsertDeconstructJob, updateDeconstructJobsState } from '../model/deconstructJobs';
-import {
-  getEnabledMultimodalModelsFromSettings,
-  resolveStoredMultimodalModelId,
-  type WorkflowCapability,
-} from '@shared/domain/models/workflowModels';
+import type { WorkflowCapability } from '@shared/domain/models/workflowModels';
 import {
   exportDeconstructRecordsToCsv,
   transformQueueItemToRecordRow,
@@ -27,22 +23,15 @@ import {
 } from '../model/deconstructQueueStorage';
 import {
   categoryForQueueItem,
+  defaultDeconstructModelId,
+  loadMultimodalModels,
+  organizeQueueIntoFourImageGroups,
   resolveActionCategory,
   selectedQueueImages,
   selectableMajorCategoryId,
   subCategoriesForItem,
   type ProductCategoryOption,
 } from './deconstructQueueOps';
-
-function loadMultimodalModels(): WorkflowCapability[] {
-  return getEnabledMultimodalModelsFromSettings();
-}
-
-function defaultDeconstructModelId(models: WorkflowCapability[]): string {
-  return models.find((model) => model.id === 'gemini-3.7-flash')?.id
-    || models.find((model) => /flash/i.test(model.id) && !model.isThinking)?.id
-    || resolveStoredMultimodalModelId(models);
-}
 
 export type UseDeconstructQueueOptions = {
   showToast: (msg: string) => void;
@@ -187,15 +176,24 @@ export function useDeconstructQueue({
     }
   }, []);
 
-  useEffect(() => {
-    if (!showDeconstructModal) return;
+  const syncModels = useCallback(() => {
     const models = loadMultimodalModels();
     setMultimodalModels(models);
-    setSelectedVisionModel((prev) => {
-      if (models.some((m) => m.id === prev)) return prev;
-      return defaultDeconstructModelId(models);
-    });
-  }, [showDeconstructModal]);
+    setSelectedVisionModel((prev) => (models.some((m) => m.id === prev) ? prev : defaultDeconstructModelId(models)));
+  }, []);
+
+  useEffect(() => {
+    if (showDeconstructModal) syncModels();
+  }, [showDeconstructModal, syncModels]);
+
+  useEffect(() => {
+    window.addEventListener('models_updated', syncModels);
+    window.addEventListener('modality_models_updated', syncModels);
+    return () => {
+      window.removeEventListener('models_updated', syncModels);
+      window.removeEventListener('modality_models_updated', syncModels);
+    };
+  }, [syncModels]);
 
   useEffect(() => {
     if (!queue.length || (!backgroundJobId && !showDeconstructModal)) return;
@@ -268,16 +266,16 @@ export function useDeconstructQueue({
           imageCount === 0
             ? '⚠️ 未识别到图片文件（支持 JPG / PNG / WEBP / AVIF / HEIC 等）'
             : skipped.length > 0
-              ? `⚠️ 未采编到符合条件的图集（跳过 ${skipped.length} 套：不足3张图）`
+              ? `⚠️ 未采编到符合条件的图集（跳过 ${skipped.length} 套：不足4张图）`
               : '⚠️ 未能成功提取图集内容'
         );
         return;
       }
       setQueue((prev) => [...prev, ...queueItems]);
       setShowDeconstructModal(true);
-      const skipTip = skipped.length > 0 ? `，跳过 ${skipped.length} 套（不足3张图）` : '';
-      const truncateTip = truncatedCount > 0 ? `，${truncatedCount} 套已截取前 10 张` : '';
-      showToast(`📁 成功识别 ${queueItems.length} 套图集${skipTip}${truncateTip}`);
+      const skipTip = skipped.length > 0 ? `，跳过 ${skipped.length} 处（不足4张图）` : '';
+      const truncateTip = truncatedCount > 0 ? `，余下不足4张已自动略过` : '';
+      showToast(`📁 已按每 4 张一组自动整理 ${queueItems.length} 组${skipTip}${truncateTip}`);
     },
     [showToast]
   );
@@ -288,8 +286,12 @@ export function useDeconstructQueue({
       showToast('所选归档文件夹已删除或不再属于当前大类，请重新选择');
       return;
     }
-    const pending = queue.filter(item => (item.status === 'pending' || item.status === 'error') && selectedQueueImages(item).length > 0);
-    if (!pending.length) { showToast('没有待处理的图集'); return; }
+    const organizedQueue = organizeQueueIntoFourImageGroups(queue);
+    const pending = organizedQueue.filter(item => (item.status === 'pending' || item.status === 'error') && selectedQueueImages(item).length === 4);
+    if (!pending.length) { showToast('至少需要 4 张有效图片才能组成一组四图母本'); return; }
+    if (organizedQueue.length !== queue.length || organizedQueue.some((item, idx) => item !== queue[idx])) {
+      setQueue(organizedQueue);
+    }
     const modelIds = multimodalModels.map(model => model.id).filter(Boolean);
     if (!modelIds.length) { showToast('请先在设置中启用多模态模型'); return; }
     isDeconstructingRef.current = true;
@@ -305,7 +307,7 @@ export function useDeconstructQueue({
       return;
     }
     setBackgroundJobId(jobId);
-    persistDeconstructQueue({ queue, currentQueueIndex: -1, userHint, selectedVisionModel, targetCategory, targetSubcategory, backgroundJobId: jobId });
+    persistDeconstructQueue({ queue: organizedQueue, currentQueueIndex: -1, userHint, selectedVisionModel, targetCategory, targetSubcategory, backgroundJobId: jobId });
     try {
       if (submissionUncertainRef.current) {
         try {

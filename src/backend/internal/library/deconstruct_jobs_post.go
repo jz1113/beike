@@ -144,8 +144,8 @@ func deconstructItemError(raw json.RawMessage) (string, string, int) {
 	if len(images) < 1 {
 		return "Array must contain at least 1 element(s)", "", 0
 	}
-	if len(images) > 10 {
-		return "Array must contain at most 10 element(s)", "", 0
+	if len(images) > 8 || (len(images) != 1 && len(images)%4 != 0) {
+		return "完整母本需 4 张或 8 张图片；单图可独立反推", "", 0
 	}
 	total := 0
 	for _, image := range images {

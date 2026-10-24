@@ -1,5 +1,5 @@
 import { inferProductCategoryAndAnatomy } from '../../products/product-category/infer';
-import { isPhoneProduct } from '../../products/phoneProductPolicy';
+import { isPhoneProduct, stripPromotionalGiftText } from '../../products/phoneProductPolicy';
 import { builtinSubcategoryFolderId, isPromptGroupSubcategory, isPromptGroupSubcategoryFolderId, PROMPT_GROUP_SUBCATEGORIES, PROMPT_GROUP_SUBCATEGORY_LABELS, type PromptGroupSubcategory } from '../../assets/promptGroupSubcategory';
 import { detectJewelryAnatomy } from '../../prompts/prompt-engine/roles';
 import { parseGroupShotSkeleton, sourcePromptSection } from './storyboardSlots';
@@ -71,7 +71,7 @@ export function promptGroupMatchesMajorCategory(
 }
 
 function digitalEvidence(text: string): string {
-  return text.replace(/(?:无|没有|不含|不要|不带|禁止|去掉|去除|未搭配)\s*(?:手机壳|保护壳|保护套|手机套|镜头膜|钢化膜|屏幕膜|贴膜|耳机|耳塞|耳麦|平板)/g, '')
+  return stripPromotionalGiftText(text).replace(/(?:无|没有|不含|不要|不带|禁止|去掉|去除|未搭配)\s*(?:手机壳|保护壳|保护套|手机套|镜头膜|钢化膜|屏幕膜|贴膜|耳机|耳塞|耳麦|平板)/g, '')
     .replace(/(?:使用|用|以|通过)?手机(?:拍摄|摄影|原相机|直出|记录)/g, '')
     .replace(/shot\s+on\s+iphone(?:\s+\d+\s*(?:pro|max|plus)?)?/gi, '');
 }
@@ -304,7 +304,9 @@ export function promptGroupCategoryFit(
     if (titledCategory !== 'all' && titledCategory !== 'digital') return 0;
     if (declaredKind === 'phone' && targetKind === 'case' && caseFocusedPhoneVisual(evidence)) return 110;
     if (targetKind && kind && targetKind !== kind) return 0;
-    if (selected && targetKind === selected) return 120;
+    if (selected && targetKind === selected) {
+      return selected === 'phone' && evidence.titleKind === 'case' ? 95 : 120;
+    }
     if (isPromptGroupSubcategoryFolderId(group.productSubcategory) && !folderDigitalKind(group)
       && reviewedCategories.includes('digital')) return 110;
     if (targetKind && kind === targetKind) return categories.includes('digital') ? 100 : 80;

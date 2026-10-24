@@ -53,10 +53,10 @@ func FeedbackFingerprint(feedback []Feedback) string { return Hash(feedback) }
 // Compare actual, explicitly rated outputs, never a model's self-assessment.
 // Pair keys contain product images, reference hash, model and generation settings.
 func Validate(version Version, feedback []Feedback) Validation {
-	result := Validation{Reason: "需要至少 3 款商品，在留出图组上完成同商品、同参考、同生成设置的新旧版成图评分对照"}
+	result := Validation{Reason: "需要至少 3 款商品，在参考图组上完成同商品、同参考、同生成设置的新旧版成图评分对照"}
 	holdouts := map[string]bool{}
 	for _, s := range version.Manifest.Samples {
-		if s.Role == "holdout" {
+		if s.Role == "holdout" || s.Role == "training" {
 			holdouts[s.ID] = true
 		}
 	}
@@ -124,7 +124,7 @@ func Validate(version Version, feedback []Feedback) Validation {
 		return result
 	}
 	result.Passed = true
-	result.Reason = "留出图组至少 3 款商品的实际对照通过，各维度无退步且存在提升"
+	result.Reason = "参考图组至少 3 款商品的实际对照通过，各维度无退步且存在提升"
 	return result
 }
 func validScores(scores map[string]int) bool {

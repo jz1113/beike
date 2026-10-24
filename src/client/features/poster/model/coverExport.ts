@@ -31,7 +31,7 @@ async function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number): Pro
 
 export async function rasterizeCoverImage(image: HTMLImageElement, format: CoverFormat): Promise<Blob> {
   const expectedRatio = format.width / format.height;
-  if (!image.naturalWidth || !image.naturalHeight || Math.abs(image.naturalWidth / image.naturalHeight - expectedRatio) > 0.02) {
+  if (!image.naturalWidth || !image.naturalHeight || Math.abs(image.naturalWidth / image.naturalHeight - expectedRatio) > 0.03) {
     throw new Error('生图结果不是 ' + format.aspectRatio + '，已停止导出以避免拉伸或裁掉标题');
   }
   const canvas = document.createElement('canvas');

@@ -1,5 +1,6 @@
 import { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
+import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
 import { runGridImageTask } from './batchGridGeneration';
 import type { BatchProductItem } from '../batchTypes';
 import type { TaskExecutionConfig } from './batchTaskExecution';
@@ -42,7 +43,11 @@ export async function recheckWorkshopTask(itemId: string, taskId: string, items:
     const query = task.upstreamTaskId ? `taskId=${encodeURIComponent(task.upstreamTaskId)}`
       : task.idempotencyKey ? `taskKey=${encodeURIComponent(task.idempotencyKey)}` : '';
     if (!query) { showToast('旧任务未保存任务标识，无法自动核对，请先核对网关记录'); return; }
-    const response = await apiFetch(`/api/generate/image?${query}&recheck_failed=1`, { headers: storageConfigHeaders() });
+    const modelId = task.learningContext?.model || settings?.selectedImageGenModel;
+    const model = modelId ? `&model=${encodeURIComponent(modelId)}` : '';
+    const response = await apiFetch(`/api/generate/image?${query}${model}&recheck_failed=1`, {
+      headers: { ...getGatewayClientHeaders(modelId), ...storageConfigHeaders() },
+    });
     const data = await response.json();
     if (!response.ok || data.status === 'QUERY_FAILED') throw new Error(data.error || '原任务暂时无法查询，请稍后再核对');
     const succeeded = data.status === 'SUCCESS' && typeof data.resultUrl === 'string' && data.resultUrl;

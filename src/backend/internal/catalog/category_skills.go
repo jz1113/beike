@@ -83,7 +83,7 @@ func CategorySkills(cfg config.Config) http.Handler {
 			feedbackHash := learning.FeedbackFingerprint(learning.TrainingFeedback(dataset, feedback))
 			fingerprint := categoryAttempt(dataset, memory, feedbackHash)
 			feedbackChanged, memoryChanged := len(feedback) > 0, len(memory.Notes) > 0
-			needsConsolidation := memory.Learned > 0
+			needsConsolidation := learning.ReadyToConsolidate(memory, scope.MinSamples)
 			if len(versions) > 0 {
 				latest := versions[0]
 				feedbackChanged = latest.Manifest.FeedbackFingerprint != feedbackHash
@@ -109,7 +109,7 @@ func CategorySkills(cfg config.Config) http.Handler {
 			return
 		}
 		action := r.URL.Query().Get("action")
-		if action == "learn" || action == "observe" {
+		if action == "learn" || action == "observe" || action == "consolidate" {
 			learnCategorySkill(cfg, w, r, db, payload)
 			return
 		}

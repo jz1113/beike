@@ -3,7 +3,7 @@ import type { TextProtocol } from '@shared/domain/models/textProtocol';
 import { normalizeReasoningEffort, type ReasoningEffort } from '@shared/domain/assistant/reasoning';
 
 const STORAGE_KEY = 'beike_cover_reasoning_by_model';
-const EFFORTS = new Set<ReasoningEffort>(['auto', 'low', 'medium', 'high', 'xhigh']);
+const EFFORTS = new Set<ReasoningEffort>(['auto', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 export function readCoverReasoningMap(): Record<string, ReasoningEffort> {
   try {

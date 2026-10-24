@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Clapperboard, History, ImagePlus, Mic, Plus, Settings2, Sparkles, UserRound } from 'lucide-react';
-import { StudioBrandChip, StudioDockBar, StudioHistoryDrawer, studioDockClass } from '@client/shared/ui/studio';
+import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
+import { StudioDockBar, studioDockClass } from '@client/shared/ui/studio/StudioDockBar';
+import { StudioHistoryDrawer } from '@client/shared/ui/studio/StudioHistoryDrawer';
 import type { AvatarVideoTask } from '@shared/contracts';
 import AvatarCreationsView from './components/AvatarCreationsView';
 import AvatarCharactersView from './components/AvatarCharactersView';

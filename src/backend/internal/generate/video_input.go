@@ -35,7 +35,10 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	if regexp.MustCompile(`^vidu`).MatchString(model) && len(images) > 15 {
 		return "Vidu 最多支持 15 张参考图片"
 	}
-	if regexp.MustCompile(`^veo3\.1`).MatchString(model) && mode == "omni" && len(images) > 3 {
+	if regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model) && (len(images) > 7 || len(videos) > 3) {
+		return "Omni Flash 最多支持 7 张参考图片、3 个参考视频"
+	}
+	if regexp.MustCompile(`(?i)^veo-?3\.1`).MatchString(model) && mode == "omni" && len(images) > 3 {
 		return "Veo 最多支持 3 张参考图片"
 	}
 	if regexp.MustCompile(`^wan3`).MatchString(model) && (len(images) > 10 || len(videos) > 5) {
@@ -149,7 +152,7 @@ func videoModeAllowed(model, mode string) bool {
 }
 
 func referenceVideoAllowed(model string) bool {
-	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || regexp.MustCompile(`(?i)minimax-h3`).MatchString(model)
+	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || regexp.MustCompile(`(?i)minimax-h3`).MatchString(model) || regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model)
 }
 
 func viduQ4Preview(id string) bool {
@@ -172,8 +175,8 @@ func videoModes(model string) []string {
 		return []string{"omni"}
 	case id == "viduq3-turbo" || id == "viduq3-pro" || viduQ4Preview(id):
 		return full
-	case regexp.MustCompile(`omni[_-]flash`).MatchString(id):
-		return []string{"first_frame", "text"}
+	case regexp.MustCompile(`omni[_-]flash|gemini-omni`).MatchString(id):
+		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case regexp.MustCompile(`^veo3\.1`).MatchString(id):
 		return full
 	case regexp.MustCompile(`sora`).MatchString(id):

@@ -18,6 +18,15 @@ func imageModelRuleError(payload map[string]json.RawMessage, model string) strin
 			return "qwen-image-edit 仅支持一张参考图；多图编辑请选择 qwen-image-edit-2509。"
 		}
 	}
+	if isGptImageModel(id) && referenceCount(payload) > 16 {
+		return "GPT Image 图像编辑最多支持 16 张参考图。"
+	}
+	if strings.Contains(id, "2.5-flash-image") && referenceCount(payload) > 3 {
+		return "gemini-2.5-flash-image 最多支持 3 张参考图。"
+	}
+	if isGeminiImageModel(id) && referenceCount(payload) > geminiMaxReferenceImages {
+		return "Gemini / Nano Banana 模型最多支持 14 张参考图。"
+	}
 	if id != "seedream-v5-pro" {
 		return ""
 	}
@@ -97,7 +106,11 @@ func aspectRatioFromSize(size string) string {
 	if clean == "" || clean == "auto" {
 		return "3:4"
 	}
-	known := map[string]struct{}{"3:4": {}, "4:3": {}, "9:16": {}, "16:9": {}, "1:1": {}, "2:3": {}, "3:2": {}, "4:5": {}, "5:4": {}, "21:9": {}}
+	known := map[string]struct{}{
+		"3:4": {}, "4:3": {}, "9:16": {}, "16:9": {}, "1:1": {},
+		"2:3": {}, "3:2": {}, "4:5": {}, "5:4": {}, "21:9": {},
+		"1:4": {}, "4:1": {}, "1:8": {}, "8:1": {},
+	}
 	if _, ok := known[clean]; ok {
 		return clean
 	}
@@ -109,6 +122,14 @@ func aspectRatioFromSize(size string) string {
 			if errW == nil && errH == nil && width > 0 && height > 0 {
 				ratio := width / height
 				switch {
+				case abs(ratio-0.125) < 0.05:
+					return "1:8"
+				case abs(ratio-0.25) < 0.06:
+					return "1:4"
+				case abs(ratio-4) < 0.4:
+					return "4:1"
+				case abs(ratio-8) < 0.8:
+					return "8:1"
 				case abs(ratio-1) < 0.08:
 					return "1:1"
 				case abs(ratio-0.75) < 0.08:

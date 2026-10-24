@@ -74,9 +74,6 @@ export interface TranslationSchema {
     };
   };
   promptBar: {
-    agent: string;
-    agentTips: string[];
-    manualBadge: string;
     refMedia: string;
     refMediaVideo: string;
     depthImage: string;

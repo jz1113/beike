@@ -5,6 +5,7 @@ import { buildGenerationPromptBatch, type BatchGenerationSettings, type BatchPro
 import { readGenerationBatchReceipts, reserveGenerationBatch, type GenerationBatchReceipt } from './generationBatchReceipts';
 import { explicitBatchGenerationRequest } from '@shared/domain/assistant/generationAuthorization';
 import { readGenerationBatchDraft } from './generationBatchDrafts';
+import { setGenerationMediaConcurrency } from './generationConcurrency';
 
 export function currentBatchSettings(): BatchGenerationSettings {
   const state = useAppStore.getState();
@@ -50,6 +51,8 @@ export function dispatchGenerationBatch(request: GenerationBatchRequest): Genera
   const session = { ...(target || { id: targetSessionId, title, createdAt: Date.now() }), tasks: [...linkedTasks, ...(target?.tasks || [])] };
   const sessions = target ? state.sessions.map(item => item.id === targetSessionId ? session : item) : [session, ...state.sessions];
   const generationTasks = [...linkedTasks, ...state.generationTasks];
+  const unsubmittedMediaCount = generationTasks.filter(task => task.mediaType !== 'agent' && !task.taskId && !task.resultUrl && task.status === 'IN_PROGRESS').length;
+  setGenerationMediaConcurrency(Math.max(entries.length, unsubmittedMediaCount));
   // Reserve before publishing; even a browser crash between these writes must not cause a paid replay.
   reserveGenerationBatch(receipt);
   persistDrawingStateToStorage(generationTasks, sessions, state.currentSessionId, { force: true, immediate: true });

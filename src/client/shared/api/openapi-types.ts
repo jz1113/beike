@@ -1789,7 +1789,7 @@ export interface components {
              * @default medium
              * @enum {string}
              */
-            reasoningEffort: "auto" | "low" | "medium" | "high" | "xhigh";
+            reasoningEffort: "auto" | "low" | "medium" | "high" | "xhigh" | "max";
         } & {
             [key: string]: unknown;
         });

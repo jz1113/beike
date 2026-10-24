@@ -201,7 +201,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                         />
                       ) : (
                         <img
-                          src={item.image}
+                          src={'thumbnail' in item && typeof item.thumbnail === 'string' && item.thumbnail ? item.thumbnail : item.image}
                           alt={item.title}
                           onLoad={event=>rememberRatio(item.id,event.currentTarget.naturalWidth/event.currentTarget.naturalHeight)}
                           loading={eager ? 'eager' : 'lazy'}

@@ -53,7 +53,7 @@ func PostModelHeaders(ctx context.Context, method, endpoint, apiKey string, payl
 		return 0, nil, err
 	}
 	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
 	return response.StatusCode, raw, err
 }
 
@@ -133,9 +133,12 @@ func NormalizeUsage(data map[string]any) map[string]any {
 	if usage == nil {
 		return nil
 	}
-	prompt := usageNumber(usage, "prompt_tokens", "promptTokens", "input_tokens", "inputTokens")
-	completion := usageNumber(usage, "completion_tokens", "completionTokens", "output_tokens", "outputTokens")
-	total := usageNumber(usage, "total_tokens", "totalTokens")
+	prompt := usageNumber(usage, "prompt_tokens", "promptTokens", "input_tokens", "inputTokens", "promptTokenCount")
+	completion := usageNumber(usage, "completion_tokens", "completionTokens", "output_tokens", "outputTokens", "candidatesTokenCount")
+	if thoughts := usageNumber(usage, "thoughtsTokenCount"); thoughts > 0 && usageNumber(usage, "completion_tokens", "completionTokens") == 0 {
+		completion += thoughts
+	}
+	total := usageNumber(usage, "total_tokens", "totalTokens", "totalTokenCount")
 	if total == 0 {
 		total = prompt + completion
 	}
@@ -152,8 +155,14 @@ func usageObject(data map[string]any) map[string]any {
 	if usage, ok := data["usage"].(map[string]any); ok {
 		return usage
 	}
+	if usage, ok := data["usageMetadata"].(map[string]any); ok {
+		return usage
+	}
 	if nested, ok := data["data"].(map[string]any); ok {
 		if usage, ok := nested["usage"].(map[string]any); ok {
+			return usage
+		}
+		if usage, ok := nested["usageMetadata"].(map[string]any); ok {
 			return usage
 		}
 	}

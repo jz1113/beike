@@ -2,7 +2,7 @@ import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
-import { normalizeImageUrlToStandardJpg, formatDisplayModel } from '@shared/domain/media/drawing';
+import { normalizeImageUrlToStandardJpg, formatDisplayModel, getAspectRatioFromSize } from '@shared/domain/media/drawing';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { prepareImageSubmission } from './prepareImageSubmission';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
@@ -241,6 +241,7 @@ export async function submitSingleGenerationTask(
         prompt: t.prompt,
         model: t.model || 'gpt-image-2',
         size: t.size || '2448x3264',
+        aspectRatio: t.size === 'auto' || t.size === 'smart' ? 'auto' : getAspectRatioFromSize(t.size),
         quality: t.quality || 'medium',
         ...(imageCaps.strength === 'quality' && t.imageQuality ? { imageQuality: t.imageQuality } : {}),
         ...(imageCaps.strength === 'prompt-extend' && t.inferenceStrength ? { inferenceStrength: t.inferenceStrength } : {}),

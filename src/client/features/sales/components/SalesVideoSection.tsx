@@ -22,6 +22,7 @@ interface Props {
 
 export function SalesVideoSection({ state, script, modelId, disabled, assetsReady, finalized, videoError, submitError, onChange, onEditPrompt }: Props) {
   const { ready, multimodalModels, videoModels } = usePreferenceModels();
+  const references = finalReferences(state, script);
   return (
     <div className="space-y-4 p-4 sm:p-5">
       <section className={`${salesCardClass} space-y-4 p-4 sm:p-5`}>
@@ -37,7 +38,7 @@ export function SalesVideoSection({ state, script, modelId, disabled, assetsRead
       </section>
       <section className={`${salesCardClass} space-y-3 p-4 sm:p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">最终完整视频提示词</h3><span className={`text-[11px] ${finalized ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}`}>{finalized ? '提示词已生成' : script.fullPrompt?.trim() ? '需要更新提示词' : '待生成'}</span></div>
-        {script.fullPrompt?.trim() ? <SalesFinalPrompt prompt={script.fullPrompt} references={finalReferences(state, script)} disabled={disabled || !assetsReady} onChange={onEditPrompt} /> : <p className="py-6 text-sm leading-7 text-slate-500 dark:text-slate-400">脚本阶段无需完整视频提示词。完成素材后，点击“生成视频提示词”。</p>}
+        {script.fullPrompt?.trim() ? <SalesFinalPrompt prompt={script.fullPrompt} references={references} disabled={disabled || !assetsReady} onChange={onEditPrompt} /> : <div className="space-y-3">{assetsReady && references.length > 0 && renderReferenceChips(references)}<p className="py-6 text-sm leading-7 text-slate-500 dark:text-slate-400">脚本阶段无需完整视频提示词。完成素材后，点击“生成视频提示词”。</p></div>}
         {assetsReady && submitError && submitError !== videoError && <p role="status" className="text-xs leading-6 text-amber-700 dark:text-amber-200">{submitError}</p>}
       </section>
     </div>
@@ -52,9 +53,8 @@ function finalReferences(state: VideoSalesStudioState, script: VideoSalesScript)
   }
 }
 
-function SalesFinalPrompt({ prompt, references, disabled, onChange }: { prompt: string; references: SalesActualReference[]; disabled: boolean; onChange: (prompt: string) => void }) {
-  const [editing, setEditing] = useState(false);
-  const chips = references.length > 0 ? (
+function renderReferenceChips(references: SalesActualReference[]) {
+  return (
     <div className="flex flex-wrap gap-2 border-b border-slate-200/80 px-3 py-2 dark:border-white/10">
       {references.map((ref, index) => (
         <a key={ref.id} href={ref.url} target="_blank" rel="noreferrer" className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white py-1 pr-2 pl-1 text-[11px] text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 ${salesFocusClass}`} title={`图片${index + 1} · ${ref.label}`}>
@@ -63,7 +63,12 @@ function SalesFinalPrompt({ prompt, references, disabled, onChange }: { prompt: 
         </a>
       ))}
     </div>
-  ) : undefined;
+  );
+}
+
+function SalesFinalPrompt({ prompt, references, disabled, onChange }: { prompt: string; references: SalesActualReference[]; disabled: boolean; onChange: (prompt: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const chips = references.length > 0 ? renderReferenceChips(references) : undefined;
   return (
     <div>
       {editing ? (

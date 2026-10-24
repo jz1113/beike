@@ -1,14 +1,12 @@
 package system
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -16,7 +14,7 @@ import (
 	"beike.local/cloud/src/backend/internal/httpx"
 )
 
-const depthSetupCommand = "npm run setup:depth-model"
+const depthSetupCommand = "pnpm run setup:depth-model"
 
 type depthEnvDetails struct {
 	OpenCV          bool `json:"opencv"`
@@ -129,41 +127,10 @@ func parseDepthStdout(stdout string) (depthStatus, bool) {
 
 func ffmpegDetail(ffmpeg, ffprobe bool) string {
 	if !ffmpeg && !ffprobe {
-		return "内置 FFmpeg 不可用，请重启 API 后重试，或执行 npm run setup:depth-env"
+		return "内置 FFmpeg 不可用，请重启 API 后重试，或执行 pnpm run setup:depth-env"
 	}
 	if !ffmpeg {
 		return "FFmpeg 不可用，但 ffprobe 正常"
 	}
 	return "FFmpeg 可用，但 ffprobe 不可用"
-}
-
-func binaryReady(root, name string) (string, bool) {
-	candidate := bundledBinary(root, name)
-	if candidate == "" {
-		candidate = name
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, candidate, "-version")
-	cmd.Stdout = &bytes.Buffer{}
-	cmd.Stderr = &bytes.Buffer{}
-	if err := cmd.Run(); err != nil {
-		return candidate, false
-	}
-	return candidate, true
-}
-
-func bundledBinary(root, name string) string {
-	platform := runtime.GOOS + "-" + runtime.GOARCH
-	var rel string
-	if name == "ffprobe" {
-		rel = filepath.Join("node_modules", "ffprobe-static", "bin", runtime.GOOS, runtime.GOARCH, "ffprobe")
-	} else {
-		rel = filepath.Join("node_modules", "@ffmpeg-installer", platform, "ffmpeg")
-	}
-	candidate := filepath.Join(root, rel)
-	if _, err := os.Stat(candidate); err == nil {
-		return candidate
-	}
-	return ""
 }

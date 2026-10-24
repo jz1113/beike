@@ -1,3 +1,5 @@
+import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
+import { upstreamModelId } from '@shared/domain/models/workflowModels';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 
 /** The transport sends product views first, sample images next, and the optional face last. */
@@ -17,4 +19,16 @@ export function workshopReferenceInput(shots: ShotPrompt[], productImageCount: n
       '明确替换项优先于参考图相应内容。不要复制参考中的旧商品、品牌、水印、字幕或界面；不要将构图参考作为第二件商品放入画面。保留真实材质与接触阴影，不额外美化成棚拍广告。',
     ].join('\n'),
   };
+}
+
+/** Reserve actual sample and face slots before trimming optional product views. */
+export function workshopReferenceBudget(model: string, shots: ShotPrompt[], hasFace: boolean): number {
+  const limit = imageCapabilities(upstreamModelId(model)).maxReferenceImages;
+  if (!limit) return 4;
+  const samples = new Set(shots.map(shot => shot.sourceReferenceImageUrl).filter(Boolean)).size;
+  const productSlots = limit - samples - (hasFace ? 1 : 0);
+  if (productSlots < 1) {
+    throw new Error(`该模型最多支持 ${limit} 张参考图，无法同时保留商品与${shots.length === 4 ? '四镜参考' : '当前镜头参考'}${hasFace ? '和锁脸图' : ''}；请${shots.length === 4 ? '改用单张逐镜，或' : ''}选择参考图容量更大的模型`);
+  }
+  return Math.min(4, productSlots);
 }

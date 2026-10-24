@@ -12,6 +12,7 @@ import { get } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recordWebProcess } from './web-processes.mjs';
+import { resolveGo } from '../common/go-toolchain.mjs';
 
 export const APP_IDENTIFIER = 'com.azhuo.workbench';
 export const VITE_PORT = 5173;
@@ -85,13 +86,6 @@ export function resolveAccessToken(root, appDataDir, { isolated = false } = {}) 
   } finally { rmSync(temporary, { force: true }); }
 
   return token;
-}
-
-export function getLogPaths(appDataDir) {
-  return {
-    api: join(appDataDir, 'api-dev.log'),
-    vite: join(appDataDir, 'vite-dev.log'),
-  };
 }
 
 const PORT_FILE = '.local/api-port';
@@ -185,7 +179,6 @@ export function webProcessOptions({ apiPort, appDataDir, accessToken }) {
 export function buildApiEnv({ apiPort, appDataDir, accessToken, extra = {} }) {
   return {
     ...process.env,
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --max-old-space-size=2048 --expose-gc`.trim(),
     PORT: String(apiPort),
     HOSTNAME: '127.0.0.1',
     AZHUO_DATA_DIR: appDataDir,
@@ -201,24 +194,6 @@ export function gatewayBinary(workspaceRoot) {
   return join(workspaceRoot, 'tools/build', binary);
 }
 
-export function resolveGo() {
-  const candidates = [
-    process.env.GO_BIN,
-    'go',
-    join(homedir(), '.local/go/bin/go'),
-    ...(process.platform === 'win32'
-      ? ['C:\\Program Files\\Go\\bin\\go.exe', 'C:\\Go\\bin\\go.exe', join(homedir(), 'go/bin/go.exe')]
-      : []),
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    if (spawnSync(candidate, ['version'], { encoding: 'utf8' }).status === 0) return candidate;
-  }
-  const hint = process.platform === 'win32'
-    ? '未找到 Go 1.26 或更高版本。请安装 Go（https://golang.google.cn/dl/）或设置 GO_BIN 环境变量'
-    : '未找到 Go 1.26 或更高版本。可安装到 ~/.local/go，或设置 GO_BIN';
-  throw new Error(hint);
-}
-
 export function buildGateway(workspaceRoot) {
   const out = gatewayBinary(workspaceRoot);
   mkdirSync(dirname(out), { recursive: true });
@@ -231,8 +206,9 @@ export function buildGateway(workspaceRoot) {
   return out;
 }
 
-export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, extraEnv, isolated = false, record = true }) {
-  const child = spawn(buildGateway(workspaceRoot), [], {
+export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, extraEnv, isolated = false, record = true, build = true }) {
+  const binary = build ? buildGateway(workspaceRoot) : gatewayBinary(workspaceRoot);
+  const child = spawn(binary, [], {
     cwd: workspaceRoot,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: buildApiEnv({
@@ -242,6 +218,7 @@ export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, 
       extra: extraEnv,
     }),
   });
+  child.on('error', error => console.error(`Go API 启动失败：${error.message}`));
   if (record) recordWebProcess(workspaceRoot, 'gateway', child, webProcessOptions({ apiPort, appDataDir, accessToken }), isolated);
   return child;
 }

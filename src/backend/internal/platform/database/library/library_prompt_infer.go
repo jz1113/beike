@@ -40,7 +40,8 @@ func digitalKind(text string) string {
 }
 
 func digitalEvidence(text string) string {
-	subject := negativeAccessoryPattern.ReplaceAllString(text, "")
+	subject := giftedAccessoryPattern.ReplaceAllString(text, "")
+	subject = negativeAccessoryPattern.ReplaceAllString(subject, "")
 	return phoneCameraPattern.ReplaceAllString(subject, "")
 }
 
@@ -175,7 +176,7 @@ var (
 	earphonePattern          = regexp.MustCompile(`耳机|耳麦|耳塞|蓝牙耳塞|airpods|earbuds|headphones`)
 	tabletPattern            = regexp.MustCompile(`平板|ipad|tablet`)
 	phoneBodyPattern         = regexp.MustCompile(`手机本体|手机裸机|直板手机|折叠屏手机|手机正反面|实机(?:展示|开箱|外观)`)
-	giftedAccessoryPattern   = regexp.MustCompile(`(?:赠送|赠|配赠|附赠)[^，,；;]{0,24}(?:手机壳|保护壳|钢化膜|手机支架|手机座|手机夹|充电器|数据线)`)
+	giftedAccessoryPattern   = regexp.MustCompile(`(?i)[（(][^）)]*(?:晒单|下单|购机|评价|好评|限时|免费|加|配|附)?(?:赠送|赠|配赠|附赠|送|礼赠)[^）)]*(?:手机壳|保护壳|保护套|钢化膜|手机膜|贴膜|镜头膜|手机支架|手机座|手机夹|充电器|充电头|数据线|充电线|充电宝|移动电源|蓝牙耳机|有线耳机|无线耳机|耳机|耳塞|手环|手表|音箱)[^）)]*[）)]|(?:晒单|下单|购机|评价|好评|限时|免费)?(?:赠送|赠|配赠|附赠|送|礼赠)[^，,；;）)]{0,24}(?:手机壳|保护壳|保护套|钢化膜|手机膜|贴膜|镜头膜|手机支架|手机座|手机夹|充电器|充电头|数据线|充电线|充电宝|移动电源|蓝牙耳机|有线耳机|无线耳机|耳机|耳塞|手环|手表|音箱)`)
 	accessoryTitlePattern    = regexp.MustCompile(`手机壳|保护壳|保护套|手机挂绳|手机挂饰|手机膜|钢化膜|屏幕膜|镜头膜|贴膜|手机支架|手机座|手机夹|手机充电器|充电头|充电宝|移动电源|数据线|充电线|手机散热器|手机稳定器|耳机|手表|平板|笔记本|电脑|matepad|xiaomi\s*pad|\b(?:phone\s*case|screen\s*protector|charger|power\s*bank|earbuds?|buds|watch|tablet|ipad|pad|tab|laptop)\b`)
 	phoneTitlePattern        = regexp.MustCompile(`手机|智能机|iphone|redmi|iqoo|红米|小米\s*\d|小米note|galaxy|pixel\s*\d|smartphone|(?:vivo|oppo|荣耀|honor|realme|一加|华为|huawei|三星|samsung|nova|oneplus)\s*[a-z0-9][a-z0-9\s+.-]{0,16}\d`)
 	phoneBrandPattern        = regexp.MustCompile(`华为|huawei|荣耀|honor|vivo|oppo|realme|一加|oneplus|三星|samsung|小米|xiaomi`)
@@ -187,3 +188,35 @@ var (
 	shotTabletPattern        = regexp.MustCompile(`平板|ipad|tablet`)
 	shotPhonePattern         = regexp.MustCompile(`手机.{0,8}(?:正面|背面|屏幕|机身|摄像头|镜头模组|中框|边框|外观)|手机本体|手机裸机|机身(?:正面|背面)|后置摄像头|前摄开孔|屏幕边框`)
 )
+
+// InferReferenceSubcategory uses repeated visible subjects, not the chosen folder.
+func InferReferenceSubcategory(data map[string]any) string {
+	return shotDigitalKind(data["shotPromptsJson"])
+}
+
+// ReferenceSubjectSubcategory requires repeated primary-subject evidence. A case
+// mentioned only in styling or detail prose is insufficient to reclassify a phone.
+func ReferenceSubjectSubcategory(raw any) string {
+	var shots []map[string]any
+	switch value := raw.(type) {
+	case string:
+		_ = json.Unmarshal([]byte(value), &shots)
+	default:
+		body, _ := json.Marshal(value)
+		_ = json.Unmarshal(body, &shots)
+	}
+	votes := map[string]int{}
+	for _, shot := range shots {
+		prompt, _ := shot["prompt"].(string)
+		kind := digitalKind(promptSection(prompt, "主体"))
+		if kind != "" {
+			votes[kind]++
+		}
+	}
+	for _, kind := range []string{"case", "earphone", "tablet", "phone"} {
+		if votes[kind] >= 2 {
+			return kind
+		}
+	}
+	return ""
+}

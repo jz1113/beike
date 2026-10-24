@@ -1,0 +1,27 @@
+{
+  "id": "seedance-2-5-prompt-copilot",
+  "name": "seedance-2-5-prompt-copilot",
+  "displayName": "Seedance 2.5 提示副驾驶",
+  "category": "模型提示词规范",
+  "author": "系统",
+  "colorTheme": "orange",
+  "icon": "film",
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "为 Seedance 2.5 视频任务规划参考角色、连续时间线、声音与首尾状态，适用于多参考、一镜到底及失败诊断。",
+  "tools": [
+    "get_view_capabilities",
+    "trigger_generate_batch",
+    "inspect_video_media",
+    "extract_video_storyboard",
+    "extract_video_detailed_frames"
+  ]
+}

@@ -21,26 +21,42 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
   const analysisInFlight = useRef(false);
+  const singleInFlight = useRef(new Set<string>());
 
   const analyzeSingleProduct = async (
     item: BatchProductItem,
     itemIndexOrSig?: number | PreviousGroupSignature,
   ): Promise<boolean> => {
+    if (analysisInFlight.current || singleInFlight.current.has(item.id)) return false;
+    const latest = itemsRef.current.find(row => row.id === item.id);
+    if (!latest || latest.isAnalyzing || latest.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired)) {
+      showToast('该商品仍有执行中或待核对的任务，请先处理后再分析');
+      return false;
+    }
     const itemIndex = typeof itemIndexOrSig === 'number' ? itemIndexOrSig : undefined;
-    try { return await analyzeBatchProduct(deps, item, itemIndex); }
+    singleInFlight.current.add(item.id);
+    try { return await analyzeBatchProduct(deps, latest, itemIndex); }
     catch (error) { showToast(error instanceof Error ? error.message : '分析失败，请重试'); return false; }
+    finally { singleInFlight.current.delete(item.id); }
   };
 
-  const startBatchVisionAnalyze = async (architectureId = selectedArchId): Promise<number> => {
+  const startBatchVisionAnalyze = async (architectureId = selectedArchId, options?: { productIds: string[] }): Promise<number> => {
+    if (analysisInFlight.current || singleInFlight.current.size > 0) return 0;
     if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
       showToast('请先确认工坊技能，再开始提示词分析');
       return 0;
     }
 
     const analysisDeps = architectureId === selectedArchId ? deps : { ...deps, selectedArchId: architectureId };
-    const activeItems = itemsRef.current.filter((item) => item.status === 'success' && item.selected);
+    const allActiveItems = itemsRef.current.filter((item) => item.status === 'success' && item.selected);
+    const requestedIds = options ? new Set(options.productIds) : null;
+    const activeItems = allActiveItems.filter(item => !requestedIds || requestedIds.has(item.id));
     if (activeItems.length === 0) {
       showToast('没有待分析的商品');
+      return 0;
+    }
+    if (activeItems.some(item => item.isAnalyzing || item.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired))) {
+      showToast('存在执行中或待核对的任务，请先在成图与交付中处理');
       return 0;
     }
 
@@ -61,7 +77,7 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
         items: activeItems,
         concurrency: analyzeConcurrency || 2,
         isAborted: () => runControlRef.current.status === 'cancelled',
-        analyzeOne: async (item, index) => analyzeBatchProduct(analysisDeps, item, index),
+        analyzeOne: async (item) => analyzeBatchProduct(analysisDeps, item, allActiveItems.findIndex(row => row.id === item.id)),
         onItemStart: () => {},
         onItemFinish: (finished, total) => setAnalyzeProgress({ current: finished, total }),
         onItemError: (item, error) => console.warn('[BatchVision] 分析失败:', item.title, error),

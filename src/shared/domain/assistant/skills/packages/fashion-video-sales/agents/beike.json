@@ -1,0 +1,30 @@
+{
+  "id": "fashion-video-sales",
+  "name": "fashion-video-sales",
+  "displayName": "服饰带货视频脚本与生成",
+  "category": "内容生产流程",
+  "author": "贝壳",
+  "colorTheme": "rose",
+  "icon": "shirt",
+  "tools": [
+    "parse_product_or_social_url",
+    "list_user_products",
+    "read_attached_document",
+    "trigger_generate_batch",
+    "get_view_capabilities"
+  ],
+  "requires": [
+    "image"
+  ],
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "从服饰、鞋、包的当前 SKU 图出发，规划口播、人物场景素材，再依据实际图片定稿整条带货视频提示词。"
+}

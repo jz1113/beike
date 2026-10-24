@@ -10,7 +10,7 @@ import { captureLearningContext } from './learningContext';
 import type { BatchTaskItem } from '../batchTypes';
 import type { BatchProductItem } from '../batchTypes';
 import { compressProductImageIfNeeded } from './generationHelpers';
-import { workshopReferenceInput } from './workshopReferenceInput';
+import { workshopReferenceInput, workshopReferenceBudget } from './workshopReferenceInput';
 
 export interface TaskExecutionConfig {
   selectedQuality: 'high' | 'medium' | 'low';
@@ -66,10 +66,11 @@ export async function executeSingleImageTask(
   // small set of additional views so the model can verify front/back/details.
   // Four views keeps the request bounded and avoids turning a product collage
   // into a noisy reference set.
+  const maxProductRefs = workshopReferenceBudget(config.selectedImageGenModel, [shot], !skipFace && Boolean(anchorFaceUrl));
   const productReferenceCandidates = Array.from(new Set([
     chosenProductImg,
     ...item.selectedProductImages,
-  ].filter((img): img is string => Boolean(img)))).slice(0, 4);
+  ].filter((img): img is string => Boolean(img)))).slice(0, maxProductRefs);
   const safeProductImages = await Promise.all(
     productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
   );
@@ -96,7 +97,7 @@ export async function executeSingleImageTask(
   const outputSize = config.outputSize || pixelSize;
   config.onOutputSizeResolved?.(outputSize);
   config.onGenerationSizeResolved?.(pixelSize);
-  config.onLearningContextResolved?.(captureLearningContext(item, shot, { ...config, selectedAspect: aspect }, 'single_shot'));
+  config.onLearningContextResolved?.(captureLearningContext(item, shot, { ...config, selectedAspect: aspect, productReferenceImages: productReferenceCandidates, anchorFaceUrl: skipFace ? undefined : anchorFaceUrl }, 'single_shot'));
   await config.beforeSubmit?.();
   const generated = await submitImageGenTaskResult(
     {

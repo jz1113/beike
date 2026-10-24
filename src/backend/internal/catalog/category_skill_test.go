@@ -23,7 +23,7 @@ type learningTransport func(*http.Request) (*http.Response, error)
 
 func (fn learningTransport) RoundTrip(r *http.Request) (*http.Response, error) { return fn(r) }
 
-func TestCategoryLearningReadsOriginalsCachesPartialWorkAndNeverTrainsOnHoldouts(t *testing.T) {
+func TestCategoryLearningContinuesAfterFailureAndReusesCompletedObservations(t *testing.T) {
 	root, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -151,15 +151,15 @@ func TestCategoryLearningReadsOriginalsCachesPartialWorkAndNeverTrainsOnHoldouts
 		}
 	}
 	call(true, 502)
-	if calls != 2 {
-		t.Fatal("failure did not stop the run")
+	if calls != len(training) {
+		t.Fatal("failure stopped remaining samples")
 	}
 	scope, err := learning.ReadScope(context.Background(), db, "a", folder)
 	if err != nil || scope.Error == "" || scope.RunningToken != "" {
 		t.Fatal("failed run not recoverable")
 	}
 	call(false, 409)
-	if calls != 2 {
+	if calls != len(training) {
 		t.Fatal("ambiguous failure replayed billable calls automatically")
 	}
 	call(true, 200)

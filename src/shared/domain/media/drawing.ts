@@ -10,7 +10,7 @@ export interface ImageGenModel {
   shortName: string;
   provider: string;
   isPrimary?: boolean;
-  supportedQualities: ('high' | 'medium' | 'low')[];
+  supportedQualities: ('max' | 'xhigh' | 'high' | 'medium' | 'low')[];
   defaultSize: string;
   supportEdits: boolean;
   badge?: string;
@@ -51,6 +51,10 @@ export const ASPECT_RATIOS: AspectRatioOption[] = [
   { id: '5:4', name: '5:4', label: '5:4', ratio: '5:4', size: '2560x2048', iconType: 'standard' },
   { id: '4:5', name: '4:5', label: '4:5', ratio: '4:5', size: '2048x2560', iconType: 'portrait' },
   { id: '21:9', name: '21:9', label: '21:9', ratio: '21:9', size: '3840x1620', iconType: 'wide' },
+  { id: '4:1', name: '4:1', label: '4:1', ratio: '4:1', size: '4096x1024', iconType: 'wide' },
+  { id: '1:4', name: '1:4', label: '1:4', ratio: '1:4', size: '1024x4096', iconType: 'tall' },
+  { id: '8:1', name: '8:1', label: '8:1', ratio: '8:1', size: '6144x768', iconType: 'wide' },
+  { id: '1:8', name: '1:8', label: '1:8', ratio: '1:8', size: '768x6144', iconType: 'tall' },
   { id: 'custom', name: '自定义', label: '自定义', ratio: 'custom', size: '3072x4096', iconType: 'custom' }
 ];
 
@@ -70,6 +74,10 @@ export const RATIO_TO_RESOLUTION_MAP: Record<string, string> = {
   '4:5': '2048x2560',
   '5:4': '2560x2048',
   '21:9': '3840x1620',
+  '1:4': '1024x4096',
+  '4:1': '4096x1024',
+  '1:8': '768x6144',
+  '8:1': '6144x768',
   'auto': '3072x4096'
 };
 
@@ -86,6 +94,11 @@ export function getAspectRatioFromSize(sizeStr?: string): string {
     const [w, h] = clean.split('x').map(Number);
     if (w && h && !isNaN(w) && !isNaN(h)) {
       const r = w / h;
+      if (w === 792 && h === 168) return '21:9';
+      if (Math.abs(r - 0.125) < 0.05) return '1:8';
+      if (Math.abs(r - 0.25) < 0.06) return '1:4';
+      if (Math.abs(r - 4) < 0.4) return '4:1';
+      if (Math.abs(r - 8) < 0.8) return '8:1';
       if (Math.abs(r - 1) < 0.08) return '1:1';
       if (Math.abs(r - 0.75) < 0.08) return '3:4';
       if (Math.abs(r - 1.333) < 0.08) return '4:3';
@@ -142,6 +155,9 @@ export function formatModelPayload(modelId: string, params: {
   hasFace?: boolean;
   plainMode?: boolean;
   omitQuality?: boolean;
+  productImage?: string;
+  primaryImage?: string;
+  images?: unknown[];
 }) {
   const resolvedModelId = (modelId && modelId.trim()) ? modelId.trim() : 'gpt-image-2';
   const isGptImage = resolvedModelId.toLowerCase().includes('gpt-image');
@@ -162,12 +178,12 @@ export function formatModelPayload(modelId: string, params: {
     targetQuality = undefined;
   } else if (params.quality !== undefined && params.quality !== null && params.quality !== '') {
     targetQuality = params.quality;
-    if (!modelConfig.supportedQualities.includes(targetQuality as 'high' | 'medium' | 'low')) {
+    if (!modelConfig.supportedQualities.includes(targetQuality as 'max' | 'xhigh' | 'high' | 'medium' | 'low')) {
       targetQuality = modelConfig.supportedQualities[0] || 'medium';
     }
   } else {
     targetQuality = isGptImage ? 'medium' : 'high';
-    if (!modelConfig.supportedQualities.includes(targetQuality as 'high' | 'medium' | 'low')) {
+    if (!modelConfig.supportedQualities.includes(targetQuality as 'max' | 'xhigh' | 'high' | 'medium' | 'low')) {
       targetQuality = modelConfig.supportedQualities[0] || 'medium';
     }
   }
@@ -194,9 +210,9 @@ export function formatModelPayload(modelId: string, params: {
   }
 
   const hasProductRef = Boolean(
-    (params as any).productImage ||
-    (params as any).primaryImage ||
-    ((params as any).images && (params as any).images.length > 0)
+    params.productImage ||
+    params.primaryImage ||
+    (params.images && params.images.length > 0)
   );
   const isWorkshopOriginal = !params.plainMode && hasProductRef;
 
@@ -232,7 +248,7 @@ export function formatModelPayload(modelId: string, params: {
 export function formatImageQualityLabel(quality?: string): string {
   if (quality === 'low') return '1K';
   if (quality === 'medium') return '2K';
-  if (quality === 'high') return '4K';
+  if (quality === 'high' || quality === 'xhigh' || quality === 'max') return '4K';
   if (quality === '1K' || quality === '2K' || quality === '4K') return quality;
   return '2K';
 }
@@ -281,7 +297,10 @@ export function formatDisplayModelCompact(
 ): string {
   const full = formatDisplayModel(model, isVideo);
   const m = (model || '').toLowerCase();
-  if (m.includes('nano-banana')) {
+  if (m.includes('nano-banana') || (m.includes('gemini') && m.includes('image'))) {
+    if (m.includes('2.1')) return 'Banana 2.1';
+    if (m.includes('lite')) return 'Banana Lite';
+    if (m.includes('pro')) return 'Banana Pro';
     if (m.includes('2k') || m.includes('2-2k')) return 'Banana 2K';
     return 'Banana 2';
   }

@@ -27,6 +27,7 @@ interface Props {
   aspect: string;
   resolution: string;
   duration: number;
+  compact?: boolean;
   onMode: (mode: string) => void;
   onAspect: (aspect: string) => void;
   onResolution: (resolution: VideoResolutionValue) => void;
@@ -78,6 +79,7 @@ export function PromptBarVideoTab({
   aspect,
   resolution,
   duration,
+  compact = false,
   onMode,
   onAspect,
   onResolution,
@@ -110,8 +112,34 @@ export function PromptBarVideoTab({
     if (next !== resolution) onResolution(next);
   }, [resolution, enabledResolutions.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const resolutionBlock = (
+    <div className="space-y-1.5">
+      <div className="text-xs font-medium text-slate-500 dark:text-slate-400">视频分辨率</div>
+      <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-white/5 rounded-2xl">
+        {resolutions.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            title={item.label}
+            onClick={() => onResolution(item.id)}
+            className={`flex-1 ${choiceClass(resolution === item.id)}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const durationBlock = (
+    <div className="space-y-1.5">
+      <div className="text-xs font-medium text-slate-500 dark:text-slate-400">时长</div>
+      <VideoDurationRulerSlider value={duration} modelId={modelId} onChange={onDuration} />
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
+    <div className={compact ? 'space-y-3' : 'space-y-4'}>
       <div className="space-y-1.5">
         <div className="text-xs font-medium text-slate-500 dark:text-slate-400">模式选择</div>
         <div
@@ -140,27 +168,17 @@ export function PromptBarVideoTab({
         <AspectRatioCardGroup value={currentAspect} onChange={onAspect} options={aspects} />
       </div>
 
-      <div className="space-y-1.5">
-        <div className="text-xs font-medium text-slate-500 dark:text-slate-400">视频分辨率</div>
-        <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-white/5 rounded-2xl">
-          {resolutions.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              title={item.label}
-              onClick={() => onResolution(item.id)}
-              className={`flex-1 ${choiceClass(resolution === item.id)}`}
-            >
-              {item.label}
-            </button>
-          ))}
+      {compact ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {resolutionBlock}
+          {durationBlock}
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="text-xs font-medium text-slate-500 dark:text-slate-400">时长</div>
-        <VideoDurationRulerSlider value={duration} modelId={modelId} onChange={onDuration} />
-      </div>
+      ) : (
+        <>
+          {resolutionBlock}
+          {durationBlock}
+        </>
+      )}
     </div>
   );
 }

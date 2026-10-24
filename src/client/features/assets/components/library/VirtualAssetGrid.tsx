@@ -36,7 +36,7 @@ export function VirtualAssetGrid<T extends { id: string }>({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 520,
     overscan: 2,
-    getItemKey: (index) => items[index * columns]?.id ?? index,
+    getItemKey: (index) => `${index}:${items[index * columns]?.id ?? index}`,
   });
 
   useLayoutEffect(() => {

@@ -24,6 +24,13 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
 const BY_ID = new Map(APPROVED_MODELS.map((m) => [m.id.toLowerCase(), m]));
 
 const MODEL_ALIASES: Record<string, string> = {
+  'nano-banana-2.1': 'gemini-nano-banana-2.1',
+  'nano-banana-2': 'gemini-3.1-flash-image',
+  'nano-banana-2-lite': 'gemini-3.1-flash-lite-image',
+  'gemini-3.1-flash-image-preview': 'gemini-3.1-flash-image',
+  'gemini-3.1-flash-lite-image-preview': 'gemini-3.1-flash-lite-image',
+  'gemini-3-pro-image-preview': 'gemini-3-pro-image',
+  'gemini-2.5-flash-image-preview': 'gemini-2.5-flash-image',
   'qwen-image-3': 'qwen-image-max',
   'qwen-image-edit-2509': 'qwen-image-edit',
   mjv7: 'midjourney',
@@ -31,6 +38,8 @@ const MODEL_ALIASES: Record<string, string> = {
   'mjv8.2': 'midjourney',
   'vidu-q4-preview': 'viduq4-preview',
   viduq4: 'viduq4-preview',
+  'gemini-omni-1.1-flash': 'omni_flash-10s',
+  'omni-flash-10s': 'omni_flash-10s',
 };
 
 export function canonicalModelId(id: string): string {

@@ -1,9 +1,11 @@
-import type { AssetProductCategory } from './assetOrganization';
+import { stripPromotionalGiftText } from "../products/phoneProductPolicy";
+import type { AssetProductCategory } from "./assetOrganization";
+import { isPromptGroupSubcategoryFolderId } from "./promptGroupSubcategory";
 
 export function serializedRuleWords(raw?: string): string[] {
   try {
-    const value: unknown = JSON.parse(raw || '[]');
-    return Array.isArray(value) ? [...new Set(value.filter((word): word is string => typeof word === 'string' && !!word.trim()).map(word => word.trim()))] : [];
+    const value: unknown = JSON.parse(raw || "[]");
+    return Array.isArray(value) ? [...new Set(value.filter((word): word is string => typeof word === "string" && !!word.trim()).map(word => word.trim()))] : [];
   } catch { return []; }
 }
 
@@ -13,10 +15,11 @@ export interface PromptFolderRuleMatch {
   anatomy: string[];
 }
 
-/** Match only active, actual tree rules. Never materialize the old default taxonomy. */
+/** Match only active root categories and prompt-group subfolders; ignore legacy action focus rows. */
 export function matchPromptFolderRules(categories: AssetProductCategory[], title: string, props?: Record<string, unknown> | null): PromptFolderRuleMatch | null {
-  const text = `${title} ${JSON.stringify(props || {})}`.toLocaleLowerCase();
-  const active = categories.filter(row => !row.isArchived);
+  const soldProps = Object.fromEntries(Object.entries(props || {}).filter(([key]) => !/赠|促销|活动|礼品/.test(key)));
+  const text = `${stripPromotionalGiftText(title)} ${JSON.stringify(soldProps)}`.toLocaleLowerCase();
+  const active = categories.filter(row => !row.isArchived && (!row.parentId || isPromptGroupSubcategoryFolderId(row.id)));
   const roots = new Map(active.filter(row => !row.parentId).map(row => [row.id, row]));
   const matches = active.flatMap(folder => {
     const major = folder.parentId ? roots.get(folder.parentId) : folder;

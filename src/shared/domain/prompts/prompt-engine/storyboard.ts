@@ -282,7 +282,17 @@ export function isOriginalTextTooSimilar(a?: string, b?: string): boolean {
   return hits >= 3;
 }
 
-export function enforceOriginalShotDiversity(shots: any[], groupHasHuman?: boolean): any[] {
+export interface OriginalDiversityShot {
+  shot_no?: number;
+  has_human?: boolean;
+  title?: string;
+  camera_focal_length?: string;
+  action?: string;
+  expression?: string;
+  angle?: string;
+}
+
+export function enforceOriginalShotDiversity<T extends OriginalDiversityShot>(shots: T[], groupHasHuman?: boolean) {
   return shots.map((s, idx) => {
     const shotNo = s.shot_no || idx + 1;
     const diversity = getOriginalDiversityForShot(shotNo);

@@ -25,10 +25,10 @@ export interface WorkshopSettingsModalProps {
   setSelectedQuality: (q: 'high' | 'medium' | 'low') => void;
   selectedVisionModel: string;
   setSelectedVisionModel: (m: string) => void;
-  availableVisionModels: Array<{ id: string; name?: string; shortName?: string }>;
+  availableVisionModels: Array<{ id: string; name?: string; shortName?: string; provider?: string; upstreamId?: string }>;
   selectedImageGenModel: string;
   setSelectedImageGenModel: (m: string) => void;
-  availableImageModels: Array<{ id: string; name?: string; shortName?: string }>;
+  availableImageModels: Array<{ id: string; name?: string; shortName?: string; provider?: string; upstreamId?: string }>;
   generationStrategy: GenerationStrategy;
   setGenerationStrategy: (strategy: GenerationStrategy) => void;
   autoGenerateCopywriting: boolean;
@@ -37,8 +37,6 @@ export interface WorkshopSettingsModalProps {
   setImageGenConcurrency?: (n: number) => void;
   analyzeConcurrency: number;
   setAnalyzeConcurrency?: (n: number) => void;
-  useAssetLibrary?: boolean;
-  setUseAssetLibrary?: (use: boolean) => void;
   lockedPersonaId?: string;
   setLockedPersonaId?: (id: string) => void;
   availablePersonas?: Array<{ id: string; name?: string; code?: string }>;
@@ -48,9 +46,6 @@ export interface WorkshopSettingsModalProps {
   lockedOutfitId?: string;
   setLockedOutfitId?: (id: string) => void;
   availableOutfits?: Array<{ id: string; title?: string; code?: string }>;
-  lockedActionId?: string;
-  setLockedActionId?: (id: string) => void;
-  availableActions?: Array<{ id: string; title?: string; code?: string }>;
   lockedFullPromptId?: string;
   setLockedFullPromptId?: (id: string) => void;
   availableFullPrompts?: Array<{ id: string; title?: string; name?: string; code?: string; shotPromptsJson?: string; hasHuman?: boolean; groupIndex?: number | null; albumName?: string | null }>;

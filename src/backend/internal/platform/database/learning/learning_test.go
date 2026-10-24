@@ -75,30 +75,13 @@ func TestDatasetRequiresScopedCompleteUniqueOriginalGroups(t *testing.T) {
 	if dataset.Total != 24 || len(dataset.Samples) != 20 || dataset.Duplicates != 1 || dataset.Excluded != 3 {
 		t.Fatalf("dataset total=%d valid=%d duplicate=%d excluded=%d", dataset.Total, len(dataset.Samples), dataset.Duplicates, dataset.Excluded)
 	}
-	holdouts := 0
-	var holdout Sample
-	for _, s := range dataset.Samples {
-		if s.Role == "holdout" {
-			holdouts++
-			holdout = s
+	for _, sample := range dataset.Samples {
+		if sample.Role != "training" {
+			t.Fatal("effective original excluded from learning")
 		}
-	}
-	if holdouts < 3 {
-		t.Fatal("no independent holdout set")
 	}
 	if err := SaveRoles(ctx, db, "a", testFolder, dataset.Samples); err != nil {
 		t.Fatal(err)
-	}
-	// A reimport with a different id must not turn previously held-out images into training.
-	insertGroup(t, db, "a_reimport", holdout.ID, "a", "phone", "deconstructed")
-	next, err := LoadDataset(ctx, db, "a", testFolder)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range next.Samples {
-		if s.ID == "a_reimport" && s.Role != "holdout" {
-			t.Fatal("held-out source leaked into learning")
-		}
 	}
 	if _, err := ReadFolder(ctx, db, "a", "jewelry"); err == nil {
 		t.Fatal("major accepted as subcategory")
@@ -137,6 +120,8 @@ func TestCandidateRequiresActualPairedHoldoutResultsAndCanRollback(t *testing.T)
 	if _, err := BeginRun(ctx, db, "a", testFolder, "input", true); err == nil {
 		t.Fatal("concurrent model run accepted")
 	}
+	// Optional independent comparisons still work for historical manifests.
+	dataset.Samples[0].Role = "holdout"
 	version := Version{Manifest: Manifest{Samples: dataset.Samples}, PromptSnippet: strings.Repeat("商品保真规则。", 60), Summary: "首版", Model: "vision", SourceFingerprint: dataset.Fingerprint}
 	if _, err := SaveVersion(ctx, db, "a", testFolder, "wrong-token", version); err == nil {
 		t.Fatal("stale run wrote candidate")

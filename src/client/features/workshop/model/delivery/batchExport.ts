@@ -32,10 +32,6 @@ export function exportFourShots(item: BatchProductItem): BatchTaskItem[] {
   return [...byShot.values()].sort((a, b) => a.shot_no - b.shot_no);
 }
 
-// Export only the spreadsheet APIs used by the asynchronous delivery entry.
-export { utils, write } from 'xlsx';
-
-
 export function toStoragePath(url: string): string {
   if (url.startsWith('/storage/')) return url.split(/[?#]/)[0];
   try {

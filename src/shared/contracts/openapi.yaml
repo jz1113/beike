@@ -1101,7 +1101,7 @@ components:
                 additionalProperties: true
             reasoningEffort:
               type: string
-              enum: [auto, low, medium, high, xhigh]
+              enum: [auto, low, medium, high, xhigh, max]
               default: medium
           additionalProperties: true
     VideoSalesCatalogImage:

@@ -51,12 +51,24 @@ export function isSuffix2kUserModel(userModelId: string): boolean {
   return sanitizeGptImageModelId(userModelId).toLowerCase() === 'gpt-image-2-2k';
 }
 
+export function isGptImage25Model(modelId: string): boolean {
+  return modelId.trim().toLowerCase().includes('gpt-image-2.5');
+}
+
 export function normalizeQualityTier(quality?: string): GptImageQualityTier {
   const q = (quality || 'medium').toLowerCase();
   if (q === 'low' || q === '1k') return 'low';
-  if (q === 'high' || q === '4k') return 'high';
+  if (q === 'high' || q === 'xhigh' || q === 'max' || q === '4k') return 'high';
   if (q === 'medium' || q === '2k') return 'medium';
   return 'medium';
+}
+
+export function normalizeGptImageWireQuality(modelId: string, quality?: string): string {
+  const q = (quality || 'medium').trim().toLowerCase();
+  if ((q === 'xhigh' || q === 'max') && isGptImage25Model(modelId)) {
+    return q;
+  }
+  return normalizeQualityTier(quality);
 }
 
 export type GptImageProfile = {
@@ -98,7 +110,7 @@ export function resolveGptImageProfile(
 
   return {
     modelId,
-    quality: omitQuality ? undefined : sizeTier,
+    quality: omitQuality ? undefined : normalizeGptImageWireQuality(modelId, quality),
     size: finalSize,
     sizeTier: lower === 'gpt-image-2-4k' ? 'high' : lower === 'gpt-image-2-2k' ? 'medium' : sizeTier,
     omitQuality,

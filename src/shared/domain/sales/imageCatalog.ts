@@ -81,7 +81,18 @@ export function inferSalesCategory(text: string): VideoSalesCategory {
   return 'other';
 }
 
-const salesPricePropertyKey = /^(价格|售价|单价|促销价|券后价|到手价|活动价|price)$/i;
+const salesPricePropertyKey = /^(价格|售价|单价|促销价|券后价|到手价|活动价|参考价|原价|吊牌价|市场价|price)$/i;
+const salesNoisyPropertyKey = /^(商品毛重|毛重|净重|商品编号|编号|货号|款号|条形码|是否可定制|可定制|是否商场同款|商场同款|店铺|卖家|包装清单|质保|保修|运费|发货地)$/i;
+const salesNoisyValue = /^(不可定制|否|无|其他|其它|-|--|暂无)$/i;
+
+function propPriority(key: string): number {
+  if (/材质|面料|成分|里料|填充/.test(key)) return 1;
+  if (/规格|容量|含量|尺寸|尺码|颜色|色号/.test(key)) return 2;
+  if (/版型|款式|领型|袖长|袖型|衣长|裤型|裙长|穿着方式|门襟|闭合/.test(key)) return 3;
+  if (/图案|流行元素|风格|工艺|设计|细节|功效|功能|特点|卖点/.test(key)) return 4;
+  if (/厚度|弹性|软硬|适用季节|季节|适用场景|场景|适用人群|适用对象/.test(key)) return 5;
+  return 6;
+}
 
 export function omitSalesPriceProps(props: Record<string, string>): Record<string, string> {
   const next: Record<string, string> = {};
@@ -89,6 +100,19 @@ export function omitSalesPriceProps(props: Record<string, string>): Record<strin
     if (!salesPricePropertyKey.test(key.trim())) next[key] = value;
   }
   return next;
+}
+
+export function cleanSalesProductProps(props: Record<string, string>, brand?: string): [string, string][] {
+  const cleaned = Object.entries(omitSalesPriceProps(props))
+    .map(([key, value]) => [key.trim(), value.trim()] as [string, string])
+    .filter(([key, value]) => {
+      if (!key || !value) return false;
+      if (salesNoisyPropertyKey.test(key) || salesNoisyValue.test(value)) return false;
+      if ((key === '商品分类' || key === '分类' || key === '类目') && /^\d+$/.test(value)) return false;
+      if (key === '品牌' && (brand?.trim() || Object.keys(props).length > 1)) return false;
+      return true;
+    });
+  return cleaned.sort((a, b) => propPriority(a[0]) - propPriority(b[0]));
 }
 
 export function omitSalesPriceClauses(text: string): string {
@@ -100,8 +124,7 @@ export function omitSalesPriceClauses(text: string): string {
 }
 
 export function sellingPointsFromProps(props: Record<string, string>): string {
-  return Object.entries(omitSalesPriceProps(props))
-    .filter(([key, value]) => key.trim() && value.trim())
+  return cleanSalesProductProps(props, props['品牌'])
     .slice(0, 8)
     .map(([key, value]) => `${key}：${value}`)
     .join('；');

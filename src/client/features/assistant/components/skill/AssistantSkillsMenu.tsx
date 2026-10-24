@@ -6,15 +6,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
 import AssistantSkillManageModal from './AssistantSkillManageModal';
-import {
-  ManualSkillStudioModal,
-  buildSkillFromStudio,
-  parseLocalSkillFiles,
-  studioStateFromSkill,
-  type SkillDraftData,
-  type SkillFileNode,
-  type SkillStudioPayload,
-} from '@client/shared/skills';
+import { ManualSkillStudioModal } from '@client/shared/skills/components/ManualSkillStudioModal';
+import { buildSkillFromStudio, studioStateFromSkill, type SkillStudioPayload } from '@client/shared/skills/model/buildSkillFromStudio';
+import type { SkillFileNode } from '@client/shared/skills/model/skillFileTree';
+import { parseLocalSkillFiles } from '@client/shared/skills/model/skillPackageParser';
+import type { SkillDraftData } from '@client/shared/skills/model/skillTypes';
 
 interface Props { showToast: (msg: string) => void; onUploadFiles: () => void; hasContext?: boolean }
 

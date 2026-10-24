@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -49,7 +50,9 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	}
 	feedback = learning.TrainingFeedback(dataset, feedback)
 	feedbackHash := learning.FeedbackFingerprint(feedback)
-	observeOnly := r.URL.Query().Get("action") == "observe"
+	action := r.URL.Query().Get("action")
+	observeOnly := action == "observe"
+	consolidateOnly := action == "consolidate"
 	limit := 5
 	if value, exists := payload["maxNewSamples"]; exists {
 		number, valid := value.(float64)
@@ -59,11 +62,15 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		}
 		limit = int(number)
 	}
-	if memory.Pending == 0 && (observeOnly || len(versions) > 0 && versions[0].SourceFingerprint == dataset.Fingerprint && versions[0].Manifest.FeedbackFingerprint == feedbackHash && versions[0].Manifest.MemoryFingerprint == memory.Fingerprint && versions[0].Manifest.EngineVersion == learning.EngineVersion && learning.MemoryCovered(memory, versions[0])) {
+	if (memory.Pending == 0 || consolidateOnly) && (observeOnly || len(versions) > 0 && versions[0].SourceFingerprint == dataset.Fingerprint && versions[0].Manifest.FeedbackFingerprint == feedbackHash && versions[0].Manifest.MemoryFingerprint == memory.Fingerprint && versions[0].Manifest.EngineVersion == learning.EngineVersion && learning.MemoryCovered(memory, versions[0])) {
 		writeSkillError(w, 409, "没有新增样本、经验或反馈，无需重复调用模型")
 		return
 	}
-	if memory.Pending == 0 && !learning.ReadyToConsolidate(memory, scope.MinSamples) {
+	if consolidateOnly && !learning.ReadyToConsolidate(memory, scope.MinSamples) {
+		writeSkillError(w, 400, "尚无已学观察或手动经验，请先读图或记录经验")
+		return
+	}
+	if !consolidateOnly && memory.Pending == 0 && !learning.ReadyToConsolidate(memory, scope.MinSamples) {
 		writeSkillError(w, 400, "有效学习样本不足，请继续投喂同类目参考图")
 		return
 	}
@@ -98,38 +105,33 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 			pendingIDs[entry.GroupID] = true
 		}
 	}
-	analyzed := 0
+	analyzed, attempted := 0, 0
+	failedSamples := []string{}
 	usage := map[string]any{}
 	for _, sample := range dataset.Samples {
-		if !pendingIDs[sample.ID] || analyzed >= limit {
+		if consolidateOnly || !pendingIDs[sample.ID] || attempted >= limit {
 			continue
 		}
-		content, err := categorySampleContent(cfg, dataset.Folder, sample)
-		if err != nil {
-			failure = fmt.Sprintf("图组「%s」原图无法读取，请修复来源后重试；已完成观察保留", sample.Title)
-			writeSkillError(w, 400, failure)
-			return
-		}
-		raw, status, tokens, err := categorySkillChat(r.Context(), base, key, model, payload, content)
+		attempted++
+		// Remove only a cached failure when the user explicitly retries this run.
+		observation, tokens, err := observeCategorySample(cfg, r, base, key, model, payload, dataset.Folder, sample)
 		addLearningUsage(usage, tokens)
-		if err != nil || status < 200 || status >= 300 {
-			failure = fmt.Sprintf("图组「%s」分析失败，已完成观察保留；请检查模型连接后重试", sample.Title)
-			writeSkillError(w, 502, failure)
-			return
-		}
-		observation := learningJSON(raw)
-		if err := validObservation(observation); err != nil {
-			failure = fmt.Sprintf("图组「%s」：%s", sample.Title, err)
-			writeSkillError(w, 502, failure)
-			return
+		if err != nil {
+			if r.Context().Err() != nil {
+				return
+			}
+			message := fmt.Sprintf("图组「%s」：%s", sample.Title, err)
+			failedSamples = append(failedSamples, message)
+			observation = map[string]any{"error": message}
+		} else {
+			analyzed++
 		}
 		encoded, _ := json.Marshal(observation)
 		if err := learning.SaveObservation(r.Context(), db, workspace, folder, model, sample, encoded); err != nil {
 			writeSkillError(w, 500, "逐组观察保存失败")
 			return
 		}
-		analyzed++
-		if err := learning.Progress(r.Context(), db, workspace, folder, token, analyzed); err != nil {
+		if err := learning.Progress(r.Context(), db, workspace, folder, token, attempted); err != nil {
 			writeSkillError(w, 409, err.Error())
 			return
 		}
@@ -139,7 +141,12 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		writeSkillError(w, 500, "观察记忆读取失败")
 		return
 	}
-	if observeOnly || !learning.ReadyToConsolidate(memory, scope.MinSamples) {
+	if len(failedSamples) > 0 {
+		failure = strings.Join(failedSamples, "；")
+		writeSkillError(w, 502, fmt.Sprintf("本轮完成 %d 套，失败 %d 套。%s；已完成观察保留，可重试未成功图组", analyzed, len(failedSamples), failure))
+		return
+	}
+	if observeOnly || (!consolidateOnly && !learning.ReadyToConsolidate(memory, scope.MinSamples)) {
 		failure = ""
 		_ = learning.Log(r.Context(), db, workspace, folder, "", "observed", fmt.Sprintf("本轮读取 %d 套；累计记住 %d 套，待学习 %d 套，不适用 %d 套", analyzed, memory.Learned, memory.Pending, memory.Rejected))
 		httpx.WriteJSON(w, 200, map[string]any{"success": true, "stage": "observed", "analyzedGroups": analyzed, "remaining": memory.Pending, "usage": usage, "model": model})
@@ -168,7 +175,7 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	}
 	candidate := learningJSON(raw)
 	prompt, summary := styleString(candidate, "promptSnippet"), styleString(candidate, "summary")
-	if utf8.RuneCountInString(prompt) < 300 || utf8.RuneCountInString(prompt) > 12000 || summary == "" || !validLearningEvidence(candidate, observations) {
+	if utf8.RuneCountInString(prompt) < 300 || utf8.RuneCountInString(prompt) > 12000 || summary == "" || !validLearningEvidence(candidate, observations, len(memory.Notes) > 0) {
 		failure = "模型没有返回完整规则与可核对的样本依据，未保存候选"
 		writeSkillError(w, 502, failure)
 		return
@@ -189,7 +196,7 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	}
 	samples := []learning.Sample{}
 	for _, sample := range dataset.Samples {
-		if used[sample.ID] || sample.Role == "holdout" {
+		if used[sample.ID] {
 			samples = append(samples, sample)
 		}
 	}
@@ -207,7 +214,7 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		writeSkillError(w, 409, "候选保存失败或正式版本已变化，请刷新重试")
 		return
 	}
-	_ = learning.Log(r.Context(), db, workspace, folder, id, "candidate", fmt.Sprintf("基于 %d 套新旧观察整理候选，保留历史经验；等待实际成图对照", len(observations)))
+	_ = learning.Log(r.Context(), db, workspace, folder, id, "candidate", fmt.Sprintf("基于 %d 套新旧观察整理候选，保留历史经验；可直接设为正式技能或先试用对比", len(observations)))
 	failure = ""
 	httpx.WriteJSON(w, 200, map[string]any{"success": true, "stage": "candidate", "versionId": id, "usage": usage, "model": model, "analyzedGroups": analyzed, "remaining": memory.Pending})
 }
@@ -224,7 +231,11 @@ func addLearningUsage(total, usage map[string]any) {
 	}
 }
 
-func validLearningEvidence(candidate map[string]any, observations []map[string]any) bool {
+func validLearningEvidence(candidate map[string]any, observations []map[string]any, notesOnly ...bool) bool {
+	if len(observations) == 0 && len(notesOnly) > 0 && notesOnly[0] {
+		list, ok := candidate["evidence"].([]any)
+		return ok && len(list) == 0
+	}
 	allowed := map[string]bool{}
 	for _, o := range observations {
 		allowed[styleString(o, "groupId")] = true

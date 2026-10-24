@@ -41,7 +41,14 @@ func TestUpsertOfficialMasterRecipes(t *testing.T) {
 		t.Fatalf("updated %s %s %s err %v", workspace, name, source, err)
 	}
 	loaded, err := LoadOfficialMasterRecipes(filepath.Join(repoRoot(t), "src/shared/data/officialMasterRecipes.json"))
-	if err != nil || len(loaded) != 2 || loaded[0].ID != "recipe_jewelry_master" {
+	if err != nil || len(loaded) != 0 {
 		t.Fatalf("catalog %#v err %v", loaded, err)
+	}
+	if err := UpsertOfficialMasterRecipes(context.Background(), db, loaded); err != nil {
+		t.Fatal(err)
+	}
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM "StyleRecipe" WHERE "workspaceId" = 'official'`).Scan(&remaining); err != nil || remaining != 0 {
+		t.Fatalf("remaining official %d err %v", remaining, err)
 	}
 }

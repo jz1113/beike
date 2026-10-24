@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
+import { subscribeAssetInvalidation } from '@client/shared/api/assetLibraryCache';
 import type { CategorySkillState } from '@shared/contracts/categorySkills';
 import { changeCategorySkill, learnCategorySkill, readCategorySkill } from '../api/categorySkills';
 import { canAutoLearn } from '../model/categoryAgent';
@@ -27,8 +28,9 @@ export function useCategorySkill(folderId: string, modelId: string, maxNewSample
     const abort = new AbortController(); controller.current = abort;
     setState(null); setError(''); setActionError(''); setNotice(''); setBusy(false); inflight.current = false;
     void refresh();
+    const unsubscribe = subscribeAssetInvalidation(() => { void refresh(); });
     const timer = window.setInterval(() => { void refresh(); }, 5000);
-    return () => { abort.abort(); window.clearInterval(timer); };
+    return () => { abort.abort(); unsubscribe(); window.clearInterval(timer); };
   }, [refresh]);
   const run = useCallback(async (action: string, payload: Record<string, unknown> = {}, force = true) => {
     if (inflight.current || !state) return false;
@@ -38,7 +40,7 @@ export function useCategorySkill(folderId: string, modelId: string, maxNewSample
     const workspace = getWorkspaceSecret();
     try {
       let message = '';
-      if (action === 'learn' || action === 'observe') {
+      if (action === 'learn' || action === 'observe' || action === 'consolidate') {
         const result = await learnCategorySkill(folderId, modelId, force, maxNewSamples, action, signal);
         message = `本轮读取 ${result.analyzedGroups} 套，${result.stage === 'candidate' ? '已整理候选技能' : '观察已记住'}${result.remaining ? `；还有 ${result.remaining} 套待学习，可继续下一轮` : ''}。`;
       } else await changeCategorySkill(folderId, action, { revision: state.scope.revision, ...payload }, signal);

@@ -16,10 +16,10 @@ export interface PromptVideoPreferences {
   generationMode: PreferenceGenerationMode;
 }
 
-export type ImageAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
+export type ImageAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16' | '5:4' | '4:5' | '4:1' | '1:4' | '8:1' | '1:8';
 export type ImageResolutionOption = '1K' | '2K' | '4K';
 export type ImageInferenceStrength = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-export type ImageQualityTier = 'low' | 'medium' | 'high';
+export type ImageQualityTier = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface PromptImagePreferences {
   modelId: string; // 'smart' 或具体模型 id
@@ -89,7 +89,7 @@ export function loadPromptPreferences(): PromptComposerPreferences {
       image: {
         ...DEFAULT_PROMPT_PREFERENCES.image,
         ...parsed.image,
-        quality: parsed.image?.quality === 'low' || parsed.image?.quality === 'medium' || parsed.image?.quality === 'high'
+        quality: parsed.image?.quality === 'low' || parsed.image?.quality === 'medium' || parsed.image?.quality === 'high' || parsed.image?.quality === 'xhigh' || parsed.image?.quality === 'max'
           ? parsed.image.quality
           : DEFAULT_PROMPT_PREFERENCES.image.quality,
       },

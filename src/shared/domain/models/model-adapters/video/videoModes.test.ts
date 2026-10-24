@@ -30,7 +30,8 @@ describe('video generation modes follow official capabilities', () => {
     ['viduq4', full],
     ['veo3.1', full],
     ['veo3.1-fast', full],
-    ['omni_flash-10s', ['first_frame', 'text']],
+    ['omni_flash-10s', seedance],
+    ['gemini-omni-1.1-flash', seedance],
     ['grok-imagine-video-1.5', [...full, 'edit', 'extend']],
     ['sora-2', ['first_frame', 'text']],
     ['sora-2-pro', ['first_frame', 'text']],
@@ -158,7 +159,8 @@ describe('video payloads keep frame roles exclusive', () => {
 
   it('rejects combinations the selected model does not implement', () => {
     expect(videoInputError({ model: 'sora-2', refMode: 'omni', images: [first, last], duration: 10, resolution: '720P', aspectRatio: '16:9' })).toMatch(/尚未接入/);
-    expect(videoInputError({ model: 'omni_flash-10s', refMode: 'first_last_frame', images: [first, last], duration: 10, resolution: '720P', aspectRatio: '16:9' })).toMatch(/尚未接入/);
+    expect(videoInputError({ model: 'omni_flash-10s', refMode: 'omni', images: Array.from({ length: 8 }, () => first), duration: 10, resolution: '720P', aspectRatio: '16:9' })).toMatch(/7 张/);
+    expect(videoInputError({ model: 'omni_flash-10s', refMode: 'text', duration: 10, resolution: '720P', aspectRatio: '1:1' })).toMatch(/比例/);
     expect(videoInputError({ model: 'grok-imagine-video-1.5', refMode: 'omni', images: Array.from({ length: 15 }, () => first), duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/14 张/);
     expect(videoInputError({ model: 'MiniMax-H3', refMode: 'omni', images: [first], videos: [clip, clip, clip, clip], duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/3 个参考视频/);
   });

@@ -87,7 +87,7 @@ func TestNativeModelRoundRejectsInvalidArguments(t *testing.T) {
 }
 
 func TestNativeTurnProtocolAndEffortValidation(t *testing.T) {
-	for _, input := range []string{`{"messages":[{"role":"user","content":"hi"}],"textProtocol":"invalid"}`, `{"messages":[{"role":"user","content":"hi"}],"reasoningEffort":"max"}`} {
+	for _, input := range []string{`{"messages":[{"role":"user","content":"hi"}],"textProtocol":"invalid"}`, `{"messages":[{"role":"user","content":"hi"}],"reasoningEffort":"extreme"}`} {
 		var payload map[string]json.RawMessage
 		_ = json.Unmarshal([]byte(input), &payload)
 		if turnStartError(payload) == "" {

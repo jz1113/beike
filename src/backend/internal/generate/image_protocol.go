@@ -18,6 +18,7 @@ type imageRequest struct {
 	Model        string
 	Prompt       string
 	Size         string
+	AspectRatio  string
 	Quality      string
 	ImageQuality string
 	Strength     string
@@ -83,17 +84,22 @@ type imageProtocol interface {
 	Poll(req imagePollRequest) (pollParsed, map[string]any, bool)
 }
 
-// resolveImageProtocol prefers an explicit template, then DashScope, then the host.
-// An OpenAI-compatible label does not override a Qianwen host, so existing providers keep working.
+// resolveImageProtocol prefers an explicit template, then DashScope/Gemini, then the host.
+// An OpenAI-compatible label does not override a Qianwen or Google official host.
 func resolveImageProtocol(base, explicit string) imageProtocol {
 	switch normalizeImageProtocol(explicit) {
 	case "template":
 		return templateImageProtocol{}
 	case "dashscope":
 		return dashscopeImageProtocol{}
+	case "gemini":
+		return geminiImageProtocol{}
 	}
 	if system.IsDashScopeGateway(base) {
 		return dashscopeImageProtocol{}
+	}
+	if isGeminiOfficialGateway(base) {
+		return geminiImageProtocol{}
 	}
 	return openaiImageProtocol{}
 }
@@ -113,6 +119,8 @@ func normalizeImageProtocol(explicit string) string {
 	switch strings.ToLower(strings.TrimSpace(explicit)) {
 	case "dashscope", "qwen", "qianwen":
 		return "dashscope"
+	case "gemini", "google":
+		return "gemini"
 	case "template", "custom-template":
 		return "template"
 	case "openai", "openai-compatible":

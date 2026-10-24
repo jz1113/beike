@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/platform/media"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -221,7 +222,16 @@ func dashscopeImageRef(ctx context.Context, ref string, index int, workspace str
 	ref = strings.TrimSpace(ref)
 	lower := strings.ToLower(ref)
 	switch {
-	case strings.HasPrefix(lower, "https://"), strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "data:image/"):
+	case strings.HasPrefix(lower, "data:image/"):
+		return ref, nil
+	case strings.HasPrefix(lower, "https://"), strings.HasPrefix(lower, "http://"):
+		if media.RemoteImageNeedsInline(ref) {
+			file, err := loadEditImage(ctx, ref, index, workspace, production)
+			if err != nil {
+				return "", err
+			}
+			return "data:" + file.mime + ";base64," + base64.StdEncoding.EncodeToString(file.data), nil
+		}
 		return ref, nil
 	case strings.HasPrefix(ref, "/storage/"):
 		file, err := loadEditImage(ctx, ref, index, workspace, production)

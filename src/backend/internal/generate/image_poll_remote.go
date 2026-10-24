@@ -56,9 +56,6 @@ func parseImagePoll(data map[string]any) (pollParsed, bool) {
 }
 
 func savedTerminal(cfg config.Config, r *http.Request, taskID, failedFallback string) (map[string]any, int, bool) {
-	if r.URL.Query().Get("recheck_failed") == "1" {
-		return nil, 0, false
-	}
 	db, err := openTaskDB(cfg)
 	if err != nil {
 		return nil, 0, false
@@ -69,6 +66,10 @@ func savedTerminal(cfg config.Config, r *http.Request, taskID, failedFallback st
 		return nil, 0, false
 	}
 	if status != "SUCCESS" && status != "FAILURE" {
+		return nil, 0, false
+	}
+	// Recovery must reuse a completed receipt even when the upstream task expired.
+	if status == "FAILURE" && r.URL.Query().Get("recheck_failed") == "1" {
 		return nil, 0, false
 	}
 	progress := "0%"
@@ -147,6 +148,9 @@ func firstImageURL(value any) string {
 		}
 		if b64, ok := typed["b64_json"].(string); ok && b64 != "" {
 			return gateway.DataImageURL(b64)
+		}
+		if found := geminiImageDirect(typed); found != "" {
+			return found
 		}
 		for _, key := range []string{"data", "result", "output", "outputs", "images"} {
 			if found := firstImageURL(typed[key]); found != "" {

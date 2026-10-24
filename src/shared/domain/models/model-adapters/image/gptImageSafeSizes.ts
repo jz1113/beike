@@ -18,6 +18,8 @@ export const GPT_IMAGE_GATEWAY_SAFE_SIZES: Record<string, Record<GptImageQuality
   '3:4': { low: '960x1280', medium: '1536x2048', high: '3072x4096' },
   '2:3': { low: '1024x1536', medium: '1360x2048', high: '2160x3240' },
   '9:16': { low: '864x1536', medium: '1152x2048', high: '2160x3840' },
+  '4:5': { low: '1024x1280', medium: '1632x2048', high: '2560x3200' },
+  '5:4': { low: '1280x1024', medium: '2048x1632', high: '3200x2560' },
 };
 
 /** gpt-image-2-2k 专线：1536 系，避免 2048 触发网关重复追加 -2k */
@@ -31,6 +33,8 @@ export const GPT_IMAGE_SUFFIX_2K_SIZES: Record<string, string> = {
   '3:4': '1536x2048',
   '2:3': '1024x1536',
   '9:16': '1152x2048',
+  '4:5': '1280x1600',
+  '5:4': '1600x1280',
 };
 
 export function isPixelSizeString(size?: string): boolean {
@@ -153,6 +157,12 @@ export function clampGptImageOfficialPixelSize(pixelSize: string): string {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return pixelSize;
 
   const snap = (value: number) => Math.max(16, Math.round(value / 16) * 16);
+  const edge = Math.max(width, height);
+  if (edge > 3840) {
+    const scale = 3840 / edge;
+    width *= scale;
+    height *= scale;
+  }
   width = snap(Math.min(3840, width));
   height = snap(Math.min(3840, height));
 
@@ -167,14 +177,14 @@ export function clampGptImageOfficialPixelSize(pixelSize: string): string {
   let pixels = width * height;
   if (pixels < 655_360) {
     const scale = Math.sqrt(655_360 / pixels);
-    width = snap(width * scale);
-    height = snap(height * scale);
+    width = Math.max(16, Math.ceil((width * scale) / 16) * 16);
+    height = Math.max(16, Math.ceil((height * scale) / 16) * 16);
     pixels = width * height;
   }
   if (pixels > 8_294_400) {
     const scale = Math.sqrt(8_294_400 / pixels);
-    width = snap(width * scale);
-    height = snap(height * scale);
+    width = Math.max(16, Math.floor((width * scale) / 16) * 16);
+    height = Math.max(16, Math.floor((height * scale) / 16) * 16);
   }
 
   width = Math.min(3840, width);

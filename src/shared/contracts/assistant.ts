@@ -100,7 +100,7 @@ export const turnStartBodySchema = z
       '缺少用户消息或附件',
     ),
     model: z.string().max(200).nullish(),
-    reasoningEffort: z.enum(['auto', 'low', 'medium', 'high', 'xhigh']).optional().default('medium'),
+    reasoningEffort: z.enum(['auto', 'low', 'medium', 'high', 'xhigh', 'max']).optional().default('medium'),
     runMode: z.enum(['auto', 'plan', 'act']).optional().default('auto'),
     referenceScope: z.enum(['auto', 'sample', 'all', 'none']).optional().default('auto'),
     historyLimit: z.number().int().min(1).max(500).nullish(),

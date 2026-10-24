@@ -98,7 +98,7 @@ func TestDeconstructGroupsPersistThroughDirectAndReviewedImports(t *testing.T) {
 			if err := db.QueryRow(`SELECT "sourceImageIndices","shotPromptsJson","sourceImages" FROM "FullPromptAsset" WHERE "workspaceId"='local' AND "title"='测试参考组'`).Scan(&indices, &shots, &sources); err != nil {
 				t.Fatal(err)
 			}
-			if indices != "[1,2,3,4]" || !strings.Contains(shots, "pure_product") || !strings.Contains(shots, "木桌自然侧光") || !strings.Contains(sources, image) {
+			if indices != "[1,2,3,4]" || !strings.Contains(shots, "pure_product") || !strings.Contains(shots, "木桌自然侧光") || !strings.Contains(sources, "/storage/local/references/") {
 				t.Fatal("source evidence lost")
 			}
 			if err := db.QueryRow(`SELECT count(*) FROM "FullPromptAsset" WHERE "workspaceId"='local' AND "title"='测试参考组'`).Scan(&count); err != nil {

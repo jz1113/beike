@@ -1,11 +1,11 @@
 export function BatchStage1OverviewCard() {
   return (
-    <header className="mx-auto max-w-2xl text-center">
-      <h1 className="text-3xl font-semibold leading-[1.35] tracking-tight text-slate-900 sm:text-[42px] dark:text-slate-50">
-        从一件商品，<br className="sm:hidden" />到一整套<span className="text-indigo-600 dark:text-indigo-300">种草内容</span>
+    <header className="mb-7 text-center">
+      <h1 className="text-3xl font-black tracking-[-0.035em] text-slate-950 dark:text-white sm:text-5xl">
+        从一件商品，到一整套种草内容
       </h1>
-      <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-500 dark:text-slate-400">
-        采集商品、挑选图片，再生成配图与文案。<br className="sm:hidden" />让每一款商品，都有自己的表达。
+      <p className="mx-auto mt-4 text-sm leading-7 text-slate-500 dark:text-slate-400 sm:text-base sm:whitespace-nowrap">
+        采集商品、挑选图片，再生成配图与文案。让每一款商品，都有自己的表达。
       </p>
     </header>
   );

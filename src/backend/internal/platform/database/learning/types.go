@@ -55,7 +55,7 @@ type Manifest struct {
 }
 
 // Bump when observation or consolidation semantics change.
-const EngineVersion = "category-agent-v2"
+const EngineVersion = "category-agent-v3"
 
 type Version struct {
 	ID                string   `json:"id"`

@@ -64,6 +64,13 @@ describe('buildSkillFromStudio', () => {
     expect(skill.tools).toEqual(['query_asset_library']);
   });
 
+  it('preserves an explicit Agent type through save and edit', () => {
+    const skill = buildSkillFromStudio({ ...payload, kind: 'agent' });
+    expect(skill.meta?.kind).toBe('agent');
+    expect(skill.markdownDoc).toContain('kind: agent');
+    expect(studioStateFromSkill(skill).draft.kind).toBe('agent');
+  });
+
   it('round-trips a saved skill back into the studio', () => {
     const skill = buildSkillFromStudio(payload, { id: 'keep-me' });
     const state = studioStateFromSkill(skill);

@@ -1,0 +1,4 @@
+interface:
+  display_name: "大字报商品封面生成"
+  short_description: "从商品图与原标题制作中文大字报封面方案：提炼 7–12 字标题、七栏设计单与可直接生图的 3:4 提示词。"
+  default_prompt: "使用 $headline-poster-generator 完成当前任务。"

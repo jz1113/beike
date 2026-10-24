@@ -20,12 +20,17 @@ type imageAdapted struct {
 }
 
 func buildImagePayload(model, prompt, size, quality, imageQuality string, refs []string) imageAdapted {
+	return buildImagePayloadWithAspect(model, prompt, size, "", quality, imageQuality, refs)
+}
+
+func buildImagePayloadWithAspect(model, prompt, size, aspectRatio, quality, imageQuality string, refs []string) imageAdapted {
+	rawSize, rawQuality := size, quality
 	model, size, quality = normalizeGptImageRequest(model, size, quality)
 	family := imageFamily(model)
 	payload := map[string]any{"model": model, "prompt": prompt, "size": size, "n": 1}
 	sentQuality := quality
 	if chosen := normalizeImageQuality(imageQuality); chosen != "" {
-		sentQuality = chosen
+		sentQuality = gptImageWireQuality(model, chosen, gptImageQualityTier(chosen))
 		if omitGptImageQuality(model) {
 			sentQuality = ""
 		}
@@ -33,9 +38,26 @@ func buildImagePayload(model, prompt, size, quality, imageQuality string, refs [
 	if isGptImageModel(model) && sentQuality != "" {
 		payload["quality"] = sentQuality
 	}
-	if family == "grok-image" {
+	switch family {
+	case "grok-image":
 		delete(payload, "size")
-		payload["aspect_ratio"] = "1:1"
+		payload["aspect_ratio"] = grokAspectRatio(rawSize, aspectRatio)
+	case "gemini-nano":
+		delete(payload, "size")
+		delete(payload, "n")
+		delete(payload, "quality")
+		payload["response_format"] = "url"
+		ratio := resolveGeminiAspectRatio(model, rawSize, aspectRatio)
+		if ratio != "" {
+			payload["aspect_ratio"] = ratio
+			payload["aspectRatio"] = ratio
+		}
+		imageSize := resolveGeminiImageSize(model, rawSize, rawQuality, imageQuality)
+		if imageSize != "" {
+			payload["image_size"] = imageSize
+			payload["imageSize"] = imageSize
+		}
+		size = geminiOfficialPixelSize(model, ratio, imageSize)
 	}
 	if len(refs) > 0 {
 		payload["image"] = refs
@@ -63,7 +85,7 @@ func imageFamily(model string) string {
 		return "flux"
 	case strings.Contains(id, "midjourney"):
 		return "midjourney"
-	case strings.Contains(id, "nano-banana") || strings.Contains(id, "gemini"):
+	case isGeminiImageModel(id):
 		return "gemini-nano"
 	default:
 		return "generic"
@@ -125,6 +147,9 @@ func imageOutcome(data map[string]any) (string, string) {
 	if data == nil {
 		return "", ""
 	}
+	if data["error"] != nil || geminiFinishFailure(data) != "" {
+		return "", ""
+	}
 	if text, ok := data["task_id"].(string); ok && text != "" {
 		return text, ""
 	}
@@ -158,7 +183,7 @@ func imageDirect(data map[string]any) string {
 			return text
 		}
 	}
-	return ""
+	return geminiImageDirect(data)
 }
 
 func imageUpstreamError(data map[string]any, status int) string {
@@ -179,6 +204,9 @@ func imageUpstreamError(data map[string]any, status int) string {
 		}
 		if text, ok := data["error"].(string); ok && text != "" {
 			return text
+		}
+		if reason := geminiFinishFailure(data); reason != "" {
+			return reason
 		}
 	}
 	if status == http.StatusUnauthorized {

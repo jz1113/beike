@@ -1,6 +1,13 @@
 /** Product titles only: never classify a product from “Shot on iPhone” camera prose. */
+export function stripPromotionalGiftText(title = ''): string {
+  return title
+    .replace(/[（(][^）)]*(?:晒单|下单|购机|评价|好评|限时|免费|加|配|附)?(?:赠送|赠|配赠|附赠|送|礼赠)[^）)]*(?:手机壳|保护壳|保护套|钢化膜|手机膜|贴膜|镜头膜|手机支架|手机座|手机夹|充电器|充电头|数据线|充电线|充电宝|移动电源|蓝牙耳机|有线耳机|无线耳机|耳机|耳塞|手环|手表|音箱)[^）)]*[）)]/gi, '')
+    .replace(/(?:晒单|下单|购机|评价|好评|限时|免费)?(?:赠送|赠|配赠|附赠|送|礼赠)[^，,；;）)]{0,24}(?:手机壳|保护壳|保护套|钢化膜|手机膜|贴膜|镜头膜|手机支架|手机座|手机夹|充电器|充电头|数据线|充电线|充电宝|移动电源|蓝牙耳机|有线耳机|无线耳机|耳机|耳塞|手环|手表|音箱)/gi, '')
+    .trim();
+}
+
 export function isPhoneProduct(title = ''): boolean {
-  const soldTitle = title.replace(/(?:赠送|赠|配赠|附赠)[^，,；;]{0,24}(?:手机壳|保护壳|钢化膜|手机支架|手机座|手机夹|充电器|数据线)/g, '').trim();
+  const soldTitle = stripPromotionalGiftText(title);
   if (/手机壳|保护壳|保护套|手机挂绳|手机挂饰|手机膜|钢化膜|屏幕膜|镜头膜|贴膜|手机支架|手机座|手机夹|手机充电器|充电头|充电宝|移动电源|数据线|充电线|手机散热器|手机稳定器|耳机|手表|平板|笔记本|电脑|matepad|xiaomi\s*pad|\b(?:phone\s*case|screen\s*protector|charger|power\s*bank|earbuds?|buds|watch|tablet|ipad|pad|tab|laptop)\b/i.test(soldTitle)) return false;
   if (/手机|智能机|iphone|redmi|iqoo|红米|小米\s*\d|小米note|galaxy|pixel\s*\d|smartphone|(?:vivo|oppo|荣耀|honor|realme|一加|华为|huawei|三星|samsung|nova|oneplus)\s*[a-z0-9][a-z0-9\s+.-]{0,16}\d/i.test(soldTitle)) return true;
   // Some marketplace titles put promotions between the brand and model and omit “手机”.

@@ -1,6 +1,8 @@
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
+import { EXTENDED_IMAGE_RATIO_ITEMS } from '../promptBarConstants';
 import {
   loadPromptPreferences,
   savePromptPreferences,
@@ -37,6 +39,7 @@ interface PromptBarParamsPillProps {
   quickQuality: string;
   setQuickAspectId: (aspect: string) => void;
   setQuickQuality: (quality: 'high' | 'medium' | 'low') => void;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
@@ -73,9 +76,23 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     savePromptPreferences(next);
   };
 
+  const onOpenChange = props.onOpenChange;
+  useEffect(() => { onOpenChange?.(open); return () => onOpenChange?.(false); }, [open, onOpenChange]);
   const credentials = getModelCredentials(props.modelId);
-  const imageCaps = imageCapabilities(props.modelId, credentials.protocol, credentials.baseUrl);
+  const resolvedImageModelId = upstreamModalityModelId('image', props.modelId);
+  const resolvedVideoModelId = upstreamModalityModelId('video', props.modelId);
+  const imageCaps = imageCapabilities(resolvedImageModelId, credentials.protocol, credentials.baseUrl);
   const allowedResolutions = imageCaps.resolutions;
+  const allowedAspectRatios = imageCaps.aspectRatios;
+
+  useEffect(() => {
+    const isExtended = EXTENDED_IMAGE_RATIO_ITEMS.some((item) => item.id === props.quickAspectId);
+    if (!isExtended) return;
+    if (allowedAspectRatios?.includes(props.quickAspectId)) return;
+    props.setQuickAspectId('3:4');
+    persist({ ...prefs, image: { ...prefs.image, aspect: '3:4' } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.modelId, (allowedAspectRatios || []).join(','), props.quickAspectId]);
 
   useEffect(() => {
     if (!allowedResolutions.length) return;
@@ -130,7 +147,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
             />
           ) : isVideo ? (
             <PromptBarVideoTab
-              modelId={props.modelId}
+              modelId={resolvedVideoModelId}
               supportedAspectRatios={props.supportedAspectRatios}
               supportedResolutions={props.supportedResolutions}
               mode={props.quickVideoRefMode}
@@ -158,6 +175,8 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
               strength={prefs.image.inferenceStrength}
               quality={prefs.image.quality || 'high'}
               allowedResolutions={allowedResolutions}
+              allowedQualities={imageCaps.qualities}
+              allowedAspectRatios={allowedAspectRatios}
               strengthMode={imageCaps.strength}
               onAspect={(aspect) => {
                 props.setQuickAspectId(aspect);

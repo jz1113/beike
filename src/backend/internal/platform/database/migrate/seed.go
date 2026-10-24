@@ -45,6 +45,15 @@ func loadRecipes(path string) ([]recipeRow, error) {
 }
 
 func upsertRecipes(ctx context.Context, db execer, recipes []recipeRow) (int, error) {
+	if len(recipes) == 0 {
+		if err := exec(ctx, db, `DELETE FROM "StyleRecipe" WHERE "workspaceId" = ?`, officialWorkspace); err != nil {
+			return 0, err
+		}
+		if err := exec(ctx, db, `DELETE FROM "PromptAssetUsageEvent" WHERE "eventType" = 'recipe_hidden'`); err != nil {
+			return 0, err
+		}
+		return 0, nil
+	}
 	now := isoNow()
 	for _, recipe := range recipes {
 		var existing string

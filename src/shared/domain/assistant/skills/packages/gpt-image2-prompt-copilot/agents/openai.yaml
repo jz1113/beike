@@ -1,0 +1,4 @@
+interface:
+  display_name: "图像生成与编辑 Copilot"
+  short_description: "把创作需求转为完整图像提示词，支持新图、参考图编辑、系列变体与生成草稿。需要生成或修改静态图片时使用。"
+  default_prompt: "使用 $gpt-image2-prompt-copilot 完成当前任务。"

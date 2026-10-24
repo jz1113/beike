@@ -11,7 +11,7 @@ import (
 var ErrConflict = errors.New("技能状态已变化或正在分析，请刷新后重试")
 
 func ReadScope(ctx context.Context, db *sql.DB, workspace, folder string) (Scope, error) {
-	s := Scope{FolderID: folder, MinSamples: 20}
+	s := Scope{FolderID: folder, MinSamples: 1}
 	err := db.QueryRowContext(ctx, `SELECT "autoAnalyze","autoPublish","minSamples","activeVersionId","trialVersionId","comparisonVersionId","revision","runningToken","runningAt","progress","lastAttempt","error" FROM "CategorySkillScope" WHERE "workspaceId"=? AND "folderId"=?`, workspace, folder).Scan(&s.AutoAnalyze, &s.AutoPublish, &s.MinSamples, &s.ActiveVersionID, &s.TrialVersionID, &s.ComparisonVersionID, &s.Revision, &s.RunningToken, &s.RunningAt, &s.Progress, &s.LastAttempt, &s.Error)
 	if err == sql.ErrNoRows {
 		return s, nil
@@ -20,12 +20,12 @@ func ReadScope(ctx context.Context, db *sql.DB, workspace, folder string) (Scope
 }
 
 func EnsureScope(ctx context.Context, db *sql.DB, workspace, folder string) error {
-	_, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CategorySkillScope" ("workspaceId","folderId") VALUES (?,?)`, workspace, folder)
+	_, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CategorySkillScope" ("workspaceId","folderId","minSamples") VALUES (?,?,1)`, workspace, folder)
 	return err
 }
 func Configure(ctx context.Context, db *sql.DB, workspace, folder string, revision, min int, analyze, publish bool) error {
-	if min < 20 || min > 30 {
-		return errors.New("整体提炼阈值应在 20–30 套之间")
+	if min < 1 || min > 30 {
+		return errors.New("整体提炼阈值应在 1–30 套之间")
 	}
 	if err := EnsureScope(ctx, db, workspace, folder); err != nil {
 		return err
@@ -77,7 +77,7 @@ func Observation(ctx context.Context, db *sql.DB, workspace, folder string, samp
 	return json.RawMessage(raw), err
 }
 func SaveObservation(ctx context.Context, db *sql.DB, workspace, folder, model string, sample Sample, raw json.RawMessage) error {
-	_, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CategorySkillObservation" ("workspaceId","folderId","groupId","fingerprint","observationJson","model","createdAt") VALUES (?,?,?,?,?,?,?)`, workspace, folder, sample.ID, sample.Fingerprint, string(raw), model, now())
+	_, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CategorySkillObservation" ("workspaceId","folderId","groupId","fingerprint","observationJson","model","createdAt") VALUES (?,?,?,?,?,?,?) ON CONFLICT ("workspaceId","folderId","groupId","fingerprint") DO UPDATE SET "observationJson"=excluded."observationJson","model"=excluded."model","createdAt"=excluded."createdAt"`, workspace, folder, sample.ID, sample.Fingerprint, string(raw), model, now())
 	return err
 }
 func SaveRoles(ctx context.Context, db *sql.DB, workspace, folder string, samples []Sample) error {

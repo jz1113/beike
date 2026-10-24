@@ -163,6 +163,8 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 		body = klingOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
 	case "minimax":
 		body = minimaxOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
+	case "veo":
+		body = veoOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	default:
 		body = flatVideoPayload(model, prompt, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	}
@@ -187,7 +189,7 @@ func videoFamily(model string) string {
 	switch {
 	case strings.Contains(id, "seedance"):
 		return "seedance"
-	case strings.Contains(id, "veo") || strings.Contains(id, "omni_flash") || strings.Contains(id, "omni-flash"):
+	case strings.Contains(id, "veo") || strings.Contains(id, "omni_flash") || strings.Contains(id, "omni-flash") || strings.Contains(id, "gemini-omni"):
 		return "veo"
 	case strings.Contains(id, "wan"):
 		return "wan"
@@ -210,19 +212,106 @@ func videoEndpoints(family, model, mode string, images []string) ([]string, []st
 	return videoEndpointSet(family, model, mode, images)
 }
 
+func veoOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images, videos []string, audio, audioSet, watermark bool) map[string]any {
+	body := flatVideoPayload(model, prompt, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
+	body["enable_upsample"] = true
+	switch mode {
+	case "first_frame":
+		if len(images) > 0 {
+			body["first_frame_image"] = images[0]
+			body["images"] = []string{images[0]}
+		}
+	case "first_last_frame":
+		if len(images) >= 2 {
+			first, last := images[0], images[len(images)-1]
+			body["first_frame_image"] = first
+			body["last_frame_image"] = last
+			body["end_frame_image"] = last
+			body["image_tail"] = last
+			body["images"] = []string{first, last}
+		}
+	case "omni", "edit", "extend":
+		if len(images) > 0 {
+			body["reference_images"] = images
+		}
+		delete(body, "image")
+		if !strings.Contains(strings.ToLower(model), "omni") {
+			delete(body, "images")
+		}
+	}
+	return body
+}
+
 func videoPixelSize(ratio, resolution string) string {
+	upper := strings.ToUpper(resolution)
+	is4K := strings.Contains(upper, "4K") || strings.Contains(upper, "UHD")
+	is1080 := strings.Contains(upper, "1080") || strings.Contains(upper, "FHD")
+	is480 := strings.Contains(upper, "480") || strings.Contains(upper, "SD")
 	switch ratio {
 	case "9:16":
+		if is4K {
+			return "2160x3840"
+		}
+		if is1080 {
+			return "1080x1920"
+		}
+		if is480 {
+			return "480x854"
+		}
 		return "720x1280"
 	case "1:1":
+		if is4K {
+			return "2048x2048"
+		}
+		if is1080 {
+			return "1440x1440"
+		}
+		if is480 {
+			return "720x720"
+		}
 		return "1024x1024"
-	case "3:4":
-		return "720x960"
 	case "4:3":
+		if is4K {
+			return "2880x2160"
+		}
+		if is1080 {
+			return "1440x1080"
+		}
+		if is480 {
+			return "640x480"
+		}
 		return "960x720"
+	case "3:4":
+		if is4K {
+			return "2160x2880"
+		}
+		if is1080 {
+			return "1080x1440"
+		}
+		if is480 {
+			return "480x640"
+		}
+		return "720x960"
+	case "21:9":
+		if is4K {
+			return "3840x1645"
+		}
+		if is1080 {
+			return "2560x1080"
+		}
+		if is480 {
+			return "1120x480"
+		}
+		return "1680x720"
 	default:
-		if strings.Contains(strings.ToLower(resolution), "1080") {
+		if is4K {
+			return "3840x2160"
+		}
+		if is1080 {
 			return "1920x1080"
+		}
+		if is480 {
+			return "854x480"
 		}
 		return "1280x720"
 	}

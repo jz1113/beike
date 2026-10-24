@@ -1,0 +1,4 @@
+interface:
+  display_name: "种子舞提示副驾驶"
+  short_description: "为 Seedance 2.0 / 即梦视频构建清晰的主体动作、镜头节拍和连续性约束，处理参考图简报与提示词修复。"
+  default_prompt: "使用 $seedance-2-prompt-copilot 完成当前任务。"

@@ -89,8 +89,15 @@ export function SkillMetadataForm({
   };
 
   return (
-    <section className="flex w-full max-w-[420px] shrink-0 flex-col overflow-hidden bg-white dark:bg-[#18181B]">
+    <section className="flex w-full shrink-0 flex-col md:w-[360px] lg:w-[400px] overflow-hidden bg-white dark:bg-[#18181B]">
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-slate-800 dark:text-slate-200">技能类型</legend>
+          <div className="flex gap-2">{(['creation', 'agent'] as const).map(kind => <button key={kind} type="button" aria-pressed={(draft.kind || 'creation') === kind}
+            onClick={() => onChange({ ...draft, kind })} className={`rounded-full px-4 py-2 text-xs ${(draft.kind || 'creation') === kind ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-500 dark:bg-white/10'}`}>
+            {kind === 'creation' ? '创作技能' : 'Agent 运行技能'}</button>)}</div>
+          <p className="text-xs text-slate-500">{draft.kind === 'agent' ? '定义 Agent 何时调用、执行步骤、工具边界与输出规范。保存后可按任务自动发现。' : '保存具体作品的脚本、分镜与参考素材，选用后应用到当前创作。'}</p>
+        </fieldset>
         {/* 技能名称 * (0/20) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -131,6 +138,8 @@ export function SkillMetadataForm({
           />
         </div>
 
+        {draft.kind === 'agent' && <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs leading-6 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">运行技能请在左侧正文中写明：适用任务、判断规则、执行步骤、允许的工具和交付格式。参考规范可作为附属文件导入。</div>}
+        {draft.kind !== 'agent' && <>
         {/* 输出体裁 * */}
         <div>
           <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
@@ -265,12 +274,13 @@ export function SkillMetadataForm({
           </div>
         </div>
 
+        </>}
         {/* 提示词指引 ℹ️ (图8) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1">
               <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                提示词指引
+                {draft.kind === 'agent' ? '触发条件说明' : '提示词指引'}
               </label>
               <FieldHint text="简要说明填写什么提示词可以让技能发挥得更好" />
             </div>
@@ -293,7 +303,7 @@ export function SkillMetadataForm({
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1">
               <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                素材上传指引
+                {draft.kind === 'agent' ? '所需输入' : '素材上传指引'}
               </label>
               <FieldHint text="使用这个技能时建议上传的素材" />
             </div>

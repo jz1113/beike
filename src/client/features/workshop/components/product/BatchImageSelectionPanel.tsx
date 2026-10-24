@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import type { BatchProductItem } from '../../model/batchTypes';
 import { BatchSelectionDetail } from './BatchSelectionDetail';
 import { toggleProductImageSelection } from '../../model/collection/batchImageSelection';
@@ -7,9 +7,7 @@ interface Props {
   displayedItems: BatchProductItem[];
   focusedIndex: number;
   activeImgFilter: 'all' | 'main' | 'sku' | 'detail';
-  productFilter: 'all' | 'pending' | 'completed';
   onFilterChange: (f: 'all' | 'main' | 'sku' | 'detail') => void;
-  onProductFilterChange: (f: 'all' | 'pending' | 'completed') => void;
   setFocusedIndex: React.Dispatch<React.SetStateAction<number>>;
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>;
   onToggleImage?: (itemId: string, imgUrl: string) => void;
@@ -17,9 +15,6 @@ interface Props {
   handleRemoveItem: (id: string) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
   onPreviewImage?: (url: string) => void;
-  onConfirmAndNext: () => void;
-  pendingItems: BatchProductItem[];
-  completedItems: BatchProductItem[];
 }
 
 export default function BatchImageSelectionPanel({
@@ -34,12 +29,7 @@ export default function BatchImageSelectionPanel({
   handleRemoveItem,
   onPreviewGallery,
   onPreviewImage,
-  onConfirmAndNext,
-  pendingItems,
-  completedItems,
 }: Props) {
-  const [galleryReady, setGalleryReady] = useState(true);
-
   const currentItem = displayedItems[focusedIndex] || displayedItems[0];
 
   useEffect(() => {
@@ -48,16 +38,7 @@ export default function BatchImageSelectionPanel({
     if (count === 0) onFilterChange('all');
   }, [currentItem, activeImgFilter, onFilterChange]);
 
-  useEffect(() => {
-    setGalleryReady(false);
-    const timer = window.setTimeout(() => setGalleryReady(true), 50);
-    return () => window.clearTimeout(timer);
-  }, [currentItem?.id, activeImgFilter]);
 
-  // 统计
-  const canContinue = completedItems.length > 0 && pendingItems.length === 0;
-
-  // 当前商品的图片过滤
   const filteredTypedImgs = useMemo(
     () => activeImgFilter === 'all'
       ? (currentItem?.allTypedImages ?? [])
@@ -72,23 +53,6 @@ export default function BatchImageSelectionPanel({
     [currentItem],
   );
 
-  // 全局批量快捷
-  const handleBatchSelectAllMain = useCallback(() => {
-    setItems(prev => prev.map(p => {
-      const mains = p.allTypedImages.filter(t => t.type === 'main').map(t => t.url);
-      const chosen = mains.length > 0 ? mains : (p.allTypedImages.slice(0, 1).map(t => t.url));
-      return chosen.length > 0 ? { ...p, selectedProductImages: chosen, coverImage: chosen[0] } : p;
-    }));
-  }, [setItems]);
-
-  const handleBatchSelectFirst = useCallback(() => {
-    setItems(prev => prev.map(p => {
-      const first = p.allTypedImages[0]?.url || p.coverImage;
-      return first ? { ...p, selectedProductImages: [first], coverImage: first } : p;
-    }));
-  }, [setItems]);
-
-  // 当前商品选图
   const handleSelect = useCallback((url: string) => {
     if (!currentItem) return;
     if (onToggleImage) onToggleImage(currentItem.id, url);
@@ -106,14 +70,13 @@ export default function BatchImageSelectionPanel({
   if (!currentItem || displayedItems.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-xs text-slate-400">
-        暂无商品，请返回批量采编添加商品
+        当前筛选下暂无商品，请切换左侧选图状态
       </div>
     );
   }
 
   return (
-    <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/70 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] overflow-hidden h-[calc(100vh-130px)] min-h-[620px] flex-1 flex flex-col transition-all duration-300 dark:border-white/10 dark:bg-[#18191c]/95">
-      {/* ===== 纯净独占全宽：当前商品选图大画幅核心区 ===== */}
+    <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/70 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] overflow-hidden min-h-[440px] lg:max-h-[650px] flex-1 flex flex-col transition-all duration-300 dark:border-white/10 dark:bg-[#18191c]/95">
       <BatchSelectionDetail
         currentItem={currentItem}
         focusedIndex={focusedIndex}
@@ -122,17 +85,12 @@ export default function BatchImageSelectionPanel({
         onFilterChange={onFilterChange}
         filteredTypedImgs={filteredTypedImgs}
         selectedSet={selectedSet}
-        galleryReady={galleryReady}
         setItems={setItems}
         batchSetProductImages={batchSetProductImages}
         handleRemoveItem={handleRemoveItem}
         handleSelect={handleSelect}
         handlePreview={handlePreview}
         setFocusedIndex={setFocusedIndex}
-        onConfirmAndNext={onConfirmAndNext}
-        canContinue={canContinue}
-        handleBatchSelectFirst={handleBatchSelectFirst}
-        handleBatchSelectAllMain={handleBatchSelectAllMain}
       />
     </div>
   );

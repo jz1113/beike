@@ -3,14 +3,24 @@ import type { GenerationPromptEntry } from '@shared/domain/assistant/generationP
 import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
 import { buildPromptBarGenerationTasks, type PromptBarSubmitInput } from '@client/shared/prompt-bar/promptBarSubmit';
 import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
+import { isGeminiImageModel, resolveGeminiPixelSize } from '@shared/domain/models/model-adapters/image/geminiImageSizes';
 import { upstreamModalityModelId, modalityPickerSelections } from '@shared/domain/models/modalityStorage';
 import { getEnabledImageModelsFromSettings, getEnabledVideoModelsFromSettings, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
 import { prepareAssistantImagePrompt, prepareBatchVideoPrompt } from './batchReferences';
 
 export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[] }
 export interface BatchGenerationSettings {
-  imageModel: string; imageAspect: string; imageQuality: 'high' | 'medium' | 'low';
-  videoModel: string; videoAspect: string; videoResolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K'; videoDuration: number; videoRefMode: string; videoGenerateAudio?: boolean;
+  imageModel: string;
+  imageAspect: string;
+  imageQuality: 'high' | 'medium' | 'low';
+  imageQualityTier?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  imageInferenceStrength?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  videoModel: string;
+  videoAspect: string;
+  videoResolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
+  videoDuration: number;
+  videoRefMode: string;
+  videoGenerateAudio?: boolean;
 }
 
 export function availableBatchModels(kind: 'image' | 'video') {
@@ -23,7 +33,13 @@ export function availableBatchModels(kind: 'image' | 'video') {
 
 function imageSize(aspect: string, model: string, quality: string) {
   if (/gpt-image/i.test(model)) return resolveGptImageSizeForModel(aspect, model, quality as 'high' | 'medium' | 'low');
-  const [a, b] = aspect.split(':').map(Number);
+  if (isGeminiImageModel(model)) {
+    return aspect === 'smart' || aspect === 'auto'
+      ? 'auto'
+      : resolveGeminiPixelSize(aspect, model, quality);
+  }
+  const normalized = aspect === 'smart' || aspect === 'auto' ? '3:4' : aspect;
+  const [a, b] = normalized.split(':').map(Number);
   if (!a || !b) throw new Error('图片比例无效');
   const side = quality === 'high' ? 1536 : quality === 'low' ? 768 : 1024;
   return `${Math.round(side * a / Math.max(a, b))}x${Math.round(side * b / Math.max(a, b))}`;
@@ -64,8 +80,15 @@ export function buildGenerationPromptBatch(entries: BatchPromptDraft[], media: M
       if (video && ['first_frame', 'first_last_frame'].includes(mode) && (prepared.urls.length !== (mode === 'first_frame' ? 1 : 2) || imageRefs.length !== prepared.urls.length)) throw new Error(mode === 'first_frame' ? '首帧模式需要恰好一张图片' : '首尾帧模式需要恰好两张图片，按素材顺序作为首帧、尾帧');
       const result = buildPromptBarGenerationTasks(input);
       if (!result.ok) throw new Error(result.error);
-      return { ...result.tasks[0], ...(video ? {} : { imageQuality: settings.imageQuality }), id: `prompt-task-${crypto.randomUUID()}`, batchId, shotNo: index + 1, title: entry.title, progress: '0%',
-        ...(video && ['first_frame', 'first_last_frame'].includes(mode) ? { firstFrameImage: imageRefs[0], lastFrameImage: mode === 'first_last_frame' ? imageRefs.at(-1) : undefined } : {}) };
+      return {
+        ...result.tasks[0],
+        ...(video ? {} : {
+          imageQuality: settings.imageQualityTier || settings.imageQuality,
+          ...(settings.imageInferenceStrength ? { inferenceStrength: settings.imageInferenceStrength } : {}),
+        }),
+        id: `prompt-task-${crypto.randomUUID()}`, batchId, shotNo: index + 1, title: entry.title, progress: '0%',
+        ...(video && ['first_frame', 'first_last_frame'].includes(mode) ? { firstFrameImage: imageRefs[0], lastFrameImage: mode === 'first_last_frame' ? imageRefs.at(-1) : undefined } : {}),
+      };
     } catch (error) { throw new Error(`${entry.title}：${error instanceof Error ? error.message : '参数无效'}`); }
   });
 }

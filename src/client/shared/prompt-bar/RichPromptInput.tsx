@@ -9,6 +9,7 @@ import {
   extractTextFromDOM,
   insertPastedTextWithMentions,
   renderTextToDOM,
+  resolveEditorInsertionRange,
 } from './promptMentionDom';
 import type { RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
 import { extractPromptMentions } from '@shared/domain/prompts/prompt-engine/mentions';
@@ -30,7 +31,6 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
   variant = 'default',
   expanded = false,
   singleLine = false,
-  onOpenManual,
 }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef<boolean>(false);
@@ -93,52 +93,36 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
     insertAtSymbol: () => {
       const editor = editorRef.current;
       if (!editor) return;
-
-      editor.focus();
-      const sel = window.getSelection();
-      let range: Range;
-
-      if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-        range = sel.getRangeAt(0);
-      } else {
-        range = document.createRange();
-        range.selectNodeContents(editor);
-        range.collapse(false);
+      const { range, sel } = resolveEditorInsertionRange(editor);
+      if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+        const textBefore = range.startContainer.textContent?.slice(0, range.startOffset) || '';
+        const existingAt = textBefore.match(/@([a-zA-Z0-9_\u4e00-\u9fa5.-]*)$/);
+        if (existingAt) {
+          onTriggerAtMenu?.(extractTextFromDOM(editor).length, existingAt[1]);
+          return;
+        }
       }
-
       const atNode = document.createTextNode('@');
       range.deleteContents();
       range.insertNode(atNode);
-
-      range = document.createRange();
-      range.setStartAfter(atNode);
-      range.collapse(true);
+      const nextRange = document.createRange();
+      nextRange.setStartAfter(atNode);
+      nextRange.collapse(true);
       if (sel) {
         sel.removeAllRanges();
-        sel.addRange(range);
+        sel.addRange(nextRange);
       }
-
       const newText = extractTextFromDOM(editor);
       lastSyncedValueRef.current = newText;
       onChange(newText);
-
       onTriggerAtMenu?.(newText.length, '');
     },
     insertMention: (subject: SubjectItem) => {
       const editor = editorRef.current;
       if (!editor) return;
-
-      editor.focus();
-      const sel = window.getSelection();
-      let range: Range;
-
-      if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-        range = sel.getRangeAt(0);
-      } else {
-        range = document.createRange();
-        range.selectNodeContents(editor);
-        range.collapse(false);
-      }
+      const resolved = resolveEditorInsertionRange(editor);
+      const { sel } = resolved;
+      let { range } = resolved;
 
       // 若光标前以 @[query] 结尾，则自动替换掉该 @ 部分
       if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
@@ -298,20 +282,20 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
 
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     const items = e.clipboardData?.items;
-    const imageFiles: File[] = [];
+    const pastedFiles: File[] = [];
     if (items) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        if (item.type.startsWith('image/')) {
+        if (item.kind === 'file') {
           const file = item.getAsFile();
-          if (file) imageFiles.push(file);
+          if (file) pastedFiles.push(file);
         }
       }
     }
-    if (imageFiles.length > 0 && onPasteFiles) {
+    if (pastedFiles.length > 0 && onPasteFiles) {
       e.preventDefault();
       e.stopPropagation();
-      onPasteFiles(imageFiles);
+      onPasteFiles(pastedFiles);
       return;
     }
 
@@ -340,8 +324,6 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
       : 'max-h-48 xl:max-h-64';
   const editorText = singleLine ? 'text-xs sm:text-[13.5px]' : isComposer ? densityComposerText : 'text-[14px] sm:text-[15px] md:text-[16px] xl:text-[17px]';
   const placeholderText = singleLine ? 'empty:before:text-xs sm:empty:before:text-[13.5px]' : 'empty:before:text-[14px] sm:empty:before:text-[14px] md:empty:before:text-[14.5px]';
-  const isManualPlaceholder = Boolean(placeholder && placeholder.includes('产品手册 ↗'));
-  const effectiveDataPlaceholder = isManualPlaceholder ? '' : placeholder;
 
   return (
     <div
@@ -365,29 +347,10 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
         onKeyUp={checkMentionAtCursor}
         onClick={checkMentionAtCursor}
         onPaste={handlePaste}
-        data-placeholder={effectiveDataPlaceholder}
+        data-placeholder={placeholder || ''}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         className={`rich-mention-contenteditable flex-1 min-w-[120px] w-full ${editorMaxH} overflow-x-hidden overflow-y-auto scrollbar-none no-scrollbar bg-transparent border-0 ring-0 text-slate-900 dark:text-slate-100 ${editorText} leading-relaxed outline-none font-normal p-0 select-text whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 dark:empty:before:text-slate-400 ${placeholderText} empty:before:pointer-events-none ${singleLine ? 'self-center pt-0' : isComposer ? 'self-start pt-0' : 'self-start pt-0.5'}`}
       />
-      {!value && isManualPlaceholder && (
-        <div className={`absolute inset-0 pointer-events-none flex items-start text-slate-400 ${editorText} leading-relaxed select-none ${singleLine ? 'items-center pt-0' : isComposer ? 'pt-0' : 'pt-0.5'}`}>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span>{placeholder?.replace(/\s*(产品手册|Documentation)\s*↗\s*$/, '') || '想让每笔积分消耗都经你同意？去设置页开启积分扣除确认即可'}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenManual?.();
-              }}
-              className="pointer-events-auto inline-flex items-center gap-0.5 text-slate-400 hover:text-slate-700 font-normal cursor-pointer transition-colors"
-              title="查看产品使用手册"
-            >
-              <span>{placeholder?.includes('Documentation') ? 'Documentation' : '产品手册'}</span>
-              <span className="text-[11px] ml-0.5">↗</span>
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 });

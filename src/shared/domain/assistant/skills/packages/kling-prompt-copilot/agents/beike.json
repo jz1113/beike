@@ -1,0 +1,27 @@
+{
+  "id": "kling-prompt-copilot",
+  "name": "kling-prompt-copilot",
+  "displayName": "克林提示副驾驶",
+  "category": "模型提示词规范",
+  "author": "系统",
+  "colorTheme": "sunset",
+  "icon": "camera",
+  "outputFormat": "code_blocks",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "为可灵视频设计有目的的运镜、从首帧出发的动作因果链与静动区域，处理图生视频和连续性修复。",
+  "tools": [
+    "get_view_capabilities",
+    "trigger_generate_batch",
+    "inspect_video_media",
+    "extract_video_storyboard",
+    "extract_video_detailed_frames"
+  ]
+}

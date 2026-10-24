@@ -24,7 +24,7 @@ export function BatchWorkshopHistoryPreview({ batch, runner, isHistoryExporting,
   };
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 dark:border-indigo-400/20 dark:bg-indigo-500/10">
         <div className="min-w-0">
           <p className="text-sm font-black text-slate-900 dark:text-slate-100">历史批次生成查看 · {batch.name}</p>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">历史批次内容只读；此前已采用的完整四镜仍可提炼为新母本。</p>
@@ -37,16 +37,9 @@ export function BatchWorkshopHistoryPreview({ batch, runner, isHistoryExporting,
           ? batch.snapshot.settings.selectedVisionModel : runner.selectedVisionModel}
         availableImageModels={runner.availableImageModels}
         selectedImageGenModel={batch.snapshot.settings.selectedImageGenModel}
-        setSelectedImageGenModel={() => {}}
         selectedQuality={batch.snapshot.settings.selectedQuality}
-        setSelectedQuality={() => {}}
         selectedAspect={batch.snapshot.settings.selectedAspect}
-        setSelectedAspect={() => {}}
         isGeneratingBatch={false}
-        totalTaskCount={0}
-        completedTaskCount={0}
-        successTaskCount={0}
-        failTaskCount={0}
       generateCopywritingForProduct={async () => {}}
         isExportingZip={isHistoryExporting}
         exportingSingleItemId={historyExportItemId}

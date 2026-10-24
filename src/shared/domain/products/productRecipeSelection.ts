@@ -32,8 +32,8 @@ export function productRecipeKind(product: ProductForRecipe): ProductRecipeKind 
 export function recipeKind(recipe: RecipeForProduct): RecipeKind {
   const label = `${recipe.id} ${recipe.name || ''} ${recipe.category || ''}`;
   const body = recipe.promptSnippet || '';
-  const labelPhone = /recipe_phone_comms_master|手机通讯|智能手机|smartphone|digital_3c/i.test(label);
-  const labelJewelry = /recipe_jewelry_master|珠宝|首饰|jewelry/i.test(label);
+  const labelPhone = /手机通讯|智能手机|smartphone|digital_3c/i.test(label);
+  const labelJewelry = /珠宝|首饰|jewelry/i.test(label);
   const bodyPhone = /手机通讯全品类|手机通讯类商品|机身轮廓|镜头模组.*接口/i.test(body);
   const bodyJewelry = /珠宝首饰全品类|首饰.*佩戴|耳饰在耳垂|项链在锁骨|手镯在手腕|宝石.*切面/i.test(body);
 
@@ -70,10 +70,7 @@ export function resolveRecipeForProduct<T extends RecipeForProduct>(
 
   const automatic = recipes.find(recipe => recipe.id === '__category_skill__');
   if (automatic) return { recipe: automatic, error: null };
-  const matching = recipes.filter(recipe => recipeKind(recipe) === productKind);
-  const preferredId = productKind === 'phone' ? 'recipe_phone_comms_master'
-    : productKind === 'jewelry' ? 'recipe_jewelry_master' : '';
-  const matched = matching.find(recipe => recipe.id === preferredId) || matching[0];
+  const matched = recipes.find(recipe => recipeKind(recipe) === productKind);
   if (matched) return { recipe: matched, error: null };
   if (productKind === 'other') {
     return { recipe: null, error: '当前商品没有可用的通用品类拍摄架构，请手动选择适合的架构' };

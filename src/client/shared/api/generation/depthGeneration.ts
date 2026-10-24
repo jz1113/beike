@@ -30,7 +30,7 @@ export function registerDepthSubmit(taskId: string, payload: DepthSubmitPayload)
     void putDerived(`depth_meta:${taskId}`, new Blob([metaJson], { type: 'application/json' }));
 
     // 确保以标准 Blob 格式持久化，避免 WKWebView/Safari 的 File DataCloneError
-    const fileObj = payload.file as any;
+    const fileObj = payload.file as Blob | (BlobPart & { type?: string });
     const blobPayload = fileObj instanceof Blob 
       ? fileObj 
       : new Blob([fileObj], { type: fileObj?.type || (payload.mode === 'depth-video' ? 'video/mp4' : 'image/jpeg') });

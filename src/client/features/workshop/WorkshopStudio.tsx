@@ -3,7 +3,6 @@ import { useAppStore } from '@client/store';
 import { normalizeWorkshopTab } from '@client/store/workshopTab';
 import BatchWorkshopView from './components/BatchWorkshopView';
 import { WorkshopTopBar } from './components/layout/WorkshopTopBar';
-import { WorkshopSideCapsuleBar } from './components/layout/WorkshopSideCapsuleBar';
 import { WorkshopDockActionsProvider } from './components/layout/WorkshopDockActionsContext';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 
@@ -30,11 +29,10 @@ export default function WorkshopStudio({
   return (
     <WorkshopDockActionsProvider>
       <div className={`flex-1 flex flex-col min-w-0 h-full overflow-hidden relative select-none ${activeWorkshopTab === 'studio' ? 'bg-transparent' : 'bg-slate-50/95 dark:bg-[#111214]/95'}`}>
-        <WorkshopSideCapsuleBar activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />
-        {activeWorkshopTab !== 'studio' && <WorkshopTopBar assetToolbarRef={setAssetToolbarTarget} activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />}
+        <WorkshopTopBar assetToolbarRef={setAssetToolbarTarget} activeTab={activeWorkshopTab} onSelectTab={setActiveWorkshopTab} />
 
         {/* 核心工作区内容渲染 */}
-        <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative z-10 ${activeWorkshopTab !== 'studio' ? 'pt-16 lg:pt-0' : ''}`}>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className={activeWorkshopTab === 'studio' ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>
             <BatchWorkshopView onOpenAssetTab={(type) => {
               setAssetInitialSubTab(type);

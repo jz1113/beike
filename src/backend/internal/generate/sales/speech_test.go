@@ -135,3 +135,27 @@ func TestFashionScriptRejectsNarrationForSelectedPresenter(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestFashionScriptNormalizesVoiceoverModes(t *testing.T) {
+	for _, mode := range []string{"product_closeup", "scene_demo", "graphic_montage"} {
+		t.Run(mode, func(t *testing.T) {
+			server := useChatServer(t, func(body map[string]any, _ int) string {
+				encoded, _ := json.Marshal(body)
+				if !strings.Contains(string(encoded), "严禁任何一段填写") {
+					t.Fatalf("missing voiceover-only constraint for %s", mode)
+				}
+				reply := strings.Replace(validWorkflowScript(), `"speechMode":"voiceover"`, `"speechMode":"on_camera"`, 1)
+				return strings.Replace(reply, `"voiceover":"看看纸巾"`, `"voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"`, 1)
+			})
+			payload := workflowPayload()
+			payload["category"] = "fashion"
+			payload["videoMode"] = mode
+			payload["productName"] = "黑色卫衣"
+			attachGateway(payload, server.URL)
+			rec := postSales(t, Script(config.Config{}), "/", payload)
+			if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"speechMode":"voiceover"`) {
+				t.Fatalf("%s got %d %s", mode, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}

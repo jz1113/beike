@@ -14,7 +14,7 @@ export function normalizeVideoModelId(model: string): string {
     'kling-v2.5-turbo': 'kling-video-v2-5-turbo', 'kling-v2-6': 'kling-video-v2-6',
     'wan3.0': 'wan3.0-video', 'wan3': 'wan3.0-video',
     'vidu-q3': 'viduq3', 'vidu-q3-mix': 'viduq3-mix', 'vidu-q3-turbo': 'viduq3-turbo', 'vidu-q3-pro': 'viduq3-pro',
-    'omni-flash-10s': 'omni_flash-10s',
+    'omni-flash-10s': 'omni_flash-10s', 'gemini-omni-1.1-flash': 'omni_flash-10s',
   };
   return aliases[model.trim().toLowerCase()] || model.trim();
 }

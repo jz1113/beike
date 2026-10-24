@@ -1,26 +1,311 @@
 {
   "models": {
-    "gemini-4-argon": { "protocol": "gemini", "thinking": "level", "levels": ["low", "medium", "high"] },
-    "gemini-3.8-flash": { "protocol": "gemini", "thinking": "level", "levels": ["low", "medium", "high"] },
-    "gemini-3.7-flash": { "protocol": "gemini", "thinking": "level", "levels": ["low", "medium", "high"] },
-    "gemini-3.1-pro-preview": { "protocol": "gemini", "thinking": "level", "levels": ["low", "medium", "high"] },
-    "gemini-3-pro-preview": { "protocol": "gemini", "thinking": "level", "levels": ["low", "high"] },
-    "gemini-3-flash-preview": { "protocol": "gemini", "thinking": "level", "levels": ["low", "medium", "high"] },
-    "gemini-2.5-pro": { "protocol": "gemini", "thinking": "budget", "levels": ["low", "medium", "high"], "budgets": { "low": 2048, "medium": 8192, "high": 12288 } },
-    "gemini-2.5-flash": { "protocol": "gemini", "thinking": "budget", "levels": ["low", "medium", "high"], "budgets": { "low": 2048, "medium": 8192, "high": 12288 } },
-    "claude-haiku-5-5": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-sonnet-5-5": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-sonnet-5": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-opus-5-5": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-opus-5": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-opus-4-8": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-opus-4-7": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "xhigh", "max"] },
-    "claude-opus-4-6": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "max"] },
-    "claude-sonnet-4-6": { "protocol": "anthropic", "thinking": "adaptive", "levels": ["low", "medium", "high", "max"] },
-    "claude-sonnet-4-5": { "protocol": "anthropic", "thinking": "budget", "levels": ["low", "medium", "high"], "aliases": ["claude-sonnet-4-5-20250929"], "budgets": { "low": 1024, "medium": 2048, "high": 3072 } },
-    "claude-haiku-4-5": { "protocol": "anthropic", "thinking": "budget", "levels": ["low", "medium", "high"], "aliases": ["claude-haiku-4-5-20251001"], "budgets": { "low": 1024, "medium": 2048, "high": 3072 } },
-    "claude-opus-4-5": { "protocol": "anthropic", "thinking": "budget", "levels": ["low", "medium", "high"], "aliases": ["claude-opus-4-5-20251101"], "budgets": { "low": 1024, "medium": 2048, "high": 3072 } },
-    "claude-sonnet-4-20250514": { "protocol": "anthropic", "thinking": "budget", "levels": ["low", "medium", "high"], "budgets": { "low": 1024, "medium": 2048, "high": 3072 } },
-    "claude-opus-4-20250514": { "protocol": "anthropic", "thinking": "budget", "levels": ["low", "medium", "high"], "budgets": { "low": 1024, "medium": 2048, "high": 3072 } }
+    "gemini-4-argon": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.8-flash": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.7-flash": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.6-flash": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.5-flash-lite": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "gemini-3.1-pro-preview": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "aliases": [
+        "gemini-3.1-pro"
+      ]
+    },
+    "gemini-3-pro-preview": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "high"
+      ]
+    },
+    "gemini-3-flash-preview": {
+      "protocol": "gemini",
+      "thinking": "level",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "aliases": [
+        "gemini-3-flash"
+      ]
+    },
+    "gemini-2.5-pro": {
+      "protocol": "gemini",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "budgets": {
+        "low": 2048,
+        "medium": 8192,
+        "high": 12288
+      }
+    },
+    "gemini-2.5-flash": {
+      "protocol": "gemini",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "budgets": {
+        "low": 2048,
+        "medium": 8192,
+        "high": 12288
+      }
+    },
+    "gemini-2.5-flash-lite": {
+      "protocol": "gemini",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "budgets": {
+        "low": 2048,
+        "medium": 8192,
+        "high": 12288
+      }
+    },
+    "claude-haiku-5-5": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-sonnet-5-5": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-sonnet-5": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-opus-5-5": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-opus-5": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-fable-5": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-opus-4-8": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-opus-4-7": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "claude-opus-4-6": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ]
+    },
+    "claude-sonnet-4-6": {
+      "protocol": "anthropic",
+      "thinking": "adaptive",
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ]
+    },
+    "claude-sonnet-4-5": {
+      "protocol": "anthropic",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "aliases": [
+        "claude-sonnet-4-5-20250929"
+      ],
+      "budgets": {
+        "low": 1024,
+        "medium": 2048,
+        "high": 3072
+      }
+    },
+    "claude-haiku-4-5": {
+      "protocol": "anthropic",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "aliases": [
+        "claude-haiku-4-5-20251001",
+        "claude-haiku-4-5-20251001-thinking"
+      ],
+      "budgets": {
+        "low": 1024,
+        "medium": 2048,
+        "high": 3072
+      }
+    },
+    "claude-opus-4-5": {
+      "protocol": "anthropic",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "aliases": [
+        "claude-opus-4-5-20251101"
+      ],
+      "budgets": {
+        "low": 1024,
+        "medium": 2048,
+        "high": 3072
+      }
+    },
+    "claude-sonnet-4-20250514": {
+      "protocol": "anthropic",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "budgets": {
+        "low": 1024,
+        "medium": 2048,
+        "high": 3072
+      }
+    },
+    "claude-opus-4-20250514": {
+      "protocol": "anthropic",
+      "thinking": "budget",
+      "levels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "budgets": {
+        "low": 1024,
+        "medium": 2048,
+        "high": 3072
+      }
+    }
   }
 }

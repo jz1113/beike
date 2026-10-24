@@ -22,9 +22,8 @@ function run(command, args, label) {
 async function main() {
   const python = process.env.DEPTH_VIDEO_PYTHON?.trim() || 'python3';
   await run(python, ['-m', 'pip', 'install', '--user', '-r', requirements], '安装 Python 依赖');
-  await run(python, ['-m', 'pip', 'install', '--user', 'torch', 'transformers', 'accelerate'], '安装深度模型依赖');
   await run(python, [pythonScript, '--check-env'], '验证深度模型环境');
-  console.log('[setup:depth-model] 完成。请重启 API：npm run dev:api');
+  console.log('[setup:depth-model] 完成。开发环境请重新运行 pnpm dev；生产环境请重启 beike 服务。');
 }
 
 main().catch((error) => {

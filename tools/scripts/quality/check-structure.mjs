@@ -10,7 +10,7 @@ import { isTestFile, moduleReferences, walkSourceFiles } from './source-files.mj
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const errors = manifestErrors(manifest);
-for (const directory of ['src', 'database', 'tools']) {
+for (const directory of ['src', 'tools']) {
   for (const file of walkSourceFiles(path.join(root, directory))) {
     const relative = path.relative(root, file);
     if (path.basename(file) === 'package.json') errors.push(`Nested manifest: ${relative}`);

@@ -79,6 +79,7 @@ export function extractSkillDraftFromContent(
     }
   }
   return {
+    kind: frontmatter.kind === 'agent' || frontmatter.kind === 'creation' ? frontmatter.kind : undefined,
     title,
     description,
     genres,

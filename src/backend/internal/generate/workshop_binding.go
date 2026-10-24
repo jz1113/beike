@@ -203,7 +203,16 @@ func workshopObjects(value any) []map[string]any {
 
 func workshopShotType(shot map[string]any) string {
 	kind := TextField(shot, "shot_type")
-	if kind == "hand_held_only" || kind == "pure_product" || kind == "model_shot" {
+	if kind == "hand_held_only" || kind == "pure_product" {
+		return kind
+	}
+	prompt := TextField(shot, "prompt")
+	refined := dblibrary.RefineShotType("model_shot", prompt)
+	if refined != "model_shot" {
+		return refined
+	}
+
+	if kind == "model_shot" {
 		return kind
 	}
 	if human, ok := shot["has_human"].(bool); ok && !human {

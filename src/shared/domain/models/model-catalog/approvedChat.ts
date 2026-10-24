@@ -2,6 +2,17 @@ import type { ApprovedModel } from './defs';
 
 export const APPROVED_CHAT_MODELS: ApprovedModel[] = [
   {
+    id: 'gpt-6-astra',
+    capability: 'multimodal',
+    vendor: 'openai',
+    name: 'GPT 6 Astra',
+    shortName: 'GPT 6 Astra',
+    adapter: 'openai-chat',
+    docs: 'docs/models.md',
+    badge: '多模态',
+    description: 'OpenAI GPT 6 Astra 多模态模型',
+  },
+  {
     id: 'gpt-6-luna',
     capability: 'multimodal',
     vendor: 'openai',

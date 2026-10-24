@@ -165,9 +165,8 @@ func fetchRemoteTextImage(ctx context.Context, u *url.URL, fresh bool) ([]byte, 
 	return data, mediaType, nil
 }
 
-// OpenAI remote URLs remain provider-fetched URLs, preserving signed URL and
-// multi-image request semantics. Only inline data URLs need local preparation;
-// native protocols use textImage for both sources because they embed bytes.
+// Public URLs retain provider fetching; protected CDN inputs are embedded with
+// source-specific headers. Native protocols embed all images.
 func prepareOpenAITextImages(ctx context.Context, payload map[string]any) error {
 	for _, raw := range textArray(payload["messages"]) {
 		for _, rawPart := range textArray(textMap(raw)["content"]) {
@@ -227,11 +226,7 @@ func supportedImageType(mediaType string) bool {
 // OSS objects saved as *.octet-stream are real pictures with a generic type.
 // Other remote URLs stay provider-fetched so signed product images are not inlined.
 func remoteImageNeedsInline(raw string) bool {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return false
-	}
-	return strings.HasSuffix(strings.ToLower(parsed.Path), ".octet-stream")
+	return media.RemoteImageNeedsInline(raw)
 }
 
 func sniffedImageType(data []byte) string {

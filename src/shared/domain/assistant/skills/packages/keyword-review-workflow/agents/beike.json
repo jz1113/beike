@@ -1,0 +1,27 @@
+{
+  "id": "keyword-review-workflow",
+  "name": "keyword-review-workflow",
+  "displayName": "关键词垂类与可制作性审核",
+  "category": "数据审核",
+  "author": "贝壳",
+  "colorTheme": "teal",
+  "icon": "table",
+  "tools": [
+    "read_attached_document",
+    "execute_code"
+  ],
+  "requires": [
+    "document"
+  ],
+  "outputFormat": "markdown",
+  "isBuiltin": true,
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": []
+  },
+  "version": "2.0.0",
+  "createdAt": 0,
+  "updatedAt": 0,
+  "description": "逐行审核关键词的内容垂类与制作可行性，保留原始数据与行序，按批准规则处理泛实体、低价值及边界查询。"
+}

@@ -1,9 +1,20 @@
+import {
+  GEMINI_MAX_REFERENCE_IMAGES,
+  geminiSupportedAspectRatios,
+  geminiSupportedResolutions,
+  isGeminiImageModel,
+} from '@shared/domain/models/model-adapters/image/geminiImageSizes';
+
 export type ImageCapabilityResolution = '1K' | '2K' | '4K';
+export type ImageCapabilityQuality = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface ImageCapability {
   resolutions: ImageCapabilityResolution[];
   strength: 'quality' | 'prompt-extend' | 'none';
   sendsQuality: boolean;
+  qualities?: ImageCapabilityQuality[];
+  aspectRatios?: string[];
+  maxReferenceImages?: number;
 }
 
 const ALL_RESOLUTIONS: ImageCapabilityResolution[] = ['1K', '2K', '4K'];
@@ -29,13 +40,39 @@ export function isNativeDashscopeImageModel(model = ''): boolean {
   return id.includes('wan2.7-image') || id.includes('wan2.6-image') || id.includes('wan2.6-t2i');
 }
 
-export function imageCapabilities(model = '', protocol?: string, baseUrl?: string): ImageCapability {
+function baseImageCapabilities(model = '', protocol?: string, baseUrl?: string): ImageCapability {
   const id = model.toLowerCase();
   if (id.includes('grok')) return { resolutions: [], strength: 'none', sendsQuality: false };
-  if (id.includes('gpt-image-2-4k')) return { resolutions: ['4K'], strength: 'none', sendsQuality: false };
-  if (id.includes('gpt-image-2-2k')) return { resolutions: ['2K'], strength: 'none', sendsQuality: false };
-  if (id.includes('gpt-image')) return { resolutions: ALL_RESOLUTIONS, strength: 'quality', sendsQuality: true };
+  if (id.includes('gpt-image-2-4k')) return { resolutions: ['4K'], strength: 'none', sendsQuality: false, maxReferenceImages: 16 };
+  if (id.includes('gpt-image-2-2k')) return { resolutions: ['2K'], strength: 'none', sendsQuality: false, maxReferenceImages: 16 };
+  if (id.includes('gpt-image-2.5')) {
+    return {
+      resolutions: ALL_RESOLUTIONS,
+      strength: 'quality',
+      sendsQuality: true,
+      qualities: ['low', 'medium', 'high', 'xhigh', 'max'],
+      maxReferenceImages: 16,
+    };
+  }
+  if (id.includes('gpt-image')) {
+    return {
+      resolutions: ALL_RESOLUTIONS,
+      strength: 'quality',
+      sendsQuality: true,
+      qualities: ['low', 'medium', 'high'],
+      maxReferenceImages: 16,
+    };
+  }
   if (id.includes('seedream-v5-pro')) return { resolutions: ['1K', '2K'], strength: 'none', sendsQuality: false };
+  if (isGeminiImageModel(id)) {
+    return {
+      resolutions: geminiSupportedResolutions(id),
+      strength: 'none',
+      sendsQuality: false,
+      aspectRatios: [...geminiSupportedAspectRatios(id)],
+      maxReferenceImages: id.includes('2.5-flash-image') ? 3 : GEMINI_MAX_REFERENCE_IMAGES,
+    };
+  }
   if (protocol === 'template') return { resolutions: ALL_RESOLUTIONS, strength: 'none', sendsQuality: false };
   const dashscope = protocol === 'dashscope' || isDashScopeBase(baseUrl) || isNativeDashscopeImageModel(model);
   if (!dashscope) return { resolutions: ALL_RESOLUTIONS, strength: 'none', sendsQuality: false };
@@ -43,4 +80,11 @@ export function imageCapabilities(model = '', protocol?: string, baseUrl?: strin
   if (id.includes('wan2.7-image')) return { resolutions: ['1K', '2K'], strength: 'prompt-extend', sendsQuality: false };
   if (id.includes('wan2.6')) return { resolutions: ['1K'], strength: 'prompt-extend', sendsQuality: false };
   return { resolutions: ['1K', '2K'], strength: 'prompt-extend', sendsQuality: false };
+}
+
+export function imageCapabilities(model = '', protocol?: string, baseUrl?: string): ImageCapability {
+  const capability = baseImageCapabilities(model, protocol, baseUrl);
+  const id = model.toLowerCase();
+  if (id.includes('qwen-image')) capability.maxReferenceImages = id === 'qwen-image-edit' ? 1 : /qwen-image-2[.-]1/.test(id) ? 10 : 3;
+  return capability;
 }
