@@ -191,7 +191,7 @@ export function AtomicAssetPreview({
               <button type="button" disabled={loadState !== 'ready' || !prompt} onClick={() => onCopyPrompt(prompt, item.id)} className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10">
                 {copiedId === item.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}{copiedId === item.id ? '已复制' : '复制提示词'}
               </button>
-              <button type="button" disabled={loadState !== 'ready' || Boolean(blockReason)} title={blockReason || undefined} onClick={() => { onApplyToWorkshop(detail); onClose(); }} className="flex min-w-0 flex-1 items-center justify-center rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">应用到工坊</button>
+              <button type="button" disabled={loadState !== 'ready' || Boolean(blockReason)} title={blockReason || undefined} onClick={() => { onApplyToWorkshop(detail); onClose(); }} className="flex min-w-0 flex-1 items-center justify-center rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">应用到电商图文</button>
             </div>
           </div>
         </section>

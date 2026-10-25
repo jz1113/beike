@@ -8,9 +8,9 @@ import (
 func TestReplayWithoutFingerprintKeepsFailure(t *testing.T) {
 	result := replayGuarded(guardedResult{
 		status: http.StatusInternalServerError,
-		body:   map[string]any{"success": false, "error": "关键词审核失败"},
+		body:   map[string]any{"success": false, "error": "词包审核失败"},
 	}, "fingerprint")
-	if result.status != http.StatusInternalServerError || result.body["error"] != "关键词审核失败" {
+	if result.status != http.StatusInternalServerError || result.body["error"] != "词包审核失败" {
 		t.Fatalf("status %d body %#v", result.status, result.body)
 	}
 }

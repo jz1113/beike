@@ -14,7 +14,7 @@ export function WorkshopGroupFolderPicker({ value, onChange, folders, categories
       <select aria-label="母本文件夹" value={value} onChange={event => onChange(event.target.value)}
         className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]">
         <option value="auto">按商品自动匹配文件夹</option>
-        {value !== 'auto' && !selected && <option value={value} disabled>原文件夹已删除或与工坊技能不符，请重新选择</option>}
+        {value !== 'auto' && !selected && <option value={value} disabled>原文件夹已删除或与电商图文技能不符，请重新选择</option>}
         {folders.filter(folder => !folder.subcategory).map(major => <optgroup key={major.id} label={major.name}>
           {folders.filter(folder => folder.majorId === major.id).map(folder => <option key={folder.id} value={folder.id}>
             {folder.subcategory ? `${major.name} / ${folder.name}` : `${major.name} · 全部子文件夹`} · {filterPromptGroupsByFolder(groups, categories, folder.id).length} 组母本

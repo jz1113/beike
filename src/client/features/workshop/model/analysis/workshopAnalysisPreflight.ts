@@ -86,7 +86,7 @@ export function workshopAnalysisBlockReason(config: AnalysisPreflightConfig, ite
   if (folderId !== 'auto' && !folder) return '母本文件夹已删除或不可用，请在生产设置中重新选择';
   if (folder && architectureMajor && !promptGroupMatchesMajorCategory({
     productCategoryIds: JSON.stringify([folder.majorId]), productCategoryNames: [folder.majorName],
-  }, architectureMajor)) return '母本文件夹与当前工坊技能的商品大类不符，请调整文件夹或工坊技能';
+  }, architectureMajor)) return '母本文件夹与当前电商图文技能的商品大类不符，请调整文件夹或电商图文技能';
   const allGroups = (config.availableFullPrompts || []).filter(group => isWorkshopAssetEligible(group, 'full_prompt'));
   const groups = filterPromptGroupsByFolder(allGroups, categories, folderId);
   const explicitGroup = !isAutoPromptGroupSelection(config.lockedFullPromptId);
@@ -95,7 +95,7 @@ export function workshopAnalysisBlockReason(config: AnalysisPreflightConfig, ite
     ? '锁定的图组母本不在当前母本文件夹内，请更换图组或调整文件夹'
     : '锁定的图组母本已失效、未发布或不完整，请重新选择';
   if (group && architectureMajor && !promptGroupMatchesMajorCategory(group, architectureMajor)) {
-    return '锁定的图组母本不属于当前工坊技能的商品大类，请重新选择或在资产库核对母本分类';
+    return '锁定的图组母本不属于当前电商图文技能的商品大类，请重新选择或在资产库核对母本分类';
   }
   if (group) {
     const majorConflict = promptGroupExplicitMajorCategoryConflict(group, item.title, productProps);

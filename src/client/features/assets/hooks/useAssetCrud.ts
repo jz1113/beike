@@ -39,7 +39,7 @@ export interface UseAssetCrudOptions {
 }
 
 /**
- * 资产增删改查、收藏、去重、备份与工坊联动 Hook
+ * 资产增删改查、收藏、去重、备份与电商图文联动 Hook
  */
 export function useAssetCrud({
   activeSubTab,
@@ -70,7 +70,7 @@ export function useAssetCrud({
   const handleClearAssets = async (scope: 'current' | 'all') => {
     const scopeName =
       scope === 'all'
-        ? '全部本地数据库数据（资产、图集与分类、工坊项目、生成任务、历史记录及 AI 对话）'
+        ? '全部本地数据库数据（资产、图集与分类、电商图文项目、生成任务、历史记录及 AI 对话）'
         : `当前「${
             activeSubTab === 'full_prompt'
               ? '完整提示词'
@@ -261,13 +261,13 @@ export function useAssetCrud({
     e.target.value = '';
   };
 
-  // 一键应用并载入种草工坊
+  // 一键应用并载入电商图文
   const handleApplyToWorkshop = (item: AssetLibrarySlim) => {
     const blocked = workshopAssetBlockReason(item, activeSubTab);
     if (blocked) { showToast(blocked); return; }
     if ((activeSubTab === 'persona' || activeSubTab === 'outfit')
       && appearanceAudience(item, activeSubTab === 'outfit') === 'unknown') {
-      showToast('请先确认该资产的适用人群，再载入工坊进行人物或穿搭替换');
+      showToast('请先确认该资产的适用人群，再载入电商图文进行人物或穿搭替换');
       return;
     }
     let promptSnippet = '';
@@ -328,7 +328,7 @@ export function useAssetCrud({
     }
     showToast(activeSubTab === 'full_prompt'
       ? '已锁定图组母本；默认沿用原组人物、穿搭和场景，可在生产设置中单独替换'
-      : '已载入电商工坊并锁定应用该提示词资产');
+      : '已载入电商图文并锁定应用该提示词资产');
   };
 
   // 保存编辑后的资产

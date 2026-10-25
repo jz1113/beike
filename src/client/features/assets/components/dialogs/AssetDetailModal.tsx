@@ -305,7 +305,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     <p>
                       {activeSubTab === 'full_prompt'
                         ? '这是整组内容的母本：场景、镜头节奏与动作逻辑固定；人物、穿搭、场景只允许按整组替换。'
-                        : '已剔除具体服装与杂乱背景，提纯为通用物理母本，可直接作为原子资产装配入工坊流水线。'}
+                        : '已剔除具体服装与杂乱背景，提纯为通用物理母本，可直接作为原子资产装配入电商图文流水线。'}
                     </p>
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               className="disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{productionBlockReason ? "暂不可用于生产" : activeSubTab === 'full_prompt' ? '载入图组' : '应用到工坊'}</span>
+              <span>{productionBlockReason ? "暂不可用于生产" : activeSubTab === 'full_prompt' ? '载入图组' : '应用到电商图文'}</span>
             </button>
           </div>
         </div>

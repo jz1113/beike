@@ -93,8 +93,8 @@ export default function UsageTab({
   return (
     <div className="settings-creator animate-fade-in">
       <CreatorProfileHeader
-        imageCount={heatmapSummary.imageCount}
-        videoCount={heatmapSummary.videoCount}
+        imageCount={usageSummary.imageCount}
+        videoCount={usageSummary.videoCount}
         canExport={allLogs.length > 0}
         canClear={allLogs.length > 0}
         onExport={handleExportCsv}

@@ -85,7 +85,7 @@ export function cleanPromptText(rawPrompt: string): string {
 }
 
 /**
- * 剥离工坊注入的守卫文案与尾部追加句（Hub/快速生图 plain 模式使用）。
+ * 剥离电商图文注入的守卫文案与尾部追加句（Hub/快速生图 plain 模式使用）。
  * 仅剥离真正的守卫标签，保留业务正文前缀。
  */
 export function stripWorkshopPromptGuards(prompt: string): string {
@@ -106,7 +106,7 @@ export function stripWorkshopPromptGuards(prompt: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-/** Hub 快速生图：精简负向词，避免电商工坊长列表污染创意请求 */
+/** Hub 快速生图：精简负向词，避免电商图文长列表污染创意请求 */
 export function getPlainNegativePrompt(): string {
   return 'blurry, low resolution, watermark, text overlay, ugly, distorted, deformed, bad anatomy, extra limbs';
 }
@@ -397,7 +397,7 @@ export function finalizeImagePrompt(
   }
 ): string {
   const text = prompt;
-  // 🌟 核心保护：Hub/普通创作区 (hub/plain) 纯文本自由创作，严禁注入电商工坊商品实物槽位或修改提示词
+  // 🌟 核心保护：Hub/普通创作区 (hub/plain) 纯文本自由创作，严禁注入电商图文商品实物槽位或修改提示词
   if (
     options?.workshopMode === 'hub' ||
     options?.workshopMode === 'plain' ||

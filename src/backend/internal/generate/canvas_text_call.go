@@ -115,7 +115,7 @@ func completeCanvasText(ctx context.Context, base, key, model string, deepseek b
 		body["thinking"] = map[string]any{"type": "disabled"}
 	}
 	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
-		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocol(ctx, model), Payload: body,
+		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocolForBase(ctx, model, base), Payload: body,
 		Client: canvasHTTP(), Timeout: 120 * time.Second,
 	})
 	if status != 0 && (status < 200 || status >= 300) {

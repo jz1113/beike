@@ -124,7 +124,7 @@ export default function AssetLibraryToolbar({
     </button>
   );
 
-  // 分类切换属于内容区的导航。让它靠左放在资产列表上方，避免与居中的工坊模块导航
+  // 分类切换属于内容区的导航。让它靠左放在资产列表上方，避免与居中的电商图文模块导航
   // 和右侧管理操作抢占同一条顶栏。
   const tabNavigation = (
     <div className="flex items-center gap-2.5 flex-wrap shrink-0">

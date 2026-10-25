@@ -260,7 +260,7 @@ export function CreationSkillDetailModal({
             onClick={handleUseNow}
             className="flex cursor-pointer items-center gap-1.5 rounded-full bg-slate-950 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
           >
-            <span>{item.runtime === 'workshop' ? '应用到工坊' : '立即使用'}</span>
+            <span>{item.runtime === 'workshop' ? '应用到电商图文' : '立即使用'}</span>
             <CornerDownLeft size={13} />
           </button>
         </footer>

@@ -43,7 +43,7 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
   const startBatchVisionAnalyze = async (architectureId = selectedArchId, options?: { productIds: string[] }): Promise<number> => {
     if (analysisInFlight.current || singleInFlight.current.size > 0) return 0;
     if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
-      showToast('请先确认工坊技能，再开始提示词分析');
+      showToast('请先确认电商图文技能，再开始提示词分析');
       return 0;
     }
 

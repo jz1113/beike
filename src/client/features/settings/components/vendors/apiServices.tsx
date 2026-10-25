@@ -62,7 +62,7 @@ export const API_SERVICES: ApiServiceItem[] = [
     registerUrl: 'https://platform.deepseek.com',
     registerName: '前往 DeepSeek Platform 获取 API Key',
     defaultBaseUrl: 'https://api.deepseek.com',
-    description: '独立保存 DeepSeek 凭证，用于助手、文案、图像理解与关键词审核。',
+    description: '独立保存 DeepSeek 凭证，用于助手、文案、图像理解与词包审核。',
     capabilities: ['Chat Completions', '图像理解', 'deepseek-flash', 'Bearer API Key']
   },
   {

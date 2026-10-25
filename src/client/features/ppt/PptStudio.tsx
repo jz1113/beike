@@ -36,7 +36,7 @@ export const PptStudio: React.FC<Props> = ({ onBack, onOpenSettings }) => {
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent text-slate-800 dark:text-slate-200">
-      <StudioBrandChip title="PPT 工坊" icon={<FileType className="h-4 w-4" />} onBack={onBack} />
+      <StudioBrandChip title="PPT" icon={<FileType className="h-4 w-4" />} onBack={onBack} />
       <StudioDockBar items={dock} label="PPT 导航" />
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {stage === 'input' && <PptInputStage onOpenSettings={onOpenSettings} />}

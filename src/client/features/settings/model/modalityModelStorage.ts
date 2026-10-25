@@ -12,6 +12,7 @@ import {
 
 const STORAGE_KEY_PREFIX = MODALITY_STORAGE_KEY_PREFIX;
 const GLOBAL_CONFIG_KEY = 'beike_modality_global_config_v1';
+const GLOBAL_CONFIG_MANUAL_OVERRIDE_KEY = 'beike_modality_global_config_manual_override_v1';
 
 export const DEFAULT_BASE_URL_RECOMMENDATIONS = [
   'https://ai.comfly.org',
@@ -77,6 +78,21 @@ export function saveStoredModalityGlobalConfig(config: ModalityGlobalConfig): vo
   } catch {
     // 忽略存储异常
   }
+}
+
+/**
+ * Global credentials predate provider propagation and have no source metadata.
+ * Keep a small side marker so a user-edited global value can be distinguished
+ * from that legacy inherited value during the one-time provider migration.
+ */
+export function markModalityGlobalConfigManualOverride(): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(GLOBAL_CONFIG_MANUAL_OVERRIDE_KEY, 'true'); } catch { /* Ignore storage failures. */ }
+}
+
+export function hasModalityGlobalConfigManualOverride(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return localStorage.getItem(GLOBAL_CONFIG_MANUAL_OVERRIDE_KEY) === 'true'; } catch { return false; }
 }
 
 const LEGACY_PLACEHOLDER_IDS = new Set([

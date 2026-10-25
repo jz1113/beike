@@ -24,9 +24,9 @@ const render = (component: typeof WorkshopOutputSettings, overrides: Partial<Wor
 
 describe('workshop production settings', () => {
   it('replaces the one-option skill selector with an automatic status while keeping manual recipes selectable', () => {
-    expect(render(WorkshopContentSettings)).not.toContain('aria-label="工坊技能"');
+    expect(render(WorkshopContentSettings)).not.toContain('aria-label="电商图文技能"');
     const manual = render(WorkshopContentSettings, { recipes: [...defaults.recipes, { id: 'custom', name: '手动技能' }] });
-    expect(manual).toContain('aria-label="工坊技能"');
+    expect(manual).toContain('aria-label="电商图文技能"');
     expect(manual).toContain('手动技能');
   });
 

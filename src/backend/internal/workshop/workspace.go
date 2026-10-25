@@ -16,7 +16,7 @@ func WorkspaceGet(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mode := r.URL.Query().Get("mode")
 		if mode != "original" {
-			writeFail(w, http.StatusBadRequest, "无效的工坊模式", "bad_request")
+			writeFail(w, http.StatusBadRequest, "无效的电商图文模式", "bad_request")
 			return
 		}
 		db, err := httpx.OpenDB(cfg)
@@ -52,7 +52,7 @@ func WorkspacePut(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mode := r.URL.Query().Get("mode")
 		if mode != "original" {
-			writeFail(w, http.StatusBadRequest, "无效的工坊模式", "bad_request")
+			writeFail(w, http.StatusBadRequest, "无效的电商图文模式", "bad_request")
 			return
 		}
 		body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20+1))

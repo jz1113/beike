@@ -28,7 +28,7 @@ func Skills(cfg config.Config) http.Handler {
 			}
 			page, err := dbcatalog.ListStyleRecipes(r.Context(), db, workspace, "", 1, 10000)
 			if err != nil {
-				writeSkillError(w, 500, "工坊技能加载失败")
+				writeSkillError(w, 500, "电商图文技能加载失败")
 				return
 			}
 			items := []map[string]any{}

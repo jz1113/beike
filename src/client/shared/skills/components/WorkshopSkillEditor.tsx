@@ -52,11 +52,11 @@ export function WorkshopSkillEditor({ skill, onClose, onSaved }: Props) {
   return createPortal(<dialog ref={dialog} onCancel={event => { event.preventDefault(); close(); }}
     aria-labelledby="workshop-skill-editor-title" className="m-auto w-[min(720px,calc(100vw-2rem))] max-h-[90dvh] overflow-y-auto rounded-2xl bg-white p-6 text-slate-900 backdrop:bg-black/40 dark:bg-[#18191c] dark:text-slate-100">
     <header className="mb-5 flex items-center justify-between">
-      <h2 id="workshop-skill-editor-title" className="font-semibold">{skill?.isOfficial ? '编辑官方技能副本' : skill ? '编辑工坊技能' : '新建工坊技能'}</h2>
+      <h2 id="workshop-skill-editor-title" className="font-semibold">{skill?.isOfficial ? '编辑官方技能副本' : skill ? '编辑电商图文技能' : '新建电商图文技能'}</h2>
       <button type="button" onClick={close} aria-label="关闭技能编辑器"><X className="h-5 w-5" /></button>
     </header>
     <fieldset disabled={saving} className="space-y-4">
-      {skill && <p className="text-xs text-slate-500">修订后另存新版，保留原版和当前工坊选择；新版须明确应用后才用于生产。</p>}
+      {skill && <p className="text-xs text-slate-500">修订后另存新版，保留原版和当前电商图文选择；新版须明确应用后才用于生产。</p>}
       <label className="block space-y-1 text-xs">技能名称<input value={name} onChange={event => setName(event.target.value)} className={inputClass} /></label>
       <label className="block space-y-1 text-xs">适用商品类目<select value={category} onChange={event => setCategory(event.target.value)} className={inputClass}>
         {!categories.some(item => item.id === category) && <option value={category}>{category}</option>}

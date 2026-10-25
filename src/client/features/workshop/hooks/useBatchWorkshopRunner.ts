@@ -1,3 +1,4 @@
+import { useWorkshopSkillApplied } from './useWorkshopSkillApplied';
 import { workshopAnalysisBlockReason } from '../model/analysis/workshopAnalysisPreflight';
 import { useWorkshopAnalysis } from './useWorkshopAnalysis';
 import { useFreshWorkshopEntry } from './useFreshWorkshopEntry';
@@ -44,7 +45,7 @@ export function useBatchWorkshopRunner() {
   const [batchInputText, setBatchInputText] = useState('');
   const { items, itemsRef, setItems } = useLiveItems();
 
-  // 配方库（工坊技能与全局 store 同步，支持资产中心「载入配方」）
+  // 配方库（电商图文技能与全局 store 同步，支持资产中心「载入配方」）
   const selectedArchId = useAppStore((s) => s.selectedArchId);
   const setSelectedArchId = useAppStore((s) => s.setSelectedArchId);
   const originalAnchorFaceImageUrl = useAppStore((s) => (
@@ -67,7 +68,7 @@ export function useBatchWorkshopRunner() {
   const [selectedAspect, setSelectedAspect] = useState<'3:4' | '1:1' | '9:16' | '16:9'>('3:4');
   const [gridOutputSize, setGridOutputSize] = useState<string | undefined>();
 
-  // 优先恢复工坊设置；首次使用时沿用首页分镜预设。
+  // 优先恢复电商图文设置；首次使用时沿用首页分镜预设。
   const [selectedShotCount, setSelectedShotCount] = useWorkshopShotCount();
 
 
@@ -148,15 +149,7 @@ export function useBatchWorkshopRunner() {
     setSelectedArchId(id);
     invalidateWorkshopConfig('architecture');
   };
-  useEffect(() => {
-    const applied = () => {
-      analyzeConfigRevisionRef.current += 1;
-      setItems(previous => applyInvalidationToItems(previous, { type: 'architecture' }));
-      setStoryboardRevision(revision => revision + 1);
-    };
-    window.addEventListener('workshop-skill-applied', applied);
-    return () => window.removeEventListener('workshop-skill-applied', applied);
-  }, [setItems]);
+  useWorkshopSkillApplied(setItems, setStoryboardRevision, analyzeConfigRevisionRef);
   const changeSelectedShotCount = (count: number) => {
     if (count === selectedShotCount) return;
     setSelectedShotCount(count);

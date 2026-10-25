@@ -35,7 +35,7 @@ export function getWorkshopFlow(items: BatchProductItem[], config: {
     if (stage === 2) return products.length > 0 ? null : '请先添加并采集商品';
     if (stage === 3) return imagesReady ? null : '请先为每款商品选择至少一张商品图';
     if (stage === 4) return hasResults ? null : '请先在「分析与确认」中确认提示词并开始生图';
-    return '无效的工坊步骤';
+    return '无效的电商图文步骤';
   };
 
   return { products, readiness, results, busy, imagesReady, hasResults, pendingAnalysisIds, reasonForStage };

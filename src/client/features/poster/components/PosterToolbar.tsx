@@ -59,7 +59,7 @@ export function PosterToolbar({
         <ToolSuiteMark>
           <Brush className="h-4 w-4 stroke-[2]" />
         </ToolSuiteMark>
-        <span className="text-sm font-black tracking-tight">封面生成</span>
+        <span className="text-sm font-black tracking-tight">封面</span>
       </button>
       <div className="contents sm:ml-auto sm:flex sm:max-w-full sm:items-center sm:justify-end sm:gap-2">
         <button type="button" onClick={onOpenRules} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-bold text-slate-600 shadow-sm transition hover:border-amber-300 hover:bg-white hover:text-slate-950 dark:border-amber-400/70 dark:bg-[#1B1B1E]/90 dark:text-slate-200 dark:hover:border-amber-300 dark:hover:bg-[#26262B] dark:hover:text-white" aria-label="封面规则" title="查看封面生成和样张反推规则">

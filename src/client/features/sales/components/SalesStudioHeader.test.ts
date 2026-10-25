@@ -13,7 +13,7 @@ describe('sales studio return entry', () => {
       onBack: vi.fn(), onReset: vi.fn(), resetDisabled: false, resetTitle: '更换商品',
       steps: [], onStep: vi.fn(), onOpenRules: vi.fn(),
     }));
-    const chip = renderToStaticMarkup(createElement(StudioBrandChip, { title: '带货视频', icon, onBack: vi.fn(), inline: true }));
+    const chip = renderToStaticMarkup(createElement(StudioBrandChip, { title: '电商视频', icon, onBack: vi.fn(), inline: true }));
     expect(html).toContain(chip);
     expect(html).toContain('带货规则');
     expect(html).toContain('更换商品');
@@ -22,14 +22,14 @@ describe('sales studio return entry', () => {
   });
 
   it('keeps the original floating placement for other studios', () => {
-    const html = renderToStaticMarkup(createElement(StudioBrandChip, { title: '数字人工作室', icon, onBack: vi.fn() }));
+    const html = renderToStaticMarkup(createElement(StudioBrandChip, { title: '数字人', icon, onBack: vi.fn() }));
     expect(html).toContain('absolute left-0 top-0');
-    expect(html).toContain('数字人工作室 · 点击返回首页');
+    expect(html).toContain('数字人 · 点击返回首页');
   });
 
   it('returns home when the inline chip is clicked', () => {
     const onBack = vi.fn();
-    const button = StudioBrandChip({ title: '带货视频', icon, onBack, inline: true });
+    const button = StudioBrandChip({ title: '电商视频', icon, onBack, inline: true });
     expect(button.type).toBe('button');
     button.props.onClick();
     expect(onBack).toHaveBeenCalledTimes(1);

@@ -66,7 +66,7 @@ func guardKeywordSubmission(r *http.Request, workspace, baseURL, apiKey string, 
 	}()
 	dir := filepath.Join(receiptsRoot(), workspace)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		flight.resp = guardedResult{status: http.StatusInternalServerError, body: map[string]any{"success": false, "error": "关键词审核失败"}}
+		flight.resp = guardedResult{status: http.StatusInternalServerError, body: map[string]any{"success": false, "error": "词包审核失败"}}
 		return flight.resp
 	}
 	file := filepath.Join(dir, key+".json")

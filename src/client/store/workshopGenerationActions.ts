@@ -70,7 +70,7 @@ export const createWorkshopGenerationActions: StateCreator<AppState, [], [], Wor
       // 🌟 1. 商品实物素材图精准绑定 (分镜显式指定 > 严格 1对1 槽位分配用户勾选底图)
       const shotProductImage = p.productImageUrl || effectiveImages[idx % effectiveImages.length]?.url || primarySelectedImage?.url;
 
-      // 换人换品工坊下，每个分镜精准绑定其对应的已勾选社媒参考图作为垫图/ControlNet基准
+      // 电商图文下，每个分镜精准绑定其对应的已勾选社媒参考图作为垫图/ControlNet基准
       const shotRefImage = primarySelectedImage?.url;
 
       const existing = state.workshopTasks.find(t => t.id === `shot-${idx}`);

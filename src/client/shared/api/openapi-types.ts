@@ -1414,6 +1414,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/video/bind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_video_bind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -4292,6 +4308,31 @@ export interface operations {
                         }[];
                     };
                 };
+            };
+        };
+    };
+    post_api_generate_video_bind: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    taskKey: string;
+                    taskId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 仅为提交结果未确认且无上游任务 ID 的记录绑定人工核对到的任务 ID，不重新提交 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

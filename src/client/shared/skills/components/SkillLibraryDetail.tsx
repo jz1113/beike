@@ -14,8 +14,8 @@ export function SkillLibraryDetail({ entry, onClose }: { entry: SkillLibraryEntr
       if (Array.isArray(raw)) samples = raw.filter((image): image is string => typeof image === 'string' && image.length > 0);
     } catch { /* Legacy rows can have no readable sample list. */ }
   }
-  return createPortal(<SkillGuideDialog title={item.title} status={`适用场景：${entry.kind === 'workshop' ? '工坊' : '助手'}`} layout="compact" items={[]}
-    document={{ name: item.title, filename: entry.kind === 'assistant' ? 'SKILL.md' : '工坊技能规则',
+  return createPortal(<SkillGuideDialog title={item.title} status={`适用场景：${entry.kind === 'workshop' ? '电商图文' : '助手'}`} layout="compact" items={[]}
+    document={{ name: item.title, filename: entry.kind === 'assistant' ? 'SKILL.md' : '电商图文技能规则',
       source: item.prompt || '', body: item.prompt || '', overview: <div className="space-y-3 text-sm">
         <p>{item.description}</p><p>分类：{item.category}</p>
         {item.libraryVersion && <p>内容版本：{item.libraryVersion.slice(0, 12)}</p>}

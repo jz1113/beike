@@ -5,6 +5,7 @@ import { loadStoredProviders, type ApiProvider } from '../model/apiProviderTypes
 import { catalogRequestProtocol } from '../model/catalogRequestProtocol';
 import { parseRemoteModelFetch } from '../model/remoteModelFetch';
 import type { ModalityChannelOption, ModalityGlobalConfig } from '../model/modalityModelTypes';
+import { PROVIDER_CREDENTIALS_CHANGED_EVENT } from '../model/providerCredentialSync';
 
 export interface ModalityChannelLookup {
   name: string;
@@ -45,6 +46,12 @@ export function useModalityChannelCatalog(
   const channels = useMemo(() => buildChannels(globalConfig, providers), [globalConfig, providers]);
 
   const refreshChannels = useCallback(() => setProviders(loadStoredProviders()), []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.addEventListener(PROVIDER_CREDENTIALS_CHANGED_EVENT, refreshChannels);
+    return () => window.removeEventListener(PROVIDER_CREDENTIALS_CHANGED_EVENT, refreshChannels);
+  }, [refreshChannels]);
 
   useEffect(() => {
     if (selectedChannelId && !channels.some((channel) => channel.id === selectedChannelId)) {

@@ -14,7 +14,7 @@ interface Props {
 export function WorkshopFlowNavigation({ currentStage, busy, productCount, readyCount, resultCount, reasonForStage, onSelectStage }: Props) {
   const counts = [productCount ? `${productCount} 款商品` : '从这里开始', `${productCount} 款待确认`, `${readyCount}/${productCount} 款就绪`, `${resultCount} 张成图`];
   return (
-    <nav aria-label="电商工坊生产流程" className="shrink-0 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-8 dark:border-white/10 dark:bg-[#151619]/95">
+    <nav aria-label="电商图文生产流程" className="shrink-0 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-8 dark:border-white/10 dark:bg-[#151619]/95">
       <ol className="mx-auto grid w-full max-w-[1760px] grid-cols-4 gap-1 sm:gap-3">
         {workshopSteps.map(({ stage, title, description }, index) => {
           const active = currentStage === stage;

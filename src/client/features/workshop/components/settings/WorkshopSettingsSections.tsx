@@ -33,15 +33,15 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
     : '暂无可用四图母本，请到资产库导入并解构图组。';
   return <section className="space-y-3 py-5" aria-label="内容与素材">
     <h3 className="text-sm font-semibold">内容与素材</h3>
-    {hasRecipeChoice ? <label className={labelClass}>工坊技能
-      <select aria-label="工坊技能" value={selectedArchId} disabled={!hasRecipes} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
-        {!selectedArchId && <option value="" disabled>{hasRecipes ? '请选择工坊技能' : '暂无可用工坊技能'}</option>}
+    {hasRecipeChoice ? <label className={labelClass}>电商图文技能
+      <select aria-label="电商图文技能" value={selectedArchId} disabled={!hasRecipes} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
+        {!selectedArchId && <option value="" disabled>{hasRecipes ? '请选择电商图文技能' : '暂无可用电商图文技能'}</option>}
         {hasRecipes && <option value="auto">按参考图组应用类目技能</option>}
         {selectedArchId === '__category_skill__' && <option value="__category_skill__">按参考图组应用类目技能</option>}
         {manualRecipes.map(recipe => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}
       </select>
     </label> : hasRecipes && <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">类目技能随参考图组自动应用，无需单独选择。</p>}
-    {!hasRecipes && <p role="status" className="text-xs leading-5 text-amber-700 dark:text-amber-300">暂未加载到可用工坊技能。请在“素材与技能”检查类目技能，或在全局“技能”管理手动技能后重试。</p>}
+    {!hasRecipes && <p role="status" className="text-xs leading-5 text-amber-700 dark:text-amber-300">暂未加载到可用电商图文技能。请在“素材与技能”检查类目技能，或在全局“技能”管理手动技能后重试。</p>}
     {props.personaMode === 'none' && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">此历史批次启用了无人像限制，仅使用无人物图组。
       {props.setPersonaMode && <button type="button" className="font-semibold underline" onClick={() => props.setPersonaMode?.('asset_driven')}>改为跟随图组出镜范围</button>}
     </p>}

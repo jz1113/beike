@@ -24,7 +24,7 @@ export function KeywordReviewRecordDetails({ record, columns, onClose }: { recor
       <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="keyword-record-title" className="flex max-h-[min(780px,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl outline-none dark:bg-[#18191c]">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5 dark:border-white/10">
           <div className="min-w-0">
-            <h2 id="keyword-record-title" tabIndex={-1} data-dialog-initial-focus className="text-lg font-black leading-7 text-slate-950 outline-none dark:text-slate-100">关键词审核详情</h2>
+            <h2 id="keyword-record-title" tabIndex={-1} data-dialog-initial-focus className="text-lg font-black leading-7 text-slate-950 outline-none dark:text-slate-100">词包审核详情</h2>
             <p className="mt-1 break-words text-xs font-semibold text-slate-500 dark:text-slate-400">{record.sheetName} · 第 {record.rowNumber} 行 · {statusLabel}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="关闭详情" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><X className="h-5 w-5" /></button>

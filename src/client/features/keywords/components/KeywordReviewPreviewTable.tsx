@@ -52,7 +52,7 @@ export function KeywordReviewPreviewTable({ review, onSelect }: { review: Return
                     {(review.search || review.sheetFilter || review.categoryFilter || review.filter !== 'all') && <button type="button" onClick={() => { review.setSearch(''); review.setSheetFilter(''); review.setCategoryFilter(''); review.setFilter('all'); }} className="rounded-xl px-3 text-xs font-bold text-blue-700 hover:bg-blue-50">清空筛选</button>}
                   </div>
                 </div>
-                <div ref={scrollRef} tabIndex={0} role="region" aria-label="关键词审核结果表，可横向滚动" aria-busy={review.searchPending} className="max-h-[600px] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400">
+                <div ref={scrollRef} tabIndex={0} role="region" aria-label="词包审核结果表，可横向滚动" aria-busy={review.searchPending} className="max-h-[600px] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400">
                   <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-sm">
                     <colgroup><col className="w-[7%]" /><col className="w-[27%]" /><col className="w-[13%]" /><col className="w-[12%]" />{review.reviewMode === 'video' && <col className="w-[9%]" />}<col className={review.reviewMode === 'video' ? 'w-[16%]' : 'w-[25%]'} /><col className="w-[10%]" /><col className="w-[6%]" /></colgroup>
                     <thead className="sticky top-0 z-10 bg-slate-950 text-white">

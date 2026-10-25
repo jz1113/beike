@@ -3,6 +3,7 @@ import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
 import { classifyGenerationPollResult, imageGenBusinessError, isTransientPollError } from '@client/shared/api/generation/generationErrors';
 import { pollGenerationTask, pollSingleTaskResult, submitImageGenTask } from '@client/shared/api/generation/generationApi';
 import { sleepWhilePolling } from '@client/shared/api/generation/generationAbort';
+import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
 import { withSalesAbort } from './salesAbortSignal';
 import { SalesSubmitUncertainError, type SalesVideoLookup } from '../model/salesSubmitError';
 
@@ -12,6 +13,27 @@ export type { SalesVideoLookup };
 function normalizeSalesImageRef(url: string): string {
   const value = url.trim();
   return value.startsWith('//') ? `https:${value}` : value;
+}
+
+function recordSalesVideoUsage(input: {
+  taskId?: unknown;
+  localTaskId?: string;
+  modelId?: string;
+  duration?: number;
+  usage?: unknown;
+}) {
+  const taskId = typeof input.taskId === 'string' && input.taskId ? input.taskId : undefined;
+  const modelId = input.modelId?.trim();
+  if (!taskId && !input.localTaskId) return;
+  recordMediaTaskUsage({
+    taskId,
+    localTaskId: input.localTaskId,
+    modelId: modelId || 'doubao-seedance-2.5',
+    type: 'video',
+    mediaCount: 1,
+    duration: input.duration,
+    usage: input.usage,
+  });
 }
 
 export async function generateSalesReferenceFrame(input: {
@@ -58,7 +80,7 @@ export async function generateSalesShotVideo(input: {
   isAborted: () => boolean;
   onTaskId?: (taskId: string) => void;
 }): Promise<string> {
-  if (input.existingTaskId) return pollVideoTask(input.existingTaskId, input.videoModel, input.isAborted);
+  if (input.existingTaskId) return pollVideoTask(input.existingTaskId, input.videoModel, input.duration, input.isAborted);
   const listed = (input.referenceImages || []).map(normalizeSalesImageRef).filter(Boolean);
   const images = listed.length ? listed : (input.referenceImage ? [normalizeSalesImageRef(input.referenceImage)] : []);
   if (!images.length) throw new Error('这个镜头还没有参考图');
@@ -98,8 +120,28 @@ export async function lookupSalesVideoSubmission(key: string, model: string | un
   if (typeof error === 'string' && error.includes('尚未找到')) return { outcome: 'missing', error };
   if (!taskId) return { outcome: 'pending', error: error || '原视频提交结果待核实，请查询原任务；不会自动重新提交' };
   if (data.status === 'FAILURE') return { outcome: 'failed', taskId, error: error || '视频生成失败' };
-  if (data.status === 'SUCCESS' && url) return { outcome: 'done', taskId, url };
+  if (data.status === 'SUCCESS' && url) {
+    recordSalesVideoUsage({ taskId, modelId: model, usage: data.usage });
+    return { outcome: 'done', taskId, url };
+  }
   return { outcome: 'poll', taskId };
+}
+
+/** Attaches an upstream task ID verified in the provider console to an unconfirmed submission; never resubmits. */
+export async function bindSalesVideoTask(key: string, taskId: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await apiFetch('/api/generate/video/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskKey: key, taskId }),
+    });
+  } catch {
+    throw new Error('网络异常，任务 ID 未绑定，请稍后重试');
+  }
+  const data = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || !data || data.success === false) throw new Error(typeof data?.error === 'string' && data.error ? data.error : '任务 ID 绑定失败');
+  return typeof data.taskId === 'string' && data.taskId ? data.taskId : taskId;
 }
 
 async function submitSalesVideo(input: {
@@ -117,6 +159,7 @@ async function submitSalesVideo(input: {
 }): Promise<string> {
   assertVideoActive(input.isAborted);
   const model = input.model || 'doubao-seedance-2.5';
+  const localTaskId = input.submissionKey || `sales-video-${crypto.randomUUID()}`;
   for (const image of input.referenceImages) {
     if (!/^(https?:\/\/|\/storage\/)/.test(image)) throw imageGenBusinessError('参考图需要可访问的公网地址或本地存储地址，请重新生成素材后再提交');
   }
@@ -150,7 +193,14 @@ async function submitSalesVideo(input: {
     throw new SalesSubmitUncertainError();
   }
   const data = await res.json().catch(() => null);
-  if (data?.taskId) input.onTaskId?.(String(data.taskId));
+  if (data?.taskId) {
+    input.onTaskId?.(String(data.taskId));
+    if (res.ok && data.success !== false) {
+      recordSalesVideoUsage({ taskId: data.taskId, localTaskId, modelId: model, duration: input.duration, usage: data.usage });
+    }
+  } else if (res.ok && data?.status === 'SUCCESS' && data?.resultUrl) {
+    recordSalesVideoUsage({ localTaskId, modelId: model, duration: input.duration, usage: data.usage });
+  }
   if (res.status >= 500 || data?.submissionUnknown) throw new SalesSubmitUncertainError(typeof data?.error === 'string' ? data.error : undefined);
   if (!data) throw new SalesSubmitUncertainError();
   if (res.ok && data.status === 'SUCCESS' && data.resultUrl) return String(data.resultUrl);
@@ -160,16 +210,16 @@ async function submitSalesVideo(input: {
   }
   if (!data.taskId) throw new SalesSubmitUncertainError();
   const taskId = String(data.taskId);
-  return pollVideoTask(taskId, model, input.isAborted);
+  return pollVideoTask(taskId, model, input.duration, input.isAborted);
 }
 
-async function pollVideoTask(taskId: string, model: string | undefined, isAborted: () => boolean): Promise<string> {
+async function pollVideoTask(taskId: string, model: string | undefined, duration: number | undefined, isAborted: () => boolean): Promise<string> {
   const start = Date.now();
   while (Date.now() - start < 360000) {
     assertVideoActive(isAborted);
     try { await sleepWhilePolling(2000, isAborted); }
     catch (error) { assertVideoActive(isAborted); throw error; }
-    let data: { resultUrl?: unknown; failReason?: unknown; error?: unknown; status?: unknown };
+    let data: { resultUrl?: unknown; failReason?: unknown; error?: unknown; status?: unknown; usage?: unknown };
     try {
       data = await pollGenerationTask(taskId, 'video', model);
     } catch (err) {
@@ -179,7 +229,10 @@ async function pollVideoTask(taskId: string, model: string | undefined, isAborte
     }
     if (data?.status === 'QUERY_FAILED') continue;
     const outcome = classifyGenerationPollResult(data, { httpOk: true });
-    if (outcome === 'success') return String(data.resultUrl);
+    if (outcome === 'success') {
+      recordSalesVideoUsage({ taskId, modelId: model, duration, usage: data.usage });
+      return String(data.resultUrl);
+    }
     if (outcome === 'failure') throw imageGenBusinessError(typeof data.failReason === 'string' ? data.failReason : typeof data.error === 'string' ? data.error : '视频生成失败');
   }
   throw new Error('视频生成超时，请继续查询原任务，不要重新提交');

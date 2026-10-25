@@ -191,17 +191,24 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     baseUrl: 'https://api.deepseek.com', apiKey: deepSeekApiKey.trim(),
   }));
 
-  const handleSaveDeepSeekConfig = async () => {
-    const snapshot = { deepSeekApiKey: deepSeekApiKey.trim() };
-    await saves.save('deepseek_official', snapshot, () => persistDeepSeekConfig(snapshot.deepSeekApiKey), 'DeepSeek 独立凭证已保存');
+  const handleSaveDeepSeekConfig = async (notify = true, overrideApiKey?: string) => {
+    const snapshot = { deepSeekApiKey: (overrideApiKey ?? deepSeekApiKey).trim() };
+    const saved = await saves.save('deepseek_official', snapshot, () => persistDeepSeekConfig(snapshot.deepSeekApiKey), 'DeepSeek 独立凭证已保存', notify);
+    if (saved) setDeepSeekApiKey(snapshot.deepSeekApiKey);
+    return saved;
   };
 
   const handleTestWanbang = () => connectionChecks.run('wanbang_ecommerce', () => testWanbangConnection(wanbangKey, wanbangSecret));
 
   const handleSaveApiConfig = async (newUrl: string, newKey: string, notify = false) => {
     const snapshot = { baseUrl: newUrl.trim(), apiKey: newKey.trim() };
-    await saves.save('comfly_gateway', snapshot, () => persistAiGatewayConfig(snapshot.baseUrl, snapshot.apiKey),
+    const saved = await saves.save('comfly_gateway', snapshot, () => persistAiGatewayConfig(snapshot.baseUrl, snapshot.apiKey),
       snapshot.apiKey ? 'Comfly 网关配置已保存' : '已清空 API Key', notify);
+    if (saved) {
+      setBaseUrl(snapshot.baseUrl);
+      setApiKey(snapshot.apiKey);
+    }
+    return saved;
   };
 
   const handleSaveWanbangConfig = async () => {

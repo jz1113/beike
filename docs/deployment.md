@@ -35,7 +35,7 @@ sudo systemctl status beike --no-pager
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
-浏览器通过公网 IP 或域名访问，先通过 Nginx 网页认证，再检查工坊、素材库及当前工作区。官方种子来自 `src/shared/domain/prompts/masterRecipes.ts` 与 `src/shared/data/`，启动时同步，不能当作无引用文件删除。`pnpm seed:export` 会改写仓库种子，应按[种子导出](database.md#官方种子导出)明确选择数据源，不是每次部署必跑步骤。
+浏览器通过公网 IP 或域名访问，先通过 Nginx 网页认证，再检查电商图文、素材库及当前工作区。官方种子来自 `src/shared/domain/prompts/masterRecipes.ts` 与 `src/shared/data/`，启动时同步，不能当作无引用文件删除。`pnpm seed:export` 会改写仓库种子，应按[种子导出](database.md#官方种子导出)明确选择数据源，不是每次部署必跑步骤。
 
 ## HTTPS
 

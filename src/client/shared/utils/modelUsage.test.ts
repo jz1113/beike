@@ -62,4 +62,12 @@ describe('reported model usage', () => {
     expect(getUsageLogs()).toHaveLength(1);
     expect(getUsageSummary('today').imageCount).toBe(1);
   });
+
+  it('counts a video once across submission and completion receipts', () => {
+    installStorage();
+    recordMediaTaskUsage({ localTaskId: 'sales-video-1', taskId: 'video-1', modelId: 'wan3.0-video', type: 'video', mediaCount: 1, duration: 15 });
+    recordMediaTaskUsage({ taskId: 'video-1', modelId: 'wan3.0-video', type: 'video', mediaCount: 1, duration: 15 });
+    expect(getUsageLogs()).toHaveLength(1);
+    expect(getUsageSummary('today').videoCount).toBe(1);
+  });
 });

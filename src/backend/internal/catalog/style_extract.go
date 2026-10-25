@@ -103,7 +103,7 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 		body["thinking"] = map[string]any{"type": "disabled"}
 	}
 	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
-		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocol(ctx, model), Payload: body,
+		BaseURL: base, APIKey: key, Protocol: gateway.TextProtocolForBase(ctx, model, base), Payload: body,
 		Client: styleHTTP(), Timeout: 180 * time.Second,
 	})
 	if err != nil {

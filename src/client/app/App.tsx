@@ -227,7 +227,7 @@ export default function App() {
 
           {/* 🌟 3. 右侧主工作区 */}
           <div ref={mainContentRef} className="flex-1 min-w-0 flex flex-col h-full overflow-hidden group/main relative z-10 bg-transparent">
-            {/* 页面主视图：展馆首页 vs 生成工作区 vs 沉浸式买家秀工坊 vs 资产中心 vs 无限画布 */}
+            {/* 页面主视图：展馆首页 vs 生成工作区 vs 沉浸式电商图文 vs 资产中心 vs 无限画布 */}
             <main className="flex-1 min-w-0 overflow-hidden flex flex-col relative z-10 bg-transparent">
               <Suspense fallback={
                 <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
@@ -274,19 +274,19 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="keyword_review" currentView={pageView}>
-                  <AppErrorBoundary title="关键词审核异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                  <AppErrorBoundary title="词包异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <KeywordsStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="workshop" currentView={pageView}>
-                  <AppErrorBoundary title="电商工坊异常" resetLabel="重置工坊" onReset={() => { clearWorkshopStudioDraft(); useAppStore.getState().resetModeSession('storyboard_generate'); }}>
+                  <AppErrorBoundary title="电商图文异常" resetLabel="重置电商图文" onReset={() => { clearWorkshopStudioDraft(); useAppStore.getState().resetModeSession('storyboard_generate'); }}>
                     <WorkshopStudio onOpenSettings={navigateToSettings} AssetPromptLibraryComponent={AssetPromptLibrary} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="headline_poster" currentView={pageView}>
-                  <AppErrorBoundary title="封面生成异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                  <AppErrorBoundary title="封面异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <PosterStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
@@ -298,19 +298,19 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="ppt_generator" currentView={pageView}>
-                  <AppErrorBoundary title="PPT生成工坊异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                  <AppErrorBoundary title="PPT异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <PptStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
-                  <AppErrorBoundary title="带货视频异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <SalesStudio onBack={() => setCurrentView('home')} />
+                  <AppErrorBoundary title="电商视频异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <SalesStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="avatar" currentView={pageView}>
-                  <AppErrorBoundary title="数字人工作室异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                  <AppErrorBoundary title="数字人异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <AvatarStudioView onBackToHome={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>

@@ -47,7 +47,7 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 		result.UsedSubmitURL = endpoint
 		timeout := 20 * time.Second
 		if result.EndpointAttempts == 1 {
-			timeout = 60 * time.Second
+			timeout = 180 * time.Second
 		}
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
 		status, data, err := postJSON(attemptCtx, client, endpoint, command)

@@ -130,7 +130,7 @@ func keywordTransportError(err error) string {
 	if strings.Contains(message, "private ip") || strings.Contains(message, "host not allowed") {
 		return "模型网关地址不可用"
 	}
-	return "关键词审核失败"
+	return "词包审核失败"
 }
 
 func loadKeywordRules(cfg config.Config, r *http.Request, version *int) ([]reviewsvc.RuleEntry, int, map[string]any) {
@@ -139,12 +139,12 @@ func loadKeywordRules(cfg config.Config, r *http.Request, version *int) ([]revie
 	}
 	db, err := httpx.OpenDB(cfg)
 	if err != nil {
-		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "关键词审核失败"}
+		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "词包审核失败"}
 	}
 	defer db.Close()
 	current, history, err := database.ListKeywordRules(r.Context(), db, httpx.WorkspaceFrom(r))
 	if err != nil {
-		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "关键词审核失败"}
+		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "词包审核失败"}
 	}
 	chosen := current
 	if version != nil {
@@ -174,7 +174,7 @@ func keywordCredentials(cfg config.Config, r *http.Request, provider, model, bas
 		}
 		baseURL = system.NormalizeGatewayBaseURL(baseURL)
 		if baseURL != keywordDeepSeekBaseURL {
-			return "", "", http.StatusBadRequest, "关键词审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"
+			return "", "", http.StatusBadRequest, "词包审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"
 		}
 		apiKey = strings.TrimSpace(apiKey)
 		if apiKey == "" {

@@ -19,13 +19,13 @@ export function ToolSuiteMark({
 }
 
 /**
- * 种草工坊 (Buyer Show Workshop) 品牌标志
+ * 电商图文 (Buyer Show Workshop) 品牌标志
  */
 export function GrassWorkshopIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <img 
       src="/brand/workshop_icon.png" 
-      alt="种草工坊" 
+      alt="电商图文"
       draggable={false}
       className={`${className} object-contain flex-shrink-0 select-none pointer-events-none`}
     />

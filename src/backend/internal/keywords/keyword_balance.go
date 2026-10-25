@@ -36,7 +36,7 @@ func keywordBalance(r *http.Request, fetch balanceFetch) (int, map[string]any) {
 	}
 	baseURL = system.NormalizeGatewayBaseURL(baseURL)
 	if baseURL != keywordDeepSeekBaseURL {
-		return http.StatusBadRequest, map[string]any{"success": false, "error": "关键词审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"}
+		return http.StatusBadRequest, map[string]any{"success": false, "error": "词包审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"}
 	}
 	apiKey = strings.TrimSpace(apiKey)
 	if apiKey == "" {

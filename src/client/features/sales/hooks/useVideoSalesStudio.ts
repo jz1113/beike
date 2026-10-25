@@ -14,7 +14,7 @@ import { uploadSalesImages } from '../api/uploadSalesImages';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { collectEcommerceProduct } from '../api/collectProduct';
 import { composeSalesVideo, analyzeProductMedia, generateSalesScripts, selectSalesImages } from '../api/videoSalesApi';
-import { generateSalesReferenceFrame, generateSalesShotVideo, lookupSalesVideoSubmission } from '../api/salesMediaApi';
+import { bindSalesVideoTask, generateSalesReferenceFrame, generateSalesShotVideo, lookupSalesVideoSubmission } from '../api/salesMediaApi';
 import { buildSalesPlan, type SalesPlanPhase } from '../model/buildSalesPlan';
 import { executeSalesRender } from '../model/executeSalesRender';
 import { parseProductLink } from '../model/productLink';
@@ -346,6 +346,22 @@ export function useVideoSalesStudio() {
     return true;
   }, [commit]);
 
+  const bindVideoTask = useCallback(async (taskId: string) => {
+    if (!salesJobAllowed(busyRef.current, 'render')) return '当前有任务进行中，请稍后再试';
+    const script = stateRef.current.scripts[stateRef.current.selectedScriptIndex];
+    const key = script?.renderSubmissionKey;
+    if (!script || !key || script.renderStatus !== 'uncertain' || script.renderTaskId) return '当前记录无需绑定任务 ID';
+    try {
+      const bound = await bindSalesVideoTask(key, taskId.trim());
+      commit((previous) => ({ ...previous, scripts: previous.scripts.map((item) => item.id === script.id ? { ...item, renderStatus: 'generating', renderTaskId: bound, renderError: undefined } : item) }));
+      setError(null);
+      void runRender({ resumeOnly: true });
+      return null;
+    } catch (err) {
+      return err instanceof Error ? err.message : '任务 ID 绑定失败';
+    }
+  }, [commit, runRender]);
+
   const resetProject = useCallback(async () => {
     const allowed = () => salesJobAllowed(busyRef.current, 'collect') && hasSalesProductContent(stateRef.current);
     if (resetPendingRef.current || !allowed()) return false;
@@ -367,13 +383,16 @@ export function useVideoSalesStudio() {
     }
   }, [commit]);
 
+  const clearError = useCallback(() => setError(null), []);
+
   return {
     state, updateState, ...stages,
     videoError: salesSingleVideoError(state, state.scripts[state.selectedScriptIndex]),
     videoSubmitError: salesSingleVideoError(state, state.scripts[state.selectedScriptIndex], true),
     isCollecting, isUploading, isPlanning, planPhase, isRendering, renderPhase, error,
     runProductCollect, addProductImages, markImageUnavailable, editShot, editFullPrompt,
-    runPlan, runRender, stopRender, resetProject, prepareVideoRetry,
+    runPlan, runRender, stopRender, resetProject, prepareVideoRetry, bindVideoTask,
+    clearError,
     stopWork: () => { planAbortRef.current?.abort(); uploadAbortRef.current?.abort(); collectAbortRef.current?.abort(); stages.stopAssets(); renderAbortRef.current?.abort(); },
   };
 }

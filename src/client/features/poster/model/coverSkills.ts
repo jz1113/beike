@@ -24,7 +24,7 @@ export function coverSkillMemoryStatus(adoptedCount: number, pendingCount: numbe
 export const COVER_SKILLS: CoverSkill[] = [
   {
     id: 'generate',
-    title: '封面生成',
+    title: '封面',
     summary: '一次画出商品、背景和标题。纠正优先于样张。',
     appliesWhen: '有商品图和标题时',
     input: '商品图和标题',

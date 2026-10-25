@@ -27,7 +27,7 @@ export function librarySkillItem(entry: SkillLibraryEntry): SkillItem {
       category,
       genres: ['图片'],
       showcaseUrls: workshopSamples(skill.sampleImages),
-      badge: skill.isOfficial ? '官方 · 工坊' : '工坊',
+      badge: skill.isOfficial ? '官方 · 电商图文' : '电商图文',
       isOfficial: skill.isOfficial,
       coverUrl: skill.coverUrl || undefined,
       prompt: skill.promptSnippet,

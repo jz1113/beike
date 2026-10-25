@@ -31,7 +31,7 @@ export function toolDisplayName(name: string): string {
     case 'workspace_navigate':
       return '调度工作台视图';
     case 'workspace_load_workshop_product':
-      return '载入种草工坊';
+      return '载入电商图文';
     case 'trigger_generate':
       return '准备生图';
     case 'trigger_generate_batch':

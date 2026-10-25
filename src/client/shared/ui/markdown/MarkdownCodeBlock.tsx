@@ -16,12 +16,14 @@ export default function MarkdownCodeBlock({
   incomplete = false,
   action,
   preamble,
+  renderedCode,
 }: {
   code: string;
   lang?: string;
   incomplete?: boolean;
   action?: ReactNode;
   preamble?: ReactNode;
+  renderedCode?: ReactNode;
 }) {
   const [wrap, setWrap] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -82,7 +84,7 @@ export default function MarkdownCodeBlock({
       {copyError ? <p role="alert" className="px-3 py-1.5 text-[11px] text-rose-600 dark:text-rose-400">{copyError}</p> : null}
       {preamble}
       <pre className={`px-3 py-2 font-mono text-[11.5px] leading-6 text-slate-800 select-text dark:text-slate-100 ${wrap ? 'break-words whitespace-pre-wrap' : 'overflow-x-auto whitespace-pre'}`}>
-        <code>{code}</code>
+        <code>{renderedCode ?? code}</code>
       </pre>
     </div>
   );

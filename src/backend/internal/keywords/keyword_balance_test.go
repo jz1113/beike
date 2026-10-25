@@ -17,7 +17,7 @@ func TestKeywordBalanceValidation(t *testing.T) {
 	}{
 		{body: "", status: http.StatusBadRequest, error: "请求数据格式异常"},
 		{body: "[]", status: http.StatusBadRequest, error: "Expected object, received array"},
-		{body: `{"customBaseUrl":"https://example.com","customApiKey":"key"}`, status: http.StatusBadRequest, error: "关键词审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"},
+		{body: `{"customBaseUrl":"https://example.com","customApiKey":"key"}`, status: http.StatusBadRequest, error: "词包审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"},
 		{body: `{"customBaseUrl":"https://api.deepseek.com/v1/"}`, status: http.StatusBadRequest, error: "未配置 DeepSeek API Key，请到设置里的 DeepSeek 官方服务填写"},
 		{body: `{"customApiKey":true}`, status: http.StatusBadRequest, error: "customApiKey: Expected string, received boolean"},
 	}

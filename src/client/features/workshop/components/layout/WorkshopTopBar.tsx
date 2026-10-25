@@ -16,12 +16,12 @@ export function WorkshopTopBar({ assetToolbarRef, activeTab, onSelectTab }: Work
   const setCurrentView = useAppStore((s) => s.setCurrentView);
   const setIsWorkshopConfigOpen = useAppStore((s) => s.setIsWorkshopConfigOpen);
   const { actions } = useWorkshopDockActions();
-  const studioTitle = '电商工坊';
+  const studioTitle = '电商图文';
   return (
     <header
       className="relative z-30 flex w-full shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200/60 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 dark:border-white/10 dark:bg-[#151619]/95"
     >
-      {/* 左上角：工坊入口 */}
+      {/* 左上角：电商图文入口 */}
       <button
         type="button"
         onClick={() => setCurrentView('home')}

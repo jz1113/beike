@@ -66,11 +66,11 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-slate-900 dark:text-slate-100">
       <header className="relative z-20 flex min-h-[72px] shrink-0 flex-wrap items-center justify-between py-3 gap-3 px-4 sm:px-6 lg:px-8">
-        <button type="button" onClick={onBack} aria-label="关键词审核，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#26262B] text-slate-900 dark:text-white">
+        <button type="button" onClick={onBack} aria-label="词包，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-slate-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#26262B] text-slate-900 dark:text-white">
           <ToolSuiteMark>
             <FilePen className="h-4 w-4 stroke-[2]" />
           </ToolSuiteMark>
-          <span className="text-sm font-black tracking-tight">关键词审核</span>
+          <span className="text-sm font-black tracking-tight">词包</span>
         </button>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <button type="button" onClick={() => setShowRules(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-bold text-slate-600 dark:text-slate-300 shadow-sm transition hover:border-amber-300 dark:hover:border-amber-400/50 hover:bg-white dark:hover:bg-[#26262B] hover:text-slate-950 dark:hover:text-white">
@@ -108,7 +108,7 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
         <div className="mx-auto w-full max-w-[1680px] space-y-5">
           <KeywordReviewRecoveryStatus saving={review.sessionLoading || review.sessionSaving} savedAt={review.sessionSavedAt} error={review.sessionError} hasTask={Boolean(review.parsed)} disableRetry={review.isRunning || review.isPreparing || review.isImporting || review.isExporting} onRetry={() => void review.retrySessionSave()} onDiscard={review.sessionCanClear ? review.reset : undefined} />
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <div role="group" aria-label="关键词审核类型" className="inline-flex rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 p-1">
+            <div role="group" aria-label="词包审核类型" className="inline-flex rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 p-1">
               {(['image', 'video'] as const).map((mode) => <button key={mode} type="button" aria-pressed={review.reviewMode === mode} disabled={!review.canSwitchMode} onClick={() => void review.selectReviewMode(mode)} className={`rounded-xl px-5 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${review.reviewMode === mode ? 'bg-slate-950 dark:bg-white text-white dark:text-slate-950 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10 hover:text-slate-950 dark:hover:text-white disabled:opacity-50'}`}>{mode === 'image' ? '图文关键词' : '视频关键词'}</button>)}
             </div>
             {review.parsed && <span className="text-xs text-slate-500 dark:text-slate-400">{review.isRunning || review.isPreparing ? '审核进行中，暂不可切换类型' : review.counts.done > 0 ? '已有审核结果；请先导出进度，再点击“换表”切换类型' : !review.canSwitchMode ? '本次已有审核尝试；请先处理当前任务，或点击“换表”后切换类型' : '尚未审核，可直接切换类型'}</span>}
@@ -117,7 +117,7 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
             <section className="mx-auto max-w-[980px] pt-8 sm:pt-14">
               <div className="mb-7 text-center">
                 <p className="text-xs font-black tracking-[0.22em] text-amber-600">SEMANTIC REVIEW</p>
-                <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 dark:text-white sm:text-5xl">{review.reviewMode === 'video' ? '视频关键词审核' : '图文关键词审核'}</h1>
+                <h1 className="mt-3 text-3xl font-black tracking-[-0.035em] text-slate-950 dark:text-white sm:text-5xl">{review.reviewMode === 'video' ? '视频词包审核' : '图文词包审核'}</h1>
                 <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500 dark:text-slate-400 sm:text-base">{review.reviewMode === 'video'
                   ? `保留视频词包原始内容，逐行判断最终垂类、是否可制作及低价值标记。先试跑 ${review.trialSize} 条，查看结果后再批量审核。`
                   : `逐行判断图文关键词的最终垂类和制作价值，并给出具体依据。先试跑 ${review.trialSize} 条，查看结果后再批量审核、导出结果。`}审核模型可在右上角切换。</p>
@@ -188,7 +188,7 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
                 {(review.tokenUsage.cacheHit + review.tokenUsage.cacheMiss + review.tokenUsage.completion) > 0 && <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">{review.usageProvider === 'deepseek' ? `本轮估算费用 ¥${review.estimatedCostLabel}（仅供参考，以官方账单为准） · ` : '本轮用量（费用以所选网关账单为准） · '}缓存命中 {review.tokenUsage.cacheHit}、未命中 {review.tokenUsage.cacheMiss}、输出 {review.tokenUsage.completion} token。</p>}
                 {review.reviewMode === 'video' && <p className="mt-1 text-xs font-semibold text-rose-700">已标记低价值关键词 {review.counts.lowValue} 条；原表“分类”保留，新增“最终垂类”和“低价值关键词”结果列。</p>}
                 {review.counts.uncertain > 0 && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{review.counts.uncertain} 条提交结果待核对：已隔离，避免重复扣费。请导出当前进度并核对所用模型的用量。</p>}
-                <div role="progressbar" aria-label="关键词审核完成进度" aria-valuemin={0} aria-valuemax={review.counts.total} aria-valuenow={review.counts.done} aria-valuetext={`已完成 ${review.counts.done} / ${review.counts.total} 条`} className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div role="progressbar" aria-label="词包审核完成进度" aria-valuemin={0} aria-valuemax={review.counts.total} aria-valuenow={review.counts.done} aria-valuetext={`已完成 ${review.counts.done} / ${review.counts.total} 条`} className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><span role="status" aria-live="polite">{review.notice || '等待试跑'}</span><span className="shrink-0 tabular-nums">{review.counts.done} / {review.counts.total} · {progress}%</span></div>

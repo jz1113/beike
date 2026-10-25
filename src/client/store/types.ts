@@ -158,7 +158,7 @@ export interface WorkshopSlice {
   /** 原创生成模式独立会话缓存 */
   originalSessionCache: WorkshopModeSession;
   currentStep: number;
-  /** 种草工坊批次阶段，与 URL ?step= 同步。 */
+  /** 电商图文批次阶段，与 URL ?step= 同步。 */
   batchStage: number;
   product: ProductWidgetData | ProductData | null;
   images: ProductImage[];
@@ -199,7 +199,7 @@ export interface WorkshopSlice {
   originalAnchorFaceImageUrl?: string;
   originalIsAnchorFaceConfirmed: boolean;
   socialPromptSourceKey: string;
-  /** 提示词库「载入分镜」→ 批量工坊的一次性桥接载荷 */
+  /** 提示词库「载入分镜」→ 电商图文的一次性桥接载荷 */
   pendingBatchPromptImport: {
     productTitle?: string;
     productFingerprint?: string;
@@ -208,11 +208,11 @@ export interface WorkshopSlice {
     referenceImages?: string[];
     masterImageIndex?: number;
   } | null;
-  /** 资产中心/配方库载入后跳转批量工坊阶段（1–4），消费后清空 */
+  /** 资产中心/配方库载入后跳转电商图文阶段（1–4），消费后清空 */
   pendingBatchStage: number | null;
   /** 首页入口的一次性意图，不持久化；刷新仍恢复活跃批次。 */
   pendingFreshWorkshopEntry: boolean;
-  /** 资产中心「应用」一键桥接锁定到批量工坊原子资产（置景/穿搭/人设），消费后清空 */
+  /** 资产中心「应用」一键桥接锁定到电商图文原子资产（置景/穿搭/人设），消费后清空 */
   pendingBatchLockedAssets: {
     sceneId?: string;
     outfitId?: string;

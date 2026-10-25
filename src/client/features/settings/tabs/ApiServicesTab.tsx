@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SettingsConnectionContext } from '../components/SettingsControls';
 import { ApiServicesWanbangPanel } from '../components/vendors/ApiServicesWanbangPanel';
 import { ApiServicesApiaPanel } from '../components/vendors/ApiServicesApiaPanel';
@@ -10,7 +10,26 @@ import { AddProviderModal } from '../components/providers/AddProviderModal';
 import { serviceStatuses } from '../model/serviceStatuses';
 import { SERVICE_STATUS_COLORS } from '../components/vendors/ApiServicesNavList';
 import { useApiProviders } from '../hooks/useApiProviders';
+import { loadStoredProviders } from '../model/apiProviderTypes';
+import {
+  hasModalityGlobalConfigManualOverride,
+  loadStoredModalityGlobalConfig,
+} from '../model/modalityModelStorage';
+import {
+  canonicalProviderId,
+  loadSavedProviderCredentialSnapshots,
+  propagateProviderCredentials,
+  rememberSavedProviderCredentials,
+} from '../model/providerCredentialSync';
 import type { ApiServicesTabProps } from './apiServicesTabTypes';
+
+function initialProviderCredentialSnapshots(): Record<string, { baseUrl: string; apiKey: string }> {
+  const remembered = loadSavedProviderCredentialSnapshots();
+  return Object.fromEntries(loadStoredProviders().map(provider => [provider.id, remembered[provider.id] || {
+    baseUrl: provider.baseUrl,
+    apiKey: provider.apiKey,
+  }]));
+}
 
 export default function ApiServicesTab({
   config: c,
@@ -24,6 +43,7 @@ export default function ApiServicesTab({
 }: ApiServicesTabProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSavingProvider, setIsSavingProvider] = useState(false);
+  const savedProviderCredentialsRef = useRef<Record<string, { baseUrl: string; apiKey: string }>>(initialProviderCredentialSnapshots());
 
   const {
     providers,
@@ -73,21 +93,46 @@ export default function ApiServicesTab({
     if (!currentProvider) return;
     setIsSavingProvider(true);
     try {
+      const currentCredentials = {
+        baseUrl: currentProvider.baseUrl.trim(),
+        apiKey: currentProvider.apiKey.trim(),
+      };
+      const canonicalId = canonicalProviderId(currentProvider.id);
+      const previousCredentials = canonicalId === 'comfly_gateway'
+        ? { baseUrl: c.gatewaySavedConfig?.baseUrl ?? c.baseUrl, apiKey: c.gatewaySavedConfig?.apiKey ?? c.apiKey }
+        : canonicalId === 'openai_official'
+          ? { baseUrl: c.openAIBaseUrl, apiKey: c.openAIApiKey }
+          : canonicalId === 'deepseek_official'
+            ? { baseUrl: 'https://api.deepseek.com', apiKey: c.deepSeekApiKey }
+            : canonicalId === 'lianchi_images'
+              ? { baseUrl: '', apiKey: c.lianchiApiKey }
+              : savedProviderCredentialsRef.current[currentProvider.id] || { baseUrl: '', apiKey: '' };
+      const legacyGlobalConfig = loadStoredModalityGlobalConfig();
+      const migrationPreviousCredentials = canonicalId === 'comfly_gateway'
+        && !hasModalityGlobalConfigManualOverride()
+        && (legacyGlobalConfig.apiKey.trim() !== currentCredentials.apiKey
+          || legacyGlobalConfig.baseUrl.trim().replace(/\/+$/, '').toLowerCase()
+            !== currentCredentials.baseUrl.replace(/\/+$/, '').toLowerCase())
+        ? { baseUrl: legacyGlobalConfig.baseUrl, apiKey: legacyGlobalConfig.apiKey }
+        : previousCredentials;
+      let saved = true;
       // 同步到对应底层配置
-      if (currentProvider.id === 'comfly_gateway') {
-        await c.handleSaveApiConfig(currentProvider.baseUrl, currentProvider.apiKey, true);
-      } else if (currentProvider.id === 'openai_official') {
-        c.setOpenAIBaseUrl(currentProvider.baseUrl);
-        c.setOpenAIApiKey(currentProvider.apiKey);
-        await c.handleSaveOpenAIConfig();
-      } else if (currentProvider.id === 'deepseek_official') {
-        c.setDeepSeekApiKey(currentProvider.apiKey);
-        await c.handleSaveDeepSeekConfig();
-      } else if (currentProvider.id === 'lianchi_images') {
-        c.setLianchiApiKey(currentProvider.apiKey);
-        await c.handleSaveLianchiConfig();
+      if (canonicalId === 'comfly_gateway') {
+        saved = await c.handleSaveApiConfig(currentCredentials.baseUrl, currentCredentials.apiKey, false);
+      } else if (canonicalId === 'openai_official') {
+        saved = await c.handleSaveOpenAIConfig(false, currentCredentials);
+      } else if (canonicalId === 'deepseek_official') {
+        saved = await c.handleSaveDeepSeekConfig(false, currentCredentials.apiKey);
+      } else if (canonicalId === 'lianchi_images') {
+        saved = await c.handleSaveLianchiConfig(false, currentCredentials.apiKey);
       }
-      showToast(`「${currentProvider.name}」配置已保存`);
+      if (!saved) return;
+      const result = propagateProviderCredentials(currentProvider.id, migrationPreviousCredentials, currentCredentials);
+      savedProviderCredentialsRef.current[currentProvider.id] = currentCredentials;
+      rememberSavedProviderCredentials(currentProvider.id, currentCredentials);
+      showToast(result.updated > 0
+        ? `「${currentProvider.name}」已保存，已同步 ${result.updated} 处模型凭证`
+        : `「${currentProvider.name}」配置已保存`);
     } catch {
       showToast(`保存「${currentProvider.name}」配置失败`);
     } finally {

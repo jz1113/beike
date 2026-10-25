@@ -84,7 +84,7 @@ export function KeywordReviewRulesDialog({ open, onClose, mode }: Props) {
               <BookOpen className="h-4 w-4 text-amber-600" />
             </span>
             <div>
-              <h2 id="keyword-review-rules-title" tabIndex={-1} data-dialog-initial-focus className="text-sm font-black tracking-tight outline-none">{mode === 'video' ? '视频关键词审核规则' : '图文关键词审核规则'}</h2>
+              <h2 id="keyword-review-rules-title" tabIndex={-1} data-dialog-initial-focus className="text-sm font-black tracking-tight outline-none">{mode === 'video' ? '视频词包审核规则' : '图文词包审核规则'}</h2>
               <p id="keyword-review-rules-description" className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{mode === 'video' ? '保留视频原表全部列，新增最终垂类、制作判断与低价值标记' : '保留原表头；空的「实体拓展q」「分类」不进入结果表；审核列接在「下发时间」后面'}</p>
             </div>
           </div>

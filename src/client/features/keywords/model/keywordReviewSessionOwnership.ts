@@ -22,7 +22,7 @@ export function createKeywordReviewSessionOwnership(scope: string) {
     acquiring = new Promise<void>((resolve, reject) => {
       lockLifetime = navigator.locks.request(`beike-keyword-review:${scope}`, { ifAvailable: true }, async (lock) => {
         if (!lock) {
-          reject(new KeywordReviewOwnershipError('此工作区的关键词审核已在另一页面打开，请关闭该页面后重试'));
+          reject(new KeywordReviewOwnershipError('此工作区的词包审核已在另一页面打开，请关闭该页面后重试'));
           return;
         }
         held = true;
@@ -34,7 +34,7 @@ export function createKeywordReviewSessionOwnership(scope: string) {
       void lockLifetime.catch((error) => {
         held = false;
         releaseLock = null;
-        reject(error instanceof Error ? error : new KeywordReviewOwnershipError('无法取得关键词审核任务的页面保护锁'));
+        reject(error instanceof Error ? error : new KeywordReviewOwnershipError('无法取得词包审核任务的页面保护锁'));
       });
     }).finally(() => { acquiring = null; });
     return acquiring;

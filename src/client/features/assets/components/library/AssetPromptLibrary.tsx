@@ -176,7 +176,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     openDetailItem,
   } = useAssetDetail({ activeSubTab });
 
-  // 资产增删改查与工坊联动
+  // 资产增删改查与电商图文联动
   const {
     editingItem,
     setEditingItem,

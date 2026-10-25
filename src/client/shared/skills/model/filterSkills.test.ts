@@ -6,7 +6,7 @@ const items: SkillItem[] = [
   { id: 'assistant:official', title: '历史脚本', description: '金榜题名', models: '', category: '一镜到底', presentation: 'creation', runtime: 'assistant', isOfficial: true, genres: ['视频'], tags: ['第一人称'] },
   { id: 'assistant:custom', title: '人物脚本', description: '连贯动作', models: 'Model-Video', category: '一镜到底', presentation: 'creation', runtime: 'assistant', author: '作者', tags: ['POV'] },
   { id: 'workshop:custom', title: '母本换品', description: '换品', models: '', category: '商品摄影', presentation: 'creation', runtime: 'workshop' },
-  { id: 'assistant:agent', title: '关键词审核', description: '逐行判断', models: '', category: '数据审核', presentation: 'agent', runtime: 'assistant', isOfficial: true },
+  { id: 'assistant:agent', title: '词包审核', description: '逐行判断', models: '', category: '数据审核', presentation: 'agent', runtime: 'assistant', isOfficial: true },
 ];
 const filters: SkillFilters = { presentation: 'creation', runtime: 'all', scope: 'all', category: '全部', query: '' };
 const favorites = new Set(['assistant:official', 'assistant:agent']);

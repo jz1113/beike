@@ -870,6 +870,24 @@ paths:
                           type: integer
                         reason:
                           type: string
+  /api/generate/video/bind:
+    post:
+      operationId: post_api_generate_video_bind
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskKey, taskId]
+              properties:
+                taskKey:
+                  type: string
+                taskId:
+                  type: string
+      responses:
+        '200':
+          description: 仅为提交结果未确认且无上游任务 ID 的记录绑定人工核对到的任务 ID，不重新提交
   /api/health:
     get:
       operationId: get_api_health

@@ -152,6 +152,7 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/image-batch", true, generate.ImageBatch(cfg)},
 		{"POST /api/generate/video", true, generate.Video(cfg)},
 		{"GET /api/generate/video", true, generate.Video(cfg)},
+		{"POST /api/generate/video/bind", true, generate.VideoBind(cfg)},
 		{"POST /api/generate/audio", true, generate.Audio(cfg)},
 		{"GET /api/generate/audio", true, generate.Audio(cfg)},
 		{"POST /api/generate/depth-image", true, depth.DepthImage(cfg)},

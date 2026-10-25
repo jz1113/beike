@@ -137,7 +137,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
   if (!workspaceReady) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8" role={workspaceError ? 'alert' : 'status'}>
-        <p>{workspaceError || '正在准备工坊批次，请稍候…'}</p>
+        <p>{workspaceError || '正在准备电商图文批次，请稍候…'}</p>
         {workspaceError && <button type="button" onClick={() => void reloadWorkspace()} className="rounded-lg border px-4 py-2">重新加载</button>}
       </div>
     );
@@ -280,7 +280,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         setGalleryIndex={setGalleryIndex}
         handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
       />
-      {/* 🌟 种草工坊全局生产预设中心模态框 */}
+      {/* 🌟 电商图文全局生产预设中心模态框 */}
       <BatchWorkshopSettings
         runner={runner}
         isOpen={isWorkshopConfigOpen}

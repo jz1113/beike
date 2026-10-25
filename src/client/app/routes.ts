@@ -58,6 +58,6 @@ export function syncViewToUrl(view: AppView, extra?: Record<string, string>) {
 
 /**
  * TanStack Router 评估结论（Phase 4）：
- * - 当前 4 个顶栏视图 + 工坊 step 深链，用 `routes.ts` + `viewSlice` 已足够。
- * - 若未来需要嵌套路由（资产中心多 tab、工坊 5 步独立 URL），再引入 TanStack Router。
+ * - 当前 4 个顶栏视图 + 电商图文 step 深链，用 `routes.ts` + `viewSlice` 已足够。
+ * - 若未来需要嵌套路由（资产中心多 tab、电商图文 5 步独立 URL），再引入 TanStack Router。
  */

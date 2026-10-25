@@ -15,9 +15,9 @@ export async function fetchRecipes(): Promise<WorkshopRecipeSummary[]> {
   let pages = 1;
   for (let page = 1; page <= pages; page++) {
     const res = await apiRequest('GET', '/api/catalog/styles', { search: `page=${page}&pageSize=${pageSize}` });
-    if (!res.ok) throw new Error('工坊技能加载失败');
+    if (!res.ok) throw new Error('电商图文技能加载失败');
     const data = await res.json();
-    if (!data.success || !Array.isArray(data.recipes)) throw new Error('工坊技能响应无效');
+    if (!data.success || !Array.isArray(data.recipes)) throw new Error('电商图文技能响应无效');
     if (page === 1 && Number.isInteger(data.total) && data.total > 0) pages = Math.ceil(data.total / pageSize);
     if (page === 1 && data.categorySkillBase) recipes.push(data.categorySkillBase);
     recipes.push(...data.recipes);

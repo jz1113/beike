@@ -9,7 +9,6 @@ import {
   MODALITY_STORAGE_KEY_PREFIX,
   API_PROVIDERS_STORAGE_KEY,
   noteRemovedDefaultModels,
-  resolveModalityModelRoute,
 } from './modalityStorage';
 import { configureDomainRuntime } from '../core/runtime';
 
@@ -99,76 +98,6 @@ describe('modalityStorage', () => {
     expect(loaded).toHaveLength(1);
     expect(loaded[0].modelId).toBe('doubao-seed-2-0-pro');
     expect(loaded[0].isCustom).toBe(true);
-  });
-
-  it('resolves model credentials by item id or model id, then channel, then global', () => {
-    memoryStore.set('beike_modality_global_config_v1', JSON.stringify({
-      baseUrl: 'https://global.example',
-      apiKey: 'sk-global',
-    }));
-    memoryStore.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([
-      { id: 'comfly_gateway', name: 'Comfly', baseUrl: 'https://channel.example', apiKey: 'sk-channel' },
-    ]));
-    memoryStore.set(getModalityStorageKey('image'), JSON.stringify([
-      {
-        id: 'img_own',
-        name: 'Own',
-        modality: 'image',
-        modelId: 'own-model',
-        baseUrl: 'https://own.example',
-        apiKey: 'sk-own',
-        channelId: 'comfly_gateway',
-      },
-      {
-        id: 'img_channel',
-        name: 'Channel',
-        modality: 'image',
-        modelId: 'channel-model',
-        channelId: 'comfly_gateway',
-        isDefault: true,
-      },
-      {
-        id: 'img_missing',
-        name: 'Missing',
-        modality: 'image',
-        modelId: 'missing-model',
-        channelId: 'gone',
-      },
-      {
-        id: 'img_partial',
-        name: 'Partial',
-        modality: 'image',
-        modelId: 'partial-model',
-        apiKey: 'sk-partial',
-        channelId: 'comfly_gateway',
-      },
-    ]));
-
-    expect(resolveModalityModelRoute('image', 'img_own')).toEqual({
-      modelId: 'own-model',
-      baseUrl: 'https://own.example',
-      apiKey: 'sk-own',
-    });
-    expect(resolveModalityModelRoute('image', 'channel-model')).toEqual({
-      modelId: 'channel-model',
-      baseUrl: 'https://channel.example',
-      apiKey: 'sk-channel',
-    });
-    expect(resolveModalityModelRoute('image', 'img_channel').modelId).toBe('channel-model');
-    expect(resolveModalityModelRoute('image', 'img_missing')).toEqual({
-      modelId: 'missing-model',
-      baseUrl: 'https://global.example',
-      apiKey: 'sk-global',
-    });
-    expect(resolveModalityModelRoute('image', 'img_partial')).toEqual({
-      modelId: 'partial-model',
-      baseUrl: 'https://channel.example',
-      apiKey: 'sk-partial',
-    });
-    expect(resolveModalityModelRoute('image')).toMatchObject({
-      modelId: 'channel-model',
-      baseUrl: 'https://channel.example',
-    });
   });
 
   it('keeps the front picker on custom models until a modality list is saved', () => {

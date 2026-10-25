@@ -67,7 +67,7 @@ export function executeClientToolAction(
         platform: String(product.platform || 'local'), price: typeof product.price === 'number' ? product.price : String(product.price || ''),
         picUrl: typeof product.picUrl === 'string' ? product.picUrl : imageGroups.main[0] }, imageGroups, '🤖 AI 助手载入');
       store.setStep(2);
-      showToast(String(action.message || '已装载至电商工坊'));
+      showToast(String(action.message || '已装载至电商图文'));
       break;
     }
     case 'trigger_generate': {

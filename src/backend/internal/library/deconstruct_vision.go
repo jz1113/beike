@@ -28,7 +28,7 @@ func callDeconstructVision(ctx context.Context, baseURL, apiKey, model string, i
 		"max_tokens":      8192,
 		"response_format": map[string]any{"type": "json_object"},
 	}
-	req := gateway.TextRequest{BaseURL: baseURL, APIKey: apiKey, Protocol: gateway.TextProtocol(ctx, model), Payload: body, Client: http.DefaultClient, Timeout: 240 * time.Second}
+	req := gateway.TextRequest{BaseURL: baseURL, APIKey: apiKey, Protocol: gateway.TextProtocolForBase(ctx, model, baseURL), Payload: body, Client: http.DefaultClient, Timeout: 240 * time.Second}
 	var status int
 	var data map[string]any
 	var err error

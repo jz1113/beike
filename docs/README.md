@@ -12,13 +12,13 @@
 
 - [商品图片采集](product-collection.md)：图片分类、SKU、缓存与收费刷新。
 - [社媒内容解析](social-parsing.md)：APIA、奇云、调度与错误处理。
-- [工坊图组绑定](workshop-asset-binding.md)：母本选择、替换、生成输入与失效规则。
-- [工坊参考样本与类目技能](workshop-reference-generation.md)：学习记忆、版本对照与晋升。
-- [封面工作室](poster.md)：标题、设计、生图、批次恢复与封面记忆。
-- [关键词审核](keywords.md)：审核模式、规则版本、导出与中断恢复。
-- [PPT 工作室](ppt.md)：内容生成、页面修改与导出边界。
+- [电商图文图组绑定](workshop-asset-binding.md)：母本选择、替换、生成输入与失效规则。
+- [电商图文参考样本与类目技能](workshop-reference-generation.md)：学习记忆、版本对照与晋升。
+- [封面](poster.md)：标题、设计、生图、批次恢复与封面记忆。
+- [词包](keywords.md)：审核模式、规则版本、导出与中断恢复。
+- [PPT](ppt.md)：内容生成、页面修改与导出边界。
 - [无限画布](canvas.md)：节点参考、任务、保存与深度处理。
-- [视频带货](video-sales.md)：商品、脚本、素材确认、定稿与成片恢复。
+- [电商视频](video-sales.md)：商品、脚本、素材确认、定稿与成片恢复。
 - [助手执行机制](assistant-runtime.md)：工具、技能、上下文、执行预算与回执。
 - [Agent 技能包维护](skills.md)：存放位置、文件导入导出、执行正文与按需读取。
 - [桌宠](desktop-pet.md)：显示、导入与数据保存。

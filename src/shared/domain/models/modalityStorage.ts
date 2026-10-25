@@ -1,4 +1,5 @@
 import { configuredTextProtocol, parseTextProtocol, resolveTextProtocol, type TextProtocol } from './textProtocol';
+import { protocolForBaseUrl, providerTextProtocol } from './modalityProtocol';
 import { domainStorage } from '../core/runtime';
 import { isAvatarDriverModel } from './avatarDrivers';
 import { DEFAULT_MODALITY_MODELS, type ModalityStorageKind, type StoredModalityModelItem } from './modalityDefaults';
@@ -16,6 +17,10 @@ export interface StoredApiProviderCredentials {
   name?: string;
   baseUrl?: string;
   apiKey?: string;
+  /** Provider transport used when a synced model has no model-level override. */
+  providerType?: string;
+  /** Legacy provider field retained for settings saved before providerType was introduced. */
+  provider?: string;
   enabled?: boolean;
 }
 
@@ -331,13 +336,47 @@ export interface ModalityModelRoute {
   apiKey: string;
 }
 
-function providerCredentials(channelId: string | undefined): { baseUrl: string; apiKey: string } | null {
+export interface ResolveModalityModelRouteOptions {
+  /** Ignore model/channel-specific credentials and use the global default channel. */
+  channel?: 'selected' | 'default';
+}
+
+interface LegacyWorkflowModelRoute {
+  id: string;
+  routeId?: string;
+  customBaseUrl?: string;
+  customApiKey?: string;
+  providerId?: string;
+  channel?: string;
+  textProtocol?: unknown;
+  apiTemplate?: string;
+}
+
+function findLegacyWorkflowModel(value: string): LegacyWorkflowModelRoute | null {
+  if (!value) return null;
+  try {
+    const raw = readStorageItem('custom_models');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const found = parsed.find((item): item is LegacyWorkflowModelRoute => (
+      Boolean(item && typeof item === 'object' && typeof item.id === 'string'
+        && (item.id === value || item.routeId === value))
+    ));
+    return found || null;
+  } catch {
+    return null;
+  }
+}
+
+function providerCredentials(channelId: string | undefined): { baseUrl: string; apiKey: string; providerType?: string } | null {
   if (!channelId) return null;
   const provider = readStoredApiProviders().find((item) => item.id === channelId);
   if (!provider) return null;
   return {
     baseUrl: provider.baseUrl?.trim() || '',
     apiKey: provider.apiKey?.trim() || '',
+    providerType: provider.providerType || provider.provider,
   };
 }
 
@@ -350,20 +389,50 @@ export function credentialsForModalityItem(item: StoredModalityModelItem): { bas
   return { baseUrl: channel?.baseUrl || undefined, apiKey: channel?.apiKey || undefined };
 }
 
-/** 模型专属地址和 Key 优先，其次是来源渠道，最后回退到全局配置。value 可以是条目 id 或 modelId。 */
-export function resolveModalityModelRoute(kind: ModalityStorageKind, value?: string): ModalityModelRoute {
+/**
+ * 模型专属地址和 Key 优先，其次是来源渠道，最后回退到全局配置。
+ * value 可以是条目 id 或 modelId。传入 channel=default 时保留模型 ID，
+ * 但强制使用全局默认渠道的地址、Key 和协议。
+ */
+export function resolveModalityModelRoute(
+  kind: ModalityStorageKind,
+  value?: string,
+  options?: ResolveModalityModelRouteOptions,
+): ModalityModelRoute {
   const read = readEffectiveModalityModels(kind);
   const models = read.configured ? read.models : readStoredModalityModels(kind);
   const globalConfig = readStoredModalityGlobalConfig();
+  const useDefaultChannel = options?.channel === 'default';
   const trimmed = value?.trim() || '';
+  const legacy = kind === 'chat' ? findLegacyWorkflowModel(trimmed) : null;
   const matched = trimmed
     ? models.find((item) => item.id === trimmed) || models.find((item) => item.modelId === trimmed)
     : models.find((item) => item.isDefault) || models[0];
-  const channel = providerCredentials(matched?.channelId);
+  const legacyChannelId = legacy?.providerId || (legacy?.channel && readStoredApiProviders().some((item) => item.id === legacy.channel) ? legacy.channel : undefined);
+  const channel = providerCredentials(matched?.channelId || legacyChannelId);
+  const modelProtocol = matched ? configuredTextProtocol(matched) : legacy ? configuredTextProtocol(legacy) : undefined;
+  const routeBaseUrl = useDefaultChannel
+    ? globalConfig.baseUrl
+    : matched?.baseUrl?.trim() || legacy?.customBaseUrl?.trim() || channel?.baseUrl || globalConfig.baseUrl;
+  // Synced models inherit the channel transport unless the model card explicitly
+  // chooses a protocol. This matters for OpenAI-compatible gateways that expose
+  // Claude/Gemini model IDs but do not implement their native endpoints.
+  const channelProtocol = providerTextProtocol(channel?.providerType);
+  const baseProtocol = protocolForBaseUrl(routeBaseUrl, readStoredApiProviders());
+  // The built-in Comfly endpoint is OpenAI-compatible even when its model
+  // catalog labels a Claude/Gemini entry with the vendor's native protocol.
+  // Keep explicit native overrides for separately configured channels.
+  const protocolPreference = useDefaultChannel
+    ? baseProtocol || modelProtocol
+    : !channel && baseProtocol === 'openai'
+      ? baseProtocol
+      : modelProtocol || channelProtocol || baseProtocol;
   return {
-    modelId: matched?.modelId || trimmed,
-    ...(kind === 'chat' ? { textProtocol: resolveTextProtocol(matched?.modelId || trimmed, matched ? configuredTextProtocol(matched) : undefined) } : {}),
-    baseUrl: matched?.baseUrl?.trim() || channel?.baseUrl || globalConfig.baseUrl,
-    apiKey: matched?.apiKey?.trim() || channel?.apiKey || globalConfig.apiKey,
+    modelId: matched?.modelId || legacy?.id || trimmed,
+    ...(kind === 'chat' ? { textProtocol: resolveTextProtocol(matched?.modelId || legacy?.id || trimmed, protocolPreference) } : {}),
+    baseUrl: routeBaseUrl,
+    apiKey: useDefaultChannel
+      ? globalConfig.apiKey
+      : matched?.apiKey?.trim() || legacy?.customApiKey?.trim() || channel?.apiKey || globalConfig.apiKey,
   };
 }

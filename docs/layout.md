@@ -47,7 +47,7 @@ src/client/
   types/                     浏览器公共类型
 ```
 
-功能根目录放页面入口、对外导出与功能样式。按实际需要建立职责目录：画布另有 `store`，生成引擎另有 `engine`，工坊另有 `views`，首页另有 `data`，设置另有 `tabs`。不为没有实现的职责创建空目录。
+功能根目录放页面入口、对外导出与功能样式。按实际需要建立职责目录：画布另有 `store`，生成引擎另有 `engine`，电商图文另有 `views`，首页另有 `data`，设置另有 `tabs`。不为没有实现的职责创建空目录。
 
 ### 组件归组
 
@@ -72,9 +72,9 @@ src/client/
 | `workshop` | `settings` / `delivery` / `history` | 生成配置 / 成图、进度、审核与交付 / 历史批次 |
 | `assistant` | `message` / `panels` / `brand-kit` / `document` / `skill` | 对话消息 / 功能面板 / 品牌 / 文档 / 技能 |
 
-资产中心 `AssetCenter`、工坊组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
+资产中心 `AssetCenter`、电商图文组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
 
-工坊 model 按 `collection / analysis / generation / delivery / workspace` 分组。画布的几何、导入、图层、图关系和任务规则放在 model；节点类型和打光参数由 model 导出，hook 直接引用。设置默认模型在 `settings/model/presetModels.ts`；服务商图标与展示数据属于 components。
+电商图文 model 按 `collection / analysis / generation / delivery / workspace` 分组。画布的几何、导入、图层、图关系和任务规则放在 model；节点类型和打光参数由 model 导出，hook 直接引用。设置默认模型在 `settings/model/presetModels.ts`；服务商图标与展示数据属于 components。
 
 ### 浏览器共享能力
 
@@ -97,13 +97,13 @@ src/client/
 | 资产库 | `assets` | `assets`、`library`、`catalog` |
 | 设置 | `settings` | `system` |
 | AI 助手 | `assistant` | `assistant` |
-| 电商工坊 | `workshop` | `workshop`、`catalog`、`platform/database/learning` |
-| 封面生成 | `poster` | `generate/poster` |
-| 关键词审核 | `keywords` | `keywords` |
-| 内容采集 | `collect` | `catalog`、`platform/collect` |
-| PPT 生成 | `ppt` | `generate/ppt`、`generate/export` |
+| 电商图文 | `workshop` | `workshop`、`catalog`、`platform/database/learning` |
+| 封面 | `poster` | `generate/poster` |
+| 词包 | `keywords` | `keywords` |
+| 采集 | `collect` | `catalog`、`platform/collect` |
+| PPT | `ppt` | `generate/ppt`、`generate/export` |
 | 数字人 | `avatar` | `avatar` |
-| 带货视频 | `sales` | `generate/sales` |
+| 电商视频 | `sales` | `generate/sales` |
 | 技能 | `skills` | `catalog`、`platform/database` |
 
 页面入口统一为 `PosterStudio / KeywordsStudio / PptStudio / SalesStudio`。带货的共享业务规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
@@ -124,8 +124,8 @@ src/client/
 | `internal/catalog` | 类目、商品、风格、技能与采集入口 |
 | `internal/library` / `internal/assets` | 素材库、图组、查重与反推 / 存储、生图任务与素材生命周期 |
 | `internal/generate` | 图像、视频、分析、文案、语音与画布任务编排 |
-| `internal/generate/{depth,poster,ppt,export,sales}` | 深度推理、封面设计、PPT、文件导出、带货视频子包 |
-| `internal/workshop` / `internal/keywords` | 工坊批次与输出审核 / 关键词审核与提交保护 |
+| `internal/generate/{depth,poster,ppt,export,sales}` | 深度推理、封面设计、PPT、文件导出、电商视频子包 |
+| `internal/workshop` / `internal/keywords` | 电商图文批次与输出审核 / 关键词审核与提交保护 |
 | `internal/assistant` | 回合、记忆、沙箱、工具与运行时；`extract` 抽取文档，`sessions` 读写会话 |
 | `internal/avatar` | 数字人驱动与配音流程 |
 | `internal/gateway` | 模型协议、提交适配与文本流式处理 |
@@ -157,7 +157,7 @@ Go 的同目录文件共同组成一个包，共享未导出类型。领域包�
 
 官方架构由 `src/shared/domain/prompts/masterRecipes.ts` 的 `OFFICIAL_MASTER_RECIPES` 与 `src/shared/data/officialMasterRecipes.json` 同步维护，`pnpm check:shared-data` 校验两者一致，Go 种子加载器与 `seed:export` 统一使用 `officialMasterRecipes.json`；原始数据库架构行一并保存在提示词资产快照中，不再保留第二份架构导出文件。
 
-domain 的子目录包括 `assistant / assets / collection / core / media / models / pets / products / prompts / sales / settings / skills / workshop`。其中 core 放环境注入、并发池和任务状态；models 放模型目录与调用适配；业务提示词、技能和工坊规则分别放入 prompts、skills 和 workshop。
+domain 的子目录包括 `assistant / assets / collection / core / media / models / pets / products / prompts / sales / settings / skills / workshop`。其中 core 放环境注入、并发池和任务状态；models 放模型目录与调用适配；业务提示词、技能和电商图文规则分别放入 prompts、skills 和 workshop。
 
 Agent 运行技能的可维护文件包存放在 `src/shared/domain/assistant/skills/packages/<skill-id>/`，主文件为 `SKILL.md`，展示信息、按需规范与交付模板随包维护。`pnpm skills:build` 生成浏览器安全目录；`pnpm check:skills` 防止正文、元数据与运行时漂移。包结构及自定义技能的工作区存储见[技能包维护](skills.md)。
 
@@ -180,11 +180,11 @@ Agent 运行技能的可维护文件包存放在 `src/shared/domain/assistant/sk
 
 根 `database` 只兼容已有本地数据，新检出无需创建，整目录忽略提交；数据库、WAL/SHM、快照和素材保持原位。数据目录与 Windows/SQLite URL 解析、迁移前备份、维护命令选库及一致性恢复统一见[数据库维护](database.md)；生产路径与升级步骤见[服务器部署](deployment.md)。
 
-工坊生成计划、提交标识与上游回执须先保存再轮询，保存失败时保留恢复信息；助手按当前工作区原子领取 turnId，重复请求核对原任务。服务重启后未确认的付费生成或后台反推任务不自动重放，用户重新进入后核对原结果。具体恢复规则以各产品文档为准。
+电商图文生成计划、提交标识与上游回执须先保存再轮询，保存失败时保留恢复信息；助手按当前工作区原子领取 turnId，重复请求核对原任务。服务重启后未确认的付费生成或后台反推任务不自动重放，用户重新进入后核对原结果。具体恢复规则以各产品文档为准。
 
 ## 验证与文件生命周期
 
-`pnpm check` 串行执行目录与单项目结构检查、模型目录、工坊契约、共享数据、OpenAPI、类型检查、ESLint、质量基线、依赖边界、循环与密钥检查、Go 格式/vet/测试、前端单元测试与生产构建。CI 使用同一命令。
+`pnpm check` 串行执行目录与单项目结构检查、模型目录、电商图文契约、共享数据、OpenAPI、类型检查、ESLint、质量基线、依赖边界、循环与密钥检查、Go 格式/vet/测试、前端单元测试与生产构建。CI 使用同一命令。
 
 - `check:root-layout` 限定根目录归属，检查 HTML/Vite/OpenAPI 的唯一位置、docs 平铺和组件实际分类。
 - `check:structure` 禁止嵌套 package.json、workspace 依赖和未声明的外部依赖。

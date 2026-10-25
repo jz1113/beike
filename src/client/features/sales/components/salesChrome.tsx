@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, Check, Loader2, Plus, ShoppingBag } from 'lucide-react';
+import { AlertCircle, BookOpen, Check, Loader2, Plus, RefreshCw, ShoppingBag } from 'lucide-react';
 import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
 import type { VideoSalesCategory, VideoSalesScript } from '@shared/domain/sales';
 import { salesCreationRule } from '../model/fashionSalesSkill';
@@ -9,6 +9,7 @@ import type { SalesWorkflowStep, SalesWorkflowStepView } from '../model/salesWor
 export const salesFocusClass = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/70 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#18191c]';
 export const salesPanelClass = 'rounded-[20px] border border-slate-200/80 bg-white dark:border-white/10 dark:bg-[#18191c]';
 export const salesCardClass = 'rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-white/10 dark:bg-white/[0.025]';
+export const salesTileClass = 'rounded-2xl border border-slate-200/80 bg-white dark:border-white/10 dark:bg-white/[0.02]';
 export const salesGroupClass = 'space-y-3.5';
 export const salesSectionTitleClass = 'text-[13px] font-semibold text-slate-800 dark:text-slate-100';
 export const salesLabelClass = 'block text-xs font-medium text-slate-600 dark:text-slate-300';
@@ -17,6 +18,35 @@ export const salesNoteClass = 'text-xs leading-6 text-slate-500 dark:text-slate-
 export const salesDividerClass = 'border-t border-slate-100 pt-5 dark:border-white/[0.08]';
 export const salesTabTrackClass = 'inline-flex rounded-xl bg-slate-100 p-1 dark:bg-black/20';
 export const salesGhostButtonClass = `inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.025] dark:text-slate-200 dark:hover:bg-white/[0.07] ${salesFocusClass}`;
+
+/** 不确定时长的细进度条，用于提示词合成、视频生成等等待。 */
+export function SalesIndeterminateBar({ label }: { label: string }) {
+  return <div role="progressbar" aria-label={label} className="relative h-1 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
+    <span className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-amber-500/80 motion-safe:animate-[sales-indeterminate_1.4s_ease-in-out_infinite] dark:bg-amber-300/80" />
+    <style>{'@keyframes sales-indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}'}</style>
+  </div>;
+}
+
+export function SalesAlert({ tone = 'warn', children }: { tone?: 'warn' | 'error'; children: ReactNode }) {
+  const color = tone === 'error' ? 'border-rose-500/20 bg-rose-500/[0.06] text-rose-600 dark:text-rose-300' : 'border-amber-500/20 bg-amber-500/[0.07] text-amber-700 dark:text-amber-200';
+  return <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-6 ${color}`}><AlertCircle className="mt-1 h-3.5 w-3.5 shrink-0" aria-hidden /><div className="min-w-0">{children}</div></div>;
+}
+
+/** 步骤内吸顶子标题，与素材补齐保持一致。 */
+export function SalesStickyHeader({ label, title, meta, actions, children }: { label: string; title: string; meta?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
+  return <section aria-label={label} className="sticky top-0 z-10 -mx-4 -mt-4 space-y-2 border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 dark:border-white/[0.08] dark:bg-[#18191c]/90">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2"><h2 className="text-sm font-semibold">{title}</h2>{meta}</div>
+      {actions}
+    </div>
+    {children}
+  </section>;
+}
+
+export function SalesStatusPill({ tone, children }: { tone: 'done' | 'busy' | 'warn' | 'error' | 'idle'; children: ReactNode }) {
+  const color = { done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300', busy: 'bg-amber-500/10 text-amber-700 dark:text-amber-200', warn: 'bg-amber-500/10 text-amber-700 dark:text-amber-200', error: 'bg-rose-500/10 text-rose-600 dark:text-rose-300', idle: 'bg-black/5 text-slate-500 dark:bg-white/10 dark:text-slate-400' }[tone];
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${color}`}>{tone === 'busy' && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}{tone === 'done' && <Check className="h-3 w-3" aria-hidden />}{children}</span>;
+}
 
 export function salesTabClass(active: boolean): string {
   return `rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${salesFocusClass} ${active ? 'bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}`;
@@ -78,18 +108,22 @@ export function SalesActionBar({ primary, secondary, busy, reason, note, progres
   }, [busy]);
   const description = reason || note;
   const primaryClass = `inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-[13px] font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white ${salesFocusClass}`;
-  return <footer aria-label="当前步骤操作" className="shrink-0 border-t border-slate-200/80 bg-white px-3 py-2.5 sm:px-5 dark:border-white/10 dark:bg-[#18191c]">
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-        {controls}
-        <div className={controls && !busy && !description ? 'sr-only' : 'min-w-0'}>
-          <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy ? 'text-amber-700 dark:text-amber-300' : ''}>{busy ? progress || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
+  return <footer aria-label="当前步骤操作" className="shrink-0 bg-transparent px-3 py-2.5 sm:px-5">
+    <div className="@container mx-auto flex max-w-[1600px] justify-center">
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm @min-[720px]:rounded-full dark:border-white/10 dark:bg-[#18191c]">
+        <div className="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400">
+        <div className={controls && !busy && !reason ? 'sr-only' : 'min-w-0'}>
+          <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
+          {busy && <div className="mt-1.5 w-48 max-w-full"><SalesIndeterminateBar label={progress || '正在处理'} /></div>}
           {busy && <p className="mt-0.5"><span className="tabular-nums">已等待 {elapsed} 秒</span>{note ? ` · ${note}` : ''}</p>}
         </div>
-      </div>
-      <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-        {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 flex-1 px-4 disabled:opacity-40 sm:flex-none ${salesGhostButtonClass}`}>{secondary.label}</button>}
-        {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} aria-describedby={`${uid}-reason`} className={`${primaryClass} flex-1 sm:flex-none`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} flex-1 sm:flex-none`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{primary.label}</button>}
+        </div>
+        {controls && <div className="hidden min-w-0 @min-[720px]:flex">{controls}</div>}
+        {controls && <details className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] @min-[720px]:hidden"><summary className="cursor-pointer list-none text-xs font-medium text-slate-700 dark:text-slate-200">创作设置</summary><div className="mt-2">{controls}</div></details>}
+        <div className="flex w-full min-w-0 flex-wrap justify-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+        {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 min-w-max shrink-0 whitespace-nowrap px-4 disabled:opacity-40 ${salesGhostButtonClass}`}>{/重新生成/.test(secondary.label) && <RefreshCw className="h-3.5 w-3.5" aria-hidden />}{secondary.label}</button>}
+        {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} title={description || undefined} aria-describedby={`${uid}-reason`} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} title={description || undefined} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{primary.label}</button>}
+        </div>
       </div>
     </div>
   </footer>;
@@ -103,9 +137,10 @@ interface SalesStudioHeaderProps {
   steps: SalesWorkflowStepView[];
   onStep: (step: SalesWorkflowStep) => void;
   onOpenRules: () => void;
+  hideSteps?: boolean;
 }
 
-export function SalesStudioHeader({ onBack, onReset, resetDisabled, resetTitle, steps, onStep, onOpenRules }: SalesStudioHeaderProps) {
+export function SalesStudioHeader({ onBack, onReset, resetDisabled, resetTitle, steps, onStep, onOpenRules, hideSteps = false }: SalesStudioHeaderProps) {
   const navigationRef = useRef<HTMLOListElement>(null);
   const current = steps.find((step) => step.state === 'current')?.id;
   useEffect(() => {
@@ -114,21 +149,21 @@ export function SalesStudioHeader({ onBack, onReset, resetDisabled, resetTitle, 
   return (
     <div className="shrink-0">
       <header className="flex min-h-16 items-center gap-2 px-3 sm:px-5">
-        <StudioBrandChip title="带货视频" icon={<ShoppingBag className="h-4 w-4" />} onBack={onBack} inline />
+        <StudioBrandChip title="电商视频" icon={<ShoppingBag className="h-4 w-4" />} onBack={onBack} inline />
         <span className="hidden text-xs text-slate-400 lg:inline">从商品到一条完整视频</span>
         <button type="button" onClick={onOpenRules} className={`ml-auto h-9 ${salesGhostButtonClass}`} aria-label="带货规则"><BookOpen className="h-3.5 w-3.5" /><span className="hidden sm:inline">带货规则</span></button>
         <button type="button" onClick={onReset} disabled={resetDisabled} title={resetTitle} className={`h-9 shrink-0 disabled:opacity-40 ${salesGhostButtonClass}`}><Plus className="h-3.5 w-3.5" /><span>更换商品</span></button>
       </header>
-      <nav aria-label="带货制作五步" className="overflow-x-auto px-3 pb-3 sm:px-5">
+      {!hideSteps && <nav aria-label="带货制作五步" className="overflow-x-auto px-3 pb-3 sm:px-5">
         <ol ref={navigationRef} className="flex min-w-max gap-2 sm:min-w-0">
           {steps.map((step, index) => <li key={step.id} className="min-w-0 flex-1">
-            <button type="button" onClick={() => onStep(step.id)} aria-current={step.state === 'current' ? 'step' : undefined} aria-label={`${index + 1} ${step.label}${step.state === 'done' ? '，已完成' : step.state === 'current' ? '，当前步骤' : '，待完成'}`} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-xs transition ${salesFocusClass} ${step.state === 'current' ? 'border-amber-300/80 bg-amber-50/70 font-semibold text-slate-900 dark:border-amber-300/35 dark:bg-amber-400/[0.07] dark:text-slate-100' : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
+            <button type="button" onClick={() => onStep(step.id)} aria-current={step.state === 'current' ? 'step' : undefined} aria-label={`${index + 1} ${step.label}${step.state === 'done' ? '，已完成' : step.state === 'current' ? '，当前步骤' : '，待完成'}`} className={`flex w-full items-center gap-2 border-b-2 px-3 py-2.5 text-xs transition ${salesFocusClass} ${step.state === 'current' ? 'border-amber-500 font-semibold text-slate-900 dark:border-amber-300 dark:text-slate-100' : 'border-transparent text-slate-500 hover:border-slate-300 hover:bg-slate-100 dark:text-slate-400 dark:hover:border-white/20 dark:hover:bg-white/5'}`}>
               <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] tabular-nums ${step.state === 'done' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-black/5 dark:bg-white/10'}`}>{step.state === 'done' ? <Check className="h-3 w-3" aria-hidden /> : index + 1}</span>
               <span className="whitespace-nowrap">{step.label}</span>
             </button>
           </li>)}
         </ol>
-      </nav>
+      </nav>}
     </div>
   );
 }

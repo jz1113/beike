@@ -12,7 +12,7 @@ export const SKILL_PURPOSES = {
   creation: {
     label: '创作技能',
     description: '可复用的具体创作模板，定义要生成的作品与需要替换的内容。',
-    invocation: '由你选择后应用到当前创作；工坊模板应用到换品流程。',
+    invocation: '由你选择后应用到当前创作；电商图文模板应用到换品流程。',
     content: '完整脚本、分镜、风格约束、创作提示词与参考作品。',
   },
 } as const;

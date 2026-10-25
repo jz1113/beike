@@ -266,7 +266,7 @@ func viewCapabilities(view string, client map[string]any) string {
 }
 
 func navigateTool(target, reason string) string {
-	label := map[string]string{"workshop": "种草工坊", "generate": "极速生图", "assets": "资产中心"}[target]
+	label := map[string]string{"workshop": "电商图文", "generate": "极速生图", "assets": "资产中心"}[target]
 	if label == "" {
 		label = "灵感首页"
 	}

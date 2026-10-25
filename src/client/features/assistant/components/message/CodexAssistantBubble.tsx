@@ -98,7 +98,7 @@ export default function CodexAssistantBubble({
             setStep(2);
             setCurrentView('workshop');
             setIsAssistantOpen(false);
-            showToast('🚀 已载入生图工坊！');
+            showToast('🚀 已载入电商图文！');
           }}
           onAnalyzeImages={onAnalyzeImages}
           onGenerateShotsForProduct={(title) =>

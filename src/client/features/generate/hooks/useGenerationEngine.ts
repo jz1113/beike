@@ -26,7 +26,7 @@ export {
 
 /**
  * 全局生图/视频任务引擎：与视图解耦，挂在 page 级即可在切页后继续提交与轮询。
- * 工坊批量生图由 useBatchWorkshopRunner 自行轮询 per-item tasks，不在此处理。
+ * 电商图文批量生图由 useBatchWorkshopRunner 自行轮询 per-item tasks，不在此处理。
  */
 // 所有批次与组件挂载共享分通道队列；最后一个引擎卸载时才中止请求。
 let generationEngineUsers = 0;

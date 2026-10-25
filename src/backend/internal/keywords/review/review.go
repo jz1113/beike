@@ -141,7 +141,7 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 		return Result{}, &OutputError{Message: err.Error(), Usage: usage}
 	}
 	if partial && len(checked.results) == 0 {
-		return Result{}, &OutputError{Message: fmt.Sprintf("关键词审核模型 %s 输出被截断，本批结果未写入", input.Model), Usage: usage}
+		return Result{}, &OutputError{Message: fmt.Sprintf("词包审核模型 %s 输出被截断，本批结果未写入", input.Model), Usage: usage}
 	}
 	return Result{Results: stripLookup(checked.results), Failed: checked.failed, Usage: usage, Model: input.Model}, nil
 }
@@ -327,7 +327,7 @@ func stripLookup(results []map[string]any) []map[string]any {
 func readModelPayload(data map[string]any, model string) (any, bool, error) {
 	choices, _ := data["choices"].([]any)
 	if len(choices) == 0 {
-		return nil, false, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
+		return nil, false, fmt.Errorf("词包审核模型 %s 没有返回内容", model)
 	}
 	choice, _ := choices[0].(map[string]any)
 	truncated := fmt.Sprint(choice["finish_reason"]) == "length"
@@ -335,9 +335,9 @@ func readModelPayload(data map[string]any, model string) (any, bool, error) {
 	raw, _ := message["content"].(string)
 	if strings.TrimSpace(raw) == "" {
 		if truncated {
-			return nil, false, fmt.Errorf("关键词审核模型 %s 输出被截断，本批结果未写入", model)
+			return nil, false, fmt.Errorf("词包审核模型 %s 输出被截断，本批结果未写入", model)
 		}
-		return nil, false, fmt.Errorf("关键词审核模型 %s 没有返回内容", model)
+		return nil, false, fmt.Errorf("词包审核模型 %s 没有返回内容", model)
 	}
 	parsed, err := parseModelJSON(raw)
 	if err == nil {
@@ -347,9 +347,9 @@ func readModelPayload(data map[string]any, model string) (any, bool, error) {
 		return salvaged, true, nil
 	}
 	if truncated {
-		return nil, false, fmt.Errorf("关键词审核模型 %s 输出被截断，本批结果未写入", model)
+		return nil, false, fmt.Errorf("词包审核模型 %s 输出被截断，本批结果未写入", model)
 	}
-	return nil, false, fmt.Errorf("关键词审核模型 %s 返回了不完整 JSON，本批结果未写入", model)
+	return nil, false, fmt.Errorf("词包审核模型 %s 返回了不完整 JSON，本批结果未写入", model)
 }
 
 var fencePattern = regexp.MustCompile("(?i)^```(?:json)?\\s*")

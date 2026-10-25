@@ -31,12 +31,53 @@ function render(patch: Partial<typeof base> = {}) {
 beforeEach(() => { panelWidth.wide = false; vi.clearAllMocks(); });
 
 describe('sales studio integration', () => {
+  it.each([true, false])('shows the outline and actual video materials when wide=%s', (wide) => {
+    panelWidth.wide = wide;
+    const videoScript: VideoSalesScript = { ...script,
+      shots: [{ ...script.shots[0], imageIndex: 0 }, { ...script.shots[0], shotId: 2, imageIndex: 0 }],
+      assets: [{ id: 'person', kind: 'person', label: '出镜讲解者', prompt: '人物', required: true, status: 'done', validation: 'passed', url: '/person.jpg' }],
+    };
+    const html = render({ state: { ...base.state, scripts: [videoScript],
+      workspaceNavigation: { step: 'video', lastCreativeStep: 'video' },
+      imageCatalog: [{ index: 0, role: 'main', url: '/product.jpg' }, { index: 1, role: 'detail', url: '/unused.jpg' }],
+      colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg', '/unused.jpg'], excludedImageUrls: [] },
+    } });
+    const summary = wide ? html.slice(html.indexOf('<aside'), html.indexOf('</aside>')) : html.slice(html.indexOf('创作与生成结果'), html.indexOf('最终完整视频提示词'));
+    expect(summary).toContain('aria-label="脚本大纲"');
+    expect(summary).not.toContain('待准备素材');
+    expect(summary).toContain('aria-label="生成素材"');
+    expect(summary).toContain('已确认');
+    expect(summary).toContain('aria-label="整体使用素材"');
+    const materials = summary.slice(summary.indexOf('aria-label="整体使用素材"'));
+    expect(materials).toContain('图片 1');
+    expect(materials).toContain('图片 2');
+    expect(materials).not.toContain('图片 3');
+    expect(materials).toContain('/product.jpg');
+    expect(materials).toContain('/person.jpg');
+    expect(materials).not.toContain('/unused.jpg');
+    const workspace = html.slice(html.indexOf('创作与生成结果'), html.indexOf('<footer'));
+    expect(workspace).not.toContain('当前制作阶段');
+    expect(workspace).not.toContain('aria-label="视频设置"');
+    expect(html.slice(html.indexOf('<footer'))).toContain('aria-label="视频设置"');
+  });
+  it('keeps unfinished generated materials visible with the missing-reference reason', () => {
+    panelWidth.wide = true;
+    const html = render({ state: { ...base.state,
+      workspaceNavigation: { step: 'video', lastCreativeStep: 'video' },
+      imageCatalog: [{ index: 0, role: 'main', url: '/product.jpg' }],
+      colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] },
+      scripts: [{ ...script, shots: [{ ...script.shots[0], imageIndex: 0 }], assets: [{ id: 'person', kind: 'person', label: '出镜人物', prompt: '人物', required: true, status: 'failed' }] }],
+    } });
+    const summary = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
+    expect(summary).toContain('生成失败');
+    expect(summary).toContain('出镜人物尚未生成');
+  });
   it('keeps history available while reviewing scripts rather than only on results', () => {
     const html = render({ state: { ...base.state, scripts: [script, { ...script, id: 'history', title: '历史脚本' }] } });
     expect(html).toContain('口播与画面时间轴');
     expect(html).toContain('选择历史方案');
     expect(html).toContain('历史脚本');
-    expect(html.indexOf('历史方案与任务')).toBeLessThan(html.indexOf('商品确认与前置设置'));
+    expect(html.indexOf('历史方案与任务')).toBeLessThan(html.indexOf('商品采集与前置设置'));
   });
   it('shows the distinction between a speaking presenter and voiceover', () => {
     const speaking = { ...script, shots: [{ ...script.shots[0], speechMode: 'on_camera' as const }, { ...script.shots[0], shotId: 2, speechMode: 'voiceover' as const }] };
@@ -47,20 +88,20 @@ describe('sales studio integration', () => {
     expect(html).toContain('出镜方式');
     expect(html).toMatch(/value="live_presenter" selected=""/);
     expect(html).toContain('完整嘴部清晰可见');
-    expect(html).toContain('返回修改商品与设置');
+    expect(html).not.toContain('返回修改商品与设置');
     expect(html).toContain('人物出镜讲解');
   });
   it('renders one footer and starts pending scripts at the script stage', () => {
     const html = render();
     expect(html.match(/<footer\b/g)).toHaveLength(1);
-    expect(html).toMatch(/aria-current="step"[^>]*>[\s\S]*?口播脚本/);
+    expect(html).toMatch(/aria-current="step"[^>]*>[\s\S]*?卖点与脚本/);
     expect(html).toContain('口播与画面时间轴');
     expect(html).not.toContain('等待生成成片');
   });
   it('keeps a saved but invalid prompt out of completed-step markers', () => {
     const html = render({ state: { ...base.state, scripts: [{ ...script, fullPrompt: '旧版完整提示词', finalizedRevision: 'old' }] } });
-    expect(html).toContain('aria-label="4 视频定稿，待完成"');
-    expect(html).not.toContain('aria-label="4 视频定稿，已完成"');
+    expect(html).toContain('aria-label="4 视频生成，待完成"');
+    expect(html).not.toContain('aria-label="4 视频生成，已完成"');
   });
   it('keeps the prompt step complete when the new video model has a separate compatibility error', () => {
     const state = { ...structuredClone(defaultSalesStudioState), productName: '商品',
@@ -74,7 +115,7 @@ describe('sales studio integration', () => {
     approved.finalizedRevision = salesFinalInputRevision(state, approved);
     state.scripts = [approved];
     const html = render({ state, videoError: '当前视频模型不支持所选参考模式' });
-    expect(html).toContain('aria-label="4 视频定稿，已完成"');
+    expect(html).toContain('aria-label="4 视频生成，已完成"');
     expect(base.runFinalize).not.toHaveBeenCalled();
   });
   it('shows the global error only once', () => {
@@ -102,11 +143,11 @@ describe('sales studio integration', () => {
     const footer = html.slice(footerAt);
     expect(aside).toContain('商品链接');
     expect(aside).not.toContain('商品资料');
-    expect(workspace).toContain('商品资料');
+    expect(workspace).toContain('商品名称');
     expect(workspace).not.toContain('出镜方式');
-    expect(footer).toContain('创作技能');
-    expect(footer).toContain('出镜方式');
-    expect(footer).toContain('口播模型');
+    expect(footer).toContain('技能');
+    expect(footer).toContain('出镜');
+    expect(footer).toContain('模型');
   });
   it('preserves query-only recovery for historical shot receipts', () => {
     const historical = { ...script, deliveryMode: undefined, shots: [{ ...script.shots[0], taskId: 'old-receipt', status: 'generating' as const }] };

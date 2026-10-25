@@ -36,6 +36,25 @@ func TestTextProtocolResolution(t *testing.T) {
 	if got := TextProtocol(WithTextProtocol(ctx, "auto"), "claude-5.5-haiku"); got != "anthropic" {
 		t.Fatal(got)
 	}
+	if got := TextProtocolForBase(WithTextProtocol(ctx, "auto"), "gemini-2.5-flash", "https://api.openai.com"); got != "openai" {
+		t.Fatal(got)
+	}
+}
+
+func TestTextProtocolResolutionPrefersKnownBaseEndpoints(t *testing.T) {
+	for _, tc := range []struct {
+		model, explicit, base, want string
+	}{
+		{"gemini-2.5-flash", "auto", "https://api.openai.com", "openai"},
+		{"claude-3-7-sonnet", "auto", "https://api.anthropic.com", "anthropic"},
+		{"gemini-2.5-flash", "auto", "https://generativelanguage.googleapis.com", "gemini"},
+		{"gemini-2.5-flash", "openai", "https://api.anthropic.com", "openai"},
+		{"gemini-2.5-flash", "auto", "https://relay.example", "gemini"},
+	} {
+		if got := ResolveTextProtocolForBase(tc.model, tc.explicit, tc.base); got != tc.want {
+			t.Fatalf("%+v: %s", tc, got)
+		}
+	}
 }
 
 func TestTextNativeAuthenticationAndPaths(t *testing.T) {

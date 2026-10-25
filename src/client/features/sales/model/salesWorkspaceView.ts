@@ -13,7 +13,7 @@ export function salesHasRenderActivity(script: VideoSalesScript | undefined, res
 }
 
 export const SALES_WORKFLOW_STEPS = [
-  ['product', '商品确认'], ['plan', '口播脚本'], ['assets', '素材图片'], ['video', '视频定稿'], ['result', '生成结果'],
+  ['product', '商品采集'], ['plan', '卖点与脚本'], ['assets', '素材补齐'], ['video', '视频生成'], ['result', '生成结果'],
 ] as const;
 export type SalesWorkflowStep = (typeof SALES_WORKFLOW_STEPS)[number][0];
 export interface SalesWorkflowStepView { id: SalesWorkflowStep; label: string; state: 'current' | 'done' | 'pending' }
@@ -43,6 +43,7 @@ export interface SalesStageContext {
   busy: boolean;
   progress?: string | null;
   hasScript: boolean;
+  collected?: boolean;
   planCurrent: boolean;
   planReason: string | null;
   assetsReady: boolean;
@@ -69,33 +70,33 @@ export function salesStageActions(context: SalesStageContext): SalesStageActions
   if (c.rendering) return { primary: action('正在生成视频', 'result', true), secondary: action('停止继续提交', 'stop', false), note: '已提交的任务仍可能生成并计费，停止仅阻止后续提交或查询。' };
   if (c.busy && !c.rendering) return { primary: action(c.progress || '正在处理', 'product', true), secondary: action('停止当前操作', 'stop', false), note: '停止后保留已完成结果；服务商已接受的任务仍可能生成并计费。' };
   if (c.step === 'product') return {
-    primary: action(c.progress || (c.hasScript ? '更新商品分析与口播脚本' : '确认商品，编写口播脚本'), 'write', c.busy || Boolean(c.planReason)),
+    primary: action(c.progress || (c.collected ? '生成卖点与脚本' : '采集商品并生成卖点脚本'), 'write', c.busy || Boolean(c.planReason)),
     reason: c.planReason,
     secondary: c.hasScript ? action('返回原创作阶段', 'resume') : undefined,
   };
   if (c.step === 'result') {
-    if (c.hasResult) return { primary: action(c.canQuery || c.submissionUncertain || c.renderFailed ? '下载已有成片' : '下载完整视频', 'download'), secondary: c.canQuery ? action('继续查询原任务', 'query') : action('返回视频定稿', 'video'), reason: c.renderFailed ? '本次生成失败，已有成片仍保留，没有被这次任务替换。' : c.submissionUncertain && !c.canQuery ? '新提交结果未确认且没有回执，请核对服务端记录；已有成片仍可下载。' : null };
-    if (c.canQuery) return { primary: action('继续查询原任务', 'query'), secondary: action('返回视频定稿', 'video'), note: '仅查询已有回执，不重新提交或创建计费任务。' };
-    if (c.renderFailed) return { primary: action('返回视频定稿', 'video'), reason: '视频生成失败，请查看上方原因并调整后再生成。' };
-    if (c.submissionUncertain) return { primary: action('返回视频定稿', 'video'), reason: '提交结果未确认且没有回执，请先核对服务端生成记录，避免重复计费。' };
-    return { primary: action(c.hasScript ? '去视频定稿' : '去确认商品', c.hasScript ? 'video' : 'product') };
+    if (c.hasResult) return { primary: action(c.canQuery || c.submissionUncertain || c.renderFailed ? '下载已有成片' : '下载完整视频', 'download'), secondary: c.canQuery ? action('继续查询原任务', 'query') : action('返回视频生成', 'video'), reason: c.renderFailed ? '本次生成失败，已有成片仍保留，没有被这次任务替换。' : c.submissionUncertain && !c.canQuery ? '新提交结果未确认且没有回执，可在上方填入渠道任务 ID 继续查询；已有成片仍可下载。' : null };
+    if (c.canQuery) return { primary: action('继续查询原任务', 'query'), secondary: action('返回视频生成', 'video'), note: '仅查询已有回执，不重新提交或创建计费任务。' };
+    if (c.renderFailed) return { primary: action('返回视频生成', 'video'), reason: '视频生成失败，请查看上方原因并调整后再生成。' };
+    if (c.submissionUncertain) return { primary: action('返回视频生成', 'video'), reason: '提交结果未确认且没有回执，可在上方填入渠道任务 ID 继续查询，或核实未提交后准备新草稿。' };
+    return { primary: action(c.hasScript ? '去视频生成' : '去商品采集', c.hasScript ? 'video' : 'product') };
   }
-  if (!c.hasScript) return { primary: action('去确认商品', 'product'), reason: '先确认商品与参考图，再编写口播脚本。' };
-  if (c.step === 'assets' && c.assetsQueryable) return { primary: action('继续查询原图片任务', 'queryAssets'), secondary: action('返回口播脚本', 'plan'), note: '仅查询已有图片任务，不重新生图；查询完成后再补齐或确认素材。' };
-  if (c.step === 'assets' && c.assetsUnresolved) return { primary: action('图片提交结果待核实', 'prepare', true), secondary: action('返回口播脚本', 'plan'), reason: '部分图片没有返回任务回执，请先核对服务商记录，避免重复计费。' };
+  if (!c.hasScript) return { primary: action('去商品采集', 'product'), reason: '先采集商品资料并选择参考图，再提炼卖点和编写脚本。' };
+  if (c.step === 'assets' && c.assetsQueryable) return { primary: action('继续查询原图片任务', 'queryAssets'), secondary: action('返回卖点与脚本', 'plan'), note: '仅查询已有图片任务，不重新生图；查询完成后再补齐或确认素材。' };
+  if (c.step === 'assets' && c.assetsUnresolved) return { primary: action('图片提交结果待核实', 'prepare', true), secondary: action('返回卖点与脚本', 'plan'), reason: '部分图片没有返回任务回执，请先核对服务商记录，避免重复计费。' };
   if (c.step === 'plan') return c.planCurrent ? {
-    primary: action('确认脚本，准备素材图片', 'assets'),
-    secondary: action('重新编写脚本', 'write', c.busy || Boolean(c.planReason)),
+    primary: action('确认脚本，补齐素材', 'assets'),
+    secondary: action('重新生成卖点与脚本', 'write', c.busy || Boolean(c.planReason)),
     reason: c.planReason,
   } : {
-    primary: action(c.progress || '更新口播脚本', 'write', c.busy || Boolean(c.planReason)),
+    primary: action(c.progress || '更新卖点与脚本', 'write', c.busy || Boolean(c.planReason)),
     secondary: action('检查商品资料', 'product'),
-    reason: c.planReason || '商品资料或创作参数已变化，请更新口播脚本。',
+    reason: c.planReason || '商品资料或创作参数已变化，请更新卖点与脚本。',
   };
-  if (!c.planCurrent) return { primary: action('去更新口播脚本', 'plan'), reason: '当前脚本已过期，请先更新脚本再继续。' };
+  if (!c.planCurrent) return { primary: action('去更新卖点与脚本', 'plan'), reason: '当前脚本已过期，请先更新卖点与脚本再继续。' };
   if (c.step === 'assets') return {
-    primary: c.assetsReady ? action('素材已确认，进入视频定稿', 'video') : c.assetsGenerated ? action('图片无误，确认并继续', 'confirmAssets') : action(c.progress || (c.assetCount ? '生成待完成素材（可能计费）' : '确认素材图片'), 'prepare', c.busy || (c.assetCount > 0 && !c.imageReady)),
-    secondary: action('返回口播脚本', 'plan'),
+    primary: c.assetsReady ? action('素材已确认，进入视频生成', 'video') : c.assetsGenerated ? action('图片无误，确认并继续', 'confirmAssets') : action(c.progress || (c.assetCount ? '补齐待生成素材（可能计费）' : '确认素材图片'), 'prepare', c.busy || (c.assetCount > 0 && !c.imageReady)),
+    secondary: action('返回卖点与脚本', 'plan'),
     reason: !c.assetsReady && !c.assetsGenerated && c.assetCount > 0 && !c.imageReady ? '请先选择绘图模型。' : c.preflightError,
   };
   if (!c.assetsReady) return { primary: action('去完成素材与确认', 'assets'), reason: '请先完成必要素材并确认图片，再生成视频提示词。' };

@@ -52,7 +52,7 @@ export function WorkshopSettingsModal(props: WorkshopSettingsModalProps) {
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"><Settings2 size={19} /></span>
             <div><h2 id="workshop-settings-title" className="text-base font-bold">生产设置</h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">电商工坊 <span className="mx-1.5 text-slate-300">/</span> 当前批次 · 修改自动保存</p></div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">电商图文 <span className="mx-1.5 text-slate-300">/</span> 当前批次 · 修改自动保存</p></div>
           </div>
           <button type="button" onClick={onClose} aria-label="关闭生产设置" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-indigo-500 dark:hover:bg-white/10"><X size={18} /></button>
         </header>

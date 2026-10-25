@@ -31,7 +31,7 @@ export function CoverMemoryStudioDialog({ memory, error, busy, feeding, onClose,
     <div className="fixed inset-0 z-[120] flex flex-col bg-[#101014] text-white">
       <header className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5" aria-label="返回封面生成"><ArrowLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5" aria-label="返回封面"><ArrowLeft className="h-4 w-4" /></button>
           <span className="text-sm font-black">封面记忆</span>
           <div className="relative">
             <button type="button" onClick={() => setHelpOpen((value) => !value)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5" aria-label="封面记忆说明"><CircleHelp className="h-4 w-4" /></button>

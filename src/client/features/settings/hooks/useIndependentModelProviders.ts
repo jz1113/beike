@@ -97,34 +97,47 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     provider: 'openai', baseUrl: openAIBaseUrl.trim(), apiKey: openAIApiKey.trim(), allowInsecureHttp: openAIAllowInsecureHttp,
   }));
 
-  const handleSaveOpenAIConfig = async () => {
+  const handleSaveOpenAIConfig = async (
+    notify = true,
+    overrides?: { baseUrl?: string; apiKey?: string },
+  ) => {
     try {
-      const url = new URL(openAIBaseUrl.trim());
+      const effectiveBaseUrl = overrides?.baseUrl ?? openAIBaseUrl;
+      const effectiveApiKey = overrides?.apiKey ?? openAIApiKey;
+      const url = new URL(effectiveBaseUrl.trim());
       if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('接口地址须为 HTTP 或 HTTPS Base URL，不包含账号、查询参数或片段');
       if (url.protocol === 'http:' && !openAIAllowInsecureHttp) throw new Error('HTTP 网关需先勾选明文传输选项');
       if (url.protocol === 'http:' && !isPublicHttpGatewayIpUrl(url.toString())) throw new Error('HTTP 网关只支持公网 IPv4 地址，不支持内网地址或域名');
-      if (openAIEnabled && !openAIApiKey.trim()) throw new Error('启用前请填写 OpenAI API Key');
+      if (openAIEnabled && !effectiveApiKey.trim()) throw new Error('启用前请填写 OpenAI API Key');
       const snapshot = buildIndependentProviderSnapshot(
-        openAIBaseUrl,
-        openAIApiKey,
+        effectiveBaseUrl,
+        effectiveApiKey,
         openAIEnabled,
         openAIAllowInsecureHttp ? normalizedOpenAIBaseUrl : '',
         lianchiApiKey,
       );
-      await saves.save('openai_official', snapshot, () => persistOpenAIConfig(snapshot.openAIBaseUrl, snapshot.openAIApiKey,
+      const saved = await saves.save('openai_official', snapshot, () => persistOpenAIConfig(snapshot.openAIBaseUrl, snapshot.openAIApiKey,
         {
           enabled: snapshot.openAIEnabled,
           allowInsecureHttp: /^http:\/\//i.test(snapshot.openAIBaseUrl)
             && snapshot.openAIInsecureHttpConsentUrl === snapshot.openAIBaseUrl,
-        }), 'OpenAI Responses 接口配置已保存');
+        }), 'OpenAI Responses 接口配置已保存', notify);
+      if (saved) {
+        setOpenAIBaseUrl(snapshot.openAIBaseUrl);
+        setOpenAIApiKey(snapshot.openAIApiKey);
+      }
+      return saved;
     } catch (error) {
       showToast(`OpenAI 配置保存失败：${formatUserError(error, '请检查接口地址')}`);
+      return false;
     }
   };
 
-  const handleSaveLianchiConfig = async () => {
-    const snapshot = { lianchiApiKey: lianchiApiKey.trim() };
-    await saves.save('lianchi_images', snapshot, () => persistLianchiConfig(snapshot.lianchiApiKey), '✅ 联池 API Key 已保存；选择「联池image2」即可调用');
+  const handleSaveLianchiConfig = async (notify = true, overrideApiKey?: string) => {
+    const snapshot = { lianchiApiKey: (overrideApiKey ?? lianchiApiKey).trim() };
+    const saved = await saves.save('lianchi_images', snapshot, () => persistLianchiConfig(snapshot.lianchiApiKey), '✅ 联池 API Key 已保存；选择「联池image2」即可调用', notify);
+    if (saved) setLianchiApiKey(snapshot.lianchiApiKey);
+    return saved;
   };
 
   const handleTestLianchi = () => connectionChecks.run('lianchi_images', () => testModelConnection('联池', {

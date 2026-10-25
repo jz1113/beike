@@ -92,7 +92,7 @@ func chatCompletion(ctx context.Context, base, apiKey, model string, messages an
 func ChatCompletionPayload(ctx context.Context, base, apiKey string, payload map[string]any, timeout time.Duration) (string, map[string]any, int, error) {
 	model, _ := payload["model"].(string)
 	status, data, err := gateway.CompleteText(ctx, gateway.TextRequest{
-		BaseURL: base, APIKey: apiKey, Protocol: gateway.TextProtocol(ctx, model),
+		BaseURL: base, APIKey: apiKey, Protocol: gateway.TextProtocolForBase(ctx, model, base),
 		Payload: payload, Client: ModelHTTP(), Timeout: timeout,
 	})
 	if err != nil {

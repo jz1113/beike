@@ -7,12 +7,21 @@ import { salesPlanInputRevision, salesSingleVideoError } from '../model/salesSta
 import { defaultSalesStudioState, type VideoSalesStudioState } from '../model/salesStudioDraft';
 import { generateSalesReferenceFrame } from '../api/salesMediaApi';
 
+const resolveModalityModelRoute = vi.hoisted(() => vi.fn((modality: string, value?: string, options?: unknown) => {
+  void value;
+  void options;
+  return {
+    modelId: `${modality}-chosen`,
+    ...(modality === 'chat' ? { textProtocol: 'openai', baseUrl: 'https://model-channel.test', apiKey: 'model-key' } : {}),
+  };
+}));
+
 vi.mock('react', () => ({ useCallback: (callback: unknown) => callback, useEffect: () => {}, useRef: (current: unknown) => ({ current }), useState: (value: unknown) => [value, vi.fn()] }));
 vi.mock('../model/prepareSalesAssets', () => ({ prepareSalesCreativeAssets: vi.fn() }));
 vi.mock('../api/videoSalesApi', () => ({ analyzeProductMedia: vi.fn(), finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn() }));
 vi.mock('../api/salesMediaApi', () => ({ generateSalesReferenceFrame: vi.fn() }));
 vi.mock('../model/salesStageRules', async (original) => ({ ...await original<typeof import('../model/salesStageRules')>(), salesSingleVideoError: vi.fn() }));
-vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute: (modality: string) => ({ modelId: `${modality}-chosen` }) }));
+vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute }));
 
 function Harness() {
   const state: VideoSalesStudioState = { ...structuredClone(defaultSalesStudioState), productName: '商品',
@@ -75,8 +84,11 @@ describe('sales creative stage ordering', () => {
     expect(stateRef.current.scripts[0].fullPrompt).toBeUndefined();
     await stages.runFinalize();
     expect(finalizeSalesPrompts).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ operation: 'finalize',
+      model: 'chat-chosen', textProtocol: 'openai', customBaseUrl: 'https://model-channel.test', customApiKey: 'model-key',
       actualReferences: [{ id: 'product-8', kind: 'product', label: '商品参考 9', url: '/black.jpg' }, { id: 'scene', kind: 'scene', label: '桌面', url: '/actual-scene.jpg' }],
     }));
+    expect(resolveModalityModelRoute).toHaveBeenCalledWith('chat', undefined);
+    expect(resolveModalityModelRoute.mock.calls.filter(([modality]) => modality === 'chat').every(([, , options]) => options === undefined)).toBe(true);
     expect(stateRef.current.scripts[0].finalizedRevision).toBeTruthy();
   });
 

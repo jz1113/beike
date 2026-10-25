@@ -401,7 +401,7 @@ export default function ProductCardWidget({
               className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer border border-slate-200 dark:hover:text-white dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/10 dark:border-white/10"
             >
               <ShoppingBag className="w-3.5 h-3.5 text-blue-600" />
-              <span>载入生图工坊</span>
+              <span>载入电商图文</span>
               <ArrowRight className="w-3 h-3 ml-0.5" />
             </button>
           )}

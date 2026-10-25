@@ -45,7 +45,7 @@ export function SkillCard({
         </button>
 
         <span className="pointer-events-none absolute left-2.5 top-2.5 rounded-md bg-black/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white/95 backdrop-blur-md">
-          {skill.runtime === 'workshop' ? '工坊换品' : 'AI生成'}
+          {skill.runtime === 'workshop' ? '电商图文换品' : 'AI生成'}
         </span>
 
         {bottomTag && (

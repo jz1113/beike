@@ -18,7 +18,7 @@ export function KeywordReviewModelPicker({ options, value, disabled, onChange }:
   const models = options.map((option) => ({
     id: option.value,
     name: option.name,
-    desc: '关键词审核',
+    desc: '词包审核',
     provider: option.channel,
     upstreamId: option.model,
   }));

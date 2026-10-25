@@ -12,6 +12,7 @@ import {
   planModalityChannelSync,
   saveStoredModalityModels,
   resetStoredModalityModels,
+  markModalityGlobalConfigManualOverride,
 } from '../model/modalityModelStorage';
 import { inferVendorFromModelId } from '../model/modalityMeta';
 import {
@@ -21,6 +22,7 @@ import {
   withLinkedCustomName,
   writeModalityDefaultKey,
 } from '../model/modalityDefaultSync';
+import { PROVIDER_CREDENTIALS_CHANGED_EVENT } from '../model/providerCredentialSync';
 
 const MODALITY_LABEL: Record<ModalityKind, string> = {
   chat: '多模态',
@@ -76,8 +78,24 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
     }
   }, [kind]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const refresh = () => {
+      setGlobalConfig(loadStoredModalityGlobalConfig());
+      const loaded = loadStoredModalityModels(kind);
+      setModels(loaded);
+      const defaultItem = loaded.find(model => model.isDefault) || loaded[0];
+      if (defaultItem) setFocusedModelId(defaultItem.id);
+    };
+    window.addEventListener(PROVIDER_CREDENTIALS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(PROVIDER_CREDENTIALS_CHANGED_EVENT, refresh);
+  }, [kind]);
+
   // 全局配置持久化
   const updateGlobalConfig = useCallback((updates: Partial<ModalityGlobalConfig>) => {
+    if (updates.baseUrl !== undefined || updates.apiKey !== undefined) {
+      markModalityGlobalConfigManualOverride();
+    }
     setGlobalConfig(prev => {
       const next = { ...prev, ...updates };
       saveStoredModalityGlobalConfig(next);
@@ -87,6 +105,7 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
 
   // 保存全局配置并写入历史记录
   const saveGlobalConfig = useCallback(() => {
+    markModalityGlobalConfigManualOverride();
     setGlobalConfig(prev => {
       const cleanUrl = prev.baseUrl.trim();
       const cleanKey = prev.apiKey.trim();
@@ -112,6 +131,7 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
 
   // 从下拉中选择 Base URL
   const selectBaseUrl = useCallback((url: string) => {
+    markModalityGlobalConfigManualOverride();
     setGlobalConfig(prev => {
       const next: ModalityGlobalConfig = {
         ...prev,
@@ -138,6 +158,7 @@ export function useModalityModels(kind: ModalityKind, showToast: (msg: string) =
 
   // 从下拉中选择 API Key
   const selectApiKey = useCallback((key: string) => {
+    markModalityGlobalConfigManualOverride();
     setGlobalConfig(prev => {
       const next: ModalityGlobalConfig = {
         ...prev,

@@ -94,7 +94,7 @@ export function salesSingleVideoError(state: VideoSalesStudioState, script: Vide
   try {
     const images = assertSalesPlanCurrent(state, script);
     if (!salesAssetsReady(script)) return '请先生成所需素材并确认图片';
-    if (!state.selectedChatModel?.trim()) return '请选择定稿提示词使用的多模态模型';
+    if (!state.selectedChatModel?.trim()) return '请选择用于合成视频提示词的多模态模型';
     if (!state.selectedVideoModel?.trim()) return '请在视频制作阶段选择视频模型';
     const model = resolveModalityModelRoute('video', state.selectedVideoModel).modelId || '';
     const config = getVideoModelById(model);

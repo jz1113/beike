@@ -63,7 +63,7 @@ export default function AvatarStudioView({ onBackToHome, onOpenSettings }: Props
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-transparent text-slate-900 dark:text-slate-100">
-      <StudioBrandChip title="数字人工作室" icon={<ImagePlus className="h-4 w-4" />} onBack={() => onBackToHome?.()} />
+      <StudioBrandChip title="数字人" icon={<ImagePlus className="h-4 w-4" />} onBack={() => onBackToHome?.()} />
       <StudioDockBar items={dock} label="数字人导航" />
       {toastMessage && (
         <div className="fixed left-1/2 top-16 z-50 -translate-x-1/2 rounded-2xl bg-slate-950/90 px-4 py-2 text-xs font-semibold text-white shadow-2xl">{toastMessage}</div>

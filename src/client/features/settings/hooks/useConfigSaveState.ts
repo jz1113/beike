@@ -22,22 +22,24 @@ export function useConfigSaveState<T extends object>(
     operation: () => Promise<void>,
     message: string,
     notify = true,
-  ) => {
-    if (!active) return;
+  ): Promise<boolean> => {
+    if (!active) return false;
     const currentSession = session.current;
     const version = versions.current[service] = (versions.current[service] || 0) + 1;
     setStates(previous => ({ ...previous, [service]: 'saving' }));
     try {
       await operation();
-      if (currentSession !== session.current) return;
+      if (currentSession !== session.current) return false;
       onSaved(snapshot);
-      if (version !== versions.current[service]) return;
+      if (version !== versions.current[service]) return false;
       setStates(previous => ({ ...previous, [service]: 'saved' }));
       if (notify) showToast(message);
+      return true;
     } catch (error) {
-      if (currentSession !== session.current || version !== versions.current[service]) return;
+      if (currentSession !== session.current || version !== versions.current[service]) return false;
       setStates(previous => ({ ...previous, [service]: 'error' }));
-      if (notify) showToast(formatUserError(error, '配置保存失败，请重试'));
+      showToast(formatUserError(error, '配置保存失败，请重试'));
+      return false;
     }
   };
   return { save, states, isSaving: Object.values(states).some(state => state === 'saving') };

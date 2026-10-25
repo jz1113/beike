@@ -110,10 +110,10 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
     showToast,
   });
 
-  // 一键带入商用生图工坊
+  // 一键带入电商图文
   const handleImportToWorkshop = (item: any) => {
     const payload = buildCollectorWorkshopPayload(item);
-    if (!payload) { showToast('请先采集可用图片，再带入商业视觉工坊'); return; }
+    if (!payload) { showToast('请先采集可用图片，再带入电商图文'); return; }
     setProductData(payload.product, payload.images);
 
     setStep(1);
@@ -126,7 +126,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
       setCurrentView('workshop');
     }
     onClose();
-    showToast('已将采集返回的可用素材带入「商业视觉工坊」');
+    showToast('已将采集返回的可用素材带入「电商图文」');
   };
 
   // 一键导入 AI 助手输入框
@@ -204,7 +204,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
             <ToolSuiteMark>
               <Download className="h-4 w-4 stroke-[2]" />
             </ToolSuiteMark>
-            <span className="text-sm font-black tracking-tight">内容采集</span>
+            <span className="text-sm font-black tracking-tight">采集</span>
           </button>
         </header>
 
@@ -212,7 +212,7 @@ export default function UniversalCollectorModal({ isOpen, onClose, onEnterWorksh
         <div className="flex-1 overflow-y-auto px-4 pb-10 pt-8 sm:px-6 sm:pt-12 lg:px-8">
           <section className="mx-auto w-full max-w-[1120px]">
             <div className="mx-auto max-w-[980px] text-center">
-              <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px] dark:text-slate-100">内容采集</h1>
+              <h1 id="collector-modal-title" className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-[40px] dark:text-slate-100">采集</h1>
               <p id="collector-modal-desc" className="mt-3 text-sm text-slate-500 dark:text-slate-400">{activeTab === 'batch' ? '粘贴多条链接或导入表格，批量收集商品图片与社媒素材。' : activeTab === 'video' ? '导入含标题和视频链接的表格，按标题批量下载到本地文件夹。' : '一个链接，收集商品图片与社媒素材。'}</p>
               <div role="tablist" aria-label="采集模式选择" className="mt-6 inline-flex max-w-full overflow-x-auto rounded-full bg-slate-200/70 p-1 text-sm font-medium ring-1 ring-black/[0.06] dark:bg-[#1B1B1E] dark:ring-white/[0.08]">
                 <button type="button" role="tab" aria-selected={activeTab === 'video'} onClick={() => setActiveTab('video')} className={collectorTabClass(activeTab === 'video')}><FileVideo className="h-3.5 w-3.5" />oss视频下载{videoQueue.items.length > 0 ? ` (${videoQueue.items.length})` : ''}</button>

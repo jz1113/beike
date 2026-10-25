@@ -307,7 +307,7 @@ export default function AssistantMessageList({
                         setStep(2);
                         setCurrentView('workshop');
                         setIsAssistantOpen(false);
-                        showToast('🚀 已载入生图工坊！');
+                        showToast('🚀 已载入电商图文！');
                       }}
                       onAnalyzeImages={canAnalyzeCollection ? () => { setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。'); textareaRef.current?.focus(); } : undefined}
           onGenerateShotsForProduct={(title) => {

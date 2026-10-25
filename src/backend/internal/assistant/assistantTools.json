@@ -307,7 +307,7 @@
     "type": "function",
     "function": {
       "name": "get_workshop_state",
-      "description": "获取用户当前工作台状态（所在视图、工坊步骤、已载入商品、拍摄架构）。当需要感知用户当前工作环境时调用。",
+      "description": "获取用户当前工作台状态（所在视图、电商图文步骤、已载入商品、拍摄架构）。当需要感知用户当前工作环境时调用。",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -319,7 +319,7 @@
     "type": "function",
     "function": {
       "name": "workspace_navigate",
-      "description": "工作台视图调度导航。当用户明确要求「去种草工坊」「去极速生图」「查看资产中心」「返回首页」或需要跨模块执行任务时调用。",
+      "description": "工作台视图调度导航。当用户明确要求「去电商图文」「去极速生图」「查看资产中心」「返回首页」或需要跨模块执行任务时调用。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -348,7 +348,7 @@
     "type": "function",
     "function": {
       "name": "workspace_load_workshop_product",
-      "description": "核实当前工作区已保存商品资料及图片后，请求将商品载入种草工坊；不能用未采集的编号建立空壳商品。",
+      "description": "核实当前工作区已保存商品资料及图片后，请求将商品载入电商图文；不能用未采集的编号建立空壳商品。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -424,7 +424,7 @@
     "type": "function",
     "function": {
       "name": "set_workshop_arch",
-      "description": "切换种草工坊的拍摄架构偏好。当用户要求更换拍摄方案/架构时调用。",
+      "description": "切换电商图文的拍摄架构偏好。当用户要求更换拍摄方案/架构时调用。",
       "parameters": {
         "type": "object",
         "properties": {

@@ -104,7 +104,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
       method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
     });
     const result = await response.json();
-    if (!response.ok || !result.success) throw new Error(result.error || '工坊技能操作失败');
+    if (!response.ok || !result.success) throw new Error(result.error || '电商图文技能操作失败');
     announceSkillLibraryChange();
   };
 
@@ -176,7 +176,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
     window.dispatchEvent(new Event('workshop-skill-applied'));
     if (onEnterWorkshop) onEnterWorkshop();
     else { store.setCurrentView('workshop'); store.setActiveWorkshopTab('studio'); }
-    showToast(`已将「${item.title}」应用到工坊`);
+    showToast(`已将「${item.title}」应用到电商图文`);
   };
 
   const edit = (item: SkillItem) => {
@@ -251,7 +251,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
               {presentation === 'creation' && (allItems.some((item) => item.runtime === 'workshop') || runtime === 'workshop') && (
                 <select aria-label="筛选适用场景" value={runtime} onChange={(event) => { setRuntime(event.target.value as SkillRuntime | 'all'); setCategory('全部'); }}
                   className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-600 dark:border-white/10 dark:bg-[#202226] dark:text-slate-300">
-                  <option value="all">全部场景</option><option value="assistant">助手创作</option><option value="workshop">工坊换品</option>
+                  <option value="all">全部场景</option><option value="assistant">助手创作</option><option value="workshop">电商图文换品</option>
                 </select>
               )}
               {filteredByUser && <button type="button" onClick={resetFilters} className="cursor-pointer rounded-full px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-white/5">重置筛选</button>}
@@ -291,7 +291,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
           )}
           {library.hiddenOfficialRecipes.length > 0 && presentation === 'creation' && (
             <details className="rounded-xl border border-slate-200 p-4 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
-              <summary className="cursor-pointer">已隐藏的工坊技能 · {library.hiddenOfficialRecipes.length}</summary>
+              <summary className="cursor-pointer">已隐藏的电商图文技能 · {library.hiddenOfficialRecipes.length}</summary>
               <div className="mt-4 flex flex-wrap gap-3">{library.hiddenOfficialRecipes.map((skill) => <button type="button" key={skill.id} className="rounded-lg border border-slate-200 px-3 py-2 dark:border-white/10" onClick={() => { void run(`restore:${skill.id}`, () => requestStyle('POST', { id: skill.id }, '?action=restore')); }}>{skill.name} · 恢复</button>)}</div>
             </details>
           )}
@@ -301,8 +301,8 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
       <input ref={element => { folderInput.current = element; element?.setAttribute('webkitdirectory', ''); }} type="file" multiple className="hidden" onChange={event => { if (event.target.files?.length) void studio.upload(event.target.files, presentation); event.target.value = ''; }} />
       {filesLocationOpen && <SkillFilesLocationDialog onClose={() => setFilesLocationOpen(false)} onImportFolder={() => folderInput.current?.click()} />}
       <ManualSkillStudioModal isOpen={studio.open} onClose={studio.close} showToast={showToast} initialFiles={studio.files} initialDraft={studio.draft} heading={studio.editing ? '编辑技能' : '创建技能'} mode={studio.editing ? 'edit' : 'create'} onSave={studio.save} />
-      {workshopEditor && <WorkshopSkillEditor key={workshopEditor === 'new' ? 'new' : workshopEditor.id} skill={workshopEditor === 'new' ? null : workshopEditor} onClose={() => setWorkshopEditor(null)} onSaved={() => showToast('技能已保存，可选择应用到工坊')} />}
-      <StyleExtractModal key={feedSkill?.id || 'new'} baseSkill={feedSkill} initialImages={[]} isOpen={extractOpen} onClose={() => setExtractOpen(false)} onRecipeCreated={() => { announceSkillLibraryChange(); showToast('新技能已保存，可选择应用到工坊'); }} />
+      {workshopEditor && <WorkshopSkillEditor key={workshopEditor === 'new' ? 'new' : workshopEditor.id} skill={workshopEditor === 'new' ? null : workshopEditor} onClose={() => setWorkshopEditor(null)} onSaved={() => showToast('技能已保存，可选择应用到电商图文')} />}
+      <StyleExtractModal key={feedSkill?.id || 'new'} baseSkill={feedSkill} initialImages={[]} isOpen={extractOpen} onClose={() => setExtractOpen(false)} onRecipeCreated={() => { announceSkillLibraryChange(); showToast('新技能已保存，可选择应用到电商图文'); }} />
       {detail && (librarySkillItem(detail).presentation === 'creation'
         ? <CreationSkillDetailModal key={skillEntryKey(detail)} item={librarySkillItem(detail)} isFavorite={favorites.has(skillEntryKey(detail))} onDuplicate={detail.kind === 'assistant' ? () => duplicateSkill(detail.content) : undefined} onClose={() => setDetail(null)} onToggleFavorite={() => toggleFavoriteByKey(skillEntryKey(detail))} onUse={(initialPromptOverride) => { applySkill(librarySkillItem(detail), initialPromptOverride); setDetail(null); }} showToast={showToast} />
         : <SkillLibraryDetail entry={detail} onClose={() => setDetail(null)} />)}

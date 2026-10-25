@@ -39,6 +39,42 @@ func ResolveTextProtocol(model, explicit string) string {
 	return "openai"
 }
 
+// ResolveTextProtocolForBase keeps model-id inference for unknown endpoints,
+// while preferring the protocol that is unambiguous from an official/native
+// endpoint or an explicitly compatible path.
+func ResolveTextProtocolForBase(model, explicit, base string) string {
+	p := strings.ToLower(strings.TrimSpace(explicit))
+	if p != "" && p != "auto" {
+		return p
+	}
+	if inferred := textProtocolFromBase(base); inferred != "" {
+		return inferred
+	}
+	return ResolveTextProtocol(model, explicit)
+}
+
+func textProtocolFromBase(base string) string {
+	u, err := url.Parse(strings.TrimSpace(base))
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	path := strings.ToLower(strings.TrimRight(u.Path, "/"))
+	switch {
+	case host == "api.anthropic.com" || strings.HasSuffix(path, "/messages"):
+		return "anthropic"
+	case host == "generativelanguage.googleapis.com" || strings.HasSuffix(host, ".googleapis.com") || strings.Contains(path, "/generatecontent"):
+		return "gemini"
+	case host == "api.openai.com" || host == "api.deepseek.com" || host == "api.siliconflow.cn" ||
+		host == "ai.comfly.org" || host == "ai.comfly.chat" || host == "shop.comfly.chat" ||
+		host == "dashscope.aliyuncs.com" || strings.HasSuffix(host, ".qianwenaiapi.com") ||
+		strings.Contains(path, "/chat/completions") || strings.Contains(path, "/compatible-mode/"):
+		return "openai"
+	default:
+		return ""
+	}
+}
+
 func WithTextProtocol(ctx context.Context, protocol string) context.Context {
 	return context.WithValue(ctx, textProtocolKey{}, protocol)
 }
@@ -46,6 +82,11 @@ func WithTextProtocol(ctx context.Context, protocol string) context.Context {
 func TextProtocol(ctx context.Context, model string) string {
 	p, _ := ctx.Value(textProtocolKey{}).(string)
 	return ResolveTextProtocol(model, p)
+}
+
+func TextProtocolForBase(ctx context.Context, model, base string) string {
+	p, _ := ctx.Value(textProtocolKey{}).(string)
+	return ResolveTextProtocolForBase(model, p, base)
 }
 
 func CompleteText(ctx context.Context, req TextRequest) (int, map[string]any, error) {
@@ -72,7 +113,7 @@ func requestText(ctx context.Context, req TextRequest, stream bool, onDelta func
 	model := textString(payload["model"])
 	protocol := strings.TrimSpace(req.Protocol)
 	if protocol == "" || strings.EqualFold(protocol, "auto") {
-		protocol = TextProtocol(ctx, model)
+		protocol = ResolveTextProtocolForBase(model, protocol, req.BaseURL)
 	}
 	protocol = ResolveTextProtocol(model, protocol)
 	if protocol != "openai" && protocol != "gemini" && protocol != "anthropic" {

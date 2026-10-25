@@ -152,7 +152,7 @@ func loadWorkshopProduct(ctx context.Context, db *sql.DB, workspace, itemID stri
 		"success": true, "action": "load_workshop_product", "itemId": itemID, "title": title,
 		"product": map[string]any{"itemId": itemID, "title": title, "platform": platform, "price": "", "picUrl": cover},
 		"images":  map[string]any{"main": main, "details": details, "skus": skus},
-		"message": "商品资料已核实，已请求将图片和资料载入种草工坊",
+		"message": "商品资料已核实，已请求将图片和资料载入电商图文",
 	})
 	return string(body)
 }

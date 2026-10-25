@@ -132,13 +132,13 @@ export function useSalesCreativeStages(input: {
       if (controller.signal.aborted) return;
       if (!result.fullPrompt?.trim() || result.prompts.length !== script.shots.length
         || new Set(result.prompts.map((item) => item.shotId)).size !== script.shots.length
-        || script.shots.some((shot) => !result.prompts.some((item) => item.shotId === shot.shotId && item.prompt?.trim()))) throw new Error('视频提示词定稿不完整');
+        || script.shots.some((shot) => !result.prompts.some((item) => item.shotId === shot.shotId && item.prompt?.trim()))) throw new Error('完整视频提示词不完整');
       commit((state) => ({ ...state, scripts: state.scripts.map((item) => item.id === script.id && salesFinalInputRevision(state, item) === revision ? {
         ...item, fullPrompt: result.fullPrompt!.trim(), finalizedRevision: revision, finalStaleReason: undefined,
         shots: item.shots.map((shot) => ({ ...shot, finalPrompt: result.prompts.find((prompt) => prompt.shotId === shot.shotId)!.prompt, promptStale: false })),
       } : item) }));
     } catch (err) {
-      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '视频定稿失败');
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '视频提示词合成失败');
     } finally {
       busyRef.current.planning = false;
       setIsFinalizing(false);
@@ -155,7 +155,7 @@ export function useSalesCreativeStages(input: {
     const images = selectedImages.length > 0 ? selectedImages : fallbackImages;
     if (!images.length) { setError('请先采集或上传至少一张商品图'); return false; }
     const chat = resolveModalityModelRoute('chat', current.selectedChatModel);
-    if (!chat.modelId) { setError('请先在下方创作设置中选择多模态分析与口播模型'); return false; }
+    if (!chat.modelId) { setError('请先在下方创作设置中选择卖点与脚本模型'); return false; }
     busyRef.current.planning = true;
     setIsAnalyzing(true);
     setError(null);

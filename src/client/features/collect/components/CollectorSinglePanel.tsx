@@ -271,7 +271,7 @@ export default function CollectorSinglePanel({
                   className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-slate-100 text-white dark:text-slate-950 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shadow-slate-900/10 shrink-0"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-300 dark:text-amber-500" />
-                  <span>带入商用工坊</span>
+                  <span>带入电商图文</span>
                 </button>
               </div>
             </div>

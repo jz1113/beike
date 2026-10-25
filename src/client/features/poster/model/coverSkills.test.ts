@@ -4,7 +4,7 @@ import { COVER_SKILLS, coverSkillMemoryStatus } from './coverSkills';
 describe('cover skills', () => {
   it('keeps generation and reverse rules readable', () => {
     expect(COVER_SKILLS.map((skill) => skill.id)).toEqual(['generate', 'deconstruct']);
-    expect(COVER_SKILLS.map((skill) => skill.title)).toEqual(['封面生成', '样张反推']);
+    expect(COVER_SKILLS.map((skill) => skill.title)).toEqual(['封面', '样张反推']);
     expect(COVER_SKILLS.map((skill) => skill.flow)).toEqual([
       ['商品图', '标题', '封面'],
       ['参考封面', '待确认记忆', '采纳后可引用'],

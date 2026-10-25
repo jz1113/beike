@@ -1,5 +1,5 @@
 /**
- * 视频带货共享领域类型定义
+ * 电商视频共享领域类型定义
  */
 
 export interface SalesColorSelection {
