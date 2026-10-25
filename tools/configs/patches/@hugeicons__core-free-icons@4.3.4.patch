@@ -1,0 +1,23 @@
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index ec544044d0efe63642fcbbb94dee3bf3c6b7519c..8893275c7fa7ca83465f26c32a3a609b6dfffeb9 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -2500,12 +2500,12 @@ export { default as GridOffFreeIcons, default as GridOffIcon } from './GridOffIc
+ export { default as Grid, default as Grid2x2, default as GridFreeIcons, default as GridIcon } from './GridIcon.js';
+ export { default as GridTableFreeIcons, default as GridTableIcon } from './GridTableIcon.js';
+ export { default as GridViewFreeIcons, default as GridViewIcon } from './GridViewIcon.js';
+-export { default as Grid2X2CheckFreeIcons, default as Grid2X2CheckIcon, default as Grid2x2CheckFreeIcons, default as Grid2x2CheckIcon } from './Grid2x2CheckIcon.js';
+-export { default as Grid2X2PlusFreeIcons, default as Grid2X2PlusIcon, default as Grid2x2PlusFreeIcons, default as Grid2x2PlusIcon } from './Grid2x2PlusIcon.js';
+-export { default as Grid2X2FreeIcons, default as Grid2X2Icon, default as Grid2x2FreeIcons, default as Grid2x2Icon } from './Grid2x2Icon.js';
+-export { default as Grid2X2XFreeIcons, default as Grid2X2XIcon, default as Grid2x2XFreeIcons, default as Grid2x2XIcon } from './Grid2x2XIcon.js';
+-export { default as Grid3X2FreeIcons, default as Grid3X2Icon, default as Grid3x2FreeIcons, default as Grid3x2Icon } from './Grid3x2Icon.js';
+-export { default as Grid3X3FreeIcons, default as Grid3X3Icon, default as Grid3x3FreeIcons, default as Grid3x3Icon } from './Grid3x3Icon.js';
++export { default as Grid2X2CheckFreeIcons, default as Grid2X2CheckIcon, default as Grid2x2CheckFreeIcons, default as Grid2x2CheckIcon } from './Grid2X2CheckIcon.js';
++export { default as Grid2X2PlusFreeIcons, default as Grid2X2PlusIcon, default as Grid2x2PlusFreeIcons, default as Grid2x2PlusIcon } from './Grid2X2PlusIcon.js';
++export { default as Grid2X2FreeIcons, default as Grid2X2Icon, default as Grid2x2FreeIcons, default as Grid2x2Icon } from './Grid2X2Icon.js';
++export { default as Grid2X2XFreeIcons, default as Grid2X2XIcon, default as Grid2x2XFreeIcons, default as Grid2x2XIcon } from './Grid2X2XIcon.js';
++export { default as Grid3X2FreeIcons, default as Grid3X2Icon, default as Grid3x2FreeIcons, default as Grid3x2Icon } from './Grid3X2Icon.js';
++export { default as Grid3X3FreeIcons, default as Grid3X3Icon, default as Grid3x3FreeIcons, default as Grid3x3Icon } from './Grid3X3Icon.js';
+ export { default as GrimacingFreeIcons, default as GrimacingIcon } from './GrimacingIcon.js';
+ export { default as GrinningFreeIcons, default as GrinningIcon } from './GrinningIcon.js';
+ export { default as GripHorizontalFreeIcons, default as GripHorizontalIcon } from './GripHorizontalIcon.js';

@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@hugeicons/core-free-icons@4.3.4':
+    hash: f77318fae98301a63f1ea6ef5d2819c7d02cc0e6a1e62cadd6a4ffdabde557b0
+    path: tools/configs/patches/@hugeicons__core-free-icons@4.3.4.patch
+
 importers:
 
   .:
@@ -16,7 +21,7 @@ importers:
         version: 2.1.2
       '@hugeicons/core-free-icons':
         specifier: ^4.3.4
-        version: 4.3.4
+        version: 4.3.4(patch_hash=f77318fae98301a63f1ea6ef5d2819c7d02cc0e6a1e62cadd6a4ffdabde557b0)
       '@hugeicons/react':
         specifier: ^1.1.10
         version: 1.1.10(react@19.2.8)
@@ -2737,7 +2742,7 @@ snapshots:
   '@ffprobe-installer/win32-x64@5.1.0':
     optional: true
 
-  '@hugeicons/core-free-icons@4.3.4': {}
+  '@hugeicons/core-free-icons@4.3.4(patch_hash=f77318fae98301a63f1ea6ef5d2819c7d02cc0e6a1e62cadd6a4ffdabde557b0)': {}
 
   '@hugeicons/react@1.1.10(react@19.2.8)':
     dependencies:

@@ -104,6 +104,9 @@
     "onlyBuiltDependencies": [
       "@ffmpeg-installer/darwin-arm64",
       "simple-git-hooks"
-    ]
+    ],
+    "patchedDependencies": {
+      "@hugeicons/core-free-icons@4.3.4": "tools/configs/patches/@hugeicons__core-free-icons@4.3.4.patch"
+    }
   }
 }
