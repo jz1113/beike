@@ -1,0 +1,21 @@
+title = "Beike credential scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Official prompt asset sourceKey values are SHA-256 content hashes."
+  condition = "AND"
+  paths = ['''(^|/)src/shared/data/promptAssets\.json$''']
+  regexTarget = "match"
+  regexes = ['''^sourceKey": "[0-9a-f]{64}"$''']
+
+  [[rules.allowlists]]
+  description = "This fixed browser storage prefix identifies dismissed model defaults."
+  condition = "AND"
+  paths = ['''(^|/)src/shared/domain/models/modalityStorage\.ts$''']
+  regexTarget = "match"
+  regexes = ['''^DISMISSED_DEFAULTS_KEY_PREFIX\s*=\s*'beike_modality_dismissed_defaults_v1_'$''']

@@ -188,6 +188,8 @@ Agent 运行技能的可维护文件包存放在 `src/shared/domain/assistant/sk
 
 `pnpm check` 串行执行目录与单项目结构检查、模型目录、电商图文契约、共享数据、OpenAPI、类型检查、ESLint、质量基线、依赖边界、循环与密钥检查、Go 格式/vet/测试、前端单元测试与生产构建。CI 使用同一命令。
 
+GitHub CI 额外运行 Gitleaks，配置位于 `tools/configs/gitleaks.toml`，保留默认检测规则。已核实的官方素材来源 SHA-256 与固定浏览器存储前缀仅按具体文件和精确内容共同匹配排除，不豁免整份文件或凭证字段。
+
 - `check:root-layout` 限定根目录归属，检查 HTML/Vite/OpenAPI 的唯一位置、docs 平铺和组件实际分类。
 - `check:structure` 禁止嵌套 package.json、workspace 依赖和未声明的外部依赖。
 - `lint:boundaries` 校验静态导入、re-export、类型导入、字面量动态 import 和 require，并阻止 feature model 反向依赖功能界面。
