@@ -3,13 +3,10 @@ import { apiFetch } from '@client/shared/api/apiClient';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import {
   videoSalesAnalyzeBodySchema,
-  videoSalesComposeBodySchema,
   videoSalesFinalizeBodySchema,
   videoSalesFinalizeResponseSchema,
   videoSalesScriptGenerateBodySchema,
   videoSalesSelectBodySchema,
-  videoSalesValidateAssetsResponseSchema,
-  type VideoSalesComposeBody,
 } from '@shared/contracts/videoSales';
 import type {
   VideoSalesCategory,
@@ -24,8 +21,8 @@ import type { SalesRouteHeaders } from '../model/salesRoute';
 export type { SalesRouteHeaders };
 
 export interface SalesWorkflowContext {
-  workflowVersion?: 3;
-  eligibleImageIndexes?: number[];
+  workflowVersion: 3;
+  eligibleImageIndexes: number[];
   selectedColor?: string;
   aspectRatio?: string;
 }
@@ -59,18 +56,15 @@ function routeHeaders(input: SalesRouteHeaders): Record<string, string> {
 
 export async function analyzeProductMedia(input: {
   imageCatalog: SalesImageRef[];
-  productName?: string;
+  productName: string;
   brand?: string;
-  priceRange?: string;
   productDescription?: string;
-  category?: VideoSalesCategory;
+  category: VideoSalesCategory;
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<VideoSalesProductAnalysis> {
   const data = await postSales('/api/generate/video-sales/analyze', parseSales(videoSalesAnalyzeBodySchema, {
     imageCatalog: input.imageCatalog.map((image) => ({ index: image.index, url: image.url, role: image.role })),
-    imageUrls: input.imageCatalog.map((image) => image.url),
     productName: input.productName,
     brand: input.brand,
-    priceRange: input.priceRange,
     productDescription: input.productDescription,
     category: input.category,
     workflowVersion: input.workflowVersion,
@@ -94,16 +88,12 @@ export async function generateSalesScripts(input: {
   category: VideoSalesCategory;
   brand?: string;
   productDescription?: string;
-  productImages?: string[];
-  imageCatalog?: SalesImageRef[];
+  imageCatalog: SalesImageRef[];
   productAnalysis?: string;
   videoMode: VideoSalesMode;
   targetDuration: number;
-  priceRange?: string;
+  aspectRatio: string;
   targetAudience?: string;
-  platforms?: string[];
-  templateId?: string;
-  fashionReferences?: { person: boolean; face: boolean; scene: boolean };
 } & SalesRouteHeaders & SalesWorkflowContext): Promise<VideoSalesScript[]> {
   const request = { ...input };
   delete request.signal;
@@ -147,16 +137,16 @@ export async function finalizeSalesPrompts(input: {
   shots: VideoSalesScript['shots'];
   imageCatalog: SalesImageRef[];
   productAnalysis?: string;
-  category?: VideoSalesCategory;
-  operation?: 'finalize';
-  actualReferences?: SalesActualReference[];
-  assets?: VideoSalesScript['assets'];
-  targetDuration?: number;
+  category: VideoSalesCategory;
+  operation: 'finalize';
+  actualReferences: SalesActualReference[];
+  assets: NonNullable<VideoSalesScript['assets']>;
+  targetDuration: number;
+  aspectRatio: string;
   videoModel?: string;
   videoRefMode?: string;
   videoResolution?: string;
-  referenceOrder?: Array<{ slot: string; label: string; url: string; imageIndex?: number }>;
-} & SalesRouteHeaders & SalesWorkflowContext): Promise<{ prompts: Array<{ shotId: number; prompt: string; imagePrompt?: string }>; fullPrompt?: string; personImagePrompt?: string; sceneImagePrompt?: string }> {
+} & SalesRouteHeaders & SalesWorkflowContext): Promise<{ prompts: Array<{ shotId: number; prompt: string }>; fullPrompt: string }> {
   const data = await postSales('/api/generate/video-sales/finalize-prompts', parseSales(videoSalesFinalizeBodySchema, {
     shots: input.shots.map((shot) => ({
       shotId: shot.shotId,
@@ -172,7 +162,6 @@ export async function finalizeSalesPrompts(input: {
     imageCatalog: input.imageCatalog.map((image) => ({ index: image.index, url: image.url, role: image.role })),
     productAnalysis: input.productAnalysis,
     category: input.category,
-    referenceOrder: input.referenceOrder,
     operation: input.operation,
     actualReferences: input.actualReferences,
     assets: input.assets,
@@ -191,36 +180,4 @@ export async function finalizeSalesPrompts(input: {
   }, '定稿请求不正确'), videoSalesFinalizeResponseSchema, routeHeaders(input), input.signal);
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-finalize', type: 'vision', usage: data.usage });
   return { prompts: data.prompts, fullPrompt: data.fullPrompt };
-}
-
-export async function validateSalesAssets(input: {
-  shots: VideoSalesScript['shots'];
-  imageCatalog: SalesImageRef[];
-  actualReferences: SalesActualReference[];
-  assets?: VideoSalesScript['assets'];
-  productAnalysis?: string;
-} & SalesRouteHeaders & SalesWorkflowContext): Promise<Array<{ id: string; status: 'passed' | 'conflict' | 'uncertain'; reason: string }>> {
-  const request = { ...input };
-  delete request.signal;
-  const data = await postSales(
-    '/api/generate/video-sales/finalize-prompts',
-    parseSales(videoSalesFinalizeBodySchema, { ...request, operation: 'validate-assets' }, '素材校验请求不正确'),
-    videoSalesValidateAssetsResponseSchema, routeHeaders(input), input.signal,
-  );
-  recordChatTokens({ modelId: data.model || input.model || 'video-sales-validate', type: 'vision', usage: data.usage });
-  const found = data.validations || [];
-  if (found.length !== input.actualReferences.length || new Set(found.map((item) => item.id)).size !== found.length
-    || input.actualReferences.some((ref) => !found.some((item) => item.id === ref.id))
-    || found.some((item) => !['passed', 'conflict', 'uncertain'].includes(item.status) || !item.reason?.trim())) {
-    throw new Error('素材校验结果不完整，请重试校验');
-  }
-  return found;
-}
-
-export async function composeSalesVideo(body: VideoSalesComposeBody): Promise<string> {
-  const data = await postSales('/api/generate/video-sales/compose', parseSales(videoSalesComposeBodySchema, body, '合成请求不正确'), z.object({
-    resultUrl: z.string().optional(), executed: z.boolean().optional(),
-  }));
-  if (!data.executed || !data.resultUrl) throw new Error('合成没有返回成片地址');
-  return data.resultUrl;
 }

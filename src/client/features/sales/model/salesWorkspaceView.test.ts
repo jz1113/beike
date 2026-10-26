@@ -118,9 +118,10 @@ describe('render activity and historical receipts', () => {
     expect(salesHasRenderActivity(script, null, true)).toBe(true);
   });
   it('exposes historical shot receipts as query-only recovery', () => {
-    const historical: VideoSalesScript = { ...script, deliveryMode: undefined, shots: [{ shotId: 1, type: 'hook', duration: 15, description: '', camera: '', voiceover: '', visualSource: 'product_image', transition: 'direct_concat', taskId: 'receipt', status: 'generating' }] };
+    const historical: VideoSalesScript = { ...script, deliveryMode: undefined, shots: [{ shotId: 1, type: 'hook', duration: 15, description: '', camera: '', speechMode: 'voiceover', voiceover: '', visualSource: 'product_image', transition: 'direct_concat', taskId: 'receipt', status: 'generating' }] };
     expect(salesHasRenderActivity(historical, null, false)).toBe(true);
     expect(salesHasQueryableTask(historical)).toBe(true);
+    expect(salesHasQueryableTask({ ...historical, shots: [{ ...historical.shots[0], status: 'uncertain' }] })).toBe(true);
     expect(salesStageActions({ ...ready, step: 'result', canQuery: salesHasQueryableTask(historical) }).primary.intent).toBe('query');
     expect(salesHasQueryableTask({ ...historical, deliveryMode: 'single' })).toBe(false);
   });

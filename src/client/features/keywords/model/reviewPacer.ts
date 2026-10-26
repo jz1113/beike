@@ -18,6 +18,16 @@ export class ReviewPacer {
 
   get concurrency(): number { return this.limit; }
 
+  /** Leave time for the provider to recover between passes over unfinished rows. */
+  async waitToRetry(round: number, shouldStop: () => boolean): Promise<boolean> {
+    const delay = Math.min(60_000, 5_000 * 2 ** Math.min(4, Math.max(0, round - 1)));
+    this.cooldownUntil = Math.max(this.cooldownUntil, Date.now() + delay);
+    while (!shouldStop() && Date.now() < this.cooldownUntil) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(500, this.cooldownUntil - Date.now())));
+    }
+    return !shouldStop();
+  }
+
   async acquire(shouldStop: () => boolean): Promise<boolean> {
     while (!shouldStop()) {
       const cooldown = this.cooldownUntil - Date.now();

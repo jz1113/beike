@@ -11,7 +11,7 @@ function populatedDraft(): VideoSalesStudioState {
     brand: '品牌', priceLabel: '100元', sellingPoints: '舒适', props: { 材质: '棉' },
     imageCatalog: [{ index: 0, role: 'main', url: 'https://example.com/product.jpg' }],
     productImages: ['https://example.com/product.jpg'],
-    fashionRefs: { personUrl: '/person.jpg', faceUrl: '/face.jpg', sceneUrl: '/scene.jpg' },
+    historicalData: { fashionRefs: { personUrl: '/person.jpg', faceUrl: '/face.jpg', sceneUrl: '/scene.jpg' } },
     scripts: [{ id: 'old', title: '旧方案', totalDuration: 0, shots: [], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' } }],
     selectedScriptIndex: 1, composedResultUrl: '/final.mp4',
     analysis: {
@@ -52,16 +52,16 @@ describe('clearing the current sales product', () => {
     const original = populatedDraft();
     const snapshot = structuredClone(original);
     const cleared = clearSalesProduct(original);
-    for (const key of ['props', 'imageCatalog', 'productImages', 'fashionRefs', 'scripts', 'colorSelection'] as const) {
+    for (const key of ['props', 'imageCatalog', 'productImages', 'scripts', 'colorSelection'] as const) {
       expect(cleared[key]).not.toBe(original[key]);
       expect(cleared[key]).not.toBe(defaultSalesStudioState[key]);
     }
     expect(original).toEqual(snapshot);
-    expect(defaultSalesStudioState.fashionRefs.personUrl).toBe('');
+    expect(defaultSalesStudioState.historicalData).toBeUndefined();
   });
 
   it.each<Partial<VideoSalesStudioState>>([
-    { fashionRefs: { personUrl: '/person.jpg', faceUrl: '', sceneUrl: '' } },
+    { historicalData: { fashionRefs: { personUrl: '/person.jpg' } } },
     { scripts: populatedDraft().scripts }, { analysis: populatedDraft().analysis },
     { composedResultUrl: '/final.mp4' }, { props: { 材质: '棉' } },
     { productImages: ['/legacy.jpg'] }, { imageCatalog: populatedDraft().imageCatalog },
@@ -87,5 +87,22 @@ describe('clearing the current sales product', () => {
     expect(reopened).toEqual(cleared);
     expect(hasSalesProductContent(reopened)).toBe(false);
     expect(getItem).toHaveBeenCalledWith(SALES_STUDIO_STORAGE_KEY);
+  });
+});
+
+describe('sales skill defaults and historical drafts', () => {
+  it('defaults a new project to the installed fashion presenter skill', () => {
+    expect(defaultSalesStudioState).toMatchObject({ category: 'fashion', videoMode: 'live_presenter' });
+  });
+  it('upgrades an empty former generic draft without leaving an unavailable default', () => {
+    const saved = { ...defaultSalesStudioState, category: 'other', videoMode: 'product_closeup' };
+    vi.stubGlobal('window', { localStorage: { getItem: () => JSON.stringify(saved) } });
+    expect(readSalesStudioDraft()).toMatchObject({ category: 'fashion', videoMode: 'live_presenter' });
+  });
+  it('preserves the category and paid results of historical generic products until explicit selection', () => {
+    const saved = { ...populatedDraft(), category: 'home' };
+    vi.stubGlobal('window', { localStorage: { getItem: () => JSON.stringify(saved) } });
+    expect(readSalesStudioDraft()).toMatchObject({ category: 'home', composedResultUrl: '/final.mp4', scripts: [{ id: 'old' }] });
+    expect(clearSalesProduct(readSalesStudioDraft())).toMatchObject({ category: 'fashion', videoMode: 'live_presenter', scripts: [] });
   });
 });

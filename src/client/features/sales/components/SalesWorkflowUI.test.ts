@@ -30,7 +30,7 @@ vi.mock('@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels', () => ({ u
 const images: SalesImageRef[] = [{ index: 0, role: 'sku', url: '/black.png' }, { index: 1, role: 'sku', url: '/red.png' }, { index: 2, role: 'main', url: '/unknown.png' }];
 const metadata = { version: 1 as const, variants: [{ id: 'black', label: '黑色 / M', color: '黑色', skuIds: ['b'], imageUrls: ['/black.png'] }, { id: 'red', label: '红色 / M', color: '红色', skuIds: ['r'], imageUrls: ['/red.png'] }] };
 const selection: SalesColorSelection = { variantId: 'black', colorLabel: '黑色', confirmedImageUrls: [], excludedImageUrls: [] };
-const script: VideoSalesScript = { id: 's', title: '商品口播', totalDuration: 15, deliveryMode: 'single', assets: [], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' }, shots: [{ shotId: 1, type: 'hook', duration: 3, description: '展示商品', voiceover: '看这个商品', camera: '近景', visualSource: 'product_image', transition: 'direct_concat' }, { shotId: 2, type: 'demo', duration: 12, description: '使用展示', voiceover: '看细节', camera: '特写', visualSource: 'product_image', transition: 'direct_concat' }] };
+const script: VideoSalesScript = { id: 's', title: '商品口播', totalDuration: 15, deliveryMode: 'single', assets: [], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' }, shots: [{ shotId: 1, type: 'hook', duration: 3, description: '展示商品', speechMode: 'voiceover', voiceover: '看这个商品', camera: '近景', visualSource: 'product_image', transition: 'direct_concat' }, { shotId: 2, type: 'demo', duration: 12, description: '使用展示', voiceover: '看细节', camera: '特写', visualSource: 'product_image', transition: 'direct_concat' }] };
 
 function nodes(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   return Children.toArray(node).flatMap((child) => isValidElement<Record<string, unknown>>(child) ? [child, ...nodes(child.props.children as ReactNode)] : []);
@@ -49,7 +49,7 @@ beforeEach(() => { hooks.index = 0; hooks.values = []; });
 describe('sales image gallery', () => {
   it('shows all images for direct selection without a color field', () => {
     const html = renderToStaticMarkup(gallery());
-    for (const label of ['全部图片', '已选', '查看商品图 1 大图', '查看商品图 2 大图', '查看商品图 3 大图']) expect(html).toContain(label);
+    for (const label of ['只看已选', '商品参考图', '查看商品图 1 大图', '查看商品图 2 大图', '查看商品图 3 大图']) expect(html).toContain(label);
     expect(html).not.toContain('未选');
     for (const label of ['本次商品颜色', '确认此颜色', '搜索商品颜色']) expect(html).not.toContain(label);
     expect(nodes(gallery()).some((item) => item.type === 'button' && renderToStaticMarkup(item).includes('删除'))).toBe(false);
@@ -125,7 +125,7 @@ describe('sales image gallery', () => {
 
 describe('sales workflow stages', () => {
   it('shows only the spoken timeline in the script stage', () => {
-    const html = renderToStaticMarkup(createElement(SalesPlanSection, { script: { ...script, fullPrompt: '不应显示在脚本区', personImagePrompt: '旧人物绘图' }, disabled: false, onEditShot: vi.fn() }));
+    const html = renderToStaticMarkup(createElement(SalesPlanSection, { script: { ...script, fullPrompt: '不应显示在脚本区', historicalData: { personImagePrompt: '旧人物绘图' } }, disabled: false, onEditShot: vi.fn() }));
     expect(html).toContain('0');
     expect(html).toContain('15');
     expect(html).toContain('口播与画面时间轴');
@@ -150,7 +150,7 @@ describe('sales workflow stages', () => {
   it('lets a rejected detail image retry while its generated reference is still awaiting validation', () => {
     const assets: SalesCreativeAsset[] = [
       { id: 'main', kind: 'keyframe', label: '黑色卫衣正面平铺主图', prompt: '平铺主图', required: true, status: 'done', url: '/main.jpg', validation: 'pending' },
-      { id: 'detail', kind: 'keyframe', label: '胸前绣花与罗纹领口细节', prompt: '绣花细节', required: true, status: 'uncertain', validation: 'pending', usesProduct: true, referenceAssetIds: ['main'], validationReason: '图 2 缺失参考图无法读取；参考图预设 SM19' },
+      { id: 'detail', kind: 'keyframe', label: '胸前绣花与罗纹领口细节', prompt: '绣花细节', required: true, status: 'uncertain', validation: 'pending', usesProduct: true, productImageIndexes: [0], referenceAssetIds: ['main'], validationReason: '图 2 缺失参考图无法读取；参考图预设 SM19' },
     ];
     const view = createElement(SalesAssetsSection, { script: { ...script, shots: [{ ...script.shots[0], imageIndex: 0 }], assets }, imageModel: 'image', disabled: false, onModel: vi.fn(), onEditPrompt: vi.fn(), onGenerate: vi.fn() });
     const html = renderToStaticMarkup(view);
@@ -174,10 +174,10 @@ describe('sales workflow stages', () => {
     const imgClass = html.match(/<img[^>]*class="([^"]*)"/)?.[1] ?? '';
     expect(imgClass.split(/\s+/)).not.toContain('w-full');
   });
-  it('keeps legacy reference error numbering aligned with every selected product image', () => {
+  it('keeps reference error numbering aligned with explicitly bound product images', () => {
     const assets: SalesCreativeAsset[] = [
       { id: 'main', kind: 'keyframe', label: '前置静帧', prompt: '商品', required: true, status: 'done', url: '/main.jpg' },
-      { id: 'detail', kind: 'keyframe', label: '细节', prompt: '局部', required: true, usesProduct: true, referenceAssetIds: ['main'], status: 'failed', error: '图 3 缺失参考图无法读取' },
+      { id: 'detail', kind: 'keyframe', label: '细节', prompt: '局部', required: true, usesProduct: true, productImageIndexes: [0, 1], referenceAssetIds: ['main'], status: 'failed', error: '图 3 缺失参考图无法读取' },
     ];
     const html = renderToStaticMarkup(createElement(SalesAssetsSection, { script: { ...script, assets }, productImages: images.slice(0, 2), imageModel: 'image', disabled: false, onModel: vi.fn(), onEditPrompt: vi.fn(), onGenerate: vi.fn() }));
     expect(html).toContain('第 3 张参考图「前置静帧」');
@@ -201,11 +201,12 @@ describe('sales workflow stages', () => {
     expect(render).toHaveBeenCalledTimes(1);
     expect(finalize).toHaveBeenCalledTimes(1);
   });
-  it('renders the same five stages for every category', () => {
-    const html = renderToStaticMarkup(createElement(SalesStudioHeader, { onBack: vi.fn(), onReset: vi.fn(), resetDisabled: false, resetTitle: '', steps: [{ id: 'product', label: '商品采集', state: 'current' }, { id: 'plan', label: '卖点与脚本', state: 'pending' }, { id: 'assets', label: '素材补齐', state: 'pending' }, { id: 'video', label: '视频生成', state: 'pending' }, { id: 'result', label: '生成结果', state: 'pending' }], onStep: vi.fn(), onOpenRules: vi.fn() }));
-    for (const label of ['商品采集', '卖点与脚本', '素材补齐', '视频生成', '生成结果']) expect(html).toContain(label);
-    expect(html).toContain('aria-current="step"');
-    expect(html).not.toContain('带货分区');
+  it('keeps a compact header without a workflow step strip', () => {
+    const html = renderToStaticMarkup(createElement(SalesStudioHeader, { onBack: vi.fn(), onReset: vi.fn(), resetDisabled: false, resetTitle: '', onOpenRules: vi.fn() }));
+    expect(html).toContain('电商视频');
+    expect(html).toContain('带货规则');
+    expect(html).not.toContain('<nav');
+    expect(html).not.toContain('aria-current="step"');
     expect(html).not.toContain('role="tablist"');
   });
   it('keeps the skill at the top of planning settings and marks supplemental facts as optional', () => {
@@ -214,10 +215,10 @@ describe('sales workflow stages', () => {
     expect(fields).not.toContain('创作技能');
     expect(settings.indexOf('创作设置')).toBeLessThan(settings.indexOf('创作技能'));
     expect(settings.indexOf('创作技能')).toBeLessThan(settings.indexOf('卖点与脚本模型'));
-    expect(settings).toContain('同一模型也用于商品分析、可选图片校验和视频提示词');
-    expect(settings).toContain('通用制作流程');
+    expect(settings).toContain('同一模型也用于商品分析和视频提示词');
+    expect(settings).not.toContain('通用制作流程');
     expect(settings).toContain('服饰专属规则');
-    expect(settings).toContain('value="generic"');
+    expect(settings).not.toContain('value="generic"');
     for (const label of ['商品品类', '美妆护肤', '食品零食', '家居日用', '服饰鞋包', '数码3C', '通用百货']) expect(fields).not.toContain(label);
     expect(fields).not.toContain('品牌');
     expect(fields).not.toContain('补充品牌');
@@ -292,13 +293,13 @@ describe('sales workflow stages', () => {
     expect(html).toContain('图片99、图片10、15秒');
   });
   it('keeps stopped or uncertain task recovery separate from duplicate controls', () => {
-    const html = renderToStaticMarkup(createElement(SalesResultSection, { script: { ...script, renderTaskId: 'receipt', renderStatus: 'uncertain' }, aspectRatio: '9:16', resultUrl: null, renderPhase: null, isRendering: false, onStop: vi.fn(), onCompose: vi.fn(), singleDelivery: true, actionsInFooter: true }));
+    const html = renderToStaticMarkup(createElement(SalesResultSection, { script: { ...script, renderTaskId: 'receipt', renderStatus: 'uncertain' }, aspectRatio: '9:16', resultUrl: null, renderPhase: null, isRendering: false, onStop: vi.fn(), onQuery: vi.fn(), singleDelivery: true, actionsInFooter: true }));
     expect(html).toContain('提交结果待确认');
     expect(html).toContain('不会重新提交');
     expect(html).not.toContain('继续查询原任务（不重新提交）');
   });
   it('turns an unconfirmed submission without receipt into a recoverable card', () => {
-    const html = renderToStaticMarkup(createElement(SalesResultSection, { script: { ...script, renderSubmissionKey: 'key-1', renderStatus: 'uncertain', renderError: '视频提交响应未确认（网络或响应读取阶段，尝试 1 个端点）' }, aspectRatio: '9:16', resultUrl: null, renderPhase: null, isRendering: false, onStop: vi.fn(), onCompose: vi.fn(), singleDelivery: true, actionsInFooter: true, onPrepareRetry: vi.fn(), onBindTask: vi.fn() }));
+    const html = renderToStaticMarkup(createElement(SalesResultSection, { script: { ...script, renderSubmissionKey: 'key-1', renderStatus: 'uncertain', renderError: '视频提交响应未确认（网络或响应读取阶段，尝试 1 个端点）' }, aspectRatio: '9:16', resultUrl: null, renderPhase: null, isRendering: false, onStop: vi.fn(), onQuery: vi.fn(), singleDelivery: true, actionsInFooter: true, onPrepareRetry: vi.fn(), onBindTask: vi.fn() }));
     expect(html).toContain('不会自动重新提交');
     expect(html).toContain('技术详情');
     expect(html).toContain('绑定并查询');
@@ -317,7 +318,7 @@ describe('sales workflow stages', () => {
     click(gallery({ onChange, selection: { colorLabel: '', confirmedImageUrls: ['/red.png'], excludedImageUrls: [] } }), '清空重选');
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ variantId: undefined, colorLabel: '', confirmedImageUrls: [] }));
   });
-  it('renders collected product attributes and asset thumbnails without a duplicate prompt reference strip', () => {
+  it('renders current SKU specifications and asset thumbnails without a duplicate prompt reference strip', () => {
     const fields = renderToStaticMarkup(createElement(SalesProductFields, {
       productName: '卫衣',
       brand: '品牌',
@@ -331,10 +332,10 @@ describe('sales workflow stages', () => {
       disabled: false,
       onChange: vi.fn(),
     }));
-    expect(fields).toContain('商品参数');
-    expect(fields).toContain('100%棉');
+    expect(fields).toContain('商品规格');
+    expect(fields).not.toContain('100%棉');
     expect(fields).toContain('100265837786');
-    expect(fields).toContain('SKU 颜色');
+    expect(fields).toContain('黑色 / 加绒');
     expect(fields).toContain('已自动提炼 · 1 条');
     expect(fields).toContain('提炼依据与适用场景');
     expect(fields).toContain('圆领罗纹收口');
@@ -342,7 +343,7 @@ describe('sales workflow stages', () => {
     expect(fields).not.toContain('aria-expanded');
     expect(fields).not.toContain('1315');
     expect(fields).not.toContain('0.660');
-    expect(fields).not.toContain('<details');
+    expect(fields).not.toContain('展开全部参数');
 
     const planHtml = renderToStaticMarkup(createElement(SalesPlanSection, {
       script: {

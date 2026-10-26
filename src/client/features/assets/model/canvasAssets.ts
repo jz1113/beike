@@ -99,7 +99,7 @@ export function buildCanvasAssets(projects: AssetCanvasProject[]) {
         model: '无限画布',
         aspectRatio: '1:1',
         mediaType: 'image',
-        isCanvasPlaceholder: !project.thumbnail,
+        isCanvasPlaceholder: true,
         rawTask: project,
       });
     }

@@ -12,9 +12,8 @@ import (
 )
 
 type finalPrompt struct {
-	ShotID      int    `json:"shotId"`
-	Prompt      string `json:"prompt"`
-	ImagePrompt string `json:"imagePrompt,omitempty"`
+	ShotID int    `json:"shotId"`
+	Prompt string `json:"prompt"`
 }
 
 // Finalize writes one video prompt from the pictures that were actually generated.
@@ -36,6 +35,10 @@ func Finalize(cfg config.Config) http.Handler {
 			return
 		}
 		if err := checkWorkflowVersion(payload); err != nil {
+			workflowError(w, 400, err)
+			return
+		}
+		if err := checkFashionCategory(payload); err != nil {
 			workflowError(w, 400, err)
 			return
 		}

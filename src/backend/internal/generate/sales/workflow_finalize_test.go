@@ -8,59 +8,6 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 )
 
-func TestWorkflowValidatesActualImagesAndProductVisually(t *testing.T) {
-	server := useChatServer(t, func(body map[string]any, _ int) string {
-		encoded, _ := json.Marshal(body)
-		text := string(encoded)
-		for _, expected := range []string{"image_url", "white.jpg", "table.jpg", "图片1", "图片2", "selectedColor", "白色", "不能仅凭文字声称通过"} {
-			if !strings.Contains(text, expected) {
-				t.Errorf("missing %s", expected)
-			}
-		}
-		if strings.Contains(text, "red.jpg") {
-			t.Error("disallowed picture sent")
-		}
-		return `{"validations":[{"id":"table","status":"uncertain","reason":"纸巾外观不可辨认"},{"id":"product_white","status":"passed","reason":"白色包装与原图一致"}]}`
-	})
-	payload := workflowPayload()
-	payload["operation"] = "validate-assets"
-	attachGateway(payload, server.URL)
-	rec := postSales(t, Finalize(config.Config{}), "/", payload)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"status":"uncertain"`) {
-		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
-	}
-	var result struct {
-		Validations []assetValidation `json:"validations"`
-	}
-	_ = json.Unmarshal(rec.Body.Bytes(), &result)
-	if len(result.Validations) != 2 || result.Validations[0].ID != "product_white" {
-		t.Fatal("IDs not returned in reference order")
-	}
-}
-
-func TestWorkflowAssetValidationRejectsBadOrInventedResults(t *testing.T) {
-	replies := []string{
-		`{}`, `not JSON`,
-		`{"validations":[{"id":"product_white","status":"passed","reason":"白色"}]}`,
-		`{"validations":[{"id":"product_white","status":"passed","reason":"白色"},{"id":"other","status":"passed","reason":"不存在"}]}`,
-		`{"validations":[{"id":"product_white","status":"passed","reason":"白色"},{"id":"product_white","status":"passed","reason":"重复"}]}`,
-		`{"validations":[{"id":"product_white","status":"passed","reason":"白色"},{"id":"table","status":"ok","reason":"未知状态"}]}`,
-		`{"validations":[{"id":"product_white","status":"passed","reason":"白色"},{"id":"table","status":"passed","reason":""}]}`,
-	}
-	for _, reply := range replies {
-		t.Run(reply, func(t *testing.T) {
-			server := useChatServer(t, func(map[string]any, int) string { return reply })
-			payload := workflowPayload()
-			payload["operation"] = "validate-assets"
-			attachGateway(payload, server.URL)
-			rec := postSales(t, Finalize(config.Config{}), "/", payload)
-			if rec.Code != 502 {
-				t.Fatalf("got %d %s", rec.Code, rec.Body.String())
-			}
-		})
-	}
-}
-
 func TestWorkflowActualReferenceIntegrity(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -96,7 +43,7 @@ func TestWorkflowActualReferenceIntegrity(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := workflowPayload()
-			payload["operation"] = "validate-assets"
+			payload["operation"] = "finalize"
 			tc.mutate(payload)
 			rec := postSales(t, Finalize(config.Config{}), "/", payload)
 			if rec.Code != 400 {
@@ -106,8 +53,8 @@ func TestWorkflowActualReferenceIntegrity(t *testing.T) {
 	}
 }
 
-func TestWorkflowAllCategoriesFinalizeOneVideoWithoutStillPrompts(t *testing.T) {
-	for _, category := range []string{"beauty", "food", "home", "fashion", "tech", "other"} {
+func TestWorkflowFashionFinalizesOneVideoWithoutStillPrompts(t *testing.T) {
+	for _, category := range []string{"fashion"} {
 		t.Run(category, func(t *testing.T) {
 			server := useChatServer(t, func(body map[string]any, _ int) string {
 				encoded, _ := json.Marshal(body)
@@ -134,7 +81,7 @@ func TestWorkflowAllCategoriesFinalizeOneVideoWithoutStillPrompts(t *testing.T) 
 				} else if strings.Contains(text, "语速略慢") || strings.Contains(text, "生活 vlog") {
 					t.Errorf("non-fashion finalize included the fashion architecture")
 				}
-				return `{"fullPrompt":"实拍桌面，保持白色商品，整段口播","prompts":[{"shotId":1,"prompt":"推近白色商品"}]}`
+				return `{"fullPrompt":"实拍桌面，保持白色商品，看看这款纸巾","prompts":[{"shotId":1,"prompt":"展示白色商品，看看这款纸巾"}]}`
 			})
 			payload := workflowPayload()
 			payload["operation"] = "finalize"

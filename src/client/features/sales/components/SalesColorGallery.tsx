@@ -1,12 +1,16 @@
-import { useState } from 'react';
-import { Check, Search, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { Check, ImagePlus, Loader2, Search, X } from 'lucide-react';
 import type { SalesColorSelection, SalesImageRef } from '@shared/domain/sales';
 import { eligibleSalesImages } from '@shared/domain/sales/workflow';
 import type { VideoSalesStudioState } from '../hooks/useVideoSalesStudio';
-import { salesFocusClass, salesTabClass, salesTabTrackClass } from './salesChrome';
+import { salesFocusClass } from './salesChrome';
 
 interface Props {
   images: SalesImageRef[];
+  usableCount?: number;
+  onUploadClick?: () => void;
+  isUploading?: boolean;
+  emptyContent?: ReactNode;
   metadata: VideoSalesStudioState['variantMetadata'];
   selection: SalesColorSelection;
   disabled: boolean;
@@ -14,7 +18,7 @@ interface Props {
   onImageError: (index: number) => void;
 }
 
-export function SalesColorGallery({ images, metadata, selection, disabled, onChange, onImageError }: Props) {
+export function SalesColorGallery({ images, metadata, selection, disabled, onChange, onImageError, usableCount, onUploadClick, isUploading, emptyContent }: Props) {
   const [group, setGroup] = useState<'all' | 'selected'>('all');
   const [preview, setPreview] = useState<SalesImageRef | null>(null);
   const previewIndex = images.findIndex((image) => image.index === preview?.index);
@@ -48,23 +52,27 @@ export function SalesColorGallery({ images, metadata, selection, disabled, onCha
   };
 
   return (
-    <div className="@container space-y-3">
-      <div className="flex items-center gap-2">
-        <div className={`${salesTabTrackClass} flex min-w-0 flex-1`} role="tablist" aria-label="商品图片分组">
-          {(['all', 'selected'] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={activeGroup === key} onClick={() => setGroup(key)} className={`${salesTabClass(activeGroup === key)} flex-1 px-2 text-xs`}>{key === 'all' ? '全部图片' : '已选'} {grouped[key].length}</button>)}
+    <div className="@container flex min-h-0 flex-1 flex-col">
+      <div className="sales-gallery-header flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 pb-3 pt-4">
+        <h3 className="text-xs font-semibold">商品参考图 <span className="ml-1 text-[11px] font-normal text-slate-500 dark:text-slate-400">(共 {images.length} 张 · 已选 {usableCount ?? selected.size} 张)</span></h3>
+        <div className="flex items-center gap-2.5">
+          <button type="button" role="switch" aria-checked={activeGroup === 'selected'} onClick={() => setGroup(activeGroup === 'selected' ? 'all' : 'selected')} className={`inline-flex items-center gap-1.5 rounded-md text-[11px] text-slate-500 dark:text-slate-400 ${salesFocusClass}`}><span className={`flex h-3.5 w-6 items-center rounded-full p-0.5 transition-colors ${activeGroup === 'selected' ? 'bg-slate-600 dark:bg-slate-400' : 'bg-slate-200 dark:bg-white/15'}`} aria-hidden><span className={`h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform ${activeGroup === 'selected' ? 'translate-x-2.5' : ''}`} /></span>只看已选</button>
+          {onUploadClick && <button type="button" disabled={disabled} onClick={onUploadClick} className={`inline-flex items-center gap-1 rounded-md text-[11px] text-slate-600 disabled:opacity-40 dark:text-slate-300 ${salesFocusClass}`}>{isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <ImagePlus className="h-3.5 w-3.5" aria-hidden />}上传图片</button>}
+          {selected.size > 0 && <button type="button" disabled={disabled} onClick={clearSelected} className={`shrink-0 rounded-md text-[11px] text-slate-400 hover:text-slate-700 disabled:opacity-40 dark:hover:text-slate-200 ${salesFocusClass}`}>清空重选</button>}
         </div>
-        {selected.size > 0 && <button type="button" disabled={disabled} onClick={clearSelected} className={`shrink-0 rounded-lg px-2 py-2 text-[11px] text-slate-500 transition hover:bg-slate-50 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-white/5 ${salesFocusClass}`}>清空重选</button>}
       </div>
-      <div className="grid grid-cols-2 gap-2.5 p-0.5 @min-[360px]:grid-cols-3 @min-[520px]:grid-cols-4">
+      <div className="sales-gallery-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth pr-1">
+      {images.length === 0 ? emptyContent : <div className="grid grid-cols-3 gap-2.5 p-0.5 @min-[560px]:grid-cols-4">
         {grouped[activeGroup].map((image) => {
           const isSelected = selected.has(image.url);
-          return <article key={`${image.index}-${image.url}`} className={`relative overflow-hidden rounded-xl border transition-colors ${isSelected ? 'border-amber-500/70 bg-amber-500/[0.04] dark:border-amber-400/60 dark:bg-amber-400/[0.04]' : 'border-black/[0.07] dark:border-white/[0.08]'} ${image.unavailable ? 'opacity-50' : ''}`}>
-            <button type="button" disabled={disabled || image.unavailable} onClick={() => toggleImage(image.url)} aria-label={`${isSelected ? '取消选择' : '选择'}商品图 ${image.index + 1}`} aria-pressed={isSelected} className={`relative block aspect-square max-h-44 w-full bg-white text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/70 disabled:cursor-not-allowed`}><img src={image.url} alt={`商品图 ${image.index + 1}`} loading="lazy" className="h-full w-full object-contain" onError={() => onImageError(image.index)} /><span className="absolute left-1 top-1 rounded px-1 py-px text-[9px] bg-black/40 font-medium tabular-nums text-white">#{image.index + 1}</span>{isSelected && <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-500 p-1 text-slate-950 shadow-sm ring-2 ring-white/90 dark:bg-amber-400"><Check className="h-3 w-3" /></span>}{image.unavailable && <span className="absolute inset-x-0 bottom-0 bg-black/70 text-[10px] text-white">图片不可用</span>}</button>
+          return <article key={`${image.index}-${image.url}`} className={`sales-reference-tile group relative overflow-hidden rounded-xl border-2 transition-colors ${isSelected ? 'is-selected border-amber-500 dark:border-amber-400' : 'border-transparent hover:border-amber-500 dark:hover:border-amber-400'} ${image.unavailable ? 'opacity-50' : ''}`}>
+            <button type="button" disabled={disabled || image.unavailable} onClick={() => toggleImage(image.url)} aria-label={`${isSelected ? '取消选择' : '选择'}商品图 ${image.index + 1}`} aria-pressed={isSelected} className={`relative block aspect-square w-full bg-white text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/70 disabled:cursor-not-allowed`}><img src={image.url} alt={`商品图 ${image.index + 1}`} loading="lazy" className="sales-reference-image h-full w-full object-contain" onError={() => onImageError(image.index)} /><span className="absolute left-1 top-1 rounded px-1 py-px text-[9px] bg-black/40 font-medium tabular-nums text-white">#{image.index + 1}</span>{isSelected && <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-500 p-1 text-slate-950 shadow-sm ring-2 ring-white/90 dark:bg-amber-400"><Check className="h-3 w-3" /></span>}{image.unavailable && <span className="absolute inset-x-0 bottom-0 bg-black/70 text-[10px] text-white">图片不可用</span>}</button>
             <button type="button" disabled={image.unavailable} onClick={() => setPreview(image)} aria-label={`查看商品图 ${image.index + 1} 大图`} className={`absolute bottom-1 right-1 rounded-md bg-black/45 p-1 text-white opacity-70 backdrop-blur-sm transition-opacity hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 disabled:opacity-40 ${salesFocusClass}`}><Search className="h-2.5 w-2.5" aria-hidden /></button>
           </article>;
         })}
+      </div>}
+      {images.length > 0 && grouped[activeGroup].length === 0 && <p className="py-4 text-center text-xs text-slate-500">尚未选择商品图，请在全部图片中直接选择。</p>}
       </div>
-      {grouped[activeGroup].length === 0 && <p className="py-4 text-center text-xs text-slate-500">尚未选择商品图，请在全部图片中直接选择。</p>}
       {preview && <div role="dialog" aria-modal="true" aria-label="商品图片大图" className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4" onKeyDown={(event) => {
         if (event.key === 'Escape') { event.stopPropagation(); setPreview(null); }
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); movePreview(event.key === 'ArrowLeft' ? -1 : 1); }

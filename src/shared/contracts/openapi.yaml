@@ -796,9 +796,10 @@ paths:
   /api/generate/video-sales/compose:
     post:
       operationId: post_api_generate_video_sales_compose
+      deprecated: true
       responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
+        '410':
+          description: 逐镜拼接已停用，历史片段仅支持查询和下载
   /api/generate/video-sales/finalize-prompts:
     post:
       operationId: post_api_generate_video_sales_finalize_prompts
@@ -810,11 +811,13 @@ paths:
               $ref: '#/components/schemas/VideoSalesFinalizeRequest'
       responses:
         '200':
-          description: validate-assets 返回逐ID视觉校验，finalize 返回一条整段提示词，无operation仍走旧接口
+          description: 仅 finalize 返回整段及分段视频提示词；素材由用户人工确认
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/VideoSalesFinalizeResponse'
+        '410':
+          description: validate-assets 已停用，请人工确认素材
   /api/generate/video-sales/script:
     post:
       operationId: post_api_generate_video_sales_script
@@ -826,7 +829,7 @@ paths:
               $ref: '#/components/schemas/VideoSalesScriptRequest'
       responses:
         '200':
-          description: 新版每套脚本包含单条视频交付模式及自动素材计划，旧请求兼容
+          description: 仅服饰技能，返回单条视频交付模式及按需素材计划，不接受旧创作请求
           content:
             application/json:
               schema:
@@ -1136,369 +1139,546 @@ components:
           type: string
           minLength: 1
     VideoSalesWorkflowRequest:
-      type: object
-      description: workflowVersion为3时imageCatalog与eligibleImageIndexes必填，保留原始编号，仅处理允许集合
+      type: "object"
+      required:
+        - "workflowVersion"
+        - "imageCatalog"
+        - "eligibleImageIndexes"
       properties:
         workflowVersion:
-          type: integer
-          enum: [3]
+          type: "integer"
+          enum:
+            - 3
         imageCatalog:
-          type: array
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesCatalogImage"
           minItems: 1
           maxItems: 40
-          items:
-            $ref: '#/components/schemas/VideoSalesCatalogImage'
         eligibleImageIndexes:
-          type: array
+          type: "array"
+          items:
+            type: "integer"
+            minimum: 0
           minItems: 1
           maxItems: 40
           uniqueItems: true
-          items:
-            type: integer
-            minimum: 0
         selectedColor:
-          type: string
+          type: "string"
           maxLength: 200
         model:
-          type: string
+          type: "string"
         customBaseUrl:
-          type: string
+          type: "string"
         customApiKey:
-          type: string
+          type: "string"
         textProtocol:
-          type: string
-          enum: [auto, openai, gemini, anthropic]
-          default: auto
-      oneOf:
-        - not:
-            required: [workflowVersion]
-        - required: [workflowVersion, imageCatalog, eligibleImageIndexes]
+          type: "string"
+          enum:
+            - "auto"
+            - "openai"
+            - "gemini"
+            - "anthropic"
+          default: "auto"
+      description: "仅接受当前流程；保留商品目录原始编号，仅处理允许集合"
     VideoSalesAnalyzeRequest:
-      allOf:
-        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
-        - type: object
-          properties:
-            imageUrls:
-              type: array
-              maxItems: 40
-              items:
-                type: string
-            productName:
-              type: string
-            brand:
-              type: string
-            priceRange:
-              type: string
-            productDescription:
-              type: string
-              maxLength: 4000
-            category:
-              type: string
+      type: "object"
+      required:
+        - "workflowVersion"
+        - "imageCatalog"
+        - "eligibleImageIndexes"
+        - "productName"
+        - "category"
+      properties:
+        workflowVersion:
+          type: "integer"
+          enum:
+            - 3
+        imageCatalog:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesCatalogImage"
+          minItems: 1
+          maxItems: 40
+        eligibleImageIndexes:
+          type: "array"
+          items:
+            type: "integer"
+            minimum: 0
+          minItems: 1
+          maxItems: 40
+          uniqueItems: true
+        selectedColor:
+          type: "string"
+          maxLength: 200
+        model:
+          type: "string"
+        customBaseUrl:
+          type: "string"
+        customApiKey:
+          type: "string"
+        textProtocol:
+          type: "string"
+          enum:
+            - "auto"
+            - "openai"
+            - "gemini"
+            - "anthropic"
+          default: "auto"
+        productName:
+          type: "string"
+          minLength: 1
+        brand:
+          type: "string"
+        category:
+          type: "string"
+          enum:
+            - "fashion"
+        productDescription:
+          type: "string"
+          maxLength: 4000
+      additionalProperties: false
     VideoSalesAspectRatio:
-      type: string
-      enum: ['9:16', '16:9', '3:4', '4:3', '1:1', '21:9']
+      type: "string"
+      enum:
+        - "9:16"
+        - "16:9"
+        - "3:4"
+        - "1:1"
     VideoSalesScriptRequest:
-      allOf:
-        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
-        - type: object
-          required: [productName]
-          properties:
-            productName:
-              type: string
-              minLength: 1
-              maxLength: 100
-            category:
-              type: string
-              enum: [beauty, food, home, fashion, tech, other]
-            productDescription:
-              type: string
-              maxLength: 2000
-            productAnalysis:
-              type: string
-              maxLength: 4000
-            productImages:
-              type: array
-              maxItems: 40
-              items:
-                type: string
-            targetDuration:
-              type: integer
-              minimum: 10
-              maximum: 120
-            aspectRatio:
-              $ref: '#/components/schemas/VideoSalesAspectRatio'
-            priceRange:
-              type: string
-            brand:
-              type: string
-            targetAudience:
-              type: string
-            videoMode:
-              type: string
-              enum: [product_closeup, graphic_montage, scene_demo, live_presenter]
-            platforms:
-              type: array
-              items:
-                type: string
-            templateId:
-              type: string
-            characterId:
-              type: string
-            fashionReferences:
-              type: object
-              required: [person, face, scene]
-              properties:
-                person:
-                  type: boolean
-                face:
-                  type: boolean
-                scene:
-                  type: boolean
-          oneOf:
-            - not:
-                required: [workflowVersion]
-            - required: [workflowVersion, targetDuration, aspectRatio]
+      type: "object"
+      required:
+        - "workflowVersion"
+        - "imageCatalog"
+        - "eligibleImageIndexes"
+        - "productName"
+        - "category"
+        - "targetDuration"
+        - "aspectRatio"
+      properties:
+        workflowVersion:
+          type: "integer"
+          enum:
+            - 3
+        imageCatalog:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesCatalogImage"
+          minItems: 1
+          maxItems: 40
+        eligibleImageIndexes:
+          type: "array"
+          items:
+            type: "integer"
+            minimum: 0
+          minItems: 1
+          maxItems: 40
+          uniqueItems: true
+        selectedColor:
+          type: "string"
+          maxLength: 200
+        model:
+          type: "string"
+        customBaseUrl:
+          type: "string"
+        customApiKey:
+          type: "string"
+        textProtocol:
+          type: "string"
+          enum:
+            - "auto"
+            - "openai"
+            - "gemini"
+            - "anthropic"
+          default: "auto"
+        productName:
+          type: "string"
+          minLength: 1
+          maxLength: 100
+        category:
+          type: "string"
+          enum:
+            - "fashion"
+        brand:
+          type: "string"
+        productDescription:
+          type: "string"
+          maxLength: 4000
+        productAnalysis:
+          type: "string"
+          maxLength: 8000
+        targetAudience:
+          type: "string"
+          maxLength: 200
+        targetDuration:
+          type: "integer"
+          minimum: 10
+          maximum: 120
+        aspectRatio:
+          $ref: "#/components/schemas/VideoSalesAspectRatio"
+        videoMode:
+          type: "string"
+          enum:
+            - "product_closeup"
+            - "graphic_montage"
+            - "scene_demo"
+            - "live_presenter"
+          default: "live_presenter"
+      additionalProperties: false
     VideoSalesPlannedAsset:
-      type: object
-      description: 按需1至4张，依赖只能指向前序素材；衣服上身图usesProduct必须为true
-      required: [id, kind, label, prompt, required]
+      type: "object"
+      required:
+        - "id"
+        - "kind"
+        - "label"
+        - "prompt"
+        - "required"
       properties:
         id:
-          type: string
+          type: "string"
           minLength: 1
         kind:
-          type: string
-          enum: [person, face, scene, keyframe]
+          type: "string"
+          enum:
+            - "person"
+            - "face"
+            - "scene"
+            - "keyframe"
         label:
-          type: string
+          type: "string"
           minLength: 1
         prompt:
-          type: string
+          type: "string"
           minLength: 1
         required:
-          type: boolean
+          type: "boolean"
         referenceAssetIds:
-          type: array
-          uniqueItems: true
+          type: "array"
           items:
-            type: string
+            type: "string"
+            minLength: 1
+          uniqueItems: true
         usesProduct:
-          type: boolean
+          type: "boolean"
         productImageIndexes:
-          type: array
-          description: 本张静帧按目标视角选择的商品目录原始编号，须属于模型看过的允许图片；未提供时兼容旧计划，生图使用全部已选商品图
-          uniqueItems: true
+          type: "array"
           items:
-            type: integer
+            type: "integer"
             minimum: 0
+          uniqueItems: true
+          description: "使用商品的素材必须明确提供非空原始编号；旧计划缺失时需更新脚本"
+      description: "按需 1 至 4 张，依赖只能指向前序素材"
+      oneOf:
+        -
+          required:
+            - "usesProduct"
+            - "productImageIndexes"
+          properties:
+            usesProduct:
+              enum:
+                - true
+            productImageIndexes:
+              minItems: 1
+        -
+          properties:
+            usesProduct:
+              enum:
+                - false
+            productImageIndexes:
+              maxItems: 0
     VideoSalesShot:
-      type: object
-      required: [shotId]
+      type: "object"
+      required:
+        - "shotId"
+        - "speechMode"
+        - "voiceover"
       properties:
         shotId:
-          type: integer
+          type: "integer"
           minimum: 1
         type:
-          type: string
+          type: "string"
         duration:
-          type: integer
+          type: "integer"
           minimum: 1
         description:
-          type: string
+          type: "string"
         camera:
-          type: string
+          type: "string"
+        speechMode:
+          type: "string"
+          enum:
+            - "on_camera"
+            - "voiceover"
         voiceover:
-          type: string
+          type: "string"
+          minLength: 1
         prompt:
-          type: string
+          type: "string"
         imageIndex:
-          type: integer
+          type: "integer"
           minimum: 0
         visualSource:
-          type: string
+          type: "string"
+          enum:
+            - "product_image"
+            - "ai_generate"
         transition:
-          type: string
+          type: "string"
+          enum:
+            - "direct_concat"
         selectionReason:
-          type: string
+          type: "string"
     VideoSalesScript:
-      type: object
-      description: 新版deliveryMode和assets必有，时长必须精确匹配请求，旧版返回结构保留
-      required: [id, title, totalDuration, shots]
+      type: "object"
+      required:
+        - "id"
+        - "title"
+        - "totalDuration"
+        - "shots"
+        - "deliveryMode"
+        - "assets"
       properties:
         id:
-          type: string
+          type: "string"
         title:
-          type: string
+          type: "string"
         beat:
-          type: string
+          type: "string"
+          enum:
+            - "unbox"
+            - "lifestyle"
+            - "accessory"
         deliveryMode:
-          type: string
-          enum: [single]
+          type: "string"
+          enum:
+            - "single"
         assets:
-          type: array
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesPlannedAsset"
           minItems: 1
           maxItems: 4
-          items:
-            $ref: '#/components/schemas/VideoSalesPlannedAsset'
         totalDuration:
-          type: integer
+          type: "integer"
         shots:
-          type: array
+          type: "array"
           items:
-            $ref: '#/components/schemas/VideoSalesShot'
+            $ref: "#/components/schemas/VideoSalesShot"
+          minItems: 1
+          maxItems: 40
         seo:
-          type: object
+          type: "object"
           additionalProperties: true
         fullPrompt:
-          type: string
+          type: "string"
+      description: "仅当前服饰脚本，分镜为整段时间轴，总时长精确匹配请求"
     VideoSalesSelectRequest:
-      allOf:
-        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
-        - type: object
-          required: [shots, imageCatalog]
-          properties:
-            shots:
-              type: array
-              minItems: 1
-              maxItems: 40
-              items:
-                $ref: '#/components/schemas/VideoSalesShot'
+      type: "object"
+      required:
+        - "workflowVersion"
+        - "imageCatalog"
+        - "eligibleImageIndexes"
+        - "shots"
+      properties:
+        workflowVersion:
+          type: "integer"
+          enum:
+            - 3
+        imageCatalog:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesCatalogImage"
+          minItems: 1
+          maxItems: 40
+        eligibleImageIndexes:
+          type: "array"
+          items:
+            type: "integer"
+            minimum: 0
+          minItems: 1
+          maxItems: 40
+          uniqueItems: true
+        selectedColor:
+          type: "string"
+          maxLength: 200
+        model:
+          type: "string"
+        customBaseUrl:
+          type: "string"
+        customApiKey:
+          type: "string"
+        textProtocol:
+          type: "string"
+          enum:
+            - "auto"
+            - "openai"
+            - "gemini"
+            - "anthropic"
+          default: "auto"
+        shots:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesShot"
+          minItems: 1
+          maxItems: 40
+      additionalProperties: false
     VideoSalesActualReference:
-      type: object
-      required: [id, kind, label, url]
+      type: "object"
+      required:
+        - "id"
+        - "kind"
+        - "label"
+        - "url"
       properties:
         id:
-          type: string
+          type: "string"
           minLength: 1
         kind:
-          type: string
-          enum: [product, person, face, scene, keyframe]
+          type: "string"
+          enum:
+            - "product"
+            - "person"
+            - "face"
+            - "scene"
+            - "keyframe"
         label:
-          type: string
+          type: "string"
           minLength: 1
         url:
-          type: string
+          type: "string"
           minLength: 1
     VideoSalesFinalizeRequest:
-      allOf:
-        - $ref: '#/components/schemas/VideoSalesWorkflowRequest'
-        - type: object
-          required: [shots, imageCatalog]
-          properties:
-            operation:
-              type: string
-              enum: [validate-assets, finalize]
-            shots:
-              type: array
-              minItems: 1
-              maxItems: 40
-              items:
-                allOf:
-                  - $ref: '#/components/schemas/VideoSalesShot'
-                  - type: object
-                    required: [imageIndex]
-            actualReferences:
-              type: array
-              minItems: 1
-              maxItems: 44
-              items:
-                $ref: '#/components/schemas/VideoSalesActualReference'
-            assets:
-              type: array
-              minItems: 1
-              maxItems: 4
-              items:
-                $ref: '#/components/schemas/VideoSalesPlannedAsset'
-            targetDuration:
-              type: integer
-              minimum: 10
-              maximum: 120
-            aspectRatio:
-              $ref: '#/components/schemas/VideoSalesAspectRatio'
-            videoModel:
-              type: string
-            videoRefMode:
-              type: string
-            videoResolution:
-              type: string
-            productAnalysis:
-              type: string
-              maxLength: 8000
-            category:
-              type: string
-              enum: [beauty, food, home, fashion, tech, other]
-            referenceOrder:
-              type: array
-              maxItems: 4
-              items:
-                type: object
-                required: [slot, label, url]
-                properties:
-                  slot:
-                    type: string
-                    enum: [person, face, garment, scene]
-                  label:
-                    type: string
-                  url:
-                    type: string
-                  imageIndex:
-                    type: integer
-                    minimum: 0
-          oneOf:
-            - not:
-                anyOf:
-                  - required: [workflowVersion]
-                  - required: [operation]
-            - required: [workflowVersion, operation, actualReferences]
-              properties:
-                operation:
-                  enum: [validate-assets]
-            - required: [workflowVersion, operation, actualReferences, targetDuration, aspectRatio]
-              properties:
-                operation:
-                  enum: [finalize]
-    VideoSalesAssetValidation:
-      type: object
-      required: [id, status, reason]
+      type: "object"
+      required:
+        - "workflowVersion"
+        - "imageCatalog"
+        - "eligibleImageIndexes"
+        - "operation"
+        - "category"
+        - "shots"
+        - "actualReferences"
+        - "assets"
+        - "targetDuration"
+        - "aspectRatio"
       properties:
-        id:
-          type: string
-        status:
-          type: string
-          enum: [passed, conflict, uncertain]
-        reason:
-          type: string
-          minLength: 1
+        workflowVersion:
+          type: "integer"
+          enum:
+            - 3
+        imageCatalog:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesCatalogImage"
+          minItems: 1
+          maxItems: 40
+        eligibleImageIndexes:
+          type: "array"
+          items:
+            type: "integer"
+            minimum: 0
+          minItems: 1
+          maxItems: 40
+          uniqueItems: true
+        selectedColor:
+          type: "string"
+          maxLength: 200
+        model:
+          type: "string"
+        customBaseUrl:
+          type: "string"
+        customApiKey:
+          type: "string"
+        textProtocol:
+          type: "string"
+          enum:
+            - "auto"
+            - "openai"
+            - "gemini"
+            - "anthropic"
+          default: "auto"
+        operation:
+          type: "string"
+          enum:
+            - "finalize"
+        category:
+          type: "string"
+          enum:
+            - "fashion"
+        shots:
+          type: "array"
+          items:
+            allOf:
+              -
+                $ref: "#/components/schemas/VideoSalesShot"
+              -
+                required:
+                  - "imageIndex"
+                  - "duration"
+          minItems: 1
+          maxItems: 40
+        actualReferences:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesActualReference"
+          minItems: 1
+          maxItems: 44
+        assets:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/VideoSalesPlannedAsset"
+          minItems: 1
+          maxItems: 4
+        targetDuration:
+          type: "integer"
+          minimum: 10
+          maximum: 120
+        aspectRatio:
+          $ref: "#/components/schemas/VideoSalesAspectRatio"
+        videoModel:
+          type: "string"
+        videoRefMode:
+          type: "string"
+        videoResolution:
+          type: "string"
+        productAnalysis:
+          type: "string"
+          maxLength: 8000
+      additionalProperties: false
     VideoSalesFinalizeResponse:
-      type: object
-      required: [success]
+      type: "object"
+      required:
+        - "success"
+        - "fullPrompt"
+        - "prompts"
       properties:
         success:
-          type: boolean
+          type: "boolean"
+          enum:
+            - true
         model:
-          type: string
-        validations:
-          type: array
-          items:
-            $ref: '#/components/schemas/VideoSalesAssetValidation'
+          type: "string"
+        usage:
+          type: "object"
+          additionalProperties: true
         fullPrompt:
-          type: string
+          type: "string"
+          minLength: 1
         prompts:
-          type: array
+          type: "array"
           items:
-            type: object
-            required: [shotId, prompt]
+            type: "object"
+            required:
+              - "shotId"
+              - "prompt"
             properties:
               shotId:
-                type: integer
+                type: "integer"
+                minimum: 1
               prompt:
-                type: string
-              imagePrompt:
-                type: string
-        personImagePrompt:
-          type: string
-        sceneImagePrompt:
-          type: string
+                type: "string"
+                minLength: 1
+          minItems: 1
     CollectVariantMetadata:
       type: object
       required: [version, variants]

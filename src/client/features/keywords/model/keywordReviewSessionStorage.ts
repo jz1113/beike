@@ -1,12 +1,13 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction } from 'idb';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { getApiBase } from '@client/shared/api/apiBase';
-import { KEYWORD_REVIEW_CATEGORIES, KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode, type KeywordReviewRow } from '@shared/contracts/generate';
+import type { KeywordReviewMode, KeywordReviewRow } from '@shared/contracts/generate';
 import type { KeywordReviewRecord, ParsedKeywordWorkbook } from './keywordReviewWorkbookTypes';
 import type { ReviewTokenUsage } from './reviewCost';
 import { normalizeKeywordReviewSettings, type KeywordReviewSettings } from './keywordReviewSettings';
 import type { ReviewSubmission } from './reviewSubmission';
 import { createKeywordReviewSessionOwnership, KeywordReviewOwnershipError } from './keywordReviewSessionOwnership';
+import { isValidReviewVerdict } from './keywordReviewVerdict';
 
 export interface KeywordReviewSessionContext {
   rulesVersion: number | null;
@@ -177,10 +178,7 @@ function sameInput(left: KeywordReviewRow, right: KeywordReviewRow): boolean {
 }
 
 function validCompletedRecord(record: KeywordReviewRecord, mode: KeywordReviewMode): boolean {
-  const categories: readonly string[] = mode === 'video' ? KEYWORD_VIDEO_CATEGORIES : KEYWORD_REVIEW_CATEGORIES;
-  return record.status === 'done' && categories.includes(record.category || '')
-    && (record.producible === '制作' || record.producible === '不制作')
-    && (mode !== 'video' || record.lowValue === '是' || record.lowValue === '否');
+  return record.status === 'done' && isValidReviewVerdict(record, mode);
 }
 
 function restoreRecord(record: KeywordReviewRecord, uncertain: boolean, mode: KeywordReviewMode): KeywordReviewRecord {

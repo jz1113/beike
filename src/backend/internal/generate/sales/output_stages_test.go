@@ -18,9 +18,8 @@ func TestSalesStagesRecoverAndStillValidateDomainResults(t *testing.T) {
 		{"script", "", validWorkflowScript(), Script(config.Config{}), 200},
 		{"wrong duration", "", strings.Replace(validWorkflowScript(), `"duration":15`, `"duration":14`, 1), Script(config.Config{}), 502},
 		{"select", "", `{"assignments":[{"shotId":1,"imageIndex":2,"reason":"白色商品主图"}]}`, Select(config.Config{}), 200},
-		{"finalize", "finalize", `{"fullPrompt":"图片1商品，图片2场景","prompts":[{"shotId":1,"prompt":"展示图片1商品"}]}`, Finalize(config.Config{}), 200},
+		{"finalize", "finalize", `{"fullPrompt":"图片1商品，图片2场景，看看这款纸巾","prompts":[{"shotId":1,"prompt":"展示图片1商品，看看这款纸巾"}]}`, Finalize(config.Config{}), 200},
 		{"invented reference", "finalize", `{"fullPrompt":"图片99商品","prompts":[{"shotId":1,"prompt":"展示商品"}]}`, Finalize(config.Config{}), 502},
-		{"validate", "validate-assets", `{"validations":[{"id":"table","status":"uncertain","reason":"看不清"},{"id":"product_white","status":"passed","reason":"白色包装"}]}`, Finalize(config.Config{}), 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0

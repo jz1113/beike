@@ -22,86 +22,6 @@ func TestLegacySalesRoutesRequireCurrentWorkflow(t *testing.T) {
 	}
 }
 
-func TestBuildFFmpegCommand(t *testing.T) {
-	payload := ComposePayload{
-		ProjectID: "proj_test_123",
-		Clips: []ComposeClip{
-			{
-				Type:       "image",
-				FilePath:   "/tmp/test_product.jpg",
-				Duration:   3.0,
-				Transition: "direct_concat",
-				Motion:     "zoom_in_slow",
-			},
-			{
-				Type:       "video",
-				FilePath:   "/tmp/test_clip.mp4",
-				Duration:   4.0,
-				Transition: "ffmpeg_fade",
-				HasAudio:   true,
-			},
-		},
-		Output: ComposeOutputSpec{
-			Resolution:  "1080p",
-			AspectRatio: "9:16",
-			BgmPath:     "/tmp/bgm.mp3",
-			BgmVolume:   0.3,
-		},
-		Subtitles: []ComposeSubtitle{
-			{
-				Text:      "湿水不破的神仙好物",
-				StartTime: 0.0,
-				EndTime:   3.0,
-			},
-		},
-	}
-
-	cmdStr, args := BuildFFmpegCommand(payload, "/tmp/out.mp4")
-	if cmdStr == "" || len(args) == 0 {
-		t.Fatalf("expected non-empty command and args")
-	}
-}
-
-func TestVoiceoverDucksBackgroundMusic(t *testing.T) {
-	payload := ComposePayload{
-		Clips:  []ComposeClip{{Type: "image", FilePath: "a.jpg", Duration: 3, AudioURL: "voice.mp3"}},
-		Output: ComposeOutputSpec{BgmPath: "bgm.mp3", BgmVolume: 0.2, AspectRatio: "9:16"},
-	}
-	_, args := BuildFFmpegCommand(payload, "out.mp4")
-	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "voice.mp3") || !strings.Contains(joined, "sidechaincompress") || !strings.Contains(joined, "bgm.mp3") {
-		t.Fatalf("missing ducked voiceover: %s", joined)
-	}
-}
-
-func TestFadeOffsetUsesRunningTimeline(t *testing.T) {
-	payload := ComposePayload{Clips: []ComposeClip{
-		{Type: "image", FilePath: "a.jpg", Duration: 3},
-		{Type: "image", FilePath: "b.jpg", Duration: 4, Transition: "ffmpeg_fade"},
-		{Type: "image", FilePath: "c.jpg", Duration: 5, Transition: "ffmpeg_fade"},
-	}}
-	_, args := BuildFFmpegCommand(payload, "out.mp4")
-	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "offset=2.50") || !strings.Contains(joined, "offset=6.00") {
-		t.Fatalf("fade offsets missing: %s", joined)
-	}
-}
-
-func TestComposeWithoutSubtitlesOmitsDrawtext(t *testing.T) {
-	payload := ComposePayload{
-		Clips:  []ComposeClip{{Type: "video", FilePath: "a.mp4", Duration: 3, AudioURL: "voice.mp3"}},
-		Output: ComposeOutputSpec{AspectRatio: "9:16", Resolution: "1080p"},
-	}
-	_, args := BuildFFmpegCommand(payload, "out.mp4")
-	joined := strings.Join(args, " ")
-	if strings.Contains(joined, "drawtext") {
-		t.Fatalf("subtitles should be absent: %s", joined)
-	}
-	if !strings.Contains(joined, "voice.mp3") {
-		t.Fatalf("voiceover should remain: %s", joined)
-	}
-}
-
 func TestLimitVisionImagesPrefersMain(t *testing.T) {
 	images := []CatalogImage{
 		{Index: 10, URL: "https://example.com/detail.jpg", Role: "detail"},
@@ -115,21 +35,31 @@ func TestLimitVisionImagesPrefersMain(t *testing.T) {
 	}
 }
 
-func TestAssignImageIndexesClamps(t *testing.T) {
-	shots := []ScriptShot{{ShotId: 1, Description: "正面", VisualSource: "ai_generate"}, {ShotId: 2, Description: "细节"}}
-	assigned := AssignImageIndexes(shots, []ImageAssignment{{ShotID: 1, ImageIndex: 9}, {ShotID: 2, ImageIndex: 1}}, 2)
-	if assigned[0].ImageIndex != 0 || assigned[1].ImageIndex != 1 || assigned[0].VisualSource != "ai_generate" || assigned[1].VisualSource != "product_image" {
-		t.Fatalf("unexpected indexes: %+v", assigned)
+func TestRetiredSalesOperationsNeverCallModels(t *testing.T) {
+	for _, operation := range []string{"compose", "validate-assets"} {
+		payload := workflowPayload()
+		payload["operation"] = operation
+		handler := Finalize(config.Config{})
+		if operation == "compose" {
+			handler = Compose(config.Config{})
+		}
+		rec := postSales(t, handler, "/", payload)
+		if rec.Code != http.StatusGone || !strings.Contains(rec.Body.String(), "已停用") {
+			t.Fatalf("%s: %d %s", operation, rec.Code, rec.Body.String())
+		}
 	}
 }
 
-func TestComposePathsRejectEscape(t *testing.T) {
-	if _, _, err := prepareComposeOutput("local", "../etc"); err == nil {
-		t.Fatal("expected project id rejection")
-	}
-	root := t.TempDir()
-	t.Setenv("AZHUO_CACHE_DIR", root)
-	if _, err := resolveComposeMedia(t.Context(), "/etc/passwd", root, "clip"); err == nil {
-		t.Fatal("expected absolute path rejection")
+func TestSalesCreationRejectsOtherCategoriesBeforeModelCalls(t *testing.T) {
+	for _, category := range []string{"", "home", "beauty", "food", "tech", "other"} {
+		for _, handler := range []http.Handler{Analyze(config.Config{}), Script(config.Config{}), Finalize(config.Config{})} {
+			payload := workflowPayload()
+			payload["category"] = category
+			payload["operation"] = "finalize"
+			rec := postSales(t, handler, "/", payload)
+			if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "category 必须为 fashion") {
+				t.Fatalf("%s: %d %s", category, rec.Code, rec.Body.String())
+			}
+		}
 	}
 }

@@ -59,6 +59,13 @@ export function dataRows(sheet: XLSX.WorkSheet, col: number, afterRow: number): 
   }).sort((a, b) => a - b);
 }
 
+/** Notes, titles and other populated rows must survive a completed export. */
+export function hasNonKeywordRows(sheet: XLSX.WorkSheet, queryCol: number, headerRow: number): boolean {
+  const rows = new Set([headerRow, ...dataRows(sheet, queryCol, headerRow)]);
+  return Object.entries(sheet).some(([address, cell]) => !address.startsWith('!')
+    && meaningfulCell(cell) && !rows.has(XLSX.utils.decode_cell(address).r));
+}
+
 export function hasInternalLinks(sheet: XLSX.WorkSheet): boolean {
   return Object.entries(sheet).some(([address, cell]) => !address.startsWith('!') && cell?.l?.Target?.startsWith('#'));
 }

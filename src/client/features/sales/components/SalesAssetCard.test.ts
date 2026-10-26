@@ -9,7 +9,7 @@ const asset: SalesCreativeAsset = { id: 'scene', kind: 'scene', label: '场景',
 describe('sales asset task actions', () => {
   it('queries a receipt without requiring a model, prompt or missing reference', () => {
     const onGenerate = vi.fn();
-    const props = { asset, assets: [asset], legacyProductIndexes: [], disabled: false, modelReady: false, onEdit: vi.fn(), onGenerate };
+    const props = { asset, assets: [asset], disabled: false, modelReady: false, onEdit: vi.fn(), onGenerate };
     const card = SalesAssetCard(props);
     const html = renderToStaticMarkup(createElement(SalesAssetCard, props));
     expect(html).toContain('继续查询此素材（不重新生图）');
@@ -19,7 +19,7 @@ describe('sales asset task actions', () => {
     expect(onGenerate).toHaveBeenCalledExactlyOnceWith(true);
   });
   it('disables resubmission for an uncertain asset without a receipt', () => {
-    const card = SalesAssetCard({ asset: { ...asset, status: 'uncertain', taskId: undefined }, assets: [], legacyProductIndexes: [], disabled: false, modelReady: true, onEdit: vi.fn(), onGenerate: vi.fn() });
+    const card = SalesAssetCard({ asset: { ...asset, status: 'uncertain', taskId: undefined }, assets: [], disabled: false, modelReady: true, onEdit: vi.fn(), onGenerate: vi.fn() });
     expect(card.props.children.at(-1).props.disabled).toBe(true);
     expect(renderToStaticMarkup(card)).toContain('提交结果待核实');
   });

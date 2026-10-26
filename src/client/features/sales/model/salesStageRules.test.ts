@@ -3,7 +3,7 @@ import { configureDomainRuntime } from '@shared/domain/core/runtime';
 import { getModalityStorageKey } from '@shared/domain/models/modalityStorage';
 import type { VideoSalesScript } from '@shared/domain/sales';
 import { reuseSalesPlanAssets } from './salesAssetHelpers';
-import { assertSalesPlanCurrent, invalidateSalesState, salesFinalInputRevision, salesPlanInputRevision, salesSingleVideoError } from './salesStageRules';
+import { assertSalesPlanCurrent, invalidateSalesState, salesAnalysisInputRevision, salesFinalInputRevision, salesPlanInputRevision, salesSingleVideoError } from './salesStageRules';
 import { defaultSalesStudioState, normalizeSalesScripts, readSalesColorSelection, type VideoSalesStudioState } from './salesStudioDraft';
 import { salesStageActions } from './salesWorkspaceView';
 import { salesResolveRefMode, salesResolveResolution } from './salesWorkspace';
@@ -16,8 +16,8 @@ function fixture(): { state: VideoSalesStudioState; script: VideoSalesScript } {
   const script: VideoSalesScript = {
     id: 'plan', title: '方案', totalDuration: 15, workflowVersion: 3, deliveryMode: 'single',
     planRevision: salesPlanInputRevision(state), finalizedRevision: 'final', assetValidation: 'passed',
-    shots: [{ shotId: 1, type: 'demo', duration: 15, description: '展示', camera: '中景', voiceover: '如实展示', imageIndex: 4, visualSource: 'product_image', transition: 'direct_concat' }],
-    assets: [{ id: 'scene', kind: 'scene', label: '桌面', prompt: '实拍桌面', required: true, status: 'done', url: '/scene.jpg', sourceRevision: 'source', validation: 'passed' }],
+    shots: [{ shotId: 1, type: 'demo', duration: 15, description: '展示', camera: '中景', speechMode: 'voiceover', voiceover: '如实展示', imageIndex: 4, visualSource: 'product_image', transition: 'direct_concat' }],
+    assets: [{ id: 'scene', kind: 'scene', label: '桌面', prompt: '实拍桌面', required: true, status: 'done', url: '/scene.jpg', sourceRevision: 'source', validation: 'passed', validationSource: 'manual' }],
     seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
     renderStatus: 'generating', renderTaskId: 'paid-task', renderResultUrl: '/history.mp4',
   };
@@ -209,5 +209,44 @@ describe('sales stage invalidation and migration', () => {
     expect(reuseSalesPlanAssets(next, script).assets![0]).toMatchObject({ url: '/scene.jpg', status: 'done', validation: 'pending' });
     expect(reuseSalesPlanAssets({ ...next, planRevision: 'new-color' }, script).assets![0].url).toBeUndefined();
     expect(reuseSalesPlanAssets({ ...next, assets: [{ ...next.assets[0], prompt: '另一个场景' }] }, script).assets![0].url).toBeUndefined();
+  });
+});
+
+describe('sales analysis input reuse', () => {
+  it.each<Partial<VideoSalesStudioState>>([
+    { productName: '另一件商品' }, { sellingPoints: '新事实' }, { props: { 材质: '棉' } },
+    { imageCatalog: [{ index: 4, role: 'main', url: '/other.jpg' }] },
+  ])('drops old analysis and script checkpoints when product evidence changes: %j', (patch) => {
+    const { state } = fixture();
+    state.analysis = { sellingPoints: ['旧分析'] } as NonNullable<VideoSalesStudioState['analysis']>;
+    state.analysisRevision = salesAnalysisInputRevision(state);
+    state.planCheckpoint = { revision: 'old-checkpoint', analysis: state.analysis, script: state.scripts[0] };
+    const next = invalidateSalesState(state, patch);
+    expect(next.analysis).toBeNull();
+    expect(next.analysisRevision).toBeUndefined();
+    expect(next.planCheckpoint).toBeUndefined();
+    expect(next.scripts[0].renderTaskId).toBe('paid-task');
+  });
+  it('reuses product analysis but drops the script checkpoint when only timing changes', () => {
+    const { state } = fixture();
+    state.analysis = { sellingPoints: ['已核实卖点'] } as NonNullable<VideoSalesStudioState['analysis']>;
+    state.analysisRevision = salesAnalysisInputRevision(state);
+    state.planCheckpoint = { revision: 'checkpoint', script: state.scripts[0] };
+    const next = invalidateSalesState(state, { targetDuration: 30 });
+    expect(next.analysis).toBe(state.analysis);
+    expect(next.analysisRevision).toBe(salesAnalysisInputRevision(next));
+    expect(next.planCheckpoint).toBeUndefined();
+  });
+  it('includes edited shot prompts in finalization input signatures', () => {
+    const { state, script } = approvedFixture();
+    const previous = salesFinalInputRevision(state, script);
+    const changed = { ...script, shots: [{ ...script.shots[0], prompt: '改用另一个动作' }] };
+    expect(salesFinalInputRevision(state, changed)).not.toBe(previous);
+  });
+  it('blocks creation for a historical category while retaining its queryable receipts', () => {
+    const { state, script } = approvedFixture();
+    state.category = 'home';
+    expect(salesSingleVideoError(state, script)).toContain('历史方案');
+    expect(script.renderTaskId).toBe('paid-task');
   });
 });

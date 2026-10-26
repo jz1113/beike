@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { KeywordReviewRecord, OutputColumn, ParsedKeywordWorkbook } from './keywordReviewWorkbookTypes';
 import { writeWorkbookProgress } from './keywordReviewWorkbookState';
 import { buildReviewedWorkbook } from './keywordReviewWorkbookExport';
+import { hasNonKeywordRows } from './keywordReviewSheetLayout';
 
 function cloneCell(cell: XLSX.CellObject | undefined): XLSX.CellObject | undefined {
   if (!cell) return undefined;
@@ -26,7 +27,13 @@ function columnWidth(column: OutputColumn): number {
 }
 
 export function buildMergedReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: KeywordReviewRecord[]): XLSX.WorkBook {
-  if (parsed.preserveSourceLayout || parsed.hasFormulas) return buildReviewedWorkbook(parsed, records);
+  // Older browser snapshots may predate the source-layout flag for notes.
+  const hasNotes = parsed.sheets.some((meta) => {
+    const sheet = parsed.workbook.Sheets[meta.name];
+    const queryCol = meta.outputColumns.find((column) => column.sourceKind === 'query')?.sourceCol;
+    return sheet && (queryCol === undefined || hasNonKeywordRows(sheet, queryCol, meta.headerRow));
+  });
+  if (parsed.preserveSourceLayout || parsed.hasFormulas || hasNotes) return buildReviewedWorkbook(parsed, records);
   const columns = parsed.displayColumns;
   const includeSourceSheet = parsed.sheets.length > 1;
   const offset = includeSourceSheet ? 1 : 0;

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { KeywordReviewRecord } from './keywordReviewWorkbookTypes';
-import { advanceAutomaticRetryVersions, countReviewRecords, isAutomaticRetryRecord, isIsolatedSubmission, isUnbilledGatewayFailure } from './reviewProgress';
+import { advanceAutomaticRetryVersions, countReviewRecords, isAutomaticRetryRecord, isIsolatedSubmission } from './reviewProgress';
 
 function record(id: string, patch: Partial<KeywordReviewRecord>): KeywordReviewRecord {
   return { id, query: id, sheetName: 'Sheet1', rowNumber: 1, status: 'idle', sourceValues: {}, ...patch };
 }
 
 describe('automatic keyword review retries', () => {
-  it('resumes ordinary failures and unbilled gateway rows, not unknown charges', () => {
+  it('keeps every unknown charge isolated even when the error resembles a free gateway failure', () => {
     const gateway = record('gateway', {
       status: 'error',
       submissionUncertain: true,
@@ -44,26 +44,22 @@ describe('automatic keyword review retries', () => {
       submissionUncertain: true,
       error: '模型服务响应传输异常，提交结果待核对；提交结果待核对，暂不重新收费',
     });
-    expect(isUnbilledGatewayFailure(gateway)).toBe(true);
-    expect(isUnbilledGatewayFailure(busy)).toBe(true);
-    expect(isUnbilledGatewayFailure(deepseek)).toBe(true);
     expect(isAutomaticRetryRecord(ordinary)).toBe(true);
-    for (const held of [dropped, timeout, receipt, truncated]) {
-      expect(isUnbilledGatewayFailure(held)).toBe(false);
+    for (const held of [gateway, busy, deepseek, dropped, timeout, receipt, truncated]) {
       expect(isAutomaticRetryRecord(held)).toBe(false);
+      expect(isIsolatedSubmission(held)).toBe(true);
     }
     expect(isAutomaticRetryRecord(record('idle', { status: 'idle' }))).toBe(false);
 
     const versions = new Map<number, number>([[1, 3]]);
     const indices = new Map([['gateway', 1], ['dropped', 2], ['ordinary', 3]]);
     advanceAutomaticRetryVersions([gateway, dropped, ordinary, record('idle', { status: 'idle' })], indices, versions);
-    expect(versions.get(1)).toBe(4);
+    expect(versions.get(1)).toBe(3);
     expect(versions.get(3)).toBe(1);
     expect(versions.has(2)).toBe(false);
     expect(isIsolatedSubmission(dropped)).toBe(true);
-    expect(isIsolatedSubmission(gateway)).toBe(false);
     const counts = countReviewRecords([gateway, dropped, ordinary]);
     expect(counts.failed).toBe(3);
-    expect(counts.uncertain).toBe(1);
+    expect(counts.uncertain).toBe(2);
   });
 });

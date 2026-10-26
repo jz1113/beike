@@ -19,7 +19,7 @@ export const SALES_SKILL_DOCUMENT = {
   body: skillSource.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '').trim(),
 };
 
-// 规则弹窗只展示已接入的服饰技能。通用制作流程仍保留在创作设置中。
+// 创作设置与规则弹窗只展示实际接入的技能。
 export const SALES_RULE_GROUPS: readonly SalesRuleGroup[] = [
   {
     id: 'fashion',
@@ -33,19 +33,18 @@ export const SALES_RULE_GROUPS: readonly SalesRuleGroup[] = [
   },
 ];
 
-export type SalesSkillId = 'generic' | 'fashion';
+export type SalesSkillId = 'fashion';
 
 export const SALES_SKILL_OPTIONS: readonly { id: SalesSkillId; label: string }[] = [
-  { id: 'generic', label: '通用制作流程' },
   { id: 'fashion', label: '服饰专属规则' },
 ];
 
-export function salesSkillId(category: VideoSalesCategory): SalesSkillId {
-  return category === 'fashion' ? 'fashion' : 'generic';
+export function salesSkillId(category: VideoSalesCategory): SalesSkillId | '' {
+  return category === 'fashion' ? 'fashion' : '';
 }
 
 export function salesCategoryForSkill(skill: SalesSkillId): VideoSalesCategory {
-  return skill === 'fashion' ? 'fashion' : 'other';
+  return skill;
 }
 
 export function salesSkillBadge(fashionActive: boolean): string {
@@ -56,5 +55,5 @@ export function salesCreationRule(category: VideoSalesCategory): { title: string
   if (category === 'fashion') {
     return { title: '服饰专属规则', detail: '本次商品分析与口播按服饰、鞋、包的实拍叙事编写：开箱换装、生活穿搭或鞋包展示。' };
   }
-  return { title: '通用制作流程', detail: '本次商品分析与口播按全品类通用流程编写。' };
+  return { title: '请选择已接入的技能', detail: '当前仅支持服饰、鞋、包。历史方案可查看和查询原任务；继续创作前请选择服饰专属规则并更新脚本。' };
 }

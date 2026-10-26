@@ -64,6 +64,7 @@ func TestWorkflowScriptClaudeNativeResponseParsing(t *testing.T) {
 		t.Run(map[bool]string{false: "usable JSON", true: "field mismatch"}[invalid], func(t *testing.T) {
 			calls := 0
 			reply := strings.Replace(validWorkflowScript(), `"usesProduct":true`, `"referenceAssetIds":"","usesProduct":true`, 1)
+			reply = strings.Replace(reply, `"productImageIndexes":[2]`, `"productImageIndexes":[1]`, 1)
 			reply = strings.Replace(reply, `"shotId":1`, `"shotId":1,"textOverlay":{"enabled":false}`, 1)
 			if invalid {
 				reply = strings.Replace(reply, `"camera":"推近"`, `"camera":{"private":"secret-model-output"}`, 1)

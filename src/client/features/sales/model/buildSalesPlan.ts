@@ -1,5 +1,5 @@
 import {
-  applyStrictImageAssignments, omitSalesPriceClauses, omitSalesPriceProps, validateSalesAssetPlan, type FashionRefs, type SalesImageRef,
+  applyStrictImageAssignments, omitSalesPriceClauses, omitSalesPriceProps, validateSalesAssetPlan, type SalesImageRef,
   type VideoSalesCategory, type VideoSalesMode, type VideoSalesProductAnalysis, type VideoSalesScript,
 } from '@shared/domain/sales';
 import type { SalesRouteHeaders } from './salesRoute';
@@ -10,7 +10,7 @@ export interface SalesPlanApi {
   selectSalesImages(input: object): Promise<Array<{ shotId: number; imageIndex: number; reason?: string }>>;
 }
 
-export type SalesPlanPhase = 'analyze' | 'script' | 'select' | 'prompt';
+export type SalesPlanPhase = 'analyze' | 'script' | 'select';
 export interface SalesPlanCheckpoint { analysis?: VideoSalesProductAnalysis; script?: VideoSalesScript }
 
 export async function buildSalesPlan(input: {
@@ -20,7 +20,6 @@ export async function buildSalesPlan(input: {
   sellingPoints: string;
   productProps?: Record<string, string>;
   imageCatalog: SalesImageRef[];
-  fashionRefs?: FashionRefs;
   targetDuration: number;
   aspectRatio?: string;
   selectedColor?: string;
@@ -30,6 +29,7 @@ export async function buildSalesPlan(input: {
   checkpoint?: SalesPlanCheckpoint;
   onCheckpoint?: (checkpoint: SalesPlanCheckpoint) => void;
 }, api: SalesPlanApi): Promise<{ analysis: VideoSalesProductAnalysis; script: VideoSalesScript }> {
+  if (input.category !== 'fashion') throw new Error('当前仅接入服饰、鞋、包技能');
   const images = input.imageCatalog.filter((image) => image.url.trim() && !image.unavailable);
   if (!images.length) throw new Error('请先选择至少一张用于生成的商品图');
   if (!Number.isInteger(input.targetDuration) || input.targetDuration < 10 || input.targetDuration > 120) throw new Error('目标时长需为 10–120 秒的整数');
@@ -49,7 +49,7 @@ export async function buildSalesPlan(input: {
   input.onPhase('script');
   const scripts = input.checkpoint?.script ? [input.checkpoint.script] : await api.generateSalesScripts({
     productName: input.productName, brand: input.brand, category: input.category,
-    productDescription, productImages: images.map((image) => image.url), imageCatalog: images,
+    productDescription, imageCatalog: images,
     productAnalysis: JSON.stringify(analysis), videoMode: input.videoMode, targetDuration: input.targetDuration,
     targetAudience: analysis.targetAudience, ...context, ...input.route,
   });
@@ -74,7 +74,7 @@ export async function buildSalesPlan(input: {
     script: {
       ...selected, shots, totalDuration: total, deliveryMode: 'single', workflowVersion: 3, planStale: false,
       assets: selected.assets.map((asset) => ({
-        ...asset, usesProduct: asset.usesProduct ?? (input.category === 'fashion' && asset.kind === 'person'),
+        ...asset, usesProduct: asset.usesProduct ?? false,
         url: undefined, status: 'pending', validation: 'pending',
       })),
       fullPrompt: undefined, finalizedRevision: undefined, assetValidation: 'pending',

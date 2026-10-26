@@ -97,7 +97,14 @@ func keywordReviewResult(provider string, reviewed reviewsvc.Result, err error) 
 		if upstream.Provider == "DeepSeek" {
 			code = "deepseek_api_error"
 		}
-		return upstream.Status, map[string]any{"success": false, "error": message, "code": code}
+		body := map[string]any{"success": false, "error": message, "code": code}
+		if usage := upstream.Body["usage"]; usage != nil {
+			body["usage"] = usage
+		}
+		if upstream.SubmissionUnknown || upstream.Body["submissionUnknown"] == true {
+			body["submissionUnknown"] = true
+		}
+		return upstream.Status, body
 	}
 	var output *reviewsvc.OutputError
 	if errors.As(err, &output) {
@@ -107,7 +114,7 @@ func keywordReviewResult(provider string, reviewed reviewsvc.Result, err error) 
 		}
 		return http.StatusBadGateway, body
 	}
-	return http.StatusBadGateway, map[string]any{"success": false, "error": keywordTransportError(err)}
+	return http.StatusBadGateway, map[string]any{"success": false, "error": keywordTransportError(err), "submissionUnknown": true}
 }
 
 func keywordTransportError(err error) string {

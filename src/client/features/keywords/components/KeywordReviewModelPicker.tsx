@@ -36,8 +36,8 @@ export function KeywordReviewModelPicker({ options, value, disabled, onChange }:
         onClick={() => setOpen((current) => !current)}
         className={`inline-flex h-10 max-w-[240px] items-center gap-1.5 rounded-xl border bg-white/90 px-3 text-sm font-semibold text-slate-700 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#1B1B1E]/90 dark:text-slate-200 ${
           open
-            ? 'border-amber-300 dark:border-amber-400/50'
-            : 'border-slate-200 hover:border-amber-300 dark:border-white/10 dark:hover:border-amber-400/50'
+            ? 'border-white/[0.12] dark:border-white/[0.12]'
+            : 'border-white/[0.07] hover:border-white/[0.12] dark:hover:border-white/[0.12]'
         }`}
       >
         <span className="truncate">{label}</span>

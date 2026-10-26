@@ -9,9 +9,9 @@ describe('fashion skill sheet', () => {
     expect(html).toContain('带货规则');
     expect(html).toContain('服饰专属规则');
     expect(html).toContain('当前适用');
-    expect(html).toContain('同一颜色的单品图');
-    expect(html).toContain('查看详情');
-    expect(html).toContain('max-w-[560px]');
+    expect(html).not.toContain('同一颜色的单品图');
+    expect(html).toContain('aria-label="查看服饰专属规则详情"');
+    expect(html).toContain('max-w-[640px]');
     expect(html).not.toContain('通用制作流程');
     expect(html).not.toContain('全品类');
     expect(html).not.toContain('服饰带货视频');

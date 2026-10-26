@@ -1,5 +1,6 @@
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
-import { salesActualReferences, type VideoSalesScript, type VideoSalesShot } from '@shared/domain/sales';
+import { salesActualReferences, type VideoSalesScript } from '@shared/domain/sales';
+import { queryHistoricalSalesShots } from './querySalesHistory';
 import { renderSalesVideo, type SalesRenderGenerators, type SalesRenderPhase } from './renderSalesVideo';
 import { SalesSubmitUncertainError, type SalesVideoLookup } from './salesSubmitError';
 import { assertSalesPlanCurrent, salesSingleVideoError } from './salesStageRules';
@@ -13,12 +14,9 @@ export async function executeSalesRender(input: {
   script: VideoSalesScript;
   current: SalesRenderSnapshot;
   getState: () => SalesRenderSnapshot;
-  replaceScript: (script: VideoSalesScript) => void;
   commitScript: (recipe: (script: VideoSalesScript) => VideoSalesScript, extra?: { composedResultUrl?: string | null }) => void;
   persistScript?: (recipe: (script: VideoSalesScript) => VideoSalesScript, extra?: { composedResultUrl?: string | null }) => void;
-  patchShot: (index: number, patch: Partial<VideoSalesShot>) => void;
   onPhase: (phase: SalesRenderPhase) => void;
-  onPromptPhase: () => void;
   onResult: (url: string) => void;
 }, generators: SalesRenderGenerators): Promise<void> {
   const { script, current } = input;
@@ -50,14 +48,13 @@ export async function executeSalesRender(input: {
     if (input.resumeOnly) throw new Error('尚未找到原视频提交记录，请稍后查询；不会自动重新提交');
   }
   if (script.deliveryMode !== 'single') {
-    const url = await renderSalesVideo({
-      shots: script.shots, images: current.productImages, videoModel: current.selectedVideoModel,
-      aspectRatio: current.aspectRatio, resolution: current.videoResolution, refMode: current.videoRefMode,
-      redraw: false, resumeOnly: true, signal: input.signal,
-      getShots: () => input.getState().scripts[input.getState().selectedScriptIndex]?.shots || [],
-      patchShot: input.patchShot, onPhase: input.onPhase,
-    }, generators);
-    if (url && !input.signal.aborted) input.onResult(url);
+    if (!input.resumeOnly) throw new Error('历史逐镜方案仅支持查询和下载，请更新脚本后生成整段视频');
+    input.onPhase('querying');
+    await queryHistoricalSalesShots({
+      script, signal: input.signal, videoModel: current.selectedVideoModel,
+      getShots: () => input.getState().scripts.find((item) => item.id === script.id)?.shots || [],
+      patchShot: (index, patch) => input.commitScript((previous) => ({ ...previous, shots: previous.shots.map((shot, ordinal) => ordinal === index ? { ...shot, ...patch } : shot) })),
+    }, generators.generateVideo);
     return;
   }
   if (input.resumeOnly) return;
@@ -76,11 +73,10 @@ export async function executeSalesRender(input: {
   let receipt: string | undefined;
   try {
     const url = await renderSalesVideo({
-      shots: script.shots, images: current.productImages, videoModel: model,
+      videoModel: model,
       aspectRatio: snapshot.aspectRatio, resolution: snapshot.resolution, refMode: snapshot.refMode,
-      redraw: false, resumeOnly: false, signal: input.signal,
-      getShots: () => input.getState().scripts[input.getState().selectedScriptIndex]?.shots || [],
-      patchShot: input.patchShot, onPhase: input.onPhase,
+      signal: input.signal,
+      onPhase: input.onPhase,
       single: {
         prompt: snapshot.prompt, images: snapshot.images, duration: snapshot.duration, submissionKey,
         onTaskId: (taskId) => { receipt = taskId; input.commitScript((previous) => ({ ...previous, renderTaskId: taskId, renderStatus: 'generating' })); },
@@ -110,10 +106,19 @@ async function recoverSalesSubmission(script: VideoSalesScript, input: Parameter
   if (found.outcome === 'poll' && found.taskId) {
     input.commitScript((previous) => ({ ...previous, renderTaskId: found.taskId, renderStatus: 'generating', renderError: undefined }));
     const snapshot = script.renderSnapshot;
-    const url = await generators.generateVideo({
-      existingTaskId: found.taskId, prompt: snapshot?.prompt || '', duration: snapshot?.duration || script.totalDuration,
-      videoModel: snapshot?.model, isAborted: () => input.signal.aborted,
-    });
+    let url: string;
+    try {
+      url = await generators.generateVideo({
+        existingTaskId: found.taskId, prompt: snapshot?.prompt || '', duration: snapshot?.duration || script.totalDuration,
+        videoModel: snapshot?.model, isAborted: () => input.signal.aborted,
+      });
+    } catch (err) {
+      input.commitScript((previous) => ({ ...previous,
+        renderStatus: err instanceof Error && err.name === 'ImageGenBusinessError' ? 'failed' : 'generating',
+        renderError: err instanceof Error ? err.message : '原任务结果未确认',
+      }));
+      throw err;
+    }
     input.commitScript((previous) => ({ ...previous, renderStatus: 'done', renderResultUrl: url, renderError: undefined }), { composedResultUrl: url });
     if (!input.signal.aborted) input.onResult(url);
     return found.outcome;

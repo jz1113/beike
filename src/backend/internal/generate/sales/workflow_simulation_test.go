@@ -37,12 +37,11 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }
 
 func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
-	const fashionScript = `{"scripts":[{"title":"开箱展示","beat":"unbox","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示黑色上衣","camera":"中景","speechMode":"on_camera","voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompt":"展示商品","visualSource":"product_image"}],"assets":[{"id":"person","kind":"person","label":"出镜人物","prompt":"成年人物上身展示黑色上衣","required":true,"usesProduct":true},{"id":"face","kind":"face","label":"人物特写","prompt":"同一人物面部特写","required":true,"referenceAssetIds":["person"]}]}]}`
+	const fashionScript = `{"scripts":[{"title":"开箱展示","beat":"unbox","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示黑色上衣","camera":"中景","speechMode":"on_camera","voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompt":"展示商品","visualSource":"product_image"}],"assets":[{"id":"person","kind":"person","label":"出镜人物","prompt":"成年人物上身展示黑色上衣","required":true,"usesProduct":true,"productImageIndexes":[7]},{"id":"face","kind":"face","label":"人物特写","prompt":"同一人物面部特写","required":true,"referenceAssetIds":["person"]}]}]}`
 	replies := []string{
 		`{"productName":"黑色圆领上衣","category":"fashion","sellingPoints":["圆领"],"knownFacts":["黑色"],"creativeNotes":["开箱换装"]}`,
 		fashionScript,
 		`{"assignments":[{"shotId":1,"imageIndex":7,"reason":"黑色主图"}]}`,
-		`{"validations":[{"id":"product-7","status":"passed","reason":"黑色与原图一致"},{"id":"person","status":"passed","reason":"人物已生成"},{"id":"face","status":"passed","reason":"与人物一致"}]}`,
 		`{"fullPrompt":"图片1黑色上衣，图片2人物，图片3特写，人物亲口说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompts":[{"shotId":1,"prompt":"0到15秒人物说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"}]}`,
 	}
 	var calls int
@@ -59,7 +58,7 @@ func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
 		if call == 2 && !strings.Contains(text, "开箱换装") {
 			t.Error("fashion script omitted its narrative")
 		}
-		if call == 5 && (!strings.Contains(text, "图片1") || !strings.Contains(text, "图片3") || !strings.Contains(text, "黑色")) {
+		if call == 4 && (!strings.Contains(text, "图片1") || !strings.Contains(text, "图片3") || !strings.Contains(text, "黑色")) {
 			t.Error("finalize omitted the actual reference order or color")
 		}
 		return replies[call-1]
@@ -99,44 +98,14 @@ func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
 		{"id": "person", "kind": "person", "label": "出镜人物", "url": "https://example.com/person.jpg"},
 		{"id": "face", "kind": "face", "label": "人物特写", "url": "https://example.com/face.jpg"},
 	}
-	payload["operation"] = "validate-assets"
-	validation := postSales(t, Finalize(config.Config{}), "/validate", payload)
-	if validation.Code != 200 || strings.Contains(validation.Body.String(), `"status":"conflict"`) {
-		t.Fatalf("validate %d %s", validation.Code, validation.Body.String())
-	}
 	payload["operation"] = "finalize"
 	payload["videoModel"] = "kling-video-v3-omni"
 	final := postSales(t, Finalize(config.Config{}), "/finalize", payload)
 	if final.Code != 200 || !strings.Contains(final.Body.String(), "商品颜色事实：黑色") || strings.Contains(final.Body.String(), "white.jpg") {
 		t.Fatalf("finalize %d %s", final.Code, final.Body.String())
 	}
-	if calls != 5 {
-		t.Fatalf("expected 5 model calls, got %d", calls)
-	}
-}
-
-func TestWorkflowGenericScriptOmitsFashionNarrative(t *testing.T) {
-	server := useChatServer(t, func(body map[string]any, call int) string {
-		encoded, _ := json.Marshal(body)
-		if strings.Contains(string(encoded), "开箱换装") {
-			t.Errorf("call %d used the fashion narrative", call)
-		}
-		if call == 1 {
-			return `{"productName":"纸巾","category":"home","sellingPoints":["白色包装"]}`
-		}
-		return `{"scripts":[{"title":"桌面展示","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示纸巾","camera":"推近","voiceover":"看看纸巾","prompt":"展示商品"}],"assets":[{"id":"scene","kind":"scene","label":"桌面","prompt":"实拍桌面","required":true}]}]}`
-	})
-	guardLocalModelHTTP(t, server)
-	payload := workflowPayload()
-	attachGateway(payload, server.URL)
-	analysis := postSales(t, Analyze(config.Config{}), "/analyze", payload)
-	if analysis.Code != 200 {
-		t.Fatalf("analyze %d %s", analysis.Code, analysis.Body.String())
-	}
-	payload["productAnalysis"] = analysis.Body.String()
-	script := postSales(t, Script(config.Config{}), "/script", payload)
-	if script.Code != 200 || strings.Contains(script.Body.String(), "unbox") || !strings.Contains(script.Body.String(), `"kind":"scene"`) {
-		t.Fatalf("script %d %s", script.Code, script.Body.String())
+	if calls != 4 {
+		t.Fatalf("expected 4 model calls, got %d", calls)
 	}
 }
 
@@ -145,7 +114,7 @@ func TestWorkflowScriptRejectsFortyFirstShot(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", count), func(t *testing.T) {
 			server := useChatServer(t, func(map[string]any, int) string { return scriptWithShots(count) })
 			payload := workflowPayload()
-			payload["targetDuration"] = count
+			payload["targetDuration"] = 120
 			attachGateway(payload, server.URL)
 			rec := postSales(t, Script(config.Config{}), "/script", payload)
 			if count == 40 && rec.Code != 200 {
@@ -161,10 +130,10 @@ func TestWorkflowScriptRejectsFortyFirstShot(t *testing.T) {
 func scriptWithShots(count int) string {
 	shots := make([]map[string]any, count)
 	for i := 0; i < count; i++ {
-		shots[i] = map[string]any{"shotId": i + 1, "duration": 1, "description": "展示商品", "camera": "中景", "voiceover": "看", "prompt": "展示商品", "visualSource": "product_image"}
+		shots[i] = map[string]any{"shotId": i + 1, "duration": 3, "description": "展示商品", "camera": "中景", "speechMode": "voiceover", "voiceover": "看看这件上衣的领口结构", "prompt": "展示商品", "visualSource": "product_image"}
 	}
 	encoded, _ := json.Marshal(map[string]any{"scripts": []any{map[string]any{
-		"title": "多镜", "deliveryMode": "single", "totalDuration": count, "shots": shots,
+		"title": "多镜", "deliveryMode": "single", "totalDuration": 120, "shots": shots,
 		"assets": []any{map[string]any{"id": "scene", "kind": "scene", "label": "桌面", "prompt": "实拍桌面", "required": true}},
 	}}})
 	return string(encoded)
@@ -181,7 +150,7 @@ func TestWorkflowFinalizeKeepsSafeFailureReasons(t *testing.T) {
 		{503, "服务暂不可用（HTTP 503）"},
 		{504, "不要立刻再次提交"},
 	}
-	for _, operation := range []string{"validate-assets", "finalize"} {
+	for _, operation := range []string{"finalize"} {
 		for _, tc := range cases {
 			t.Run(fmt.Sprintf("%s/%d", operation, tc.status), func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

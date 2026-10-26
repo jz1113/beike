@@ -53,13 +53,7 @@ export function explainSalesReferenceError(message: string, labels: string[]): s
 export function salesAssetProductImages(asset: SalesCreativeAsset, images: SalesImageRef[]): SalesImageRef[] {
   if (!asset.usesProduct) return [];
   const available = images.filter((image) => image.url.trim() && !image.unavailable);
-  // Legacy plans do not have per-asset picks. Keep all explicitly selected product
-  // evidence, rather than silently narrowing a front still to a shot's back image.
-  if (asset.productImageIndexes === undefined) {
-    if (!available.length) throw new Error(`${asset.label}缺少可用商品参考图`);
-    return available;
-  }
-  if (!asset.productImageIndexes.length) throw new Error(`${asset.label}缺少商品参考编号，请重新编写脚本`);
+  if (!asset.productImageIndexes?.length) throw new Error(`${asset.label}缺少商品参考编号，请重新编写脚本`);
   return asset.productImageIndexes.map((index) => {
     const image = available.find((item) => item.index === index);
     if (!image) throw new Error(`${asset.label}引用的商品图 ${index} 未被选中或已不可用，请更新方案`);
@@ -81,6 +75,31 @@ export function salesAssetImagePrompt(asset: SalesCreativeAsset, products: Sales
   }
   dependencies.forEach((dependency, index) => lines.push(`输入参考图${products.length + index + 1}：已生成素材「${dependency.label}」，只继承所需的人物身份、空间与光线；商品正反面与细节仍以商品原图及本张要求为准，不照搬前置素材的视角。`));
   return lines.join('\n');
+}
+
+export function salesAssetSourceRevision(asset: SalesCreativeAsset, images: SalesImageRef[], assets: SalesCreativeAsset[], selectedColor: string, aspectRatio: string): string {
+  const products = salesAssetProductImages(asset, images);
+  const dependencies = (asset.referenceAssetIds || []).map((id) => assets.find((item) => item.id === id));
+  return salesContentRevision({
+    prompt: salesAssetImagePrompt(asset, products, dependencies.filter((item): item is SalesCreativeAsset => Boolean(item)), selectedColor),
+    kind: asset.kind, referenceImages: [...products.map((item) => item.url), ...dependencies.map((item) => item?.url)], aspectRatio,
+  });
+}
+
+/** Keep previous pictures/receipts visible, but require regeneration when their source changes. */
+export function updateSalesCreativeAsset(script: VideoSalesScript, id: string, patch: Partial<SalesCreativeAsset>): VideoSalesScript {
+  const previous = script.assets?.find((asset) => asset.id === id);
+  if (!previous) return script;
+  const promptChanged = patch.prompt !== undefined && patch.prompt !== previous.prompt;
+  const imageChanged = patch.url !== undefined && patch.url !== previous.url;
+  const changed = new Set(promptChanged || imageChanged ? [id] : []);
+  const assets = script.assets?.map((asset) => {
+    if (asset.id === id) return { ...asset, ...patch, ...(promptChanged ? { status: 'pending' as const, validation: 'pending' as const, validationSource: undefined, validationReason: undefined } : {}) };
+    if (!asset.referenceAssetIds?.some((dependency) => changed.has(dependency))) return asset;
+    changed.add(asset.id);
+    return { ...asset, ...(['generating', 'uncertain'].includes(asset.status || '') ? {} : { status: 'pending' as const }), validation: 'pending' as const, validationSource: undefined, validationReason: '前置素材已变化，请重新生成此素材' };
+  });
+  return { ...script, assets, assetValidation: 'pending', finalizedRevision: undefined };
 }
 
 /** Query saved receipts without applying the currently edited draft to already-paid work. */
@@ -130,13 +149,16 @@ export function reuseSalesPlanAssets(next: VideoSalesScript, previous?: VideoSal
   if (!previous || next.planRevision !== previous.planRevision) return next;
   const creative = (asset: SalesCreativeAsset) => salesContentRevision({
     id: asset.id, kind: asset.kind, prompt: asset.prompt, usesProduct: asset.usesProduct,
-    referenceAssetIds: asset.referenceAssetIds || [],
+    referenceAssetIds: asset.referenceAssetIds || [], productImageIndexes: asset.productImageIndexes,
   });
+  const reused = new Set<string>();
   return { ...next, assets: next.assets?.map((asset) => {
     const old = previous.assets?.find((item) => item.id === asset.id && creative(item) === creative(asset));
-    return old?.status === 'done' && old.url ? {
+    if (!old || old.status !== 'done' || !old.url || asset.referenceAssetIds?.some((id) => !reused.has(id))) return asset;
+    reused.add(asset.id);
+    return {
       ...asset, url: old.url, status: 'done', sourceRevision: old.sourceRevision,
       validation: 'pending', modelId: old.modelId, attempts: old.attempts,
-    } : asset;
+    };
   }), assetValidation: 'pending' };
 }

@@ -8,7 +8,7 @@ function assetStatus(asset: SalesCreativeAsset): string {
   if (asset.status === 'generating') return '生成中';
   if (asset.status === 'uncertain') return '待查询';
   if (asset.status !== 'done' || !asset.url) return '待生成';
-  return asset.validation === 'passed' ? '已确认' : '待确认';
+  return asset.validation === 'passed' && asset.validationSource === 'manual' ? '已确认' : '待确认';
 }
 
 export function SalesVideoMaterials({ script, productImages }: { script: VideoSalesScript; productImages: SalesImageRef[] }) {

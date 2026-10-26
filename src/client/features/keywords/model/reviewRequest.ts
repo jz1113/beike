@@ -116,7 +116,7 @@ export async function requestReviewBatch(
     if (data.usage !== undefined) error.usage = data.usage;
     if (data.replayed) error.replayed = true;
     error.usageReplayed = data.usageReplayed;
-    if (response.status === 409 && data.submissionUnknown) {
+    if (data.submissionUnknown) {
       throw Object.assign(error, { outcomeUncertain: true, infrastructureFailure: true });
     }
     if (isRecoverableModelOutputError(response.status, data.code)) {
@@ -124,8 +124,12 @@ export async function requestReviewBatch(
     }
     // A finished HTTP error with no usage did not report a charge. Retry it with a new key.
     // Timeouts, dropped connections, 409 receipts and responses that include usage stay quarantined.
+    // A gateway's upstream account can require verification even though the user's
+    // gateway key is valid. This is a failed model request, not a local configuration error.
+    const upstreamVerification = data.code === 'upstream_api_error'
+      && /verify your account\b/i.test(data.error || '');
     const unbilledGateway = data.usage === undefined && !data.submissionUnknown
-      && (response.status === 429 || response.status >= 500);
+      && (response.status === 429 || response.status >= 500 || upstreamVerification);
     if (unbilledGateway) {
       const rateLimited = response.status === 429 || response.status === 503;
       const gatewayTimeout = response.status === 504 || response.status === 524;

@@ -14,7 +14,7 @@ vi.mock('@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels', () => ({ u
 
 const script: VideoSalesScript = {
   id: 'script', title: '口播方案', totalDuration: 15, deliveryMode: 'single', renderStatus: 'pending',
-  shots: [{ shotId: 1, type: 'hook', duration: 15, description: '展示商品', voiceover: '口播内容', camera: '近景', visualSource: 'product_image', transition: 'direct_concat' }],
+  shots: [{ shotId: 1, type: 'hook', duration: 15, description: '展示商品', speechMode: 'voiceover', voiceover: '口播内容', camera: '近景', visualSource: 'product_image', transition: 'direct_concat' }],
   seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
 };
 const base = {
@@ -35,7 +35,7 @@ describe('sales studio integration', () => {
     panelWidth.wide = wide;
     const videoScript: VideoSalesScript = { ...script,
       shots: [{ ...script.shots[0], imageIndex: 0 }, { ...script.shots[0], shotId: 2, imageIndex: 0 }],
-      assets: [{ id: 'person', kind: 'person', label: '出镜讲解者', prompt: '人物', required: true, status: 'done', validation: 'passed', url: '/person.jpg' }],
+      assets: [{ id: 'person', kind: 'person', label: '出镜讲解者', prompt: '人物', required: true, status: 'done', validation: 'passed', validationSource: 'manual', url: '/person.jpg' }],
     };
     const html = render({ state: { ...base.state, scripts: [videoScript],
       workspaceNavigation: { step: 'video', lastCreativeStep: 'video' },
@@ -85,26 +85,36 @@ describe('sales studio integration', () => {
     expect(html).toContain('出镜说话 · 同步口型');
     expect(html).toContain('画外音');
     expect(html).toContain('段落 1 声音来源');
-    expect(html).toContain('出镜方式');
-    expect(html).toMatch(/value="live_presenter" selected=""/);
+    expect(html).toContain('呈现方式');
+    expect(html).toMatch(/value="live_presenter"[^>]*selected=""/);
     expect(html).toContain('完整嘴部清晰可见');
     expect(html).not.toContain('返回修改商品与设置');
-    expect(html).toContain('人物出镜讲解');
+    expect(html).toContain('人物讲解');
   });
   it('renders one footer and starts pending scripts at the script stage', () => {
     const html = render();
     expect(html.match(/<footer\b/g)).toHaveLength(1);
-    expect(html).toMatch(/aria-current="step"[^>]*>[\s\S]*?卖点与脚本/);
+    expect(html.slice(0, html.indexOf('</header>'))).not.toContain('aria-current="step"');
+    expect(html).toContain('aria-label="返回商品资料"');
     expect(html).toContain('口播与画面时间轴');
     expect(html).not.toContain('等待生成成片');
   });
-  it('keeps a saved but invalid prompt out of completed-step markers', () => {
-    const html = render({ state: { ...base.state, scripts: [{ ...script, fullPrompt: '旧版完整提示词', finalizedRevision: 'old' }] } });
-    expect(html).toContain('aria-label="4 视频生成，待完成"');
-    expect(html).not.toContain('aria-label="4 视频生成，已完成"');
-  });
-  it('keeps the prompt step complete when the new video model has a separate compatibility error', () => {
+  it('keeps an invalid saved prompt from being submitted after removing the step strip', () => {
     const state = { ...structuredClone(defaultSalesStudioState), productName: '商品',
+      workspaceNavigation: { step: 'video' as const, lastCreativeStep: 'video' as const },
+      imageCatalog: [{ index: 0, role: 'main' as const, url: '/product.jpg' }],
+      colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] },
+    };
+    state.scripts = [{ ...script, fullPrompt: '旧版完整提示词', finalizedRevision: 'old', assets: [], assetValidation: 'passed',
+      shots: [{ ...script.shots[0], imageIndex: 0 }], planRevision: salesPlanInputRevision(state) }];
+    const html = render({ state });
+    expect(html).toContain('生成视频提示词');
+    expect(html).not.toContain('确认生成整段视频（可能计费）');
+    expect(base.runRender).not.toHaveBeenCalled();
+  });
+  it('preserves a valid prompt when a video model has a separate compatibility error', () => {
+    const state = { ...structuredClone(defaultSalesStudioState), productName: '商品',
+      workspaceNavigation: { step: 'video' as const, lastCreativeStep: 'video' as const },
       imageCatalog: [{ index: 0, role: 'main' as const, url: '/product.jpg' }],
       colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] },
     };
@@ -115,8 +125,23 @@ describe('sales studio integration', () => {
     approved.finalizedRevision = salesFinalInputRevision(state, approved);
     state.scripts = [approved];
     const html = render({ state, videoError: '当前视频模型不支持所选参考模式' });
-    expect(html).toContain('aria-label="4 视频生成，已完成"');
+    expect(html).toContain('已经确认的整段提示词');
+    expect(html).toContain('重新生成视频提示词');
+    expect(html).toContain('当前视频模型不支持所选参考模式');
     expect(base.runFinalize).not.toHaveBeenCalled();
+  });
+  it.each(['product', 'plan', 'assets', 'video', 'result'] as const)('keeps %s reachable with contextual actions and no step strip', (step) => {
+    const html = render({ state: { ...base.state,
+      scripts: [{ ...script, renderTaskId: 'receipt', renderStatus: 'generating' }],
+      workspaceNavigation: { step, lastCreativeStep: step === 'product' ? 'video' : step },
+    } });
+    expect(html).not.toContain('带货制作五步');
+    expect(html.slice(0, html.indexOf('</header>'))).not.toContain('aria-current="step"');
+    expect(html).toContain(step === 'result' ? '返回视频生成' : 'aria-label="查看生成结果"');
+    if (step === 'plan') expect(html).toContain('aria-label="返回商品资料"');
+    if (step === 'video') expect(html).toContain('aria-label="返回素材补齐"');
+    if (step === 'assets') expect(html).toContain('去更新卖点与脚本');
+    if (step === 'product') expect(html).toContain('返回原创作阶段');
   });
   it('shows the global error only once', () => {
     const html = render({ error: '本次采集失败' });
@@ -133,8 +158,8 @@ describe('sales studio integration', () => {
     expect(html.split('继续查询原任务')).toHaveLength(2);
     expect(html).not.toContain('确认生成整段视频（可能计费）');
   });
-  it('places product fields in the main workspace and creative controls in the bottom bar on wide product step', () => {
-    panelWidth.wide = true;
+  it.each([true, false])('keeps product fields and images on the left and insights on the right when wide=%s', (wide) => {
+    panelWidth.wide = wide;
     const html = render({ state: { ...defaultSalesStudioState, category: 'fashion', videoMode: 'live_presenter' } });
     const splitAt = html.indexOf('创作与生成结果');
     const footerAt = html.indexOf('<footer');
@@ -143,10 +168,14 @@ describe('sales studio integration', () => {
     const footer = html.slice(footerAt);
     expect(aside).toContain('商品链接');
     expect(aside).not.toContain('商品资料');
-    expect(workspace).toContain('商品名称');
-    expect(workspace).not.toContain('出镜方式');
+    expect(aside).toContain('商品名称');
+    expect(aside).toContain('商品参考图');
+    expect(workspace).not.toContain('商品名称');
+    expect(workspace).toContain('脚本卖点');
+    expect(workspace).not.toContain('aria-label="已选参考图"');
+    expect(workspace).not.toContain('呈现方式');
     expect(footer).toContain('技能');
-    expect(footer).toContain('出镜');
+    expect(footer).toContain('呈现方式');
     expect(footer).toContain('模型');
   });
   it('preserves query-only recovery for historical shot receipts', () => {

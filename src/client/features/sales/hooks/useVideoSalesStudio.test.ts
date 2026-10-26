@@ -33,13 +33,13 @@ function existingProject(): VideoSalesStudioState {
   const script: VideoSalesScript = {
     id: 'existing', title: '已有方案', totalDuration: 3,
     seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
-    personFrameUrl: 'https://example.com/person.jpg', sceneFrameUrl: 'https://example.com/scene.jpg',
+    historicalData: { personFrameUrl: 'https://example.com/person.jpg', sceneFrameUrl: 'https://example.com/scene.jpg' },
     renderTaskId: 'completed-render', renderStatus: 'done',
     shots: [{
       shotId: 1, type: 'demo', duration: 3, description: '旧商品', camera: '特写',
       visualSource: 'product_image', transition: 'direct_concat', voiceover: '旧卖点',
       imageIndex: 0, prompt: '旧提示词', finalPrompt: '旧定稿', promptStale: false,
-      referenceFrameUrl: 'https://example.com/reference.jpg', assetUrl: 'https://example.com/shot.mp4',
+      historicalData: { referenceFrameUrl: 'https://example.com/reference.jpg' }, assetUrl: 'https://example.com/shot.mp4',
       taskId: 'completed-shot', status: 'done',
     }],
   };
@@ -84,7 +84,7 @@ describe('video sales clear current product safety', () => {
       selectedChatModel: 'chat', selectedVideoModel: 'video', targetDuration: 10,
       productImages: ['/product.jpg'], imageCatalog: [{ index: 0, role: 'main', url: '/product.jpg' }],
       colorSelection: { colorLabel: '黑色', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] },
-      fashionRefs: { personUrl: '/person.jpg', faceUrl: '/face.jpg', sceneUrl: '/scene.jpg' },
+      historicalData: { fashionRefs: { personUrl: '/person.jpg', faceUrl: '/face.jpg', sceneUrl: '/scene.jpg' } },
       collectionSource: '缓存', fromCache: true, detailsMissing: true,
     });
   });
@@ -114,7 +114,7 @@ describe('video sales clear current product safety', () => {
     expect(confirmAction).toHaveBeenCalledWith(expect.objectContaining({ title: '清空当前商品？', description: expect.stringContaining('服务端生成记录') }));
     expect(latestCommit()).toMatchObject({
       productName: '', productUrl: '', productImages: [], imageCatalog: [], scripts: [],
-      fashionRefs: { personUrl: '', faceUrl: '', sceneUrl: '' }, analysis: null, composedResultUrl: null,
+      analysis: null, composedResultUrl: null,
       category: 'fashion', selectedChatModel: 'chat', selectedVideoModel: 'video', targetDuration: 10,
     });
     expect(latestCommit().collectionSource).toBeUndefined();
@@ -242,14 +242,14 @@ describe('video sales collection refresh safety', () => {
     expect(updated.selectedScriptIndex).toBe(1);
     expect(updated.scripts).toHaveLength(2);
     for (const script of updated.scripts) {
-      expect(script.personFrameUrl).toBeUndefined();
-      expect(script.sceneFrameUrl).toBeUndefined();
+      expect(script.historicalData?.personFrameUrl).toBe('https://example.com/person.jpg');
+      expect(script.historicalData?.sceneFrameUrl).toBe('https://example.com/scene.jpg');
       expect(script.renderTaskId).toBe('completed-render');
       expect(script.shots[0]).toMatchObject({ promptStale: true, assetUrl: 'https://example.com/shot.mp4', taskId: 'completed-shot', status: 'done', prompt: '旧提示词' });
-      expect(script.shots[0].referenceFrameUrl).toBeUndefined();
+      expect(script.shots[0].historicalData?.referenceFrameUrl).toBe('https://example.com/reference.jpg');
     }
     expect(original.scripts[0].shots[0].promptStale).toBe(false);
-    expect(original.scripts[0].personFrameUrl).toBe('https://example.com/person.jpg');
+    expect(original.scripts[0].historicalData?.personFrameUrl).toBe('https://example.com/person.jpg');
   });
 
   it('leaves existing scripts untouched when refresh fails', async () => {

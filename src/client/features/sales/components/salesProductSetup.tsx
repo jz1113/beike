@@ -1,11 +1,11 @@
 import { useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { Clapperboard, FileText, ImagePlus, Images, Loader2, Pencil, Video, X } from 'lucide-react';
-import { cleanSalesProductProps, eligibleSalesImages, type SalesColorSelection, type SalesImageRef, type VideoSalesCategory, type VideoSalesProductAnalysis } from '@shared/domain/sales';
+import { Clapperboard, FileText, ImagePlus, Images, Loader2, Pencil, Video } from 'lucide-react';
+import { eligibleSalesImages, type SalesColorSelection, type SalesImageRef, type VideoSalesCategory, type VideoSalesProductAnalysis } from '@shared/domain/sales';
 import type { VideoSalesStudioState } from '../hooks/useVideoSalesStudio';
+import { salesProductProfile } from '../model/salesProductProfile';
 import { PRODUCT_IMAGE_ACCEPT, imagesFromDataTransfer } from '../model/productImageDrop';
-import { salesCardClass, salesDividerClass, salesFocusClass, salesGhostButtonClass, salesInputClass, salesLabelClass, salesSectionTitleClass } from './salesChrome';
+import { salesCardClass, salesDividerClass, salesFocusClass, salesGhostButtonClass, salesInputClass, salesLabelClass } from './salesChrome';
 import { SalesColorGallery } from './SalesColorGallery';
-import { SalesPlanningSettings } from './salesPlanning';
 import { SalesProductInsights } from './SalesProductInsights';
 
 interface SalesProductFieldsProps {
@@ -24,115 +24,33 @@ interface SalesProductFieldsProps {
   noDivider?: boolean;
   canAnalyze?: boolean;
   onAnalyze?: () => void;
-  workspaceLayout?: boolean;
-  onSelection?: (selection: SalesColorSelection) => void;
+  profileOnly?: boolean;
   onChange: (patch: { productName?: string; brand?: string; sellingPoints?: string }) => void;
 }
 
-function trimCollectedProductTitle(productName: string): string {
-  const value = productName.trim();
-  if (!value) return value;
-  // Collected titles commonly end with the selected color and size. Keep the
-  // product identity in the title and surface the SKU details below it.
-  return value.replace(/\s+(?:黑色|白色|灰色|蓝色|绿色|黄色|红色|粉色|紫色|橙色|棕色|米色|咖色|驼色|藏青)(?:加绒|常规|薄款|厚款)?(?:\s+[A-Za-z0-9一二三四五六七八九十]{1,8})?\s*$/i, '').trim() || value;
-}
-
-function selectionWasCleared(selection?: SalesColorSelection): boolean {
-  return Boolean(selection
-    && !selection.variantId
-    && !selection.colorLabel.trim()
-    && selection.confirmedImageUrls.length === 0
-    && selection.excludedImageUrls.length > 0);
-}
-
-function collectedSpecEntries(props: Record<string, string>): string[] {
-  const specKeys = /尺码|规格|版本|配置|套餐|容量|尺寸|型号|网络|内存|存储/i;
-  return cleanSalesProductProps(props, '__hidden_brand__')
-    .filter(([key]) => specKeys.test(key))
-    .map(([key, value]) => `${key}：${value}`);
-}
-
-function splitVariantLabel(label: string | undefined, color: string | undefined): { color: string; spec: string } {
-  const source = label?.trim() || '';
-  if (!source) return { color: color?.trim() || '', spec: '' };
-  const colorPrefix = /^(原色钛金属|黑色钛金属|银白灰|深空灰|钛空灰|暗夜黑|曜石黑|幻夜黑|亮黑|磨砂黑|星空黑|羽砂黑|雪域白|凝光白|珍珠白|象牙白|钛金|流光金|香槟金|玫瑰金|土豪金|远峰蓝|海蓝|天蓝|冰蓝|藏青|深蓝|暗夜绿|苍岭绿|墨绿|橄榄绿|薄荷绿|浅绿|暗夜紫|丁香紫|薰衣草紫|樱花粉|活力橙|日落橙|中国红|酒红|银色|灰色|黑色|白色|金色|蓝色|绿色|黄色|橙色|棕色|米色|驼色|咖色|粉色|紫色)(?=加绒|常规|薄款|厚款|套装|标准版|高配|顶配|\s|[/]|$)/;
-  const match = source.match(colorPrefix);
-  if (match) return { color: match[1], spec: source.slice(match[1].length).trim().replace(/^[/,:：-]+/, '').trim() };
-  return { color: color?.trim() || source, spec: color && source !== color ? source : '' };
-}
-
 export function SalesProductFields({
-  productName, sellingPoints, props, productUrl, variantMetadata, colorSelection, images, analysis, isAnalyzing, isCollected, disabled, noDivider, canAnalyze, onAnalyze, workspaceLayout, onSelection, onChange,
+  productName, sellingPoints, props, productUrl, variantMetadata, colorSelection, images, analysis, isAnalyzing, isCollected, disabled, noDivider, canAnalyze, onAnalyze, profileOnly, onChange,
 }: SalesProductFieldsProps) {
   const [editingProductName, setEditingProductName] = useState(false);
-  const entries = cleanSalesProductProps(props || {}, '__hidden_brand__');
-  const collectedId = variantMetadata?.requestedSkuId || (/^\d{7,20}$/.test((productUrl || '').trim()) ? (productUrl || '').trim() : '');
-  const variants = (variantMetadata?.variants || []).filter((item) => item.label && item.label !== '未知');
-  const selected = eligibleSalesImages(images || [], colorSelection || { colorLabel: '', confirmedImageUrls: [], excludedImageUrls: [] }, variantMetadata);
-  const matching = selected.length > 0 ? variants.filter((variant) => selected.every((image) => variant.imageUrls.includes(image.url))) : [];
-  const selectionCleared = selectionWasCleared(colorSelection);
-  const currentVariant = selectionCleared ? undefined : (
-    variants.find((variant) => variant.id === colorSelection?.variantId)
-    || matching.find((variant) => variant.id === colorSelection?.variantId)
-    || (matching.length === 1 ? matching[0] : undefined)
-    || (selected.length === 0 ? variants.find((variant) => variant.id === variantMetadata?.selectedVariantId) : undefined)
-    || (selected.length === 0 && collectedId ? variants.find((variant) => variant.skuIds.includes(collectedId)) : undefined)
-  );
-  const variantDetails = splitVariantLabel(currentVariant?.label, currentVariant?.color);
-  const currentColor = variantDetails.color || (selected.length > 0 ? colorSelection?.colorLabel || '' : '');
-  const variantSpec = variantDetails.spec;
-  const collectedSpecs = collectedSpecEntries(props || {});
-  const currentSpec = [variantSpec, ...collectedSpecs].filter((value, index, all) => value && all.indexOf(value) === index).join(' / ');
-  const displayProductName = isCollected ? trimCollectedProductTitle(productName) : productName;
-  const selectedUrls = selected.map((image) => image.url);
-  const toggleReferenceImage = (url: string) => {
-    if (!onSelection) return;
-    const wasSelected = selectedUrls.includes(url);
-    const nextUrls = wasSelected ? selectedUrls.filter((item) => item !== url) : [...selectedUrls, url];
-    onSelection({
-      ...(colorSelection || { colorLabel: '', confirmedImageUrls: [], excludedImageUrls: [] }),
-      variantId: undefined,
-      colorLabel: '',
-      confirmedImageUrls: nextUrls,
-      excludedImageUrls: wasSelected ? [...new Set([...(colorSelection?.excludedImageUrls || []), url])] : (colorSelection?.excludedImageUrls || []).filter((item) => item !== url),
-    });
-  };
-
-  const productNameField = <div className={workspaceLayout ? `${salesCardClass} p-4` : ''}>
-    <label className={salesLabelClass}>商品名称<span className="ml-1 text-[10px] font-normal text-slate-400">必填</span>
-      {isCollected && !editingProductName ? <div className="mt-2 flex items-start gap-2"><p className="min-w-0 flex-1 text-[15px] font-semibold leading-6">{displayProductName || '未返回商品名称'}</p><button type="button" disabled={disabled} onClick={() => setEditingProductName(true)} className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500 hover:bg-black/[0.04] disabled:opacity-40 dark:text-slate-400 dark:hover:bg-white/5 ${salesFocusClass}`}><Pencil className="h-3 w-3" aria-hidden />编辑</button></div> : <textarea rows={2} value={productName} placeholder="填写可核实的商品名称" disabled={disabled} onChange={(event) => onChange({ productName: event.target.value })} className={`${salesInputClass} resize-y text-[13px] leading-6`} />}
-    </label>
+  const profile = salesProductProfile({ productName, productUrl, props, variantMetadata, colorSelection, images, isCollected });
+  const productNameField = <div className="min-w-0">
+    <label htmlFor="sales-product-name" className={salesLabelClass}>商品名称<span className="ml-1 text-[10px] font-normal text-slate-400">必填</span></label>
+      {isCollected && !editingProductName ? <div className="mt-2 flex items-start gap-2"><p className="min-w-0 flex-1 whitespace-pre-wrap text-[15px] font-semibold leading-6 [overflow-wrap:anywhere]">{productName || '未返回商品名称'}</p><button type="button" disabled={disabled} onClick={() => setEditingProductName(true)} className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500 hover:bg-black/[0.04] disabled:opacity-40 dark:text-slate-400 dark:hover:bg-white/5 ${salesFocusClass}`}><Pencil className="h-3 w-3" aria-hidden />编辑</button></div> : <textarea id="sales-product-name" rows={3} value={productName} placeholder="填写可核实的商品名称" disabled={disabled} onChange={(event) => onChange({ productName: event.target.value })} className={`${salesInputClass} sales-product-name-input resize-y text-[13px] leading-5`} />}
   </div>;
-  const skuCard = (collectedId || variants.length > 0 || selected.length > 0) ? <div className={`${workspaceLayout ? `${salesCardClass} p-4` : 'space-y-2 rounded-xl bg-slate-50 px-3.5 py-3 dark:bg-white/[0.035]'} `} aria-label="当前采集 SKU 与规格">
-    <div className={`grid gap-3 ${workspaceLayout ? '@min-[440px]:grid-cols-3' : '@min-[440px]:grid-cols-2'}`}>
-      <div className="min-w-0"><span className="block text-[11px] text-slate-500 dark:text-slate-400">SKU 颜色</span><span className="mt-1 block break-words text-xs font-medium">{currentColor || '未选择'}</span></div>
-      <div className="min-w-0"><span className="block text-[11px] text-slate-500 dark:text-slate-400">SKU 规格</span><span className="mt-1 block break-words text-xs font-medium">{currentSpec || '未返回'}</span></div>
-      <div className={`min-w-0 ${workspaceLayout ? '' : '@min-[440px]:col-span-2'}`}><span className="block text-[11px] text-slate-500 dark:text-slate-400">SKU</span><span className="mt-1 block break-all text-xs font-medium tabular-nums">{collectedId || '未返回'}</span></div>
-    </div>
-  </div> : null;
-  const selectedReferences = workspaceLayout ? <section className={`${salesCardClass} space-y-3 p-4`} aria-label="已选参考图">
-    <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">已选参考图</h3><span className="text-xs text-slate-500 dark:text-slate-400">{selected.length} 张</span></div>
-    {selected.length > 0 ? <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2.5">{selected.map((image) => <button key={`${image.index}-${image.url}`} type="button" disabled={disabled} onClick={() => toggleReferenceImage(image.url)} aria-label={`取消选择商品图 ${image.index + 1}`} className={`group relative aspect-square min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white transition hover:border-amber-500/70 disabled:opacity-40 dark:border-white/10 ${salesFocusClass}`}><img src={image.url} alt={`已选商品图 ${image.index + 1}`} className="h-full w-full object-contain" /><span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"><X className="h-4 w-4" aria-hidden /></span></button>)}</div> : <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-xs text-slate-500 dark:border-white/10 dark:text-slate-400"><Images className="mb-2 h-5 w-5" aria-hidden /><span>从左侧勾选，最多用于生成的参考图</span></div>}
-  </section> : null;
-  const propertiesCard = entries.length > 0 && <section className={workspaceLayout ? `${salesCardClass} space-y-3 p-4` : 'space-y-3 border-t border-slate-100 pt-5 dark:border-white/[0.08]'} aria-label="已采集商品属性">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h3 className="text-sm font-medium">商品参数<span className="ml-2 text-xs font-normal text-slate-400">{entries.length} 项</span></h3>
-    </div>
-    <dl className="grid grid-cols-1 gap-x-6 @min-[440px]:grid-cols-2">
-      {entries.map(([key, value]) => <div key={key} className={`grid grid-cols-[5rem_minmax(0,1fr)] gap-3 py-3 text-[13px] leading-6 ${workspaceLayout ? '' : 'border-b border-slate-100 dark:border-white/[0.05]'}`}>
-        <dt className="break-words text-slate-500 dark:text-slate-400">{key}</dt><dd className="min-w-0 break-words text-slate-700 dark:text-slate-200">{value}</dd>
-      </div>)}
-    </dl>
-  </section>;
-
-  const insights = <SalesProductInsights sellingPoints={sellingPoints} props={props} analysis={analysis} disabled={disabled} isAnalyzing={isAnalyzing} canAnalyze={canAnalyze} onAnalyze={onAnalyze} onChange={onChange} card={workspaceLayout} />;
-  return <section className={`${noDivider ? '' : salesDividerClass} @container ${workspaceLayout ? '' : 'space-y-5'}`}>
-    {workspaceLayout ? <div className="grid gap-5 @min-[900px]:grid-cols-2"><div className="space-y-5">{productNameField}{skuCard}{propertiesCard}{selectedReferences}</div><div className="space-y-5">{insights}</div></div> : <>{productNameField}{skuCard}{propertiesCard}{insights}</>}
+  return <section className={`${noDivider ? '' : salesDividerClass} sales-product-fields @container space-y-3`} aria-label="商品基础档案">
+    {productNameField}
+    {profile.hasData ? <dl aria-label="当前采集 SKU 与规格" className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-4 gap-y-2 rounded-xl bg-slate-100/70 px-3 py-2.5 dark:bg-white/[0.04]">
+      <div className="min-w-0"><dt className="text-[11px] text-slate-500 dark:text-slate-400">SKU</dt><dd className="mt-1 break-all text-xs font-medium leading-5 tabular-nums">{profile.sku || '未确认'}</dd></div>
+      <div className="min-w-0"><dt className="text-[11px] text-slate-500 dark:text-slate-400">商品规格</dt><dd className="mt-1 text-xs font-medium leading-5 [overflow-wrap:anywhere]">{profile.specification || '未返回'}</dd></div>
+    </dl> : <p className="text-[11px] leading-5 text-slate-400 dark:text-slate-500">采集商品链接后将自动提取 SKU 与商品规格</p>}
+    {!profileOnly && <SalesProductInsights sellingPoints={sellingPoints} props={props} analysis={analysis} disabled={disabled} isAnalyzing={isAnalyzing} canAnalyze={canAnalyze} onAnalyze={onAnalyze} onChange={onChange} />}
   </section>;
 }
 
 interface SalesProductMediaProps {
   productUrl: string;
+  isCollected?: boolean;
+  children?: ReactNode;
   images: SalesImageRef[];
   usableCount: number;
   metadata: VideoSalesStudioState['variantMetadata'];
@@ -147,7 +65,7 @@ interface SalesProductMediaProps {
   onImageError: (index: number) => void;
 }
 
-export function SalesProductMedia({ productUrl, images, usableCount, metadata, selection, isBusy, isCollecting, isUploading, onUrlChange, onSelection, onCollect, onUpload, onImageError }: SalesProductMediaProps) {
+export function SalesProductMedia({ productUrl, isCollected, children, images, usableCount, metadata, selection, isBusy, isCollecting, isUploading, onUrlChange, onSelection, onCollect, onUpload, onImageError }: SalesProductMediaProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
@@ -161,20 +79,19 @@ export function SalesProductMedia({ productUrl, images, usableCount, metadata, s
     if (!isBusy) void imagesFromDataTransfer(event.dataTransfer).then((files) => onUpload(files));
   };
   return (
-    <section className="space-y-5">
-      <h2 className={salesSectionTitleClass}>商品采集与选图</h2>
-      <div className="space-y-2">
-      <label className={salesLabelClass} htmlFor="sales-product-url">商品链接
+    <section className="sales-product-media flex h-full min-h-0 flex-col">
+      <div className="sales-product-link shrink-0 pb-4">
+      <h2 className="mb-4 text-sm font-semibold">商品档案与参考图</h2>
+      <label className={salesLabelClass} htmlFor="sales-product-url">商品链接</label>
         <div className="mt-1.5 flex gap-2">
           <input id="sales-product-url" value={productUrl} disabled={isBusy} onChange={(event) => onUrlChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !isBusy) onCollect(); }} placeholder="京东、淘宝、天猫、1688 或拼多多" className={`${salesInputClass} mt-0 min-w-0 flex-1`} />
-          <button type="button" onClick={onCollect} disabled={isBusy || !productUrl.trim()} className={`h-10 shrink-0 px-3.5 disabled:opacity-40 ${salesGhostButtonClass}`}>{isCollecting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}采集</button>
+          <button type="button" onClick={onCollect} disabled={isBusy || !productUrl.trim()} className={`h-10 shrink-0 px-3.5 disabled:opacity-40 ${isCollected ? salesGhostButtonClass : `sales-collect-primary ${salesFocusClass}`}`}>{isCollecting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}采集</button>
         </div>
-      </label>
       </div>
+      {children}
       <input ref={inputRef} type="file" aria-label="上传商品图片" accept={PRODUCT_IMAGE_ACCEPT} multiple className="hidden" disabled={isBusy} onChange={(event) => { const files = [...(event.target.files || [])]; event.target.value = ''; if (files.length) void onUpload(files); }} />
-      <div className={`space-y-3 rounded-2xl ${dragging ? 'ring-2 ring-slate-400' : ''}`} onDragEnter={(event) => { if (!hasFiles(event)) return; event.preventDefault(); if (!isBusy) { dragDepth.current += 1; setDragging(true); } }} onDragOver={(event) => { if (!hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = isBusy ? 'none' : 'copy'; }} onDragLeave={(event) => { if (!hasFiles(event)) return; event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }} onDrop={onDrop}>
-        <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-medium">商品参考图 <span className="ml-1 text-[11px] font-normal text-slate-500 dark:text-slate-400">{images.length} 张 · 已选 {usableCount} 张</span></span>{images.length > 0 && <button type="button" disabled={isBusy} onClick={() => inputRef.current?.click()} className={`inline-flex items-center gap-1 rounded text-xs disabled:opacity-40 ${salesFocusClass}`}>{isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}上传商品图</button>}</div>
-        {images.length > 0 ? <SalesColorGallery images={images} metadata={metadata} selection={selection} disabled={isBusy} onChange={onSelection} onImageError={onImageError} /> : <button type="button" disabled={isBusy} onClick={() => inputRef.current?.click()} className="flex w-full flex-col items-center rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-xs text-slate-500 disabled:opacity-40 dark:border-white/20"><ImagePlus className="mb-2 h-5 w-5" />{isUploading ? '正在上传图片' : dragging ? '松开以添加图片' : '上传商品图片，或拖入图片 / 文件夹'}</button>}
+      <div className={`sales-product-gallery flex min-h-0 flex-1 flex-col ${dragging ? 'rounded-xl ring-2 ring-amber-500/50' : ''}`} onDragEnter={(event) => { if (!hasFiles(event)) return; event.preventDefault(); if (!isBusy) { dragDepth.current += 1; setDragging(true); } }} onDragOver={(event) => { if (!hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = isBusy ? 'none' : 'copy'; }} onDragLeave={(event) => { if (!hasFiles(event)) return; event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }} onDrop={onDrop}>
+        <SalesColorGallery images={images} metadata={metadata} selection={selection} disabled={isBusy} onChange={onSelection} onImageError={onImageError} usableCount={usableCount} isUploading={isUploading} onUploadClick={() => inputRef.current?.click()} emptyContent={<button type="button" disabled={isBusy} onClick={() => inputRef.current?.click()} className={`flex min-h-48 w-full flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 px-4 py-8 text-xs text-slate-500 transition hover:border-amber-500/50 disabled:opacity-40 dark:border-white/15 ${salesFocusClass}`}><ImagePlus className="mb-3 h-6 w-6 text-slate-400" aria-hidden />{isUploading ? '正在上传图片' : dragging ? '松开以添加图片' : '上传商品图片，或拖入图片/文件夹'}</button>} />
         {dragging && <p role="status" className="text-center text-xs text-slate-500">松开以添加商品图片，原图会保留。</p>}
       </div>
     </section>
@@ -218,29 +135,8 @@ export function SalesProductWorkspace({ state, disabled, isAnalyzing, onAnalyze,
   onChange: (patch: Partial<VideoSalesStudioState>) => void;
   children?: ReactNode;
 }) {
-  return <div className="w-full max-w-none space-y-5 p-5 lg:p-6">
-    <div className="min-w-0">
-      <SalesProductFields
-        noDivider
-        workspaceLayout
-        productName={state.productName}
-        brand={state.brand}
-        sellingPoints={state.sellingPoints}
-        props={state.props}
-        productUrl={state.productUrl}
-        variantMetadata={state.variantMetadata}
-        colorSelection={state.colorSelection}
-        images={state.imageCatalog}
-        analysis={state.analysis}
-        isAnalyzing={isAnalyzing}
-        isCollected={Boolean(state.detailsMissing !== undefined || state.collectionSource !== undefined || state.fromCache !== undefined)}
-        disabled={disabled}
-        canAnalyze={Boolean(state.productName.trim() && state.imageCatalog.some((image) => !image.unavailable))}
-        onAnalyze={onAnalyze}
-        onSelection={(colorSelection) => onChange({ colorSelection })}
-        onChange={onChange}
-      />
-    </div>
+  return <div className="flex h-full min-h-0 flex-col">
+    <SalesProductInsights sellingPoints={state.sellingPoints} props={state.props} analysis={state.analysis} disabled={disabled} isAnalyzing={isAnalyzing} canAnalyze={Boolean(state.productName.trim() && state.imageCatalog.some((image) => !image.unavailable))} onAnalyze={onAnalyze} onChange={onChange} card />
     {children}
   </div>;
 }
@@ -261,38 +157,13 @@ interface ProductSetupPanelProps {
   onOpenRules: () => void;
 }
 
-export function ProductSetupPanel({ state, updateState, compact, mediaOnly, isBusy, isCollecting, isUploading, isAnalyzing, onAnalyze, onCollect, onImageError, onUpload, onOpenRules }: ProductSetupPanelProps) {
+export function ProductSetupPanel({ state, updateState, compact, mediaOnly, isBusy, isCollecting, isUploading, isAnalyzing, onAnalyze, onCollect, onImageError, onUpload }: ProductSetupPanelProps) {
   const usable = eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata);
-  const media = <SalesProductMedia productUrl={state.productUrl} images={state.imageCatalog} usableCount={usable.length} metadata={state.variantMetadata} selection={state.colorSelection} isBusy={isBusy} isCollecting={isCollecting} isUploading={isUploading} onUrlChange={(productUrl) => updateState({ productUrl })} onSelection={(colorSelection) => updateState({ colorSelection })} onCollect={onCollect} onUpload={onUpload} onImageError={onImageError} />;
   const isCollected = Boolean(state.detailsMissing !== undefined || state.collectionSource !== undefined || state.fromCache !== undefined);
-  const form = <div className="space-y-5">
-    {media}
-    <SalesProductFields
-      productName={state.productName}
-      brand={state.brand}
-      sellingPoints={state.sellingPoints}
-      props={state.props}
-      productUrl={state.productUrl}
-      variantMetadata={state.variantMetadata}
-      colorSelection={state.colorSelection}
-      images={state.imageCatalog}
-      analysis={state.analysis}
-      isAnalyzing={isAnalyzing}
-      isCollected={isCollected}
-      disabled={isBusy}
-      canAnalyze={Boolean(state.productName.trim() && state.imageCatalog.some((image) => !image.unavailable))}
-      onAnalyze={onAnalyze}
-      onChange={updateState}
-    />
-    {compact && <SalesPlanningSettings state={state} disabled={isBusy} onOpenRules={onOpenRules} onChange={updateState} />}
-  </div>;
-  if (!compact) return mediaOnly ? media : form;
-  const selectedVariantId = state.colorSelection.variantId || state.variantMetadata?.selectedVariantId;
-  const selectedVariant = state.variantMetadata?.variants.find((variant) => variant.id === selectedVariantId);
-  const requestedSku = state.variantMetadata?.requestedSkuId;
-  const sku = selectedVariant
-    ? selectedVariant.skuIds.length === 1 ? selectedVariant.skuIds[0] : requestedSku && selectedVariant.skuIds.includes(requestedSku) ? requestedSku : undefined
-    : requestedSku;
+  const profile = <SalesProductFields noDivider profileOnly productName={state.productName} brand={state.brand} sellingPoints={state.sellingPoints} props={state.props} productUrl={state.productUrl} variantMetadata={state.variantMetadata} colorSelection={state.colorSelection} images={state.imageCatalog} isCollected={isCollected} disabled={isBusy} onChange={updateState} />;
+  const media = <SalesProductMedia productUrl={state.productUrl} isCollected={isCollected} images={state.imageCatalog} usableCount={usable.length} metadata={state.variantMetadata} selection={state.colorSelection} isBusy={isBusy} isCollecting={isCollecting} isUploading={isUploading} onUrlChange={(productUrl) => updateState({ productUrl })} onSelection={(colorSelection) => updateState({ colorSelection })} onCollect={onCollect} onUpload={onUpload} onImageError={onImageError}>{profile}</SalesProductMedia>;
+  if (!compact) return mediaOnly ? media : <div className="flex h-full min-h-0 flex-col gap-5">{media}<SalesProductInsights sellingPoints={state.sellingPoints} props={state.props} analysis={state.analysis} disabled={isBusy} isAnalyzing={isAnalyzing} canAnalyze={Boolean(state.productName.trim() && state.imageCatalog.some((image) => !image.unavailable))} onAnalyze={onAnalyze} onChange={updateState} /></div>;
+  const { sku } = salesProductProfile({ ...state, images: state.imageCatalog, isCollected });
   const displayProductName = state.productName;
   const summaryItems: [string, string][] = [
     ['SKU', sku || '未确认'],
@@ -300,7 +171,7 @@ export function ProductSetupPanel({ state, updateState, compact, mediaOnly, isBu
     ['画面比例', state.aspectRatio],
   ];
   return <section aria-label="当前商品摘要" className="space-y-2.5">
-    <div className="min-w-0"><p className="sr-only">商品名</p><h2 title={displayProductName} className="line-clamp-2 break-words text-base font-semibold leading-6">{displayProductName || '尚未确认商品'}</h2></div>
+    <div className="min-w-0"><p className="sr-only">商品名</p><h2 className="text-base font-semibold leading-6 [overflow-wrap:anywhere]">{displayProductName || '尚未确认商品'}</h2></div>
     <dl className="flex flex-wrap items-center gap-2 text-xs">{summaryItems.map(([label, value]) => <div key={label} className="flex gap-1.5 rounded-md bg-slate-100 px-2.5 py-1.5 dark:bg-white/[0.06]"><dt className="text-slate-500 dark:text-slate-400">{label}</dt><dd className="font-medium tabular-nums">{value}</dd></div>)}</dl>
   </section>;
 }

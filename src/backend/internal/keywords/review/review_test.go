@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -142,33 +143,24 @@ func TestReviewFallsBackWhenGeminiStreamEndpointIsRejected(t *testing.T) {
 	}
 }
 
-func TestReviewFallsBackWhenGeminiStreamConnectionDrops(t *testing.T) {
-	calls := 0
+func TestReviewDoesNotResubmitWhenGeminiStreamConnectionDrops(t *testing.T) {
+	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if calls == 1 {
-			conn, _, err := w.(http.Hijacker).Hijack()
-			if err != nil {
-				t.Fatal(err)
-			}
-			_ = conn.Close()
+		calls.Add(1)
+		conn, _, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			t.Error(err)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"candidates": []any{map[string]any{
-				"finishReason": "STOP",
-				"content":      map[string]any{"parts": []any{map[string]any{"text": `{"results":[["1","动物","制作","猫砂属于宠物用品",""]]}`}}},
-			}},
-			"usageMetadata": map[string]any{"totalTokenCount": 3},
-		})
+		_ = conn.Close()
 	}))
 	defer server.Close()
 	result, err := Review(context.Background(), server.Client(), Input{
 		BaseURL: server.URL, APIKey: "secret", Model: "gemini-3.8-flash", Provider: "gateway",
 		Rows: []Row{{ID: "row-1", Query: "猫砂"}},
 	})
-	if err != nil || len(result.Results) != 1 || result.Results[0]["category"] != "动物" || calls < 2 {
-		t.Fatalf("result %#v calls %d err %v", result, calls, err)
+	if err == nil || len(result.Results) != 0 || calls.Load() != 1 {
+		t.Fatalf("result %#v calls %d err %v", result, calls.Load(), err)
 	}
 }
 

@@ -40,7 +40,7 @@ func TestWorkflowResponsePreservesExplicitNonProductAsset(t *testing.T) {
 func TestWorkflowRejectsInvalidAssetProductReferences(t *testing.T) {
 	for _, indexes := range []string{`[9]`, `[77]`, `[2,2]`, `[-1]`, `[2.5]`, `[]`} {
 		t.Run(indexes, func(t *testing.T) {
-			reply := strings.Replace(validWorkflowScript(), `"usesProduct":true`, `"usesProduct":true,"productImageIndexes":`+indexes, 1)
+			reply := strings.Replace(validWorkflowScript(), `"productImageIndexes":[2]`, `"productImageIndexes":`+indexes, 1)
 			server := useChatServer(t, func(map[string]any, int) string { return reply })
 			payload := workflowPayload()
 			attachGateway(payload, server.URL)
@@ -49,20 +49,5 @@ func TestWorkflowRejectsInvalidAssetProductReferences(t *testing.T) {
 				t.Fatalf("got %d %s", rec.Code, rec.Body.String())
 			}
 		})
-	}
-}
-
-func TestWorkflowValidationChecksAssetViewInsteadOfColorOnly(t *testing.T) {
-	refs := []actualReference{{ID: "front", Kind: "keyframe", Label: "卫衣正面", URL: "front.jpg"}}
-	body := validationBody("vision", map[string]any{"assets": []PlannedAsset{{ID: "front", ProductImageIndexes: []int{2}}}}, nil, refs, nil)
-	encoded, _ := json.Marshal(body)
-	for _, expected := range []string{"领口前后高低", "名称或提示词写正面但实际是背面时必须 conflict", "无法确认正反或必要外观一致性时 uncertain", "标志在正常比例下较小不等于缺失或移位", "不得因为黑色", "productImageIndexes"} {
-		if !strings.Contains(string(encoded), expected) {
-			t.Errorf("missing %s", expected)
-		}
-	}
-	results, err := parseValidations(`{"validations":[{"id":"front","status":"conflict","reason":"要求胸前正面，实际为高领口无标志的背面"}]}`, refs)
-	if err != nil || results[0].Status != "conflict" {
-		t.Fatalf("view conflict lost: %#v %v", results, err)
 	}
 }

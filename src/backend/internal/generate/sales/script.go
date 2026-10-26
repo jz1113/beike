@@ -12,20 +12,18 @@ import (
 
 // ScriptShot matches frontend shot contract
 type ScriptShot struct {
-	ShotId          int               `json:"shotId"`
-	Type            string            `json:"type"`
-	Duration        int               `json:"duration"`
-	Description     string            `json:"description"`
-	Camera          string            `json:"camera"`
-	VisualSource    string            `json:"visualSource"`
-	Transition      string            `json:"transition"`
-	Voiceover       string            `json:"voiceover"`
-	SpeechMode      string            `json:"speechMode,omitempty"`
-	Prompt          string            `json:"prompt,omitempty"`
-	ImageIndex      int               `json:"imageIndex"`
-	SelectionReason string            `json:"selectionReason,omitempty"`
-	Motion          string            `json:"motion,omitempty"`
-	TextOverlay     map[string]string `json:"textOverlay,omitempty"`
+	ShotId          int    `json:"shotId"`
+	Type            string `json:"type"`
+	Duration        int    `json:"duration"`
+	Description     string `json:"description"`
+	Camera          string `json:"camera"`
+	VisualSource    string `json:"visualSource"`
+	Transition      string `json:"transition"`
+	Voiceover       string `json:"voiceover"`
+	SpeechMode      string `json:"speechMode,omitempty"`
+	Prompt          string `json:"prompt,omitempty"`
+	ImageIndex      int    `json:"imageIndex"`
+	SelectionReason string `json:"selectionReason,omitempty"`
 }
 
 // ScriptSEO matches frontend seo contract
@@ -70,6 +68,10 @@ func Script(cfg config.Config) http.Handler {
 			return
 		}
 		if err := checkWorkflowVersion(payload); err != nil {
+			workflowError(w, 400, err)
+			return
+		}
+		if err := checkFashionCategory(payload); err != nil {
 			workflowError(w, 400, err)
 			return
 		}

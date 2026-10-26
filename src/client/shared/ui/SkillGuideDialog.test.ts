@@ -225,9 +225,10 @@ describe('in-place skill detail page', () => {
   it('replaces the compact overview instead of appending details below', () => {
     const closed = renderToStaticMarkup(createElement(SkillGuideDialog, page));
     expect(closed).toContain('示例规则');
-    expect(closed).toContain('查看详情');
-    expect(closed).toContain('max-w-[560px]');
-    expect(closed).toContain('h-9 w-9');
+    expect(closed).toContain('aria-label="查看示例规则详情"');
+    expect(closed).toContain('max-w-[640px]');
+    expect(closed).toContain('h-10 w-10');
+    expect(closed).not.toContain('商品图');
     expect(closed).not.toContain('完整文档正文');
     expect(closed).not.toContain('max-w-[840px]');
     expect(closed.match(/overflow-y-auto/g)).toHaveLength(1);
@@ -237,8 +238,9 @@ describe('in-place skill detail page', () => {
     expect(open).toContain('完整文档正文');
     expect(open).toContain('example-skill');
     expect(open).toContain('保持商品一致');
-    expect(open).toContain('max-w-[720px]');
-    expect(open).toContain('h-[min(720px,calc(100dvh-2rem))]');
+    expect(open).toContain('max-w-[640px]');
+    expect(open).toContain('h-[min(740px,calc(100dvh-2rem))]');
+    expect(open).toContain('商品图');
     expect(open).not.toContain('查看详情');
     expect(open).not.toContain('max-w-[560px]');
     expect(open).not.toContain('name: example-skill');

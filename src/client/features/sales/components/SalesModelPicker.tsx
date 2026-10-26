@@ -35,7 +35,7 @@ export function SalesModelPicker({ modality, value, models, ready, disabled, onC
   const label = sourceId ? agentTriggerModelName(sourceId, selected?.name || '') : '未配置模型';
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || disabled) return;
     if (!models.length) {
       if (value) onChange('');
       return;
@@ -43,7 +43,7 @@ export function SalesModelPicker({ modality, value, models, ready, disabled, onC
     if (models.some((model) => matchesStoredModel(model, value))) return;
     const next = preferredSelectionId(modality, models);
     if (next && next !== value) onChange(next);
-  }, [ready, models, value, modality, onChange]);
+  }, [ready, models, value, modality, disabled, onChange]);
 
   return (
     <div className="relative min-w-0">

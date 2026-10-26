@@ -9,7 +9,7 @@ func salesSpeechRules() string {
 	return `声音与画面执行规则：以逐段标注的声音来源和台词原文为准，不得把出镜讲解替换成旁白。
 on_camera：画内同一位出镜人物亲口说出台词，声音来自此人，与画面同时生成；保持同一自然声线、语气和空间声，禁止另加解说员或后期旁白替代。中文每个字的发音、唇形开合、下颌动作和说话起止同步，停顿时嘴部自然停止发音，不持续机械开合、不提前动嘴、不声音结束后继续说。说话时用头顶至腰部或大腿的正面或轻微侧面中景，完整头部和主要服装同时入画，嘴唇可辨且无遮挡，不为对口型推近或裁切放大脸部，不被手、手机、衣领或商品遮挡，不用背影、远景或大幅转头承载说话。每句配一个简单展示动作；转身、换装、低头看细节和遮嘴动作放在句间停顿，必要时独立划成 voiceover 段，不能在同一段随意切换声音来源。
 voiceover：仅明确的商品细节、手部、背影或无露脸段使用画外音，画内人物不假装开口说话；与出镜段沿用同一人的声线和空间感，不引入第二个解说员，不要求无脸画面对口型。
-台词原文不能增删、改写或遗漏。嘴型要求仅用于出镜说话；声音来源未标明时，按实际画面逐段确定：露脸讲解就由此人说话，纯商品或背影才用画外音，不能把全片默认为旁白。
+台词原文不能增删、改写或遗漏。嘴型要求仅用于出镜说话；每段必须明确声音来源，不得自行推断或把全片默认为旁白。
 生活实拍节奏：稳定的手机固定机位或轻微手持，保持空间、光线和动作连续；自然眨眼、呼吸、轻重音、视线短暂落到商品后回镜头，微表情随语义变化。避免每秒切镜、无目的推拉环绕、匀速摆拍、持续营业式微笑、塑料磨皮、夸张变装特效；真实速度，不用慢动作覆盖口播，不把静帧做成幻灯片。`
 }
 
@@ -20,7 +20,7 @@ func speechDirection(mode string) string {
 	case "voiceover":
 		return "声音来源：同一人物画外音，本段画内人物不开口，不要求无脸画面对口型。"
 	default:
-		return "声音来源按本段实际画面确定：露脸讲解由人物亲口说出并同步口型，纯商品、手部或背影使用画外音。"
+		return "声音来源缺失，必须更新脚本后再定稿。"
 	}
 }
 
@@ -48,16 +48,11 @@ func validateFinalSpeech(full string, prompts []finalPrompt, shots []ScriptShot)
 		byID[prompt.ShotID] = prompt.Prompt
 	}
 	for _, shot := range shots {
-		// Older drafts did not carry a speech mode; retain their existing contract.
-		if shot.SpeechMode != "" && (!strings.Contains(full, shot.Voiceover) || !strings.Contains(byID[shot.ShotId], shot.Voiceover)) {
+		if !strings.Contains(full, shot.Voiceover) || !strings.Contains(byID[shot.ShotId], shot.Voiceover) {
 			return fmt.Errorf("第 %d 段定稿遗漏或改写台词原文，请重新定稿", shot.ShotId)
 		}
 	}
 	return nil
-}
-
-func speechAssetValidationRules() string {
-	return `有 on_camera 分镜时，逐张检查承担出镜讲解的人物或关键帧：正面或轻微侧面的中景，完整头部与主要服装同时入画，嘴唇可辨且无遮挡，不要求脸部或嘴部特写。只有背面、远景、手机挡脸或嘴唇畸变的讲解素材应 conflict；看不清时 uncertain，并说明需补充同一人物的可用讲解帧。商品细节、手部及纯场景素材不强制露脸。静帧只能确认口型生成条件，不能据此声称成片已经口型同步。`
 }
 
 func needsSpeakingAsset(shots []ScriptShot) bool {
@@ -80,7 +75,7 @@ func normalizeFashionSpeechModes(shots []ScriptShot, mode string) []ScriptShot {
 	out := make([]ScriptShot, len(shots))
 	copy(out, shots)
 	for i := range out {
-		if out[i].SpeechMode == "on_camera" || (out[i].SpeechMode == "" && strings.TrimSpace(out[i].Voiceover) != "") {
+		if out[i].SpeechMode == "on_camera" {
 			out[i].SpeechMode = "voiceover"
 		}
 	}

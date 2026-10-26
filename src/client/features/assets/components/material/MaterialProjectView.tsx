@@ -1,31 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { Folder } from '@client/shared/media/widgets/Folder';
-import type { ChatSession } from '@client/store/types';
-import type { AssetCanvasProject } from '../../model/canvasAssets';
-import type { AssetTaskBatch } from '../../model/assetBatch';
-
-type Task = AssetTaskBatch['tasks'][number];
-
-export interface ProjectFolderItem {
-  id: string;
-  title: string;
-  assetCount: number;
-  type: 'session' | 'canvas';
-  updatedAt?: number;
-}
+import type { ProjectFolderItem } from '../../model/materialProjects';
 
 interface Props {
-  sessions: ChatSession[];
-  canvasProjects: AssetCanvasProject[];
-  mergedTasks: Task[];
-  searchKeyword: string;
-  sortOrder: 'newest' | 'oldest' | 'name';
+  projects: ProjectFolderItem[];
   onSelectProject: (project: ProjectFolderItem) => void;
   selectedProjectIds?: string[];
   isBatchMode?: boolean;
   onToggleSelectProject?: (id: string, e?: React.MouseEvent) => void;
-  onDeleteProject?: (project: ProjectFolderItem) => void;
 }
 
 interface ProjectCardProps {
@@ -142,102 +125,12 @@ function MaterialProjectCard({
 }
 
 export default function MaterialProjectView({
-  sessions,
-  canvasProjects,
-  mergedTasks,
-  searchKeyword,
-  sortOrder,
+  projects: projectList,
   onSelectProject,
   selectedProjectIds = [],
   isBatchMode = false,
   onToggleSelectProject,
 }: Props) {
-  // 聚合各项目素材统计
-  const projectList = useMemo(() => {
-    // 统计各 session 对应素材数
-    const sessionCountMap = new Map<string, number>();
-    for (const task of mergedTasks) {
-      if (task.sessionId) {
-        sessionCountMap.set(task.sessionId, (sessionCountMap.get(task.sessionId) || 0) + 1);
-      }
-    }
-
-    const items: ProjectFolderItem[] = [];
-
-    // 对话项目 / 创作项目
-    for (const s of sessions) {
-      const count = sessionCountMap.get(s.id) || 0;
-      items.push({
-        id: s.id,
-        title: s.title || '未命名项目',
-        assetCount: count,
-        type: 'session',
-        updatedAt: s.updatedAt || s.createdAt || 0,
-      });
-    }
-
-    // 画布项目
-    for (const c of canvasProjects) {
-      items.push({
-        id: c.id,
-        title: c.title || '未命名画布',
-        assetCount: c.nodes?.length || 0,
-        type: 'canvas',
-        updatedAt: c.updatedAt || 0,
-      });
-    }
-
-    // 搜索过滤
-    const kw = searchKeyword.trim().toLowerCase();
-    const filtered = kw ? items.filter((p) => p.title.toLowerCase().includes(kw)) : items;
-
-    // 排序
-    return filtered.sort((a, b) => {
-      if (sortOrder === 'name') return a.title.localeCompare(b.title, 'zh-CN');
-      if (sortOrder === 'oldest') return (a.updatedAt || 0) - (b.updatedAt || 0);
-      return (b.updatedAt || 0) - (a.updatedAt || 0);
-    });
-  }, [sessions, canvasProjects, mergedTasks, searchKeyword, sortOrder]);
-
-  // 提取各项目的最新素材照片供 3D 拟物折页文件夹预览（最多 3 张）
-  const projectPhotosMap = useMemo(() => {
-    const map = new Map<string, string[]>();
-
-    // 1. 会话/对话项目素材
-    for (const task of mergedTasks) {
-      if (!task.sessionId) continue;
-      const url = task.resultUrl || task.coverUrl;
-      if (!url || task.status === 'FAILURE') continue;
-
-      const list = map.get(task.sessionId);
-      if (!list) {
-        map.set(task.sessionId, [url]);
-      } else if (list.length < 3 && !list.includes(url)) {
-        list.push(url);
-      }
-    }
-
-    // 2. 画布项目素材
-    for (const canvas of canvasProjects) {
-      const urls: string[] = [];
-      if (canvas.thumbnail) urls.push(canvas.thumbnail);
-      if (canvas.nodes) {
-        for (const node of canvas.nodes) {
-          if (urls.length >= 3) break;
-          const nodeUrl = node.imageUrl || node.referenceImageUrl;
-          if (nodeUrl && !urls.includes(nodeUrl)) {
-            urls.push(nodeUrl);
-          }
-        }
-      }
-      if (urls.length > 0) {
-        map.set(canvas.id, urls);
-      }
-    }
-
-    return map;
-  }, [mergedTasks, canvasProjects]);
-
   if (projectList.length === 0) {
     return (
       <div className="flex h-72 w-full flex-col items-center justify-center gap-3 text-slate-400">
@@ -257,7 +150,7 @@ export default function MaterialProjectView({
         <MaterialProjectCard
           key={project.id}
           project={project}
-          photos={projectPhotosMap.get(project.id) || []}
+          photos={project.photos}
           isSelected={selectedProjectIds.includes(project.id)}
           isBatchMode={Boolean(isBatchMode)}
           onToggleSelect={(id, e) => onToggleSelectProject?.(id, e)}

@@ -4,11 +4,11 @@ import { analyzeProductMedia, generateSalesScripts, selectSalesImages, finalizeS
 import { buildSalesPlan } from './buildSalesPlan';
 
 vi.mock('../api/videoSalesApi', () => ({ analyzeProductMedia: vi.fn(), generateSalesScripts: vi.fn(), selectSalesImages: vi.fn(), finalizeSalesPrompts: vi.fn() }));
-const shot = { shotId: 1, type: 'demo' as const, duration: 15, description: '展示商品', camera: '中景', voiceover: '如实展示商品', visualSource: 'product_image' as const, transition: 'direct_concat' as const };
+const shot = { shotId: 1, type: 'demo' as const, duration: 15, description: '展示商品', camera: '中景', speechMode: 'voiceover' as const, voiceover: '如实展示商品', visualSource: 'product_image' as const, transition: 'direct_concat' as const };
 const script = { id: 'script', title: '展示', totalDuration: 15, shots: [shot], assets: [{ id: 'scene', kind: 'scene' as const, label: '场景', prompt: '实拍桌面', required: true }], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' } };
 const planApi = { analyzeProductMedia, generateSalesScripts, selectSalesImages };
 const input = {
-  productName: '商品', brand: '', category: 'other' as VideoSalesCategory, sellingPoints: '棉',
+  productName: '商品', brand: '', category: 'fashion' as VideoSalesCategory, sellingPoints: '棉',
   imageCatalog: [{ index: 9, url: '/black.jpg', role: 'main' as const }], selectedColor: '黑色', aspectRatio: '16:9',
   targetDuration: 15, videoMode: 'product_closeup' as const, route: { model: 'chosen-vision' }, onPhase: vi.fn(),
 };
@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.mocked(selectSalesImages).mockResolvedValue([{ shotId: 1, imageIndex: 9, reason: '当前黑色商品图' }]);
 });
 
-describe('all-category script and asset planning', () => {
+describe('fashion script and asset planning', () => {
   it('assigns the sole selected image without another model request', async () => {
     const result = await buildSalesPlan(input, planApi);
     expect(result.script.shots[0].imageIndex).toBe(9);
@@ -39,18 +39,16 @@ describe('all-category script and asset planning', () => {
   });
   it('stops before writing when analysis finishes after cancellation', async () => {
     const controller = new AbortController();
-    const analysis = await analyzeProductMedia({ imageCatalog: [] });
+    const analysis = await analyzeProductMedia({ workflowVersion: 3, category: 'fashion', productName: '上衣', imageCatalog: input.imageCatalog, eligibleImageIndexes: [9] });
     vi.mocked(analyzeProductMedia).mockClear().mockImplementation(async () => { controller.abort(); return analysis; });
     await expect(buildSalesPlan({ ...input, route: { ...input.route, signal: controller.signal } }, planApi)).rejects.toThrow('已停止');
     expect(generateSalesScripts).not.toHaveBeenCalled();
   });
-  it.each<VideoSalesCategory>(['beauty', 'food', 'home', 'fashion', 'tech', 'other'])('plans %s without uploaded people or video models and defers finalization', async (category) => {
-    const result = await buildSalesPlan({ ...input, category }, planApi);
-    expect(result.script.deliveryMode).toBe('single');
-    expect(result.script.assets?.[0].status).toBe('pending');
-    expect(result.script.fullPrompt).toBeUndefined();
+  it.each<VideoSalesCategory>(['beauty', 'food', 'home', 'tech', 'other'])('rejects %s before any model request', async (category) => {
+    await expect(buildSalesPlan({ ...input, category }, planApi)).rejects.toThrow('仅接入服饰');
+    expect(analyzeProductMedia).not.toHaveBeenCalled();
+    expect(generateSalesScripts).not.toHaveBeenCalled();
     expect(finalizeSalesPrompts).not.toHaveBeenCalled();
-    expect(generateSalesScripts).toHaveBeenCalledWith(expect.objectContaining({ model: 'chosen-vision', aspectRatio: '16:9', targetDuration: 15, selectedColor: '黑色', eligibleImageIndexes: [9] }));
   });
   it('keeps price out of analysis and the script request', async () => {
     await buildSalesPlan({ ...input, sellingPoints: '价格：168元；材质：棉', productProps: { 价格: '168元', 材质: '棉' } }, planApi);

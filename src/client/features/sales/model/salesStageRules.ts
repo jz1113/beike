@@ -18,11 +18,20 @@ export function salesVideoPreflightError(state: VideoSalesStudioState): string |
 }
 
 export function salesPlanReason(state: VideoSalesStudioState, chatModelId?: string): string | null {
+  if (state.category !== 'fashion') return '当前仅接入服饰、鞋、包技能，请选择服饰专属规则后更新脚本';
   if (!state.productName.trim()) return '请先采集或填写商品名称';
   if (!eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata).length) return '请先选择至少一张用于生成的商品图';
   if (!Number.isInteger(state.targetDuration) || state.targetDuration < 10 || state.targetDuration > 120) return '目标时长必须为 10–120 秒整数';
   if (!chatModelId) return '请配置多模态模型';
   return null;
+}
+
+export function salesAnalysisInputRevision(state: VideoSalesStudioState): string {
+  return salesContentRevision({
+    productName: state.productName, brand: state.brand, category: state.category, sellingPoints: state.sellingPoints,
+    props: state.props, selectedColor: { variantId: state.colorSelection.variantId, colorLabel: state.colorSelection.colorLabel },
+    images: eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
+  });
 }
 
 export function salesPlanInputRevision(state: VideoSalesStudioState): string {
@@ -46,7 +55,7 @@ function salesVideoParamKey(model: string | undefined, resolution: string | unde
 
 export function salesFinalInputRevision(state: VideoSalesStudioState, script: VideoSalesScript): string {
   return salesContentRevision({
-    plan: salesPlanInputRevision(state), shots: script.shots.map(({ shotId, duration, description, camera, voiceover, speechMode, imageIndex }) => ({ shotId, duration, description, camera, voiceover, speechMode, imageIndex })),
+    plan: salesPlanInputRevision(state), shots: script.shots.map(({ shotId, duration, description, camera, voiceover, speechMode, imageIndex, prompt }) => ({ shotId, duration, description, camera, voiceover, speechMode, imageIndex, prompt })),
     assets: script.assets?.map(({ id, url, prompt, validation, productImageIndexes }) => ({ id, url, prompt, validation, productImageIndexes })),
     chatModel: salesPromptModelKey(state.selectedChatModel),
     resolution: salesResolveResolution(state.selectedVideoModel, state.videoResolution),
@@ -72,17 +81,20 @@ export function invalidateSalesState(previous: VideoSalesStudioState, patch: Par
   };
   return {
     ...next,
+    ...(salesAnalysisInputRevision(next) !== salesAnalysisInputRevision(previous) ? { analysis: null, analysisRevision: undefined } : {}),
+    planCheckpoint: undefined,
     scripts: next.scripts.map((script) => ({
       ...script, finalizedRevision: undefined, finalStaleReason: '商品或创作内容已变化，请先生成视频提示词',
       planStale: true, assetValidation: 'pending' as const,
-      personFrameUrl: undefined, sceneFrameUrl: undefined,
-      shots: script.shots.map((shot) => ({ ...shot, promptStale: true, referenceFrameUrl: undefined })),
+      shots: script.shots.map((shot) => ({ ...shot, promptStale: true })),
     })),
   };
 }
 
 export function assertSalesPlanCurrent(state: VideoSalesStudioState, script: VideoSalesScript): SalesImageRef[] {
   if (script.deliveryMode !== 'single' || script.planStale || script.planRevision !== salesPlanInputRevision(state)) throw new Error('商品、颜色或创作参数已变化，请先更新创作方案');
+  if (script.shots.some((shot) => !['on_camera', 'voiceover'].includes(shot.speechMode || ''))) throw new Error('脚本缺少声音来源，请补充每段声音来源或更新脚本');
+  if (script.assets?.some((asset) => asset.usesProduct && !asset.productImageIndexes?.length)) throw new Error('素材缺少商品参考编号，请更新脚本');
   if (script.totalDuration !== state.targetDuration || script.shots.reduce((sum, shot) => sum + shot.duration, 0) !== state.targetDuration) throw new Error('分镜时长与目标不一致，请更新脚本');
   const images = eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata);
   if (!images.length || script.shots.some((shot) => !images.some((image) => image.index === shot.imageIndex))) throw new Error('方案包含未选中或已不可用的商品参考图');
@@ -91,6 +103,7 @@ export function assertSalesPlanCurrent(state: VideoSalesStudioState, script: Vid
 
 export function salesSingleVideoError(state: VideoSalesStudioState, script: VideoSalesScript | undefined, requirePrompt = false): string | null {
   if (!script) return '请先生成口播与视频脚本';
+  if (state.category !== 'fashion') return '历史方案仅支持查看和查询原任务；请选择服饰专属规则后更新脚本';
   try {
     const images = assertSalesPlanCurrent(state, script);
     if (!salesAssetsReady(script)) return '请先生成所需素材并确认图片';

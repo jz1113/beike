@@ -12,7 +12,7 @@ export function salesAssetProgress(assets: SalesCreativeAsset[]) {
   return {
     total: assets.length,
     generated: generated.length,
-    confirmed: generated.filter((asset) => asset.validation === 'passed').length,
+    confirmed: generated.filter((asset) => asset.validation === 'passed' && asset.validationSource === 'manual').length,
     required: assets.filter((asset) => asset.required).length,
     requiredGenerated: generated.filter((asset) => asset.required).length,
     failed: assets.filter((asset) => asset.status === 'failed').length,

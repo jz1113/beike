@@ -6,23 +6,14 @@ export function isRecoverableModelOutputError(status: number, code?: string): bo
   return status === 502 && code === 'model_output_invalid';
 }
 
-/** Historical rows quarantined after a completed gateway HTTP error that did not report usage. */
-const UNBILLED_GATEWAY_FAILURE = /(?:模型网关|DeepSeek)\s*(?:请求失败|服务暂时故障|服务繁忙|请求过于频繁)，请稍后重试/;
-
-export function isUnbilledGatewayFailure(record: { status: string; error?: string; submissionUncertain?: boolean }): boolean {
-  return record.status === 'error' && record.submissionUncertain === true && UNBILLED_GATEWAY_FAILURE.test(record.error || '');
-}
-
-/** Ordinary failures, plus gateway errors that were previously isolated even though no usage was reported. */
+/** Error text cannot establish whether an unknown submission was billed. */
 export function isAutomaticRetryRecord(record: { status: string; error?: string; submissionUncertain?: boolean }): boolean {
-  if (record.status !== 'error') return false;
-  if (!record.submissionUncertain) return true;
-  return isUnbilledGatewayFailure(record);
+  return record.status === 'error' && !record.submissionUncertain;
 }
 
 /** Submission may already have been billed, so it must not be sent again automatically. */
 export function isIsolatedSubmission(record: { status: string; error?: string; submissionUncertain?: boolean }): boolean {
-  return record.status === 'error' && record.submissionUncertain === true && !isUnbilledGatewayFailure(record);
+  return record.status === 'error' && record.submissionUncertain === true;
 }
 
 export function advanceAutomaticRetryVersions(

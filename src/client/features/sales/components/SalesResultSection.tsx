@@ -1,7 +1,7 @@
 import { Check, Copy, Download, Film, Loader2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { VideoSalesScript, VideoSalesShot } from '@shared/domain/sales';
-import { salesPreviewClass, salesRedrawnCount, salesRenderStatus, salesShotStatusLabel, type SalesRenderPhase } from '../model/salesWorkspace';
+import { salesPreviewClass, salesRenderStatus, salesShotStatusLabel, type SalesRenderPhase } from '../model/salesWorkspace';
 import { salesSingleResultStatus } from '../model/salesWorkspaceView';
 import { SalesAlert, SalesIndeterminateBar, SalesStatusPill, SalesStickyHeader, salesCardClass, salesGhostButtonClass, salesLabelClass, salesNoteClass } from './salesChrome';
 
@@ -12,7 +12,7 @@ interface Props {
   renderPhase: SalesRenderPhase | null;
   isRendering: boolean;
   onStop: () => void;
-  onCompose: () => void;
+  onQuery: () => void;
   singleDelivery?: boolean;
   actionsInFooter?: boolean;
   globalError?: string | null;
@@ -20,7 +20,7 @@ interface Props {
   onBindTask?: (taskId: string) => Promise<string | null>;
 }
 
-export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase, isRendering, onStop, onCompose, singleDelivery = false, actionsInFooter = false, globalError, onPrepareRetry, onBindTask }: Props) {
+export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase, isRendering, onStop, onQuery, singleDelivery = false, actionsInFooter = false, globalError, onPrepareRetry, onBindTask }: Props) {
   const [copyStatus, setCopyStatus] = useState<{ title: 'idle' | 'copied' | 'error'; body: 'idle' | 'copied' | 'error' }>({ title: 'idle', body: 'idle' });
   const copyText = async (kind: 'title' | 'body') => {
     const seo = script.seo;
@@ -36,7 +36,7 @@ export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase
   const shots = script.shots;
   const issue = globalError || script.renderError;
   const videoDone = shots.filter((shot) => shot.status === 'done' && shot.assetUrl).length;
-  const done = renderPhase === 'redrawing' ? salesRedrawnCount(shots) : videoDone;
+  const done = videoDone;
   const status = singleDelivery ? salesSingleResultStatus({ rendering: isRendering, hasResult: Boolean(resultUrl), status: script.renderStatus, hasReceipt: Boolean(script.renderTaskId) }) : salesRenderStatus({ renderPhase, done, total: shots.length, hasResult: Boolean(resultUrl) });
   const failed = script.renderStatus === 'failed' || (Boolean(issue) && !isRendering);
   const pill = isRendering ? <SalesStatusPill tone="busy">{script.renderTaskId ? '生成中' : '提交中'}</SalesStatusPill> : resultUrl && !failed ? <SalesStatusPill tone="done">已完成</SalesStatusPill> : script.renderStatus === 'uncertain' ? <SalesStatusPill tone="warn">待核对</SalesStatusPill> : failed ? <SalesStatusPill tone="error">失败</SalesStatusPill> : <SalesStatusPill tone="idle">未完成</SalesStatusPill>;
@@ -49,8 +49,8 @@ export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase
       {showStatus && <SalesStickyHeader label="生成结果" title="生成结果" meta={<><span className="truncate text-xs text-slate-500">{status}</span>{pill}</>}
         actions={<>
           {!actionsInFooter && isRendering && <button type="button" onClick={onStop} className={`h-8 ${salesGhostButtonClass}`}>停止继续提交</button>}
-          {!singleDelivery && !isRendering && videoDone === shots.length && !resultUrl && <button type="button" onClick={onCompose} className={`h-8 ${salesGhostButtonClass}`}><RefreshCw className="h-3.5 w-3.5" />重新合成</button>}
-          {!actionsInFooter && singleDelivery && !isRendering && script.renderTaskId && ['generating', 'uncertain'].includes(script.renderStatus || '') && <button type="button" onClick={onCompose} className={`h-8 ${salesGhostButtonClass}`}>继续查询原任务（不重新提交）</button>}
+          {!singleDelivery && !isRendering && shots.some((shot) => shot.taskId && ['generating', 'uncertain'].includes(shot.status || '')) && <button type="button" onClick={onQuery} className={`h-8 ${salesGhostButtonClass}`}><RefreshCw className="h-3.5 w-3.5" />查询历史镜头</button>}
+          {!actionsInFooter && singleDelivery && !isRendering && script.renderTaskId && ['generating', 'uncertain'].includes(script.renderStatus || '') && <button type="button" onClick={onQuery} className={`h-8 ${salesGhostButtonClass}`}>继续查询原任务（不重新提交）</button>}
           {!actionsInFooter && resultUrl && <a href={resultUrl} download={`${script.title || '电商视频'}.mp4`} className={`h-8 ${salesGhostButtonClass}`}><Download className="h-3.5 w-3.5" />下载完整视频</a>}
         </>}>
         {isRendering && <SalesIndeterminateBar label={status} />}
@@ -71,7 +71,8 @@ export function SalesResultSection({ script, aspectRatio, resultUrl, renderPhase
               </div>}
               {resultUrl && <p className="text-[11px] text-slate-500 dark:text-slate-400">{aspectRatio} · {script.totalDuration || shots.reduce((sum, shot) => sum + (shot.duration || 0), 0)} 秒</p>}
             </section>}
-            {!singleDelivery && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {!singleDelivery && <SalesAlert>这是历史逐镜方案，仅支持查询和下载已有片段；请更新脚本后生成整段视频。</SalesAlert>}
+      {!singleDelivery && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {shots.map((shot, index) => <ShotResult key={shot.shotId || index} shot={shot} index={index} title={script.title} aspectRatio={aspectRatio} />)}
             </div>}
           </div>
@@ -159,11 +160,12 @@ function ReceiptRow({ label, value, fallback }: { label: string; value?: string 
 }
 
 function ShotResult({ shot, index, title, aspectRatio }: { shot: VideoSalesShot; index: number; title: string; aspectRatio: string }) {
+  const historicalFrame = typeof shot.historicalData?.referenceFrameUrl === 'string' ? shot.historicalData.referenceFrameUrl : '';
   const label = salesShotStatusLabel(shot.status, Boolean(shot.assetUrl));
   return (
     <article className={`${salesCardClass} p-3`}>
       <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-[#8E8E93]"><span>镜头 {index + 1}</span><span>{label}</span></div>
-      {shot.assetUrl ? <video src={shot.assetUrl} muted playsInline controls className={`rounded-xl ${salesPreviewClass(aspectRatio, 'shot')}`} /> : shot.referenceFrameUrl ? <img src={shot.referenceFrameUrl} alt="场景参考图" className={`rounded-xl object-cover ${salesPreviewClass(aspectRatio, 'shot')}`} /> : <div className={`flex items-center justify-center rounded-xl bg-black/[0.04] text-[11px] text-slate-500 dark:bg-white/[0.06] dark:text-[#8E8E93] ${salesPreviewClass(aspectRatio, 'shot')}`}>{shot.status === 'redrawing' ? '正在重绘参考图' : '待生成'}</div>}
+      {shot.assetUrl ? <video src={shot.assetUrl} muted playsInline controls className={`rounded-xl ${salesPreviewClass(aspectRatio, 'shot')}`} /> : historicalFrame ? <img src={historicalFrame} alt="场景参考图" className={`rounded-xl object-cover ${salesPreviewClass(aspectRatio, 'shot')}`} /> : <div className={`flex items-center justify-center rounded-xl bg-black/[0.04] text-[11px] text-slate-500 dark:bg-white/[0.06] dark:text-[#8E8E93] ${salesPreviewClass(aspectRatio, 'shot')}`}>历史镜头尚无结果</div>}
       {shot.status === 'uncertain' && <p className="mt-2 text-[11px] leading-relaxed text-amber-600 dark:text-amber-300">这个历史镜头的提交结果未确认。当前流程不再重新提交单镜，请核对生成记录。</p>}
       {shot.failReason && <p className="mt-2 text-[11px] text-rose-500">{shot.failReason}</p>}
       {shot.assetUrl && <a href={shot.assetUrl} download={`${title || '电商视频'}-镜头${index + 1}.mp4`} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500"><Download className="h-3 w-3" />下载</a>}

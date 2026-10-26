@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -45,10 +44,11 @@ type Result struct {
 }
 
 type UpstreamError struct {
-	Status   int
-	Provider string
-	Body     map[string]any
-	Message  string
+	Status            int
+	Provider          string
+	Body              map[string]any
+	Message           string
+	SubmissionUnknown bool
 }
 
 func (e *UpstreamError) Error() string { return "upstream" }
@@ -106,9 +106,9 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 		Client: client, Timeout: 630 * time.Second,
 	}
 	status, data, callErr := gateway.StreamText(ctx, request, nil)
-	// Some gateways accept generateContent but reject or drop
-	// streamGenerateContent immediately. Retry once without streaming.
-	if streamEndpointRejected(status, data) || streamTransportFallback(status, callErr) {
+	// An explicit unsupported endpoint can fall back without creating a second
+	// generation after an ambiguous transport failure.
+	if streamEndpointRejected(status, data) {
 		log.Printf("[API] keyword-review stream unavailable status=%d detail=%s", status, redactReviewError(callErr))
 		status, data, callErr = gateway.CompleteText(ctx, request)
 	}
@@ -126,7 +126,7 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 		if status == 0 {
 			return Result{}, callErr
 		}
-		return Result{}, &UpstreamError{Status: 502, Provider: provider, Message: "模型服务响应传输异常，提交结果待核对"}
+		return Result{}, &UpstreamError{Status: 502, Provider: provider, Body: data, Message: "模型服务响应传输异常，提交结果待核对", SubmissionUnknown: true}
 	}
 	usage, _ := json.Marshal(data["usage"])
 	if data["usage"] == nil {
@@ -152,15 +152,7 @@ func streamEndpointRejected(status int, data map[string]any) bool {
 	default:
 		return false
 	}
-	return data == nil || data["usage"] == nil
-}
-
-func streamTransportFallback(status int, err error) bool {
-	if status != 0 || err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	message := strings.ToLower(err.Error())
-	return !strings.Contains(message, "timeout") && !strings.Contains(message, "deadline")
+	return data == nil || (data["usage"] == nil && data["submissionUnknown"] != true)
 }
 
 var reviewURLPattern = regexp.MustCompile(`https?://[^\s"']+`)
@@ -178,7 +170,7 @@ func redactReviewError(err error) string {
 
 func concreteReasoningEffort(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "low", "medium", "high", "xhigh":
+	case "low", "medium", "high", "xhigh", "max":
 		return strings.ToLower(strings.TrimSpace(value))
 	default:
 		return ""

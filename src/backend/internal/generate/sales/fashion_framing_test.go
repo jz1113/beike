@@ -32,7 +32,7 @@ func TestFashionExamplesKeepNormalDistanceInEveryPresentationMode(t *testing.T) 
 }
 
 func TestFashionFramingReachesFinalModelAndSubmittedPrompt(t *testing.T) {
-	for _, category := range []string{"fashion", "home"} {
+	for _, category := range []string{"fashion"} {
 		t.Run(category, func(t *testing.T) {
 			server := useChatServer(t, func(body map[string]any, _ int) string {
 				messages := body["messages"].([]any)
@@ -41,7 +41,7 @@ func TestFashionFramingReachesFinalModelAndSubmittedPrompt(t *testing.T) {
 				if strings.Contains(text, fashionFramingRules()) != (category == "fashion") {
 					t.Fatal("final model did not receive the category's framing rules")
 				}
-				return `{"fullPrompt":"参考图片保持商品一致","prompts":[{"shotId":1,"prompt":"连续展示"}]}`
+				return `{"fullPrompt":"参考图片保持商品一致，看看这款纸巾","prompts":[{"shotId":1,"prompt":"连续展示，看看这款纸巾"}]}`
 			})
 			payload := workflowPayload()
 			payload["operation"] = "finalize"

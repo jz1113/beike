@@ -116,9 +116,6 @@ type analysisFacts struct {
 
 func analysisFactsFrom(payload map[string]any) analysisFacts {
 	category := strings.TrimSpace(generate.StringField(payload, "category"))
-	if category == "" {
-		category = "other"
-	}
 	return analysisFacts{
 		Name:        strings.TrimSpace(generate.StringField(payload, "productName")),
 		Brand:       strings.TrimSpace(generate.StringField(payload, "brand")),
@@ -226,25 +223,16 @@ func summarizeAnalysisBody(model string, facts analysisFacts, partials string) m
 
 func analysisSystemPrompt(category string) string {
 	base := "你是电商选品编辑。只输出 JSON 对象，不输出解释。不要把价格、金额或优惠写进卖点、已知事实或拍摄建议。"
-	if category != "fashion" {
-		return base
-	}
 	return base + " 当前商品属于服饰、鞋、包。knownFacts 只写颜色、版型、面料、结构等看得见或资料里有的事实。sellingPoints 至少写两条能分开说的事实，每条写成嘴里能说出来的穿着场合或搭配，并写明依据；推不出场合或搭配就不要写成卖点。不要写成必须照念的论证箭头。usageScenarios 与 painPoints 只从品名、季节和品类推出。creativeNotes 与 videoSuggestions 只在开箱换装、生活穿搭、鞋包展示中给出生活实拍方向，keyVisuals 只列画面里真的会给观众看的一处。不编造功效、评价、销量、实测、优惠、尺码或价格。" + "\n" + fashionFramingRules()
 }
 
 func analysisSummaryPrompt(category string) string {
 	base := "你负责合并商品分析结果。只输出 JSON 对象。不要把价格、金额或优惠写进卖点、已知事实或拍摄建议。"
-	if category != "fashion" {
-		return base
-	}
 	return base + " 合并时保持服饰约束：knownFacts 只保留颜色、版型、面料、结构等可见事实；sellingPoints 保留能说出口的穿着场合或搭配并带依据，推不出场合或搭配的删掉，至少留下两条能分开说的事实，不要保留论证箭头；usageScenarios 与 painPoints 只保留能从品名、季节或品类推出的场合。拍摄建议只保留开箱换装、生活穿搭或鞋包展示，keyVisuals 只保留画面里真的会给观众看的一处，不新增功效、评价、销量、实测、优惠、尺码或价格。" + "\n" + fashionFramingRules()
 }
 
 func analysisJSONShape(category string) string {
-	points := "卖点"
-	if category == "fashion" {
-		points = "能说出口的穿着场合或搭配"
-	}
+	points := "能说出口的穿着场合或搭配"
 	return `输出格式：{"productName":"","category":"","brand":"","visualFeatures":{"mainColor":"","designStyle":"","productForm":"","texture":""},"sellingPoints":["` + points + `"],"targetAudience":"","usageScenarios":["场景"],"painPoints":["痛点"],"knownFacts":["资料或图片中可见的事实"],"creativeNotes":["拍摄建议，不是商品事实"],"videoSuggestions":{"recommendedAngles":["角度"],"keyVisuals":["焦点"],"suggestedStyle":""}}`
 }
 

@@ -74,6 +74,8 @@ src/client/
 
 资产中心 `AssetCenter`、电商图文组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
 
+素材库的平铺列表、项目计数与项目详情使用相同的素材合并和来源筛选规则。画布封面与空项目占位不作为独立素材；文字备注不计入素材数。“我上传的”只展示带独立上传标记的记录，生成任务的参考图字段不改变生成结果的来源。历史素材逐页加载并显示加载或重试状态；历史未完整读取时不能删除对话项目。批量操作只作用于当前可见的勾选项，筛选切换和删除后清理失效勾选。项目归属使用精确标识匹配，服务端确认素材删除成功后才移除本地对话项目；删除、下载与项目清理共享操作锁。
+
 电商图文 model 按 `collection / analysis / generation / delivery / workspace` 分组。画布的几何、导入、图层、图关系和任务规则放在 model；节点类型和打光参数由 model 导出，hook 直接引用。设置默认模型在 `settings/model/presetModels.ts`；服务商图标与展示数据属于 components。
 
 ### 浏览器共享能力

@@ -51,6 +51,10 @@ func Analyze(cfg config.Config) http.Handler {
 			workflowError(w, 400, err)
 			return
 		}
+		if err := checkFashionCategory(payload); err != nil {
+			workflowError(w, 400, err)
+			return
+		}
 		images, err := workflowCatalog(payload)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})

@@ -1359,6 +1359,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @deprecated */
         post: operations["post_api_generate_video_sales_compose"];
         delete?: never;
         options?: never;
@@ -1814,12 +1815,12 @@ export interface components {
             url: string;
             role: string;
         };
-        /** @description workflowVersion为3时imageCatalog与eligibleImageIndexes必填，保留原始编号，仅处理允许集合 */
+        /** @description 仅接受当前流程；保留商品目录原始编号，仅处理允许集合 */
         VideoSalesWorkflowRequest: {
             /** @enum {integer} */
-            workflowVersion?: 3;
-            imageCatalog?: components["schemas"]["VideoSalesCatalogImage"][];
-            eligibleImageIndexes?: number[];
+            workflowVersion: 3;
+            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
+            eligibleImageIndexes: number[];
             selectedColor?: string;
             model?: string;
             customBaseUrl?: string;
@@ -1829,41 +1830,59 @@ export interface components {
              * @enum {string}
              */
             textProtocol: "auto" | "openai" | "gemini" | "anthropic";
-        } & (unknown | unknown);
-        VideoSalesAnalyzeRequest: components["schemas"]["VideoSalesWorkflowRequest"] & {
-            imageUrls?: string[];
-            productName?: string;
+        };
+        VideoSalesAnalyzeRequest: {
+            /** @enum {integer} */
+            workflowVersion: 3;
+            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
+            eligibleImageIndexes: number[];
+            selectedColor?: string;
+            model?: string;
+            customBaseUrl?: string;
+            customApiKey?: string;
+            /**
+             * @default auto
+             * @enum {string}
+             */
+            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
+            productName: string;
             brand?: string;
-            priceRange?: string;
+            /** @enum {string} */
+            category: "fashion";
             productDescription?: string;
-            category?: string;
         };
         /** @enum {string} */
-        VideoSalesAspectRatio: "9:16" | "16:9" | "3:4" | "4:3" | "1:1" | "21:9";
-        VideoSalesScriptRequest: components["schemas"]["VideoSalesWorkflowRequest"] & ({
+        VideoSalesAspectRatio: "9:16" | "16:9" | "3:4" | "1:1";
+        VideoSalesScriptRequest: {
+            /** @enum {integer} */
+            workflowVersion: 3;
+            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
+            eligibleImageIndexes: number[];
+            selectedColor?: string;
+            model?: string;
+            customBaseUrl?: string;
+            customApiKey?: string;
+            /**
+             * @default auto
+             * @enum {string}
+             */
+            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
             productName: string;
             /** @enum {string} */
-            category?: "beauty" | "food" | "home" | "fashion" | "tech" | "other";
+            category: "fashion";
+            brand?: string;
             productDescription?: string;
             productAnalysis?: string;
-            productImages?: string[];
-            targetDuration?: number;
-            aspectRatio?: components["schemas"]["VideoSalesAspectRatio"];
-            priceRange?: string;
-            brand?: string;
             targetAudience?: string;
-            /** @enum {string} */
-            videoMode?: "product_closeup" | "graphic_montage" | "scene_demo" | "live_presenter";
-            platforms?: string[];
-            templateId?: string;
-            characterId?: string;
-            fashionReferences?: {
-                person: boolean;
-                face: boolean;
-                scene: boolean;
-            };
-        } & (unknown | unknown));
-        /** @description 按需1至4张，依赖只能指向前序素材；衣服上身图usesProduct必须为true */
+            targetDuration: number;
+            aspectRatio: components["schemas"]["VideoSalesAspectRatio"];
+            /**
+             * @default live_presenter
+             * @enum {string}
+             */
+            videoMode: "product_closeup" | "graphic_montage" | "scene_demo" | "live_presenter";
+        };
+        /** @description 按需 1 至 4 张，依赖只能指向前序素材 */
         VideoSalesPlannedAsset: {
             id: string;
             /** @enum {string} */
@@ -1873,30 +1892,43 @@ export interface components {
             required: boolean;
             referenceAssetIds?: string[];
             usesProduct?: boolean;
-            /** @description 本张静帧按目标视角选择的商品目录原始编号，须属于模型看过的允许图片；未提供时兼容旧计划，生图使用全部已选商品图 */
+            /** @description 使用商品的素材必须明确提供非空原始编号；旧计划缺失时需更新脚本 */
             productImageIndexes?: number[];
-        };
+        } & ({
+            /** @enum {unknown} */
+            usesProduct: true;
+            productImageIndexes: unknown;
+        } | {
+            /** @enum {unknown} */
+            usesProduct?: false;
+            productImageIndexes?: unknown;
+        });
         VideoSalesShot: {
             shotId: number;
             type?: string;
             duration?: number;
             description?: string;
             camera?: string;
-            voiceover?: string;
+            /** @enum {string} */
+            speechMode: "on_camera" | "voiceover";
+            voiceover: string;
             prompt?: string;
             imageIndex?: number;
-            visualSource?: string;
-            transition?: string;
+            /** @enum {string} */
+            visualSource?: "product_image" | "ai_generate";
+            /** @enum {string} */
+            transition?: "direct_concat";
             selectionReason?: string;
         };
-        /** @description 新版deliveryMode和assets必有，时长必须精确匹配请求，旧版返回结构保留 */
+        /** @description 仅当前服饰脚本，分镜为整段时间轴，总时长精确匹配请求 */
         VideoSalesScript: {
             id: string;
             title: string;
-            beat?: string;
             /** @enum {string} */
-            deliveryMode?: "single";
-            assets?: components["schemas"]["VideoSalesPlannedAsset"][];
+            beat?: "unbox" | "lifestyle" | "accessory";
+            /** @enum {string} */
+            deliveryMode: "single";
+            assets: components["schemas"]["VideoSalesPlannedAsset"][];
             totalDuration: number;
             shots: components["schemas"]["VideoSalesShot"][];
             seo?: {
@@ -1904,7 +1936,20 @@ export interface components {
             };
             fullPrompt?: string;
         };
-        VideoSalesSelectRequest: components["schemas"]["VideoSalesWorkflowRequest"] & {
+        VideoSalesSelectRequest: {
+            /** @enum {integer} */
+            workflowVersion: 3;
+            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
+            eligibleImageIndexes: number[];
+            selectedColor?: string;
+            model?: string;
+            customBaseUrl?: string;
+            customApiKey?: string;
+            /**
+             * @default auto
+             * @enum {string}
+             */
+            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
             shots: components["schemas"]["VideoSalesShot"][];
         };
         VideoSalesActualReference: {
@@ -1914,52 +1959,46 @@ export interface components {
             label: string;
             url: string;
         };
-        VideoSalesFinalizeRequest: components["schemas"]["VideoSalesWorkflowRequest"] & ({
+        VideoSalesFinalizeRequest: {
+            /** @enum {integer} */
+            workflowVersion: 3;
+            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
+            eligibleImageIndexes: number[];
+            selectedColor?: string;
+            model?: string;
+            customBaseUrl?: string;
+            customApiKey?: string;
+            /**
+             * @default auto
+             * @enum {string}
+             */
+            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
             /** @enum {string} */
-            operation?: "validate-assets" | "finalize";
-            shots: (components["schemas"]["VideoSalesShot"] & Record<string, never>)[];
-            actualReferences?: components["schemas"]["VideoSalesActualReference"][];
-            assets?: components["schemas"]["VideoSalesPlannedAsset"][];
-            targetDuration?: number;
-            aspectRatio?: components["schemas"]["VideoSalesAspectRatio"];
+            operation: "finalize";
+            /** @enum {string} */
+            category: "fashion";
+            shots: (components["schemas"]["VideoSalesShot"] & unknown)[];
+            actualReferences: components["schemas"]["VideoSalesActualReference"][];
+            assets: components["schemas"]["VideoSalesPlannedAsset"][];
+            targetDuration: number;
+            aspectRatio: components["schemas"]["VideoSalesAspectRatio"];
             videoModel?: string;
             videoRefMode?: string;
             videoResolution?: string;
             productAnalysis?: string;
-            /** @enum {string} */
-            category?: "beauty" | "food" | "home" | "fashion" | "tech" | "other";
-            referenceOrder?: {
-                /** @enum {string} */
-                slot: "person" | "face" | "garment" | "scene";
-                label: string;
-                url: string;
-                imageIndex?: number;
-            }[];
-        } & (unknown | {
-            /** @enum {unknown} */
-            operation: "validate-assets";
-        } | {
-            /** @enum {unknown} */
-            operation: "finalize";
-        }));
-        VideoSalesAssetValidation: {
-            id: string;
-            /** @enum {string} */
-            status: "passed" | "conflict" | "uncertain";
-            reason: string;
         };
         VideoSalesFinalizeResponse: {
-            success: boolean;
+            /** @enum {boolean} */
+            success: true;
             model?: string;
-            validations?: components["schemas"]["VideoSalesAssetValidation"][];
-            fullPrompt?: string;
-            prompts?: {
+            usage?: {
+                [key: string]: unknown;
+            };
+            fullPrompt: string;
+            prompts: {
                 shotId: number;
                 prompt: string;
-                imagePrompt?: string;
             }[];
-            personImagePrompt?: string;
-            sceneImagePrompt?: string;
         };
         CollectVariantMetadata: {
             /** @enum {integer} */
@@ -4220,8 +4259,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
+            /** @description 逐镜拼接已停用，历史片段仅支持查询和下载 */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4242,7 +4281,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description validate-assets 返回逐ID视觉校验，finalize 返回一条整段提示词，无operation仍走旧接口 */
+            /** @description 仅 finalize 返回整段及分段视频提示词；素材由用户人工确认 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4250,6 +4289,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["VideoSalesFinalizeResponse"];
                 };
+            };
+            /** @description validate-assets 已停用，请人工确认素材 */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4266,7 +4312,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 新版每套脚本包含单条视频交付模式及自动素材计划，旧请求兼容 */
+            /** @description 仅服饰技能，返回单条视频交付模式及按需素材计划，不接受旧创作请求 */
             200: {
                 headers: {
                     [name: string]: unknown;

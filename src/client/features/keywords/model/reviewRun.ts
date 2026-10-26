@@ -11,7 +11,7 @@ import type { ReviewRequestError } from './reviewRequest';
 type SubmitOptions = Parameters<typeof createReviewBatchSubmit>[0];
 type Checkpoints = Pick<SubmitOptions, 'onDispatch' | 'onCancelled' | 'onSuccess' | 'onRequestFailure' | 'onUsage'>;
 
-/** First try plus two automatic resubmits. */
+/** First try plus two resubmits per pass; bulk runs revisit remaining failures. */
 const BATCH_ATTEMPTS = 3;
 
 function halvedBatchLimit(rowCount: number): number {
@@ -40,7 +40,11 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
   pacer?: ReviewPacer;
   request?: SubmitOptions['request'];
 }): Promise<string> {
-  const { queue, mode, settings, rulesVersion } = options;
+  const { mode, settings, rulesVersion } = options;
+  let queue = options.queue;
+  const recordsById = new Map(queue.map((record) => [record.id, record]));
+  const completedIds = new Set<string>();
+  const failures = new Map<string, { record: KeywordReviewRecord; uncertain: boolean }>();
   const pacer = options.pacer ?? new ReviewPacer(settings.maxConcurrency);
   let batchLimit = settings.batchSize;
   const shrinkBatchLimit = (rowCount: number): boolean => {
@@ -51,9 +55,8 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
   };
   let nextIndex = 0;
   let completed = 0;
-  let failed = 0;
-  let uncertain = 0;
   let rateRetries = 0;
+  let retryRound = 0;
   let fatalError: Error | null = null;
   const bumpVersion = (rows: KeywordReviewRecord[]) => {
     for (const record of rows) {
@@ -63,21 +66,26 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
   };
   const worker = async () => {
     const submitBatch = async (batch: KeywordReviewRecord[], attempt = 0): Promise<void> => {
+      batch = batch.filter((record) => !completedIds.has(record.id));
+      if (batch.length === 0 || options.shouldStop()) return;
       const ids = batch.map((record) => record.id);
       const settled = new Set<string>();
       const markFailed = async (values: string[], message: string, submissionUncertain = false) => {
-        const fresh = values.filter((id) => !settled.has(id));
+        const fresh = values.filter((id) => !settled.has(id) && !completedIds.has(id));
         fresh.forEach((id) => settled.add(id));
-        failed += fresh.length;
-        if (submissionUncertain) uncertain += fresh.length;
+        for (const id of fresh) failures.set(id, { record: recordsById.get(id)!, uncertain: submissionUncertain });
         await options.markFailed(fresh, message, submissionUncertain);
       };
       const submit = createReviewBatchSubmit({
         ...options, model: options.model.model, provider: options.model.provider, textProtocol: options.model.textProtocol, reasoningEffort: options.model.reasoningEffort,
         lookup: false, lookupBudget: 0, pacer,
         onSuccess: async (chunk, results, lookedUp, usage, lookupUsage, submission) => {
-          chunk.forEach((record) => settled.add(record.id));
-          completed += chunk.length;
+          for (const record of chunk) {
+            settled.add(record.id);
+            if (!completedIds.has(record.id)) completed += 1;
+            completedIds.add(record.id);
+            failures.delete(record.id);
+          }
           await options.onSuccess(chunk, results, lookedUp, usage, lookupUsage, submission);
           options.refreshBalance();
         },
@@ -89,10 +97,8 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
         onFailure: () => options.refreshBalance(true),
       });
       const resubmit = async (rows: KeywordReviewRecord[], failure: ReviewRequestError) => {
-        if (options.shouldStop() || failure.fatalConfig || failure.fatalLocal || rows.length === 0 || attempt + 1 >= BATCH_ATTEMPTS) return false;
-        if (failure.outcomeUncertain) bumpVersion(rows);
-        const chargeNote = failure.outcomeUncertain ? '，可能再次产生费用' : '';
-        options.notice(`${options.model.label} 本批未完成，正在自动重试（${attempt + 2}/${BATCH_ATTEMPTS}）${chargeNote}…`);
+        if (options.shouldStop() || failure.outcomeUncertain || failure.fatalConfig || failure.fatalLocal || rows.length === 0 || attempt + 1 >= BATCH_ATTEMPTS) return false;
+        options.notice(`${options.model.label} 本批未完成，正在自动重试（${attempt + 2}/${BATCH_ATTEMPTS}）…`);
         await submitBatch(rows, attempt + 1);
         return true;
       };
@@ -118,7 +124,7 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
         }
       } catch (error) {
         const failure = error instanceof Error ? error as ReviewRequestError : new Error('审核失败') as ReviewRequestError;
-        if (failure.gatewayTimeout === true && batch.length > 10 && !options.shouldStop()) {
+        if (failure.gatewayTimeout === true && !failure.outcomeUncertain && batch.length > 10 && !options.shouldStop()) {
           const mid = Math.ceil(batch.length / 2);
           const shrunk = shrinkBatchLimit(batch.length);
           const batchNote = shrunk ? `，后续改为每批不超过 ${batchLimit} 条` : '';
@@ -126,7 +132,7 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
           await submitBatch(batch.slice(0, mid));
           const rest = batch.slice(mid);
           if (!options.shouldStop()) await submitBatch(rest);
-          else await markFailed(rest.map((record) => record.id), failure.message, failure.outcomeUncertain === true);
+          else await markFailed(rest.map((record) => record.id), failure.message);
           return;
         }
         if (failure.fatalConfig || failure.fatalLocal) {
@@ -145,16 +151,28 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
       nextIndex += size;
       const batch = queue.slice(index, index + size);
       options.notice(mode === 'trial' ? `按规则 v${rulesVersion} 正在试跑 ${batch.length} 条…`
-        : `按规则 v${rulesVersion} 并行审核中，本轮还剩 ${queue.length - completed - failed} 条`);
+        : `按规则 v${rulesVersion} ${retryRound ? `自动重试第 ${retryRound} 轮` : '并行审核中'}，已完成 ${completed}/${options.queue.length} 条`);
       options.onWaiting(batch.map((record) => record.id));
       await submitBatch(batch);
     }
   };
-  const workers = Math.min(mode === 'trial' ? 1 : settings.maxConcurrency, Math.ceil(queue.length / settings.batchSize));
-  await Promise.allSettled(Array.from({ length: workers }, async () => {
-    try { await worker(); }
-    catch (error) { fatalError = error instanceof Error ? error : new Error('审核批次处理失败'); options.requestStop(); }
-  }));
+  while (queue.length > 0 && !options.shouldStop()) {
+    nextIndex = 0;
+    const workers = Math.min(mode === 'trial' ? 1 : settings.maxConcurrency, Math.ceil(queue.length / settings.batchSize));
+    await Promise.allSettled(Array.from({ length: workers }, async () => {
+      try { await worker(); }
+      catch (error) { fatalError = error instanceof Error ? error : new Error('审核批次处理失败'); options.requestStop(); }
+    }));
+    if (mode === 'trial' || fatalError || options.shouldStop()) break;
+    queue = [...failures.values()].filter((failure) => !failure.uncertain).map((failure) => failure.record);
+    if (queue.length === 0) break;
+    retryRound += 1;
+    options.notice(`已完成 ${completed}/${options.queue.length} 条，剩余 ${queue.length} 条失败记录将在等待后自动重试（第 ${retryRound} 轮），无需手动点击重试。`);
+    if (!await pacer.waitToRetry(retryRound, options.shouldStop)) break;
+    bumpVersion(queue);
+  }
+  const failed = failures.size;
+  const uncertain = [...failures.values()].filter((failure) => failure.uncertain).length;
   const failedNote = failed ? `、失败 ${failed} 条` : '';
   const uncertainNote = uncertain ? `（其中 ${uncertain} 条提交待核对，暂不重新收费）` : '';
   if (fatalError) return `${(fatalError as Error).message}。本次完成 ${completed} 条${failedNote}${uncertainNote}；可导出当前进度。`;

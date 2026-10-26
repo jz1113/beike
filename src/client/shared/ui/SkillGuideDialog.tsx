@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 import { SkillGuideDocumentView, type SkillGuideDocument } from './SkillGuideDocumentView';
 
@@ -48,9 +48,9 @@ export function SkillGuideDialog({ title, status, note, items, layout, detailMod
   const widthClass = skillDocument
     ? 'h-[min(740px,calc(100dvh-2rem))] max-w-[800px]'
     : openPage
-      ? 'h-[min(720px,calc(100dvh-2rem))] max-w-[720px]'
+      ? 'h-[min(740px,calc(100dvh-2rem))] max-w-[640px]'
       : detailMode === 'page'
-        ? 'max-w-[560px]'
+        ? 'max-w-[640px]'
         : layout === 'grid'
           ? 'max-w-[840px]'
           : 'max-w-[680px]';
@@ -109,16 +109,21 @@ export function SkillGuideDialog({ title, status, note, items, layout, detailMod
         onKeyDown={(event) => handleDialogKey(event, onClose)}
       >
         {openPage ? (
-          <header className="flex items-center gap-2 border-b border-slate-100 px-3 py-3 sm:px-4 dark:border-white/10">
-            <button type="button" onClick={() => collapse(openPage.id)} className={`inline-flex h-8 shrink-0 items-center gap-0.5 rounded-xl px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100 ${focusRing}`}>
-              <ChevronLeft className="h-4 w-4" aria-hidden />
-              返回
-            </button>
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-sm font-black tracking-tight">{openPage.title}</h2>
-              <p id={`${uid}-page-summary`} className="truncate text-xs leading-5 text-slate-500 dark:text-slate-400">{openPage.summary}</p>
+          <header className="px-5 pb-5 pt-5 sm:px-6 sm:pt-6">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center">{openPage.mark}</span>
+                {openPage.badge ? <span className={`text-xs ${openPage.badge.tone === 'ready' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{openPage.badge.label}</span> : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => collapse(openPage.id)} className={`inline-flex h-8 items-center gap-0.5 rounded-lg px-2 text-xs text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10 ${focusRing}`}>
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />返回列表
+                </button>
+                <CloseButton title={title} onClose={onClose} />
+              </div>
             </div>
-            <CloseButton title={title} onClose={onClose} />
+            <h2 className="text-xl font-semibold tracking-tight">{openPage.title}<span className="ml-2 text-base font-normal text-slate-400">技能</span></h2>
+            <p id={`${uid}-page-summary`} className="mt-1.5 text-sm leading-6 text-slate-500 dark:text-slate-400">{openPage.summary}</p>
           </header>
         ) : (
           <header className={`flex items-start justify-between gap-3 border-b border-slate-100 dark:border-white/10 ${detailMode === 'page' ? 'px-4 py-3 sm:px-4' : 'px-4 py-4 sm:px-5'}`}>
@@ -142,7 +147,9 @@ export function SkillGuideDialog({ title, status, note, items, layout, detailMod
             <ul className={layout === 'grid' ? 'grid items-stretch gap-3 sm:grid-cols-2' : 'grid gap-2'}>
               {items.map((item) => (
                 <li key={item.id} className="h-full min-w-0">
-                  <SkillGuideCard item={item} layout={layout} dense={detailMode === 'page'} open={openId === item.id} detailId={detailDomId(uid, item.id)} toggleId={toggleDomId(uid, item.id)} onToggle={() => toggle(item.id)} />
+                  {detailMode === 'page'
+                    ? <SkillGuideRow item={item} detailId={detailDomId(uid, item.id)} toggleId={toggleDomId(uid, item.id)} onToggle={() => toggle(item.id)} />
+                    : <SkillGuideCard item={item} layout={layout} open={openId === item.id} detailId={detailDomId(uid, item.id)} toggleId={toggleDomId(uid, item.id)} onToggle={() => toggle(item.id)} />}
                 </li>
               ))}
             </ul>
@@ -154,17 +161,34 @@ export function SkillGuideDialog({ title, status, note, items, layout, detailMod
   );
 }
 
-function SkillGuideCard({ item, layout, dense, open, detailId, toggleId, onToggle }: { item: SkillGuideItem; layout: 'compact' | 'grid'; dense: boolean; open: boolean; detailId: string; toggleId: string; onToggle: () => void }) {
+function SkillGuideRow({ item, detailId, toggleId, onToggle }: { item: SkillGuideItem; detailId: string; toggleId: string; onToggle: () => void }) {
+  return (
+    <button id={toggleId} type="button" aria-label={`查看${item.title}详情`} aria-expanded={false} aria-controls={detailId} onClick={onToggle}
+      className={`group flex w-full items-center gap-3.5 rounded-xl px-3 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-white/5 ${focusRing}`}>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center">{item.mark}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">{item.title}</span>
+        <span className="mt-1 block truncate text-[13px] leading-5 text-slate-500 dark:text-slate-400" title={item.summary}>{item.summary}</span>
+      </span>
+      {item.badge ? <span className={`flex shrink-0 items-center gap-1 text-[11px] ${item.badge.tone === 'ready' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+        {item.badge.tone === 'ready' ? <Check className="h-4 w-4" aria-hidden /> : null}<span className="sr-only sm:not-sr-only">{item.badge.label}</span>
+      </span> : null}
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-600 dark:text-slate-600 dark:group-hover:text-slate-300" aria-hidden />
+    </button>
+  );
+}
+
+function SkillGuideCard({ item, layout, open, detailId, toggleId, onToggle }: { item: SkillGuideItem; layout: 'compact' | 'grid'; open: boolean; detailId: string; toggleId: string; onToggle: () => void }) {
   const facts = [
     ['适用', item.appliesWhen],
     ['输入', item.input],
     ['产出', item.output],
   ] as const;
-  const stacked = layout === 'grid' || dense;
+  const stacked = layout === 'grid';
   return (
-    <article className={`flex h-full flex-col rounded-[18px] border ${dense ? 'p-3' : 'p-4'} ${open ? 'border-amber-300 bg-amber-50/40 ring-2 ring-amber-100 dark:border-amber-300/40 dark:bg-amber-400/5 dark:ring-amber-400/15' : 'border-slate-200/80 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]'}`}>
+    <article className={`flex h-full flex-col rounded-[18px] border p-4 ${open ? 'border-amber-300 bg-amber-50/40 ring-2 ring-amber-100 dark:border-amber-300/40 dark:bg-amber-400/5 dark:ring-amber-400/15' : 'border-slate-200/80 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]'}`}>
       <div className="flex items-start gap-3">
-        <SkillMark size={dense ? 'dense' : layout === 'grid' ? 'compact' : 'regular'}>{item.mark}</SkillMark>
+        <SkillMark size={layout === 'grid' ? 'compact' : 'regular'}>{item.mark}</SkillMark>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[15px] font-black tracking-tight">{item.title}</h3>
@@ -173,7 +197,7 @@ function SkillGuideCard({ item, layout, dense, open, detailId, toggleId, onToggl
           <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.summary}</p>
         </div>
       </div>
-      <dl className={stacked ? (dense ? 'mt-2.5 space-y-1.5' : 'mt-3 space-y-2') : 'mt-3 grid gap-3 sm:grid-cols-3'}>
+      <dl className={stacked ? 'mt-3 space-y-2' : 'mt-3 grid gap-3 sm:grid-cols-3'}>
         {facts.map(([label, value]) => (
           <div key={label} className="min-w-0">
             <dt className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{label}</dt>
@@ -181,11 +205,11 @@ function SkillGuideCard({ item, layout, dense, open, detailId, toggleId, onToggl
           </div>
         ))}
       </dl>
-      <div className={stacked ? `mt-auto flex flex-col ${dense ? 'gap-2 pt-3' : 'gap-3 pt-4'}` : 'mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'}>
+      <div className={stacked ? 'mt-auto flex flex-col gap-3 pt-4' : 'mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'}>
         <SkillFlow steps={item.flow} />
-        <button id={toggleId} type="button" aria-expanded={open} aria-controls={detailId} onClick={onToggle} className={`inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-amber-300 hover:text-slate-950 dark:border-white/10 dark:bg-[#1B1B1E] dark:text-slate-100 dark:hover:border-amber-300/50 ${dense || layout === 'grid' ? 'w-full' : 'w-full sm:w-auto'} ${focusRing}`}>
+        <button id={toggleId} type="button" aria-expanded={open} aria-controls={detailId} onClick={onToggle} className={`inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-amber-300 hover:text-slate-950 dark:border-white/10 dark:bg-[#1B1B1E] dark:text-slate-100 dark:hover:border-amber-300/50 ${layout === 'grid' ? 'w-full' : 'w-full sm:w-auto'} ${focusRing}`}>
           {open ? '收起详情' : '查看详情'}
-          {dense ? <ChevronRight className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} aria-hidden />}
+          <ChevronDown className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} aria-hidden />
         </button>
       </div>
     </article>
@@ -224,8 +248,14 @@ function SkillGuideDetail({ item, detailRef, detailId, onCollapse }: { item: Ski
 
 function SkillGuidePage({ item, detailRef, detailId }: { item: SkillGuideItem; detailRef: Ref<HTMLElement>; detailId: string }) {
   return (
-    <section ref={detailRef} id={detailId} aria-label={`${item.title}详情`} tabIndex={-1} className={`min-h-0 overflow-y-auto overscroll-contain px-4 py-4 outline-none sm:px-5 ${focusRing}`}>
+    <section ref={detailRef} id={detailId} aria-label={`${item.title}详情`} tabIndex={-1} className={`mx-4 mb-4 min-h-0 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 outline-none sm:mx-6 sm:mb-6 sm:p-5 dark:border-white/[0.07] dark:bg-white/[0.025] ${focusRing}`}>
       <div className="space-y-5">
+        <div className="border-b border-slate-200/70 pb-4 dark:border-white/[0.07]">
+          <dl className="space-y-3">
+            {([['适用', item.appliesWhen], ['输入', item.input], ['产出', item.output]] as const).map(([label, value]) => <div key={label} className="flex gap-4 text-[13px] leading-6"><dt className="shrink-0 text-slate-400">{label}</dt><dd className="text-slate-600 dark:text-slate-300">{value}</dd></div>)}
+          </dl>
+          <div className="pt-4"><SkillFlow steps={item.flow} /></div>
+        </div>
         {item.sections.map((section) => (
           <div key={section.heading} className="border-l-2 border-amber-200 pl-3 dark:border-amber-400/35">
             <h3 className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{section.heading}</h3>
@@ -253,8 +283,8 @@ function CloseButton({ title, onClose }: { title: string; onClose: () => void })
   );
 }
 
-function SkillMark({ size, children }: { size: 'dense' | 'compact' | 'regular'; children: ReactNode }) {
-  const box = size === 'dense' ? 'h-9 w-9 rounded-xl' : size === 'compact' ? 'h-11 w-11 rounded-2xl' : 'h-14 w-14 rounded-2xl';
+function SkillMark({ size, children }: { size: 'compact' | 'regular'; children: ReactNode }) {
+  const box = size === 'compact' ? 'h-11 w-11 rounded-2xl' : 'h-14 w-14 rounded-2xl';
   return (
     <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-amber-50 text-amber-800 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-300/25 ${box}`}>
       <span aria-hidden className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-[#df6a48]/20" />

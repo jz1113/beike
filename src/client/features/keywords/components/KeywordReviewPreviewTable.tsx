@@ -5,14 +5,14 @@ import type { KeywordReviewRecord } from '../model/keywordReviewWorkbook';
 import { REVIEW_FILTER_LABELS, type KeywordReviewFilter } from '../model/reviewPreview';
 import { isIsolatedSubmission } from '../model/reviewProgress';
 
-const selectClass = 'h-10 min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:text-slate-200 dark:border-white/10 dark:bg-[#18191c]';
-const pageButtonClass = 'flex h-8 items-center justify-center rounded-lg border border-slate-200 px-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-white/5 dark:border-white/10';
+const selectClass = 'h-10 min-w-0 max-w-full rounded-xl border border-white/[0.07] bg-white px-3 text-sm text-zinc-700 outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10 dark:text-zinc-300 dark:bg-zinc-900';
+const pageButtonClass = 'flex h-8 items-center justify-center rounded-lg border border-white/[0.07] px-2.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-white/5';
 
 function ReviewStatus({ record }: { record: KeywordReviewRecord }) {
-  if (record.status === 'done') return <span className="inline-flex items-center gap-1.5 text-emerald-700"><CheckCircle2 className="h-4 w-4" />已完成</span>;
-  if (record.status === 'running') return <span className="inline-flex items-center gap-1.5 text-blue-600"><Loader2 className="h-4 w-4 animate-spin" />审核中</span>;
-  if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-600" title={record.error}><XCircle className="h-4 w-4" />{isIsolatedSubmission(record) ? '待核对' : '失败'}</span>;
-  return <span className="text-slate-500 dark:text-slate-400">待审核</span>;
+  if (record.status === 'done') return <span className="inline-flex items-center gap-1.5 text-zinc-400"><CheckCircle2 className="h-4 w-4" />已完成</span>;
+  if (record.status === 'running') return <span className="inline-flex items-center gap-1.5 text-amber-500 dark:text-amber-400"><Loader2 className="h-4 w-4 animate-spin" />审核中</span>;
+  if (record.status === 'error') return <span className="inline-flex items-center gap-1.5 text-rose-500 dark:text-rose-400" title={record.error}><XCircle className="h-4 w-4" />{isIsolatedSubmission(record) ? '待核对' : '失败'}</span>;
+  return <span className="text-zinc-500 dark:text-zinc-400">待审核</span>;
 }
 
 function reviewReason(record: KeywordReviewRecord) {
@@ -29,17 +29,18 @@ export function KeywordReviewPreviewTable({ review, onSelect }: { review: Return
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [review.page, review.filter, review.search, review.sheetFilter, review.categoryFilter]);
   return (
-              <section className="overflow-hidden rounded-[26px] border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#18191c]/95">
-                <div className="space-y-3 border-b border-slate-100 px-4 py-4 sm:px-5 dark:border-white/10">
+              <section className="overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/90 shadow-sm backdrop-blur dark:bg-zinc-900/95">
+                <div className="space-y-4 border-b border-white/[0.07] px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div><h2 className="text-sm font-black text-slate-900 dark:text-slate-100">审核预览</h2><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">按原表顺序分页，点击详情查看完整内容和审核依据</p></div>
-                    <span role="status" className="text-xs font-semibold text-slate-500 dark:text-slate-400">{review.searchPending ? '正在筛选…' : `${REVIEW_FILTER_LABELS[review.filter]} · ${review.filteredCount} 条`}</span>
+                    <span role="status" className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">{review.searchPending ? '正在筛选…' : `${REVIEW_FILTER_LABELS[review.filter]} · ${review.filteredCount.toLocaleString('en-US')} 条`}</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:border-white/10 dark:bg-[#18191c]">
+                  <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                    <label className="flex w-80 max-w-full items-center gap-2 rounded-xl border border-white/[0.07] bg-white px-3 focus-within:border-blue-400/50 focus-within:ring-2 focus-within:ring-blue-400/10 dark:bg-zinc-900">
                       <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
                       <input type="search" aria-label="搜索关键词或审核依据" placeholder="搜索关键词、原表内容或审核依据" value={review.search} onChange={(event) => review.setSearch(event.target.value)} className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none" />
                     </label>
+                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
                     <select aria-label="筛选审核状态" value={review.filter} onChange={(event) => review.setFilter(event.target.value as KeywordReviewFilter)} className={selectClass}>
                       {Object.entries(REVIEW_FILTER_LABELS).filter(([key]) => key !== 'low_value' || review.reviewMode === 'video').map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
@@ -50,23 +51,24 @@ export function KeywordReviewPreviewTable({ review, onSelect }: { review: Return
                       <option value="">全部垂类</option>{review.categories.map((category) => <option key={category} value={category}>{category}</option>)}
                     </select>
                     {(review.search || review.sheetFilter || review.categoryFilter || review.filter !== 'all') && <button type="button" onClick={() => { review.setSearch(''); review.setSheetFilter(''); review.setCategoryFilter(''); review.setFilter('all'); }} className="rounded-xl px-3 text-xs font-bold text-blue-700 hover:bg-blue-50">清空筛选</button>}
+                    </div>
                   </div>
                 </div>
                 <div ref={scrollRef} tabIndex={0} role="region" aria-label="词包审核结果表，可横向滚动" aria-busy={review.searchPending} className="max-h-[600px] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400">
                   <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-sm">
                     <colgroup><col className="w-[7%]" /><col className="w-[27%]" /><col className="w-[13%]" /><col className="w-[12%]" />{review.reviewMode === 'video' && <col className="w-[9%]" />}<col className={review.reviewMode === 'video' ? 'w-[16%]' : 'w-[25%]'} /><col className="w-[10%]" /><col className="w-[6%]" /></colgroup>
-                    <thead className="sticky top-0 z-10 bg-slate-950 text-white">
+                    <thead className="sticky top-0 z-10 border-b border-white/[0.07] bg-zinc-900/80 text-zinc-400 backdrop-blur">
                       <tr>
                         {['行号', 'query', '最终垂类', '是否可制作', ...(review.reviewMode === 'video' ? ['低价值'] : []), '判断依据', '状态', '详情'].map((label) => <th key={label} className="px-4 py-3 text-xs font-bold whitespace-nowrap">{label}</th>)}
                       </tr>
                     </thead>
                     <tbody>
                       {review.previewRecords.map((record) => (
-                        <tr key={record.id} className="border-b border-slate-100 last:border-0 hover:bg-amber-50/35 dark:border-white/10">
-                          <td className="px-4 py-3 text-xs tabular-nums text-slate-500 dark:text-slate-400">{record.rowNumber}</td>
+                        <tr key={record.id} className="border-b border-white/[0.07] last:border-0 hover:bg-zinc-500/5">
+                          <td className="px-4 py-3 text-xs tabular-nums text-slate-500 dark:text-slate-400">{record.rowNumber.toLocaleString('en-US')}</td>
                           <td className="px-4 py-3"><span className="line-clamp-2 break-words font-bold leading-5 text-slate-800 dark:text-slate-100" title={record.query}>{record.query}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500 dark:text-slate-400">{record.sheetName}</span></td>
                           <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200"><span className="line-clamp-2 break-words">{record.status === 'done' ? record.category || '—' : '—'}</span></td>
-                          <td className="px-4 py-3">{record.status === 'done' && record.producible ? <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${record.producible === '制作' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.producible}</span> : <span className="text-slate-500 dark:text-slate-400">—</span>}</td>
+                          <td className="px-4 py-3">{record.status === 'done' && record.producible ? <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${record.producible === '制作' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>{record.producible}</span> : <span className="text-slate-500 dark:text-slate-400">—</span>}</td>
                           {review.reviewMode === 'video' && <td className="px-4 py-3 text-xs font-bold text-slate-700 dark:text-slate-200">{record.status === 'done' ? record.lowValue || '—' : '—'}</td>}
                           <td className={`px-4 py-3 text-xs leading-5 ${record.status === 'error' ? 'text-rose-700' : 'text-slate-500 dark:text-slate-400'}`}><span className="line-clamp-2 break-words" title={reviewReason(record)}>{reviewReason(record)}</span></td>
                           <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold"><ReviewStatus record={record} /></td>
@@ -77,12 +79,12 @@ export function KeywordReviewPreviewTable({ review, onSelect }: { review: Return
                     </tbody>
                   </table>
                 </div>
-                <nav aria-label="审核预览分页" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 py-3 pl-4 pr-20 dark:border-white/10">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">显示 {review.previewStart}–{review.previewEnd} / {review.filteredCount} 条 · 每页 {review.previewLimit} 条</p>
+                <nav aria-label="审核预览分页" className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] px-4 py-3 sm:px-5">
+                  <p className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">显示 {review.previewStart.toLocaleString('en-US')}–{review.previewEnd.toLocaleString('en-US')} / {review.filteredCount.toLocaleString('en-US')} 条 · 每页 {review.previewLimit.toLocaleString('en-US')} 条</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <button type="button" disabled={review.page === 1} onClick={() => review.setPage(1)} className={pageButtonClass}>首页</button>
                     <button type="button" aria-label="上一页" disabled={review.page === 1} onClick={() => review.setPage(review.page - 1)} className={pageButtonClass}><ChevronLeft className="h-4 w-4" /></button>
-                    <span className="text-xs font-semibold tabular-nums text-slate-600 dark:text-slate-300">{review.page} / {review.pageCount}</span>
+                    <span className="text-xs font-medium tabular-nums text-zinc-600 dark:text-zinc-300">{review.page.toLocaleString('en-US')} / {review.pageCount.toLocaleString('en-US')}</span>
                     <button type="button" aria-label="下一页" disabled={review.page === review.pageCount} onClick={() => review.setPage(review.page + 1)} className={pageButtonClass}><ChevronRight className="h-4 w-4" /></button>
                     <button type="button" disabled={review.page === review.pageCount} onClick={() => review.setPage(review.pageCount)} className={pageButtonClass}>末页</button>
                   </div>

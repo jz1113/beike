@@ -3,7 +3,7 @@ import { videoModeLabel, videoModes } from '@shared/domain/media/videoCapabiliti
 
 export type SalesAspectRatio = '9:16' | '3:4' | '16:9' | '1:1';
 export type SalesVideoRefMode = 'omni' | 'first_frame' | 'first_last_frame' | 'text';
-export type SalesRenderPhase = 'redrawing' | 'generating' | 'composing';
+export type SalesRenderPhase = 'generating' | 'querying';
 
 export const SALES_ASPECTS: { value: SalesAspectRatio; label: string }[] = [
   { value: '9:16', label: '9:16 竖屏' },
@@ -45,20 +45,20 @@ export function salesVideoCapability(modelId?: string): SalesVideoCapability {
   const id = modelId?.trim() || '';
   if (!id) return { known: false, note: '请先配置视频模型' };
   const model = getVideoModelById(id);
-  if (!model) return { known: false, note: '该模型的画幅和单镜头时长尚未登记，生成时以服务商实际结果为准' };
+  if (!model) return { known: false, note: '该模型的画幅和整段时长尚未登记，生成时以服务商实际结果为准' };
   const bounds = getVideoDurationBounds(id);
   const ratios = SALES_ASPECTS.filter((item) => model.supportedAspectRatios.includes(item.value)).map((item) => item.value);
   const ratioText = ratios.length > 0 ? `支持 ${ratios.join('、')}` : '当前画幅都不在支持列表里';
-  return { known: true, note: `单镜头 ${bounds.min}–${bounds.max} 秒，${ratioText}` };
+  return { known: true, note: `整段 ${bounds.min}–${bounds.max} 秒，${ratioText}` };
 }
 
 export function salesAspectOptions(modelId?: string): { id: string; label: string; disabled: boolean }[] {
   const model = modelId?.trim() ? getVideoModelById(modelId) : undefined;
-  const compose = new Set<string>(SALES_ASPECTS.map((item) => item.value));
+  const aspects = new Set<string>(SALES_ASPECTS.map((item) => item.value));
   return VIDEO_ASPECT_RATIOS.map((item) => ({
     id: item.id,
     label: item.id === 'adaptive' ? '智能' : item.label,
-    disabled: !compose.has(item.id) || Boolean(model && !model.supportedAspectRatios.includes(item.id)),
+    disabled: !aspects.has(item.id) || Boolean(model && !model.supportedAspectRatios.includes(item.id)),
   }));
 }
 
@@ -90,16 +90,6 @@ export function salesParamSummary(input: { refMode: string; aspect: string; reso
   return `${videoModeLabel(input.refMode)} · ${input.aspect} · ${input.resolution} · ${input.duration}秒`;
 }
 
-export function salesComposeResolution(resolution: string | undefined): '720p' | '1080p' {
-  const value = (resolution || '').toUpperCase();
-  if (value === '480P' || value === '720P') return '720p';
-  return '1080p';
-}
-
-export function salesComposeAspect(aspect: string): SalesAspectRatio {
-  if (aspect === '16:9' || aspect === '3:4' || aspect === '1:1' || aspect === '9:16') return aspect;
-  return '9:16';
-}
 
 export function salesResolutionChoices(modelId?: string): VideoResolution[] {
   const supported = modelId?.trim() ? getVideoModelById(modelId)?.supportedResolutions : undefined;
@@ -149,24 +139,13 @@ export function salesRenderStatus(input: {
     if (input.hasResult) return '成片已生成';
     return '等待生成成片';
   }
-  if (input.renderPhase === 'redrawing') return `正在重绘参考图 ${input.done}/${input.total}`;
   if (input.renderPhase === 'generating') return `正在生成镜头 ${input.done}/${input.total}`;
-  if (input.renderPhase === 'composing') return '正在合成成片';
+  if (input.renderPhase === 'querying') return '正在查询历史镜头';
   if (input.hasResult) return '成片已生成';
   return `镜头 ${input.done}/${input.total}`;
 }
 
-export function salesRedrawnCount(shots: Array<{ referenceFrameUrl?: string; status?: string; assetUrl?: string; taskId?: string }>): number {
-  return shots.filter((shot) => (
-    Boolean(shot.referenceFrameUrl)
-    || shot.status === 'uncertain'
-    || (shot.status === 'done' && Boolean(shot.assetUrl))
-    || (Boolean(shot.taskId) && shot.status === 'generating' && !shot.assetUrl)
-  )).length;
-}
-
 export function salesShotStatusLabel(status?: string, hasAsset = false): string {
-  if (status === 'redrawing') return '重绘中';
   if (status === 'generating') return '生成中';
   if (status === 'uncertain') return '提交未确认';
   if (status === 'failed') return '失败';

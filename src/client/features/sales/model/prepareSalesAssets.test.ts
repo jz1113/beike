@@ -6,20 +6,18 @@ import type { SalesImageBatchClient, SalesImageBatchItem, SalesImageBatchReceipt
 function harness() {
   let script: VideoSalesScript = {
     id: 'plan', title: '展示', totalDuration: 15, deliveryMode: 'single',
-    shots: [{ shotId: 1, type: 'demo', duration: 15, description: '人物展示黑色商品', camera: '中景', voiceover: '展示商品', visualSource: 'ai_generate', transition: 'direct_concat', imageIndex: 8 }],
+    shots: [{ shotId: 1, type: 'demo', duration: 15, description: '人物展示黑色商品', camera: '中景', speechMode: 'voiceover', voiceover: '展示商品', visualSource: 'ai_generate', transition: 'direct_concat', imageIndex: 8 }],
     assets: [
-      { id: 'person', kind: 'person', label: '人物', prompt: '成年人物展示商品', required: true, usesProduct: true },
+      { id: 'person', kind: 'person', label: '人物', prompt: '成年人物展示商品', required: true, usesProduct: true, productImageIndexes: [8] },
       { id: 'scene', kind: 'scene', label: '场景', prompt: '自然光房间', required: true },
     ], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
   };
   const updateAsset = (id: string, patch: Partial<SalesCreativeAsset>) => { script = { ...script, assets: script.assets!.map((asset) => asset.id === id ? { ...asset, ...patch } : asset) }; };
   const job = () => ({ script, images: [{ index: 8, role: 'main' as const, url: '/black.jpg' }],
-    imageModel: 'image-model', aspectRatio: '9:16', selectedColor: '黑色', productAnalysis: '{}', route: { model: 'vision' },
+    imageModel: 'image-model', aspectRatio: '9:16', selectedColor: '黑色',
     isAborted: () => false, getScript: () => script, updateAsset,
-    setValidation: (status: VideoSalesScript['assetValidation']) => { script = { ...script, assetValidation: status }; },
   });
-  const validate = vi.fn<typeof import('../api/videoSalesApi').validateSalesAssets>(async (input) => input.actualReferences.map((ref) => ({ id: ref.id, status: 'passed' as const, reason: '外观与脚本一致' })));
-  return { job, validate, updateAsset, current: () => script };
+  return { job, updateAsset, current: () => script };
 }
 
 function client(partial: Partial<SalesImageBatchClient>): SalesImageBatchClient {
@@ -36,38 +34,45 @@ function doneReceipt(item: SalesImageBatchItem): SalesImageBatchReceipt {
 }
 
 describe('automatic creative images', () => {
+  it('requires a durable saved submission key before contacting the image provider', async () => {
+    const h = harness();
+    const submitBatch = vi.fn(async () => []);
+    const beforeSubmit = vi.fn(() => {
+      expect(h.current().assets!.every((asset) => asset.status === 'generating' && asset.submissionKey)).toBe(true);
+      throw new Error('本地存储已满');
+    });
+    await expect(prepareSalesCreativeAssets({ ...h.job(), beforeSubmit }, client({ submitBatch }))).rejects.toThrow('本地存储已满');
+    expect(submitBatch).not.toHaveBeenCalled();
+    expect(h.current().assets!.every((asset) => asset.status === 'failed' && !asset.submissionKey && asset.attempts === 0)).toBe(true);
+  });
+
+
   it('keeps receipt keys uncertain after stopping a submission without permitting a new task', async () => {
     const h = harness();
     let aborted = false;
     const submitBatch = vi.fn(async () => { aborted = true; throw new DOMException('已停止', 'AbortError'); });
-    await expect(prepareSalesCreativeAssets({ ...h.job(), autoValidate: false, isAborted: () => aborted }, client({ submitBatch }), h.validate)).rejects.toThrow('已停止');
+    await expect(prepareSalesCreativeAssets({ ...h.job(), isAborted: () => aborted }, client({ submitBatch }))).rejects.toThrow('已停止');
     expect(h.current().assets?.every((asset) => asset.status === 'uncertain' && asset.submissionKey)).toBe(true);
-    await expect(prepareSalesCreativeAssets({ ...h.job(), autoValidate: false }, client({ submitBatch }), h.validate)).rejects.toThrow('不能自动重投');
+    await expect(prepareSalesCreativeAssets({ ...h.job() }, client({ submitBatch }))).rejects.toThrow('不能自动重投');
     expect(submitBatch).toHaveBeenCalledTimes(1);
   });
   it('leaves a single creation ready for human confirmation without calling visual validation', async () => {
     const h = harness();
-    await prepareSalesCreativeAssets({ ...h.job(), autoValidate: false }, client({ submitBatch: async (items) => items.map(doneReceipt) }), h.validate);
+    await prepareSalesCreativeAssets({ ...h.job() }, client({ submitBatch: async (items) => items.map(doneReceipt) }));
     expect(h.current().assets?.every((asset) => asset.status === 'done')).toBe(true);
-    expect(h.validate).not.toHaveBeenCalled();
     expect(h.current().assetValidation).not.toBe('passed');
   });
-  it('generates without human uploads, injects the selected product, and validates actual image URLs', async () => {
+  it('generates without human uploads, injects the selected product, and leaves actual images for human confirmation', async () => {
     const h = harness();
     const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map(doneReceipt));
-    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }));
     expect(submitBatch).toHaveBeenCalledTimes(1);
     const [items] = submitBatch.mock.calls[0];
     expect(items).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'person', referenceImages: ['/black.jpg'] }),
       expect.objectContaining({ id: 'scene', referenceImages: [] }),
     ]));
-    expect(h.validate).toHaveBeenCalledWith(expect.objectContaining({ actualReferences: [
-      { id: 'product-8', kind: 'product', label: '商品参考 9', url: '/black.jpg' },
-      { id: 'person', kind: 'person', label: '人物', url: '/person.jpg' },
-      { id: 'scene', kind: 'scene', label: '场景', url: '/scene.jpg' },
-    ] }));
-    expect(h.current().assetValidation).toBe('passed');
+    expect(h.current().assetValidation).not.toBe('passed');
   });
 
   it('marks independent images generating before the batch returns', async () => {
@@ -77,7 +82,7 @@ describe('automatic creative images', () => {
       seen = h.current().assets!.map((asset) => asset.status);
       return h.current().assets!.map((asset) => ({ id: asset.id, url: `/${asset.id}.jpg`, outcome: 'done' as const }));
     });
-    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }));
     expect(seen).toEqual(['generating', 'generating']);
   });
 
@@ -92,7 +97,7 @@ describe('automatic creative images', () => {
       waves.push(items.map((item) => item.id));
       return items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const }));
     });
-    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }));
     expect(waves).toEqual([['person'], ['face']]);
     expect(submitBatch.mock.calls[1][0]).toEqual([expect.objectContaining({ id: 'face', referenceImages: ['/person.jpg'] })]);
   });
@@ -105,21 +110,20 @@ describe('automatic creative images', () => {
       sceneCalls += 1;
       return sceneCalls === 1 ? { id: item.id, outcome: 'failed' as const, error: '明确失败' } : { id: item.id, url: '/scene.jpg', outcome: 'done' as const };
     }));
-    await expect(prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate)).rejects.toThrow('明确失败');
+    await expect(prepareSalesCreativeAssets(h.job(), client({ submitBatch }))).rejects.toThrow('明确失败');
     expect(h.current().assets![0].url).toBe('/person.jpg');
     expect(h.current().assets![1].status).toBe('failed');
-    expect(h.validate).not.toHaveBeenCalled();
-    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }));
     expect(submitBatch).toHaveBeenCalledTimes(2);
     expect(submitBatch.mock.calls[1][0].map((item) => item.id)).toEqual(['scene']);
-    expect(h.current().assetValidation).toBe('passed');
+    expect(h.current().assetValidation).not.toBe('passed');
   });
 
   it('names an unreadable generated reference and retries that image', async () => {
     const h = harness();
     h.current().assets = [
-      { id: 'flat', kind: 'keyframe', label: '黑色卫衣正面平铺主图', prompt: '主图', required: true, usesProduct: true },
-      { id: 'detail', kind: 'keyframe', label: '胸前细节', prompt: '细节', required: true, usesProduct: true, referenceAssetIds: ['flat'] },
+      { id: 'flat', kind: 'keyframe', label: '黑色卫衣正面平铺主图', prompt: '主图', required: true, usesProduct: true, productImageIndexes: [8] },
+      { id: 'detail', kind: 'keyframe', label: '胸前细节', prompt: '细节', required: true, usesProduct: true, productImageIndexes: [8], referenceAssetIds: ['flat'] },
     ];
     let detailTries = 0;
     const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => {
@@ -129,20 +133,20 @@ describe('automatic creative images', () => {
         ? { id: item.id, outcome: 'uncertain' as const, error: '图 2 缺失参考图无法读取；参考图预设 SM19' }
         : { id: item.id, url: '/detail.jpg', outcome: 'done' as const };
     }));
-    await expect(prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate)).rejects.toThrow('黑色卫衣正面平铺主图');
+    await expect(prepareSalesCreativeAssets(h.job(), client({ submitBatch }))).rejects.toThrow('黑色卫衣正面平铺主图');
     expect(h.current().assets![1]).toMatchObject({ status: 'failed', taskId: undefined });
     expect(h.current().assets![1].error).toContain('没有创建可查询的生成任务');
-    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets(h.job(), client({ submitBatch }));
     expect(submitBatch.mock.calls.at(-1)?.[0].map((item) => item.id)).toEqual(['detail']);
-    expect(h.current().assetValidation).toBe('passed');
+    expect(h.current().assetValidation).not.toBe('passed');
   });
   it('does not automatically resubmit an image whose submission result is unknown', async () => {
     const h = harness();
     const submitBatch = vi.fn(async () => { throw new Error('连接中断'); });
     const batch = client({ submitBatch });
-    await expect(prepareSalesCreativeAssets(h.job(), batch, h.validate)).rejects.toThrow('连接中断');
+    await expect(prepareSalesCreativeAssets(h.job(), batch)).rejects.toThrow('连接中断');
     expect(h.current().assets!.every((asset) => asset.status === 'uncertain' && !asset.taskId)).toBe(true);
-    await expect(prepareSalesCreativeAssets(h.job(), batch, h.validate)).rejects.toThrow('提交结果未确认');
+    await expect(prepareSalesCreativeAssets(h.job(), batch)).rejects.toThrow('提交结果未确认');
     expect(submitBatch).toHaveBeenCalledTimes(1);
   });
 
@@ -159,23 +163,22 @@ describe('automatic creative images', () => {
       return '/person.jpg';
     });
     const batch = client({ submitBatch, poll });
-    await expect(prepareSalesCreativeAssets(h.job(), batch, h.validate)).rejects.toThrow('查询超时');
+    await expect(prepareSalesCreativeAssets(h.job(), batch)).rejects.toThrow('查询超时');
     expect(h.current().assets![0]).toMatchObject({ status: 'uncertain', taskId: 'existing-image' });
-    await prepareSalesCreativeAssets(h.job(), batch, h.validate);
+    await prepareSalesCreativeAssets(h.job(), batch);
     expect(submitBatch).toHaveBeenCalledTimes(1);
     expect(poll).toHaveBeenCalledTimes(2);
-    expect(h.current().assetValidation).toBe('passed');
+    expect(h.current().assetValidation).not.toBe('passed');
   });
 
   it('submits only the requested asset when another missing asset is unrelated', async () => {
     const h = harness();
     const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const })));
-    await prepareSalesCreativeAssets({ ...h.job(), regenerateId: 'scene' }, client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets({ ...h.job(), regenerateId: 'scene' }, client({ submitBatch }));
     expect(submitBatch.mock.calls[0][0].map((item) => item.id)).toEqual(['scene']);
     expect(h.current().assets![0].status).toBeUndefined();
     expect(h.current().assets![1]).toMatchObject({ status: 'done', url: '/scene.jpg' });
-    expect(h.validate).not.toHaveBeenCalled();
-    expect(h.current().assetValidation).toBe('pending');
+    expect(h.current().assetValidation).not.toBe('passed');
   });
 
   it('submits an unfinished person dependency before the requested face and skips unrelated assets', async () => {
@@ -190,10 +193,9 @@ describe('automatic creative images', () => {
       waves.push(items.map((item) => item.id));
       return items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const }));
     });
-    await prepareSalesCreativeAssets({ ...h.job(), regenerateId: 'face' }, client({ submitBatch }), h.validate);
+    await prepareSalesCreativeAssets({ ...h.job(), regenerateId: 'face' }, client({ submitBatch }));
     expect(waves).toEqual([['person'], ['face']]);
     expect(h.current().assets!.find((asset) => asset.id === 'scene')?.status).toBeUndefined();
-    expect(h.validate).not.toHaveBeenCalled();
   });
 
   it('keeps an image that arrives after cancellation and does not validate it', async () => {
@@ -203,9 +205,9 @@ describe('automatic creative images', () => {
       aborted = true;
       return items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const }));
     });
-    await expect(prepareSalesCreativeAssets({ ...h.job(), isAborted: () => aborted }, client({ submitBatch }), h.validate)).rejects.toThrow('已停止素材校验');
+    await prepareSalesCreativeAssets({ ...h.job(), isAborted: () => aborted }, client({ submitBatch }));
+    expect(h.current().assetValidation).not.toBe('passed');
     expect(h.current().assets!.every((asset) => asset.status === 'done' && asset.url)).toBe(true);
-    expect(h.validate).not.toHaveBeenCalled();
   });
 
   it('binds front and back stills independently even when all video shots select the back', async () => {
@@ -218,33 +220,15 @@ describe('automatic creative images', () => {
     const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const })));
     await prepareSalesCreativeAssets({ ...h.job(), images: [
       { index: 2, role: 'main', url: '/front-original.jpg' }, { index: 8, role: 'main', url: '/back-original.jpg' },
-    ] }, client({ submitBatch }), h.validate);
+    ] }, client({ submitBatch }));
     expect(submitBatch.mock.calls[0][0]).toEqual([
       expect.objectContaining({ id: 'front', referenceImages: ['/front-original.jpg'] }),
       expect.objectContaining({ id: 'back', referenceImages: ['/back-original.jpg'] }),
     ]);
     expect(submitBatch.mock.calls[0][0][0].prompt).not.toContain('先展示背面再转身');
     expect(submitBatch.mock.calls[0][0][0].prompt).toContain('正面胸前标志');
-    expect(h.validate.mock.calls[0][0].assets?.[0].productImageIndexes).toEqual([2]);
   });
 
-  it('revalidates existing images without submitting or polling image tasks, even with no image model', async () => {
-    const h = harness();
-    for (const asset of h.current().assets!) h.updateAsset(asset.id, { status: 'done', url: `/${asset.id}.jpg`, validation: 'pending', sourceRevision: 'legacy-signature' });
-    const submitBatch = vi.fn(async () => []);
-    const poll = vi.fn(async () => '/unexpected.jpg');
-    await prepareSalesCreativeAssets({ ...h.job(), imageModel: '', validateOnly: true }, client({ submitBatch, poll }), h.validate);
-    expect(submitBatch).not.toHaveBeenCalled();
-    expect(poll).not.toHaveBeenCalled();
-    expect(h.validate).toHaveBeenCalledOnce();
-    expect(h.current().assetValidation).toBe('passed');
-  });
 
-  it('blocks a visual conflict rather than claiming successful validation', async () => {
-    const h = harness();
-    const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => ({ id: item.id, url: '/frame.jpg', outcome: 'done' as const })));
-    h.validate.mockImplementation(async (input) => input.actualReferences.map((ref) => ({ id: ref.id, status: 'conflict' as const, reason: '颜色不符' })));
-    await expect(prepareSalesCreativeAssets(h.job(), client({ submitBatch }), h.validate)).rejects.toThrow('颜色不符');
-    expect(h.current().assetValidation).toBe('conflict');
-  });
+
 });

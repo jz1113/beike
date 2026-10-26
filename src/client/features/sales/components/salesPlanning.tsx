@@ -6,6 +6,7 @@ import type { VideoSalesStudioState } from '../hooks/useVideoSalesStudio';
 import { SALES_SKILL_OPTIONS, salesCategoryForSkill, salesSkillId, type SalesSkillId } from '../model/fashionSalesSkill';
 import { SalesCreationRule, salesCardClass, salesDividerClass, salesFocusClass, salesGroupClass, salesInputClass, salesLabelClass, salesSectionTitleClass } from './salesChrome';
 import { SalesModelPicker } from './SalesModelPicker';
+import { SalesPresentationSelect } from './SalesPresentationSelect';
 import { SalesVideoPreflight } from './SalesVideoPreflight';
 import { salesUnverifiedClaims } from '../model/salesClaimWarnings';
 
@@ -32,18 +33,16 @@ export function SalesPlanningSettings({ state, disabled, noDivider, layout = 've
         <div className="space-y-2">
           <label className={salesLabelClass}>创作技能
             <select value={salesSkillId(state.category)} disabled={disabled} onChange={(event) => onChange({ category: salesCategoryForSkill(event.target.value as SalesSkillId), ...(event.target.value === 'fashion' && state.category !== 'fashion' ? { videoMode: 'live_presenter' } : {}) })} className={salesInputClass}>
+              {state.category !== 'fashion' && <option value="" disabled>请选择服饰技能（服饰、鞋、包）</option>}
               {SALES_SKILL_OPTIONS.map((skill) => <option key={skill.id} value={skill.id} className="bg-white text-slate-900 dark:bg-[#1B1B1E] dark:text-slate-100">{skill.label}</option>)}
             </select>
           </label>
           {!isBottom && <SalesCreationRule category={state.category} onOpenRules={onOpenRules} />}
         </div>
-        {state.category === 'fashion' && <label className={salesLabelClass}>出镜方式
-          <select value={state.videoMode} disabled={disabled} onChange={(event) => onChange({ videoMode: event.target.value as VideoSalesStudioState['videoMode'] })} className={salesInputClass}>
-            <option value="live_presenter">人物出镜讲解（同步口型）</option><option value="product_closeup">商品与细节展示（画外音）</option><option value="scene_demo">手部或背影展示（画外音）</option><option value="graphic_montage">商品混剪（画外音）</option>
-          </select>
-          <span className="mt-1 block text-[11px] font-normal leading-5 text-slate-500">{state.videoMode === 'live_presenter' ? '出镜讲解由人物亲口说话，细节镜头可接同一人的画外音。' : '当前为无露脸画外音展示；需要人物露脸说话时请选择「人物出镜讲解（同步口型）」。'}</span>
+        {state.category === 'fashion' && <label className={salesLabelClass}>呈现方式
+          <SalesPresentationSelect value={state.videoMode} disabled={disabled} onChange={(videoMode) => onChange({ videoMode })} className={salesInputClass} showDescription />
         </label>}
-        <div className="space-y-1.5"><span className={salesLabelClass}>卖点与脚本模型</span><SalesModelPicker modality="chat" value={state.selectedChatModel || ''} models={multimodalModels} ready={ready} disabled={disabled} onChange={(selectedChatModel) => onChange({ selectedChatModel })} /><p className="text-[11px] leading-5 text-slate-500">同一模型也用于商品分析、可选图片校验和视频提示词。</p></div>
+        <div className="space-y-1.5"><span className={salesLabelClass}>卖点与脚本模型</span><SalesModelPicker modality="chat" value={state.selectedChatModel || ''} models={multimodalModels} ready={ready} disabled={disabled} onChange={(selectedChatModel) => onChange({ selectedChatModel })} /><p className="text-[11px] leading-5 text-slate-500">同一模型也用于商品分析和视频提示词。</p></div>
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-3">
             <label className={salesLabelClass}>目标时长（秒）<input type="number" min={10} max={120} step={1} className={salesInputClass} value={state.targetDuration} disabled={disabled} onChange={(event) => onChange({ targetDuration: Number(event.target.value) })} /></label>
@@ -70,6 +69,8 @@ export function SalesFooterCreationControls({ state, disabled, onChange }: {
   disabled: boolean;
   onChange: (patch: Partial<VideoSalesStudioState>) => void;
 }) {
+  const [customDuration, setCustomDuration] = useState(false);
+  const isCustomDuration = customDuration || !DURATION_OPTIONS.some((option) => option.value === state.targetDuration);
   const { ready, multimodalModels } = usePreferenceModels();
   const selectClass = `h-9 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-800 outline-none transition focus:border-amber-500/70 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-100 ${salesFocusClass}`;
   return (
@@ -78,18 +79,14 @@ export function SalesFooterCreationControls({ state, disabled, onChange }: {
         <label className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
           <span className="shrink-0">技能</span>
           <select aria-label="创作技能" value={salesSkillId(state.category)} disabled={disabled} onChange={(event) => onChange({ category: salesCategoryForSkill(event.target.value as SalesSkillId), ...(event.target.value === 'fashion' && state.category !== 'fashion' ? { videoMode: 'live_presenter' } : {}) })} className={selectClass}>
+            {state.category !== 'fashion' && <option value="" disabled>请选择服饰技能（服饰、鞋、包）</option>}
             {SALES_SKILL_OPTIONS.map((skill) => <option key={skill.id} value={skill.id} className="bg-white text-slate-900 dark:bg-[#1B1B1E] dark:text-slate-100">{skill.label}</option>)}
           </select>
         </label>
         {state.category === 'fashion' && (
           <label className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-          <span className="shrink-0">出镜</span>
-          <select aria-label="出镜方式" value={state.videoMode} disabled={disabled} onChange={(event) => onChange({ videoMode: event.target.value as VideoSalesStudioState['videoMode'] })} className={selectClass}>
-            <option value="live_presenter">人物出镜讲解（同步口型）</option>
-            <option value="product_closeup">商品与细节展示（画外音）</option>
-            <option value="scene_demo">手部或背影展示（画外音）</option>
-            <option value="graphic_montage">商品混剪（画外音）</option>
-          </select>
+          <span className="shrink-0">呈现方式</span>
+          <SalesPresentationSelect value={state.videoMode} disabled={disabled} onChange={(videoMode) => onChange({ videoMode })} className={selectClass} />
           </label>
         )}
         <div className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
@@ -104,12 +101,13 @@ export function SalesFooterCreationControls({ state, disabled, onChange }: {
           <span className="shrink-0">时长</span>
           <div className="inline-flex h-9 items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-0.5 dark:border-white/10 dark:bg-white/[0.05]">
             {DURATION_OPTIONS.map((option) => (
-              <button key={option.value} type="button" disabled={disabled} aria-pressed={state.targetDuration === option.value} onClick={() => onChange({ targetDuration: option.value })} className={`rounded-lg px-2 py-1 text-[11px] font-medium transition ${state.targetDuration === option.value ? 'bg-amber-500/20 text-amber-800 dark:bg-amber-400/25 dark:text-amber-200' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>
+              <button key={option.value} type="button" disabled={disabled} aria-pressed={!isCustomDuration && state.targetDuration === option.value} onClick={() => { setCustomDuration(false); onChange({ targetDuration: option.value }); }} className={`rounded-lg px-2 py-1 text-[11px] font-medium transition ${!isCustomDuration && state.targetDuration === option.value ? 'bg-slate-200 text-slate-900 dark:bg-white/15 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>
                 {option.label}
               </button>
             ))}
-            <input aria-label="目标时长（秒）" type="number" min={10} max={120} step={1} value={state.targetDuration} disabled={disabled} onChange={(event) => onChange({ targetDuration: Number(event.target.value) })} className="h-7 w-12 border-l border-slate-200 bg-transparent px-1 text-center text-xs font-medium text-slate-800 outline-none dark:border-white/10 dark:text-slate-100" />
+            <button type="button" disabled={disabled} aria-pressed={isCustomDuration} onClick={() => setCustomDuration(true)} className={`rounded-lg px-2 py-1 text-[11px] font-medium transition ${isCustomDuration ? 'bg-slate-200 text-slate-900 dark:bg-white/15 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'} ${salesFocusClass}`}>自定义</button>
           </div>
+          {isCustomDuration && <input autoFocus aria-label="目标时长（秒）" type="number" min={10} max={120} step={1} value={state.targetDuration} disabled={disabled} onChange={(event) => onChange({ targetDuration: Number(event.target.value) })} className="h-7 w-12 border-l border-slate-200 bg-transparent px-1 text-center text-xs font-medium text-slate-800 outline-none dark:border-white/10 dark:text-slate-100" />}
         </div>
         <label className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
           <span className="shrink-0">比例</span>
@@ -233,7 +231,7 @@ export function SalesPlanSection({ script, disabled, onEditShot, suppliedFacts =
                 </div>
               </div>
               <div className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
-                <div className="min-h-24 rounded-xl border border-amber-200/70 bg-amber-50/45 p-3 dark:border-amber-300/10 dark:bg-amber-300/[0.04]"><InlineShotField id={`sales-shot-${index}-voiceover`} label={shot.speechMode === 'on_camera' ? '出镜说话 · 同步口型' : '画外音'} value={shot.voiceover} disabled={disabled} prominent count={shotHan} hint={isFashion ? `建议 ${Math.max(6, shot.duration * 3)}–${shot.duration * 6} 字` : undefined} onSave={(value) => onEditShot(index, { voiceover: value })} /></div>
+                <div className="min-h-24 rounded-xl border border-amber-200/70 bg-amber-50/45 p-3 dark:border-amber-300/10 dark:bg-amber-300/[0.04]"><InlineShotField id={`sales-shot-${index}-voiceover`} label={shot.speechMode === 'on_camera' ? '出镜说话 · 同步口型' : shot.speechMode === 'voiceover' ? '画外音' : '声音未标注'} value={shot.voiceover} disabled={disabled} prominent count={shotHan} hint={isFashion ? `建议 ${Math.max(6, shot.duration * 3)}–${shot.duration * 6} 字` : undefined} onSave={(value) => onEditShot(index, { voiceover: value })} /></div>
                 <div className="min-h-24 rounded-xl border border-slate-200/80 bg-white/65 p-3 dark:border-white/10 dark:bg-white/[0.025]"><InlineShotField id={`sales-shot-${index}-description`} label="画面描述" value={shot.description} disabled={disabled} onSave={(value) => onEditShot(index, { description: value })} /></div>
               </div>
               <SalesPromptDetails title="查看完整提示词" value={shot.prompt || shot.description} disabled={disabled} onChange={(value) => onEditShot(index, { prompt: value })} rows={5} copyable note={shot.promptStale ? '商品或脚本已更新，保存后请重新生成视频提示词。' : undefined} />

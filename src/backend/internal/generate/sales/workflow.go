@@ -25,11 +25,21 @@ type actualReference struct {
 	URL   string `json:"url"`
 }
 
-func workflowV3(payload map[string]any) bool { return payload["workflowVersion"] == float64(3) }
-
 func checkWorkflowVersion(payload map[string]any) error {
 	if payload["workflowVersion"] != float64(3) {
 		return fmt.Errorf("请使用当前工作室流程")
+	}
+	for _, field := range []string{"imageUrls", "productImages", "priceRange", "platforms", "templateId", "characterId", "fashionReferences", "referenceOrder"} {
+		if _, exists := payload[field]; exists {
+			return fmt.Errorf("参数 %s 已停用，请使用当前服饰制作流程", field)
+		}
+	}
+	return nil
+}
+
+func checkFashionCategory(payload map[string]any) error {
+	if payload["category"] != "fashion" {
+		return fmt.Errorf("当前仅接入服饰、鞋、包技能，category 必须为 fashion")
 	}
 	return nil
 }
@@ -174,7 +184,7 @@ func workflowTiming(payload map[string]any) (int, string, error) {
 		return 0, "", err
 	}
 	switch ratio {
-	case "9:16", "16:9", "3:4", "4:3", "1:1", "21:9":
+	case "9:16", "16:9", "3:4", "1:1":
 	default:
 		return 0, "", fmt.Errorf("aspectRatio 无效")
 	}
@@ -196,7 +206,7 @@ func strictShots(payload map[string]any, needImages bool, catalog []CatalogImage
 		}
 		seen[shot.ShotId] = true
 	}
-	if err := validateSpeechModes(shots, false); err != nil {
+	if err := validateSpeechModes(shots, true); err != nil {
 		return nil, err
 	}
 	if needImages {
@@ -246,7 +256,7 @@ func validateAssetPlan(assets []PlannedAsset) error {
 			return fmt.Errorf("未知素材类型 %s", asset.Kind)
 		}
 		productIndexes := map[int]bool{}
-		if asset.ProductImageIndexes != nil && asset.UsesProduct && len(asset.ProductImageIndexes) == 0 {
+		if asset.UsesProduct && len(asset.ProductImageIndexes) == 0 {
 			return fmt.Errorf("素材 %s 缺少商品参考编号", asset.ID)
 		}
 		for _, index := range asset.ProductImageIndexes {

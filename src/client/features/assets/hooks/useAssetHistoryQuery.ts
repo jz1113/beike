@@ -24,6 +24,14 @@ export function useAssetHistoryQuery(enabled: boolean) {
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   });
+  const { fetchNextPage, hasNextPage, isFetching, isError } = query;
+  useEffect(() => {
+    if (enabled && !documentHidden && hasNextPage && !isFetching && !isError) {
+      // Drain history sequentially so search, project counts and deletion see every page.
+      void fetchNextPage({ cancelRefetch: false });
+    }
+  }, [enabled, documentHidden, hasNextPage, isFetching, isError, fetchNextPage]);
+
   const [pollError, setPollError] = useState<Error | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [pollRevision, setPollRevision] = useState(0);

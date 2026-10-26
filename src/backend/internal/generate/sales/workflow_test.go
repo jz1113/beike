@@ -15,16 +15,17 @@ import (
 
 func workflowPayload() map[string]any {
 	return map[string]any{
-		"workflowVersion": 3, "targetDuration": 15, "aspectRatio": "16:9", "productName": "白色纸巾", "category": "home", "selectedColor": "白色",
+		"workflowVersion": 3, "targetDuration": 15, "aspectRatio": "16:9", "productName": "白色上衣", "category": "fashion", "videoMode": "product_closeup", "selectedColor": "白色",
 		"imageCatalog":         []map[string]any{{"index": 2, "url": "https://example.com/white.jpg", "role": "main"}, {"index": 9, "url": "https://example.com/red.jpg", "role": "sku"}},
 		"eligibleImageIndexes": []int{2},
-		"shots":                []map[string]any{{"shotId": 1, "imageIndex": 2, "duration": 15, "description": "桌面纸巾展示", "camera": "推近", "voiceover": "看看这款纸巾", "prompt": "展示商品", "visualSource": "ai_generate"}},
+		"assets":               []PlannedAsset{{ID: "table", Kind: "scene", Label: "桌面", Prompt: "自然光房间", Required: true}},
+		"shots":                []map[string]any{{"shotId": 1, "imageIndex": 2, "duration": 15, "description": "桌面纸巾展示", "camera": "推近", "speechMode": "voiceover", "voiceover": "看看这款纸巾", "prompt": "展示商品", "visualSource": "ai_generate"}},
 		"actualReferences":     []map[string]any{{"id": "product_white", "kind": "product", "label": "白色纸巾", "url": "https://example.com/white.jpg"}, {"id": "table", "kind": "scene", "label": "桌面场景", "url": "https://example.com/table.jpg"}},
 	}
 }
 
 func validWorkflowScript() string {
-	return `{"scripts":[{"id":"script_1","title":"桌面展示","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"桌面纸巾","camera":"推近","speechMode":"voiceover","voiceover":"看看纸巾","prompt":"展示商品","visualSource":"ai_generate"}],"assets":[{"id":"table","kind":"scene","label":"桌面","prompt":"实拍桌面纸巾，商品保持白色","required":true,"usesProduct":true}]}]}`
+	return `{"scripts":[{"id":"script_1","title":"桌面展示","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"桌面纸巾","camera":"推近","speechMode":"voiceover","voiceover":"我今天出门就套这件白色圆领，领口这圈罗纹很清楚，胸前图案的位置也能看见。上班可以配深色长裤，周末换条牛仔裤，还是这一件。","prompt":"展示商品","visualSource":"ai_generate"}],"assets":[{"id":"table","kind":"scene","label":"桌面","prompt":"实拍桌面纸巾，商品保持白色","required":true,"usesProduct":true,"productImageIndexes":[2]}]}]}`
 }
 
 func attachGateway(payload map[string]any, url string) {
@@ -44,7 +45,7 @@ func TestWorkflowScriptHasPlanWithoutPersonOrVideoModel(t *testing.T) {
 				t.Errorf("missing %s", expected)
 			}
 		}
-		for _, forbidden := range []string{"red.jpg", "开箱换装", "没有提供出镜人物"} {
+		for _, forbidden := range []string{"red.jpg", "没有提供出镜人物"} {
 			if strings.Contains(text, forbidden) {
 				t.Errorf("unexpected %s", forbidden)
 			}
@@ -164,8 +165,8 @@ func TestWorkflowAnalysisOnlySeesEligiblePictures(t *testing.T) {
 		if strings.Contains(text, "red.jpg") {
 			t.Error("disallowed picture sent to model")
 		}
-		if strings.Contains(text, "开箱换装") {
-			t.Error("home analysis used the fashion narrative")
+		if !strings.Contains(text, "开箱换装") {
+			t.Error("fashion analysis omitted its narrative")
 		}
 		return `{"productName":"纸巾","sellingPoints":["白色包装"]}`
 	})
@@ -289,14 +290,14 @@ func TestWorkflowFashionScriptRequestsNarrative(t *testing.T) {
 				t.Errorf("missing %s", expected)
 			}
 		}
-		return strings.Replace(validWorkflowScript(), `"voiceover":"看看纸巾"`, `"voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"`, 1)
+		return strings.Replace(validWorkflowScript(), `"voiceover":"我今天出门就套这件白色圆领，领口这圈罗纹很清楚，胸前图案的位置也能看见。上班可以配深色长裤，周末换条牛仔裤，还是这一件。"`, `"voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"`, 1)
 	})
 	payload := workflowPayload()
 	payload["category"] = "fashion"
 	payload["productName"] = "黑色卫衣"
 	attachGateway(payload, server.URL)
 	rec := postSales(t, Script(config.Config{}), "/", payload)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"beat":"unbox"`) || !strings.Contains(rec.Body.String(), `"deliveryMode":"single"`) {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"beat":"lifestyle"`) || !strings.Contains(rec.Body.String(), `"deliveryMode":"single"`) {
 		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
 	}
 }
@@ -304,6 +305,7 @@ func TestWorkflowFashionScriptRequestsNarrative(t *testing.T) {
 func TestWorkflowFashionWearingAssetMustUseProduct(t *testing.T) {
 	reply := strings.Replace(validWorkflowScript(), "桌面纸巾，商品保持白色", "衣服上身实拍", 1)
 	reply = strings.Replace(reply, `"usesProduct":true`, `"usesProduct":false`, 1)
+	reply = strings.Replace(reply, `"productImageIndexes":[2]`, `"productImageIndexes":[]`, 1)
 	server := useChatServer(t, func(map[string]any, int) string { return reply })
 	payload := workflowPayload()
 	payload["category"] = "fashion"

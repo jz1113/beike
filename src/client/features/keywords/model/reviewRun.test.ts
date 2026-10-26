@@ -9,6 +9,10 @@ function row(id: string): KeywordReviewRecord {
 }
 
 class ImmediatePacer extends ReviewPacer {
+  override async waitToRetry(_round: number, shouldStop: () => boolean): Promise<boolean> {
+    return !shouldStop();
+  }
+
   override async acquire(shouldStop: () => boolean): Promise<boolean> {
     return !shouldStop();
   }
@@ -50,8 +54,8 @@ function fatalKeyFailure(): ReviewRequestError {
   return Object.assign(new Error('API Key 无效'), { fatalConfig: true });
 }
 
-describe('runKeywordReviewBatches gateway pause', () => {
-  it('retries an exhausted gateway batch and still reviews the later rows', async () => {
+describe('runKeywordReviewBatches recovery', () => {
+  it('requeues exhausted gateway batches until they succeed and reviews the later rows', async () => {
     let stopped = false;
     const marked: Array<{ uncertain?: boolean }> = [];
     const seen: string[] = [];
@@ -79,20 +83,24 @@ describe('runKeywordReviewBatches gateway pause', () => {
       pacer: new ImmediatePacer(1),
       request: async (body) => {
         const payload = JSON.parse(body) as { rows: Array<{ id: string }> };
-        seen.push(payload.rows[0].id);
-        throw gatewayFailure();
+        const id = payload.rows[0].id;
+        seen.push(id);
+        if (seen.filter((item) => item === id).length <= 24) throw gatewayFailure();
+        return { success: true, results: [doneResult(id)], failedIds: [] };
       },
     });
     expect(stopped).toBe(false);
-    expect(message).toContain('失败 3 条');
+    expect(message).toContain('完成 3 条');
+    expect(message).not.toContain('失败');
     expect(message).not.toContain('已暂停');
     expect(seen.filter((id) => id === 'a').length).toBeGreaterThan(1);
     expect(seen).toEqual(expect.arrayContaining(['a', 'b', 'c']));
     expect(marked).toEqual([{ uncertain: false }, { uncertain: false }, { uncertain: false }]);
   });
 
-  it('continues after a success resets the gateway failure streak', async () => {
+  it('finishes later rows before revisiting earlier exhausted failures', async () => {
     let stopped = false;
+    const attempts = new Map<string, number>();
     const message = await runKeywordReviewBatches({
       queue: [row('a'), row('b'), row('ok'), row('c'), row('d')],
       candidates: 5,
@@ -117,10 +125,13 @@ describe('runKeywordReviewBatches gateway pause', () => {
       pacer: new ImmediatePacer(1),
       request: async (body) => {
         const payload = JSON.parse(body) as { rows: Array<{ id: string }> };
-        if (payload.rows[0]?.id === 'ok') {
+        const id = payload.rows[0].id;
+        const attempt = (attempts.get(id) ?? 0) + 1;
+        attempts.set(id, attempt);
+        if (id === 'ok' || attempt > 24) {
           return {
             success: true,
-            results: [{ id: 'ok', category: '其他', producible: '制作', categoryReason: '可做', rejectReason: '' }],
+            results: [doneResult(id)],
             failedIds: [],
           };
         }
@@ -129,6 +140,7 @@ describe('runKeywordReviewBatches gateway pause', () => {
     });
     expect(stopped).toBe(false);
     expect(message).toContain('批量审核已处理到最后一个词');
+    expect(message).toContain('完成 5 条');
     expect(message).not.toContain('已暂停');
   });
 
@@ -199,10 +211,11 @@ describe('runKeywordReviewBatches gateway pause', () => {
       pacer: new ImmediatePacer(1),
       request: async () => {
         calls += 1;
-        throw gatewayTimeout();
+        if (calls <= 3) throw gatewayTimeout();
+        return { success: true, results: queue.map((record) => doneResult(record.id)), failedIds: [] };
       },
     });
-    expect(calls).toBe(3);
+    expect(calls).toBe(4);
     expect(marked).toHaveLength(1);
     expect(marked[0][0]).toContain('HTTP 524');
     expect(marked[0].slice(1)).toEqual(queue.map((record) => record.id));
@@ -290,7 +303,7 @@ describe('runKeywordReviewBatches gateway pause', () => {
     expect(notices.some((text) => text.includes('接近网关切断时间'))).toBe(false);
   });
 
-  it('resubmits an uncertain batch with a new idempotency version and continues', async () => {
+  it('quarantines an uncertain batch without changing its operation and continues', async () => {
     const versions = new Map<number, number>();
     const marked: Array<{ ids: string[]; uncertain?: boolean }> = [];
     const notices: string[] = [];
@@ -324,10 +337,10 @@ describe('runKeywordReviewBatches gateway pause', () => {
         return { success: true, results: [doneResult('next')], failedIds: [] };
       },
     });
-    expect(calls).toBe(4);
-    expect(versions.get(0)).toBe(2);
+    expect(calls).toBe(2);
+    expect(versions.has(0)).toBe(false);
     expect(marked).toEqual([{ ids: ['held'], uncertain: true }]);
-    expect(notices.some((text) => text.includes('可能再次产生费用'))).toBe(true);
+    expect(notices.some((text) => text.includes('可能再次产生费用'))).toBe(false);
     expect(message).toContain('完成 1 条');
     expect(message).toContain('失败 1 条');
   });

@@ -2,12 +2,13 @@ import { Loader2, RotateCcw } from 'lucide-react';
 import type { SalesCreativeAsset, SalesImageRef } from '@shared/domain/sales';
 import { explainSalesReferenceError, salesReferenceRejection } from '../model/salesAssetHelpers';
 import { salesAssetRecovery } from '../model/salesAssetProgress';
-import { salesGhostButtonClass } from './salesChrome';
+import { salesGhostButtonClass, salesInputClass } from './salesChrome';
 
-export function SalesAssetCard({ asset, assets, aspectRatio, productImages, legacyProductIndexes, disabled, modelReady, onGenerate }: { asset: SalesCreativeAsset; assets: SalesCreativeAsset[]; aspectRatio?: string; productImages?: SalesImageRef[]; legacyProductIndexes: number[]; disabled: boolean; modelReady: boolean; onEdit?: (prompt: string) => void; onGenerate: (queryOnly?: boolean) => void }) {
+export function SalesAssetCard({ asset, assets, aspectRatio, productImages, disabled, modelReady, onEdit, onGenerate }: { asset: SalesCreativeAsset; assets: SalesCreativeAsset[]; aspectRatio?: string; productImages?: SalesImageRef[]; disabled: boolean; modelReady: boolean; onEdit?: (prompt: string) => void; onGenerate: (queryOnly?: boolean) => void }) {
   const dependencies = (asset.referenceAssetIds || []).map((id) => assets.find((item) => item.id === id));
   const dependencyPending = dependencies.some((item) => !item?.url || item.status !== 'done');
-  const usedIndexes = asset.usesProduct ? (asset.productImageIndexes ?? legacyProductIndexes) : [];
+  const usedIndexes = asset.usesProduct ? (asset.productImageIndexes ?? []) : [];
+  const missingProductReferences = Boolean(asset.usesProduct && !usedIndexes.length);
   const productLabels = usedIndexes.map((index) => `商品参考 ${index + 1}`);
   const matchedProducts = usedIndexes.map((index) => ({ index, image: productImages?.find((img) => img.index === index) })).filter((item) => Boolean(item.image?.url));
   const referenceLabels = [...productLabels, ...dependencies.map((item) => item?.label || '缺失参考')];
@@ -31,12 +32,14 @@ export function SalesAssetCard({ asset, assets, aspectRatio, productImages, lega
         {dependencies.length > 0 && <span className="min-w-0 truncate text-[11px] text-slate-500">{dependencies.map((item) => item?.label || '缺失参考').join('、')}</span>}
         <span className="sr-only">使用参考：{referenceLabels.join('、')}</span>
       </div>}
+      {missingProductReferences && <p role="alert" className="text-xs leading-5 text-amber-600 dark:text-amber-300">此旧素材缺少商品参考编号，请更新脚本后再生成。</p>}
       {dependencies.length > 0 && (dependencyPending || referenceRejected) && <p className="text-[11px] leading-4 text-amber-600 dark:text-amber-300">{dependencyPending ? '请先生成参考图片' : '前置图已生成，可直接重试'}</p>}
       {asset.validationReason && asset.validationReason !== referenceIssue && asset.validationReason !== '人工已确认' && <p className="text-xs leading-5 text-amber-600 dark:text-amber-300">{asset.validationReason}</p>}
       {referenceIssue && <p role="alert" className="text-xs leading-5 text-rose-500">{explainSalesReferenceError(referenceIssue, referenceLabels)}</p>}
       {asset.error && asset.error !== referenceIssue && <p role="alert" className="text-xs leading-5 text-rose-500">{asset.error}</p>}
       {asset.status === 'uncertain' && !referenceRejected && <p className="text-xs leading-5 text-amber-600 dark:text-amber-300">提交结果未确认，请先核对服务商记录，重新提交可能重复计费。</p>}
-      <button type="button" title={asset.url ? '重新生成会再次提交绘图任务，可能计费' : undefined} disabled={disabled || (canQuery ? false : Boolean(recovery) || dependencyPending || !modelReady || !asset.prompt.trim())} onClick={() => onGenerate(canQuery)} className={`min-h-8 px-3 py-1.5 disabled:opacity-40 ${salesGhostButtonClass}`}>{inFlight && !canQuery ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}{canQuery ? '继续查询此素材（不重新生图）' : recovery === 'verify' ? '提交结果待核实' : asset.url ? '重新生成此素材（可能计费）' : asset.status === 'failed' || asset.status === 'uncertain' ? '重试此素材（可能计费）' : '生成此素材（可能计费）'}</button>
+      <details open={asset.status === 'failed' || asset.validation === 'conflict'} className="text-xs text-slate-500"><summary className="cursor-pointer py-1">查看与编辑绘图提示词</summary><textarea aria-label={`${asset.label}绘图提示词`} rows={5} value={asset.prompt} readOnly={!onEdit} disabled={disabled || Boolean(recovery) || inFlight} onChange={(event) => onEdit?.(event.target.value)} className={`${salesInputClass} resize-y text-xs leading-6`} /><p className="mt-1 leading-5">修改后需重新生成此素材，并更新依赖它的素材；已有图片保留供核对。</p></details>
+      <button type="button" title={asset.url ? '重新生成会再次提交绘图任务，可能计费' : undefined} disabled={disabled || (canQuery ? false : Boolean(recovery) || missingProductReferences || dependencyPending || !modelReady || !asset.prompt.trim())} onClick={() => onGenerate(canQuery)} className={`min-h-8 px-3 py-1.5 disabled:opacity-40 ${salesGhostButtonClass}`}>{inFlight && !canQuery ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}{canQuery ? '继续查询此素材（不重新生图）' : recovery === 'verify' ? '提交结果待核实' : asset.url ? '重新生成此素材（可能计费）' : asset.status === 'failed' || asset.status === 'uncertain' ? '重试此素材（可能计费）' : '生成此素材（可能计费）'}</button>
     </article>
   );
 }

@@ -69,7 +69,6 @@ export function ImageLightboxModal() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const { show: showToast } = useToast();
@@ -93,7 +92,6 @@ export function ImageLightboxModal() {
 
   useEffect(() => {
     setIsPromptExpanded(false);
-    setIsImageLoading(true);
   }, [previewTask?.id, previewTask?.resultUrl]);
 
   // 计算视频播放源（优先走带 Range/防盗链代理的 proxyMediaUrl，避免跨域阻断与防盗链拦截）
@@ -235,12 +233,6 @@ export function ImageLightboxModal() {
   };
 
   useEffect(() => {
-    if (previewTask) {
-      setIsImageLoading(true);
-    }
-  }, [previewTask]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!previewTask) return;
       if (e.key === 'Escape') {
@@ -366,12 +358,10 @@ export function ImageLightboxModal() {
           currentVideoSrc={currentVideoSrc}
           videoLoadFailed={videoLoadFailed}
           isVideoLoading={isVideoLoading}
-          isImageLoading={isImageLoading}
           handleVideoCanPlay={handleVideoCanPlay}
           handleVideoDuration={handleVideoDuration}
           handleVideoError={handleVideoError}
           setIsVideoLoading={setIsVideoLoading}
-          setIsImageLoading={setIsImageLoading}
         />
 
         {/* 🌟 2. 右侧区域：主信息卡片 (完全对齐图 1) + 对话生图界面专有工具箱面板 (完全对齐图 2) */}

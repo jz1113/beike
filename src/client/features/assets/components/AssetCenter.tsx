@@ -11,10 +11,7 @@ import { mergeAssetTasks } from '../model/mergeAssetTasks';
 import { useAssetHistoryQuery } from '../hooks/useAssetHistoryQuery';
 import { buildCanvasAssets, type AssetCanvasProject } from '../model/canvasAssets';
 import { useAssetActions } from '../hooks/useAssetActions';
-import { confirmAction } from '@client/shared/utils/confirmAction';
-import { permanentDeleteGeneration } from '@client/shared/api/permanentDeleteGeneration';
 import { useI18n } from '@client/shared/i18n';
-import type { ProjectFolderItem } from './material/MaterialProjectView';
 import MaterialLibraryView from './material/MaterialLibraryView';
 import AssetLibraryView from './library/AssetLibraryView';
 
@@ -148,8 +145,11 @@ export default function AssetCenter({
     isDownloadingZip,
     handleBatchDeleteTasks,
     handleBatchDownloadTasks,
+    handleBatchDeleteProjects,
   } = useAssetActions({
     mergedTasks,
+    serverHistoryComplete,
+    deleteSession,
     selectedTaskIds,
     failedTasks,
     setSelectedTaskIds,
@@ -160,76 +160,6 @@ export default function AssetCenter({
     onDeleteCanvasProject,
     onDeleteCanvasNode,
   });
-
-  const handleBatchDeleteProjects = useCallback(
-    async (projectsToDelete: ProjectFolderItem[]) => {
-      if (projectsToDelete.length === 0) return false;
-      const totalAssets = projectsToDelete.reduce((sum, p) => sum + p.assetCount, 0);
-      const title =
-        projectsToDelete.length === 1
-          ? `确认删除「${projectsToDelete[0].title}」`
-          : `确认删除选中的 ${projectsToDelete.length} 个项目`;
-      const description =
-        projectsToDelete.length === 1
-          ? totalAssets > 0
-            ? `此操作无法撤回，删除项目后，内部包含的 ${totalAssets} 个素材也将被清理，确认删除么？`
-            : `此操作无法撤回，删除项目后，内部记录将被清理，确认删除么？`
-          : totalAssets > 0
-          ? `此操作无法撤回，选中的 ${projectsToDelete.length} 个项目及其包含的 ${totalAssets} 个素材将被清理，确认删除么？`
-          : `此操作无法撤回，选中的 ${projectsToDelete.length} 个项目将被清理，确认删除么？`;
-
-      const confirmed = await confirmAction({
-        title,
-        description,
-        confirmText: '删除',
-        cancelText: '取消',
-      });
-      if (!confirmed) return false;
-
-      const protectUrls = canvasProjects
-        .flatMap((cp) => [
-          cp.thumbnail,
-          ...cp.nodes.flatMap((node) => [
-            node.imageUrl,
-            node.videoUrl,
-            node.audioUrl,
-            node.referenceImageUrl,
-            ...(node.drawing?.references || []),
-          ]),
-        ])
-        .filter((url): url is string => Boolean(url));
-
-      for (const p of projectsToDelete) {
-        if (p.type === 'canvas') {
-          onDeleteCanvasProject(p.id);
-        } else {
-          const sessionTasks = mergedTasks.filter(
-            (t) => t.sessionId === p.id || t.batchId?.includes(p.id)
-          );
-          if (sessionTasks.length > 0) {
-            await permanentDeleteGeneration(sessionTasks, { protectUrls }).catch(() => {});
-          }
-          deleteSession(p.id);
-        }
-      }
-
-      showToast(
-        projectsToDelete.length === 1
-          ? `已删除项目“${projectsToDelete[0].title}”`
-          : `已成功删除 ${projectsToDelete.length} 个项目`
-      );
-      void refetchAssetTasks();
-      return true;
-    },
-    [canvasProjects, deleteSession, mergedTasks, onDeleteCanvasProject, refetchAssetTasks, showToast]
-  );
-
-  const handleDeleteProject = useCallback(
-    async (project: ProjectFolderItem) => {
-      await handleBatchDeleteProjects([project]);
-    },
-    [handleBatchDeleteProjects]
-  );
 
   return (
     <div className={`${pageRoot} bg-transparent select-none`}>
@@ -311,16 +241,22 @@ export default function AssetCenter({
 
       {/* 🌟 主视图内容区 */}
       <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-3">
+        {mainTab === 'material' && (historyQuery.isFetching || historyQuery.hasNextPage || historyQuery.error || historyQuery.pollError) && (
+          <div role="status" aria-live="polite" className="mb-3 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span>{historyQuery.error || historyQuery.pollError ? '部分素材加载失败，请刷新重试' : `正在加载素材，已读取 ${dbTasks.length} 条…`}</span>
+            {(historyQuery.error || historyQuery.pollError) && <button type="button" onClick={() => void refetchAssetTasks()} className="font-medium text-blue-600 dark:text-blue-400">重试</button>}
+          </div>
+        )}
         {mainTab === 'material' ? (
           <MaterialLibraryView
             sessions={activeSessions}
             canvasProjects={canvasProjects}
             mergedTasks={mergedTasks}
             sourceType={sourceType}
+            onSourceTypeChange={setSourceType}
             setPreviewTask={(task, queue) => setPreviewTask(task as unknown as Parameters<typeof setPreviewTask>[0], queue as unknown as Parameters<typeof setPreviewTask>[1])}
             onBatchDelete={handleBatchDeleteTasks}
             onBatchDownload={handleBatchDownloadTasks}
-            onDeleteProject={handleDeleteProject}
             onBatchDeleteProjects={handleBatchDeleteProjects}
             isDownloadingZip={isDownloadingZip}
             isDeleting={isDeleting}

@@ -15,8 +15,6 @@ export interface ImageAssignment {
   reason?: string;
 }
 
-const ROLE_RANK: Record<SalesImageRole, number> = { main: 0, sku: 1, detail: 2 };
-
 export function buildSalesImageCatalog(input: {
   mainImages?: string[];
   skuImages?: string[];
@@ -36,40 +34,6 @@ export function buildSalesImageCatalog(input: {
   push('sku', input.skuImages);
   push('detail', input.descImages);
   return images;
-}
-
-/** 视觉模型只看主图、规格图和少量详情图，编号仍对应完整目录。 */
-export function visionImageBudget(images: SalesImageRef[], limit = 8): SalesImageRef[] {
-  const unique = images.filter((image, index) => image.url.trim() && images.findIndex((item) => item.url === image.url) === index);
-  const ordered = [...unique].sort((a, b) => ROLE_RANK[a.role] - ROLE_RANK[b.role] || a.index - b.index);
-  return ordered.slice(0, Math.max(1, limit));
-}
-
-export function applyImageAssignments(shots: VideoSalesShot[], assignments: ImageAssignment[], imageCount: number): VideoSalesShot[] {
-  const byShot = new Map(assignments.map((item) => [item.shotId, item.imageIndex]));
-  return shots.map((shot, ordinal) => {
-    const fallback = imageCount > 0 ? ordinal % imageCount : 0;
-    const raw = byShot.get(shot.shotId);
-    const imageIndex = typeof raw === 'number' && imageCount > 0 && raw >= 0 && raw < imageCount ? raw : fallback;
-    return { ...shot, imageIndex, assetUrl: undefined, status: 'pending' };
-  });
-}
-
-export function removeCatalogImage(images: SalesImageRef[], index: number): SalesImageRef[] {
-  return images.filter((image) => image.index !== index).map((image, next) => ({ ...image, index: next }));
-}
-
-export function remapShotAfterImageRemoval(shot: VideoSalesShot, removed: number): VideoSalesShot {
-  if (typeof shot.imageIndex !== 'number') return shot;
-  if (shot.imageIndex === removed) return { ...shot, imageIndex: 0, assetUrl: undefined, referenceFrameUrl: undefined, status: 'pending' };
-  if (shot.imageIndex > removed) return { ...shot, imageIndex: shot.imageIndex - 1 };
-  return shot;
-}
-
-export function shotReferenceImage(shot: { imageIndex?: number }, images: string[], ordinal: number): string {
-  if (typeof shot.imageIndex === 'number' && images[shot.imageIndex]) return images[shot.imageIndex];
-  if (images.length === 0) return '';
-  return images[ordinal % images.length] || '';
 }
 
 export function inferSalesCategory(text: string): VideoSalesCategory {
@@ -135,13 +99,14 @@ export function usableSalesImages(images: SalesImageRef[]): SalesImageRef[] {
 }
 
 export function appendSalesImages(images: SalesImageRef[], urls: string[], role: SalesImageRole = 'main'): SalesImageRef[] {
-  const next = images.map((image, index) => ({ ...image, index }));
+  const next = images.map((image) => ({ ...image }));
+  let nextIndex = images.reduce((max, image) => Math.max(max, image.index + 1), 0);
   const seen = new Set(next.map((image) => image.url));
   for (const raw of urls) {
     const url = raw.trim();
     if (!url || seen.has(url)) continue;
     seen.add(url);
-    next.push({ index: next.length, url, role });
+    next.push({ index: nextIndex++, url, role });
   }
   return next;
 }

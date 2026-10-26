@@ -14,14 +14,14 @@ import { salesSingleVideoError } from './salesStageRules';
 import type { SalesImageBatchItem } from '../api/salesImageBatch';
 
 vi.mock('../api/videoSalesApi', () => ({
-  analyzeProductMedia: vi.fn(), generateSalesScripts: vi.fn(), selectSalesImages: vi.fn(), finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn(),
+  analyzeProductMedia: vi.fn(), generateSalesScripts: vi.fn(), selectSalesImages: vi.fn(), finalizeSalesPrompts: vi.fn(),
 }));
 vi.mock('./renderSalesVideo', () => ({ renderSalesVideo: vi.fn() }));
 vi.mock('../api/salesMediaApi', async (original) => ({ ...await original<typeof import('../api/salesMediaApi')>(), generateSalesShotVideo: vi.fn() }));
 vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute: (_modality: string, modelId: string) => ({ modelId }) }));
 
 const planApi = { analyzeProductMedia, generateSalesScripts, selectSalesImages };
-const renderApi = { generateFrame: async () => '', generateVideo: generateSalesShotVideo, compose: async () => '' };
+const renderApi = { generateVideo: generateSalesShotVideo };
 const seo = { title: '', hashtags: [] as string[], coverText: '', interactionGuide: '', description: '' };
 const analysis = {
   productName: '黑色圆领上衣', category: 'fashion' as const,
@@ -29,7 +29,7 @@ const analysis = {
   sellingPoints: ['圆领'], targetAudience: '成年人', usageScenarios: ['日常'], painPoints: [],
   videoSuggestions: { recommendedAngles: [], keyVisuals: [], suggestedStyle: '' },
 };
-const shot = { shotId: 1, type: 'demo' as const, duration: 15, description: '展示黑色上衣', camera: '中景', voiceover: '看这件黑色上衣', visualSource: 'product_image' as const, transition: 'direct_concat' as const };
+const shot = { shotId: 1, type: 'demo' as const, duration: 15, description: '展示黑色上衣', camera: '中景', speechMode: 'voiceover' as const, voiceover: '看这件黑色上衣', visualSource: 'product_image' as const, transition: 'direct_concat' as const };
 
 function fashionState(): VideoSalesStudioState {
   const fillers = Array.from({ length: 7 }, (_, index) => `https://example.com/other-${index}.jpg`);
@@ -44,8 +44,7 @@ function fashionState(): VideoSalesStudioState {
   } }, 'https://item.jd.com/1.html');
   return {
     ...product, draftVersion: 3, category: 'fashion', sellingPoints: '圆领', props: product.props,
-    colorSelection: { variantId: 'black', colorLabel: '黑色', confirmedImageUrls: [], excludedImageUrls: [] },
-    fashionRefs: { personUrl: '', faceUrl: '', sceneUrl: '' }, videoMode: 'product_closeup', targetDuration: 15,
+    colorSelection: { variantId: 'black', colorLabel: '黑色', confirmedImageUrls: [], excludedImageUrls: [] }, videoMode: 'product_closeup', targetDuration: 15,
     aspectRatio: '9:16', videoResolution: '720P', videoRefMode: 'omni',
     selectedChatModel: 'vision-test', selectedImageModel: 'image-test', selectedVideoModel: 'kling-video-v3-omni',
     scripts: [], selectedScriptIndex: 0, analysis: null, composedResultUrl: null,
@@ -64,13 +63,13 @@ async function readyFashion() {
   let script: VideoSalesScript = { ...plan.script, id: 'plan', planRevision: salesPlanInputRevision(state) };
   const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => ({ id: item.id, url: `/${item.id}.jpg`, outcome: 'done' as const })));
   await prepareSalesCreativeAssets({
-    script, images, imageModel: 'image-test', aspectRatio: '9:16', selectedColor: '黑色', productAnalysis: JSON.stringify(plan.analysis),
-    route: { model: 'vision-test' }, isAborted: () => false, getScript: () => script,
+    script, images, imageModel: 'image-test', aspectRatio: '9:16', selectedColor: '黑色',
+    isAborted: () => false, getScript: () => script,
     updateAsset: (id, patch) => { script = { ...script, assets: script.assets!.map((asset) => asset.id === id ? { ...asset, ...patch } : asset) }; },
-    setValidation: (status) => { script = { ...script, assetValidation: status }; },
-  }, { submitBatch, poll: async () => { throw new Error('不应查询'); }, lookup: async () => ({ id: '', outcome: 'uncertain' }) }, async (input) => input.actualReferences.map((ref) => ({ id: ref.id, status: 'passed' as const, reason: '外观一致' })));
+  }, { submitBatch, poll: async () => { throw new Error('不应查询'); }, lookup: async () => ({ id: '', outcome: 'uncertain' }) });
+  script = { ...script, assets: script.assets?.map((asset) => ({ ...asset, validation: 'passed' as const, validationSource: 'manual' as const })), assetValidation: 'passed' };
   const references = salesActualReferences(script, images);
-  const finalized = await finalizeSalesPrompts({ shots: script.shots, imageCatalog: images, actualReferences: references, operation: 'finalize' });
+  const finalized = await finalizeSalesPrompts({ workflowVersion: 3, category: 'fashion', shots: script.shots, assets: script.assets!, targetDuration: state.targetDuration, aspectRatio: state.aspectRatio, eligibleImageIndexes: images.map((image) => image.index), imageCatalog: images, actualReferences: references, operation: 'finalize' });
   script = {
     ...script, fullPrompt: finalized.fullPrompt, assetValidation: 'passed',
     shots: script.shots.map((item) => ({ ...item, finalPrompt: finalized.prompts.find((prompt) => prompt.shotId === item.shotId)?.prompt, promptStale: false })),
@@ -114,7 +113,7 @@ describe('offline video sales workflow', () => {
     let script = ready.script;
     await executeSalesRender({
       resumeOnly: false, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
-      replaceScript: vi.fn(), patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      onPhase: vi.fn(), onResult: vi.fn(),
       commitScript: (recipe) => { script = recipe(script); ready.setScript(script); ready.state.scripts = [script]; },
     }, renderApi);
     expect(submitted).toHaveBeenCalledTimes(1);
@@ -125,17 +124,14 @@ describe('offline video sales workflow', () => {
     expect(readSalesStudioDraft().scripts[0]).toMatchObject({ renderTaskId: 'paid-once', renderResultUrl: '/final.mp4', assetValidation: 'passed' });
   });
 
-  it('plans a generic product without the fashion narrative or an automatic person image', async () => {
-    const state = { ...fashionState(), category: 'other' as const, productName: '纸巾', colorSelection: { colorLabel: '白色', confirmedImageUrls: ['https://example.com/black.jpg'], excludedImageUrls: [] } };
-    vi.mocked(generateSalesScripts).mockResolvedValue([{ id: 'draft', title: '展示', totalDuration: 15, shots: [{ ...shot, description: '展示纸巾', voiceover: '看看纸巾' }], seo, assets: [{ id: 'scene', kind: 'scene', label: '桌面', prompt: '实拍桌面', required: true }] }]);
-    const plan = await buildSalesPlan({
+  it('rejects an unsupported category before any model call', async () => {
+    await expect(buildSalesPlan({
       productName: '纸巾', brand: '', category: 'other', sellingPoints: '', selectedColor: '白色',
-      imageCatalog: eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
+      imageCatalog: [{ index: 0, role: 'main', url: '/white.jpg' }],
       targetDuration: 15, videoMode: 'product_closeup', route: { model: 'vision-test' }, onPhase: vi.fn(),
-    }, planApi);
-    expect(plan.script.assets?.map((asset) => asset.kind)).toEqual(['scene']);
-    expect(plan.script.assets?.[0].usesProduct).toBeFalsy();
-    expect(plan.script.fullPrompt).toBeUndefined();
+    }, planApi)).rejects.toThrow('服饰');
+    expect(analyzeProductMedia).not.toHaveBeenCalled();
+    expect(generateSalesScripts).not.toHaveBeenCalled();
     expect(finalizeSalesPrompts).not.toHaveBeenCalled();
   });
 
@@ -147,7 +143,7 @@ describe('offline video sales workflow', () => {
     const stale = invalidateSalesState(ready.state, { colorSelection: { variantId: 'white', colorLabel: '白色', confirmedImageUrls: [], excludedImageUrls: [] } });
     await expect(executeSalesRender({
       resumeOnly: false, signal: new AbortController().signal, script: ready.script, current: stale, getState: () => stale,
-      replaceScript: vi.fn(), commitScript: vi.fn(), patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      commitScript: vi.fn(), onPhase: vi.fn(), onResult: vi.fn(),
     }, renderApi)).rejects.toThrow('更新创作方案');
     ready.setScript({ ...ready.script, assetValidation: 'passed', renderStatus: 'uncertain', renderTaskId: undefined });
     expect(salesSingleVideoError(ready.state, ready.script, true)).toContain('核对生成记录');
@@ -161,7 +157,7 @@ describe('offline video sales workflow', () => {
     vi.mocked(generateSalesShotVideo).mockResolvedValue('/original.mp4');
     await executeSalesRender({
       resumeOnly: true, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
-      replaceScript: vi.fn(), commitScript: vi.fn(), patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      commitScript: vi.fn(), onPhase: vi.fn(), onResult: vi.fn(),
     }, renderApi);
     expect(generateSalesShotVideo).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'original-task', videoModel: 'original-model' }));
     expect(renderSalesVideo).not.toHaveBeenCalled();
@@ -173,14 +169,14 @@ describe('offline video sales workflow', () => {
     vi.mocked(renderSalesVideo).mockImplementation(async (request) => { request.single?.onTaskId?.('stopped-task'); throw new DOMException('已停止', 'AbortError'); });
     await expect(executeSalesRender({
       resumeOnly: false, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
-      replaceScript: vi.fn(), patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      onPhase: vi.fn(), onResult: vi.fn(),
       commitScript: (recipe) => { script = recipe(script); },
     }, renderApi)).rejects.toThrow('已停止');
     expect(script).toMatchObject({ renderTaskId: 'stopped-task', renderStatus: 'generating' });
     vi.mocked(generateSalesShotVideo).mockResolvedValue('/stopped.mp4');
     await executeSalesRender({
       resumeOnly: true, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
-      replaceScript: vi.fn(), commitScript: vi.fn(), patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      commitScript: vi.fn(), onPhase: vi.fn(), onResult: vi.fn(),
     }, renderApi);
     expect(renderSalesVideo).toHaveBeenCalledTimes(1);
     expect(generateSalesShotVideo).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'stopped-task' }));
@@ -192,7 +188,7 @@ describe('offline video sales workflow', () => {
     vi.mocked(renderSalesVideo).mockRejectedValue(new SalesSubmitUncertainError('回执未确认'));
     await expect(executeSalesRender({
       resumeOnly: false, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
-      replaceScript: vi.fn(), patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      onPhase: vi.fn(), onResult: vi.fn(),
       commitScript: (recipe) => { script = recipe(script); },
     }, renderApi)).rejects.toThrow('回执未确认');
     expect(script.renderStatus).toBe('uncertain');
@@ -201,7 +197,7 @@ describe('offline video sales workflow', () => {
     const lookup = vi.fn(async () => ({ outcome: 'pending' as const, error: '原视频提交结果待核实，请稍后查询；不会自动重新提交' }));
     await expect(executeSalesRender({
       resumeOnly: true, signal: new AbortController().signal, script, current: ready.state, getState: () => ready.state,
-      replaceScript: vi.fn(), commitScript: (recipe) => { script = recipe(script); }, patchShot: vi.fn(), onPhase: vi.fn(), onPromptPhase: vi.fn(), onResult: vi.fn(),
+      commitScript: (recipe) => { script = recipe(script); }, onPhase: vi.fn(), onResult: vi.fn(),
     }, { ...renderApi, lookupSubmission: lookup })).rejects.toThrow('待核实');
     expect(lookup).toHaveBeenCalledWith(script.renderSubmissionKey, expect.any(String), expect.any(Function));
     expect(renderSalesVideo).toHaveBeenCalledTimes(1);

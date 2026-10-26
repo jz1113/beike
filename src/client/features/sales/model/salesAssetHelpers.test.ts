@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SalesCreativeAsset, VideoSalesScript } from '@shared/domain/sales';
 import { validateSalesAssetPlan } from '@shared/domain/sales';
-import { canResubmitRejectedAsset, explainSalesReferenceError, recoverSalesAssetReceipts, salesAssetImagePrompt, salesAssetProductImages, salesReferenceRejection } from './salesAssetHelpers';
+import { canResubmitRejectedAsset, explainSalesReferenceError, recoverSalesAssetReceipts, salesAssetImagePrompt, salesAssetProductImages, salesReferenceRejection, reuseSalesPlanAssets, updateSalesCreativeAsset } from './salesAssetHelpers';
 
 describe('sales reference rejection', () => {
   it('names the reference that could not be read and allows an explicit retry', () => {
@@ -28,8 +28,8 @@ describe('per-asset product view evidence', () => {
     expect(salesAssetProductImages({ ...front, productImageIndexes: [12, 2] }, images)).toEqual([images[2], images[0]]);
   });
 
-  it('keeps all selected evidence for legacy plans, without guessing views from names or order', () => {
-    expect(salesAssetProductImages({ ...front, productImageIndexes: undefined }, images)).toEqual(images);
+  it('blocks legacy product assets without explicit references', () => {
+    expect(() => salesAssetProductImages({ ...front, productImageIndexes: undefined }, images)).toThrow('缺少商品参考编号');
     expect(salesAssetProductImages({ ...front, usesProduct: false, productImageIndexes: undefined }, images)).toEqual([]);
   });
 
@@ -37,10 +37,11 @@ describe('per-asset product view evidence', () => {
     expect(() => salesAssetProductImages(front, [images[1]])).toThrow('未被选中');
     expect(() => salesAssetProductImages(front, [{ ...images[0], unavailable: true }])).toThrow('不可用');
     expect(() => salesAssetProductImages({ ...front, productImageIndexes: [] }, images)).toThrow('缺少商品参考');
-    expect(() => salesAssetProductImages({ ...front, productImageIndexes: undefined }, [])).toThrow('缺少可用商品');
-    for (const indexes of [[2, 2], [-1], [2.5], []]) {
+    expect(() => salesAssetProductImages({ ...front, productImageIndexes: undefined }, [])).toThrow('缺少商品参考编号');
+    for (const indexes of [[2, 2], [-1], [2.5]]) {
       expect(() => validateSalesAssetPlan([{ ...front, productImageIndexes: indexes }], images)).toThrow('编号无效');
     }
+    expect(() => validateSalesAssetPlan([{ ...front, productImageIndexes: [] }], images)).toThrow('缺少商品参考编号');
     expect(() => validateSalesAssetPlan([{ ...front, productImageIndexes: [77] }], images)).toThrow('未被选中');
     expect(() => validateSalesAssetPlan([{ ...front, usesProduct: false }], images)).toThrow('编号无效');
   });
@@ -111,4 +112,44 @@ it('recovers a stopped image submission by its key without creating another task
   expect(lookup).toHaveBeenCalledWith('saved-image-key', undefined, expect.any(Function));
   expect(generate).toHaveBeenCalledWith(expect.objectContaining({ existingTaskId: 'original-image-task' }));
   expect(updateAsset).toHaveBeenCalledWith('front', expect.objectContaining({ url: '/recovered.jpg', status: 'done' }));
+});
+
+describe('dependent sales image invalidation', () => {
+  function plan(): VideoSalesScript {
+    return { id: 'plan', title: '', totalDuration: 15, shots: [], planRevision: 'unchanged', assetValidation: 'passed', finalizedRevision: 'approved',
+      seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
+      assets: [
+        { ...front, id: 'person', kind: 'person', url: '/old-person.jpg', status: 'done', validation: 'passed' },
+        { ...front, id: 'face', kind: 'face', url: '/old-face.jpg', status: 'done', validation: 'passed', referenceAssetIds: ['person'] },
+        { ...front, id: 'frame', url: '/old-frame.jpg', status: 'done', validation: 'passed', referenceAssetIds: ['face'] },
+        { ...front, id: 'independent', url: '/table.jpg', status: 'done', validation: 'passed' },
+      ],
+    };
+  }
+  it('expires all dependent images after a person changes while preserving old pictures', () => {
+    const original = plan();
+    const next = updateSalesCreativeAsset(original, 'person', { url: '/new-person.jpg', status: 'done' });
+    expect(next.assets![1]).toMatchObject({ status: 'pending', validation: 'pending', url: '/old-face.jpg' });
+    expect(next.assets![2]).toMatchObject({ status: 'pending', validation: 'pending', url: '/old-frame.jpg' });
+    expect(next.assets![3]).toBe(original.assets![3]);
+    expect(next.assetValidation).toBe('pending');
+    expect(next.finalizedRevision).toBeUndefined();
+    expect(original.assets![1].status).toBe('done');
+  });
+  it('keeps unresolved dependent receipts queryable when their source changes', () => {
+    const original = plan();
+    original.assets![1] = { ...original.assets![1], status: 'uncertain', taskId: 'paid-face-task' };
+    const next = updateSalesCreativeAsset(original, 'person', { prompt: '新的选角' });
+    expect(next.assets![0]).toMatchObject({ status: 'pending', url: '/old-person.jpg' });
+    expect(next.assets![1]).toMatchObject({ status: 'uncertain', taskId: 'paid-face-task', validation: 'pending' });
+  });
+  it('does not reuse images whose product view changed or whose ancestor was not reused', () => {
+    const original = plan();
+    const next = plan();
+    next.assets = next.assets!.map((asset) => ({ ...asset, status: 'pending', url: undefined }));
+    next.assets[0].productImageIndexes = [9];
+    const reused = reuseSalesPlanAssets(next, original);
+    expect(reused.assets!.slice(0, 3).every((asset) => !asset.url)).toBe(true);
+    expect(reused.assets![3].url).toBe('/table.jpg');
+  });
 });

@@ -5,10 +5,8 @@ import {
   salesAspectConflict,
   salesJobAllowed,
   salesAspectOptions,
-  salesComposeResolution,
   salesParamSummary,
   salesPreviewClass,
-  salesRedrawnCount,
   salesRenderStatus,
   salesDurationEnabled,
   salesRefModeChoices,
@@ -46,13 +44,6 @@ describe('sales model capability', () => {
     expect(salesVideoCapability('my-shop-video').note).toMatch(/尚未登记/);
   });
 
-  it('describes a registered model without inventing a percentage', () => {
-    expect(salesVideoCapability('doubao-seedance-2.5').note).toMatch(/单镜头/);
-    expect(salesRenderStatus({ renderPhase: 'redrawing', done: 1, total: 4, hasResult: false })).toBe('正在重绘参考图 1/4');
-    expect(salesRenderStatus({ renderPhase: 'generating', done: 1, total: 4, hasResult: false })).toBe('正在生成镜头 1/4');
-    expect(salesRedrawnCount([{ referenceFrameUrl: 'https://frame' }, { status: 'redrawing' }])).toBe(1);
-  });
-
   it('summarizes the video params the way the homepage pill does', () => {
     expect(salesParamSummary({ refMode: 'omni', aspect: '9:16', resolution: '480P', duration: 15 })).toBe('全能参考 · 9:16 · 480P · 15秒');
     expect(salesParamSummary({ refMode: 'first_frame', aspect: '1:1', resolution: '720P', duration: 30 })).toBe('首帧生视频 · 1:1 · 720P · 30秒');
@@ -81,13 +72,6 @@ describe('sales model capability', () => {
     expect(salesVideoCapability('vidu-q4-preview').known).toBe(true);
   });
 
-  it('maps generation resolution onto the two compose sizes', () => {
-    expect(salesComposeResolution('480P')).toBe('720p');
-    expect(salesComposeResolution('720P')).toBe('720p');
-    expect(salesComposeResolution('1080P')).toBe('1080p');
-    expect(salesComposeResolution('4K')).toBe('1080p');
-  });
-
   it('shows homepage aspects but only enables ratios the compose step can output', () => {
     const veo = salesAspectOptions('veo3.1');
     expect(veo.find((item) => item.id === '21:9')?.disabled).toBe(true);
@@ -109,9 +93,10 @@ describe('sales workspace flow', () => {
 
   it('names uncertain shots without treating them as finished', () => {
     expect(salesShotStatusLabel('uncertain')).toBe('提交未确认');
-    expect(salesShotStatusLabel('redrawing')).toBe('重绘中');
+    expect(salesShotStatusLabel('redrawing')).toBe('等待');
     expect(salesShotStatusLabel('generating')).toBe('生成中');
     expect(salesShotStatusLabel(undefined, true)).toBe('已完成');
+    expect(salesRenderStatus({ renderPhase: 'querying', done: 0, total: 2, hasResult: false })).toBe('正在查询历史镜头');
   });
 
   it('rejects a second collect, plan, or render while one job is active', () => {

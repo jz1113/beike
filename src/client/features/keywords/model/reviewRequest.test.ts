@@ -18,6 +18,33 @@ async function capture(status: number, body: unknown): Promise<ReviewRequestErro
 }
 
 describe('requestReviewBatch', () => {
+  it.each([400, 401, 403])('retries upstream account verification on HTTP %s', async (status) => {
+    const error = await capture(status, {
+      success: false, code: 'upstream_api_error',
+      error: '模型网关请求失败，请稍后重试。接口原因：Verify your account to continue.',
+    });
+    expect(error.gatewayRetryable).toBe(true);
+    expect(error.fatalConfig).toBeUndefined();
+    expect(error.outcomeUncertain).toBeUndefined();
+  });
+
+  it.each([400, 401, 402, 403, 404, 409, 422])('still stops for configuration and credential errors on HTTP %s', async (status) => {
+    const error = await capture(status, { success: false, code: 'upstream_api_error', error: 'API Key 无效或请求配置错误' });
+    expect(error.fatalConfig).toBe(true);
+    expect(error.gatewayRetryable).toBeUndefined();
+  });
+
+  it('does not treat local authentication or billed verification failures as unbilled gateway retries', async () => {
+    const local = await capture(403, { success: false, error: 'Verify your account to continue.' });
+    const billed = await capture(403, {
+      success: false, code: 'upstream_api_error', error: 'Verify your account to continue.',
+      usage: { total_tokens: 10 },
+    });
+    expect(local.gatewayRetryable).toBeUndefined();
+    expect(local.fatalConfig).toBe(true);
+    expect(billed.gatewayRetryable).toBeUndefined();
+  });
+
   it('retries an unbilled gateway 503 instead of quarantining it', async () => {
     const error = await capture(503, { success: false, error: '账本暂不可用', code: 'upstream_api_error' });
     expect(error.rateLimited).toBe(true);
@@ -58,6 +85,15 @@ describe('requestReviewBatch', () => {
     const error = await capture(409, { success: false, error: '该任务正在提交或提交结果待核对', submissionUnknown: true });
     expect(error.outcomeUncertain).toBe(true);
     expect(error.gatewayRetryable).toBeUndefined();
+  });
+
+  it.each([502, 503, 504, 524])('keeps an explicitly unknown HTTP %s out of every new-task retry path', async (status) => {
+    const error = await capture(status, { success: false, error: '模型响应传输异常', submissionUnknown: true });
+    expect(error.outcomeUncertain).toBe(true);
+    expect(error.gatewayRetryable).toBeUndefined();
+    expect(error.gatewayTimeout).toBeUndefined();
+    expect(error.rateLimited).toBeUndefined();
+    expect(error.fatalConfig).toBeUndefined();
   });
 
   it('still repairs invalid model output instead of treating it as a gateway retry', async () => {

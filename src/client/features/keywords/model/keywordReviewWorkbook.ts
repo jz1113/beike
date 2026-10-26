@@ -1,11 +1,12 @@
 import * as XLSX from 'xlsx';
-import { KEYWORD_REVIEW_CATEGORIES, KEYWORD_REVIEW_REJECT_PREFIXES, KEYWORD_VIDEO_CATEGORIES, type KeywordReviewMode, type KeywordReviewResult } from '@shared/contracts/generate';
+import { KEYWORD_REVIEW_REJECT_PREFIXES, type KeywordReviewMode, type KeywordReviewResult } from '@shared/contracts/generate';
 import { saveToDownloadDir } from '@client/shared/media/saveDownload';
 import { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';
 import { buildReviewedWorkbook } from './keywordReviewWorkbookExport';
-import { cellText, dataRows, effectiveSheetRange, emptyDataColumns, formulaColumns, hasInternalLinks, sheetHasData } from './keywordReviewSheetLayout';
+import { cellText, dataRows, effectiveSheetRange, emptyDataColumns, formulaColumns, hasInternalLinks, hasNonKeywordRows, sheetHasData } from './keywordReviewSheetLayout';
 import { allocateReviewColumns, buildOutputColumns, findKeywordHeader, mergeOutputColumns } from './keywordReviewColumns';
 import { isProgressStateSheet, restoreWorkbookProgress, workbookReviewMode } from './keywordReviewWorkbookState';
+import { isValidReviewVerdict } from './keywordReviewVerdict';
 import type {
   KeywordReviewRecord,
   KeywordReviewSheet,
@@ -57,6 +58,7 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
     const formulaCols = formulasBySheet.get(sheetName) || new Set<number>();
     const header = findKeywordHeader(sheet, range, formulaCols);
     if (!header) continue;
+    if (hasNonKeywordRows(sheet, header.found.query as number, header.row)) preserveSourceLayout = true;
     const emptyCols = emptyDataColumns(sheet, header.row, range);
     layouts.set(sheetName, { header, emptyCols, formulaCols });
     const outputColumns = buildOutputColumns(header.headers, emptyCols, header.found, mode, preserveSourceLayout, formulaCols);
@@ -76,9 +78,9 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
       const categoryReason = reviewRead.categoryReasonReadCol === undefined ? '' : cellText(sheet, row, reviewRead.categoryReasonReadCol).trim();
       const rejectReason = reviewRead.rejectReasonReadCol === undefined ? '' : cellText(sheet, row, reviewRead.rejectReasonReadCol).trim();
       const lowValue = reviewRead.lowValueReadCol === undefined ? '' : cellText(sheet, row, reviewRead.lowValueReadCol).trim();
-      const validCategories: readonly string[] = mode === 'video' ? KEYWORD_VIDEO_CATEGORIES : KEYWORD_REVIEW_CATEGORIES;
-      const alreadyReviewed = Boolean(!reviewModeMismatch && validCategories.includes(category) && producible
-        && (mode !== 'video' || lowValue === '是' || lowValue === '否'));
+      const lowValueFlag = lowValue === '是' || lowValue === '否' ? lowValue : undefined;
+      const clearVerdict = reviewModeMismatch || (mode === 'video' && lowValueFlag === '是' && producible === '制作');
+      const alreadyReviewed = !clearVerdict && isValidReviewVerdict({ category, producible, lowValue: lowValueFlag }, mode);
       const sourceValues: Record<string, string> = {};
       for (const column of outputColumns) {
         if (column.kind !== 'source' || column.sourceCol === undefined) continue;
@@ -95,11 +97,11 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
           : cellText(sheet, row, header.found.entityExpansion),
         contentType: header.found.contentType === undefined ? undefined : cellText(sheet, row, header.found.contentType),
         status: alreadyReviewed ? 'done' : 'idle',
-        category: reviewModeMismatch ? undefined : category || undefined,
-        producible: reviewModeMismatch ? undefined : producible,
-        categoryReason: reviewModeMismatch ? undefined : categoryReason || undefined,
-        rejectReason: reviewModeMismatch ? undefined : rejectReason || undefined,
-        lowValue: !reviewModeMismatch && (lowValue === '是' || lowValue === '否') ? lowValue : undefined,
+        category: clearVerdict ? undefined : category || undefined,
+        producible: clearVerdict ? undefined : producible,
+        categoryReason: clearVerdict ? undefined : categoryReason || undefined,
+        rejectReason: clearVerdict ? undefined : rejectReason || undefined,
+        lowValue: clearVerdict ? undefined : lowValueFlag,
         sourceValues,
       });
       recordCount += 1;
@@ -130,8 +132,8 @@ export function parseKeywordWorkbookData(workbook: XLSX.WorkBook, fileName: stri
   const reviewedNames = new Set(sheets.map((sheet) => sheet.name));
   const hasAuxiliarySheets = workbook.SheetNames.some((name) => !reviewedNames.has(name)
     && workbook.Sheets[name] && !isProgressStateSheet(workbook.Sheets[name]) && sheetHasData(workbook.Sheets[name]));
-  if (hasAuxiliarySheets && !preserveSourceLayout) {
-    preserveSourceLayout = true;
+  if (hasAuxiliarySheets) preserveSourceLayout = true;
+  if (preserveSourceLayout) {
     for (const sheet of sheets) {
       const layout = layouts.get(sheet.name)!;
       sheet.outputColumns = buildOutputColumns(layout.header.headers, layout.emptyCols, layout.header.found, mode, true, layout.formulaCols);

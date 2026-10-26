@@ -18,13 +18,13 @@ export function eligibleSalesImages(images: SalesImageRef[], selection: SalesCol
 
 export function salesAssetsReady(script?: VideoSalesScript): boolean {
   return Boolean(script?.deliveryMode === 'single' && !script.planStale && Array.isArray(script.assets)
-    && script.assets.every((asset) => (!asset.required && !asset.url) || (asset.status === 'done' && Boolean(asset.url) && asset.validation === 'passed'))
+    && script.assets.every((asset) => (!asset.required && !asset.url && !['generating', 'uncertain'].includes(asset.status || '')) || (asset.status === 'done' && Boolean(asset.url) && asset.validation === 'passed' && asset.validationSource === 'manual'))
     && script.assetValidation === 'passed');
 }
 
 export function salesAssetsGenerated(script?: VideoSalesScript): boolean {
   return Boolean(script?.deliveryMode === 'single' && !script.planStale && Array.isArray(script.assets)
-    && script.assets.every((asset) => (!asset.required && !asset.url) || (asset.status === 'done' && Boolean(asset.url))));
+    && script.assets.every((asset) => (!asset.required && !asset.url && !['generating', 'uncertain'].includes(asset.status || '')) || (asset.status === 'done' && Boolean(asset.url))));
 }
 
 export function salesActualReferences(script: VideoSalesScript, images: SalesImageRef[]): SalesActualReference[] {
@@ -57,6 +57,7 @@ export function validateSalesAssetPlan(assets: SalesCreativeAsset[], images?: Sa
   for (const asset of assets) {
     if (!asset.id?.trim() || seen.has(asset.id) || asset.id.startsWith('product-')) throw new Error('素材编号缺失或重复');
     if (!['person', 'face', 'scene', 'keyframe'].includes(asset.kind) || !asset.prompt?.trim() || !asset.label?.trim()) throw new Error('素材生成计划不完整');
+    if (asset.usesProduct && !asset.productImageIndexes?.length) throw new Error('商品素材缺少商品参考编号，请更新脚本');
     if (asset.productImageIndexes !== undefined && (!Array.isArray(asset.productImageIndexes)
       || asset.productImageIndexes.some((index) => !Number.isInteger(index) || index < 0)
       || new Set(asset.productImageIndexes).size !== asset.productImageIndexes.length

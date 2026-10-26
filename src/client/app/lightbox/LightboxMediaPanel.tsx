@@ -1,6 +1,6 @@
 import type { RefObject, SyntheticEvent } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { LightboxImage } from './LightboxImage';
 import { openExternalUrl } from '@client/shared/media/downloadMedia';
 import type { GenerationTask } from '@client/store/appStoreTypes';
 
@@ -15,19 +15,17 @@ interface Props {
   currentVideoSrc: string;
   videoLoadFailed: boolean;
   isVideoLoading: boolean;
-  isImageLoading: boolean;
   handleVideoCanPlay: () => void;
   handleVideoDuration: (event: SyntheticEvent<HTMLVideoElement>) => void;
   handleVideoError: () => void;
   setIsVideoLoading: (value: boolean) => void;
-  setIsImageLoading: (value: boolean) => void;
 }
 
 export function LightboxMediaPanel({
   previewTask, isVideo, total, currentIndex, handlePrev, handleNext,
-  videoRef, currentVideoSrc, videoLoadFailed, isVideoLoading, isImageLoading,
+  videoRef, currentVideoSrc, videoLoadFailed, isVideoLoading,
   handleVideoCanPlay, handleVideoDuration, handleVideoError,
-  setIsVideoLoading, setIsImageLoading,
+  setIsVideoLoading,
 }: Props) {
   const resultUrl = previewTask.resultUrl;
   if (!resultUrl) return null;
@@ -109,52 +107,7 @@ export function LightboxMediaPanel({
               )}
             </div>
           ) : (
-            <div className="relative max-h-full max-w-full inline-flex items-center justify-center rounded-2xl overflow-hidden shadow-2xl">
-              {/* 🌟 紧密贴合大图左上角「AI生成」标识 (对齐图 1 原版，随图片居中紧密贴合) */}
-              <div className="absolute top-3 left-3 z-30 px-2 py-0.5 rounded bg-black/45 backdrop-blur-xs text-[10px] text-white/90 font-medium select-none pointer-events-none tracking-tight shadow-2xs">
-                AI生成
-              </div>
-
-              {isImageLoading && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                  <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-                </div>
-              )}
-              <img
-                key={resultUrl}
-                src={proxyMediaUrl(resultUrl, { width: 1920 })}
-                alt={previewTask.prompt}
-                onLoad={(e) => {
-                  setIsImageLoading(false);
-                  const target = e.currentTarget;
-                  // 🌟 防御性检测：若代理接口返回了 400x400 兜底 SVG 占位图，自动无缝切换为直连原图
-                  if (
-                    !target.dataset.hasRetried &&
-                    target.naturalWidth === 400 &&
-                    target.naturalHeight === 400 &&
-                    resultUrl
-                  ) {
-                    target.dataset.hasRetried = 'true';
-                    target.src = resultUrl;
-                  }
-                }}
-                onError={(e) => {
-                  setIsImageLoading(false);
-                  const target = e.currentTarget;
-                  if (!target.dataset.hasRetried && resultUrl) {
-                    target.dataset.hasRetried = 'true';
-                    target.src = resultUrl;
-                  } else if (!target.dataset.hasThumbFallback && resultUrl) {
-                    // 🌟 第二重容灾：若直连原图也遇到网络限制，使用已在列表页成功呈现的 640px 缓存缩略图
-                    target.dataset.hasThumbFallback = 'true';
-                    target.src = proxyMediaUrl(resultUrl, { thumb: true, width: 640 });
-                  }
-                }}
-                className={`max-h-[48vh] md:max-h-[82vh] max-w-full object-contain transition-all duration-300 select-none ${
-                  isImageLoading ? 'opacity-0 scale-98' : 'opacity-100 scale-100'
-                }`}
-              />
-            </div>
+            <LightboxImage key={resultUrl} resultUrl={resultUrl} alt={previewTask.prompt} />
           )}
         </div>
 

@@ -3,7 +3,7 @@ import type { VideoSalesScript } from '@shared/domain/sales';
 export function salesHasQueryableTask(script?: VideoSalesScript): boolean {
   const open = ['generating', 'uncertain'].includes(script?.renderStatus || '');
   return Boolean(open && (script?.renderTaskId || script?.renderSubmissionKey)
-    || script?.deliveryMode !== 'single' && script?.shots.some((shot) => shot.taskId && shot.status === 'generating'));
+    || script?.deliveryMode !== 'single' && script?.shots.some((shot) => shot.taskId && ['generating', 'uncertain'].includes(shot.status || '')));
 }
 
 export function salesHasRenderActivity(script: VideoSalesScript | undefined, resultUrl: string | null, rendering: boolean): boolean {
@@ -16,7 +16,6 @@ export const SALES_WORKFLOW_STEPS = [
   ['product', '商品采集'], ['plan', '卖点与脚本'], ['assets', '素材补齐'], ['video', '视频生成'], ['result', '生成结果'],
 ] as const;
 export type SalesWorkflowStep = (typeof SALES_WORKFLOW_STEPS)[number][0];
-export interface SalesWorkflowStepView { id: SalesWorkflowStep; label: string; state: 'current' | 'done' | 'pending' }
 export interface SalesNavigation { step: SalesWorkflowStep; lastCreativeStep: Exclude<SalesWorkflowStep, 'product'> }
 
 export function initialSalesNavigation(hasScript: boolean, hasResult: boolean): SalesNavigation {

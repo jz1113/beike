@@ -76,13 +76,12 @@ func TestSalesNativeErrorsDoNotFallbackOrReplay(t *testing.T) {
 	generate.ModelHTTP = func() *http.Client { return server.Client() }
 	defer func() { generate.ModelHTTP = previous }()
 	payload := map[string]any{
-		"workflowVersion": 3, "model": "gemini-2.5-flash", "textProtocol": "gemini", "customBaseUrl": server.URL, "customApiKey": "secret", "productName": "纸巾",
+		"workflowVersion": 3, "category": "fashion", "model": "gemini-2.5-flash", "textProtocol": "gemini", "customBaseUrl": server.URL, "customApiKey": "secret", "productName": "纸巾",
 		"targetDuration": 15, "aspectRatio": "9:16",
 		"imageCatalog":         []map[string]any{{"index": 1, "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "role": "main"}},
 		"eligibleImageIndexes": []int{1},
 	}
 	for _, handler := range []http.Handler{Script(config.Config{}), Analyze(config.Config{})} {
-		payload["imageUrls"] = []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}
 		body, _ := json.Marshal(payload)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body)))
@@ -118,7 +117,7 @@ func postAnthropicAnalysis(t *testing.T, server *httptest.Server, images []map[s
 		indexes[i], _ = image["index"].(int)
 	}
 	payload := map[string]any{
-		"workflowVersion": 3, "model": "claude-5.5-haiku", "textProtocol": "anthropic", "productName": "卫衣",
+		"workflowVersion": 3, "category": "fashion", "model": "claude-5.5-haiku", "textProtocol": "anthropic", "productName": "卫衣",
 		"customBaseUrl": server.URL + "/v1/chat/completions", "customApiKey": "analysis-secret",
 		"imageCatalog": images, "eligibleImageIndexes": indexes,
 	}
@@ -241,14 +240,14 @@ func TestAnalyzeAnthropicTimeoutAndMissingInput(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 	imageRec := httptest.NewRecorder()
-	imageBody := `{"workflowVersion":3,"model":"claude-5.5-haiku","textProtocol":"anthropic","customBaseUrl":"https://example.test","customApiKey":"analysis-secret","imageCatalog":[{"index":6,"url":"data:text/html;base64,SGk=","role":"main"}],"eligibleImageIndexes":[6]}`
+	imageBody := `{"workflowVersion":3,"category":"fashion","model":"claude-5.5-haiku","textProtocol":"anthropic","customBaseUrl":"https://example.test","customApiKey":"analysis-secret","imageCatalog":[{"index":6,"url":"data:text/html;base64,SGk=","role":"main"}],"eligibleImageIndexes":[6]}`
 	Analyze(config.Config{}).ServeHTTP(imageRec, httptest.NewRequest(http.MethodPost, "/analyze", strings.NewReader(imageBody)))
 	if imageRec.Code != 502 || !strings.Contains(imageRec.Body.String(), "图片编号 6") || !strings.Contains(imageRec.Body.String(), "格式不受支持") || strings.Contains(imageRec.Body.String(), "SGk=") {
 		t.Fatalf("%d %s", imageRec.Code, imageRec.Body.String())
 	}
 	for _, tc := range []struct{ body, want string }{
-		{`{"workflowVersion":3,"model":"claude-5.5-haiku","textProtocol":"anthropic","customApiKey":"analysis-secret"}`, "缺少 imageCatalog"},
-		{`{"workflowVersion":3,"model":"claude-5.5-haiku","textProtocol":"anthropic","imageCatalog":[{"index":1,"url":"` + salesPNG + `","role":"main"}],"eligibleImageIndexes":[1]}`, "请配置多模态模型地址和密钥"},
+		{`{"workflowVersion":3,"category":"fashion","model":"claude-5.5-haiku","textProtocol":"anthropic","customApiKey":"analysis-secret"}`, "缺少 imageCatalog"},
+		{`{"workflowVersion":3,"category":"fashion","model":"claude-5.5-haiku","textProtocol":"anthropic","imageCatalog":[{"index":1,"url":"` + salesPNG + `","role":"main"}],"eligibleImageIndexes":[1]}`, "请配置多模态模型地址和密钥"},
 	} {
 		response := httptest.NewRecorder()
 		Analyze(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/analyze", strings.NewReader(tc.body)))

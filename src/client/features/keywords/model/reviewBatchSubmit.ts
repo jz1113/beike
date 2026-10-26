@@ -1,10 +1,11 @@
-import { KEYWORD_REVIEW_CATEGORIES, KEYWORD_VIDEO_CATEGORIES, KeywordReviewResultSchema, type KeywordReviewMode, type KeywordReviewResult } from '@shared/contracts/generate';
+import { KeywordReviewResultSchema, type KeywordReviewMode, type KeywordReviewResult } from '@shared/contracts/generate';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { ResolvedTextProtocol } from '@shared/domain/models/textProtocol';
 import type { KeywordReviewRecord } from './keywordReviewWorkbook';
 import { ReviewPacer, SLOW_GATEWAY_BATCH_MS } from './reviewPacer';
 import { DEEPSEEK_BASE_URL, requestReviewBatch, type ReviewRequestError } from './reviewRequest';
 import type { ReviewSubmission } from './reviewSubmission';
+import { isValidReviewVerdict } from './keywordReviewVerdict';
 
 /** Attempts for one chunk after an unbilled gateway or rate-limit response, including the first try. */
 const GATEWAY_RETRY_ATTEMPTS = 8;
@@ -33,16 +34,14 @@ function validateBatchResults(
   };
   if (!Array.isArray(data.results) || (data.failedIds !== undefined && !Array.isArray(data.failedIds))) return invalid();
   const expected = new Set(rows.map((row) => row.id));
-  const categories = new Set<string>(mode === 'video' ? KEYWORD_VIDEO_CATEGORIES : KEYWORD_REVIEW_CATEGORIES);
   const seen = new Set<string>();
   const results: KeywordReviewResult[] = [];
   for (const candidate of data.results) {
     const parsed = KeywordReviewResultSchema.safeParse(candidate);
     if (!parsed.success) return invalid();
     const result = parsed.data;
-    if (!expected.has(result.id) || seen.has(result.id) || !categories.has(result.category) || !result.categoryReason.trim()) return invalid();
+    if (!expected.has(result.id) || seen.has(result.id) || !isValidReviewVerdict(result, mode) || !result.categoryReason.trim()) return invalid();
     if (result.producible === '不制作' ? !result.rejectReason.trim() : Boolean(result.rejectReason.trim())) return invalid();
-    if (mode === 'video' && (!result.lowValue || (result.lowValue === '是' && result.producible !== '不制作'))) return invalid();
     seen.add(result.id);
     results.push(result);
   }
@@ -152,7 +151,7 @@ export function createReviewBatchSubmit(options: {
           failure.outcomeUncertain = true;
           failure.infrastructureFailure = true;
         }
-        const retryable = failure.rateLimited === true || failure.gatewayRetryable === true;
+        const retryable = !failure.outcomeUncertain && (failure.rateLimited === true || failure.gatewayRetryable === true);
         // A 504/524 already used the gateway's time budget. Repeating the same rows times out again.
         const sameBatchRetry = retryable && failure.gatewayTimeout !== true;
         if (failure.gatewayTimeout === true) gatewayTimedOut = true;
@@ -161,7 +160,7 @@ export function createReviewBatchSubmit(options: {
           retryReason = failure.gatewayRetryable && !failure.rateLimited ? 'gateway' : 'rate';
         }
         // The failed attempt's receipt is already stored. The next try must use a new key.
-        if (retryable || failure.modelOutputInvalid) {
+        if (retryable || (failure.modelOutputInvalid && !failure.outcomeUncertain)) {
           options.versions.set(sourceIndex, retryVersion + 1);
         }
         if (!usageAccounted && failure.usage !== undefined && !(failure.usageReplayed ?? failure.replayed)) {

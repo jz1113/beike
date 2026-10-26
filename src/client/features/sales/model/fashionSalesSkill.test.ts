@@ -17,16 +17,15 @@ describe('sales rule groups', () => {
     expect(fashion.flow).toEqual(['选择叙事', '保持一致', '实图定稿', '整段出片']);
   });
 
-  it('keeps generic creation selectable outside the rules dialog', () => {
+  it('offers only the installed skill and leaves legacy categories unselected', () => {
     expect(salesCreationRule('fashion').title).toBe('服饰专属规则');
-    expect(salesCreationRule('home').title).toBe('通用制作流程');
-    expect(salesCreationRule('beauty').detail).toContain('通用流程');
-    expect(SALES_SKILL_OPTIONS.map((item) => [item.id, item.label])).toEqual([['generic', '通用制作流程'], ['fashion', '服饰专属规则']]);
+    expect(salesCreationRule('home').title).toBe('请选择已接入的技能');
+    expect(salesCreationRule('beauty').detail).toContain('历史方案');
+    expect(SALES_SKILL_OPTIONS.map((item) => [item.id, item.label])).toEqual([['fashion', '服饰专属规则']]);
     expect(salesSkillId('fashion')).toBe('fashion');
-    expect(salesSkillId('beauty')).toBe('generic');
-    expect(salesSkillId('home')).toBe('generic');
+    expect(salesSkillId('beauty')).toBe('');
+    expect(salesSkillId('home')).toBe('');
     expect(salesCategoryForSkill('fashion')).toBe('fashion');
-    expect(salesCategoryForSkill('generic')).toBe('other');
     expect(salesSkillBadge(true)).toBe('当前适用');
     expect(salesSkillBadge(false)).toBe('服饰鞋包适用');
     expect(`${salesSkillBadge(true)}${salesSkillBadge(false)}`).not.toMatch(/不适用|使用中|未使用|正在生成/);
@@ -49,7 +48,13 @@ describe('sales rule groups', () => {
     for (const section of ['适用范围', '输入与事实依据', '执行流程', '口播', '素材与参考规则', '输出与阶段区分', '参考成片吸收', '费用与恢复', '交付自检']) {
       expect(SALES_SKILL_DOCUMENT.body).toContain(`## ${section}`);
     }
-    expect(source.indexOf('**自动生图并校验**')).toBeLessThan(source.indexOf('**实际图片定稿**'));
+    const confirmation = source.indexOf('**自动生图与人工确认**');
+    expect(confirmation).toBeGreaterThan(-1);
+    expect(confirmation).toBeLessThan(source.indexOf('**实际图片定稿**'));
+    expect(source).toContain('不再调用自动视觉校验');
+    expect(source).toContain('其他品类暂不支持新创作');
+    expect(source).not.toContain('通用自动创作流程');
+    expect(source).toContain('不自动使用全部已选图');
     expect(source).toContain('`fullPrompt`');
     expect(source).toContain('`shotId`');
     expect(source).toContain('绘图提示词属于前面的素材规划');

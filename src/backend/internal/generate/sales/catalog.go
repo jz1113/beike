@@ -41,19 +41,7 @@ func parseCatalog(payload map[string]any) []CatalogImage {
 			return images
 		}
 	}
-	urls := generate.StringListField(payload, "productImages")
-	if len(urls) == 0 {
-		urls = generate.StringListField(payload, "imageUrls")
-	}
-	images := make([]CatalogImage, 0, len(urls))
-	for index, url := range urls {
-		url = strings.TrimSpace(url)
-		if url == "" {
-			continue
-		}
-		images = append(images, CatalogImage{Index: index, URL: url, Role: "main"})
-	}
-	return images
+	return nil
 }
 
 func normalizeRole(role string) string {
@@ -129,26 +117,4 @@ func ApplyStrictAssignments(shots []ScriptShot, assignments []ImageAssignment, c
 		out[i].VisualSource = keepVisualSource(out[i].VisualSource)
 	}
 	return out, nil
-}
-
-// AssignImageIndexes clamps model picks onto the full collected catalog.
-func AssignImageIndexes(shots []ScriptShot, assignments []ImageAssignment, imageCount int) []ScriptShot {
-	byShot := map[int]int{}
-	for _, item := range assignments {
-		byShot[item.ShotID] = item.ImageIndex
-	}
-	out := append([]ScriptShot(nil), shots...)
-	for i := range out {
-		fallback := 0
-		if imageCount > 0 {
-			fallback = i % imageCount
-		}
-		index, ok := byShot[out[i].ShotId]
-		if !ok || imageCount <= 0 || index < 0 || index >= imageCount {
-			index = fallback
-		}
-		out[i].ImageIndex = index
-		out[i].VisualSource = keepVisualSource(out[i].VisualSource)
-	}
-	return out
 }

@@ -1,25 +1,9 @@
 import {
-  salesActualReferences, salesContentRevision, validateSalesAssetPlan,
+  validateSalesAssetPlan,
   type SalesCreativeAsset, type SalesImageRef, type VideoSalesScript,
 } from '@shared/domain/sales';
-import { canResubmitRejectedAsset, explainSalesReferenceError, mapWithLimit, SALES_IMAGE_BATCH_LIMIT, salesAssetImagePrompt, salesAssetProductImages, salesReferenceRejection } from './salesAssetHelpers';
+import { canResubmitRejectedAsset, explainSalesReferenceError, mapWithLimit, SALES_IMAGE_BATCH_LIMIT, salesAssetImagePrompt, salesAssetProductImages, salesAssetSourceRevision, salesReferenceRejection } from './salesAssetHelpers';
 import type { SalesImageBatchClient, SalesImageBatchReceipt } from './salesImageTypes';
-import type { SalesRouteHeaders } from './salesRoute';
-
-export interface SalesAssetValidator {
-  (input: {
-    shots: VideoSalesScript['shots'];
-    imageCatalog: SalesImageRef[];
-    actualReferences: ReturnType<typeof salesActualReferences>;
-    assets?: VideoSalesScript['assets'];
-    productAnalysis?: string;
-    workflowVersion?: 3;
-    eligibleImageIndexes?: number[];
-    selectedColor?: string;
-    aspectRatio?: string;
-    signal?: AbortSignal;
-  } & SalesRouteHeaders): Promise<Array<{ id: string; status: 'passed' | 'conflict' | 'uncertain'; reason: string }>>;
-}
 
 type AssetJob = {
   id: string;
@@ -43,17 +27,12 @@ export async function prepareSalesCreativeAssets(input: {
   imageModel: string;
   aspectRatio: string;
   selectedColor: string;
-  productAnalysis: string;
-  route: SalesRouteHeaders;
   regenerateId?: string;
-  validateOnly?: boolean;
-  autoValidate?: boolean;
+  beforeSubmit?: () => void;
   isAborted: () => boolean;
   updateAsset: (id: string, patch: Partial<SalesCreativeAsset>) => void;
   getScript: () => VideoSalesScript;
-  setValidation: (status: NonNullable<VideoSalesScript['assetValidation']>) => void;
-}, client: SalesImageBatchClient, validate: SalesAssetValidator): Promise<void> {
-  if (input.validateOnly) return validatePreparedSalesAssets(input, validate);
+}, client: SalesImageBatchClient): Promise<void> {
   if (input.script.assets?.length && !input.imageModel.trim()) throw new Error('请先选择绘图模型');
   const assets = input.script.assets || [];
   validateSalesAssetPlan(assets, input.images);
@@ -83,34 +62,6 @@ export async function prepareSalesCreativeAssets(input: {
     if (failure) throw failure;
     if (blocked) throw blocked;
   }
-  if (input.autoValidate !== false) await validatePreparedSalesAssets(input, validate);
-}
-
-/** Re-check existing pictures without invoking or resubmitting image generation. */
-export async function validatePreparedSalesAssets(input: Pick<Parameters<typeof prepareSalesCreativeAssets>[0],
-  'script' | 'images' | 'isAborted' | 'getScript' | 'setValidation' | 'updateAsset' | 'productAnalysis' | 'selectedColor' | 'route'>,
-validate: SalesAssetValidator): Promise<void> {
-  if (input.isAborted()) throw new DOMException('已停止素材校验', 'AbortError');
-  const assets = input.getScript().assets || [];
-  validateSalesAssetPlan(assets, input.images);
-  input.setValidation('pending');
-  const missingRequired = assets.some((asset) => asset.required && (asset.status !== 'done' || !asset.url));
-  if (missingRequired) {
-    input.setValidation('pending');
-    return;
-  }
-  const actualReferences = salesActualReferences(input.getScript(), input.images);
-  const results = await validate({
-    shots: input.script.shots, assets: input.getScript().assets, imageCatalog: input.images, actualReferences,
-    productAnalysis: input.productAnalysis, workflowVersion: 3,
-    eligibleImageIndexes: input.images.map((image) => image.index), selectedColor: input.selectedColor, ...input.route,
-  });
-  for (const result of results) {
-    if (assets.some((asset) => asset.id === result.id)) input.updateAsset(result.id, { validation: result.status, validationReason: result.reason, validationSource: 'model' });
-  }
-  const failed = results.find((result) => result.status !== 'passed');
-  input.setValidation(failed?.status || 'passed');
-  if (failed) throw new Error(`素材需要确认：${failed.reason}`);
 }
 
 function preparationScope(assets: SalesCreativeAsset[], regenerateId?: string): Set<string> | null {
@@ -138,7 +89,7 @@ function inspectAsset(input: Parameters<typeof prepareSalesCreativeAssets>[0], i
   const referenceImages = [...productRefs.map((ref) => ref.url), ...dependencies.map((asset) => asset!.url!)];
   const referenceLabels = [...productRefs.map((ref) => `商品参考 ${ref.index + 1}`), ...dependencies.map((asset) => asset?.label || '前置素材')];
   const prompt = salesAssetImagePrompt(current, productRefs, dependencies as SalesCreativeAsset[], input.selectedColor);
-  const sourceRevision = salesContentRevision({ prompt, kind: current.kind, referenceImages, aspectRatio: input.aspectRatio });
+  const sourceRevision = salesAssetSourceRevision(current, input.images, input.getScript().assets || [], input.selectedColor, input.aspectRatio);
   const force = current.id === input.regenerateId;
   if (!force && current.status === 'done' && current.url && current.sourceRevision === sourceRevision) return { kind: 'skip' };
   if (current.status === 'uncertain' && !current.taskId && !(force && canResubmitRejectedAsset(current))) return { kind: 'block', error: new Error(`${current.label}提交结果未确认，请先核对服务端生成记录，不能自动重投`) };
@@ -165,6 +116,11 @@ async function runAssetWave(input: Parameters<typeof prepareSalesCreativeAssets>
   const fresh = jobs.filter((job) => !job.resume);
   let receipts: SalesImageBatchReceipt[] = [];
   if (fresh.length) {
+    try { input.beforeSubmit?.(); }
+    catch (error) {
+      for (const job of fresh) input.updateAsset(job.id, { status: 'failed', attempts: job.attempts - 1, submissionKey: undefined, error: '项目保存失败，未提交绘图任务' });
+      throw error;
+    }
     try {
       if (input.isAborted()) throw new DOMException('已停止素材准备', 'AbortError');
       receipts = await client.submitBatch(fresh.map((job) => ({

@@ -33,6 +33,9 @@ export interface MergedAssetTask {
   rawTask?: { id?: string; status?: string; resultUrl?: string; referenceImages?: string[] };
   batchTitle?: string;
   canvasProjectTitle?: string;
+  canvasProjectId?: string;
+  nodeId?: string;
+  isCanvasPlaceholder?: boolean;
   duration?: number | string;
   coverUrl?: string;
   isUploaded?: boolean;
@@ -168,7 +171,8 @@ export function mergeAssetTasks({ dbTasks, generationTasks, sessions, canvasTask
     if (task.id) tasksById.set(task.id, task);
   }
 
-  let list = mediaCategory === 'canvas' ? [...canvasTasks] : Array.from(tasksById.values());
+  const mediaCanvasTasks = canvasTasks.filter((task) => !task.isCanvasPlaceholder);
+  let list = mediaCategory === 'canvas' ? mediaCanvasTasks : [...tasksById.values(), ...mediaCanvasTasks];
   if (mediaCategory !== 'canvas' && mediaCategory !== 'all') {
     list = list.filter((task) => {
       if (mediaCategory === 'image') return task.mediaType === 'image' || task.mediaType === 'depth-image';

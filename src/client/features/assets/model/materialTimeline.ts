@@ -1,9 +1,10 @@
-import type { AssetTaskBatch } from './assetBatch';
+import type { MergedAssetTask } from './mergeAssetTasks';
+import { getAssetTime, matchesAssetTime } from '@client/shared/utils/assetTaskData';
 import { getAssetMediaKind } from './assetMedia';
 import { isPureAgentDialogue } from './agentAssetFilter';
 import { useI18nStore, TRANSLATIONS, type SupportedLocale } from '@client/shared/i18n';
 
-type Task = AssetTaskBatch['tasks'][number];
+type Task = MergedAssetTask;
 
 export interface TimelineGroup {
   key: string;
@@ -23,9 +24,8 @@ export interface MaterialFilterOptions {
 
 export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions): Task[] {
   let list = tasks.filter((t) => !isPureAgentDialogue(t));
-  if (opts.sourceType === 'uploaded') {
-    list = list.filter((t) => t.isUploaded || t.sourceImageUrl || t.referenceImageUrl);
-  }
+  // A reference attached to a generation is not an independent uploaded asset.
+  list = list.filter((task) => opts.sourceType === 'uploaded' ? task.isUploaded === true : !task.isUploaded);
   if (opts.mediaCategory !== 'all') {
     list = list.filter((t) => getAssetMediaKind(t) === opts.mediaCategory);
   }
@@ -36,21 +36,7 @@ export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions):
       list = list.filter((t) => t.status === 'FAILURE');
     }
   }
-  if (opts.timeFilter && opts.timeFilter !== 'all') {
-    const now = Date.now();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayMs = todayStart.getTime();
-    const yesterdayMs = todayMs - 86400000;
-    list = list.filter((t) => {
-      const time = new Date(t.createdAt).getTime() || 0;
-      if (opts.timeFilter === 'today') return time >= todayMs;
-      if (opts.timeFilter === 'yesterday') return time >= yesterdayMs && time < todayMs;
-      if (opts.timeFilter === '7days') return time >= now - 7 * 86400000;
-      if (opts.timeFilter === '30days') return time >= now - 30 * 86400000;
-      return true;
-    });
-  }
+  list = list.filter((task) => matchesAssetTime(task.createdAt, opts.timeFilter || 'all'));
   const kw = opts.searchInput.trim().toLowerCase();
   if (kw) {
     list = list.filter((t) => (t.title || t.prompt || '').toLowerCase().includes(kw));
@@ -62,8 +48,8 @@ export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions):
       const currentLocale = useI18nStore.getState().locale || 'zh-CN';
       return titleA.localeCompare(titleB, currentLocale);
     }
-    const timeA = new Date(a.createdAt).getTime() || 0;
-    const timeB = new Date(b.createdAt).getTime() || 0;
+    const timeA = getAssetTime(a.createdAt);
+    const timeB = getAssetTime(b.createdAt);
     return opts.sortOrder === 'oldest' ? timeA - timeB : timeB - timeA;
   });
 }
@@ -82,14 +68,15 @@ export function formatTimelineDate(
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterdayStart = todayStart - 86400000;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yesterdayStart = yesterday.getTime();
   const time = d.getTime();
 
   if (time >= todayStart) {
-    return { key: 'today', label: t.today, order: 9999999999 };
+    return { key: 'today', label: t.today, order: todayStart };
   }
   if (time >= yesterdayStart) {
-    return { key: 'yesterday', label: t.yesterday, order: 9999999998 };
+    return { key: 'yesterday', label: t.yesterday, order: yesterdayStart };
   }
 
   const isSameYear = d.getFullYear() === now.getFullYear();
@@ -105,6 +92,9 @@ export function groupTasksByTimeline(
   sortOrder: 'newest' | 'oldest' | 'name',
   locale?: SupportedLocale
 ): TimelineGroup[] {
+  if (sortOrder === 'name') {
+    return tasks.length ? [{ key: 'name', label: '', order: 0, tasks }] : [];
+  }
   const map = new Map<string, { label: string; order: number; tasks: Task[] }>();
 
   for (const task of tasks) {

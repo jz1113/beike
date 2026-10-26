@@ -117,6 +117,9 @@ func discardUnbilledReject(status int, payload map[string]any) bool {
 	if payload == nil {
 		return true
 	}
+	if payload["submissionUnknown"] == true {
+		return false
+	}
 	usage, ok := payload["usage"]
 	return !ok || usage == nil
 }

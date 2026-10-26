@@ -1,23 +1,26 @@
 import { useState, useMemo } from 'react';
 import { ArrowLeft, Check, ChevronDown, Search } from 'lucide-react';
-import type { AssetTaskBatch } from '../../model/assetBatch';
-import type { ProjectFolderItem } from './MaterialProjectView';
+import type { MergedAssetTask } from '../../model/mergeAssetTasks';
+import { taskBelongsToProject, type ProjectFolderItem } from '../../model/materialProjects';
+import { filterMaterialTasks } from '../../model/materialTimeline';
+import { useMaterialSelection } from '../../hooks/useMaterialSelection';
 import AssetMediaPreview from '../dialogs/AssetMediaPreview';
 import MaterialFloatingDock from './MaterialFloatingDock';
 import { getAssetMediaKind } from '../../model/assetMedia';
 import { DocumentAssetCardCover } from './MaterialAssetCard';
 import { openAgentDocument } from '@client/shared/ui/agentDocumentBus';
 
-type Task = AssetTaskBatch['tasks'][number];
+type Task = MergedAssetTask;
 
 interface Props {
   project: ProjectFolderItem;
   mergedTasks: Task[];
   onBack: () => void;
   setPreviewTask: (task: Task, queue?: Task[]) => void;
-  onBatchDelete: (ids: string[]) => void;
+  onBatchDelete: (ids: string[]) => Promise<boolean>;
   onBatchDownload: (ids: string[]) => void;
-  onDeleteProject?: (project: ProjectFolderItem) => void;
+  sourceType: 'ai' | 'uploaded';
+  onSourceTypeChange: (source: 'ai' | 'uploaded') => void;
   isDownloadingZip?: boolean;
   isDeleting?: boolean;
 }
@@ -31,65 +34,22 @@ export default function MaterialProjectDetailView({
   setPreviewTask,
   onBatchDelete,
   onBatchDownload,
+  sourceType,
+  onSourceTypeChange,
   isDownloadingZip = false,
   isDeleting = false,
 }: Props) {
-  const [sourceType, setSourceType] = useState<'ai' | 'uploaded'>('ai');
   const [searchInput, setSearchInput] = useState('');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'audio' | 'document'>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest');
   const [displaySize, setDisplaySize] = useState<DisplaySize>('medium');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // 筛选属于该项目的素材
-  const projectTasks = useMemo(() => {
-    return mergedTasks.filter((task) => {
-      if (project.type === 'session') {
-        return task.sessionId === project.id || task.batchId?.includes(project.id);
-      }
-      return task.batchId?.includes(project.id);
-    });
-  }, [mergedTasks, project]);
-
-  // 根据搜索、来源和媒体类型进一步过滤
-  const filteredTasks = useMemo(() => {
-    let list = [...projectTasks];
-
-    // 来源过滤（我上传的 vs AI生成）
-    if (sourceType === 'uploaded') {
-      list = list.filter((t) => t.isUploaded || t.sourceImageUrl || t.referenceImageUrl);
-    }
-
-    // 媒体过滤
-    if (mediaFilter !== 'all') {
-      list = list.filter((t) => getAssetMediaKind(t) === mediaFilter);
-    }
-
-    // 搜索过滤
-    const kw = searchInput.trim().toLowerCase();
-    if (kw) {
-      list = list.filter((t) => (t.title || t.prompt || '').toLowerCase().includes(kw));
-    }
-
-    // 排序
-    return list.sort((a, b) => {
-      if (sortOrder === 'name') {
-        const titleA = a.title || a.prompt || '';
-        const titleB = b.title || b.prompt || '';
-        return titleA.localeCompare(titleB, 'zh-CN');
-      }
-      const timeA = new Date(a.createdAt).getTime() || 0;
-      const timeB = new Date(b.createdAt).getTime() || 0;
-      return sortOrder === 'oldest' ? timeA - timeB : timeB - timeA;
-    });
-  }, [projectTasks, sourceType, mediaFilter, searchInput, sortOrder]);
-
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
+  const projectTasks = useMemo(() => mergedTasks.filter((task) => taskBelongsToProject(task, project)), [mergedTasks, project]);
+  const filteredTasks = useMemo(() => filterMaterialTasks(projectTasks, {
+    sourceType, mediaCategory: mediaFilter, searchInput, sortOrder,
+  }), [projectTasks, sourceType, mediaFilter, searchInput, sortOrder]);
+  const selection = useMaterialSelection(filteredTasks, JSON.stringify([project.type, project.id, sourceType, mediaFilter, searchInput]));
+  const selectedIds = selection.ids;
+  const toggleSelect = selection.toggle;
 
   const handleCardClick = (task: Task) => {
     if (getAssetMediaKind(task) === 'document') {
@@ -131,7 +91,7 @@ export default function MaterialProjectDetailView({
           <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 border border-slate-200/60 shadow-2xs dark:bg-white/10 dark:border-white/10">
             <button
               type="button"
-              onClick={() => setSourceType('ai')}
+              onClick={() => onSourceTypeChange('ai')}
               className={`px-3 py-1 rounded-full text-xs transition-all ${
                 sourceType === 'ai'
                   ? 'bg-white text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
@@ -142,7 +102,7 @@ export default function MaterialProjectDetailView({
             </button>
             <button
               type="button"
-              onClick={() => setSourceType('uploaded')}
+              onClick={() => onSourceTypeChange('uploaded')}
               className={`px-3 py-1 rounded-full text-xs transition-all ${
                 sourceType === 'uploaded'
                   ? 'bg-white text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
@@ -304,9 +264,9 @@ export default function MaterialProjectDetailView({
       {/* 底部浮动批量操作栏 (图5) */}
       <MaterialFloatingDock
         selectedCount={selectedIds.length}
-        onClearSelection={() => setSelectedIds([])}
+        onClearSelection={selection.clear}
         onBatchDownload={() => onBatchDownload(selectedIds)}
-        onBatchDelete={() => onBatchDelete(selectedIds)}
+        onBatchDelete={async () => { if (await onBatchDelete(selectedIds)) selection.clear(); }}
         isDownloading={isDownloadingZip}
         isDeleting={isDeleting}
       />

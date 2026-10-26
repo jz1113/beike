@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -54,7 +52,7 @@ func postSales(t *testing.T, handler http.Handler, path string, payload map[stri
 func TestAnalyzeRejectsEmptyObject(t *testing.T) {
 	server := useChatServer(t, func(map[string]any, int) string { return "{}" })
 	rec := postSales(t, Analyze(config.Config{}), "/api/generate/video-sales/analyze", map[string]any{
-		"workflowVersion": 3, "productName": "纸巾", "customBaseUrl": server.URL, "customApiKey": "test",
+		"workflowVersion": 3, "category": "fashion", "productName": "纸巾", "customBaseUrl": server.URL, "customApiKey": "test",
 		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}}, "eligibleImageIndexes": []int{0},
 	})
 	if rec.Code != http.StatusBadGateway {
@@ -80,7 +78,7 @@ func TestAnalyzeCoversEveryImageBatch(t *testing.T) {
 		images[i] = map[string]any{"index": i, "url": "https://example.com/" + string(rune('1'+i)) + ".jpg", "role": "main"}
 	}
 	rec := postSales(t, Analyze(config.Config{}), "/api/generate/video-sales/analyze", map[string]any{
-		"workflowVersion": 3, "productName": "纸巾", "imageCatalog": images, "eligibleImageIndexes": indexes,
+		"workflowVersion": 3, "category": "fashion", "productName": "纸巾", "imageCatalog": images, "eligibleImageIndexes": indexes,
 		"customBaseUrl": server.URL, "customApiKey": "test",
 	})
 	if rec.Code != http.StatusOK {
@@ -106,7 +104,7 @@ func TestAnalyzeCoversEveryImageBatch(t *testing.T) {
 func TestScriptRejectsEmptyStoryboard(t *testing.T) {
 	server := useChatServer(t, func(map[string]any, int) string { return `{"scripts":[{}]}` })
 	rec := postSales(t, Script(config.Config{}), "/api/generate/video-sales/script", map[string]any{
-		"workflowVersion": 3, "productName": "纸巾", "targetDuration": 15, "aspectRatio": "9:16",
+		"workflowVersion": 3, "category": "fashion", "productName": "纸巾", "targetDuration": 15, "aspectRatio": "9:16",
 		"imageCatalog": []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}}, "eligibleImageIndexes": []int{0},
 		"customBaseUrl": server.URL, "customApiKey": "test",
 	})
@@ -121,7 +119,7 @@ func TestSelectRejectsUnknownImage(t *testing.T) {
 	})
 	rec := postSales(t, Select(config.Config{}), "/api/generate/video-sales/select-images", map[string]any{
 		"workflowVersion": 3, "customBaseUrl": server.URL, "customApiKey": "test",
-		"shots":                []map[string]any{{"shotId": 1, "description": "正面", "voiceover": "看这里"}},
+		"shots":                []map[string]any{{"shotId": 1, "description": "正面", "speechMode": "voiceover", "voiceover": "看这里"}},
 		"imageCatalog":         []map[string]any{{"index": 0, "url": "https://example.com/a.jpg", "role": "main"}},
 		"eligibleImageIndexes": []int{0},
 	})
@@ -156,65 +154,26 @@ func TestScriptPromptOmitsPrice(t *testing.T) {
 	}
 }
 
-func TestGenericScriptStaysForOtherCategories(t *testing.T) {
-	body := workflowScriptBody("gemini", map[string]any{"productName": "纸巾", "category": "home"}, nil, 15, "9:16")
-	encoded, _ := json.Marshal(body)
-	if strings.Contains(string(encoded), "开箱换装") {
-		t.Fatal("home category used the fashion skill")
-	}
-	if !strings.Contains(string(encoded), "ai_generate") || !strings.Contains(string(encoded), "product_image") {
-		t.Fatal("generic script should distinguish scene shots from product shots")
-	}
-}
-
 func TestNormalizeFashionBeat(t *testing.T) {
 	if normalizeFashionBeat("", "运动鞋") != "accessory" || normalizeFashionBeat("lifestyle", "运动鞋") != "lifestyle" {
 		t.Fatal("beat normalization failed for shoes")
 	}
-	if normalizeFashionBeat("", "连衣裙") != "unbox" {
-		t.Fatal("clothing should default to unbox")
+	if normalizeFashionBeat("", "连衣裙") != "lifestyle" || normalizeFashionBeat("invalid", "上衣") != "lifestyle" {
+		t.Fatal("clothing should default to an already-worn lifestyle presentation")
+	}
+	for _, beat := range []string{"unbox", "lifestyle", "accessory"} {
+		if normalizeFashionBeat(beat, "连衣裙") != beat {
+			t.Fatalf("explicit narrative %s was replaced", beat)
+		}
 	}
 }
 
 func TestNormalizeKeepsSceneVisualSource(t *testing.T) {
-	script := normalizeScript(SalesScript{Title: "方案", Shots: []ScriptShot{
+	script := normalizeScriptPresentation(SalesScript{Title: "方案", Shots: []ScriptShot{
 		{ShotId: 1, Description: "人在客厅", Voiceover: "看这里", Prompt: "草稿", VisualSource: "ai_generate"},
 		{ShotId: 2, Description: "包装特写", Voiceover: "再看", Prompt: "草稿", VisualSource: "avatar_presenter"},
 	}})
 	if script.Shots[0].VisualSource != "ai_generate" || script.Shots[1].VisualSource != "product_image" {
 		t.Fatalf("visual source was not kept: %+v", script.Shots)
-	}
-}
-
-func TestStorageURLResolvesInsideRoot(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv("AZHUO_CACHE_DIR", root)
-	if err := os.WriteFile(filepath.Join(root, "clip.mp4"), []byte("video"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	got, err := resolveComposeMedia(t.Context(), "/storage/clip.mp4", root, "clip")
-	if err != nil || got != filepath.Join(root, "clip.mp4") {
-		t.Fatalf("storage url: %s %v", got, err)
-	}
-}
-
-func TestVideoClipIsTrimmed(t *testing.T) {
-	payload := ComposePayload{Clips: []ComposeClip{{Type: "video", FilePath: "a.mp4", Duration: 4, HasAudio: true}}}
-	_, args := BuildFFmpegCommand(payload, "out.mp4")
-	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "-t 4.00 -i a.mp4") || !strings.Contains(joined, "fps=30") || !strings.Contains(joined, "apad=whole_dur=4.00") {
-		t.Fatalf("video was not trimmed: %s", joined)
-	}
-}
-
-func TestFadeAudioFollowsVideoOverlap(t *testing.T) {
-	payload := ComposePayload{Clips: []ComposeClip{
-		{Type: "video", FilePath: "a.mp4", Duration: 3, HasAudio: true},
-		{Type: "video", FilePath: "b.mp4", Duration: 4, HasAudio: true, Transition: "ffmpeg_fade"},
-	}}
-	_, args := BuildFFmpegCommand(payload, "out.mp4")
-	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "acrossfade=d=0.50") || !strings.Contains(joined, "xfade=transition=fade") {
-		t.Fatalf("fade timeline missing: %s", joined)
 	}
 }

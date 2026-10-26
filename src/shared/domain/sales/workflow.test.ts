@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eligibleSalesImages, salesActualReferences, salesAssetsReady, validateSalesAssetPlan } from './workflow';
+import { eligibleSalesImages, salesActualReferences, salesAssetsReady, salesAssetsGenerated, validateSalesAssetPlan } from './workflow';
 import type { VideoSalesScript } from './types';
 
 const images = [
@@ -11,7 +11,7 @@ const variants = { version: 1 as const, variants: [{ id: 'black', label: '曜石
 const selection = { variantId: 'black', colorLabel: '曜石黑', confirmedImageUrls: [] as string[], excludedImageUrls: [] as string[] };
 const script: VideoSalesScript = {
   id: 'script', title: '展示', totalDuration: 15, deliveryMode: 'single', assets: [], assetValidation: 'passed',
-  shots: [{ shotId: 1, type: 'demo', duration: 15, description: '展示', camera: '中景', voiceover: '商品', visualSource: 'product_image', transition: 'direct_concat', imageIndex: 0 }],
+  shots: [{ shotId: 1, type: 'demo', duration: 15, description: '展示', camera: '中景', speechMode: 'voiceover', voiceover: '商品', visualSource: 'product_image', transition: 'direct_concat', imageIndex: 0 }],
   seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
 };
 
@@ -59,4 +59,16 @@ describe('creative image plan safety', () => {
     expect(salesAssetsReady({ ...script, assets: [{ id: 'scene', kind: 'scene', label: '场景', prompt: '房间', required: true }] })).toBe(false);
     expect(salesAssetsReady({ ...script, assets: [{ id: 'scene', kind: 'scene', label: '场景', prompt: '房间', required: true, url: '/scene.jpg', status: 'done', validation: 'conflict' }] })).toBe(false);
   });
+  it('requires manual confirmation even when an old automatic validation passed', () => {
+    const asset = { id: 'scene', kind: 'scene' as const, label: '场景', prompt: '房间', required: true, url: '/scene.jpg', status: 'done' as const, validation: 'passed' as const };
+    expect(salesAssetsGenerated({ ...script, assets: [asset] })).toBe(true);
+    expect(salesAssetsReady({ ...script, assets: [asset] })).toBe(false);
+    expect(salesAssetsReady({ ...script, assets: [{ ...asset, validationSource: 'manual' }] })).toBe(true);
+  });
+});
+
+it.each(['generating', 'uncertain'] as const)('does not ignore an unresolved optional image: %s', (status) => {
+  const pending = { ...script, assets: [{ id: 'scene', kind: 'scene' as const, label: '场景', prompt: '房间', required: false, status, submissionKey: 'saved-key' }] };
+  expect(salesAssetsGenerated(pending)).toBe(false);
+  expect(salesAssetsReady(pending)).toBe(false);
 });

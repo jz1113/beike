@@ -6,6 +6,7 @@ import { getAssetDownloadExtension } from '@client/shared/utils/assetTaskData';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import type { AssetCanvasProject } from '../model/canvasAssets';
 import type { AssetTaskBatch } from '../model/assetBatch';
+import { taskBelongsToProject, type ProjectFolderItem } from '../model/materialProjects';
 
 type Task = AssetTaskBatch['tasks'][number];
 interface Params {
@@ -13,6 +14,8 @@ interface Params {
   onDeleteCanvasProject: (projectId: string) => void;
   onDeleteCanvasNode: (projectId: string, nodeId: string) => void;
   mergedTasks: Task[];
+  serverHistoryComplete: boolean;
+  deleteSession: (id: string) => void;
   selectedTaskIds: string[];
   failedTasks: Task[];
   setSelectedTaskIds: (ids: string[]) => void;
@@ -21,7 +24,7 @@ interface Params {
   refetchAssetTasks: () => Promise<unknown>;
 }
 
-export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, setSelectedTaskIds, setIsBatchMode, showToast, refetchAssetTasks, canvasProjects, onDeleteCanvasProject, onDeleteCanvasNode }: Params) {
+export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, setSelectedTaskIds, setIsBatchMode, showToast, refetchAssetTasks, canvasProjects, onDeleteCanvasProject, onDeleteCanvasNode, serverHistoryComplete, deleteSession }: Params) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [zipProgressLabel, setZipProgressLabel] = useState('');
@@ -29,11 +32,11 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
   const isBusy = isDeleting || isDownloadingZip;
 
   const deleteTargets = async (targets: Task[], message: string, success: string, clearSelection = false) => {
-    if (!targets.length || lock.current || isBusy) return;
+    if (!targets.length || lock.current || isBusy) return false;
     lock.current = true;
     setIsDeleting(true);
     try {
-      if (!(await confirmAction(message))) return;
+      if (!(await confirmAction(message))) return false;
       const regularTargets = targets.filter(task => !task.canvasProjectId);
       let warning: string | undefined;
       if (regularTargets.length) {
@@ -43,7 +46,7 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
         warning = result.warning;
       }
       for (const task of targets.filter(task => task.canvasProjectId)) {
-        if (task.nodeId === 'cover' || task.nodeId === 'init') onDeleteCanvasProject(task.canvasProjectId);
+        if (task.isCanvasPlaceholder) onDeleteCanvasProject(task.canvasProjectId);
         else onDeleteCanvasNode(task.canvasProjectId, task.nodeId);
       }
       if (clearSelection) {
@@ -51,10 +54,59 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
         setSelectedTaskIds([]);
       }
       showToast(warning ? `${success}；${warning}` : success);
-      if (regularTargets.length) await refetchAssetTasks();
+      if (regularTargets.length) await refetchAssetTasks().catch(() => undefined);
+      return true;
     } catch (error) {
       showToast(`删除未全部完成：${formatUserError(error, '请重试')}`);
+      void refetchAssetTasks().catch(() => undefined);
+      return false;
     } finally {
+      lock.current = false;
+      setIsDeleting(false);
+    }
+  };
+
+  const handleBatchDeleteProjects = async (projects: ProjectFolderItem[]) => {
+    if (!projects.length || lock.current || isBusy) return false;
+    if (!serverHistoryComplete && projects.some((project) => project.type === 'session')) {
+      showToast('请等待历史素材加载完成后再删除项目；加载失败时请先刷新重试');
+      return false;
+    }
+    lock.current = true;
+    setIsDeleting(true);
+    let needsRefresh = false;
+    try {
+      const assetCount = projects.reduce((sum, project) => sum + mergedTasks.filter((task) => taskBelongsToProject(task, project)).length, 0);
+      const confirmed = await confirmAction({
+        title: projects.length === 1 ? `确认删除「${projects[0].title}」` : `确认删除选中的 ${projects.length} 个项目`,
+        description: `此操作无法撤回，将删除项目及其中的 ${assetCount} 个素材和其他内部记录，确认删除么？`,
+        confirmText: '删除', cancelText: '取消',
+      });
+      if (!confirmed) return false;
+      const protectUrls = canvasProjects.flatMap((canvas) => [canvas.thumbnail, ...canvas.nodes.flatMap((node) => [node.imageUrl, node.videoUrl, node.audioUrl, node.referenceImageUrl, ...(node.drawing?.references || [])])]).filter((url): url is string => Boolean(url));
+      const warnings = new Set<string>();
+      for (const project of projects) {
+        if (project.type === 'canvas') {
+          onDeleteCanvasProject(project.id);
+          continue;
+        }
+        const tasks = mergedTasks.filter((task) => taskBelongsToProject(task, project));
+        if (tasks.length) {
+          needsRefresh = true;
+          const result = await permanentDeleteGeneration(tasks, { protectUrls });
+          if (!result.ok) throw new Error(`${result.partial ? '部分素材已删除，项目和剩余素材仍保留。' : ''}${result.error || '服务端删除失败，请重试'}`);
+          if (result.warning) warnings.add(result.warning);
+        }
+        // Remove the local session only after all its archive deletions were acknowledged.
+        deleteSession(project.id);
+      }
+      showToast(`已删除 ${projects.length} 个项目${warnings.size ? `；${[...warnings].join('；')}` : ''}`);
+      return true;
+    } catch (error) {
+      showToast(`删除未全部完成：${formatUserError(error, '请重试')}`);
+      return false;
+    } finally {
+      if (needsRefresh) await refetchAssetTasks().catch(() => undefined);
       lock.current = false;
       setIsDeleting(false);
     }
@@ -74,7 +126,7 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
     if (batch.batchId.startsWith('canvas-project-')) {
       const projectId = batch.batchId.slice('canvas-project-'.length);
       // A project-level action also deletes notes and other non-media nodes.
-      return deleteTargets([{ canvasProjectId: projectId, nodeId: 'init' }], `确定删除画布项目“${batch.title}”及其全部内容吗？`, '已删除画布项目');
+      return deleteTargets([{ canvasProjectId: projectId, nodeId: 'init', isCanvasPlaceholder: true }], `确定删除画布项目“${batch.title}”及其全部内容吗？`, '已删除画布项目');
     }
     return deleteTargets(batch.tasks, `确定删除该批次的 ${batch.tasks.length} 条记录吗？`, '已删除该批次');
   };
@@ -127,5 +179,5 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
     }
   };
 
-  return { isBusy, isDeleting, isDownloadingZip, zipProgressLabel, setIsDownloadingZip, handleDeleteTask, handleBatchDelete, handleBatchDeleteTasks, handleBatchDownloadTasks, handleClearFailedAndStuck, handleDeleteBatch, handleBatchDownload };
+  return { isBusy, isDeleting, isDownloadingZip, zipProgressLabel, setIsDownloadingZip, handleBatchDeleteProjects, handleDeleteTask, handleBatchDelete, handleBatchDeleteTasks, handleBatchDownloadTasks, handleClearFailedAndStuck, handleDeleteBatch, handleBatchDownload };
 }

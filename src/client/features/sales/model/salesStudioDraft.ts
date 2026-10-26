@@ -1,7 +1,4 @@
 import {
-  emptyFashionRefs,
-  readFashionRefs,
-  type FashionRefs,
   type SalesImageRef,
   type VideoSalesProductAnalysis,
   type VideoSalesScript,
@@ -13,6 +10,7 @@ import {
 import { readProductVariantMetadata, type ProductVariantMetadata } from '@shared/domain/collection/productVariants';
 import { salesOpeningProductUrl, type SalesAspectRatio, type SalesVideoRefMode } from './salesWorkspace';
 import type { SalesPlanCheckpoint } from './buildSalesPlan';
+import { archiveSalesFields, migrateSalesScript } from './salesDraftMigration';
 import type { SalesNavigation } from './salesWorkspaceView';
 
 export const SALES_STUDIO_STORAGE_KEY = 'beike.video_sales.draft.v3';
@@ -30,7 +28,7 @@ export interface VideoSalesStudioState {
   props: Record<string, string>;
   imageCatalog: SalesImageRef[];
   productImages: string[];
-  fashionRefs: FashionRefs;
+  historicalData?: Record<string, unknown>;
   collectionSource?: string;
   fromCache?: boolean;
   detailsMissing?: boolean;
@@ -45,6 +43,7 @@ export interface VideoSalesStudioState {
   scripts: VideoSalesScript[];
   selectedScriptIndex: number;
   analysis: VideoSalesProductAnalysis | null;
+  analysisRevision?: string;
   composedResultUrl: string | null;
   planCheckpoint?: SalesPlanCheckpoint & { revision: string };
   workspaceNavigation?: SalesNavigation;
@@ -57,13 +56,12 @@ export const defaultSalesStudioState: VideoSalesStudioState = {
   productName: '',
   brand: '',
   priceLabel: '',
-  category: 'other',
+  category: 'fashion',
   sellingPoints: '',
   props: {},
   imageCatalog: [],
   productImages: [],
-  fashionRefs: emptyFashionRefs(),
-  videoMode: 'product_closeup',
+  videoMode: 'live_presenter',
   targetDuration: 15,
   aspectRatio: '9:16',
   videoResolution: '480P',
@@ -76,8 +74,8 @@ export const defaultSalesStudioState: VideoSalesStudioState = {
 
 export function hasSalesProductContent(state: VideoSalesStudioState): boolean {
   return Boolean(
-    [state.productUrl, state.productName, state.brand, state.priceLabel, state.sellingPoints, ...Object.values(state.fashionRefs)].some((value) => value.trim())
-    || Object.keys(state.props).length || state.imageCatalog.length || state.productImages.length
+    [state.productUrl, state.productName, state.brand, state.priceLabel, state.sellingPoints].some((value) => value.trim())
+    || Object.keys(state.historicalData || {}).length || Object.keys(state.props).length || state.imageCatalog.length || state.productImages.length
     || state.scripts.length || state.analysis || state.composedResultUrl || state.selectedScriptIndex
     || state.colorSelection?.colorLabel || state.colorSelection?.variantId
     || state.colorSelection?.confirmedImageUrls.length || state.colorSelection?.excludedImageUrls.length || state.variantMetadata?.variants.length
@@ -88,11 +86,11 @@ export function hasSalesProductContent(state: VideoSalesStudioState): boolean {
 export function clearSalesProduct(state: VideoSalesStudioState): VideoSalesStudioState {
   return {
     ...defaultSalesStudioState,
-    category: state.category,
+    category: 'fashion',
     selectedChatModel: state.selectedChatModel,
     selectedImageModel: state.selectedImageModel,
     selectedVideoModel: state.selectedVideoModel,
-    videoMode: state.videoMode,
+    videoMode: state.category === 'fashion' ? state.videoMode : 'live_presenter',
     targetDuration: state.targetDuration,
     aspectRatio: state.aspectRatio,
     videoResolution: state.videoResolution,
@@ -101,7 +99,6 @@ export function clearSalesProduct(state: VideoSalesStudioState): VideoSalesStudi
     colorSelection: emptySalesColorSelection(),
     imageCatalog: [],
     productImages: [],
-    fashionRefs: emptyFashionRefs(),
     scripts: [],
   };
 }
@@ -133,12 +130,15 @@ export function readSalesStudioDraft(): VideoSalesStudioState {
   try {
     const saved = window.localStorage.getItem(SALES_STUDIO_STORAGE_KEY) || window.localStorage.getItem('beike.video_sales.draft.v2');
     if (!saved) return defaultSalesStudioState;
-    const parsed = JSON.parse(saved) as Partial<VideoSalesStudioState>;
+    const parsed = archiveSalesFields(JSON.parse(saved) as Partial<VideoSalesStudioState>, ['fashionRefs']);
     const scripts = normalizeSalesScripts(parsed.scripts, parsed.draftVersion === 3);
+    const empty = !scripts.length && !parsed.productName && !parsed.imageCatalog?.length && !parsed.productImages?.length;
     return {
       ...defaultSalesStudioState,
       ...parsed,
       draftVersion: 3,
+      category: empty ? 'fashion' : parsed.category || defaultSalesStudioState.category,
+      videoMode: empty && parsed.category !== 'fashion' ? 'live_presenter' : parsed.videoMode || defaultSalesStudioState.videoMode,
       colorSelection: readSalesColorSelection(parsed.colorSelection),
       variantMetadata: readProductVariantMetadata(parsed.variantMetadata),
       targetDuration: Number.isInteger(parsed.targetDuration) && parsed.targetDuration! >= 10 && parsed.targetDuration! <= 120 ? parsed.targetDuration! : 15,
@@ -151,7 +151,6 @@ export function readSalesStudioDraft(): VideoSalesStudioState {
       scripts,
       imageCatalog: Array.isArray(parsed.imageCatalog) ? parsed.imageCatalog : [],
       productUrl: salesOpeningProductUrl(parsed),
-      fashionRefs: readFashionRefs(parsed.fashionRefs),
     };
   } catch {
     return defaultSalesStudioState;
@@ -175,10 +174,10 @@ export function normalizeSalesScripts(value: unknown, current: boolean): VideoSa
     && typeof item.title === 'string' && Array.isArray(item.shots) && item.shots.every((shot: unknown) => shot && typeof shot === 'object'
       && 'shotId' in shot && typeof shot.shotId === 'number' && 'duration' in shot && typeof shot.duration === 'number')))
     .map((script) => ({
-      ...script,
+      ...migrateSalesScript(script),
       assets: Array.isArray(script.assets) ? script.assets.filter((asset) => asset && typeof asset.id === 'string' && typeof asset.prompt === 'string')
         .map((asset) => ({ ...asset, status: asset.status === 'generating' ? 'uncertain' : asset.status })) : undefined,
-      ...(current && script.workflowVersion === 3 ? {} : { planStale: true, finalizedRevision: undefined, assetValidation: 'pending' as const }),
+      ...(current && script.workflowVersion === 3 && script.shots.every((shot) => shot.speechMode === 'on_camera' || shot.speechMode === 'voiceover') && !script.assets?.some((asset) => asset.usesProduct && !asset.productImageIndexes?.length) ? {} : { planStale: true, finalizedRevision: undefined, assetValidation: 'pending' as const }),
       // A browser may close after the request reached the provider but before a receipt arrived.
       ...(script.renderStatus === 'generating' && !script.renderTaskId ? { renderStatus: 'uncertain' as const, renderError: '上次提交结果未确认，请核对服务端生成记录' } : {}),
     }));

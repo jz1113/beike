@@ -14,7 +14,7 @@ describe('sales asset recovery and progress', () => {
   });
   it('counts completed required assets separately from optional and failed ones', () => {
     expect(salesAssetProgress([
-      { ...asset, status: 'done', url: '/scene.jpg', validation: 'passed' },
+      { ...asset, status: 'done', url: '/scene.jpg', validation: 'passed', validationSource: 'manual' },
       { ...asset, id: 'optional', required: false, status: 'failed' },
       { ...asset, id: 'pending', status: 'uncertain', submissionKey: 'key' },
     ])).toEqual({ total: 3, generated: 1, confirmed: 1, required: 2, requiredGenerated: 1, failed: 1, queryable: true, unresolved: false });

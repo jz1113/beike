@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VideoSalesScript } from '@shared/domain/sales';
 import { useSalesCreativeStages } from './useSalesCreativeStages';
-import { finalizeSalesPrompts } from '../api/videoSalesApi';
+import { analyzeProductMedia, finalizeSalesPrompts } from '../api/videoSalesApi';
 import { prepareSalesCreativeAssets } from '../model/prepareSalesAssets';
 import { salesPlanInputRevision, salesSingleVideoError } from '../model/salesStageRules';
 import { defaultSalesStudioState, type VideoSalesStudioState } from '../model/salesStudioDraft';
+import { salesAssetSourceRevision } from '../model/salesAssetHelpers';
 import { generateSalesReferenceFrame } from '../api/salesMediaApi';
 
 const resolveModalityModelRoute = vi.hoisted(() => vi.fn((modality: string, value?: string, options?: unknown) => {
@@ -18,7 +19,7 @@ const resolveModalityModelRoute = vi.hoisted(() => vi.fn((modality: string, valu
 
 vi.mock('react', () => ({ useCallback: (callback: unknown) => callback, useEffect: () => {}, useRef: (current: unknown) => ({ current }), useState: (value: unknown) => [value, vi.fn()] }));
 vi.mock('../model/prepareSalesAssets', () => ({ prepareSalesCreativeAssets: vi.fn() }));
-vi.mock('../api/videoSalesApi', () => ({ analyzeProductMedia: vi.fn(), finalizeSalesPrompts: vi.fn(), validateSalesAssets: vi.fn() }));
+vi.mock('../api/videoSalesApi', () => ({ analyzeProductMedia: vi.fn(), finalizeSalesPrompts: vi.fn() }));
 vi.mock('../api/salesMediaApi', () => ({ generateSalesReferenceFrame: vi.fn() }));
 vi.mock('../model/salesStageRules', async (original) => ({ ...await original<typeof import('../model/salesStageRules')>(), salesSingleVideoError: vi.fn() }));
 vi.mock('@shared/domain/models/modalityStorage', () => ({ resolveModalityModelRoute }));
@@ -29,7 +30,7 @@ function Harness() {
   };
   const script: VideoSalesScript = { id: 'plan', title: '脚本', totalDuration: 15, deliveryMode: 'single', workflowVersion: 3, planRevision: salesPlanInputRevision(state),
     assets: [{ id: 'scene', kind: 'scene', label: '桌面', prompt: '实拍桌面', required: true, status: 'pending' }],
-    shots: [{ shotId: 1, type: 'demo', duration: 15, imageIndex: 8, description: '展示', camera: '中景', voiceover: '商品', visualSource: 'product_image', transition: 'direct_concat' }],
+    shots: [{ shotId: 1, type: 'demo', duration: 15, imageIndex: 8, description: '展示', camera: '中景', speechMode: 'voiceover', voiceover: '商品', visualSource: 'product_image', transition: 'direct_concat' }],
     seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
   };
   state.scripts = [script];
@@ -47,6 +48,55 @@ beforeEach(() => {
 });
 
 describe('sales creative stage ordering', () => {
+  it('requires selected product images before analysis and never falls back to the gallery', async () => {
+    const { stages, stateRef, setError } = Harness();
+    stateRef.current.colorSelection = { colorLabel: '', confirmedImageUrls: [], excludedImageUrls: [] };
+    expect(await stages.runProductAnalyze()).toBe(false);
+    expect(analyzeProductMedia).not.toHaveBeenCalled();
+    expect(setError).toHaveBeenCalledWith('请先选择至少一张用于生成的商品图');
+  });
+  it('reuses analysis for unchanged selected product inputs without another model call', async () => {
+    const { stages } = Harness();
+    vi.mocked(analyzeProductMedia).mockResolvedValue({ sellingPoints: ['圆领结构'] } as NonNullable<VideoSalesStudioState['analysis']>);
+    expect(await stages.runProductAnalyze()).toBe(true);
+    expect(await stages.runProductAnalyze()).toBe(true);
+    expect(analyzeProductMedia).toHaveBeenCalledTimes(1);
+  });
+  it('invalidates a changed image prompt and prevents confirming the previous image', () => {
+    const { stages, stateRef } = Harness();
+    const asset = stateRef.current.scripts[0].assets![0];
+    Object.assign(asset, { status: 'done', url: '/old.jpg', validation: 'passed' });
+    stages.editAssetPrompt('scene', '新的房间');
+    expect(stateRef.current.scripts[0].assets![0]).toMatchObject({ prompt: '新的房间', status: 'pending', url: '/old.jpg' });
+    expect(stages.confirmAssets()).toBe(false);
+  });
+  it('preserves the prompt and receipt while an image submission remains unresolved', () => {
+    const { stages, stateRef, setError } = Harness();
+    Object.assign(stateRef.current.scripts[0].assets![0], { status: 'uncertain', taskId: 'paid-task' });
+    stages.editAssetPrompt('scene', '不能替换原任务输入');
+    expect(stateRef.current.scripts[0].assets![0]).toMatchObject({ prompt: '实拍桌面', taskId: 'paid-task' });
+    expect(setError).toHaveBeenCalledWith(expect.stringContaining('原图片任务'));
+  });
+  it('rejects confirmation when a recovered dependent image has outdated sources', () => {
+    const { stages, stateRef, setError } = Harness();
+    const script = stateRef.current.scripts[0];
+    const asset = script.assets![0];
+    asset.sourceRevision = salesAssetSourceRevision(asset, stateRef.current.imageCatalog, script.assets!, '', '9:16');
+    Object.assign(asset, { status: 'done', url: '/old.jpg', prompt: '已修改的场景' });
+    expect(stages.confirmAssets()).toBe(false);
+    expect(setError).toHaveBeenCalledWith(expect.stringContaining('重新生成此素材'));
+  });
+  it('does not apply an analysis response after the product inputs change', async () => {
+    const { stages, stateRef } = Harness();
+    vi.mocked(analyzeProductMedia).mockImplementation(async () => {
+      stateRef.current = { ...stateRef.current, productName: '另一个商品' };
+      return { sellingPoints: ['旧商品卖点'] } as NonNullable<VideoSalesStudioState['analysis']>;
+    });
+    expect(await stages.runProductAnalyze()).toBe(false);
+    expect(stateRef.current.analysis).toBeNull();
+    expect(stateRef.current.sellingPoints).toBe('');
+  });
+
   it('queries only the requested image receipt even after the plan becomes stale', async () => {
     const { stages, stateRef } = Harness();
     const script = stateRef.current.scripts[0];
@@ -78,10 +128,10 @@ describe('sales creative stage ordering', () => {
     expect(setError).toHaveBeenCalledWith('素材尚未完成校验');
     vi.mocked(prepareSalesCreativeAssets).mockImplementation(async (input) => {
       input.updateAsset('scene', { url: '/actual-scene.jpg', status: 'done', validation: 'passed' });
-      input.setValidation('passed');
     });
     await stages.runAssets();
     expect(stateRef.current.scripts[0].fullPrompt).toBeUndefined();
+    expect(stages.confirmAssets()).toBe(true);
     await stages.runFinalize();
     expect(finalizeSalesPrompts).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ operation: 'finalize',
       model: 'chat-chosen', textProtocol: 'openai', customBaseUrl: 'https://model-channel.test', customApiKey: 'model-key',
@@ -96,7 +146,7 @@ describe('sales creative stage ordering', () => {
     const { stages, stateRef, setError } = Harness();
     stateRef.current.scripts[0].assets![0] = { ...stateRef.current.scripts[0].assets![0], status: 'uncertain', error: '图 2 缺失参考图无法读取；参考图预设 SM19' };
     await stages.runAssets('scene');
-    expect(prepareSalesCreativeAssets).toHaveBeenCalledWith(expect.objectContaining({ regenerateId: 'scene' }), expect.anything(), expect.anything());
+    expect(prepareSalesCreativeAssets).toHaveBeenCalledWith(expect.objectContaining({ regenerateId: 'scene' }), expect.anything());
     expect(setError).not.toHaveBeenCalledWith(expect.stringContaining('未确认'));
     vi.mocked(prepareSalesCreativeAssets).mockClear();
     stateRef.current.scripts[0].assets![0] = { ...stateRef.current.scripts[0].assets![0], status: 'uncertain', taskId: undefined, error: '连接中断' };

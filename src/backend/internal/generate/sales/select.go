@@ -115,28 +115,3 @@ func selectChatBody(model string, shots []ScriptShot, vision []CatalogImage) map
 		"response_format": map[string]string{"type": "json_object"},
 	}
 }
-
-func parseSelectShots(payload map[string]any) []ScriptShot {
-	raw, ok := payload["shots"].([]any)
-	if !ok {
-		return nil
-	}
-	shots := make([]ScriptShot, 0, len(raw))
-	for _, item := range raw {
-		obj, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		shotID := generate.IntField(obj, "shotId")
-		if shotID == 0 {
-			shotID = len(shots) + 1
-		}
-		shots = append(shots, ScriptShot{
-			ShotId:      shotID,
-			Type:        generate.StringField(obj, "type"),
-			Description: generate.StringField(obj, "description"),
-			Voiceover:   generate.StringField(obj, "voiceover"),
-		})
-	}
-	return shots
-}

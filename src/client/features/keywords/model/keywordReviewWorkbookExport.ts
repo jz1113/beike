@@ -45,10 +45,8 @@ export function buildReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: Ke
       const row = record.rowNumber - 1;
       const styleSource = sheet[XLSX.utils.encode_cell({ r: row, c: Math.max(0, categoryCol - 1) })];
       if (record.status !== 'done' || !record.category || !record.producible) {
-        if (parsed.reviewModeMismatch) {
-          for (const col of [categoryCol, categoryReasonCol, producibleCol, rejectReasonCol, lowValueCol]) {
-            if (col >= 0) writeCell(sheet, row, col, '', styleSource);
-          }
+        for (const col of [categoryCol, categoryReasonCol, producibleCol, rejectReasonCol, lowValueCol]) {
+          if (col >= 0) writeCell(sheet, row, col, '', styleSource);
         }
         continue;
       }

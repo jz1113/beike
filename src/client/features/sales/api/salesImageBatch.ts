@@ -24,8 +24,8 @@ function batchItemPayload(item: SalesImageBatchItem): Record<string, unknown> {
     prompt: item.prompt,
     model: item.imageModel,
     aspectRatio: item.aspectRatio || '9:16',
-    customBaseUrl,
-    customApiKey,
+    customBaseUrl: modelCreds.baseUrl || customBaseUrl,
+    customApiKey: modelCreds.apiKey || customApiKey,
     storageConfig: readClientStorageConfig(),
     ...(images.length ? { useReferenceImage: true, referenceImageUrl: images[0], referenceImages: images, images } : {}),
   };
@@ -75,17 +75,22 @@ export async function submitSalesImageBatch(items: SalesImageBatchItem[], isAbor
   if (!response.ok || !data?.success || !Array.isArray(data.items)) {
     throw new Error(typeof data?.error === 'string' ? data.error : '批量生图请求失败');
   }
-  return items.map((item, index) => ({ ...classifyBatchItem(data.items[index], item.id), id: item.id }));
+  return items.map((item) => {
+    const matches = data.items.filter((raw: unknown) => raw && typeof raw === 'object' && 'id' in raw && raw.id === item.id);
+    return { ...classifyBatchItem(matches.length === 1 ? matches[0] : undefined, item.id), id: item.id };
+  });
 }
 
 export async function lookupSalesImageSubmission(key: string, imageModel: string | undefined, isAborted: () => boolean): Promise<SalesImageBatchReceipt> {
   throwIfGenerationAborted(isAborted);
   let response: Response;
   try {
-    response = await apiFetch(`/api/generate/image?taskKey=${encodeURIComponent(key)}`, {
+    response = await withSalesAbort(isAborted, (signal) => apiFetch(`/api/generate/image?taskKey=${encodeURIComponent(key)}${imageModel ? `&model=${encodeURIComponent(imageModel)}` : ''}`, {
+      signal,
       headers: { ...getGatewayClientHeaders(imageModel), ...storageConfigHeaders() },
-    });
+    }));
   } catch (error) {
+    if (isAborted()) throw error;
     return { id: '', outcome: 'uncertain', error: error instanceof Error ? error.message : '原任务提交记录暂时无法核对' };
   }
   const data = await response.json().catch(() => null);
