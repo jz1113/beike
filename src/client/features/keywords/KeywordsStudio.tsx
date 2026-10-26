@@ -175,17 +175,6 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
                   </div>
                 </div>
                 <p className="mt-3 text-xs leading-5 text-zinc-500 tabular-nums dark:text-zinc-400">{review.reviewMode === 'video' ? '视频' : '图文'}审核 · {review.model} · 已识别 {review.parsed.sheets.length.toLocaleString('en-US')} 个工作表，共 {review.counts.total.toLocaleString('en-US')} 条关键词</p>
-                <details className="mt-2 text-xs leading-5 text-zinc-500 tabular-nums dark:text-zinc-400">
-                  <summary className="w-fit cursor-pointer font-semibold hover:text-slate-800 dark:hover:text-slate-100">审核与费用说明</summary>
-                  <div className="mt-2 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-                    <p>工作表：{review.parsed.sheets.map((sheet) => `${sheet.name} ${sheet.recordCount.toLocaleString('en-US')} 条`).join('、')}。试跑 {review.trialSize.toLocaleString('en-US')} 条，每次请求 {review.batchSize.toLocaleString('en-US')} 条，最多 {review.concurrency.toLocaleString('en-US')} 路并发；遇限流会自动降速并重试。网关切断单次响应时，会把该批拆开再提交。</p>
-                    <p>停止后会等待已提交请求返回并保留结果。网关已明确返回且没有用量的失败会自动换新任务重试。只有提交结果无法确认的记录会单独隔离，避免重复扣费；费用估算只计入已收到的用量。</p>
-                    <p>联网补查暂不可用，当前审核不发起额外补查请求。</p>
-                    <p>模型费用以实际账单为准。<a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing/" target="_blank" rel="noreferrer" className="ml-1 font-semibold text-blue-700 underline underline-offset-2">查看 DeepSeek 官方价格</a></p>
-                    <p>{review.parsed.preserveSourceLayout ? '含备注说明行、公式、内部引用或辅助工作表的工作簿保留原工作表与列顺序。' : review.reviewMode === 'video' ? '原表列全部保留，追加最终垂类、制作判断与低价值标记。' : '原表列保留；整列为空的实体拓展q和分类不进入结果表，审核列接在下发时间后。'}</p>
-                    {review.parsed.preserveSourceLayout && <p>为保留备注说明行、公式、内部引用或辅助表，导出保留原布局，新增审核列追加至末尾。</p>}
-                  </div>
-                </details>
                 {review.parsed.reviewModeMismatch && <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">此表来自{review.parsed.sourceReviewMode === 'video' ? '视频' : '图文'}审核，旧裁决已清除；当前将按{review.reviewMode === 'video' ? '视频' : '图文'}规则重新审核。</p>}
                 {(review.tokenUsage.cacheHit + review.tokenUsage.cacheMiss + review.tokenUsage.completion) > 0 && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{review.usageProvider === 'deepseek' ? `本轮估算费用 ¥${review.estimatedCostLabel}（仅供参考，以官方账单为准） · ` : '本轮用量（费用以所选网关账单为准） · '}缓存命中 <span className="font-medium text-zinc-700 tabular-nums dark:text-zinc-300">{review.tokenUsage.cacheHit.toLocaleString('en-US')}</span>、未命中 <span className="font-medium text-zinc-700 tabular-nums dark:text-zinc-300">{review.tokenUsage.cacheMiss.toLocaleString('en-US')}</span>、输出 <span className="font-medium text-zinc-700 tabular-nums dark:text-zinc-300">{review.tokenUsage.completion.toLocaleString('en-US')}</span> token。</p>}
                 {review.reviewMode === 'video' && <p className="mt-1 text-xs text-zinc-500 tabular-nums dark:text-zinc-400">已标记低价值关键词 {review.counts.lowValue.toLocaleString('en-US')} 条；原表“分类”保留，新增“最终垂类”和“低价值关键词”结果列。</p>}
