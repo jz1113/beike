@@ -65,14 +65,20 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-slate-900 dark:text-slate-100">
-      <header className="relative z-20 flex min-h-[72px] shrink-0 flex-wrap items-center justify-between py-3 gap-3 px-4 sm:px-6 lg:px-8">
-        <button type="button" onClick={onBack} aria-label="词包，返回首页" title="返回首页" className="group inline-flex h-10 items-center gap-2 rounded-xl border border-white/[0.07] bg-white/90 dark:bg-[#1B1B1E]/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-white/[0.12] hover:bg-white dark:hover:bg-[#26262B] text-slate-900 dark:text-white">
+      <header className="relative z-20 grid min-h-[72px] shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-8">
+        <button type="button" onClick={onBack} aria-label="词包，返回首页" title="返回首页" className="group inline-flex h-10 items-center justify-self-start gap-2 rounded-xl border border-white/[0.07] bg-white/90 dark:bg-[#1B1B1E]/90 px-3 shadow-sm backdrop-blur transition-colors hover:border-white/[0.12] hover:bg-white dark:hover:bg-[#26262B] text-slate-900 dark:text-white">
           <ToolSuiteMark>
             <FilePen className="h-4 w-4 stroke-[2]" />
           </ToolSuiteMark>
           <span className="text-sm font-black tracking-tight">词包</span>
         </button>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="col-span-2 row-start-2 flex max-w-full flex-col items-center gap-1.5 justify-self-center text-center lg:col-span-1 lg:col-start-2 lg:row-start-1">
+          <div role="group" aria-label="词包审核类型" className="inline-flex items-center gap-1 rounded-lg border border-white/[0.07] bg-zinc-900/90 p-1">
+            {(['image', 'video'] as const).map((mode) => <button key={mode} type="button" aria-pressed={review.reviewMode === mode} disabled={!review.canSwitchMode} onClick={() => void review.selectReviewMode(mode)} className={`rounded-md px-3 py-1.5 text-sm transition disabled:cursor-not-allowed ${review.reviewMode === mode ? 'bg-zinc-800 font-medium text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 disabled:opacity-50'}`}>{mode === 'image' ? '图文关键词' : '视频关键词'}</button>)}
+          </div>
+          {review.parsed && <span className="max-w-xs text-xs leading-5 text-zinc-500">{review.isRunning || review.isPreparing ? '审核进行中，暂不可切换类型' : review.counts.done > 0 ? '已有审核结果；请先导出进度，再点击“换表”切换类型' : !review.canSwitchMode ? '本次已有审核尝试；请先处理当前任务，或点击“换表”后切换类型' : '尚未审核，可直接切换类型'}</span>}
+        </div>
+        <div className="col-start-2 row-start-1 flex min-w-0 flex-wrap items-center justify-end gap-2 lg:col-start-3">
           <div className="max-w-xl">
             <KeywordReviewRecoveryStatus saving={review.sessionLoading || review.sessionSaving} savedAt={review.sessionSavedAt} error={review.sessionError} hasTask={Boolean(review.parsed)} disableRetry={review.isRunning || review.isPreparing || review.isImporting || review.isExporting} onRetry={() => void review.retrySessionSave()} onDiscard={review.sessionCanClear ? review.reset : undefined} />
           </div>
@@ -109,12 +115,6 @@ export default function KeywordsStudio({ onBack, onOpenSettings }: Props) {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-[1680px] space-y-5">
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <div role="group" aria-label="词包审核类型" className="inline-flex items-center gap-1 rounded-lg border border-white/[0.07] bg-zinc-900/90 p-1">
-              {(['image', 'video'] as const).map((mode) => <button key={mode} type="button" aria-pressed={review.reviewMode === mode} disabled={!review.canSwitchMode} onClick={() => void review.selectReviewMode(mode)} className={`rounded-md px-3 py-1.5 text-sm transition disabled:cursor-not-allowed ${review.reviewMode === mode ? 'bg-zinc-800 font-medium text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 disabled:opacity-50'}`}>{mode === 'image' ? '图文关键词' : '视频关键词'}</button>)}
-            </div>
-            {review.parsed && <span className="text-xs text-slate-500 dark:text-slate-400">{review.isRunning || review.isPreparing ? '审核进行中，暂不可切换类型' : review.counts.done > 0 ? '已有审核结果；请先导出进度，再点击“换表”切换类型' : !review.canSwitchMode ? '本次已有审核尝试；请先处理当前任务，或点击“换表”后切换类型' : '尚未审核，可直接切换类型'}</span>}
-          </div>
           {!review.parsed ? (
             <section className="mx-auto max-w-[980px] pt-8 sm:pt-14">
               <div className="mb-7 text-center">

@@ -108,26 +108,29 @@ export function SalesActionBar({ primary, secondary, busy, reason, note, progres
     return () => window.clearInterval(timer);
   }, [busy]);
   const description = reason || note;
+  const actionTitle = busy ? progress || primary.label : primaryTitle || description;
+  const hideStatus = !busy && (quietReason || (controls && !reason));
   const primaryClass = `sales-primary-action inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition disabled:cursor-not-allowed ${salesFocusClass}`;
   return <footer aria-label="当前步骤操作" className="shrink-0 bg-transparent px-3 py-2.5 sm:px-5">
     <div className="@container mx-auto flex w-full justify-center">
-      <div className="sales-action-dock flex w-full max-w-full flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm @min-[720px]:rounded-full dark:border-white/10 dark:bg-[#18191c]">
-        <div className={`${quietReason ? 'sr-only' : 'min-w-0'} text-xs leading-5 text-slate-500 dark:text-slate-400`}>
-        <div className={controls && !busy && (!reason || quietReason) ? 'sr-only' : 'min-w-0'}>
-          <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy && !quietReason ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && !quietReason && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
-          {busy && <div className="mt-1.5 w-48 max-w-full"><SalesIndeterminateBar label={progress || '正在处理'} /></div>}
-          {busy && <p className="mt-0.5"><span className="tabular-nums">已等待 {elapsed} 秒</span>{note ? ` · ${note}` : ''}</p>}
+      <div className={`sales-action-dock ${busy ? 'is-busy' : '@min-[720px]:rounded-full'} flex w-full max-w-full flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-[#18191c]`}>
+        <div className={`${hideStatus ? 'sr-only' : 'sales-dock-status min-w-0'} text-xs leading-5 text-slate-500 dark:text-slate-400`}>
+          <div className={busy ? 'sales-dock-status-heading' : undefined}>
+            <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy && !quietReason ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && !quietReason && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || primary.label || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
+            {busy && <span className="shrink-0 text-[11px] tabular-nums">已等待 {elapsed} 秒</span>}
+          </div>
+          {busy && <div className="mt-1.5"><SalesIndeterminateBar label={progress || primary.label || '正在处理'} /></div>}
         </div>
-        </div>
-        {controls && <div className="hidden min-w-0 @min-[720px]:flex">{controls}</div>}
-        {controls && <details className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] @min-[720px]:hidden"><summary className="cursor-pointer list-none text-xs font-medium text-slate-700 dark:text-slate-200">创作设置</summary><div className="mt-2">{controls}</div></details>}
+        {controls && <div className="sales-dock-controls hidden min-w-0 @min-[720px]:flex">{controls}</div>}
+        {controls && <details className="sales-dock-controls w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] @min-[720px]:hidden"><summary className="cursor-pointer list-none text-xs font-medium text-slate-700 dark:text-slate-200">创作设置</summary><div className="mt-2">{controls}</div></details>}
         <div className="sales-dock-actions flex w-full min-w-0 flex-wrap justify-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
         {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 min-w-max shrink-0 whitespace-nowrap px-4 disabled:opacity-40 ${salesGhostButtonClass}`}>{/重新生成/.test(secondary.label) && <RefreshCw className="h-3.5 w-3.5" aria-hidden />}{secondary.label}</button>}
-        <span className="sales-primary-tooltip relative inline-flex max-w-full" title={primaryTitle || description || undefined} tabIndex={primary.disabled ? 0 : undefined}>
-        {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} title={primaryTitle || description || undefined} aria-describedby={`${uid}-reason`} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} title={primaryTitle || description || undefined} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{primary.label}</button>}
-        {primary.disabled && (primaryTitle || description) && <span role="tooltip" className="sales-disabled-tooltip pointer-events-none absolute bottom-full right-0 mb-2 w-max max-w-64 rounded-lg bg-slate-800 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg dark:bg-slate-200 dark:text-slate-900">{primaryTitle || description}</span>}
+        <span className="sales-primary-tooltip relative inline-flex max-w-full" title={actionTitle || undefined} tabIndex={primary.disabled ? 0 : undefined}>
+        {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} title={actionTitle || undefined} aria-describedby={`${uid}-reason`} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} title={actionTitle || undefined} aria-label={busy ? primary.label : undefined} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{busy ? '处理中' : primary.label}</button>}
+        {primary.disabled && actionTitle && <span role="tooltip" className="sales-disabled-tooltip pointer-events-none absolute bottom-full right-0 mb-2 w-max max-w-64 rounded-lg bg-slate-800 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg dark:bg-slate-200 dark:text-slate-900">{actionTitle}</span>}
         </span>
         </div>
+        {busy && note && <p className="sales-dock-note min-w-0 text-[11px] leading-4 text-slate-500 dark:text-slate-400">{note}</p>}
       </div>
     </div>
   </footer>;
