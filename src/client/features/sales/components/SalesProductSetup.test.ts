@@ -93,6 +93,9 @@ describe('product confirmation information hierarchy', () => {
     expect(html).not.toContain('示例品牌');
     expect(html).not.toContain('填写可核实的商品名称');
     expect(html).not.toContain('<input');
+    expect(html).not.toContain('id="sales-product-name"');
+    expect(html).not.toContain('>编辑</button>');
+    expect(html).not.toContain('必填');
   });
   it('preserves the complete collected title including its color and size', () => {
     const html = renderToStaticMarkup(createElement(SalesProductFields, {

@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { Clapperboard, FileText, ImagePlus, Images, Loader2, Pencil, Video } from 'lucide-react';
+import { Clapperboard, FileText, ImagePlus, Images, Loader2, Video } from 'lucide-react';
 import { eligibleSalesImages, type SalesColorSelection, type SalesImageRef, type VideoSalesCategory, type VideoSalesProductAnalysis } from '@shared/domain/sales';
 import type { VideoSalesStudioState } from '../hooks/useVideoSalesStudio';
 import { salesProductProfile } from '../model/salesProductProfile';
@@ -31,11 +31,15 @@ interface SalesProductFieldsProps {
 export function SalesProductFields({
   productName, sellingPoints, props, productUrl, variantMetadata, colorSelection, images, analysis, isAnalyzing, isCollected, disabled, noDivider, canAnalyze, onAnalyze, profileOnly, onChange,
 }: SalesProductFieldsProps) {
-  const [editingProductName, setEditingProductName] = useState(false);
   const profile = salesProductProfile({ productName, productUrl, props, variantMetadata, colorSelection, images, isCollected });
   const productNameField = <div className="min-w-0">
-    <label htmlFor="sales-product-name" className={salesLabelClass}>商品名称<span className="ml-1 text-[10px] font-normal text-slate-400">必填</span></label>
-      {isCollected && !editingProductName ? <div className="mt-2 flex items-start gap-2"><p className="min-w-0 flex-1 whitespace-pre-wrap text-[15px] font-semibold leading-6 [overflow-wrap:anywhere]">{productName || '未返回商品名称'}</p><button type="button" disabled={disabled} onClick={() => setEditingProductName(true)} className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500 hover:bg-black/[0.04] disabled:opacity-40 dark:text-slate-400 dark:hover:bg-white/5 ${salesFocusClass}`}><Pencil className="h-3 w-3" aria-hidden />编辑</button></div> : <textarea id="sales-product-name" rows={3} value={productName} placeholder="填写可核实的商品名称" disabled={disabled} onChange={(event) => onChange({ productName: event.target.value })} className={`${salesInputClass} sales-product-name-input resize-y text-[13px] leading-5`} />}
+    {isCollected ? <>
+      <p className={salesLabelClass}>商品名称</p>
+      <p className="mt-2 whitespace-pre-wrap text-[15px] font-semibold leading-6 [overflow-wrap:anywhere]">{productName || '未返回商品名称'}</p>
+    </> : <>
+      <label htmlFor="sales-product-name" className={salesLabelClass}>商品名称<span className="ml-1 text-[10px] font-normal text-slate-400">必填</span></label>
+      <textarea id="sales-product-name" rows={3} value={productName} placeholder="填写可核实的商品名称" disabled={disabled} onChange={(event) => onChange({ productName: event.target.value })} className={`${salesInputClass} sales-product-name-input resize-y text-[13px] leading-5`} />
+    </>}
   </div>;
   return <section className={`${noDivider ? '' : salesDividerClass} sales-product-fields @container space-y-3`} aria-label="商品基础档案">
     {productNameField}
