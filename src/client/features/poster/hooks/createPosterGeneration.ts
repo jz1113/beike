@@ -43,7 +43,8 @@ export function createPosterGeneration(context: Pick<PosterState,
     const attempt = { recovering: recoveringImage, dispatched: false };
     activeAttemptsRef.current.set(item.id, attempt);
     try {
-      const shouldRewriteTitle = !recoveringImage && shouldRewriteCoverTitle(item, settings.titleHandling);
+      const reuseDesign = !recoveringImage && Boolean(item.designPlan && item.prompt && item.coverTitle);
+      const shouldRewriteTitle = !recoveringImage && !reuseDesign && shouldRewriteCoverTitle(item, settings.titleHandling);
       updateItem(item.id, { status: shouldRewriteTitle ? 'rewriting' : 'prompting', error: undefined, modelFallbackNote: undefined, resultUrl: undefined });
 
       const modelLabel = (modelId: string) => {
@@ -69,7 +70,7 @@ export function createPosterGeneration(context: Pick<PosterState,
       const titleResult = shouldRewriteTitle
         ? await runWithModelFallback('标题改写', 'rewriting', settings.titleModel, (modelId) => rewriteCoverTitle(item, modelId, signal))
         : {
-          value: recoveringImage ? item.coverTitle : item.isTitleEdited ? normalizeCoverTitle(item.coverTitle) : preservedOriginalTitle(item),
+          value: recoveringImage || reuseDesign ? item.coverTitle : item.isTitleEdited ? normalizeCoverTitle(item.coverTitle) : preservedOriginalTitle(item),
           modelId: settings.titleModel,
         };
       const coverTitle = titleResult.value;
@@ -81,7 +82,7 @@ export function createPosterGeneration(context: Pick<PosterState,
 
       let designPlan = item.designPlan;
       let prompt = item.prompt;
-      if (!recoveringImage) {
+      if (!recoveringImage && !reuseDesign) {
         const previous = [...itemsRef.current.slice(0, index)].reverse().find((row) => row.designPlan);
         const batchId = ensureActiveBatch();
         const directorResult = await runWithModelFallback(
@@ -90,6 +91,7 @@ export function createPosterGeneration(context: Pick<PosterState,
             batchId,
             previousDesign: previousDesignSummary(previous?.designPlan),
             memorySampleId: item.memorySampleId || settings.memorySampleId || 'auto',
+            memoryUsageId: item.memoryUsageId,
             signal,
           }),
         );
@@ -100,6 +102,9 @@ export function createPosterGeneration(context: Pick<PosterState,
           status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'integrated-cover-v5',
           memorySampleId: directorResult.value.memorySampleId,
           memoryEntryIds: directorResult.value.memoryEntryIds,
+          memoryUsageId: directorResult.value.memoryUsageId,
+          memoryRevisionId: directorResult.value.memoryRevisionId,
+          memoryWarning: directorResult.value.memoryWarning,
           modelFallbackNote: directorResult.fallbackNote || titleResult.fallbackNote,
         });
       }

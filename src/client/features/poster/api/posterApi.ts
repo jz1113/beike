@@ -8,6 +8,7 @@ import { classifyGenerationPollResult, imageGenBusinessError } from '@client/sha
 import { loadImageForCanvas, rasterizeCoverImage } from '../model/coverExport';
 import {
   normalizeCoverTitle,
+  posterModelImageUrl,
   type CoverDesignPlan,
   type HeadlineDesignResponse,
   type HeadlineTitleResponse,
@@ -35,7 +36,7 @@ export async function rewriteCoverTitle(item: PosterItem, titleModel: string, si
         model: titleModel,
         originalTitle: item.originalTitle,
         productName: item.productName,
-        imageUrls: [item.sourceImageUrl],
+        imageUrls: [posterModelImageUrl(item.sourceImageUrl, window.location.origin)],
       }),
       signal,
     }), { signal });
@@ -57,9 +58,10 @@ export async function directCoverDesign(
     batchId?: string;
     previousDesign?: string;
     memorySampleId?: string;
+    memoryUsageId?: string;
     signal?: AbortSignal;
   },
-): Promise<{ design: HeadlineDesignResponse; memorySampleId: string; memoryEntryIds: string[] }> {
+): Promise<{ design: HeadlineDesignResponse; memorySampleId: string; memoryEntryIds: string[]; memoryUsageId?: string; memoryRevisionId?: string; memoryWarning?: string }> {
   const signal = options?.signal;
   try {
     const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-design', {
@@ -72,10 +74,11 @@ export async function directCoverDesign(
         aspectRatio: item.format.aspectRatio,
         batchId: options?.batchId,
         itemId: item.id,
-        itemTitle: item.originalTitle || item.productName,
+        itemTitle: (item.originalTitle || item.productName).slice(0, 200),
         previousDesign: options?.previousDesign,
         memorySampleId: options?.memorySampleId || 'auto',
-        imageUrls: [item.sourceImageUrl],
+        memoryUsageId: options?.memoryUsageId,
+        imageUrls: [posterModelImageUrl(item.sourceImageUrl, window.location.origin)],
       }),
       signal,
     }), { signal });
@@ -86,6 +89,9 @@ export async function directCoverDesign(
         design: data.data as HeadlineDesignResponse,
         memorySampleId: typeof data.memorySampleId === 'string' ? data.memorySampleId : '',
         memoryEntryIds: Array.isArray(data.memoryEntryIds) ? data.memoryEntryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
+        memoryUsageId: typeof data.memoryUsageId === 'string' ? data.memoryUsageId : undefined,
+        memoryRevisionId: typeof data.memoryRevisionId === 'string' ? data.memoryRevisionId : undefined,
+        memoryWarning: typeof data.memoryWarning === 'string' ? data.memoryWarning : undefined,
       };
     }
     throw new Error(data?.error || '封面设计模型没有返回可用方案');
@@ -133,6 +139,7 @@ export async function generateFinalCover(
   if (!generatedSceneUrl && taskId) generatedSceneUrl = await waitForPosterOperation(pollSingleTask(taskId, isAborted), recovery.signal);
   if (!generatedSceneUrl) {
     if (!plan || !prompt) throw new Error('封面设计记录缺失，已停止本次生图；请重新进行标题与封面设计');
+    const referenceUrl = posterModelImageUrl(productReferenceUrl, window.location.origin);
     generatedSceneUrl = await waitForPosterOperation(submitImageGenTask({
     model: imageModel,
     aspectRatio: format.aspectRatio,
@@ -140,8 +147,8 @@ export async function generateFinalCover(
     quality: imageQuality,
     source: 'headline_poster_direct_final',
     useReferenceImage: true,
-    referenceImageUrl: productReferenceUrl,
-    referenceImages: [productReferenceUrl],
+    referenceImageUrl: referenceUrl,
+    referenceImages: [referenceUrl],
     prompt,
     metadata: {
       workflow: 'headline_poster_direct_final',

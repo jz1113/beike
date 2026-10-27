@@ -1,6 +1,7 @@
 import { useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { BatchProductItem } from '../model/batchTypes';
 import { parseBatchInputLines, runBatchCollect } from '../model/collection/batchCollect';
+import { buildWorkshopTableItems, type WorkshopImportRow } from '../model/collection/workshopTableImport';
 
 interface BatchCollectionOptions {
   items: BatchProductItem[];
@@ -18,12 +19,25 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
   const collectInFlight = useRef(false);
 
   const handleRemoveItem = (itemId: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== itemId));
+    const target = itemsRef.current.find((item) => item.id === itemId);
+    setItems((prev) => prev.map((item) => (
+      item.id === itemId ? { ...item, selected: false } : item
+    )));
+    if (target) showToast(`已放弃商品「${target.title || target.itemId}」`);
+  };
+
+  const handleTableImport = (rows: WorkshopImportRow[]) => {
+    if (collectInFlight.current || itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired))) {
+      throw new Error('请等待当前任务结束并处理待核对任务，再导入商品');
+    }
+    const result = buildWorkshopTableItems(rows, itemsRef.current);
+    itemsRef.current = result.items;
+    setItems(result.items);
   };
 
   const handleParseInput = () => {
     if (collectInFlight.current) return [];
-    const { newItems: created, error } = parseBatchInputLines(
+    const { newItems: created, error, skipped } = parseBatchInputLines(
       batchInputText, new Set(itemsRef.current.map((item) => `${item.platform}:${item.itemId}`)),
     );
     if (error === 'EMPTY_INPUT') {
@@ -38,7 +52,7 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
     itemsRef.current = nextItems;
     setItems(nextItems);
     setBatchInputText('');
-    showToast(`成功加入 ${created.length} 个待采商品`);
+    showToast(`成功加入 ${created.length} 个待采商品${skipped ? `，跳过 ${skipped} 条重复、无效或超出上限的输入` : ''}`);
     return created;
   };
 
@@ -76,5 +90,5 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
     }
   };
 
-  return { isCollecting, collectProgress, collectInFlight, handleRemoveItem, handleParseInput, startBatchCollect };
+  return { isCollecting, collectProgress, collectInFlight, handleRemoveItem, handleParseInput, handleTableImport, startBatchCollect };
 }

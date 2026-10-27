@@ -97,13 +97,13 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
   const architecture = String(firstGroup.architecture_summary || firstGroup.architectureSummary || '');
   const sourceGroupNumber = item.appliedFullPromptDisplayNumber
     ?? getCachedAssetsSync('full_prompt').find(group => group.id === item.appliedFullPromptId)?.displayNumber;
-  const sourceGroupName = !item.appliedFullPromptId ? '当前图组母本'
+  const sourceGroupName = !item.appliedFullPromptId ? '本次技能创作'
     : `母本 ${sourceGroupNumber ? fullPromptGroupLabel(sourceGroupNumber) : `#${stableAssetCode('R', item.appliedFullPromptId)}`}`;
 
   return <>
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200/65 bg-indigo-50/30 px-3.5 py-2.5 text-xs dark:border-indigo-500/20 dark:bg-indigo-500/[0.06]">
       <span className="font-semibold text-slate-800 dark:text-slate-100">满意图组沉淀</span>
-      <span className="text-slate-500 dark:text-slate-400">四镜全部点“采用”后，可重析入库；首组还可用于原母本的一次性换图。</span>
+      <span className="text-slate-500 dark:text-slate-400">四镜全部点“采用”后，可提炼入库供技能学习。{item.appliedFullPromptId && '历史首组还可用于来源母本的一次性换图。'}</span>
       {replacement?.replaced && <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">来源母组已换图</span>}
       <div className="ml-auto flex flex-wrap gap-2">
         {groupIndices.map((groupIndex) => {
@@ -114,7 +114,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
             title={!tasks ? '请先将本组四张有效成图全部标记为采用' : undefined}
             className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white/80 px-2.5 py-1.5 font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-indigo-400/25 dark:bg-white/5 dark:text-indigo-300 dark:hover:bg-indigo-500/15">
             {busyGroup === groupIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {saved ? '已处理' : groupIndex === 0 ? '提炼原四镜' : `提炼衍生四镜 ${groupIndex}`}
+            {saved ? '已处理' : `提炼第 ${groupIndex + 1} 组四镜`}
           </button>;
         })}
       </div>
@@ -123,7 +123,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
     {preview && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && busyGroup === null) setPreview(null); }}>
       <section role="dialog" aria-modal="true" aria-label="确认衍生图组入库" className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/95 p-5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#18191c]">
         <div className="flex items-start justify-between gap-3">
-          <div><h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">确认四镜成图</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">来自 {sourceGroupName} · 本次成图第 {preview.groupIndex + 1} 组。可新增衍生母本；首组也可审核后替换来源母组图片一次。</p></div>
+          <div><h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">确认四镜成图</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">来自 {sourceGroupName} · 本次成图第 {preview.groupIndex + 1} 组，确认后归档为学习图组。{preview.groupIndex === 0 && replacement?.replaceable && '也可审核后替换历史来源母组图片一次。'}</p></div>
           <button type="button" aria-label="关闭" disabled={busyGroup !== null} onClick={() => setPreview(null)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/70 dark:text-slate-400"><X className="h-4 w-4" /></button>
         </div>
         {preview.groupIndex === 0 && replacement?.replaceable && replacement.sourceImages.length === 4 && <>
@@ -146,7 +146,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
           </details>)}
         </div>
         {error && <p role="alert" className="mt-2 text-xs text-rose-600">{error}</p>}
-        <p className="mt-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">替换将保留母组编号并更新四张展示图及其反推提示词，旧图不再作为母组图片保存；每个母组仅可替换一次。新增衍生母本则保留原母组不变。</p>
+        <p className="mt-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">保存后保留生成来源，供素材归档与复核，不自动混入原始学习样本。{preview.groupIndex === 0 && replacement?.replaceable && '替换历史母组会更新四张展示图及反推词，并保留原编号；每个母组仅可替换一次。'}</p>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" disabled={busyGroup !== null} onClick={() => setPreview(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 dark:border-white/10">暂不入库</button>
           {preview.groupIndex === 0 && replacement?.replaceable && <button type="button" disabled={busyGroup !== null || reviewedGroupSignature(reviewedFourShotGroup(item, preview.groupIndex)) !== preview.signature}
@@ -155,7 +155,7 @@ export function WorkshopPromoteGroup({ item, visionModel }: { item: BatchProduct
           </button>}
           <button type="button" disabled={busyGroup !== null || reviewedGroupSignature(reviewedFourShotGroup(item, preview.groupIndex)) !== preview.signature}
             onClick={() => void approve('publish')} className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 ${preview.groupIndex === 0 && replacement?.replaceable ? 'border border-indigo-200 bg-white text-indigo-700 dark:bg-[#18191c]' : 'bg-indigo-600 text-white'}`}>
-            {busyGroup !== null && <Loader2 className="h-3.5 w-3.5 animate-spin" />}新增衍生母本
+            {busyGroup !== null && <Loader2 className="h-3.5 w-3.5 animate-spin" />}保存学习图组
           </button>
         </div>
       </section>

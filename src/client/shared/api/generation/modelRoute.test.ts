@@ -63,11 +63,11 @@ describe('text model request routing', () => {
     ]));
     expect(routed('/api/generate/canvas-text', { model: 'b', prompt: 'hello' })).toMatchObject({ model: 'gemini-4-argon', customBaseUrl: 'https://b.test', customApiKey: 'b', textProtocol: 'openai' });
   });
-  it.each(['/api/assistant/turn/start', '/api/generate/analyze', '/api/generate/copywriting', '/api/generate/ppt-outline', '/api/generate/ppt-detail', '/api/generate/ppt-narration', '/api/generate/video-sales/analyze', '/api/generate/video-sales/script', '/api/generate/video-sales/select-images', '/api/generate/video-sales/finalize-prompts', '/api/generate/keyword-review', '/api/generate/headline-title', '/api/generate/headline-design', '/api/generate/headline-deconstruct'])('routes %s text/vision requests', path => {
+  it.each(['/api/assistant/turn/start', '/api/generate/analyze', '/api/generate/copywriting', '/api/generate/video-sales/analyze', '/api/generate/video-sales/script', '/api/generate/video-sales/select-images', '/api/generate/video-sales/finalize-prompts', '/api/generate/keyword-review', '/api/generate/headline-title', '/api/generate/headline-design', '/api/generate/headline-deconstruct'])('routes %s text/vision requests', path => {
     expect(routed(path, { model: 'claude-5.5-haiku' }).textProtocol).toBe('anthropic');
     expect(routed(path, { model: 'claude-5.5-haiku', textProtocol: 'openai', customApiKey: 'chosen' })).toMatchObject({ textProtocol: 'openai', customApiKey: 'chosen' });
   });
-  it.each(['/api/generate/image', '/api/generate/video', '/api/generate/ppt-slide', '/api/generate/audio'])('leaves %s generation requests unchanged', path => {
+  it.each(['/api/generate/image', '/api/generate/video', '/api/generate/audio'])('leaves %s generation requests unchanged', path => {
     const init = { method: 'POST', body: JSON.stringify({ model: 'gemini-image', apiFormat: 'keep' }) };
     expect(withModelRoute(path, init)).toBe(init);
   });

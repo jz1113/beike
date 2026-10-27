@@ -62,6 +62,10 @@ function patchItemTasks(
 
 export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps): Promise<void> {
   if (generationLock) return;
+  if (deps.itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.status === 'collecting' || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+    deps.showToast('已有任务执行中，请等待结束后再开始生图');
+    return;
+  }
 
   const {
     config,
@@ -173,11 +177,9 @@ export async function startBatchGenerationCoordinator(deps: BatchCoordinatorDeps
     }
     await taskConfig.beforeSubmit();
 
-    if (autoGenerateCopywriting) {
-      void generateAllCopywriting();
-    }
+    if (autoGenerateCopywriting) await generateAllCopywriting();
     if (failCount === 0) {
-      showToast(`批量生图全部完成！成功 ${successCount} 张 / ${latestSuccessful.length} 款商品${autoGenerateCopywriting ? '，正在生成文案' : '；文案自动生成已关闭，可在交付页手动生成'}`);
+      showToast(`批量生图完成：成功 ${successCount} 张 / ${latestSuccessful.length} 款商品${autoGenerateCopywriting ? '，文案状态见商品卡片' : '；可在交付页手动生成文案'}`);
     } else if (successCount === 0) {
       showToast(`批量生图全部失败（${failCount} 张）。请查看失败原因后重试`);
     } else {
@@ -198,6 +200,10 @@ export async function retryFailedImageTasksCoordinator(
   isGeneratingBatch: boolean
 ): Promise<void> {
   if (isGeneratingBatch || generationLock) return;
+  if (deps.itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.status === 'collecting' || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+    deps.showToast('已有任务执行中，请等待结束后再重试');
+    return;
+  }
   if (hasRecoveryRequired(successfulItems)) {
     deps.showToast('存在未核验的恢复任务，请先确认后再重试');
     return;
@@ -303,6 +309,10 @@ export async function retrySingleShotTaskCoordinator(
   }
   const targetItem = items.find((item) => item.id === itemId);
   if (!targetItem) return;
+  if (items.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.status === 'collecting' || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+    showToast('已有任务执行中，请等待结束后再重新生成');
+    return;
+  }
   const task = targetItem.tasks?.[shotIndex];
   const shot = findShotByNo(targetItem, task?.shot_no);
   if (!task || !shot) {

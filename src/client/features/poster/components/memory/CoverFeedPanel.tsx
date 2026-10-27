@@ -6,6 +6,7 @@ import { REASONING_EFFORT_LABELS, normalizeReasoningEffort, reasoningCapability 
 import type { CoverFeedJob } from '../../hooks/useCoverSampleFeed';
 import type { CoverVisionModel } from '../../model/coverVisionModels';
 import { coverVisionModelLabel, coverVisionPickerModels } from '../../model/coverVisionModels';
+import { canStartCoverFeed } from '../../model/coverFeedState';
 import { CoverFeedEffort } from './CoverFeedEffort';
 
 interface Props {
@@ -50,7 +51,7 @@ export function CoverFeedPanel({
   useEffect(() => {
     if (busy) setShowModelPicker(false);
   }, [busy]);
-  const ready = jobs.some((job) => job.status !== 'done');
+  const ready = canStartCoverFeed(jobs.map((job) => job.status));
   const uncertain = jobs.some((job) => job.status === 'uncertain');
   const onChange = (event: ChangeEvent<HTMLInputElement>) => {
     onFiles(Array.from(event.target.files || []));
@@ -117,6 +118,7 @@ export function CoverFeedPanel({
         </ul>
       )}
       {jobs.some((job) => job.error) && <p className="mt-2 text-[11px] leading-5 text-rose-500">{jobs.find((job) => job.error)?.error}</p>}
+      {uncertain && <p className="mt-2 text-[11px] leading-5 text-amber-600">有待核对的原任务，请先刷新核对。其他图片会在核对后继续。</p>}
       {notice && <p className="mt-2 text-[11px] leading-5 text-amber-600">{notice}</p>}
       <p className="sr-only" aria-live="polite">{selected ? `当前模型 ${coverVisionModelLabel(selected)}` : '没有可用的反推模型'}，思考强度 {coverEffortLabel(selected, effort)}，{jobs.length} 张样张</p>
       <div className="mt-3 flex justify-end gap-2">

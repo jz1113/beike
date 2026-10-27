@@ -169,7 +169,7 @@ describe('sales workflow stages', () => {
     const view = SalesAssetsSection({ script: { ...script, assets }, imageModel: '', disabled: false, onModel: vi.fn(), onEditPrompt: vi.fn(), onGenerate: vi.fn() });
     const html = renderToStaticMarkup(view);
     expect(html).not.toContain('仅重新校验已有图片');
-    expect(html).toContain('商品参考 8');
+    expect(html).not.toContain('本素材参考图片');
     expect(html).toContain('object-contain');
     const imgClass = html.match(/<img[^>]*class="([^"]*)"/)?.[1] ?? '';
     expect(imgClass.split(/\s+/)).not.toContain('w-full');
@@ -181,7 +181,6 @@ describe('sales workflow stages', () => {
     ];
     const html = renderToStaticMarkup(createElement(SalesAssetsSection, { script: { ...script, assets }, productImages: images.slice(0, 2), imageModel: 'image', disabled: false, onModel: vi.fn(), onEditPrompt: vi.fn(), onGenerate: vi.fn() }));
     expect(html).toContain('第 3 张参考图「前置静帧」');
-    expect(html).toContain('商品参考 1、商品参考 2');
   });
   it('keeps video configuration gated until assets are ready and accepts a missing full prompt', () => {
     const html = renderToStaticMarkup(createElement(SalesVideoSection, { state: defaultSalesStudioState, script, disabled: false, assetsReady: false, videoError: null, onEditPrompt: vi.fn() }));
@@ -201,12 +200,12 @@ describe('sales workflow stages', () => {
     expect(render).toHaveBeenCalledTimes(1);
     expect(finalize).toHaveBeenCalledTimes(1);
   });
-  it('keeps a compact header without a workflow step strip', () => {
+  it('shows five workflow steps in the shared header', () => {
     const html = renderToStaticMarkup(createElement(SalesStudioHeader, { onBack: vi.fn(), onReset: vi.fn(), resetDisabled: false, resetTitle: '', onOpenRules: vi.fn() }));
     expect(html).toContain('电商视频');
     expect(html).toContain('带货规则');
-    expect(html).not.toContain('<nav');
-    expect(html).not.toContain('aria-current="step"');
+    expect(html).toContain('aria-label="电商视频制作步骤"');
+    expect(html.match(/aria-current="step"/g)).toHaveLength(1);
     expect(html).not.toContain('role="tablist"');
   });
   it('keeps the skill at the top of planning settings and marks supplemental facts as optional', () => {
@@ -253,7 +252,7 @@ describe('sales workflow stages', () => {
   it('shows submission-specific blockers beside the final prompt', () => {
     const html = renderToStaticMarkup(createElement(SalesVideoSection, { state: defaultSalesStudioState, script: { ...script, fullPrompt: '整段提示词' }, disabled: false, assetsReady: true, videoError: null, submitError: '上次视频提交结果未确认，请先核对生成记录', onEditPrompt: vi.fn() }));
     expect(html).toContain('上次视频提交结果未确认');
-    expect(html).toContain('纯文本');
+    expect(html).not.toContain('纯文本');
     expect(html).toContain('整段提示词');
     expect(html).toContain('编辑');
     expect(html).not.toContain('图片1 ·');
@@ -278,11 +277,14 @@ describe('sales workflow stages', () => {
       state: { ...defaultSalesStudioState, imageCatalog: images.slice(0, 1), colorSelection: { colorLabel: '', confirmedImageUrls: ['/black.png'], excludedImageUrls: [] } },
       script: ready, disabled: false, assetsReady: true, videoError: null, onEditPrompt: vi.fn(),
     }));
-    expect(html).toContain('纯文本');
-    expect(html).toContain('@图片 1');
-    expect(html).toContain('@图片 2');
-    expect(html).toContain('</a>黑色上衣，<a');
-    expect(html.indexOf('图片1 · 商品参考 1')).toBeLessThan(html.indexOf('图片2 · 出镜人物'));
+    expect(html).not.toContain('纯文本');
+    expect(html).toContain('@图片1');
+    expect(html).toContain('@图片2');
+    expect(html).toContain('</button>黑色上衣，<button');
+    expect(html).not.toContain('target="_blank"');
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(2);
+    expect(html).not.toContain('aria-label="引用素材映射"');
+    expect(html.indexOf('查看图片1')).toBeLessThan(html.indexOf('查看图片2'));
     expect(html).not.toContain('提示词引用的素材');
     expect(html).toContain('src="/black.png"');
     expect(html).toContain('src="/person.jpg"');
@@ -381,8 +383,9 @@ describe('sales workflow stages', () => {
       onEditPrompt: vi.fn(),
       onGenerate: vi.fn(),
     }));
-    expect(assetHtml).toContain('本素材参考图片');
-    expect(assetHtml).toContain('商品参考 #1');
+    expect(assetHtml).not.toContain('本素材参考图片');
+    expect(assetHtml).not.toContain('绘图提示词');
+    expect(assetHtml).toContain('src="/front.jpg"');
 
     const preFinalHtml = renderToStaticMarkup(createElement(SalesVideoSection, {
       state: { ...defaultSalesStudioState, imageCatalog: images.slice(0, 1), colorSelection: { colorLabel: '', confirmedImageUrls: ['/black.png'], excludedImageUrls: [] } },
@@ -395,10 +398,11 @@ describe('sales workflow stages', () => {
     expect(preFinalHtml).not.toContain('提示词引用的素材');
     expect(preFinalHtml).not.toContain('<img');
   });
-  it('keeps paid-task warnings visible alongside progress in the single footer', () => {
+  it('keeps progress and stop in the footer without an extra running note', () => {
     const html = renderToStaticMarkup(createElement(SalesActionBar, { primary: { label: '正在生成视频', disabled: true }, secondary: { label: '停止继续提交', onClick: vi.fn() }, busy: true, progress: '正在查询任务', note: '已提交任务仍可能计费' }));
     expect(html).toContain('正在查询任务');
-    expect(html).toContain('已提交任务仍可能计费');
+    expect(html).not.toContain('已提交任务仍可能计费');
+    expect(html).toContain('停止继续提交');
     expect(html).toContain('aria-describedby=');
   });
 });

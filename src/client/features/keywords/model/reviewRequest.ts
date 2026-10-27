@@ -119,6 +119,7 @@ export async function requestReviewBatch(
     if (data.submissionUnknown) {
       throw Object.assign(error, { outcomeUncertain: true, infrastructureFailure: true });
     }
+    if (data.code === 'local_progress_unavailable') throw Object.assign(error, { fatalLocal: true });
     if (isRecoverableModelOutputError(response.status, data.code)) {
       throw Object.assign(error, { modelOutputInvalid: true });
     }

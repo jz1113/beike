@@ -42,7 +42,7 @@ func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
 		`{"productName":"黑色圆领上衣","category":"fashion","sellingPoints":["圆领"],"knownFacts":["黑色"],"creativeNotes":["开箱换装"]}`,
 		fashionScript,
 		`{"assignments":[{"shotId":1,"imageIndex":7,"reason":"黑色主图"}]}`,
-		`{"fullPrompt":"图片1黑色上衣，图片2人物，图片3特写，人物亲口说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompts":[{"shotId":1,"prompt":"0到15秒人物说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"}]}`,
+		`{"fullPrompt":"图片1黑色上衣，图片2人物，图片3特写，人物亲口说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompts":[{"shotId":1,"speechMode":"on_camera","prompt":"0到15秒人物说：家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"}]}`,
 	}
 	var calls int
 	server := useChatServer(t, func(body map[string]any, call int) string {

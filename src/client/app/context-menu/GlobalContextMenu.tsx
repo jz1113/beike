@@ -61,9 +61,13 @@ export default function GlobalContextMenu() {
 
   const handleToggleShowcase = () => {
     if (!menu.mediaUrl || (menu.type !== 'image' && menu.type !== 'video')) return;
-    const published = toggleHomeShowcase(menu.mediaUrl, menu.type);
-    closeMenu();
-    showToast(published === 'removed' ? '已取消首页展示' : menu.type === 'video' ? '已设为首页展示视频' : '已设为首页展示图');
+    try {
+      const published = toggleHomeShowcase(menu.mediaUrl, menu.type);
+      closeMenu();
+      showToast(published === 'removed' ? '已取消首页展示' : menu.type === 'video' ? '已设为首页展示视频' : '已设为首页展示图');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '首页展示保存失败');
+    }
   };
 
   // 1. 下载图像/媒体

@@ -5,6 +5,7 @@ import { renderSalesVideo, type SalesRenderGenerators, type SalesRenderPhase } f
 import { SalesSubmitUncertainError, type SalesVideoLookup } from './salesSubmitError';
 import { assertSalesPlanCurrent, salesSingleVideoError } from './salesStageRules';
 import type { VideoSalesStudioState } from './salesStudioDraft';
+import { salesSkillBinding } from '@shared/domain/sales/skill';
 
 export type SalesRenderSnapshot = VideoSalesStudioState;
 
@@ -65,6 +66,7 @@ export async function executeSalesRender(input: {
   const model = resolveModalityModelRoute('video', current.selectedVideoModel).modelId!;
   const submissionKey = script.renderSubmissionKey && open ? script.renderSubmissionKey : crypto.randomUUID();
   const snapshot = {
+    ...salesSkillBinding(),
     model, prompt: script.fullPrompt!, images: references.map((ref) => ref.url), duration: current.targetDuration,
     aspectRatio: current.aspectRatio, resolution: current.videoResolution, refMode: current.videoRefMode, submissionKey,
   };

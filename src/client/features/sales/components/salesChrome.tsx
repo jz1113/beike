@@ -1,12 +1,13 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { AlertCircle, ArrowLeft, BookOpen, Check, Loader2, Plus, RefreshCw, ShoppingBag, Video } from 'lucide-react';
+import { AlertCircle, BookOpen, Check, ChevronDown, FolderOpen, Loader2, Plus, RefreshCw, ShoppingBag, Video } from 'lucide-react';
 import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
 import type { VideoSalesCategory, VideoSalesScript } from '@shared/domain/sales';
+import type { SalesWorkflowStep } from '../model/salesWorkspaceView';
 import { salesCreationRule } from '../model/fashionSalesSkill';
 
 /** 带货工作台的中性表面与小面积重点色，兼容浅色和深色。 */
 export const salesFocusClass = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/70 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#18191c]';
-export const salesPanelClass = 'rounded-[20px] border border-slate-200/80 bg-white dark:border-white/10 dark:bg-[#18191c]';
+export const salesPanelClass = 'rounded-[20px] border border-slate-200/80 bg-white dark:border-white/10 dark:bg-[#141417]';
 export const salesCardClass = 'rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-white/10 dark:bg-white/[0.025]';
 export const salesTileClass = 'rounded-2xl border border-slate-200/80 bg-white dark:border-white/10 dark:bg-white/[0.02]';
 export const salesGroupClass = 'space-y-3.5';
@@ -68,14 +69,17 @@ export function SalesHistorySection({ scripts, selected, disabled, onSelect }: {
   scripts: VideoSalesScript[]; selected: number; disabled: boolean; onSelect: (index: number) => void;
 }) {
   if (scripts.length < 2) return null;
-  return <section aria-label="历史方案与任务" className="mx-3 mb-3 shrink-0 rounded-xl border border-slate-200/80 bg-white px-3 py-2 sm:mx-5 dark:border-white/10 dark:bg-[#18191c]">
-    <label className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">方案与历史任务 · {scripts.length} 份
-      <select aria-label="选择历史方案" disabled={disabled} value={selected} onChange={(event) => onSelect(Number(event.target.value))} className="min-w-0 flex-1 rounded-lg border border-black/10 bg-transparent p-2 dark:border-white/10">
-        {scripts.map((script, index) => <option key={script.id} value={index}>{index === 0 ? '最新' : '历史'} · {script.title}{script.renderResultUrl ? ' · 已有成片' : script.renderTaskId ? ' · 已有任务回执' : ''}{script.planStale ? ' · 方案已过期' : ''}</option>)}
-      </select>
-    </label>
-    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">切换方案可查看对应脚本；已有成片和任务可通过页头的“查看生成结果”打开。</p>
-  </section>;
+  return <details className="sales-history-menu group/history relative" aria-label="历史方案与任务">
+    <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 ${salesGhostButtonClass}`}><FolderOpen className="h-3.5 w-3.5" aria-hidden /><span>方案与历史 ({scripts.length})</span><ChevronDown className="h-3 w-3 transition group-open/history:rotate-180" aria-hidden /></summary>
+    <div className="sales-history-popover absolute right-0 top-full z-40 mt-2 w-80 max-w-[85vw] rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-[#141417]">
+      <label className="block text-xs text-slate-500">选择历史方案
+        <select aria-label="选择历史方案" disabled={disabled} value={selected} onChange={(event) => onSelect(Number(event.target.value))} className="mt-2 w-full rounded-lg border border-black/10 bg-transparent p-2 text-xs dark:border-white/10">
+          {scripts.map((script, index) => <option key={script.id} value={index}>{index === 0 ? '最新' : '历史'} · {script.title}{script.renderResultUrl ? ' · 已有成片' : script.renderTaskId ? ' · 已有任务回执' : ''}{script.planStale ? ' · 方案已过期' : ''}</option>)}
+        </select>
+      </label>
+      <p className="mt-2 text-[11px] leading-5 text-slate-500">切换可查看对应脚本、成片和任务记录。</p>
+    </div>
+  </details>;
 }
 
 interface Action {
@@ -95,9 +99,10 @@ interface SalesActionBarProps {
   note?: string;
   progress?: string | null;
   controls?: ReactNode;
+  hideProgress?: boolean;
 }
 
-export function SalesActionBar({ primary, secondary, busy, reason, note, progress, controls, quietReason, primaryTitle }: SalesActionBarProps) {
+export function SalesActionBar({ primary, secondary, busy, reason, note, progress, controls, quietReason, primaryTitle, hideProgress }: SalesActionBarProps) {
   const uid = useId();
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -109,20 +114,20 @@ export function SalesActionBar({ primary, secondary, busy, reason, note, progres
   }, [busy]);
   const description = reason || note;
   const actionTitle = busy ? progress || primary.label : primaryTitle || description;
-  const hideStatus = !busy && (quietReason || (controls && !reason));
+  const hideStatus = hideProgress || !busy && (quietReason || (controls && !reason));
   const primaryClass = `sales-primary-action inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition disabled:cursor-not-allowed ${salesFocusClass}`;
   return <footer aria-label="当前步骤操作" className="shrink-0 bg-transparent px-3 py-2.5 sm:px-5">
     <div className="@container mx-auto flex w-full justify-center">
-      <div className={`sales-action-dock ${busy ? 'is-busy' : '@min-[720px]:rounded-full'} flex w-full max-w-full flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-[#18191c]`}>
+      <div className={`sales-action-dock ${busy ? 'is-busy' : ''} ${controls ? 'has-controls' : ''} flex max-w-full flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-[#18191c]`}>
         <div className={`${hideStatus ? 'sr-only' : 'sales-dock-status min-w-0'} text-xs leading-5 text-slate-500 dark:text-slate-400`}>
           <div className={busy ? 'sales-dock-status-heading' : undefined}>
             <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy && !quietReason ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && !quietReason && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || primary.label || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
-            {busy && <span className="shrink-0 text-[11px] tabular-nums">已等待 {elapsed} 秒</span>}
+            {busy && !hideProgress && <span className="shrink-0 text-[11px] tabular-nums">已等待 {elapsed} 秒</span>}
           </div>
-          {busy && <div className="mt-1.5"><SalesIndeterminateBar label={progress || primary.label || '正在处理'} /></div>}
+          {busy && !hideProgress && <div className="mt-1.5"><SalesIndeterminateBar label={progress || primary.label || '正在处理'} /></div>}
         </div>
-        {controls && <div className="sales-dock-controls hidden min-w-0 @min-[720px]:flex">{controls}</div>}
-        {controls && <details className="sales-dock-controls w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] @min-[720px]:hidden"><summary className="cursor-pointer list-none text-xs font-medium text-slate-700 dark:text-slate-200">创作设置</summary><div className="mt-2">{controls}</div></details>}
+        {controls && <div className="sales-dock-controls sales-dock-controls-desktop min-w-0">{controls}</div>}
+        {controls && <details className="sales-dock-controls sales-dock-controls-mobile w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]"><summary className="cursor-pointer list-none text-xs font-medium text-slate-700 dark:text-slate-200">创作设置</summary><div className="mt-2">{controls}</div></details>}
         <div className="sales-dock-actions flex w-full min-w-0 flex-wrap justify-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
         {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 min-w-max shrink-0 whitespace-nowrap px-4 disabled:opacity-40 ${salesGhostButtonClass}`}>{/重新生成/.test(secondary.label) && <RefreshCw className="h-3.5 w-3.5" aria-hidden />}{secondary.label}</button>}
         <span className="sales-primary-tooltip relative inline-flex max-w-full" title={actionTitle || undefined} tabIndex={primary.disabled ? 0 : undefined}>
@@ -130,7 +135,6 @@ export function SalesActionBar({ primary, secondary, busy, reason, note, progres
         {primary.disabled && actionTitle && <span role="tooltip" className="sales-disabled-tooltip pointer-events-none absolute bottom-full right-0 mb-2 w-max max-w-64 rounded-lg bg-slate-800 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg dark:bg-slate-200 dark:text-slate-900">{actionTitle}</span>}
         </span>
         </div>
-        {busy && note && <p className="sales-dock-note min-w-0 text-[11px] leading-4 text-slate-500 dark:text-slate-400">{note}</p>}
       </div>
     </div>
   </footer>;
@@ -141,20 +145,37 @@ interface SalesStudioHeaderProps {
   onReset: () => void;
   resetDisabled: boolean;
   resetTitle: string;
-  returnAction?: { label: string; onClick: () => void };
+  step?: SalesWorkflowStep;
+  availableSteps?: SalesWorkflowStep[];
+  onNavigate?: (step: SalesWorkflowStep) => void;
+  history?: ReactNode;
   onViewResult?: () => void;
   onOpenRules: () => void;
 }
 
-export function SalesStudioHeader({ onBack, onReset, resetDisabled, resetTitle, returnAction, onViewResult, onOpenRules }: SalesStudioHeaderProps) {
+const HEADER_STEPS = [
+  ['product', '商品与卖点'], ['plan', '分镜脚本'], ['assets', '素材准备'], ['video', '视频提示词'], ['result', '成片结果'],
+] as const;
+
+export function SalesStudioHeader({ onBack, onReset, resetDisabled, resetTitle, step = 'product', availableSteps = ['product'], onNavigate, history, onViewResult, onOpenRules }: SalesStudioHeaderProps) {
   return (
-    <header className="flex min-h-16 shrink-0 items-center gap-2 px-3 sm:px-5">
+    <header className="sales-studio-header">
       <StudioBrandChip title="电商视频" icon={<ShoppingBag className="h-4 w-4" />} onBack={onBack} inline />
-      {returnAction ? <button type="button" onClick={returnAction.onClick} title={returnAction.label} aria-label={returnAction.label} className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-2 text-xs text-slate-500 transition hover:bg-black/5 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100 ${salesFocusClass}`}><ArrowLeft className="h-3.5 w-3.5" aria-hidden /><span className="hidden sm:inline">{returnAction.label}</span></button> : <span className="hidden text-xs text-slate-400 lg:inline">从商品到一条完整视频</span>}
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {onViewResult && <button type="button" onClick={onViewResult} title="查看生成结果" aria-label="查看生成结果" className={`h-9 ${salesGhostButtonClass}`}><Video className="h-3.5 w-3.5" aria-hidden /><span className="hidden md:inline">查看生成结果</span></button>}
-        <button type="button" onClick={onOpenRules} title="带货规则" className={`h-9 ${salesGhostButtonClass}`} aria-label="带货规则"><BookOpen className="h-3.5 w-3.5" /><span className="hidden sm:inline">带货规则</span></button>
-        <button type="button" onClick={onReset} disabled={resetDisabled} title={resetTitle} className={`h-9 shrink-0 disabled:opacity-40 ${salesGhostButtonClass}`}><Plus className="h-3.5 w-3.5" /><span>更换商品</span></button>
+      <nav aria-label="电商视频制作步骤" className="sales-stepper">
+        <ol className="flex items-center justify-center gap-1">
+          {HEADER_STEPS.map(([id, label], index) => <li key={id} className="flex min-w-0 items-center gap-1">
+            {index > 0 && <span className="sales-step-connector" aria-hidden />}
+            <button type="button" aria-label={label} title={`第 ${index + 1} 步 · ${label}`} aria-current={step === id ? 'step' : undefined} disabled={!availableSteps.includes(id) && step !== id} onClick={() => onNavigate?.(id)} className={`sales-step ${salesFocusClass}`}>
+              <span className="sales-step-number">{index + 1}</span><span className="sales-step-label">{label}</span>
+            </button>
+          </li>)}
+        </ol>
+      </nav>
+      <div className="sales-header-actions flex items-center justify-end gap-2">
+        {history}
+        {onViewResult && <button type="button" onClick={onViewResult} title="查看生成结果" aria-label="查看生成结果" className={`h-9 ${salesGhostButtonClass}`}><Video className="h-3.5 w-3.5" aria-hidden /><span className="sales-header-action-label">查看生成结果</span></button>}
+        <button type="button" onClick={onOpenRules} title="带货规则" className={`h-9 ${salesGhostButtonClass}`} aria-label="带货规则"><BookOpen className="h-3.5 w-3.5" /><span className="sales-header-action-label">带货规则</span></button>
+        <button type="button" onClick={onReset} disabled={resetDisabled} title={resetTitle} aria-label="更换商品" className={`h-9 shrink-0 disabled:opacity-40 ${salesGhostButtonClass}`}><Plus className="h-3.5 w-3.5" /><span className="sales-header-action-label">更换商品</span></button>
       </div>
     </header>
   );

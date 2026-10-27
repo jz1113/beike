@@ -17,8 +17,6 @@ export const VIEW_TO_URL: Record<AppView, string> = {
   canvas: 'canvas',
   settings: 'settings',
   skills: 'skills',
-  ppt_generator: 'ppt_generator',
-  avatar: 'avatar',
   video_sales: 'video_sales',
 };
 

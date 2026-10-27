@@ -15,6 +15,7 @@ export interface KeywordReviewSessionContext {
   retryVersions: Array<[number, number]>;
   hasUnexportedResults: boolean;
   usageProvider: 'deepseek' | 'gateway';
+  usageModel?: string;
   estimatedYuan: number;
   tokenUsage: ReviewTokenUsage;
   modelValue: string;
@@ -90,6 +91,7 @@ function copyContext(context: KeywordReviewSessionContext): KeywordReviewSession
     retryVersions: context.retryVersions.map(([index, version]) => [index, version]),
     hasUnexportedResults: context.hasUnexportedResults,
     usageProvider: context.usageProvider,
+    usageModel: typeof context.usageModel === 'string' ? context.usageModel : '',
     estimatedYuan: context.estimatedYuan,
     tokenUsage: {
       cacheHit: context.tokenUsage.cacheHit,

@@ -72,7 +72,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		"prompts": prompts, "modelUsed": model, "requestedModel": model,
 		"modelSwitched": false, "triedModels": []string{model}, "rawOutput": text,
 		"usedActionIds": []any{}, "assetTrace": workshopTrace(binding),
-		"qualityChecks": []any{}, "usedAssetLibrary": binding != nil, "assemblySource": "reference_adaptation",
+		"qualityChecks": []any{}, "usedAssetLibrary": false, "assemblySource": "skill",
 	}
 	attachUsage(body, data)
 	httpx.WriteJSON(w, http.StatusOK, body)
@@ -98,6 +98,6 @@ func saveAnalysis(cfg config.Config, r *http.Request, title, fingerprint, model 
 		title = "未命名商品"
 	}
 	_, _ = dbcatalog.CreatePromptRecord(r.Context(), db, workspaceOf(r), dbcatalog.PromptDraft{
-		ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "参考样本换品", PromptsJSON: string(raw),
+		ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "技能创作", PromptsJSON: string(raw),
 	})
 }

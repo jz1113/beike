@@ -2,7 +2,6 @@ import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { fetchAssetDetail } from '@client/shared/api/assetLibraryCache';
 import { audienceLabel } from '@shared/domain/assets/appearanceAudience';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
-import { workshopAssetBlockReason, type WorkshopAssetCandidate } from '@shared/domain/workshop/workshop-pipeline';
 import { Check, Copy, ExternalLink, ImageOff, Tags, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -16,7 +15,6 @@ interface Props {
   copiedId: string | null;
   onClose: () => void;
   onCopyPrompt: (text: string, id: string) => void;
-  onApplyToWorkshop: (detail: AssetLibrarySlim) => void;
   onOpenTagEdit: (detail: AssetLibrarySlim) => void;
 }
 
@@ -64,7 +62,7 @@ function infoRows(detail: AssetLibrarySlim, type: GalleryAtomType): Array<[strin
 }
 
 export function AtomicAssetPreview({
-  item, type, displayLabel, copiedId, onClose, onCopyPrompt, onApplyToWorkshop, onOpenTagEdit,
+  item, type, displayLabel, copiedId, onClose, onCopyPrompt, onOpenTagEdit,
 }: Props) {
   const [detail, setDetail] = useState<AssetLibrarySlim>(item);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -79,9 +77,7 @@ export function AtomicAssetPreview({
   const proxiedImage = directImage ? proxyMediaUrl(directImage) : '';
   const imageUrl = useDirectImage ? directImage : proxiedImage;
   const prompt = getAssetPreviewText(detail, type).trim();
-  const blockReason = loadState === 'ready'
-    ? workshopAssetBlockReason(detail as WorkshopAssetCandidate, type)
-    : null;
+
   const rows = infoRows(detail, type);
 
   useEffect(() => {
@@ -168,7 +164,6 @@ export function AtomicAssetPreview({
                 <button type="button" role="tab" aria-selected={view === 'prompt'} onClick={() => setView('prompt')} className={`border-b-2 pb-2.5 text-xs font-medium transition-colors ${view === 'prompt' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'}`}>提示词</button>
                 <button type="button" role="tab" aria-selected={view === 'info'} onClick={() => setView('info')} className={`border-b-2 pb-2.5 text-xs font-medium transition-colors ${view === 'info' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'}`}>信息</button>
               </div>
-              {loadState === 'ready' && blockReason && <p className="mt-2 text-[11px] text-amber-700">暂不可载入：{blockReason}</p>}
             </div>
 
             <div ref={promptScrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2.5 sm:px-6">
@@ -191,7 +186,6 @@ export function AtomicAssetPreview({
               <button type="button" disabled={loadState !== 'ready' || !prompt} onClick={() => onCopyPrompt(prompt, item.id)} className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10">
                 {copiedId === item.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}{copiedId === item.id ? '已复制' : '复制提示词'}
               </button>
-              <button type="button" disabled={loadState !== 'ready' || Boolean(blockReason)} title={blockReason || undefined} onClick={() => { onApplyToWorkshop(detail); onClose(); }} className="flex min-w-0 flex-1 items-center justify-center rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">应用到电商图文</button>
             </div>
           </div>
         </section>

@@ -2,7 +2,7 @@ package workshop
 
 import "encoding/json"
 
-// Copy only generation preferences; product bindings and pipeline state start fresh.
+// Keep model and image preferences; each new batch starts with four-shot grid output.
 func emptyBatchWithPreferences(previous string) string {
 	var old, next map[string]any
 	if json.Unmarshal([]byte(previous), &old) != nil {
@@ -13,7 +13,7 @@ func emptyBatchWithPreferences(previous string) string {
 	}
 	saved, _ := old["settings"].(map[string]any)
 	settings := next["settings"].(map[string]any)
-	for _, name := range []string{"selectedVisionModel", "selectedImageGenModel", "selectedQuality", "selectedAspect", "generationStrategy", "gridOutputSize"} {
+	for _, name := range []string{"selectedVisionModel", "selectedImageGenModel", "selectedQuality", "selectedAspect", "gridOutputSize"} {
 		if value, exists := saved[name]; exists {
 			settings[name] = value
 		}

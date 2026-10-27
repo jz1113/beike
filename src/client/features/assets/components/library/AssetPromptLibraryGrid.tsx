@@ -1,16 +1,15 @@
-import { useMemo, useState } from 'react';
-import { CategorySkillPanel, type CategorySkillTab } from '../folders/CategorySkillPanel';
-import { promptGroupSubcategoryOptions } from '../../model/promptGroupFolders';
-import type { ComponentProps, Dispatch, MouseEvent, RefObject, SetStateAction } from 'react';
-import { ChevronRight, Layers } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ComponentProps, Dispatch, MouseEvent, ReactNode, RefObject, SetStateAction } from 'react';
+import { ListChecks, X } from 'lucide-react';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import type { PromptGroupFolder } from '../../model/promptGroupFolders';
 import type { GalleryAtomType } from '../../model/assetGalleryLabels';
 import { promptGroupCategoryLabel } from '../../model/promptGroupFolders';
-import { promptLibraryEmptyCopy } from '../../model/promptLibraryEmptyCopy';
-import { PromptGroupCategoryFolders } from '../folders/PromptGroupCategoryFolders';
+import { AssetLibraryEmptyState } from './AssetLibraryEmptyState';
+import { PromptLibrarySidebar } from '../folders/PromptLibrarySidebar';
+import { PromptCategoryManager } from '../folders/PromptCategoryManager';
 import { VirtualAssetGrid } from './VirtualAssetGrid';
 import PromptAssetCard from '../cards/PromptAssetCard';
 import { AssetLifecycleFilter } from '../filters/assetLibraryFilters';
@@ -22,18 +21,18 @@ export function isGalleryAtomType(type: PromptAssetType): type is GalleryAtomTyp
 }
 
 interface Props {
+  onActionsTarget?: (element: HTMLDivElement | null) => void;
+  onOpenSkills?: () => void;
+  audienceFilters?: ReactNode;
   activeSubTab: PromptAssetType;
   items: AssetLibrarySlim[];
   displayedItems: AssetLibrarySlim[];
   promptGroupCategories: AssetProductCategory[];
   promptGroupAlbums: PromptAlbum[];
-  categoryFolders: PromptGroupFolder[];
   subcategoryFolders: PromptGroupFolder[];
   assetScrollRef: RefObject<HTMLDivElement | null>;
   loadError: string | null;
   isLoading: boolean;
-  folderRootVisible: boolean;
-  subcategoryFoldersVisible: boolean;
   promptGroupCategoryFilter: string;
   promptGroupSubcategoryFilter: string;
   currentFolderName: string;
@@ -50,10 +49,9 @@ interface Props {
   setSelectedTag: (tag: string | null) => void;
   sortBy: 'default' | 'usage' | 'favorite';
   setSortBy: (value: Props['sortBy']) => void;
-  isAnyFilterActive: boolean;
+  hasContentFilters: boolean;
+  clearContentFilters: () => void;
   resetKey: string;
-  returnToCategoryFolders: () => void;
-  returnToSubcategoryFolders: () => void;
   openCategoryFolder: (id: string) => void;
   openSubcategoryFolder: (id: string) => void;
   applyOrganization: (value: { categories: AssetProductCategory[]; albums: PromptAlbum[] }) => void;
@@ -78,96 +76,76 @@ interface Props {
   getAssetPreviewText: (item: Record<string, unknown>) => string;
   setEditingItem: (item: Record<string, unknown>) => void;
   setTagEditItem: (item: Record<string, unknown>) => void;
-  onUseLearningReference: (id: string) => void;
   onFeedReference: () => void;
   deleteAsset: (id: string, event: MouseEvent) => void | Promise<void>;
 }
 
 /** The library's folder and card presentation; mutations remain owned by its parent. */
 export function AssetPromptLibraryGrid({
-  activeSubTab, items, displayedItems, promptGroupCategories, promptGroupAlbums,
-  categoryFolders, subcategoryFolders, assetScrollRef, loadError, isLoading,
-  folderRootVisible, subcategoryFoldersVisible, promptGroupCategoryFilter,
+  onActionsTarget, onOpenSkills, audienceFilters, activeSubTab, items, displayedItems, promptGroupCategories, promptGroupAlbums,
+  subcategoryFolders, assetScrollRef, loadError, isLoading,
+  promptGroupCategoryFilter,
   promptGroupSubcategoryFilter, currentFolderName, isBatchMode, selectedIds,
   openCardMenuId, copiedId, galleryLabels, showLifecycleFilters, lifecycleFilter,
   setLifecycleFilter, dynamicTagList, selectedTag, setSelectedTag, sortBy, setSortBy,
-  isAnyFilterActive, resetKey, returnToCategoryFolders, returnToSubcategoryFolders,
+  hasContentFilters, clearContentFilters, resetKey,
   openCategoryFolder, openSubcategoryFolder, applyOrganization, showToast,
   refreshAssets, handleResetAllFilters, selectCard, openGroupPreview, openDetailItem,
   setAtomicPreview, setMoveItems, setOpenCardMenuId, setSelectedIds, setIsBatchMode,
   selectionAnchorRef, setAssetContextMenu, toggleSelectItem, toggleFavorite,
   setZoomImageUrl, withAssetDetail, handleCopyPrompt, getAssetPreviewText,
-  setEditingItem, setTagEditItem, deleteAsset, onUseLearningReference, onFeedReference,
+  setEditingItem, setTagEditItem, deleteAsset, onFeedReference,
 }: Props) {
-  const [learningTab, setLearningTab] = useState<CategorySkillTab>('references');
-  const groupNumbers = useMemo(() => {
-    const map = new Map<string, number>();
-    if (activeSubTab !== 'full_prompt') return map;
-    displayedItems.forEach((item, index) => map.set(item.id, index + 1));
-    return map;
-  }, [activeSubTab, displayedItems]);
-  const learningFolder = activeSubTab === 'full_prompt' && !folderRootVisible && !subcategoryFoldersVisible && !isBatchMode
-    ? promptGroupSubcategoryOptions(promptGroupCategories, promptGroupCategoryFilter).find(option => option.id === promptGroupSubcategoryFilter)?.folderId : undefined;
+  const [managingCategories, setManagingCategories] = useState(false);
+  useEffect(() => {
+    setManagingCategories(false);
+  }, [activeSubTab]);
+  const isGroup = activeSubTab === 'full_prompt';
+  const categoryLabels = useMemo(() => new Map(activeSubTab === 'full_prompt' ? displayedItems.map(item => [item.id, promptGroupCategoryLabel(item, promptGroupCategories, promptGroupAlbums)]) : []), [activeSubTab, displayedItems, promptGroupCategories, promptGroupAlbums]);
+  const sharedCategoryLabel = new Set(categoryLabels.values()).size === 1 ? categoryLabels.values().next().value : undefined;
+  const hasUsageSort = sortBy !== 'default' || new Set(items.map(item => item.usageCount || 0)).size > 1;
+  const typeTitle = { full_prompt: '全部母本', persona: '全部人物', outfit: '全部穿搭', scene: '全部场景', action: '全部动作' }[activeSubTab];
   return (
-      <div ref={assetScrollRef} data-asset-scroll className={`flex-1 min-h-0 bg-transparent overflow-y-auto px-5 sm:px-7 xl:px-8 pb-6 ${activeSubTab === 'full_prompt' ? 'pt-2' : activeSubTab === 'persona' || activeSubTab === 'outfit' ? 'pt-3' : 'pt-6'}`}>
+      <div className="asset-library-workspace">
+        {activeSubTab === 'full_prompt' && <PromptLibrarySidebar items={items} categories={promptGroupCategories} albums={promptGroupAlbums}
+          category={promptGroupCategoryFilter} subcategory={promptGroupSubcategoryFilter}
+          onSelect={(category, subcategory) => { setManagingCategories(false); openCategoryFolder(category); if (subcategory) openSubcategoryFolder(subcategory); }}
+          onManage={() => setManagingCategories(true)} onOpenSkills={onOpenSkills} />}
+        <div className="asset-library-main">
+        <div className="asset-gallery-heading">
+          <nav aria-label="当前素材分类" className="asset-gallery-path">
+            {isGroup && promptGroupCategoryFilter !== 'all' ? <>
+              <button type="button" onClick={() => openCategoryFolder('all')}>全部母本</button><span>/</span>
+              {promptGroupSubcategoryFilter === 'all' ? <strong aria-current="page">{currentFolderName}</strong> : <>
+                <button type="button" onClick={() => openCategoryFolder(promptGroupCategoryFilter)}>{currentFolderName}</button><span>/</span>
+                <strong aria-current="page">{subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.name || '待分类'}</strong>
+              </>}
+            </> : <strong aria-current="page">{typeTitle}</strong>}
+            <small role="status" aria-live="polite">{hasContentFilters ? '找到 ' : ''}{displayedItems.length} {isGroup ? '组' : '项'}</small>
+          </nav>
+          <div className="asset-gallery-controls">
+          <div className="asset-gallery-filters">
+            {showLifecycleFilters && <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} items={items} />}
+            <AssetTagFilter activeSubTab={activeSubTab} dynamicTagList={dynamicTagList} selectedTag={selectedTag} setSelectedTag={setSelectedTag} />
+            {hasUsageSort && <AssetLibrarySortControls showCount={false} isAnyFilterActive={false} displayedItemsCount={displayedItems.length} sortBy={sortBy} setSortBy={setSortBy} defaultSortTitle="按默认顺序排列" />}
+            {!isBatchMode && displayedItems.length > 1 && <button type="button" onClick={() => setIsBatchMode(true)} className="asset-gallery-manage"><ListChecks size={14} />批量管理</button>}
+            {hasContentFilters && <button type="button" onClick={clearContentFilters} className="flex items-center gap-1 rounded-xl px-2 py-2 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"><X className="h-3 w-3" />清除筛选</button>}
+          </div>
+          <div ref={onActionsTarget} className="asset-gallery-actions" />
+          </div>
+        </div>
+        {audienceFilters && <div className="asset-gallery-audience">{audienceFilters}</div>}
+        <div ref={assetScrollRef} data-asset-scroll className={`asset-library-gallery${isBatchMode ? ' is-batch-mode' : ''}`}>
         {loadError && <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
           资产加载失败：{loadError}。{items.length ? '当前显示缓存内容，可能已过期。' : '尚不能判断资产库是否为空。'}
           <button type="button" onClick={refreshAssets} className="ml-3 underline">重新加载资产</button>
         </div>}
-        {activeSubTab === 'full_prompt' && !folderRootVisible && !isBatchMode && (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <nav aria-label="商品文件夹路径" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <button type="button" onClick={returnToCategoryFolders} className="rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 font-semibold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-indigo-400/40 dark:hover:text-indigo-300 cursor-pointer">商品大类</button>
-              <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-              {promptGroupSubcategoryFilter !== 'all' && promptGroupCategoryFilter !== 'all' ? <>
-                <button type="button" onClick={returnToSubcategoryFolders} className="rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 font-semibold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-indigo-400/40 dark:hover:text-indigo-300 cursor-pointer">{currentFolderName}</button>
-                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-                <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                  {subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.name || '待分类'}
-                </span>
-              </> : <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{currentFolderName}</span>}
-            </nav>
-            {!subcategoryFoldersVisible && (!learningFolder || learningTab === 'references') && <div className="flex flex-wrap items-center gap-2">
-              {showLifecycleFilters && <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} items={items} />}
-              <AssetTagFilter activeSubTab={activeSubTab} dynamicTagList={dynamicTagList} selectedTag={selectedTag} setSelectedTag={setSelectedTag} />
-              <AssetLibrarySortControls showCount={false} isAnyFilterActive={false} displayedItemsCount={displayedItems.length} sortBy={sortBy} setSortBy={setSortBy} defaultSortTitle="按组号从小到大" />
-            </div>}
-          </div>
-        )}
-        {learningFolder && <CategorySkillPanel key={learningFolder} folderId={learningFolder} tab={learningTab} onTab={setLearningTab} groupNumbers={groupNumbers} onPreview={id => { const item = items.find(item => item.id === id); if (item) openGroupPreview(item, groupNumbers.get(id)); else showToast('来源图组已移除，请重新提炼技能'); }} onUseReference={onUseLearningReference} />}
-        {folderRootVisible && isLoading && !items.length && !promptGroupCategories.length ? (
-          <div className="flex flex-wrap gap-5 animate-pulse" aria-label="正在加载商品大类">
-            {[1, 2, 3].map(n => <div key={n} className="h-40 w-[164px] rounded-2xl bg-slate-100/70 dark:bg-white/10" />)}
-          </div>
-        ) : folderRootVisible ? (
-          <PromptGroupCategoryFolders
-            categories={promptGroupCategories}
-            folders={categoryFolders}
-            total={items.length}
-            onOpen={openCategoryFolder}
-            onOpenAll={() => openCategoryFolder('all')}
-            onChanged={applyOrganization}
-            onNotice={showToast}
-            onMoveGroups={ids => setMoveItems(items.filter(item => ids.includes(item.id)))}
-            onArchived={refreshAssets}
-          />
-        ) : subcategoryFoldersVisible ? (
-          <PromptGroupCategoryFolders
-            categories={promptGroupCategories}
-            folders={subcategoryFolders}
-            total={categoryFolders.find(folder => folder.id === promptGroupCategoryFilter)?.items.length || 0}
-            parentId={promptGroupCategoryFilter}
-            onOpen={openSubcategoryFolder}
-            onChanged={applyOrganization}
-            onNotice={showToast}
-            onMoveGroups={ids => setMoveItems(items.filter(item => ids.includes(item.id)))}
-            onArchived={refreshAssets}
-          />
-        ) : learningFolder && learningTab !== 'references' ? null : displayedItems.length > 0 ? (
+        {displayedItems.length > 0 ? (
           <VirtualAssetGrid
             items={displayedItems}
             scrollRef={assetScrollRef}
             openItemId={openCardMenuId}
+            minCardWidth={208}
             resetKey={resetKey}
             renderItem={(item, index) => {
               const isSelected = selectedIds.includes(item.id);
@@ -180,7 +158,7 @@ export function AssetPromptLibraryGrid({
                   activeSubTab={activeSubTab}
                   listPosition={listPosition}
                   displayLabel={displayLabel}
-                  productCategoryLabel={activeSubTab === 'full_prompt' ? promptGroupCategoryLabel(item, promptGroupCategories, promptGroupAlbums) : undefined}
+                  productCategoryLabel={!sharedCategoryLabel && promptGroupSubcategoryFilter === 'all' ? categoryLabels.get(item.id) : undefined}
                   isBatchMode={isBatchMode}
                   isSelected={isSelected}
                   isMenuOpen={openCardMenuId === item.id}
@@ -272,26 +250,18 @@ export function AssetPromptLibraryGrid({
               <div key={n} className="aspect-[3/4] bg-white/50 rounded-2xl dark:bg-[#18191c]/95" />
             ))}
           </div>
-        ) : loadError ? null : learningFolder && !subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.items.length ? (
-          <div className="mx-auto flex min-h-64 max-w-xl flex-col items-center justify-center px-6 py-10 text-center">
-            <Layers className="mb-4 h-9 w-9 text-indigo-300" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">给这个类目投喂第一组参考</h3>
-            <p className="mt-2 text-xs leading-6 text-slate-500">从同类目的四张参考图开始。保留镜头顺序，反推后归档，逐步积累可复用的方法。</p>
-            <button type="button" onClick={onFeedReference} className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-500">投喂参考图</button>
-          </div>
-        ) : (
-          <div className="mx-auto flex min-h-[320px] w-full max-w-xl flex-col items-center justify-center px-6 py-16 text-center">
-            <Layers className="w-10 h-10 text-slate-300 mx-auto mb-5" />
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">{promptLibraryEmptyCopy(activeSubTab, isAnyFilterActive).title}</h3>
-            <p className="mt-2 text-balance text-sm leading-6 text-slate-500 dark:text-slate-400">{promptLibraryEmptyCopy(activeSubTab, isAnyFilterActive).body}</p>
-            {isAnyFilterActive && (
-              <button type="button" onClick={handleResetAllFilters} className="mt-6 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500">
-                清空筛选
-              </button>
-            )}
-          </div>
-        )}
+        ) : loadError ? null : <AssetLibraryEmptyState tab={activeSubTab} filtered={hasContentFilters}
+          folderName={activeSubTab === 'full_prompt' && promptGroupCategoryFilter !== 'all'
+            ? promptGroupSubcategoryFilter !== 'all' ? subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.name || '当前分类' : currentFolderName
+            : undefined}
+          onClearFilters={clearContentFilters} onBrowseAll={handleResetAllFilters} onFeedReference={onFeedReference} />}
+        </div>
+        </div>
+        {activeSubTab === 'full_prompt' && managingCategories && <PromptCategoryManager items={items} categories={promptGroupCategories} albums={promptGroupAlbums}
+          initialCategory={promptGroupCategoryFilter}
+          onBrowse={(category, subcategory) => { openCategoryFolder(category); if (subcategory) openSubcategoryFolder(subcategory); }}
+          onClose={() => setManagingCategories(false)} onChanged={applyOrganization} onNotice={showToast}
+          onMoveGroups={ids => { setManagingCategories(false); setMoveItems(items.filter(item => ids.includes(item.id))); }} onArchived={refreshAssets} />}
       </div>
-
   );
 }

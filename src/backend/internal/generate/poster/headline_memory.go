@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -19,12 +20,34 @@ func HeadlineMemory(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		entries, samples, usages, err := listCoverMemory(r.Context(), db, httpx.WorkspaceFrom(r))
+		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+		if r.URL.Query().Get("offset") == "" {
+			offset, err = 0, nil
+		}
+		if err != nil || offset < 0 {
+			httpx.WriteJSON(w, 400, map[string]any{"success": false, "error": "分页位置无效"})
+			return
+		}
+		workspace := httpx.WorkspaceFrom(r)
+		if err := recoverStaleCoverFeeds(r.Context(), db, workspace); err != nil {
+			httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "核对样张状态失败"})
+			return
+		}
+		entries, samples, usages, err := listCoverMemory(r.Context(), db, workspace, offset)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取封面记忆失败"})
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "entries": entries, "samples": samples, "usages": usages})
+		revisions, err := listCoverRevisions(r.Context(), db, workspace, offset)
+		if err != nil {
+			httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "读取经验版本失败"})
+			return
+		}
+		var nextOffset any
+		if len(entries) == 100 || len(samples) == 100 || len(usages) == 100 || len(revisions) == 100 {
+			nextOffset = offset + 100
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "entries": entries, "samples": samples, "usages": usages, "revisions": revisions, "nextOffset": nextOffset})
 	})
 }
 
@@ -47,7 +70,10 @@ func HeadlineMemoryEntry(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		err := setCoverEntryStatus(r.Context(), db, httpx.WorkspaceFrom(r), r.PathValue("id"), body.Status)
+		workspace := httpx.WorkspaceFrom(r)
+		err := mutateCoverExperience(r.Context(), db, workspace, "更新采纳规则", func(tx *sql.Tx) error {
+			return setCoverEntryStatus(r.Context(), tx, workspace, r.PathValue("id"), body.Status)
+		})
 		if err == sql.ErrNoRows {
 			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "找不到这条封面记忆"})
 			return
@@ -81,7 +107,10 @@ func HeadlineMemoryCorrection(cfg config.Config) http.Handler {
 		}
 		defer db.Close()
 		entry := coverEntry{ID: coverID("entry"), Branch: "correction", Rule: rule, Status: "adopted", Source: "correction"}
-		if err := insertCoverEntries(r.Context(), db, httpx.WorkspaceFrom(r), []coverEntry{entry}); err != nil {
+		workspace := httpx.WorkspaceFrom(r)
+		if err := mutateCoverExperience(r.Context(), db, workspace, "写入纠正", func(tx *sql.Tx) error {
+			return insertCoverEntries(r.Context(), tx, workspace, []coverEntry{entry})
+		}); err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "保存纠正失败"})
 			return
 		}

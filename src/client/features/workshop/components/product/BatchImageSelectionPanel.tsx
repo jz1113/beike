@@ -76,7 +76,7 @@ export default function BatchImageSelectionPanel({
   }
 
   return (
-    <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/70 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] overflow-hidden min-h-[440px] lg:max-h-[650px] flex-1 flex flex-col transition-all duration-300 dark:border-white/10 dark:bg-[#18191c]/95">
+    <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/70 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] overflow-hidden min-h-[620px] flex-1 flex flex-col transition-all duration-300 dark:border-white/10 dark:bg-[#18191c]/95">
       <BatchSelectionDetail
         currentItem={currentItem}
         focusedIndex={focusedIndex}

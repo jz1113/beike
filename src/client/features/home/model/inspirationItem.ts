@@ -1,6 +1,5 @@
 export interface InspirationItem {
   id: string | number;
-  isBanner?: boolean;
   category: string;
   tag: string;
   title: string;
@@ -26,6 +25,13 @@ export interface InspirationItem {
   aspectRatio?: string;
   model?: string;
   quality?: string;
-  /** 关联的分镜预设 ID */
-  storyboardPresetId?: string;
+}
+
+export interface InspirationUseOptions {
+  referenceImages?: string[];
+  videoRefMode?: string;
+  videoDuration?: number;
+  videoModel?: string;
+  videoAspectId?: string;
+  videoResolution?: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
 }

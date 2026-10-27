@@ -210,6 +210,25 @@ describe('automatic creative images', () => {
     expect(h.current().assets!.every((asset) => asset.status === 'done' && asset.url)).toBe(true);
   });
 
+  it('sends the original SKU before generated dependencies with explicit color fidelity even without a color name', async () => {
+    const h = harness();
+    h.current().assets = [
+      { id: 'person', kind: 'person', label: '已生成的人物', prompt: '人物参考', required: true, url: '/purple-person.jpg', status: 'done' },
+      { id: 'frame', kind: 'keyframe', label: '上身图', prompt: '人物穿粉紫色羽绒服站在暖色玄关', required: true, usesProduct: true, productImageIndexes: [8], referenceAssetIds: ['person'] },
+    ];
+    const submitBatch = vi.fn(async (items: SalesImageBatchItem[]) => items.map((item) => ({ id: item.id, url: item.id === 'person' ? '/purple-person.jpg' : '/frame.jpg', outcome: 'done' as const })));
+    await prepareSalesCreativeAssets({ ...h.job(), images: [{ index: 8, role: 'main', url: '/pale-original.jpg' }], selectedColor: '', regenerateId: 'frame' }, client({ submitBatch }));
+    const frame = submitBatch.mock.calls.flatMap(([items]) => items).find((item) => item.id === 'frame')!;
+    expect(frame.referenceImages).toEqual(['/pale-original.jpg', '/purple-person.jpg']);
+    expect(frame.prompt).toContain('输入参考图1：商品原图（目录编号 8）');
+    expect(frame.prompt).toContain('输入参考图2：已生成素材「已生成的人物」');
+    expect(frame.prompt.indexOf('原图颜色优先于 SKU 色名')).toBeGreaterThan(frame.prompt.indexOf('本张画面要求：'));
+    expect(frame.prompt).toContain('保留色相、明度、饱和度与冷暖倾向');
+    expect(frame.prompt).toContain('中性白平衡');
+    expect(frame.prompt).toContain('不继承其衣物偏色');
+    expect(h.current().assets![1].validation).toBe('pending');
+  });
+
   it('binds front and back stills independently even when all video shots select the back', async () => {
     const h = harness();
     h.current().shots[0] = { ...h.current().shots[0], description: '先展示背面再转身' };

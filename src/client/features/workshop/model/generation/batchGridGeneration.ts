@@ -63,7 +63,8 @@ export async function runGridImageTask(
       const reference = item.selectedProductImages[0] || item.coverImage;
       if (!reference) throw new Error('缺少商品垫图，请先勾选商品图');
       const hasHuman = shots.some(shot => shot.shot_type === 'model_shot' || (!shot.shot_type && shot.has_human === true));
-      const maxProductRefs = workshopReferenceBudget(config.selectedImageGenModel, shots, hasHuman && Boolean(config.anchorFaceUrl));
+      const skillOnly = shots.every(shot => shot.assembly_source === 'skill');
+      const maxProductRefs = workshopReferenceBudget(config.selectedImageGenModel, shots, !skillOnly && hasHuman && Boolean(config.anchorFaceUrl));
       const productReferenceCandidates = Array.from(new Set([
         reference,
         ...item.selectedProductImages,
@@ -74,13 +75,13 @@ export async function runGridImageTask(
       const productImageUrl = productReferenceImages[0];
       const referenceInput = workshopReferenceInput(shots, productReferenceImages.length);
       const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(compressProductImageIfNeeded));
-      const safeAnchorFaceUrl = hasHuman && config.anchorFaceUrl
+      const safeAnchorFaceUrl = !skillOnly && hasHuman && config.anchorFaceUrl
         ? await compressProductImageIfNeeded(config.anchorFaceUrl)
         : undefined;
       patch({ gridTaskKey: taskKey, gridSize: size, outputSize, upstreamTaskId: undefined });
       setItems(items => items.map(entry => entry.id === item.id ? { ...entry, tasks: entry.tasks.map(task => {
         const shot = shots.find(shot => shot.shot_no === task.shot_no);
-        return matchesAttempt(task) && shot ? { ...task, learningContext: captureLearningContext(item, shot, { ...config, productReferenceImages: productReferenceCandidates, anchorFaceUrl: hasHuman ? config.anchorFaceUrl : undefined }, 'grid_first') } : task;
+        return matchesAttempt(task) && shot ? { ...task, learningContext: captureLearningContext(item, shot, { ...config, productReferenceImages: productReferenceCandidates, anchorFaceUrl: !skillOnly && hasHuman ? config.anchorFaceUrl : undefined }, 'grid_first') } : task;
       }) } : entry));
       await config.beforeSubmit?.();
       verifySource = true;

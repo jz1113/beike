@@ -23,6 +23,7 @@ export const CoverMemorySampleSchema = z.object({
   status: z.enum(['running', 'completed', 'failed']),
   error: z.string(),
   createdAt: z.string(),
+  requestKey: z.string().optional(),
 });
 
 export const CoverMemoryUsageSchema = z.object({
@@ -32,7 +33,15 @@ export const CoverMemoryUsageSchema = z.object({
   itemTitle: z.string(),
   entryIds: z.array(z.string()),
   design: z.record(z.string(), z.string()),
+  rating: z.enum(['', 'good', 'bad']).optional(),
+  note: z.string().optional(),
   createdAt: z.string(),
+});
+
+export const CoverMemoryRevisionSchema = z.object({
+  id: z.string(), reason: z.string(), fingerprint: z.string(),
+  entryCount: z.number(), sampleCount: z.number(), createdAt: z.string(),
+  markdown: z.string().optional(),
 });
 
 export const CoverMemoryResponseSchema = z.object({
@@ -40,6 +49,8 @@ export const CoverMemoryResponseSchema = z.object({
   entries: z.array(CoverMemoryEntrySchema).default([]),
   samples: z.array(CoverMemorySampleSchema).default([]),
   usages: z.array(CoverMemoryUsageSchema).default([]),
+  revisions: z.array(CoverMemoryRevisionSchema).default([]),
+  nextOffset: z.number().int().nonnegative().nullable().optional(),
   error: z.string().optional(),
 });
 
@@ -58,3 +69,5 @@ export type CoverMemoryEntry = z.infer<typeof CoverMemoryEntrySchema>;
 export type CoverMemorySample = z.infer<typeof CoverMemorySampleSchema>;
 export type CoverMemoryUsage = z.infer<typeof CoverMemoryUsageSchema>;
 export type CoverMemoryResponse = z.infer<typeof CoverMemoryResponseSchema>;
+
+export type CoverMemoryRevision = z.infer<typeof CoverMemoryRevisionSchema>;

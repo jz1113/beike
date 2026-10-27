@@ -14,5 +14,3 @@ export interface ReviewSubmission {
   lookup: boolean;
   lookupBudget?: number;
 }
-
-export type PendingKeywordReviewSubmission = ReviewSubmission;

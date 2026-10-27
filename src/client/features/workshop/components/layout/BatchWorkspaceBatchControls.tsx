@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { WorkshopBatchSummary } from '@shared/contracts/workshopBatches';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
 import { BatchHistoryPanel } from '../history/BatchHistoryPanel';
+import { BatchNameDialog } from '../history/BatchNameDialog';
+import { batchHistoryTitle } from '../../model/workspace/batchHistory';
+import type { BatchDeleteResult } from '../../api/batchManagement';
+import { Layers3, Pencil } from 'lucide-react';
 import { useWorkshopDockActions } from './WorkshopDockActionsContext';
 
 interface Props {
@@ -12,11 +16,11 @@ interface Props {
   currentStage: number;
   ready: boolean;
   busy: boolean;
-  createNewBatch: () => Promise<void>;
+  createNewBatch: (name?: string) => Promise<void>;
   refreshHistory: () => Promise<WorkshopBatchSummary[]>;
   duplicateBatch: (id: string) => Promise<void>;
   clearHistory: () => Promise<number>;
-  deleteHistoryBatch: (id: string) => Promise<void>;
+  deleteHistoryBatches: (ids: string[]) => Promise<BatchDeleteResult>;
   renameBatch: (id: string, name: string) => Promise<void>;
   readBatch: (id: string) => Promise<WorkshopBatch>;
   onOpenGenerationView: (batch: WorkshopBatch) => void;
@@ -25,36 +29,41 @@ interface Props {
 
 export function BatchWorkspaceBatchControls({
   activeBatch, historyBatches, itemsCount, batchInputText, currentStage, ready, busy,
-  createNewBatch, refreshHistory, duplicateBatch, clearHistory, deleteHistoryBatch, renameBatch, readBatch, onOpenGenerationView, showToast,
+  createNewBatch, refreshHistory, duplicateBatch, clearHistory, deleteHistoryBatches, renameBatch, readBatch, onOpenGenerationView, showToast,
 }: Props) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [nameMode, setNameMode] = useState<'create' | 'rename' | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const { setActions } = useWorkshopDockActions();
 
-  const run = async (action: () => Promise<void>) => {
-    setIsRunning(true);
-    try {
-      await action();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : '批次操作失败，请重试');
-    } finally {
-      setIsRunning(false);
-    }
+  const loadHistory = async () => {
+    setHistoryLoading(true); setHistoryError('');
+    try { await refreshHistory(); }
+    catch (error) { setHistoryError(error instanceof Error ? error.message : '历史批次读取失败'); }
+    finally { setHistoryLoading(false); }
   };
-
   const openHistory = () => {
-    void refreshHistory().catch(error => showToast(error instanceof Error ? error.message : '历史批次读取失败'));
     setIsHistoryOpen(true);
+    void loadHistory();
   };
 
   const requestNew = () => {
     if (busy) { showToast('任务执行中，请等待结束后再新建批次'); return; }
-    if (itemsCount === 0 && currentStage === 1 && !batchInputText.trim()) {
-      showToast('当前已经是空白新批次，可以直接输入 SKU');
-      return;
-    }
-    if (!window.confirm('新建批次会保留当前内容到历史，并切换到空白批次。确定继续吗？')) return;
-    void run(createNewBatch);
+    setNameMode('create');
+  };
+  const reuseEmpty = itemsCount === 0 && currentStage === 1 && !batchInputText.trim();
+  const saveName = async (name: string) => {
+    setIsRunning(true);
+    try {
+      if (nameMode === 'rename' || reuseEmpty) {
+        if (!activeBatch) throw new Error('当前批次尚未就绪，请稍后重试');
+        const nextName = name || batchHistoryTitle({ ...activeBatch, name: '未命名新批次' });
+        if (nextName !== activeBatch.name) await renameBatch(activeBatch.id, nextName);
+      } else await createNewBatch(name || undefined);
+      showToast(nameMode === 'rename' ? '批次名称已保存' : '新批次已就绪');
+    } finally { setIsRunning(false); }
   };
   // The toolbar lives above this view; stable callbacks read the current batch state.
   const handlersRef = useRef({ requestNew, openHistory });
@@ -74,10 +83,18 @@ export function BatchWorkspaceBatchControls({
 
   return (
     <>
+      {activeBatch && <div className="batch-workspace-identity">
+        <Layers3 size={15} /><span className="batch-workspace-label">当前批次</span>
+        <button type="button" disabled={!ready || isRunning} onClick={() => setNameMode('rename')} className="batch-workspace-name" title="编辑当前批次名称"><span>{batchHistoryTitle(activeBatch)}</span><Pencil size={12} /></button>
+      </div>}
       {isHistoryOpen && (
         <BatchHistoryPanel
           activeBatch={activeBatch}
           historyBatches={historyBatches}
+          historyLoading={historyLoading}
+          historyError={historyError}
+          productionBusy={busy}
+          onRefresh={loadHistory}
           onClose={() => setIsHistoryOpen(false)}
           onReadBatch={readBatch}
           onOpenGenerationView={onOpenGenerationView}
@@ -86,12 +103,13 @@ export function BatchWorkspaceBatchControls({
             const deleted = await clearHistory();
             showToast(deleted > 0 ? `已清空 ${deleted} 个历史批次` : '没有可清空的历史批次');
           }}
-          onDeleteBatch={async id => { await deleteHistoryBatch(id); showToast('已删除该条历史记录'); }}
+          onDeleteBatches={deleteHistoryBatches}
           onRenameBatch={renameBatch}
+          onCreateBatch={() => { setIsHistoryOpen(false); requestNew(); }}
           onError={showToast}
         />
       )}
-
+      {nameMode && <BatchNameDialog mode={nameMode} initialName={nameMode === 'rename' && activeBatch ? batchHistoryTitle(activeBatch) : ''} reuseEmpty={reuseEmpty} onSave={saveName} onClose={() => setNameMode(null)} />}
     </>
   );
 }

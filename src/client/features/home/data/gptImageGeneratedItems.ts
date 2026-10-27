@@ -1,4 +1,4 @@
-import type { InspirationItem } from '../components/inspiration/InspirationModal';
+import type { InspirationItem } from '../model/inspirationItem';
 
 export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
   {
@@ -16,7 +16,7 @@ export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
       name: '贝壳云图 · 旗舰AI',
       badge: 'GPT Image 2',
     },
-    date: '刚刚生成 · 3:4 比例',
+    date: '精选作品',
   },
   {
     id: 'item-gpt-image-royal-cat',
@@ -33,7 +33,7 @@ export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
       name: '贝壳云图 · 旗舰AI',
       badge: 'GPT Image 2',
     },
-    date: '刚刚生成 · 3:4 比例',
+    date: '精选作品',
   },
   {
     id: 'item-gpt-image-soup-lily',
@@ -50,7 +50,7 @@ export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
       name: '贝壳云图 · 旗舰AI',
       badge: 'GPT Image 2',
     },
-    date: '刚刚生成 · 3:4 比例',
+    date: '精选作品',
   },
   {
     id: 'item-gpt-image-taro-plant',
@@ -67,7 +67,7 @@ export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
       name: '贝壳云图 · 旗舰AI',
       badge: 'GPT Image 2',
     },
-    date: '刚刚生成 · 3:4 比例',
+    date: '精选作品',
   },
   {
     id: 'item-gpt-image-ribs-soup',
@@ -84,6 +84,6 @@ export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
       name: '贝壳云图 · 旗舰AI',
       badge: 'GPT Image 2',
     },
-    date: '刚刚生成 · 3:4 比例',
+    date: '精选作品',
   },
 ];

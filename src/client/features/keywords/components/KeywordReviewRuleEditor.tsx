@@ -67,8 +67,8 @@ export function KeywordReviewRuleEditor({ open, mode }: { open: boolean; mode: K
   }, [open, reloadAttempt]);
 
   const save = async () => {
-    if (!current || savingRef.current || loading || publishNeedsCheck) return;
-    if (!note.trim()) { setMessage('请填写本次修改原因'); return; }
+    if (!current || savingRef.current || loading || loadError || publishNeedsCheck) return;
+    if (note.trim().length < 2) { setMessage('本次修改原因至少填写 2 个字'); return; }
     if (entries.some((entry) => entry.text.trim().length < 4)) { setMessage('每条补充规则至少填写 4 个字'); return; }
     if (entries.reduce((total, entry) => total + entry.text.length, 0) > 6000) { setMessage('补充规则总长度不能超过 6000 字'); return; }
     const snapshot = { baseVersion: current.version, entries: entries.map((entry) => ({ ...entry })), note: note.trim() };
@@ -125,7 +125,7 @@ export function KeywordReviewRuleEditor({ open, mode }: { open: boolean; mode: K
       {loading && <p role="status" className="text-xs text-slate-500 dark:text-slate-400">正在读取补充规则…</p>}
       {loadError && <div className="space-y-2 rounded-xl bg-rose-50 p-3"><p role="alert" className="break-words text-xs leading-5 text-rose-700">{loadError}</p><button type="button" disabled={loading || saving} onClick={() => setReloadAttempt((value) => value + 1)} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50 dark:bg-[#18191c]">重试读取规则</button></div>}
       {saveFailed && !loadError && <button type="button" disabled={loading || saving} onClick={() => setReloadAttempt((value) => value + 1)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 disabled:opacity-50">重新读取已发布规则并核对</button>}
-      {current && <fieldset disabled={saving || loading} className="min-w-0 space-y-3 border-0 p-0" aria-label="补充规则编辑">
+      {current && <fieldset disabled={saving || loading || Boolean(loadError)} className="min-w-0 space-y-3 border-0 p-0" aria-label="补充规则编辑">
         {entries.map((entry, index) => (entry.mode || 'image') === mode ? (
           <div key={index} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row dark:border-white/10">
             <select aria-label={`第 ${index + 1} 条规则类别`} value={entry.section} onChange={(event) => setEntries((items) => items.map((item, i) => i === index ? { ...item, section: event.target.value as KeywordReviewRuleEntry['section'] } : item))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs sm:w-28 dark:border-white/10 dark:bg-[#18191c]">

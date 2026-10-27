@@ -93,6 +93,7 @@ export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRu
           </dl>
         </details>
       )}
+      {item.memoryWarning && <p role="status" className="mt-1 text-[11px] leading-4 text-amber-600">{item.memoryWarning}</p>}
       {failed && item.error && <p className="mt-1 line-clamp-3 text-[11px] leading-4 text-rose-600" title={item.error}>{item.error}</p>}
     </article>
   );

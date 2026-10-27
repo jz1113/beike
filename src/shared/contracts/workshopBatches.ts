@@ -23,6 +23,12 @@ export const workshopBatchSummarySchema = workshopBatchSchema.omit({ snapshot: t
   itemCount: z.number().int().min(0),
   readyCount: z.number().int().min(0),
   taskCount: z.number().int().min(0),
+  hasInput: z.boolean().optional(),
+  resultCount: z.number().int().min(0).optional(),
+  failedCount: z.number().int().min(0).optional(),
+  productTitles: z.array(z.string()).max(200).optional(),
+  productIds: z.array(z.string()).max(200).optional(),
+  previewImages: z.array(z.string()).max(4).optional(),
 });
 export type WorkshopBatchSummary = z.infer<typeof workshopBatchSummarySchema>;
 

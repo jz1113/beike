@@ -150,12 +150,13 @@ export function PosterSettingsDialog({
             <label className="block text-xs font-bold text-slate-500">
               生成时引用
               <select aria-label="选择参考样张" value={settingsDraft.memorySampleId} disabled={isRunning} onChange={(event) => patch({ memorySampleId: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-white/10 dark:bg-[#1e232b] dark:text-slate-100">
-                <option value="">自动选择一张已采纳样张</option>
+                <option value="">自动选择：商品关键词与成图反馈</option>
+                <option value="corrections">仅引用全局纠正</option>
                 {memorySamples.map((sample) => <option key={sample.id} value={sample.id}>{sample.title}{sample.grouped ? ' · 旧版分组反推' : ''}</option>)}
-                {settingsDraft.memorySampleId && !memorySamples.some((sample) => sample.id === settingsDraft.memorySampleId) && <option value={settingsDraft.memorySampleId}>已保存的样张暂不可用</option>}
+                {settingsDraft.memorySampleId && settingsDraft.memorySampleId !== 'corrections' && !memorySamples.some((sample) => sample.id === settingsDraft.memorySampleId) && <option value={settingsDraft.memorySampleId}>已保存的样张暂不可用</option>}
               </select>
             </label>
-            <p className="mt-2 text-[11px] leading-5 text-slate-400">只会加上全局纠正和这一张样张的已采纳特点。已经开始设计的封面会继续用当时记下的样张。</p>
+            <p className="mt-2 text-[11px] leading-5 text-slate-400">自动选择参考商品标题关键词和已保存评价；无匹配时按反馈与时间选择。只引用全局纠正和一张样张的已采纳特点。重试保留原规则快照。</p>
           </section>
           <div className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-400"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" /><span>成品规格按导入第三列：<b className="font-semibold text-slate-600 dark:text-slate-300">文字竖 720 × 960 · 文字横 1440 × 1440 · JPG · 大于 200 KB 且小于 5 MB</b></span></div>
         </div>

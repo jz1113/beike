@@ -7,6 +7,7 @@ import { proxyMediaUrl } from '@client/shared/api/apiClient';
 
 
 export function exportPromptGroupName(item: BatchProductItem): string {
+  if (item.contentPlan) return `内容${item.contentPlan.index}-${item.contentPlan.theme}`;
   const label = fullPromptGroupLabel(item.appliedFullPromptDisplayNumber);
   if (label !== '未编号图组') return label;
   if (!item.appliedFullPromptId) return '未绑定图组';

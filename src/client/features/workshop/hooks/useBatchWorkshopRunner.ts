@@ -22,7 +22,7 @@ import type { VisionAnalyzeDeps } from '../model/analysis/batchVisionAnalyze';
 import { useAppStore } from '@client/store';
 
 // 🚀 模块化外抽能力
-import { usePersistentNumber, usePersistentEnum } from '@client/shared/hooks/usePersistentState';
+import { usePersistentNumber } from '@client/shared/hooks/usePersistentState';
 import { useBatchPreviewGallery, useBatchToast } from './useBatchPreviewGallery';
 import { useBatchWorkshopResources } from './useBatchWorkshopResources';
 import { useBatchWorkshopImports } from './useBatchWorkshopImports';
@@ -37,6 +37,7 @@ import {
 import { useWorkshopGeneration } from './useWorkshopGeneration';
 import { useLiveWorkshopWorkspace } from './useLiveWorkshopWorkspace';
 import type { WorkshopSnapshot } from '@shared/contracts/workshopWorkspace';
+import { getWorkshopFlow } from '../model/workspace/workshopFlow';
 
 export function useBatchWorkshopRunner() {
   const [currentStage, setCurrentStage] = useState<number>(1);
@@ -48,14 +49,9 @@ export function useBatchWorkshopRunner() {
   // 配方库（电商图文技能与全局 store 同步，支持资产中心「载入配方」）
   const selectedArchId = useAppStore((s) => s.selectedArchId);
   const setSelectedArchId = useAppStore((s) => s.setSelectedArchId);
-  const originalAnchorFaceImageUrl = useAppStore((s) => (
-    s.workshopMode === 'storyboard_generate' && s.originalIsAnchorFaceConfirmed
-      ? s.originalAnchorFaceImageUrl
-      : undefined
-  ));
 
   const {
-    recipes, availableVisionModels, selectedVisionModel, setSelectedVisionModel,
+    recipes, skillLoadState, skillLoadError, reloadSkills, availableVisionModels, selectedVisionModel, setSelectedVisionModel,
     availableImageModels, selectedImageGenModel, setSelectedImageGenModel,
   } = useBatchWorkshopResources(setSelectedArchId);
 
@@ -68,7 +64,7 @@ export function useBatchWorkshopRunner() {
   const [selectedAspect, setSelectedAspect] = useState<'3:4' | '1:1' | '9:16' | '16:9'>('3:4');
   const [gridOutputSize, setGridOutputSize] = useState<string | undefined>();
 
-  // 优先恢复电商图文设置；首次使用时沿用首页分镜预设。
+  // 批次快照恢复已选镜数；新批次从完整四镜开始。
   const [selectedShotCount, setSelectedShotCount] = useWorkshopShotCount();
 
 
@@ -85,26 +81,17 @@ export function useBatchWorkshopRunner() {
     max: 50,
   });
 
-  const [generationStrategy, setGenerationStrategy] = usePersistentEnum<GenerationStrategy>('workshop_generation_strategy', {
-    fallback: 'single_shot',
-    isValid: (v): v is GenerationStrategy => v === 'grid_first' || v === 'single_shot',
-  });
+  const [generationStrategy, setGenerationStrategy] = useState<GenerationStrategy>('grid_first');
   // 文案自动生成是批次配置：关闭后仍可在交付页手动写作或按需生成。
   const [autoGenerateCopywriting, setAutoGenerateCopywriting] = useState(true);
   const [activeImgFilter, setActiveImgFilter] = useState<'all' | 'main' | 'sku' | 'detail'>('all');
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const analyzeConfigRevisionRef = useRef(0);
-  const handleAppliedBinding = useCallback(() => {
-    analyzeConfigRevisionRef.current += 1;
-    setItems((previous) => applyInvalidationToItems(previous, { type: 'locked_assets' }));
-    setStoryboardRevision((revision) => revision + 1);
-  }, [setItems]);
-  const assetLocks = useWorkshopAssetLocks(workspaceReady, handleAppliedBinding);
+  const assetLocks = useWorkshopAssetLocks(workspaceReady);
   const {
     useAssetLibrary, setUseAssetLibrary, lockedPersonaId, setLockedPersonaId, lockedSceneId, setLockedSceneId,
     lockedOutfitId, setLockedOutfitId, lockedActionId, setLockedActionId, lockedFullPromptId, setLockedFullPromptId,
     promptGroupFolderId, setPromptGroupFolderId,
-    availablePersonas, availableScenes, availableOutfits, availableActions, availableFullPrompts, availableProductCategories,
   } = assetLocks;
 
   // 批量生图与进度
@@ -133,7 +120,7 @@ export function useBatchWorkshopRunner() {
 
   const successfulItems = items.filter((i) => i.status === 'success' && i.selected);
 
-  const { isCollecting, collectProgress, collectInFlight, handleRemoveItem, handleParseInput, startBatchCollect } = useBatchCollection({
+  const { isCollecting, collectProgress, collectInFlight, handleRemoveItem, handleParseInput, handleTableImport, startBatchCollect } = useBatchCollection({
     items, itemsRef, setItems, batchInputText, setBatchInputText, showToast, onCollected: () => setCurrentStage(stage => stage === 1 ? 2 : stage),
   });
 
@@ -155,10 +142,9 @@ export function useBatchWorkshopRunner() {
     setSelectedShotCount(count);
     invalidateWorkshopConfig('shot_count');
   };
-  const changeLockedAsset = (apply: (value: string) => void, current: string) => (value: string) => {
-    if (value === current) return;
-    apply(value);
-    invalidateWorkshopConfig('locked_assets');
+  const changeGenerationStrategy = (strategy: GenerationStrategy) => {
+    if (strategy === 'grid_first') changeSelectedShotCount(4);
+    setGenerationStrategy(strategy);
   };
 
   const {
@@ -175,24 +161,14 @@ export function useBatchWorkshopRunner() {
 
   // 视觉分析
   const visionAnalyzeDeps: VisionAnalyzeDeps = {
-    assetLoadState: assetLocks.assetLoadState, assetLoadError: assetLocks.assetLoadError, availableFullPrompts,
-    promptGroupFolderId, availableProductCategories,
     recipes,
+    skillLoadState,
+    skillLoadError,
     selectedArchId,
     items,
-    availablePersonas,
-    availableScenes,
-    availableOutfits,
     selectedShotCount,
-    lockedPersonaId,
-    lockedSceneId,
-    lockedOutfitId,
-    lockedActionId,
-    lockedFullPromptId,
-    personaMode,
     selectedVisionModel,
     availableVisionModels: availableVisionModels.map((m) => ({ id: m.id })),
-    useAssetLibrary,
     setItems,
     getItems: () => itemsRef.current,
     getConfigRevision: () => analyzeConfigRevisionRef.current,
@@ -214,9 +190,6 @@ export function useBatchWorkshopRunner() {
     gridOutputSize,
     selectedImageGenModel,
     selectedShotCount,
-    lockedSceneId,
-    availableScenes,
-    anchorFaceUrl: originalAnchorFaceImageUrl,
     isAborted: () => runControlRef.current.status === 'cancelled',
     isPaused: () => runControlRef.current.status === 'paused',
   };
@@ -318,10 +291,14 @@ export function useBatchWorkshopRunner() {
   };
 
   const enteringFreshBatch = useFreshWorkshopEntry(workspace.ready, () => whenIdle(workspace.startFreshEntry), showToast);
+  const flow = getWorkshopFlow(items, { generationStrategy, selectedShotCount,
+    collecting: isCollecting, analyzing: isAnalyzingAll, generating: isGeneratingBatch });
+  const pendingAnalysis = new Set(flow.pendingAnalysisIds);
 
   return {
-    assetLoadState: assetLocks.assetLoadState, assetLoadError: assetLocks.assetLoadError, reloadAssets: assetLocks.reloadAssets,
-    analysisIssue: successfulItems.map(item => workshopAnalysisBlockReason(visionAnalyzeDeps, item)).find(Boolean) || null,
+    flow,
+    skillLoadState, skillLoadError, reloadSkills,
+    analysisIssue: successfulItems.filter(item => pendingAnalysis.has(item.id)).map(item => workshopAnalysisBlockReason(visionAnalyzeDeps, item)).find(Boolean) || null,
     currentStage,
     setCurrentStage,
     batchInputText,
@@ -333,6 +310,7 @@ export function useBatchWorkshopRunner() {
     successfulItems,
     handleRemoveItem,
     handleParseInput,
+    handleTableImport,
     startBatchCollect,
     recipes,
     selectedArchId,
@@ -343,29 +321,7 @@ export function useBatchWorkshopRunner() {
     availableImageModels,
     selectedImageGenModel,
     setSelectedImageGenModel,
-    personaMode,
-    setPersonaMode: (value: 'asset_driven' | 'none') => { if (value !== personaMode) { setPersonaMode(value); invalidateWorkshopConfig('locked_assets'); } },
     pipelineStatus: effectivePipelineStatus,
-    useAssetLibrary,
-    setUseAssetLibrary: (value: boolean) => { if (value !== useAssetLibrary) { setUseAssetLibrary(value); invalidateWorkshopConfig('locked_assets'); } },
-    lockedPersonaId,
-    setLockedPersonaId: changeLockedAsset(setLockedPersonaId, lockedPersonaId),
-    lockedSceneId,
-    setLockedSceneId: changeLockedAsset(setLockedSceneId, lockedSceneId),
-    lockedOutfitId,
-    setLockedOutfitId: changeLockedAsset(setLockedOutfitId, lockedOutfitId),
-    lockedActionId,
-    setLockedActionId: changeLockedAsset(setLockedActionId, lockedActionId),
-    lockedFullPromptId,
-    setLockedFullPromptId: changeLockedAsset(setLockedFullPromptId, lockedFullPromptId),
-    promptGroupFolderId,
-    setPromptGroupFolderId: changeLockedAsset(setPromptGroupFolderId, promptGroupFolderId),
-    availablePersonas,
-    availableScenes,
-    availableOutfits,
-    availableActions,
-    availableFullPrompts,
-    availableProductCategories,
     selectedQuality,
     setSelectedQuality,
     selectedAspect,
@@ -402,29 +358,18 @@ export function useBatchWorkshopRunner() {
     exportingSingleItemId,
     ...delivery,
     generationStrategy,
-    setGenerationStrategy,
+    setGenerationStrategy: changeGenerationStrategy,
     autoGenerateCopywriting,
     setAutoGenerateCopywriting,
     imageGenConcurrency,
     setImageGenConcurrency,
-    previewImageUrl,
+    previewImageUrl, previewGallery, openGalleryPreview, closeGalleryPreview, setGalleryIndex,
     setPreviewImageUrl: handleSetPreviewImageUrl,
-    previewGallery,
-    openGalleryPreview,
-    closeGalleryPreview,
-    setGalleryIndex,
     isAutoPilotRunning,
     startAutoPilotPipeline,
-    pauseRun,
-    resumeRun,
-    cancelRun,
-    acknowledgeRecovery,
-    completeCurrentBatch,
-    reviewTask,
-    reviewBatch,
-    isReviewingOutputs,
-    toastMsg,
-    showToast,
+    pauseRun, resumeRun, cancelRun, acknowledgeRecovery, completeCurrentBatch,
+    reviewTask, reviewBatch, isReviewingOutputs,
+    toastMsg, showToast,
     workspaceError: workspace.error,
     workspaceStatus: workspace.status,
     workspaceSaveActions: { retry: workspace.retrySave, download: workspace.downloadDraft },
@@ -436,11 +381,11 @@ export function useBatchWorkshopRunner() {
     activeBatch: workspace.activeBatch,
     historyBatches: workspace.historyBatches,
     refreshBatchHistory: workspace.refreshHistory,
-    createNewBatch: () => whenIdle(() => workspace.createNewBatch()),
+    createNewBatch: (name?: string) => whenIdle(() => workspace.createNewBatch(name)),
     duplicateBatch: (id: string) => whenIdle(() => workspace.duplicateBatch(id)),
     archiveCurrentBatch: () => whenIdle(() => workspace.archiveCurrentBatch()),
     clearHistory: workspace.clearHistory,
-    deleteHistoryBatch: workspace.deleteHistoryBatch,
+    deleteHistoryBatches: workspace.deleteHistoryBatches,
     renameBatch: workspace.renameBatch,
     readBatch: workspace.readBatch,
   };

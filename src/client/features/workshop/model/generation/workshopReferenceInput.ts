@@ -2,33 +2,24 @@ import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
 import { upstreamModelId } from '@shared/domain/models/workflowModels';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 
-/** The transport sends product views first, sample images next, and the optional face last. */
+export function isLegacyReferenceShot(shot: ShotPrompt): boolean {
+  return shot.assembly_source === 'group_skeleton' || Boolean(shot.sourceReferenceImageUrl || shot.sourceGroupId || shot.sourcePrompt);
+}
+
+/** Only product images enter a new skill-driven generation request. */
 export function workshopReferenceInput(shots: ShotPrompt[], productImageCount: number) {
-  const sampleShots = shots.filter(shot => Boolean(shot.sourceReferenceImageUrl));
-  if (!sampleShots.length) {
-    if (shots.some(shot => shot.assembly_source === 'group_skeleton')) throw new Error('旧分析尚未绑定参考原图，请重新分析后生成');
-    return { compositionReferenceImages: [] as string[], instruction: '' };
-  }
-  if (sampleShots.length !== shots.length) throw new Error('参考图绑定不完整，请重新分析后生成');
-  const compositionReferenceImages = [...new Set(sampleShots.map(shot => shot.sourceReferenceImageUrl!))];
+  if (shots.some(isLegacyReferenceShot)) throw new Error('此分镜来自旧参考素材流程，请按创作技能重新分析后生成；历史成图和原任务仍可查看与恢复');
   return {
-    compositionReferenceImages,
-    instruction: [
-      `【参考图分工】@图片1 至 @图片${productImageCount} 仅用于当前商品身份与结构。`,
-      ...sampleShots.map((shot, index) => `分镜${shot.shot_no}${shots.length === 4 ? `（${['左上', '右上', '左下', '右下'][index]}格）` : ''}的构图参考为 @图片${productImageCount + compositionReferenceImages.indexOf(shot.sourceReferenceImageUrl!) + 1}，保留该图的主体占比、裁切、视角、动作、空间与自然光感；将其中旧商品完整替换为当前商品。`),
-      '明确替换项优先于参考图相应内容。不要复制参考中的旧商品、品牌、水印、字幕或界面；不要将构图参考作为第二件商品放入画面。保留真实材质与接触阴影，不额外美化成棚拍广告。',
-    ].join('\n'),
+    compositionReferenceImages: [] as string[],
+    instruction: `【商品图职责】@图片1 至 @图片${productImageCount} 仅用于当前同款商品的身份、结构、颜色和材质；画面构图、场景、人物与穿搭按已确认的技能分镜执行，不复制商品原图的广告字、原模特或背景。`,
   };
 }
 
-/** Reserve actual sample and face slots before trimming optional product views. */
 export function workshopReferenceBudget(model: string, shots: ShotPrompt[], hasFace: boolean): number {
+  if (shots.some(isLegacyReferenceShot)) throw new Error('旧参考素材分镜需按创作技能重新分析后才能发起新生图');
   const limit = imageCapabilities(upstreamModelId(model)).maxReferenceImages;
   if (!limit) return 4;
-  const samples = new Set(shots.map(shot => shot.sourceReferenceImageUrl).filter(Boolean)).size;
-  const productSlots = limit - samples - (hasFace ? 1 : 0);
-  if (productSlots < 1) {
-    throw new Error(`该模型最多支持 ${limit} 张参考图，无法同时保留商品与${shots.length === 4 ? '四镜参考' : '当前镜头参考'}${hasFace ? '和锁脸图' : ''}；请${shots.length === 4 ? '改用单张逐镜，或' : ''}选择参考图容量更大的模型`);
-  }
+  const productSlots = limit - (hasFace ? 1 : 0);
+  if (productSlots < 1) throw new Error(`该模型最多支持 ${limit} 张参考图，无法同时保留商品图和锁脸图，请选择参考图容量更大的模型`);
   return Math.min(4, productSlots);
 }

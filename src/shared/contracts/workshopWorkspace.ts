@@ -51,6 +51,13 @@ const product = z.object({
   status: z.enum(['pending', 'collecting', 'success', 'failed']), selected: z.boolean(),
   allTypedImages: z.array(z.object({ url: z.string(), type: z.enum(['main', 'sku', 'detail']) })),
   selectedProductImages: strings,
+  contentPlan: z.object({
+    index: z.number().int().min(1).max(20), total: z.number().int().min(1).max(20),
+    theme: z.string().max(200), focus: z.string().max(1000), opening: z.string().max(1000),
+    scene: z.string().max(1000), treatment: z.string().max(1000),
+  }).refine(plan => plan.index <= plan.total, '内容序号不能超过总需求').optional(),
+  importCategory: z.string().optional(),
+  importSourceRows: z.array(z.number().int().positive()).optional(),
   prompts: z.array(prompt),
   tasks: z.array(task),
   skipped: z.boolean().optional(),

@@ -123,6 +123,10 @@ describe('sales creative stage ordering', () => {
   });
   it('blocks finalization until actual images pass and sends those exact images in submission order', async () => {
     const { stages, stateRef, setError } = Harness();
+    stateRef.current.analysis = { sellingPoints: ['圆领结构'], knownFacts: ['棉含量由原始商品资料提供'] } as NonNullable<VideoSalesStudioState['analysis']>;
+    stateRef.current.props = { 材质: '纯棉', 价格: '168元' };
+    stateRef.current.sellingPoints = '圆领；价格：168元';
+    stateRef.current.scripts[0].planRevision = salesPlanInputRevision(stateRef.current);
     await stages.runFinalize();
     expect(finalizeSalesPrompts).not.toHaveBeenCalled();
     expect(setError).toHaveBeenCalledWith('素材尚未完成校验');
@@ -135,6 +139,8 @@ describe('sales creative stage ordering', () => {
     await stages.runFinalize();
     expect(finalizeSalesPrompts).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ operation: 'finalize',
       model: 'chat-chosen', textProtocol: 'openai', customBaseUrl: 'https://model-channel.test', customApiKey: 'model-key',
+      productAnalysis: JSON.stringify(stateRef.current.analysis),
+      productDescription: JSON.stringify({ originalProductProperties: { 材质: '纯棉' }, creativeSellingPoints: '圆领' }),
       actualReferences: [{ id: 'product-8', kind: 'product', label: '商品参考 9', url: '/black.jpg' }, { id: 'scene', kind: 'scene', label: '桌面', url: '/actual-scene.jpg' }],
     }));
     expect(resolveModalityModelRoute).toHaveBeenCalledWith('chat', undefined);

@@ -1,4 +1,4 @@
-import type { InspirationItem } from '../components/inspiration/InspirationModal';
+import type { InspirationItem } from '../model/inspirationItem';
 
 const MEDIA_ROOT = '/inspirations/imported-20260910';
 
@@ -16,33 +16,9 @@ export const IMPORTED_IMAGE_INSPIRATIONS: InspirationItem[] = [
     aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
   },
   {
-    id: 'imported-image-jay-collab-02', category: 'photo', tag: '节日街拍 · 巨幕打卡',
-    title: '新春灯会巨幕 · 福字提灯合影',
-    prompt: billboardPrompt('一位短发年轻男生站在画面中央', '身穿黑色长大衣与米色针织衫，戴针织手套，一手举红色福字卡片，一手提发光中式小灯笼，直视镜头自然微笑'), image: `${MEDIA_ROOT}/jay-collab-02.jpg`,
-    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
-  },
-  {
-    id: 'imported-image-jay-collab-03', category: 'photo', tag: '夜景人像 · 巨幕打卡',
-    title: '冬夜巨幕街拍 · 围巾男生看手机',
-    prompt: billboardPrompt('一位短发年轻男生站在画面中央', '身穿深色长大衣、棕色针织衫与格纹围巾，低头查看手机，另一只手提暖光中式灯笼，神态自然克制'), image: `${MEDIA_ROOT}/jay-collab-03.jpg`,
-    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
-  },
-  {
-    id: 'imported-image-jay-collab-04', category: 'photo', tag: '商业街拍 · 购物打卡',
-    title: '城市巨幕购物季 · 暖笑男士街拍',
-    prompt: billboardPrompt('一位年轻男士站在画面中央', '身穿黑色长大衣与灰色高领针织衫，双手拿手机并提牛皮纸购物袋，面向镜头自然微笑，呈现都市购物后的轻松状态'), image: `${MEDIA_ROOT}/jay-collab-04.jpg`,
-    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
-  },
-  {
     id: 'imported-image-jay-collab-05', category: 'photo', tag: '女性街拍 · 巨幕打卡',
     title: '灯笼夜景巨幕 · 风衣女生手机抓拍',
     prompt: billboardPrompt('一位长卷发年轻女生站在画面中央', '身穿卡其色长风衣与黑色高领衫，一手查看手机、一手提棕色手袋，神态安静自然'), image: `${MEDIA_ROOT}/jay-collab-05.jpg`,
-    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
-  },
-  {
-    id: 'imported-image-jay-collab-06', category: 'photo', tag: '冬日街拍 · 巨幕打卡',
-    title: '冬夜暖饮巨幕 · 女生咖啡合影',
-    prompt: billboardPrompt('一位短卷发年轻女生站在画面中央', '身穿炭灰色长大衣、米色针织衫和针织手套，双手捧着咖啡杯，对镜头温暖微笑'), image: `${MEDIA_ROOT}/jay-collab-06.jpeg`,
     aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
   },
   {
@@ -52,21 +28,9 @@ export const IMPORTED_IMAGE_INSPIRATIONS: InspirationItem[] = [
     aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
   },
   {
-    id: 'imported-image-jay-collab-08', category: 'photo', tag: '明星合影 · 奶茶广告',
-    title: '白色机车风 · 递奶茶联名合照',
-    prompt: muralPrompt('一位长发年轻女生'), image: `${MEDIA_ROOT}/jay-collab-08.jpeg`,
-    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
-  },
-  {
     id: 'imported-image-jay-collab-09', category: 'photo', tag: '明星合影 · 奶茶广告',
     title: '城市车窗互动 · 笑容女生递奶茶',
     prompt: `${muralPrompt('一位长发年轻女生')} 前景女生露出自然灿烂笑容，白色机车夹克搭配黑色短上衣与浅蓝牛仔裤，奶茶杯贴近镜头形成强烈视觉焦点。`, image: `${MEDIA_ROOT}/jay-collab-09.jpeg`,
-    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
-  },
-  {
-    id: 'imported-image-jay-collab-10', category: 'photo', tag: '夜景男装 · 巨幕打卡',
-    title: '蓝调商业街 · 连帽男生购物街拍',
-    prompt: billboardPrompt('一位短发年轻男生全身站在画面中央', '身穿藏蓝长大衣叠搭灰色连帽衫、牛仔裤与皮靴，一手拿手机、一手提牛皮纸购物袋，迈步走向镜头，神情冷静'), image: `${MEDIA_ROOT}/jay-collab-10.jpg`,
     aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
   },
 ];

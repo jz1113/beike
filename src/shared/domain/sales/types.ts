@@ -40,6 +40,8 @@ export interface SalesActualReference {
 }
 
 export interface SalesVideoSnapshot {
+  skillId?: string;
+  skillRevision?: string;
   model: string;
   prompt: string;
   images: string[];
@@ -89,11 +91,11 @@ export interface VideoSalesShot {
   type: VideoSalesShotType;
   duration: number; // 秒 (通常 2-8s)
   description: string; // 画面构图与动态描述
-  camera: string; // 运镜描述（如：特写推近、俯拍全景）
+  camera: string; // 按技能确定的机位、正常距离景别与必要运镜
   visualSource: VideoSalesVisualSource;
   transition: VideoSalesTransition;
   speechMode?: VideoSalesSpeechMode;
-  voiceover: string; // 台词原文，声音来源由 speechMode 指定。服饰是对镜头的口语，全片约每秒 3.2–4.6 字，15 秒为 48–69 字，单段不超过约每秒 6 字；其他品类约每秒 3–4 字
+  voiceover: string; // 台词原文，声音来源由 speechMode 指定。服饰约每秒 2.4–4.6 汉字，日常优先 2.4–3.6，单段不超过每秒约 6 字
   prompt?: string; // 图生视频画面提示词，不包含字幕或大字
   finalPrompt?: string;
   selectionReason?: string;
@@ -123,6 +125,8 @@ export interface VideoSalesSeo {
 export interface VideoSalesScript {
   id: string;
   title: string;
+  skillId?: string;
+  skillRevision?: string;
   totalDuration: number; // 秒
   shots: VideoSalesShot[];
   seo: VideoSalesSeo;

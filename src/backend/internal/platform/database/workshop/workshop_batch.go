@@ -94,6 +94,7 @@ func EnsureActiveWorkshopBatch(ctx context.Context, db *sql.DB, workspace string
 }
 
 func insertBatchTx(ctx context.Context, tx *sql.Tx, workspace, id, name, status, snapshot, now string, legacy bool) error {
+	name = workshopBatchName(id, name, now)
 	flag := 0
 	if legacy {
 		flag = 1
@@ -142,7 +143,7 @@ func snapshotHasContent(raw string) bool {
 }
 
 func emptyBatchSnapshot() string {
-	return `{"version":2,"mode":"original","currentStage":1,"batchInputText":"","items":[],"settings":{"selectedVisionModel":"gemini-3.7-flash","selectedImageGenModel":"gpt-image-2","selectedArchId":"auto","hasHumanPersona":true,"personaMode":"asset_driven","selectedQuality":"high","selectedAspect":"3:4","selectedShotCount":4,"useAssetLibrary":true,"lockedPersonaId":"auto","lockedSceneId":"auto","lockedOutfitId":"auto","lockedActionId":"auto","lockedFullPromptId":"auto","promptGroupFolderId":"auto","generationStrategy":"single_shot","autoGenerateCopywriting":true},"pipeline":{"status":"draft","planRevision":0,"storyboardRevision":0,"diversityContext":{"groupSignatures":[],"actionIds":[],"sceneIds":[]},"runs":[]}}`
+	return `{"version":2,"mode":"original","currentStage":1,"batchInputText":"","items":[],"settings":{"selectedVisionModel":"gemini-3.7-flash","selectedImageGenModel":"gpt-image-2","selectedArchId":"auto","hasHumanPersona":true,"personaMode":"asset_driven","selectedQuality":"high","selectedAspect":"3:4","selectedShotCount":4,"useAssetLibrary":true,"lockedPersonaId":"auto","lockedSceneId":"auto","lockedOutfitId":"auto","lockedActionId":"auto","lockedFullPromptId":"auto","promptGroupFolderId":"auto","generationStrategy":"grid_first","autoGenerateCopywriting":true},"pipeline":{"status":"draft","planRevision":0,"storyboardRevision":0,"diversityContext":{"groupSignatures":[],"actionIds":[],"sceneIds":[]},"runs":[]}}`
 }
 
 var ErrBatchConflict = errors.New("批次冲突")

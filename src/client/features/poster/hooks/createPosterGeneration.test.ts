@@ -85,4 +85,21 @@ describe('poster production after workflow extraction', () => {
     expect(context.itemsRef.current[0].status).toBe('failed');
     expect(context.itemsRef.current[0].error).toContain('无法保存原任务查询标识');
   });
+  it('keeps a saved rule snapshot on design retry and reuses a completed design after image failure', async () => {
+    const { context, item, runner } = fixture(false);
+    item.memoryUsageId = 'original-usage';
+    item.memorySampleId = 'original-sample';
+    vi.mocked(directCoverDesign).mockResolvedValue({ memorySampleId: 'original-sample', memoryEntryIds: ['old-rule'], memoryUsageId: 'new-usage', memoryRevisionId: 'original-revision', design: {
+      title: item.originalTitle, titleLines: [item.originalTitle], layout: '保持主体', imagePrompt: '原方案',
+    } });
+    vi.mocked(generateFinalCover).mockRejectedValueOnce(Object.assign(new Error('确定失败'), { retryable: false }));
+    await runner.runItem(item, 0);
+    expect(directCoverDesign).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.objectContaining({ memoryUsageId: 'original-usage' }));
+    expect(context.itemsRef.current[0]).toMatchObject({ memoryUsageId: 'new-usage', memoryRevisionId: 'original-revision', status: 'failed' });
+    vi.mocked(generateFinalCover).mockResolvedValueOnce('https://example.com/result.jpg');
+    await runner.runItem(context.itemsRef.current[0], 0);
+    expect(directCoverDesign).toHaveBeenCalledOnce();
+    expect(context.itemsRef.current[0].status).toBe('complete');
+  });
+
 });

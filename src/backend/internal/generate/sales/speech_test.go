@@ -69,7 +69,7 @@ func TestFinalizeBindsEachVoiceSourceAndPreservesDialogue(t *testing.T) {
 					first = "人物中近景"
 				}
 				raw, _ := json.Marshal(map[string]any{"fullPrompt": full, "prompts": []finalPrompt{
-					{ShotID: 1, Prompt: first}, {ShotID: 2, Prompt: "领口特写，画外音：再给你看看领口。"},
+					{ShotID: 1, SpeechMode: "on_camera", Prompt: first}, {ShotID: 2, SpeechMode: "voiceover", Prompt: "领口特写，画外音：再给你看看领口。"},
 				}})
 				return string(raw)
 			})
@@ -91,6 +91,11 @@ func TestFinalizeBindsEachVoiceSourceAndPreservesDialogue(t *testing.T) {
 			}
 			if !strings.HasPrefix(result.Prompts[0].Prompt, speechDirection("on_camera")) || !strings.HasPrefix(result.Prompts[1].Prompt, speechDirection("voiceover")) {
 				t.Fatal("per-shot speech directions were lost")
+			}
+			for _, line := range []string{"今天穿这件出门。", "再给你看看领口。"} {
+				if strings.Count(result.FullPrompt, line) != 1 {
+					t.Fatalf("validated dialogue repeated in full prompt: %s", line)
+				}
 			}
 		})
 	}
@@ -136,7 +141,7 @@ func TestFashionScriptRejectsNarrationForSelectedPresenter(t *testing.T) {
 	}
 }
 
-func TestFashionScriptNormalizesVoiceoverModes(t *testing.T) {
+func TestFashionScriptRejectsConflictingVoiceoverModes(t *testing.T) {
 	for _, mode := range []string{"product_closeup", "scene_demo", "graphic_montage"} {
 		t.Run(mode, func(t *testing.T) {
 			server := useChatServer(t, func(body map[string]any, _ int) string {
@@ -153,7 +158,7 @@ func TestFashionScriptNormalizesVoiceoverModes(t *testing.T) {
 			payload["productName"] = "黑色卫衣"
 			attachGateway(payload, server.URL)
 			rec := postSales(t, Script(config.Config{}), "/", payload)
-			if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"speechMode":"voiceover"`) {
+			if rec.Code != 502 {
 				t.Fatalf("%s got %d %s", mode, rec.Code, rec.Body.String())
 			}
 		})

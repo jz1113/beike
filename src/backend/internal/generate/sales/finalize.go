@@ -12,8 +12,9 @@ import (
 )
 
 type finalPrompt struct {
-	ShotID int    `json:"shotId"`
-	Prompt string `json:"prompt"`
+	ShotID     int    `json:"shotId"`
+	SpeechMode string `json:"speechMode"`
+	Prompt     string `json:"prompt"`
 }
 
 // Finalize writes one video prompt from the pictures that were actually generated.

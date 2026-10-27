@@ -42,7 +42,7 @@ export default function BatchStageFooter({
           type="button"
           onClick={primaryAction.onClick}
           disabled={primaryAction.disabled}
-          className="px-5 py-3 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          className="px-5 py-3 rounded-xl text-xs font-bold bg-slate-950 hover:bg-black text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
           {primaryAction.icon}
           <span>{primaryAction.label}</span>

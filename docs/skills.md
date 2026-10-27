@@ -2,7 +2,7 @@
 
 ## 存放与真源
 
-内置 Agent 运行技能统一存放在 `src/shared/domain/assistant/skills/packages/<skill-id>/`。每个技能的 `SKILL.md` 是执行正文的唯一维护入口，详情阅读器和发送给 Agent 的正文均由它生成，不再分别维护长文展示版和短版执行提示词。创作示例仍保留在 `builtinCreationSkills.ts`，不自动加入运行技能目录。
+内置 Agent 运行技能统一存放在 `src/shared/domain/assistant/skills/packages/<skill-id>/`。每个技能的 `SKILL.md` 是主执行指令的维护入口，详情阅读器和发送给 Agent 的正文均由它生成；条件规范与模板维护在主文件明确引用的包内资源中。创作示例仍保留在 `builtinCreationSkills.ts`，不自动加入运行技能目录。
 
 - `SKILL.md`：名称、触发用途、输入决策、执行步骤、失败恢复、输出与验收。
 - `agents/beike.json`：稳定 ID、中文展示名称、版本、实际工具等应用元数据。
@@ -14,6 +14,18 @@
 不为凑目录创建空资源，不编造许可证。维护技能时保留已有 ID、路由与持久化标识，避免破坏历史消息和收藏。
 
 修改包后运行 `pnpm skills:build`，生成浏览器安全的 `compiledSkillPackages.json`。`pnpm check:skills` 校验主文件、元数据、真实工具名、引用资源及编译结果同步，已纳入 `pnpm check`。不要直接编辑生成的 JSON。编译器位于 `tools/scripts/skills/build-skill-packages.mjs`，主正文超过 10,000 字符时要求拆分参考资料。
+
+## 电商视频的分阶段执行
+
+服饰工作室与对话助手共用 `fashion-video-sales` 技能包。完整创作规范维护在 `references/production.md`，分析、选图与成片执行约束分别维护在相应参考文件，静帧参考职责、脚本示例、出镜与声音指令、口播数值维护在 `assets`。工作室使用固定流程调度，并将该阶段的技能规则直接注入对应模型；无需每一步另起 Agent，也不回退到另一份内置创作提示词。代码负责 JSON 协议、依赖、计时、事实传递和校验。
+
+通用电商视频质量规则维护在包内 `references/content-quality.md`，服饰专业规则继续维护在 `references/production.md`，脚本与分镜导演方法维护在 `references/directing.md`。编译器从三份资源按章节分发：分析接收质量判定、信息增益、展示主线与信任规则；脚本另接收分镜状态设计和声音要求；生图接收画面、首帧及商品层次构图；定稿接收分镜状态、提示词取舍、相关质量规则与交付模板。成片执行仅接收精简的拍摄及声音指令，不把人工审核教程拼进视频提示词。三份资源全文进入版本摘要与本地阅读镜像，缺失或重复的必需章节使构建失败。教学脚本保留在导演参考中供按需阅读，不自动注入生产阶段，避免示例商品与时间轴变成固定模板。验收由实际听看完成，当前没有新增自动评分服务或发布阻断接口。
+
+后续类目的质量基线、证据要求与接入条件见[电商视频质量与类目接入](video-content-quality.md)。目前该通用资源随服饰包发布；有第二个实际类目接入时再提取为共用编译输入并装入各包，保持单一维护源，不复制多份长期演化，也不把服饰的中景、单SKU或禁价格规则直接套到全部类目。
+
+`tools/scripts/skills/build-sales-skill.mjs` 按阶段编译为浏览器的 `src/shared/domain/sales/compiledSalesSkill.json` 与 Go 内嵌的 `src/backend/internal/generate/sales/skill_package.generated.json`，同时生成 `.agents/skills/fashion-video-sales/SKILL.md` 阅读镜像。三者均由 `pnpm skills:build` 更新，不能独立编辑。前端构建、API 构建（包括开发启动器）与 `pnpm check` 都检查同步性，缺失资源或过期产物会直接失败。
+
+编译摘要覆盖主文件、完整规范、阶段资源、执行指令与口播限制。各创作请求携带技能 ID 和摘要，服务端拒绝明确选择了其他技能或过期摘要的请求；响应回传实际执行摘要，前端校验一致后才采用。兼容不带标识的旧调用时，服务端仍执行唯一安装的服饰技能。草稿的分析、脚本、素材和定稿签名包含该规则摘要，更新技能后旧内容须按阶段更新；查询原任务与读取旧结果保持可用。
 
 ## 界面和自定义技能
 

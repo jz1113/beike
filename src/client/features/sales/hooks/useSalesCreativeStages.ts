@@ -125,6 +125,8 @@ export function useSalesCreativeStages(input: {
         actualReferences: salesActualReferences(script, images), eligibleImageIndexes: images.map((item) => item.index),
         selectedColor: current.colorSelection.colorLabel,
         category: current.category, targetDuration: current.targetDuration, aspectRatio: current.aspectRatio,
+        productAnalysis: current.analysis ? JSON.stringify(current.analysis) : undefined,
+        productDescription: JSON.stringify({ originalProductProperties: omitSalesPriceProps(current.props), creativeSellingPoints: omitSalesPriceClauses(current.sellingPoints) }),
         videoModel: video.modelId, videoRefMode: current.videoRefMode, videoResolution: current.videoResolution,
         model: chat.modelId, textProtocol: chat.textProtocol, customBaseUrl: chat.baseUrl, customApiKey: chat.apiKey, signal: controller.signal,
       });

@@ -30,7 +30,7 @@ export const MODALITY_TITLES: Record<ModalityKind, { title: string; subtitle: st
   },
   avatar: {
     title: '数字人',
-    subtitle: '照片数字人与视频对口型的驱动模型。配音仍在语音线路配置。',
+    subtitle: '数字人功能重建中，已保存的驱动模型配置保留。配音仍在语音线路配置。',
   },
 };
 

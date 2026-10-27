@@ -57,6 +57,9 @@ func analysisFailureReason(status int, err error) string {
 	if errors.Is(err, errTruncatedOutput) {
 		return errTruncatedOutput.Error()
 	}
+	if errors.Is(err, errInvalidSalesJSON) {
+		return "没有返回有效 JSON（JSON 不完整或语法错误）"
+	}
 	if errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		return "已取消"
 	}
@@ -222,13 +225,11 @@ func summarizeAnalysisBody(model string, facts analysisFacts, partials string) m
 }
 
 func analysisSystemPrompt(category string) string {
-	base := "你是电商选品编辑。只输出 JSON 对象，不输出解释。不要把价格、金额或优惠写进卖点、已知事实或拍摄建议。"
-	return base + " 当前商品属于服饰、鞋、包。knownFacts 只写颜色、版型、面料、结构等看得见或资料里有的事实。sellingPoints 至少写两条能分开说的事实，每条写成嘴里能说出来的穿着场合或搭配，并写明依据；推不出场合或搭配就不要写成卖点。不要写成必须照念的论证箭头。usageScenarios 与 painPoints 只从品名、季节和品类推出。creativeNotes 与 videoSuggestions 只在开箱换装、生活穿搭、鞋包展示中给出生活实拍方向，keyVisuals 只列画面里真的会给观众看的一处。不编造功效、评价、销量、实测、优惠、尺码或价格。" + "\n" + fashionFramingRules()
+	return salesSkillInstructions("analyze") + "\n当前执行商品图片分析，只输出约定结构的 JSON 对象。"
 }
 
 func analysisSummaryPrompt(category string) string {
-	base := "你负责合并商品分析结果。只输出 JSON 对象。不要把价格、金额或优惠写进卖点、已知事实或拍摄建议。"
-	return base + " 合并时保持服饰约束：knownFacts 只保留颜色、版型、面料、结构等可见事实；sellingPoints 保留能说出口的穿着场合或搭配并带依据，推不出场合或搭配的删掉，至少留下两条能分开说的事实，不要保留论证箭头；usageScenarios 与 painPoints 只保留能从品名、季节或品类推出的场合。拍摄建议只保留开箱换装、生活穿搭或鞋包展示，keyVisuals 只保留画面里真的会给观众看的一处，不新增功效、评价、销量、实测、优惠、尺码或价格。" + "\n" + fashionFramingRules()
+	return salesSkillInstructions("analyze") + "\n当前合并已完成的分批图片分析，只输出约定结构的 JSON 对象。"
 }
 
 func analysisJSONShape(category string) string {

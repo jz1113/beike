@@ -1,4 +1,4 @@
-export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'keyword_review' | 'assets' | 'canvas' | 'settings' | 'skills' | 'ppt_generator' | 'avatar' | 'video_sales';
+export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'keyword_review' | 'assets' | 'canvas' | 'settings' | 'skills' | 'video_sales';
 
 const LEGACY_VIEW: Record<string, AppView> = {
   hub: 'home',
@@ -12,9 +12,9 @@ const LEGACY_VIEW: Record<string, AppView> = {
   canvas: 'canvas',
   settings: 'settings',
   skills: 'skills',
-  ppt_generator: 'ppt_generator',
-  avatar: 'avatar',
-  digital_human: 'avatar',
+  ppt_generator: 'home',
+  avatar: 'home',
+  digital_human: 'home',
   video_sales: 'video_sales',
   daihuo: 'video_sales',
 };
@@ -35,8 +35,6 @@ export function isAppView(value: string): value is AppView {
     value === 'canvas' ||
     value === 'settings' ||
     value === 'skills' ||
-    value === 'ppt_generator' ||
-    value === 'avatar' ||
     value === 'video_sales'
   );
 }

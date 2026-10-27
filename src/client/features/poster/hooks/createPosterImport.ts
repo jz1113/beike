@@ -27,8 +27,12 @@ export function createPosterImport(context: Pick<PosterState,
     }
     importingRef.current = true;
     setIsImporting(true);
+    const initialCount = itemsRef.current.length;
     try {
       assertPosterImportRowCount(images.length);
+      for (const file of images) {
+        if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name} 超过 20MB，请压缩后导入。`);
+      }
       let tableCount = 0;
       for (const file of tables) {
         if (file.size > 20 * 1024 * 1024) throw new Error('表格文件超过 20MB，请拆分后导入。');
@@ -45,27 +49,25 @@ export function createPosterImport(context: Pick<PosterState,
         void persistActiveBatch(next);
         tableCount += parsed.length;
       }
-      const uploaded = [];
+      let uploadedCount = 0;
       for (const file of images) {
-        if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name} 超过 20MB，请压缩后导入。`);
         const url = await uploadStudioFile(file, 'headline-poster');
         const absolute = /^https?:\/\//i.test(url) ? url : new URL(url, window.location.origin).href;
-        uploaded.push(posterItemFromUploadedImage(absolute, file.name));
-      }
-      if (uploaded.length > 0) {
         ensureActiveBatch();
-        const next = mergePosterItems(itemsRef.current, uploaded);
+        const next = mergePosterItems(itemsRef.current, [posterItemFromUploadedImage(absolute, file.name)]);
         itemsRef.current = next;
         setItemsIfAlive(next);
-        void persistActiveBatch(next);
+        await persistActiveBatch(next);
+        uploadedCount += 1;
       }
       const parts = [
         tableCount > 0 ? `表格 ${tableCount} 条` : '',
-        uploaded.length > 0 ? `图片 ${uploaded.length} 张，原标题取自文件名，版式为文字竖` : '',
+        uploadedCount > 0 ? `图片 ${uploadedCount} 张，原标题取自文件名，版式为文字竖` : '',
       ].filter(Boolean);
       setNoticeIfAlive(`已导入 ${parts.join('，')}。`);
     } catch (error) {
-      setNoticeIfAlive(`导入失败：${error instanceof Error ? error.message : '文件格式无法识别'}`);
+      const addedCount = itemsRef.current.length - initialCount;
+      setNoticeIfAlive(`${addedCount > 0 ? `已保留成功导入的 ${addedCount} 条；后续` : ''}导入失败：${error instanceof Error ? error.message : '文件格式无法识别'}`);
     } finally {
       importingRef.current = false;
       if (aliveRef.current) setIsImporting(false);

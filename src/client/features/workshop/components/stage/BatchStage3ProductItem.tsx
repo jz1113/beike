@@ -1,3 +1,4 @@
+import { contentPlanLabel } from '../../model/analysis/workshopContentPlan';
 import { WorkshopReferenceStrip } from '../product/WorkshopReferenceStrip';
 import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
 import {
@@ -90,6 +91,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
               >
                 {item.title}
               </h4>
+              {item.contentPlan && <span className="text-xs text-indigo-500">{contentPlanLabel(item)}</span>}
               {item.isAnalyzing ? (
                 <BatchStatusBadge variant="analyzing" spinning>
                   AI 分析优化中
@@ -120,7 +122,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
                 <>
                   <span>·</span>
                   <span className="inline-flex max-w-full flex-wrap items-center gap-1.5" title={`母本原名称：${item.appliedFullPromptTitle || '未命名'}；资产 ID：${item.appliedFullPromptId}`}>
-                    <span>{item.appliedFullPromptSelectionMode === 'auto' ? '轮询使用' : '固定使用'}</span>
+                    <span>历史参考</span>
                     <strong className="text-indigo-700">{sourceGroupName}</strong>
                   </span>
                   {item.appliedFullPromptAppearance && <span className={`rounded px-1.5 py-0.5 font-medium ${item.appliedFullPromptAppearance === 'human' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600 dark:text-slate-300 dark:bg-white/10'}`}>
@@ -166,7 +168,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
             onClick={() => handleRemoveItem(item.id)}
             disabled={item.isAnalyzing || isAnalyzingAll}
             className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-rose-500/10"
-            title="移除此商品" aria-label={`移除商品 ${item.title}`}
+            title="放弃此商品" aria-label={`放弃商品 ${item.title}`}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -201,7 +203,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
       )}
 
       {hasPrompts && item.appliedFullPromptId && !sharedAssets.scene && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">每款商品使用上方母组，场景按镜头绑定；展开分镜结构可核对实际场景与光线。</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">此商品保留旧参考素材分镜；需要发起新生图时，请按创作技能重新分析。</p>
       )}
 
       {hasPrompts && <WorkshopReferenceStrip item={item} />}
@@ -247,7 +249,7 @@ const MemoizedProductItem = React.memo(function ProductItem({
           </div>
           {showShotSummary && <div className="grid grid-cols-2 gap-2 border-t pt-3">
             {item.prompts.map((shot, index) => <div key={index} className="text-xs text-slate-600 p-3 bg-white rounded-lg space-y-1 dark:text-slate-300 dark:bg-[#18191c]">
-              <p className="font-medium">{index + 1}. {shot.title || `分镜 ${index + 1}`} · {shot.camera_focal_length || '母本机位'}</p>
+              <p className="font-medium">{index + 1}. {shot.title || `分镜 ${index + 1}`} · {shot.camera_focal_length || '技能分镜'}</p>
               <p className="line-clamp-3" title={getShotAssetLabels(shot).scene}>场景：{getShotAssetLabels(shot).scene || '未记录'}</p>
               <p>光线：{shot.lighting_type || '未记录'}</p>
             </div>)}

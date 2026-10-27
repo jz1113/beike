@@ -7,6 +7,7 @@ export interface CoverFeedJobView {
   status: CoverFeedJobStatus;
   url?: string;
   sampleId?: string;
+  requestKey?: string;
   error?: string;
 }
 
@@ -15,7 +16,7 @@ export function coverFeedBusy(statuses: CoverFeedJobStatus[]) {
 }
 
 export function canStartCoverFeed(statuses: CoverFeedJobStatus[]) {
-  return statuses.length > 0 && !coverFeedBusy(statuses);
+  return statuses.some((status) => status === 'queued' || status === 'failed') && !coverFeedBusy(statuses) && !statuses.includes('uncertain');
 }
 
 export function coverFeedPhase(statuses: CoverFeedJobStatus[], dragging: boolean): 'idle' | 'ready' | 'dragging' | 'uploading' | 'analyzing' | 'success' | 'partial' | 'error' {
@@ -25,14 +26,15 @@ export function coverFeedPhase(statuses: CoverFeedJobStatus[], dragging: boolean
   const failed = statuses.some((status) => status === 'failed' || status === 'uncertain');
   const done = statuses.some((status) => status === 'done');
   if (done && failed) return 'partial';
+  if (done && statuses.includes('queued')) return 'ready';
   if (done) return 'success';
   if (failed) return 'error';
   return 'ready';
 }
 
 export function reconcileCoverFeedJob(job: CoverFeedJobView, samples: CoverMemorySample[], startedAt: string): CoverFeedJobView {
-  if (!job.url) return { ...job, status: 'uncertain', error: '上传结果不确定，请先刷新核对，不要重复投喂' };
-  const matched = samples.find((sample) => sample.imageUrls.includes(job.url || '') && sample.createdAt >= startedAt);
+  if (!job.url && !job.sampleId && !job.requestKey) return { ...job, status: 'uncertain', error: '上传结果不确定，请先刷新核对，不要重复投喂' };
+  const matched = samples.find((sample) => job.sampleId ? sample.id === job.sampleId : job.requestKey ? sample.requestKey === job.requestKey : sample.imageUrls.includes(job.url || '') && sample.createdAt >= startedAt);
   if (!matched) return { ...job, status: 'uncertain', error: '没有查到这次反推结果，请先刷新核对，不要重复投喂' };
   if (matched.status === 'completed') return { ...job, status: 'done', sampleId: matched.id, error: undefined };
   if (matched.status === 'failed') return { ...job, status: 'failed', sampleId: matched.id, error: matched.error || '反推失败' };

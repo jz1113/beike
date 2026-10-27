@@ -36,12 +36,11 @@ func TestFashionFramingReachesFinalModelAndSubmittedPrompt(t *testing.T) {
 		t.Run(category, func(t *testing.T) {
 			server := useChatServer(t, func(body map[string]any, _ int) string {
 				messages := body["messages"].([]any)
-				user := messages[1].(map[string]any)["content"].([]any)
-				text := user[0].(map[string]any)["text"].(string)
-				if strings.Contains(text, fashionFramingRules()) != (category == "fashion") {
+				text := messages[0].(map[string]any)["content"].(string)
+				if strings.Contains(text, salesSkillStage("finalize")) != (category == "fashion") {
 					t.Fatal("final model did not receive the category's framing rules")
 				}
-				return `{"fullPrompt":"参考图片保持商品一致，看看这款纸巾","prompts":[{"shotId":1,"prompt":"连续展示，看看这款纸巾"}]}`
+				return `{"fullPrompt":"参考图片保持商品一致，看看这款纸巾","prompts":[{"shotId":1,"speechMode":"voiceover","prompt":"连续展示，看看这款纸巾"}]}`
 			})
 			payload := workflowPayload()
 			payload["operation"] = "finalize"
@@ -54,8 +53,16 @@ func TestFashionFramingReachesFinalModelAndSubmittedPrompt(t *testing.T) {
 			if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &response) != nil {
 				t.Fatalf("%d %s", rec.Code, rec.Body.String())
 			}
-			if strings.Contains(response.FullPrompt, fashionFramingRules()) != (category == "fashion") {
-				t.Fatal("submitted prompt lost the framing preamble or applied it to another category")
+			if !strings.Contains(response.FullPrompt, "按时间轴指定的机位") || !strings.Contains(response.FullPrompt, "正常距离中景") {
+				t.Fatal("submitted prompt lost executable camera directions")
+			}
+			for _, forbidden := range []string{"旧分镜", "需要补充中景素材", "ID=", "类型=", "每段围绕一个"} {
+				if strings.Contains(response.FullPrompt, forbidden) {
+					t.Fatalf("submitted prompt leaked authoring metadata: %s", forbidden)
+				}
+			}
+			if strings.Count(response.FullPrompt, "看看这款纸巾") != 1 {
+				t.Fatal("deterministic preamble duplicated the validated dialogue")
 			}
 		})
 	}

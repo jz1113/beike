@@ -5,7 +5,7 @@ import type { CategorySkillState } from '@shared/contracts/categorySkills';
 import { changeCategorySkill, learnCategorySkill, readCategorySkill } from '../api/categorySkills';
 import { canAutoLearn } from '../model/categoryAgent';
 
-export function useCategorySkill(folderId: string, modelId: string, maxNewSamples: number) {
+export function useCategorySkill(folderId: string, modelId: string, maxNewSamples: number, autoLearn = true) {
   const [state, setState] = useState<CategorySkillState | null>(null);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -42,8 +42,13 @@ export function useCategorySkill(folderId: string, modelId: string, maxNewSample
       let message = '';
       if (action === 'learn' || action === 'observe' || action === 'consolidate') {
         const result = await learnCategorySkill(folderId, modelId, force, maxNewSamples, action, signal);
-        message = `本轮读取 ${result.analyzedGroups} 套，${result.stage === 'candidate' ? '已整理候选技能' : '观察已记住'}${result.remaining ? `；还有 ${result.remaining} 套待学习，可继续下一轮` : ''}。`;
-      } else await changeCategorySkill(folderId, action, { revision: state.scope.revision, ...payload }, signal);
+        message = result.stage === 'running'
+          ? `后台学习已启动；关闭窗口后仍会继续，当前还有 ${result.remaining} 组待读图。`
+          : `本轮读取 ${result.analyzedGroups} 组，${result.stage === 'candidate' ? '已整理候选技能' : '观察已保存'}${result.remaining ? `；还有 ${result.remaining} 组待读图，可继续下一轮` : '；待读图组已处理完毕'}。`;
+      } else {
+        await changeCategorySkill(folderId, action, { revision: state.scope.revision, ...payload }, signal);
+        if (action === 'edit') message = '已保存新候选版本，确认后可试用或设为正式技能。';
+      }
       if (controller.current === requestController && !signal?.aborted && getWorkspaceSecret() === workspace) setNotice(message);
       return true;
     } catch (error) {
@@ -55,8 +60,8 @@ export function useCategorySkill(folderId: string, modelId: string, maxNewSample
     }
   }, [folderId, maxNewSamples, modelId, refresh, state]);
   useEffect(() => {
-    if (!state || !modelId || busy || error || actionError) return;
+    if (!autoLearn || !state || !modelId || busy || error || actionError) return;
     if (canAutoLearn(state)) void run('learn', {}, false);
-  }, [actionError, busy, error, modelId, run, state]);
+  }, [actionError, autoLearn, busy, error, modelId, run, state]);
   return { state, error: actionError || error, notice, busy, refresh, run };
 }

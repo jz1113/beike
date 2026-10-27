@@ -1,9 +1,9 @@
 import type { AssetLibrarySlim } from './assetLibraryTypes';
 
-/** A full-prompt group's visible name is its persisted library number, never its current list position. */
+/** Format a group number; gallery callers pass the current list's one-based position. */
 export function fullPromptGroupLabel(displayNumber: unknown): string {
   return typeof displayNumber === 'number' && Number.isSafeInteger(displayNumber) && displayNumber > 0
-    ? `组 ${displayNumber}`
+    ? `图组 ${String(displayNumber).padStart(2, '0')}`
     : '未编号图组';
 }
 

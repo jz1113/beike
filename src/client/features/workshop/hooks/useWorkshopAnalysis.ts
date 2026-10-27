@@ -28,6 +28,10 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
     itemIndexOrSig?: number | PreviousGroupSignature,
   ): Promise<boolean> => {
     if (analysisInFlight.current || singleInFlight.current.has(item.id)) return false;
+    if (itemsRef.current.some(row => row.isCopywritingGenerating || row.status === 'collecting' || row.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+      showToast('已有任务执行中，请等待结束后再分析');
+      return false;
+    }
     const latest = itemsRef.current.find(row => row.id === item.id);
     if (!latest || latest.isAnalyzing || latest.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired)) {
       showToast('该商品仍有执行中或待核对的任务，请先处理后再分析');
@@ -42,6 +46,10 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
 
   const startBatchVisionAnalyze = async (architectureId = selectedArchId, options?: { productIds: string[] }): Promise<number> => {
     if (analysisInFlight.current || singleInFlight.current.size > 0) return 0;
+    if (itemsRef.current.some(item => item.isCopywritingGenerating || item.status === 'collecting' || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
+      showToast('已有任务执行中，请等待结束后再分析');
+      return 0;
+    }
     if (architectureId !== 'auto' && !recipes.some((recipe) => recipe.id === architectureId)) {
       showToast('请先确认电商图文技能，再开始提示词分析');
       return 0;

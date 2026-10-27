@@ -19,7 +19,7 @@ func TestSalesSelectionAndFinalizeNativeProtocols(t *testing.T) {
 		handler                          http.Handler
 	}{
 		{"selection", "gemini", "select-key", "/v1beta/models/shared-vision:generateContent", `{"assignments":[{"shotId":1,"imageIndex":2,"reason":"正面主图"}]}`, Select(cfg)},
-		{"finalize", "anthropic", "final-key", "/v1/messages", `{"fullPrompt":"整段展示台灯","prompts":[{"shotId":1,"prompt":"展示台灯"}]}`, Finalize(cfg)},
+		{"finalize", "anthropic", "final-key", "/v1/messages", `{"fullPrompt":"整段展示台灯","prompts":[{"shotId":1,"speechMode":"voiceover","prompt":"展示台灯"}]}`, Finalize(cfg)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls atomic.Int32

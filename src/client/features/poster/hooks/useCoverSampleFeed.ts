@@ -12,6 +12,9 @@ import { decodeCoverSample, importCoverSamples, releaseCoverSampleDrafts, type C
 
 export interface CoverFeedJob extends CoverSampleDraft {
   status: CoverFeedJobStatus;
+  requestKey?: string;
+  selectionId?: string;
+  effort?: ReasoningEffort;
   url?: string;
   error?: string;
   sampleId?: string;
@@ -28,7 +31,8 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
   useEffect(() => () => releaseCoverSampleDrafts(jobsRef.current), []);
 
   const patch = (id: string, next: Partial<CoverFeedJob>) => {
-    setJobs((current) => current.map((job) => job.id === id ? { ...job, ...next } : job));
+    jobsRef.current = jobsRef.current.map((job) => job.id === id ? { ...job, ...next } : job);
+    setJobs(jobsRef.current);
   };
 
   const addFiles = async (files: File[]) => {
@@ -38,7 +42,7 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
       setNotice(result.error);
       return;
     }
-    setJobs((current) => [...current, ...result.drafts.map((draft) => ({ ...draft, status: 'queued' as const }))]);
+    setJobs((current) => [...current, ...result.drafts.map((draft) => ({ ...draft, status: 'queued' as const, requestKey: crypto.randomUUID() }))]);
     setNotice(result.skipped.length ? `已跳过 ${result.skipped.length} 个文件：${result.skipped[0]?.reason}` : null);
   };
 
@@ -55,6 +59,8 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
   };
 
   const runJob = async (job: CoverFeedJob, selectionId: string, startedAt: string, effort?: ReasoningEffort) => {
+    const requestKey = job.status === 'failed' ? crypto.randomUUID() : job.requestKey || crypto.randomUUID();
+    patch(job.id, { requestKey, selectionId, effort, sampleId: undefined });
     let url = job.url;
     try {
       if (!url) {
@@ -63,7 +69,7 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
         patch(job.id, { url });
       }
       patch(job.id, { status: 'analyzing' });
-      const result = await deconstructCoverSample(url, selectionId, job.name.replace(/\.[^.]+$/, '') || '封面样张', effort);
+      const result = await deconstructCoverSample(url, selectionId, job.name.replace(/\.[^.]+$/, '') || '封面样张', effort, requestKey);
       patch(job.id, { status: 'done', sampleId: result.sampleId, error: undefined });
       return true;
     } catch (error) {
@@ -75,11 +81,11 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
       }
       try {
         const memory = await fetchCoverMemory();
-        const reconciled = reconcileCoverFeedJob({ id: job.id, status: 'uncertain', url }, memory.samples, startedAt);
+        const reconciled = reconcileCoverFeedJob({ id: job.id, status: 'uncertain', url, requestKey, sampleId: error instanceof CoverDeconstructError ? error.sampleId : undefined }, memory.samples, startedAt);
         patch(job.id, reconciled);
         return reconciled.status === 'done';
       } catch {
-        patch(job.id, { status: 'uncertain', error: message });
+        patch(job.id, { status: 'uncertain', requestKey, error: message, sampleId: error instanceof CoverDeconstructError ? error.sampleId : undefined });
         return false;
       }
     }
@@ -87,7 +93,7 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
 
   const start = async (selectionId: string, effort?: ReasoningEffort) => {
     if (runningRef.current || !selectionId || !canStartCoverFeed(jobsRef.current.map((job) => job.status))) return false;
-    const pending = jobsRef.current.filter((job) => job.status !== 'done');
+    const pending = jobsRef.current.filter((job) => job.status === 'queued' || job.status === 'failed');
     if (pending.length === 0) return false;
     runningRef.current = true;
     setNotice(null);
@@ -115,14 +121,24 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
   };
 
   const retryUncertain = async () => {
-    const startedAt = new Date(0).toISOString();
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setNotice(null);
     try {
       const memory = await fetchCoverMemory();
-      setJobs((current) => current.map((job) => job.status === 'uncertain' ? { ...job, ...reconcileCoverFeedJob(job, memory.samples, startedAt) } : job));
+      const startedAt = new Date(0).toISOString();
+      for (const job of jobsRef.current.filter((candidate) => candidate.status === 'uncertain')) {
+        const matched = memory.samples.find((sample) => sample.id === job.sampleId || Boolean(job.requestKey && sample.requestKey === job.requestKey));
+        if (matched) patch(job.id, reconcileCoverFeedJob(job, memory.samples, startedAt));
+        else if (job.requestKey && job.url && job.selectionId) {
+          // Replay the exact request key: an existing operation can never dispatch twice.
+          await runJob(job, job.selectionId, startedAt, job.effort);
+        }
+      }
       await reloadMemory();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '封面记忆读取失败');
-    }
+    } finally { runningRef.current = false; }
   };
 
   const statuses = jobs.map((job) => job.status);

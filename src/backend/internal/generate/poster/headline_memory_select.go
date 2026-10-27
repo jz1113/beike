@@ -7,15 +7,20 @@ import (
 	"strings"
 )
 
+type coverMemoryReader interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
 var ErrCoverSampleNotAdopted = errors.New("所选样张没有已采纳的特点")
 
 type adoptedTrait struct {
 	id, branch, rule, source, sampleID, createdAt string
 }
 
-func adoptedCoverSelection(ctx context.Context, db *sql.DB, workspace, requested string) ([]string, []string, string, error) {
+func adoptedCoverSelection(ctx context.Context, db coverMemoryReader, workspace, requested string, hint ...string) ([]string, []string, string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT "id","branch","rule","source","sampleId","createdAt" FROM "CoverMemoryEntry"
-		WHERE "workspaceId"=? AND "status"='adopted' ORDER BY "createdAt" DESC LIMIT 200`, workspace)
+		WHERE "workspaceId"=? AND "status"='adopted' ORDER BY "createdAt" DESC, "id" DESC`, workspace)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -47,19 +52,20 @@ func adoptedCoverSelection(ctx context.Context, db *sql.DB, workspace, requested
 	if err := rows.Err(); err != nil {
 		return nil, nil, "", err
 	}
+	if (strings.TrimSpace(requested) == "" || requested == "auto") && len(hint) > 0 && len(groups) > 0 {
+		newest, err = relevantCoverSample(ctx, db, workspace, hint[0], newest, groups)
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
 	chosen, err := chooseCoverSample(groups, newest, requested)
 	if err != nil {
 		return nil, nil, "", err
 	}
-	if len(corrections) > 8 {
-		corrections = corrections[:8]
-	}
+
 	traits := []adoptedTrait{}
 	if chosen != "" {
 		traits = groups[chosen]
-		if len(traits) > 16 {
-			traits = traits[:16]
-		}
 	}
 	lines := make([]string, 0, len(corrections)+len(traits))
 	ids := make([]string, 0, len(corrections)+len(traits))
@@ -70,6 +76,9 @@ func adoptedCoverSelection(ctx context.Context, db *sql.DB, workspace, requested
 		}
 		lines = append(lines, "- ["+label+"] "+entry.rule)
 		ids = append(ids, entry.id)
+	}
+	if len([]rune(strings.Join(lines, "\n"))) > 16000 {
+		return nil, nil, "", errors.New("已采纳规则超过设计容量，请合并或停用重复规则后再生成")
 	}
 	if chosen == "" {
 		return lines, ids, "corrections", nil

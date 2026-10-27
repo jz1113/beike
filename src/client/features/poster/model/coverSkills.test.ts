@@ -29,7 +29,7 @@ describe('cover skills', () => {
     expect(text).not.toContain('只支持 3:4');
     expect(coverSkillMemoryStatus(0, 0)).toEqual({
       summary: '已采纳 0 条 · 待确认 0 条',
-      note: '待确认不会参与生成。生成时引用全局纠正，以及本次选中的一张样张。',
+      note: '待确认不会参与生成。采纳与纠正自动保存经验版本；生成引用全局纠正和一张样张，反馈帮助选样。',
     });
     expect(coverSkillMemoryStatus(3, 2).summary).toBe('已采纳 3 条 · 待确认 2 条');
     expect(coverSkillMemoryStatus(3, 2).note).not.toMatch(/都会进入|全部已采纳/);

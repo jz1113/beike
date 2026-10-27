@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronDown, Copy, Image as ImageIcon, Pencil, Settings2, UserRound, Map } from 'lucide-react';
 import { usePreferenceModels } from '@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels';
-import { VIDEO_SALES_SHOT_TYPE_CONFIG, type SalesCreativeAsset, type SalesImageRef, type VideoSalesScript, type VideoSalesShot } from '@shared/domain/sales';
+import { VIDEO_SALES_SHOT_TYPE_CONFIG, salesSkillSpeechLimits, type SalesCreativeAsset, type SalesImageRef, type VideoSalesScript, type VideoSalesShot } from '@shared/domain/sales';
 import type { VideoSalesStudioState } from '../hooks/useVideoSalesStudio';
 import { SALES_SKILL_OPTIONS, salesCategoryForSkill, salesSkillId, type SalesSkillId } from '../model/fashionSalesSkill';
 import { SalesCreationRule, salesCardClass, salesDividerClass, salesFocusClass, salesGroupClass, salesInputClass, salesLabelClass, salesSectionTitleClass } from './salesChrome';
@@ -132,6 +132,7 @@ interface SalesScriptOutlineProps {
   script: VideoSalesScript;
   productImages?: SalesImageRef[];
   showPlannedAssets?: boolean;
+  timeline?: boolean;
 }
 
 function PlannedAssetsSummary({ assets }: { assets: SalesCreativeAsset[] }) {
@@ -160,7 +161,7 @@ function shotRanges(script: VideoSalesScript) {
   });
 }
 
-export function SalesScriptOutline({ script, productImages, showPlannedAssets = true }: SalesScriptOutlineProps) {
+export function SalesScriptOutline({ script, productImages, showPlannedAssets = true, timeline = false }: SalesScriptOutlineProps) {
   const ranges = shotRanges(script);
   const shotCount = script.shots.length;
   const [activeIndex, setActiveIndex] = useState(0);
@@ -182,7 +183,7 @@ export function SalesScriptOutline({ script, productImages, showPlannedAssets = 
       <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200">脚本大纲</h2>
       <span className="text-sm tabular-nums text-slate-400">{ranges.length} 段 · {duration} 秒</span>
     </div>
-    <ol className="mt-4 space-y-2">
+    <ol className={`${timeline ? 'sales-result-timeline' : ''} mt-4 space-y-2`}>
       {ranges.map(({ shot, index, start, end }) => {
         const type = VIDEO_SALES_SHOT_TYPE_CONFIG[shot.type] || VIDEO_SALES_SHOT_TYPE_CONFIG.demo;
         const matchedImage = typeof shot.imageIndex === 'number' ? productImages?.find((image) => image.index === shot.imageIndex) : undefined;
@@ -194,7 +195,7 @@ export function SalesScriptOutline({ script, productImages, showPlannedAssets = 
             <span className="w-16 shrink-0 text-sm tabular-nums text-slate-400">{start}–{end}s</span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 text-sm font-medium"><span>{type.label}</span>{matchedImage?.url && <img src={matchedImage.url} alt="" className="h-5 w-5 rounded object-contain" />}</span>
-              <span className="mt-1 block truncate text-sm leading-6">{shot.voiceover?.split(/\r?\n/)[0] || '此段无口播'}</span>
+              <span className={`sales-outline-dialogue mt-1 block text-sm leading-6 ${timeline ? 'whitespace-pre-wrap [overflow-wrap:anywhere]' : 'truncate'}`}>{(timeline ? shot.voiceover : shot.voiceover?.split(/\r?\n/)[0]) || '此段无口播'}</span>
             </span>
           </button>
         </li>;
@@ -222,7 +223,7 @@ export function SalesPlanSection({ script, disabled, onEditShot, suppliedFacts =
             <article className={`${salesCardClass} overflow-hidden p-4 sm:p-5`}>
               <div className="flex flex-wrap items-center gap-2 border-b border-slate-200/70 pb-3 dark:border-white/10">
                 <span className="text-sm font-semibold">{index + 1}. {type.label}</span>
-                {shot.camera && <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">{shot.camera}</span>}
+                {shot.camera && <span title={shot.camera} className="min-w-0 max-w-full truncate rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-500 sm:max-w-xs dark:bg-white/[0.06] dark:text-slate-400">{shot.camera}</span>}
                 <span className="text-[11px] tabular-nums text-slate-400">{start}–{end}s</span>
                 <div className="ml-auto flex items-center gap-2">
                   {matchedImage?.url && <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" title={shot.selectionReason || `匹配商品参考 #${shot.imageIndex! + 1}`}><img src={matchedImage.url} alt={`商品参考 ${shot.imageIndex! + 1}`} className="h-6 w-6 rounded-md border border-slate-200 bg-white object-contain dark:border-white/10" />商品图 {shot.imageIndex! + 1}</span>}
@@ -231,10 +232,10 @@ export function SalesPlanSection({ script, disabled, onEditShot, suppliedFacts =
                 </div>
               </div>
               <div className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
-                <div className="min-h-24 rounded-xl border border-amber-200/70 bg-amber-50/45 p-3 dark:border-amber-300/10 dark:bg-amber-300/[0.04]"><InlineShotField id={`sales-shot-${index}-voiceover`} label={shot.speechMode === 'on_camera' ? '出镜说话 · 同步口型' : shot.speechMode === 'voiceover' ? '画外音' : '声音未标注'} value={shot.voiceover} disabled={disabled} prominent count={shotHan} hint={isFashion ? `建议 ${Math.max(6, shot.duration * 3)}–${shot.duration * 6} 字` : undefined} onSave={(value) => onEditShot(index, { voiceover: value })} /></div>
-                <div className="min-h-24 rounded-xl border border-slate-200/80 bg-white/65 p-3 dark:border-white/10 dark:bg-white/[0.025]"><InlineShotField id={`sales-shot-${index}-description`} label="画面描述" value={shot.description} disabled={disabled} onSave={(value) => onEditShot(index, { description: value })} /></div>
+                <div className="min-h-24 rounded-xl border border-amber-200/70 bg-amber-50/45 p-3 dark:border-amber-300/10 dark:bg-amber-300/[0.04]"><InlineShotField id={`sales-shot-${index}-voiceover`} label={shot.speechMode === 'on_camera' ? '出镜说话 · 同步口型' : shot.speechMode === 'voiceover' ? '画外音' : '声音未标注'} value={shot.voiceover} disabled={disabled} prominent count={shotHan} hint={isFashion ? `建议 ${Math.max(salesSkillSpeechLimits.minShotHan, Math.round(shot.duration * salesSkillSpeechLimits.preferredMinRate))}–${Math.max(salesSkillSpeechLimits.minShotHan, Math.round(shot.duration * salesSkillSpeechLimits.preferredMaxRate))} 字，可随展示调整` : undefined} onSave={(value) => onEditShot(index, { voiceover: value })} /></div>
+                <div className="min-h-24 rounded-xl border border-slate-200/80 bg-white/65 p-3 dark:border-white/10 dark:bg-white/[0.025]"><InlineShotField id={`sales-shot-${index}-description`} label="画面描述" value={shot.description} disabled={disabled} compact onSave={(value) => onEditShot(index, { description: value })} /></div>
               </div>
-              <SalesPromptDetails title="查看完整提示词" value={shot.prompt || shot.description} disabled={disabled} onChange={(value) => onEditShot(index, { prompt: value })} rows={5} copyable note={shot.promptStale ? '商品或脚本已更新，保存后请重新生成视频提示词。' : undefined} />
+              <SalesPromptDetails title="查看完整提示词" value={shot.prompt || shot.description} disabled={disabled} onChange={(value) => onEditShot(index, { prompt: value })} rows={5} preview={false} copyable note={shot.promptStale ? '商品或脚本已更新，保存后请重新生成视频提示词。' : undefined} />
               <details className="mt-3 border-t border-slate-200/70 pt-3 dark:border-white/10"><summary className={`flex cursor-pointer items-center gap-2 rounded text-xs font-medium text-slate-500 ${salesFocusClass}`}><Settings2 className="h-3.5 w-3.5 shrink-0" aria-hidden /><span>更多设置</span><span className="ml-auto flex items-center gap-1.5 text-[11px] font-normal text-slate-400"><span>{shot.duration} 秒 · {shot.speechMode === 'on_camera' ? '出镜说话' : shot.speechMode === 'voiceover' ? '画外音' : '声音未标注'}</span><ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" aria-hidden /></span></summary><div className="mt-3 flex flex-wrap items-end gap-3"><label className="block w-28 text-xs text-slate-500">时长（秒）<input aria-label={`段落 ${index + 1} 时长`} type="number" min={1} max={60} disabled={disabled} value={shot.duration} onChange={(event) => onEditShot(index, { duration: Number(event.target.value) || shot.duration })} className={salesInputClass} /></label><label className="block min-w-48 flex-1 text-xs text-slate-500">声音来源<select aria-label={`段落 ${index + 1} 声音来源`} value={shot.speechMode || ''} disabled={disabled} onChange={(event) => onEditShot(index, { speechMode: event.target.value as NonNullable<VideoSalesShot['speechMode']> })} className={salesInputClass}><option value="" disabled>未标注</option><option value="on_camera">出镜人物说话</option><option value="voiceover">画外音</option></select></label></div>{shot.speechMode === 'on_camera' && <p className="mt-3 text-xs leading-6 text-slate-500">出镜说话建议用中景，完整嘴部清晰可见；修改后检查人物素材并重新合成视频提示词。</p>}{shot.selectionReason && <p className="mt-3 text-[11px] leading-5 text-slate-500">参考依据：{shot.selectionReason}</p>}</details>
             </article>
           </li>;
@@ -244,12 +245,20 @@ export function SalesPlanSection({ script, disabled, onEditShot, suppliedFacts =
   );
 }
 
-function InlineShotField({ id, label, value, disabled, prominent, count, hint, onSave }: { id: string; label: string; value: string; disabled: boolean; prominent?: boolean; count?: number; hint?: string; onSave: (value: string) => void }) {
+function InlineShotField({ id, label, value, disabled, prominent, compact, count, hint, onSave }: { id: string; label: string; value: string; disabled: boolean; prominent?: boolean; compact?: boolean; count?: number; hint?: string; onSave: (value: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
   const save = () => { if (draft !== value) onSave(draft); setEditing(false); };
-  return <div className="min-w-0"><div className="flex items-center justify-between gap-2"><span className="text-[11px] font-medium text-slate-500">{label}{typeof count === 'number' ? ` · ${count} 字` : ''}</span>{hint && <span className="text-[10px] text-slate-400">{hint}</span>}</div>{editing ? <textarea id={id} autoFocus rows={prominent ? 4 : 3} value={draft} disabled={disabled} onChange={(event) => setDraft(event.target.value)} onBlur={save} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); save(); } }} className={`${salesInputClass} resize-y ${prominent ? 'text-base leading-8' : 'text-sm leading-7'}`} /> : <button type="button" id={id} disabled={disabled} onClick={() => setEditing(true)} className={`mt-1 block w-full rounded-lg text-left ${prominent ? 'text-lg font-semibold leading-9 text-slate-900 dark:text-slate-100' : 'text-sm leading-7 text-slate-600 dark:text-slate-300'} ${salesFocusClass} hover:bg-black/[0.025] dark:hover:bg-white/[0.03]`}>{value || '此段无内容，点击添加'}</button>}</div>;
+  return <div className="min-w-0">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] font-medium text-slate-500">{label}{typeof count === 'number' ? ` · ${count} 字` : ''}</span>
+      {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+      {compact && value && !editing && <button type="button" aria-label={`${expanded ? '收起' : '展开'}${label}`} aria-expanded={expanded} aria-controls={`${id}-preview`} onClick={() => setExpanded((open) => !open)} className={`shrink-0 rounded text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 ${salesFocusClass}`}>{expanded ? '收起' : '展开'}</button>}
+    </div>
+    {editing ? <textarea id={id} autoFocus rows={prominent ? 4 : 3} value={draft} disabled={disabled} onChange={(event) => setDraft(event.target.value)} onBlur={save} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); save(); } }} className={`${salesInputClass} resize-y ${prominent ? 'text-base leading-8' : 'text-sm leading-7'}`} /> : <button type="button" id={id} disabled={disabled} onClick={() => setEditing(true)} className={`mt-1 block w-full rounded-lg text-left ${prominent ? 'text-lg font-semibold leading-9 text-slate-900 dark:text-slate-100' : 'text-sm leading-7 text-slate-600 dark:text-slate-300'} ${salesFocusClass} hover:bg-black/[0.025] dark:hover:bg-white/[0.03]`}><span id={`${id}-preview`} className={compact && !expanded ? 'line-clamp-2' : 'whitespace-pre-wrap'}>{value || '此段无内容，点击添加'}</span></button>}
+  </div>;
 }
 
 interface SalesPromptDetailsProps {
@@ -270,7 +279,7 @@ export function SalesPromptDetails({ title, value, disabled, onChange, rows = 6,
     try { await navigator.clipboard.writeText(value); setCopyStatus('已复制完整提示词'); }
     catch { setCopyStatus('复制失败，请选中文本手动复制或重试'); }
   };
-  return <details open={initiallyOpen} className="group/prompt rounded-xl border border-slate-200/80 p-3 dark:border-white/10">
+  return <details open={initiallyOpen} className="sales-shot-prompt group/prompt rounded-xl border border-slate-200/80 p-2.5 dark:border-white/10 dark:bg-black/25">
     <summary className={`cursor-pointer list-none rounded ${salesFocusClass}`}>
       <span className="flex items-center justify-between gap-3"><span className="text-xs font-medium text-slate-700 dark:text-slate-200">{title}</span><span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500"><span>{value.length} 字 · 展开编辑</span><ChevronDown className="h-3.5 w-3.5 transition group-open/prompt:rotate-180" /></span></span>
       {preview && <span className="mt-2 line-clamp-2 break-words text-xs leading-6 text-slate-500 dark:text-slate-400 group-open/prompt:hidden">{value || '暂无提示词'}</span>}

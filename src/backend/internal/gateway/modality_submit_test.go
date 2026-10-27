@@ -30,26 +30,12 @@ func TestDispatchModalitySuccess(t *testing.T) {
 	}
 }
 
-func TestDispatchModalityAvatarAndThreeD(t *testing.T) {
+func TestDispatchModalityThreeD(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"id":"task-avatar-999"}`))
+		_, _ = w.Write([]byte(`{"id":"task-threed-999"}`))
 	}))
 	defer server.Close()
-
-	avatarRes := SubmitAvatar(context.Background(), SubmitCommand{
-		Endpoints:   []string{server.URL + "/avatar"},
-		APIKey:      "test-key",
-		PayloadJSON: `{"video_id":"vid-1"}`,
-		Client:      server.Client(),
-		ReadTaskID: func(m map[string]any) string {
-			id, _ := m["id"].(string)
-			return id
-		},
-	})
-	if avatarRes.Outcome != Accepted || avatarRes.TaskID != "task-avatar-999" {
-		t.Fatalf("avatar submit failed: %#v", avatarRes)
-	}
 
 	threedRes := SubmitThreeD(context.Background(), SubmitCommand{
 		Endpoints:   []string{server.URL + "/threed"},
@@ -61,7 +47,7 @@ func TestDispatchModalityAvatarAndThreeD(t *testing.T) {
 			return id
 		},
 	})
-	if threedRes.Outcome != Accepted || threedRes.TaskID != "task-avatar-999" {
+	if threedRes.Outcome != Accepted || threedRes.TaskID != "task-threed-999" {
 		t.Fatalf("threed submit failed: %#v", threedRes)
 	}
 }

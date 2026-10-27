@@ -160,18 +160,8 @@
 
 ## 数字人驱动与语音合成
 
-数字人口播把配音和驱动拆成两套凭证。配音模型在设置「语音」线路拉取，对口型驱动模型在设置「数字人」线路拉取。配音默认值、家族路径、请求与恢复边界见[语音合成接入](语音合成与音频处理调用参考.md)，以下只维护驱动矩阵。驱动路径的兼容尝试按实现的错误条件执行；环境变量 `AVATAR_LIPSYNC_SUBMIT_URLS` 与 `AVATAR_LIPSYNC_POLL_URLS` 可覆盖驱动地址。
+数字人功能重建中，旧人物、音色克隆、口播任务与驱动接口已移除。设置页保留数字人模型分类、线路和已保存的凭证；这些配置目前不提供数字人生成能力。历史数据库迁移与用户素材保留，供后续重建使用。
 
-| 家族 | 识别 | 输入 | 提交路径 | 轮询路径 |
-| --- | --- | --- | --- | --- |
-| 可灵对口型 | `kling` 且含 lip/avatar/ident | 照片或视频 + 音频 | `/kling/v1/videos/lip-sync` | `/kling/v1/videos/lip-sync/{id}` |
-| OmniHuman | `omnihuman` | 照片 + 音频 | `/v1/videos/omnihuman` | `/v1/videos/omnihuman/{id}` |
-| 万相对口型 | `wanx-avatar`、`videoretalk`、`emo-v` | 照片或视频 + 音频 | DashScope `image2video/video-synthesis` | `/api/v1/tasks/{id}` |
-| Hedra | `hedra` | 照片 + 音频 | `/hedra/v1/generations` | `/hedra/v1/generations/{id}` |
-| LatentSync | `latentsync`、`musetalk` | 视频 + 音频 | `/fal/latentsync` | `/fal/latentsync/{id}` |
-
-Seedance 等普通视频模型不能当作数字人驱动。声音克隆走 MiniMax `/v1/voice_clone` 或 ElevenLabs `/v1/voices/add`，状态分为处理中、就绪和失败。
-
-产品提交为 `POST /api/avatar/render`，状态查询为 `GET /api/avatar/tasks/{id}`。请求分别提供 `voiceModel` / `voiceBaseUrl` / `voiceApiKey` 与 `videoModel` / `driverBaseUrl` / `driverApiKey`，其余人物、布局和字幕字段按 `src/backend/internal/avatar/` 的请求实现填写；任务完成仍需预览口型与音画同步。
+通用语音合成仍使用 `POST /api/generate/audio`，默认值、家族路径与结果保存规则见[语音合成接入](语音合成与音频处理调用参考.md)。
 
 语音参考：[OpenAI Audio](https://platform.openai.com/docs/api-reference/audio)、[MiniMax Speech](https://platform.minimaxi.com/document/t2a_v2)、[CosyVoice](https://help.aliyun.com/zh/model-studio/cosyvoice)、[ElevenLabs](https://elevenlabs.io/docs/api-reference)。

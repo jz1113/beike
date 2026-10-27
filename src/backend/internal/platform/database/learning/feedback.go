@@ -53,7 +53,7 @@ func FeedbackFingerprint(feedback []Feedback) string { return Hash(feedback) }
 // Compare actual, explicitly rated outputs, never a model's self-assessment.
 // Pair keys contain product images, reference hash, model and generation settings.
 func Validate(version Version, feedback []Feedback) Validation {
-	result := Validation{Reason: "需要至少 3 款商品，在参考图组上完成同商品、同参考、同生成设置的新旧版成图评分对照"}
+	result := Validation{Reason: "需要至少 3 款商品，以相同商品图和生成设置完成新旧技能的实际成图评分对照"}
 	holdouts := map[string]bool{}
 	for _, s := range version.Manifest.Samples {
 		if s.Role == "holdout" || s.Role == "training" {
@@ -63,7 +63,8 @@ func Validate(version Version, feedback []Feedback) Validation {
 	baseline := map[string]Feedback{}
 	candidate := map[string]Feedback{}
 	for _, f := range feedback {
-		if !holdouts[f.GroupID] || !validScores(f.Scores) || f.ComparisonKey == "" {
+		skillOnly := version.FolderID != "" && f.GroupID == "skill:"+version.FolderID
+		if (!holdouts[f.GroupID] && !skillOnly) || !validScores(f.Scores) || f.ComparisonKey == "" {
 			continue
 		}
 		if f.VersionID == version.ParentVersionID {
@@ -124,7 +125,7 @@ func Validate(version Version, feedback []Feedback) Validation {
 		return result
 	}
 	result.Passed = true
-	result.Reason = "参考图组至少 3 款商品的实际对照通过，各维度无退步且存在提升"
+	result.Reason = "至少 3 款商品的实际成图对照通过，各维度无退步且存在提升"
 	return result
 }
 func validScores(scores map[string]int) bool {
@@ -143,6 +144,9 @@ func validScores(scores map[string]int) bool {
 // Held-out images, observations and feedback never enter rule-writing prompts.
 func TrainingFeedback(dataset Dataset, feedback []Feedback) []Feedback {
 	allowed := map[string]bool{}
+	if dataset.Folder.ID != "" {
+		allowed["skill:"+dataset.Folder.ID] = true
+	}
 	for _, s := range dataset.Samples {
 		if s.Role == "training" {
 			allowed[s.ID] = true

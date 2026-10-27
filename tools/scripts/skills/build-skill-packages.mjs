@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSkillFileContent } from '../../../src/shared/domain/assistant/skills/parseSkillFile.ts';
 import { OPENAI_TOOLS } from '../../../src/shared/domain/assistant/tools/defs.ts';
+import { compileSalesSkill } from './build-sales-skill.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const source = path.join(root, 'src/shared/domain/assistant/skills/packages');
@@ -37,6 +38,7 @@ const catalog = fs.readdirSync(source, { withFileTypes: true }).filter(entry => 
   return { ...metadata, prompt: parsed.prompt, markdownDoc, files };
 });
 const rendered = `${JSON.stringify(catalog, null, 2)}\n`;
+compileSalesSkill(root, catalog, process.argv.includes('--write'));
 if (process.argv.includes('--write')) {
   fs.writeFileSync(destination, rendered);
 } else if (!fs.existsSync(destination) || fs.readFileSync(destination, 'utf8') !== rendered) {

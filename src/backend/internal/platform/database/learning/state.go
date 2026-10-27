@@ -70,14 +70,14 @@ func Progress(ctx context.Context, db *sql.DB, workspace, folder, token string, 
 
 func Observation(ctx context.Context, db *sql.DB, workspace, folder string, sample Sample) (json.RawMessage, error) {
 	var raw string
-	err := db.QueryRowContext(ctx, `SELECT "observationJson" FROM "CategorySkillObservation" WHERE "workspaceId"=? AND "folderId"=? AND "groupId"=? AND "fingerprint"=?`, workspace, folder, sample.ID, sample.Fingerprint).Scan(&raw)
+	err := db.QueryRowContext(ctx, `SELECT "observationJson" FROM "CategorySkillObservation" WHERE "workspaceId"=? AND "folderId"=? AND "groupId"=? AND "fingerprint"=?`, workspace, folder, sample.ID, observationKey(sample)).Scan(&raw)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return json.RawMessage(raw), err
 }
 func SaveObservation(ctx context.Context, db *sql.DB, workspace, folder, model string, sample Sample, raw json.RawMessage) error {
-	_, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CategorySkillObservation" ("workspaceId","folderId","groupId","fingerprint","observationJson","model","createdAt") VALUES (?,?,?,?,?,?,?) ON CONFLICT ("workspaceId","folderId","groupId","fingerprint") DO UPDATE SET "observationJson"=excluded."observationJson","model"=excluded."model","createdAt"=excluded."createdAt"`, workspace, folder, sample.ID, sample.Fingerprint, string(raw), model, now())
+	_, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CategorySkillObservation" ("workspaceId","folderId","groupId","fingerprint","observationJson","model","createdAt") VALUES (?,?,?,?,?,?,?) ON CONFLICT ("workspaceId","folderId","groupId","fingerprint") DO UPDATE SET "observationJson"=excluded."observationJson","model"=excluded."model","createdAt"=excluded."createdAt"`, workspace, folder, sample.ID, observationKey(sample), string(raw), model, now())
 	return err
 }
 func SaveRoles(ctx context.Context, db *sql.DB, workspace, folder string, samples []Sample) error {
@@ -116,4 +116,11 @@ func Events(ctx context.Context, db *sql.DB, workspace, folder string) ([]Event,
 		events = append(events, event)
 	}
 	return events, rows.Err()
+}
+
+func observationKey(sample Sample) string {
+	if sample.ObservationKey != "" {
+		return Hash([]string{sample.Fingerprint, sample.ObservationKey})
+	}
+	return sample.Fingerprint
 }

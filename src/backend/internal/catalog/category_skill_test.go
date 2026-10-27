@@ -113,9 +113,9 @@ func TestCategoryLearningContinuesAfterFailureAndReusesCompletedObservations(t *
 				}
 				observations := []any{}
 				for n := 1; n <= 4; n++ {
-					observations = append(observations, map[string]any{"shot": n, "visual": "侧光、完整手部与自然接触阴影", "replacement": "仅换手机本体并保持占比"})
+					observations = append(observations, map[string]any{"shot": n, "purpose": "展示结构", "promptTemplate": "商品结构→机位→接触→场景→光影→保真", "promptExample": "@图片1保持可见轮廓，斜侧近景，置于桌面，真实接触阴影", "visual": "侧光、完整手部与自然接触阴影", "replacement": "仅换手机本体并保持占比"})
 				}
-				output = map[string]any{"compatible": true, "observations": observations, "reusableRules": []string{"按商品原图核对结构"}, "conditions": []string{"手持时"}, "failuresToAvoid": []string{"勿磨皮或更换构图"}}
+				output = map[string]any{"compatible": true, "groupFramework": "整体到细节，再进入生活场景", "differenceAxes": []string{"主题与展示重点", "场景与动作关系", "开场与机位节奏"}, "observations": observations, "reusableRules": []string{"按商品原图核对结构"}, "conditions": []string{"手持时"}, "failuresToAvoid": []string{"勿磨皮或更换构图"}}
 			} else {
 				aggregated = true
 				observations := material["observations"].([]any)

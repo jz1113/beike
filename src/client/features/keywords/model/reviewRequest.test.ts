@@ -18,6 +18,13 @@ async function capture(status: number, body: unknown): Promise<ReviewRequestErro
 }
 
 describe('requestReviewBatch', () => {
+  it('stops on server receipt-storage failure before starting another paid request', async () => {
+    const error = await capture(503, { success: false, code: 'local_progress_unavailable', error: '服务器无法保存审核提交凭据' });
+    expect(error.fatalLocal).toBe(true);
+    expect(error.outcomeUncertain).toBeUndefined();
+    expect(error.rateLimited).toBeUndefined();
+    expect(error.gatewayRetryable).toBeUndefined();
+  });
   it.each([400, 401, 403])('retries upstream account verification on HTTP %s', async (status) => {
     const error = await capture(status, {
       success: false, code: 'upstream_api_error',

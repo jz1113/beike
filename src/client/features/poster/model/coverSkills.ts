@@ -17,7 +17,7 @@ export interface CoverSkill {
 export function coverSkillMemoryStatus(adoptedCount: number, pendingCount: number): { summary: string; note: string } {
   return {
     summary: `已采纳 ${adoptedCount} 条 · 待确认 ${pendingCount} 条`,
-    note: '待确认不会参与生成。生成时引用全局纠正，以及本次选中的一张样张。',
+    note: '待确认不会参与生成。采纳与纠正自动保存经验版本；生成引用全局纠正和一张样张，反馈帮助选样。',
   };
 }
 
@@ -76,6 +76,8 @@ export const COVER_SKILLS: CoverSkill[] = [
           '已采纳记忆会写进设计提示词。纠正优先于这一张样张。没有对应记忆的栏位按硬约束判断，不要套用固定风格名。',
           '没有已采纳记忆时，提示词附上六句冷启动：米白纸纹、对角色面、近黑哑光底、有方向的柔光、浅冷几何、纸感留白加一种真实材质。',
           '冷启动只供起稿，不能覆盖硬约束。已有记忆时不再附上这六句。',
+          '采纳、停用和纠正自动保存可导出、可回退的经验版本。自动选样参考商品关键词和人工评价。引用记录保留当时规则，重试使用原快照；已有设计直接复用。',
+          '这是经验库积累，不会自动训练模型，也不会改写内置 SKILL.md。备注只记录观察，只有明确填写的纠正才会成为全局规则。',
         ],
       },
     ],

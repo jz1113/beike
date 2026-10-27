@@ -639,3 +639,281 @@ html.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus-vi
   background: #161619;
   border-color: rgba(255, 255, 255, 0.18);
 }
+
+/* Reference workspace polish: keep every settings surface on the same visual grid. */
+.settings-workspace {
+  --settings-backdrop: rgba(5, 5, 7, .72);
+  --settings-shell: #f5f6f8;
+  --settings-panel: #ffffff;
+  --settings-panel-muted: #f8f9fb;
+  --settings-sidebar: #f0f1f4;
+  --settings-border: rgba(15, 23, 42, .10);
+  --settings-border-strong: rgba(15, 23, 42, .16);
+  --settings-text: #172033;
+  --settings-muted: #7b8494;
+  --settings-active: #e7ebf2;
+}
+
+.settings-workspace > button[aria-label="关闭设置"] {
+  background: var(--settings-backdrop);
+  backdrop-filter: blur(8px);
+}
+
+.settings-workspace .settings-shell {
+  width: min(1120px, calc(100% - 64px));
+  height: min(760px, calc(100% - 64px));
+  border-radius: 22px;
+  border-color: var(--settings-border-strong);
+  background: var(--settings-shell);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .28), 0 2px 12px rgba(0, 0, 0, .10);
+}
+
+.settings-workspace .settings-shell > main > :first-child {
+  min-height: 64px;
+  background: var(--settings-panel);
+  border-color: var(--settings-border);
+}
+
+.settings-workspace .settings-shell > main > :first-child h1 {
+  font-size: 17px;
+  letter-spacing: -.01em;
+}
+
+.settings-workspace .settings-sidebar {
+  width: 224px;
+  flex-basis: 224px;
+  background: var(--settings-sidebar);
+  border-right: 1px solid var(--settings-border);
+}
+
+.settings-workspace .settings-sidebar > div:first-child {
+  padding: 22px 16px 12px;
+}
+
+.settings-workspace .settings-sidebar > div:first-child > div {
+  color: var(--settings-muted);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: .02em;
+}
+
+.settings-workspace .settings-sidebar > div:nth-child(2) {
+  padding: 4px 12px 16px;
+}
+
+.settings-workspace .settings-sidebar button {
+  min-height: 38px;
+  padding-inline: 12px;
+  border-radius: 10px;
+  color: var(--settings-muted);
+  font-size: 14px;
+  line-height: 20px;
+  transition: background .16s ease, color .16s ease, transform .16s ease;
+}
+
+.settings-workspace .settings-sidebar button:hover {
+  background: color-mix(in srgb, var(--settings-active) 62%, transparent);
+  color: var(--settings-text);
+}
+
+.settings-workspace .settings-sidebar button[aria-current="page"] {
+  background: var(--settings-active);
+  color: var(--settings-text);
+  box-shadow: none;
+}
+
+.settings-workspace .settings-sidebar button svg {
+  opacity: .86;
+}
+
+.settings-workspace .settings-sidebar button[aria-current="page"] svg {
+  opacity: 1;
+}
+
+.settings-workspace .settings-sidebar button > span:last-child {
+  color: color-mix(in srgb, var(--settings-muted) 90%, transparent);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-workspace .settings-shell > main {
+  background: var(--settings-panel);
+}
+
+.settings-workspace .settings-page-scroll,
+.settings-workspace .settings-shell .settings-page-scroll {
+  background: var(--settings-shell);
+  padding: 24px 28px;
+}
+
+.settings-workspace .settings-page-content {
+  max-width: 1000px;
+}
+
+.settings-workspace .settings-service-nav,
+.settings-workspace .settings-canvas-rail {
+  background: var(--settings-panel-muted);
+  border-color: var(--settings-border);
+}
+
+.settings-workspace .settings-config-card,
+.settings-workspace .settings-model-panel,
+.settings-workspace .settings-defaults,
+.settings-workspace .settings-balance-card,
+.settings-workspace .settings-usage-metrics > div,
+.settings-workspace .settings-usage-more,
+.settings-workspace .settings-default-rules,
+.settings-workspace .settings-default-card,
+.settings-workspace .settings-milestone,
+.settings-workspace .settings-footprint,
+.settings-workspace .settings-mix section,
+.settings-workspace .settings-usage-log {
+  border-radius: 14px;
+  border-color: var(--settings-border);
+  background: var(--settings-panel);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+}
+
+.settings-workspace .settings-service-header {
+  padding-bottom: 6px;
+}
+
+.settings-workspace .settings-service-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--settings-panel-muted);
+  border-color: var(--settings-border);
+}
+
+.settings-workspace .settings-form-field > label,
+.settings-workspace .settings-service-header p,
+.settings-workspace .settings-field-note {
+  color: var(--settings-muted);
+}
+
+.settings-workspace .settings-field,
+.settings-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not(.studio-control-input),
+.settings-workspace select:not(.studio-control-input),
+.settings-workspace textarea {
+  border-color: var(--settings-border-strong);
+  background: var(--settings-panel);
+  color: var(--settings-text);
+  border-radius: 10px;
+}
+
+.settings-workspace .settings-button-primary {
+  min-height: 38px;
+  border-radius: 10px;
+  background: var(--settings-text);
+}
+
+.settings-workspace .settings-button-secondary {
+  min-height: 38px;
+  border-radius: 10px;
+  background: var(--settings-panel);
+  border-color: var(--settings-border-strong);
+}
+
+.settings-workspace .settings-creator {
+  max-width: 900px;
+  gap: 20px;
+}
+
+.settings-workspace .settings-creator-top {
+  min-height: 34px;
+}
+
+.settings-workspace .settings-creator-actions button,
+.settings-workspace .settings-range > button {
+  height: 34px;
+  border-radius: 10px;
+  border-color: var(--settings-border-strong);
+  background: var(--settings-panel);
+  color: var(--settings-text);
+}
+
+.settings-workspace .settings-creator-actions button:hover,
+.settings-workspace .settings-range > button:hover {
+  background: var(--settings-panel-muted);
+}
+
+.settings-workspace .settings-creator-card {
+  padding: 12px 0 6px;
+}
+
+.settings-workspace .settings-creator-avatar {
+  width: 76px;
+  height: 76px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--settings-panel-muted) 86%, transparent);
+}
+
+.settings-workspace .settings-milestone-grid > div {
+  padding: 20px 18px;
+}
+
+.settings-workspace .settings-milestone-value strong {
+  font-size: 28px;
+}
+
+.settings-workspace .settings-footprint,
+.settings-workspace .settings-mix section,
+.settings-workspace .settings-usage-log {
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .settings-workspace .settings-shell {
+    width: min(100%, calc(100% - 24px));
+    height: min(900px, calc(100% - 24px));
+    border-radius: 18px;
+  }
+
+  .settings-workspace .settings-page-scroll,
+  .settings-workspace .settings-shell .settings-page-scroll {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-workspace .settings-shell {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border-inline: 0;
+  }
+
+  .settings-workspace .settings-page-scroll,
+  .settings-workspace .settings-shell .settings-page-scroll {
+    padding: 16px;
+  }
+}
+
+.dark .settings-workspace,
+html.dark .settings-workspace {
+  --settings-backdrop: rgba(0, 0, 0, .68);
+  --settings-shell: #141416;
+  --settings-panel: #171719;
+  --settings-panel-muted: #101012;
+  --settings-sidebar: #101012;
+  --settings-border: rgba(255, 255, 255, .08);
+  --settings-border-strong: rgba(255, 255, 255, .13);
+  --settings-text: #f5f5f7;
+  --settings-muted: #8e8e93;
+  --settings-active: #242429;
+}
+
+.dark .settings-workspace .settings-shell,
+html.dark .settings-workspace .settings-shell {
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .52), 0 2px 12px rgba(0, 0, 0, .26);
+}
+
+.dark .settings-workspace .settings-sidebar button:hover,
+html.dark .settings-workspace .settings-sidebar button:hover {
+  background: #1d1d22;
+}
+
+.dark .settings-workspace .settings-creator-avatar,
+html.dark .settings-workspace .settings-creator-avatar {
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .035);
+}

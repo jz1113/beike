@@ -57,6 +57,9 @@ export interface PosterItem {
   /** The adopted sample pinned for this cover. Retries keep the same reference. */
   memorySampleId?: string;
   memoryEntryIds?: string[];
+  memoryUsageId?: string;
+  memoryRevisionId?: string;
+  memoryWarning?: string;
 }
 
 export interface PosterProductionSettings {
@@ -67,6 +70,29 @@ export interface PosterProductionSettings {
   concurrency: number;
   /** Empty means the server picks one adopted sample when design starts. */
   memorySampleId: string;
+}
+
+/**
+ * The poster lightbox represents one product, so it should show one current
+ * cover result rather than exposing the input, upstream scene and exported
+ * JPEG as three separate gallery slides.
+ */
+export function posterPreviewImages(item: Pick<PosterItem, 'resultUrl' | 'generatedSceneUrl' | 'sourceImageUrl'>): string[] {
+  const current = item.resultUrl || item.generatedSceneUrl || item.sourceImageUrl;
+  return current ? [current] : [];
+}
+
+/** Local uploads are read by the API, whose port may differ from the UI. */
+export function posterModelImageUrl(source: string, origin: string): string {
+  try {
+    const image = new URL(source, origin);
+    const page = new URL(origin);
+    const loopback = (hostname: string) => hostname === 'localhost' || hostname === '[::1]' || /^127\./.test(hostname);
+    if (image.pathname.startsWith('/storage/') && (image.hostname === page.hostname || loopback(image.hostname) && loopback(page.hostname))) {
+      return `${image.pathname}${image.search}`;
+    }
+  } catch { /* Validation will report malformed input before submission. */ }
+  return source;
 }
 
 export interface HeadlineDesignResponse {

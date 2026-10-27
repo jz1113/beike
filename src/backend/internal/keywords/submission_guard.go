@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -66,7 +67,7 @@ func guardKeywordSubmission(r *http.Request, workspace, baseURL, apiKey string, 
 	}()
 	dir := filepath.Join(receiptsRoot(), workspace)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		flight.resp = guardedResult{status: http.StatusInternalServerError, body: map[string]any{"success": false, "error": "词包审核失败"}}
+		flight.resp = receiptStorageFailure()
 		return flight.resp
 	}
 	file := filepath.Join(dir, key+".json")
@@ -137,13 +138,20 @@ func replayGuarded(resp guardedResult, fingerprint string) guardedResult {
 func claimReceipt(file string, receipt map[string]any, fingerprint, legacy string) (guardedResult, bool) {
 	raw, err := marshalReceipt(receipt)
 	if err != nil {
-		return guardedResult{}, false
+		return receiptStorageFailure(), true
 	}
 	handle, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err == nil {
-		_, _ = handle.Write(raw)
-		_ = handle.Close()
+		written, writeErr := handle.Write(raw)
+		syncErr := handle.Sync()
+		closeErr := handle.Close()
+		if writeErr != nil || written != len(raw) || syncErr != nil || closeErr != nil {
+			return receiptStorageFailure(), true
+		}
 		return guardedResult{}, false
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return receiptStorageFailure(), true
 	}
 	savedRaw, readErr := os.ReadFile(file)
 	if readErr != nil {
@@ -173,6 +181,13 @@ func claimReceipt(file string, receipt map[string]any, fingerprint, legacy strin
 		header.Set("x-submission-attempt-id", attempt)
 	}
 	return guardedResult{status: int(status), body: payload, header: header}, true
+}
+
+func receiptStorageFailure() guardedResult {
+	return guardedResult{status: http.StatusServiceUnavailable, body: map[string]any{
+		"success": false, "code": "local_progress_unavailable",
+		"error": "服务器无法保存审核提交凭据，已暂停；本批尚未提交模型，请检查服务器存储后重试",
+	}}
 }
 
 func decorateSubmission(result guardedResult, attemptID string, replayed bool) guardedResult {

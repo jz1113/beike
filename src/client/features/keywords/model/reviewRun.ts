@@ -33,7 +33,6 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
   requestStop: () => void;
   indices: Map<string, number>;
   versions: Map<number, number>;
-  onWaiting: (ids: string[]) => void;
   markFailed: (ids: string[], message: string, uncertain?: boolean) => Promise<void>;
   notice: (message: string) => void;
   refreshBalance: (force?: boolean) => void;
@@ -152,7 +151,6 @@ export async function runKeywordReviewBatches(options: Checkpoints & {
       const batch = queue.slice(index, index + size);
       options.notice(mode === 'trial' ? `按规则 v${rulesVersion} 正在试跑 ${batch.length} 条…`
         : `按规则 v${rulesVersion} ${retryRound ? `自动重试第 ${retryRound} 轮` : '并行审核中'}，已完成 ${completed}/${options.queue.length} 条`);
-      options.onWaiting(batch.map((record) => record.id));
       await submitBatch(batch);
     }
   };

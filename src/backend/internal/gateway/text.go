@@ -188,6 +188,9 @@ func requestText(ctx context.Context, req TextRequest, stream bool, onDelta func
 			err = validateNativeTextJSON(protocol, req.Payload, data)
 		}
 		if err != nil {
+			if errors.Is(err, ErrInvalidTextJSON) {
+				return status, nil, &TextJSONError{Response: data}
+			}
 			return status, nil, err
 		}
 		return status, data, nil
@@ -215,6 +218,9 @@ func requestText(ctx context.Context, req TextRequest, stream bool, onDelta func
 		err = validateNativeTextJSON(protocol, req.Payload, data)
 	}
 	if err != nil {
+		if errors.Is(err, ErrInvalidTextJSON) {
+			return status, nil, &TextJSONError{Response: data}
+		}
 		return status, nil, err
 	}
 	return status, data, nil

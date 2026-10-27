@@ -52,7 +52,7 @@ export interface ShotPrompt {
   sourceShotNo?: number;
   sourcePrompt?: string;
   sourceGroupId?: string;
-  assembly_source?: 'group_skeleton' | 'architecture' | 'fallback';
+  assembly_source?: 'skill' | 'group_skeleton' | 'architecture' | 'fallback';
   shot_no: number;
   title?: string;
   prompt: string;

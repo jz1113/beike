@@ -1,3 +1,4 @@
+import { contentPlanLabel } from '../../model/analysis/workshopContentPlan';
 import { useState } from 'react';
 import { Check, Copy, ExternalLink, ZoomIn } from 'lucide-react';
 import LazyProxyImage from '@client/shared/ui/LazyProxyImage';
@@ -5,8 +6,7 @@ import { BatchProductItem } from '../../model/batchTypes';
 
 export interface BatchStage4ProductInfoProps {
   item: BatchProductItem;
-  jdUrl: string;
-  cleanId: string;
+  productUrl: string | null;
   copiedId: string | null;
   onCopy: (id: string, text: string) => void;
   onPreview: (url: string) => void;
@@ -14,8 +14,7 @@ export interface BatchStage4ProductInfoProps {
 
 export function BatchStage4ProductInfo({
   item,
-  jdUrl,
-  cleanId,
+  productUrl,
   copiedId,
   onCopy,
   onPreview,
@@ -31,27 +30,28 @@ export function BatchStage4ProductInfo({
           <span>商品信息</span>
         </span>
         <span className="shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 dark:text-slate-400 dark:bg-white/10">
-          {item.platform?.toUpperCase() || '商品'}
+          {item.platform === 'local' ? '本地商品' : item.platform?.toUpperCase() || '商品'}
         </span>
       </div>
       <div className="space-y-1">
         <label className="text-xs font-medium text-slate-500 block dark:text-slate-400">商品名称</label>
         <div title={item.title} className="line-clamp-3 text-[13px] font-medium text-slate-800 leading-6 [overflow-wrap:anywhere] dark:text-slate-100">{item.title}</div>
+        {item.contentPlan && <p className="mt-1 text-xs text-indigo-500">{contentPlanLabel(item)}</p>}
       </div>
       <div className="space-y-1.5">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">商品链接</label>
-          {cleanId && <span title={cleanId} className="min-w-0 truncate text-[11px] text-slate-500 tabular-nums dark:text-slate-400">ID: {cleanId}</span>}
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{item.platform === 'local' ? '商品类目' : '商品链接'}</label>
+          {item.platform !== 'local' && <span title={item.itemId} className="min-w-0 truncate text-[11px] text-slate-500 tabular-nums dark:text-slate-400">ID: {item.itemId}</span>}
         </div>
-        <div className="flex items-center gap-2">
-          <a href={jdUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 py-2 px-2 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex items-center justify-center gap-1.5 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 dark:text-indigo-300" title="在新标签页中直接打开京东商品页">
-            <span className="truncate">打开京东商品页</span>
+        {productUrl ? <div className="flex items-center gap-2">
+          <a href={productUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 py-2 px-2 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex items-center justify-center gap-1.5 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 dark:text-indigo-300" title="在新标签页中打开原商品页">
+            <span className="truncate">打开原商品页</span>
             <ExternalLink className="w-3.5 h-3.5 shrink-0" />
           </a>
-          <button type="button" onClick={() => onCopy(`jd_${item.id}`, jdUrl)} className="py-2 px-2 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-1 shrink-0 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/5 dark:border-white/10">
+          <button type="button" onClick={() => onCopy(`jd_${item.id}`, productUrl)} className="py-2 px-2 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-1 shrink-0 dark:text-slate-200 dark:hover:bg-white/10 dark:bg-white/5 dark:border-white/10">
             {copiedId === `jd_${item.id}` ? <><Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /><span className="text-emerald-700 dark:text-emerald-300">已复制</span></> : <><Copy className="w-3.5 h-3.5" /><span>复制</span></>}
           </button>
-        </div>
+        </div> : <p className="text-xs text-slate-600 dark:text-slate-300">{item.platform === 'local' ? item.category : '原商品链接未记录'}</p>}
       </div>
       <div className="space-y-1.5 pt-1">
         <div className="flex items-center justify-between text-[11px]">

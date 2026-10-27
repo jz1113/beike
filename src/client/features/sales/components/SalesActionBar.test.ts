@@ -53,7 +53,7 @@ describe('sales action dock busy layout', () => {
     (stopButton.props.onClick as () => void)();
     expect(stop).toHaveBeenCalledOnce();
     expect(generate).not.toHaveBeenCalled();
-    expect(renderToStaticMarkup(view)).toContain('服务商已接受的任务仍可能生成并计费。');
+    expect(renderToStaticMarkup(view)).not.toContain('服务商已接受的任务仍可能生成并计费。');
   });
 
   it('restores the original action and configuration after work ends', () => {

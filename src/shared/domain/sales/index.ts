@@ -4,3 +4,4 @@ export * from './imageCatalog';
 export * from './planRules';
 export * from './fashionRefs';
 export * from './workflow';
+export * from './skill';

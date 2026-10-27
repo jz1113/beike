@@ -1,4 +1,4 @@
-import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { groupCardImageUrl } from '../../model/groupPreviewImageSources';
 import { Image as ImageIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -17,7 +17,7 @@ function PreviewTile({ url, index }: { url: string; index: number }) {
   const [useDirectUrl, setUseDirectUrl] = useState(false);
   const [failed, setFailed] = useState(false);
   const directUrl = url.startsWith('//') ? `https:${url}` : url;
-  const proxyUrl = proxyMediaUrl(directUrl, { thumb: true, width: 320 });
+  const proxyUrl = groupCardImageUrl(directUrl);
 
   if (failed) {
     return <div className="flex min-h-0 min-w-0 items-center justify-center bg-slate-100 text-slate-300 dark:bg-white/10"><ImageIcon className="h-5 w-5" /></div>;
@@ -30,6 +30,7 @@ function PreviewTile({ url, index }: { url: string; index: number }) {
       className="h-full w-full min-h-0 min-w-0 object-cover transition-transform duration-300 group-hover/thumb:scale-[1.02]"
       loading="lazy"
       decoding="async"
+      referrerPolicy="no-referrer"
       onError={() => {
         if (!useDirectUrl && proxyUrl !== directUrl) setUseDirectUrl(true);
         else setFailed(true);

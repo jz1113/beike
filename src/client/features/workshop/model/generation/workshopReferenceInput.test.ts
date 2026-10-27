@@ -1,37 +1,43 @@
 import { describe, expect, it } from 'vitest';
+import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import { workshopReferenceInput, workshopReferenceBudget } from './workshopReferenceInput';
 
-describe('workshop reference image roles', () => {
-  it('keeps extra product views ahead of the source sample', () => {
-    const result = workshopReferenceInput([{ shot_no: 3, prompt: '木桌俯拍', sourceReferenceImageUrl: 'sample-3' }], 4);
-    expect(result.compositionReferenceImages).toEqual(['sample-3']);
-    expect(result.instruction).toContain('分镜3的构图参考为 @图片5');
-    expect(result.instruction).toContain('将其中旧商品完整替换');
-  });
-  it('maps grid positions to the corresponding original images', () => {
-    const result = workshopReferenceInput([1, 2, 3, 4].map(n => ({ shot_no: n, prompt: `shot${n}`, sourceReferenceImageUrl: `sample${n}` })), 2);
-    expect(result.instruction).toContain('分镜1（左上格）的构图参考为 @图片3');
-    expect(result.instruction).toContain('分镜4（右下格）的构图参考为 @图片6');
-  });
-  it('does not silently discard missing references or mislabel legacy prompts', () => {
-    expect(() => workshopReferenceInput([{ shot_no: 1, prompt: 'a', assembly_source: 'group_skeleton' }], 1)).toThrow('旧分析');
-    expect(() => workshopReferenceInput([{ shot_no: 1, prompt: 'a', sourceReferenceImageUrl: 'a' }, { shot_no: 2, prompt: 'b' }], 1)).toThrow('不完整');
-    expect(workshopReferenceInput([{ shot_no: 1, prompt: '手动导入' }], 1).instruction).toBe('');
-  });
-});
+const skillShot: ShotPrompt = { shot_no: 1, prompt: '桌面自然光展示商品', assembly_source: 'skill' };
 
-describe('workshop model reference budgets', () => {
-  const shot = { shot_no: 1, prompt: '桌面', sourceReferenceImageUrl: 'original' };
-  it('reserves the sample and optional face, keeping actual slots within the model limit', () => {
-    expect(workshopReferenceBudget('gemini-2.5-flash-image', [shot], false)).toBe(2);
-    expect(workshopReferenceBudget('gemini-2.5-flash-image', [shot], true)).toBe(1);
-    expect(workshopReferenceBudget('qwen-image-3.0', [shot], false)).toBe(2);
-    expect(workshopReferenceBudget('qwen-image-2.1', [shot], true)).toBe(4);
-    expect(() => workshopReferenceBudget('qwen-image-edit', [shot], false)).toThrow('最多支持 1 张');
+describe('workshop skill production images', () => {
+  it('uses product views without composition references for both single shots and grids', () => {
+    for (const shots of [[skillShot], [1, 2, 3, 4].map(n => ({ ...skillShot, shot_no: n }))]) {
+      const result = workshopReferenceInput(shots, 3);
+      expect(result.compositionReferenceImages).toEqual([]);
+      expect(result.instruction).toContain('@图片1 至 @图片3');
+      expect(result.instruction).toContain('按已确认的技能分镜执行');
+      expect(result.instruction).not.toContain('@图片4');
+    }
   });
-  it('requires all grid samples and asks for single shots when the capacity cannot fit them', () => {
-    const shots = [1, 2, 3, 4].map(n => ({ ...shot, shot_no: n, sourceReferenceImageUrl: `original${n}` }));
-    expect(() => workshopReferenceBudget('qwen-image-3.0', shots, false)).toThrow('改用单张逐镜');
-    expect(workshopReferenceBudget('gpt-image-2', shots, true)).toBe(4);
+
+  it.each<Partial<ShotPrompt>>([
+    { assembly_source: 'group_skeleton' },
+    { sourceReferenceImageUrl: 'old-sample' },
+    { sourceGroupId: 'old-group' },
+    { sourcePrompt: 'old reverse prompt' },
+  ])('requires fresh analysis when legacy reference evidence remains: %j', legacy => {
+    const shots = [{ ...skillShot, ...legacy }];
+    expect(() => workshopReferenceInput(shots, 1)).toThrow('按创作技能重新分析');
+    expect(() => workshopReferenceBudget('gpt-image-2', shots, false)).toThrow('按创作技能重新分析');
+  });
+
+  it('keeps manually imported text product-only', () => {
+    const result = workshopReferenceInput([{ shot_no: 1, prompt: '手动导入' }], 1);
+    expect(result.compositionReferenceImages).toEqual([]);
+    expect(result.instruction).toContain('当前同款商品');
+  });
+
+  it('uses the model image capacity for product views without reserving sample slots', () => {
+    expect(workshopReferenceBudget('gemini-2.5-flash-image', [skillShot], false)).toBe(3);
+    expect(workshopReferenceBudget('qwen-image-3.0', [skillShot], false)).toBe(3);
+    expect(workshopReferenceBudget('qwen-image-edit', [skillShot], false)).toBe(1);
+    const grid = [1, 2, 3, 4].map(n => ({ ...skillShot, shot_no: n }));
+    expect(workshopReferenceBudget('qwen-image-3.0', grid, false)).toBe(3);
+    expect(workshopReferenceBudget('gpt-image-2', grid, false)).toBe(4);
   });
 });

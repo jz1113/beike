@@ -34,19 +34,21 @@ export function SalesProductFields({
   const profile = salesProductProfile({ productName, productUrl, props, variantMetadata, colorSelection, images, isCollected });
   const productNameField = <div className="min-w-0">
     {isCollected ? <>
-      <p className={salesLabelClass}>商品名称</p>
-      <p className="mt-2 whitespace-pre-wrap text-[15px] font-semibold leading-6 [overflow-wrap:anywhere]">{productName || '未返回商品名称'}</p>
+      <p className="sr-only">商品名称</p>
+      <p className="whitespace-pre-wrap text-[15px] font-semibold leading-6 [overflow-wrap:anywhere]">{productName || '未返回商品名称'}</p>
     </> : <>
       <label htmlFor="sales-product-name" className={salesLabelClass}>商品名称<span className="ml-1 text-[10px] font-normal text-slate-400">必填</span></label>
       <textarea id="sales-product-name" rows={3} value={productName} placeholder="填写可核实的商品名称" disabled={disabled} onChange={(event) => onChange({ productName: event.target.value })} className={`${salesInputClass} sales-product-name-input resize-y text-[13px] leading-5`} />
     </>}
   </div>;
   return <section className={`${noDivider ? '' : salesDividerClass} sales-product-fields @container space-y-3`} aria-label="商品基础档案">
-    {productNameField}
-    {profile.hasData ? <dl aria-label="当前采集 SKU 与规格" className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-4 gap-y-2 rounded-xl bg-slate-100/70 px-3 py-2.5 dark:bg-white/[0.04]">
-      <div className="min-w-0"><dt className="text-[11px] text-slate-500 dark:text-slate-400">SKU</dt><dd className="mt-1 break-all text-xs font-medium leading-5 tabular-nums">{profile.sku || '未确认'}</dd></div>
-      <div className="min-w-0"><dt className="text-[11px] text-slate-500 dark:text-slate-400">商品规格</dt><dd className="mt-1 text-xs font-medium leading-5 [overflow-wrap:anywhere]">{profile.specification || '未返回'}</dd></div>
-    </dl> : <p className="text-[11px] leading-5 text-slate-400 dark:text-slate-500">采集商品链接后将自动提取 SKU 与商品规格</p>}
+    <div className="sales-product-identity space-y-1.5">
+      {productNameField}
+      {profile.hasData ? <dl aria-label="当前采集 SKU 与规格" className="sales-product-specs flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+        <div className="flex min-w-0 gap-1"><dt className="shrink-0">SKU:</dt><dd className="min-w-0 break-all font-medium tabular-nums text-slate-700 dark:text-slate-300">{profile.sku || '未确认'}</dd></div>
+        <div className="flex min-w-0 gap-1"><dt className="shrink-0" aria-label="商品规格">规格:</dt><dd className="min-w-0 font-medium text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{profile.specification || '未返回'}</dd></div>
+      </dl> : <p className="text-[11px] leading-5 text-slate-400 dark:text-slate-500">采集商品链接后将自动提取 SKU 与商品规格</p>}
+    </div>
     {!profileOnly && <SalesProductInsights sellingPoints={sellingPoints} props={props} analysis={analysis} disabled={disabled} isAnalyzing={isAnalyzing} canAnalyze={canAnalyze} onAnalyze={onAnalyze} onChange={onChange} />}
   </section>;
 }
@@ -87,9 +89,9 @@ export function SalesProductMedia({ productUrl, isCollected, children, images, u
       <div className="sales-product-link shrink-0 pb-4">
       <h2 className="mb-4 text-sm font-semibold">商品档案与参考图</h2>
       <label className={salesLabelClass} htmlFor="sales-product-url">商品链接</label>
-        <div className="mt-1.5 flex gap-2">
-          <input id="sales-product-url" value={productUrl} disabled={isBusy} onChange={(event) => onUrlChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !isBusy) onCollect(); }} placeholder="京东、淘宝、天猫、1688 或拼多多" className={`${salesInputClass} mt-0 min-w-0 flex-1`} />
-          <button type="button" onClick={onCollect} disabled={isBusy || !productUrl.trim()} className={`h-10 shrink-0 px-3.5 disabled:opacity-40 ${isCollected ? salesGhostButtonClass : `sales-collect-primary ${salesFocusClass}`}`}>{isCollecting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}采集</button>
+        <div className="mt-1.5 flex items-center gap-2 [&>input]:mt-0">
+          <input id="sales-product-url" value={productUrl} disabled={isBusy} onChange={(event) => onUrlChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !isBusy) onCollect(); }} placeholder="京东、淘宝、天猫、1688 或拼多多" className={`${salesInputClass} h-11 min-w-0 flex-1`} />
+          <button type="button" onClick={onCollect} disabled={isBusy || !productUrl.trim()} className={`h-11 shrink-0 px-3.5 disabled:opacity-40 ${isCollected ? salesGhostButtonClass : `sales-collect-primary ${salesFocusClass}`}`}>{isCollecting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}采集</button>
         </div>
       </div>
       {children}

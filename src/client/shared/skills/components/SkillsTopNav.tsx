@@ -35,7 +35,7 @@ export function SkillsTopNav({
 
   return (
     <header className="relative z-30 shrink-0 px-5 pb-3 pt-5 sm:px-8 lg:px-10">
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4">
+      <div className="flex w-full flex-wrap items-center justify-between gap-4">
         <div
           role="tablist"
           aria-label="技能类型"

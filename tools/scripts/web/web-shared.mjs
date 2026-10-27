@@ -195,6 +195,8 @@ export function gatewayBinary(workspaceRoot) {
 }
 
 export function buildGateway(workspaceRoot) {
+  const skills = spawnSync(process.execPath, ['--import', 'tsx', 'tools/scripts/skills/build-skill-packages.mjs'], { cwd: workspaceRoot, stdio: 'inherit' });
+  if (skills.status !== 0) throw new Error('技能规则与运行资源不同步，请先执行 pnpm skills:build');
   const out = gatewayBinary(workspaceRoot);
   mkdirSync(dirname(out), { recursive: true });
   const result = spawnSync(resolveGo(), ['build', '-o', out, './src/backend/cmd/api'], {

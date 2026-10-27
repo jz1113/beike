@@ -1,10 +1,13 @@
 import { normalizeCollectedProductImages } from '@shared/domain/collection/productImages';
 import { apiFetch } from '../../../../shared/api/apiClient';
 import type { BatchProductItem, TypedProductImage } from '../batchTypes';
+import { parseWorkshopProduct } from './parseWorkshopProduct';
+import { workshopProductKey } from './workshopTableImport';
 
 export interface ParseBatchInputResult {
   newItems: BatchProductItem[];
   error?: 'EMPTY_INPUT' | 'NO_NEW_ITEMS';
+  skipped?: number;
 }
 
 /**
@@ -28,27 +31,23 @@ export function parseBatchInputLines(
   }
 
   const newItems: BatchProductItem[] = [];
-  const seenIds = new Set(existingItemIds);
+  const seenIds = new Set([...existingItemIds].map(id => id.replace(/^tmall:/, 'taobao:')));
+  let skipped = 0;
 
   lines.forEach((line, idx) => {
-    let platform: 'jd' | 'taobao' | '1688' = 'jd';
-    if (/taobao\.com|tmall\.com/i.test(line)) platform = 'taobao';
-    if (/1688\.com/i.test(line)) platform = '1688';
-
-    const numMatch =
-      line.match(/(?:item\.jd\.com\/|id=|itemId=|item_id=|\/)(\d+)/i) ||
-      line.match(/\b\d{7,16}\b/) ||
-      line.match(/\d+/);
-    const itemId = numMatch ? (numMatch[1] || numMatch[0]) : line;
-    const dedupeKey = `${platform}:${itemId}`;
-    if (seenIds.has(dedupeKey)) return;
-    if (seenIds.size >= 20) return;
+    const parsed = parseWorkshopProduct(line);
+    if (!parsed) { skipped++; return; }
+    const { platform, itemId, url } = parsed;
+    // Historical Tmall rows used the Taobao platform identifier.
+    const dedupeKey = `${platform === 'tmall' ? 'taobao' : platform}:${itemId}`;
+    if (seenIds.has(dedupeKey) || seenIds.has(`${platform}:${itemId}`)) { skipped++; return; }
+    if (existingItemIds.size + newItems.length >= 20) { skipped++; return; }
     seenIds.add(dedupeKey);
     newItems.push({
       id: `batch_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       itemId,
       platform,
-      url: /^https?:\/\//i.test(line) ? line : undefined,
+      url,
       title: `待采编商品 (${itemId})`,
       price: 0,
       category: '待采编',
@@ -68,10 +67,10 @@ export function parseBatchInputLines(
   });
 
   if (newItems.length === 0) {
-    return { newItems: [], error: 'NO_NEW_ITEMS' };
+    return { newItems: [], error: 'NO_NEW_ITEMS', skipped };
   }
 
-  return { newItems };
+  return { newItems, skipped };
 }
 
 export interface BuildTypedListResult {
@@ -114,6 +113,16 @@ export interface RunBatchCollectDeps {
   forceRefresh?: boolean;
 }
 
+interface CollectionResponse {
+  success?: boolean;
+  product?: Record<string, unknown> & { title?: string; price?: number; category?: string; brand?: string; props?: Record<string, string> };
+  images?: unknown;
+  fromCache?: boolean;
+  apiUsed?: string;
+  missingConfig?: string;
+  error?: string;
+}
+
 /**
  * 运行批量商品采集任务（3 worker 并发队列）
  */
@@ -125,6 +134,8 @@ export async function runBatchCollect(
   let index = 0;
   let successCount = 0;
   let failedCount = 0;
+  // A multi-content SKU shares one collection request, including failures, within this run.
+  const requests = new Map<string, Promise<{ res: Response; data: CollectionResponse }>>();
 
   const worker = async () => {
     while (index < pendingItems.length) {
@@ -132,17 +143,20 @@ export async function runBatchCollect(
       deps.onItemUpdate(item.id, { status: 'collecting' });
 
       try {
-        const res = await apiFetch('/api/catalog/collect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: item.url || item.itemId,
-            platform: 'auto',
-            forceRefresh: deps.forceRefresh ?? item.status === 'failed',
-          }),
-        });
-
-        const data = await res.json().catch(() => ({ error: '网络响应解析失败' }));
+        const key = workshopProductKey(item);
+        let request = requests.get(key);
+        if (!request) {
+          request = (async () => {
+            const res = await apiFetch('/api/catalog/collect', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: item.url || item.itemId, platform: 'auto', forceRefresh: deps.forceRefresh ?? item.status === 'failed' }),
+            });
+            const data: CollectionResponse = await res.json().catch(() => ({ error: '网络响应解析失败' }));
+            return { res, data };
+          })();
+          requests.set(key, request);
+        }
+        const { res, data } = await request;
 
         if (res.ok && data.success && data.product) {
           const prod = data.product;
@@ -154,12 +168,10 @@ export async function runBatchCollect(
             continue;
           }
 
-          const defaultMain = mainImgs.filter(u => !/\.gif(?:$|[?#])/i.test(u)).slice(0, 1);
-          const initialSelected = defaultMain.length > 0 ? defaultMain : (cleanCover && !/\.gif(?:$|[?#])/i.test(cleanCover) ? [cleanCover] : []);
           deps.onItemUpdate(item.id, {
             title: prod.title || item.title,
             price: prod.price || 0,
-            category: prod.category || '数码正品',
+            category: item.importCategory || prod.category || item.category || '未分类',
             brand: prod.brand || '',
             coverImage: cleanCover,
             mainImages: mainImgs,
@@ -171,7 +183,7 @@ export async function runBatchCollect(
             status: 'success',
             selected: true,
             allTypedImages: typedList,
-            selectedProductImages: initialSelected,
+            selectedProductImages: [],
             errorMsg: undefined,
           });
           successCount++;

@@ -160,7 +160,7 @@ func Switch(ctx context.Context, db *sql.DB, workspace, folder, action, versionI
 	if n, _ := result.RowsAffected(); n != 1 {
 		return ErrConflict
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO "CategorySkillEvent" ("id","workspaceId","folderId","versionId","eventType","detail","createdAt") VALUES (?,?,?,?,?,?,?)`, ID(), workspace, folder, versionID, action, map[string]string{"trial": "后续分析试用候选版本；已分析批次不变", "baseline": "后续分析恢复生产版，用于同商品同母本对照", "publish": "候选通过留出图组的实际成图对照，升级为生产版", "activate": "直接设为当前细分的正式技能", "rollback": "恢复上一生产版本，保留历史记录"}[action], now())
+	_, err = tx.ExecContext(ctx, `INSERT INTO "CategorySkillEvent" ("id","workspaceId","folderId","versionId","eventType","detail","createdAt") VALUES (?,?,?,?,?,?,?)`, ID(), workspace, folder, versionID, action, map[string]string{"trial": "后续分析试用候选版本；已分析批次不变", "baseline": "后续分析恢复正式技能，用于同商品同设置对照", "publish": "候选通过同条件的实际成图对照，升级为正式技能", "activate": "直接设为当前细分的正式技能", "rollback": "恢复上一生产版本，保留历史记录"}[action], now())
 	if err != nil {
 		return err
 	}

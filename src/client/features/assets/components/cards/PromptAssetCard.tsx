@@ -67,6 +67,7 @@ export default function PromptAssetCard({
   activeSubTab,
   listPosition,
   displayLabel,
+  productCategoryLabel,
   isBatchMode,
   isSelected,
   isMenuOpen,
@@ -90,7 +91,7 @@ export default function PromptAssetCard({
     ? groupCodeLabel
     : displayLabel || item.title || item.name || '未命名资产';
   const inlineDetail = activeSubTab === 'full_prompt' || activeSubTab === 'persona' || activeSubTab === 'outfit' || activeSubTab === 'scene';
-  const headerAboveImage = activeSubTab === 'full_prompt';
+  const numberedGroup = activeSubTab === 'full_prompt';
   const imageUrl = (item.coverUrl || item.avatarUrl) as string | undefined;
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const visibleImageUrl = imageUrl && imageUrl !== failedImageUrl ? imageUrl : null;
@@ -99,7 +100,7 @@ export default function PromptAssetCard({
   }, [activeSubTab, item]);
 
   const cardContainerClass = activeSubTab === 'full_prompt'
-    ? `group relative self-start flex flex-col transition-all duration-200 cursor-pointer`
+    ? `asset-group-card group relative self-start flex flex-col transition-all duration-200 cursor-pointer`
     : `group relative self-start flex flex-col rounded-2xl border p-2.5 shadow-2xs transition-all duration-200 cursor-pointer ${
         isSelected
           ? 'border-indigo-500 bg-indigo-50/30 ring-2 ring-indigo-500/20 dark:border-indigo-400 dark:bg-indigo-500/10'
@@ -108,34 +109,36 @@ export default function PromptAssetCard({
 
   return (
     <div
+      role="group"
+      aria-label={displayTitle}
+      tabIndex={0}
+      onKeyDown={event => {
+        if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        event.currentTarget.click();
+      }}
       onClick={onCardClick}
       onContextMenu={onContextMenu}
+      data-selected={isSelected || undefined}
+      data-menu-open={isMenuOpen || undefined}
       data-prompt-library-context
       className={cardContainerClass}
     >
-      <div className={`${headerAboveImage ? 'order-1 mb-1.5 min-h-6 px-0.5' : 'order-2 mt-2 min-h-7'} flex items-center gap-1.5 select-none`}>
+      <div className={`${numberedGroup ? 'asset-group-card-header' : 'order-2 mt-2 min-h-7'} flex items-center gap-1.5 select-none`}>
         <h3
-          className={`min-w-0 flex-1 truncate text-xs font-bold tabular-nums leading-snug text-slate-800 transition-colors dark:text-slate-100 ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
+          className={numberedGroup ? 'asset-group-number' : `min-w-0 flex-1 truncate text-xs font-bold tabular-nums leading-snug text-slate-800 transition-colors dark:text-slate-100 ${TAB_HOVER_TITLE_CLASS[activeSubTab]}`}
           title={displayTitle}
         >
           {displayTitle}
         </h3>
-        {inlineDetail && activeSubTab !== 'full_prompt' && !isBatchMode && (
-          <button
-            type="button"
-            onClick={onViewDetail}
-            className="shrink-0 whitespace-nowrap rounded-lg px-2 py-0.5 text-[11px] font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-200 cursor-pointer"
-          >
-            查看提示词
-          </button>
-        )}
         {!isBatchMode && (
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className={`${numberedGroup ? 'asset-group-menu' : ''} flex shrink-0 items-center gap-0.5`}>
             <div className="relative">
               <button
                 onClick={onToggleMenu}
                 className="p-1 rounded-lg text-slate-400 opacity-70 hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer dark:hover:text-slate-200 dark:hover:bg-white/10"
                 title="更多操作"
+                aria-label={numberedGroup ? `${displayTitle}更多操作` : '更多操作'}
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
@@ -211,7 +214,7 @@ export default function PromptAssetCard({
         <p className="order-4 mt-1 text-[10px] font-medium text-rose-600 dark:text-rose-400">{visualAssetIssue(item, activeSubTab)}</p>
       ) : null}
 
-      <div className={`relative min-w-0 ${headerAboveImage ? 'order-2' : 'order-1'}`}>
+      <div className="relative order-1 min-w-0">
         {visibleImageUrl ? (
           <div
             onClick={(e) => {
@@ -255,8 +258,9 @@ export default function PromptAssetCard({
                 <ZoomIn className="w-3.5 h-3.5 text-white drop-shadow-sm" />
               </div>
             )}
+            {isBatchMode && isSelected && <div className="pointer-events-none absolute inset-0 bg-indigo-600/[0.08]" aria-hidden="true" />}
             {activeSubTab === 'full_prompt' && item.imageReplaced === true && (
-              <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md">已换图</span>
+              <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md">已换图</span>
             )}
           </div>
         ) : (
@@ -272,7 +276,7 @@ export default function PromptAssetCard({
             onClick={onToggleSelect}
             aria-label={`${isSelected ? '取消选择' : '选择'}${displayTitle}`}
             aria-pressed={isSelected}
-            className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition-colors cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white/95 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 dark:text-slate-400 dark:border-white/10 dark:bg-[#18191c]/95'}`}
+            className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border shadow-md transition-all cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white ring-2 ring-white/80 dark:ring-slate-900/80' : 'border-slate-200 bg-white/95 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 dark:text-slate-300 dark:border-white/15 dark:bg-[#18191c]/95'}`}
           >
             {isSelected ? <Check className="h-5 w-5" strokeWidth={3} /> : <Square className="h-5 w-5" />}
           </button>
@@ -299,6 +303,8 @@ export default function PromptAssetCard({
           ))}
         </div>
       )}
+
+      {activeSubTab === 'full_prompt' && productCategoryLabel && <p className="asset-group-caption order-5" title={productCategoryLabel}>{productCategoryLabel}</p>}
 
       {!isBatchMode && !inlineDetail && (
         <div className="order-6 mt-2 border-t border-slate-200/70 pt-2 dark:border-white/10">

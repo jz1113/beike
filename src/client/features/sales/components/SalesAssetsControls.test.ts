@@ -19,7 +19,7 @@ function nodes(node: ReactNode): ReactElement<Record<string, unknown>>[] {
 }
 
 describe('sales asset controls and legacy speech labels', () => {
-  it('wires the image model picker and per-asset prompt editing to the studio', () => {
+  it('keeps model selection and source prompts without displaying a prompt editor', () => {
     const asset: SalesCreativeAsset = { id: 'scene', kind: 'scene', label: '场景', prompt: '自然光房间', required: true };
     const onModel = vi.fn();
     const onEditPrompt = vi.fn();
@@ -32,7 +32,10 @@ describe('sales asset controls and legacy speech labels', () => {
     expect(onEditPrompt).toHaveBeenCalledWith('scene', '新的房间');
     const html = renderToStaticMarkup(view);
     expect(html).toContain('绘图模型');
-    expect(html).toContain('场景绘图提示词');
+    expect(html).not.toContain('绘图提示词');
+    expect(html).not.toContain('<textarea');
+    expect(html).not.toContain('自然光房间');
+    expect(asset.prompt).toBe('自然光房间');
   });
   it('does not label a legacy unmarked speech source as voiceover', () => {
     const html = renderToStaticMarkup(createElement(SalesPlanSection, { script: { ...script, shots: [{ ...script.shots[0], speechMode: undefined }] }, disabled: false, onEditShot: vi.fn() }));

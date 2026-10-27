@@ -2,7 +2,9 @@ package poster
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -62,15 +64,13 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 			return
 		}
 
-		base, key := headlineCredentials(cfg, r, payload, model)
-		images, message := headlineImages(r, imagesRaw)
-		if message != "" {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "样张图片读取失败，请检查链接或网络"})
+		requestKey, validKey := coverRequestKey(payload)
+		if !validKey {
+			httpx.WriteJSON(w, 400, map[string]any{"success": false, "error": "投喂标识需要 8 到 128 个字符"})
 			return
 		}
-
+		base, key := headlineCredentials(cfg, r, payload, model)
 		title := strings.TrimSpace(generate.StringField(payload, "title"))
-		sampleID := coverID("sample")
 		workspace := httpx.WorkspaceFrom(r)
 		db, ok := openCoverDB(cfg)
 		if !ok {
@@ -78,10 +78,37 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 			return
 		}
 		defer db.Close()
-		if err := insertCoverSample(r.Context(), db, workspace, sampleID, title, model, images); err != nil {
-			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "封面样张没有保存，未调用反推模型"})
+		hash := coverFeedHash(imagesRaw, model, title, effort, generate.StringField(payload, "textProtocol"), base)
+		operation, claimed, err := beginCoverFeed(r.Context(), db, workspace, requestKey, title, model, hash, imagesRaw)
+		if err != nil {
+			if errors.Is(err, errCoverRequestMismatch) {
+				httpx.WriteJSON(w, 409, map[string]any{"success": false, "error": errCoverRequestMismatch.Error()})
+			} else {
+				httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "投喂登记失败，未调用反推模型；请核对原请求"})
+			}
 			return
 		}
+		if !claimed {
+			replayCoverFeed(w, operation)
+			return
+		}
+		sampleID := operation.ID
+		// The persisted operation survives a lost browser response and can be reconciled without another paid call.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 150*time.Second)
+		defer cancel()
+		r = r.WithContext(ctx)
+		defer func() {
+			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer stop()
+			_, _ = db.ExecContext(cleanup, `UPDATE "CoverMemorySample" SET "status"='failed',"error"='反推未完成，请核对后重试',"updatedAt"=? WHERE "id"=? AND "workspaceId"=? AND "status"='running'`, coverNow(), sampleID, workspace)
+		}()
+		images, message := headlineImages(cfg, r, imagesRaw)
+		if message != "" {
+			markCoverSample(r, cfg, workspace, sampleID, "failed", "", "样张图片读取失败，请检查链接或网络")
+			httpx.WriteJSON(w, 400, map[string]any{"success": false, "sampleId": sampleID, "error": "样张图片读取失败，请检查链接或网络"})
+			return
+		}
+
 		prompt := coverDeconstructPrompt()
 		content := []any{map[string]any{"type": "text", "text": prompt}}
 		for _, img := range images {
@@ -92,7 +119,7 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 		if err != nil || status >= 300 || strings.TrimSpace(text) == "" {
 			markCoverSample(r, cfg, workspace, sampleID, "failed", "", headlineErrorText(err, status, "反推分析模型响应异常"))
 			code := headlineFailure(err, status)
-			httpx.WriteJSON(w, code, map[string]any{"success": false, "error": headlineErrorText(err, status, "反推分析模型响应异常")})
+			httpx.WriteJSON(w, code, map[string]any{"success": false, "sampleId": sampleID, "error": headlineErrorText(err, status, "反推分析模型响应异常")})
 			return
 		}
 
@@ -105,13 +132,13 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 
 		entries := entriesFromDeconstruction(sampleID, parsed)
 		if len(entries) == 0 {
-			_ = finishCoverSample(r.Context(), db, workspace, sampleID, "failed", "", "反推结果没有可保存的特点")
+			markCoverSample(r, cfg, workspace, sampleID, "failed", "", "反推结果没有可保存的特点")
 			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "反推结果没有可保存的特点"})
 			return
 		}
 		raw, _ := json.Marshal(parsed)
 		if err := saveCoverDeconstruction(r.Context(), db, workspace, sampleID, string(raw), entries); err != nil {
-			_ = finishCoverSample(r.Context(), db, workspace, sampleID, "failed", "", "反推结果没有写入封面记忆，请先刷新核对，不要重复投喂")
+			markCoverSample(r, cfg, workspace, sampleID, "failed", "", "反推结果没有写入封面记忆，请先刷新核对，不要重复投喂")
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "反推结果没有写入封面记忆，请先刷新核对，不要重复投喂"})
 			return
 		}
@@ -161,5 +188,7 @@ func markCoverSample(r *http.Request, cfg config.Config, workspace, id, status, 
 		return
 	}
 	defer db.Close()
-	_ = finishCoverSample(r.Context(), db, workspace, id, status, deconstruction, errText)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+	defer cancel()
+	_ = finishCoverSample(ctx, db, workspace, id, status, deconstruction, errText)
 }

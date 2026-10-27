@@ -5,7 +5,7 @@ import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 import { usePosterInputDraft } from './usePosterInputDraft';
 import { loadPosterProductionSettings, persistPosterProductionSettings } from '../model/posterDraft';
 import { loadPosterBatchHistory, resolvePosterWorkspaceScope } from '../model/posterBatchHistory';
-import { normalizeConcurrency, normalizeCoverTitle, makeId } from '../model/posterTypes';
+import { normalizeConcurrency, normalizeCoverTitle, makeId, posterPreviewImages } from '../model/posterTypes';
 import type { PosterItem } from '../model/posterTypes';
 import { usePosterState } from './usePosterState';
 import { createPosterHistory } from './createPosterHistory';
@@ -179,11 +179,7 @@ export function usePosterProduction() {
   const failedCount = useMemo(() => items.filter((item) => item.status === 'failed'
     && (!item.importError || item.imageTaskId || item.generatedSceneUrl || item.generationRecoveryRequired)).length, [items]);
   const previewItem = useMemo(() => previewState ? items.find((item) => item.id === previewState.itemId) ?? null : null, [items, previewState]);
-  const previewImages = useMemo(() => previewItem ? Array.from(new Set([
-    previewItem.sourceImageUrl,
-    previewItem.generatedSceneUrl,
-    previewItem.resultUrl,
-  ].filter((url): url is string => Boolean(url)))) : [], [previewItem]);
+  const previewImages = useMemo(() => previewItem ? posterPreviewImages(previewItem) : [], [previewItem]);
 
   const updateItem = (id: string, patch: Partial<PosterItem>) => {
     // The unmount cleanup already saved interruption and the submission key.
@@ -258,6 +254,7 @@ export function usePosterProduction() {
     }
     updateItem(id, {
       coverTitle: title, isTitleEdited: true, status: 'idle', error: undefined,
+      memorySampleId: undefined, memoryEntryIds: undefined, memoryUsageId: undefined, memoryRevisionId: undefined, memoryWarning: undefined,
       resultUrl: undefined, prompt: undefined, promptVersion: undefined, designPlan: undefined,
       imageTaskId: undefined, imageSubmissionKey: undefined, generatedSceneUrl: undefined,
       generationRecoveryRequired: false,

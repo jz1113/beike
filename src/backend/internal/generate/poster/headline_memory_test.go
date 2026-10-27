@@ -379,5 +379,20 @@ func TestHeadlineDeconstructReasoningEffort(t *testing.T) {
 func coverMemoryConfig(t *testing.T) config.Config {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "cover.db")
-	return config.Config{DatabaseURL: "file:" + path, NodeEnv: "development"}
+	cfg := config.Config{DatabaseURL: "file:" + path, NodeEnv: "development"}
+	db, err := database.OpenWrite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, name := range []string{"cover_memory.sql", "cover_learning.sql"} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "platform", "database", "migrate", "sources", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(string(raw)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return cfg
 }

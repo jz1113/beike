@@ -6,6 +6,8 @@ import { nextWorkshopRecipeSelection } from '../model/workshopResourceRules';
 export function useBatchWorkshopResources(setSelectedArchId: (id: string) => void) {
   const recipeRequest = useRef(0);
   const [recipes, setRecipes] = useState<any[]>([]);
+  const [skillLoadState, setSkillLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [skillLoadError, setSkillLoadError] = useState('');
   // 模型配置
   const [availableVisionModels, setAvailableVisionModels] = useState<any[]>([]);
   const [selectedVisionModel, setSelectedVisionModel] = useState<string>('gemini-3.7-flash');
@@ -15,14 +17,20 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
   // 资源异步加载
   const fetchRecipesHandler = useCallback(async () => {
     const request = ++recipeRequest.current;
+    setSkillLoadState('loading');
+    setSkillLoadError('');
     try {
       const visible = await fetchRecipes();
       if (request !== recipeRequest.current) return;
       setRecipes(visible);
+      setSkillLoadState('ready');
       const next = nextWorkshopRecipeSelection(visible, useAppStore.getState().selectedArchId);
       if (next !== null) setSelectedArchId(next);
-    } catch {
-      if (request === recipeRequest.current) setRecipes([]);
+    } catch (error) {
+      if (request === recipeRequest.current) {
+        setRecipes([]); setSkillLoadState('error');
+        setSkillLoadError(error instanceof Error ? error.message : '创作技能加载失败');
+      }
     }
   }, [setSelectedArchId]);
 
@@ -55,7 +63,7 @@ export function useBatchWorkshopResources(setSelectedArchId: (id: string) => voi
   }, [fetchRecipesHandler, loadModelsHandler]);
 
   return {
-    recipes, availableVisionModels, selectedVisionModel, setSelectedVisionModel,
+    recipes, skillLoadState, skillLoadError, reloadSkills: fetchRecipesHandler, availableVisionModels, selectedVisionModel, setSelectedVisionModel,
     availableImageModels, selectedImageGenModel, setSelectedImageGenModel,
   };
 }

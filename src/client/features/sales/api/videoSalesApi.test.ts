@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const fetch = vi.hoisted(() => vi.fn());
 vi.mock('@client/shared/api/apiClient', () => ({ apiFetch: fetch }));
 vi.mock('@client/shared/utils/modelUsage', () => ({ recordChatTokens: vi.fn() }));
+import { salesSkillBinding } from '@shared/domain/sales/skill';
 import { videoSalesScriptGenerateBodySchema } from '@shared/contracts/videoSales';
 import { analyzeProductMedia, finalizeSalesPrompts, generateSalesScripts, selectSalesImages } from './videoSalesApi';
 
@@ -13,8 +14,8 @@ const shot = { shotId: 1, type: 'demo' as const, duration: 15, description: '展
 beforeEach(() => {
   fetch.mockReset();
   fetch.mockResolvedValue({ ok: true, json: async () => ({
-    success: true, analysis: {}, scripts: [], assignments: [],
-    fullPrompt: '整段', prompts: [{ shotId: 1, prompt: '镜头' }],
+    success: true, ...salesSkillBinding(), analysis: {}, scripts: [], assignments: [],
+    fullPrompt: '整段', prompts: [{ shotId: 1, speechMode: 'voiceover', prompt: '镜头' }],
     validations: [{ id: 'a', status: 'passed', reason: '外观一致' }],
   }) });
 });
@@ -44,7 +45,16 @@ describe('video sales selected text route', () => {
     expect(fetch).toHaveBeenCalledTimes(4);
     for (const [, init] of fetch.mock.calls) {
       expect(JSON.parse(init.body)).toMatchObject(route);
+      expect(JSON.parse(init.body)).toMatchObject(salesSkillBinding());
       expect(init.headers).toMatchObject({ 'x-custom-base-url': route.customBaseUrl, 'x-custom-api-key': route.customApiKey });
     }
+  });
+
+  it('rejects a server that did not execute the selected skill revision', async () => {
+    for (const patch of [{ skillId: 'other-skill' }, { skillRevision: 'outdated' }, { skillId: undefined, skillRevision: undefined }]) {
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, analysis: {}, ...salesSkillBinding(), ...patch }) });
+      await expect(analyzeProductMedia({ ...route, ...workflow, imageCatalog: images, productName: '裙子' })).rejects.toThrow('技能版本');
+    }
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 });

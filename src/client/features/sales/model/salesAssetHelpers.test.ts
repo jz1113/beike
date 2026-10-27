@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SalesCreativeAsset, VideoSalesScript } from '@shared/domain/sales';
 import { validateSalesAssetPlan } from '@shared/domain/sales';
+import { salesSkillStage } from '@shared/domain/sales/skill';
 import { canResubmitRejectedAsset, explainSalesReferenceError, recoverSalesAssetReceipts, salesAssetImagePrompt, salesAssetProductImages, salesReferenceRejection, reuseSalesPlanAssets, updateSalesCreativeAsset } from './salesAssetHelpers';
 
 describe('sales reference rejection', () => {
@@ -50,13 +51,29 @@ describe('per-asset product view evidence', () => {
     const dependency: SalesCreativeAsset = { id: 'person', kind: 'person', label: '背面人物', prompt: '背面', required: true };
     const prompt = salesAssetImagePrompt(front, [images[0]], [dependency], '黑色');
     expect(prompt).toContain('本次只生成一张静帧');
+    expect(prompt).toContain(salesSkillStage('image'));
     expect(prompt).toContain('素材名称：卫衣正面');
     expect(prompt).toContain('输入参考图1：商品原图（目录编号 2）');
     expect(prompt).toContain('输入参考图2：已生成素材「背面人物」');
     expect(prompt).toContain('不照搬前置素材的视角');
+    expect(prompt).toContain('不继承原模特的脸、白底或棚拍光');
+    expect(prompt).toContain('不冻结表情、手势和每一道褶皱');
     expect(prompt).toContain('不能把背面当正面');
     expect(prompt).toContain('商品颜色：黑色');
     expect(prompt).not.toContain('画面创作依据');
+  });
+
+  it('uses a new scene without moving the identity reference background into it', () => {
+    const person: SalesCreativeAsset = { id: 'person', kind: 'person', label: '家中人物', prompt: '室内上身', required: true };
+    const scene: SalesCreativeAsset = { id: 'street', kind: 'scene', label: '街边', prompt: '室外路边', required: true };
+    const prompt = salesAssetImagePrompt({ ...front, prompt: '同一人物站在街边' }, [images[0]], [person, scene], '黑色');
+    const identityLine = prompt.split('\n').find((line) => line.includes('输入参考图2：'));
+    const sceneLine = prompt.split('\n').find((line) => line.includes('输入参考图3：'));
+    expect(identityLine).toContain('继承同一人物身份');
+    expect(identityLine).toContain('只有本张明确沿用同一场景时');
+    expect(identityLine).toContain('不搬入原人物图背景');
+    expect(sceneLine).toContain('用于本张明确引用的场景布局与光线');
+    expect(sceneLine).toContain('不从空景额外增加人物');
   });
 });
 

@@ -1,11 +1,11 @@
-import type {InspirationItem} from '../components/inspiration/InspirationModal';
+import type {InspirationItem} from '../model/inspirationItem';
 
 // Shot descriptions are reconstructed from the supplied videos, not their original generation prompts.
 export const FEATURED_VIDEO_INSPIRATIONS:InspirationItem[]=[
   {
     id:'video-fold-craft',category:'video',tag:'折叠屏广告 · 镜头拆解',title:'折叠的艺术 · 从纸页到手机',
     image:'/inspirations/fold-craft/poster.jpg',video:'/inspirations/fold-craft/video.mp4',poster:'/inspirations/fold-craft/poster.jpg',mediaType:'video',
-    aspectRatio:'16:9',actualVideoDuration:33.7,videoDuration:15,quality:'720P',storyboardPresetId:'lifestyle-4shot',
+    aspectRatio:'16:9',actualVideoDuration:33.7,videoDuration:15,quality:'720P',
     prompt:`【总体设定】16:9 横屏，约 34 秒的折叠屏手机概念广告。以下为参考片的视觉拆解与复刻建议；按镜头分段生成后剪辑，非原片提示词。以“折叠与展开”为贯穿动作，从纸张、地图、书页自然过渡到手机铰链。画面由灰白日光逐步进入纯黑产品摄影，克制、安静、强调手工触感与金属精度。
 
 【摄影与材质】开场以纸张纤维、指尖关节和折痕为重点，侧向柔光，灰白背景。后半段黑色镜面台面，手部与产品由窄条轮廓光勾边；书页和屏幕的亮部成为视觉中心。可用微距和中近景交替，浅景深、平滑推进，保持折叠轴清晰。不要把建议焦段当作原片实拍参数。
@@ -27,7 +27,7 @@ export const FEATURED_VIDEO_INSPIRATIONS:InspirationItem[]=[
   {
     id:'video-childhood-village',category:'video',tag:'乡村童年 · 叙事镜头拆解',title:'童年 · 土路、游戏与落日',
     image:'/inspirations/childhood-village/poster.jpg',video:'/inspirations/childhood-village/video.mp4',poster:'/inspirations/childhood-village/poster.jpg',mediaType:'video',
-    aspectRatio:'16:9',actualVideoDuration:167.56,videoDuration:15,quality:'720P',storyboardPresetId:'lifestyle-4shot',
+    aspectRatio:'16:9',actualVideoDuration:167.56,videoDuration:15,quality:'720P',
     prompt:`【总体设定】16:9 横屏，约 2 分 48 秒的乡村童年叙事短片。以下依据所提供视频的可见画面整理为分段创作提示，非原片提示词；长片需逐段生成并剪辑。围绕身穿旧蓝灰短袖的男孩、村里的同伴与童年游戏展开，用池塘、土路、砖墙、木门、泥水和麦田建立统一空间。
 
 【摄影与色彩】整体低饱和土黄、暖棕与灰蓝，清晨或傍晚的侧逆光、柔和阴影、细腻颗粒。广角交代村庄，儿童视线高度的中景跟随动作，低机位与手部特写捕捉尘土和玩具。不追求每个镜头都金光灿烂，屋内保留自然暗部，皮肤、旧衣和泥土有真实细节。

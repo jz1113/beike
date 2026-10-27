@@ -11,14 +11,12 @@ import (
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/assistant/extract"
 	"beike.local/cloud/src/backend/internal/assistant/sessions"
-	"beike.local/cloud/src/backend/internal/avatar"
 	"beike.local/cloud/src/backend/internal/catalog"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/generate/export"
 	"beike.local/cloud/src/backend/internal/generate/poster"
-	"beike.local/cloud/src/backend/internal/generate/ppt"
 	"beike.local/cloud/src/backend/internal/generate/sales"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/keywords"
@@ -145,6 +143,9 @@ func nativeRoutes(cfg config.Config) []route {
 		{"PATCH /api/generate/headline-memory/entries/{id}", true, poster.HeadlineMemoryEntry(cfg)},
 		{"POST /api/generate/headline-memory/corrections", true, poster.HeadlineMemoryCorrection(cfg)},
 		{"DELETE /api/generate/headline-memory/trash", true, poster.HeadlineMemoryTrash(cfg)},
+		{"GET /api/generate/headline-memory/revisions/{id}", true, poster.HeadlineMemoryRevision(cfg)},
+		{"POST /api/generate/headline-memory/revisions/{id}/restore", true, poster.HeadlineMemoryRevision(cfg)},
+		{"PATCH /api/generate/headline-memory/usages/{id}", true, poster.HeadlineMemoryFeedback(cfg)},
 		{"POST /api/generate/analyze", true, generate.Analyze(cfg)},
 		{"POST /api/generate/copywriting", true, generate.Copywriting(cfg)},
 		{"POST /api/generate/image", true, generate.Image(cfg)},
@@ -160,27 +161,12 @@ func nativeRoutes(cfg config.Config) []route {
 		{"GET /api/generate/depth-video", true, depth.DepthVideo(cfg)},
 		{"GET /api/generate/depth-image", true, depth.DepthImage(cfg)},
 		{"POST /api/generate/export-zip", true, export.ExportZip(cfg)},
-		{"POST /api/generate/ppt-outline", true, ppt.PptOutline(cfg)},
-		{"POST /api/generate/ppt-detail", true, ppt.PptDetail(cfg)},
-		{"POST /api/generate/ppt-slide", true, ppt.PptSlide(cfg)},
-		{"POST /api/generate/ppt-narration", true, ppt.PptNarration(cfg)},
 		{"POST /api/generate/video-sales/analyze", true, sales.Analyze(cfg)},
 		{"POST /api/generate/video-sales/script", true, sales.Script(cfg)},
 		{"POST /api/generate/video-sales/select-images", true, sales.Select(cfg)},
 		{"POST /api/generate/video-sales/finalize-prompts", true, sales.Finalize(cfg)},
 		{"POST /api/generate/video-sales/compose", true, sales.Compose(cfg)},
 		{"POST /api/workshop/tasks/{taskId}/review", true, workshop.Review(cfg)},
-		{"GET /api/avatar/characters", true, avatar.Characters(cfg)},
-		{"POST /api/avatar/characters", true, avatar.CreateCharacter(cfg)},
-		{"DELETE /api/avatar/characters/{id}", true, avatar.DeleteCharacterHandler(cfg)},
-		{"GET /api/avatar/voices", true, avatar.Voices(cfg)},
-		{"POST /api/avatar/voices", true, avatar.CreateVoice(cfg)},
-		{"DELETE /api/avatar/voices/{id}", true, avatar.DeleteVoiceHandler(cfg)},
-		{"GET /api/avatar/fonts", true, avatar.Fonts(cfg)},
-		{"GET /api/avatar/tasks", true, avatar.Tasks(cfg)},
-		{"GET /api/avatar/tasks/{id}", true, avatar.TaskDetail(cfg)},
-		{"DELETE /api/avatar/tasks/{id}", true, avatar.DeleteTaskHandler(cfg)},
-		{"POST /api/avatar/render", true, avatar.Render(cfg)},
 	}
 }
 

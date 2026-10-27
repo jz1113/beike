@@ -9,6 +9,7 @@ const aspectRatioSchema = z.enum(['9:16', '16:9', '3:4', '1:1']);
 const modelFields = {
   ...TextRequestRoutingFields,
   model: z.string().optional(), customBaseUrl: z.string().optional(), customApiKey: z.string().optional(),
+  skillId: z.literal('fashion-video-sales').optional(), skillRevision: z.string().length(64).optional(),
 };
 const workflowFields = {
   workflowVersion: z.literal(3),
@@ -98,6 +99,7 @@ export const videoSalesFinalizeBodySchema = z.object({
   targetDuration: z.number().int().min(10).max(120), aspectRatio: aspectRatioSchema,
   videoModel: z.string().optional(), videoRefMode: z.string().optional(), videoResolution: z.string().optional(),
   productAnalysis: z.string().max(8000).optional(), category: categorySchema,
+  productDescription: z.string().max(4000).optional(),
 }).strict().superRefine((value, ctx) => {
   checkCatalog(value, ctx);
   const allowed = new Set(value.eligibleImageIndexes);
@@ -112,6 +114,6 @@ export type VideoSalesFinalizeBody = z.infer<typeof videoSalesFinalizeBodySchema
 
 export const videoSalesFinalizeResponseSchema = z.object({
   success: z.literal(true), fullPrompt: z.string().min(1),
-  prompts: z.array(z.object({ shotId: z.number().int().positive(), prompt: z.string().min(1) })).min(1),
+  prompts: z.array(z.object({ shotId: z.number().int().positive(), speechMode: z.enum(['on_camera', 'voiceover']), prompt: z.string().min(1) })).min(1),
   model: z.string().optional(), usage: z.unknown().optional(),
 });

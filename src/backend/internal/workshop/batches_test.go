@@ -96,7 +96,7 @@ func TestCreateBatchReusesEmptyDraft(t *testing.T) {
 	cfg := config.Config{DatabaseURL: "file:" + dbPath}
 	response := httptest.NewRecorder()
 	CreateBatch(cfg).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/workshop-batches", bytes.NewBufferString(`{}`)))
-	if response.Code != http.StatusCreated || !bytes.Contains(response.Body.Bytes(), []byte("未命名新批次")) {
+	if response.Code != http.StatusCreated || !bytes.Contains(response.Body.Bytes(), []byte("电商图片 · ")) {
 		t.Fatalf("create %d %s", response.Code, response.Body.String())
 	}
 }

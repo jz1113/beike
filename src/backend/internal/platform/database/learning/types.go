@@ -15,20 +15,24 @@ type Folder struct {
 	MajorName string `json:"majorName"`
 }
 type Sample struct {
-	ID          string           `json:"id"`
-	Title       string           `json:"title"`
-	Fingerprint string           `json:"fingerprint"`
-	Images      []string         `json:"images"`
-	Shots       []map[string]any `json:"shots"`
-	Role        string           `json:"role"`
+	ObservationKey    string           `json:"observationKey,omitempty"`
+	ObservationDigest string           `json:"observationDigest,omitempty"`
+	ID                string           `json:"id"`
+	Title             string           `json:"title"`
+	Fingerprint       string           `json:"fingerprint"`
+	Images            []string         `json:"images"`
+	Shots             []map[string]any `json:"shots"`
+	Role              string           `json:"role"`
 }
 type Dataset struct {
-	Folder      Folder   `json:"folder"`
-	Total       int      `json:"total"`
-	Excluded    int      `json:"excluded"`
-	Duplicates  int      `json:"duplicates"`
-	Samples     []Sample `json:"samples"`
-	Fingerprint string   `json:"fingerprint"`
+	LearningFingerprint string   `json:"learningFingerprint"`
+	LearningInstruction string   `json:"-"`
+	Folder              Folder   `json:"folder"`
+	Total               int      `json:"total"`
+	Excluded            int      `json:"excluded"`
+	Duplicates          int      `json:"duplicates"`
+	Samples             []Sample `json:"samples"`
+	Fingerprint         string   `json:"fingerprint"`
 }
 type Scope struct {
 	FolderID            string `json:"folderId"`
@@ -55,7 +59,8 @@ type Manifest struct {
 }
 
 // Bump when observation or consolidation semantics change.
-const EngineVersion = "category-agent-v3"
+const EngineVersion = "category-agent-v4"
+const ObservationVersion = "visual-prompt-blueprint-v1"
 
 type Version struct {
 	ID                string   `json:"id"`

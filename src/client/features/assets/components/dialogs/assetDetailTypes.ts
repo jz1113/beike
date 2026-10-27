@@ -13,7 +13,6 @@ export interface AssetDetailModalProps {
   onCopyPrompt: (text: string, id: string, e: MouseEvent) => void;
   onOpenTagEdit: (item: any) => void;
   onDeleteAsset: (id: string, e: MouseEvent) => void;
-  onApplyToWorkshop: (item: any) => void;
   getAssetPreviewText: (item: any) => string;
 }
 

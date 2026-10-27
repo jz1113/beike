@@ -1,0 +1,308 @@
+.workshop-settings-dialog {
+  border-color: rgba(255, 255, 255, .1);
+  background: #151619;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, .55), 0 2px 18px rgba(0, 0, 0, .28);
+}
+
+.workshop-settings-dialog > .min-h-0 {
+  min-height: 0;
+}
+
+.workshop-settings-dialog [aria-label="图片与交付"],
+.workshop-settings-dialog [aria-label="图片输出"],
+.workshop-settings-dialog [aria-label="创作技能"],
+.workshop-settings-dialog [aria-label="生成模型"],
+.workshop-settings-dialog [aria-label="高级执行设置"] {
+  max-width: 900px;
+  padding-top: 24px;
+  padding-bottom: 28px;
+}
+
+.workshop-settings-dialog [aria-label="图片与交付"] > h3,
+.workshop-settings-dialog [aria-label="图片输出"] > h3,
+.workshop-settings-dialog [aria-label="创作技能"] h3,
+.workshop-settings-dialog [aria-label="生成模型"] h3 {
+  font-size: 16px;
+}
+
+.workshop-settings-dialog .workshop-settings-main > header {
+  min-height: 60px;
+  border-color: rgba(255, 255, 255, .1);
+  background: #17181b;
+}
+
+.workshop-settings-dialog .workshop-settings-main > header h2 {
+  letter-spacing: -.01em;
+}
+
+.workshop-settings-dialog .workshop-settings-main > header p {
+  color: #8e8e93;
+}
+
+.workshop-settings-dialog .workshop-settings-nav {
+  background: #111214;
+  border-color: rgba(255, 255, 255, .09);
+}
+
+.workshop-settings-dialog .workshop-settings-nav-item[aria-current="page"] {
+  background: #24252a;
+  box-shadow: none;
+  color: #f5f5f7;
+}
+
+.workshop-settings-dialog .workshop-settings-nav-item:hover:not([aria-current="page"]) {
+  background: rgba(255, 255, 255, .055);
+}
+
+.workshop-settings-dialog .workshop-settings-nav-item strong {
+  color: inherit;
+}
+
+.workshop-settings-dialog [aria-label="图片与交付"],
+.workshop-settings-dialog [aria-label="图片输出"],
+.workshop-settings-dialog [aria-label="创作技能"],
+.workshop-settings-dialog [aria-label="生成模型"],
+.workshop-settings-dialog [aria-label="高级执行设置"] {
+  max-width: 900px;
+  margin-inline: auto;
+}
+
+.workshop-settings-dialog [aria-label="图片与交付"] > h3,
+.workshop-settings-dialog [aria-label="图片输出"] > h3,
+.workshop-settings-dialog [aria-label="创作技能"] h3,
+.workshop-settings-dialog [aria-label="生成模型"] h3 {
+  color: #f4f4f5;
+  font-size: 16px;
+  letter-spacing: -.01em;
+}
+
+.workshop-settings-dialog [aria-label="创作技能"] > p,
+.workshop-settings-dialog [aria-label="生成模型"] > p,
+.workshop-settings-dialog [aria-label="图片与交付"] > p,
+.workshop-settings-dialog [aria-label="图片输出"] > p,
+.workshop-settings-dialog [aria-label="高级执行设置"] p {
+  color: #8e8e93;
+}
+
+.workshop-settings-dialog label,
+.workshop-settings-dialog legend {
+  color: #c7c7cc;
+}
+
+.workshop-settings-dialog select,
+.workshop-settings-dialog input[type="number"] {
+  min-height: 38px;
+  border-color: rgba(255, 255, 255, .12);
+  background: #1b1c20;
+  color: #ededed;
+}
+
+.workshop-settings-dialog select:focus,
+.workshop-settings-dialog input[type="number"]:focus {
+  border-color: rgba(129, 140, 248, .8);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .16);
+}
+
+.workshop-settings-dialog [aria-label="创作技能"] > div:last-child {
+  border-color: rgba(255, 255, 255, .1);
+  background: #202126;
+}
+
+.workshop-settings-dialog [aria-label="高级执行设置"] > details {
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  padding-top: 16px;
+}
+
+.workshop-settings-dialog [aria-label="高级执行设置"] summary {
+  color: #d7d7dc;
+}
+
+.workshop-settings-dialog [aria-label="切图交付尺寸"],
+.workshop-settings-dialog [aria-label="图片输出"] details {
+  border-color: rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .035);
+}
+
+.workshop-settings-dialog [aria-label="切图交付尺寸"] summary,
+.workshop-settings-dialog [aria-label="图片输出"] details summary {
+  color: #d7d7dc;
+}
+
+.workshop-settings-dialog [aria-label="图片输出"] label > span,
+.workshop-settings-dialog [aria-label="图片输出"] fieldset > p {
+  background: rgba(255, 255, 255, .055);
+  color: #b6b6bd;
+}
+
+.workshop-settings-dialog [aria-label="图片输出"] > label:last-child {
+  background: #24252a;
+}
+
+.workshop-settings-dialog .workshop-settings-main > footer {
+  border-color: rgba(255, 255, 255, .1);
+  background: #17181b;
+}
+
+.workshop-settings-dialog .workshop-settings-main > footer button {
+  min-width: 88px;
+  border-radius: 11px;
+}
+
+.workshop-output-settings {
+  color: #f4f4f5;
+}
+
+.workshop-settings-label {
+  color: #c7c7cc;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workshop-output-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid rgba(129, 140, 248, .24);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, .1);
+  color: #c7d2fe;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.workshop-output-summary svg { color: #a5b4fc; }
+.workshop-output-summary i { width: 3px; height: 3px; border-radius: 50%; background: #818cf8; }
+
+.workshop-output-mode {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 78px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 13px;
+  background: #1b1c20;
+  color: #b6b6bd;
+  text-align: left;
+  transition: border-color .16s ease, background-color .16s ease, color .16s ease, box-shadow .16s ease;
+}
+
+.workshop-output-mode:hover { border-color: rgba(165, 180, 252, .55); background: #202126; }
+.workshop-output-mode.is-selected { border-color: #f4f4f5; background: #f4f4f5; color: #17181b; box-shadow: 0 8px 20px rgba(0, 0, 0, .16); }
+.workshop-output-mode-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(255, 255, 255, .07); color: #a5b4fc; }
+.workshop-output-mode.is-selected .workshop-output-mode-icon { background: #e0e7ff; color: #4f46e5; }
+.workshop-output-mode-icon svg { width: 16px; height: 16px; }
+.workshop-output-mode strong { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 650; }
+.workshop-output-mode strong em { padding: 2px 5px; border-radius: 5px; background: rgba(99, 102, 241, .16); color: #a5b4fc; font-size: 10px; font-style: normal; font-weight: 500; }
+.workshop-output-mode.is-selected strong em { background: #e0e7ff; color: #4f46e5; }
+.workshop-output-mode small { display: block; margin-top: 4px; color: #85858d; font-size: 11px; line-height: 1.45; }
+.workshop-output-mode.is-selected small { color: #5f6470; }
+.workshop-output-mode-check { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; border-radius: 50%; background: #4f46e5; color: #fff; }
+.workshop-output-mode-check svg { width: 12px; height: 12px; }
+
+.workshop-output-static { display: flex; flex-direction: column; gap: 3px; min-height: 38px; margin-top: 8px; padding: 9px 11px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 9px; background: #1b1c20; color: #ededed; font-size: 12px; font-weight: 500; }
+.workshop-output-static small { color: #85858d; font-size: 10px; font-weight: 400; }
+.workshop-quality-option { position: relative; display: flex; min-height: 76px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 11px 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: #1b1c20; color: #a5a5ad; text-align: left; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
+.workshop-quality-option:hover { border-color: rgba(165, 180, 252, .55); background: #202126; }
+.workshop-quality-option.is-selected { border-color: #f4f4f5; background: #f4f4f5; color: #17181b; }
+.workshop-quality-option span { font-size: 12px; font-weight: 600; }
+.workshop-quality-option strong { color: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
+.workshop-quality-option small { color: #777982; font-size: 10px; }
+.workshop-quality-check { position: absolute; top: 10px; right: 10px; width: 14px; height: 14px; color: #4f46e5; }
+.workshop-output-fixed { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 11px 12px; border: 1px solid rgba(129, 140, 248, .25); border-radius: 10px; background: rgba(99, 102, 241, .08); color: #c7d2fe; font-size: 11px; }
+.workshop-output-fixed span { margin-left: auto; color: #eef2ff; font-variant-numeric: tabular-nums; }
+.workshop-output-note { font-size: 11px; line-height: 1.65; color: #8e8e93; }
+.workshop-copywriting-toggle { border: 1px solid rgba(255, 255, 255, .08); background: #202126; }
+.workshop-copywriting-toggle:hover { border-color: rgba(165, 180, 252, .35); }
+
+@media (max-width: 767px) {
+  .workshop-settings-dialog {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .workshop-settings-dialog .workshop-settings-nav {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .workshop-settings-dialog .workshop-settings-nav > div:last-child {
+    padding-bottom: 2px;
+  }
+
+  .workshop-output-settings > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workshop-output-summary {
+    align-self: flex-start;
+  }
+}
+
+html:not(.dark) .workshop-settings-dialog {
+  border-color: rgba(15, 23, 42, .14);
+  background: #ffffff;
+  box-shadow: 0 32px 90px rgba(15, 23, 42, .24), 0 2px 18px rgba(15, 23, 42, .12);
+}
+
+html:not(.dark) .workshop-settings-dialog .workshop-settings-main > header,
+html:not(.dark) .workshop-settings-dialog .workshop-settings-main > footer {
+  border-color: rgba(15, 23, 42, .1);
+  background: #ffffff;
+}
+
+html:not(.dark) .workshop-settings-dialog .workshop-settings-nav {
+  background: #f5f6f8;
+  border-color: rgba(15, 23, 42, .1);
+}
+
+html:not(.dark) .workshop-settings-dialog .workshop-settings-nav-item[aria-current="page"] {
+  background: #ffffff;
+  color: #172033;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+}
+
+html:not(.dark) .workshop-settings-dialog [aria-label="图片与交付"] > h3,
+html:not(.dark) .workshop-settings-dialog [aria-label="图片输出"] > h3,
+html:not(.dark) .workshop-settings-dialog [aria-label="创作技能"] h3,
+html:not(.dark) .workshop-settings-dialog [aria-label="生成模型"] h3 {
+  color: #172033;
+}
+
+html:not(.dark) .workshop-settings-dialog select,
+html:not(.dark) .workshop-settings-dialog input[type="number"] {
+  border-color: rgba(15, 23, 42, .14);
+  background: #ffffff;
+  color: #172033;
+}
+
+html:not(.dark) .workshop-output-settings { color: #172033; }
+html:not(.dark) .workshop-settings-label { color: #475569; }
+html:not(.dark) .workshop-output-summary { border-color: rgba(79, 70, 229, .18); background: #eef2ff; color: #4338ca; }
+html:not(.dark) .workshop-output-summary svg { color: #6366f1; }
+html:not(.dark) .workshop-output-summary i { background: #818cf8; }
+html:not(.dark) .workshop-output-mode { border-color: rgba(15, 23, 42, .12); background: #fff; color: #64748b; }
+html:not(.dark) .workshop-output-mode:hover { border-color: rgba(79, 70, 229, .4); background: #f8fafc; }
+html:not(.dark) .workshop-output-mode.is-selected { border-color: #172033; background: #172033; color: #fff; box-shadow: 0 8px 20px rgba(15, 23, 42, .14); }
+html:not(.dark) .workshop-output-mode-icon { background: #f1f5f9; color: #6366f1; }
+html:not(.dark) .workshop-output-mode.is-selected .workshop-output-mode-icon { background: rgba(255, 255, 255, .12); color: #c7d2fe; }
+html:not(.dark) .workshop-output-mode strong em { background: #eef2ff; color: #4f46e5; }
+html:not(.dark) .workshop-output-mode.is-selected strong em { background: rgba(255, 255, 255, .12); color: #c7d2fe; }
+html:not(.dark) .workshop-output-mode small { color: #64748b; }
+html:not(.dark) .workshop-output-mode.is-selected small { color: #cbd5e1; }
+html:not(.dark) .workshop-output-mode-check { background: #6366f1; }
+html:not(.dark) .workshop-output-static { border-color: rgba(15, 23, 42, .12); background: #f8fafc; color: #172033; }
+html:not(.dark) .workshop-output-static small { color: #64748b; }
+html:not(.dark) .workshop-quality-option { border-color: rgba(15, 23, 42, .12); background: #fff; color: #64748b; }
+html:not(.dark) .workshop-quality-option:hover { border-color: rgba(79, 70, 229, .4); background: #f8fafc; }
+html:not(.dark) .workshop-quality-option.is-selected { border-color: #172033; background: #172033; color: #fff; }
+html:not(.dark) .workshop-quality-option small { color: #94a3b8; }
+html:not(.dark) .workshop-output-fixed { border-color: rgba(79, 70, 229, .18); background: #eef2ff; color: #4338ca; }
+html:not(.dark) .workshop-output-fixed span { color: #312e81; }
+html:not(.dark) .workshop-copywriting-toggle { border-color: rgba(15, 23, 42, .08); background: #f8fafc; }
+html:not(.dark) .workshop-copywriting-toggle:hover { border-color: rgba(79, 70, 229, .28); }
+

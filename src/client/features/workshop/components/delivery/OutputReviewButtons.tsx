@@ -31,7 +31,7 @@ function OutputRatingDialog({ rating, decision, onClose, onSubmit }: { rating?: 
       onSubmit(nextDecision, { scores: result.data, note: note.trim() });
     }}>
       <h3 id="output-rating-title" className="font-semibold">成图评分反馈</h3>
-      <p className="mb-4 mt-2 text-xs leading-5 text-slate-500">对照当前商品图和原参考图评分，记录走样、光线、手部接触或风格偏差。反馈关联本次生成时使用的技能版本。</p>
+      <p className="mb-4 mt-2 text-xs leading-5 text-slate-500">对照当前商品图和已确认的分镜评分，记录走样、光线、手部接触或风格偏差。反馈关联本次生成时使用的技能版本。</p>
       <div className="grid grid-cols-2 gap-3">{metrics.map(([key, label]) => <label key={key} className="space-y-1 text-xs"><span>{label}（0–100）</span><input type="number" required min={0} max={100} step={1} value={scores[key]} onChange={event => setScores(previous => ({ ...previous, [key]: event.target.value }))} className="w-full rounded-lg border border-slate-200 bg-transparent p-2 dark:border-white/10" /></label>)}</div>
       <label className="mt-4 block text-xs">处理结果<select value={nextDecision} onChange={event => setNextDecision(event.target.value as Decision)} className="ml-3 rounded-md bg-slate-100 p-2 dark:bg-white/10"><option value="accepted">采用</option><option value="rejected">淘汰</option></select></label>
       <label className="mt-4 block text-xs">具体问题与改进建议<textarea maxLength={2000} value={note} onChange={event => setNote(event.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-slate-200 bg-transparent p-2 dark:border-white/10" /></label>

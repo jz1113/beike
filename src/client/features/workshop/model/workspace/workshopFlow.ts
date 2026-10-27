@@ -3,7 +3,7 @@ import { checkWorkshopReadiness, summarizeWorkshopResults } from '../generation/
 
 export const workshopSteps = [
   { stage: 1, title: '添加商品', description: '粘贴链接或 SKU，采集商品' },
-  { stage: 2, title: '选图与配置', description: '确认商品图、参考素材和生成设置' },
+  { stage: 2, title: '选图与配置', description: '确认商品图、创作技能和生成设置' },
   { stage: 3, title: '分析与确认', description: '生成分镜，核对提示词后再生图' },
   { stage: 4, title: '成图与交付', description: '检查图片、补充文案并导出' },
 ] as const;
@@ -24,12 +24,21 @@ export function getWorkshopFlow(items: BatchProductItem[], config: {
     || items.some(item => item.isAnalyzing || item.isCopywritingGenerating
       || item.status === 'collecting' || item.tasks.some(task => task.status === 'IN_PROGRESS')));
   const imagesReady = products.length > 0 && products.every(item => item.selectedProductImages.some(url => url.trim()));
-  const hasResults = products.some(item => item.tasks.length > 0);
-  const blockedIds = new Set(readiness.issues.map(issue => issue.productId));
-  const pendingAnalysisIds = products.filter(item => blockedIds.has(item.id)
-    && !item.isAnalyzing && !item.tasks.some(task => task.recoveryRequired)).map(item => item.id);
+  // Uncertain submissions remain reachable even when deselected or superseded.
+  const hasResults = products.some(item => item.tasks.some(task => task.resultStatus !== 'superseded'))
+    || items.some(item => item.tasks.some(task => task.recoveryRequired));
+  const analysisIds = new Set(readiness.issues.filter(issue => issue.resolution === 'analyze').map(issue => issue.productId));
+  const pendingAnalysisIds = products.filter(item => analysisIds.has(item.id)
+    && item.selectedProductImages.some(url => url.trim())
+    && !item.isAnalyzing && !item.tasks.some(task => task.recoveryRequired || task.status === 'IN_PROGRESS')).map(item => item.id);
+  const imageReadyCount = products.filter(item => item.selectedProductImages.some(url => url.trim())).length;
+  const completedStages: WorkshopStage[] = [];
+  if (products.length > 0) completedStages.push(1);
+  if (imagesReady) completedStages.push(2);
+  if (readiness.canGenerate) completedStages.push(3);
 
   const reasonForStage = (stage: number): string | null => {
+    if (stage === 4 && hasResults && (!busy || config.generating || items.some(item => item.tasks.some(task => task.status === 'IN_PROGRESS')))) return null;
     if (busy) return '任务执行中，请等待当前任务结束后切换步骤';
     if (stage === 1) return null;
     if (stage === 2) return products.length > 0 ? null : '请先添加并采集商品';
@@ -38,5 +47,5 @@ export function getWorkshopFlow(items: BatchProductItem[], config: {
     return '无效的电商图文步骤';
   };
 
-  return { products, readiness, results, busy, imagesReady, hasResults, pendingAnalysisIds, reasonForStage };
+  return { products, readiness, results, busy, imagesReady, imageReadyCount, hasResults, pendingAnalysisIds, completedStages, reasonForStage };
 }

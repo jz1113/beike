@@ -1,4 +1,3 @@
-import { workshopAssetBlockReason } from '@shared/domain/workshop/workshop-pipeline';
 import React from 'react';
 import {
   X,
@@ -8,7 +7,6 @@ import {
   ZoomIn,
   Check,
   Copy,
-  Sparkles,
 } from 'lucide-react';
 import {
   humanizeShotType,
@@ -34,11 +32,9 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   onCopyPrompt,
   onOpenTagEdit,
   onDeleteAsset,
-  onApplyToWorkshop,
   getAssetPreviewText,
 }) => {
   if (!detailItem) return null;
-  const productionBlockReason = workshopAssetBlockReason(detailItem, activeSubTab);
 
   let sourceImagesList: string[] = [];
   if (typeof detailItem.sourceImages === 'string') {
@@ -354,20 +350,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (detailLoading || productionBlockReason) return;
-                onApplyToWorkshop(detailItem);
-                onClose();
-              }}
-              disabled={detailLoading || Boolean(productionBlockReason)}
-              title={productionBlockReason || undefined}
-              className="disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{productionBlockReason ? "暂不可用于生产" : activeSubTab === 'full_prompt' ? '载入图组' : '应用到电商图文'}</span>
-            </button>
+
           </div>
         </div>
       </div>

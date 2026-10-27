@@ -1,4 +1,4 @@
-import type {InspirationItem} from '../components/inspiration/InspirationModal';
+import type {InspirationItem} from '../model/inspirationItem';
 
 const prompt=`场景：穿搭达人开箱种草。博主从购物袋掏出衣服展示、瞬间换装旋转、多角度pose。极简白墙卧室，自然日光，活泼有感染力。10秒。
 
@@ -37,5 +37,5 @@ export const OUTFIT_VIDEO_INSPIRATION:InspirationItem={
   image:'/inspirations/outfit-unboxing/poster.jpg',video:'/inspirations/outfit-unboxing/video.mp4',poster:'/inspirations/outfit-unboxing/poster.jpg',mediaType:'video',
   referenceImages:['/inspirations/outfit-unboxing/person.png','/inspirations/outfit-unboxing/dress.png'],
   referenceLabels:['博主人物 · 原提示词 @image1','连衣裙 · 原提示词 @image4（使用时为 @image2）'],
-  videoRefMode:'omni',videoDuration:10,actualVideoDuration:10.08,aspectRatio:'9:16',quality:'720P',storyboardPresetId:'lifestyle-4shot',
+  videoRefMode:'omni',videoDuration:10,actualVideoDuration:10.08,aspectRatio:'9:16',quality:'720P',
 };

@@ -236,7 +236,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
       />
 
       <div className="shrink-0 px-5 pb-3 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-[1440px] space-y-3">
+        <div className="w-full space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-2 dark:border-white/[0.08]">
             <div aria-label="技能归属" className="flex items-center gap-6">
               {([['all', '全部'], ['my', '我的'], ['favorite', '收藏']] as const).map(([value, label]) => (
@@ -265,7 +265,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
       <AgentCreateSkillBar isOpen={agentOpen} onClose={() => setAgentOpen(false)} onAskAgent={askAgentToCreate} onGenerated={(result) => { studio.generated({ ...result, draft: { ...result.draft, kind: presentation } }); setAgentOpen(false); }} showToast={showToast} />
 
       <main id="skill-library-panel" role="tabpanel" aria-labelledby={`skill-tab-${presentation}`} className="min-h-0 flex-1 overflow-y-auto px-5 pb-10 pt-3 sm:px-8 lg:px-10" aria-busy={loading}>
-        <div className="mx-auto max-w-[1440px] space-y-6">
+        <div className="w-full space-y-6">
           {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"><p>{error}，可刷新重试。</p><button type="button" onClick={() => { void reload(); }} className="font-semibold underline underline-offset-4">重新加载</button></div>}
           {presentation === 'agent' && (
             <div className="flex flex-wrap items-center justify-between gap-2 px-3 text-xs text-slate-400 dark:text-slate-500">

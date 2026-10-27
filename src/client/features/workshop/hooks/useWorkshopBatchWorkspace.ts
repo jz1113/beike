@@ -8,6 +8,7 @@ import { recoverWorkspace, hasWorkspaceContent } from '../model/workspace/worksp
 import { serializeWorkspaceSnapshot, WorkspaceSaveSession } from '../model/workspace/workspaceSave';
 import { createWorkspaceCheckpoint } from '../model/workspace/workspaceCheckpoint';
 import { downloadWorkspaceDraft } from '../model/workspace/workspaceDraft';
+import { deleteWorkshopBatches } from '../api/batchManagement';
 
 function parseBatchResponse(data: unknown): WorkshopBatch {
   return workshopBatchSchema.parse((data as { batch?: unknown }).batch);
@@ -212,16 +213,16 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     const response = await apiFetch('/api/catalog/workshop-batches/history', { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '历史批次清空失败');
-    await refreshHistory();
+    if (alive.current) setHistoryBatches(previous => previous.filter(batch => batch.id === activeBatchRef.current?.id));
     return Number(data.deleted) || 0;
-  }, [refreshHistory]);
+  }, []);
 
-  const deleteHistoryBatch = useCallback(async (id: string) => {
-    const response = await apiFetch(`/api/catalog/workshop-batches/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || '历史记录删除失败');
-    await refreshHistory();
-  }, [refreshHistory]);
+  const deleteHistoryBatches = useCallback(async (ids: string[]) => {
+    const result = await deleteWorkshopBatches(ids);
+    const deleted = new Set(result.deletedIds);
+    if (alive.current) setHistoryBatches(previous => previous.filter(batch => !deleted.has(batch.id)));
+    return result;
+  }, []);
 
   const renameBatch = useCallback(async (id: string, name: string) => {
     const response = await apiFetch(`/api/catalog/workshop-batches/${id}`, {
@@ -230,9 +231,12 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '批次命名失败');
     const batch = parseBatchResponse(data);
-    if (batch.id === activeBatch?.id && alive.current) setActiveBatch(batch);
-    await refreshHistory();
-  }, [activeBatch?.id, refreshHistory]);
+    if (alive.current) {
+      // Renaming only changes metadata; the response snapshot may precede an autosave.
+      setActiveBatch(previous => previous?.id === batch.id ? { ...previous, name: batch.name } : previous);
+      setHistoryBatches(previous => previous.map(row => row.id === batch.id ? { ...row, name: batch.name, updatedAt: batch.updatedAt } : row));
+    }
+  }, []);
 
   const readBatch = useCallback(async (id: string) => {
     const response = await apiFetch(`/api/catalog/workshop-batches/${id}`);
@@ -264,7 +268,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     duplicateBatch,
     archiveCurrentBatch,
     clearHistory,
-    deleteHistoryBatch,
+    deleteHistoryBatches,
     renameBatch,
     readBatch,
     reload: async () => {

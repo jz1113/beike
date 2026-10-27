@@ -2,6 +2,7 @@ package poster
 
 import (
 	"beike.local/cloud/src/backend/internal/generate"
+	"context"
 	"errors"
 	"net/http"
 	"regexp"
@@ -19,7 +20,7 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 		model = "gemini-3.7-flash"
 	}
 	base, key := headlineCredentials(cfg, r, payload, model)
-	images, message := headlineImages(r, generate.StringListField(payload, "imageUrls"))
+	images, message := headlineImages(cfg, r, generate.StringListField(payload, "imageUrls"))
 	if message != "" {
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "商品图片读取失败，未调用标题模型"})
 		return
@@ -64,7 +65,7 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		cover = strings.TrimSpace(generate.StringField(payload, "productTitle"))
 	}
 	base, key := headlineCredentials(cfg, r, payload, model)
-	images, message := headlineImages(r, generate.StringListField(payload, "imageUrls"))
+	images, message := headlineImages(cfg, r, generate.StringListField(payload, "imageUrls"))
 	if message != "" {
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "商品图片读取失败，未调用设计或生图模型"})
 		return
@@ -73,7 +74,7 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 	if ratio != "1:1" {
 		ratio = "3:4"
 	}
-	memoryLines, memoryIDs, memorySampleID, memoryErr := adoptedMemory(r, cfg, generate.StringField(payload, "memorySampleId"))
+	memory, memoryErr := designMemoryForRequest(r, cfg, payload)
 	if memoryErr != nil {
 		code := http.StatusInternalServerError
 		if errors.Is(memoryErr, ErrCoverSampleNotAdopted) {
@@ -82,7 +83,7 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, code, map[string]any{"success": false, "error": memoryErr.Error()})
 		return
 	}
-	content := []any{map[string]any{"type": "text", "text": coverDirectorPrompt(original, cover, ratio, generate.StringField(payload, "productName"), generate.StringField(payload, "previousDesign"), memoryLines)}}
+	content := []any{map[string]any{"type": "text", "text": coverDirectorPrompt(original, cover, ratio, generate.StringField(payload, "productName"), generate.StringField(payload, "previousDesign"), memory.Lines)}}
 	for _, image := range images {
 		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image}})
 	}
@@ -105,8 +106,11 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": message})
 		return
 	}
-	recordDesignUsage(r, cfg, generate.StringField(payload, "batchId"), generate.StringField(payload, "itemId"), generate.StringField(payload, "itemTitle"), memoryIDs, design, memorySampleID)
-	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v5", "memorySampleId": memorySampleID, "memoryEntryIds": memoryIDs}
+	usageID, auditErr := recordDesignMemory(r, cfg, payload, memory, design)
+	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v5", "memorySampleId": memory.SampleID, "memoryEntryIds": memory.IDs, "memoryUsageId": usageID, "memoryRevisionId": memory.RevisionID}
+	if auditErr != nil {
+		body["memoryWarning"] = "设计已完成，但引用记录未保存；请保留本次设计，勿重复付费设计"
+	}
 	if usage := generate.NormalizeUsage(usageData); usage != nil {
 		body["usage"] = usage
 	}
@@ -128,49 +132,32 @@ func headlineCredentials(cfg config.Config, r *http.Request, payload map[string]
 	return base, generate.HeadlineAPIKey(cfg, r, payload, clientBase)
 }
 
-func headlineImages(r *http.Request, urls []string) ([]string, string) {
-	out := make([]string, 0, len(urls))
-	for _, item := range urls {
-		item = strings.TrimSpace(item)
-		if strings.HasPrefix(item, "data:image/") {
-			out = append(out, item)
-			continue
-		}
-		status, raw, err := generate.PostModel(r.Context(), http.MethodGet, item, "", nil, 20*time.Second)
-		if err != nil || status < 200 || status >= 300 || len(raw) == 0 {
-			return nil, "unread"
-		}
-		out = append(out, item)
-	}
-	return out, ""
-}
-
 func headlineTitlePrompt(original, product string) string {
 	return "你是小红书封面的标题编辑。只返回 JSON：{\"title\":\"7-12个纯中文字符\"}。原标题：" + original + "。商品名：" + product + "。标题必须是 7 到 12 个纯中文字，读起来像一条笔记封面：结论或使用场景放在前面，品类名能省则省。每个字都带信息，从对象、变化、感受、对比里留下两样。事实只来自原标题和商品图，没有依据就不写参数、价格、功效或品牌背书。出现必入、神器、绝绝子、yyds、真的绝了、实拍体验时整句重写。例如「洗衣效果很到位」写成「洗完衣服不发灰」。"
 }
 
-func adoptedMemory(r *http.Request, cfg config.Config, requested string) ([]string, []string, string, error) {
-	requested = strings.TrimSpace(requested)
+func designMemoryForRequest(r *http.Request, cfg config.Config, payload map[string]any) (coverDesignMemory, error) {
+	requested := strings.TrimSpace(generate.StringField(payload, "memorySampleId"))
 	db, ok := openCoverDB(cfg)
 	if !ok {
-		if requested != "" && requested != "auto" && requested != "corrections" {
-			return nil, nil, "", errors.New("封面记忆数据库不可用")
+		if cfg.SQLiteFile() != "" || requested != "" && requested != "auto" && requested != "corrections" || generate.StringField(payload, "memoryUsageId") != "" {
+			return coverDesignMemory{}, errors.New("封面记忆数据库不可用")
 		}
-		return nil, nil, "corrections", nil
+		return coverDesignMemory{SampleID: "corrections", IDs: []string{}}, nil
 	}
 	defer db.Close()
-	return adoptedCoverSelection(r.Context(), db, httpx.WorkspaceFrom(r), requested)
+	return readDesignMemory(r.Context(), db, httpx.WorkspaceFrom(r), requested, generate.StringField(payload, "productName")+" "+generate.StringField(payload, "originalTitle"), generate.StringField(payload, "memoryUsageId"), generate.StringField(payload, "batchId"), generate.StringField(payload, "itemId"))
 }
 
-func recordDesignUsage(r *http.Request, cfg config.Config, batchID, itemID, title string, entryIDs []string, design map[string]any, memorySampleID string) {
+func recordDesignMemory(r *http.Request, cfg config.Config, payload map[string]any, memory coverDesignMemory, design map[string]any) (string, error) {
 	db, ok := openCoverDB(cfg)
 	if !ok {
-		return
+		return "", errors.New("封面记忆数据库不可用")
 	}
 	defer db.Close()
-	sheet := coverDesignSheet(design)
-	sheet["memorySampleId"] = memorySampleID
-	_ = recordCoverUsage(r.Context(), db, httpx.WorkspaceFrom(r), batchID, itemID, title, entryIDs, sheet)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+	defer cancel()
+	return saveDesignMemory(ctx, db, httpx.WorkspaceFrom(r), generate.StringField(payload, "batchId"), generate.StringField(payload, "itemId"), generate.StringField(payload, "itemTitle"), memory, design)
 }
 
 func normalizeHeadline(value string) string {

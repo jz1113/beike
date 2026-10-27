@@ -88,3 +88,26 @@ func TestUnknownAPIIsJSON(t *testing.T) {
 		t.Fatalf("body %#v", body)
 	}
 }
+
+func TestRetiredStudioRoutesAreNotServed(t *testing.T) {
+	handler := New(config.Config{AccessToken: "secret", NodeEnv: "development"})
+	for _, pattern := range []string{
+		"GET /api/avatar/characters", "POST /api/avatar/characters", "DELETE /api/avatar/characters/example",
+		"GET /api/avatar/voices", "POST /api/avatar/voices", "DELETE /api/avatar/voices/example",
+		"GET /api/avatar/fonts", "GET /api/avatar/tasks", "GET /api/avatar/tasks/example",
+		"DELETE /api/avatar/tasks/example", "POST /api/avatar/render",
+		"POST /api/generate/ppt-outline", "POST /api/generate/ppt-detail",
+		"POST /api/generate/ppt-slide", "POST /api/generate/ppt-narration",
+	} {
+		t.Run(pattern, func(t *testing.T) {
+			method, path, _ := strings.Cut(pattern, " ")
+			request := httptest.NewRequest(method, path, nil)
+			request.Header.Set("x-app-token", "secret")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), "接口不存在") {
+				t.Fatalf("status %d body %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}

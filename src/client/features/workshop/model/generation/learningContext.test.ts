@@ -7,6 +7,12 @@ import type { BatchProductItem, BatchTaskItem } from '../batchTypes';
 import type { LearningTaskConfig } from './learningContext';
 
 describe('learning generation evidence', () => {
+  it('records skill results without a mother group, replacement assets or a face anchor', () => {
+    const item = { appliedSkillSnapshot: { id: 'base', name: 'base', promptSnippet: 'rules', learningScopeId: 'folder', learningVersionId: 'trial', learningReferenceFingerprint: 'skill-only', baseRecipeVersion: 'base' }, selectedProductImages: ['main', 'back'], applied_persona: 'old-persona', applied_outfit: 'old-outfit', applied_scene: 'old-scene' } as BatchProductItem;
+    const config = { selectedImageGenModel: 'image', selectedQuality: 'high', selectedAspect: '3:4', anchorFaceUrl: 'old-face', productReferenceImages: ['main'] } satisfies LearningTaskConfig;
+    const context = captureLearningContext(item, { shot_no: 1, prompt: '人物展示', assembly_source: 'skill', has_human: true }, config, 'grid_first');
+    expect(learningContextSchema.parse(context)).toMatchObject({ groupId: 'skill:folder', versionId: 'trial', referenceImage: '', anchorFaceUrl: '', replacements: [], productImages: ['main'] });
+  });
   it('freezes the exact skill, source and product inputs and clears ratings for a new attempt', () => {
     const item = { appliedFullPromptId: 'group', appliedSkillSnapshot: { id: 'base', name: 'base', promptSnippet: 'rules', learningScopeId: 'folder', learningVersionId: 'candidate', learningReferenceFingerprint: 'four-originals', baseRecipeVersion: 'base' }, selectedProductImages: ['main', 'back', 'main'], coverImage: 'cover' } as BatchProductItem;
     const config = { selectedImageGenModel: 'image', selectedQuality: 'high', selectedAspect: '3:4', anchorFaceUrl: 'face' } satisfies LearningTaskConfig;

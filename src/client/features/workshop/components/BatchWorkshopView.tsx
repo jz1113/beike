@@ -9,13 +9,11 @@ import BatchStage4Queue from './stage/BatchStage4Queue';
 import { BatchPreviewLightbox } from '@client/shared/modals/lightbox/BatchPreviewLightbox';
 import { BatchWorkshopSettings } from './settings/BatchWorkshopSettings';
 import { BatchWorkspaceBatchControls } from './layout/BatchWorkspaceBatchControls';
+import { WorkshopProductionSummary } from './settings/WorkshopProductionSummary';
 import { useAppStore } from '@client/store';
 import { BatchProductItem, TypedProductImage } from '../model/batchTypes';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
-import { isAutoPromptGroupSelection } from '@shared/domain/workshop/workshop-pipeline';
-import { getWorkshopFlow, type WorkshopStage } from '../model/workspace/workshopFlow';
-import { WorkshopFlowNavigation } from './layout/WorkshopFlowNavigation';
-import { WorkshopProductionSummary } from './settings/WorkshopProductionSummary';
+import type { WorkshopStage } from '../model/workspace/workshopFlow';
 import { BatchWorkshopHistoryPreview } from './history/BatchWorkshopHistoryPreview';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 export type { TypedProductImage, BatchProductItem };
@@ -95,14 +93,14 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     createNewBatch,
     duplicateBatch,
     clearHistory,
-    deleteHistoryBatch,
+    deleteHistoryBatches,
     renameBatch,
     readBatch,
   } = runner;
-  const flow = getWorkshopFlow(items, { generationStrategy, selectedShotCount, collecting: isCollecting, analyzing: isAnalyzingAll, generating: isGeneratingBatch });
+  const flow = runner.flow;
   useEffect(() => {
-    if (workspaceReady && !flow.busy && !historyGenerationBatch && currentStage > 1 && successfulItems.length === 0) setCurrentStage(1);
-  }, [workspaceReady, flow.busy, historyGenerationBatch, currentStage, successfulItems.length, setCurrentStage]);
+    if (workspaceReady && !flow.busy && !historyGenerationBatch && currentStage > 1 && successfulItems.length === 0 && !flow.hasResults) setCurrentStage(1);
+  }, [workspaceReady, flow.busy, flow.hasResults, historyGenerationBatch, currentStage, successfulItems.length, setCurrentStage]);
   useEffect(() => {
     // A cached history preview must not hide the newly selected active batch.
     setHistoryGenerationBatch(null);
@@ -158,25 +156,21 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         refreshHistory={refreshBatchHistory}
         duplicateBatch={duplicateBatch}
         clearHistory={async () => { const count = await clearHistory(); setHistoryGenerationBatch(null); return count; }}
-        deleteHistoryBatch={async id => { await deleteHistoryBatch(id); setHistoryGenerationBatch(previous => previous?.id === id ? null : previous); }}
+        deleteHistoryBatches={async ids => { const result = await deleteHistoryBatches(ids); setHistoryGenerationBatch(previous => previous && result.deletedIds.includes(previous.id) ? null : previous); return result; }}
         renameBatch={renameBatch}
         readBatch={readBatch}
         onOpenGenerationView={setHistoryGenerationBatch}
         showToast={showToast}
       />
-      {!historyGenerationBatch && <WorkshopFlowNavigation currentStage={currentStage} busy={flow.busy}
-        productCount={successfulItems.length} readyCount={flow.readiness.readyCount} resultCount={flow.results.success}
-        reasonForStage={flow.reasonForStage} onSelectStage={selectStage} />}
-      {/* 主体工作区 Content Area（Stage 1 采编采用黄金阅读宽度；Stage 2+ 选图及后续生产流水线自适应全屏大画幅充盈放大） */}
-      <div key={historyGenerationBatch?.id || currentStage} className="flex-1 min-h-0 overflow-y-auto px-5 pt-4 pb-6 sm:px-8 sm:pt-6 sm:pb-8 xl:px-10 flex flex-col">
+      <div key={historyGenerationBatch?.id || currentStage} className={`flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10 sm:px-6 lg:px-8 ${currentStage === 1 && !historyGenerationBatch ? 'pt-1 sm:pt-2' : 'pt-5'}`}>
         <div className={
           !historyGenerationBatch && currentStage === 1
-            ? "max-w-[980px] mx-auto w-full flex-1 flex flex-col"
+            ? "mx-auto w-full max-w-[1120px] flex-1 flex flex-col"
             : historyGenerationBatch || currentStage === 4
               ? "mx-auto w-full max-w-[1840px] space-y-4"
-              : !historyGenerationBatch && currentStage === 2 ? "w-full flex-1 flex flex-col min-h-0" : "w-full space-y-4"
+              : !historyGenerationBatch && currentStage === 2 ? "mx-auto w-full max-w-[1760px] flex-1 flex flex-col min-h-0" : "mx-auto w-full max-w-[1760px] space-y-4"
         }>
-          {!historyGenerationBatch && (currentStage === 2 || currentStage === 3) && <WorkshopProductionSummary runner={runner} onOpenSettings={() => setIsWorkshopConfigOpen(true)} />}
+          {!historyGenerationBatch && currentStage === 3 && <WorkshopProductionSummary runner={runner} onOpenSettings={() => setIsWorkshopConfigOpen(true)} />}
           {historyGenerationBatch ? (
             <BatchWorkshopHistoryPreview
               batch={historyGenerationBatch}
@@ -196,28 +190,22 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
               setItems={setItems}
               isCollecting={isCollecting}
               collectProgress={collectProgress}
+              handleTableImport={runner.handleTableImport}
               handleParseInput={handleParseInput}
               startBatchCollect={startBatchCollect}
               onContinue={() => selectStage(2)}
+              busy={flow.busy}
             />
           )}
 
           {!historyGenerationBatch && currentStage === 2 && (
             <BatchConfigProvider value={stage2ConfigValue}>
-              {items.some(item => item.status === 'failed' || item.status === 'pending') && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300/50 bg-amber-50/85 px-3.5 py-2 text-xs text-amber-800 backdrop-blur-md dark:border-amber-500/30 dark:bg-amber-950/50 dark:text-amber-200">
-                <span>{items.filter(item => item.status === 'failed' || item.status === 'pending').length} 款商品未采集成功</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setItems(prev => prev.filter(item => item.status !== 'failed' && item.status !== 'pending'))} className="rounded-lg px-2.5 py-1 hover:bg-amber-500/15">忽略</button>
-                  <button type="button" onClick={() => { setCurrentStage(1); void startBatchCollect(); }} className="rounded-lg bg-amber-500/15 px-3 py-1 font-medium hover:bg-amber-500/25">重试采集</button>
-                </div>
-              </div>}
               <BatchStage2Config key={runner.activeBatch?.id || 'draft'} />
             </BatchConfigProvider>
           )}
 
           {!historyGenerationBatch && currentStage === 3 && (
             <BatchStage3Prompts
-              autoMatchMotherTemplate={isAutoPromptGroupSelection(runner.lockedFullPromptId)}
               generationStrategy={generationStrategy}
               selectedShotCount={selectedShotCount}
               successfulItems={successfulItems}
@@ -237,7 +225,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
 
           {!historyGenerationBatch && currentStage === 4 && (
             <BatchStage4Queue
-              successfulItems={successfulItems}
+              successfulItems={items.filter(item => (item.selected && item.status === 'success') || item.tasks.some(task => task.recoveryRequired))}
               selectedVisionModel={runner.selectedVisionModel}
               availableImageModels={availableImageModels}
               selectedImageGenModel={selectedImageGenModel}

@@ -13,7 +13,6 @@ const (
 	ModalityImage      Modality = "image"
 	ModalityVideo      Modality = "video"
 	ModalityAudio      Modality = "audio"
-	ModalityAvatar     Modality = "avatar"
 	ModalityThreeD     Modality = "threed"
 	ModalityMultimodal Modality = "multimodal"
 )

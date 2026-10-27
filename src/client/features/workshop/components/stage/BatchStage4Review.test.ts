@@ -53,10 +53,11 @@ const queueProps = (items: BatchProductItem[]): ComponentProps<typeof BatchStage
 });
 
 describe('stage four image review UI', () => {
-  it('shows the reference thumbnail in the product list and removes the old actions', () => {
+  it('shows product thumbnails instead of legacy samples and removes the old actions', () => {
     const html = renderToStaticMarkup(createElement(BatchStage4Queue, queueProps([product('one'), product('two')])));
-    expect(html).toContain('src="/reference-one.jpg"');
-    expect(html).toContain('src="/reference-two.jpg"');
+    expect(html).toContain('src="/product.jpg"');
+    expect(html).not.toContain('src="/reference-one.jpg"');
+    expect(html).not.toContain('src="/reference-two.jpg"');
     expect(html).toContain('审核通过');
     expect(html).toContain('审核驳回');
     for (const label of ['评分反馈', '返回修改分镜', '下载本款图片与文案', '完成并归档本批次']) expect(html).not.toContain(label);

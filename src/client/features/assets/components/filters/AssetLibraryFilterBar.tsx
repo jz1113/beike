@@ -13,8 +13,6 @@ import { AssetLibrarySortControls } from './assetLibraryFilters';
 import { AssetTagFilter } from './assetLibraryFilters';
 
 export interface AssetLibraryFilterBarProps {
-  /** 与筛选维度同级的资产类型导航，由父级提供以保持筛选栏的单行布局。 */
-  navigation?: ReactNode;
   hideSecondaryRow?: boolean;
   statusFilters?: ReactNode;
   activeSubTab: AssetSubTab;
@@ -43,7 +41,6 @@ export interface AssetLibraryFilterBarProps {
 }
 
 export function AssetLibraryFilterBar({
-  navigation,
   hideSecondaryRow,
   statusFilters,
   activeSubTab,
@@ -108,7 +105,6 @@ export function AssetLibraryFilterBar({
 
   return (
     <>
-    <div className="border-b border-slate-200/70 bg-transparent px-5 sm:px-7 py-2.5 dark:border-white/10">{navigation}</div>
     {!hideSecondaryRow && <div className="flex items-center justify-between px-5 sm:px-7 py-3 bg-transparent border-b border-slate-200/60 gap-3 flex-wrap text-xs select-none dark:border-white/10">
       <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
         {statusFilters}

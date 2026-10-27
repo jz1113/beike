@@ -55,9 +55,9 @@ describe('product confirmation information hierarchy', () => {
       colorSelection: { colorLabel: '', confirmedImageUrls: ['/white.jpg'], excludedImageUrls: [] },
       variantMetadata: { version: 1, requestedSkuId: '100000002', variants: [{ id: 'white', label: '白色', skuIds: ['100000001', '100000002'], imageUrls: ['/white.jpg'] }] },
     }));
-    expect(html).toContain('SKU</dt><dd class="mt-1 break-all text-xs font-medium leading-5 tabular-nums">100000002');
+    expect(html).toContain('SKU:</dt><dd class="min-w-0 break-all font-medium tabular-nums text-slate-700 dark:text-slate-300">100000002');
     expect(html).not.toContain('100000001');
-    expect(html).toContain('商品规格</dt><dd class="mt-1 text-xs font-medium leading-5 [overflow-wrap:anywhere]">白色');
+    expect(html).toContain('规格:</dt><dd class="min-w-0 font-medium text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">白色');
     expect(html).not.toContain('可选 SKU 规格');
   });
   it('does not report the collected variant as selected after clearing images', () => {
@@ -66,7 +66,7 @@ describe('product confirmation information hierarchy', () => {
       colorSelection: { colorLabel: '', confirmedImageUrls: [], excludedImageUrls: ['/black.jpg'] },
       variantMetadata: { version: 1, selectedVariantId: 'black', variants: [{ id: 'black', label: '黑色', skuIds: ['100000001'], imageUrls: ['/black.jpg'] }] },
     }));
-    expect(html).toContain('商品规格</dt><dd class="mt-1 text-xs font-medium leading-5 [overflow-wrap:anywhere]">未选择');
+    expect(html).toContain('规格:</dt><dd class="min-w-0 font-medium text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">未选择');
     expect(html).not.toContain('黑色</span>');
   });
   it('shows the collected current SKU color and suffix specification before image selection', () => {
@@ -76,9 +76,9 @@ describe('product confirmation information hierarchy', () => {
       colorSelection: { colorLabel: '', confirmedImageUrls: [], excludedImageUrls: [] },
       variantMetadata: { version: 1, requestedSkuId: '100000001', selectedVariantId: 'black-fleece', variants: [{ id: 'black-fleece', label: '黑色加绒', color: '黑色加绒', skuIds: ['100000001'], imageUrls: ['/black.jpg'] }] },
     }));
-    expect(html).toContain('商品规格</dt><dd class="mt-1 text-xs font-medium leading-5 [overflow-wrap:anywhere]">黑色');
+    expect(html).toContain('规格:</dt><dd class="min-w-0 font-medium text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">黑色');
     expect(html).toContain('黑色 / 加绒');
-    expect(html).toContain('SKU</dt><dd class="mt-1 break-all text-xs font-medium leading-5 tabular-nums">100000001');
+    expect(html).toContain('SKU:</dt><dd class="min-w-0 break-all font-medium tabular-nums text-slate-700 dark:text-slate-300">100000001');
   });
   it('renders collected product identity as fixed information', () => {
     const html = renderToStaticMarkup(createElement(SalesProductFields, {
@@ -122,7 +122,7 @@ describe('product confirmation information hierarchy', () => {
       colorSelection: { colorLabel: '', confirmedImageUrls: ['/cover.jpg', '/front.jpg'], excludedImageUrls: [] },
       variantMetadata: { version: 1, variants: [{ id: 'blue', label: '蓝色', skuIds: ['100234809783'], imageUrls: ['/blue.jpg'] }] },
     }));
-    expect(html).toContain('SKU</dt><dd class="mt-1 break-all text-xs font-medium leading-5 tabular-nums">100234809783');
+    expect(html).toContain('SKU:</dt><dd class="min-w-0 break-all font-medium tabular-nums text-slate-700 dark:text-slate-300">100234809783');
     expect(html).toContain('蓝色 / XL</dd>');
     expect(html).not.toContain('未确认');
     expect(html).not.toContain('未返回');
@@ -204,7 +204,7 @@ describe('product confirmation information hierarchy', () => {
     const onAnalyze = vi.fn();
     const render = (extracted: boolean) => {
       hooks.index = 0;
-      return SalesProductInsights({ sellingPoints: '宽松剪裁；领口罗纹收口', analysis: extracted ? analysis : null, disabled: false, canAnalyze: true, onAnalyze, onChange: vi.fn(), card: true });
+      return SalesProductInsights({ sellingPoints: extracted ? '宽松剪裁；领口罗纹收口' : '', analysis: extracted ? analysis : null, disabled: false, canAnalyze: true, onAnalyze, onChange: vi.fn(), card: true });
     };
     const initial = nodes(render(false)).find((item) => item.type === 'button' && renderToStaticMarkup(item).includes('AI 提炼卖点'))!;
     expect(initial.props.disabled).toBeFalsy();

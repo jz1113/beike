@@ -6,6 +6,17 @@ import (
 	"strings"
 )
 
+// ErrInvalidTextJSON identifies a completed answer with invalid JSON syntax.
+// Callers may inspect the response; it does not represent a transport failure.
+var ErrInvalidTextJSON = errors.New("native text response did not contain valid JSON")
+
+// TextJSONError retains a completed response for callers that can repair its syntax.
+// The ordinary result stays nil on failure, so other callers cannot consume it as success.
+type TextJSONError struct{ Response map[string]any }
+
+func (e *TextJSONError) Error() string { return ErrInvalidTextJSON.Error() }
+func (e *TextJSONError) Unwrap() error { return ErrInvalidTextJSON }
+
 // Claude's json_object compatibility mode uses a system instruction, because
 // Messages only offers schema-constrained JSON. Validate the final object rather
 // than silently accepting prose. Tool turns/refusals/length stops are not JSON
@@ -29,10 +40,10 @@ func validateNativeTextJSON(protocol string, payload, result map[string]any) err
 	}
 	extracted, value, ok := nativeJSONValue(textString(msg["content"]), format)
 	if !ok {
-		return errors.New("native text response did not contain valid JSON")
+		return ErrInvalidTextJSON
 	}
 	if format == "json_object" && textMap(value) == nil {
-		return errors.New("native text response did not contain a JSON object")
+		return ErrInvalidTextJSON
 	}
 	msg["content"] = extracted
 	return nil

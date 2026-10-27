@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { KEYWORD_REVIEW_REJECT_PREFIXES, type KeywordReviewMode, type KeywordReviewResult } from '@shared/contracts/generate';
+import { KEYWORD_REVIEW_REJECT_PREFIXES, type KeywordReviewMode } from '@shared/contracts/generate';
 import { saveToDownloadDir } from '@client/shared/media/saveDownload';
 import { buildMergedReviewedWorkbook } from './mergedReviewedWorkbook';
 import { buildReviewedWorkbook } from './keywordReviewWorkbookExport';
@@ -162,17 +162,6 @@ export async function parseKeywordWorkbook(file: File, mode: KeywordReviewMode =
     ? XLSX.read((await file.text()).replace(/^\uFEFF/, ''), { type: 'string', raw: true, cellStyles: true })
     : XLSX.read(await file.arrayBuffer(), { type: 'array', cellStyles: true, cellDates: true });
   return parseKeywordWorkbookData(workbook, file.name, mode);
-}
-
-export function applyReviewResults(
-  records: KeywordReviewRecord[],
-  results: KeywordReviewResult[],
-): KeywordReviewRecord[] {
-  const byId = new Map(results.map((item) => [item.id, item]));
-  return records.map((record) => {
-    const result = byId.get(record.id);
-    return result ? { ...record, ...result, status: 'done', error: undefined } : record;
-  });
 }
 
 export async function exportReviewedWorkbook(parsed: ParsedKeywordWorkbook, records: KeywordReviewRecord[], partial = false) {

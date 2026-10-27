@@ -18,23 +18,23 @@ describe('sales studio return entry', () => {
     expect(html).toContain('带货规则');
     expect(html).toContain('更换商品');
     expect(html).not.toContain('lucide-chevron-left');
-    expect(html).not.toContain('<nav');
-    expect(html).not.toContain('aria-current="step"');
+    expect(html).toContain('aria-label="电商视频制作步骤"');
+    expect(html.match(/aria-current="step"/g)).toHaveLength(1);
     expect(chip).not.toContain('<header');
   });
 
-  it('opens the contextual return and existing result without resetting the product', () => {
+  it('opens a completed stage and existing result without resetting the product', () => {
     const onReturn = vi.fn();
     const onViewResult = vi.fn();
     const onReset = vi.fn();
-    const view = SalesStudioHeader({ onBack: vi.fn(), onReset, resetDisabled: false, resetTitle: '', onOpenRules: vi.fn(), returnAction: { label: '返回素材补齐', onClick: onReturn }, onViewResult });
+    const view = SalesStudioHeader({ onBack: vi.fn(), onReset, resetDisabled: false, resetTitle: '', onOpenRules: vi.fn(), step: 'video', availableSteps: ['product', 'plan', 'assets', 'video'], onNavigate: onReturn, onViewResult });
     function buttons(node: ReactNode): ReactElement<Record<string, unknown>>[] {
       return Children.toArray(node).flatMap((child) => isValidElement<Record<string, unknown>>(child) ? [child, ...buttons(child.props.children as ReactNode)] : []);
     }
     const entries = buttons(view);
-    (entries.find((entry) => entry.props['aria-label'] === '返回素材补齐')!.props.onClick as () => void)();
+    (entries.find((entry) => entry.type === 'button' && renderToStaticMarkup(entry).includes('素材准备'))!.props.onClick as () => void)();
     (entries.find((entry) => entry.props['aria-label'] === '查看生成结果')!.props.onClick as () => void)();
-    expect(onReturn).toHaveBeenCalledTimes(1);
+    expect(onReturn).toHaveBeenCalledExactlyOnceWith('assets');
     expect(onViewResult).toHaveBeenCalledTimes(1);
     expect(onReset).not.toHaveBeenCalled();
   });

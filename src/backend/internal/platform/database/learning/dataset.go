@@ -35,6 +35,13 @@ func LoadDataset(ctx context.Context, db *sql.DB, workspace, folderID string) (D
 		return Dataset{}, err
 	}
 	dataset := Dataset{Folder: folder, Total: len(ids), Samples: []Sample{}}
+	// Only explicit edits change the observation guidance. Generated candidates
+	// must never invalidate their own inputs and cause an endless relearning loop.
+	err = db.QueryRowContext(ctx, `SELECT "promptSnippet" FROM "CategorySkillVersion" WHERE "workspaceId"=? AND "folderId"=? AND "model"='manual' ORDER BY "createdAt" DESC,"id" DESC LIMIT 1`, workspace, folderID).Scan(&dataset.LearningInstruction)
+	if err != nil && err != sql.ErrNoRows {
+		return Dataset{}, err
+	}
+	dataset.LearningFingerprint = Hash([]string{ObservationVersion, ObservationPrompt(folder, Sample{}), dataset.LearningInstruction})
 	seen := map[string]bool{}
 	for _, id := range ids {
 		raw, err := dblibrary.LibraryPromptDetail(ctx, db, workspace, id)
@@ -62,7 +69,8 @@ func LoadDataset(ctx context.Context, db *sql.DB, workspace, folderID string) (D
 			continue
 		}
 		seen[key] = true
-		sample.Fingerprint = Hash(map[string]any{"images": sample.Images, "shots": sample.Shots})
+		sample.Fingerprint = Hash(map[string]any{"images": sample.Images, "shots": sample.Shots, "observationVersion": ObservationVersion})
+		sample.ObservationKey = Hash([]string{sample.Fingerprint, dataset.LearningFingerprint})
 		dataset.Samples = append(dataset.Samples, sample)
 	}
 	sort.Slice(dataset.Samples, func(i, j int) bool { return dataset.Samples[i].ID < dataset.Samples[j].ID })

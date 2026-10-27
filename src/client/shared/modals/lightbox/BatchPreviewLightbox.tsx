@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { LightboxImage } from './LightboxImage';
 import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 import {
   X,
@@ -161,11 +161,7 @@ export function BatchPreviewLightbox({
           }}
         >
           {currentImageUrl && (
-            <img
-              src={proxyMediaUrl(currentImageUrl)}
-              alt="高清大图预览"
-              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all duration-200"
-            />
+            <LightboxImage key={currentImageUrl} src={currentImageUrl} alt="高清大图预览" className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all duration-200" />
           )}
         </div>
 
@@ -200,7 +196,7 @@ export function BatchPreviewLightbox({
                   : 'border-transparent opacity-40 hover:opacity-80'
               }`}
             >
-              <img src={proxyMediaUrl(img)} alt="" className="w-full h-full object-cover" />
+              <LightboxImage key={img} src={img} alt="" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

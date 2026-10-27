@@ -46,7 +46,7 @@ export function BatchStage4Header({ busy, totalTaskCount, completedTaskCount, di
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2.5"><h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">成图与交付</h1><span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-600 dark:bg-white/5 dark:text-slate-300">{status}</span></div>
         <p className="text-xs text-slate-500 dark:text-slate-400">{successfulItems.length} 款商品 · 已出图 {displaySuccessCount} 张 · {outputLabel}</p>
-        <p className="text-xs leading-6 text-slate-400 dark:text-slate-500">核对商品与参考画面，补充发布文案，再导出图片与文案包。</p>
+        <p className="text-xs leading-6 text-slate-400 dark:text-slate-500">对照商品图与已确认的分镜核对成图，补充发布文案，再导出图片与文案包。</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {!readOnly && busy && (runControlStatus === 'paused' ? onResumeRun : onPauseRun) && <>

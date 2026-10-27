@@ -64,6 +64,16 @@ func ListKeywordRules(ctx context.Context, db *sql.DB, workspace string) (RuleRe
 	return current, append(history, InitialRuleRevision()), nil
 }
 
+// Frozen tasks can outlive the editor's recent-history window.
+func GetKeywordRuleRevision(ctx context.Context, db *sql.DB, workspace string, version int) (RuleRevision, error) {
+	if version == 0 {
+		return InitialRuleRevision(), nil
+	}
+	return scanRevision(db.QueryRowContext(ctx, `
+		SELECT "version", "entriesJson", "note", "createdAt"
+		FROM "KeywordReviewRuleRevision" WHERE "workspaceId" = ? AND "version" = ?`, workspace, version))
+}
+
 func PublishKeywordRules(ctx context.Context, db *sql.DB, workspace string, baseVersion int, entries []RuleEntry, note string) (RuleRevision, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

@@ -57,13 +57,13 @@ export function resolveRecipeForProduct<T extends RecipeForProduct>(
   const chosen = recipes.find(recipe => recipe.id === selectedArchId);
 
   if (selectedArchId !== 'auto') {
-    if (!chosen) return { recipe: null, error: '所选拍摄架构已失效，请重新选择或改用自动匹配' };
+    if (!chosen) return { recipe: null, error: '所选创作技能已失效，请重新选择或改用自动匹配' };
     const chosenKind = recipeKind(chosen);
     if (chosenKind === 'conflict') {
-      return { recipe: null, error: `拍摄架构「${chosen.name || chosen.id}」的名称与正文品类不一致，请先修正架构内容` };
+      return { recipe: null, error: `创作技能「${chosen.name || chosen.id}」的名称与正文品类不一致，请先修正技能内容` };
     }
     if (productKind !== 'other' && chosenKind !== 'other' && chosenKind !== productKind) {
-      return { recipe: null, error: `拍摄架构「${chosen.name || chosen.id}」不适用于${kindLabel(productKind)}商品，请选择相应架构或改用自动匹配` };
+      return { recipe: null, error: `创作技能「${chosen.name || chosen.id}」不适用于${kindLabel(productKind)}商品，请选择相应技能或改用自动匹配` };
     }
     return { recipe: chosen, error: null };
   }
@@ -73,7 +73,7 @@ export function resolveRecipeForProduct<T extends RecipeForProduct>(
   const matched = recipes.find(recipe => recipeKind(recipe) === productKind);
   if (matched) return { recipe: matched, error: null };
   if (productKind === 'other') {
-    return { recipe: null, error: '当前商品没有可用的通用品类拍摄架构，请手动选择适合的架构' };
+    return { recipe: null, error: '当前商品没有可用的通用品类创作技能，请手动选择适合的技能' };
   }
-  return { recipe: null, error: `没有可用的${kindLabel(productKind)}拍摄架构，请先在拍摄架构库中添加或恢复` };
+  return { recipe: null, error: `没有可用的${kindLabel(productKind)}创作技能，请先在创作技能库中添加或恢复` };
 }

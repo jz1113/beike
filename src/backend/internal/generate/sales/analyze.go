@@ -85,7 +85,7 @@ func Analyze(cfg config.Config) http.Handler {
 		if usage := generate.NormalizeUsage(raw); usage != nil {
 			response["usage"] = usage
 		}
-		httpx.WriteJSON(w, http.StatusOK, response)
+		httpx.WriteJSON(w, http.StatusOK, withSalesSkill(response))
 	})
 }
 

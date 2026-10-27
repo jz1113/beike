@@ -63,7 +63,7 @@ function BatchProductImageGrid({
 
   return (
     <div className="space-y-3 pb-4">
-      <div className="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-3.5">
+      <div className="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3.5 sm:gap-4">
         {visibleImages.map((imgObj, imgIdx) => {
           const isChecked = selectedSet.has(imgObj.url);
           const selectedOrder = isChecked ? selectedImages.indexOf(imgObj.url) : -1;
@@ -86,7 +86,7 @@ function BatchProductImageGrid({
 
       {hasMore && (
         <div ref={loadMoreRef} className="py-2 text-center text-[11px] text-slate-400 font-mono">
-          加载更多素材 ({visibleLimit}/{images.length})
+          加载更多商品图 ({visibleLimit}/{images.length})
         </div>
       )}
     </div>

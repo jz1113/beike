@@ -178,7 +178,7 @@ export default function BatchStage4Queue({
                 </div>
                 <div className="max-h-80 overflow-y-auto space-y-1 [scrollbar-gutter:stable]">
                   {successfulItems.map((product, index) => {
-                    const cover = product.prompts?.find(shot => shot.selected !== false && shot.sourceReferenceImageUrl)?.sourceReferenceImageUrl;
+                    const cover = product.selectedProductImages[0] || product.coverImage;
                     const copyFailed = Boolean(product.copywritingError);
                     const copyReady = Boolean(product.copywriting?.title && product.copywriting?.content);
                     const imageStatus = describeImageStatus(product);
@@ -186,7 +186,7 @@ export default function BatchStage4Queue({
                       onClick={() => setActiveItemIndex(index)} title={product.title}
                       className={`w-full min-w-0 flex items-center gap-2.5 rounded-xl p-2 text-left transition-colors ${index === safeIndex ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-400/30' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'}`}>
                       <span className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50 dark:bg-[#131417]">
-                        {cover && <LazyProxyImage src={cover} alt={`${product.title}的参考图`} thumb width={80} className="!object-contain" />}
+                        {cover && <LazyProxyImage src={cover} alt={`${product.title}的商品图`} thumb width={80} className="!object-contain" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-medium">{index + 1}. {product.title}</span>

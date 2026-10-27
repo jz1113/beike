@@ -13,7 +13,7 @@ const workspaceRoot = path.resolve(scriptDir, '../../..');
 const REQUIRED_DIRS = [
   'src/client', 'src/backend', 'src/shared/contracts', 'src/shared/domain', 'src/shared/data',
   'src/client/public', 'tools/configs', 'tools/scripts', 'tools/launchers', 'docs', 'tools/deploy',
-  'src/client/features/poster', 'src/client/features/keywords', 'src/client/features/ppt', 'src/client/features/sales',
+  'src/client/features/poster', 'src/client/features/keywords', 'src/client/features/sales',
   'src/shared/domain/sales', 'src/backend/internal/keywords', 'src/backend/internal/gateway',
   'src/backend/internal/generate/poster', 'src/backend/internal/generate/sales',
 ];

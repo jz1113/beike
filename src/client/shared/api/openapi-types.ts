@@ -276,134 +276,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/avatar/characters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_avatar_characters"];
-        put?: never;
-        post: operations["post_api_avatar_characters"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/characters/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["delete_api_avatar_characters_id"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/fonts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_avatar_fonts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/render": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_avatar_render"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_avatar_tasks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/tasks/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_avatar_tasks_id"];
-        put?: never;
-        post?: never;
-        delete: operations["delete_api_avatar_tasks_id"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/voices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_avatar_voices"];
-        put?: never;
-        post: operations["post_api_avatar_voices"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/avatar/voices/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["delete_api_avatar_voices_id"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/catalog/assets/{type}/{id}/create-version": {
         parameters: {
             query?: never;
@@ -670,7 +542,7 @@ export interface paths {
         /** @description 读取当前工作区二级类目的样本、观察记忆、经验、技能版本及验证进度。 */
         get: operations["get_api_catalog_category_skills"];
         put?: never;
-        /** @description 逐组观察、整理候选、维护经验及切换版本；学习请求不自动重放失败调用。 */
+        /** @description 逐组观察、整理候选、手动编辑新候选、维护经验及切换版本；学习请求支持后台执行，编辑不覆盖已有版本，学习请求不自动重放失败调用。 */
         post: operations["post_api_catalog_category_skills"];
         delete?: never;
         options?: never;
@@ -1110,6 +982,38 @@ export interface paths {
         patch: operations["patch_api_generate_headline_memory_entries_id"];
         trace?: never;
     };
+    "/api/generate/headline-memory/revisions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_generate_headline_memory_revisions_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/generate/headline-memory/revisions/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_headline_memory_revisions_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/generate/headline-memory/trash": {
         parameters: {
             query?: never;
@@ -1124,6 +1028,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/generate/headline-memory/usages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_generate_headline_memory_usages_id"];
         trace?: never;
     };
     "/api/generate/headline-title": {
@@ -1232,70 +1152,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_api_generate_layer_decomposition"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/ppt-detail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_ppt_detail"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/ppt-narration": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_ppt_narration"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/ppt-outline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_ppt_outline"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/ppt-slide": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_ppt_slide"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2404,204 +2260,6 @@ export interface operations {
             };
         };
     };
-    get_api_avatar_characters: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_avatar_characters: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    delete_api_avatar_characters_id: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_api_avatar_fonts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_avatar_render: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_api_avatar_tasks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_api_avatar_tasks_id: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    delete_api_avatar_tasks_id: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_api_avatar_voices: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_avatar_voices: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    delete_api_avatar_voices_id: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     post_api_catalog_assets_type_id_create_version: {
         parameters: {
             query?: never;
@@ -3031,7 +2689,7 @@ export interface operations {
     post_api_catalog_category_skills: {
         parameters: {
             query: {
-                action: "learn" | "observe" | "remember" | "forget" | "retry-sample" | "configure" | "trial" | "baseline" | "publish" | "rollback";
+                action: "learn" | "observe" | "consolidate" | "edit" | "remember" | "forget" | "retry-sample" | "configure" | "trial" | "baseline" | "publish" | "activate" | "rollback";
             };
             header?: never;
             path?: never;
@@ -3046,11 +2704,17 @@ export interface operations {
                     /** @default 5 */
                     maxNewSamples?: number;
                     force?: boolean;
+                    /** @description 学习操作登记后立即返回，模型调用在服务端继续执行。 */
+                    background?: boolean;
                     /** @enum {string} */
                     kind?: "prefer" | "avoid";
                     content?: string;
                     id?: string;
                     versionId?: string;
+                    /** @description edit 操作的完整技能正文；versionId 指定来源版本。 */
+                    promptSnippet?: string;
+                    /** @description edit 操作的修改说明。 */
+                    summary?: string;
                 } & {
                     [key: string]: unknown;
                 };
@@ -3059,6 +2723,13 @@ export interface operations {
         responses: {
             /** @description 操作成功；学习操作包含 observed 或 candidate 阶段、已读组数和剩余组数。 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 学习任务已登记，服务端将在后台继续执行；通过 GET 轮询 scope.runningToken、progress 和 error。 */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3915,7 +3586,61 @@ export interface operations {
             };
         };
     };
+    get_api_generate_headline_memory_revisions_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_generate_headline_memory_revisions_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     delete_api_generate_headline_memory_trash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_generate_headline_memory_usages_id: {
         parameters: {
             query?: never;
             header?: never;
@@ -4078,78 +3803,6 @@ export interface operations {
         };
     };
     post_api_generate_layer_decomposition: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_ppt_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_ppt_narration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_ppt_outline: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_ppt_slide: {
         parameters: {
             query?: never;
             header?: never;

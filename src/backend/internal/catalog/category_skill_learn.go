@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
@@ -86,38 +87,105 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		writeSkillError(w, 409, err.Error())
 		return
 	}
+	run := categorySkillRun{cfg: cfg, workspace: workspace, folder: folder, token: token, base: base, key: key, model: model,
+		payload: payload, dataset: dataset, scope: scope, memory: memory, versions: versions, feedback: feedback,
+		feedbackHash: feedbackHash, observeOnly: observeOnly, consolidateOnly: consolidateOnly, limit: limit}
+	if background, _ := payload["background"].(bool); background {
+		protocol := gateway.TextProtocol(r.Context(), model)
+		go func() {
+			workerDB, openErr := httpx.OpenDB(cfg)
+			if openErr != nil {
+				finishCategorySkillRun(cfg, workspace, folder, token, "后台分析无法打开数据库，请稍后重试")
+				return
+			}
+			defer workerDB.Close()
+			workerRequest := r.Clone(gateway.WithTextProtocol(context.Background(), protocol))
+			run.db = workerDB
+			run.request = workerRequest
+			run.writer = nil
+			executeCategorySkillRun(run)
+		}()
+		httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"success": true, "stage": "running", "analyzedGroups": 0, "remaining": memory.Pending, "model": model})
+		return
+	}
+	run.db = db
+	run.request = r
+	run.writer = w
+	executeCategorySkillRun(run)
+}
+
+type categorySkillRun struct {
+	cfg                                        config.Config
+	db                                         *sql.DB
+	request                                    *http.Request
+	writer                                     http.ResponseWriter
+	workspace, folder, token, base, key, model string
+	payload                                    map[string]any
+	dataset                                    learning.Dataset
+	scope                                      learning.Scope
+	memory                                     learning.Memory
+	versions                                   []learning.Version
+	feedback                                   []learning.Feedback
+	feedbackHash                               string
+	observeOnly, consolidateOnly               bool
+	limit                                      int
+}
+
+func finishCategorySkillRun(cfg config.Config, workspace, folder, token, message string) {
+	db, err := httpx.OpenDB(cfg)
+	if err != nil {
+		return
+	}
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = learning.FinishRun(ctx, db, workspace, folder, token, message)
+	if message != "" {
+		_ = learning.Log(ctx, db, workspace, folder, "", "failed", message)
+	}
+}
+
+func executeCategorySkillRun(run categorySkillRun) {
+	r, db, w := run.request, run.db, run.writer
 	failure := "分析中断，已完成的逐组观察保留；可手动重试"
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = learning.FinishRun(ctx, db, workspace, folder, token, failure)
+		_ = learning.FinishRun(ctx, db, run.workspace, run.folder, run.token, failure)
 		if failure != "" {
-			_ = learning.Log(ctx, db, workspace, folder, "", "failed", failure)
+			_ = learning.Log(ctx, db, run.workspace, run.folder, "", "failed", failure)
 		}
 	}()
-	if err := learning.SaveRoles(r.Context(), db, workspace, folder, dataset.Samples); err != nil {
-		writeSkillError(w, 500, "样本分工保存失败")
+	fail := func(status int, message string) {
+		failure = message
+		if w != nil {
+			writeSkillError(w, status, message)
+		}
+	}
+	ctx := r.Context()
+	if err := learning.SaveRoles(ctx, db, run.workspace, run.folder, run.dataset.Samples); err != nil {
+		fail(500, "样本分工保存失败")
 		return
 	}
 	pendingIDs := map[string]bool{}
-	for _, entry := range memory.Entries {
-		if entry.State == "pending" {
+	for _, entry := range run.memory.Entries {
+		if entry.State == "pending" || entry.State == "stale" || entry.State == "failed" {
 			pendingIDs[entry.GroupID] = true
 		}
 	}
 	analyzed, attempted := 0, 0
 	failedSamples := []string{}
 	usage := map[string]any{}
-	for _, sample := range dataset.Samples {
-		if consolidateOnly || !pendingIDs[sample.ID] || attempted >= limit {
+	for _, sample := range run.dataset.Samples {
+		if run.consolidateOnly || !pendingIDs[sample.ID] || attempted >= run.limit {
 			continue
 		}
 		attempted++
 		// Remove only a cached failure when the user explicitly retries this run.
-		observation, tokens, err := observeCategorySample(cfg, r, base, key, model, payload, dataset.Folder, sample)
+		observation, tokens, err := observeCategorySample(run.cfg, r, run.base, run.key, run.model, run.payload, run.dataset.Folder, sample, run.dataset.LearningInstruction)
 		addLearningUsage(usage, tokens)
 		if err != nil {
-			if r.Context().Err() != nil {
+			if ctx.Err() != nil {
 				return
 			}
 			message := fmt.Sprintf("图组「%s」：%s", sample.Title, err)
@@ -127,64 +195,69 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 			analyzed++
 		}
 		encoded, _ := json.Marshal(observation)
-		if err := learning.SaveObservation(r.Context(), db, workspace, folder, model, sample, encoded); err != nil {
-			writeSkillError(w, 500, "逐组观察保存失败")
+		if err := learning.SaveObservation(ctx, db, run.workspace, run.folder, run.model, sample, encoded); err != nil {
+			fail(500, "逐组观察保存失败")
 			return
 		}
-		if err := learning.Progress(r.Context(), db, workspace, folder, token, attempted); err != nil {
-			writeSkillError(w, 409, err.Error())
+		if err := learning.Progress(ctx, db, run.workspace, run.folder, run.token, attempted); err != nil {
+			fail(409, err.Error())
 			return
 		}
 	}
-	memory, err = learning.ReadMemory(r.Context(), db, workspace, folder, dataset)
+	memory, err := learning.ReadMemory(ctx, db, run.workspace, run.folder, run.dataset)
 	if err != nil {
-		writeSkillError(w, 500, "观察记忆读取失败")
+		fail(500, "观察记忆读取失败")
 		return
 	}
 	if len(failedSamples) > 0 {
 		failure = strings.Join(failedSamples, "；")
-		writeSkillError(w, 502, fmt.Sprintf("本轮完成 %d 套，失败 %d 套。%s；已完成观察保留，可重试未成功图组", analyzed, len(failedSamples), failure))
+		fail(502, fmt.Sprintf("本轮完成 %d 套，失败 %d 套。%s；已完成观察保留，可重试未成功图组", analyzed, len(failedSamples), failure))
 		return
 	}
-	if observeOnly || (!consolidateOnly && !learning.ReadyToConsolidate(memory, scope.MinSamples)) {
+	if run.observeOnly || (!run.consolidateOnly && !learning.ReadyToConsolidate(memory, run.scope.MinSamples)) {
 		failure = ""
-		_ = learning.Log(r.Context(), db, workspace, folder, "", "observed", fmt.Sprintf("本轮读取 %d 套；累计记住 %d 套，待学习 %d 套，不适用 %d 套", analyzed, memory.Learned, memory.Pending, memory.Rejected))
-		httpx.WriteJSON(w, 200, map[string]any{"success": true, "stage": "observed", "analyzedGroups": analyzed, "remaining": memory.Pending, "usage": usage, "model": model})
+		_ = learning.Log(ctx, db, run.workspace, run.folder, "", "observed", fmt.Sprintf("本轮读取 %d 套；累计记住 %d 套，待学习 %d 套，不适用 %d 套", analyzed, memory.Learned, memory.Pending, memory.Rejected))
+		if w != nil {
+			httpx.WriteJSON(w, 200, map[string]any{"success": true, "stage": "observed", "analyzedGroups": analyzed, "remaining": memory.Pending, "usage": usage, "model": run.model})
+		}
 		return
 	}
 	// Continue the newest usable draft, so unpublished improvements are remembered.
-	previous, inherited := categoryParent(versions, scope.ActiveVersionID, dataset, memory)
+	previous, inherited := categoryParent(run.versions, run.scope.ActiveVersionID, run.dataset, memory)
+	if run.dataset.LearningInstruction != "" {
+		previous = run.dataset.LearningInstruction + "\n【此前已整理规则】\n" + previous
+	}
 	observations := selectCategorySources(memory.Sources, inherited)
-	recent := feedback
+	recent := run.feedback
 	if len(recent) > 20 {
 		recent = recent[len(recent)-20:]
 	}
-	content := []any{map[string]any{"type": "text", "text": learning.NotePrompt(memory.Notes) + consolidatePrompt(dataset.Folder, observations, previous, recent)}}
-	content, err = categoryFeedbackContent(cfg, content, recent)
+	content := []any{map[string]any{"type": "text", "text": learning.NotePrompt(memory.Notes) + consolidatePrompt(run.dataset.Folder, observations, previous, recent)}}
+	content, err = categoryFeedbackContent(run.cfg, content, recent)
 	if err != nil {
 		failure = "评分反馈的原图无法读取，请修复图片来源后重试；观察记忆已保留"
-		writeSkillError(w, 400, failure)
+		fail(400, failure)
 		return
 	}
-	raw, status, tokens, err := categorySkillChat(r.Context(), base, key, model, payload, content)
+	raw, status, tokens, err := categorySkillChat(ctx, run.base, run.key, run.model, run.payload, content)
 	addLearningUsage(usage, tokens)
 	if err != nil || status < 200 || status >= 300 {
 		failure = "技能整理失败，逐组观察已保留，可重试整理"
-		writeSkillError(w, 502, failure)
+		fail(502, failure)
 		return
 	}
 	candidate := learningJSON(raw)
 	prompt, summary := styleString(candidate, "promptSnippet"), styleString(candidate, "summary")
 	if utf8.RuneCountInString(prompt) < 300 || utf8.RuneCountInString(prompt) > 12000 || summary == "" || !validLearningEvidence(candidate, observations, len(memory.Notes) > 0) {
 		failure = "模型没有返回完整规则与可核对的样本依据，未保存候选"
-		writeSkillError(w, 502, failure)
+		fail(502, failure)
 		return
 	}
-	fresh, err := learning.LoadDataset(r.Context(), db, workspace, folder)
-	notes, noteErr := learning.Notes(r.Context(), db, workspace, folder)
-	if err != nil || noteErr != nil || fresh.Fingerprint != dataset.Fingerprint || learning.Hash(notes) != memory.Fingerprint {
+	fresh, err := learning.LoadDataset(ctx, db, run.workspace, run.folder)
+	notes, noteErr := learning.Notes(ctx, db, run.workspace, run.folder)
+	if err != nil || noteErr != nil || fresh.Fingerprint != run.dataset.Fingerprint || fresh.LearningFingerprint != run.dataset.LearningFingerprint || learning.Hash(notes) != memory.Fingerprint {
 		failure = "分析期间样本或经验发生变化，观察记忆已保留，请重新整理"
-		writeSkillError(w, 409, failure)
+		fail(409, failure)
 		return
 	}
 	used := map[string]bool{}
@@ -195,8 +268,9 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		used[sample.ID] = true
 	}
 	samples := []learning.Sample{}
-	for _, sample := range dataset.Samples {
+	for _, sample := range run.dataset.Samples {
 		if used[sample.ID] {
+			sample.ObservationDigest = learning.MemoryDigest(memory, sample.ID)
 			samples = append(samples, sample)
 		}
 	}
@@ -208,15 +282,17 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 			}
 		}
 	}
-	manifest := learning.Manifest{Samples: samples, FeedbackFingerprint: feedbackHash, RuleEvidence: evidence, MemoryFingerprint: memory.Fingerprint, Notes: memory.Notes, EngineVersion: learning.EngineVersion}
-	id, err := learning.SaveVersion(r.Context(), db, workspace, folder, token, learning.Version{ParentVersionID: scope.ActiveVersionID, SourceFingerprint: dataset.Fingerprint, Manifest: manifest, PromptSnippet: prompt, Summary: summary, Model: model})
+	manifest := learning.Manifest{Samples: samples, FeedbackFingerprint: run.feedbackHash, RuleEvidence: evidence, MemoryFingerprint: memory.Fingerprint, Notes: memory.Notes, EngineVersion: learning.EngineVersion}
+	id, err := learning.SaveVersion(ctx, db, run.workspace, run.folder, run.token, learning.Version{ParentVersionID: run.scope.ActiveVersionID, SourceFingerprint: run.dataset.Fingerprint, Manifest: manifest, PromptSnippet: prompt, Summary: summary, Model: run.model})
 	if err != nil {
-		writeSkillError(w, 409, "候选保存失败或正式版本已变化，请刷新重试")
+		fail(409, "候选保存失败或正式版本已变化，请刷新重试")
 		return
 	}
-	_ = learning.Log(r.Context(), db, workspace, folder, id, "candidate", fmt.Sprintf("基于 %d 套新旧观察整理候选，保留历史经验；可直接设为正式技能或先试用对比", len(observations)))
+	_ = learning.Log(ctx, db, run.workspace, run.folder, id, "candidate", fmt.Sprintf("基于 %d 套新旧观察整理候选，保留历史经验；可直接设为正式技能或先试用对比", len(observations)))
 	failure = ""
-	httpx.WriteJSON(w, 200, map[string]any{"success": true, "stage": "candidate", "versionId": id, "usage": usage, "model": model, "analyzedGroups": analyzed, "remaining": memory.Pending})
+	if w != nil {
+		httpx.WriteJSON(w, 200, map[string]any{"success": true, "stage": "candidate", "versionId": id, "usage": usage, "model": run.model, "analyzedGroups": analyzed, "remaining": memory.Pending})
+	}
 }
 
 func addLearningUsage(total, usage map[string]any) {

@@ -34,7 +34,7 @@ func checkWorkflowVersion(payload map[string]any) error {
 			return fmt.Errorf("参数 %s 已停用，请使用当前服饰制作流程", field)
 		}
 	}
-	return nil
+	return checkSalesSkill(payload)
 }
 
 func checkFashionCategory(payload map[string]any) error {
@@ -100,7 +100,7 @@ func workflowScriptResponse(script SalesScript) map[string]any {
 			}
 		}
 	}
-	return result
+	return withSalesSkill(result)
 }
 
 func decodeField(payload map[string]any, field string, out any) error {

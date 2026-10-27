@@ -20,7 +20,7 @@ func DuplicateWorkshopBatch(ctx context.Context, db *sql.DB, workspace, id strin
 	if source.ID == active.ID {
 		source = active
 	}
-	return replaceActiveBatch(ctx, db, workspace, active, source.Name+"（副本）", duplicateSnapshot(source.Snapshot), false)
+	return replaceActiveBatch(ctx, db, workspace, active, workshopBatchCopyName(source), duplicateSnapshot(source.Snapshot), false)
 }
 
 func ArchiveActiveWorkshopBatch(ctx context.Context, db *sql.DB, workspace string, force bool) (WorkshopBatchRow, error) {
@@ -69,7 +69,9 @@ func duplicateSnapshot(raw string) string {
 		snapshot = map[string]any{}
 	}
 	snapshot["currentStage"] = stageForBatchContent(snapshot)
-	snapshot["batchInputText"] = ""
+	if items, _ := snapshot["items"].([]any); len(items) > 0 {
+		snapshot["batchInputText"] = ""
+	}
 	snapshot["pipeline"] = map[string]any{
 		"status": "draft", "planRevision": 0, "storyboardRevision": 0,
 		"diversityContext": map[string]any{"groupSignatures": []any{}, "actionIds": []any{}, "sceneIds": []any{}},

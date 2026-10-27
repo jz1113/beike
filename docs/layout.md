@@ -89,7 +89,7 @@ src/client/
 
 ### 功能导航
 
-前端功能路径相对于 `src/client/features`，后端路径相对于 `src/backend/internal`。功能目录优先使用一个常用英文词；封面、关键词、PPT、带货分别记作 `poster / keywords / ppt / sales`。相同业务沿用相同名称，共用后端能力按实际归属列出。
+前端功能路径相对于 `src/client/features`，后端路径相对于 `src/backend/internal`。功能目录优先使用一个常用英文词；封面、关键词、带货分别记作 `poster / keywords / sales`。相同业务沿用相同名称，共用后端能力按实际归属列出。
 
 | 功能 | 前端 | 后端 |
 | --- | --- | --- |
@@ -103,16 +103,16 @@ src/client/
 | 封面 | `poster` | `generate/poster` |
 | 词包 | `keywords` | `keywords` |
 | 采集 | `collect` | `catalog`、`platform/collect` |
-| PPT | `ppt` | `generate/ppt`、`generate/export` |
-| 数字人 | `avatar` | `avatar` |
 | 电商视频 | `sales` | `generate/sales` |
 | 技能 | `skills` | `catalog`、`platform/database` |
 
-页面入口统一为 `PosterStudio / KeywordsStudio / PptStudio / SalesStudio`。带货的共享业务规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
+页面入口统一为 `PosterStudio / KeywordsStudio / SalesStudio`。带货的共享业务规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
+
+数字人与 PPT 功能重建中，首页仅保留入口占位，旧视图参数回到首页。旧工作室、专属契约与生成接口已移除；数字人历史数据库迁移、用户数据和模型线路配置保留。`generate/export` 继续服务电商图文等功能的通用 ZIP 导出。
 
 目录名用于源码定位。浏览器视图参数、HTTP 接口地址、草稿存储键与数据库标识保持原有兼容形式，已有链接和工作记录继续可用。
 
-产品操作与恢复规则分别见 [assistant-runtime.md](assistant-runtime.md)、[video-sales.md](video-sales.md)、[workshop-asset-binding.md](workshop-asset-binding.md) 与 [workshop-reference-generation.md](workshop-reference-generation.md)。
+产品操作与恢复规则分别见 [assistant-runtime.md](assistant-runtime.md)、[video-sales.md](video-sales.md)、[workshop-production.md](workshop-production.md)、[workshop-asset-binding.md](workshop-asset-binding.md) 与 [workshop-reference-generation.md](workshop-reference-generation.md)。
 
 ## Go 后端
 
@@ -126,10 +126,9 @@ src/client/
 | `internal/catalog` | 类目、商品、风格、技能与采集入口 |
 | `internal/library` / `internal/assets` | 素材库、图组、查重与反推 / 存储、生图任务与素材生命周期 |
 | `internal/generate` | 图像、视频、分析、文案、语音与画布任务编排 |
-| `internal/generate/{depth,poster,ppt,export,sales}` | 深度推理、封面设计、PPT、文件导出、电商视频子包 |
+| `internal/generate/{depth,poster,export,sales}` | 深度推理、封面设计、文件导出、电商视频子包 |
 | `internal/workshop` / `internal/keywords` | 电商图文批次与输出审核 / 关键词审核与提交保护 |
 | `internal/assistant` | 回合、记忆、沙箱、工具与运行时；`extract` 抽取文档，`sessions` 读写会话 |
-| `internal/avatar` | 数字人驱动与配音流程 |
 | `internal/gateway` | 模型协议、提交适配与文本流式处理 |
 | `internal/platform/collect` | 采集上游请求与响应 |
 | `internal/platform/database` | 数据库连接、工具与按领域拆分的数据访问；`migrate` 负责版本化迁移与官方种子 |
@@ -137,7 +136,7 @@ src/client/
 
 Go 的同目录文件共同组成一个包，共享未导出类型。领域包内按文件前缀定位职责，例如 `generate/image_*.go`、`generate/video_*.go` 与 `gateway/text_*.go`；拆子包须先具备独立职责和稳定依赖，避免仅为减少文件数扩大导出接口。
 
-当前 gateway 的模态入口是 `video_submit.go`、`audio_submit.go`、`avatar_submit.go`、`threed_submit.go` 与 `multimodal_submit.go`，公共提交在 `submit.go / adapter.go`，文本协议在 `text_*.go`。图像和视频部分上游协议仍与 generate 任务编排相邻；不存在独立的 `gateway/image` 等目录，也没有单独的 dispatcher.go。接入新模型先复用现有适配入口，厂商文档见 [models.md](models.md)。
+当前 gateway 的模态入口是 `video_submit.go`、`audio_submit.go`、`threed_submit.go` 与 `multimodal_submit.go`，公共提交在 `submit.go / adapter.go`，文本协议在 `text_*.go`。图像和视频部分上游协议仍与 generate 任务编排相邻；不存在独立的 `gateway/image` 等目录，也没有单独的 dispatcher.go。接入新模型先复用现有适配入口，厂商文档见 [models.md](models.md)。
 
 路由修改后执行 `pnpm openapi:write`，更新共享 OpenAPI 和 `src/client/shared/api/openapi-types.ts`。Go 契约测试及 `pnpm check:openapi` 校验路由覆盖和生成类型。未登记的 `/api` 请求返回不存在。
 
@@ -170,6 +169,7 @@ Agent 运行技能的可维护文件包存放在 `src/shared/domain/assistant/sk
 - Go 查找集中在 `tools/scripts/common/go-toolchain.mjs`，双击启动器、开发构建、迁移与质量检查复用同一规则：从 `go.mod` 读取最低版本，使用本地稳定工具链；显式 `GO_BIN` 无效或版本过低时报错，否则从 PATH 和常见安装位置查找。`gofmt` 从选定 SDK 的 GOROOT 定位。生产启动不要求 Go 编译器。
 - `/app_logo.png`、`/inspirations/...` 等公开 URL 保持稳定。组件迁移同步更新静态导入、动态加载、样式路径与质量基线中的文件路径。
 - 首页大图可以配置 `thumbnail` 供列表使用，查看、下载与参考图继续使用 `image` 原图。`pnpm media:thumbnails` 用本机 FFmpeg 重建 `public/inspirations/thumbnails` 中的预览图。
+- 首页作品按预先声明的比例排版，分页追加完整行；图片解码、重试和视频播放不改变已有卡片的位置。隐藏首页时暂停分页和媒体预览。作品预览只展示已记录的模型、日期与规格，不填入推测值；本地发布记录读取时兼容旧字段并校验格式，写入失败时提示错误。
 - Windows 根目录 `.bat` 只调用 `tools/launchers/启动贝壳云图.ps1`；macOS 使用根目录 `启动贝壳云图.command`，两个实现都定位到仓库根目录运行。目录检查要求这两个双击入口存在，并禁止 `tools/launchers` 内重复的 `.bat` / `.command`。开发端口写入 `.local/api-port`，兼容读取旧 `.local-api-port`；隔离端口写入 `.local/isolated-api-port`。
 - 日常与隔离模式的进程记录分别放在 `.local/web-processes.json` 和 `.local/isolated-web-processes.json`。只操作 PID、启动时间、工作目录和配置匹配的已记录进程，不按端口或模糊名称停止服务。迁移前的 Vite 记录会在下次启动时核对并替换为新配置。
 - PowerShell 验证隔离数据模式：设置 `$env:BEIKE_ISOLATED_DEV="1"` 后运行 `pnpm dev:web`；可再设置独立的 `AZHUO_DATA_DIR`。隔离模式使用独立令牌、API 空闲端口和 UI 5174，不能指向日常用户数据目录。

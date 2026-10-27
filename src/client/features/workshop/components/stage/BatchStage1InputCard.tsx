@@ -1,5 +1,6 @@
-import { useId, useState } from 'react';
-import { ArrowUp, Link2, Loader2 } from 'lucide-react';
+import { useId } from 'react';
+import { ArrowUp, Loader2 } from 'lucide-react';
+import { countBatchInputLines } from '../../model/collection/batchCollect';
 
 export interface BatchStage1InputCardProps {
   batchInputText: string;
@@ -10,78 +11,24 @@ export interface BatchStage1InputCardProps {
   handleSmartBatchCollect: () => Promise<void>;
 }
 
-export function BatchStage1InputCard({
-  batchInputText, setBatchInputText, isCollecting, hasInputs,
-  handleSmartBatchCollect, collectProgress,
-}: BatchStage1InputCardProps) {
+export function BatchStage1InputCard({ batchInputText, setBatchInputText, isCollecting, hasInputs, handleSmartBatchCollect, collectProgress }: BatchStage1InputCardProps) {
   const statusId = useId();
-  const [isFocused, setIsFocused] = useState(false);
-  const showActiveEditor = isFocused || Boolean(batchInputText.trim()) || isCollecting || hasInputs;
-
-  return (
-    <section
-      aria-label="导入商品"
-      className="group relative flex min-h-[300px] w-full flex-col justify-between overflow-hidden rounded-[32px] border-2 border-dashed border-slate-300 bg-white/95 text-left shadow-[0_28px_80px_-50px_rgba(15,23,42,.45)] transition hover:border-amber-400 hover:bg-white focus-within:border-amber-400 focus-within:bg-white dark:border-white/10 dark:bg-[#1B1B1E]/95 dark:hover:border-amber-400/60 dark:hover:bg-[#1B1B1E] dark:focus-within:border-amber-400/60 dark:focus-within:bg-[#1B1B1E]"
-    >
-      {!showActiveEditor && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-8 text-center"
-        >
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg transition group-hover:-translate-y-1 group-hover:bg-amber-600 dark:bg-white/10">
-            <Link2 className="h-7 w-7" />
-          </span>
-          <span className="mt-5 text-lg font-black text-slate-900 dark:text-white">
-            点击或粘贴商品链接与京东 SKU
-          </span>
-          <span className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            支持京东、淘宝 / 天猫、1688 商品链接 · 每行一款，单批最多 20 款
-          </span>
-        </div>
-      )}
-
-      <textarea
-        rows={6}
-        disabled={isCollecting}
-        value={batchInputText}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        onChange={e => setBatchInputText(e.target.value)}
-        onKeyDown={e => {
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            if (!isCollecting && hasInputs) void handleSmartBatchCollect();
-          }
-        }}
-        placeholder={showActiveEditor ? '粘贴商品链接或京东 SKU（每行一款）：\nhttps://item.jd.com/100279945637.html\n支持京东、淘宝 / 天猫、1688 商品链接，单批最多 20 款' : ''}
-        aria-label="商品链接或京东 SKU"
-        aria-describedby={statusId}
-        spellCheck={false}
-        className={`w-full flex-1 resize-none bg-transparent px-8 pt-7 pb-16 text-sm leading-[1.8] text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60 sm:px-9 sm:pt-8 dark:text-slate-100 dark:placeholder:text-slate-500 ${
-          showActiveEditor ? 'min-h-[300px] cursor-text' : 'min-h-[300px] cursor-pointer opacity-0'
-        }`}
-      />
-
-      <div
-        className={`pointer-events-none absolute inset-x-8 bottom-6 flex items-center justify-end sm:inset-x-9 sm:bottom-7 ${
-          showActiveEditor ? 'opacity-100' : 'sr-only opacity-0'
-        }`}
-      >
-        <div id={statusId} aria-live="polite" className="sr-only">
-          {isCollecting ? `正在采集 ${collectProgress?.current ?? 0} / ${collectProgress?.total ?? 0}` : ''}
-        </div>
-        <button
-          type="button"
-          onClick={() => void handleSmartBatchCollect()}
-          disabled={isCollecting || !hasInputs}
-          aria-label={isCollecting ? '正在采集' : '开始采集'}
-          title={isCollecting ? '正在采集' : '开始采集（⌘ / Ctrl + Enter）'}
-          className="pointer-events-auto inline-flex h-10 gap-2 px-4 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 dark:disabled:bg-white/10 dark:disabled:text-slate-600"
-        >
-          {isCollecting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowUp className="h-4 w-4 stroke-[2.25]" aria-hidden="true" />}
-          <span className="text-xs font-semibold">{isCollecting ? '正在采集' : '采集商品'}</span>
-        </button>
-      </div>
-    </section>
-  );
+  return <section aria-label="导入商品">
+    <div className="relative min-h-[300px] overflow-hidden rounded-[32px] border-2 border-dashed border-slate-300 bg-white/80 px-6 py-6 text-left transition hover:border-indigo-300 hover:bg-white focus-within:border-indigo-400 dark:border-white/10 dark:bg-[#1B1B1E]/80 dark:hover:border-indigo-400/50 dark:hover:bg-[#1B1B1E] sm:px-9 sm:py-8">
+    <textarea id={`${statusId}-input`} rows={6} disabled={isCollecting} value={batchInputText}
+      onChange={event => setBatchInputText(event.target.value)} onKeyDown={event => {
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !event.nativeEvent.isComposing) {
+          event.preventDefault(); if (!isCollecting && hasInputs) void handleSmartBatchCollect();
+        }
+      }} placeholder={'每行粘贴一款商品链接或京东 SKU\n\nhttps://item.jd.com/…html\nhttps://item.taobao.com/item.htm?id=…\nhttps://detail.1688.com/offer/…html'} aria-label="商品链接或京东 SKU" aria-describedby={statusId} spellCheck={false}
+      className="min-h-[232px] w-full resize-none border-0 bg-transparent p-0 pb-12 text-sm leading-[1.8] text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 disabled:opacity-60 dark:text-slate-200 dark:placeholder:text-slate-500" />
+      <button type="button" onClick={() => void handleSmartBatchCollect()} disabled={isCollecting || !hasInputs} aria-label={isCollecting ? '正在采集' : '开始采集'} title="采集商品（⌘ / Ctrl + Enter）" className="absolute bottom-6 right-6 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm transition hover:bg-black focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 dark:disabled:bg-white/10 dark:disabled:text-slate-600 sm:bottom-8 sm:right-9">
+        {isCollecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" strokeWidth={2.25} />}
+      </button>
+    </div>
+    <div id={statusId} aria-live="polite" className="mt-3 flex flex-wrap justify-between gap-x-4 gap-y-1 text-left text-xs leading-6 text-slate-500 dark:text-slate-400">
+      <span>支持京东、淘宝 / 天猫、1688，重复商品自动跳过，最多 20 款。</span>
+      <span>{isCollecting ? `正在采集 ${collectProgress?.current ?? 0}/${collectProgress?.total ?? 0}` : batchInputText.trim() ? `已输入 ${countBatchInputLines(batchInputText)} 条 · ⌘ / Ctrl + Enter 采集` : '⌘ / Ctrl + Enter 采集'}</span>
+    </div>
+  </section>;
 }

@@ -41,11 +41,6 @@ export function useKeywordReviewPreview(records: KeywordReviewRecord[], parsed: 
     };
   }, [records, visible]);
 
-  const sheetSummary = useMemo(
-    () => parsed?.sheets.map((sheet) => `${sheet.name} ${sheet.recordCount} 条`).join('、') || '',
-    [parsed],
-  );
-
   const categories = useMemo(() => [...new Set(records.filter((record) => record.status === 'done').map((record) => record.category).filter((category): category is string => Boolean(category)))].sort((a, b) => a.localeCompare(b, 'zh-CN')), [records]);
   const filteredRecords = useMemo(() => filterReviewRecords(records, filter, deferredSearch, sheetFilter, categoryFilter), [records, filter, deferredSearch, sheetFilter, categoryFilter]);
   const scope = JSON.stringify([filter, deferredSearch, sheetFilter, categoryFilter]);
@@ -62,7 +57,7 @@ export function useKeywordReviewPreview(records: KeywordReviewRecord[], parsed: 
   }, [parsed]);
 
   return {
-    counts, sheetSummary, filteredRecords, previewRecords, search, setSearch, sheetFilter, setSheetFilter,
+    counts, filteredRecords, previewRecords, search, setSearch, sheetFilter, setSheetFilter,
     categoryFilter, setCategoryFilter, categories, page: currentPage, pageCount, setPage,
     searchPending: search !== deferredSearch,
     previewStart: filteredRecords.length ? (currentPage - 1) * PREVIEW_LIMIT + 1 : 0,

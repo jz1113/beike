@@ -17,5 +17,5 @@ export async function changeCategorySkill(folderId: string, action: string, payl
   return read(await apiRequest('POST', endpoint, { search: `action=${encodeURIComponent(action)}`, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, folderId }), signal }));
 }
 export async function learnCategorySkill(folderId: string, modelId: string, force: boolean, maxNewSamples: number, action: 'learn' | 'observe' | 'consolidate', signal?: AbortSignal) {
-  return categorySkillRunSchema.parse(await changeCategorySkill(folderId, action, { force, maxNewSamples, model: isDeepSeekRoute(modelId) ? modelId : selectedTextModel(modelId).modelId, ...getMultimodalClientOverrides(modelId) }, signal));
+  return categorySkillRunSchema.parse(await changeCategorySkill(folderId, action, { background: true, force, maxNewSamples, model: isDeepSeekRoute(modelId) ? modelId : selectedTextModel(modelId).modelId, ...getMultimodalClientOverrides(modelId) }, signal));
 }

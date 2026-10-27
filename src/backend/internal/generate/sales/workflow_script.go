@@ -56,54 +56,34 @@ func handleWorkflowScript(w http.ResponseWriter, r *http.Request, cfg config.Con
 		workflowError(w, 502, err)
 		return
 	}
-	if len(script.Shots) > 40 {
-		workflowError(w, 502, fmt.Errorf("分镜数量不能超过40"))
-		return
-	}
-	if err := validateScriptReferences(normalized, catalog); err != nil {
-		workflowError(w, 502, err)
-		return
-	}
-	if err := exactDuration(script.Shots, target); err != nil {
-		workflowError(w, 502, err)
-		return
-	}
-	if script.TotalDuration != target {
-		workflowError(w, 502, fmt.Errorf("脚本 totalDuration 与目标时长不符"))
-		return
-	}
-	if script.DeliveryMode != "single" {
-		workflowError(w, 502, fmt.Errorf("脚本 deliveryMode 必须为 single"))
-		return
-	}
-	if err := validateAssetPlan(script.Assets); err != nil {
-		workflowError(w, 502, err)
-		return
-	}
-	script.Shots = normalizeFashionSpeechModes(script.Shots, generate.StringField(payload, "videoMode"))
-
-	if err := validateSpeechModes(script.Shots, true); err != nil {
-		workflowError(w, 502, err)
-		return
-	}
-	if err := validateSpeakingAssetPlan(script.Shots, script.Assets); err != nil {
-		workflowError(w, 502, err)
-		return
-	}
-	for _, asset := range script.Assets {
-		text := asset.Label + asset.Prompt
-		if !asset.UsesProduct && (strings.Contains(text, "上身") || strings.Contains(text, "试穿") || strings.Contains(text, "穿上") || strings.Contains(text, "穿着该")) {
-			workflowError(w, 502, fmt.Errorf("衣服上身素材 %s 必须 usesProduct:true", asset.ID))
+	if err := validateWorkflowScript(script, normalized, catalog, target, generate.StringField(payload, "videoMode")); err != nil {
+		// Local speech limits are deterministic and easy for the model to repair.
+		// Retry once with the exact failing segment instead of asking the user to
+		// repeat product analysis or manually trim generated copy.
+		if !isRecoverableSpeechValidationError(err) {
+			workflowError(w, 502, err)
 			return
 		}
-	}
-	if err := validateFashionPresentation(script.Shots, generate.StringField(payload, "videoMode")); err != nil {
-		workflowError(w, 502, err)
-		return
-	}
-	if err := validateFashionVoiceover(script.Shots, target); err != nil {
-		workflowError(w, 502, err)
-		return
+		repairBody := salesJSONRecoveryBody(body, fmt.Sprintf("上一版脚本未通过口播校验：%s。请根据原始商品事实重新输出完整 scripts JSON；只压缩或重写超限口播，保留可核实事实、镜头结构、素材依赖和总时长，不要输出说明。", err))
+		repairedContent, repairedRaw, repairedStatus, repairErr := postChatJSON(r.Context(), base, key, repairBody, chatWait)
+		if errors.Is(repairErr, errTruncatedOutput) {
+			workflowError(w, 502, fmt.Errorf("口播脚本生成失败：%w", repairErr))
+			return
+		}
+		if repairErr != nil || repairedStatus < 200 || repairedStatus >= 300 {
+			workflowError(w, 502, fmt.Errorf("脚本模型调用失败：%s", analysisFailureReason(repairedStatus, repairErr)))
+			return
+		}
+		repairedScript, repairedNormalized, parseErr := oneSalesScript(repairedContent)
+		if parseErr != nil {
+			workflowError(w, 502, parseErr)
+			return
+		}
+		if validationErr := validateWorkflowScript(repairedScript, repairedNormalized, catalog, target, generate.StringField(payload, "videoMode")); validationErr != nil {
+			workflowError(w, 502, validationErr)
+			return
+		}
+		script, normalized, raw = repairedScript, repairedNormalized, repairedRaw
 	}
 
 	if !scriptReady(script) {
@@ -118,25 +98,63 @@ func handleWorkflowScript(w http.ResponseWriter, r *http.Request, cfg config.Con
 	if usage := generate.NormalizeUsage(raw); usage != nil {
 		response["usage"] = usage
 	}
-	httpx.WriteJSON(w, 200, response)
+	httpx.WriteJSON(w, 200, withSalesSkill(response))
+}
+
+func validateWorkflowScript(script SalesScript, normalized string, catalog []CatalogImage, target int, videoMode string) error {
+	if len(script.Shots) > 40 {
+		return fmt.Errorf("分镜数量不能超过40")
+	}
+	if err := validateScriptReferences(normalized, catalog); err != nil {
+		return err
+	}
+	if err := exactDuration(script.Shots, target); err != nil {
+		return err
+	}
+	if script.TotalDuration != target {
+		return fmt.Errorf("脚本 totalDuration 与目标时长不符")
+	}
+	if script.DeliveryMode != "single" {
+		return fmt.Errorf("脚本 deliveryMode 必须为 single")
+	}
+	if err := validateAssetPlan(script.Assets); err != nil {
+		return err
+	}
+	if err := validateSpeechModes(script.Shots, true); err != nil {
+		return err
+	}
+	if err := validateFashionPresentation(script.Shots, videoMode); err != nil {
+		return err
+	}
+	if err := validateSpeakingAssetPlan(script.Shots, script.Assets); err != nil {
+		return err
+	}
+	for _, asset := range script.Assets {
+		text := asset.Label + asset.Prompt
+		if !asset.UsesProduct && (strings.Contains(text, "上身") || strings.Contains(text, "试穿") || strings.Contains(text, "穿上") || strings.Contains(text, "穿着该")) {
+			return fmt.Errorf("衣服上身素材 %s 必须 usesProduct:true", asset.ID)
+		}
+	}
+	return validateFashionVoiceover(script.Shots, target)
+}
+
+func isRecoverableSpeechValidationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "口播") && (strings.Contains(message, "不要超过") || strings.Contains(message, "应写") || strings.Contains(message, "至少写一句"))
 }
 
 func workflowScriptBody(model string, payload map[string]any, catalog []CatalogImage, target int, ratio string) map[string]any {
-	system := salesScriptRules() + `
-这是 workflowVersion:3：仅服饰、鞋、包：选图后分析→脚本及素材计划→按需生图→人工确认素材→实际图定稿→一次生成一条整段视频。分镜是整段时间轴，不是逐镜头提交任务。
-每套 script 必须有 deliveryMode:"single" 和 assets 数组；按脚本实际需要规划1至4张静帧，禁止每个分镜机械生成一张，禁止强制人物或人脸。不需要预先提供人物图片、视频模型或视频参数。
-assets 元素格式：{"id":"scene_1","kind":"person|face|scene|keyframe","label":"素材名称","prompt":"可直接绘图的中文静帧提示词","required":true,"referenceAssetIds":[],"usesProduct":false}。
-referenceAssetIds 只能依赖数组里已出现的素材ID，不能自引用、循环或未知引用。只有必须继承同一人物身份或具体空间时才建立依赖；有商品原图就直接引用商品原图，不要先重画平铺图再让上身图依赖平铺图。互不依赖的静帧应并行生成，不为相同商品建立多余的串行依赖。人脸可以依赖人物；同一人物、场景应复用。需要展示商品的静帧 usesProduct:true，尤其衣服上身图必须 usesProduct:true 并保持商品颜色、款式、版型、纹理，不得把商品事实当作创意改变。没有商品的纯人物或场景不要伪造商品依赖。
-需要展示商品的静帧 usesProduct:true，并填写 productImageIndexes 数组，使用下方实际可见且允许的商品目录原始编号，按这张静帧的目标视角选图；不得复用不相干分镜的选图。未使用商品的素材 productImageIndexes:[]。正面、背面和细节分别选择对应证据；若只有背面证据，就不要规划声称看得清正面胸前细节的素材。每张 prompt 明确唯一目标视角，并说明对应原图中可见的领口、图案或标志位置，未知细节不编造；相反视角只用于补充结构，不能当主视角。生成图不能作为商品事实覆盖原图，不把前序背面画面照搬为正面。每张仅生成单一静帧，不输出正反拼图或多视图。
-商品颜色、款式、包装是事实，selectedColor 是目标颜色事实，不可与其他颜色混用。未知卖点不编造。口播的使用效果只能复述已有资料或knownFacts的明确证据，不能由罗纹、材质比例、厚度、图片外观推断穿着或实测结果；没有明确资料禁止写不闷、不往上滑、不缩水、不起球、保暖、不勒、透气、显瘦等效果断言，改写为可见结构、位置或穿搭建议。口播不要出现价格、金额或优惠。素材绘图提示词只描述一张实际照片，不含运镜、时长、字幕和口播。分镜口播有精确时间轴，视频模型生成声音，全程无字幕。
-每个分镜 duration 必须正整数，合计精确等于 targetDuration，totalDuration 也必须等于它，禁止近似、增加片尾或默默修正时长。不输出固定竖屏，不假设视频模型能力。`
+	system := salesSkillInstructions("script") + `
+当前执行 workflowVersion:3 的脚本与素材计划阶段。只返回一套 script，deliveryMode:"single"，分镜是整条视频的语义时间段。
+接口约束：assets 必须为1至4项数组，每项字段为 id、kind(person|face|scene|keyframe)、label、prompt、required、referenceAssetIds、usesProduct、productImageIndexes。依赖只能引用前序素材ID，不得循环、重复或使用 product- 保留前缀；face 必须依赖同一 person。usesProduct:true 时 productImageIndexes 必须从实际可见的商品原始目录编号选择，按本张目标视角选图，未知细节不编造；无商品素材填空数组。上身图 usesProduct:true。每张静帧只写本张要求，不输出整段时间轴。
+shots 每项 duration 为正整数，合计精确等于 targetDuration，totalDuration 也须精确等于它。声音来源 speechMode 每段明确，不得只改字段而在画面描述保留相反的说话方式。beat 取 unbox、lifestyle 或 accessory。visualSource 只能为 product_image 或 ai_generate，transition 为 direct_concat。
+不要选择商品分镜图，不输出 imageIndex；不要求用户预先上传人物或选择视频模型。只交付脚本、素材计划和发布文案，不输出最终 fullPrompt。`
 	category := generate.StringField(payload, "category")
-	low, high := fashionVoiceoverBudget(target)
-	system += "\n仅服饰品类遵循以下叙事，并在脚本 JSON 中输出 beat，取值为 unbox、lifestyle 或 accessory。\n" + fashionNarrativeRules() + "\n" + fashionStillRules() + "\n" + fashionCameraRules() + "\n" + fashionVoiceoverRules() + fmt.Sprintf("\n本次目标 %d 秒，口播汉字合计写 %d 到 %d 个，标点、数字、字母和省略号不计，不得少于 %d 个，也不得超过 %d 个。每一段至少一句能说完的话，不必写满同一密度，单段不超过约每秒 6 个字。卖点用口语说出来，不念论证箭头；口播和同一段画面是同一处。只锁定当前这一件。\n", target, low, high, low, high) + "服饰 videoMode 为 live_presenter 时让同一人物对镜头现场讲解，必须包含 on_camera 分镜，开场和收尾优先露脸说完整短句；product_closeup 是兼容保留的商品展示方式，不代表必须近景；它与 graphic_montage 都为商品展示，scene_demo 为手部或背影展示，这些无露脸模式全部使用 voiceover，不强加人脸。未指定 videoMode 时默认优先出镜人物讲解。根据具体脚本决定是否需要人物或人脸。锁定同一人物及当前这一件单品，衣服上身素材必须 usesProduct:true。"
-
-	system += "\nvoiceover 字段只存台词原文，不代表旁白；每段必须输出 speechMode，取值 on_camera（出镜人物说话）或 voiceover（画外音）。description 和 prompt 写清声音来源与可执行动作。\n" + salesSpeechRules()
+	system += fashionVoiceoverBudgetPrompt(target)
 	system += fashionPresentationRule(generate.StringField(payload, "videoMode"))
-
 	system += workflowScriptOutputExample(target, category, LimitVisionImages(catalog, 8), generate.StringField(payload, "videoMode"))
 	facts := map[string]any{"productName": payload["productName"], "category": category, "productDescription": payload["productDescription"], "productAnalysis": payload["productAnalysis"], "brand": payload["brand"], "selectedColor": payload["selectedColor"], "targetAudience": payload["targetAudience"], "videoMode": payload["videoMode"], "targetDuration": target, "aspectRatio": ratio}
 	encoded, _ := json.Marshal(facts)
@@ -152,36 +170,34 @@ func workflowScriptOutputExample(target int, category string, catalog []CatalogI
 	}
 	script.Beat = "lifestyle"
 
-	var voiceovers []string
-	low, high := fashionVoiceoverBudget(target)
-	lead := "用一个场合或一件具体的事对镜头开口，把第一条事实嵌进去。"
-	tail := "把事实说成对镜头的话，不要写近看怎样、走远怎样"
+	lead := salesSkillDirective("scriptExample", "lead")
+	tail := salesSkillDirective("scriptExample", "tail")
 	if !presenter {
-		lead = "用一个场合或一件具体的事用画外音自然开口，把第一条事实嵌进去。"
-		tail = "全程使用画外音配合商品或无露脸展示，不要写近看怎样、走远怎样"
+		lead = salesSkillDirective("scriptExample", "leadVoiceover")
+		tail = salesSkillDirective("scriptExample", "tailVoiceover")
 	}
-	span := fmt.Sprintf("全片汉字合计 %d 到 %d 个。本段至少一句口语，不必写满；单段不超过约每秒 6 个字。%s", low, high, tail)
-	voiceovers = []string{
-		"开场须直接可念：" + lead + span,
-		"中段须直接可念：换装或转身可以少说，只讲这一镜正在看的那一处，禁止只用精致、好看、高级或百搭。" + span,
-		"收尾须直接可念：用另一条事实说清怎么穿、什么时候穿，可以征求意见。禁止就看这一件、可以直接入手、简单好搭、值得入、基础百搭、闭眼入。" + span,
+	voiceovers := []string{lead + tail}
+	types := []string{"hook"}
+	durations := []int{target}
+	if target >= 10 {
+		opening := target * 3 / 10
+		durations = []int{opening, target - opening*2, opening}
+		types = []string{"hook", "detail", "closing"}
+		voiceovers = []string{lead, tail, salesSkillDirective("scriptExample", "closing")}
 	}
-
-	durations := []int{target / 3, target / 3, target - 2*(target/3)}
 	for i, duration := range durations {
+		low, high := fashionPreferredVoiceoverBudget(duration)
+		voiceover := fmt.Sprintf("本段约 %d–%d 个汉字，直接输出可念的台词，不输出这些编写说明：%s", max(low, installedSalesSkill.SpeechLimits.MinShotHan), max(high, installedSalesSkill.SpeechLimits.MinShotHan), voiceovers[i])
 		script.Shots = append(script.Shots, ScriptShot{
-			ShotId: i + 1, Type: []string{"hook", "detail", "closing"}[i], Duration: duration,
-			Description: "依照商品事实描述本段连续画面", Camera: "缓慢推近", VisualSource: "ai_generate",
-			Transition: "direct_concat", SpeechMode: "voiceover", Voiceover: voiceovers[i], Prompt: "连续实拍画面提示词，包含本段口播原文和声音，无字幕",
+			ShotId: i + 1, Type: types[i], Duration: duration,
+			Description: salesSkillDirective("scriptExample", "description"), Camera: salesSkillDirective("scriptExample", "camera"), VisualSource: "ai_generate",
+			Transition: "direct_concat", SpeechMode: "voiceover", Voiceover: voiceover, Prompt: salesSkillDirective("scriptExample", "prompt"),
 		})
-		script.Shots[i].Camera = "中全景，固定机位，保持正常展示距离"
-		script.Shots[i].Description = "在正常距离展示整件商品与穿搭比例，动作自然，商品和标志不靠近镜头"
-
-		if presenter && i != 1 {
+		if presenter {
 			script.Shots[i].SpeechMode = "on_camera"
-			script.Shots[i].Description = "同一人物头顶至腰部或大腿的正面中景对镜头亲口讲解，完整嘴部无遮挡，语句结束后再展示动作"
-			script.Shots[i].Camera = "中景，手机固定机位，保持距离，嘴部可见"
-			script.Shots[i].Prompt = "人物现场说出台词原文，发音与唇形逐字同步，停顿时自然停嘴，无字幕"
+			script.Shots[i].Description = salesSkillDirective("scriptExample", "presenterDescription")
+			script.Shots[i].Camera = salesSkillDirective("scriptExample", "presenterCamera")
+			script.Shots[i].Prompt = salesSkillDirective("scriptExample", "presenterPrompt")
 		}
 	}
 	example := workflowScriptResponse(script)
@@ -190,10 +206,10 @@ func workflowScriptOutputExample(target int, category string, catalog []CatalogI
 		indexes = append(indexes, catalog[0].Index)
 	}
 	var assetPrompt string
-	assetPrompt = "自然光下的一张生活实拍照片，正常距离展示整件商品及周围空间，保留轮廓与自然比例，不裁成局部或 logo 大画面，外观和颜色以商品原图为准"
+	assetPrompt = salesSkillDirective("scriptExample", "assetPrompt")
 
 	if presenter {
-		assetPrompt = "一张生活实拍静帧：出镜讲解者，写明按当前服装及目标人群选定的东亚成年角色、具体年龄、外貌及发型，保持同一身份，保留自然纹理的真实肤质；脚本里的具体房间，窗光从一侧进来，头顶至腰部或大腿的正面或轻微侧面中景，完整嘴唇清楚可见，手、手机、衣领和商品不遮嘴，表情自然放松。不含秒数、运镜和口播。若展示当前这一件，写清是举着还是已经穿上，外观与商品原图一致"
+		assetPrompt = salesSkillDirective("scriptExample", "presenterAssetPrompt")
 	}
 	example["assets"] = []map[string]any{{
 		"id": "scene_1", "kind": "scene", "label": "商品展示场景", "prompt": assetPrompt,

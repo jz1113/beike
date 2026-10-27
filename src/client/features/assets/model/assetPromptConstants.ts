@@ -1,6 +1,5 @@
 import { isPlaceholderIdentity } from '@shared/domain/workshop/workshop-pipeline';
 export {
-  OFFICIAL_REVERSE_SYSTEM_PROMPT,
   MIN_IMAGES_PER_SET,
   MAX_IMAGES_PER_SET,
 } from '@shared/domain/assets/asset-deconstruct/prompts';

@@ -36,6 +36,9 @@ function BatchProductImageTile({
       ? 'border-amber-500 ring-2 ring-amber-500/90 shadow-[0_0_18px_rgba(245,158,11,0.25)] dark:shadow-[0_0_22px_rgba(245,158,11,0.2)]'
       : 'border-indigo-600 ring-2 ring-indigo-500/90 shadow-[0_0_16px_rgba(99,102,241,0.2)] dark:shadow-[0_0_20px_rgba(99,102,241,0.15)]'
     : 'border-slate-200/80 hover:border-indigo-400/80 hover:shadow-lg hover:-translate-y-0.5 dark:border-white/10 dark:hover:border-indigo-500/60 dark:hover:shadow-black/50';
+  const imageTone = isChecked
+    ? 'opacity-100 saturate-100 brightness-100'
+    : 'opacity-55 saturate-50 brightness-75 group-hover:opacity-90 group-hover:saturate-100 group-hover:brightness-100';
 
   return (
     <div
@@ -44,8 +47,8 @@ function BatchProductImageTile({
         isChecked
           ? isPrimary
             ? '当前已设为 #1 主基准（点击取消）'
-            : `已选为参考图 #${selectedOrder + 1}（点击取消，或悬停设为主基准）`
-          : '点击选为参考素材'
+            : `已选商品图 #${selectedOrder + 1}（点击取消，或悬停设为主基准）`
+          : '点击选择商品图'
       }
     >
       <div className="w-full h-full flex items-center justify-center relative overflow-hidden">
@@ -54,15 +57,15 @@ function BatchProductImageTile({
           thumb={true}
           width={380}
           wrapperClassName="w-full h-full relative flex items-center justify-center bg-transparent"
-          className="max-w-full max-h-full object-contain transition-transform duration-300 ease-out group-hover:scale-105"
-          alt={`${typeLabel}，素材 ${imgIdx + 1}`}
+          className={`max-w-full max-h-full object-contain transition-[filter,opacity,transform] duration-200 ease-out group-hover:scale-105 ${imageTone}`}
+          alt={`${typeLabel}，商品图 ${imgIdx + 1}`}
         />
       </div>
 
       {/* 点击卡片主交互层 */}
       <button
         type="button"
-        aria-label={`${isChecked ? '取消选择' : '选择'}素材 ${imgIdx + 1}`}
+        aria-label={`${isChecked ? '取消选择' : '选择'}商品图 ${imgIdx + 1}`}
         aria-pressed={isChecked}
         onClick={onToggle}
         className="absolute inset-0 z-10 rounded-[inherit] cursor-pointer focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-[-2px]"
@@ -101,14 +104,14 @@ function BatchProductImageTile({
             ) : (
               <>
                 <Check className="w-2.5 h-2.5 stroke-[3]" />
-                <span>#{selectedOrder + 1} 参考</span>
+                <span>#{selectedOrder + 1} 商品图</span>
               </>
             )}
           </div>
         ) : (
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 px-2 py-0.5 rounded-lg bg-black/60 hover:bg-indigo-600 text-white text-[10px] font-semibold backdrop-blur-md shadow-xs flex items-center gap-1">
             <Plus className="w-3 h-3 stroke-[2.5]" />
-            <span>选为参考</span>
+            <span>选择商品图</span>
           </div>
         )}
       </div>

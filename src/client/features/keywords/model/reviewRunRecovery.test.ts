@@ -36,7 +36,6 @@ function setup(count: number) {
     shouldStop: () => stopped,
     requestStop: () => { stopped = true; },
     indices: new Map(queue.map((record, index) => [record.id, index])), versions: new Map(),
-    onWaiting: () => {},
     onDispatch: async () => {},
     onSuccess: async (rows) => {
       for (const row of rows) completed.set(row.id, (completed.get(row.id) ?? 0) + 1);

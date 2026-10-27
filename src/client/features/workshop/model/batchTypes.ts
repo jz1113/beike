@@ -49,6 +49,16 @@ export interface BatchCopywriting {
   tags?: string[];
 }
 
+export interface WorkshopContentPlan {
+  index: number;
+  total: number;
+  theme: string;
+  focus: string;
+  opening: string;
+  scene: string;
+  treatment: string;
+}
+
 export interface BatchProductItem {
   id: string;
   itemId: string;
@@ -68,6 +78,9 @@ export interface BatchProductItem {
   fromCache?: boolean;
   apiUsed?: string;
   selected: boolean;
+  contentPlan?: WorkshopContentPlan;
+  importCategory?: string;
+  importSourceRows?: number[];
 
   // 全量分类图片池
   allTypedImages: TypedProductImage[];

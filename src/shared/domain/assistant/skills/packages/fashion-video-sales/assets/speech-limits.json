@@ -1,0 +1,16 @@
+{
+  "minRate": 2.4,
+  "maxRate": 6.5,
+  "preferredMaxRate": 6,
+  "shotMaxRate": 8,
+  "minShotHan": 6,
+  "disallowedPhrases": [
+    "就看这一件",
+    "可以直接入手",
+    "简单好搭",
+    "值得入",
+    "基础百搭",
+    "闭眼入"
+  ],
+  "preferredMinRate": 5
+}

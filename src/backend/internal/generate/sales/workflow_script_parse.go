@@ -87,24 +87,68 @@ func scriptList(root map[string]any) []any {
 }
 
 func scriptJSONObject(content string) ([]byte, bool) {
-	text := strings.TrimSpace(content)
+	text := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(content), "\ufeff"))
 	if raw, ok := jsonObjectBytes(text); ok {
 		return raw, true
+	}
+	if json.Valid([]byte(text)) || strings.HasPrefix(text, "[") {
+		return nil, false
 	}
 	stripped := stripMarkdownFence(text)
 	if raw, ok := jsonObjectBytes(stripped); ok {
 		return raw, true
 	}
-	start := strings.Index(stripped, "{")
-	end := strings.LastIndex(stripped, "}")
-	if start < 0 || end <= start {
+	if json.Valid([]byte(stripped)) || strings.HasPrefix(stripped, "[") {
 		return nil, false
 	}
-	return jsonObjectBytes(stripped[start : end+1])
+	// Scan complete outer objects so braces in dialogue do not cut the JSON.
+	// Multiple complete answers are ambiguous; never silently choose one.
+	var found []byte
+	depth, start := 0, 0
+	quoted, escaped := false, false
+	for i := 0; i < len(stripped); i++ {
+		c := stripped[i]
+		if depth == 0 {
+			if c != '{' {
+				continue
+			}
+			start, depth, quoted, escaped = i, 1, false, false
+			continue
+		}
+		if quoted {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == '"' {
+				quoted = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			quoted = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				if raw, ok := jsonObjectBytes(stripped[start : i+1]); ok {
+					if found != nil {
+						return nil, false
+					}
+					found = raw
+				}
+			}
+		}
+	}
+	return found, found != nil && depth == 0
 }
 
 func jsonObjectBytes(text string) ([]byte, bool) {
 	var value any
+	// Removing trailing commas is a syntax-only repair outside quoted strings.
+	text = removeSalesTrailingCommas(text)
 	if json.Unmarshal([]byte(text), &value) != nil {
 		return nil, false
 	}
@@ -112,6 +156,35 @@ func jsonObjectBytes(text string) ([]byte, bool) {
 		return nil, false
 	}
 	return []byte(text), true
+}
+
+func removeSalesTrailingCommas(text string) string {
+	var out strings.Builder
+	quoted, escaped := false, false
+	for i := 0; i < len(text); i++ {
+		c := text[i]
+		if quoted {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == '"' {
+				quoted = false
+			}
+		} else if c == '"' {
+			quoted = true
+		} else if c == ',' {
+			next := i + 1
+			for next < len(text) && strings.ContainsRune(" \t\r\n", rune(text[next])) {
+				next++
+			}
+			if next < len(text) && (text[next] == '}' || text[next] == ']') {
+				continue
+			}
+		}
+		out.WriteByte(c)
+	}
+	return out.String()
 }
 
 func stripMarkdownFence(content string) string {

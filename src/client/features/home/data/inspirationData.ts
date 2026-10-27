@@ -1,12 +1,14 @@
 import {OUTFIT_VIDEO_INSPIRATION} from './outfitVideoInspiration';
 import {FEATURED_VIDEO_INSPIRATIONS} from './featuredVideoInspirations';
 import {GPT_IMAGE_2_GENERATED_ITEMS} from './gptImageGeneratedItems';
+import {WORKBOOK_GENERATED_ITEMS} from './workbookGeneratedItems';
 import {IMPORTED_VIDEO_INSPIRATIONS} from './importedVideoInspirations';
 import {IMPORTED_IMAGE_INSPIRATIONS} from './importedImageInspirations';
-import type { InspirationItem } from '../components/inspiration/InspirationModal';
+import type { InspirationItem } from '../model/inspirationItem';
 
 // 高美感商用爆款案例库（100% 真实 AI 旗舰模型生成）
-const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
+export const INSPIRATION_ITEMS: InspirationItem[] = [
+  ...WORKBOOK_GENERATED_ITEMS,
   ...GPT_IMAGE_2_GENERATED_ITEMS,
   OUTFIT_VIDEO_INSPIRATION,
   ...FEATURED_VIDEO_INSPIRATIONS,
@@ -65,10 +67,9 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
         badge: '官方精选'
       },
       date: '2026-08-16 | 内容由 AI 生成',
-      aspectRatio: '3:4',
+      aspectRatio: '9:16',
       model: 'doubao-seedance-2.5',
       quality: '720P',
-      storyboardPresetId: 'lifestyle-4shot',
     },
     {
       id: 'item-video-shadow-puppet-wusong-tiger',
@@ -101,43 +102,6 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       aspectRatio: '16:9',
       model: 'doubao-seedance-2-0-260128',
       quality: '720P',
-      storyboardPresetId: 'lifestyle-4shot',
-    },
-    {
-      id: 'item-1',
-      isBanner: true,
-      category: 'illustration',
-      tag: '🔥 热门推荐',
-      title: '东方丧彪猫 · 极简主义情感素描美学',
-      prompt: '极简主义素描风格，空气感强，松散的细密长线条，精致的涂抹，形式多变，写意，细节敲定，情愫流连，叠加态，神秘感，非常规不对称构图，动态模糊，抽象，标新立异，震撼，意境，大幅留白，高对比度黑色，空灵的氛围，夸张的比例，褪色的边缘，手绘的不完美，最小的阴影，光密度梯度，梦幻般的构图，平静的负空间，情感艺术素描美学，猫，丧彪，东方，极繁，全身入镜。',
-      image: '/inspirations/insp_1.jpg',
-      storyboardPresetId: 'single-shot',
-    },
-    {
-      id: 'item-2',
-      category: 'illustration',
-      tag: '奇幻插画',
-      title: 'Dan Gartman 风格 · 极简神秘插画',
-      prompt: 'Dan Gartman风格插画，极简主义，奇幻插画，不对称构图。神秘阴暗，极致细节，传统色彩高饱和的融合对比碰撞来搭配，oc渲染，神秘，孤寂，留白，震撼，超高清画质，无文字。',
-      image: '/inspirations/insp_2.jpg',
-      storyboardPresetId: 'single-shot',
-    },
-    {
-      id: 'item-3',
-      category: 'photo',
-      tag: '治愈禅意',
-      title: '雨中小和尚 · 荷叶撑伞微距漫步',
-      prompt: '以微距的视角，生成一幅简约透明的白色线条人物，下雨天，一个小和尚（缩小迷你版），手上撑着一片荷叶挡雨，孤独在雨中漫步，背后有小白兔小鸡跟着，实景清晰，背景虚化，禅意、治愈系，人物小点',
-      image: '/inspirations/insp_3.jpg',
-      storyboardPresetId: 'single-shot',
-    },
-    {
-      id: 'item-4',
-      category: 'illustration',
-      tag: '先锋前卫',
-      title: '丝网印波斯猫 · 先锋极简抽象点绘',
-      prompt: '创意想象，极简，大幅留白，先锋前卫，极简抽象，抽象的简约形态，由极少几个关键元素构成强烈视觉焦点，简约氛围，丝网印刷的点绘效果突出极简质感，艺术风格明显，波丝猫，无文字。',
-      image: '/inspirations/insp_4.jpg',
     },
     {
       id: 'item-5',
@@ -154,14 +118,6 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       title: '国风妖孽帅哥 · 超写实角色设定三视图',
       prompt: '人物形象提示词：（三视图） 1.主视觉区 (上方)以 "正面 + 侧面 + 背面" 三个核心视角为主体，直观呈现角色的整体身形、服饰搭配和标志性特征，是制作人员对人物 "整体造型" 的参考基础。 2.补充信息区 (左侧)拆分出 "面部特写" 和 "配色板"(明确毛发、服饰的色值)，补充主视角没覆盖的细节与色彩标准。 3.局部细节区 (底部)用小模块单独展示关键部件的设计 (配饰、点缀、关键身份识别元素)，把主视角里的 "模糊细节" 拆分为精准的制作参考，方便导演确认。 4.全身照比例照 (右侧)使用黄金比例参考物和人物身高形成对比。 5.背景为白色，最高品质细节丰富。 6【真人写实】超写实国风，现代风格，写实风格，质感光照，自然光线，质感十足，8K高清纹理，布料褶皱自然，艺术写实风格，营造出震撼的视觉效果。',
       image: '/inspirations/insp_6.jpg',
-    },
-    {
-      id: 'item-7',
-      category: 'illustration',
-      tag: '微景观',
-      title: '春日微景观 · 3D厚涂奔跑小狗插画',
-      prompt: '厚涂风格，3D，微景观，厚涂，厚薄不同塑造立体感，俯视图，居中斜构图的一抹不规则的厚厚的草绿色闪光颜料，上面（可爱的小狗汪汪队，奔跑的小狗，云彩，花朵小草，小鸟），极简俯视图，画面底部写着纤细艺术字“Spring is coming”，*大面积留白*，白色纸张纹理背景。',
-      image: '/inspirations/insp_7.jpg',
     },
     {
       id: 'item-8',
@@ -196,14 +152,6 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       image: '/inspirations/insp_11.jpg',
     },
     {
-      id: 'item-12',
-      category: '3d',
-      tag: '3D潮玩',
-      title: '毛绒哆啦A梦 · 极端透视Q萌翻白眼特写',
-      prompt: '绒毛材质，极端透视，干净白背景，3D渲染，极简，Q萌，艺术性，光线追踪，朦胧感，光影加重，硕大的胖嘟嘟的哆啦A梦背部特写，扭头，翻白眼，皮毛质感纹理。',
-      image: '/inspirations/insp_12.jpg',
-    },
-    {
       id: 'item-13',
       category: 'ecommerce',
       tag: '复古穿搭',
@@ -228,22 +176,6 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       image: '/inspirations/insp_15.jpg',
     },
     {
-      id: 'item-16',
-      category: 'photo',
-      tag: '宿命梦核',
-      title: '宿命梦核 · 绿意春日烂漫光影叙事',
-      prompt: '宿命感，故事感，be，有创意性，艺术气息，风格模糊 梦核感，绿色系，树枝茂密，蓝天，光影斑斓，气质，超高清画质，细节丰富，精致感强，朦胧，极致超清，极致细节，春天，高质量，极致细节，温柔透明，阳光普照，极致烂漫，极致宿命感，悲剧感',
-      image: '/inspirations/insp_16.jpg',
-    },
-    {
-      id: 'item-17',
-      category: 'illustration',
-      tag: '单线写意',
-      title: 'Adam Riches 艺术风格 · 连续单线抽离群像',
-      prompt: 'Adam Riches艺术风格，以单线连续绘画为语言，让彩色圆珠笔在纸上游走成即兴的线条集合，单线条时而密集，时而疏朗，这些看似无序的轨迹，堆叠，最终在画布上随性勾勒出抽象群体，画风写意，皆由线条的韵律叙事，构建抽象暗黑空间，重组出平面线条的立体感，人文写实大师，复杂光影与层叠构图，混乱中藏着精准叙事，艺术性，高级感，意境，艺术性大幅留白，自然百态。',
-      image: '/inspirations/insp_17.jpg',
-    },
-    {
       id: 'item-29',
       category: 'ecommerce',
       tag: '美妆直播',
@@ -260,22 +192,6 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       image: '/inspirations/insp_18.jpg',
     },
     {
-      id: 'item-19',
-      category: 'illustration',
-      tag: '梵高油画',
-      title: '梵高油画英短猫 · 格子头巾Q萌插画',
-      prompt: '油画，梵高风格作品，欧美艺术插画，绘本插画，一只戴着蓝白色格子花头巾的猫咪，猫咪品种是英短猫，笔触细腻，油画笔触明显，写意，极简，猫咪的脸圆嘟嘟，表情震惊但是很可爱，超近景手绘插图，Q版。淡紫色背景。',
-      image: '/inspirations/insp_19.jpg',
-    },
-    {
-      id: 'item-20',
-      category: 'illustration',
-      tag: '唯美水彩',
-      title: '慕夏风黑猫芍药 · 水彩透叠宁静插画',
-      prompt: '慕夏风格插画，线条感通透，主角是黑色猫咪，水彩透叠， 颜色淡雅和谐。清新淡雅脱俗，色调温馨柔和，营造出一种宁静，愉快的氛围、故事感，完美构图，超多逼真细节，高清，超清，粉白芍药，大师级构图，大师级绘画水准精雕细琢，唯美精致浪漫',
-      image: '/inspirations/insp_20.jpg',
-    },
-    {
       id: 'item-21',
       category: 'ecommerce',
       tag: '七夕刺绣',
@@ -290,23 +206,6 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       title: '法式欧包新品 · 烘焙商业美食海报',
       prompt: '法式欧包新品海报 竖版烘焙新品商业海报，浅咖色干净纯色背景，法式经典烘焙主题，顶部文字 “全新上市、New Arrival”，居中大号金色手写字体标题「轻食欧包」；画面摆放四款欧包面包：抹茶青稞红豆碱水包、牛油果干酪巧心欧包、生巧乳酪碱水球、生椰咖啡干酪欧包，面包旁摆放咖啡豆，巧克力块，干酪；每个面包配有对应中英文字标签，画面最下方绿色英文标识 “Bakery”，柔和自然光，高清美食摄影，法式风格，画面干净柔和，细节清晰，4K，浅绿暖调，精细面包肌理 负面提示词 水印、模糊、畸变、多余杂物、混乱背景、错误文字、人物、强烈阴影、暗沉色调、面包造型崩坏、多余水印 logo',
       image: '/inspirations/insp_22.jpg',
-      storyboardPresetId: 'single-shot',
-    },
-    {
-      id: 'item-23',
-      category: 'illustration',
-      tag: '国风素描',
-      title: '赵云极简素描 · 东方意境空灵美学',
-      prompt: '极简主义素描风格，空气感强，松散的细密长线条，精致的涂抹，形式多变，写意，细节敲定，情愫流连，叠加态，神秘感，非常规不对称构图，动态模糊，抽象，标新立异，震撼，意境，大幅留白，高对比度黑色，空灵的氛围，夸张的比例，褪色的边缘，手绘的不完美，最小的阴影，光密度梯度，梦幻般的构图，平静的负空间，情感艺术素描美学，赵云，东方，极繁，人物全身入镜。',
-      image: '/inspirations/insp_23.jpg',
-    },
-    {
-      id: 'item-24',
-      category: '3d',
-      tag: '先锋特写',
-      title: '明代锦衣卫 · Armin Hofmann 极简特写',
-      prompt: 'Armin Hofmann风格，一幅超高清的特写画面：在极度深蓝的背景里，夸张抽象变形的东方神秘黑衣明代锦衣卫指挥使，高鼻梁，丹凤眼，容颜绝美，五官精致立体，身穿深蓝色飞鱼服，神秘、威严的氛围。仰角拍摄，酷炫风格。聚焦人物面部，使其从黑暗中窥视着世界。高品质细节，超精细，高分辦率，最佳品质，C4D，32K壁纸，eyes half closin the dark, in the style of Roberto Ferri and Hajime Sorayama',
-      image: '/inspirations/insp_24.jpg',
     },
     {
       id: 'item-25',
@@ -333,29 +232,3 @@ const ALL_INSPIRATION_ITEMS: InspirationItem[] = [
       image: '/inspirations/insp_27.jpg',
     }
   ];
-
-// Removed from the home inspiration gallery per the curated visual cleanup.
-const REMOVED_INSPIRATION_IDS = new Set([
-  'item-1',
-  'item-2',
-  'item-3',
-  'item-4',
-  'item-7',
-  'item-12',
-  'item-16',
-  'item-17',
-  'item-19',
-  'item-20',
-  'item-23',
-  'item-24',
-  'imported-image-jay-collab-02',
-  'imported-image-jay-collab-03',
-  'imported-image-jay-collab-04',
-  'imported-image-jay-collab-06',
-  'imported-image-jay-collab-08',
-  'imported-image-jay-collab-10',
-]);
-
-export const INSPIRATION_ITEMS: InspirationItem[] = ALL_INSPIRATION_ITEMS.filter(
-  item => !REMOVED_INSPIRATION_IDS.has(String(item.id)),
-);

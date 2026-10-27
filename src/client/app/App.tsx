@@ -39,9 +39,7 @@ const GenerateWorkspace = lazyWithRetry(() => import('@client/features/generate/
 const WorkshopStudio = lazyWithRetry(() => import('@client/features/workshop/WorkshopStudio'));
 const PosterStudio = lazyWithRetry(() => import('@client/features/poster/PosterStudio'));
 const KeywordsStudio = lazyWithRetry(() => import('@client/features/keywords/KeywordsStudio'));
-const PptStudio = lazyWithRetry(() => import('@client/features/ppt/PptStudio'));
 const SalesStudio = lazyWithRetry(() => import('@client/features/sales/SalesStudio'));
-const AvatarStudioView = lazyWithRetry(() => import('@client/features/avatar/AvatarStudioView'));
 const AssetCenter = lazyWithRetry(() => import('@client/features/assets/components/AssetCenter'));
 const AssetPromptLibrary = lazyWithRetry(() => import('@client/features/assets/components/library/AssetPromptLibrary'));
 const SkillsWorkspaceView = lazyWithRetry(() => import('@client/features/skills/SkillsWorkspaceView'));
@@ -148,7 +146,7 @@ export default function App() {
   // 🌟 画布独立全屏工作台：进入项目后隐藏全局 Sidebar，呈现完全独立的画板创作界面
   const activeCanvasProjectId = useCanvasStore((s) => s.activeProjectId);
   const isCanvasFullscreen = currentView === 'canvas' && !!activeCanvasProjectId;
-  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review' || currentView === 'video_sales' || currentView === 'avatar' || currentView === 'ppt_generator';
+  const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review' || currentView === 'video_sales';
   const isDedicatedFullscreen = isCanvasFullscreen || isWorkshopFullscreen;
 
   useEffect(() => {
@@ -241,9 +239,7 @@ export default function App() {
                       onEnterWorkshop={enterOriginalWorkshop}
                       onOpenHeadlinePoster={enterHeadlinePoster}
                       onOpenKeywordReview={() => setCurrentView('keyword_review')}
-                      onOpenPptGenerator={() => setCurrentView('ppt_generator')}
                       onOpenVideoSales={() => setCurrentView('video_sales')}
-                      onOpenAvatarStudio={() => setCurrentView('avatar')}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
                       recentProjects={<CanvasRecentProjects lead="square" onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
@@ -297,23 +293,12 @@ export default function App() {
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="ppt_generator" currentView={pageView}>
-                  <AppErrorBoundary title="PPT异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <PptStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
-                  </AppErrorBoundary>
-                </ViewKeepAlivePanel>
-
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
                   <AppErrorBoundary title="电商视频异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
                     <SalesStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
-                <ViewKeepAlivePanel view="avatar" currentView={pageView}>
-                  <AppErrorBoundary title="数字人异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <AvatarStudioView onBackToHome={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
-                  </AppErrorBoundary>
-                </ViewKeepAlivePanel>
               </Suspense>
             </main>
           </div>

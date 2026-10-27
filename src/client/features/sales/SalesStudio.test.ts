@@ -21,7 +21,7 @@ const base = {
   state: { ...defaultSalesStudioState, scripts: [script] },
   isCollecting: false, isUploading: false, isPlanning: false, isPreparingAssets: false, isFinalizing: false, isRendering: false,
   planPhase: null, renderPhase: null, error: null as string | null, videoError: null as string | null, videoSubmitError: null as string | null,
-  updateState: vi.fn(), resetProject: vi.fn(), runPlan: vi.fn(), runAssets: vi.fn(), runFinalize: vi.fn(), runRender: vi.fn(), stopRender: vi.fn(),
+  updateState: vi.fn(), resetProject: vi.fn(), runPlan: vi.fn(), runAssets: vi.fn(), runFinalize: vi.fn(), runRender: vi.fn(), stopRender: vi.fn(), stopWork: vi.fn(),
   runProductCollect: vi.fn(), markImageUnavailable: vi.fn(), addProductImages: vi.fn(), editShot: vi.fn(), editAssetPrompt: vi.fn(), editFullPrompt: vi.fn(), retryShot: vi.fn(),
 };
 function render(patch: Partial<typeof base> = {}) {
@@ -31,6 +31,17 @@ function render(patch: Partial<typeof base> = {}) {
 beforeEach(() => { panelWidth.wide = false; vi.clearAllMocks(); });
 
 describe('sales studio integration', () => {
+  it('uses one result-stage progress display without a global result Dock', () => {
+    const html = render({ isRendering: true, state: { ...base.state,
+      scripts: [{ ...script, renderTaskId: 'receipt', renderStatus: 'generating' }],
+      workspaceNavigation: { step: 'result', lastCreativeStep: 'video' },
+    } });
+    expect(html).toContain('sales-result-workspace has-storyboard');
+    expect(html).not.toContain('<footer');
+    expect(html.match(/正在生成视频…/g)).toHaveLength(1);
+    expect(html.match(/停止继续提交/g)).toHaveLength(1);
+    expect(html).not.toContain('正在提交视频任务');
+  });
   it.each([true, false])('shows the outline and actual video materials when wide=%s', (wide) => {
     panelWidth.wide = wide;
     const videoScript: VideoSalesScript = { ...script,
@@ -42,16 +53,17 @@ describe('sales studio integration', () => {
       imageCatalog: [{ index: 0, role: 'main', url: '/product.jpg' }, { index: 1, role: 'detail', url: '/unused.jpg' }],
       colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg', '/unused.jpg'], excludedImageUrls: [] },
     } });
-    const summary = wide ? html.slice(html.indexOf('<aside'), html.indexOf('</aside>')) : html.slice(html.indexOf('创作与生成结果'), html.indexOf('最终完整视频提示词'));
+    const summary = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
     expect(summary).toContain('aria-label="脚本大纲"');
     expect(summary).not.toContain('待准备素材');
-    expect(summary).toContain('aria-label="生成素材"');
+    expect(summary).not.toContain('aria-label="生成素材"');
     expect(summary).toContain('已确认');
-    expect(summary).toContain('aria-label="整体使用素材"');
-    const materials = summary.slice(summary.indexOf('aria-label="整体使用素材"'));
-    expect(materials).toContain('图片 1');
-    expect(materials).toContain('图片 2');
-    expect(materials).not.toContain('图片 3');
+    expect(summary).not.toContain('aria-label="整体使用素材"');
+    expect(summary).toContain('aria-label="使用素材"');
+    const materials = summary.slice(summary.indexOf('aria-label="使用素材"'));
+    expect(materials).toContain('图片1');
+    expect(materials).not.toContain('AI生成');
+    expect(materials).not.toContain('图片3');
     expect(materials).toContain('/product.jpg');
     expect(materials).toContain('/person.jpg');
     expect(materials).not.toContain('/unused.jpg');
@@ -77,7 +89,7 @@ describe('sales studio integration', () => {
     expect(html).toContain('口播与画面时间轴');
     expect(html).toContain('选择历史方案');
     expect(html).toContain('历史脚本');
-    expect(html.indexOf('历史方案与任务')).toBeLessThan(html.indexOf('商品采集与前置设置'));
+    expect(html.indexOf('历史方案与任务')).toBeLessThan(html.indexOf('商品信息与分镜'));
   });
   it('shows the distinction between a speaking presenter and voiceover', () => {
     const speaking = { ...script, shots: [{ ...script.shots[0], speechMode: 'on_camera' as const }, { ...script.shots[0], shotId: 2, speechMode: 'voiceover' as const }] };
@@ -94,12 +106,12 @@ describe('sales studio integration', () => {
   it('renders one footer and starts pending scripts at the script stage', () => {
     const html = render();
     expect(html.match(/<footer\b/g)).toHaveLength(1);
-    expect(html.slice(0, html.indexOf('</header>'))).not.toContain('aria-current="step"');
-    expect(html).toContain('aria-label="返回商品资料"');
+    expect(html.slice(0, html.indexOf('</header>')).match(/aria-current="step"/g)).toHaveLength(1);
+    expect(html).toContain('商品与卖点');
     expect(html).toContain('口播与画面时间轴');
     expect(html).not.toContain('等待生成成片');
   });
-  it('keeps an invalid saved prompt from being submitted after removing the step strip', () => {
+  it('keeps an invalid saved prompt from being submitted through step navigation', () => {
     const state = { ...structuredClone(defaultSalesStudioState), productName: '商品',
       workspaceNavigation: { step: 'video' as const, lastCreativeStep: 'video' as const },
       imageCatalog: [{ index: 0, role: 'main' as const, url: '/product.jpg' }],
@@ -130,16 +142,16 @@ describe('sales studio integration', () => {
     expect(html).toContain('当前视频模型不支持所选参考模式');
     expect(base.runFinalize).not.toHaveBeenCalled();
   });
-  it.each(['product', 'plan', 'assets', 'video', 'result'] as const)('keeps %s reachable with contextual actions and no step strip', (step) => {
+  it.each(['product', 'plan', 'assets', 'video', 'result'] as const)('keeps %s reachable with contextual actions and the shared stepper', (step) => {
     const html = render({ state: { ...base.state,
       scripts: [{ ...script, renderTaskId: 'receipt', renderStatus: 'generating' }],
       workspaceNavigation: { step, lastCreativeStep: step === 'product' ? 'video' : step },
     } });
-    expect(html).not.toContain('带货制作五步');
-    expect(html.slice(0, html.indexOf('</header>'))).not.toContain('aria-current="step"');
+    expect(html).toContain('aria-label="电商视频制作步骤"');
+    expect(html.slice(0, html.indexOf('</header>')).match(/aria-current="step"/g)).toHaveLength(1);
     expect(html).toContain(step === 'result' ? '返回视频生成' : 'aria-label="查看生成结果"');
-    if (step === 'plan') expect(html).toContain('aria-label="返回商品资料"');
-    if (step === 'video') expect(html).toContain('aria-label="返回素材补齐"');
+    if (step === 'plan') expect(html).toContain('商品与卖点');
+    if (step === 'video') expect(html).toContain('素材准备');
     if (step === 'assets') expect(html).toContain('去更新卖点与脚本');
     if (step === 'product') expect(html).toContain('返回原创作阶段');
   });

@@ -37,6 +37,8 @@ export function restoreWorkbookProgress(workbook: XLSX.WorkBook, records: Keywor
       const record = byId.get(`${sheetName}:${rowNumber}`);
       if (!record || record.query !== query) continue;
       if (sheet.A1.v === STATE_MARKER && value(5) !== inputSignature(record)) continue;
+      // A valid verdict can be filled in after exporting an uncertain request.
+      if (record.status === 'done') continue;
       // Older exports did not save contextual inputs. Keep their unknown charges quarantined conservatively.
       record.status = 'error';
       record.submissionUncertain = true;

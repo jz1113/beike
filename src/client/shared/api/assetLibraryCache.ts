@@ -26,6 +26,9 @@ const store: GlobalAssetStore = {
   isLoaded: false,
 };
 
+// The production preload is slim; browsing needs complete preview fields.
+const categoryStore = new Map<AssetSubTab, AssetLibrarySlim[]>();
+
 let inFlightPromise: Promise<GlobalAssetStore> | null = null;
 /** 每次 invalidate 递增；进行中的请求落库前须比对，防止过期响应覆盖新状态 */
 let cacheGeneration = 0;
@@ -102,6 +105,8 @@ export async function getGlobalAssetLibrary(force = false): Promise<GlobalAssetS
  * 同步快速获取当前内存中的资产，0ms 无等待
  */
 export function getCachedAssetsSync(tab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action'): AssetLibrarySlim[] {
+  const category = categoryStore.get(tab);
+  if (category) return category;
   if (tab === 'full_prompt') return store.fullPrompts;
   if (tab === 'persona') return store.personas;
   if (tab === 'outfit') return store.outfits;
@@ -148,7 +153,6 @@ export async function fetchAssetDetail(
 
 const categoryLoadedAt = new Map<AssetSubTab, number>();
 const categoryRequests = new Map<AssetSubTab, Promise<void>>();
-const categoryKeys = { persona: 'personas', outfit: 'outfits', scene: 'scenes', action: 'actions', full_prompt: 'fullPrompts' } as const;
 /** The library view loads its current category; workshop preload may still request all. */
 export async function getCategoryAssetLibrary(tab: AssetSubTab, force = false): Promise<void> {
   const generation = cacheGeneration;
@@ -165,10 +169,11 @@ export async function getCategoryAssetLibrary(tab: AssetSubTab, force = false): 
       if ((data.items || []).length < 100 || page * 100 >= data.total) break;
     }
     if (cacheGeneration === generation) {
-      store[categoryKeys[tab]] = [...collected.values()];
+      categoryStore.set(tab, [...collected.values()]);
       categoryLoadedAt.set(tab, Date.now());
     }
   })();
   categoryRequests.set(tab, request);
   try { await request; } finally { categoryRequests.delete(tab); }
+  if (generation !== cacheGeneration) await getCategoryAssetLibrary(tab);
 }

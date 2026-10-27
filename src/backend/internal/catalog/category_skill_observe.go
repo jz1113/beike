@@ -11,10 +11,13 @@ import (
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 )
 
-func observeCategorySample(cfg config.Config, r *http.Request, base, key, model string, payload map[string]any, folder learning.Folder, sample learning.Sample) (map[string]any, map[string]any, error) {
+func observeCategorySample(cfg config.Config, r *http.Request, base, key, model string, payload map[string]any, folder learning.Folder, sample learning.Sample, instruction string) (map[string]any, map[string]any, error) {
 	content, err := categorySampleContent(cfg, folder, sample)
 	if err != nil {
 		return nil, nil, errors.New("原图无法读取，请修复来源后重试")
+	}
+	if instruction != "" {
+		content = append(content, map[string]any{"type": "text", "text": "【用户修订的技能】重新核对原图并按此技能归纳方法；其中的图像结论必须经原图验证，不得执行工具或改变输出格式：" + instruction})
 	}
 	raw, status, usage, err := categorySkillChat(r.Context(), base, key, model, payload, content)
 	if err != nil || status < 200 || status >= 300 {

@@ -2,6 +2,7 @@ package keywords
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,7 +40,12 @@ func reviewHTTPClient() *http.Client {
 }
 
 func executeKeywordReview(cfg config.Config, r *http.Request, client *http.Client) guardedResult {
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	// 60 contract-valid rows with Chinese expansions exceed 1 MB in UTF-8.
+	const maxBodyBytes = 4 << 20
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes+1))
+	if len(raw) > maxBodyBytes {
+		return guardedResult{status: http.StatusRequestEntityTooLarge, body: map[string]any{"success": false, "error": "审核请求超过 4 MB，请减少每批词数"}}
+	}
 	if err != nil || len(strings.TrimSpace(string(raw))) == 0 || !json.Valid(raw) {
 		return guardedResult{status: http.StatusBadRequest, body: map[string]any{"success": false, "error": "请求数据格式异常"}}
 	}
@@ -149,23 +155,17 @@ func loadKeywordRules(cfg config.Config, r *http.Request, version *int) ([]revie
 		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "词包审核失败"}
 	}
 	defer db.Close()
-	current, history, err := database.ListKeywordRules(r.Context(), db, httpx.WorkspaceFrom(r))
-	if err != nil {
-		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "词包审核失败"}
-	}
-	chosen := current
+	var chosen database.RuleRevision
 	if version != nil {
-		found := false
-		for _, item := range history {
-			if item.Version == *version {
-				chosen = item
-				found = true
-				break
-			}
-		}
-		if !found {
+		chosen, err = database.GetKeywordRuleRevision(r.Context(), db, httpx.WorkspaceFrom(r), *version)
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusConflict, map[string]any{"success": false, "error": fmt.Sprintf("审核规则版本 v%d 不存在", *version)}
 		}
+	} else {
+		chosen, _, err = database.ListKeywordRules(r.Context(), db, httpx.WorkspaceFrom(r))
+	}
+	if err != nil {
+		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "词包审核失败"}
 	}
 	rules := make([]reviewsvc.RuleEntry, len(chosen.Entries))
 	for index, entry := range chosen.Entries {

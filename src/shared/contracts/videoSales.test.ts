@@ -45,7 +45,7 @@ describe('current fashion sales contracts', () => {
     for (const patch of [{ targetDuration: 16 }, { shots: [{ ...shots[0], speechMode: undefined }] }, { shots: [{ ...shots[0], imageIndex: 9 }] }, { actualReferences: [actualReferences[0], actualReferences[0]] }]) {
       expect(videoSalesFinalizeBodySchema.safeParse({ ...finalize, ...patch }).success).toBe(false);
     }
-    expect(videoSalesFinalizeResponseSchema.safeParse({ success: true, fullPrompt: '完整视频', prompts: [{ shotId: 1, prompt: '镜头定稿' }] }).success).toBe(true);
+    expect(videoSalesFinalizeResponseSchema.safeParse({ success: true, fullPrompt: '完整视频', prompts: [{ shotId: 1, speechMode: 'voiceover', prompt: '镜头定稿' }] }).success).toBe(true);
   });
 
   it('requires per-asset product evidence and ordered dependencies', () => {

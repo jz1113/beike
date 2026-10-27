@@ -18,17 +18,21 @@ import { getAssetPreviewText as getAssetPreviewTextHelper } from '../../model/as
 import { AssetLifecycleFilter } from '../filters/assetLibraryFilters';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import { buildAssetGalleryLabels, type GalleryAtomType } from '../../model/assetGalleryLabels';
-import { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders } from '../folders/PromptGroupCategoryFolders';
+import { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders, promptGroupSubcategoryOptions } from '../../model/promptGroupFolders';
+import { CategorySkillsDialog } from '../folders/CategorySkillsDialog';
 import { MovePromptGroupsDialog } from '../folders/MovePromptGroupsDialog';
 import { PromptAssetContextMenu } from '../folders/PromptAssetContextMenu';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
 
 import { AssetPromptLibraryGrid, isGalleryAtomType } from './AssetPromptLibraryGrid';
+import { AssetLibrarySelectionBar } from './AssetLibrarySelectionBar';
+import './assetLibrary.css';
+import './assetLibraryWorkspace.css';
 
 interface Props {
-  toolbarTarget?: HTMLElement | null;
-  onEnterWorkshop?: () => void;
   initialSubTab?: PromptAssetType;
+  initialSkillsOpen?: boolean;
+  navigationTarget?: HTMLElement | null;
 }
 
 function libraryItem(item: Record<string, unknown>): AssetLibrarySlim | null {
@@ -36,9 +40,10 @@ function libraryItem(item: Record<string, unknown>): AssetLibrarySlim | null {
   return { ...item, id: item.id } as AssetLibrarySlim;
 }
 
-export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, initialSubTab = 'full_prompt' }: Props) {
+export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', initialSkillsOpen = false, navigationTarget }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<PromptAssetType>(initialSubTab);
-  const [showCategoryFolders, setShowCategoryFolders] = useState(initialSubTab === 'full_prompt');
+
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
 
   // UI 交互状态
   const { categories: promptGroupCategories, albums: promptGroupAlbums, applyOrganization } = usePromptGroupCategories(true);
@@ -60,7 +65,6 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
   const {
     isLoading,
     loadError,
-    setIsLoading,
     items,
     setItems,
     isBatchMode,
@@ -111,16 +115,12 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     () => buildPromptGroupFolders(items, promptGroupCategories, promptGroupAlbums),
     [items, promptGroupCategories, promptGroupAlbums],
   );
-  const folderRootVisible = activeSubTab === 'full_prompt' && showCategoryFolders && promptGroupCategoryFilter === 'all' && !isBatchMode;
-  const subcategoryFoldersVisible = activeSubTab === 'full_prompt' && !showCategoryFolders
-    && promptGroupCategoryFilter !== 'all' && promptGroupCategoryFilter !== 'unclassified'
-    && promptGroupCategoryFilter !== 'universal' && promptGroupSubcategoryFilter === 'all' && !isBatchMode;
   const subcategoryFolders = useMemo(
     () => buildPromptGroupSubcategoryFolders(items, promptGroupCategories, promptGroupAlbums, promptGroupCategoryFilter),
     [items, promptGroupCategories, promptGroupAlbums, promptGroupCategoryFilter],
   );
   const currentFolderName = promptGroupCategoryFilter === 'all'
-    ? '全部母组'
+    ? '全部图组母本'
     : categoryFolders.find(folder => folder.id === promptGroupCategoryFilter)?.name
       || promptGroupCategories.find(category => category.id === promptGroupCategoryFilter)?.name
       || '待分类';
@@ -128,12 +128,12 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     const status = item.registry?.status || item.lifecycleStatus;
     return status && status !== 'published';
   });
-  useEffect(() => {
-    if (isBatchMode) setShowCategoryFolders(false);
-  }, [isBatchMode]);
-  useEffect(() => {
-    if (activeSubTab === 'full_prompt') setShowCategoryFolders(true);
-  }, [activeSubTab]);
+  const hasContentFilters = activeSubTab === 'full_prompt'
+    ? Boolean(selectedTag || lifecycleFilter !== 'all') : isAnyFilterActive;
+  const clearContentFilters = () => {
+    if (activeSubTab !== 'full_prompt') { handleResetAllFilters(); return; }
+    setSelectedTag(null); setLifecycleFilter('all');
+  };
   useEffect(() => {
     if (activeSubTab === 'persona' || activeSubTab === 'outfit') setSortBy('default');
   }, [activeSubTab, setSortBy]);
@@ -141,24 +141,10 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     setSelectedTag(null);
     setLifecycleFilter('all');
     setPromptGroupCategoryFilter(id);
-    setShowCategoryFolders(false);
     assetScrollRef.current?.scrollTo({ top: 0 });
   };
   const openSubcategoryFolder = (id: string) => {
     setPromptGroupSubcategoryFilter(id);
-    assetScrollRef.current?.scrollTo({ top: 0 });
-  };
-  const returnToSubcategoryFolders = () => {
-    setSelectedTag(null);
-    setLifecycleFilter('all');
-    setPromptGroupSubcategoryFilter('all');
-    assetScrollRef.current?.scrollTo({ top: 0 });
-  };
-  const returnToCategoryFolders = () => {
-    handleResetAllFilters();
-    setSortBy('default');
-    setPromptGroupCategoryFilter('all');
-    setShowCategoryFolders(true);
     assetScrollRef.current?.scrollTo({ top: 0 });
   };
   const galleryLabels = useMemo(
@@ -176,21 +162,19 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     openDetailItem,
   } = useAssetDetail({ activeSubTab });
 
-  // 资产增删改查与电商图文联动
+  // 学习素材管理
   const {
     editingItem,
     setEditingItem,
     tagEditItem,
     setTagEditItem,
     isUpdating,
-    handleClearAssets,
+    isDeleting,
     toggleFavorite,
     deleteAsset,
     handleBatchDelete,
-    handleDeduplicate,
     handleExportJsonBackup,
     handleImportJsonBackup,
-    handleApplyToWorkshop,
     handleSaveEdit,
     handleSaveTagEdit,
   } = useAssetCrud({
@@ -200,12 +184,10 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     selectedIds,
     setSelectedIds,
     setIsBatchMode,
-    setIsLoading,
     detailItem,
     setDetailItem,
     showToast,
     fetchAssets,
-    onEnterWorkshop,
   });
 
   const queueApi = useDeconstructQueue({
@@ -220,8 +202,14 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
   const xhsImport = useXhsBatchImport({ queueApi, showToast, onRefreshAssets: refreshAssets });
   const { folderInputRef, setShowDeconstructModal, processFilesOrFolders } = queueApi;
 
-  // 查看反推规格模态框
-  const [showPromptSpecModal, setShowPromptSpecModal] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(initialSkillsOpen);
+  const [browseTarget, setBrowseTarget] = useState<{ category: string; subcategory: string } | null>(null);
+  useEffect(() => {
+    if (!browseTarget || activeSubTab !== 'full_prompt') return;
+    setPromptGroupCategoryFilter(browseTarget.category);
+    setPromptGroupSubcategoryFilter(browseTarget.subcategory);
+    setBrowseTarget(null);
+  }, [browseTarget, activeSubTab, setPromptGroupCategoryFilter, setPromptGroupSubcategoryFilter]);
   const [groupPreview, setGroupPreview] = useState<{
     item: AssetLibrarySlim;
     listPosition?: number;
@@ -236,6 +224,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
   const [assetContextMenu, setAssetContextMenu] = useState<{ x: number; y: number } | null>(null);
   const selectionAnchorRef = useRef<string | null>(null);
   const clearAssetSelection = () => {
+    selectionAnchorRef.current = null;
     setAssetContextMenu(null);
     setSelectedIds([]);
     setIsBatchMode(false);
@@ -261,9 +250,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     return false;
   };
   useEffect(() => {
-    if (isBatchMode && selectedIds.length === 0) setIsBatchMode(false);
-  }, [isBatchMode, selectedIds.length, setIsBatchMode]);
-  useEffect(() => {
+    selectionAnchorRef.current = null;
     setAssetContextMenu(null);
     setSelectedIds([]);
     setIsBatchMode(false);
@@ -272,6 +259,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     if (!isBatchMode) return;
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !moveItems) {
+        selectionAnchorRef.current = null;
         setAssetContextMenu(null);
         setSelectedIds([]);
         setIsBatchMode(false);
@@ -296,7 +284,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
     if (!detail) { showToast('资产详情加载失败，请重试'); return; }
     action(detail);
   };
-  const getAssetPreviewText = (item: any) => getAssetPreviewTextHelper(item, activeSubTab);
+  const getAssetPreviewText = (item: Record<string, unknown>) => getAssetPreviewTextHelper(item, activeSubTab);
   const openGroupPreview = (item: AssetLibrarySlim, listPosition?: number) => {
     setOpenCardMenuId(null);
     setZoomImageUrl(null);
@@ -304,7 +292,7 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
   };
 
   return (
-    <div className="flex flex-col h-full bg-transparent text-slate-800 select-none dark:text-slate-100">
+    <div className="asset-library flex h-full min-h-0 min-w-0 flex-col bg-transparent text-slate-800 select-none dark:text-slate-100">
       {/* 浮动 Toast 提示 */}
       {toastMsg && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[130] px-4 py-2 bg-slate-900/90 text-white text-xs font-semibold rounded-2xl shadow-xl backdrop-blur-md animate-in fade-in duration-200">
@@ -313,9 +301,9 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
       )}
 
       <AssetLibraryToolbar
-        toolbarTarget={toolbarTarget}
-        hideSecondaryRow={(activeSubTab === 'full_prompt' && !isBatchMode) || activeSubTab === 'persona' || activeSubTab === 'outfit'}
-        audienceFilters={(activeSubTab === 'persona' || activeSubTab === 'outfit') && <AppearanceAudienceFilter type={activeSubTab} value={audienceFilter} onChange={setAudienceFilter} items={items} />}
+        navigationTarget={navigationTarget}
+        actionsTarget={actionsTarget}
+        hideSecondaryRow={activeSubTab === 'full_prompt' || activeSubTab === 'persona' || activeSubTab === 'outfit'}
         statusFilters={showLifecycleFilters && <AssetLifecycleFilter value={lifecycleFilter} onChange={setLifecycleFilter} items={items} />}
         activeSubTab={activeSubTab}
         setActiveSubTab={setActiveSubTab}
@@ -328,9 +316,8 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
         importJsonRef={importJsonRef}
         onImportJsonBackup={handleImportJsonBackup}
         onExportJsonBackup={handleExportJsonBackup}
-        onDeduplicate={handleDeduplicate}
-        onOpenPromptSpec={() => setShowPromptSpecModal(true)}
-        onClearAssets={handleClearAssets}
+        onOpenSkills={() => setSkillsOpen(true)}
+        onRefresh={refreshAssets} isLoading={isLoading}
         dynamicTagList={dynamicTagList}
         selectedTag={selectedTag}
         actionCategory={actionCategory}
@@ -355,24 +342,29 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
       />
 
 
-      {isBatchMode && selectedIds.length > 0 && <div className="px-6 py-1 text-[11px] text-indigo-600">
-        已选 {selectedIds.length} 项 · 右键操作，按 Esc 取消选择
-      </div>}
+      {isBatchMode && <AssetLibrarySelectionBar count={selectedIds.length} total={displayedItems.length}
+        itemLabel={activeSubTab === 'full_prompt' ? '组' : '项'}
+        allSelected={displayedItems.length > 0 && displayedItems.every(item => selectedIds.includes(item.id))}
+        canMove={activeSubTab === 'full_prompt'} busy={isUpdating || isDeleting}
+        onSelectAll={() => setSelectedIds(displayedItems.every(item => selectedIds.includes(item.id)) ? [] : displayedItems.map(item => item.id))}
+        onMove={() => setMoveItems(items.filter(item => selectedIds.includes(item.id)))}
+        onDelete={() => void handleBatchDelete()} onClose={clearAssetSelection} />}
 
       <AssetPromptLibraryGrid
+        onActionsTarget={setActionsTarget}
+        onOpenSkills={() => setSkillsOpen(true)}
+        audienceFilters={(activeSubTab === 'persona' || activeSubTab === 'outfit') && <AppearanceAudienceFilter type={activeSubTab} value={audienceFilter} onChange={setAudienceFilter} items={items} />}
         activeSubTab={activeSubTab} items={items} displayedItems={displayedItems}
         promptGroupCategories={promptGroupCategories} promptGroupAlbums={promptGroupAlbums}
-        categoryFolders={categoryFolders} subcategoryFolders={subcategoryFolders}
+        subcategoryFolders={subcategoryFolders}
         assetScrollRef={assetScrollRef} loadError={loadError} isLoading={isLoading}
-        folderRootVisible={folderRootVisible} subcategoryFoldersVisible={subcategoryFoldersVisible}
         promptGroupCategoryFilter={promptGroupCategoryFilter} promptGroupSubcategoryFilter={promptGroupSubcategoryFilter}
         currentFolderName={currentFolderName} isBatchMode={isBatchMode} selectedIds={selectedIds}
         openCardMenuId={openCardMenuId} copiedId={copiedId} galleryLabels={galleryLabels}
         showLifecycleFilters={showLifecycleFilters} lifecycleFilter={lifecycleFilter} setLifecycleFilter={setLifecycleFilter}
         dynamicTagList={dynamicTagList} selectedTag={selectedTag} setSelectedTag={setSelectedTag}
-        sortBy={sortBy} setSortBy={setSortBy} isAnyFilterActive={isAnyFilterActive}
+        sortBy={sortBy} setSortBy={setSortBy} hasContentFilters={hasContentFilters} clearContentFilters={clearContentFilters}
         resetKey={JSON.stringify([activeSubTab, selectedTag, promptGroupCategoryFilter, promptGroupSubcategoryFilter, actionCategory, actionSubCategory, actionShotScale, actionAnchor, sortBy, lifecycleFilter, audienceFilter])}
-        returnToCategoryFolders={returnToCategoryFolders} returnToSubcategoryFolders={returnToSubcategoryFolders}
         openCategoryFolder={openCategoryFolder} openSubcategoryFolder={openSubcategoryFolder}
         applyOrganization={applyOrganization} showToast={showToast} refreshAssets={refreshAssets}
         handleResetAllFilters={handleResetAllFilters} selectCard={selectCard} openGroupPreview={openGroupPreview}
@@ -383,7 +375,6 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
         withAssetDetail={withAssetDetail} handleCopyPrompt={handleCopyPrompt} getAssetPreviewText={getAssetPreviewText}
         setEditingItem={(item) => { const next = libraryItem(item); if (next) setEditingItem(next); }}
         setTagEditItem={(item) => { const next = libraryItem(item); if (next) setTagEditItem(next); }}
-        onUseLearningReference={id => { void withAssetDetail({ id }, detail => { const item = libraryItem(detail); if (item) handleApplyToWorkshop(item); }); }}
         deleteAsset={deleteAsset} onFeedReference={() => setShowDeconstructModal(true)}
       />
 
@@ -396,13 +387,19 @@ export default function AssetPromptLibrary({ onEnterWorkshop, toolbarTarget, ini
         onClose={() => setAssetContextMenu(null)}
       />}
 
+      {skillsOpen && <CategorySkillsDialog categories={promptGroupCategories} albums={promptGroupAlbums}
+        initialFolder={promptGroupSubcategoryOptions(promptGroupCategories, promptGroupCategoryFilter).find(option => option.id === promptGroupSubcategoryFilter)?.folderId}
+        onBrowse={(category, subcategory) => { setSkillsOpen(false); setActiveSubTab('full_prompt'); setBrowseTarget({ category, subcategory }); }}
+        onClose={() => setSkillsOpen(false)} onPreview={id => {
+          void fetchAssetDetail('full_prompt', id).then(detail => { const item = detail && libraryItem(detail); if (!item) throw new Error('来源图组不可用'); setSkillsOpen(false); openGroupPreview(item, item.displayNumber ?? undefined); }).catch(error => showToast(error instanceof Error ? error.message : '图组读取失败'));
+        }} />}
       <AssetLibraryDialogs
         activeSubTab={activeSubTab} copiedId={copiedId}
         promptGroupCategories={promptGroupCategories} promptGroupAlbums={promptGroupAlbums}
-        detail={{ item: detailItem, loading: detailLoading, imageIndex: detailActiveImageIndex, setItem: setDetailItem, setImageIndex: setDetailActiveImageIndex, onDelete: deleteAsset, onApply: handleApplyToWorkshop, getText: getAssetPreviewText }}
+        detail={{ item: detailItem, loading: detailLoading, imageIndex: detailActiveImageIndex, setItem: setDetailItem, setImageIndex: setDetailActiveImageIndex, onDelete: deleteAsset, getText: getAssetPreviewText }}
         edit={{ item: editingItem, setItem: setEditingItem, isUpdating, onSave: handleSaveEdit, tagItem: tagEditItem, setTagItem: setTagEditItem, onSaveTag: handleSaveTagEdit }}
         preview={{ group: groupPreview, setGroup: setGroupPreview, atom: atomicPreview, setAtom: setAtomicPreview, zoomUrl: zoomImageUrl, setZoomUrl: setZoomImageUrl, onCopy: handleCopyPrompt }}
-        panels={{ specOpen: showPromptSpecModal, setSpecOpen: setShowPromptSpecModal, subcategoryOpen: showSubCategoryModal, setSubcategoryOpen: setShowSubCategoryModal, actionCategory, queueApi, xhsImport, showToast }}
+        panels={{ subcategoryOpen: showSubCategoryModal, setSubcategoryOpen: setShowSubCategoryModal, actionCategory, queueApi, xhsImport, showToast }}
       />
 
       {moveItems && <MovePromptGroupsDialog key={moveItems.map(item => item.id).join(',')}

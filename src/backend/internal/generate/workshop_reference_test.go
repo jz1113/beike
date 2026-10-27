@@ -18,7 +18,7 @@ import (
 	"beike.local/cloud/src/backend/internal/platform/database/migrate"
 )
 
-func TestWorkshopReferenceAnalysisUsesStoredGroupAndActualImages(t *testing.T) {
+func TestWorkshopAnalysisIgnoresLegacyReferenceLocks(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", "..", ".."))
 	path := filepath.Join(t.TempDir(), "workshop.db")
 	if err := migrate.Run(path, root, false); err != nil {
@@ -51,14 +51,19 @@ func TestWorkshopReferenceAnalysisUsesStoredGroupAndActualImages(t *testing.T) {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		encoded, _ := json.Marshal(body)
-		for _, expected := range []string{"https://example.com/product.jpg", "https://example.com/4.jpg", "完整反推词4", "只改旧商品"} {
+		for _, expected := range []string{"https://example.com/product.jpg", "商品图是唯一图像输入", "创作技能"} {
 			if !strings.Contains(string(encoded), expected) {
 				t.Errorf("missing %s in multimodal request", expected)
 			}
 		}
+		for _, legacy := range []string{"https://example.com/4.jpg", "完整反推词4", "木桌纹理"} {
+			if strings.Contains(string(encoded), legacy) {
+				t.Errorf("legacy reference leaked into production request: %s", legacy)
+			}
+		}
 		generated := []any{}
 		for i := 1; i <= 4; i++ {
-			generated = append(generated, map[string]any{"shot_no": i, "prompt": fmt.Sprintf("换品成稿%d", i), "has_human": true, "shot_type": "model_shot"})
+			generated = append(generated, map[string]any{"shot_no": i, "prompt": fmt.Sprintf("创作成稿%d", i), "has_human": true, "shot_type": "model_shot", "sourceReferenceImageUrl": "https://example.com/4.jpg", "sourcePrompt": "旧参考词"})
 		}
 		text, _ := json.Marshal(map[string]any{"productFingerprint": "台灯", "prompts": generated})
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(text)}}}})
@@ -83,19 +88,19 @@ func TestWorkshopReferenceAnalysisUsesStoredGroupAndActualImages(t *testing.T) {
 	var result map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &result)
 	prompts := workshopObjects(result["prompts"])
-	if len(prompts) != 4 || prompts[3]["sourceReferenceImageUrl"] != "https://example.com/4.jpg" || prompts[3]["has_human"] != false || prompts[3]["sourcePrompt"] != "完整反推词4，木桌纹理，自然侧光" {
-		t.Fatalf("lost source evidence: %#v", prompts)
+	if len(prompts) != 4 || prompts[3]["assembly_source"] != "skill" || prompts[3]["has_human"] != true || prompts[3]["sourceReferenceImageUrl"] != nil || prompts[3]["sourcePrompt"] != nil {
+		t.Fatalf("legacy evidence or appearance overrode skill production: %#v", prompts)
 	}
 	foreign := post("another-workspace")
-	if foreign.Code != 400 || calls != 1 {
-		t.Fatalf("workspace guard: %d calls=%d", foreign.Code, calls)
+	if foreign.Code != 200 || calls != 2 {
+		t.Fatalf("irrelevant legacy asset blocked another workspace: %d calls=%d", foreign.Code, calls)
 	}
 	if _, err := db.Exec(`UPDATE "FullPromptAsset" SET "sourceImages"='[]' WHERE "id"=?`, group["id"]); err != nil {
 		t.Fatal(err)
 	}
 	missing := post("local")
-	if missing.Code != 400 || calls != 1 {
-		t.Fatalf("missing originals should stop before model: %d calls=%d", missing.Code, calls)
+	if missing.Code != 200 || calls != 3 {
+		t.Fatalf("missing legacy originals blocked skill production: %d calls=%d", missing.Code, calls)
 	}
 }
 

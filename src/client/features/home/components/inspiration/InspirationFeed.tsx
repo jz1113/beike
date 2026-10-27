@@ -1,15 +1,14 @@
-import {justifiedRows} from '../../model/justifiedRows';
-import { useMemo, useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
-import { handleImgError } from '@client/shared/media/imageError';
-import type { InspirationItem, InspirationUseOptions } from './InspirationModal';
+import { visibleJustifiedRows } from '../../model/justifiedRows';
+import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
+import type { InspirationItem, InspirationUseOptions } from '../../model/inspirationItem';
 import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../model/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
+import { FeedImage } from './FeedImage';
 import { INSPIRATION_MEDIA_FILTERS, isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
-import { HOME_PUBLISHED_EVENT, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
+import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 import { CanvasShowcase } from './CanvasShowcase';
-import { getStoryboardPresetById, persistStoryboardPreset } from '@shared/domain/prompts/prompt-engine/storyboardPreset';
-import { useAppStore } from '@client/store';
+import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
 
 // 限制首屏附近的图片并发下载与解码；用户开始浏览后再逐批补齐。
 const INITIAL_VISIBLE = 10;
@@ -23,6 +22,7 @@ interface Props {
 const FEED_GAP = 8;
 
 export default function InspirationFeed({ onUsePrompt }: Props) {
+  const isVisible = useViewVisibility();
   const [mediaFilter, setMediaFilter] = useState<InspirationMediaFilter>('image');
   const [published, setPublished] = useState<PublishedHomeItem[]>(() => readPublishedHomeItems());
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
@@ -31,31 +31,15 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   const [hasStartedBrowsing, setHasStartedBrowsing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const ratioUpdateFrameRef = useRef<number | null>(null);
-  const pendingRatiosRef = useRef<Record<string, number>>({});
-  const [feedWidth,setFeedWidth]=useState(1200);
-  const [mediaRatios,setMediaRatios]=useState<Record<string,number>>({});
-  const rememberRatio=useCallback((id:string|number,ratio:number)=>{
-    if(!Number.isFinite(ratio) || ratio<=0)return;
-    pendingRatiosRef.current[String(id)] = ratio;
-    if (ratioUpdateFrameRef.current !== null) return;
-    ratioUpdateFrameRef.current = window.requestAnimationFrame(() => {
-      ratioUpdateFrameRef.current = null;
-      const pending = pendingRatiosRef.current;
-      pendingRatiosRef.current = {};
-      setMediaRatios(previous => {
-        let changed = false;
-        const next = { ...previous };
-        for (const [key, value] of Object.entries(pending)) {
-          if (Math.abs((previous[key] || 0) - value) >= 0.001) {
-            next[key] = value;
-            changed = true;
-          }
-        }
-        return changed ? next : previous;
-      });
-    });
-  },[]);
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
+  const [feedWidth, setFeedWidth] = useState(0);
+
+  useEffect(() => {
+    if (!isVisible) {
+      setSelectedModalItem(null);
+      setSelectedCanvasItem(null);
+    }
+  }, [isVisible]);
 
   const filteredItems = useMemo(() => {
     const mine = published.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
@@ -65,8 +49,15 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
 
   useEffect(() => {
     const refresh = () => setPublished(readPublishedHomeItems());
+    const refreshStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === HOME_PUBLISHED_STORAGE_KEY) refresh();
+    };
     window.addEventListener(HOME_PUBLISHED_EVENT, refresh);
-    return () => window.removeEventListener(HOME_PUBLISHED_EVENT, refresh);
+    window.addEventListener('storage', refreshStorage);
+    return () => {
+      window.removeEventListener(HOME_PUBLISHED_EVENT, refresh);
+      window.removeEventListener('storage', refreshStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -74,31 +65,34 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
     setHasStartedBrowsing(false);
   }, [mediaFilter, published]);
 
-  // 原生 lazy-loading 会预取视口下方一大段图片。若哨兵初始就在视口内，
-  // 自动分页会立刻把整条瀑布流渲染出来，抵消首屏限流效果。
+  // 用户开始滚动后逐批加载；首批不足一屏时只补到页面可以滚动。
   useEffect(() => {
-    const hub = document.querySelector('[data-hub-scroll]') as HTMLElement | null;
+    const hub = gridRef.current?.closest<HTMLElement>('[data-hub-scroll]');
     if (!hub) return;
     const onScroll = () => {
-      if (hub.scrollTop > 80) setHasStartedBrowsing(true);
+      if (hub.scrollTop > 0) setHasStartedBrowsing(true);
     };
+    onScroll();
     hub.addEventListener('scroll', onScroll, { passive: true });
     return () => hub.removeEventListener('scroll', onScroll);
-  }, []);
+  }, [mediaFilter, published, isVisible]);
 
-  const visibleItems = useMemo(
-    () => filteredItems.slice(0, visibleCount),
-    [filteredItems, visibleCount],
+  // Layout uses declared ratios before media loads. Decode, retry, and video playback
+  // must not resize cards or move them between rows.
+  const ratios = useMemo(() => filteredItems.map(item => {
+    const [w, h] = inspirationAspectRatio({ aspectRatio: 'aspectRatio' in item ? item.aspectRatio : undefined }).split('/').map(Number);
+    return w / h;
+  }), [filteredItems]);
+  const rows = useMemo(
+    () => visibleJustifiedRows(ratios, feedWidth, visibleCount, FEED_GAP),
+    [ratios, feedWidth, visibleCount],
   );
-  const hasMore = visibleCount < filteredItems.length;
-  const ratios=visibleItems.map(item=>{
-    const [w,h]=inspirationAspectRatio({ aspectRatio: 'aspectRatio' in item ? item.aspectRatio : undefined }).split('/').map(Number);
-    return mediaRatios[item.id] || w/h;
-  });
-  const rows=justifiedRows(ratios,feedWidth,FEED_GAP);
+  const renderedItemCount = (rows.at(-1)?.at(-1) ?? -1) + 1;
+  const hasMore = renderedItemCount < filteredItems.length;
 
 
-  useEffect(()=>{
+  useLayoutEffect(()=>{
+    if (!isVisible) return;
     const grid=gridRef.current;if(!grid)return;
     const measure=()=>{
       const width=grid.clientWidth;
@@ -109,32 +103,45 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
     observer?.observe(grid);
     window.addEventListener('resize',measure);
     return ()=>{observer?.disconnect();window.removeEventListener('resize',measure);};
-  },[filteredItems.length]);
+  },[filteredItems.length, isVisible]);
 
   const handleLoadMore = useCallback(() => {
-    setVisibleCount((n) => Math.min(n + LOAD_MORE_STEP, filteredItems.length));
-  }, [filteredItems.length]);
+    setVisibleCount(Math.min(renderedItemCount + LOAD_MORE_STEP, filteredItems.length));
+  }, [filteredItems.length, renderedItemCount]);
 
   useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el || !hasMore || !hasStartedBrowsing) return;
+    if (!el || !hasMore || !isVisible || feedWidth <= 0) return;
+    const hub = gridRef.current?.closest<HTMLElement>('[data-hub-scroll]');
     const obs = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) handleLoadMore();
+        if (entry.isIntersecting && (hasStartedBrowsing || (hub && hub.scrollHeight <= hub.clientHeight + 1))) {
+          handleLoadMore();
+        }
       },
-      { rootMargin: '400px' },
+      { root: hub, rootMargin: '400px' },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, hasStartedBrowsing, handleLoadMore, visibleItems.length]);
+  }, [hasMore, hasStartedBrowsing, handleLoadMore, isVisible, feedWidth]);
 
-  const openItem = (item: InspirationItem | PublishedHomeItem) => {
+  const openItem = (item: InspirationItem | PublishedHomeItem, trigger: HTMLElement) => {
+    previewTriggerRef.current = trigger;
     if ('publishedKind' in item && item.publishedKind === 'canvas') setSelectedCanvasItem(item);
     else setSelectedModalItem(item);
   };
 
+  const closePreview = () => {
+    setSelectedModalItem(null);
+    setSelectedCanvasItem(null);
+    const trigger = previewTriggerRef.current;
+    window.requestAnimationFrame(() => {
+      if (trigger?.isConnected && !trigger.closest('[inert]')) trigger.focus();
+    });
+  };
+
   const scrollHubToTop = () => {
-    const hub = document.querySelector('[data-hub-scroll]') as HTMLElement | null;
+    const hub = gridRef.current?.closest<HTMLElement>('[data-hub-scroll]');
     if (hub) hub.scrollTo({ top: 0, behavior: 'smooth' });
     else window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -167,9 +174,9 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
       ) : (
         <>
           <div ref={gridRef} className="flex flex-col gap-2">
-            {rows.map(row=><div key={visibleItems[row[0]].id} className="flex gap-2 [content-visibility:auto] [contain-intrinsic-size:180px]" style={{height:(feedWidth-FEED_GAP*(row.length-1))/row.reduce((sum,index)=>sum+ratios[index],0)}}>
+            {rows.map(row=><div key={filteredItems[row[0]].id} className="flex gap-2" style={{height:(feedWidth-FEED_GAP*(row.length-1))/row.reduce((sum,index)=>sum+ratios[index],0)}}>
             {row.map(index => {
-              const item=visibleItems[index];
+              const item=filteredItems[index];
               const isVideo=isInspirationVideo(item);
               const eager = index < INSPIRATION_EAGER_COUNT;
               return (
@@ -178,15 +185,16 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                     role="button"
                     tabIndex={0}
                     aria-label={item.title}
-                    onClick={() => openItem(item)}
+                    onClick={event => openItem(item, event.currentTarget)}
                     onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        openItem(item);
+                        openItem(item, event.currentTarget);
                       }
                     }}
                     style={{flex:`${ratios[index]} 1 0%`}}
-                    className="min-w-0 h-full rounded-xl bg-slate-100 dark:bg-[#13161C] shadow-2xs hover:shadow-lg dark:shadow-[0_4px_24px_rgba(0,0,0,0.6)] transition-all duration-300 overflow-hidden group cursor-pointer relative border border-slate-200/80 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5"
+                    className="min-w-0 h-full rounded-xl bg-slate-100 dark:bg-[#13161C] shadow-2xs hover:shadow-lg dark:shadow-[0_4px_24px_rgba(0,0,0,0.6)] transition-shadow duration-300 overflow-hidden group cursor-pointer relative border border-slate-200/80 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5"
                   >
                     <div
                       className="relative w-full h-full overflow-hidden rounded-lg"
@@ -196,20 +204,16 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                         <LazyFeedVideo
                           src={item.video || item.image}
                           poster={item.poster}
-                          onAspectRatio={ratio=>rememberRatio(item.id,ratio)}
                           className="w-full h-full object-contain block rounded-lg bg-slate-100 dark:bg-slate-800"
                         />
                       ) : (
-                        <img
+                        <FeedImage
+                          key={item.image}
                           src={'thumbnail' in item && typeof item.thumbnail === 'string' && item.thumbnail ? item.thumbnail : item.image}
+                          fallbackSrc={item.image}
                           alt={item.title}
-                          onLoad={event=>rememberRatio(item.id,event.currentTarget.naturalWidth/event.currentTarget.naturalHeight)}
-                          loading={eager ? 'eager' : 'lazy'}
-                          fetchPriority={eager ? 'high' : undefined}
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => handleImgError(e, item.image)}
-                          className="w-full h-full object-cover block transition-transform duration-500 ease-out group-hover:scale-[1.04] bg-slate-100 dark:bg-slate-800"
+                          eager={eager}
+                          className="w-full h-full object-contain block transition-transform duration-500 ease-out group-hover:scale-[1.04] bg-slate-100 dark:bg-slate-800"
                         />
                       )}
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/55 to-transparent px-2.5 pb-2 pt-8 opacity-0 transition-opacity group-hover:opacity-100">
@@ -232,13 +236,14 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
         </>
       )}
 
-      {selectedCanvasItem && <CanvasShowcase item={selectedCanvasItem} onClose={() => setSelectedCanvasItem(null)} />}
+      {isVisible && selectedCanvasItem && <CanvasShowcase key={selectedCanvasItem.id} item={selectedCanvasItem} onClose={closePreview} />}
 
-      {selectedModalItem && <Suspense fallback={null}><InspirationModal
+      {isVisible && selectedModalItem && <Suspense fallback={null}><InspirationModal
+        key={selectedModalItem.id}
         item={selectedModalItem}
         allItems={filteredItems.filter(item => !('publishedKind' in item) || item.publishedKind !== 'canvas')}
         isOpen={!!selectedModalItem}
-        onClose={() => setSelectedModalItem(null)}
+        onClose={closePreview}
         onUsePromptOnly={(prompt) => {
           onUsePrompt(prompt);
           scrollHubToTop();
@@ -248,21 +253,6 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
           scrollHubToTop();
         }}
         onNavigate={(newItem) => setSelectedModalItem(newItem)}
-        onApplyPreset={(presetId) => {
-          const preset = getStoryboardPresetById(presetId);
-          if (preset) {
-            persistStoryboardPreset(preset);
-            // 同步首页出图数量，与旧 setQuickStoryboardPreset 行为一致
-            useAppStore.getState().setQuickCount(preset.shotCount);
-          }
-        }}
-        availablePresets={INSPIRATION_ITEMS
-          .filter(i => i.storyboardPresetId)
-          .map(i => {
-            const p = getStoryboardPresetById(i.storyboardPresetId!);
-            return p ? { ...p, storyboardPresetId: i.storyboardPresetId } : null;
-          })
-          .filter(Boolean) as any}
       /></Suspense>}
     </div>
   );

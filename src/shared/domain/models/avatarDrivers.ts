@@ -25,9 +25,3 @@ export function classifyAvatarDriver(modelId: string): AvatarDriverSpec | null {
 export function isAvatarDriverModel(modelId: string): boolean {
   return classifyAvatarDriver(modelId) !== null;
 }
-
-export function avatarMediaKind(url: string): 'image' | 'video' {
-  const path = url.split('?')[0].toLowerCase();
-  if (/\.(png|jpe?g|webp|gif|avif)$/.test(path)) return 'image';
-  return 'video';
-}

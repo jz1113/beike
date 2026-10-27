@@ -79,7 +79,7 @@ export function formatAnalyzedStoryboard(opts: {
   });
 
   let canonicalOutfit = lookPartsFromApi;
-  if (formattedPrompts.some(p => p.has_human !== false)) {
+  if (formattedPrompts.some(p => p.has_human !== false && p.assembly_source !== 'skill')) {
     if (!canonicalOutfit?.top || isGenericLook(canonicalOutfit.top)) {
       const firstHuman = formattedPrompts.find(p => p.has_human !== false);
       if (firstHuman) {
@@ -90,7 +90,7 @@ export function formatAnalyzedStoryboard(opts: {
       }
     }
     formattedPrompts.forEach((p) => {
-      if (p.assembly_source === 'group_skeleton') return;
+      if (p.assembly_source === 'group_skeleton' || p.assembly_source === 'skill') return;
       p.prompt = p.has_human !== false
         ? enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi, fingerprintFromApi)
         : preventJewelryGlitches(p.prompt, fingerprintFromApi);
@@ -111,7 +111,7 @@ export function formatAnalyzedStoryboard(opts: {
     optics: p.optics, camera_focal_length: p.camera_focal_length, angle: p.angle, lighting_type: p.lighting_type,
     scene: p.scene, has_human: p.has_human,
   }));
-  const gridPrompt = formattedPrompts.length === 4 && formattedPrompts.every(p => p.assembly_source === 'group_skeleton')
+  const gridPrompt = formattedPrompts.length === 4 && formattedPrompts.every(p => p.assembly_source === 'group_skeleton' || p.assembly_source === 'skill')
     ? buildBoundGroupGridPrompt(formattedPrompts)
     : assembleGrid2x2Prompt(gridBible, gridShots, { macroSlotIndex: 0 });
 

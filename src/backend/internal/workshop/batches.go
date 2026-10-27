@@ -356,15 +356,6 @@ func historyHandler(cfg config.Config, clear bool) http.Handler {
 	})
 }
 
-func summarizeBatch(row dbworkshop.WorkshopBatchRow) map[string]any {
-	items, ready, tasks := batchCounts(row.Snapshot)
-	return map[string]any{
-		"id": row.ID, "name": row.Name, "status": row.Status, "revision": row.Revision,
-		"createdAt": row.CreatedAt, "updatedAt": row.UpdatedAt, "legacyRecovered": row.LegacyRecovered,
-		"itemCount": items, "readyCount": ready, "taskCount": tasks,
-	}
-}
-
 func batchPayload(row dbworkshop.WorkshopBatchRow) map[string]any {
 	var snapshot any
 	if json.Unmarshal([]byte(row.Snapshot), &snapshot) != nil {
@@ -375,27 +366,4 @@ func batchPayload(row dbworkshop.WorkshopBatchRow) map[string]any {
 		"createdAt": row.CreatedAt, "updatedAt": row.UpdatedAt, "legacyRecovered": row.LegacyRecovered,
 		"snapshot": snapshot,
 	}
-}
-
-func batchCounts(raw string) (int, int, int) {
-	var snapshot map[string]any
-	if json.Unmarshal([]byte(raw), &snapshot) != nil {
-		return 0, 0, 0
-	}
-	items, _ := snapshot["items"].([]any)
-	ready := 0
-	tasks := 0
-	for _, item := range items {
-		product, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if product["status"] == "success" && product["selected"] == true {
-			ready++
-		}
-		if list, ok := product["tasks"].([]any); ok {
-			tasks += len(list)
-		}
-	}
-	return len(items), ready, tasks
 }

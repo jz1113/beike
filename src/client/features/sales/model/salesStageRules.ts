@@ -4,6 +4,7 @@ import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage
 import { eligibleSalesImages, salesActualReferences, salesAssetsReady, salesContentRevision, type SalesImageRef, type VideoSalesScript } from '@shared/domain/sales';
 import type { VideoSalesStudioState } from './salesStudioDraft';
 import { salesResolveRefMode, salesResolveResolution } from './salesWorkspace';
+import { salesSkillBinding } from '@shared/domain/sales/skill';
 
 export function salesVideoPreflightError(state: VideoSalesStudioState): string | null {
   if (!state.selectedVideoModel) return null;
@@ -28,6 +29,7 @@ export function salesPlanReason(state: VideoSalesStudioState, chatModelId?: stri
 
 export function salesAnalysisInputRevision(state: VideoSalesStudioState): string {
   return salesContentRevision({
+    skill: salesSkillBinding(),
     productName: state.productName, brand: state.brand, category: state.category, sellingPoints: state.sellingPoints,
     props: state.props, selectedColor: { variantId: state.colorSelection.variantId, colorLabel: state.colorSelection.colorLabel },
     images: eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
@@ -36,6 +38,7 @@ export function salesAnalysisInputRevision(state: VideoSalesStudioState): string
 
 export function salesPlanInputRevision(state: VideoSalesStudioState): string {
   return salesContentRevision({
+    skill: salesSkillBinding(),
     productName: state.productName, brand: state.brand, category: state.category, sellingPoints: state.sellingPoints,
     priceLabel: state.priceLabel, props: state.props, targetDuration: state.targetDuration, aspectRatio: state.aspectRatio,
     selectedColor: { variantId: state.colorSelection.variantId, colorLabel: state.colorSelection.colorLabel }, videoMode: state.videoMode,
@@ -55,6 +58,7 @@ function salesVideoParamKey(model: string | undefined, resolution: string | unde
 
 export function salesFinalInputRevision(state: VideoSalesStudioState, script: VideoSalesScript): string {
   return salesContentRevision({
+    skill: salesSkillBinding(),
     plan: salesPlanInputRevision(state), shots: script.shots.map(({ shotId, duration, description, camera, voiceover, speechMode, imageIndex, prompt }) => ({ shotId, duration, description, camera, voiceover, speechMode, imageIndex, prompt })),
     assets: script.assets?.map(({ id, url, prompt, validation, productImageIndexes }) => ({ id, url, prompt, validation, productImageIndexes })),
     chatModel: salesPromptModelKey(state.selectedChatModel),

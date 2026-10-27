@@ -6,28 +6,19 @@ import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { isOpenAIModelRouteId, requestModelId } from '@shared/domain/models/workflowModels';
 import { readReportedUsage } from '@client/shared/utils/modelUsage';
 import { recordModelUsage, resolveModelVendor } from '@client/shared/utils/usageTracker';
-import { buildJewelryTemplateStyle, isJewelryProductTitle } from '@shared/domain/products/jewelryArch';
-import { recipeKind, resolveRecipeForProduct } from '@shared/domain/products/productRecipeSelection';
-import { isAutoPromptGroupSelection, promptGroupAppearanceFilter } from '@shared/domain/workshop/workshop-pipeline';
+import { resolveRecipeForProduct } from '@shared/domain/products/productRecipeSelection';
 import { productPropsWithCategory, type BatchProductItem } from '../batchTypes';
-import { resolveAnalysisGroup, resolveAnalysisAppearance } from './resolveAnalysisGroup';
 import { formatAnalyzedStoryboard } from './batchVisionAnalyzeFormat';
+import { workshopContentContext } from './workshopContentPlan';
 export { runBatchVisionAnalyze } from './batchVisionAnalyzeQueue';
 
 export type VisionAnalyzeDeps = Omit<AnalysisPreflightConfig, 'recipes'> & {
   recipes: Array<{ id: string; name: string; category?: string; promptSnippet?: string; libraryVersion?: string }>;
   selectedArchId: string;
   items?: BatchProductItem[];
-  lockedPersonaId: string;
-  lockedSceneId: string;
-  lockedOutfitId: string;
-  lockedActionId: string;
-  lockedFullPromptId?: string;
   selectedShotCount: number;
   selectedVisionModel: string;
   availableVisionModels?: Array<{ id: string }>;
-  useAssetLibrary?: boolean;
-  personaMode?: 'asset_driven' | 'none';
   setItems?: (update: BatchProductItem[] | ((prev: BatchProductItem[]) => BatchProductItem[])) => void;
   getItems?: () => BatchProductItem[];
   getConfigRevision?: () => number;
@@ -53,12 +44,7 @@ export async function analyzeBatchProduct(
   deps: VisionAnalyzeDeps,
   item: BatchProductItem,
   itemIndex?: number,
-  allocatedAsset?: {
-    scene?: any;
-    outfit?: any;
-    persona?: any;
-    actions?: any[];
-  }
+
 ): Promise<boolean> {
     const blockReason = workshopAnalysisBlockReason(deps, item);
     if (blockReason) {
@@ -73,53 +59,23 @@ export async function analyzeBatchProduct(
     const chosenProductImgs = item.selectedProductImages.filter(url => url.trim());
     const imagePayload = chosenProductImgs.map(normalizeImageUrlToStandardJpg);
 
-    const effectivePersona = deps.personaMode || 'asset_driven';
-
     const { customBaseUrl: localUrl, customApiKey: localApiKey, textProtocol, apiFormat, allowInsecureHttp } = getMultimodalClientOverrides(deps.selectedVisionModel);
     const targetShotCount = deps.selectedShotCount || 4;
 
     let data: any = null;
     let apiError: string | null = null;
 
-    const groupAppearance = promptGroupAppearanceFilter(deps.lockedFullPromptId);
-    const fullPromptId = !isAutoPromptGroupSelection(deps.lockedFullPromptId) ? deps.lockedFullPromptId : undefined;
-    const groupFolderId = deps.promptGroupFolderId && deps.promptGroupFolderId !== 'auto' ? deps.promptGroupFolderId : undefined;
-    const lockedAssets = (deps.lockedPersonaId !== 'auto' || deps.lockedSceneId !== 'auto' || deps.lockedOutfitId !== 'auto' || fullPromptId || groupAppearance || groupFolderId) ? {
-      personaId: deps.lockedPersonaId !== 'auto' ? deps.lockedPersonaId : undefined,
-      sceneId: deps.lockedSceneId !== 'auto' ? deps.lockedSceneId : undefined,
-      outfitId: deps.lockedOutfitId !== 'auto' ? deps.lockedOutfitId : undefined,
-      fullPromptId,
-      groupAppearance,
-      groupFolderId,
-    } : undefined;
-
     const computedProductIdx = typeof itemIndex === 'number'
       ? itemIndex
       : (deps.items ? deps.items.findIndex(p => p.id === item.id) : 0);
 
-    const resolvedGroup = resolveAnalysisGroup(deps, item, archObj, Math.max(0, computedProductIdx));
-    if (!resolvedGroup) throw new Error('没有适配当前商品的参考样本，请补充样本后重试');
-    const resolvedAppearance = resolveAnalysisAppearance(deps, resolvedGroup, Math.max(0, computedProductIdx));
-
-    const isJewelryArch = recipeKind(archObj) === 'jewelry';
-    const jewelryProduct = isJewelryProductTitle(item.title, item.props);
-    const templateStyle = isJewelryArch && jewelryProduct
-      ? buildJewelryTemplateStyle(archObj.name, archObj.promptSnippet || '', item.title, item.props)
-      : `${archObj.name} \n${archObj.promptSnippet || ''}`;
-
     const analyzeRun = beginProductAnalyze(item.id);
-    // One user-triggered analysis may be retried with the same ID, while a
-    // later "重新分析" should reserve the next mother in auto-rotation.
+    // Freeze the user-triggered attempt independently of historical asset locks.
     const analysisRunId = globalThis.crypto.randomUUID();
     const configSignature = JSON.stringify({
       revision: deps.getConfigRevision?.(),
       arch: archObj.id,
       shots: targetShotCount,
-      persona: deps.lockedPersonaId,
-      scene: deps.lockedSceneId,
-      outfit: deps.lockedOutfitId,
-      fullPrompt: deps.lockedFullPromptId || 'auto',
-      groupFolder: deps.promptGroupFolderId || 'auto',
       images: item.selectedProductImages || [],
     });
     deps.setItems?.(prev => prev.map(p => (
@@ -136,20 +92,12 @@ export async function analyzeBatchProduct(
           productTitle: item.title || '优质电商商品',
           productProps: productPropsWithCategory(item),
           productIndex: Math.max(0, computedProductIdx),
+          contentPlan: workshopContentContext(item, deps.getItems?.() || deps.items || [item]),
           imageUrls: imagePayload,
-          modelPersona: effectivePersona,
-          templateStyle,
           recipeId: archObj.id,
           recipeVersion: archObj.libraryVersion,
-          useAssetLibrary: deps.useAssetLibrary !== false,
-          lockedAssets: { ...lockedAssets, ...resolvedAppearance, fullPromptId: resolvedGroup.id },
-          groupSelectionMode: fullPromptId ? 'manual' : 'auto',
-          allocatedAssets: allocatedAsset ? {
-            sceneId: allocatedAsset.scene?.id,
-            outfitId: allocatedAsset.outfit?.id,
-            personaId: allocatedAsset.persona?.id,
-          } : undefined,
-          extraRequirements: `- 🚨【分镜数量严格保证】：必须输出完整的 ${targetShotCount} 个分镜，数组 prompts 长度必须严格等于 ${targetShotCount}！\n- 🚨【商品外观唯一锚定 @图片1】：商品身份与参考图构图分开，保留逐镜完整反推描述，仅修改商品及其接触关系。`,
+          useAssetLibrary: false,
+          extraRequirements: `必须输出完整的 ${targetShotCount} 个分镜，prompts 长度严格等于 ${targetShotCount}。仅以当前商品图与创作技能设计完整画面，商品外观以 @图片1 为准，不绑定参考图组或素材替换。`,
           shotCount: targetShotCount,
           model: requestModelId(deps.selectedVisionModel),
           customBaseUrl: localUrl,
@@ -174,6 +122,7 @@ export async function analyzeBatchProduct(
       apiError = err.message || '视觉分析请求超时或网络异常';
     }
 
+    try {
     if (apiError || !data?.prompts || data.prompts.length === 0) {
       if (analyzeEpochs.get(item.id) !== analyzeRun.epoch) return false;
       deps.setItems?.(prev => prev.map(p => {
@@ -194,11 +143,6 @@ export async function analyzeBatchProduct(
       revision: deps.getConfigRevision?.(),
       arch: archObj.id,
       shots: deps.selectedShotCount || 4,
-      persona: deps.lockedPersonaId,
-      scene: deps.lockedSceneId,
-      outfit: deps.lockedOutfitId,
-      fullPrompt: deps.lockedFullPromptId || 'auto',
-      groupFolder: deps.promptGroupFolderId || 'auto',
       images: (deps.getItems?.().find(p => p.id === item.id)?.selectedProductImages) || item.selectedProductImages || [],
     });
     if (latestSignature !== configSignature) {
@@ -304,4 +248,14 @@ export async function analyzeBatchProduct(
     }));
 
     return true;
+    } catch (failure) {
+      if (analyzeEpochs.get(item.id) === analyzeRun.epoch) {
+        const message = failure instanceof Error ? failure.message : '分镜分析失败，请重试';
+        deps.setItems?.(previous => previous.map(row => row.id === item.id
+          ? { ...row, isAnalyzing: false, analyzedSuccess: false, analysisError: message } : row));
+      }
+      throw failure;
+    } finally {
+      if (analyzeControllers.get(item.id)?.signal === analyzeRun.signal) analyzeControllers.delete(item.id);
+    }
   }

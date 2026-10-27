@@ -1,5 +1,6 @@
 import type { AssetSubTab } from '../../model/assetPromptConstants';
 import DynamicTagDropdown from './DynamicTagDropdown';
+import { ArrowDownWideNarrow } from 'lucide-react';
 
 const colors: Record<AssetSubTab, string> = {
   full_prompt: 'bg-indigo-50 border-indigo-300 text-indigo-900 dark:bg-indigo-500/15 dark:border-indigo-400/40 dark:text-indigo-200',
@@ -39,9 +40,11 @@ export function AssetLifecycleFilter({
     { id: 'needs_fix', label: '待修复' },
     { id: 'published', label: '已发布' },
   ] as const;
+  const visible = options.filter(option => option.id === 'all' || option.id === value || items.some(item => (item.registry?.status || item.lifecycleStatus) === option.id));
+  if (value === 'all' && visible.length < 3) return null;
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200/70 bg-slate-100/80 p-1 dark:border-white/[0.08] dark:bg-white/[0.05]">
-      {options.map((option) => (
+      {visible.map((option) => (
         <button
           key={option.id}
           type="button"
@@ -83,24 +86,14 @@ export function AssetLibrarySortControls({
         {isAnyFilterActive ? '筛选结果：' : ''}
         <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{displayedItemsCount}</strong> {unit}
       </span>}
-      <div className="flex items-center gap-1 rounded-xl border border-slate-200/70 bg-slate-100/90 p-1 text-xs dark:border-white/[0.08] dark:bg-white/[0.06]">
-        {(['default', 'usage'] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            title={key === 'default' ? defaultSortTitle : undefined}
-            aria-label={key === 'default' && defaultSortTitle ? `默认排序：${defaultSortTitle}` : undefined}
-            onClick={() => setSortBy(key)}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-              sortBy === key
-                ? 'bg-white text-slate-900 shadow-2xs font-bold dark:text-white dark:bg-[#25262B]'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 dark:text-slate-400'
-            }`}
-          >
-            {key === 'default' ? '默认排序' : '使用最多'}
-          </button>
-        ))}
-      </div>
+      <label className="asset-sort-select" title={sortBy === 'default' ? defaultSortTitle : undefined}>
+        <ArrowDownWideNarrow size={14} aria-hidden="true" />
+        <select aria-label="素材排序" value={sortBy} onChange={event => setSortBy(event.target.value as 'default' | 'usage' | 'favorite')}>
+          <option value="default">默认顺序</option>
+          <option value="usage">使用最多</option>
+          {sortBy === 'favorite' && <option value="favorite">收藏优先</option>}
+        </select>
+      </label>
     </div>
   );
 }

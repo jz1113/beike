@@ -94,7 +94,7 @@ func writeAssignments(w http.ResponseWriter, model string, shots []ScriptShot, r
 			body["usage"] = usage
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, body)
+	httpx.WriteJSON(w, http.StatusOK, withSalesSkill(body))
 }
 
 func selectChatBody(model string, shots []ScriptShot, vision []CatalogImage) map[string]any {
@@ -102,13 +102,13 @@ func selectChatBody(model string, shots []ScriptShot, vision []CatalogImage) map
 	for _, shot := range shots {
 		lines = append(lines, fmt.Sprintf("镜头 %d，类型 %s，画面：%s，口播：%s", shot.ShotId, shot.Type, shot.Description, shot.Voiceover))
 	}
-	intro := "为每个镜头选择一张最合适的商品参考图，并说明选择理由。优先能看清商品的主图或规格图，少用大段文字详情图。imageIndex 必须使用下面给出的图片编号，不要遗漏镜头。\n" +
+	intro := "按技能为每个镜头分配商品参考图。imageIndex 必须使用下面给出的图片编号，不要遗漏镜头。\n" +
 		strings.Join(lines, "\n") +
-		"\n只输出 JSON：{\"assignments\":[{\"shotId\":1,\"imageIndex\":0,\"reason\":\"这张主图能看清包装正面\"}]}"
+		"\n只输出 JSON：{\"assignments\":[{\"shotId\":1,\"imageIndex\":0,\"reason\":\"与该镜头的商品视角相符\"}]}"
 	return map[string]any{
 		"model": model,
 		"messages": []map[string]any{
-			{"role": "system", "content": "你负责为带货分镜挑选商品参考图。不要发明目录里没有的图片编号。" + compactJSONRules},
+			{"role": "system", "content": salesSkillInstructions("select") + "\n只输出逐镜商品图分配 JSON。" + compactJSONRules},
 			{"role": "user", "content": visionParts(intro, vision)},
 		},
 		"temperature":     0.2,

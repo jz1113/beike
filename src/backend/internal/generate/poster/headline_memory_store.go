@@ -2,6 +2,7 @@ package poster
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -33,13 +34,14 @@ type coverEntry struct {
 }
 
 type coverSample struct {
-	ID        string   `json:"id"`
-	Title     string   `json:"title"`
-	ImageURLs []string `json:"imageUrls"`
-	Model     string   `json:"model"`
-	Status    string   `json:"status"`
-	Error     string   `json:"error"`
-	CreatedAt string   `json:"createdAt"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	ImageURLs  []string `json:"imageUrls"`
+	Model      string   `json:"model"`
+	RequestKey string   `json:"requestKey"`
+	Status     string   `json:"status"`
+	Error      string   `json:"error"`
+	CreatedAt  string   `json:"createdAt"`
 }
 
 type coverUsage struct {
@@ -50,6 +52,8 @@ type coverUsage struct {
 	EntryIDs  []string          `json:"entryIds"`
 	Design    map[string]string `json:"design"`
 	CreatedAt string            `json:"createdAt"`
+	Rating    string            `json:"rating"`
+	Note      string            `json:"note"`
 }
 
 func insertCoverSample(ctx context.Context, db *sql.DB, workspace, id, title, model string, imageURLs []string) error {
@@ -86,10 +90,14 @@ func insertCoverEntries(ctx context.Context, db coverExec, workspace string, ent
 		if entry.Source == "" {
 			entry.Source = "sample"
 		}
+		created := entry.CreatedAt
+		if created == "" {
+			created = now
+		}
 		_, err := db.ExecContext(ctx, `INSERT INTO "CoverMemoryEntry"
 			("id","workspaceId","branch","rule","evidence","sampleId","status","source","useCount","createdAt","updatedAt")
 			VALUES (?,?,?,?,?,?,?,?,0,?,?)`,
-			entry.ID, workspace, entry.Branch, entry.Rule, entry.Evidence, entry.SampleID, entry.Status, entry.Source, now, now)
+			entry.ID, workspace, entry.Branch, entry.Rule, entry.Evidence, entry.SampleID, entry.Status, entry.Source, created, now)
 		if err != nil {
 			return err
 		}
@@ -97,22 +105,22 @@ func insertCoverEntries(ctx context.Context, db coverExec, workspace string, ent
 	return nil
 }
 
-func listCoverMemory(ctx context.Context, db *sql.DB, workspace string) ([]coverEntry, []coverSample, []coverUsage, error) {
-	entries, err := listCoverEntries(ctx, db, workspace)
+func listCoverMemory(ctx context.Context, db *sql.DB, workspace string, page ...int) ([]coverEntry, []coverSample, []coverUsage, error) {
+	entries, err := listCoverEntries(ctx, db, workspace, page...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	samples, err := listCoverSamples(ctx, db, workspace)
+	samples, err := listCoverSamples(ctx, db, workspace, page...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	usages, err := listCoverUsages(ctx, db, workspace)
+	usages, err := listCoverUsages(ctx, db, workspace, page...)
 	return entries, samples, usages, err
 }
 
-func listCoverEntries(ctx context.Context, db *sql.DB, workspace string) ([]coverEntry, error) {
+func listCoverEntries(ctx context.Context, db *sql.DB, workspace string, page ...int) ([]coverEntry, error) {
 	rows, err := db.QueryContext(ctx, `SELECT "id","branch","rule","evidence","sampleId","status","source","useCount","createdAt"
-		FROM "CoverMemoryEntry" WHERE "workspaceId"=? ORDER BY "createdAt" DESC LIMIT 200`, workspace)
+		FROM "CoverMemoryEntry" WHERE "workspaceId"=? ORDER BY "createdAt" DESC, "id" DESC`+coverPageSQL(page), workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -128,9 +136,9 @@ func listCoverEntries(ctx context.Context, db *sql.DB, workspace string) ([]cove
 	return out, rows.Err()
 }
 
-func listCoverSamples(ctx context.Context, db *sql.DB, workspace string) ([]coverSample, error) {
-	rows, err := db.QueryContext(ctx, `SELECT "id","title","imageUrls","model","status","error","createdAt"
-		FROM "CoverMemorySample" WHERE "workspaceId"=? ORDER BY "createdAt" DESC LIMIT 30`, workspace)
+func listCoverSamples(ctx context.Context, db *sql.DB, workspace string, page ...int) ([]coverSample, error) {
+	rows, err := db.QueryContext(ctx, `SELECT "id","title","imageUrls","model","status","error","createdAt","requestKey"
+		FROM "CoverMemorySample" WHERE "workspaceId"=? ORDER BY "createdAt" DESC, "id" DESC`+coverPageSQL(page), workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +147,7 @@ func listCoverSamples(ctx context.Context, db *sql.DB, workspace string) ([]cove
 	for rows.Next() {
 		var sample coverSample
 		var raw string
-		if err := rows.Scan(&sample.ID, &sample.Title, &raw, &sample.Model, &sample.Status, &sample.Error, &sample.CreatedAt); err != nil {
+		if err := rows.Scan(&sample.ID, &sample.Title, &raw, &sample.Model, &sample.Status, &sample.Error, &sample.CreatedAt, &sample.RequestKey); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(raw), &sample.ImageURLs)
@@ -151,9 +159,9 @@ func listCoverSamples(ctx context.Context, db *sql.DB, workspace string) ([]cove
 	return out, rows.Err()
 }
 
-func listCoverUsages(ctx context.Context, db *sql.DB, workspace string) ([]coverUsage, error) {
-	rows, err := db.QueryContext(ctx, `SELECT "id","batchId","itemId","itemTitle","entryIds","design","createdAt"
-		FROM "CoverMemoryUsage" WHERE "workspaceId"=? ORDER BY "createdAt" DESC LIMIT 50`, workspace)
+func listCoverUsages(ctx context.Context, db *sql.DB, workspace string, page ...int) ([]coverUsage, error) {
+	rows, err := db.QueryContext(ctx, `SELECT "id","batchId","itemId","itemTitle","entryIds","design","createdAt","rating","note"
+		FROM "CoverMemoryUsage" WHERE "workspaceId"=? ORDER BY "createdAt" DESC, "id" DESC`+coverPageSQL(page), workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +170,7 @@ func listCoverUsages(ctx context.Context, db *sql.DB, workspace string) ([]cover
 	for rows.Next() {
 		var usage coverUsage
 		var ids, design string
-		if err := rows.Scan(&usage.ID, &usage.BatchID, &usage.ItemID, &usage.ItemTitle, &ids, &design, &usage.CreatedAt); err != nil {
+		if err := rows.Scan(&usage.ID, &usage.BatchID, &usage.ItemID, &usage.ItemTitle, &ids, &design, &usage.CreatedAt, &usage.Rating, &usage.Note); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(ids), &usage.EntryIDs)
@@ -178,7 +186,7 @@ func listCoverUsages(ctx context.Context, db *sql.DB, workspace string) ([]cover
 	return out, rows.Err()
 }
 
-func setCoverEntryStatus(ctx context.Context, db *sql.DB, workspace, id, status string) error {
+func setCoverEntryStatus(ctx context.Context, db coverExec, workspace, id, status string) error {
 	result, err := db.ExecContext(ctx, `UPDATE "CoverMemoryEntry" SET "status"=?, "updatedAt"=? WHERE "id"=? AND "workspaceId"=?`,
 		status, coverNow(), id, workspace)
 	if err != nil {
@@ -223,24 +231,48 @@ func saveCoverDeconstruction(ctx context.Context, db *sql.DB, workspace, id, dec
 	return tx.Commit()
 }
 
+func coverUsageID(workspace, batchID, itemID string, entryIDs []string, design map[string]string) string {
+	if entryIDs == nil {
+		entryIDs = []string{}
+	}
+	raw, _ := json.Marshal([]any{workspace, batchID, itemID, entryIDs, design})
+	return fmt.Sprintf("usage_%x", sha256.Sum256(raw))
+}
+
 func recordCoverUsage(ctx context.Context, db *sql.DB, workspace, batchID, itemID, title string, entryIDs []string, design map[string]string) error {
 	if entryIDs == nil {
 		entryIDs = []string{}
 	}
 	ids, _ := json.Marshal(entryIDs)
 	raw, _ := json.Marshal(design)
-	_, err := db.ExecContext(ctx, `INSERT INTO "CoverMemoryUsage"
-		("id","workspaceId","batchId","itemId","itemTitle","entryIds","design","createdAt")
-		VALUES (?,?,?,?,?,?,?,?)`, coverID("usage"), workspace, batchID, itemID, title, string(ids), string(raw), coverNow())
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	for _, id := range entryIDs {
-		if _, err := db.ExecContext(ctx, `UPDATE "CoverMemoryEntry" SET "useCount"="useCount"+1, "updatedAt"=? WHERE "id"=? AND "workspaceId"=?`, coverNow(), id, workspace); err != nil {
-			return err
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO "CoverMemoryUsage"
+  ("id","workspaceId","batchId","itemId","itemTitle","entryIds","design","createdAt")
+  VALUES (?,?,?,?,?,?,?,?)`, coverUsageID(workspace, batchID, itemID, entryIDs, design), workspace, batchID, itemID, title, string(ids), string(raw), coverNow())
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 1 {
+		seen := map[string]bool{}
+		for _, id := range entryIDs {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			if _, err := tx.ExecContext(ctx, `UPDATE "CoverMemoryEntry" SET "useCount"="useCount"+1 WHERE "id"=? AND "workspaceId"=?`, id, workspace); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func coverBranchLabel(branch string) string {
@@ -328,4 +360,11 @@ func validCoverBranch(branch string) bool {
 
 func validCoverStatus(status string) bool {
 	return status == "pending" || status == "adopted" || status == "trashed"
+}
+
+func coverPageSQL(page []int) string {
+	if len(page) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" LIMIT 100 OFFSET %d", max(0, page[0]))
 }

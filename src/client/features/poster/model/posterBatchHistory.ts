@@ -128,6 +128,9 @@ function snapshotItem(value: unknown, batchId: string): PosterBatchSnapshotItem 
     importError, error: importError || stringValue(item.error),
     modelFallbackNote: stringValue(item.modelFallbackNote),
     memorySampleId: stringValue(item.memorySampleId)?.trim(),
+    memoryUsageId: stringValue(item.memoryUsageId)?.trim(),
+    memoryRevisionId: stringValue(item.memoryRevisionId)?.trim(),
+    memoryWarning: stringValue(item.memoryWarning),
     memoryEntryIds: Array.isArray(item.memoryEntryIds) ? item.memoryEntryIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0) : undefined,
   };
 }

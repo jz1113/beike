@@ -2,7 +2,7 @@ import type { FilterableAsset } from '../model/assetFilterTags';
 import { buildAssetTagList } from '../model/assetFilterTags';
 import { isMacroOrCloseUp, isHalfBody, isFullBody } from '../model/assetShotScale';
 import { appearanceAudience, type AppearanceAudience } from '@shared/domain/assets/appearanceAudience';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   extractActionCategories,
   extractActionFocusAnchors,
@@ -71,10 +71,10 @@ export function useAssetLibraryFilters<T extends FilterableAsset>(
     setPromptGroupSubcategoryFilter('all');
   }, [activeSubTab]);
 
-  const setPromptGroupCategoryFilter = (value: string) => {
+  const setPromptGroupCategoryFilter = useCallback((value: string) => {
     setPromptGroupCategoryFilterState(value);
     setPromptGroupSubcategoryFilter('all');
-  };
+  }, []);
 
   // 空库不保留上次浏览时的动作筛选，否则会出现「0 条资产」却挂着珠宝/景别等条件的假象。
   useEffect(() => {

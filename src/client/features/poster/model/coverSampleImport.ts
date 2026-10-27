@@ -151,7 +151,7 @@ async function collectImage(
     skipped.push({ name, reason: '图片无法解码' });
     return;
   }
-  collected.push({ id: `${source}:${file.size}:${collected.length}`, name, source, file });
+  collected.push({ id: `cover_feed_${crypto.randomUUID()}`, name, source, file });
 }
 
 function zipEntrySize(entry: ZipEntry) {

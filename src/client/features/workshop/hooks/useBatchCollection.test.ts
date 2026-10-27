@@ -39,6 +39,29 @@ beforeEach(() => { runBatchCollect.mockReset(); });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('collection to image selection', () => {
+  it('abandons a product without deleting its collected record', () => {
+    const showToast = vi.fn();
+    const item = product('ready', 'success');
+    const itemsRef = { current: [item] };
+    const setItems = (update: SetStateAction<BatchProductItem[]>) => {
+      itemsRef.current = typeof update === 'function' ? update(itemsRef.current) : update;
+    };
+    let collection!: ReturnType<typeof useBatchCollection>;
+    function Harness() {
+      collection = useBatchCollection({
+        items: [item], itemsRef, setItems, batchInputText: '', setBatchInputText: vi.fn(), showToast, onCollected: vi.fn(),
+      });
+      return null;
+    }
+    renderToString(createElement(Harness));
+
+    collection.handleRemoveItem('ready');
+
+    expect(itemsRef.current).toHaveLength(1);
+    expect(itemsRef.current[0]).toMatchObject({ id: 'ready', selected: false });
+    expect(showToast).toHaveBeenCalledWith('已放弃商品「ready」');
+  });
+
   it('waits for all collection requests before opening selection and ignores repeat submissions', async () => {
     let finish!: () => void;
     const waitForRest = new Promise<void>(resolve => { finish = resolve; });

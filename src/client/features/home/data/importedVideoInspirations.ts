@@ -1,4 +1,4 @@
-import type { InspirationItem } from '../components/inspiration/InspirationModal';
+import type { InspirationItem } from '../model/inspirationItem';
 
 const MEDIA_ROOT = '/inspirations/imported-20260910';
 

@@ -1,23 +1,22 @@
 import type { SalesImageRef, VideoSalesScript } from '@shared/domain/sales';
-import { salesActualReferences } from '@shared/domain/sales';
-import MarkdownCodeBlock from '@client/shared/ui/markdown/MarkdownCodeBlock';
-import { SalesPromptReferences } from './SalesPromptReferences';
+import type { VideoSalesStudioState } from '../model/salesStudioDraft';
+import { salesProductProfile } from '../model/salesProductProfile';
 import { SalesScriptOutline } from './salesPlanning';
 import { SalesVideoMaterials } from './SalesVideoMaterials';
-import { salesCardClass, salesSectionTitleClass } from './salesChrome';
 
-export function SalesResultSidebar({ script, productImages }: { script: VideoSalesScript; productImages: SalesImageRef[] }) {
-  let references: ReturnType<typeof salesActualReferences> = [];
-  try { references = salesActualReferences(script, productImages); } catch { /* 方案尚未完成时仍展示脚本与可用素材。 */ }
-  return <div className="space-y-5">
-    <SalesScriptOutline script={script} productImages={productImages} showPlannedAssets={false} />
+/** All creative stages share the same product, outline and material tray. */
+export function SalesResultSidebar({ script, productImages, state }: { script: VideoSalesScript; productImages: SalesImageRef[]; state?: VideoSalesStudioState }) {
+  const profile = state ? salesProductProfile({ ...state, images: productImages, isCollected: state.collectionSource !== undefined || state.detailsMissing !== undefined || state.fromCache !== undefined }) : null;
+  return <div className="sales-workflow-sidebar">
+    {state && <header className="sales-sidebar-identity">
+      <h2 title={state.productName} className="line-clamp-2 text-sm font-semibold leading-6">{state.productName || '当前商品'}</h2>
+      <dl aria-label="商品与视频参数" className="mt-3 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+        <div title={profile?.sku || '未确认'} className="sales-sidebar-pill min-w-0 flex-1"><dt>SKU</dt><dd className="truncate">{profile?.sku || '未确认'}</dd></div>
+        <div className="sales-sidebar-pill shrink-0"><dt>目标时长</dt><dd>{state.targetDuration}s</dd></div>
+        <div className="sales-sidebar-pill shrink-0"><dt>画面比例</dt><dd>{state.aspectRatio}</dd></div>
+      </dl>
+    </header>}
+    <div className="sales-sidebar-outline"><SalesScriptOutline script={script} productImages={productImages} showPlannedAssets={false} timeline /></div>
     <SalesVideoMaterials script={script} productImages={productImages} />
-    <section aria-label="完整视频提示词" className="border-t border-slate-200/70 pt-5 dark:border-white/10">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className={salesSectionTitleClass}>完整视频提示词</h2>
-        <span className="text-[11px] text-slate-400">{script.fullPrompt?.trim() ? '已生成' : '未生成'}</span>
-      </div>
-      {script.fullPrompt?.trim() ? <MarkdownCodeBlock code={script.fullPrompt} renderedCode={<SalesPromptReferences prompt={script.fullPrompt} references={references} />} /> : <div className={`${salesCardClass} p-3 text-xs leading-6 text-slate-500 dark:text-slate-400`}>视频提示词将在素材确认后生成。</div>}
-    </section>
   </div>;
 }

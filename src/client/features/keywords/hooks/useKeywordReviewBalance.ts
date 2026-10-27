@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeywordReviewBalance } from '@shared/contracts/generate';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { credentialGet } from '@client/shared/api/credentialClient';
-import { DEEPSEEK_BASE_URL, type BalanceResponse } from '../model/reviewRequest';
+import { resolveKeywordReviewRoute, type KeywordReviewModelOption } from '@client/shared/models/keywordReviewModels';
+import type { BalanceResponse } from '../model/reviewRequest';
 
 const REFRESH_INTERVAL_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 12_000;
 
-export function useKeywordReviewBalance(enabled: boolean) {
+export function useKeywordReviewBalance(enabled: boolean, model: KeywordReviewModelOption) {
   const [balance, setBalance] = useState<KeywordReviewBalance | null>(null);
   const [balanceError, setBalanceError] = useState('');
   const [balanceUpdatedAt, setBalanceUpdatedAt] = useState<number | null>(null);
@@ -20,6 +21,9 @@ export function useKeywordReviewBalance(enabled: boolean) {
   const pendingForceRef = useRef(false);
   const lastAttemptRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modelRef = useRef(model);
+  modelRef.current = model;
+  const generationRef = useRef(0);
   const keyRef = useRef('');
   const spendVersionRef = useRef(0);
 
@@ -46,10 +50,15 @@ export function useKeywordReviewBalance(enabled: boolean) {
     timerRef.current = null;
     lastAttemptRef.current = Date.now();
     setBalanceRefreshing(true);
+    const generation = generationRef.current;
+    const isCurrent = () => enabledRef.current && generation === generationRef.current;
     const requestedSpendVersion = spendVersionRef.current;
     const request = (async () => {
       try {
-        const apiKey = (await credentialGet('deepseek_api_key')).trim();
+        const route = resolveKeywordReviewRoute(modelRef.current);
+        if (route.provider !== 'deepseek') return;
+        const apiKey = route.apiKey.trim() || (route.keySource === 'deepseek' ? (await credentialGet('deepseek_api_key')).trim() : '');
+        if (!isCurrent()) return;
         if (apiKey !== keyRef.current) {
           keyRef.current = apiKey;
           setBalance(null);
@@ -59,10 +68,11 @@ export function useKeywordReviewBalance(enabled: boolean) {
         const response = await apiFetch('/api/generate/keyword-review/balance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customBaseUrl: DEEPSEEK_BASE_URL, customApiKey: apiKey }),
+          body: JSON.stringify({ customBaseUrl: route.baseUrl, customApiKey: apiKey }),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
         const raw = await response.text();
+        if (!isCurrent()) return;
         let data: BalanceResponse;
         try { data = JSON.parse(raw) as BalanceResponse; }
         catch { throw new Error(`余额服务返回 HTTP ${response.status} 非 JSON 响应，请稍后刷新`); }
@@ -82,7 +92,7 @@ export function useKeywordReviewBalance(enabled: boolean) {
         else pendingRef.current = true;
         setBalanceError('');
       } catch (error) {
-        setBalanceError(error instanceof Error ? error.message : '余额查询失败');
+        if (isCurrent()) setBalanceError(error instanceof Error ? error.message : '余额查询失败');
       }
     })().finally(() => {
       inFlightRef.current = null;
@@ -98,14 +108,22 @@ export function useKeywordReviewBalance(enabled: boolean) {
   }, []);
 
   useEffect(() => {
+    setBalance(null);
+    setBalanceError('');
+    setBalanceUpdatedAt(null);
+    setBalanceDirty(false);
     if (!enabled) return;
     refreshBalance(true);
     const interval = setInterval(() => refreshBalance(), 30_000);
     return () => {
+      generationRef.current += 1;
       clearInterval(interval);
       if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      pendingRef.current = false;
+      pendingForceRef.current = false;
     };
-  }, [enabled, refreshBalance]);
+  }, [enabled, model, refreshBalance]);
 
   return { balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance, markDispatch };
 }

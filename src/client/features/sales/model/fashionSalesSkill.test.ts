@@ -80,12 +80,12 @@ describe('sales rule groups', () => {
     expect(source).toContain('画面无字幕、贴纸、大字标题或价格条');
     expect(source).toContain('口播不出现价格或金额');
     expect(source).toContain('没有依据的功效、评价、销量、实测、优惠、尺码或链接不编造');
-    expect(source).toContain('15秒全片写48–69个汉字');
-    expect(source).toContain('约每秒 3.2–4.6 个字');
-    expect(source).toContain('单段不超过约每秒 6 个字');
+    expect(source).toContain('15秒日常口播优先75–90个汉字');
+    expect(source).toContain('全片平均每秒5–6字');
+    expect(source).toContain('单段每秒8字仅为异常拦截上限');
     expect(source).toContain('对镜头说的第一人称');
     expect(source).toContain('可以直接入手、简单好搭、值得入、基础百搭、闭眼入不算收尾');
-    expect(source).toContain('语速略慢，一句说完停半拍，嘴型与原文对齐');
+    expect(source).toContain('自然聊天语速，停顿随语义和动作变化，嘴型与原文对齐');
     expect(source).toContain('参考成片吸收');
     expect(source).toContain('不认第二套、第三套');
     expect(source).toContain('不写换装或面料飘动');

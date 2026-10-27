@@ -11,7 +11,5 @@ export * from './catalog';
 export * from './promptAsset';
 export * from './categoryMigration';
 export * from './deconstructJobs';
-export * from './pptGeneration';
 export * from './videoSales';
-export * from './avatar';
 export * from './pets';

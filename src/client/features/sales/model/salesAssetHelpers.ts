@@ -1,5 +1,6 @@
 import type { SalesCreativeAsset, SalesImageRef, VideoSalesScript } from '@shared/domain/sales';
 import { salesContentRevision } from '@shared/domain/sales';
+import { salesImageReferenceRoles as roles, salesSkillStage } from '@shared/domain/sales/skill';
 
 export type SalesFrameGenerator = (input: {
   prompt: string;
@@ -64,16 +65,21 @@ export function salesAssetProductImages(asset: SalesCreativeAsset, images: Sales
 export function salesAssetImagePrompt(asset: SalesCreativeAsset, products: SalesImageRef[], dependencies: SalesCreativeAsset[], selectedColor: string): string {
   const lines = [
     `本次只生成一张静帧，素材名称：${asset.label}。`,
+    salesSkillStage('image'),
     `本张画面要求：${asset.prompt}`,
-    '只画本张要求的单一视角，不混入其他分镜动作，不生成多视图、拼图、对照图、文字或时间轴。',
+    roles.singleFrame,
   ];
   if (products.length) {
-    lines.push('商品原图是外观事实依据，生成素材不能覆盖或纠正原图事实。');
-    products.forEach((image, index) => lines.push(`输入参考图${index + 1}：商品原图（目录编号 ${image.index}）。先辨认其真实视角，按本张目标视角使用；目录编号和图片先后顺序不代表正反面。`));
-    lines.push('严格区分商品正面、背面、侧面和局部：按领口前后高低、门襟、口袋、接缝、胸前或背部图案与标志的位置判断，不能把背面当正面、水平镜像冒充转身，或把胸前标志移到背部。局部细节只能还原原图中可见的部位，不能臆造看不清的结构。');
+    lines.push(roles.product);
+    products.forEach((image, index) => lines.push(`输入参考图${index + 1}：商品原图（目录编号 ${image.index}）。${roles.productView}`));
+    lines.push(roles.viewEvidence);
     if (selectedColor.trim()) lines.push(`商品颜色：${selectedColor.trim()}；与商品原图保持一致。`);
+    lines.push(roles.colorFidelity);
   }
-  dependencies.forEach((dependency, index) => lines.push(`输入参考图${products.length + index + 1}：已生成素材「${dependency.label}」，只继承所需的人物身份、空间与光线；商品正反面与细节仍以商品原图及本张要求为准，不照搬前置素材的视角。`));
+  dependencies.forEach((dependency, index) => {
+    const role = dependency.kind === 'scene' ? roles.scene : roles.person;
+    lines.push(`输入参考图${products.length + index + 1}：已生成素材「${dependency.label}」，${role}；${roles.dependency}`);
+  });
   return lines.join('\n');
 }
 

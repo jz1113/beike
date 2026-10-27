@@ -3,6 +3,7 @@ import {
   type VideoSalesCategory, type VideoSalesMode, type VideoSalesProductAnalysis, type VideoSalesScript,
 } from '@shared/domain/sales';
 import type { SalesRouteHeaders } from './salesRoute';
+import { salesSkillBinding } from '@shared/domain/sales/skill';
 
 export interface SalesPlanApi {
   analyzeProductMedia(input: object): Promise<VideoSalesProductAnalysis>;
@@ -72,7 +73,7 @@ export async function buildSalesPlan(input: {
   return {
     analysis,
     script: {
-      ...selected, shots, totalDuration: total, deliveryMode: 'single', workflowVersion: 3, planStale: false,
+      ...selected, ...salesSkillBinding(), shots, totalDuration: total, deliveryMode: 'single', workflowVersion: 3, planStale: false,
       assets: selected.assets.map((asset) => ({
         ...asset, usesProduct: asset.usesProduct ?? false,
         url: undefined, status: 'pending', validation: 'pending',

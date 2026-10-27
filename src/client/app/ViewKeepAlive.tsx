@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppView } from '@client/store/appView';
 import { ViewVisibilityContext } from '@client/shared/hooks/useViewVisibility';
 
-const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'keyword_review', 'headline_poster', 'assets', 'canvas', 'workshop', 'avatar', 'ppt_generator', 'video_sales'];
+const KEEP_ALIVE_VIEWS: AppView[] = ['home', 'generate', 'keyword_review', 'headline_poster', 'assets', 'canvas', 'workshop', 'video_sales'];
 
 interface ViewKeepAlivePanelProps {
   view: AppView;

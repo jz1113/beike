@@ -131,69 +131,6 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
-  /api/avatar/characters:
-    get:
-      operationId: get_api_avatar_characters
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-    post:
-      operationId: post_api_avatar_characters
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  '/api/avatar/characters/{id}':
-    delete:
-      operationId: delete_api_avatar_characters_id
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/avatar/fonts:
-    get:
-      operationId: get_api_avatar_fonts
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/avatar/render:
-    post:
-      operationId: post_api_avatar_render
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/avatar/tasks:
-    get:
-      operationId: get_api_avatar_tasks
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  '/api/avatar/tasks/{id}':
-    delete:
-      operationId: delete_api_avatar_tasks_id
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-    get:
-      operationId: get_api_avatar_tasks_id
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/avatar/voices:
-    get:
-      operationId: get_api_avatar_voices
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-    post:
-      operationId: post_api_avatar_voices
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  '/api/avatar/voices/{id}':
-    delete:
-      operationId: delete_api_avatar_voices_id
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
   '/api/catalog/assets/{type}/{id}/create-version':
     post:
       operationId: post_api_catalog_assets_type_id_create_version
@@ -352,14 +289,14 @@ paths:
                     type: string
     post:
       operationId: post_api_catalog_category_skills
-      description: 逐组观察、整理候选、维护经验及切换版本；学习请求不自动重放失败调用。
+      description: 逐组观察、整理候选、手动编辑新候选、维护经验及切换版本；学习请求支持后台执行，编辑不覆盖已有版本，学习请求不自动重放失败调用。
       parameters:
         - in: query
           name: action
           required: true
           schema:
             type: string
-            enum: [learn, observe, remember, forget, retry-sample, configure, trial, baseline, publish, rollback]
+            enum: [learn, observe, consolidate, edit, remember, forget, retry-sample, configure, trial, baseline, publish, activate, rollback]
       requestBody:
         required: true
         content:
@@ -381,6 +318,9 @@ paths:
                   default: 5
                 force:
                   type: boolean
+                background:
+                  type: boolean
+                  description: 学习操作登记后立即返回，模型调用在服务端继续执行。
                 kind:
                   type: string
                   enum: [prefer, avoid]
@@ -391,9 +331,20 @@ paths:
                   type: string
                 versionId:
                   type: string
+                promptSnippet:
+                  type: string
+                  minLength: 1
+                  maxLength: 16000
+                  description: edit 操作的完整技能正文；versionId 指定来源版本。
+                summary:
+                  type: string
+                  maxLength: 200
+                  description: edit 操作的修改说明。
       responses:
         '200':
           description: 操作成功；学习操作包含 observed 或 candidate 阶段、已读组数和剩余组数。
+        '202':
+          description: 学习任务已登记，服务端将在后台继续执行；通过 GET 轮询 scope.runningToken、progress 和 error。
         '409':
           description: 状态冲突、相同资料已尝试或候选尚未通过实际成图对照。
   /api/catalog/collect:
@@ -672,9 +623,27 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  '/api/generate/headline-memory/revisions/{id}':
+    get:
+      operationId: get_api_generate_headline_memory_revisions_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/generate/headline-memory/revisions/{id}/restore':
+    post:
+      operationId: post_api_generate_headline_memory_revisions_id_restore
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/headline-memory/trash:
     delete:
       operationId: delete_api_generate_headline_memory_trash
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/generate/headline-memory/usages/{id}':
+    patch:
+      operationId: patch_api_generate_headline_memory_usages_id
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
@@ -727,30 +696,6 @@ paths:
   /api/generate/layer-decomposition:
     post:
       operationId: post_api_generate_layer_decomposition
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/ppt-detail:
-    post:
-      operationId: post_api_generate_ppt_detail
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/ppt-narration:
-    post:
-      operationId: post_api_generate_ppt_narration
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/ppt-outline:
-    post:
-      operationId: post_api_generate_ppt_outline
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/ppt-slide:
-    post:
-      operationId: post_api_generate_ppt_slide
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应

@@ -5,8 +5,6 @@ interface Props {
   onEnterWorkshop: () => void;
   onOpenHeadlinePoster: () => void;
   onOpenKeywordReview: () => void;
-  onOpenPptGenerator?: () => void;
-  onOpenAvatarStudio?: () => void;
   onOpenVideoSales?: () => void;
   onOpenCollectorHub?: () => void;
   onPlaceholderClick?: (title: string) => void;
@@ -17,8 +15,8 @@ const capsules = [
   { id: 'workshop', title: '电商图文', hint: '从商品到批量图文的一站式创作', icon: ShoppingBag },
   { id: 'headline_poster', title: '封面', hint: '商品与标题，一次生成吸睛封面', icon: Brush },
   { id: 'keyword_review', title: '词包', hint: '批量语义分类，审核内容是否值得制作', icon: FilePen },
-  { id: 'digital_human', title: '数字人', hint: '高颜值数字人克隆与口播视频生成', icon: ScanFace },
-  { id: 'ppt_generator', title: 'PPT', hint: '一句话/大纲，AI 视觉渲染高保真演示文稿', icon: FileType },
+  { id: 'digital_human', title: '数字人', hint: '功能重建中', icon: ScanFace },
+  { id: 'ppt_generator', title: 'PPT', hint: '功能重建中', icon: FileType },
   { id: 'collector_hub', title: '采集', hint: '聚合商品与社媒内容，沉淀可用素材库', icon: Download },
 ] as const;
 
@@ -26,8 +24,6 @@ export default function FeatureCapsules({
   onEnterWorkshop,
   onOpenHeadlinePoster,
   onOpenKeywordReview,
-  onOpenPptGenerator,
-  onOpenAvatarStudio,
   onOpenVideoSales,
   onOpenCollectorHub,
   onPlaceholderClick,
@@ -40,9 +36,9 @@ export default function FeatureCapsules({
     headline_poster: onOpenHeadlinePoster,
     workshop: onEnterWorkshop,
     keyword_review: onOpenKeywordReview,
-    ppt_generator: onOpenPptGenerator || (() => handlePlaceholder('PPT')),
-    collector_hub: onOpenCollectorHub || (() => {}),
-    digital_human: onOpenAvatarStudio || (() => handlePlaceholder('数字人')),
+    ppt_generator: () => handlePlaceholder('PPT'),
+    collector_hub: onOpenCollectorHub || (() => handlePlaceholder('采集')),
+    digital_human: () => handlePlaceholder('数字人'),
     video_sales: onOpenVideoSales || (() => handlePlaceholder('电商视频')),
   };
 

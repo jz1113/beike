@@ -8,9 +8,9 @@ import { exportReviewedWorkbook, parseKeywordWorkbook, parseKeywordWorkbookData 
 import { advanceAutomaticRetryVersions, applyBatchResults, isAutomaticRetryRecord, updateReviewRecords } from '../model/reviewProgress';
 import { DEEPSEEK_BASE_URL } from '../model/reviewRequest';
 import { runKeywordReviewBatches } from '../model/reviewRun';
-import { prepareReviewRun } from '../model/reviewRunPreparation';
-import { DEFAULT_KEYWORD_REVIEW_SETTINGS, normalizeKeywordReviewSettings, type KeywordReviewSettings } from '../model/keywordReviewSettings';
-import { addTokenUsage, estimateReviewYuan, formatReviewYuan, isDeepSeekPeakHour, readTokenUsage } from '../model/reviewCost';
+import { prepareReviewRun, validateReviewInputs } from '../model/reviewRunPreparation';
+import { normalizeKeywordReviewSettings, type KeywordReviewSettings } from '../model/keywordReviewSettings';
+import { addTokenUsage, estimateReviewYuan, formatReviewYuan, readTokenUsage } from '../model/reviewCost';
 import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import { useKeywordReviewPreview, PREVIEW_LIMIT, type KeywordReviewFilter } from './useKeywordReviewPreview';
 import { useKeywordReviewConfig } from './useKeywordReviewConfig';
@@ -18,8 +18,6 @@ import { useKeywordReviewBalance } from './useKeywordReviewBalance';
 import { useKeywordReviewSession } from './useKeywordReviewSession';
 import type { ReviewSubmission } from '../model/reviewSubmission';
 
-export const KEYWORD_REVIEW_BATCH_SIZE = DEFAULT_KEYWORD_REVIEW_SETTINGS.batchSize;
-export const KEYWORD_REVIEW_CONCURRENCY = DEFAULT_KEYWORD_REVIEW_SETTINGS.maxConcurrency;
 export type { KeywordReviewFilter } from './useKeywordReviewPreview';
 
 export function useKeywordReview() {
@@ -47,7 +45,7 @@ export function useKeywordReview() {
   const busy = () => isRunning || runStartingRef.current || exportingRef.current || importingRef.current || session.pendingWrites.current > 0;
   const { settings, modelOptions, selectedModel, selectModel: selectConfiguredModel, saveSettings: saveConfiguredSettings } = useKeywordReviewConfig(busy, setNotice);
   const { balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance, markDispatch } =
-    useKeywordReviewBalance(selectedModel.provider === 'deepseek' && (visible || isRunning));
+    useKeywordReviewBalance(selectedModel.provider === 'deepseek' && (visible || isRunning), selectedModel);
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; stopRequestedRef.current = true; inputVersionRef.current += 1; };
@@ -123,8 +121,9 @@ export function useKeywordReview() {
     runStartingRef.current = true; setIsPreparing(true);
     const version = inputVersionRef.current;
     const runModel = selectedModel;
+    const queue = mode === 'trial' ? candidates.slice(0, settings.trialSize) : candidates;
     let route: ReturnType<typeof resolveKeywordReviewRoute>;
-    try { route = resolveKeywordReviewRoute(runModel); }
+    try { validateReviewInputs(queue); route = resolveKeywordReviewRoute(runModel); }
     catch (error) {
       finishPreparing(); setNotice(error instanceof Error ? error.message : '审核准备失败，未发起审核请求'); return;
     }
@@ -145,13 +144,12 @@ export function useKeywordReview() {
           ...record, status: 'idle', error: undefined, submissionUncertain: false,
         })));
       }
-      setContext({ rulesVersion, usageProvider: route.provider, modelValue: runModel.value, settings,
+      setContext({ rulesVersion, usageProvider: route.provider, usageModel: route.model, modelValue: runModel.value, settings,
         tokenUsage: { cacheHit: 0, cacheMiss: 0, completion: 0 }, estimatedYuan: 0 });
       await commit();
     } catch (error) {
       finishPreparing(); setNotice(error instanceof Error ? error.message : '审核准备失败，未发起审核请求'); return;
     }
-    const queue = mode === 'trial' ? candidates.slice(0, settings.trialSize) : candidates;
     const controller = new AbortController();
     stopRequestedRef.current = false; abortRef.current = controller;
     setIsRunning(true); setRunMode(mode); setIsStopping(false);
@@ -164,7 +162,6 @@ export function useKeywordReview() {
         signal: controller.signal, shouldStop, requestStop: () => { stopRequestedRef.current = true; },
         indices: recordIndicesRef.current, versions: batchRetryVersionsRef.current, notice: setNotice,
         refreshBalance: (force) => { if (route.provider === 'deepseek') refreshBalance(force); },
-        onWaiting: () => {},
         onDispatch: async (submission) => {
           if (session.errorRef.current) throw new Error(session.errorRef.current);
           setContext((current) => ({ ...current, reviewAttempted: true, submissions: [...current.submissions, submission] }));
@@ -182,7 +179,7 @@ export function useKeywordReview() {
           const used = readTokenUsage(usage);
           recordChatTokens({ modelId: route.model, modelName: runModel.label, type: 'chat', usage });
           setContext((current) => ({ ...current, tokenUsage: addTokenUsage(current.tokenUsage, used),
-            estimatedYuan: current.estimatedYuan + estimateReviewYuan(used, date).yuan }));
+            estimatedYuan: current.estimatedYuan + (route.provider === 'deepseek' && route.model === 'deepseek-flash' ? estimateReviewYuan(used, date).yuan : 0) }));
         },
         onSuccess: async (_chunk, results, _lookedUp, _usage, _lookupUsage, submission) => {
           setRecords((current) => applyBatchResults(current, recordIndicesRef.current, results));
@@ -281,8 +278,8 @@ export function useKeywordReview() {
     filteredCount: filteredRecords.length, previewLimit: PREVIEW_LIMIT, settings, saveSettings,
     trialSize: settings.trialSize, batchSize: settings.batchSize, concurrency: settings.maxConcurrency,
     isImporting, isPreparing, isRunning, runMode, isExporting, isStopping, hasUnexportedResults: context.hasUnexportedResults, notice,
-    tokenUsage: context.tokenUsage, usageProvider: context.usageProvider, estimatedCost: { yuan: context.estimatedYuan },
-    estimatedCostLabel: formatReviewYuan(context.estimatedYuan), peakHour: selectedModel.provider === 'deepseek' && isDeepSeekPeakHour(),
+    tokenUsage: context.tokenUsage, usageProvider: context.usageProvider,
+    estimatedCostLabel: context.usageProvider === 'deepseek' && context.usageModel === 'deepseek-flash' ? formatReviewYuan(context.estimatedYuan) : null,
     balance, balanceError, balanceUpdatedAt, balanceRefreshing, balanceDirty, refreshBalance,
     sessionRecovery: session.recovery, sessionLoading: session.loading, sessionSaving: session.saving,
     sessionSavedAt: session.savedAt, sessionError: session.error, sessionReady: session.canStart(),

@@ -9,9 +9,9 @@ import (
 
 const BaseRecipeID = "__category_skill__"
 
-// The base supplies product constraints while each original group supplies its own visual style.
+// The base is a complete creative skill; training references are never production inputs.
 func BaseRecipe() map[string]any {
-	return map[string]any{"id": BaseRecipeID, "name": "按参考图组应用细分技能", "category": "general", "tag": "自动细分", "libraryVersion": "category-base-v1", "promptSnippet": "商品身份、外形、颜色、结构、标识、比例与材质以当前商品图片（@图片1）为准，不复制参考图中的旧商品，不臆造不可见细节。单镜绘图提示词按【@图片1主体结构锚定 → 构图机位与主体占比 → 动作握持/佩戴/摆放接触 → 生活场景与前景背景层次 → 自然光色与接触阴影 → 材质微距纹理与实拍景深 → 负向约束】架构组织；四镜保持参考图组的分镜递进与叙事节奏。只修改换品必需的握持、佩戴、支撑、接触、遮挡与受光关系；明确替换项按用户选择执行，静物、手部、人像的出镜范围严格一致。细分规则按适用条件调用，不将不同风格平均为单一模板。"}
+	return map[string]any{"id": BaseRecipeID, "name": "按商品细分应用创作技能", "category": "general", "tag": "自动细分", "libraryVersion": "category-creative-v2", "promptSnippet": "以当前商品图（@图片1）确认身份、型号、颜色、结构、标识、比例和材质，不臆造不可见细节或未经证实的参数。根据商品用途、可见结构及适用的类目创作方法，自主设计可共同发布的小红书生活摄影分镜：每镜有明确展示目的、构图机位、主体占比、动作或摆放接触、生活场景、自然光色、真实材质与接触阴影。四镜或八镜按内容安排递进与差异，不机械重复机位，不强制人像、棚拍或奢华道具。需要人物时明确成年人物身份与穿搭，并在同款多镜中保持一致；纯静物不添加人脸或手部，仅手部镜头不扩展为人像。每镜输出完整、独立可执行的提示词。技能中的历史样本只用于归纳创作方法，生产不绑定或复刻任何参考原图。"}
 }
 
 func Apply(ctx context.Context, db *sql.DB, workspace string, group map[string]any, refs []string, shots []map[string]any, base map[string]any) (map[string]any, error) {

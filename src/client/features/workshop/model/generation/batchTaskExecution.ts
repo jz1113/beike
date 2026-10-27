@@ -42,7 +42,7 @@ export async function executeSingleImageTask(
   const chosenProductImg =
     item.selectedProductImages[0] || item.coverImage || shot.productImageUrl;
   let promptText = (shot.prompt || '').trim();
-  if (shot.assembly_source !== 'group_skeleton' && item.lookParts?.top && !isGenericLook(item.lookParts.top) && shot.has_human !== false) {
+  if (shot.assembly_source !== 'group_skeleton' && shot.assembly_source !== 'skill' && item.lookParts?.top && !isGenericLook(item.lookParts.top) && shot.has_human !== false) {
     promptText = enforceLookConsistency(
       promptText,
       item.lookParts,
@@ -61,7 +61,7 @@ export async function executeSingleImageTask(
     throw new Error('该分镜为过期包装机位，请重新分析');
   }
 
-  const skipFace = shot.has_human === false || shot.shot_type === 'pure_product' || shot.shot_type === 'hand_held_only';
+  const skipFace = shot.assembly_source === 'skill' || shot.has_human === false || shot.shot_type === 'pure_product' || shot.shot_type === 'hand_held_only';
   // Keep the chosen front/cover as the stable @图片1 slot, while forwarding a
   // small set of additional views so the model can verify front/back/details.
   // Four views keeps the request bounded and avoids turning a product collage

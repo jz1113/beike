@@ -64,6 +64,7 @@ func mustMigrations() []migration {
 		{version: "20261023_01_category_skill_memory", checksum: file("category_skill_memory.sql"), apply: script("category_skill_memory.sql", false)},
 		{version: "20261023_02_workshop_repair", checksum: label("workshop-learning-and-shot-repair-v1"), apply: applyWorkshopRepair},
 		{version: "20261023_03_reference_folder_repair", checksum: label("reference-primary-subject-folder-repair-v1"), apply: applyReferenceFolderRepair},
+		{version: "20261026_01_cover_learning", checksum: file("cover_learning.sql"), apply: script("cover_learning.sql", false)},
 	}
 }
 

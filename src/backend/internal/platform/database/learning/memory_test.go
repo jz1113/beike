@@ -116,3 +116,33 @@ func TestHistoricalHoldoutsBecomeAvailableWithoutLosingObservations(t *testing.T
 		t.Fatal("historical role blocked learning", err)
 	}
 }
+
+func TestObservationCacheIsInvalidatedBySkillInstructionChanges(t *testing.T) {
+	db := learningDB(t)
+	ctx := context.Background()
+	insertGroup(t, db, "g1", "g1", "a", "phone", "deconstructed")
+	first, err := LoadDataset(ctx, db, "a", testFolder)
+	if err != nil || len(first.Samples) != 1 {
+		t.Fatalf("initial dataset: %#v %v", first, err)
+	}
+	raw := json.RawMessage(`{"compatible":true,"groupFramework":"四镜递进","differenceAxes":["机位","动作","场景"],"observations":[{"shot":1,"visual":"可见","replacement":"替换","purpose":"展示","promptTemplate":"主体→机位","promptExample":"@图片1"}],"reusableRules":["保真"],"conditions":["手持"],"failuresToAvoid":["变形"]}`)
+	if err := SaveObservation(ctx, db, "a", testFolder, "vision", first.Samples[0], raw); err != nil {
+		t.Fatal(err)
+	}
+	before, err := ReadMemory(ctx, db, "a", testFolder, first)
+	if err != nil || before.Learned != 1 || before.Stale != 0 {
+		t.Fatalf("cached observation not learned: %#v %v", before, err)
+	}
+	_, err = db.Exec(`INSERT INTO "CategorySkillVersion" ("id","workspaceId","folderId","parentVersionId","sourceFingerprint","manifestJson","promptSnippet","summary","model","createdAt") VALUES ('manual-v1','a',?, '', '', '{}', '改用更细的提示词架构并重新核对证据', '', 'manual', CURRENT_TIMESTAMP)`, testFolder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := LoadDataset(ctx, db, "a", testFolder)
+	if err != nil || second.LearningFingerprint == first.LearningFingerprint {
+		t.Fatalf("skill instruction did not change learning fingerprint: %#v %v", second, err)
+	}
+	after, err := ReadMemory(ctx, db, "a", testFolder, second)
+	if err != nil || after.Learned != 0 || after.Stale != 1 || after.Pending != 1 {
+		t.Fatalf("changed instruction reused old observation: %#v %v", after, err)
+	}
+}

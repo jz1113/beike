@@ -10,6 +10,7 @@ import (
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
 	want := map[string]string{
+		"20261026_01_cover_learning":                           "bd3c97e8cabc8b50cd383bb9adeb5206c49898d468886c113f965e7c550c585d",
 		"20261023_03_reference_folder_repair":                  "94e470dda4794de5fc6fc5063179dbd7c9fc6bfabacded305c3942828cc5505f",
 		"20261023_02_workshop_repair":                          "0b8bbd17d7b1855a7da951442a9a9efcae6422db39d4479ca49ce85398386645",
 		"20261023_01_category_skill_memory":                    "0c80824b6c90b1470efda4c793964a8794f62b0ad1fb99c6188865ab2065e12b",

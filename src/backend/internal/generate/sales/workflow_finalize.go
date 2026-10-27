@@ -73,6 +73,13 @@ func handleWorkflowFinalize(w http.ResponseWriter, r *http.Request, cfg config.C
 	response := map[string]any{"success": true, "model": model}
 	prompts, full, err := parseWorkflowPrompts(content, shots)
 	if err == nil {
+		full = chineseSalesDirecting(full, shots)
+		for i := range prompts {
+			prompts[i].Prompt = chineseSalesDirecting(prompts[i].Prompt, shots)
+		}
+		err = validateChineseSalesDirecting(full, prompts, shots)
+	}
+	if err == nil {
 		err = validateFinalSpeech(full, prompts, shots)
 	}
 	if err == nil {
@@ -91,8 +98,10 @@ func handleWorkflowFinalize(w http.ResponseWriter, r *http.Request, cfg config.C
 	if usage := generate.NormalizeUsage(raw); usage != nil {
 		response["usage"] = usage
 	}
-	httpx.WriteJSON(w, 200, response)
+	httpx.WriteJSON(w, 200, withSalesSkill(response))
 }
+
+var unresolvedFinalReference = regexp.MustCompile(`(?i)\{\{\s*Mixed\b[^}]*\}\}|</?node-asset\b`)
 
 var finalImageNumber = regexp.MustCompile(`(?:图片|参考图|图)\s*([0-9]+)`)
 
@@ -102,6 +111,9 @@ func validateFinalImageNumbers(full string, prompts []finalPrompt, count int) er
 		texts = append(texts, prompt.Prompt)
 	}
 	for _, text := range texts {
+		if unresolvedFinalReference.MatchString(text) {
+			return fmt.Errorf("定稿残留未绑定的参考占位，请改用实际图片编号")
+		}
 		for _, match := range finalImageNumber.FindAllStringSubmatch(text, -1) {
 			index, err := strconv.Atoi(match[1])
 			if err != nil || index < 1 || index > count {
@@ -117,7 +129,8 @@ func parseWorkflowPrompts(content string, shots []ScriptShot) ([]finalPrompt, st
 		FullPrompt string        `json:"fullPrompt"`
 		Prompts    []finalPrompt `json:"prompts"`
 	}
-	if json.Unmarshal([]byte(content), &parsed) != nil || strings.TrimSpace(parsed.FullPrompt) == "" {
+	object, ok := scriptJSONObject(content)
+	if !ok || json.Unmarshal(object, &parsed) != nil || strings.TrimSpace(parsed.FullPrompt) == "" {
 		return nil, "", fmt.Errorf("缺少完整视频提示词或 JSON 无效")
 	}
 	if len(parsed.Prompts) != len(shots) {
@@ -132,7 +145,7 @@ func parseWorkflowPrompts(content string, shots []ScriptShot) ([]finalPrompt, st
 		if !expected[prompt.ShotID] || byID[prompt.ShotID].ShotID != 0 || strings.TrimSpace(prompt.Prompt) == "" {
 			return nil, "", fmt.Errorf("定稿分镜编号未知、重复或缺少提示词")
 		}
-		byID[prompt.ShotID] = finalPrompt{ShotID: prompt.ShotID, Prompt: strings.TrimSpace(prompt.Prompt)}
+		byID[prompt.ShotID] = finalPrompt{ShotID: prompt.ShotID, SpeechMode: prompt.SpeechMode, Prompt: strings.TrimSpace(prompt.Prompt)}
 	}
 	out := make([]finalPrompt, 0, len(shots))
 	for _, shot := range shots {
@@ -142,28 +155,46 @@ func parseWorkflowPrompts(content string, shots []ScriptShot) ([]finalPrompt, st
 }
 
 func workflowFinalConstraints(payload map[string]any, shots []ScriptShot, refs []actualReference, target int, ratio string) string {
-	intro := fmt.Sprintf("一次生成一条完整视频，总时长精确 %d 秒，画幅 %s。分镜仅为同一视频时间轴，禁止增删时长。全程无字幕、无贴纸、无价格条，口播由视频模型生成，不要出现价格、金额或优惠。", target, ratio)
-	intro += fashionPaceNote() + "\n" + fashionFramingRules()
+	intro := strings.NewReplacer("{{target}}", strconv.Itoa(target), "{{ratio}}", ratio).Replace(salesSkillDirective("video", "intro"))
+	intro = "【视频要求】\n" + intro + "\n" + fashionVideoRenderRules()
 
-	lines := []string{intro, salesSpeechRules()}
-	for i, ref := range refs {
-		lines = append(lines, fmt.Sprintf("图片%d：%s（ID=%s，类型=%s）；按实际图片锁定外观与连续性。", i+1, ref.Label, ref.ID, ref.Kind))
-	}
+	lines := []string{intro, "【商品外观】\n" + salesSkillDirective("video", "colorFidelity")}
 	if color := strings.TrimSpace(generate.StringField(payload, "selectedColor")); color != "" {
-		lines = append(lines, "商品颜色事实："+color+"；款式与商品原图一致，不可创意改色或换款。")
+		lines = append(lines, strings.ReplaceAll(salesSkillDirective("video", "selectedColor"), "{{color}}", color))
 	}
+	if len(refs) > 0 {
+		lines = append(lines, "【图片参考职责】")
+	}
+	for i, ref := range refs {
+		role := salesSkillDirective("referenceRoles", "default")
+		switch ref.Kind {
+		case "product":
+			role = salesSkillDirective("referenceRoles", "product")
+		case "scene":
+			role = salesSkillDirective("referenceRoles", "scene")
+		case "face":
+			role = salesSkillDirective("referenceRoles", "face")
+		}
+		lines = append(lines, fmt.Sprintf("图片%d：%s。", i+1, role))
+	}
+	lines = append(lines, "【分段声音要求】")
 	start := 0
 	for _, shot := range shots {
-		lines = append(lines, fmt.Sprintf("%d–%d秒：镜头%d，口播原文「%s」。", start, start+shot.Duration, shot.ShotId, shot.Voiceover)+speechDirection(shot.SpeechMode))
+		// The generated full prompt has already been checked for every verbatim line.
+		// Keep timing and source deterministic without repeating dialogue or implying a cut.
+		lines = append(lines, fmt.Sprintf("%d–%d秒：", start, start+shot.Duration)+speechDirection(shot.SpeechMode))
 		start += shot.Duration
 	}
-	return strings.Join(lines, "\n")
+	return chineseSalesDirecting(strings.Join(lines, "\n"), nil)
 }
 
 func workflowFinalizeBody(model string, payload map[string]any, shots []ScriptShot, refs []actualReference, catalog []CatalogImage, target int, ratio string) map[string]any {
-	facts, _ := json.Marshal(map[string]any{"shots": shots, "assets": payload["assets"], "productAnalysis": payload["productAnalysis"], "category": payload["category"], "selectedColor": payload["selectedColor"], "videoModel": payload["videoModel"], "videoRefMode": payload["videoRefMode"], "videoResolution": payload["videoResolution"]})
-	system := `沿用每段 speechMode；voiceover 字段是台词原文，不默认代表旁白。fullPrompt 和对应分段 prompts 必须完整保留本段台词原文及声音来源，不增删改写。你负责服饰、鞋、包的实际图片定稿。逐张观察实际参考图与商品原图，以真实图的外观而非计划中的想象写一条完整视频提示词。图片编号只能引用给出的实际图片连续编号，不得把商品对照图的目录编号当成图片编号，不得虚构缺失人物、人脸或场景。参考图是外观约束，不强迫图间幻灯片切换。逐张辨认商品正面、背面和局部，锁定领口、门襟、口袋、接缝、图案和标志所在部位；不能把背面写成正面、把镜像写成转身或把胸前标志移到背部。保持人物身份、商品颜色款式、空间与动作连续；采用真实穿搭或鞋包展示规则。禁止编造事实。逐段包含准确起止秒数、原文口播、运镜、动作和衔接；全程无字幕。一次生成整段视频，不拆任务。不要求人物或场景绘图提示词，不生成 imagePrompt。没有提供的视频模型、分辨率、参考模式均不得自行默认或猜测；音频能力已经由调用方检查。严格按输入画幅、目标时长，不输出固定竖屏。只输出 JSON {"fullPrompt":"一条整段视频提示词","prompts":[{"shotId":1,"prompt":"本段定稿"}]}。`
-	system += "\n" + fashionFinalPromptRules()
+	facts, _ := json.Marshal(map[string]any{"shots": shots, "assets": payload["assets"], "productAnalysis": payload["productAnalysis"], "productDescription": payload["productDescription"], "category": payload["category"], "selectedColor": payload["selectedColor"], "videoModel": payload["videoModel"], "videoRefMode": payload["videoRefMode"], "videoResolution": payload["videoResolution"]})
+	system := salesSkillInstructions("finalize") + `
+只执行实际图片定稿，严格保持输入时间轴、画幅、原文台词与 speechMode。不要求人物或场景绘图提示词，不输出 imagePrompt。参考编号以 actualReferences 的实际顺序为准，商品对照原图目录编号不等于成片编号。
+fullPrompt 和每项 prompt 的画面、动作、声音及标题全部使用中文；出镜说话、画外音、商品规格、标志、生活记录均写中文，不把英文协议值、字段名、品牌原文或内部标识带进提示词正文。JSON 字段名和 speechMode 枚举值按协议保留英文，已确认的台词原文逐字保留。
+完整提示词按模板用【中文章节名】独立换行，段落之间换行，时间轴每个时间范围独占一段。只写当前商品及实际镜头的执行内容，不照抄教程，不重复请求前言中的通用规则、参考职责或声音时间轴。
+只输出 JSON {"fullPrompt":"完整视频提示词，逐段声音来源明确，每段台词原文仅写一次","prompts":[{"shotId":1,"speechMode":"on_camera","prompt":"本段实际图定稿，完整保留本段台词原文一次"}]}。speechMode 只能为 on_camera 或 voiceover，必须逐段与输入一致；示例值不是默认值。prompts 必须与原 shotId 一一对应。`
 
 	return withLongOutput(chatBody(model, system, workflowVisionParts(workflowFinalConstraints(payload, shots, refs, target, ratio)+"\n请求事实："+string(facts), refs, catalog), 0.3))
 }

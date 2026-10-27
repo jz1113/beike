@@ -15,6 +15,7 @@ import { isDeliverableWorkshopResult, isUsableWorkshopResult } from '../../model
 import { BatchStage4ProductInfo } from './BatchStage4ProductInfo';
 import { BatchStage4CopyPanel } from './BatchStage4CopyPanel';
 import { WorkshopPromoteGroup } from '../delivery/WorkshopPromoteGroup';
+import { workshopProductSource } from '../../model/collection/productSource';
 
 export interface BatchStage4ProductItemProps {
   productNavigation?: React.ReactNode;
@@ -66,17 +67,6 @@ export function BatchStage4ProductItem({
     handleCopy(`all_${prod.id}`, fullText);
   };
 
-  const resolveJdUrl = (prod: BatchProductItem) => {
-    const cleanId = String(prod.itemId || prod.id || '').replace(/[^\d]/g, '');
-    if (cleanId) {
-      return `https://item.jd.com/${cleanId}.html`;
-    }
-    if (prod.url && prod.url.startsWith('http')) {
-      return prod.url;
-    }
-    return `https://search.jd.com/Search?keyword=${encodeURIComponent(prod.title)}`;
-  };
-
   const tasks = item.tasks || [];
   const successTasks = tasks.filter(isUsableWorkshopResult);
   const selectedImages = [...new Set((item.selectedProductImages || []).filter(Boolean))];
@@ -90,8 +80,7 @@ export function BatchStage4ProductItem({
     .map(t => t.resultUrl)
     .filter((url): url is string => typeof url === 'string' && url.length > 0);
 
-  const jdUrl = resolveJdUrl(item);
-  const cleanId = String(item.itemId || item.id || '').replace(/[^\d]/g, '');
+  const productUrl = workshopProductSource(item);
 
   return (
     <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)] gap-4 items-start animate-in fade-in duration-200">
@@ -99,8 +88,7 @@ export function BatchStage4ProductItem({
       <div className="lg:row-span-2 min-w-0 space-y-4">
       <BatchStage4ProductInfo
         item={item}
-        jdUrl={jdUrl}
-        cleanId={cleanId}
+        productUrl={productUrl}
         copiedId={copiedId}
         onCopy={handleCopy}
         onPreview={(url) => {

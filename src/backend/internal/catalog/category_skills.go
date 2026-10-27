@@ -118,6 +118,15 @@ func CategorySkills(cfg config.Config) http.Handler {
 			writeSkillError(w, 400, "请刷新后再修改技能状态")
 			return
 		}
+		if action == "edit" {
+			id, editErr := learning.EditVersion(r.Context(), db, workspace, folder, styleString(payload, "versionId"), styleString(payload, "promptSnippet"), styleString(payload, "summary"), int(revision))
+			if editErr != nil {
+				writeSkillError(w, http.StatusConflict, editErr.Error())
+				return
+			}
+			httpx.WriteJSON(w, 200, map[string]any{"success": true, "versionId": id})
+			return
+		}
 		if action == "remember" || action == "forget" || action == "retry-sample" {
 			if action == "retry-sample" {
 				dataset, loadErr := learning.LoadDataset(r.Context(), db, workspace, folder)
@@ -166,5 +175,5 @@ func categoryReadError(w http.ResponseWriter, err error) {
 }
 
 func categoryAttempt(dataset learning.Dataset, memory learning.Memory, feedbackHash string) string {
-	return learning.Hash([]string{dataset.Fingerprint, feedbackHash, memory.Fingerprint, learning.EngineVersion})
+	return learning.Hash([]string{dataset.Fingerprint, dataset.LearningFingerprint, feedbackHash, memory.Fingerprint, learning.EngineVersion})
 }

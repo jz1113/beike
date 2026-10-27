@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
-import { ArrowRight, Check, Plus, Settings2, X } from 'lucide-react';
-import { apiFetch, proxyMediaUrl } from '@client/shared/api/apiClient';
+import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { Check, FolderClosed, MoreHorizontal, Plus, Settings2, X } from 'lucide-react';
+import { apiFetch } from '@client/shared/api/apiClient';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
-import Folder from '@client/shared/media/widgets/Folder';
 import { PromptFolderDeleteDialog } from './PromptFolderDeleteDialog';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import type { PromptGroupFolder } from '../../model/promptGroupFolders';
@@ -15,20 +14,20 @@ export { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders } from '../
 interface Props {
   categories: AssetProductCategory[];
   folders: PromptGroupFolder[];
-  total: number;
   onOpen: (id: string) => void;
-  onOpenAll?: () => void;
   onChanged: (organization: { categories: AssetProductCategory[]; albums: PromptAlbum[] }) => void;
   onNotice: (message: string) => void;
   onMoveGroups: (ids: string[]) => void;
   onArchived: () => void;
   parentId?: string;
+  activeId?: string;
 }
 
-export function PromptGroupCategoryFolders({ categories, folders, total, onOpen, onOpenAll, onChanged, onNotice, onMoveGroups, onArchived, parentId }: Props) {
+export function PromptGroupCategoryFolders({ categories, folders, onOpen, onChanged, onNotice, onMoveGroups, onArchived, parentId, activeId }: Props) {
   const [rulesId, setRulesId] = useState<string | null>(null);
   const ruleCategories = promptFolderRuleCategories(categories);
-  const defaultRulesId = parentId || ruleCategories.find(category => !category.parentId)?.id;
+  const defaultRulesId = parentId;
+  const inputId = useId();
   const ruleCategory = rulesId ? promptFolderRuleCategory(ruleCategories, rulesId, rulesId === parentId ? undefined : parentId) : undefined;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PromptGroupFolder[] | null>(null);
@@ -147,7 +146,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
       setDeleteTarget(null);
       setSelectedFolderIds([]);
       onArchived();
-      onNotice(`已删除 ${result.archivedCount} 个文件夹，母组已保留`);
+      onNotice(`已删除 ${result.archivedCount} 个分类，母本已保留`);
     } catch (cause) {
       setDeleteError(cause instanceof Error ? cause.message : '删除失败，请重试');
     } finally {
@@ -159,7 +158,9 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     if (!createDialogOpen) return;
     setName('');
     setError('');
-    requestAnimationFrame(() => createInputRef.current?.focus());
+    const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = requestAnimationFrame(() => createInputRef.current?.focus());
+    return () => { cancelAnimationFrame(frame); if (origin?.isConnected) origin.focus(); };
   }, [createDialogOpen]);
 
   useEffect(() => {
@@ -199,7 +200,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     const { id, initialName } = editing;
     const trimmed = editing.draft.trim();
     if (!trimmed || trimmed.length > 40) {
-      setEditing(current => current?.id === id ? { ...current, error: '文件夹名称需为 1–40 个字' } : current);
+      setEditing(current => current?.id === id ? { ...current, error: '分类名称需为 1–40 个字' } : current);
       requestAnimationFrame(() => renameInputRef.current?.focus());
       return;
     }
@@ -212,7 +213,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     try {
       await persistFolder(id, trimmed);
       finishInlineRename(id, restoreFocus);
-      onNotice('文件夹已改名');
+      onNotice('分类已改名');
     } catch (cause) {
       setEditing(current => current?.id === id ? {
         ...current, saving: false, error: cause instanceof Error ? cause.message : '保存失败，请重试',
@@ -228,7 +229,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     if (!createDialogOpen || saving) return;
     const trimmed = name.trim();
     if (!trimmed || trimmed.length > 40) {
-      setError('文件夹名称需为 1–40 个字');
+      setError('分类名称需为 1–40 个字');
       return;
     }
     setSaving(true);
@@ -236,7 +237,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     try {
       await persistFolder(undefined, trimmed);
       setCreateDialogOpen(false);
-      onNotice('文件夹已创建');
+      onNotice('分类已创建');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '保存失败，请重试');
     } finally {
@@ -244,43 +245,25 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
     }
   };
 
-  return <section data-prompt-folder-area aria-label={parentId ? '商品细分文件夹' : '商品大类文件夹'} className="min-h-full pt-1"
+  return <section data-prompt-folder-area aria-label={parentId ? '商品细分管理' : '商品大类管理'} className="asset-category-list"
     onContextMenu={event => openMenu(event)}
     onClick={event => { if (event.target === event.currentTarget) setSelectedFolderIds([]); }}
-    onKeyDown={event => { if (event.key === 'Escape') setSelectedFolderIds([]); }}>
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h2 className="text-[15px] font-bold text-slate-900 dark:text-slate-100">{parentId ? '商品细分' : '商品大类'}</h2><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{total} 组母本，按商品{parentId ? '细分' : '大类'}归档</p>
-        {selectedFolderIds.length > 0 && <p className="mt-1 text-[11px] text-indigo-600">已选 {selectedFolderIds.length} 个文件夹 · 右键操作，按 Esc 清除</p>}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={openCreateDialog}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10">
-          <Plus className="h-3.5 w-3.5" />新建文件夹
-        </button>
-        {defaultRulesId && ruleCategories.some(category => category.id === defaultRulesId) && <button type="button" onClick={() => setRulesId(defaultRulesId)}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10">
-          <Settings2 className="h-3.5 w-3.5" />分类规则
-        </button>}
-        {total > 0 && onOpenAll && <button type="button" onClick={onOpenAll}
-          className="inline-flex items-center gap-1 rounded-lg border border-indigo-200/70 bg-indigo-50/70 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-100/70 hover:text-indigo-800 focus-visible:outline-2 focus-visible:outline-indigo-500 dark:border-indigo-400/20 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20">
-          查看全部母组<ArrowRight className="h-3.5 w-3.5" />
-        </button>}
+    onKeyDown={event => { if (event.key === 'Escape' && !menu && !createDialogOpen && !deleteTarget && selectedFolderIds.length) { event.preventDefault(); event.stopPropagation(); setSelectedFolderIds([]); } }}>
+    <div className="asset-category-list-heading">
+      <h3>{parentId ? '商品细分' : '商品大类'} · {folders.length}</h3>
+      <div className="asset-category-list-actions">
+        {defaultRulesId && ruleCategories.some(category => category.id === defaultRulesId) && <button type="button" onClick={() => setRulesId(defaultRulesId)}><Settings2 size={12} />大类规则</button>}
+        <button type="button" onClick={openCreateDialog}><Plus size={12} />{parentId ? '新建细分' : '新建大类'}</button>
       </div>
     </div>
+    {selectedFolderIds.length > 0 && <p className="mb-2 text-[11px] text-slate-500">已选 {selectedFolderIds.length} 个分类 · Esc 清除</p>}
 
-    {folders.length ? <div className="grid grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-x-4 gap-y-5 max-w-6xl">
+    {folders.length ? <div>
       {folders.map(folder => {
-        const previews = folder.items.slice(0, 3).map(item => proxyMediaUrl(item.coverUrl, { thumb: true, width: 180 })).filter(Boolean);
         const isSelected = selectedFolderIds.includes(folder.id);
-        return <div key={folder.id} data-prompt-folder className={`group relative min-w-0 rounded-2xl border px-2 py-3 text-center transition-all ${isSelected ? 'border-indigo-400/70 bg-indigo-50/70 dark:border-indigo-400/50 dark:bg-indigo-500/10' : 'border-transparent hover:border-slate-200/80 hover:bg-white/70 dark:hover:border-white/[0.08] dark:hover:bg-white/[0.04]'}`}
+        return <div key={folder.id} data-prompt-folder className="asset-category-edit-row" data-selected={isSelected || activeId === folder.id}
           onContextMenu={event => openMenu(event, folder)}
           onKeyDown={event => {
-            if ((event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('.folder-stage')) {
-              event.preventDefault();
-              selectOrOpen(event, folder);
-              return;
-            }
             if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
               event.preventDefault();
               const target = event.target as HTMLElement;
@@ -295,12 +278,7 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
               });
             }
           }}>
-          <div className="flex h-[136px] items-center justify-center overflow-hidden">
-            <Folder color={folder.isVirtual ? '#64748B' : '#4F46E5'} size={0.52} items={previews.length ? previews : [{ title: folder.name }]}
-              open={false} peek={false} intro={false} tilt={0} bounce={0} draggable={false} zoomOnClick={false}
-              count={folder.items.length} badgeSuffix="组" ariaLabel={`打开${folder.name}，${folder.items.length}组母本`}
-              onClick={event => selectOrOpen(event, folder)} />
-          </div>
+          <FolderClosed size={16} strokeWidth={1.6} className="shrink-0" />
           {editing?.id === folder.id ? <input
             ref={renameInputRef} data-prompt-folder-rename-input
             aria-label={`重命名${folder.name}`} aria-invalid={Boolean(editing.error)}
@@ -327,22 +305,23 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
               }
               void commitInlineRename(false);
             }}
-            className="mt-0.5 block w-full rounded-md border border-indigo-400 bg-white px-1 py-0.5 text-center text-sm font-semibold text-slate-900 outline-none ring-2 ring-indigo-100 disabled:opacity-60 dark:text-slate-100 dark:bg-[#18191c]"
+            className="min-w-0 flex-1 rounded-md border border-slate-400 bg-transparent px-2 py-1 text-xs text-slate-900 outline-none disabled:opacity-60 dark:text-slate-100"
           /> : <button type="button" ref={element => {
             if (element) nameButtonRefs.current.set(folder.id, element);
             else nameButtonRefs.current.delete(folder.id);
           }} onClick={event => selectOrOpen(event, folder)}
-            className="mt-1 flex w-full items-center justify-center gap-1 text-sm font-semibold text-slate-800 hover:text-indigo-600 focus-visible:outline-none focus-visible:underline focus-visible:decoration-2 focus-visible:decoration-indigo-500 focus-visible:underline-offset-4 dark:text-slate-100"
+            className="asset-category-edit-name" aria-current={activeId === folder.id ? 'true' : undefined}
             aria-label={isSelected ? `${folder.name}，已选中` : undefined} title={folder.name}>
             <span className="min-w-0 truncate">{folder.name}</span>{isSelected && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-indigo-600" />}
           </button>}
           {editing?.id === folder.id && editing.error && <p id={`prompt-folder-rename-error-${folder.id}`} role="alert"
-            className="mt-1 text-[11px] leading-4 text-rose-600">{editing.error}</p>}
-          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{folder.items.length} 组母本</p>
+            className="order-last w-full text-[11px] leading-4 text-rose-600">{editing.error}</p>}
+          <small>{folder.items.length} 组</small>
+          <button type="button" className="asset-category-edit-more" aria-label={`${folder.name}分类操作`} aria-haspopup="menu" onClick={event => openMenu(event, folder)}><MoreHorizontal size={15} /></button>
         </div>;
       })}
-    </div> : <div className="rounded-xl border border-dashed border-slate-200 px-6 py-12 text-center text-sm text-slate-500 dark:text-slate-400 dark:border-white/10">
-      还没有商品{parentId ? '细分' : '大类'}，右键空白处可新建文件夹。
+    </div> : <div className="asset-category-empty">
+      还没有商品{parentId ? '细分' : '大类'}，点击上方按钮即可添加。
     </div>}
 
     {menu && <PromptFolderContextMenu menu={menu} menuRef={menuRef} folders={folders}
@@ -353,15 +332,15 @@ export function PromptGroupCategoryFolders({ categories, folders, total, onOpen,
       onDelete={openDeleteDialog} onCreate={openCreateDialog} />}
 
     {createDialogOpen && <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateDialogOpen(false); }}>
-      <form role="dialog" aria-modal="true" aria-label="新建文件夹" onSubmit={saveFolder}
+      <form role="dialog" aria-modal="true" aria-label={parentId ? '新建商品细分' : '新建商品大类'} onSubmit={saveFolder}
         onKeyDown={event => { if (event.key === 'Escape' && !saving) setCreateDialogOpen(false); }}
         className="w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#18191c]">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">新建文件夹</h3>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{parentId ? '新建商品细分' : '新建商品大类'}</h3>
           <button type="button" aria-label="关闭" disabled={saving} onClick={() => setCreateDialogOpen(false)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>
         </div>
-        <label htmlFor="prompt-folder-name" className="mt-5 block text-xs font-semibold text-slate-600 dark:text-slate-300">{parentId ? '商品细分名称' : '商品大类名称'}</label>
-        <input ref={createInputRef} id="prompt-folder-name" value={name} maxLength={40} onChange={event => setName(event.target.value)}
+        <label htmlFor={inputId} className="mt-5 block text-xs font-semibold text-slate-600 dark:text-slate-300">{parentId ? '商品细分名称' : '商品大类名称'}</label>
+        <input ref={createInputRef} id={inputId} value={name} maxLength={40} onChange={event => setName(event.target.value)}
           className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 dark:border-white/10"
           placeholder={parentId ? '例如：手机本体、手机壳' : '例如：手机数码、珠宝首饰'} />
         {error && <p role="alert" className="mt-2 text-xs text-rose-600">{error}</p>}

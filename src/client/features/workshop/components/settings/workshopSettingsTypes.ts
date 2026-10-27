@@ -1,15 +1,14 @@
 import type { GenerationStrategy } from '../../model/batchTypes';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
-import type { AssetProductCategory } from '@shared/domain/assets/assetOrganization';
 
 export interface WorkshopSettingsModalProps {
   isOpen: boolean;
   workspaceStatus?: string;
   workspaceError?: string | null;
   busy?: boolean;
-  assetLoadState?: 'loading' | 'ready' | 'error';
-  assetLoadError?: string;
-  onReloadAssets?: () => void;
+  skillLoadState?: 'loading' | 'ready' | 'error';
+  skillLoadError?: string;
+  onReloadSkills?: () => void;
   onOpenAssets?: (type?: PromptAssetType) => void;
   onClose: () => void;
   selectedArchId: string;
@@ -37,22 +36,4 @@ export interface WorkshopSettingsModalProps {
   setImageGenConcurrency?: (n: number) => void;
   analyzeConcurrency: number;
   setAnalyzeConcurrency?: (n: number) => void;
-  lockedPersonaId?: string;
-  setLockedPersonaId?: (id: string) => void;
-  availablePersonas?: Array<{ id: string; name?: string; code?: string }>;
-  lockedSceneId?: string;
-  setLockedSceneId?: (id: string) => void;
-  availableScenes?: Array<{ id: string; title?: string; code?: string }>;
-  lockedOutfitId?: string;
-  setLockedOutfitId?: (id: string) => void;
-  availableOutfits?: Array<{ id: string; title?: string; code?: string }>;
-  lockedFullPromptId?: string;
-  setLockedFullPromptId?: (id: string) => void;
-  availableFullPrompts?: Array<{ id: string; title?: string; name?: string; code?: string; shotPromptsJson?: string; hasHuman?: boolean; groupIndex?: number | null; albumName?: string | null }>;
-  availableProductCategories?: AssetProductCategory[];
-  promptGroupFolderId?: string;
-  setPromptGroupFolderId?: (id: string) => void;
-  products?: Array<{ title: string; props?: Record<string, string> }>;
-  personaMode?: 'asset_driven' | 'none';
-  setPersonaMode?: (mode: 'asset_driven' | 'none') => void;
 }

@@ -9,11 +9,10 @@ export function WorkshopProductionSummary({ runner, onOpenSettings }: {
     const model = models.find(item => item.id === id);
     return model?.shortName || model?.name || id || '未选择';
   };
-  const recipe = runner.selectedArchId === 'auto' ? '按商品匹配类目技能' : runner.recipes.find(item => item.id === runner.selectedArchId)?.name || '技能待选择';
-  const reference = runner.availableFullPrompts.find(item => item.id === runner.lockedFullPromptId);
+  const recipe = runner.selectedArchId === 'auto' || runner.selectedArchId === '__category_skill__' ? '按商品细分应用创作技能' : runner.recipes.find(item => item.id === runner.selectedArchId)?.name || '技能待选择';
   const settings = [
-    ['创作依据', recipe],
-    ['参考图组', reference?.title || (runner.lockedFullPromptId.startsWith('auto') ? '按商品匹配参考母本' : '参考母本待确认')],
+    ['创作技能', recipe],
+    ['商品依据', '当前选中的商品图'],
     ['分析模型', modelName(runner.availableVisionModels, runner.selectedVisionModel)],
     ['生图输出', `${modelName(runner.availableImageModels, runner.selectedImageGenModel)} · ${runner.selectedAspect} · ${runner.selectedShotCount} 镜`],
   ];

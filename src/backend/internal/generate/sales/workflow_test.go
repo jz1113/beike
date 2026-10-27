@@ -221,22 +221,22 @@ func TestWorkflowAnalysisAppliesFashionNarrative(t *testing.T) {
 
 func TestFashionVoiceoverBudget(t *testing.T) {
 	low, high := fashionVoiceoverBudget(15)
-	if low != 48 || high != 69 {
+	if low != 36 || high != 98 {
 		t.Fatalf("15s got %d-%d", low, high)
 	}
 	low, high = fashionVoiceoverBudget(30)
-	if low != 96 || high != 138 {
+	if low != 72 || high != 195 {
 		t.Fatalf("30s got %d-%d", low, high)
 	}
 	low, high = fashionVoiceoverBudget(10)
-	if low != 32 || high != 46 {
+	if low != 24 || high != 65 {
 		t.Fatalf("10s got %d-%d", low, high)
 	}
 	low, high = fashionVoiceoverBudget(5)
-	if low != 16 || high != 23 {
+	if low != 12 || high != 33 {
 		t.Fatalf("5s got %d-%d", low, high)
 	}
-	if fashionShotVoiceoverCap(5) != 30 {
+	if fashionShotVoiceoverCap(5) != 40 {
 		t.Fatalf("5s cap %d", fashionShotVoiceoverCap(5))
 	}
 }
@@ -247,12 +247,16 @@ func TestFashionVoiceoverRejectsThinCopyAndEmptyClose(t *testing.T) {
 		{ShotId: 2, Duration: 5, Voiceover: "圆领罗纹收边，胸前小图案很精致。"},
 		{ShotId: 3, Duration: 5, Voiceover: "秋季日常穿，基础百搭，可以收着。"},
 	}
-	if err := validateFashionVoiceover(thin, 15); err == nil || !strings.Contains(err.Error(), "汉字") {
+	if err := validateFashionVoiceover(thin, 15); err == nil || !strings.Contains(err.Error(), "空号召") {
 		t.Fatalf("thin copy: %v", err)
 	}
 	spoken := "家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。"
 	if voiceoverHanCount(spoken) < 48 || voiceoverHanCount(spoken) > 69 {
 		t.Fatalf("sample length %d", voiceoverHanCount(spoken))
+	}
+	daily := "今天出门，我想穿得简单一点。这件浅蓝圆领，里面露一点白色。下面配深色牛仔裤，我就这样穿了。"
+	if err := validateFashionVoiceover([]ScriptShot{{ShotId: 1, Duration: 15, Voiceover: daily}}, 15); err != nil {
+		t.Fatalf("daily copy should leave room for actions: %v", err)
 	}
 	if err := validateFashionVoiceover([]ScriptShot{{ShotId: 1, Duration: 15, Voiceover: spoken}}, 15); err != nil {
 		t.Fatal(err)
@@ -285,7 +289,7 @@ func TestWorkflowFashionScriptRequestsNarrative(t *testing.T) {
 	server := useChatServer(t, func(body map[string]any, _ int) string {
 		encoded, _ := json.Marshal(body)
 		text := string(encoded)
-		for _, expected := range []string{"开箱换装", "生活穿搭", "鞋包展示", "beat", "deliveryMode", "usesProduct", "对镜头", "卖点", "可以直接入手", "48 到 69", "不得少于 48", "每秒 6", "真实肤质", "中景"} {
+		for _, expected := range []string{"开箱换装", "生活穿搭", "鞋包展示", "beat", "deliveryMode", "usesProduct", "对镜头", "卖点", "可以直接入手", "日常口播优先合计 75–90", "全片不超过 98 个汉字", "每秒 8", "真实肤质", "中景"} {
 			if !strings.Contains(text, expected) {
 				t.Errorf("missing %s", expected)
 			}
@@ -298,6 +302,45 @@ func TestWorkflowFashionScriptRequestsNarrative(t *testing.T) {
 	attachGateway(payload, server.URL)
 	rec := postSales(t, Script(config.Config{}), "/", payload)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"beat":"lifestyle"`) || !strings.Contains(rec.Body.String(), `"deliveryMode":"single"`) {
+		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWorkflowFashionScriptRepairsOverloadedShotOnce(t *testing.T) {
+	var root map[string]any
+	if err := json.Unmarshal([]byte(validWorkflowScript()), &root); err != nil {
+		t.Fatal(err)
+	}
+	script := root["scripts"].([]any)[0].(map[string]any)
+	shots := script["shots"].([]any)
+	first := shots[0].(map[string]any)
+	first["duration"] = 4
+	first["voiceover"] = strings.Repeat("衣", 36)
+	second := map[string]any{
+		"shotId": 2, "duration": 11, "description": "展示细节", "camera": "固定中景",
+		"speechMode": "voiceover", "voiceover": strings.Repeat("裤", 60), "prompt": "展示商品细节", "visualSource": "ai_generate",
+	}
+	script["shots"] = []any{first, second}
+	script["totalDuration"] = 15
+	invalid, err := json.Marshal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server := useChatServer(t, func(body map[string]any, calls int) string {
+		if calls == 1 {
+			return string(invalid)
+		}
+		encoded, _ := json.Marshal(body)
+		if !strings.Contains(string(encoded), "上一版脚本未通过口播校验") {
+			t.Error("repair request did not include the validation reason")
+		}
+		return validWorkflowScript()
+	})
+	payload := workflowPayload()
+	attachGateway(payload, server.URL)
+	rec := postSales(t, Script(config.Config{}), "/script", payload)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"deliveryMode":"single"`) {
 		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
 	}
 }

@@ -7,6 +7,7 @@
 - 安装与构建使用 Node.js 22、pnpm 10.13.1、Go 1.26 或更高稳定版本；安装脚本检查并准备 Go。生产重启只运行已有构建产物。
 - `pnpm build` 执行类型检查并构建 `tools/build/ui/` 与 `tools/build/beike-api`；`pnpm build:api` 可单独更新后端。Windows API 为 `.exe`，服务器须使用目标系统的构建产物。
 - Go 提供 API、静态页与素材访问；systemd 运行 `tools/scripts/web/start-web.mjs`，Nginx 反向代理到 `127.0.0.1:3000`。
+- 本地 `pnpm dev` 在 `pnpm skills:build` 更新带货规则后自动重建并重启 Go API，使内嵌规则与页面同步；规则检查或构建失败时保留原服务并输出错误。生产环境仍须完整构建前后端并重启服务；版本不一致时仅刷新页面不能更新后台内嵌规则。
 - 生产数据库、`.env`、`storage/` 与备份放在数据目录，不随源码发布覆盖。API 启动时执行版本化迁移与官方种子；迁移失败须排障，不能删除用户库。
 - 执行模板在 `tools/deploy/`：`bootstrap-ubuntu.sh`、`beike.service`、`env.production.example`、HTTP / HTTPS Nginx 配置及 `enable-https.sh`。
 

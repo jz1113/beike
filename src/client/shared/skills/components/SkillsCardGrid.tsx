@@ -25,7 +25,7 @@ export function SkillsCardGrid({
     return <SkillsEmptyState message={emptyMessage} onAction={onEmptyAction} actionLabel={emptyActionLabel} />;
   }
   return (
-    <div className="grid grid-cols-1 items-start gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] items-start gap-x-5 gap-y-7">
       {skills.map((skill) => (
         <SkillCard key={skill.id} skill={skill} isFavorite={favorites.has(skill.id)} {...actions} />
       ))}

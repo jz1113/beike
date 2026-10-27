@@ -1,20 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { usePersistentNumber } from '@client/shared/hooks/usePersistentState';
+import { useState, useCallback } from 'react';
 
 export function useWorkshopShotCount() {
-  const [fallback] = useState(() => {
-    try {
-      return 4;
-    } catch {
-      return 4;
-    }
-  });
-  const [stored, setStored] = usePersistentNumber('workshop_shot_count', { fallback, min: 1, max: 8 });
-  const count = stored === 8 ? 8 : 4;
-  // Migrate legacy single-shot presets to complete four-shot groups.
-  useEffect(() => {
-    if (stored !== count) setStored(count);
-  }, [stored, count, setStored]);
-  const setCount = useCallback((value: number) => setStored(value === 8 ? 8 : 4), [setStored]);
+  const [count, setStored] = useState(4);
+  const setCount = useCallback((value: number) => setStored(value === 8 ? 8 : 4), []);
   return [count, setCount] as const;
 }

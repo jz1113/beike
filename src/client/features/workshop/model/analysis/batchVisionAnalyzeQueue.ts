@@ -11,14 +11,21 @@ export async function runBatchVisionAnalyze(opts: {
 }): Promise<number> {
   let successAnalyzed = 0;
   let finishedCount = 0;
-  let itemIdx = 0;
-  const concurrency = Math.min(Math.max(1, Math.floor(opts.concurrency || 2)), 6, opts.items.length);
+  const groups = new Map<string, Array<{ item: BatchProductItem; index: number }>>();
+  opts.items.forEach((item, index) => {
+    const key = `${item.platform === 'tmall' ? 'taobao' : item.platform}:${item.itemId}`;
+    const group = groups.get(key) || [];
+    group.push({ item, index }); groups.set(key, group);
+  });
+  const queue = [...groups.values()];
+  let groupIndex = 0;
+  const concurrency = Math.min(Math.max(1, Math.floor(opts.concurrency || 2)), 6, queue.length);
 
   const worker = async () => {
-    while (itemIdx < opts.items.length && !opts.isAborted()) {
-      const currentItemIdx = itemIdx++;
-      const item = opts.items[currentItemIdx];
-      if (!item) break;
+    while (groupIndex < queue.length && !opts.isAborted()) {
+      const group = queue[groupIndex++];
+      for (const { item, index: currentItemIdx } of group) {
+      if (opts.isAborted()) break;
       opts.onItemStart(item);
       try {
         if (await opts.analyzeOne(item, currentItemIdx)) successAnalyzed++;
@@ -27,6 +34,7 @@ export async function runBatchVisionAnalyze(opts: {
       } finally {
         finishedCount++;
         opts.onItemFinish(finishedCount, opts.items.length);
+      }
       }
     }
   };

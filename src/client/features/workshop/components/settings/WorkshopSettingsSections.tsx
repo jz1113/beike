@@ -1,91 +1,66 @@
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
+import { Check, Crop, Images, Sparkles } from 'lucide-react';
 import type { WorkshopSettingsModalProps } from './workshopSettingsTypes';
 import { WorkshopGridOutputSettings } from './WorkshopGridOutputSettings';
-import { WorkshopAssetBindings } from './WorkshopAssetBindings';
-import { recipeKind } from '@shared/domain/products/productRecipeSelection';
-import { promptGroupMatchesMajorCategory } from '@shared/domain/workshop/workshop-pipeline';
 import { workshopOutputSettings, WORKSHOP_ANALYSIS_CONCURRENCY, WORKSHOP_IMAGE_CONCURRENCY } from '../../model/workshopOutputSettings';
+import { savedWorkshopOutputSize } from '../../model/generation/generationHelpers';
 
 const selectClass = 'mt-2 w-full min-w-0 rounded-lg border border-slate-200/70 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50 dark:text-slate-100 dark:border-white/10 dark:bg-[#18191c]';
 const labelClass = 'block min-w-0 text-xs font-semibold text-slate-700 dark:text-slate-200';
 
 export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
-  const { assetLoadState = 'ready', availableFullPrompts = [], availableProductCategories = [], availablePersonas = [], availableScenes = [], availableOutfits = [] } = props;
-  const hasRecipes = props.recipes.length > 0;
-  const manualRecipes = props.recipes.filter(recipe => recipe.id !== '__category_skill__');
-  const hasRecipeChoice = manualRecipes.length > 0 || (props.selectedArchId !== 'auto' && props.selectedArchId !== '__category_skill__');
-  const selectedArchId = hasRecipes && (props.selectedArchId === 'auto' || props.recipes.some(recipe => recipe.id === props.selectedArchId))
-    ? props.selectedArchId
-    : '';
-  const selectedRecipe = props.recipes.find(recipe => recipe.id === selectedArchId);
-  const selectedKind = selectedRecipe ? recipeKind(selectedRecipe) : undefined;
-  const architectureMajor = selectedKind === 'phone' ? 'digital' : selectedKind === 'jewelry' ? 'jewelry' : undefined;
-  const architectureName = availableProductCategories.find(category => !category.parentId && !category.isArchived && architectureMajor
-    && promptGroupMatchesMajorCategory({ productCategoryIds: JSON.stringify([category.id]), productCategoryNames: [category.name] }, architectureMajor))?.name || selectedRecipe?.name || '';
-  const architectureGroupCount = architectureMajor
-    ? availableFullPrompts.filter(group => promptGroupMatchesMajorCategory(group, architectureMajor)).length : 0;
-  const inventoryMessage = availableFullPrompts.length
-    ? architectureMajor
-      ? architectureGroupCount
-        ? `${architectureName} · ${architectureGroupCount} 组完整母本，文件夹已同步`
-        : `当前${architectureName}架构暂无母本，请先到资产库补充`
-      : `全库 ${availableFullPrompts.length} 组完整母本 · 添加商品后按类目与细分匹配`
-    : '暂无可用四图母本，请到资产库导入并解构图组。';
-  return <section className="space-y-3 py-5" aria-label="内容与素材">
-    <h3 className="text-sm font-semibold">内容与素材</h3>
-    {hasRecipeChoice ? <label className={labelClass}>电商图文技能
-      <select aria-label="电商图文技能" value={selectedArchId} disabled={!hasRecipes} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
-        {!selectedArchId && <option value="" disabled>{hasRecipes ? '请选择电商图文技能' : '暂无可用电商图文技能'}</option>}
-        {hasRecipes && <option value="auto">按参考图组应用类目技能</option>}
-        {selectedArchId === '__category_skill__' && <option value="__category_skill__">按参考图组应用类目技能</option>}
+  const { skillLoadState = 'ready', recipes } = props;
+  const automatic = props.selectedArchId === 'auto' || props.selectedArchId === '__category_skill__';
+  const manualRecipes = recipes.filter(recipe => recipe.id !== '__category_skill__');
+  const selected = recipes.find(recipe => recipe.id === props.selectedArchId);
+  const selectedId = automatic ? 'auto' : selected?.id || '';
+  return <section className="space-y-3 py-4" aria-label="创作技能">
+    <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">创作技能</h3><span className="text-[11px] text-slate-500">{automatic ? '按商品细分匹配' : '当前批次指定'}</span></div>
+    <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">根据商品图与创作技能设计分镜。人物、穿搭、场景由技能和商品决定；参考素材用于学习技能，生产无需采集或指定参考素材。</p>
+    {(manualRecipes.length > 0 || !automatic) && <label className={labelClass}>当前技能
+      <select aria-label="电商图文技能" value={selectedId} disabled={skillLoadState === 'loading'} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
+        {!selectedId && <option value="" disabled>所选技能已失效，请重新选择</option>}
+        <option value="auto">按商品细分应用创作技能</option>
         {manualRecipes.map(recipe => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}
       </select>
-    </label> : hasRecipes && <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">类目技能随参考图组自动应用，无需单独选择。</p>}
-    {!hasRecipes && <p role="status" className="text-xs leading-5 text-amber-700 dark:text-amber-300">暂未加载到可用电商图文技能。请在“素材与技能”检查类目技能，或在全局“技能”管理手动技能后重试。</p>}
-    {props.personaMode === 'none' && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">此历史批次启用了无人像限制，仅使用无人物图组。
-      {props.setPersonaMode && <button type="button" className="font-semibold underline" onClick={() => props.setPersonaMode?.('asset_driven')}>改为跟随图组出镜范围</button>}
-    </p>}
-    <section className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 dark:bg-white/5 dark:border-white/10" aria-label="生产资源状态">
+    </label>}
+    <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 dark:bg-white/5 dark:border-white/10">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p role={assetLoadState === 'error' ? 'alert' : 'status'} className={`text-xs ${assetLoadState === 'error' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
-          {assetLoadState === 'loading' ? '正在加载素材…' : assetLoadState === 'error' ? `加载失败：${props.assetLoadError || '请重试'}` : inventoryMessage}
+        <p role={skillLoadState === 'error' ? 'alert' : 'status'} className={`text-xs ${skillLoadState === 'error' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+          {skillLoadState === 'loading' ? '正在加载创作技能…' : skillLoadState === 'error' ? `技能加载失败：${props.skillLoadError || '请重试'}` : !recipes.length ? '暂无可用创作技能，请刷新后重试' : automatic ? '自动使用当前试用版或正式版；未提炼的细分使用基础创作技能' : selected?.name || '所选技能已失效，请重新选择'}
         </p>
         <div className="flex gap-3 text-xs font-medium">
-          <button type="button" onClick={props.onReloadAssets} disabled={assetLoadState === 'loading' || !props.onReloadAssets} className="text-slate-500 hover:text-indigo-600 disabled:opacity-50 dark:text-slate-400 dark:hover:text-indigo-300">刷新</button>
-          <button type="button" onClick={() => props.onOpenAssets?.()} disabled={!props.onOpenAssets} className="text-indigo-600 disabled:opacity-50 dark:text-indigo-400">管理素材 ↗</button>
+          <button type="button" onClick={props.onReloadSkills} disabled={skillLoadState === 'loading' || !props.onReloadSkills} className="text-slate-500 hover:text-indigo-600 disabled:opacity-50 dark:text-slate-400 dark:hover:text-indigo-300">刷新技能</button>
+          <button type="button" onClick={() => props.onOpenAssets?.()} disabled={!props.onOpenAssets} className="text-slate-700 disabled:opacity-50 dark:text-slate-200">管理创作技能 ↗</button>
         </div>
       </div>
-    </section>
-    <WorkshopAssetBindings
-      groupId={props.lockedFullPromptId || 'auto'} groups={availableFullPrompts} onGroupChange={id => props.setLockedFullPromptId?.(id)}
-      products={props.products}
-      architectureMajor={architectureMajor}
-      categories={availableProductCategories} folderId={props.promptGroupFolderId} onFolderChange={props.setPromptGroupFolderId}
-      personaMode={props.personaMode}
-      personaId={props.lockedPersonaId || 'auto'} personas={availablePersonas} onPersonaChange={id => props.setLockedPersonaId?.(id)}
-      sceneId={props.lockedSceneId || 'auto'} scenes={availableScenes} onSceneChange={id => props.setLockedSceneId?.(id)}
-      outfitId={props.lockedOutfitId || 'auto'} outfits={availableOutfits} onOutfitChange={id => props.setLockedOutfitId?.(id)}
-      onOpenAssets={props.onOpenAssets}
-    />
+    </div>
   </section>;
 }
 
 export function WorkshopOutputSettings(props: WorkshopSettingsModalProps) {
   const isGrid = props.generationStrategy === 'grid_first';
   const output = workshopOutputSettings(props.selectedImageGenModel, props.selectedAspect, props.selectedQuality);
-  return <section className="space-y-3 py-5" aria-label="图片与交付">
-    <h3 className="text-sm font-semibold">图片与交付</h3>
-    <div className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3">
-      <label className={labelClass}>生成方式
-        <select aria-label="生成方式" value={props.generationStrategy} className={selectClass} onChange={event => {
-          const value = event.target.value as WorkshopSettingsModalProps['generationStrategy'];
-          if (value === 'grid_first') props.setSelectedShotCount(4);
-          props.setGenerationStrategy(value);
-        }}><option value="grid_first">四宫格拆分</option><option value="single_shot">单张逐镜</option></select>
-      </label>
+  const tileSize = props.gridOutputSize || savedWorkshopOutputSize({ gridSize: output.size });
+  const deliveryCount = isGrid ? 4 : props.selectedShotCount;
+  const deliverySize = isGrid ? tileSize || output.size : output.size;
+  return <section className="workshop-output-settings space-y-5 py-5" aria-label="图片输出">
+    <div className="flex items-start justify-between gap-4">
+      <div><h3 className="text-sm font-semibold">图片输出</h3><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">先确定生成方式，再调整画幅与清晰度。</p></div>
+      <div className="workshop-output-summary shrink-0" aria-label="当前输出摘要"><Images className="h-4 w-4" /><span>{deliveryCount} 张</span><i aria-hidden="true" /> <span>{deliverySize?.replace('x', ' × ')} px</span></div>
+    </div>
+    <fieldset><legend className="workshop-settings-label">生成方式</legend><div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {([['grid_first', '四宫格拆图', '一次生成整图，自动拆成 4 张', <Crop key="crop" />], ['single_shot', '单张逐镜', '每镜独立生成，可选 4 或 8 镜', <Sparkles key="sparkles" />]] as const).map(([strategy, title, description, icon]) => {
+        const selected = props.generationStrategy === strategy;
+        return <button type="button" key={strategy} aria-label={title} aria-pressed={selected} onClick={() => props.setGenerationStrategy(strategy)} className={`workshop-output-mode ${selected ? 'is-selected' : ''}`}>
+          <span className="workshop-output-mode-icon">{icon}</span><span className="min-w-0 flex-1"><strong>{title}{strategy === 'grid_first' && <em>默认</em>}</strong><small>{description}</small></span><span className="workshop-output-mode-check" aria-hidden="true">{selected && <Check />}</span>
+        </button>;
+      })}
+    </div></fieldset>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <label className={labelClass}>分镜数量
-        {isGrid ? <span className="mt-2 block rounded-lg bg-slate-50 px-2.5 py-2 text-xs font-normal dark:bg-white/5">固定 4 镜</span> : <select aria-label="分镜数量" value={props.selectedShotCount} onChange={event => props.setSelectedShotCount(Number(event.target.value))} className={selectClass}>
-          {[4, 8].map(count => <option key={count} value={count}>{count} 镜{count === 8 ? ' · 含 4 镜扩展' : ''}</option>)}
+        {isGrid ? <span className="workshop-output-static mt-2"><span>固定 4 镜</span><small>四格分别对应一个完整机位</small></span> : <select aria-label="分镜数量" value={props.selectedShotCount} onChange={event => props.setSelectedShotCount(Number(event.target.value))} className={selectClass}>
+          {[4, 8].map(count => <option key={count} value={count}>{count} 镜{count === 8 ? ' · 完整创作' : ''}</option>)}
         </select>}
       </label>
       <label className={labelClass}>{isGrid ? '整图画幅' : '图片画幅'}
@@ -94,18 +69,18 @@ export function WorkshopOutputSettings(props: WorkshopSettingsModalProps) {
         </select>
       </label>
     </div>
-    <fieldset><legend className={labelClass}>{isGrid ? '整图画质与请求尺寸' : '单张画质与请求尺寸'}</legend>
-      {output.fixedQuality ? <p className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">当前模型使用固定档位 · {output.size.replace('x', ' × ')} px，无需另选画质。</p>
-        : <div className="mt-2 grid grid-cols-3 gap-2">{output.choices.map(({ value, label, size }) => <button key={value} type="button" aria-pressed={props.selectedQuality === value} onClick={() => props.setSelectedQuality(value)} className={`rounded-lg px-2 py-2 text-xs transition-colors ${props.selectedQuality === value ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10 dark:bg-white/5'}`}>
-          <span className="block font-medium">{label}</span><span className="mt-1 block text-[10px] tabular-nums opacity-75">{size.replace('x', ' × ')} px</span>
-        </button>)}</div>}
+    <fieldset aria-label="画质档位"><legend className="workshop-settings-label">{isGrid ? '整图画质与请求尺寸' : '单张画质与请求尺寸'}</legend>
+      {output.fixedQuality ? <p className="workshop-output-fixed mt-2"><Check className="h-4 w-4" />当前模型使用固定档位<span>{output.size.replace('x', ' × ')} px</span></p>
+        : <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">{output.choices.map(({ value, label, size }) => { const selected = props.selectedQuality === value; return <button key={value} type="button" aria-pressed={selected} onClick={() => props.setSelectedQuality(value)} className={`workshop-quality-option ${selected ? 'is-selected' : ''}`}>
+          <span>{label}</span><strong>{size.replace('x', ' × ')}</strong><small>请求尺寸 · px</small>{selected && <Check className="workshop-quality-check" />}
+        </button>; })}</div>}
     </fieldset>
-    <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">显示当前模型的请求尺寸，实际原图以服务商返回为准。{isGrid ? '整图拆为 4 张，每张获得四分之一像素；精细商品建议单张逐镜。' : props.selectedShotCount === 8 ? '前 4 镜沿用母本，后 4 镜扩展场景、动作与机位；采用后可每四镜提炼为新母本。' : '每镜独立使用商品图与对应母本原图生成。'}</p>
-    {isGrid && <details className="rounded-xl border border-slate-200 p-3 dark:border-white/10" open={props.gridOutputSize ? true : undefined}>
-      <summary className="cursor-pointer text-xs font-medium">切图交付尺寸 <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{props.gridOutputSize ? `自定义 ${props.gridOutputSize.replace('x', ' × ')} px` : '默认按原图四等分'}</span></summary>
+    <p className="workshop-output-note">{isGrid ? `预计交付 4 张 · 每张 ${tileSize?.replace('x', ' × ')} px${props.gridOutputSize ? '（自定义）' : '（原图四等分）'}。` : props.selectedShotCount === 8 ? '按技能设计 8 个完整分镜，安排展示递进与画面差异。' : '每镜独立使用商品图与已确认的技能提示词生成。'} 实际原图以服务商返回为准。</p>
+    {isGrid && <details className="workshop-output-details rounded-xl border border-slate-200 p-3 dark:border-white/10" open={props.gridOutputSize ? true : undefined}>
+      <summary className="cursor-pointer text-xs font-medium">切图交付尺寸 <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{props.gridOutputSize ? `自定义 ${props.gridOutputSize.replace('x', ' × ')} px` : '默认四等分 · 可调整'}</span></summary>
       <WorkshopGridOutputSettings {...props} />
     </details>}
-    <label className="flex cursor-pointer items-start gap-2 rounded-xl bg-slate-50 p-3 dark:bg-white/5"><input type="checkbox" checked={props.autoGenerateCopywriting} onChange={event => props.setAutoGenerateCopywriting(event.target.checked)} className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-indigo-600" />
+    <label className="workshop-copywriting-toggle flex cursor-pointer items-start gap-3 rounded-xl p-3.5"><input type="checkbox" checked={props.autoGenerateCopywriting} onChange={event => props.setAutoGenerateCopywriting(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600" />
       <span className="text-xs font-medium">成图后自动生成文案<span className="mt-1 block text-[11px] font-normal leading-5 text-slate-500 dark:text-slate-400">为已有有效成图且缺少完整文案的商品生成标题与正文，会调用文本模型。关闭后可在交付页手动生成。</span></span>
     </label>
   </section>;

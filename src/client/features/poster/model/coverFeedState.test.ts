@@ -19,4 +19,18 @@ describe('cover feed state', () => {
     expect(reconcileCoverFeedJob(job, [sample({ status: 'failed', error: '模型失败' })], '2026-01-01T00:00:00Z')).toMatchObject({ status: 'failed', error: '模型失败' });
     expect(reconcileCoverFeedJob(job, [], '2026-01-01T00:00:00Z').status).toBe('uncertain');
   });
+  it('keeps uncertain work out of the paid submission queue', () => {
+    expect(canStartCoverFeed(['queued', 'uncertain'])).toBe(false);
+    expect(canStartCoverFeed(['uncertain'])).toBe(false);
+    expect(coverFeedPhase(['done', 'queued'], false)).toBe('ready');
+  });
+
+  it('reconciles by the exact operation instead of a previous use of the same image', () => {
+    const job = { id: 'job', status: 'uncertain' as const, url: 'https://cdn.example/a.jpg', requestKey: 'new-key' };
+    expect(reconcileCoverFeedJob(job, [sample({ requestKey: 'old-key' })], '').status).toBe('uncertain');
+    expect(reconcileCoverFeedJob(job, [sample({ requestKey: 'new-key', status: 'running' })], '').status).toBe('uncertain');
+    expect(reconcileCoverFeedJob(job, [sample({ requestKey: 'new-key' })], '').status).toBe('done');
+    expect(reconcileCoverFeedJob({ ...job, sampleId: 'different' }, [sample({ requestKey: 'new-key' })], '').status).toBe('uncertain');
+  });
+
 });

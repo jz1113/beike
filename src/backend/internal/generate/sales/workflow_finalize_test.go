@@ -73,15 +73,15 @@ func TestWorkflowFashionFinalizesOneVideoWithoutStillPrompts(t *testing.T) {
 					}
 				}
 				if category == "fashion" {
-					for _, expected := range []string{"语速略慢", "生活 vlog", "嘴型与原文对齐"} {
+					for _, expected := range []string{"自然聊天语速", "生活 vlog", "嘴型与原文对齐"} {
 						if !strings.Contains(text, expected) {
 							t.Errorf("fashion finalize missing %s", expected)
 						}
 					}
-				} else if strings.Contains(text, "语速略慢") || strings.Contains(text, "生活 vlog") {
+				} else if strings.Contains(text, "自然聊天语速") || strings.Contains(text, "生活 vlog") {
 					t.Errorf("non-fashion finalize included the fashion architecture")
 				}
-				return `{"fullPrompt":"实拍桌面，保持白色商品，看看这款纸巾","prompts":[{"shotId":1,"prompt":"展示白色商品，看看这款纸巾"}]}`
+				return `{"fullPrompt":"实拍桌面，保持白色商品，看看这款纸巾","prompts":[{"shotId":1,"speechMode":"voiceover","prompt":"展示白色商品，看看这款纸巾"}]}`
 			})
 			payload := workflowPayload()
 			payload["operation"] = "finalize"
@@ -111,7 +111,7 @@ func TestWorkflowFinalizeRejectsTimingBeforeModel(t *testing.T) {
 }
 
 func TestWorkflowFinalizeRejectsIncompletePromptIDs(t *testing.T) {
-	for _, reply := range []string{`{"fullPrompt":"图片3出现","prompts":[{"shotId":1,"prompt":"本段"}]}`, `{"fullPrompt":"整段","prompts":[]}`, `{"fullPrompt":"整段","prompts":[{"shotId":2,"prompt":"未知编号"}]}`, `{"prompts":[{"shotId":1,"prompt":"缺整段"}]}`} {
+	for _, reply := range []string{`{"fullPrompt":"图片3出现","prompts":[{"shotId":1,"speechMode":"voiceover","prompt":"本段"}]}`, `{"fullPrompt":"整段","prompts":[]}`, `{"fullPrompt":"整段","prompts":[{"shotId":2,"speechMode":"voiceover","prompt":"未知编号"}]}`, `{"prompts":[{"shotId":1,"speechMode":"voiceover","prompt":"缺整段"}]}`} {
 		t.Run(reply, func(t *testing.T) {
 			server := useChatServer(t, func(map[string]any, int) string { return reply })
 			payload := workflowPayload()

@@ -67,9 +67,9 @@ func TestObserveHonorsBudgetBelowThresholdAndRemembersRejections(t *testing.T) {
 			if calls > 1 {
 				shots := []map[string]any{}
 				for n := 1; n <= 4; n++ {
-					shots = append(shots, map[string]any{"shot": n, "visual": "可见纹理", "replacement": "保持接触与裁切"})
+					shots = append(shots, map[string]any{"shot": n, "purpose": "展示结构", "promptTemplate": "商品结构→机位→接触→场景→光影→保真", "promptExample": "@图片1保持可见轮廓，斜侧近景，置于桌面，真实接触阴影", "visual": "可见纹理", "replacement": "保持接触与裁切"})
 				}
-				output = map[string]any{"compatible": true, "observations": shots, "reusableRules": []string{"保留原图关系"}, "conditions": []string{"手持时"}, "failuresToAvoid": []string{"勿虚构结构"}}
+				output = map[string]any{"compatible": true, "groupFramework": "整体到细节，再进入生活场景", "differenceAxes": []string{"主题与展示重点", "场景与动作关系", "开场与机位节奏"}, "observations": shots, "reusableRules": []string{"保留原图关系"}, "conditions": []string{"手持时"}, "failuresToAvoid": []string{"勿虚构结构"}}
 			}
 			raw, _ := json.Marshal(output)
 			body, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(raw)}}}})

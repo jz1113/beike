@@ -10,7 +10,6 @@ import type { DeconstructModalProps } from '../deconstruct/DeconstructModal';
 import type { TagEditModalProps } from './TagEditModal';
 import { AssetDetailModal } from './AssetDetailModal';
 import { AssetEditModal } from './AssetEditModal';
-import { AssetPromptSpecModal } from './AssetPromptSpecModal';
 import DeconstructModal from '../deconstruct/DeconstructModal';
 import { FullPromptGroupPreview } from '../cards/FullPromptGroupPreview';
 import { AtomicAssetPreview } from '../cards/AtomicAssetPreview';
@@ -32,7 +31,6 @@ interface Props {
     setItem: (value: AssetDetailModalProps['detailItem']) => void;
     setImageIndex: (value: number) => void;
     onDelete: AssetDetailModalProps['onDeleteAsset'];
-    onApply: AssetDetailModalProps['onApplyToWorkshop'];
     getText: AssetDetailModalProps['getAssetPreviewText'];
   };
   edit: {
@@ -54,8 +52,6 @@ interface Props {
     onCopy: (text: string, id: string) => void;
   };
   panels: {
-    specOpen: boolean;
-    setSpecOpen: (value: boolean) => void;
     subcategoryOpen: boolean;
     setSubcategoryOpen: (value: boolean) => void;
     actionCategory: ActionCategoryId | 'all';
@@ -87,7 +83,6 @@ export function AssetLibraryDialogs({ activeSubTab, copiedId, promptGroupCategor
         onCopyPrompt={preview.onCopy}
         onOpenTagEdit={(item) => edit.setTagItem({ ...item })}
         onDeleteAsset={detail.onDelete}
-        onApplyToWorkshop={detail.onApply}
         getAssetPreviewText={detail.getText}
       />
       <AssetEditModal
@@ -100,7 +95,6 @@ export function AssetLibraryDialogs({ activeSubTab, copiedId, promptGroupCategor
         onSave={edit.onSave}
         onClose={() => edit.setItem(null)}
       />
-      <AssetPromptSpecModal isOpen={panels.specOpen} onClose={() => panels.setSpecOpen(false)} showToast={panels.showToast} />
       <DeconstructModal queueApi={panels.queueApi} xhsImport={panels.xhsImport} showToast={panels.showToast} />
       <SubCategoryManagerModal
         isOpen={panels.subcategoryOpen}
@@ -117,7 +111,6 @@ export function AssetLibraryDialogs({ activeSubTab, copiedId, promptGroupCategor
           initialIndex={preview.group.initialIndex}
           copiedId={copiedId}
           onCopyPrompt={preview.onCopy}
-          onApplyToWorkshop={(item) => { detail.onApply(item); preview.setGroup(null); }}
           onOpenTagEdit={(item) => { preview.setGroup(null); edit.setTagItem({ ...item }); }}
           onOpenEdit={(item) => { preview.setGroup(null); edit.setItem({ ...item }); }}
           onClose={() => preview.setGroup(null)}
@@ -131,7 +124,6 @@ export function AssetLibraryDialogs({ activeSubTab, copiedId, promptGroupCategor
           displayLabel={preview.atom.displayLabel}
           copiedId={copiedId}
           onCopyPrompt={preview.onCopy}
-          onApplyToWorkshop={(item) => { detail.onApply(item); preview.setAtom(null); }}
           onOpenTagEdit={(item) => { preview.setAtom(null); edit.setTagItem({ ...item }); }}
           onClose={() => preview.setAtom(null)}
         />

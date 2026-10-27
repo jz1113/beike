@@ -10,7 +10,8 @@ interface Props {
   onPreview: (id: string) => void;
   onRun: (action: string, payload?: Record<string, unknown>) => Promise<boolean>;
 }
-const labels = { learned: '已记住', pending: '待学习', rejected: '不适用', holdout: '独立验证' };
+const labels = { learned: '已记住', pending: '待读图', stale: '需重新学习', failed: '失败待重试', rejected: '不适用', holdout: '独立验证' };
+const statusCount = (memory: CategorySkillState['memory'], value: string) => value === 'pending' ? Math.max(0, memory.pending - (memory.stale ?? 0) - (memory.failed ?? 0)) : value === 'stale' ? (memory.stale ?? 0) : value === 'failed' ? (memory.failed ?? 0) : value === 'learned' ? memory.learned : value === 'rejected' ? memory.rejected : value === 'holdout' ? memory.holdout : 0;
 const inputClass = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-white/5';
 
 export function CategoryMemoryView({ memory, groupNumbers, busy, onPreview, onRun }: Props) {
@@ -20,10 +21,10 @@ export function CategoryMemoryView({ memory, groupNumbers, busy, onPreview, onRu
   const [filter, setFilter] = useState('all');
   const [limit, setLimit] = useState(12);
   const entries = memory.entries
-    .map((entry, idx) => ({ entry, number: groupNumbers?.get(entry.groupId) ?? idx + 1 }))
-    .sort((a, b) => a.number - b.number)
+    .map(entry => ({ entry, number: groupNumbers?.get(entry.groupId) }))
+    .sort((a, b) => (a.number ?? Number.MAX_SAFE_INTEGER) - (b.number ?? Number.MAX_SAFE_INTEGER))
     .filter(({ entry, number }) => (filter === 'all' || entry.state === filter)
-      && [`组 ${number}`, entry.reason, ...entry.rules, ...entry.conditions, ...entry.avoid].join(' ').toLowerCase().includes(query.toLowerCase()));
+      && [fullPromptGroupLabel(number), number === undefined ? '' : `组 ${number}`, entry.title, entry.reason, ...entry.rules, ...entry.conditions, ...entry.avoid].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
   return <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(250px,0.8fr)_minmax(0,1.8fr)]">
     <section className="self-start rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#18191c]">
       <h4 className="flex items-center gap-2 text-sm font-semibold"><Brain className="h-4 w-4 text-indigo-500" />教它记住</h4>
@@ -53,13 +54,17 @@ export function CategoryMemoryView({ memory, groupNumbers, busy, onPreview, onRu
     <section className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
         <label className={`flex min-w-0 flex-1 items-center gap-2 ${inputClass}`}><Search className="h-3.5 w-3.5 shrink-0 text-slate-400" /><input aria-label="搜索观察记忆" value={query} onChange={event => { setQuery(event.target.value); setLimit(12); }} placeholder="搜索组号、提示词架构、写法或避坑" className="min-w-0 flex-1 bg-transparent outline-none" /></label>
-        <select aria-label="筛选记忆状态" value={filter} onChange={event => { setFilter(event.target.value); setLimit(12); }} className={inputClass}><option value="all">全部状态</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select aria-label="筛选记忆状态" value={filter} onChange={event => { setFilter(event.target.value); setLimit(12); }} className={inputClass}><option value="all">全部状态（{memory.entries.length}）</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}（{statusCount(memory, value)}）</option>)}</select>
       </div>
+      <p className="mt-2 text-xs text-slate-500">显示 {Math.min(limit, entries.length)} / {entries.length} 组{entries.length !== memory.entries.length ? ` · 记忆列表共 ${memory.entries.length} 组` : ''}</p>
       <div className="mt-3 space-y-3">{entries.slice(0, limit).map(({ entry, number }) => <article key={entry.groupId} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#18191c]">
         <div className="flex flex-wrap items-center justify-between gap-2"><button type="button" onClick={() => onPreview(entry.groupId)} className="max-w-full truncate text-left text-xs font-bold tabular-nums hover:text-indigo-500 hover:underline">{fullPromptGroupLabel(number)}</button>
-          <span className={`rounded-md px-2 py-1 text-[11px] ${entry.state === 'learned' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : entry.state === 'rejected' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400'}`}>{labels[entry.state]}</span>
+          <span className={`rounded-md px-2 py-1 text-[11px] ${entry.state === 'learned' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : entry.state === 'rejected' || entry.state === 'stale' || entry.state === 'failed' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400'}`}>{labels[entry.state]}</span>
         </div>
         {entry.state === 'learned' ? <div className="mt-3 space-y-3 text-xs leading-6">
+          {entry.groupFramework && <div><p className="font-semibold text-indigo-600 dark:text-indigo-300">本组架构与展示递进</p><p className="mt-1 whitespace-pre-wrap">{entry.groupFramework}</p></div>}
+          {!!entry.observations?.length && <details><summary className="cursor-pointer font-semibold text-indigo-600 dark:text-indigo-300">逐镜读图依据、构建槽位与示例</summary><div className="mt-3 space-y-4">{entry.observations.map(shot => <div key={shot.shot} className="rounded-lg bg-slate-50 p-3 dark:bg-white/5"><p className="font-semibold">第 {shot.shot} 镜 · {shot.purpose || '视觉观察'}</p><p className="mt-2 whitespace-pre-wrap"><b>可见事实：</b>{shot.visual}</p><p className="mt-2 whitespace-pre-wrap"><b>迁移方法：</b>{shot.replacement}</p>{shot.promptTemplate && <p className="mt-2 whitespace-pre-wrap"><b>提示词架构：</b>{shot.promptTemplate}</p>}{shot.promptExample && <p className="mt-2 whitespace-pre-wrap"><b>完整示例：</b>{shot.promptExample}</p>}</div>)}</div></details>}
+          {!!entry.differenceAxes?.length && <div><p className="font-semibold text-indigo-600 dark:text-indigo-300">同款多组如何做出差异</p><ul className="mt-1 list-disc pl-4">{entry.differenceAxes.map((axis, index) => <li key={index}>{axis}</li>)}</ul></div>}
           <div>
             <p className="font-semibold text-indigo-600 dark:text-indigo-300">绘图提示词构建方法</p>
             <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700 dark:text-slate-200">{entry.rules.map((rule, i) => <li key={i}>{rule}</li>)}</ul>
@@ -77,11 +82,11 @@ export function CategoryMemoryView({ memory, groupNumbers, busy, onPreview, onRu
             </div>
           )}
           <details><summary className="cursor-pointer text-slate-500">观察信息与重新学习</summary><p className="mt-2 text-slate-500">{entry.model} · {new Date(entry.createdAt).toLocaleString()}</p><button type="button" disabled={busy} onClick={() => void onRun('retry-sample', { id: entry.groupId })} className="mt-2 text-indigo-500 underline disabled:opacity-40">重置观察，下轮重新读图</button></details>
-        </div> : <p className="mt-3 text-xs leading-6 text-slate-500">{entry.state === 'rejected' ? entry.reason : entry.state === 'holdout' ? '独立保留，用于成图对照；图片与评分均不参与技能编写。' : entry.reason || '尚未读图。下轮学习会提炼该组的绘图提示词构建方法与提示词架构。'}</p>}
+        </div> : <p className="mt-3 text-xs leading-6 text-slate-500">{entry.state === 'rejected' ? entry.reason : entry.state === 'holdout' ? '独立保留，用于成图对照；图片与评分均不参与技能编写。' : entry.reason || '尚未读图。将按每轮上限分批提炼绘图提示词构建方法与提示词架构。'}</p>}
         {entry.state === 'rejected' && <button type="button" disabled={busy} onClick={() => void onRun('retry-sample', { id: entry.groupId })} className="mt-2 text-xs text-indigo-500 underline disabled:opacity-40">归类确认后重新学习</button>}
       </article>)}</div>
       {!entries.length && <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500 dark:border-white/10">{memory.entries.length ? '没有匹配的记忆，试试其他搜索或状态。' : '先投喂同类目的四图组，提炼的绘图提示词构建方法与架构会保存在这里。'}</p>}
-      {entries.length > limit && <button type="button" onClick={() => setLimit(value => value + 12)} className="mt-4 w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-500 dark:border-white/10">查看更多 · 还有 {entries.length - limit} 套</button>}
+      {entries.length > limit && <button type="button" onClick={() => setLimit(value => value + 12)} className="mt-4 w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-500 dark:border-white/10">查看更多 · 还有 {entries.length - limit} 组</button>}
     </section>
   </div>;
 }

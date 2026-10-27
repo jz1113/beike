@@ -17,6 +17,7 @@ import type {
   SalesImageRef,
 } from '@shared/domain/sales';
 import type { SalesRouteHeaders } from '../model/salesRoute';
+import { salesSkillBinding } from '@shared/domain/sales/skill';
 
 export type { SalesRouteHeaders };
 
@@ -33,16 +34,20 @@ function parseSales<T>(schema: z.ZodType<T>, value: unknown, fallback: string): 
   return parsed.data;
 }
 
-async function postSales<T>(path: string, body: unknown, response: z.ZodType<T>, extraHeaders?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+async function postSales<T>(path: string, body: object, response: z.ZodType<T>, extraHeaders?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+  const skill = salesSkillBinding();
   const res = await apiFetch(path, {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json', ...extraHeaders },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, ...skill }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.success === false) {
     throw new Error(typeof data?.error === 'string' ? data.error : '请求失败');
+  }
+  if (data?.skillId !== skill.skillId || data?.skillRevision !== skill.skillRevision) {
+    throw new Error('服务端创作技能版本与当前页面不一致，请刷新页面后重试；已有任务请查询原回执');
   }
   return parseSales(response, data, '返回格式不正确');
 }
@@ -137,6 +142,7 @@ export async function finalizeSalesPrompts(input: {
   shots: VideoSalesScript['shots'];
   imageCatalog: SalesImageRef[];
   productAnalysis?: string;
+  productDescription?: string;
   category: VideoSalesCategory;
   operation: 'finalize';
   actualReferences: SalesActualReference[];
@@ -161,6 +167,7 @@ export async function finalizeSalesPrompts(input: {
     })),
     imageCatalog: input.imageCatalog.map((image) => ({ index: image.index, url: image.url, role: image.role })),
     productAnalysis: input.productAnalysis,
+    productDescription: input.productDescription,
     category: input.category,
     operation: input.operation,
     actualReferences: input.actualReferences,

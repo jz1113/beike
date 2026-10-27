@@ -4,6 +4,7 @@
  */
 import {
   VITE_PORT,
+  buildGateway,
   ensureAppDatabase,
   getWorkspaceRoot,
   healthOk,
@@ -22,6 +23,7 @@ import {
   writeApiPort,
 } from './web-shared.mjs';
 import { ownsWebProcess, stopWebProcess } from './web-processes.mjs';
+import { watchGatewaySkill } from './gateway-skill-watcher.mjs';
 import { join, resolve } from 'node:path';
 
 const workspaceRoot = getWorkspaceRoot();
@@ -31,8 +33,10 @@ const vitePort = isolated ? VITE_PORT + 1 : VITE_PORT;
 const appDataDir = resolve(process.env.AZHUO_DATA_DIR || (isolated ? join(resolveAppDataDir(), 'development') : resolveAppDataDir()));
 let gatewayChild = null;
 let viteChild = null;
+let stopSkillWatcher = null;
 
 const shutdown = (code = 0) => {
+  stopSkillWatcher?.();
   killChild(viteChild);
   killChild(gatewayChild);
   process.exit(code);
@@ -67,6 +71,23 @@ try {
   }
   writeApiPort(workspaceRoot, apiPort, { isolated });
   gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
+  stopSkillWatcher = watchGatewaySkill({
+    workspaceRoot,
+    rebuild: () => {
+      console.log('→ 带货规则已更新，正在重建 Go API…');
+      buildGateway(workspaceRoot);
+    },
+    restart: async () => {
+      if (!(await stopWebProcess(workspaceRoot, 'gateway', isolated))) {
+        throw new Error('原开发 API 已由其它启动器接管，请重新运行 pnpm dev');
+      }
+      gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated, build: false });
+      if (!(await waitFor(() => healthOk(apiPort), 'Go API 规则同步', 60000, gatewayChild))) {
+        throw new Error('Go API 规则同步启动失败，请查看上方日志');
+      }
+    },
+    onError: (error) => console.error(`✗ 带货规则同步失败：${error.message}`),
+  });
   if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gatewayChild))) shutdown(1);
   if (!reuseVite) viteChild = startViteServer({ workspaceRoot, apiPort, appDataDir, accessToken, vitePort, isolated });
   if (!(await waitFor(() => viteOk(vitePort), `Vite http://127.0.0.1:${vitePort}`, 60000, viteChild))) shutdown(1);

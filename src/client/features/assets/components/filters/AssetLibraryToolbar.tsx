@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import {
   FolderOpen,
@@ -14,9 +14,9 @@ import type { AssetSubTab } from '../../model/assetPromptConstants';
 export type { AssetSubTab } from '../../model/assetPromptConstants';
 
 export type AssetLibraryToolbarProps = {
-  toolbarTarget?: HTMLElement | null;
+  navigationTarget?: HTMLElement | null;
+  actionsTarget?: HTMLElement | null;
   statusFilters?: ReactNode;
-  audienceFilters?: ReactNode;
   activeSubTab: AssetSubTab;
   hideSecondaryRow?: boolean;
   setActiveSubTab: (tab: AssetSubTab) => void;
@@ -29,9 +29,9 @@ export type AssetLibraryToolbarProps = {
   importJsonRef: RefObject<HTMLInputElement | null>;
   onImportJsonBackup: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExportJsonBackup: () => void;
-  onDeduplicate: () => void;
-  onOpenPromptSpec: () => void;
-  onClearAssets: (scope: 'current' | 'all') => void;
+  onOpenSkills: () => void;
+  onRefresh: () => void;
+  isLoading: boolean;
   dynamicTagList: Array<{ tag: string; count: number }>;
   selectedTag: string | null;
   actionCategory?: ActionCategoryId | 'all';
@@ -56,9 +56,9 @@ export type AssetLibraryToolbarProps = {
 };
 
 export default function AssetLibraryToolbar({
-  toolbarTarget,
+  navigationTarget,
+  actionsTarget,
   statusFilters,
-  audienceFilters,
   activeSubTab,
   hideSecondaryRow,
   setActiveSubTab,
@@ -71,9 +71,8 @@ export default function AssetLibraryToolbar({
   importJsonRef,
   onImportJsonBackup,
   onExportJsonBackup,
-  onDeduplicate,
-  onOpenPromptSpec,
-  onClearAssets,
+  onOpenSkills,
+  onRefresh, isLoading,
   dynamicTagList,
   selectedTag,
   actionCategory = 'all',
@@ -96,15 +95,6 @@ export default function AssetLibraryToolbar({
   sortBy,
   setSortBy,
 }: AssetLibraryToolbarProps) {
-  // 顶栏需同时容纳品牌、资产分类、右侧模块导航；只在充足宽度时挂到顶栏。
-  const [wideLayout, setWideLayout] = useState(() => window.matchMedia('(min-width: 1536px)').matches);
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 1536px)');
-    const update = () => setWideLayout(query.matches);
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-  const portalTarget = wideLayout ? toolbarTarget : null;
   const tabBtn = (tab: AssetSubTab, label: string) => (
     <button
       type="button"
@@ -112,11 +102,7 @@ export default function AssetLibraryToolbar({
         setActiveSubTab(tab);
         setSelectedTag(null);
       }}
-      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-        activeSubTab === tab
-          ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/10 dark:text-white dark:bg-[#25262B] dark:ring-white/10'
-          : 'text-slate-600 hover:text-slate-900 dark:hover:text-white dark:text-slate-400'
-      }`}
+      className="asset-type-tab"
       aria-pressed={activeSubTab === tab}
       title={ASSET_TAB_HINT[tab]}
     >
@@ -124,26 +110,21 @@ export default function AssetLibraryToolbar({
     </button>
   );
 
-  // 分类切换属于内容区的导航。让它靠左放在资产列表上方，避免与居中的电商图文模块导航
-  // 和右侧管理操作抢占同一条顶栏。
   const tabNavigation = (
-    <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-      <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 dark:bg-white/[0.06] dark:border-white/[0.08]" aria-label="资产类型">
+      <nav className="asset-type-navigation" aria-label="资产类型">
         {tabBtn('full_prompt', '图组母本')}
-        <span className="w-px h-4 bg-slate-200 mx-0.5 dark:bg-white/10" aria-hidden="true" />
         {tabBtn('persona', '人物')}
         {tabBtn('outfit', '穿搭')}
         {tabBtn('scene', '场景')}
-      </div>
-    </div>
+      </nav>
   );
 
   const actionControls = (
-    <div className="flex items-center gap-2.5 shrink-0">
+    <div className="asset-library-actions">
       <button
         type="button"
         onClick={onOpenDeconstruct}
-        className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer h-9"
+        className="asset-feed-button"
       >
         <FolderOpen className="w-3.5 h-3.5" />
         <span>投喂参考图</span>
@@ -170,33 +151,24 @@ export default function AssetLibraryToolbar({
         importJsonRef={importJsonRef}
         onImportJsonBackup={onImportJsonBackup}
         onExportJsonBackup={onExportJsonBackup}
-        onDeduplicate={onDeduplicate}
-        onOpenPromptSpec={onOpenPromptSpec}
-        onClearAssets={onClearAssets}
+        onRefresh={onRefresh}
+        isLoading={isLoading}
+        onOpenSkills={activeSubTab === 'full_prompt' ? undefined : onOpenSkills}
       />
     </div>
   );
 
-  return (
-    <>
-      {/* 窄屏没有顶栏挂载点时，让操作控件独占一行；分类导航始终紧跟“维度筛选”。 */}
-      {!portalTarget && (
-        <div
-          data-asset-main-toolbar
-          className="flex items-center justify-end gap-3 flex-wrap px-5 sm:px-7 xl:px-8 py-1.5 bg-transparent"
-        >
+  const toolbarControls = (
+        <div className="asset-library-tools">
           {actionControls}
         </div>
-      )}
-      {portalTarget && createPortal(
-        <div className="flex h-12 min-w-0 items-center justify-end bg-transparent">
-          {actionControls}
-        </div>,
-        portalTarget,
-      )}
-      {/* 🌟 紧凑型专业复合过滤控制栏 (Filter Bar) */}
-      <AssetLibraryFilterBar
-        navigation={<>{tabNavigation}{audienceFilters}</>}
+  );
+
+  return (
+    <>
+      {navigationTarget ? createPortal(tabNavigation, navigationTarget) : <div className="asset-type-fallback">{tabNavigation}</div>}
+      {actionsTarget && createPortal(toolbarControls, actionsTarget)}
+      {activeSubTab === 'action' && <AssetLibraryFilterBar
         hideSecondaryRow={hideSecondaryRow}
         statusFilters={statusFilters}
         activeSubTab={activeSubTab}
@@ -222,7 +194,7 @@ export default function AssetLibraryToolbar({
         displayedItemsCount={displayedItemsCount}
         sortBy={sortBy}
         setSortBy={setSortBy}
-      />
+      />}
     </>
   );
 }

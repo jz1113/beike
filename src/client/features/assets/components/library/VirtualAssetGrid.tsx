@@ -6,6 +6,7 @@ interface Props<T extends { id: string }> {
   scrollRef: RefObject<HTMLDivElement | null>;
   resetKey: string;
   openItemId: string | null;
+  minCardWidth?: number;
   renderItem: (item: T, index: number) => ReactNode;
 }
 
@@ -27,7 +28,7 @@ const CachedCard = memo(function CachedCard<T extends { id: string }>({
 
 /** Keep the full collection available for filtering while mounting only visible rows. */
 export function VirtualAssetGrid<T extends { id: string }>({
-  items, scrollRef, resetKey, openItemId, renderItem,
+  items, scrollRef, resetKey, openItemId, renderItem, minCardWidth = 260,
 }: Props<T>) {
   const gridRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(1);
@@ -65,8 +66,8 @@ export function VirtualAssetGrid<T extends { id: string }>({
     <div
       ref={gridRef}
       data-asset-grid
-      className="relative grid"
-      style={{ height: virtualizer.getTotalSize(), gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}
+      className="relative grid gap-x-4"
+      style={{ height: virtualizer.getTotalSize(), gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${minCardWidth}px), 1fr))` }}
     >
       {virtualizer.getVirtualItems().map((row) => {
         const rowItems = items.slice(row.index * columns, (row.index + 1) * columns);

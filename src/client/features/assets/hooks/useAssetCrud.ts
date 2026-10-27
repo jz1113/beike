@@ -1,9 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import { apiFetch as rawApiFetch } from '@client/shared/api/apiClient';
 import { pickAssetEditFields } from '@shared/domain/assets/assetEdit';
-import { appearanceAudience } from '@shared/domain/assets/appearanceAudience';
-import { isCompletePromptGroup, workshopAssetBlockReason } from '@shared/domain/workshop/workshop-pipeline';
 
 // Keep the raw Response contract while rejecting HTTP and business errors here.
 async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Response> {
@@ -12,11 +10,9 @@ async function apiFetch(...args: Parameters<typeof rawApiFetch>): Promise<Respon
   if (!res.ok || body?.success === false) throw new Error(body?.error || `请求失败 (${res.status})`);
   return res;
 }
-import { useAppStore } from '@client/store';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
 import { resolveAssetApiType } from '../model/assetPromptConstants';
 import { buildBackupData, parseBackupDataToBulkItems } from '../model/assetBackup';
-import { parsePersonaLayers, formatPersonaPrompt } from '../model/assetPromptConstants';
 
 function errorText(err: unknown) {
   if (err instanceof Error) return err.message;
@@ -30,12 +26,10 @@ export interface UseAssetCrudOptions {
   selectedIds: string[];
   setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
   setIsBatchMode: (v: boolean) => void;
-  setIsLoading: (v: boolean) => void;
   detailItem: AssetLibrarySlim | null;
   setDetailItem: React.Dispatch<React.SetStateAction<AssetLibrarySlim | null>>;
   showToast: (msg: string) => void;
   fetchAssets: (forceReload?: boolean) => Promise<void>;
-  onEnterWorkshop?: () => void;
 }
 
 /**
@@ -47,65 +41,20 @@ export function useAssetCrud({
   selectedIds,
   setSelectedIds,
   setIsBatchMode,
-  setIsLoading,
   detailItem,
   setDetailItem,
   showToast,
   fetchAssets,
-  onEnterWorkshop,
 }: UseAssetCrudOptions) {
   const [editingItem, setEditingItem] = useState<AssetLibrarySlim | null>(null);
   const [tagEditItem, setTagEditItem] = useState<AssetLibrarySlim | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const deletingRef = useRef(false);
+  const activeTabRef = useRef(activeSubTab);
+  activeTabRef.current = activeSubTab;
 
-  const {
-    setQuickPrompt,
-    setCurrentView,
-    setStep,
-    setPendingBatchLockedAssets,
-    setPendingBatchStage,
-  } = useAppStore();
 
-  // 一键彻底清空资产
-  const handleClearAssets = async (scope: 'current' | 'all') => {
-    const scopeName =
-      scope === 'all'
-        ? '全部本地数据库数据（资产、图集与分类、电商图文项目、生成任务、历史记录及 AI 对话）'
-        : `当前「${
-            activeSubTab === 'full_prompt'
-              ? '完整提示词'
-              : activeSubTab === 'scene'
-                ? '场景'
-                : activeSubTab === 'action'
-                  ? '动作'
-                  : activeSubTab === 'outfit'
-                    ? '穿搭'
-                    : activeSubTab === 'persona'
-                      ? '人物'
-                      : '当前'
-          }」全部资产`;
-    if (!window.confirm(`⚠️ 高危操作：确定要彻底清空 ${scopeName} 吗？清空后将无法恢复，且重启服务也不会自动恢复。`)) return;
-
-    try {
-      const url = scope === 'all'
-        ? '/api/catalog/assets/library?action=clear-database'
-        : `/api/catalog/assets/library?action=clear-all&type=${resolveAssetApiType(activeSubTab)}`;
-      const res = await apiFetch(url, {
-        method: 'DELETE',
-      });
-      if (res && res.ok) {
-        const data = await res.json();
-        showToast(`🗑️ ${data.message || '已清空'}`);
-        invalidateGlobalAssetCache();
-        setSelectedIds([]);
-        await fetchAssets(true);
-      } else {
-        throw new Error('清空失败');
-      }
-    } catch (err) {
-      alert('清空操作失败: ' + errorText(err));
-    }
-  };
 
   // 切换收藏
   const toggleFavorite = async (item: AssetLibrarySlim, e?: React.MouseEvent) => {
@@ -154,9 +103,10 @@ export function useAssetCrud({
 
   // 批量删除选中的资产
   const handleBatchDelete = async () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0 || deletingRef.current) return;
     if (!window.confirm(`确认要彻底批量删除选中的 ${selectedIds.length} 项资产吗？`)) return;
-
+    deletingRef.current = true;
+    setIsDeleting(true);
     try {
       const idsParam = selectedIds.join(',');
       const response = await apiFetch(`/api/catalog/assets/library?type=${resolveAssetApiType(activeSubTab)}&ids=${idsParam}`, {
@@ -165,6 +115,7 @@ export function useAssetCrud({
       const result = await response.json();
       if (!response.ok || !result?.success) throw new Error(result?.error || '删除失败');
       invalidateGlobalAssetCache();
+      if (activeTabRef.current !== activeSubTab) return;
       setItems((prev) => prev.filter((it) => !selectedIds.includes(it.id)));
       showToast(`🗑️ 成功批量删除 ${result.count ?? 0} 项资产`);
       setSelectedIds(prev => prev.filter(id => !selectedIds.includes(id)));
@@ -172,25 +123,9 @@ export function useAssetCrud({
       await fetchAssets(true);
     } catch (err) {
       alert('批量删除失败: ' + errorText(err));
-    }
-  };
-
-  // 一键智能提纯、分类归位与去重
-  const handleDeduplicate = async () => {
-    if (!window.confirm('智能提纯将自动扫描库中所有错位资产（如穿搭/动作/人物误存入场景），自动迁移归位到对应分类并深度去重，确定继续吗？')) return;
-    setIsLoading(true);
-    try {
-      const res = await apiFetch(`/api/catalog/assets/library?action=deduplicate`, { method: 'DELETE' });
-      if (res && res.ok) {
-        const data = await res.json();
-        showToast(`✨ ${data.message || '已完成智能提纯与积木重分类'}`);
-        invalidateGlobalAssetCache();
-        await fetchAssets(true);
-      }
-    } catch (err) {
-      alert('提纯归位失败: ' + err);
     } finally {
-      setIsLoading(false);
+      deletingRef.current = false;
+      setIsDeleting(false);
     }
   };
 
@@ -259,76 +194,6 @@ export function useAssetCrud({
     };
     reader.readAsText(file);
     e.target.value = '';
-  };
-
-  // 一键应用并载入电商图文
-  const handleApplyToWorkshop = (item: AssetLibrarySlim) => {
-    const blocked = workshopAssetBlockReason(item, activeSubTab);
-    if (blocked) { showToast(blocked); return; }
-    if ((activeSubTab === 'persona' || activeSubTab === 'outfit')
-      && appearanceAudience(item, activeSubTab === 'outfit') === 'unknown') {
-      showToast('请先确认该资产的适用人群，再载入电商图文进行人物或穿搭替换');
-      return;
-    }
-    let promptSnippet = '';
-    if (activeSubTab === 'full_prompt') {
-      if (!isCompletePromptGroup(item)) {
-        showToast('该图组不是完整四图母本，请在资产库重新解构后再载入');
-        return;
-      }
-      promptSnippet = [
-        item.architectureSummary ? `【固定图组架构】${item.architectureSummary}` : '',
-        item.contentSummary ? `【内容总结】${item.contentSummary}` : '',
-      ].filter(Boolean).join('\n');
-      // Loading a new mother means its own people, clothing and scene are the default.
-      // Do not silently carry substitutions from the previously selected group.
-      setPendingBatchLockedAssets({
-        fullPromptId: item.id,
-        personaId: 'auto',
-        outfitId: 'auto',
-        sceneId: 'auto',
-        actionId: 'auto',
-      });
-      setPendingBatchStage(2);
-    } else if (activeSubTab === 'scene') {
-      const desc = item.description || '';
-      const title = item.title || '';
-      const spacePart = title && desc.includes(title) ? desc : `${title ? `${title}，` : ''}${desc}`;
-      promptSnippet = `【场景空间】：${spacePart}；【采光光影】：${item.lighting || '自然采光与清晰接触阴影'}`;
-      setPendingBatchLockedAssets({ sceneId: item.id });
-      setPendingBatchStage(2);
-    } else if (activeSubTab === 'action') {
-      const act = item.action || '';
-      const actionTitle = item.title || '';
-      const actPart = actionTitle && act.includes(actionTitle) ? act : `${actionTitle ? `${actionTitle}，` : ''}${act}`;
-      promptSnippet = `【抓拍动作】：${actPart}；【机位】：${item.camera || 'iPhone 50mm 生活镜头'}`;
-      setPendingBatchLockedAssets({ actionId: item.id });
-      setPendingBatchStage(2);
-    } else if (activeSubTab === 'outfit') {
-      promptSnippet = `【服装穿搭】：${item.top}，${item.bottom}${item.shoes ? `，${item.shoes}` : ''}，配色：${item.colorPalette || ''}`;
-      setPendingBatchLockedAssets({ outfitId: item.id });
-      setPendingBatchStage(2);
-    } else if (activeSubTab === 'persona') {
-      const layers = parsePersonaLayers(item.description || item.name);
-      promptSnippet = `【模特博主】：${formatPersonaPrompt(layers)}`;
-      setPendingBatchLockedAssets({ personaId: item.id });
-      setPendingBatchStage(2);
-    }
-
-    setQuickPrompt(promptSnippet);
-
-    if (onEnterWorkshop) {
-      onEnterWorkshop();
-    } else {
-      const store = useAppStore.getState();
-      store.setWorkshopMode('storyboard_generate');
-      store.setActiveWorkshopTab('studio');
-      setStep(2);
-      setCurrentView('workshop');
-    }
-    showToast(activeSubTab === 'full_prompt'
-      ? '已锁定图组母本；默认沿用原组人物、穿搭和场景，可在生产设置中单独替换'
-      : '已载入电商图文并锁定应用该提示词资产');
   };
 
   // 保存编辑后的资产
@@ -411,14 +276,12 @@ export function useAssetCrud({
     tagEditItem,
     setTagEditItem,
     isUpdating,
-    handleClearAssets,
+    isDeleting,
     toggleFavorite,
     deleteAsset,
     handleBatchDelete,
-    handleDeduplicate,
     handleExportJsonBackup,
     handleImportJsonBackup,
-    handleApplyToWorkshop,
     handleSaveEdit,
     handleSaveTagEdit,
   };

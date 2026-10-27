@@ -132,7 +132,7 @@ func TestFashionScriptPromptLocksReferences(t *testing.T) {
 	body := workflowScriptBody("gemini", map[string]any{"productName": "衬衫", "category": "fashion"}, nil, 15, "9:16")
 	encoded, _ := json.Marshal(body)
 	text := string(encoded)
-	for _, piece := range []string{"开箱换装", "生活穿搭", "鞋包展示", "usesProduct", "中景", "不写秒数"} {
+	for _, piece := range []string{"开箱换装", "生活穿搭", "鞋包展示", "usesProduct", "中景", "静帧不写口播、秒数"} {
 		if !strings.Contains(text, piece) {
 			t.Fatalf("missing %s", piece)
 		}
@@ -149,7 +149,7 @@ func TestScriptPromptOmitsPrice(t *testing.T) {
 	if strings.Contains(string(encoded), "168元") || strings.Contains(string(encoded), "priceRange") {
 		t.Fatal("workflow script included a price")
 	}
-	if !strings.Contains(string(encoded), "口播不要出现价格") {
+	if !strings.Contains(string(encoded), "价格和链接继续禁止") {
 		t.Fatal("script prompt should forbid price in voiceover")
 	}
 }

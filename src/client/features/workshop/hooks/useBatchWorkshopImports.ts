@@ -25,7 +25,7 @@ export function useBatchWorkshopImports({ workspaceReady, setCurrentStage, setIt
 
   useEffect(() => {
     if (!workspaceReady || !pendingBatchPromptImport?.prompts?.length) return;
-    const { productTitle, productFingerprint, prompts, referenceImages = [], masterImageIndex } = pendingBatchPromptImport;
+    const { productTitle, productFingerprint, prompts, referenceImages = [] } = pendingBatchPromptImport;
     const importId = `hist_${Date.now()}`;
 
     setItems((prev) => {
@@ -50,9 +50,11 @@ export function useBatchWorkshopImports({ workspaceReady, setCurrentStage, setIt
         props: {},
         status: 'success',
         selected: true,
-        allTypedImages: [],
-        selectedProductImages: referenceImages,
-        analyzedSuccess: true,
+        // Imported references remain available for review, but never count as a
+        // new production selection until the user explicitly picks them.
+        allTypedImages: referenceImages.map((url) => ({ url, type: 'main' as const })),
+        selectedProductImages: [],
+        analyzedSuccess: false,
         productFingerprint: productFingerprint || '',
         prompts,
         tasks: [],
@@ -60,9 +62,9 @@ export function useBatchWorkshopImports({ workspaceReady, setCurrentStage, setIt
       return [...prev, importItem];
     });
 
-    setCurrentStage(3);
+    setCurrentStage(2);
     setPendingBatchPromptImport(null);
-    showToast(`已载入 ${prompts.length} 条图组分镜${masterImageIndex ? `（母本图 #${masterImageIndex}）` : ''}；场景、镜头动作与同组参考图已联动，可直接确认后生图。`);
+    showToast(`已导入 ${prompts.length} 条历史分镜；请确认当前商品图，再按创作技能重新分析。历史分镜保留供核对。`);
   }, [workspaceReady, setCurrentStage, pendingBatchPromptImport, setPendingBatchPromptImport, showToast, setItems]);
 
 }

@@ -1,6 +1,5 @@
 import type { useBatchWorkshopRunner } from '../../hooks/useBatchWorkshopRunner';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
-import { productPropsWithCategory } from '../../model/batchTypes';
 import { WorkshopSettingsModal } from './WorkshopSettingsModal';
 
 interface BatchWorkshopSettingsProps {
@@ -16,20 +15,9 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
     analyzeConcurrency,
     autoGenerateCopywriting,
     availableImageModels,
-    availableOutfits,
-    availablePersonas,
-    availableScenes,
     availableVisionModels,
     generationStrategy,
     imageGenConcurrency,
-    isAnalyzingAll,
-    isCollecting,
-    isGeneratingBatch,
-    items,
-    lockedOutfitId,
-    lockedPersonaId,
-    lockedSceneId,
-    personaMode,
     recipes,
     selectedArchId,
     selectedAspect,
@@ -41,22 +29,18 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
     setAutoGenerateCopywriting,
     setGenerationStrategy,
     setImageGenConcurrency,
-    setLockedOutfitId,
-    setLockedPersonaId,
-    setLockedSceneId,
     setSelectedArchId,
     setSelectedAspect,
     setSelectedImageGenModel,
     setSelectedQuality,
     setSelectedShotCount,
     setSelectedVisionModel,
-    successfulItems,
   } = runner;
   return (
       <WorkshopSettingsModal
         workspaceStatus={runner.workspaceStatus} workspaceError={runner.workspaceError}
-        busy={isCollecting || isAnalyzingAll || isGeneratingBatch || runner.isAutoPilotRunning || items.some(item => item.isAnalyzing || item.isCopywritingGenerating)}
-        assetLoadState={runner.assetLoadState} assetLoadError={runner.assetLoadError} onReloadAssets={runner.reloadAssets}
+        busy={runner.flow.busy || runner.isAutoPilotRunning}
+        skillLoadState={runner.skillLoadState} skillLoadError={runner.skillLoadError} onReloadSkills={runner.reloadSkills}
         onOpenAssets={(type = 'full_prompt') => {
           onClose();
           if (onOpenAssetTab) onOpenAssetTab(type);
@@ -89,24 +73,7 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
         setImageGenConcurrency={setImageGenConcurrency}
         analyzeConcurrency={analyzeConcurrency}
         setAnalyzeConcurrency={setAnalyzeConcurrency}
-        lockedPersonaId={lockedPersonaId}
-        setLockedPersonaId={setLockedPersonaId}
-        availablePersonas={availablePersonas}
-        lockedSceneId={lockedSceneId}
-        setLockedSceneId={setLockedSceneId}
-        availableScenes={availableScenes}
-        lockedOutfitId={lockedOutfitId}
-        setLockedOutfitId={setLockedOutfitId}
-        availableOutfits={availableOutfits}
-        lockedFullPromptId={runner.lockedFullPromptId}
-        setLockedFullPromptId={runner.setLockedFullPromptId}
-        availableFullPrompts={runner.availableFullPrompts}
-        availableProductCategories={runner.availableProductCategories}
-        promptGroupFolderId={runner.promptGroupFolderId}
-        setPromptGroupFolderId={runner.setPromptGroupFolderId}
-        products={successfulItems.map(item => ({ title: item.title, props: productPropsWithCategory(item) }))}
-        personaMode={personaMode}
-        setPersonaMode={runner.setPersonaMode}
+
       />
   );
 }
