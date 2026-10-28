@@ -208,7 +208,7 @@ func workflowFinalConstraints(payload map[string]any, shots []ScriptShot, refs [
 		}
 		lines = append(lines, fmt.Sprintf("图片%d：%s。", i+1, role))
 	}
-	lines = append(lines, "【场景与道具】\n按脚本选择连续讲述、同空间切镜或短途日常动线；按时间轴指定的机位、相机距离和画面范围执行，各场景使用自身参考的光向和陈设，不覆盖其他场景。动作必须写清起始状态、动作/切镜和结果状态；连续后段继承前段动作状态，只写变化。\n【分段声音要求】")
+	lines = append(lines, "【动作与镜头总纲】\n按脚本选择连续讲述、同空间切镜或短途日常动线；动作围绕商品选择问题推进，从起始状态经过可观察的动作或切镜到结果状态，不把摆姿势、撩头发或回眸单独当作卖点。\n【场景与道具】\n按时间轴指定的机位、相机距离和画面范围执行，各场景使用自身参考的光向和陈设，不覆盖其他场景。\n【氛围与情绪】\n保持与商品和脚本一致的整体交流状态，只写有台词或事件依据的情绪变化，不为每段重复编排微笑、低头或摆拍。\n【分段声音要求】")
 	start := 0
 	for _, shot := range shots {
 		// Keep source deterministic without copying the dialogue into the preamble.
@@ -225,6 +225,7 @@ func workflowFinalizeBody(model string, payload map[string]any, shots []ScriptSh
 只执行实际图片定稿，严格保持输入时间轴、画幅、原文台词与 speechMode。不要求人物或场景绘图提示词，不输出 imagePrompt。参考编号以 actualReferences 的实际顺序为准，商品对照原图目录编号不等于成片编号。
 fullPrompt 和每项 prompt 的画面、动作、声音及标题全部使用中文；出镜说话、画外音、商品规格、标志、生活记录均写中文，不把英文协议值、字段名、品牌原文或内部标识带进提示词正文。JSON 字段名和 speechMode 枚举值按协议保留英文，已确认的台词原文逐字保留。
 完整提示词按模板用【中文章节名】独立换行，段落之间换行，时间轴每个时间范围独占一段。只写当前商品及实际镜头的执行内容，不照抄教程，不重复请求前言中的通用规则、参考职责或声音时间轴。
+fullPrompt 必须按“全片固定设定→动作与镜头总纲→氛围与情绪→时间轴与剪辑→声音与输出”组织。固定设定只写跨镜不变项；每个时间轴单元按“镜头目的、画面主体、起始状态、动作/切镜、结果状态、机位变化、表情视线、声音台词”展开。参考示例只学习这种分层方式，不复制其中的人物、地点、道具、镜头数量或秒数。
 只输出 JSON {"fullPrompt":"完整视频提示词，逐段声音来源明确，每段台词原文仅写一次","prompts":[{"shotId":1,"speechMode":"on_camera","prompt":"本段实际图定稿，完整保留本段台词原文一次"}]}。speechMode 只能为 on_camera 或 voiceover，必须逐段与输入一致；示例值不是默认值。prompts 必须与原 shotId 一一对应。`
 
 	return withLongOutput(chatBody(model, system, workflowVisionParts(workflowFinalConstraints(payload, shots, refs, target, ratio)+"\n请求事实："+string(facts), refs, catalog), 0.3))
