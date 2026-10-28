@@ -19,12 +19,6 @@ type salesSkillPackage struct {
 }
 
 type salesSpeechLimits struct {
-	MinRate           float64  `json:"minRate"`
-	MaxRate           float64  `json:"maxRate"`
-	PreferredMinRate  float64  `json:"preferredMinRate"`
-	PreferredMaxRate  float64  `json:"preferredMaxRate"`
-	ShotMaxRate       float64  `json:"shotMaxRate"`
-	MinShotHan        int      `json:"minShotHan"`
 	DisallowedPhrases []string `json:"disallowedPhrases"`
 }
 
@@ -40,9 +34,8 @@ func loadSalesSkill() salesSkillPackage {
 			panic("missing compiled sales skill stage: " + stage)
 		}
 	}
-	limits := skill.SpeechLimits
-	if limits.MinRate <= 0 || limits.MinRate > limits.PreferredMinRate || limits.PreferredMinRate > limits.PreferredMaxRate || limits.PreferredMaxRate > limits.MaxRate || limits.MaxRate > limits.ShotMaxRate || limits.MinShotHan < 1 {
-		panic("invalid compiled sales speech limits; run pnpm skills:build")
+	if len(skill.SpeechLimits.DisallowedPhrases) == 0 {
+		panic("missing compiled sales speech disallowed phrases; run pnpm skills:build")
 	}
 	return skill
 }

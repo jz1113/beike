@@ -87,7 +87,7 @@ beforeEach(() => {
   vi.mocked(generateSalesScripts).mockResolvedValue([{
     id: 'draft', title: '开箱', totalDuration: 15, beat: 'unbox', shots: [shot], seo,
     assets: [
-      { id: 'person', kind: 'person', label: '出镜人物', prompt: '成年人物上身展示黑色上衣', required: true },
+      { id: 'person', kind: 'person', label: '出镜人物', prompt: '符合商品受众的东亚人物上身展示黑色上衣', required: true },
       { id: 'face', kind: 'face', label: '人物特写', prompt: '同一人物面部特写', required: true, referenceAssetIds: ['person'] },
     ],
   }]);

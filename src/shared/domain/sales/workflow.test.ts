@@ -53,7 +53,7 @@ describe('creative image plan safety', () => {
     expect(() => validateSalesAssetPlan([])).toThrow('1 至 4');
     expect(() => validateSalesAssetPlan([{ id: 'face', kind: 'face', label: '人脸', prompt: '特写', required: true }])).toThrow('同一');
     expect(() => validateSalesAssetPlan([
-      { id: 'person', kind: 'person', label: '人物', prompt: '成年人物', required: true },
+      { id: 'person', kind: 'person', label: '人物', prompt: '符合商品受众的东亚人物', required: true },
       { id: 'face', kind: 'face', label: '人脸', prompt: '同一人', required: true, referenceAssetIds: ['person'] },
     ])).not.toThrow();
   });

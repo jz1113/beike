@@ -17,7 +17,7 @@ const images: SalesImageRef[] = [{ index: 0, role: 'main', url: '/front.png' }, 
 const script: VideoSalesScript = {
   id: 'result', title: '商品视频', deliveryMode: 'single', totalDuration: 15,
   shots: [0, 2, 0].map((imageIndex, index) => ({ shotId: index + 1, type: 'hook', duration: 5, imageIndex, description: '商品展示', voiceover: `完整台词第${index + 1}段，第一行保留全部细节。\n第二行也完整展示，不截断。`, camera: '中景', visualSource: 'product_image', transition: 'direct_concat' })),
-  assets: [{ id: 'person', kind: 'person', label: '出镜讲解者（东亚成年男性约26岁）', prompt: '人物', required: true, status: 'done', url: '/person.png' }, { id: 'scene', kind: 'scene', label: '室内场景', prompt: '场景', required: true, status: 'done', url: '/scene.png' }],
+  assets: [{ id: 'person', kind: 'person', label: '出镜讲解者（东亚人物约26岁）', prompt: '符合商品受众的东亚人物', required: true, status: 'done', url: '/person.png' }, { id: 'scene', kind: 'scene', label: '室内场景', prompt: '场景', required: true, status: 'done', url: '/scene.png' }],
   seo: { title: '日常穿搭', hashtags: ['卫衣穿搭', '#日常穿搭'], description: '正文第一段。\n正文第二段。', coverText: '一套出门', interactionGuide: '你会怎么搭配？' },
   fullPrompt: '图片1 商品正面，图片2 商品背面。', renderStatus: 'generating', renderTaskId: 'receipt', renderSubmissionKey: 'submission-key',
 };

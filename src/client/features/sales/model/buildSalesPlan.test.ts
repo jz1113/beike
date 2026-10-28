@@ -68,7 +68,7 @@ describe('fashion script and asset planning', () => {
     await expect(buildSalesPlan({ ...input, imageCatalog: [...input.imageCatalog, { index: 10, role: 'main', url: '/detail.jpg' }] }, planApi)).rejects.toThrow('没有可用参考图');
   });
   it('preserves a pure fashion portrait without inventing product dependencies', async () => {
-    vi.mocked(generateSalesScripts).mockResolvedValue([{ ...script, assets: [{ id: 'person', kind: 'person', label: '成年人物', prompt: '面部肖像', required: true, usesProduct: false, productImageIndexes: [] }] }]);
+    vi.mocked(generateSalesScripts).mockResolvedValue([{ ...script, assets: [{ id: 'person', kind: 'person', label: '符合受众的东亚人物', prompt: '约 28 岁东亚人物面部肖像', required: true, usesProduct: false, productImageIndexes: [] }] }]);
     const result = await buildSalesPlan({ ...input, category: 'fashion' }, planApi);
     expect(result.script.assets?.[0]).toMatchObject({ usesProduct: false, productImageIndexes: [] });
   });

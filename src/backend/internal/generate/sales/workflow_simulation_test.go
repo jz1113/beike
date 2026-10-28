@@ -37,7 +37,7 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }
 
 func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
-	const fashionScript = `{"scripts":[{"title":"开箱展示","beat":"unbox","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示黑色上衣","camera":"中景","speechMode":"on_camera","voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompt":"展示商品","visualSource":"product_image"}],"assets":[{"id":"person","kind":"person","label":"出镜人物","prompt":"成年人物上身展示黑色上衣","required":true,"usesProduct":true,"productImageIndexes":[7]},{"id":"face","kind":"face","label":"人物特写","prompt":"同一人物面部特写","required":true,"referenceAssetIds":["person"]}]}]}`
+	const fashionScript = `{"scripts":[{"title":"开箱展示","beat":"unbox","deliveryMode":"single","totalDuration":15,"shots":[{"shotId":1,"duration":15,"description":"展示黑色上衣","camera":"中景","speechMode":"on_camera","voiceover":"家人们，我今天出门就套这件黑色圆领。纯棉的，领口那圈罗纹贴着锁骨。单穿就行，里面加件衬衫也能压住，上班和周末都不用再换。","prompt":"展示商品","visualSource":"product_image"}],"assets":[{"id":"person","kind":"person","label":"出镜人物","prompt":"符合商品受众的东亚人物上身展示黑色上衣","required":true,"usesProduct":true,"productImageIndexes":[7]},{"id":"face","kind":"face","label":"人物特写","prompt":"同一人物面部特写","required":true,"referenceAssetIds":["person"]}]}]}`
 	replies := []string{
 		`{"productName":"黑色圆领上衣","category":"fashion","sellingPoints":["圆领"],"knownFacts":["黑色"],"creativeNotes":["开箱换装"]}`,
 		fashionScript,

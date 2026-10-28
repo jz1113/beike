@@ -65,10 +65,6 @@ export function compileSalesSkill(root, catalog, write) {
     }
   }
   const speechLimits = JSON.parse(resources['assets/speech-limits.json']);
-  for (const key of ['minRate', 'maxRate', 'preferredMinRate', 'preferredMaxRate', 'shotMaxRate', 'minShotHan']) {
-    if (!Number.isFinite(speechLimits[key]) || speechLimits[key] <= 0) throw new Error(`Invalid sales speech limit: ${key}`);
-  }
-  if (speechLimits.minRate > speechLimits.preferredMinRate || speechLimits.preferredMinRate > speechLimits.preferredMaxRate || speechLimits.preferredMaxRate > speechLimits.maxRate || speechLimits.maxRate > speechLimits.shotMaxRate || !Number.isInteger(speechLimits.minShotHan)) throw new Error('Inconsistent sales speech limits');
   if (!Array.isArray(speechLimits.disallowedPhrases) || speechLimits.disallowedPhrases.some(phrase => typeof phrase !== 'string' || !phrase.trim())) throw new Error('Invalid sales disallowed phrases');
   const revision = createHash('sha256').update(JSON.stringify({
     main: skill.markdownDoc, guide, quality, directing, stages, imageRoles, directives, speechLimits, version: skill.version,

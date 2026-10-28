@@ -51,7 +51,7 @@ describe('sales rule groups', () => {
     const confirmation = source.indexOf('**自动生图与人工确认**');
     expect(confirmation).toBeGreaterThan(-1);
     expect(confirmation).toBeLessThan(source.indexOf('**实际图片定稿**'));
-    expect(source).toContain('不再调用自动视觉校验');
+    expect(source).toContain('不增加自动视觉审核调用');
     expect(source).toContain('其他品类暂不支持新创作');
     expect(source).not.toContain('通用自动创作流程');
     expect(source).toContain('不自动使用全部已选图');
@@ -82,7 +82,7 @@ describe('sales rule groups', () => {
     expect(source).toContain('没有依据的功效、评价、销量、实测、优惠、尺码或链接不编造');
     expect(source).toContain('口播不设置面向用户的汉字数、字/秒或固定语速硬目标');
     expect(source).toContain('按脚本信息量、动作容量、静默展示和正常人语速组织台词');
-    expect(source).toContain('不使用历史字数区间阻断脚本或强制界面显示');
+    expect(source).toContain('不设置固定容量指标');
     expect(source).toContain('对镜头说的第一人称');
     expect(source).toContain('可以直接入手、简单好搭、值得入、基础百搭、闭眼入不算收尾');
     expect(source).toContain('自然聊天语速，停顿随语义和动作变化，嘴型与原文对齐');

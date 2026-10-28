@@ -244,7 +244,7 @@ func TestWorkflowFashionScriptRequestsNarrative(t *testing.T) {
 	payload["productName"] = "黑色卫衣"
 	attachGateway(payload, server.URL)
 	rec := postSales(t, Script(config.Config{}), "/", payload)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"beat":"lifestyle"`) || !strings.Contains(rec.Body.String(), `"deliveryMode":"single"`) {
+	if rec.Code != 200 || strings.Contains(rec.Body.String(), `"beat":"lifestyle"`) || !strings.Contains(rec.Body.String(), `"deliveryMode":"single"`) {
 		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
 	}
 }

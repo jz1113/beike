@@ -57,7 +57,7 @@ export type VideoSalesMode =
   | 'product_closeup'   // 商品展示，正常距离与比例，使用画外音
   | 'graphic_montage'   // 商品画面剪辑，使用画外音，全程无字幕
   | 'scene_demo'        // 手部或背影展示，使用画外音
-  | 'live_presenter';   // 按脚本生成同一成年人物，现场讲解并同步口型
+  | 'live_presenter';   // 按脚本生成同一位与商品受众匹配的人物，现场讲解并同步口型
 
 /** 商品品类 */
 export type VideoSalesCategory = 'beauty' | 'food' | 'home' | 'fashion' | 'tech' | 'other';
@@ -95,7 +95,7 @@ export interface VideoSalesShot {
   visualSource: VideoSalesVisualSource;
   transition: VideoSalesTransition;
   speechMode?: VideoSalesSpeechMode;
-  voiceover: string; // 台词原文，声音来源由 speechMode 指定。服饰约每秒 2.4–4.6 汉字，日常优先 2.4–3.6，单段不超过每秒约 6 字
+  voiceover: string; // 台词原文，声音来源由 speechMode 指定；不设固定字数、字/秒或语速硬限制
   prompt?: string; // 图生视频画面提示词，不包含字幕或大字
   finalPrompt?: string;
   selectionReason?: string;

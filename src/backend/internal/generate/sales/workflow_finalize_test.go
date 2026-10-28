@@ -73,7 +73,7 @@ func TestWorkflowFashionFinalizesOneVideoWithoutStillPrompts(t *testing.T) {
 					}
 				}
 				if category == "fashion" {
-					for _, expected := range []string{"自然聊天语速", "生活 vlog", "嘴型与原文对齐"} {
+					for _, expected := range []string{"自然聊天语速", "自然成像基线", "嘴型与原文对齐"} {
 						if !strings.Contains(text, expected) {
 							t.Errorf("fashion finalize missing %s", expected)
 						}

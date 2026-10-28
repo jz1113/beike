@@ -160,7 +160,7 @@ describe('sales skill source propagation', () => {
     expect(() => compileSalesSkill(root, skills, true)).toThrow('Missing sales content quality rules');
   });
 
-  it('includes executable templates and speech limits in the shared rule revision', () => {
+  it('includes executable templates and the disallowed speech list in the shared rule revision', () => {
     const { root, skills, read } = fixture();
     const output = 'src/shared/domain/sales/compiledSalesSkill.json';
     compileSalesSkill(root, skills, true);
@@ -175,16 +175,14 @@ describe('sales skill source propagation', () => {
     expect(changed.directives.speech.on_camera).toContain('更新的声音约束');
     const limitsFile = skills[0].files.find(file => file.path === 'assets/speech-limits.json')!;
     const limits = JSON.parse(limitsFile.content);
-    limits.maxRate = 6.4;
+    limits.disallowedPhrases = [...limits.disallowedPhrases, '新增空号召'];
     limitsFile.content = JSON.stringify(limits);
     compileSalesSkill(root, skills, true);
     expect(JSON.parse(read(output)).revision).not.toBe(changed.revision);
-    expect(JSON.parse(read(output)).speechLimits.maxRate).toBe(6.4);
-    limits.preferredMinRate = limits.preferredMaxRate + 0.1;
+    expect(JSON.parse(read(output)).speechLimits.disallowedPhrases).toContain('新增空号召');
+    delete limits.disallowedPhrases;
     limitsFile.content = JSON.stringify(limits);
-    expect(() => compileSalesSkill(root, skills, true)).toThrow('Inconsistent sales speech limits');
-    limits.preferredMinRate = before.speechLimits.preferredMinRate;
-    limitsFile.content = JSON.stringify(limits);
+    expect(() => compileSalesSkill(root, skills, true)).toThrow('Invalid sales disallowed phrases');
     delete directives.speech.on_camera;
     resource.content = JSON.stringify(directives);
     expect(() => compileSalesSkill(root, skills, true)).toThrow('Missing sales directive');

@@ -8,7 +8,7 @@ function harness() {
     id: 'plan', title: '展示', totalDuration: 15, deliveryMode: 'single',
     shots: [{ shotId: 1, type: 'demo', duration: 15, description: '人物展示黑色商品', camera: '中景', speechMode: 'voiceover', voiceover: '展示商品', visualSource: 'ai_generate', transition: 'direct_concat', imageIndex: 8 }],
     assets: [
-      { id: 'person', kind: 'person', label: '人物', prompt: '成年人物展示商品', required: true, usesProduct: true, productImageIndexes: [8] },
+      { id: 'person', kind: 'person', label: '人物', prompt: '符合商品受众的东亚人物展示商品', required: true, usesProduct: true, productImageIndexes: [8] },
       { id: 'scene', kind: 'scene', label: '场景', prompt: '自然光房间', required: true },
     ], seo: { title: '', hashtags: [], coverText: '', interactionGuide: '', description: '' },
   };
@@ -89,7 +89,7 @@ describe('automatic creative images', () => {
   it('does not submit a face until its person image is done', async () => {
     const h = harness();
     h.current().assets = [
-      { id: 'person', kind: 'person', label: '人物', prompt: '成年人物', required: true },
+      { id: 'person', kind: 'person', label: '人物', prompt: '符合商品受众的东亚人物', required: true },
       { id: 'face', kind: 'face', label: '人脸', prompt: '同一张脸', required: true, referenceAssetIds: ['person'] },
     ];
     const waves: string[][] = [];
@@ -184,7 +184,7 @@ describe('automatic creative images', () => {
   it('submits an unfinished person dependency before the requested face and skips unrelated assets', async () => {
     const h = harness();
     h.current().assets = [
-      { id: 'person', kind: 'person', label: '人物', prompt: '成年人物', required: true },
+      { id: 'person', kind: 'person', label: '人物', prompt: '符合商品受众的东亚人物', required: true },
       { id: 'face', kind: 'face', label: '人脸', prompt: '同一张脸', required: true, referenceAssetIds: ['person'] },
       { id: 'scene', kind: 'scene', label: '场景', prompt: '房间', required: true },
     ];

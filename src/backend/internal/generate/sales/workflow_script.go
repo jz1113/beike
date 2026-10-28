@@ -57,14 +57,14 @@ func handleWorkflowScript(w http.ResponseWriter, r *http.Request, cfg config.Con
 		return
 	}
 	if err := validateWorkflowScript(script, normalized, catalog, target, generate.StringField(payload, "videoMode")); err != nil {
-		// Local speech limits are deterministic and easy for the model to repair.
-		// Retry once with the exact failing segment instead of asking the user to
-		// repeat product analysis or manually trim generated copy.
+		// Empty calls to action are deterministic and easy for the model to repair.
+		// Retry once with the exact failing segment while preserving the product
+		// facts, timing, shot structure, and asset dependencies.
 		if !isRecoverableSpeechValidationError(err) {
 			workflowError(w, 502, err)
 			return
 		}
-		repairBody := salesJSONRecoveryBody(body, fmt.Sprintf("上一版脚本未通过口播校验：%s。请根据原始商品事实重新输出完整 scripts JSON；只压缩或重写超限口播，保留可核实事实、镜头结构、素材依赖和总时长，不要输出说明。", err))
+		repairBody := salesJSONRecoveryBody(body, fmt.Sprintf("上一版脚本未通过口播校验：%s。请根据原始商品事实重新输出完整 scripts JSON；只重写触发校验的空号召，使其落到具体可见的穿法、结构或搭配选择，保留可核实事实、镜头结构、素材依赖和总时长，不要输出说明。", err))
 		repairedContent, repairedRaw, repairedStatus, repairErr := postChatJSON(r.Context(), base, key, repairBody, chatWait)
 		if errors.Is(repairErr, errTruncatedOutput) {
 			workflowError(w, 502, fmt.Errorf("口播脚本生成失败：%w", repairErr))
@@ -143,7 +143,7 @@ func isRecoverableSpeechValidationError(err error) bool {
 		return false
 	}
 	message := err.Error()
-	return strings.Contains(message, "口播") && (strings.Contains(message, "不要超过") || strings.Contains(message, "应写") || strings.Contains(message, "至少写一句"))
+	return strings.Contains(message, "口播") && strings.Contains(message, "空号召")
 }
 
 func workflowScriptBody(model string, payload map[string]any, catalog []CatalogImage, target int, ratio string) map[string]any {
@@ -153,7 +153,7 @@ func workflowScriptBody(model string, payload map[string]any, catalog []CatalogI
 口播先在脑中写成一段可以连续朗读的自然种草分享，再按完整语义、换气和动作容量切成 shots。相邻段必须承接上一段，不能每段重新开场、重复报属性或把“请输出”“不要说明”等写作指令混进 voiceover。禁止属性清单式口播；优先用观察、解释和结果推进，保留少量自然语气词，但每句都要能直接对消费者说出口。
 每个 shot 都必须写清“起始状态→可观察动作或剪辑→结果状态”。相邻段至少发生一项可见变化：人物位置、手与商品的接触、商品状态、相机距离/方向、场景或明确切镜。不能三段都保持同一姿势、同一画面范围和同一商品状态，只更换台词；如果连续动作无法表现变化，必须写明切镜及切点。
 接口约束：assets 必须为1至4项数组，每项字段为 id、kind(person|face|scene|keyframe)、label、prompt、required、referenceAssetIds、usesProduct、productImageIndexes。依赖只能引用前序素材ID，不得循环、重复或使用 product- 保留前缀；face 必须依赖同一 person。usesProduct:true 时 productImageIndexes 必须从实际可见的商品原始目录编号选择，按本张目标视角选图，未知细节不编造；无商品素材填空数组。上身图 usesProduct:true。每张静帧只写本张要求，不输出整段时间轴。
-shots 每项 duration 为正整数，合计精确等于 targetDuration，totalDuration 也须精确等于它。声音来源 speechMode 每段明确，不得只改字段而在画面描述保留相反的说话方式。beat 取 unbox、lifestyle 或 accessory。visualSource 只能为 product_image 或 ai_generate，transition 为 direct_concat。
+shots 每项 duration 为正整数，合计精确等于 targetDuration，totalDuration 也须精确等于它。声音来源 speechMode 每段明确，不得只改字段而在画面描述保留相反的说话方式。若填写 beat，只能取 unbox、lifestyle 或 accessory；不确定时留空，由脚本内容和商品事实决定拍法。visualSource 只能为 product_image 或 ai_generate，transition 为 direct_concat。
 不要选择商品分镜图，不输出 imageIndex；不要求用户预先上传人物或选择视频模型。只交付脚本、素材计划和发布文案，不输出最终 fullPrompt。`
 	category := generate.StringField(payload, "category")
 	system += fashionVoiceoverBudgetPrompt(target)
@@ -171,8 +171,6 @@ func workflowScriptOutputExample(target int, category string, catalog []CatalogI
 		ID: "script_1", Title: "商品展示", DeliveryMode: "single", TotalDuration: target,
 		SEO: ScriptSEO{Title: "发布标题", Hashtags: []string{"#商品展示"}, CoverText: "封面文案", InteractionGuide: "评论引导", Description: "发布描述"},
 	}
-	script.Beat = "lifestyle"
-
 	voiceovers := []string{
 		"我今天想找一件，穿上就能把这个搭配问题解决掉的单品。",
 		"你看，我把它调整到身上以后，刚才在意的地方就有变化了，细节也能看得更清楚。",

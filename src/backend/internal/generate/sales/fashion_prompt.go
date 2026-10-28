@@ -34,7 +34,9 @@ func normalizeFashionBeat(beat, productName string) string {
 	if fashionAccessoryName(productName) {
 		return "accessory"
 	}
-	return "lifestyle"
+	// An ambiguous clothing brief must keep narrative selection open instead of
+	// silently turning every item into a lifestyle shoot.
+	return ""
 }
 
 func fashionAccessoryName(name string) bool {

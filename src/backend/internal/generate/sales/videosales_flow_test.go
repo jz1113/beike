@@ -158,8 +158,8 @@ func TestNormalizeFashionBeat(t *testing.T) {
 	if normalizeFashionBeat("", "运动鞋") != "accessory" || normalizeFashionBeat("lifestyle", "运动鞋") != "lifestyle" {
 		t.Fatal("beat normalization failed for shoes")
 	}
-	if normalizeFashionBeat("", "连衣裙") != "lifestyle" || normalizeFashionBeat("invalid", "上衣") != "lifestyle" {
-		t.Fatal("clothing should default to an already-worn lifestyle presentation")
+	if normalizeFashionBeat("", "连衣裙") != "" || normalizeFashionBeat("invalid", "上衣") != "" {
+		t.Fatal("ambiguous clothing should keep narrative selection open")
 	}
 	for _, beat := range []string{"unbox", "lifestyle", "accessory"} {
 		if normalizeFashionBeat(beat, "连衣裙") != beat {

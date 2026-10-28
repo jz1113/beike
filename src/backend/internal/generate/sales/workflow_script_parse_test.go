@@ -132,8 +132,8 @@ func TestWorkflowScriptPromptUsesCompleteCurrentExample(t *testing.T) {
 		if err := validateAssetPlan(script.Assets); err != nil {
 			t.Fatal(err)
 		}
-		if category == "fashion" && script.Beat == "" {
-			t.Fatal("fashion example omitted beat")
+		if category == "fashion" && script.Beat != "" {
+			t.Fatal("generic fashion example should not force a narrative")
 		}
 	}
 }

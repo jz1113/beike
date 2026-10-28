@@ -28,7 +28,7 @@ func TestWorkflowAssetProductReferencesPreserveViewIndexes(t *testing.T) {
 }
 
 func TestWorkflowResponsePreservesExplicitNonProductAsset(t *testing.T) {
-	script := SalesScript{Assets: []PlannedAsset{{ID: "person", Kind: "person", Label: "成年人物肖像", Prompt: "只拍面部", Required: true, UsesProduct: false}}}
+	script := SalesScript{Assets: []PlannedAsset{{ID: "person", Kind: "person", Label: "东亚人物肖像", Prompt: "符合商品受众的东亚人物，只拍面部", Required: true, UsesProduct: false}}}
 	response := workflowScriptResponse(script)
 	assets := response["assets"].([]any)
 	asset := assets[0].(map[string]any)
