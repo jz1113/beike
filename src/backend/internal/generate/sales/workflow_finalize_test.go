@@ -62,12 +62,12 @@ func TestWorkflowFashionFinalizesOneVideoWithoutStillPrompts(t *testing.T) {
 				if body["max_tokens"] != float64(longOutputTokens) {
 					t.Errorf("max_tokens %#v", body["max_tokens"])
 				}
-				for _, expected := range []string{"white.jpg", "table.jpg", "图片1", "图片2", "0–15秒", "16:9", "无字幕"} {
+				for _, expected := range []string{"white.jpg", "table.jpg", "图片1", "图片2", "0–15秒", "9:16", "无字幕"} {
 					if !strings.Contains(text, expected) {
 						t.Errorf("missing %s", expected)
 					}
 				}
-				for _, forbidden := range []string{"red.jpg", "personImagePrompt", "sceneImagePrompt", "9:16", "720p", "1080p"} {
+				for _, forbidden := range []string{"red.jpg", "personImagePrompt", "sceneImagePrompt", "720p", "1080p"} {
 					if strings.Contains(text, forbidden) {
 						t.Errorf("unexpected %s", forbidden)
 					}
@@ -91,7 +91,7 @@ func TestWorkflowFashionFinalizesOneVideoWithoutStillPrompts(t *testing.T) {
 			if rec.Code != 200 {
 				t.Fatalf("got %d %s", rec.Code, rec.Body.String())
 			}
-			for _, expected := range []string{"fullPrompt", "prompts", "图片1", "图片2", "16:9", "0–15秒", "白色"} {
+			for _, expected := range []string{"fullPrompt", "prompts", "图片1", "图片2", "9:16", "0–15秒", "白色"} {
 				if !strings.Contains(rec.Body.String(), expected) {
 					t.Errorf("response missing %s", expected)
 				}

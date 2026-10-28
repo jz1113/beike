@@ -1586,9 +1586,18 @@ components:
           type: "string"
         videoResolution:
           type: "string"
+        brand:
+          type: "string"
+          maxLength: 100
+        productName:
+          type: "string"
+          maxLength: 100
         productAnalysis:
           type: "string"
           maxLength: 8000
+        productDescription:
+          type: "string"
+          maxLength: 4000
       additionalProperties: false
     VideoSalesFinalizeResponse:
       type: "object"
@@ -1615,15 +1624,25 @@ components:
             type: "object"
             required:
               - "shotId"
+              - "speechMode"
               - "prompt"
             properties:
               shotId:
                 type: "integer"
                 minimum: 1
+              speechMode:
+                type: "string"
+                enum:
+                  - "on_camera"
+                  - "voiceover"
               prompt:
                 type: "string"
                 minLength: 1
           minItems: 1
+        languageWarnings:
+          type: "array"
+          items:
+            type: "string"
     CollectVariantMetadata:
       type: object
       required: [version, variants]

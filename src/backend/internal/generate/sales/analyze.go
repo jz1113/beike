@@ -18,6 +18,7 @@ type ProductAnalysisResult struct {
 	Brand             string            `json:"brand,omitempty"`
 	VisualFeatures    map[string]string `json:"visualFeatures"`
 	SellingPoints     []string          `json:"sellingPoints"`
+	BuyingPoints      []BuyingPoint     `json:"buyingPoints,omitempty"`
 	TargetAudience    string            `json:"targetAudience"`
 	UsageScenarios    []string          `json:"usageScenarios"`
 	PainPoints        []string          `json:"painPoints"`
@@ -27,6 +28,29 @@ type ProductAnalysisResult struct {
 	CoveredImageCount int               `json:"coveredImageCount,omitempty"`
 	ImageCount        int               `json:"imageCount,omitempty"`
 	Degraded          bool              `json:"degraded,omitempty"`
+}
+
+type BuyingPoint struct {
+	Text               string   `json:"text"`
+	Benefit            string   `json:"benefit,omitempty"`
+	Evidence           []string `json:"evidence,omitempty"`
+	SourceImageIndexes []int    `json:"sourceImageIndexes,omitempty"`
+}
+
+// Accept legacy models that return buyingPoints as plain strings.
+func (p *BuyingPoint) UnmarshalJSON(data []byte) error {
+	var text string
+	if err := json.Unmarshal(data, &text); err == nil {
+		p.Text = text
+		return nil
+	}
+	type buyingPoint BuyingPoint
+	var decoded buyingPoint
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = BuyingPoint(decoded)
+	return nil
 }
 
 // Analyze handles multimodal visual inspection of product pictures.

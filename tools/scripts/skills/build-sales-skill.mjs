@@ -4,21 +4,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const stageSections = {
-  analyze: ['质量判定与验收', '信息增益与叙事', '展示主线与脚本构建', '人设与信任', '输入与事实依据', '商品颜色保真', '叙事选择', '景别与运镜'],
-  select: ['输入与事实依据', '商品颜色保真', '景别与运镜'],
-  script: ['质量判定与验收', '信息增益与叙事', '展示主线与脚本构建', '分镜信息与状态设计', '人设与信任', '声音制作', '输入与事实依据', '商品颜色保真', '叙事选择', '日常风格', '生活动线与拍摄选择', '实拍表演与连续性', '景别与运镜', '口播', '素材与参考规则', '人物选角与年龄匹配'],
-  image: ['画面与首帧', '商品层次与构图', '商品颜色保真', '日常风格', '景别与运镜', '素材与参考规则', '人物选角与年龄匹配'],
-  finalize: ['质量判定与验收', '信息增益与叙事', '分镜信息与状态设计', '提示词编排与取舍', '画面与首帧', '声音制作', '人设与信任', '输入与事实依据', '商品颜色保真', '日常风格', '生活动线与拍摄选择', '实拍表演与连续性', '景别与运镜', '口播', '输出与阶段区分'],
+  analyze: ['质量判定与验收', '信息增益与叙事', '展示主线与脚本构建', '活人感与人物表现', '电商信息层与后期字幕', '时长结构与交付规格', '人设与信任', '输入与事实依据', '商品颜色保真', '叙事选择', '构图与运镜'],
+  select: ['输入与事实依据', '商品颜色保真', '构图与运镜'],
+  script: ['质量判定与验收', '信息增益与叙事', '展示主线与脚本构建', '分镜信息与状态设计', '活人感与人物表现', '电商信息层与后期字幕', '时长结构与交付规格', '人设与信任', '声音制作', '输入与事实依据', '商品颜色保真', '叙事选择', '日常风格', '生活动线与拍摄选择', '实拍表演与连续性', '构图与运镜', '口播', '素材与参考规则', '人物选角与年龄匹配'],
+  image: ['画面与首帧', '活人感与人物表现', '商品层次与构图', '商品颜色保真', '日常风格', '构图与运镜', '素材与参考规则', '人物选角与年龄匹配'],
+  imagePrompt: ['静帧生成提示词规则'],
+  finalize: ['质量判定与验收', '信息增益与叙事', '分镜信息与状态设计', '活人感与人物表现', '电商信息层与后期字幕', '时长结构与交付规格', '提示词编排与取舍', '画面与首帧', '声音制作', '人设与信任', '输入与事实依据', '商品颜色保真', '日常风格', '生活动线与拍摄选择', '实拍表演与连续性', '构图与运镜', '口播', '输出与阶段区分'],
   render: [],
 };
 const stageResources = {
   analyze: ['references/analysis.md'], select: ['references/selection.md'],
-  script: [], image: [], finalize: ['assets/final-video-prompt.md'], render: ['references/render.md'],
+  script: [], image: [], imagePrompt: [], finalize: ['assets/final-video-prompt.md'], render: ['references/render.md'],
 };
 const directiveKeys = {
-  promptTerms: ['on_camera', 'voiceover', 'speechmode', 'sku', 'vlog', 'logo', 'ai', 'ugc', 'pov', 'fps'],
+  promptTerms: ['on_camera', 'voiceover', 'speechmode', 'sku', 'vlog', 'logo', 'ai', 'ugc', 'pov', 'fps', 'subtitle', 'bgm', 'superres'],
   speech: ['on_camera', 'voiceover'], presentation: ['live_presenter', 'voiceover'],
-  referenceRoles: ['default', 'product', 'scene', 'face'], video: ['intro', 'selectedColor', 'colorFidelity'],
+  referenceRoles: ['default', 'product', 'scene', 'face'], video: ['intro', 'selectedColor', 'colorFidelity', 'postProduction'],
   scriptExample: ['lead', 'leadVoiceover', 'tail', 'tailVoiceover', 'closing', 'description', 'camera', 'prompt', 'presenterDescription', 'presenterCamera', 'presenterPrompt', 'assetPrompt', 'presenterAssetPrompt'],
 };
 

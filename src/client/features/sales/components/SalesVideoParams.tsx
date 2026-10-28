@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { AspectRatioCardGroup } from '@client/shared/prompt-bar/controls/preferences/AspectRatioCardGroup';
 import { usePromptBarPopoverLayout } from '@client/shared/prompt-bar/hooks/usePromptBarPopoverLayout';
 import { videoResolutionLabel } from '@shared/domain/media/videoCapabilities';
-import { DURATION_OPTIONS } from './salesPlanning';
+import { FASHION_DURATION_OPTIONS } from './salesPlanning';
 import {
   salesAspectOptions,
   salesDurationEnabled,
@@ -17,6 +17,7 @@ import {
 } from '../model/salesWorkspace';
 
 interface Props {
+  fashion?: boolean;
   modelId: string;
   refMode: SalesVideoRefMode;
   aspectRatio: SalesAspectRatio;
@@ -34,23 +35,23 @@ function choiceClass(selected: boolean) {
   }`;
 }
 
-export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, targetDuration, disabled, onChange }: Props) {
+export function SalesVideoParams({ fashion = false, modelId, refMode, aspectRatio, resolution, targetDuration, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(open, true, buttonRef, 400, 520);
   const modes = salesRefModeChoices(modelId);
-  const aspects = salesAspectOptions(modelId);
-  const resolutions = salesResolutionChoices(modelId);
+  const aspects = salesAspectOptions(modelId).filter((item) => item.id === '9:16');
+  const resolutions = fashion ? ['480P' as const] : salesResolutionChoices(modelId);
   const summary = salesParamSummary({ refMode, aspect: aspectRatio, resolution, duration: targetDuration });
 
   useEffect(() => {
     const nextMode = salesResolveRefMode(modelId, refMode);
-    const nextResolution = salesResolveResolution(modelId, resolution);
+    const nextResolution = fashion ? '480P' : salesResolveResolution(modelId, resolution);
     const patch: { videoRefMode?: SalesVideoRefMode; videoResolution?: string } = {};
     if (nextMode !== refMode) patch.videoRefMode = nextMode;
     if (nextResolution.toUpperCase() !== (resolution || '').toUpperCase()) patch.videoResolution = nextResolution;
     if (patch.videoRefMode || patch.videoResolution) onChange(patch);
-  }, [modelId, refMode, resolution, onChange]);
+  }, [fashion, modelId, refMode, resolution, onChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -117,7 +118,7 @@ export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, ta
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">视频分辨率</div>
               <div className="flex gap-1 rounded-2xl bg-slate-100/80 p-1 dark:bg-white/5">
                 {resolutions.map((item) => (
-                  <button key={item} type="button" disabled={disabled} onClick={() => onChange({ videoResolution: item })} className={`flex-1 ${choiceClass(resolution === item)}`}>
+                  <button key={item} type="button" disabled={disabled || (fashion && !salesResolutionChoices(modelId).includes('480P'))} onClick={() => onChange({ videoResolution: item })} className={`flex-1 ${choiceClass(resolution === item)}`}>
                     {videoResolutionLabel(modelId, item)}
                   </button>
                 ))}
@@ -126,7 +127,7 @@ export function SalesVideoParams({ modelId, refMode, aspectRatio, resolution, ta
             <div className="space-y-1.5">
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">成片时长</div>
               <div className="flex gap-1 rounded-2xl bg-slate-100/80 p-1 dark:bg-white/5" role="radiogroup" aria-label="成片时长">
-                {DURATION_OPTIONS.map((item) => (
+                {FASHION_DURATION_OPTIONS.map((item) => (
                   <button key={item.value} type="button" role="radio" aria-checked={targetDuration === item.value} disabled={disabled || !salesDurationEnabled(modelId, item.value)} onClick={() => onChange({ targetDuration: item.value })} className={`flex-1 ${choiceClass(targetDuration === item.value)}`}>
                     {item.label}
                   </button>

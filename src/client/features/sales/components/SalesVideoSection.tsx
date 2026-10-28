@@ -12,16 +12,18 @@ interface Props {
   finalizing?: boolean;
   videoError?: string | null;
   submitError?: string | null;
+  languageNotice?: string | null;
   onEditPrompt: (prompt: string) => void;
 }
 
-export function SalesVideoSection({ state, script, disabled, assetsReady, finalizing, videoError, submitError, onEditPrompt }: Props) {
+export function SalesVideoSection({ state, script, disabled, assetsReady, finalizing, videoError, submitError, languageNotice, onEditPrompt }: Props) {
   const references = finalReferences(state, script);
   const hasPrompt = Boolean(script.fullPrompt?.trim());
   return (
     <div className="sales-video-workspace flex h-full min-h-0 flex-col gap-4 p-4 sm:p-5">
       {!assetsReady && <SalesAlert>请先在“素材补齐”完成生成并确认图片，视频提示词和视频参数届时开放。</SalesAlert>}
       {assetsReady && videoError && <SalesAlert>{videoError}</SalesAlert>}
+      {assetsReady && languageNotice && <SalesAlert>{languageNotice}</SalesAlert>}
       <section aria-label="最终完整视频提示词" className="sales-final-prompt-section flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         {(!hasPrompt || finalizing) && <h3 className={salesSectionTitleClass}>最终完整视频提示词</h3>}
         {finalizing ? <div role="status" className="space-y-2.5 py-4">

@@ -62,7 +62,7 @@ describe('sales stage invalidation and migration', () => {
 
   it('changes video parameters without requiring a new prompt or deleting images', () => {
     const { state, script } = approvedFixture();
-    const next = invalidateSalesState(state, { videoResolution: '1080P' });
+    const next = invalidateSalesState(state, { videoResolution: '480p' });
     expect(next.scripts[0].assets).toEqual(state.scripts[0].assets);
     expect(next.scripts[0].planStale).toBeUndefined();
     expect(next.scripts[0].fullPrompt).toBe(script.fullPrompt);
@@ -103,7 +103,7 @@ describe('sales stage invalidation and migration', () => {
     const { state, script } = fixture();
     state.selectedChatModel = 'chat';
     state.selectedVideoModel = 'doubao-seedance-2.5';
-    state.videoResolution = '720P';
+    state.videoResolution = '480P';
     state.videoRefMode = 'omni';
     script.fullPrompt = '图片1黑色卫衣';
     script.finalizedRevision = salesFinalInputRevision(state, script);
@@ -156,7 +156,7 @@ describe('sales stage invalidation and migration', () => {
   it.each([undefined, 'old-content'])('never approves a missing or outdated prompt on a model switch: %s', (revision) => {
     const { state, script } = approvedFixture();
     script.finalizedRevision = revision;
-    const next = invalidateSalesState(state, { selectedChatModel: 'another-chat', videoResolution: '1080P' });
+    const next = invalidateSalesState(state, { selectedChatModel: 'another-chat', videoResolution: '480P' });
     expect(next.scripts[0].finalizedRevision).toBe(revision);
     expect(salesSingleVideoError(next, next.scripts[0], true)).toContain('更新视频提示词');
   });

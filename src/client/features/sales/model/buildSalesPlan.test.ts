@@ -80,6 +80,6 @@ describe('fashion script and asset planning', () => {
   it('rejects an absent asset plan and unsupported creation duration', async () => {
     vi.mocked(generateSalesScripts).mockResolvedValue([{ ...script, assets: undefined }]);
     await expect(buildSalesPlan(input, planApi)).rejects.toThrow('自动素材计划');
-    await expect(buildSalesPlan({ ...input, targetDuration: 0 }, planApi)).rejects.toThrow('10–120');
+    await expect(buildSalesPlan({ ...input, targetDuration: 0 }, planApi)).rejects.toThrow('13–25');
   });
 });

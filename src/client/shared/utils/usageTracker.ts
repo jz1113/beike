@@ -37,17 +37,17 @@ function notifyUsageLogs(): void {
 }
 
 /**
- * 🌟 根据本地参考单价估算调用成本 ($USD)；实际扣费以网关账单为准。
+ * 🌟 根据所用网关默认分组的参考单价估算调用成本（算力）；实际扣费以网关账单为准。
  *
  * 扣费公式:
  * - 文本类: (Prompt Tokens / 1000) * Prompt 单价 + (Completion Tokens / 1000) * Completion 单价
  * - 生图类: 固定单价 ($/张) * 数量
- * - 视频类: 固定单价或 (按秒单价 * 秒数) * 数量
+ * - 视频类: 固定单价或 (按秒单价 * 秒数) * 数量；支持按分辨率计价
  */
 export function estimateModelCost(
   modelId: string,
   type: 'image' | 'video' | 'chat' | 'vision' | 'distill' | 'audio',
-  params: { promptTokens?: number; completionTokens?: number; totalTokens?: number; mediaCount?: number; duration?: number }
+  params: { promptTokens?: number; completionTokens?: number; totalTokens?: number; mediaCount?: number; duration?: number; resolution?: string }
 ): number {
   const m = modelId.toLowerCase().trim();
 
@@ -82,6 +82,9 @@ export function estimateModelCost(
   if (type === 'video') {
     const count = params.mediaCount ?? 1;
     const dur = params.duration || 5;
+    const resolution = params.resolution?.trim().toUpperCase();
+    const resolutionPrice = resolution ? rule?.perSecPriceByResolution?.[resolution] : undefined;
+    if (resolutionPrice !== undefined) return count * dur * resolutionPrice;
     if (rule?.perSecPrice) return count * dur * rule.perSecPrice;
     if (rule?.fixedPerUnit) return count * rule.fixedPerUnit;
     if (m.includes('seedance-2.0') || m.includes('seedance-2-0')) return count * dur * 0.50;
@@ -205,6 +208,26 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
           existing.totalTokens = totalTokens;
           changed = true;
         }
+        if (item.type === 'video' && item.duration !== undefined) {
+          const refreshedCost = Number(estimateModelCost(item.modelId, item.type, {
+            mediaCount: item.mediaCount,
+            duration: item.duration,
+            resolution: item.resolution,
+          }).toFixed(6));
+          if (existing.costUsd !== refreshedCost) {
+            existing.costUsd = refreshedCost;
+            existing.costRmb = Number((refreshedCost * getQuotaToRmbRatio()).toFixed(6));
+            changed = true;
+          }
+          if (item.resolution && existing.resolution !== item.resolution) {
+            existing.resolution = item.resolution;
+            changed = true;
+          }
+          if (existing.duration !== item.duration) {
+            existing.duration = item.duration;
+            changed = true;
+          }
+        }
         if (changed) safeSaveUsageLogs(logs);
         return;
       }
@@ -215,7 +238,8 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
             completionTokens: item.completionTokens,
             totalTokens: item.totalTokens,
             mediaCount: item.mediaCount,
-            duration: item.duration
+            duration: item.duration,
+            resolution: item.resolution,
           });
 
       const costUsd = Number(calculatedCostUsd.toFixed(6));
@@ -238,6 +262,8 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
         completionTokens,
         totalTokens,
         mediaCount: item.mediaCount ?? ((item.type === 'image' || item.type === 'video') && item.success !== false ? 1 : 0),
+        ...(item.duration !== undefined ? { duration: item.duration } : {}),
+        ...(item.resolution ? { resolution: item.resolution } : {}),
         costUsd,
         costRmb,
         success: item.success,

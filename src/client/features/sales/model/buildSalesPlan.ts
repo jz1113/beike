@@ -21,6 +21,7 @@ export async function buildSalesPlan(input: {
   sellingPoints: string;
   productProps?: Record<string, string>;
   imageCatalog: SalesImageRef[];
+  analysisImageCatalog?: SalesImageRef[];
   targetDuration: number;
   aspectRatio?: string;
   selectedColor?: string;
@@ -33,18 +34,19 @@ export async function buildSalesPlan(input: {
   if (input.category !== 'fashion') throw new Error('当前仅接入服饰、鞋、包技能');
   const images = input.imageCatalog.filter((image) => image.url.trim() && !image.unavailable);
   if (!images.length) throw new Error('请先选择至少一张用于生成的商品图');
-  if (!Number.isInteger(input.targetDuration) || input.targetDuration < 10 || input.targetDuration > 120) throw new Error('目标时长需为 10–120 秒的整数');
+  if (!Number.isInteger(input.targetDuration) || input.targetDuration < 13 || input.targetDuration > 25) throw new Error('目标时长需为 13–25 秒的整数');
   const productDescription = JSON.stringify({ suppliedSellingPoints: omitSalesPriceClauses(input.sellingPoints), originalProductProperties: omitSalesPriceProps(input.productProps || {}) });
   const context = { workflowVersion: 3 as const, eligibleImageIndexes: images.map((image) => image.index), selectedColor: input.selectedColor, aspectRatio: input.aspectRatio || '9:16' };
   input.onPhase('analyze');
   const checkAbort = () => { if (input.route.signal?.aborted) throw new DOMException('已停止脚本生成', 'AbortError'); };
   checkAbort();
+  const analysisImages = (input.analysisImageCatalog || images).filter((image) => image.url.trim() && !image.unavailable);
   const analysis = input.checkpoint?.analysis || await api.analyzeProductMedia({
-    imageCatalog: images, productName: input.productName, brand: input.brand,
+    imageCatalog: analysisImages, productName: input.productName, brand: input.brand,
     productDescription, category: input.category,
-    ...context, ...input.route,
+    ...context, eligibleImageIndexes: analysisImages.map((image) => image.index), ...input.route,
   });
-  if (!analysis.sellingPoints?.some((point) => point.trim())) throw new Error('商品分析没有返回卖点');
+  if (!analysis.sellingPoints?.some((point) => point.trim()) && !analysis.buyingPoints?.some((point) => point.text?.trim())) throw new Error('商品分析没有返回可用购买理由');
   checkAbort();
   input.onCheckpoint?.({ analysis });
   input.onPhase('script');

@@ -106,9 +106,9 @@ export function SalesProductMedia({ productUrl, isCollected, children, images, u
 
 interface SalesEmptyGuideProps { kind: 'plan' | 'result' | 'assets' | 'video'; category?: VideoSalesCategory; compact?: boolean; onOpenRules?: () => void }
 const CONTENT = {
-  plan: { title: '先采集商品，再生成卖点与脚本', input: '商品资料和所选参考图', output: '卖点、口播时间轴、分镜提示词与素材计划', icon: FileText, steps: ['选择本次使用的商品图', '设置目标时长、画幅和多模态模型', '核对卖点、脚本和分镜提示词'] },
-  assets: { title: '脚本确认后，在这里补齐素材图片', input: '脚本规划的人物、场景或关键静帧', output: '可核验的参考图片', icon: Images, steps: ['先在卖点与脚本阶段确认分镜时间轴', '选择绘图模型并生成缺失素材', '核对商品外观一致后进入视频生成'] },
-  video: { title: '素材就绪后，在这里生成视频', input: '已确认的实际参考图片与完整脚本', output: '完整视频提示词、参数校验与视频任务', icon: Clapperboard, steps: ['完成并确认所需素材图片', '合成完整视频提示词并检查模型能力', '单独确认并提交整段视频生成'] },
+  plan: { title: '选图后自动生成卖点与脚本', input: '商品资料和所选参考图', output: '卖点、口播时间轴、分镜提示词与素材计划', icon: FileText, steps: ['选择本次使用的商品图', '系统自动生成卖点、脚本和素材计划', '自动进入素材准备与视频生成'] },
+  assets: { title: '系统正在自动补齐素材图片', input: '脚本规划的人物、场景或关键静帧', output: '自动核验的参考图片', icon: Images, steps: ['自动生成缺失素材', '自动核验商品外观与依赖关系', '完成后自动合成视频提示词'] },
+  video: { title: '系统正在自动生成视频', input: '已完成核验的实际参考图片与完整脚本', output: '完整视频提示词与视频任务', icon: Clapperboard, steps: ['自动合成完整视频提示词', '自动检查模型能力与参数', '自动提交整段视频生成'] },
   result: { title: '成片与任务状态会显示在这里', input: '已明确确认的视频生成任务', output: '可预览、下载的完整视频', icon: Video, steps: ['先完成素材补齐与视频生成', '查看或下载整段视频', '已有回执优先查询，不重复提交'] },
 };
 

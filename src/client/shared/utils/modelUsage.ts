@@ -51,6 +51,7 @@ export function recordMediaTaskUsage(input: {
   type: UsageLogItem['type'];
   mediaCount?: number;
   duration?: number;
+  resolution?: string;
   usage?: unknown;
 }): void {
   const tokens = readReportedUsage(input.usage);
@@ -63,6 +64,7 @@ export function recordMediaTaskUsage(input: {
     type: input.type,
     mediaCount: input.mediaCount,
     duration: input.duration,
+    resolution: input.resolution,
     promptTokens: tokens?.promptTokens,
     completionTokens: tokens?.completionTokens,
     totalTokens: tokens?.totalTokens,

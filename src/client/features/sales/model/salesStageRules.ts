@@ -1,12 +1,14 @@
 import { getVideoDurationBounds, getVideoModelById } from '@shared/domain/media/video';
 import { videoInputError, videoModes } from '@shared/domain/media/videoCapabilities';
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
-import { eligibleSalesImages, salesActualReferences, salesAssetsReady, salesContentRevision, type SalesImageRef, type VideoSalesScript } from '@shared/domain/sales';
+import { analysisSalesImages, eligibleSalesImages, salesActualReferences, salesAssetsReady, salesContentRevision, type SalesImageRef, type VideoSalesScript } from '@shared/domain/sales';
 import type { VideoSalesStudioState } from './salesStudioDraft';
 import { salesResolveRefMode, salesResolveResolution } from './salesWorkspace';
 import { salesSkillBinding } from '@shared/domain/sales/skill';
 
 export function salesVideoPreflightError(state: VideoSalesStudioState): string | null {
+  if (state.category === 'fashion' && state.aspectRatio !== '9:16') return '服饰视频只支持 9:16 竖屏，请调整画幅';
+  if (state.category === 'fashion' && state.videoResolution.toUpperCase() !== '480P') return '服饰视频只生成原生 480P，请恢复分辨率后再继续';
   if (!state.selectedVideoModel) return null;
   const model = resolveModalityModelRoute('video', state.selectedVideoModel).modelId || '';
   const config = getVideoModelById(model);
@@ -22,7 +24,9 @@ export function salesPlanReason(state: VideoSalesStudioState, chatModelId?: stri
   if (state.category !== 'fashion') return '当前仅接入服饰、鞋、包技能，请选择服饰专属规则后更新脚本';
   if (!state.productName.trim()) return '请先采集或填写商品名称';
   if (!eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata).length) return '请先选择至少一张用于生成的商品图';
-  if (!Number.isInteger(state.targetDuration) || state.targetDuration < 10 || state.targetDuration > 120) return '目标时长必须为 10–120 秒整数';
+  if (!Number.isInteger(state.targetDuration) || state.targetDuration < 13 || state.targetDuration > 25) return '目标时长必须为 13–25 秒整数';
+  if (state.aspectRatio !== '9:16') return '服饰视频只支持 9:16 竖屏';
+  if (state.videoResolution.toUpperCase() !== '480P') return '服饰视频只生成原生 480P';
   if (!chatModelId) return '请配置多模态模型';
   return null;
 }
@@ -32,7 +36,7 @@ export function salesAnalysisInputRevision(state: VideoSalesStudioState): string
     skill: salesSkillBinding(),
     productName: state.productName, brand: state.brand, category: state.category, sellingPoints: state.sellingPoints,
     props: state.props, selectedColor: { variantId: state.colorSelection.variantId, colorLabel: state.colorSelection.colorLabel },
-    images: eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
+    images: analysisSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
   });
 }
 
@@ -42,7 +46,7 @@ export function salesPlanInputRevision(state: VideoSalesStudioState): string {
     productName: state.productName, brand: state.brand, category: state.category, sellingPoints: state.sellingPoints,
     priceLabel: state.priceLabel, props: state.props, targetDuration: state.targetDuration, aspectRatio: state.aspectRatio,
     selectedColor: { variantId: state.colorSelection.variantId, colorLabel: state.colorSelection.colorLabel }, videoMode: state.videoMode,
-    images: eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
+    images: analysisSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
   });
 }
 
@@ -108,6 +112,8 @@ export function assertSalesPlanCurrent(state: VideoSalesStudioState, script: Vid
 export function salesSingleVideoError(state: VideoSalesStudioState, script: VideoSalesScript | undefined, requirePrompt = false): string | null {
   if (!script) return '请先生成口播与视频脚本';
   if (state.category !== 'fashion') return '历史方案仅支持查看和查询原任务；请选择服饰专属规则后更新脚本';
+  if (state.aspectRatio !== '9:16') return '服饰视频只支持 9:16 竖屏，请调整画幅';
+  if (state.videoResolution.toUpperCase() !== '480P') return '服饰视频只生成原生 480P，请恢复分辨率后再提交';
   try {
     const images = assertSalesPlanCurrent(state, script);
     if (!salesAssetsReady(script)) return '请先生成所需素材并确认图片';

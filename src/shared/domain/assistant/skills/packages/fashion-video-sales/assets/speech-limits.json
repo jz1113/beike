@@ -1,9 +1,9 @@
 {
-  "minRate": 2.4,
+  "minRate": 1,
   "maxRate": 6.5,
   "preferredMaxRate": 6,
   "shotMaxRate": 8,
-  "minShotHan": 6,
+  "minShotHan": 1,
   "disallowedPhrases": [
     "就看这一件",
     "可以直接入手",
@@ -12,5 +12,5 @@
     "基础百搭",
     "闭眼入"
   ],
-  "preferredMinRate": 5
+  "preferredMinRate": 1
 }

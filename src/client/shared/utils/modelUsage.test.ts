@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readReportedUsage, recordMediaTaskUsage } from './modelUsage';
-import { clearUsageLogs, getUsageLogs, getUsageSummary } from './usageTracker';
+import { clearUsageLogs, estimateModelCost, getUsageLogs, getUsageSummary } from './usageTracker';
 
 function installStorage() {
   const values = new Map<string, string>();
@@ -65,9 +65,16 @@ describe('reported model usage', () => {
 
   it('counts a video once across submission and completion receipts', () => {
     installStorage();
-    recordMediaTaskUsage({ localTaskId: 'sales-video-1', taskId: 'video-1', modelId: 'wan3.0-video', type: 'video', mediaCount: 1, duration: 15 });
-    recordMediaTaskUsage({ taskId: 'video-1', modelId: 'wan3.0-video', type: 'video', mediaCount: 1, duration: 15 });
+    recordMediaTaskUsage({ localTaskId: 'sales-video-1', taskId: 'video-1', modelId: 'wan3.0-video', type: 'video', mediaCount: 1, duration: 15, resolution: '480P' });
+    recordMediaTaskUsage({ taskId: 'video-1', modelId: 'wan3.0-video', type: 'video', mediaCount: 1, duration: 15, resolution: '480P' });
     expect(getUsageLogs()).toHaveLength(1);
     expect(getUsageSummary('today').videoCount).toBe(1);
+    expect(getUsageLogs()[0]?.costUsd).toBe(6.75);
+  });
+
+  it('uses the default-group Wan price for each supported resolution', () => {
+    expect(estimateModelCost('wan3.0-video', 'video', { duration: 15, resolution: '480P' })).toBe(6.75);
+    expect(estimateModelCost('wan3.0-video', 'video', { duration: 15, resolution: '720p' })).toBe(13.5);
+    expect(estimateModelCost('wan3.0-video', 'video', { duration: 15, resolution: '1080P' })).toBe(27);
   });
 });

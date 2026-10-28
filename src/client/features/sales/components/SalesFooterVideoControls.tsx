@@ -21,7 +21,7 @@ export function SalesFooterVideoControls({ state, modelId, disabled, onChange }:
     </div>
     <div role="group" aria-label="视频能力与参数" className="flex min-w-0 items-center gap-1.5 border-l border-slate-200 pl-3 dark:border-white/10">
       <span className="shrink-0">参数</span>
-      <div className="w-56 max-w-full"><SalesVideoParams modelId={modelId} refMode={state.videoRefMode} aspectRatio={state.aspectRatio} resolution={state.videoResolution} targetDuration={state.targetDuration} disabled={disabled} onChange={onChange} /></div>
+      <div className="w-56 max-w-full"><SalesVideoParams fashion={state.category === 'fashion'} modelId={modelId} refMode={state.videoRefMode} aspectRatio={state.aspectRatio} resolution={state.videoResolution} targetDuration={state.targetDuration} disabled={disabled} onChange={onChange} /></div>
     </div>
   </div>;
 }

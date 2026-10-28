@@ -109,36 +109,6 @@ func TestWorkflowSimulatesFashionPipelineWithoutPaidModels(t *testing.T) {
 	}
 }
 
-func TestWorkflowScriptRejectsFortyFirstShot(t *testing.T) {
-	for _, count := range []int{40, 41} {
-		t.Run(fmt.Sprintf("%d", count), func(t *testing.T) {
-			server := useChatServer(t, func(map[string]any, int) string { return scriptWithShots(count) })
-			payload := workflowPayload()
-			payload["targetDuration"] = 120
-			attachGateway(payload, server.URL)
-			rec := postSales(t, Script(config.Config{}), "/script", payload)
-			if count == 40 && rec.Code != 200 {
-				t.Fatalf("40 shots should pass, got %d %s", rec.Code, rec.Body.String())
-			}
-			if count == 41 && (rec.Code != 502 || !strings.Contains(rec.Body.String(), "分镜数量不能超过40")) {
-				t.Fatalf("41 shots should fail, got %d %s", rec.Code, rec.Body.String())
-			}
-		})
-	}
-}
-
-func scriptWithShots(count int) string {
-	shots := make([]map[string]any, count)
-	for i := 0; i < count; i++ {
-		shots[i] = map[string]any{"shotId": i + 1, "duration": 3, "description": "展示商品", "camera": "中景", "speechMode": "voiceover", "voiceover": "看看这件上衣的领口结构", "prompt": "展示商品", "visualSource": "product_image"}
-	}
-	encoded, _ := json.Marshal(map[string]any{"scripts": []any{map[string]any{
-		"title": "多镜", "deliveryMode": "single", "totalDuration": 120, "shots": shots,
-		"assets": []any{map[string]any{"id": "scene", "kind": "scene", "label": "桌面", "prompt": "实拍桌面", "required": true}},
-	}}})
-	return string(encoded)
-}
-
 func TestWorkflowFinalizeKeepsSafeFailureReasons(t *testing.T) {
 	secret := "sk-test-secret https://cdn.example/private.png?token=abc"
 	cases := []struct {

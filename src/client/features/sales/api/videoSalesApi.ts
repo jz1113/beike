@@ -152,7 +152,9 @@ export async function finalizeSalesPrompts(input: {
   videoModel?: string;
   videoRefMode?: string;
   videoResolution?: string;
-} & SalesRouteHeaders & SalesWorkflowContext): Promise<{ prompts: Array<{ shotId: number; prompt: string }>; fullPrompt: string }> {
+  brand?: string;
+  productName?: string;
+} & SalesRouteHeaders & SalesWorkflowContext): Promise<{ prompts: Array<{ shotId: number; prompt: string }>; fullPrompt: string; languageWarnings?: string[] }> {
   const data = await postSales('/api/generate/video-sales/finalize-prompts', parseSales(videoSalesFinalizeBodySchema, {
     shots: input.shots.map((shot) => ({
       shotId: shot.shotId,
@@ -177,6 +179,8 @@ export async function finalizeSalesPrompts(input: {
     videoModel: input.videoModel,
     videoRefMode: input.videoRefMode,
     videoResolution: input.videoResolution,
+    brand: input.brand,
+    productName: input.productName,
     workflowVersion: input.workflowVersion,
     eligibleImageIndexes: input.eligibleImageIndexes,
     selectedColor: input.selectedColor,
@@ -186,5 +190,5 @@ export async function finalizeSalesPrompts(input: {
     customApiKey: input.customApiKey,
   }, '定稿请求不正确'), videoSalesFinalizeResponseSchema, routeHeaders(input), input.signal);
   recordChatTokens({ modelId: data.model || input.model || 'video-sales-finalize', type: 'vision', usage: data.usage });
-  return { prompts: data.prompts, fullPrompt: data.fullPrompt };
+  return { prompts: data.prompts, fullPrompt: data.fullPrompt, languageWarnings: data.languageWarnings || [] };
 }

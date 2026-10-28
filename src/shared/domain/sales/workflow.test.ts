@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eligibleSalesImages, salesActualReferences, salesAssetsReady, salesAssetsGenerated, validateSalesAssetPlan } from './workflow';
+import { analysisSalesImages, eligibleSalesImages, salesActualReferences, salesAssetsReady, salesAssetsGenerated, validateSalesAssetPlan } from './workflow';
 import type { VideoSalesScript } from './types';
 
 const images = [
@@ -18,6 +18,10 @@ const script: VideoSalesScript = {
 describe('sales product color eligibility', () => {
   it('keeps original indexes and allows mapped images independently from main/sku roles', () => {
     expect(eligibleSalesImages(images, selection, variants)).toEqual([images[0]]);
+  });
+  it('adds detail sheets to analysis without making them generation-eligible', () => {
+    expect(analysisSalesImages(images, selection, variants).map((image) => image.index)).toEqual([0, 7]);
+    expect(eligibleSalesImages(images, selection, variants).map((image) => image.index)).toEqual([0]);
   });
   it('does not infer color or treat unknown legacy images as eligible', () => {
     expect(eligibleSalesImages(images, { ...selection, variantId: undefined }, undefined)).toEqual([]);
@@ -59,11 +63,12 @@ describe('creative image plan safety', () => {
     expect(salesAssetsReady({ ...script, assets: [{ id: 'scene', kind: 'scene', label: '场景', prompt: '房间', required: true }] })).toBe(false);
     expect(salesAssetsReady({ ...script, assets: [{ id: 'scene', kind: 'scene', label: '场景', prompt: '房间', required: true, url: '/scene.jpg', status: 'done', validation: 'conflict' }] })).toBe(false);
   });
-  it('requires manual confirmation even when an old automatic validation passed', () => {
+  it('requires an explicit validation source even when an old automatic validation passed', () => {
     const asset = { id: 'scene', kind: 'scene' as const, label: '场景', prompt: '房间', required: true, url: '/scene.jpg', status: 'done' as const, validation: 'passed' as const };
     expect(salesAssetsGenerated({ ...script, assets: [asset] })).toBe(true);
     expect(salesAssetsReady({ ...script, assets: [asset] })).toBe(false);
     expect(salesAssetsReady({ ...script, assets: [{ ...asset, validationSource: 'manual' }] })).toBe(true);
+    expect(salesAssetsReady({ ...script, assets: [{ ...asset, validationSource: 'model' }] })).toBe(true);
   });
 });
 

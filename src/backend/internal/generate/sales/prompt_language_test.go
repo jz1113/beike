@@ -25,6 +25,26 @@ func TestSalesDirectingUsesChineseAndPreservesConfirmedDialogue(t *testing.T) {
 	}
 }
 
+func TestSalesDirectingNormalizesRenderTechnicalTerms(t *testing.T) {
+	result := chineseSalesDirectingWithReport("480P 输出由 FFmpeg 处理，时间线 30fps。", nil)
+	if strings.Contains(result.Text, "480P") || strings.Contains(result.Text, "FFmpeg") || strings.Contains(result.Text, "30fps") {
+		t.Fatalf("technical terms were not normalized: %s", result.Text)
+	}
+	if len(result.Converted) != 3 {
+		t.Fatalf("expected three conversion warnings, got %#v", result.Converted)
+	}
+}
+
+func TestSalesDirectingAllowsBrandOutsideConfirmedDialogue(t *testing.T) {
+	text := chineseSalesDirecting("画面保持 Nike 运动鞋的标志与结构。", nil)
+	if err := validateChineseSalesDirectingWithAllowlist(text, nil, nil, []string{"Nike"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateChineseSalesDirectingWithAllowlist(text, nil, nil, []string{"Adidas"}); err == nil {
+		t.Fatal("accepted an unallowlisted English brand")
+	}
+}
+
 func TestSalesFinalizationReturnsChinesePromptWithProtocolEnums(t *testing.T) {
 	server := useChatServer(t, func(map[string]any, int) string {
 		return `{"fullPrompt":"【拍摄】on_camera和voiceover按脚本执行，SKU和logo保持一致。看看这款纸巾","prompts":[{"shotId":1,"speechMode":"voiceover","prompt":"voiceover画外音，看看这款纸巾"}]}`

@@ -20,6 +20,7 @@ function recordSalesVideoUsage(input: {
   localTaskId?: string;
   modelId?: string;
   duration?: number;
+  resolution?: string;
   usage?: unknown;
 }) {
   const taskId = typeof input.taskId === 'string' && input.taskId ? input.taskId : undefined;
@@ -32,6 +33,7 @@ function recordSalesVideoUsage(input: {
     type: 'video',
     mediaCount: 1,
     duration: input.duration,
+    resolution: input.resolution,
     usage: input.usage,
   });
 }
@@ -80,7 +82,7 @@ export async function generateSalesShotVideo(input: {
   isAborted: () => boolean;
   onTaskId?: (taskId: string) => void;
 }): Promise<string> {
-  if (input.existingTaskId) return pollVideoTask(input.existingTaskId, input.videoModel, input.duration, input.isAborted);
+  if (input.existingTaskId) return pollVideoTask(input.existingTaskId, input.videoModel, input.duration, input.resolution, input.isAborted);
   const listed = (input.referenceImages || []).map(normalizeSalesImageRef).filter(Boolean);
   const images = listed.length ? listed : (input.referenceImage ? [normalizeSalesImageRef(input.referenceImage)] : []);
   if (!images.length) throw new Error('这个镜头还没有参考图');
@@ -196,10 +198,10 @@ async function submitSalesVideo(input: {
   if (data?.taskId) {
     input.onTaskId?.(String(data.taskId));
     if (res.ok && data.success !== false) {
-      recordSalesVideoUsage({ taskId: data.taskId, localTaskId, modelId: model, duration: input.duration, usage: data.usage });
+      recordSalesVideoUsage({ taskId: data.taskId, localTaskId, modelId: model, duration: input.duration, resolution: input.resolution, usage: data.usage });
     }
   } else if (res.ok && data?.status === 'SUCCESS' && data?.resultUrl) {
-    recordSalesVideoUsage({ localTaskId, modelId: model, duration: input.duration, usage: data.usage });
+    recordSalesVideoUsage({ localTaskId, modelId: model, duration: input.duration, resolution: input.resolution, usage: data.usage });
   }
   if (res.status >= 500 || data?.submissionUnknown) throw new SalesSubmitUncertainError(typeof data?.error === 'string' ? data.error : undefined);
   if (!data) throw new SalesSubmitUncertainError();
@@ -210,10 +212,10 @@ async function submitSalesVideo(input: {
   }
   if (!data.taskId) throw new SalesSubmitUncertainError();
   const taskId = String(data.taskId);
-  return pollVideoTask(taskId, model, input.duration, input.isAborted);
+  return pollVideoTask(taskId, model, input.duration, input.resolution, input.isAborted);
 }
 
-async function pollVideoTask(taskId: string, model: string | undefined, duration: number | undefined, isAborted: () => boolean): Promise<string> {
+async function pollVideoTask(taskId: string, model: string | undefined, duration: number | undefined, resolution: string | undefined, isAborted: () => boolean): Promise<string> {
   const start = Date.now();
   while (Date.now() - start < 360000) {
     assertVideoActive(isAborted);
@@ -230,7 +232,7 @@ async function pollVideoTask(taskId: string, model: string | undefined, duration
     if (data?.status === 'QUERY_FAILED') continue;
     const outcome = classifyGenerationPollResult(data, { httpOk: true });
     if (outcome === 'success') {
-      recordSalesVideoUsage({ taskId, modelId: model, duration, usage: data.usage });
+      recordSalesVideoUsage({ taskId, modelId: model, duration, resolution, usage: data.usage });
       return String(data.resultUrl);
     }
     if (outcome === 'failure') throw imageGenBusinessError(typeof data.failReason === 'string' ? data.failReason : typeof data.error === 'string' ? data.error : '视频生成失败');

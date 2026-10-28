@@ -91,7 +91,7 @@ export interface VideoSalesShot {
   type: VideoSalesShotType;
   duration: number; // 秒 (通常 2-8s)
   description: string; // 画面构图与动态描述
-  camera: string; // 按技能确定的机位、正常距离景别与必要运镜
+  camera: string; // 按技能确定的机位、相机距离、画面范围与必要运镜
   visualSource: VideoSalesVisualSource;
   transition: VideoSalesTransition;
   speechMode?: VideoSalesSpeechMode;
@@ -149,6 +149,14 @@ export interface VideoSalesScript {
   renderStatus?: 'pending' | 'generating' | 'done' | 'failed' | 'uncertain';
 }
 
+/** 从商品事实转换出的消费者购买理由。sellingPoints 保留原始兼容字段。 */
+export interface VideoSalesBuyingPoint {
+  text: string;
+  benefit?: string;
+  evidence?: string[];
+  sourceImageIndexes?: number[];
+}
+
 /** 商品视觉分析结果 */
 export interface VideoSalesProductAnalysis {
   productName: string;
@@ -161,6 +169,7 @@ export interface VideoSalesProductAnalysis {
     texture: string;
   };
   sellingPoints: string[];
+  buyingPoints?: VideoSalesBuyingPoint[];
   targetAudience: string;
   usageScenarios: string[];
   painPoints: string[];

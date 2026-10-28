@@ -8,11 +8,11 @@ const workflow = { workflowVersion: 3, imageCatalog: catalog, eligibleImageIndex
 const shots = [{ shotId: 1, imageIndex: 2, duration: 15, speechMode: 'voiceover', voiceover: '看看这件上衣' }];
 const actualReferences = [{ id: 'product', kind: 'product', label: '商品', url: catalog[0].url }];
 const asset = { id: 'scene', kind: 'scene', label: '场景', prompt: '实拍房间', required: true };
-const finalize = { ...workflow, category: 'fashion', shots, assets: [asset], actualReferences, operation: 'finalize', targetDuration: 15, aspectRatio: '16:9' };
+const finalize = { ...workflow, category: 'fashion', shots, assets: [asset], actualReferences, operation: 'finalize', targetDuration: 15, aspectRatio: '9:16' };
 
 describe('current fashion sales contracts', () => {
   it('requires the current protocol and fashion category before any new creation', () => {
-    const request = { ...workflow, productName: '上衣', category: 'fashion', targetDuration: 15, aspectRatio: '16:9' };
+    const request = { ...workflow, productName: '上衣', category: 'fashion', targetDuration: 15, aspectRatio: '9:16' };
     expect(videoSalesScriptGenerateBodySchema.parse(request).videoMode).toBe('live_presenter');
     for (const patch of [{ workflowVersion: undefined }, { category: 'home' }, { category: undefined }, { targetDuration: undefined }, { aspectRatio: undefined }]) {
       expect(videoSalesScriptGenerateBodySchema.safeParse({ ...request, ...patch }).success).toBe(false);
@@ -31,7 +31,7 @@ describe('current fashion sales contracts', () => {
   it('requires an allowlist on all current catalog operations', () => {
     for (const [schema, request] of [
       [videoSalesAnalyzeBodySchema, { ...workflow, productName: '上衣', category: 'fashion' }],
-      [videoSalesScriptGenerateBodySchema, { ...workflow, productName: '上衣', category: 'fashion', targetDuration: 15, aspectRatio: '16:9' }],
+      [videoSalesScriptGenerateBodySchema, { ...workflow, productName: '上衣', category: 'fashion', targetDuration: 15, aspectRatio: '9:16' }],
       [videoSalesSelectBodySchema, { ...workflow, shots }],
       [videoSalesFinalizeBodySchema, finalize],
     ] as const) {

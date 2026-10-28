@@ -177,14 +177,14 @@ func workflowTiming(payload map[string]any) (int, string, error) {
 	if err := decodeField(payload, "targetDuration", &duration); err != nil {
 		return 0, "", err
 	}
-	if duration < 10 || duration > 120 {
-		return 0, "", fmt.Errorf("targetDuration 必须为10至120秒")
+	if duration < 13 || duration > 25 {
+		return 0, "", fmt.Errorf("targetDuration 必须为13至25秒")
 	}
 	if err := decodeField(payload, "aspectRatio", &ratio); err != nil {
 		return 0, "", err
 	}
 	switch ratio {
-	case "9:16", "16:9", "3:4", "1:1":
+	case "9:16":
 	default:
 		return 0, "", fmt.Errorf("aspectRatio 无效")
 	}

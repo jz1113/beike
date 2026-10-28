@@ -5,7 +5,7 @@ export const videoSalesCatalogImageSchema = z.object({
   index: z.number().int().nonnegative(), url: z.string().min(1), role: z.string().min(1),
 });
 const categorySchema = z.literal('fashion');
-const aspectRatioSchema = z.enum(['9:16', '16:9', '3:4', '1:1']);
+const aspectRatioSchema = z.literal('9:16');
 const modelFields = {
   ...TextRequestRoutingFields,
   model: z.string().optional(), customBaseUrl: z.string().optional(), customApiKey: z.string().optional(),
@@ -74,7 +74,7 @@ export const videoSalesScriptGenerateBodySchema = z.object({
   category: categorySchema, productDescription: z.string().max(4000).optional(),
   productAnalysis: z.string().max(8000).optional(),
   videoMode: z.enum(['product_closeup', 'graphic_montage', 'scene_demo', 'live_presenter']).default('live_presenter'),
-  targetDuration: z.number().int().min(10).max(120), aspectRatio: aspectRatioSchema,
+  targetDuration: z.number().int().min(13).max(25), aspectRatio: aspectRatioSchema,
   targetAudience: z.string().max(200).optional(),
 }).strict().superRefine(checkCatalog);
 export type VideoSalesScriptGenerateBody = z.infer<typeof videoSalesScriptGenerateBodySchema>;
@@ -96,9 +96,9 @@ export const videoSalesFinalizeBodySchema = z.object({
   shots: z.array(shotSchema).min(1).max(40), imageCatalog: catalogSchema,
   actualReferences: z.array(videoSalesActualReferenceSchema).min(1).max(44),
   assets: z.array(videoSalesPlannedAssetSchema).min(1).max(4),
-  targetDuration: z.number().int().min(10).max(120), aspectRatio: aspectRatioSchema,
+  targetDuration: z.number().int().min(13).max(25), aspectRatio: aspectRatioSchema,
   videoModel: z.string().optional(), videoRefMode: z.string().optional(), videoResolution: z.string().optional(),
-  productAnalysis: z.string().max(8000).optional(), category: categorySchema,
+  productAnalysis: z.string().max(8000).optional(), category: categorySchema, brand: z.string().max(100).optional(), productName: z.string().max(100).optional(),
   productDescription: z.string().max(4000).optional(),
 }).strict().superRefine((value, ctx) => {
   checkCatalog(value, ctx);
@@ -115,5 +115,5 @@ export type VideoSalesFinalizeBody = z.infer<typeof videoSalesFinalizeBodySchema
 export const videoSalesFinalizeResponseSchema = z.object({
   success: z.literal(true), fullPrompt: z.string().min(1),
   prompts: z.array(z.object({ shotId: z.number().int().positive(), speechMode: z.enum(['on_camera', 'voiceover']), prompt: z.string().min(1) })).min(1),
-  model: z.string().optional(), usage: z.unknown().optional(),
+  model: z.string().optional(), usage: z.unknown().optional(), languageWarnings: z.array(z.string()).optional(),
 });

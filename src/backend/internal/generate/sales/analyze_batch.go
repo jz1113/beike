@@ -137,6 +137,11 @@ func analysisReady(parsed ProductAnalysisResult) bool {
 			return true
 		}
 	}
+	for _, point := range parsed.BuyingPoints {
+		if strings.TrimSpace(point.Text) != "" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -213,13 +218,13 @@ func analysisFactText(facts analysisFacts) string {
 }
 
 func analyzeChatBody(model string, facts analysisFacts, images []CatalogImage, batch, total int) map[string]any {
-	text := fmt.Sprintf("%s\n这是第 %d 批图片，共 %d 批。只根据这些图片、本次确认颜色和已有资料总结。已知事实写入 knownFacts，拍摄建议写入 creativeNotes。不要把其他颜色写成当前商品外观，不要提取或写入价格、金额或优惠，不要编造功效、评价、销量、实测结果或促销。%s",
+	text := fmt.Sprintf("%s\n这是第 %d 批图片，共 %d 批。优先读取 role=detail 的详情图中的文字、参数、工艺和结构，并在证据中标注对应图片编号。只根据这些图片、本次确认颜色和已有资料总结。sellingPoints 只写可核实的商品事实；buyingPoints 把事实转换成消费者可理解的购买理由，每条写清收益和证据。已知事实写入 knownFacts，拍摄建议写入 creativeNotes。不要把其他颜色写成当前商品外观，不要提取或写入价格、金额或优惠，不要编造功效、评价、销量、实测结果或促销。%s",
 		analysisFactText(facts), batch, total, analysisJSONShape(facts.Category))
 	return withLongOutput(chatBody(model, analysisSystemPrompt(facts.Category), visionParts(text, images), 0.2))
 }
 
 func summarizeAnalysisBody(model string, facts analysisFacts, partials string) map[string]any {
-	text := fmt.Sprintf("%s\n下面是分批图片分析，请合并成一份。重复卖点只留一次，互相矛盾时保留更具体、能对应图片和本次确认颜色的说法。不要新增任何一批里都没有的功效、评价或优惠。%s\n分批结果：%s",
+	text := fmt.Sprintf("%s\n下面是分批图片分析，请合并成一份。优先保留详情图中可读的参数与结构证据；重复卖点和购买理由只留一次，互相矛盾时保留更具体、能对应图片和本次确认颜色的说法。buyingPoints 必须由 sellingPoints、knownFacts 或已有资料转换而来，不得补写图片未提供的收益。不要新增任何一批里都没有的功效、评价或优惠。%s\n分批结果：%s",
 		analysisFactText(facts), analysisJSONShape(facts.Category), partials)
 	return withLongOutput(chatBody(model, analysisSummaryPrompt(facts.Category), text, 0.2))
 }
@@ -234,7 +239,7 @@ func analysisSummaryPrompt(category string) string {
 
 func analysisJSONShape(category string) string {
 	points := "能说出口的穿着场合或搭配"
-	return `输出格式：{"productName":"","category":"","brand":"","visualFeatures":{"mainColor":"","designStyle":"","productForm":"","texture":""},"sellingPoints":["` + points + `"],"targetAudience":"","usageScenarios":["场景"],"painPoints":["痛点"],"knownFacts":["资料或图片中可见的事实"],"creativeNotes":["拍摄建议，不是商品事实"],"videoSuggestions":{"recommendedAngles":["角度"],"keyVisuals":["焦点"],"suggestedStyle":""}}`
+	return `输出格式：{"productName":"","category":"","brand":"","visualFeatures":{"mainColor":"","designStyle":"","productForm":"","texture":""},"sellingPoints":["` + points + `"],"buyingPoints":[{"text":"消费者购买理由","benefit":"对消费者的具体帮助","evidence":["对应事实或详情图文字"],"sourceImageIndexes":[0]}],"targetAudience":"","usageScenarios":["场景"],"painPoints":["痛点"],"knownFacts":["资料或图片中可见的事实"],"creativeNotes":["拍摄建议，不是商品事实"],"videoSuggestions":{"recommendedAngles":["角度"],"keyVisuals":["焦点"],"suggestedStyle":""}}`
 }
 
 func chatBody(model, system string, user any, temperature float64) map[string]any {

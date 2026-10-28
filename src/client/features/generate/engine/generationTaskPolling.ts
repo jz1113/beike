@@ -33,6 +33,7 @@ function recordFinishedTaskUsage(task: GenerationTask, data: { taskId?: unknown;
     type: task.mediaType === 'audio' ? 'audio' : isVideoTask(task) ? 'video' : 'image',
     mediaCount: 1,
     duration: task.videoDuration,
+    resolution: isVideoTask(task) ? task.videoResolution : undefined,
     usage: data?.usage,
   });
 }

@@ -5,6 +5,7 @@ export interface ModelPricingRule {
   completionPer1k?: number;
   fixedPerUnit?: number;
   perSecPrice?: number;
+  perSecPriceByResolution?: Record<string, number>;
 }
 
 /** 文本模型使用 Comfly 默认分组报价快照（฿/K token）；实际扣费以所用分组账单为准。 */
@@ -50,7 +51,14 @@ export const COMFY_MODEL_PRICING: Record<string, ModelPricingRule> = {
   'qwen-image': { vendor: '阿里百炼', type: 'image', fixedPerUnit: 0.25 },
   'qwen-image-edit': { vendor: '阿里百炼', type: 'image', fixedPerUnit: 0.30 },
   'qwen3.8-max': { vendor: '阿里百炼', type: 'chat', promptPer1k: 0.012, completionPer1k: 0.036 },
-  'wan3.0-video': { vendor: '阿里百炼', type: 'video', perSecPrice: 0.40 },
+  // The app submits through Comfly's default group. 国产特价2 is a separate
+  // quotation and must not be mixed into the default-group estimate.
+  'wan3.0-video': {
+    vendor: '阿里百炼',
+    type: 'video',
+    perSecPrice: 0.45,
+    perSecPriceByResolution: { '480P': 0.45, '720P': 0.90, '1080P': 1.80 },
+  },
 
   'midjourney': { vendor: 'Midjourney', type: 'image', fixedPerUnit: 0.22 },
   'flux': { vendor: 'FLUX', type: 'image', fixedPerUnit: 0.01 },

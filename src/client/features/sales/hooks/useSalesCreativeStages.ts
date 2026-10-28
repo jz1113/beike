@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { resolveModalityModelRoute } from '@shared/domain/models/modalityStorage';
-import { eligibleSalesImages, omitSalesPriceClauses, omitSalesPriceProps, salesActualReferences, type VideoSalesScript } from '@shared/domain/sales';
+import { analysisSalesImages, eligibleSalesImages, omitSalesPriceClauses, omitSalesPriceProps, salesActualReferences, type VideoSalesScript } from '@shared/domain/sales';
 import { salesAssetsGenerated } from '@shared/domain/sales/workflow';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { defaultSalesImageBatchClient } from '../api/salesImageBatch';
@@ -21,8 +21,9 @@ export function useSalesCreativeStages(input: {
   busyRef: MutableRefObject<Busy>;
   commit: Commit;
   setError: (error: string | null) => void;
+  setNotice?: (notice: string | null) => void;
 }) {
-  const { stateRef, busyRef, commit, setError } = input;
+  const { stateRef, busyRef, commit, setError, setNotice = () => {} } = input;
   const [isPreparingAssets, setIsPreparingAssets] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isQueryingAssets, setIsQueryingAssets] = useState(false);
@@ -39,12 +40,12 @@ export function useSalesCreativeStages(input: {
   }, [busyRef, commit, setError, stateRef]);
 
   const runAssets = useCallback(async (regenerateId?: string, queryOnly = false) => {
-    if (!salesJobAllowed(busyRef.current, 'plan')) return;
+    if (!salesJobAllowed(busyRef.current, 'plan')) return false;
     const current = stateRef.current;
     const script = current.scripts[current.selectedScriptIndex];
-    if (!script) { setError('请先生成创作方案'); return; }
+    if (!script) { setError('请先生成创作方案'); return false; }
     const asset = script.assets?.find((item) => item.id === regenerateId);
-    if (!queryOnly && asset?.status === 'uncertain' && !asset.taskId && !canResubmitRejectedAsset(asset)) { setError('该图片提交结果未确认，请先核对生成记录，不能自动重投'); return; }
+    if (!queryOnly && asset?.status === 'uncertain' && !asset.taskId && !canResubmitRejectedAsset(asset)) { setError('该图片提交结果未确认，请先核对生成记录，不能自动重投'); return false; }
     busyRef.current.planning = true;
     setIsPreparingAssets(true);
     setIsQueryingAssets(queryOnly);
@@ -58,10 +59,10 @@ export function useSalesCreativeStages(input: {
       await recoverSalesAssetReceipts({ script: queryOnly && regenerateId ? { ...script, assets: script.assets?.filter((item) => item.id === regenerateId) } : script, isAborted: () => controller.signal.aborted,
         updateAsset: (id, patch) => commitScript((previous) => updateSalesCreativeAsset(previous, id, patch)),
       }, generateSalesReferenceFrame, defaultSalesImageBatchClient.lookup);
-      if (queryOnly) return;
+      if (queryOnly) return true;
       if (current.category !== 'fashion') throw new Error('历史方案仅支持查询原图片任务；请选择服饰专属规则后更新脚本');
       const images = assertSalesPlanCurrent(current, script);
-      if (asset?.url && !['generating', 'uncertain'].includes(asset.status || '') && !(await confirmAction({ title: '重新生成素材？', description: '本次将调用绘图模型，可能计费；依赖这张图片的素材也可能需要更新。', confirmText: '重新生成' }))) return;
+      if (asset?.url && !['generating', 'uncertain'].includes(asset.status || '') && !(await confirmAction({ title: '重新生成素材？', description: '本次将调用绘图模型，可能计费；依赖这张图片的素材也可能需要更新。', confirmText: '重新生成' }))) return false;
       const image = resolveModalityModelRoute('image', current.selectedImageModel);
       // Existing receipts are queried rather than submitted again, even when a retry button was used.
       const force = asset?.taskId && ['generating', 'uncertain'].includes(asset.status || '') ? undefined : regenerateId;
@@ -74,8 +75,10 @@ export function useSalesCreativeStages(input: {
         getScript: () => stateRef.current.scripts.find((item) => item.id === script.id) || script,
         updateAsset: (id, patch) => commitScript((previous) => updateSalesCreativeAsset(previous, id, patch)),
       }, defaultSalesImageBatchClient);
+      return true;
     } catch (err) {
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '素材准备失败');
+      return false;
     } finally {
       busyRef.current.planning = false;
       setIsPreparingAssets(false);
@@ -84,7 +87,7 @@ export function useSalesCreativeStages(input: {
     }
   }, [busyRef, commit, setError, stateRef]);
 
-  const confirmAssets = useCallback(() => {
+  const validateAssets = useCallback((validationSource: 'manual' | 'model') => {
     if (!salesJobAllowed(busyRef.current, 'plan')) return false;
     const current = stateRef.current;
     const script = current.scripts[current.selectedScriptIndex];
@@ -97,22 +100,26 @@ export function useSalesCreativeStages(input: {
       }
       commit((state) => ({ ...state, scripts: state.scripts.map((item) => item.id !== script.id ? item : {
         ...item, assetValidation: 'passed', finalizedRevision: undefined,
-        assets: item.assets?.map((asset) => asset.status === 'done' && asset.url ? { ...asset, validation: 'passed', validationSource: 'manual', validationReason: '人工已确认' } : asset),
+        assets: item.assets?.map((asset) => asset.status === 'done' && asset.url ? { ...asset, validation: 'passed', validationSource, validationReason: validationSource === 'model' ? '已自动完成素材核验' : '人工已确认' } : asset),
       }) }));
       setError(null);
       return true;
     } catch (error) { setError(error instanceof Error ? error.message : '素材确认失败'); return false; }
   }, [busyRef, commit, setError, stateRef]);
 
+  const confirmAssets = useCallback(() => validateAssets('manual'), [validateAssets]);
+  const autoConfirmAssets = useCallback(() => validateAssets('model'), [validateAssets]);
+
   const runFinalize = useCallback(async () => {
-    if (!salesJobAllowed(busyRef.current, 'plan')) return;
+    if (!salesJobAllowed(busyRef.current, 'plan')) return false;
     const current = stateRef.current;
     const script = current.scripts[current.selectedScriptIndex];
     const capabilityError = salesSingleVideoError(current, script);
-    if (capabilityError || !script) { setError(capabilityError); return; }
+    if (capabilityError || !script) { setError(capabilityError); return false; }
     busyRef.current.planning = true;
     setIsFinalizing(true);
     setError(null);
+    setNotice(null);
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -127,10 +134,12 @@ export function useSalesCreativeStages(input: {
         category: current.category, targetDuration: current.targetDuration, aspectRatio: current.aspectRatio,
         productAnalysis: current.analysis ? JSON.stringify(current.analysis) : undefined,
         productDescription: JSON.stringify({ originalProductProperties: omitSalesPriceProps(current.props), creativeSellingPoints: omitSalesPriceClauses(current.sellingPoints) }),
+        brand: current.brand || undefined,
+        productName: current.productName,
         videoModel: video.modelId, videoRefMode: current.videoRefMode, videoResolution: current.videoResolution,
         model: chat.modelId, textProtocol: chat.textProtocol, customBaseUrl: chat.baseUrl, customApiKey: chat.apiKey, signal: controller.signal,
       });
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) return false;
       if (!result.fullPrompt?.trim() || result.prompts.length !== script.shots.length
         || new Set(result.prompts.map((item) => item.shotId)).size !== script.shots.length
         || script.shots.some((shot) => !result.prompts.some((item) => item.shotId === shot.shotId && item.prompt?.trim()))) throw new Error('完整视频提示词不完整');
@@ -138,23 +147,27 @@ export function useSalesCreativeStages(input: {
         ...item, fullPrompt: result.fullPrompt!.trim(), finalizedRevision: revision, finalStaleReason: undefined,
         shots: item.shots.map((shot) => ({ ...shot, finalPrompt: result.prompts.find((prompt) => prompt.shotId === shot.shotId)!.prompt, promptStale: false })),
       } : item) }));
+      if (result.languageWarnings?.length) setNotice(`已自动规范化提示词中的技术词：${result.languageWarnings.join('、')}`);
+      return true;
     } catch (err) {
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '视频提示词合成失败');
+      return false;
     } finally {
       busyRef.current.planning = false;
       setIsFinalizing(false);
       if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [busyRef, commit, setError, stateRef]);
+  }, [busyRef, commit, setError, setNotice, stateRef]);
 
   const runProductAnalyze = useCallback(async () => {
     if (!salesJobAllowed(busyRef.current, 'plan')) return false;
     const current = stateRef.current;
     if (current.category !== 'fashion') { setError('当前仅接入服饰、鞋、包技能，请先选择服饰专属规则'); return false; }
     if (!current.productName.trim()) { setError('请先采集或填写商品名称'); return false; }
-    const images = eligibleSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata);
+    const selectedImages = eligibleSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata);
     if (current.analysis && current.analysisRevision === salesAnalysisInputRevision(current)) return true;
-    if (!images.length) { setError('请先选择至少一张用于生成的商品图'); return false; }
+    if (!selectedImages.length) { setError('请先选择至少一张用于生成的商品图'); return false; }
+    const images = analysisSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata);
     const chat = resolveModalityModelRoute('chat', current.selectedChatModel);
     if (!chat.modelId) { setError('请先在下方创作设置中选择卖点与脚本模型'); return false; }
     busyRef.current.planning = true;
@@ -186,14 +199,15 @@ export function useSalesCreativeStages(input: {
         signal: controller.signal,
       });
       if (controller.signal.aborted || salesAnalysisInputRevision(stateRef.current) !== salesAnalysisInputRevision(current)) return false;
-      const refinedPoints = (analysis.sellingPoints || []).map((item) => item.trim()).filter(Boolean).join('；');
+      const refinedPoints = (analysis.buyingPoints?.map((item) => typeof item === 'string' ? item : item.text) || analysis.sellingPoints || [])
+        .map((item) => item.trim()).filter(Boolean).join('；');
       commit((prev) => {
         const next = invalidateSalesState(prev, refinedPoints ? { sellingPoints: refinedPoints } : {});
         return { ...next, analysis, analysisRevision: salesAnalysisInputRevision(next) };
       });
       return true;
     } catch (err) {
-      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'AI 提炼商品卖点失败');
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'AI 转换购买理由失败');
       return false;
     } finally {
       busyRef.current.planning = false;
@@ -202,5 +216,5 @@ export function useSalesCreativeStages(input: {
     }
   }, [busyRef, commit, setError, stateRef]);
 
-  return { isPreparingAssets, isQueryingAssets, isFinalizing, isAnalyzing, runAssets, runFinalize, runProductAnalyze, confirmAssets, editAssetPrompt, stopAssets: () => abortRef.current?.abort() };
+  return { isPreparingAssets, isQueryingAssets, isFinalizing, isAnalyzing, runAssets, runFinalize, runProductAnalyze, confirmAssets, autoConfirmAssets, editAssetPrompt, stopAssets: () => abortRef.current?.abort() };
 }

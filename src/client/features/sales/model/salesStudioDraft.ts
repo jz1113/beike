@@ -133,18 +133,20 @@ export function readSalesStudioDraft(): VideoSalesStudioState {
     const parsed = archiveSalesFields(JSON.parse(saved) as Partial<VideoSalesStudioState>, ['fashionRefs']);
     const scripts = normalizeSalesScripts(parsed.scripts, parsed.draftVersion === 3);
     const empty = !scripts.length && !parsed.productName && !parsed.imageCatalog?.length && !parsed.productImages?.length;
+    const category = empty ? 'fashion' : parsed.category || defaultSalesStudioState.category;
+    const fashion = category === 'fashion';
     return {
       ...defaultSalesStudioState,
       ...parsed,
       draftVersion: 3,
-      category: empty ? 'fashion' : parsed.category || defaultSalesStudioState.category,
+      category,
       videoMode: empty && parsed.category !== 'fashion' ? 'live_presenter' : parsed.videoMode || defaultSalesStudioState.videoMode,
       colorSelection: readSalesColorSelection(parsed.colorSelection),
       variantMetadata: readProductVariantMetadata(parsed.variantMetadata),
-      targetDuration: Number.isInteger(parsed.targetDuration) && parsed.targetDuration! >= 10 && parsed.targetDuration! <= 120 ? parsed.targetDuration! : 15,
+      targetDuration: Number.isInteger(parsed.targetDuration) && parsed.targetDuration! >= (fashion ? 13 : 10) && parsed.targetDuration! <= (fashion ? 25 : 120) ? parsed.targetDuration! : 15,
       selectedScriptIndex: Number.isInteger(parsed.selectedScriptIndex) && parsed.selectedScriptIndex! >= 0 && parsed.selectedScriptIndex! < scripts.length ? parsed.selectedScriptIndex! : 0,
-      aspectRatio: isSalesAspect(parsed.aspectRatio) ? parsed.aspectRatio : '9:16',
-      videoResolution: readVideoResolution(parsed.videoResolution),
+      aspectRatio: fashion ? '9:16' : (isSalesAspect(parsed.aspectRatio) ? parsed.aspectRatio : '9:16'),
+      videoResolution: fashion ? '480P' : readVideoResolution(parsed.videoResolution),
       videoRefMode: readVideoRefMode(parsed.videoRefMode),
       analysis: parsed.analysis || null,
       composedResultUrl: typeof parsed.composedResultUrl === 'string' ? parsed.composedResultUrl : null,

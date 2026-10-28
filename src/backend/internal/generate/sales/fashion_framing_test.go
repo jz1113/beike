@@ -20,7 +20,7 @@ func TestFashionExamplesKeepNormalDistanceInEveryPresentationMode(t *testing.T) 
 				if strings.Contains(shot.Camera, "推近") || strings.Contains(shot.Camera, "特写") || strings.Contains(shot.Camera, "近景") {
 					t.Fatalf("mode %s still teaches a close shot: %s", mode, shot.Camera)
 				}
-				if !strings.Contains(shot.Camera, "中景") && !strings.Contains(shot.Camera, "中全景") {
+				if !strings.Contains(shot.Camera, "正常距离") && !strings.Contains(shot.Camera, "正常展示距离") {
 					t.Fatalf("mode %s has no normal-distance composition: %s", mode, shot.Camera)
 				}
 			}
@@ -53,7 +53,7 @@ func TestFashionFramingReachesFinalModelAndSubmittedPrompt(t *testing.T) {
 			if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &response) != nil {
 				t.Fatalf("%d %s", rec.Code, rec.Body.String())
 			}
-			if !strings.Contains(response.FullPrompt, "按时间轴指定的机位") || !strings.Contains(response.FullPrompt, "正常距离中景") {
+			if !strings.Contains(response.FullPrompt, "按时间轴") || !strings.Contains(response.FullPrompt, "相机距离") {
 				t.Fatal("submitted prompt lost executable camera directions")
 			}
 			for _, forbidden := range []string{"旧分镜", "需要补充中景素材", "ID=", "类型=", "每段围绕一个"} {

@@ -16,9 +16,18 @@ export function eligibleSalesImages(images: SalesImageRef[], selection: SalesCol
   return images.filter((image) => image.url.trim() && !image.unavailable && allowed.has(image.url) && !excluded.has(image.url));
 }
 
+/** Analysis can also use unambiguous detail sheets, while generation stays color-scoped. */
+export function analysisSalesImages(images: SalesImageRef[], selection: SalesColorSelection, metadata?: ProductVariantMetadata): SalesImageRef[] {
+  const selected = eligibleSalesImages(images, selection, metadata);
+  const selectedUrls = new Set(selected.map((image) => image.url));
+  const excluded = new Set(selection.excludedImageUrls);
+  return images.filter((image) => image.url.trim() && !image.unavailable && !excluded.has(image.url)
+    && (selectedUrls.has(image.url) || image.role === 'detail'));
+}
+
 export function salesAssetsReady(script?: VideoSalesScript): boolean {
   return Boolean(script?.deliveryMode === 'single' && !script.planStale && Array.isArray(script.assets)
-    && script.assets.every((asset) => (!asset.required && !asset.url && !['generating', 'uncertain'].includes(asset.status || '')) || (asset.status === 'done' && Boolean(asset.url) && asset.validation === 'passed' && asset.validationSource === 'manual'))
+    && script.assets.every((asset) => (!asset.required && !asset.url && !['generating', 'uncertain'].includes(asset.status || '')) || (asset.status === 'done' && Boolean(asset.url) && asset.validation === 'passed' && (asset.validationSource === 'manual' || asset.validationSource === 'model')))
     && script.assetValidation === 'passed');
 }
 

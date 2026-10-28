@@ -17,7 +17,7 @@ interface Props {
 
 export function SalesProductInsights({ sellingPoints, props = {}, analysis, disabled, isAnalyzing, canAnalyze, onAnalyze, card, onChange }: Props) {
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'facts' | 'scenes'>('facts');
+  const [activeTab, setActiveTab] = useState<'facts' | 'scenes' | 'evidence'>('facts');
   const uid = useId();
   const evidenceScrollRef = useRef<HTMLDivElement>(null);
   const facts = [...new Set([
@@ -28,13 +28,22 @@ export function SalesProductInsights({ sellingPoints, props = {}, analysis, disa
     ...(analysis?.knownFacts || []),
   ].filter((item): item is string => Boolean(item?.trim())).map((item) => item.trim()))];
   const scenes = [...new Set([analysis?.targetAudience?.trim() && `适用人群：${analysis.targetAudience.trim()}`, ...(analysis?.usageScenarios || [])].filter((item): item is string => Boolean(item?.trim())).map((item) => item.trim()))];
+  const buyingPoints = (analysis?.buyingPoints || []).map((item) => typeof item === 'string' ? { text: item } : item)
+    .filter((item) => item.text?.trim()).map((item) => {
+      const evidence = item.evidence?.filter(Boolean).join('；');
+      return [item.text.trim(), item.benefit?.trim(), evidence ? `依据：${evidence}` : ''].filter(Boolean).join(' · ');
+    });
   const propFacts = new Set(Object.entries(props).map(([key, value]) => `${key.trim()}：${value.trim()}`));
   const currentPoints = sellingPoints.split(/[；;\n]+/).map((point) => point.trim()).filter(Boolean);
   const displayPoints = currentPoints.filter((point) => !propFacts.has(point));
   const hasPoints = displayPoints.length > 0;
   const extracted = Boolean(analysis || hasPoints);
   const status = isAnalyzing ? '正在自动提炼…' : analysis ? `已自动提炼 · ${displayPoints.length} 条` : displayPoints.length ? `${displayPoints.length} 条` : '等待提炼';
-  const tabs = [{ id: 'facts' as const, label: '外观与材质依据', items: facts }, { id: 'scenes' as const, label: '适用人群与场景', items: scenes }];
+  const tabs = [
+    { id: 'facts' as const, label: '外观与材质依据', items: facts },
+    { id: 'scenes' as const, label: '适用人群与场景', items: scenes },
+    { id: 'evidence' as const, label: '购买理由证据', items: buyingPoints },
+  ];
   const selectTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
     evidenceScrollRef.current?.scrollTo({ top: 0 });
@@ -42,26 +51,26 @@ export function SalesProductInsights({ sellingPoints, props = {}, analysis, disa
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const next = event.key === 'Home' ? 'facts' : event.key === 'End' ? 'scenes' : activeTab === 'facts' ? 'scenes' : 'facts';
+    const next = event.key === 'Home' ? 'facts' : event.key === 'End' ? 'evidence' : activeTab === 'facts' ? 'scenes' : activeTab === 'scenes' ? 'evidence' : 'facts';
     selectTab(next);
     document.getElementById(`${uid}-${next}-tab`)?.focus();
   };
 
-  return <section className={`sales-product-insights @container ${card ? 'sales-product-insights-workspace' : 'border-t border-slate-100 pt-5 dark:border-white/[0.08]'}`} aria-label="脚本卖点与分析">
+  return <section className={`sales-product-insights @container ${card ? 'sales-product-insights-workspace' : 'border-t border-slate-100 pt-5 dark:border-white/[0.08]'}`} aria-label="脚本购买理由与分析">
     <div className="sales-insights-core">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">脚本卖点</h2>
+        <h2 className="text-base font-semibold">脚本购买理由</h2>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
           <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">{isAnalyzing && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}{status}</span>
-          {onAnalyze && <button type="button" disabled={disabled || isAnalyzing || !canAnalyze} onClick={onAnalyze} className={`sales-extract-button ${canAnalyze && !extracted ? 'sales-extract-primary' : `sales-extract-secondary ${salesGhostButtonClass}`} ${salesFocusClass}`}>{extracted ? <RefreshCw className="h-3.5 w-3.5" aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />}{isAnalyzing ? '提炼中' : extracted ? '重新提炼' : 'AI 提炼卖点'}</button>}
+          {onAnalyze && <button type="button" disabled={disabled || isAnalyzing || !canAnalyze} onClick={onAnalyze} className={`sales-extract-button ${canAnalyze && !extracted ? 'sales-extract-primary' : `sales-extract-secondary ${salesGhostButtonClass}`} ${salesFocusClass}`}>{extracted ? <RefreshCw className="h-3.5 w-3.5" aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />}{isAnalyzing ? '转换中' : extracted ? '重新转换' : 'AI 提炼卖点→买点'}</button>}
         </div>
       </div>
       <div className="mt-5 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <span id={`${uid}-points-label`} className="text-xs font-medium text-slate-500 dark:text-slate-400">已知卖点</span>
-          {currentPoints.length > 0 && <button type="button" disabled={disabled} onClick={() => setEditing((value) => !value)} className={`shrink-0 rounded text-[11px] text-slate-500 hover:text-slate-900 disabled:opacity-40 dark:text-slate-400 dark:hover:text-white ${salesFocusClass}`}>{editing ? '完成编辑' : '编辑卖点'}</button>}
+          <span id={`${uid}-points-label`} className="text-xs font-medium text-slate-500 dark:text-slate-400">购买理由（由卖点转换）</span>
+          {currentPoints.length > 0 && <button type="button" disabled={disabled} onClick={() => setEditing((value) => !value)} className={`shrink-0 rounded text-[11px] text-slate-500 hover:text-slate-900 disabled:opacity-40 dark:text-slate-400 dark:hover:text-white ${salesFocusClass}`}>{editing ? '完成编辑' : '编辑购买理由'}</button>}
         </div>
-        {editing || displayPoints.length === 0 ? <textarea aria-labelledby={`${uid}-points-label`} rows={5} value={sellingPoints} placeholder="采集商品或输入商品信息后，点击右上角 AI 提炼卖点，或直接在此手动输入卖点" disabled={disabled} onChange={(event) => { setEditing(true); onChange({ sellingPoints: event.target.value }); }} className={`${salesInputClass} min-h-36 resize-y text-[13px] leading-7`} /> : <ol className="sales-selling-points grid grid-cols-1 gap-3 @min-[420px]:grid-cols-2">{displayPoints.map((point, index) => {
+        {editing || displayPoints.length === 0 ? <textarea aria-labelledby={`${uid}-points-label`} rows={5} value={sellingPoints} placeholder="采集商品或输入商品信息后，点击右上角 AI 提炼卖点→买点，或直接输入购买理由" disabled={disabled} onChange={(event) => { setEditing(true); onChange({ sellingPoints: event.target.value }); }} className={`${salesInputClass} min-h-36 resize-y text-[13px] leading-7`} /> : <ol className="sales-selling-points grid grid-cols-1 gap-3 @min-[420px]:grid-cols-2">{displayPoints.map((point, index) => {
           const firstClause = point.match(/^(.{1,28}?)([，,。！!？?：:]|$)/u)?.[1] || point.slice(0, 18);
           return <li key={index} className="sales-selling-point flex min-w-0 gap-3 rounded-xl bg-slate-100/80 p-4 dark:bg-white/[0.04]">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-200/80 text-[11px] font-bold tabular-nums text-slate-600 dark:bg-white/[0.08] dark:text-slate-200">{String(index + 1).padStart(2, '0')}</span>
@@ -71,7 +80,7 @@ export function SalesProductInsights({ sellingPoints, props = {}, analysis, disa
       </div>
     </div>
     <section className="sales-insights-evidence" aria-label="AI 提炼商品信息点">
-      <h3 className="mb-3 text-xs font-medium text-slate-500 dark:text-slate-400">提炼依据与适用场景</h3>
+      <h3 className="mb-3 text-xs font-medium text-slate-500 dark:text-slate-400">购买理由与提炼依据</h3>
       <div role="tablist" aria-label="提炼依据分类" className="flex shrink-0 gap-5 border-b border-slate-200 dark:border-white/[0.08]">
         {tabs.map((tab) => <button key={tab.id} type="button" role="tab" id={`${uid}-${tab.id}-tab`} aria-controls={`${uid}-${tab.id}-panel`} aria-selected={activeTab === tab.id} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => selectTab(tab.id)} onKeyDown={onTabKeyDown} className={`sales-evidence-tab relative pb-3 text-xs ${activeTab === tab.id ? 'is-active font-medium text-slate-900 dark:text-slate-100' : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'} ${salesFocusClass}`}>{tab.label} ({tab.items.length || (isAnalyzing ? '提炼中' : analysis ? '未返回' : hasPoints ? '待提炼' : 0)})</button>)}
       </div>

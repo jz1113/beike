@@ -384,6 +384,7 @@ export async function submitSingleGenerationTask(
     type: isAudio ? 'audio' : video ? 'video' : 'image',
     mediaCount: 1,
     duration: video ? (t.videoDuration || 5) : undefined,
+    resolution: video ? t.videoResolution : undefined,
     usage: data.usage,
   });
 

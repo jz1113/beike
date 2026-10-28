@@ -45,8 +45,8 @@ function fashionState(): VideoSalesStudioState {
   return {
     ...product, draftVersion: 3, category: 'fashion', sellingPoints: '圆领', props: product.props,
     colorSelection: { variantId: 'black', colorLabel: '黑色', confirmedImageUrls: [], excludedImageUrls: [] }, videoMode: 'product_closeup', targetDuration: 15,
-    aspectRatio: '9:16', videoResolution: '720P', videoRefMode: 'omni',
-    selectedChatModel: 'vision-test', selectedImageModel: 'image-test', selectedVideoModel: 'kling-video-v3-omni',
+    aspectRatio: '9:16', videoResolution: '480P', videoRefMode: 'omni',
+    selectedChatModel: 'vision-test', selectedImageModel: 'image-test', selectedVideoModel: 'wan3.0-video',
     scripts: [], selectedScriptIndex: 0, analysis: null, composedResultUrl: null,
   };
 }

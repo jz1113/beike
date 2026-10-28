@@ -51,7 +51,10 @@ describe('per-asset product view evidence', () => {
     const dependency: SalesCreativeAsset = { id: 'person', kind: 'person', label: '背面人物', prompt: '背面', required: true };
     const prompt = salesAssetImagePrompt(front, [images[0]], [dependency], '黑色');
     expect(prompt).toContain('本次只生成一张静帧');
-    expect(prompt).toContain(salesSkillStage('image'));
+    expect(prompt).toContain(salesSkillStage('imagePrompt'));
+    expect(prompt).not.toContain('【时间轴与剪辑】');
+    expect(prompt).not.toContain(salesSkillStage('image'));
+    expect(salesSkillStage('imagePrompt').length).toBeLessThan(salesSkillStage('image').length / 2);
     expect(prompt).toContain('素材名称：卫衣正面');
     expect(prompt).toContain('输入参考图1：商品原图（目录编号 2）');
     expect(prompt).toContain('输入参考图2：已生成素材「背面人物」');

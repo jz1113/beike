@@ -121,7 +121,7 @@ export function SalesActionBar({ primary, secondary, busy, reason, note, progres
       <div className={`sales-action-dock ${busy ? 'is-busy' : ''} ${controls ? 'has-controls' : ''} flex max-w-full flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-[#18191c]`}>
         <div className={`${hideStatus ? 'sr-only' : 'sales-dock-status min-w-0'} text-xs leading-5 text-slate-500 dark:text-slate-400`}>
           <div className={busy ? 'sales-dock-status-heading' : undefined}>
-            <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy && !quietReason ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && !quietReason && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || primary.label || '正在处理' : description || '按步骤确认后继续，生成操作不会自动串联。'}</p>
+            <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy && !quietReason ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && !quietReason && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || primary.label || '正在处理' : description || '选择商品图后将自动完成后续制作。'}</p>
             {busy && !hideProgress && <span className="shrink-0 text-[11px] tabular-nums">已等待 {elapsed} 秒</span>}
           </div>
           {busy && !hideProgress && <div className="mt-1.5"><SalesIndeterminateBar label={progress || primary.label || '正在处理'} /></div>}

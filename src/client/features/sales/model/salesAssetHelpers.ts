@@ -65,7 +65,7 @@ export function salesAssetProductImages(asset: SalesCreativeAsset, images: Sales
 export function salesAssetImagePrompt(asset: SalesCreativeAsset, products: SalesImageRef[], dependencies: SalesCreativeAsset[], selectedColor: string): string {
   const lines = [
     `本次只生成一张静帧，素材名称：${asset.label}。`,
-    salesSkillStage('image'),
+    salesSkillStage('imagePrompt'),
     `本张画面要求：${asset.prompt}`,
     roles.singleFrame,
   ];

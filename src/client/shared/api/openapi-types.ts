@@ -1841,7 +1841,10 @@ export interface components {
             videoModel?: string;
             videoRefMode?: string;
             videoResolution?: string;
+            brand?: string;
+            productName?: string;
             productAnalysis?: string;
+            productDescription?: string;
         };
         VideoSalesFinalizeResponse: {
             /** @enum {boolean} */
@@ -1853,8 +1856,11 @@ export interface components {
             fullPrompt: string;
             prompts: {
                 shotId: number;
+                /** @enum {string} */
+                speechMode: "on_camera" | "voiceover";
                 prompt: string;
             }[];
+            languageWarnings?: string[];
         };
         CollectVariantMetadata: {
             /** @enum {integer} */

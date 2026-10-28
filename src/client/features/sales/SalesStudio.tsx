@@ -40,7 +40,7 @@ export default function SalesStudio({ onBack, onOpenSettings }: Props) {
   const imageRoute = resolveModalityModelRoute('image', state.selectedImageModel);
   const finalized = Boolean(script?.fullPrompt?.trim() && assetsReady && script.finalizedRevision === salesFinalInputRevision(state, script));
   const usable = eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata);
-  const isBusy = studio.isCollecting || studio.isUploading || Boolean(studio.isAnalyzing) || studio.isPlanning || studio.isPreparingAssets || studio.isFinalizing || studio.isRendering;
+  const isBusy = studio.isAutoRunning || studio.isCollecting || studio.isUploading || Boolean(studio.isAnalyzing) || studio.isPlanning || studio.isPreparingAssets || studio.isFinalizing || studio.isRendering;
   const resetDisabled = isBusy || !hasSalesProductContent(state);
   const resetTitle = isBusy ? '请等待当前任务完成；视频生成可先停止' : resetDisabled ? '暂无可清空的商品内容' : '清空当前商品，保留生成设置和原始文件';
   const configScrollRef = useRef<HTMLDivElement>(null);
@@ -57,7 +57,7 @@ export default function SalesStudio({ onBack, onOpenSettings }: Props) {
   };
   const planReason = salesPlanReason(state, chatRoute.modelId);
   const assetProgress = salesAssetProgress(script?.assets || []);
-  const progress = studio.isCollecting ? '正在采集商品资料' : studio.isUploading ? '正在上传商品图片' : studio.isAnalyzing ? '正在 AI 提炼商品卖点与信息' : studio.isPlanning ? ({ analyze: '正在分析商品图片并提炼卖点', script: '正在生成卖点与完整脚本', select: '正在匹配商品参考图' }[studio.planPhase || 'analyze']) : studio.isPreparingAssets ? `${studio.isQueryingAssets ? '正在查询原图片任务' : '正在补齐素材图片'} · 已生成 ${assetProgress.generated}/${assetProgress.total}` : studio.isFinalizing ? '正在合成完整视频提示词' : studio.isRendering ? '正在生成并查询视频结果' : null;
+  const progress = studio.isCollecting ? '正在采集商品资料' : studio.isUploading ? '正在上传商品图片' : studio.isAnalyzing ? '正在把卖点转换为购买理由' : studio.isPlanning ? ({ analyze: '正在分析商品图片并转换购买理由', script: '正在生成购买理由与完整脚本', select: '正在匹配商品参考图' }[studio.planPhase || 'analyze']) : studio.isPreparingAssets ? `${studio.isQueryingAssets ? '正在查询原图片任务' : '正在补齐素材图片'} · 已生成 ${assetProgress.generated}/${assetProgress.total}` : studio.isFinalizing ? '正在合成完整视频提示词' : studio.isRendering ? '正在生成并查询视频结果' : null;
   const isCollected = Boolean(state.detailsMissing !== undefined || state.collectionSource !== undefined || state.fromCache !== undefined);
   const actions = salesStageActions({ step, busy: isBusy, progress, hasScript, collected: isCollected, planCurrent, planReason, assetsReady, assetsGenerated, assetsQueryable: assetProgress.queryable, assetsUnresolved: assetProgress.unresolved, preflightError: salesVideoPreflightError(state), assetCount: assetProgress.total, imageReady: Boolean(imageRoute.modelId), finalized, videoError: studio.videoError, submitError: studio.videoSubmitError, rendering: studio.isRendering, canQuery: salesHasQueryableTask(script), hasResult: Boolean(state.composedResultUrl), submissionUncertain: script?.renderStatus === 'uncertain', renderFailed: script?.renderStatus === 'failed' });
   const runAction = (intent: SalesActionIntent) => {
@@ -110,7 +110,7 @@ export default function SalesStudio({ onBack, onOpenSettings }: Props) {
           <div ref={workspaceScrollRef} className={`sales-workspace-scroll min-h-0 flex-1 ${step === 'video' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
             {step === 'plan' && (script ? <SalesPlanSection suppliedFacts={JSON.stringify({ sellingPoints: state.sellingPoints, props: state.props })} script={script} disabled={isBusy} onEditShot={studio.editShot} productImages={usable} /> : <SalesEmptyGuide kind="plan" category={state.category} onOpenRules={() => setRulesOpen(true)} />)}
             {step === 'assets' && (script ? <SalesAssetsSection script={script} aspectRatio={state.aspectRatio} productImages={usable} imageModel={state.selectedImageModel || imageRoute.modelId || ''} disabled={isBusy} onStop={studio.isPreparingAssets ? studio.stopWork : undefined} onModel={(selectedImageModel) => studio.updateState({ selectedImageModel })} onEditPrompt={studio.editAssetPrompt} onGenerate={(id, queryOnly) => { void studio.runAssets(id, queryOnly); }} /> : <SalesEmptyGuide kind="assets" />)}
-            {step === 'video' && (script ? <SalesVideoSection key={script.id} state={state} script={script} disabled={isBusy} assetsReady={assetsReady} finalizing={studio.isFinalizing} videoError={studio.videoError} submitError={studio.videoSubmitError} onEditPrompt={studio.editFullPrompt} /> : <SalesEmptyGuide kind="video" />)}
+            {step === 'video' && (script ? <SalesVideoSection key={script.id} state={state} script={script} disabled={isBusy} assetsReady={assetsReady} finalizing={studio.isFinalizing} videoError={studio.videoError} submitError={studio.videoSubmitError} languageNotice={studio.notice} onEditPrompt={studio.editFullPrompt} /> : <SalesEmptyGuide kind="video" />)}
             {step === 'result' && <SalesEmptyGuide kind="result" />}
           </div>
         </section>
