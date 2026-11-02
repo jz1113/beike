@@ -3,9 +3,11 @@ package sales
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -87,11 +89,19 @@ func TestAudioMixCombinesVideoVoiceoverAndBuiltinBgm(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, remote := range []bool{false, true} {
-		t.Run(fmt.Sprint("remote=", remote), func(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		remote bool
+		volume float64
+	}{
+		{"local", false, 0.16},
+		{"remote", true, 0.16},
+		{"muted-bgm-preserves-voice-level", false, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			videoURL, voiceURL := "/storage/"+videoRel, "/storage/"+voRel
 			handler := AudioMix(config.Config{Root: root})
-			if remote {
+			if test.remote {
 				videoURL, voiceURL = "https://cdn.example.test/video?sig=a%2Fb", "https://cdn.example.test/voice?sig=b%2Fc"
 				handler = audioMixHandler(config.Config{Root: root}, mixMediaClientFunc(func(r *http.Request) (*http.Response, error) {
 					file := videoAbs
@@ -105,7 +115,7 @@ func TestAudioMixCombinesVideoVoiceoverAndBuiltinBgm(t *testing.T) {
 					return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), ContentLength: int64(len(raw))}, nil
 				}))
 			}
-			body := `{"videoUrl":"` + videoURL + `","voiceMode":"voiceover","voiceoverUrl":"` + voiceURL + `","bgmId":"bgm_french_lazy"}`
+			body := fmt.Sprintf(`{"videoUrl":%q,"voiceMode":"voiceover","voiceoverUrl":%q,"bgmId":"bgm_french_lazy","bgmVolume":%g}`, videoURL, voiceURL, test.volume)
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/audio-mix", strings.NewReader(body)))
 			if rec.Code != 200 {
@@ -125,8 +135,35 @@ func TestAudioMixCombinesVideoVoiceoverAndBuiltinBgm(t *testing.T) {
 			if err != nil || !probe.HasAudio || probe.Duration < 1.5 {
 				t.Fatalf("mixed video probe invalid: %+v err=%v", probe, err)
 			}
+			if test.volume == 0 {
+				sourceLevel := audioMixSampleLevel(t, ffmpeg, voAbs)
+				mixedLevel := audioMixSampleLevel(t, ffmpeg, mixedFile)
+				if ratio := mixedLevel / sourceLevel; ratio < 0.85 || ratio > 1.15 {
+					t.Fatalf("muted BGM changed voice level: source=%v mixed=%v ratio=%v", sourceLevel, mixedLevel, ratio)
+				}
+			}
 		})
 	}
+}
+
+func audioMixSampleLevel(t *testing.T, ffmpeg, file string) float64 {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	raw, err := exec.CommandContext(ctx, ffmpeg, "-v", "error", "-i", file, "-t", "0.25", "-map", "0:a:0", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1").Output()
+	if err != nil || len(raw) < 2 {
+		t.Fatalf("decode mixed audio samples: %v (%d bytes)", err, len(raw))
+	}
+	var sum float64
+	for i := 0; i+1 < len(raw); i += 2 {
+		sample := float64(int16(binary.LittleEndian.Uint16(raw[i:])))
+		sum += sample * sample
+	}
+	level := math.Sqrt(sum / float64(len(raw)/2))
+	if level == 0 {
+		t.Fatal("expected audible voice samples")
+	}
+	return level
 }
 
 func TestAudioMixRespectsExplicitMuteAndUsesDefaultsOnlyWhenOmitted(t *testing.T) {

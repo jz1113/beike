@@ -183,6 +183,9 @@ func audioMixBgmVolume(volume *float64, hasSpeech bool) (float64, error) {
 func buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile string, keepOrig bool, bgmVol, dur, fadeStart, fadeDur float64, output string) []string {
 	args := append([]string{"-y"}, audioMixInputArgs(videoFile)...)
 	var filter string
+	// The bundled Linux FFmpeg predates apad's whole_dur and amix's normalize.
+	// Trim unbounded silence padding to the video duration; undo amix's default
+	// averaging so the two equally long inputs retain their requested gains.
 
 	switch {
 	case voiceFile != "" && bgmFile != "":
@@ -190,18 +193,18 @@ func buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile string, keepOrig bool
 		args = append(args, "-stream_loop", "-1")
 		args = append(args, audioMixInputArgs(bgmFile)...)
 		filter = fmt.Sprintf(
-			"[1:a]volume=1.0,apad=whole_dur=%.2f,atrim=0:%.2f,asetpts=PTS-STARTPTS[vo];[2:a]atrim=0:%.2f,asetpts=PTS-STARTPTS,volume=%.2f,afade=t=out:st=%.2f:d=%.2f[bgm];[vo][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]",
-			dur, dur, dur, bgmVol, fadeStart, fadeDur,
+			"[1:a]volume=1.0,apad,atrim=0:%.2f,asetpts=PTS-STARTPTS[vo];[2:a]atrim=0:%.2f,asetpts=PTS-STARTPTS,volume=%.2f,afade=t=out:st=%.2f:d=%.2f[bgm];[vo][bgm]amix=inputs=2:duration=first:dropout_transition=0,volume=2[aout]",
+			dur, dur, bgmVol, fadeStart, fadeDur,
 		)
 	case voiceFile != "":
 		args = append(args, audioMixInputArgs(voiceFile)...)
-		filter = fmt.Sprintf("[1:a]volume=1.0,apad=whole_dur=%.2f,atrim=0:%.2f,asetpts=PTS-STARTPTS[aout]", dur, dur)
+		filter = fmt.Sprintf("[1:a]volume=1.0,apad,atrim=0:%.2f,asetpts=PTS-STARTPTS[aout]", dur)
 	case keepOrig && bgmFile != "":
 		args = append(args, "-stream_loop", "-1")
 		args = append(args, audioMixInputArgs(bgmFile)...)
 		filter = fmt.Sprintf(
-			"[0:a]volume=1.0,apad=whole_dur=%.2f,atrim=0:%.2f,asetpts=PTS-STARTPTS[orig];[1:a]atrim=0:%.2f,asetpts=PTS-STARTPTS,volume=%.2f,afade=t=out:st=%.2f:d=%.2f[bgm];[orig][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]",
-			dur, dur, dur, bgmVol, fadeStart, fadeDur,
+			"[0:a]volume=1.0,apad,atrim=0:%.2f,asetpts=PTS-STARTPTS[orig];[1:a]atrim=0:%.2f,asetpts=PTS-STARTPTS,volume=%.2f,afade=t=out:st=%.2f:d=%.2f[bgm];[orig][bgm]amix=inputs=2:duration=first:dropout_transition=0,volume=2[aout]",
+			dur, dur, bgmVol, fadeStart, fadeDur,
 		)
 	default:
 		args = append(args, "-stream_loop", "-1")
